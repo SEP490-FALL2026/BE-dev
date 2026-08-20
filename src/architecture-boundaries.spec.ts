@@ -12,6 +12,40 @@ function listTypeScriptFiles(directory: string): string[] {
   });
 }
 
+/**
+ * Every Prisma model has exactly one owning module. A module may only touch its own
+ * delegates; it reads another module's data through that module's public contract.
+ */
+const PRISMA_MODEL_OWNER: Readonly<Record<string, string>> = {
+  AccessRequest: 'access-requests',
+  ApprovalStep: 'access-requests',
+  AuditEvent: 'audit',
+  CatalogApplication: 'catalog',
+  DiscoveryCase: 'discovery',
+  StoredObject: 'files',
+  ImportJob: 'imports',
+  FinancialTransaction: 'finance',
+  Principal: 'identity-access',
+  IdentityLink: 'identity-access',
+  LicensePool: 'licenses',
+  LicenseAssignment: 'licenses',
+  Department: 'organization',
+  Employee: 'organization',
+  UsageRecord: 'usage-optimization',
+};
+
+function listPrismaModels(): string[] {
+  const modelsRoot = join(process.cwd(), 'prisma', 'models');
+
+  return readdirSync(modelsRoot).flatMap((entry) =>
+    [...readFileSync(join(modelsRoot, entry), 'utf8').matchAll(/^model\s+(\w+)\s*\{/gm)].map((match) => match[1]),
+  );
+}
+
+function prismaDelegateName(model: string): string {
+  return model.charAt(0).toLowerCase() + model.slice(1);
+}
+
 describe('architecture boundaries', () => {
   const sourceRoot = join(process.cwd(), 'src');
 
@@ -63,6 +97,36 @@ describe('architecture boundaries', () => {
         (entry) => statSync(join(moduleRoot, entry)).isDirectory() && forbiddenLayerDirectories.has(entry),
       );
       expect({ moduleName, forbiddenDirectories }).toMatchObject({ forbiddenDirectories: [] });
+    }
+  });
+
+  it('assigns every Prisma model to an owning module', () => {
+    for (const model of listPrismaModels()) {
+      const owner = PRISMA_MODEL_OWNER[model];
+      expect({ model, owner, isOwned: typeof owner === 'string' }).toMatchObject({ isOwned: true });
+    }
+  });
+
+  it('lets only the owning module touch its Prisma tables', () => {
+    const modulesRoot = join(sourceRoot, 'modules');
+    const delegateOwner = new Map(
+      Object.entries(PRISMA_MODEL_OWNER).map(([model, owner]) => [prismaDelegateName(model), owner]),
+    );
+
+    for (const file of listTypeScriptFiles(modulesRoot)) {
+      const owner = relative(modulesRoot, file).split(sep)[0];
+      const source = readFileSync(file, 'utf8');
+
+      for (const match of source.matchAll(/\b(?:prisma|tx|client)\.([A-Za-z][A-Za-z0-9]*)\b/g)) {
+        const delegateOwnerModule = delegateOwner.get(match[1]);
+        if (delegateOwnerModule === undefined) continue;
+
+        expect({
+          file: relative(sourceRoot, file),
+          delegate: match[1],
+          owner: delegateOwnerModule,
+        }).toMatchObject({ owner });
+      }
     }
   });
 });
