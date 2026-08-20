@@ -103,7 +103,7 @@ describe('architecture boundaries', () => {
   it('assigns every Prisma model to an owning module', () => {
     for (const model of listPrismaModels()) {
       const owner = PRISMA_MODEL_OWNER[model];
-      expect({ model, owner, isOwned: typeof owner === 'string' }).toMatchObject({ isOwned: true });
+      expect({ model, owner, isOwned: typeof owner === 'string' }).toEqual({ model, owner, isOwned: true });
     }
   });
 
@@ -121,11 +121,8 @@ describe('architecture boundaries', () => {
         const delegateOwnerModule = delegateOwner.get(match[1]);
         if (delegateOwnerModule === undefined) continue;
 
-        expect({
-          file: relative(sourceRoot, file),
-          delegate: match[1],
-          owner: delegateOwnerModule,
-        }).toMatchObject({ owner });
+        const location = { file: relative(sourceRoot, file), delegate: match[1] };
+        expect({ ...location, owner: delegateOwnerModule }).toEqual({ ...location, owner });
       }
     }
   });
