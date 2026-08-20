@@ -1,7 +1,9 @@
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
 
-const errorCodeSchema = z.string().regex(/^[A-Z][A-Z0-9_]*(\.[A-Z0-9_]+)*$/);
+export const ERROR_CODE_PATTERN = /^[A-Z][A-Z0-9_]*(\.[A-Z0-9_]+)*$/;
+
+const errorCodeSchema = z.string().regex(ERROR_CODE_PATTERN);
 
 export const errorEnvelopeSchema = z.strictObject({
   success: z.literal(false),
@@ -12,5 +14,7 @@ export const errorEnvelopeSchema = z.strictObject({
     requestId: z.string().min(1),
   }),
 });
+
+export type ErrorEnvelope = z.infer<typeof errorEnvelopeSchema>;
 
 export class ErrorEnvelopeDto extends createZodDto(errorEnvelopeSchema) {}

@@ -3,16 +3,7 @@ import type { Request, Response } from 'express';
 import { ZodSerializationException } from 'nestjs-zod';
 import { RequestContextService } from '../../observability/request-context.service';
 import { resolveRequestId } from '../../observability/request-id';
-
-interface ErrorEnvelope {
-  success: false;
-  error: {
-    code: string;
-    message: string;
-    details?: Readonly<Record<string, unknown>>;
-    requestId: string;
-  };
-}
+import { ERROR_CODE_PATTERN, type ErrorEnvelope } from '../dto/error-envelope.dto';
 
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
@@ -71,7 +62,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
       const candidate = response as Record<string, unknown>;
       if (
         typeof candidate.code === 'string' &&
-        /^[A-Z][A-Z0-9_]*(\.[A-Z0-9_]+)*$/.test(candidate.code) &&
+        ERROR_CODE_PATTERN.test(candidate.code) &&
         typeof candidate.message === 'string'
       ) {
         const details = this.asDetails(candidate.details);
