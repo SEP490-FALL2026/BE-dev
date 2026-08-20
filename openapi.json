@@ -1,0 +1,91 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/api/v1/health/live": {
+      "get": {
+        "operationId": "healthGetLiveness",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The API process is alive.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HealthResponseDto" }
+              }
+            }
+          },
+          "500": {
+            "description": "The liveness check could not be completed.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" }
+              }
+            }
+          }
+        },
+        "summary": "",
+        "tags": ["health"]
+      }
+    }
+  },
+  "info": {
+    "title": "Software License Management API",
+    "description": "Internal software license and technology cost API",
+    "version": "1.0",
+    "contact": {}
+  },
+  "tags": [],
+  "servers": [],
+  "components": {
+    "securitySchemes": {
+      "bearer": { "scheme": "bearer", "bearerFormat": "JWT", "type": "http" }
+    },
+    "schemas": {
+      "HealthResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$"
+          },
+          "data": {
+            "type": "object",
+            "properties": { "status": { "type": "string", "enum": ["ok"] } },
+            "required": ["status"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "ErrorEnvelopeDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "const": false },
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)*$"
+              },
+              "message": { "type": "string" },
+              "details": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": {}
+              },
+              "requestId": { "type": "string", "minLength": 1 }
+            },
+            "required": ["code", "message", "requestId"],
+            "additionalProperties": false
+          }
+        },
+        "required": ["success", "error"],
+        "additionalProperties": false
+      }
+    }
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "realm": "software-license-management",
+  "enabled": true,
+  "displayName": "Software License Management",
+  "internationalizationEnabled": true,
+  "supportedLocales": ["en", "vi"],
+  "defaultLocale": "vi",
+  "registrationAllowed": false,
+  "resetPasswordAllowed": true,
+  "rememberMe": true,
+  "loginWithEmailAllowed": true,
+  "clients": [
+    {
+      "clientId": "software-license-web",
+      "name": "Software License Web",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "implicitFlowEnabled": false,
+      "redirectUris": ["http://localhost:5173/*"],
+      "webOrigins": ["http://localhost:5173"],
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      },
+      "protocolMappers": [
+        {
+          "name": "software-license-api-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "software-license-api",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "software-license-api",
+      "name": "Software License API",
+      "enabled": true,
+      "bearerOnly": true
+    }
+  ]
+}

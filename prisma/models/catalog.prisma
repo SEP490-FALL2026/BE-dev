@@ -1,0 +1,22 @@
+enum CatalogApplicationStatus {
+  ACTIVE
+  INACTIVE
+  UNDER_REVIEW
+}
+
+model CatalogApplication {
+  id                    String                   @id @default(uuid()) @db.Uuid
+  slug                  String                   @unique
+  name                  String
+  vendor                String
+  status                CatalogApplicationStatus @default(ACTIVE)
+  createdAt             DateTime                 @default(now())
+  updatedAt             DateTime                 @updatedAt
+  licensePools          LicensePool[]
+  accessRequests        AccessRequest[]
+  usageRecords          UsageRecord[]
+  financialTransactions FinancialTransaction[]
+  discoveryCases        DiscoveryCase[]
+
+  @@map("catalog_applications")
+}

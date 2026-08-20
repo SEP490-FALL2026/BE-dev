@@ -1,0 +1,1 @@
+Canonical project rules are in AGENTS.md. Read AGENTS.md and the relevant ARCHITECTURE.md section before editing. Preserve modular-monolith boundaries and run pnpm check before handoff.

@@ -1,0 +1,48 @@
+enum AccessRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  FULFILLED
+  CANCELLED
+}
+
+enum ApprovalStepStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  SKIPPED
+}
+
+model AccessRequest {
+  id            String              @id @default(uuid()) @db.Uuid
+  requesterId   String              @db.Uuid
+  applicationId String              @db.Uuid
+  status        AccessRequestStatus @default(PENDING)
+  justification String
+  hasAddedCost  Boolean             @default(false)
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  requester     Employee            @relation("AccessRequester", fields: [requesterId], references: [id], onDelete: Restrict)
+  application   CatalogApplication  @relation(fields: [applicationId], references: [id], onDelete: Restrict)
+  approvalSteps ApprovalStep[]
+
+  @@index([requesterId, status])
+  @@index([applicationId])
+  @@map("access_requests")
+}
+
+model ApprovalStep {
+  id         String             @id @default(uuid()) @db.Uuid
+  requestId  String             @db.Uuid
+  assigneeId String?            @db.Uuid
+  sequence   Int
+  status     ApprovalStepStatus @default(PENDING)
+  decidedAt  DateTime?
+  comment    String?
+  request    AccessRequest      @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  assignee   Employee?          @relation("ApprovalAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+
+  @@unique([requestId, sequence])
+  @@index([assigneeId, status])
+  @@map("approval_steps")
+}

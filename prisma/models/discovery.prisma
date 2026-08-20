@@ -1,0 +1,19 @@
+enum DiscoveryCaseStatus {
+  OPEN
+  MATCHED
+  DISMISSED
+}
+
+model DiscoveryCase {
+  id                   String              @id @default(uuid()) @db.Uuid
+  matchedApplicationId String?             @db.Uuid
+  observedName         String
+  evidenceType         String
+  status               DiscoveryCaseStatus @default(OPEN)
+  firstObservedAt      DateTime
+  lastObservedAt       DateTime
+  matchedApplication   CatalogApplication? @relation(fields: [matchedApplicationId], references: [id], onDelete: SetNull)
+
+  @@index([status, lastObservedAt])
+  @@map("discovery_cases")
+}

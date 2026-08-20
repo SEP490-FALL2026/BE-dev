@@ -1,0 +1,16 @@
+model FinancialTransaction {
+  id            String              @id @default(uuid()) @db.Uuid
+  applicationId String?             @db.Uuid
+  employeeId    String?             @db.Uuid
+  amount        Decimal             @db.Decimal(18, 2)
+  currency      String              @db.VarChar(3)
+  occurredAt    DateTime
+  externalRef   String?             @unique
+  createdAt     DateTime            @default(now())
+  application   CatalogApplication? @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+  employee      Employee?           @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+
+  @@index([applicationId, occurredAt])
+  @@index([employeeId])
+  @@map("financial_transactions")
+}

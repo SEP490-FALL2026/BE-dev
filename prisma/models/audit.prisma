@@ -1,0 +1,14 @@
+model AuditEvent {
+  id           String   @id @default(uuid()) @db.Uuid
+  actorId      String?  @db.Uuid
+  action       String
+  resourceType String
+  resourceId   String
+  requestId    String?
+  metadata     Json?
+  occurredAt   DateTime @default(now())
+
+  @@index([resourceType, resourceId, occurredAt])
+  @@index([actorId, occurredAt])
+  @@map("audit_events")
+}

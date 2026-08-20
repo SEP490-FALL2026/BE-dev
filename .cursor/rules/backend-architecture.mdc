@@ -1,0 +1,6 @@
+---
+description: NestJS modular-monolith rules
+alwaysApply: true
+---
+
+Read and follow `AGENTS.md`. Use `ARCHITECTURE.md` for folder ownership and examples. Do not import another business module's infrastructure or repository.

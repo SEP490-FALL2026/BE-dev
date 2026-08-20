@@ -1,0 +1,47 @@
+# ADR-0003: Use flat feature modules with explicit infrastructure responsibilities
+
+## Status
+
+Accepted
+
+## Date
+
+2026-08-12
+
+## Context
+
+The initial modular-monolith design used nested `api/application/domain/infrastructure` folders inside every business module. The team is small, works heavily with AI coding tools and already has a successful previous backend organized as pragmatic feature folders. Deep layers make simple modules harder to navigate and encourage empty scaffolding, while a completely unstructured flat module can grow into large service and repository files.
+
+Cross-cutting source also needs discoverable ownership: environment schema, CORS policy, HTTP filters/interceptors/pipes/decorators and authentication should not be mixed at one folder level.
+
+## Decision
+
+- Organize each business capability as a flat Nest feature module.
+- Keep root files such as `<module>.module.ts`, `<module>.controller.ts`, `<module>.service.ts`, `<module>.repo.ts`, constants, messages and scheduled processors.
+- Add responsibility folders such as `adapters/`, `dto/`, `errors/`, `helpers/`, `mappers/`, `policies/`, `schemas/` and `services/` only when they contain real code.
+- Keep `services/` as the conventional name. Reject `solution/` because it does not communicate whether a file is a use case, policy, adapter or helper.
+- Permit a root `<module>.service.ts` as the controller-facing and exported facade. It coordinates focused services and policies but must not expose repositories or accumulate every workflow.
+- Split application-wide infrastructure into explicit `config`, `http`, `security`, `database`, `queue`, `object-storage`, `observability` and `health` boundaries.
+- Keep `core/` framework-free and limited to stable primitives shared by multiple business modules.
+
+## Alternatives considered
+
+### Deep clean-architecture folders in every module
+
+They make dependency direction explicit but add navigation and scaffolding cost disproportionate to this internal system and small team. Boundary tests and narrow Nest exports provide the required isolation with fewer layers.
+
+### Rename `services/` to `solution/`
+
+This creates a project-specific term with no precise responsibility. It makes file placement less predictable for developers and AI agents and is likely to become a dumping ground.
+
+### Put every workflow in one root service
+
+This starts simply but creates god services, high merge-conflict rates and difficult tests as modules grow. The root facade remains small and delegates real workflows to focused services.
+
+## Consequences
+
+- Paths are shorter and match familiar Nest feature-module conventions.
+- Module boundaries depend on explicit exports and automated import checks rather than nested layer names.
+- A module may begin with only a module file, root service and policy; no empty folders are committed.
+- When a root service becomes mostly unrelated methods, workflows must be extracted into `services/` while preserving the facade contract.
+- Existing documentation and AI rules must use this layout and must not regenerate the superseded deep structure.

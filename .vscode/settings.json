@@ -1,0 +1,20 @@
+{
+  // 1. Cho phép tự động format code khi bấm Ctrl + S
+  "editor.formatOnSave": true,
+  // 2. Chọn Prettier làm công cụ format mặc định
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  // 3. Tự động sửa tất cả lỗi ESLint có thể fix được khi bấm Save
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit"
+  },
+  // 4. (Tùy chọn) Bắt buộc áp dụng cho các file TypeScript / JavaScript / JSON
+  "[typescript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[javascript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[json]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  }
+}

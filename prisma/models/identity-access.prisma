@@ -1,0 +1,31 @@
+enum PreferredLocale {
+  EN
+  VI
+}
+
+model Principal {
+  id              String          @id @default(uuid()) @db.Uuid
+  email           String          @unique
+  displayName     String
+  preferredLocale PreferredLocale @default(VI)
+  isActive        Boolean         @default(true)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  identities      IdentityLink[]
+  employee        Employee?
+
+  @@map("principals")
+}
+
+model IdentityLink {
+  id          String    @id @default(uuid()) @db.Uuid
+  principalId String    @db.Uuid
+  issuer      String
+  subject     String
+  createdAt   DateTime  @default(now())
+  principal   Principal @relation(fields: [principalId], references: [id], onDelete: Cascade)
+
+  @@unique([issuer, subject])
+  @@index([principalId])
+  @@map("identity_links")
+}

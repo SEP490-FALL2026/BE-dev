@@ -1,0 +1,16 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    // Pin the emit root to src/ so output is dist/main.js (NOT dist/src/main.js).
+    // Without this, if any .ts outside src/ (e.g. scripts/) is picked up, TS infers a
+    // common root of the repo and nests the whole build under dist/src → `node dist/main.js`
+    // breaks in Docker. rootDir also makes TS ERROR loudly if a stray file leaks in.
+    "rootDir": "./src",
+    // Keep the incremental cache INSIDE dist/ so nest-cli's `deleteOutDir: true` wipes it
+    // together with the output. Otherwise a root-level *.tsbuildinfo survives the wipe and
+    // tsc thinks everything is already emitted → empty dist → `Cannot find module dist/main`.
+    "tsBuildInfoFile": "./dist/tsconfig.build.tsbuildinfo"
+  },
+  "include": ["src"],
+  "exclude": ["node_modules", "test", "dist", "scripts", "**/*spec.ts"]
+}

@@ -1,0 +1,45 @@
+enum StoredObjectStatus {
+  PENDING
+  AVAILABLE
+  QUARANTINED
+  DELETED
+}
+
+enum ImportJobStatus {
+  QUEUED
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+model StoredObject {
+  id           String             @id @default(uuid()) @db.Uuid
+  objectKey    String             @unique
+  originalName String
+  contentType  String
+  sizeBytes    BigInt
+  checksum     String?
+  status       StoredObjectStatus @default(PENDING)
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  importJobs   ImportJob[]
+
+  @@map("stored_objects")
+}
+
+model ImportJob {
+  id             String          @id @default(uuid()) @db.Uuid
+  storedObjectId String          @db.Uuid
+  kind           String
+  idempotencyKey String          @unique
+  status         ImportJobStatus @default(QUEUED)
+  processedRows  Int             @default(0)
+  rejectedRows   Int             @default(0)
+  errorSummary   Json?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  storedObject   StoredObject    @relation(fields: [storedObjectId], references: [id], onDelete: Restrict)
+
+  @@index([status, createdAt])
+  @@map("import_jobs")
+}
