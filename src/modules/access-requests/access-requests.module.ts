@@ -1,9 +1,11 @@
 import { Module } from '@nestjs/common';
-import { AccessRequestsService } from './access-requests.service';
 import { ApprovalPolicy } from './policies/approval.policy';
 
+/**
+ * Holds the approval invariants for access requests. The module exports nothing yet:
+ * a root facade is added when the first controller needs orchestration, not before.
+ */
 @Module({
-  providers: [ApprovalPolicy, AccessRequestsService],
-  exports: [AccessRequestsService],
+  providers: [ApprovalPolicy],
 })
 export class AccessRequestsModule {}
