@@ -12,8 +12,7 @@ interface ConfigurableHttpInstance {
 }
 
 export function requireExpressInstance(instance: unknown): ConfigurableHttpInstance {
-  const isObjectOrFunction =
-    instance !== null && (typeof instance === 'object' || typeof instance === 'function');
+  const isObjectOrFunction = instance !== null && (typeof instance === 'object' || typeof instance === 'function');
 
   if (!isObjectOrFunction || typeof (instance as ConfigurableHttpInstance).set !== 'function') {
     throw new Error('Expected an Express HTTP adapter to configure trust proxy');
@@ -27,10 +26,7 @@ export interface ConfigureApplicationOptions {
   mountDocs?: boolean;
 }
 
-export function configureApplication(
-  app: INestApplication,
-  options: ConfigureApplicationOptions = {},
-): void {
+export function configureApplication(app: INestApplication, options: ConfigureApplicationOptions = {}): void {
   const config = app.get(ConfigService<EnvironmentVariables, true>);
   const apiPrefix = config.get('API_PREFIX', { infer: true });
   const allowedOrigins = parseCorsOrigins(config.get('CORS_ORIGINS', { infer: true }));
