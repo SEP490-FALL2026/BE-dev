@@ -7,6 +7,21 @@ import { cleanupOpenApiDoc } from 'nestjs-zod';
 import { parseCorsOrigins } from './infrastructure/config/cors';
 import { EnvironmentVariables } from './infrastructure/config/env-schema';
 
+interface ConfigurableHttpInstance {
+  set: (setting: string, value: unknown) => void;
+}
+
+export function requireExpressInstance(instance: unknown): ConfigurableHttpInstance {
+  const isObjectOrFunction =
+    instance !== null && (typeof instance === 'object' || typeof instance === 'function');
+
+  if (!isObjectOrFunction || typeof (instance as ConfigurableHttpInstance).set !== 'function') {
+    throw new Error('Expected an Express HTTP adapter to configure trust proxy');
+  }
+
+  return instance as ConfigurableHttpInstance;
+}
+
 export function configureApplication(app: INestApplication): void {
   const config = app.get(ConfigService<EnvironmentVariables, true>);
   const apiPrefix = config.get('API_PREFIX', { infer: true });
@@ -17,10 +32,10 @@ export function configureApplication(app: INestApplication): void {
     origin: allowedOrigins,
     credentials: true,
   });
-  const httpServer = app.getHttpAdapter().getInstance() as {
-    set?: (setting: string, value: number) => void;
-  };
-  httpServer.set?.('trust proxy', config.get('TRUST_PROXY_HOPS', { infer: true }));
+  requireExpressInstance(app.getHttpAdapter().getInstance()).set(
+    'trust proxy',
+    config.get('TRUST_PROXY_HOPS', { infer: true }),
+  );
   app.setGlobalPrefix(apiPrefix);
   app.enableVersioning({ type: VersioningType.URI });
   app.enableShutdownHooks();
