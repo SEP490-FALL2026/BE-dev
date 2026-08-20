@@ -110,6 +110,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
   private logUnexpected(exception: unknown, requestId: string): void {
     const summary =
       exception instanceof Error ? `${exception.name}: ${exception.message}` : 'A non-Error value was thrown';
-    this.logger.error(`[requestId=${requestId}] ${summary}`);
+    const stack = exception instanceof Error ? exception.stack : undefined;
+    this.logger.error(`[requestId=${requestId}] ${summary}`, stack);
   }
 }

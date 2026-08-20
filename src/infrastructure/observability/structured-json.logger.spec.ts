@@ -18,4 +18,27 @@ describe('StructuredJsonLogger', () => {
     expect(output).not.toContain('hunter2');
     write.mockRestore();
   });
+
+  it('keeps a sanitized stack trace on error logs', () => {
+    const logger = new StructuredJsonLogger(new RequestContextService());
+    const write = jest.spyOn(process.stderr, 'write').mockReturnValue(true);
+
+    logger.error('Boom', 'Error: Boom\n    at handler (/app/src/main.ts:10:5)');
+
+    const entry = JSON.parse(String(write.mock.calls[0][0])) as { stack?: string };
+    expect(entry.stack).toContain('at handler');
+    write.mockRestore();
+  });
+
+  it('redacts secrets inside the stack trace', () => {
+    const logger = new StructuredJsonLogger(new RequestContextService());
+    const write = jest.spyOn(process.stderr, 'write').mockReturnValue(true);
+
+    logger.error(new Error('Upstream rejected the call'), 'at fetch (Bearer signed-secret)');
+
+    const entry = JSON.parse(String(write.mock.calls[0][0])) as { stack?: string };
+    expect(entry.stack).toContain('[REDACTED]');
+    expect(entry.stack).not.toContain('signed-secret');
+    write.mockRestore();
+  });
 });
