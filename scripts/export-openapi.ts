@@ -7,7 +7,7 @@ import { configureApplication, createOpenApiDocument } from '../src/bootstrap';
 
 async function exportOpenApi(): Promise<void> {
   const app = await NestFactory.create(AppModule, { logger: false });
-  configureApplication(app);
+  configureApplication(app, { mountDocs: false });
   const document = createOpenApiDocument(app);
 
   const serializedDocument = await format(JSON.stringify(document), {

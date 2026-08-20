@@ -22,7 +22,15 @@ export function requireExpressInstance(instance: unknown): ConfigurableHttpInsta
   return instance as ConfigurableHttpInstance;
 }
 
-export function configureApplication(app: INestApplication): void {
+export interface ConfigureApplicationOptions {
+  /** Mount the interactive docs route. Disable when a caller only needs the document object. */
+  mountDocs?: boolean;
+}
+
+export function configureApplication(
+  app: INestApplication,
+  options: ConfigureApplicationOptions = {},
+): void {
   const config = app.get(ConfigService<EnvironmentVariables, true>);
   const apiPrefix = config.get('API_PREFIX', { infer: true });
   const allowedOrigins = parseCorsOrigins(config.get('CORS_ORIGINS', { infer: true }));
@@ -40,9 +48,8 @@ export function configureApplication(app: INestApplication): void {
   app.enableVersioning({ type: VersioningType.URI });
   app.enableShutdownHooks();
 
-  if (config.get('SWAGGER_ENABLED', { infer: true })) {
-    const document = createOpenApiDocument(app);
-    SwaggerModule.setup(`${apiPrefix}/docs`, app, document);
+  if ((options.mountDocs ?? true) && config.get('SWAGGER_ENABLED', { infer: true })) {
+    SwaggerModule.setup(`${apiPrefix}/docs`, app, createOpenApiDocument(app));
   }
 }
 
