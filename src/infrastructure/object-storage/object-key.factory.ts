@@ -9,8 +9,7 @@ export class ObjectKeyFactory {
     private readonly generateId: IdGenerator = randomUUID,
   ) {}
 
-  create(scope: string, originalName: string): string {
-    void originalName;
+  create(scope: string): string {
     if (!/^[a-z][a-z0-9-]*$/.test(scope)) {
       throw new Error('Invalid object storage scope');
     }
