@@ -8,7 +8,9 @@ Tài liệu này dành cho người mới vào codebase, hoặc cho AI agent c�
 
 Khi tài liệu này mâu thuẫn với `ARCHITECTURE.md` hoặc một ADR trong `docs/decisions/`, ADR thắng — và bạn nên sửa tài liệu này.
 
-> **Lưu ý về trạng thái hiện tại.** Mọi thứ tài liệu này mô tả đều đã tồn tại trong code — gồm `ERROR_CODE_PATTERN`, bảng `PRISMA_MODEL_OWNER` cùng hai architecture test đi kèm, và endpoint `/health/ready`. Ngoại lệ duy nhất là mục 6: module `catalog` trong ví dụ vertical slice **chưa được viết**, nó là bản mẫu để bạn làm theo chứ không phải code đang có trong repo.
+> **Lưu ý về trạng thái hiện tại.** Mọi thứ tài liệu này mô tả đều đã tồn tại trong code, gồm cả module `catalog` ở mục 6 — nó là reference module thật, không phải ví dụ giả định. Mở `src/modules/catalog/` để đối chiếu.
+>
+> Một khác biệt so với bản mô tả ban đầu: route param cũng phải có Zod DTO. Pipe validation toàn cục chạy với `strictSchemaDeclaration`, nên `@Param('id')` kiểu primitive sẽ ném `ZodSchemaDeclarationException` và trả 500 thay vì 422. Xem `dto/application-id.dto.ts`.
 
 ---
 

@@ -65,7 +65,8 @@ Both use the same AWS SDK v3 adapter. Business modules depend only on `ObjectSto
 | `pnpm start:dev`                    | Run HTTP API with watch mode              |
 | `pnpm start:worker`                 | Run BullMQ worker context with watch mode |
 | `pnpm test`                         | Unit tests                                |
-| `pnpm test:e2e`                     | API E2E tests                             |
+| `pnpm test:e2e`                     | API E2E tests (no database required)      |
+| `pnpm test:integration`             | Repository tests against real PostgreSQL  |
 | `pnpm lint`                         | Non-mutating lint                         |
 | `pnpm typecheck`                    | TypeScript check                          |
 | `pnpm prisma:validate`              | Validate all Prisma schema files          |
@@ -74,5 +75,30 @@ Both use the same AWS SDK v3 adapter. Business modules depend only on `ObjectSto
 | `pnpm db:migrate:deploy`            | Apply committed production migrations     |
 | `pnpm openapi:export`               | Regenerate versioned `openapi.json`       |
 | `pnpm check`                        | Full local quality gate                   |
+
+### Integration tests
+
+`pnpm test:integration` needs a real PostgreSQL and is deliberately **not** part of `pnpm check`, so the everyday gate stays fast and needs no Docker.
+
+```bash
+docker compose up -d
+NODE_ENV=test pnpm db:migrate:deploy   # creates and migrates <database>_test
+NODE_ENV=test pnpm test:integration
+```
+
+`NODE_ENV=test` appends `_test` to the database name, so the suite can truncate its own rows without ever touching the database you develop against.
+
+If something else already owns port 5432 — a natively installed PostgreSQL service is the usual culprit on Windows, and it wins over the container for `localhost` connections — either stop that service or point the suite elsewhere:
+
+```bash
+docker run -d --name slm-test-db -e POSTGRES_DB=software_license_management_test \
+  -e POSTGRES_USER=app -e POSTGRES_PASSWORD=app -p 5433:5432 postgres:17-alpine
+
+export NODE_ENV=test
+export TEST_DATABASE_URL=postgresql://app:app@localhost:5433/software_license_management_test
+pnpm db:migrate:deploy && pnpm test:integration
+```
+
+The suite fails with the host it tried rather than skipping quietly, so a misconfigured port is immediately obvious.
 
 Read `AGENTS.md` before contributing and `ARCHITECTURE.md` before changing boundaries. Documentation placement and promotion rules live in `docs/README.md`; accepted architectural decisions live under `docs/decisions/`.

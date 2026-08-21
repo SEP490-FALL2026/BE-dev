@@ -99,7 +99,11 @@ Nest encapsulate provider theo module và xem phần `exports` như public inter
 
 ## 5. Trạng thái source hiện tại
 
-Foundation modular monolith đã được triển khai: `AppModule` là composition root thuần wiring; infrastructure có config, HTTP contract, OIDC/JWT security, rate limit, Prisma, queue, object storage, observability và health (liveness + readiness). `access-requests` giữ `ApprovalPolicy` đã có test và chưa export gì — root facade chỉ xuất hiện khi có controller thật sự cần orchestration, vì một facade chỉ gọi lại policy là pass-through wrapper mà mục 4 cấm. Các business workflow còn lại sẽ được thêm theo vertical slice, không scaffold hàng loạt folder rỗng.
+Foundation modular monolith đã được triển khai: `AppModule` là composition root thuần wiring; infrastructure có config, HTTP contract, OIDC/JWT security, rate limit, Prisma, queue, object storage, observability và health (liveness + readiness).
+
+`catalog` là **reference module**: vertical slice hoàn chỉnh controller → facade → repo → DTO → mapper, tồn tại để chứng minh kiến trúc chạy được end-to-end và làm mẫu cho các module sau. Trước khi có nó, ba trong bốn architecture test về Prisma boundary chạy mà không thực thi assertion nào — không có repository nào để soi.
+
+`access-requests` giữ `ApprovalPolicy` đã có test và chưa export gì — root facade chỉ xuất hiện khi có controller thật sự cần orchestration, vì một facade chỉ gọi lại policy là pass-through wrapper mà mục 4 cấm. Nó cần `identity-access` và `organization` trước, vì `AccessRequest` tham chiếu `Employee` và việc xác định actor phải đi qua `IdentityLink` → `Principal` → `Employee`. Các business workflow còn lại thêm theo vertical slice, không scaffold hàng loạt folder rỗng.
 
 Codebase tiếp tục được xem là modular monolith khi giữ đủ các đặc tính sau:
 
@@ -148,6 +152,16 @@ src/
 │  ├─ observability/               # log context + request/correlation ID
 │  └─ health/                      # liveness/readiness
 ├─ modules/
+│  ├─ catalog/                     # reference module: vertical slice hoàn chỉnh
+│  │  ├─ catalog.module.ts         # chỉ export CatalogService
+│  │  ├─ catalog.controller.ts     # route + OpenAPI, không có logic
+│  │  ├─ catalog.service.ts        # facade: điều phối, dịch lỗi nghiệp vụ sang HTTP
+│  │  ├─ catalog.repo.ts           # file DUY NHẤT được inject PrismaService
+│  │  ├─ catalog.types.ts          # record shape và wire shape
+│  │  ├─ catalog.constants.ts      # error code ổn định
+│  │  ├─ dto/                      # request/response contract (Zod), gồm cả param
+│  │  ├─ errors/                   # lỗi nghiệp vụ, không phụ thuộc framework
+│  │  └─ mappers/                  # record → wire, chặn rò cột nội bộ
 │  ├─ access-requests/             # module hiện có: mới chỉ có policy
 │  │  ├─ policies/approval.policy.ts
 │  │  ├─ access-requests.types.ts  # contract nội bộ của module
@@ -320,6 +334,7 @@ Prisma multi-file đã GA và tài liệu chính thức khuyến nghị group mo
 - `code` là machine-readable và ổn định; `message` không phải contract để FE viết logic. `details`, nếu có, luôn là object có shape riêng cho từng error code và không chứa dữ liệu nhạy cảm.
 - **Mọi lỗi 5xx trả đúng một mã `INTERNAL_SERVER_ERROR`**, bất kể nguyên nhân là `HttpException` hay exception thường. Tiền tố `HTTP_` chỉ dùng cho mã 4xx suy ra từ status khi handler không khai mã chủ đích. Client không xử lý khác nhau giữa các loại lỗi server, nên nhiều mã chỉ tạo ảo giác về khả năng phân nhánh.
 - **Endpoint cần auth có thêm mã 503 `TOKEN_VERIFICATION_UNAVAILABLE`** khi identity provider không truy cập được. Đây là lỗi hạ tầng chứ không phải token sai: client nên retry, không đẩy user đi đăng nhập lại. Chi tiết sự cố chỉ vào log, không bao giờ ra wire.
+- **Route param cũng phải có Zod DTO**, không dùng `@Param('id')` kiểu primitive. Pipe validation toàn cục chạy với `strictSchemaDeclaration`, nên tham số không khai schema sẽ ném `ZodSchemaDeclarationException` và trả 500 thay vì 422. Bọc trong `z.strictObject({ id: z.uuid() })` cũng giúp lỗi id sai có cùng envelope `VALIDATION_ERROR` như lỗi body sai.
 - **Handler trả stream, file, redirect hoặc 204 dùng `@RawResponse()`** để bỏ success envelope. Không dùng nó để né việc khai response DTO — endpoint trả JSON phải giữ envelope, nếu không contract công bố sẽ mô tả sai thứ client nhận được.
 - OpenAPI sinh từ Nest Swagger, export thành artifact versioned để FE dùng Orval. Operation ID phải ổn định và theo `<domain><Action>`; tag theo business module để generated client được chia đúng folder.
 - Không để Orval/mock định nghĩa ngược business contract. Backend OpenAPI là source of truth; FE có thể dùng MSW data generator từ contract đó.
