@@ -126,4 +126,17 @@ describe('architecture boundaries', () => {
       }
     }
   });
+
+  it('confines PrismaService to repository files inside business modules', () => {
+    const modulesRoot = join(sourceRoot, 'modules');
+
+    for (const file of listTypeScriptFiles(modulesRoot)) {
+      if (file.endsWith('.repo.ts')) continue;
+
+      expect({
+        file: relative(sourceRoot, file),
+        usesPrismaService: readFileSync(file, 'utf8').includes('PrismaService'),
+      }).toEqual({ file: relative(sourceRoot, file), usesPrismaService: false });
+    }
+  });
 });
