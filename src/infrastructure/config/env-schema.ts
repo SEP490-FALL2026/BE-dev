@@ -9,6 +9,8 @@ export interface EnvironmentVariables {
   API_PREFIX: string;
   CORS_ORIGINS: string;
   TRUST_PROXY_HOPS: number;
+  RATE_LIMIT_TTL_MS: number;
+  RATE_LIMIT_LIMIT: number;
   SWAGGER_ENABLED: boolean;
   DATABASE_URL: string;
   OBJECT_STORAGE_ENDPOINT: string;
@@ -35,6 +37,8 @@ const environmentSchema = Joi.object({
     .default('api'),
   CORS_ORIGINS: Joi.string().allow('').default('http://localhost:5173'),
   TRUST_PROXY_HOPS: Joi.number().integer().min(0).max(20).default(0),
+  RATE_LIMIT_TTL_MS: Joi.number().integer().min(1_000).max(3_600_000).default(60_000),
+  RATE_LIMIT_LIMIT: Joi.number().integer().min(1).max(10_000).default(120),
   SWAGGER_ENABLED: Joi.boolean(),
   DATABASE_URL: Joi.string()
     .uri({ scheme: ['postgresql', 'postgres'] })

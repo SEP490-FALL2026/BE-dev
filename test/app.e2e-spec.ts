@@ -9,6 +9,7 @@ import { configureApplication, createOpenApiDocument } from './../src/bootstrap'
 import { ApiSuccessResponse } from './../src/infrastructure/http/decorators/api-success-response.decorator';
 import { successEnvelopeSchema } from './../src/infrastructure/http/dto/success-envelope.dto';
 import { Public } from './../src/infrastructure/security/decorators/public.decorator';
+import { validateEnvironment } from './../src/infrastructure/config/env-schema';
 
 const ContractProbeRequestSchema = z.strictObject({
   name: z.string().trim().min(1),
@@ -225,4 +226,51 @@ describe('Application foundation (e2e)', () => {
       },
     });
   });
+});
+
+describe('Global guard order (e2e)', () => {
+  let app: INestApplication<App> | undefined;
+
+  beforeEach(async () => {
+    const moduleFixture: TestingModule = await Test.createTestingModule({
+      imports: [AppModule],
+      controllers: [ProtectedProbeController],
+    }).compile();
+
+    app = moduleFixture.createNestApplication();
+    configureApplication(app);
+    await app.init();
+  });
+
+  afterEach(async () => {
+    await app?.close();
+  });
+
+  /**
+   * Rate limiting must reject a flood before token verification runs, so an
+   * unauthenticated caller cannot drive one JWKS lookup per request.
+   *
+   * If AuthenticationGuard were registered first, every request would short-circuit
+   * with 401 and the throttler would never count any of them, so the request after
+   * the limit would still be 401 rather than 429. That is what makes this assertion
+   * pin the ordering rather than merely observe it.
+   */
+  it('rate limits an unauthenticated flood before verifying tokens', async () => {
+    const server = app!.getHttpServer();
+    const limit = validateEnvironment({}).RATE_LIMIT_LIMIT;
+
+    for (let attempt = 0; attempt < limit; attempt += 1) {
+      await request(server).get('/api/v1/protected-probe').expect(401);
+    }
+
+    await request(server)
+      .get('/api/v1/protected-probe')
+      .expect(429)
+      .expect((response) => {
+        expect(response.body).toMatchObject({
+          success: false,
+          error: { code: 'HTTP_TOO_MANY_REQUESTS' },
+        });
+      });
+  }, 60_000);
 });

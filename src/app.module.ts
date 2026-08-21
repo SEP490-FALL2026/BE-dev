@@ -1,6 +1,4 @@
 import { Module } from '@nestjs/common';
-import { APP_GUARD } from '@nestjs/core';
-import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { ConfigurationModule } from './infrastructure/config/configuration.module';
 import { HealthModule } from './infrastructure/health/health.module';
 import { DatabaseModule } from './infrastructure/database/database.module';
@@ -15,18 +13,11 @@ import { HttpInfrastructureModule } from './infrastructure/http/http-infrastruct
     ConfigurationModule,
     ObservabilityModule,
     HttpInfrastructureModule,
-    ThrottlerModule.forRoot([
-      {
-        ttl: 60_000,
-        limit: 120,
-      },
-    ]),
     HealthModule,
     DatabaseModule,
     ObjectStorageModule,
     SecurityModule,
     AccessRequestsModule,
   ],
-  providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
 export class AppModule {}

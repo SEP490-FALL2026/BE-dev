@@ -77,4 +77,15 @@ describe('validateEnvironment', () => {
       }),
     ).toThrow('OIDC_ISSUER');
   });
+
+  it('applies rate-limit defaults', () => {
+    expect(validateEnvironment({})).toMatchObject({
+      RATE_LIMIT_TTL_MS: 60_000,
+      RATE_LIMIT_LIMIT: 120,
+    });
+  });
+
+  it('rejects a rate limit below one request', () => {
+    expect(() => validateEnvironment({ RATE_LIMIT_LIMIT: '0' })).toThrow('Environment validation failed');
+  });
 });
