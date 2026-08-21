@@ -9,7 +9,8 @@ import { configureApplication, createOpenApiDocument } from './../src/bootstrap'
 import { ApiSuccessResponse } from './../src/infrastructure/http/decorators/api-success-response.decorator';
 import { successEnvelopeSchema } from './../src/infrastructure/http/dto/success-envelope.dto';
 import { Public } from './../src/infrastructure/security/decorators/public.decorator';
-import { validateEnvironment } from './../src/infrastructure/config/env-schema';
+import { ConfigService } from '@nestjs/config';
+import { EnvironmentVariables } from './../src/infrastructure/config/env-schema';
 
 const ContractProbeRequestSchema = z.strictObject({
   name: z.string().trim().min(1),
@@ -257,7 +258,7 @@ describe('Global guard order (e2e)', () => {
    */
   it('rate limits an unauthenticated flood before verifying tokens', async () => {
     const server = app!.getHttpServer();
-    const limit = validateEnvironment({}).RATE_LIMIT_LIMIT;
+    const limit = app!.get(ConfigService<EnvironmentVariables, true>).get('RATE_LIMIT_LIMIT', { infer: true });
 
     for (let attempt = 0; attempt < limit; attempt += 1) {
       await request(server).get('/api/v1/protected-probe').expect(401);

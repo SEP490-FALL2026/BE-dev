@@ -32,8 +32,14 @@ export class StructuredJsonLogger implements LoggerService {
     this.write('verbose', message, context);
   }
 
-  fatal(message: unknown, trace?: string, context?: string): void {
-    this.write('fatal', message, context, trace);
+  /**
+   * Nest's Logger pads `error` with a placeholder trace before appending the context
+   * (`logger.service.js`), but does NOT pad `fatal`. Giving `fatal` a `trace` parameter
+   * therefore captures the context into the stack field. Keep the two signatures
+   * different on purpose; `write` still derives a stack when `message` is an Error.
+   */
+  fatal(message: unknown, context?: string): void {
+    this.write('fatal', message, context);
   }
 
   private write(level: LogLevel, value: unknown, context?: string, trace?: string): void {

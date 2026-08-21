@@ -438,7 +438,8 @@ Không tin filename, extension hoặc `Content-Type` từ browser. Với file nh
 
 - structured JSON logs, có `requestId`, `actorId`, `module`, `useCase`, `durationMs`, `result`;
 - request ID được nhận từ trusted proxy hoặc tạo mới, truyền sang job `correlationId`;
-- `/health/live` chỉ kiểm tra process; `/health/ready` kiểm tra PostgreSQL/Redis/object storage cần thiết;
+- `/health/live` chỉ kiểm tra process; `/health/ready` hiện chỉ ping PostgreSQL. Redis và object storage **chưa** được probe — thêm indicator khi có sự cố thật chứng minh là cần;
+- `TRUST_PROXY_HOPS` quyết định rate limiting có hoạt động hay không: `@nestjs/throttler` key theo `req.ip`, mà `req.ip` phụ thuộc `trust proxy`. Đứng sau reverse proxy mà để `0` thì mọi client bị nhìn thành proxy và dùng chung một bucket `RATE_LIMIT_LIMIT`;
 - metrics tối thiểu: HTTP latency/error rate, DB pool, queue depth/failure/retry, import duration/error rows;
 - alert theo symptom (error rate, queue backlog, failed import), không alert mọi log error đơn lẻ;
 - graceful shutdown đóng HTTP, queue consumer và database connection.

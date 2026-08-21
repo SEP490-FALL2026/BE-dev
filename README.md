@@ -20,7 +20,8 @@ pnpm db:migrate:dev --name init
 pnpm start:dev
 ```
 
-- API health: `http://localhost:3000/api/v1/health/live`
+- API liveness: `http://localhost:3000/api/v1/health/live`
+- API readiness (pings PostgreSQL): `http://localhost:3000/api/v1/health/ready`
 - Swagger UI: `http://localhost:3000/api/docs`
 - MinIO console: `http://localhost:9001`
 

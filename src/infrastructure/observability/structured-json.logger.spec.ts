@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { RequestContextService } from './request-context.service';
 import { StructuredJsonLogger } from './structured-json.logger';
 
@@ -40,5 +41,22 @@ describe('StructuredJsonLogger', () => {
     expect(entry.stack).toContain('[REDACTED]');
     expect(entry.stack).not.toContain('signed-secret');
     write.mockRestore();
+  });
+
+  it('keeps the Nest logger context on fatal instead of storing it as a stack', () => {
+    // Nest pads `error` with a placeholder trace before appending the context but does
+    // not pad `fatal`. A `fatal(message, trace, context)` signature therefore captures
+    // the context into the stack field. This pins the difference.
+    Logger.overrideLogger(new StructuredJsonLogger(new RequestContextService()));
+    const write = jest.spyOn(process.stderr, 'write').mockReturnValue(true);
+
+    new Logger('LicenseAssignment').fatal('Shutting down');
+
+    const entry = JSON.parse(String(write.mock.calls[0][0])) as { context: string; stack?: string };
+    write.mockRestore();
+    Logger.overrideLogger(false);
+
+    expect(entry).toMatchObject({ context: 'LicenseAssignment' });
+    expect(entry.stack).toBeUndefined();
   });
 });
