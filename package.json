@@ -34,6 +34,7 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json --runInBand",
+    "test:integration": "jest --config ./test/integration/jest-integration.json --runInBand",
     "check": "pnpm format:check && pnpm lint && pnpm prisma:validate && pnpm typecheck && pnpm test && pnpm build"
   },
   "dependencies": {
