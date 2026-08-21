@@ -34,12 +34,25 @@ const PRISMA_MODEL_OWNER: Readonly<Record<string, string>> = {
   UsageRecord: 'usage-optimization',
 };
 
-function listPrismaModels(): string[] {
+interface PrismaModelTable {
+  model: string;
+  table: string;
+}
+
+/** Reads each `model X { ... @@map("x") }` block so both the delegate name and the real table name are known. */
+function listPrismaTables(): PrismaModelTable[] {
   const modelsRoot = join(process.cwd(), 'prisma', 'models');
 
   return readdirSync(modelsRoot).flatMap((entry) =>
-    [...readFileSync(join(modelsRoot, entry), 'utf8').matchAll(/^model\s+(\w+)\s*\{/gm)].map((match) => match[1]),
+    [...readFileSync(join(modelsRoot, entry), 'utf8').matchAll(/^model\s+(\w+)\s*\{([\s\S]*?)^\}/gm)].map((match) => ({
+      model: match[1],
+      table: /@@map\("([^"]+)"\)/.exec(match[2])?.[1] ?? match[1],
+    })),
   );
+}
+
+function listPrismaModels(): string[] {
+  return listPrismaTables().map(({ model }) => model);
 }
 
 function prismaDelegateName(model: string): string {
@@ -137,6 +150,35 @@ describe('architecture boundaries', () => {
         file: relative(sourceRoot, file),
         usesPrismaService: readFileSync(file, 'utf8').includes('PrismaService'),
       }).toEqual({ file: relative(sourceRoot, file), usesPrismaService: false });
+    }
+  });
+
+  it('keeps raw SQL inside the module that owns the table', () => {
+    // The delegate scan above cannot see `$queryRaw`/`$executeRaw`, which is the most
+    // realistic way to reach another module's table while evading every other rule here.
+    // Only files that actually run raw SQL are scanned for table names, so an ordinary
+    // file mentioning a word like "employees" in prose is not a false positive.
+    const modulesRoot = join(sourceRoot, 'modules');
+    const tableOwner = new Map(
+      listPrismaTables()
+        .filter(({ model }) => PRISMA_MODEL_OWNER[model] !== undefined)
+        .map(({ model, table }) => [table, PRISMA_MODEL_OWNER[model]]),
+    );
+
+    for (const file of listTypeScriptFiles(modulesRoot)) {
+      const source = readFileSync(file, 'utf8');
+      if (!/\$(?:query|execute)Raw(?:Unsafe)?/.test(source)) continue;
+
+      const owner = relative(modulesRoot, file).split(sep)[0];
+
+      for (const [table, owningModule] of tableOwner) {
+        // String.raw is required: inside a plain template literal `\b` is the
+        // backspace character, not a word boundary, so the pattern would match nothing.
+        if (!new RegExp(String.raw`\b${table}\b`).test(source)) continue;
+
+        const location = { file: relative(sourceRoot, file), table };
+        expect({ ...location, owner: owningModule }).toEqual({ ...location, owner });
+      }
     }
   });
 });
