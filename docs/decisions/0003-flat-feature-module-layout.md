@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Accepted. Refined 2026-08-21: a root facade is created when a caller needs it, not in advance.
 
 ## Date
 
@@ -21,6 +21,7 @@ Cross-cutting source also needs discoverable ownership: environment schema, CORS
 - Add responsibility folders such as `adapters/`, `dto/`, `errors/`, `helpers/`, `mappers/`, `policies/`, `schemas/` and `services/` only when they contain real code.
 - Keep `services/` as the conventional name. Reject `solution/` because it does not communicate whether a file is a use case, policy, adapter or helper.
 - Permit a root `<module>.service.ts` as the controller-facing and exported facade. It coordinates focused services and policies but must not expose repositories or accumulate every workflow.
+- Do not create that facade before something calls it. A facade whose methods forward their arguments and return values unchanged is a layer to read through, not a layer that does work; `access-requests` had one and it was deleted. The module keeps its policy private until a controller needs orchestration.
 - Split application-wide infrastructure into explicit `config`, `http`, `security`, `database`, `queue`, `object-storage`, `observability` and `health` boundaries.
 - Keep `core/` framework-free and limited to stable primitives shared by multiple business modules.
 
@@ -42,6 +43,7 @@ This starts simply but creates god services, high merge-conflict rates and diffi
 
 - Paths are shorter and match familiar Nest feature-module conventions.
 - Module boundaries depend on explicit exports and automated import checks rather than nested layer names.
-- A module may begin with only a module file, root service and policy; no empty folders are committed.
+- A module may begin with only a module file and a policy, exporting nothing; no empty folders and no unused facade are committed.
+- `catalog` is the reference module for this layout. Copy its shape rather than re-deriving one.
 - When a root service becomes mostly unrelated methods, workflows must be extracted into `services/` while preserving the facade contract.
 - Existing documentation and AI rules must use this layout and must not regenerate the superseded deep structure.

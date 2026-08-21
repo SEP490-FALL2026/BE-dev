@@ -101,4 +101,6 @@ pnpm db:migrate:deploy && pnpm test:integration
 
 The suite fails with the host it tried rather than skipping quietly, so a misconfigured port is immediately obvious.
 
-Read `AGENTS.md` before contributing and `ARCHITECTURE.md` before changing boundaries. Documentation placement and promotion rules live in `docs/README.md`; accepted architectural decisions live under `docs/decisions/`.
+Read `AGENTS.md` before contributing and `ARCHITECTURE.md` before changing boundaries. Accepted architectural decisions live under `docs/decisions/`.
+
+Work in progress lives in the Git-ignored `docs/workspace/` tree: `PROGRESS.md` for where things stand, `INDEX.md` for the register of work items, and one folder per item under `items/`. `docs/README.md` has the full convention, and an architecture test fails the build if documents are written outside it.

@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Accepted. Amended by ADR-0004, which fixes the single 5xx error code, adds 503 for an unreachable identity provider, makes request-id trust configuration-derived, and gives the raw-response exception its concrete form.
 
 ## Date
 
@@ -40,5 +40,6 @@ This is simpler, but the team explicitly wants one FE contract. The envelope is 
 
 - `nestjs-zod` becomes part of the HTTP adapter layer and requires compatibility tests with Swagger and Orval.
 - Unsupported JSON Schema types such as runtime `Date`, `BigInt` and transforms are prohibited in wire schemas unless explicitly encoded.
-- Response validation is required for JSON endpoints; raw/stream/file responses need explicit exceptions.
+- Response validation is required for JSON endpoints; raw/stream/file responses need explicit exceptions. Implemented as `@RawResponse()` — see ADR-0004.
+- `strictSchemaDeclaration` applies to every parameter, so route params need a Zod DTO too. A bare `@Param('id')` fails as a 500 rather than a 422 — see ADR-0004.
 - Adding a public route or new authentication mode is a security-sensitive review point.

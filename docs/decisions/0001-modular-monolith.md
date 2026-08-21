@@ -26,6 +26,19 @@ Build one NestJS modular monolith with:
 
 Every module owns its business rules and persistence adapter. Only explicit application contracts are exported. Cross-module repository access is forbidden.
 
+### Implementation status, 2026-08-21
+
+The decision stands as written; two parts of it are not built yet, and this note exists so nobody reads the list above as a description of the code.
+
+| Part of the decision | Status |
+| --- | --- |
+| Feature modules, one PostgreSQL, domain-split Prisma schemas, module facades | ✅ in place; `catalog` is the reference module |
+| Cross-module repository access forbidden | ✅ enforced by tests covering table ownership, repository confinement and raw SQL |
+| API and worker entrypoints | ✅ both exist; the worker has no processor yet and says so on start |
+| MinIO local, Cloudflare R2 production, one S3 adapter | ⚠️ adapter built and unit-tested; no caller yet |
+| Redis/BullMQ for durable background work | ❌ configured, no queue registered. Deferred until a genuinely slow or retryable job exists |
+| In-process events for non-critical side effects | ❌ no event mechanism exists. Deferred until a real side effect needs one |
+
 ## Consequences
 
 ### Positive

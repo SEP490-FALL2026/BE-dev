@@ -1,6 +1,6 @@
 # Backend contributor and AI rules
 
-Read `ARCHITECTURE.md` before changing source structure or adding a dependency. Decisions under `docs/decisions/` are binding until superseded by a newer ADR. Follow `docs/README.md` when creating research, plans, specifications or durable documentation.
+Start with `docs/workspace/PROGRESS.md` — it says where the project stands, what is next, and what has already been learned the hard way, so you do not have to re-read `src/` to find out. Read `ARCHITECTURE.md` before changing source structure or adding a dependency. Decisions under `docs/decisions/` are binding until superseded by a newer ADR. Follow `docs/README.md` and the "Writing docs, specs and plans" section below when creating research, plans, specifications or durable documentation — those paths override any default your tooling suggests.
 
 ## Commands
 
@@ -81,6 +81,15 @@ Inside a business module keep `*.module.ts`, `*.controller.ts`, `*.service.ts`, 
 - Do not commit `.env`, tokens, keys, generated build output or real imported data.
 - Do not weaken validation, CORS, authorization, file limits or rate limits to make a test pass.
 - Do not add dependencies without checking official documentation, maintenance, license and audit impact.
-- Put temporary research, plans and draft specifications under the Git-ignored `docs/workspace/` tree.
-- Promote approved architecture specifications to `docs/architecture/` and accepted decisions to `docs/decisions/`; these are shared project context and must remain versioned.
-- Update `ARCHITECTURE.md` and the relevant durable ADR/spec when an accepted decision or implemented boundary changes.
+
+## Writing docs, specs and plans
+
+Read `docs/README.md` for the full convention. The rules that matter most:
+
+- **Planned work lives in `docs/workspace/items/NNNN-slug/`**, holding `spec.md`, `plan.md` and `todo.md`. One folder per unit of work; file names inside are fixed. Copy `docs/workspace/_template/` to start, register the item in `docs/workspace/INDEX.md`, and give every file frontmatter with `item`, `title`, `kind`, `status`, `started`, `completed`.
+- **`docs/workspace/PROGRESS.md` is the session memory.** Read it before exploring `src/` to find out where the project stands, and update it at the end of a session that changed something.
+- **These paths override any default your tooling suggests.** Planning and spec skills ship with their own conventions — `superpowers:writing-plans` defaults to `docs/superpowers/plans/YYYY-MM-DD-<name>.md`, and `agent-skills:spec-driven-development` defaults to `SPEC.md` at the repository root plus `tasks/plan.md` and `tasks/todo.md`. Do not create any of those. Use the item structure above instead; the skill content is still what you follow, only its output location changes.
+- **Do not add a `docs/ARCHITECTURE.md`, `SPEC.md` or `tasks/` directory.** `ARCHITECTURE.md` at the repository root is the only architecture document. A second one has already been created once by accident and had to be removed before it drifted.
+- **Promote approved architecture specifications to `docs/architecture/` and accepted decisions to `docs/decisions/`**; these are shared project context and must remain versioned. `docs/workspace/` is Git-ignored and must never hold secrets or real data.
+- **Write a new ADR rather than editing an accepted one** when a decision changes. Annotating an accepted ADR is only for recording that a later ADR amended it, or that part of it is not implemented yet.
+- **Update `ARCHITECTURE.md` and the relevant durable ADR or spec** when an accepted decision or an implemented boundary changes.
