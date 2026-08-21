@@ -1,4 +1,4 @@
-import { validateEnvironment } from './env-schema';
+import { resolveDatabaseUrl, validateEnvironment } from './env-schema';
 
 describe('validateEnvironment', () => {
   const productionInfrastructure = {
@@ -9,6 +9,7 @@ describe('validateEnvironment', () => {
     OBJECT_STORAGE_ACCESS_KEY_ID: 'test-access-key',
     OBJECT_STORAGE_SECRET_ACCESS_KEY: 'test-secret-key',
     REDIS_HOST: 'redis.internal',
+    REDIS_PASSWORD: 'redis-secret-password',
     OIDC_ISSUER: 'https://identity.example.com/realms/internal',
     OIDC_AUDIENCE: 'software-license-api',
     OIDC_JWKS_URI: 'https://identity.example.com/realms/internal/protocol/openid-connect/certs',
@@ -50,6 +51,31 @@ describe('validateEnvironment', () => {
     expect(() => validateEnvironment({ NODE_ENV: 'production', ...withoutRedis })).toThrow('REDIS_HOST');
   });
 
+  it('throws in production when no Redis password is configured', () => {
+    const { REDIS_PASSWORD: _, ...withoutPassword } = productionInfrastructure;
+    void _;
+    expect(() => validateEnvironment({ NODE_ENV: 'production', ...withoutPassword })).toThrow('REDIS_PASSWORD');
+  });
+
+  it('accepts password via REDIS_PASSWORD env var in production', () => {
+    const config = validateEnvironment({
+      NODE_ENV: 'production',
+      ...productionInfrastructure,
+      REDIS_PASSWORD: 'secret-redis-password',
+    });
+    expect(config.REDIS_PASSWORD).toBe('secret-redis-password');
+  });
+
+  it('works without password in development', () => {
+    const config = validateEnvironment({});
+    expect(config.REDIS_PASSWORD).toBe('');
+  });
+
+  it('works without password in test', () => {
+    const config = validateEnvironment({ NODE_ENV: 'test' });
+    expect(config.REDIS_PASSWORD).toBe('');
+  });
+
   it('requires OIDC verification metadata in production', () => {
     const { OIDC_ISSUER: issuer, ...withoutIssuer } = productionInfrastructure;
     void issuer;
@@ -87,5 +113,53 @@ describe('validateEnvironment', () => {
 
   it('rejects a rate limit below one request', () => {
     expect(() => validateEnvironment({ RATE_LIMIT_LIMIT: '0' })).toThrow('Environment validation failed');
+  });
+});
+
+describe('resolveDatabaseUrl', () => {
+  const DEVELOPMENT_URL = 'postgresql://app:app@localhost:5432/software_license_management';
+
+  it('leaves development and production untouched', () => {
+    expect(resolveDatabaseUrl('development', DEVELOPMENT_URL, '')).toBe(DEVELOPMENT_URL);
+    expect(resolveDatabaseUrl('production', DEVELOPMENT_URL, '')).toBe(DEVELOPMENT_URL);
+  });
+
+  it('gives the test environment its own database', () => {
+    expect(resolveDatabaseUrl('test', DEVELOPMENT_URL, '')).toBe(`${DEVELOPMENT_URL}_test`);
+  });
+
+  it('tolerates a trailing slash on the source url', () => {
+    expect(resolveDatabaseUrl('test', `${DEVELOPMENT_URL}/`, '')).toBe(`${DEVELOPMENT_URL}_test`);
+  });
+
+  it('prefers an explicit test url when one is set', () => {
+    const explicit = 'postgresql://app:app@localhost:5432/custom_test_db';
+
+    expect(resolveDatabaseUrl('test', DEVELOPMENT_URL, explicit)).toBe(explicit);
+  });
+});
+
+describe('DATABASE_URL resolution through validateEnvironment', () => {
+  // Resolving inside validateEnvironment is what makes every consumer agree. If it were
+  // resolved at one consumer instead, the Prisma CLI and any integration harness would
+  // still read the development database while the application read the test one.
+  it('hands every consumer the test database when NODE_ENV is test', () => {
+    const development = validateEnvironment({}).DATABASE_URL;
+    const test = validateEnvironment({ NODE_ENV: 'test' }).DATABASE_URL;
+
+    expect(test).not.toBe(development);
+    expect(test).toBe(`${development}_test`);
+  });
+
+  it('honours an explicit TEST_DATABASE_URL', () => {
+    const explicit = 'postgresql://app:app@localhost:5432/custom_test_db';
+
+    expect(validateEnvironment({ NODE_ENV: 'test', TEST_DATABASE_URL: explicit }).DATABASE_URL).toBe(explicit);
+  });
+
+  it('rejects TEST_DATABASE_URL outside the test environment', () => {
+    expect(() => validateEnvironment({ TEST_DATABASE_URL: 'postgresql://app:app@localhost:5432/x' })).toThrow(
+      'TEST_DATABASE_URL',
+    );
   });
 });
