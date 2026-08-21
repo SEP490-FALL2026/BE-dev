@@ -8,19 +8,11 @@
         "responses": {
           "200": {
             "description": "The API process is alive.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/HealthResponseDto" }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/HealthResponseDto" } } }
           },
           "500": {
             "description": "The liveness check could not be completed.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           }
         },
         "summary": "",
@@ -34,29 +26,15 @@
         "responses": {
           "200": {
             "description": "Every required dependency is reachable.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ReadinessResponseDto"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ReadinessResponseDto" } } }
           },
           "500": {
             "description": "The readiness check could not be completed.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "503": {
             "description": "A required dependency is unavailable.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           }
         },
         "summary": "",
@@ -83,58 +61,33 @@
             "name": "pageSize",
             "required": false,
             "in": "query",
-            "schema": {
-              "maximum": 100,
-              "exclusiveMinimum": true,
-              "default": 20,
-              "type": "integer",
-              "minimum": 0
-            }
+            "schema": { "maximum": 100, "exclusiveMinimum": true, "default": 20, "type": "integer", "minimum": 0 }
           },
           {
             "name": "status",
             "required": false,
             "in": "query",
-            "schema": {
-              "type": "string",
-              "enum": ["ACTIVE", "INACTIVE", "UNDER_REVIEW"]
-            }
+            "schema": { "type": "string", "enum": ["ACTIVE", "INACTIVE", "UNDER_REVIEW"] }
           }
         ],
         "responses": {
           "200": {
             "description": "A page of catalog applications.",
             "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CatalogApplicationPageResponseDto"
-                }
-              }
+              "application/json": { "schema": { "$ref": "#/components/schemas/CatalogApplicationPageResponseDto" } }
             }
           },
           "401": {
             "description": "Authentication is required.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
             "description": "The query parameters are invalid.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "503": {
             "description": "Authentication is temporarily unavailable.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           }
         },
         "summary": "",
@@ -145,56 +98,30 @@
         "parameters": [],
         "requestBody": {
           "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateApplicationBodyDto"
-              }
-            }
-          }
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CreateApplicationBodyDto" } } }
         },
         "responses": {
           "201": {
             "description": "The catalog application was created.",
             "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CatalogApplicationResponseDto"
-                }
-              }
+              "application/json": { "schema": { "$ref": "#/components/schemas/CatalogApplicationResponseDto" } }
             }
           },
           "401": {
             "description": "Authentication is required.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "409": {
             "description": "The slug is already used.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
             "description": "The request body is invalid.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "503": {
             "description": "Authentication is temporarily unavailable.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           }
         },
         "summary": "",
@@ -220,44 +147,24 @@
           "200": {
             "description": "The requested catalog application.",
             "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CatalogApplicationResponseDto"
-                }
-              }
+              "application/json": { "schema": { "$ref": "#/components/schemas/CatalogApplicationResponseDto" } }
             }
           },
           "401": {
             "description": "Authentication is required.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "404": {
             "description": "No application has this identifier.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
             "description": "The identifier is not a UUID.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "503": {
             "description": "Authentication is temporarily unavailable.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           }
         },
         "summary": "",
@@ -274,18 +181,13 @@
   "tags": [],
   "servers": [],
   "components": {
-    "securitySchemes": {
-      "bearer": { "scheme": "bearer", "bearerFormat": "JWT", "type": "http" }
-    },
+    "securitySchemes": { "bearer": { "scheme": "bearer", "bearerFormat": "JWT", "type": "http" } },
     "schemas": {
       "HealthResponseDto": {
         "type": "object",
         "properties": {
           "success": { "type": "boolean", "enum": [true] },
-          "message": {
-            "type": "string",
-            "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$"
-          },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
           "data": {
             "type": "object",
             "properties": { "status": { "type": "string", "enum": ["ok"] } },
@@ -304,16 +206,9 @@
           "error": {
             "type": "object",
             "properties": {
-              "code": {
-                "type": "string",
-                "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)*$"
-              },
+              "code": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)*$" },
               "message": { "type": "string" },
-              "details": {
-                "type": "object",
-                "properties": {},
-                "additionalProperties": {}
-              },
+              "details": { "type": "object", "properties": {}, "additionalProperties": {} },
               "requestId": { "type": "string", "minLength": 1 }
             },
             "required": ["code", "message", "requestId"],
@@ -327,10 +222,7 @@
         "type": "object",
         "properties": {
           "success": { "type": "boolean", "enum": [true] },
-          "message": {
-            "type": "string",
-            "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$"
-          },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
           "data": {
             "type": "object",
             "properties": {
@@ -339,10 +231,7 @@
                 "type": "array",
                 "items": {
                   "type": "object",
-                  "properties": {
-                    "name": { "type": "string" },
-                    "status": { "type": "string" }
-                  },
+                  "properties": { "name": { "type": "string" }, "status": { "type": "string" } },
                   "required": ["name", "status"],
                   "additionalProperties": false
                 }
@@ -360,10 +249,7 @@
         "type": "object",
         "properties": {
           "success": { "type": "boolean", "enum": [true] },
-          "message": {
-            "type": "string",
-            "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$"
-          },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
           "data": {
             "type": "object",
             "properties": {
@@ -380,52 +266,29 @@
                     "slug": { "type": "string" },
                     "name": { "type": "string" },
                     "vendor": { "type": "string" },
-                    "status": {
-                      "type": "string",
-                      "enum": ["ACTIVE", "INACTIVE", "UNDER_REVIEW"]
-                    },
+                    "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE", "UNDER_REVIEW"] },
                     "createdAt": {
                       "type": "string",
                       "format": "date-time",
                       "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
                     }
                   },
-                  "required": [
-                    "id",
-                    "slug",
-                    "name",
-                    "vendor",
-                    "status",
-                    "createdAt"
-                  ],
+                  "required": ["id", "slug", "name", "vendor", "status", "createdAt"],
                   "additionalProperties": false
                 }
               },
               "pagination": {
                 "type": "object",
                 "properties": {
-                  "page": {
-                    "type": "integer",
-                    "exclusiveMinimum": true,
-                    "maximum": 9007199254740991,
-                    "minimum": 0
-                  },
+                  "page": { "type": "integer", "exclusiveMinimum": true, "maximum": 9007199254740991, "minimum": 0 },
                   "pageSize": {
                     "type": "integer",
                     "exclusiveMinimum": true,
                     "maximum": 9007199254740991,
                     "minimum": 0
                   },
-                  "totalItems": {
-                    "type": "integer",
-                    "minimum": 0,
-                    "maximum": 9007199254740991
-                  },
-                  "totalPages": {
-                    "type": "integer",
-                    "minimum": 0,
-                    "maximum": 9007199254740991
-                  }
+                  "totalItems": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "totalPages": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
                 },
                 "required": ["page", "pageSize", "totalItems", "totalPages"],
                 "additionalProperties": false
@@ -443,10 +306,7 @@
         "type": "object",
         "properties": {
           "success": { "type": "boolean", "enum": [true] },
-          "message": {
-            "type": "string",
-            "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$"
-          },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
           "data": {
             "type": "object",
             "properties": {
@@ -458,10 +318,7 @@
               "slug": { "type": "string" },
               "name": { "type": "string" },
               "vendor": { "type": "string" },
-              "status": {
-                "type": "string",
-                "enum": ["ACTIVE", "INACTIVE", "UNDER_REVIEW"]
-              },
+              "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE", "UNDER_REVIEW"] },
               "createdAt": {
                 "type": "string",
                 "format": "date-time",
@@ -479,11 +336,7 @@
       "CreateApplicationBodyDto": {
         "type": "object",
         "properties": {
-          "slug": {
-            "type": "string",
-            "maxLength": 80,
-            "pattern": "^[a-z][a-z0-9-]*$"
-          },
+          "slug": { "type": "string", "maxLength": 80, "pattern": "^[a-z][a-z0-9-]*$" },
           "name": { "type": "string", "minLength": 1, "maxLength": 200 },
           "vendor": { "type": "string", "minLength": 1, "maxLength": 200 }
         },
