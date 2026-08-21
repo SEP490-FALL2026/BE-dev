@@ -92,14 +92,14 @@ Keycloak/Identity Provider và Cloudflare R2 là external infrastructure, không
 4. Luồng đồng bộ cần atomicity dùng application orchestrator và một PostgreSQL transaction rõ ràng.
 5. Domain event in-process dành cho side effect không quyết định kết quả chính, ví dụ audit/notification. Handler phải idempotent.
 6. BullMQ dành cho tác vụ chậm/có retry. Không dùng queue để né một boundary thiết kế kém.
-7. `shared/` chỉ chứa primitive kỹ thuật ổn định. Không tạo `shared/services`, `common/repositories` hoặc “utils” chứa business logic.
+7. `core/` chỉ chứa primitive kỹ thuật ổn định, không phụ thuộc framework. Không tạo `core/services`, `common/repositories` hoặc “utils” chứa business logic.
 8. Không dùng `forwardRef()` để chữa circular dependency. Nếu xuất hiện vòng phụ thuộc, xem lại ownership hoặc đưa orchestration lên module cấp cao hơn.
 
 Nest encapsulate provider theo module và xem phần `exports` như public interface. Thiết kế này tận dụng đúng cơ chế module/DI của Nest thay vì chỉ chia folder cho đẹp.
 
 ## 5. Trạng thái source hiện tại
 
-Foundation modular monolith đã được triển khai: `AppModule` là composition root; infrastructure có config, HTTP contract, OIDC/JWT security, Prisma, queue, object storage, observability và health; `access-requests` là reference business module có policy và root facade. Các business workflow còn lại sẽ được thêm theo vertical slice, không scaffold hàng loạt folder rỗng.
+Foundation modular monolith đã được triển khai: `AppModule` là composition root thuần wiring; infrastructure có config, HTTP contract, OIDC/JWT security, rate limit, Prisma, queue, object storage, observability và health (liveness + readiness). `access-requests` giữ `ApprovalPolicy` đã có test và chưa export gì — root facade chỉ xuất hiện khi có controller thật sự cần orchestration, vì một facade chỉ gọi lại policy là pass-through wrapper mà mục 4 cấm. Các business workflow còn lại sẽ được thêm theo vertical slice, không scaffold hàng loạt folder rỗng.
 
 Codebase tiếp tục được xem là modular monolith khi giữ đủ các đặc tính sau:
 
@@ -148,11 +148,10 @@ src/
 │  ├─ observability/               # log context + request/correlation ID
 │  └─ health/                      # liveness/readiness
 ├─ modules/
-│  ├─ access-requests/             # reference module đang tồn tại
+│  ├─ access-requests/             # module hiện có: mới chỉ có policy
 │  │  ├─ policies/approval.policy.ts
-│  │  ├─ access-requests.types.ts  # public facade contract
-│  │  ├─ access-requests.service.ts
-│  │  └─ access-requests.module.ts
+│  │  ├─ access-requests.types.ts  # contract nội bộ của module
+│  │  └─ access-requests.module.ts # chưa export gì; facade thêm khi có controller
 │  └─ licenses/                    # ví dụ module hoàn chỉnh khi được implement
 │     ├─ adapters/
 │     ├─ dto/
@@ -487,6 +486,7 @@ CI gate: format check -> lint không auto-fix -> typecheck -> unit -> integratio
 - Không cache trước khi đo; Redis ban đầu cho queue/lock/rate-limit.
 - Không tạo notification/email trong transaction chính.
 - Không tự động revoke hoặc block chỉ từ discovery/optimization recommendation.
+- Chưa nối BullMQ producer/consumer. `QueueInfrastructureModule` đã có nhưng chưa module nào `registerQueue`, và `AppModule` chưa import nó. Điều kiện để nối: xuất hiện job thật sự chậm hoặc cần retry (job đầu tiên dự kiến là import file). Khi đó producer nằm ở module sở hữu dữ liệu, processor đăng ký trong `WorkerModule`, và job phải idempotent với trạng thái lưu ở PostgreSQL.
 
 ## 17. Ngưỡng xem xét tách service
 
