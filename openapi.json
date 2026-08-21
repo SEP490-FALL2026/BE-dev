@@ -26,6 +26,42 @@
         "summary": "",
         "tags": ["health"]
       }
+    },
+    "/api/v1/health/ready": {
+      "get": {
+        "operationId": "healthGetReadiness",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Every required dependency is reachable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadinessResponseDto"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The readiness check could not be completed.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" }
+              }
+            }
+          },
+          "503": {
+            "description": "A required dependency is unavailable.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" }
+              }
+            }
+          }
+        },
+        "summary": "",
+        "tags": ["health"]
+      }
     }
   },
   "info": {
@@ -84,6 +120,39 @@
           }
         },
         "required": ["success", "error"],
+        "additionalProperties": false
+      },
+      "ReadinessResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "status": { "type": "string", "enum": ["ready"] },
+              "checks": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": { "type": "string" },
+                    "status": { "type": "string" }
+                  },
+                  "required": ["name", "status"],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": ["status", "checks"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
         "additionalProperties": false
       }
     }
