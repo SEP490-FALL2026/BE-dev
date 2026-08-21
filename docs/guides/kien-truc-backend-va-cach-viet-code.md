@@ -8,7 +8,7 @@ Tài liệu này dành cho người mới vào codebase, hoặc cho AI agent c�
 
 Khi tài liệu này mâu thuẫn với `ARCHITECTURE.md` hoặc một ADR trong `docs/decisions/`, ADR thắng — và bạn nên sửa tài liệu này.
 
-> **Lưu ý về trạng thái hiện tại.** Tài liệu mô tả trạng thái đích của foundation. Ba thứ được nhắc tới bên dưới sẽ có mặt sau khi chạy xong `docs/workspace/plans/foundation-hardening-plan.md`: hằng số `ERROR_CODE_PATTERN`, bảng `PRISMA_MODEL_OWNER` cùng hai architecture test đi kèm, và endpoint `/health/ready`. Nếu bạn grep mà chưa thấy chúng thì plan đó chưa được thực thi, không phải tài liệu sai.
+> **Lưu ý về trạng thái hiện tại.** Mọi thứ tài liệu này mô tả đều đã tồn tại trong code — gồm `ERROR_CODE_PATTERN`, bảng `PRISMA_MODEL_OWNER` cùng hai architecture test đi kèm, và endpoint `/health/ready`. Ngoại lệ duy nhất là mục 6: module `catalog` trong ví dụ vertical slice **chưa được viết**, nó là bản mẫu để bạn làm theo chứ không phải code đang có trong repo.
 
 ---
 
