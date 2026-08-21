@@ -8,30 +8,55 @@ These documents are reviewed with code and must remain in Git:
 
 - `architecture/`: approved specifications that describe the current or intended system design.
 - `decisions/`: accepted, superseded or deprecated Architecture Decision Records (ADRs).
-- `guides/`: stable onboarding, operations and development guides when they are added.
+- `guides/`: stable onboarding, operations and development guides.
 
 Do not delete an old ADR when a decision changes. Add a new ADR that supersedes it so humans and AI agents retain the reasoning history.
 
 ## Local working documents
 
-Use the Git-ignored `workspace/` directory for material that is still being explored:
+`workspace/` is Git-ignored. It holds work in progress and the notes that support it.
 
 ```text
 docs/
-└── workspace/             # ignored by Git
-    ├── research/          # links, experiments and investigation notes
-    ├── plans/             # implementation plans and checklists
-    └── specs/             # proposed or incomplete specifications
+└── workspace/                  # ignored by Git
+    ├── PROGRESS.md             # session memory — read this first
+    ├── INDEX.md                # registry of every work item
+    ├── _template/              # copy this to start an item
+    ├── items/
+    │   └── NNNN-slug/          # one folder per unit of work
+    │       ├── spec.md         # what and why (omit for small work)
+    │       ├── plan.md         # how, task by task
+    │       └── todo.md         # checklist
+    └── research/               # links, experiments, investigation notes
 ```
 
-Create these folders locally when first needed. Do not place secrets, production data, access tokens or personal data in them merely because Git ignores the directory.
+### Why one folder per item
+
+An earlier layout kept `specs/` and `plans/` as flat directories. After a dozen documents you could not tell which files belonged together, which work was finished, or what order any of it happened in — the folder was a pile, not a record. Grouping by item means opening one directory shows you a whole piece of work, and the number gives it a stable name to refer to in commits and conversation.
+
+### Rules
+
+- **`PROGRESS.md` is the entry point.** A session that needs to know where the project stands reads it instead of re-reading `src/`. Update it whenever something changes; a memory nobody maintains is one nobody can trust.
+- **`INDEX.md` is updated in the same change that opens or closes an item.** An index that lags makes people trust a stale answer.
+- **The item number never changes.** The slug is a lowercase kebab-case noun phrase describing the outcome.
+- **File names inside an item are fixed:** `spec.md`, `plan.md`, `todo.md`. The folder already carries the identity.
+- **Every file carries frontmatter** with `item`, `title`, `kind`, `status`, `started` and `completed`. Status is one of `proposed`, `active`, `done`, `superseded`, `abandoned`.
+- **At most one item is `active`.**
+- **Closed items are never deleted.** What was tried and rejected is exactly what a future contributor would otherwise redo.
+- **Omit files you do not need.** A one-day fix needs no spec; creating an empty one to look complete helps nobody.
+- **An unticked box in a closed item must be explained** — put it under a "Not in scope (deliberate)" heading, or it reads as forgotten work.
+
+Do not place secrets, production data, access tokens or personal data in `workspace/` merely because Git ignores it.
 
 ## Promotion workflow
 
 1. Explore under `docs/workspace/research/`.
-2. Prepare execution steps under `docs/workspace/plans/` and a draft contract under `docs/workspace/specs/` when appropriate.
+2. Open an item: copy `_template/` to `items/NNNN-slug/`, add its row to `INDEX.md`.
 3. Review the proposal with the team.
-4. Promote approved architecture to `docs/architecture/` and significant decisions to `docs/decisions/`.
-5. Keep implementation checklists local, but update durable documentation whenever the implemented system differs from it.
+4. Build it, ticking the todo only against verified results.
+5. Promote approved architecture to `docs/architecture/` and significant decisions to `docs/decisions/`.
+6. Close the item, update `INDEX.md` and `PROGRESS.md`.
+
+Keep implementation checklists local, but update durable documentation whenever the implemented system differs from it.
 
 Ignoring all of `docs/` is prohibited because it would remove architectural constraints and decision history from code review, CI and AI-agent context.
