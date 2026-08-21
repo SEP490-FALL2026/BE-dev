@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Logger, Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
@@ -16,6 +16,7 @@ import { OidcJwtVerifier } from './tokens/oidc-jwt.verifier';
     }),
   ],
   providers: [
+    Logger,
     AuthenticationGuard,
     // Global guards run in this registration order. Rate limiting must reject a flood
     // before token verification reaches the identity provider's JWKS endpoint.
