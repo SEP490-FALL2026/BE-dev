@@ -1,16 +1,21 @@
+import { Body, Controller, Get, HttpStatus, INestApplication, Post } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
-import { Body, Controller, Get, INestApplication, Post } from '@nestjs/common';
+import { createZodDto } from 'nestjs-zod';
 import request from 'supertest';
 import { App } from 'supertest/types';
-import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
 import { AppModule } from './../src/app.module';
 import { configureApplication, createOpenApiDocument } from './../src/bootstrap';
+import { EnvironmentVariables } from './../src/infrastructure/config/env-schema';
 import { ApiSuccessResponse } from './../src/infrastructure/http/decorators/api-success-response.decorator';
+import { RawResponse } from './../src/infrastructure/http/decorators/raw-response.decorator';
 import { successEnvelopeSchema } from './../src/infrastructure/http/dto/success-envelope.dto';
 import { Public } from './../src/infrastructure/security/decorators/public.decorator';
-import { ConfigService } from '@nestjs/config';
-import { EnvironmentVariables } from './../src/infrastructure/config/env-schema';
+import {
+  ACCESS_TOKEN_VERIFIER,
+  TokenVerificationUnavailableError,
+} from './../src/infrastructure/security/tokens/access-token-verifier.port';
 
 const ContractProbeRequestSchema = z.strictObject({
   name: z.string().trim().min(1),
@@ -25,7 +30,7 @@ class ContractProbeResponseDto extends createZodDto(successEnvelopeSchema(Contra
 class ContractProbeController {
   @Post()
   @Public()
-  @ApiSuccessResponse(ContractProbeResponseDto, { status: 201 })
+  @ApiSuccessResponse(ContractProbeResponseDto, { status: HttpStatus.CREATED })
   validate(@Body() input: ContractProbeRequestDto): z.infer<typeof ContractProbeDataSchema> {
     void input;
     return { accepted: true };
@@ -36,6 +41,13 @@ class ContractProbeController {
   @ApiSuccessResponse(ContractProbeResponseDto)
   invalidResponse(): unknown {
     return { accepted: 'not-a-boolean' };
+  }
+
+  @Get('raw')
+  @Public()
+  @RawResponse()
+  raw(): { plain: true } {
+    return { plain: true };
   }
 }
 
@@ -108,21 +120,50 @@ describe('Application foundation (e2e)', () => {
       });
   });
 
-  it('accepts only a safe caller-provided request ID', async () => {
-    await request(app!.getHttpServer())
-      .get('/api/v1/does-not-exist')
-      .set('x-request-id', 'web-01J_SAFE.request')
-      .expect(404)
-      .expect('x-request-id', 'web-01J_SAFE.request');
+  it('ignores a caller-provided request ID when no trusted proxy is configured', async () => {
+    // TRUST_PROXY_HOPS defaults to 0, so this app is not behind a proxy and the inbound
+    // header is untrusted input. Honouring it would let any caller pin every request to
+    // one correlation id, or reuse an id already present in somebody else's audit trail.
+    // Whether the header is well-formed is irrelevant: it is the trust that is missing.
+    for (const candidate of ['web-01J_SAFE.request', 'unsafe request id']) {
+      const response = await request(app!.getHttpServer())
+        .get('/api/v1/does-not-exist')
+        .set('x-request-id', candidate)
+        .expect(404);
 
-    const response = await request(app!.getHttpServer())
-      .get('/api/v1/does-not-exist')
-      .set('x-request-id', 'unsafe request id')
-      .expect(404);
-
-    expect(response.headers['x-request-id']).not.toBe('unsafe request id');
+      expect(response.headers['x-request-id']).not.toBe(candidate);
+      expect(response.headers['x-request-id']).toEqual(expect.any(String));
+    }
   });
 
+  it('cannot be tricked into trusting a caller that asserts its own proxy headers', async () => {
+    const response = await request(app!.getHttpServer())
+      .get('/api/v1/does-not-exist')
+      .set('x-request-id', 'caller-chosen-id')
+      .set('x-forwarded-for', '203.0.113.9')
+      .set('x-real-ip', '203.0.113.9')
+      .expect(404);
+
+    expect(response.headers['x-request-id']).not.toBe('caller-chosen-id');
+  });
+
+  it('returns a raw body unwrapped while its sibling stays enveloped', async () => {
+    // Asserting the sibling in the same test is the point: it proves the opt-out is scoped
+    // to one handler rather than having switched the envelope off for the whole app.
+    await request(app!.getHttpServer())
+      .get('/api/v1/contract-probe/raw')
+      .expect(200)
+      .expect((response) => {
+        expect(response.body).toEqual({ plain: true });
+      });
+
+    await request(app!.getHttpServer())
+      .get('/api/v1/health/live')
+      .expect(200)
+      .expect((response) => {
+        expect(response.body).toEqual({ success: true, message: 'COMMON.SUCCESS', data: { status: 'ok' } });
+      });
+  });
   it('returns a request ID for successful responses', () => {
     return request(app!.getHttpServer())
       .get('/api/v1/health/live')
@@ -167,7 +208,7 @@ describe('Application foundation (e2e)', () => {
       .expect((response) => {
         expect(response.body).toMatchObject({
           success: false,
-          error: { code: 'HTTP_INTERNAL_SERVER_ERROR' },
+          error: { code: 'INTERNAL_SERVER_ERROR' },
         });
         expect(JSON.stringify(response.body)).not.toContain('not-a-boolean');
       });
@@ -184,6 +225,43 @@ describe('Application foundation (e2e)', () => {
           error: { code: 'INVALID_ACCESS_TOKEN' },
         });
       });
+  });
+
+  it('answers 503 without describing the infrastructure when the identity provider is unreachable', async () => {
+    // The token here is fine. Only the identity provider is unreachable, so the caller must be
+    // told to retry rather than to sign in again — and must learn nothing about why.
+    const outage = new TokenVerificationUnavailableError(
+      Object.assign(new Error('connect ECONNREFUSED 10.0.0.5:8443'), { code: 'ECONNREFUSED' }),
+    );
+    const moduleFixture: TestingModule = await Test.createTestingModule({
+      imports: [AppModule],
+      controllers: [ProtectedProbeController],
+    })
+      .overrideProvider(ACCESS_TOKEN_VERIFIER)
+      .useValue({ verify: jest.fn().mockRejectedValue(outage) })
+      .compile();
+
+    const unavailableApp: INestApplication<App> = moduleFixture.createNestApplication();
+    configureApplication(unavailableApp);
+    await unavailableApp.init();
+
+    try {
+      await request(unavailableApp.getHttpServer())
+        .get('/api/v1/protected-probe')
+        .set('authorization', 'Bearer good-token')
+        .expect(503)
+        .expect((response) => {
+          expect(response.body).toMatchObject({
+            success: false,
+            error: { code: 'TOKEN_VERIFICATION_UNAVAILABLE' },
+          });
+          const wire = JSON.stringify(response.body);
+          expect(wire).not.toContain('10.0.0.5');
+          expect(wire).not.toContain('ECONNREFUSED');
+        });
+    } finally {
+      await unavailableApp.close();
+    }
   });
 
   it('documents the actual success and error wire envelopes in OpenAPI', () => {

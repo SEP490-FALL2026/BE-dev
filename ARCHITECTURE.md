@@ -318,6 +318,9 @@ Prisma multi-file đã GA và tài liệu chính thức khuyến nghị group mo
 ```
 
 - `code` là machine-readable và ổn định; `message` không phải contract để FE viết logic. `details`, nếu có, luôn là object có shape riêng cho từng error code và không chứa dữ liệu nhạy cảm.
+- **Mọi lỗi 5xx trả đúng một mã `INTERNAL_SERVER_ERROR`**, bất kể nguyên nhân là `HttpException` hay exception thường. Tiền tố `HTTP_` chỉ dùng cho mã 4xx suy ra từ status khi handler không khai mã chủ đích. Client không xử lý khác nhau giữa các loại lỗi server, nên nhiều mã chỉ tạo ảo giác về khả năng phân nhánh.
+- **Endpoint cần auth có thêm mã 503 `TOKEN_VERIFICATION_UNAVAILABLE`** khi identity provider không truy cập được. Đây là lỗi hạ tầng chứ không phải token sai: client nên retry, không đẩy user đi đăng nhập lại. Chi tiết sự cố chỉ vào log, không bao giờ ra wire.
+- **Handler trả stream, file, redirect hoặc 204 dùng `@RawResponse()`** để bỏ success envelope. Không dùng nó để né việc khai response DTO — endpoint trả JSON phải giữ envelope, nếu không contract công bố sẽ mô tả sai thứ client nhận được.
 - OpenAPI sinh từ Nest Swagger, export thành artifact versioned để FE dùng Orval. Operation ID phải ổn định và theo `<domain><Action>`; tag theo business module để generated client được chia đúng folder.
 - Không để Orval/mock định nghĩa ngược business contract. Backend OpenAPI là source of truth; FE có thể dùng MSW data generator từ contract đó.
 
@@ -437,7 +440,7 @@ Không tin filename, extension hoặc `Content-Type` từ browser. Với file nh
 ## 13. Observability và vận hành
 
 - structured JSON logs, có `requestId`, `actorId`, `module`, `useCase`, `durationMs`, `result`;
-- request ID được nhận từ trusted proxy hoặc tạo mới, truyền sang job `correlationId`;
+- request ID chỉ được nhận từ inbound header khi `TRUST_PROXY_HOPS > 0`, ngoài ra luôn sinh mới; giá trị được truyền sang job `correlationId`. Lòng tin phải đến từ cấu hình server, không bao giờ từ `x-forwarded-for`/`x-real-ip` — đó là header do client gửi, nên dùng chúng làm căn cứ thì bất kỳ ai cũng tự nhận là đi qua proxy và tự chọn correlation id, kể cả id đang nằm trong audit trail của người khác;
 - `/health/live` chỉ kiểm tra process; `/health/ready` hiện chỉ ping PostgreSQL. Redis và object storage **chưa** được probe — thêm indicator khi có sự cố thật chứng minh là cần;
 - `TRUST_PROXY_HOPS` quyết định rate limiting có hoạt động hay không: `@nestjs/throttler` key theo `req.ip`, mà `req.ip` phụ thuộc `trust proxy`. Đứng sau reverse proxy mà để `0` thì mọi client bị nhìn thành proxy và dùng chung một bucket `RATE_LIMIT_LIMIT`;
 - metrics tối thiểu: HTTP latency/error rate, DB pool, queue depth/failure/retry, import duration/error rows;
@@ -487,6 +490,7 @@ CI gate: format check -> lint không auto-fix -> typecheck -> unit -> integratio
 - Không cache trước khi đo; Redis ban đầu cho queue/lock/rate-limit.
 - Không tạo notification/email trong transaction chính.
 - Không tự động revoke hoặc block chỉ từ discovery/optimization recommendation.
+- Chuẩn job envelope khi nối BullMQ: `schemaVersion`, `correlationId`, `idempotencyKey`, `requestedBy`, `payload`. Interface sẽ được tạo lại cùng job đầu tiên; giữ nó khi chưa có producer/consumer nào chỉ là cấu trúc rỗng.
 - Chưa nối BullMQ producer/consumer. `QueueInfrastructureModule` đã có nhưng chưa module nào `registerQueue`, và `AppModule` chưa import nó. Điều kiện để nối: xuất hiện job thật sự chậm hoặc cần retry (job đầu tiên dự kiến là import file). Khi đó producer nằm ở module sở hữu dữ liệu, processor đăng ký trong `WorkerModule`, và job phải idempotent với trạng thái lưu ở PostgreSQL.
 
 ## 17. Ngưỡng xem xét tách service
