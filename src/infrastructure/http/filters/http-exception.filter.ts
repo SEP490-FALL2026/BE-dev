@@ -5,6 +5,13 @@ import { RequestContextService } from '../../observability/request-context.servi
 import { resolveRequestId } from '../../observability/request-id';
 import { ERROR_CODE_PATTERN, type ErrorEnvelope } from '../dto/error-envelope.dto';
 
+// Widened to `number` on purpose: `HttpException.getStatus()` returns a plain number, and
+// comparing it against enum members directly trips @typescript-eslint/no-unsafe-enum-comparison.
+const SERVER_ERROR: number = HttpStatus.INTERNAL_SERVER_ERROR;
+const NOT_FOUND: number = HttpStatus.NOT_FOUND;
+const UNAUTHORIZED: number = HttpStatus.UNAUTHORIZED;
+const FORBIDDEN: number = HttpStatus.FORBIDDEN;
+
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger(HttpExceptionFilter.name);
@@ -15,7 +22,10 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const http = host.switchToHttp();
     const request = http.getRequest<Request>();
     const response = http.getResponse<Response>();
-    const requestId = this.requestContext.getRequestId() ?? resolveRequestId(request.header('x-request-id'));
+    // Fallback for a failure raised before RequestIdMiddleware ran. It has no access to the
+    // proxy configuration, so it never believes the inbound header.
+    const requestId =
+      this.requestContext.getRequestId() ?? resolveRequestId(request.header('x-request-id'), { trustInbound: false });
     const status = exception instanceof HttpException ? exception.getStatus() : HttpStatus.INTERNAL_SERVER_ERROR;
     const body = this.createEnvelope(exception, status, requestId);
 
@@ -86,15 +96,22 @@ export class HttpExceptionFilter implements ExceptionFilter {
   }
 
   private codeForStatus(status: number): string {
+    // Every server fault answers with one code. The HTTP_-prefixed form is a mechanical
+    // fallback for client errors that carry no deliberate code of their own; a 5xx is
+    // never something the caller can act on differently, so it gets a single stable code.
+    if (status >= SERVER_ERROR) {
+      return 'INTERNAL_SERVER_ERROR';
+    }
+
     const name = HttpStatus[status];
     return typeof name === 'string' ? `HTTP_${name}` : 'HTTP_ERROR';
   }
 
   private safeMessageForStatus(status: number): string {
-    if (status === 404) return 'Resource was not found.';
-    if (status === 401) return 'Authentication is required.';
-    if (status === 403) return 'Access is forbidden.';
-    if (status >= 500) return 'An unexpected error occurred.';
+    if (status === NOT_FOUND) return 'Resource was not found.';
+    if (status === UNAUTHORIZED) return 'Authentication is required.';
+    if (status === FORBIDDEN) return 'Access is forbidden.';
+    if (status >= SERVER_ERROR) return 'An unexpected error occurred.';
     return 'The request could not be processed.';
   }
 

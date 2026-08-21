@@ -1,14 +1,23 @@
 import { CallHandler, ExecutionContext, Injectable, NestInterceptor } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { map, Observable } from 'rxjs';
+import { RAW_RESPONSE_METADATA } from '../decorators/raw-response.decorator';
 import { DEFAULT_SUCCESS_MESSAGE, SUCCESS_MESSAGE_METADATA } from '../decorators/api-success-response.decorator';
-import { SuccessEnvelope } from '../dto/success-envelope.dto';
 
 @Injectable()
 export class SuccessEnvelopeInterceptor implements NestInterceptor {
   constructor(private readonly reflector: Reflector) {}
 
-  intercept(context: ExecutionContext, next: CallHandler): Observable<SuccessEnvelope<unknown>> {
+  intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
+    const isRawResponse = this.reflector.getAllAndOverride<boolean>(RAW_RESPONSE_METADATA, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+
+    if (isRawResponse) {
+      return next.handle();
+    }
+
     const message =
       this.reflector.getAllAndOverride<string>(SUCCESS_MESSAGE_METADATA, [context.getHandler(), context.getClass()]) ??
       DEFAULT_SUCCESS_MESSAGE;
