@@ -489,12 +489,12 @@ Backup bắt buộc gồm PostgreSQL và object storage; Redis queue có thể p
 
 ## 15. Test strategy
 
-| Loại         | Mục tiêu                                                  | Dependency                                    | Lệnh                    |
-| ------------ | --------------------------------------------------------- | --------------------------------------------- | ----------------------- |
-| unit         | policy, use case branch, mapper, hàm thuần                 | fake port, không cần Nest container            | `pnpm test`             |
-| architecture | luật boundary đọc trực tiếp từ source                      | không có                                       | `pnpm test`             |
-| e2e          | HTTP contract: routing, validation, envelope, auth, status | repository được stub — **không cần database**  | `pnpm test:e2e`         |
-| integration  | adapter chạm hạ tầng thật: Prisma query, constraint, migration | PostgreSQL thật                             | `pnpm test:integration` |
+| Loại         | Mục tiêu                                                       | Dependency                                    | Lệnh                    |
+| ------------ | -------------------------------------------------------------- | --------------------------------------------- | ----------------------- |
+| unit         | policy, use case branch, mapper, hàm thuần                     | fake port, không cần Nest container           | `pnpm test`             |
+| architecture | luật boundary đọc trực tiếp từ source                          | không có                                      | `pnpm test`             |
+| e2e          | HTTP contract: routing, validation, envelope, auth, status     | repository được stub — **không cần database** | `pnpm test:e2e`         |
+| integration  | adapter chạm hạ tầng thật: Prisma query, constraint, migration | PostgreSQL thật                               | `pnpm test:integration` |
 
 E2E cố ý không cần database để `pnpm check` chạy nhanh và không phụ thuộc Docker. Integration là nơi duy nhất chứng minh query Prisma và việc dịch lỗi constraint thật sự đúng — mock không nói được điều đó.
 
