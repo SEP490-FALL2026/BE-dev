@@ -348,6 +348,12 @@ Prisma multi-file đã GA và tài liệu chính thức khuyến nghị group mo
 
 ## 10. Authentication và authorization
 
+> **Trạng thái 2026-08-21.** Mục này mô tả thiết kế đích, không phải code hiện có.
+>
+> Đã có: xác thực OIDC/JWT, guard toàn cục deny-by-default, `@Public()` opt-out, và `ExternalIdentity` (`issuer`, `subject`, `email`) gắn vào request.
+>
+> **Chưa có gì cả**: principal nội bộ, role, permission, resource scope, policy phân quyền. Không có bảng hay guard nào cho chúng. Toàn bộ phần này thuộc `identity-access` và `organization`, chưa được xây. Endpoint hiện tại chỉ phân biệt được đã xác thực với chưa xác thực.
+
 ### Authentication
 
 - **OIDC là protocol xác thực; JWT là định dạng token. Chúng được dùng cùng nhau, không thay thế nhau.**
@@ -483,18 +489,24 @@ Backup bắt buộc gồm PostgreSQL và object storage; Redis queue có thể p
 
 ## 15. Test strategy
 
-| Loại        | Mục tiêu                                                 | Dependency                                                |
-| ----------- | -------------------------------------------------------- | --------------------------------------------------------- |
-| unit        | entity, policy, use case branch                          | fake port, không Nest container nếu không cần             |
-| integration | Prisma repository, migration, transaction, parser        | PostgreSQL/Redis/MinIO test container hoặc service cô lập |
-| contract    | OpenAPI snapshot/schema và stable operationId/error code | Nest testing app                                          |
-| e2e         | critical workflow từ HTTP tới DB                         | app + real infrastructure test instance                   |
+| Loại         | Mục tiêu                                                  | Dependency                                    | Lệnh                    |
+| ------------ | --------------------------------------------------------- | --------------------------------------------- | ----------------------- |
+| unit         | policy, use case branch, mapper, hàm thuần                 | fake port, không cần Nest container            | `pnpm test`             |
+| architecture | luật boundary đọc trực tiếp từ source                      | không có                                       | `pnpm test`             |
+| e2e          | HTTP contract: routing, validation, envelope, auth, status | repository được stub — **không cần database**  | `pnpm test:e2e`         |
+| integration  | adapter chạm hạ tầng thật: Prisma query, constraint, migration | PostgreSQL thật                             | `pnpm test:integration` |
+
+E2E cố ý không cần database để `pnpm check` chạy nhanh và không phụ thuộc Docker. Integration là nơi duy nhất chứng minh query Prisma và việc dịch lỗi constraint thật sự đúng — mock không nói được điều đó.
+
+Architecture test chỉ có giá trị khi được chứng minh bằng probe: tạo file vi phạm, xem test fail **và nêu đích danh file**, rồi xoá probe. Test quét không có gì để quét thì xanh vĩnh viễn.
 
 Critical e2e đầu tiên: no-self-approval, approval có/không có cost, seat assignment idempotency, import retry không duplicate, unauthorized signed URL, audit được ghi cùng transaction.
 
 Test fixture/seed phải deterministic. Có thể dùng Faker trong dev/test factory với seed cố định, nhưng không thêm Faker vào runtime business flow và không dùng random data để che thiếu assertion. Mock API cho FE vẫn sinh từ OpenAPI/MSW/Orval; seed backend dành cho integration/e2e và demo database.
 
-CI gate: format check -> lint không auto-fix -> typecheck -> unit -> integration -> e2e/contract -> build -> dependency/secret scan.
+CI gate hiện tại: `pnpm check` (format check → lint không auto-fix → prisma validate → typecheck → unit + architecture → build) → `pnpm test:e2e` → OpenAPI drift check → `pnpm audit --prod`.
+
+`pnpm test:integration` **chưa nằm trong CI** vì cần database service. Đưa vào khi CI thật sự gate merge; trước đó chạy tay theo hướng dẫn ở `README.md`.
 
 ## 16. Quyết định có chủ ý chưa làm
 
