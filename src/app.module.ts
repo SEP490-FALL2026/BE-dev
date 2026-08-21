@@ -5,6 +5,7 @@ import { DatabaseModule } from './infrastructure/database/database.module';
 import { ObjectStorageModule } from './infrastructure/object-storage/object-storage.module';
 import { SecurityModule } from './infrastructure/security/security.module';
 import { AccessRequestsModule } from './modules/access-requests/access-requests.module';
+import { CatalogModule } from './modules/catalog/catalog.module';
 import { ObservabilityModule } from './infrastructure/observability/observability.module';
 import { HttpInfrastructureModule } from './infrastructure/http/http-infrastructure.module';
 
@@ -18,6 +19,7 @@ import { HttpInfrastructureModule } from './infrastructure/http/http-infrastruct
     ObjectStorageModule,
     SecurityModule,
     AccessRequestsModule,
+    CatalogModule,
   ],
 })
 export class AppModule {}
