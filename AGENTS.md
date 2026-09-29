@@ -1,95 +1,12 @@
-# Backend contributor and AI rules
+# SaaS-Sentry — Backend
 
-Start with `docs/workspace/PROGRESS.md` — it says where the project stands, what is next, and what has already been learned the hard way, so you do not have to re-read `src/` to find out. Read `ARCHITECTURE.md` before changing source structure or adding a dependency. Decisions under `docs/decisions/` are binding until superseded by a newer ADR. Follow `docs/README.md` and the "Writing docs, specs and plans" section below when creating research, plans, specifications or durable documentation — those paths override any default your tooling suggests.
+Áp dụng cho toàn bộ repo này, cho dev và AI agent.
 
-## Commands
+1. Đọc [docs/rules/README.md](docs/rules/README.md) và [docs/rules/context.md](docs/rules/context.md) trước khi làm việc; đã đọc trong cùng task thì chỉ nạp lại khi nguồn thay đổi.
+2. Chọn playbook theo nhiệm vụ trong bảng README. Đọc các quy tắc chuyên đề mà task chạm tới; không nạp mọi file mặc định.
+3. Quy tắc trong các file được dẫn có hiệu lực như hướng dẫn tại đây. BRD sở hữu nghiệp vụ; ADR/kiến trúc tại repo sở hữu cách hiện thực. Ghi rõ mâu thuẫn hiện hành, không tự chọn bản tiện nhất.
+4. Giữ thay đổi có sẵn của người khác; không đưa secrets/dữ liệu thật vào artefact. Hoàn tất công việc đã được giao, chỉ hỏi về quyết định còn thiếu làm thay đổi phạm vi/hành vi/quyền.
+5. Kiểm chứng theo tác động và báo kết quả thực chạy. Không tự commit, push, deploy hoặc thao tác dữ liệu môi trường dùng chung khi chưa được ủy quyền.
 
-- Install: `pnpm install --frozen-lockfile`
-- Development: `pnpm start:dev`
-- Full check: `pnpm check`
-- Focused unit test: `pnpm test -- <path-or-pattern>`
-- E2E: `pnpm test:e2e`
-- Fix formatting/lint deliberately: `pnpm format`, then `pnpm lint:fix`
-
-Use the pinned pnpm version in `package.json`. On Windows PowerShell where script execution blocks `pnpm.ps1`, use `pnpm.cmd`; do not change the machine execution policy.
-
-## Source placement
-
-- `src/core`: framework-free TypeScript primitives only. It may not import NestJS, Prisma, BullMQ, Redis or AWS SDK.
-- `src/infrastructure`: application-wide technical capabilities. Keep configuration, HTTP lifecycle, security, database connection, queue, object storage, observability and health in their named folders.
-- `src/modules/<domain>`: one business capability using the flat feature-module convention described below.
-- `src/app.module.ts`: composition root only. No business decisions.
-- `src/main.ts`: bootstrap only. No business decisions.
-
-Inside a business module keep `*.module.ts`, `*.controller.ts`, `*.service.ts`, `*.repo.ts`, constants, messages and cron/processors at the module root. Create `adapters/`, `dto/`, `errors/`, `helpers/`, `mappers/`, `policies/`, `schemas/` and `services/` only when real files need them. Do not create `api/application/domain/infrastructure` layers or empty architecture theater.
-
-- Keep the conventional folder name `services/`; never create a vague `solution/` or `utils/` dumping ground.
-- A root `<module>.service.ts` is the controller-facing/public facade. It may coordinate focused services but must not become a god service or a pass-through wrapper with no real consumer.
-- `services/` contains focused workflows/use cases such as `assign-license.service.ts`; `policies/` contains business decisions that can be tested without HTTP or Prisma.
-- `schemas/` owns reusable Zod/domain schemas. `dto/` creates distinct HTTP request/response DTOs; do not duplicate the same Zod shape in both places.
-
-## Boundary rules
-
-1. A module may export an application facade/contract, never its repository or Prisma adapter.
-2. Never import another module's `adapters/`, `dto/`, `errors/`, `helpers/`, `mappers/`, `policies/`, `schemas/`, `services/` or `*.repo.ts` files. Import only an explicitly exported root facade/contract.
-3. Never query another module's table from a repository. Call its public contract.
-4. Controllers validate/map HTTP only. Put workflow in use cases and invariants in policies/entities.
-5. Request and response DTOs are separate. Never expose Prisma models or domain entities directly.
-6. Do not create generic base controllers, services or repositories.
-7. Do not use `forwardRef()` to hide a circular dependency. Repair ownership/orchestration.
-8. PostgreSQL is authoritative. Redis is for jobs/coordination, not business records.
-
-## HTTP contracts
-
-- Use Zod 4 DTOs through `nestjs-zod`; do not add `class-validator` DTOs or plain interfaces at an HTTP boundary.
-- Request objects use `z.strictObject`. Request and response schemas are separate when coercion/defaults or wire/domain representations differ.
-- Wire dates are ISO strings. Map Prisma `Date`, `Decimal`, `BigInt` and entities before returning; never expose Prisma values directly.
-- Ordinary JSON success responses use `{ success: true, message, data }`. Apply `@ApiSuccessResponse(...)` with the complete envelope DTO so runtime validation and OpenAPI agree.
-- `message` is an uppercase localization key such as `COMMON.SUCCESS`, not English/Vietnamese display copy.
-- Streams, redirects, files, raw responses and 204 responses are explicit exceptions; document and test them rather than bypassing the interceptor casually.
-- Guards run before pipes. Never inspect body/query/params in an authorization guard as if Zod has already validated them.
-
-## Authentication and authorization
-
-- OIDC is the login protocol; the API verifies JWT access tokens. Do not use an ID token to call the API.
-- Authentication is global and deny-by-default. Every anonymous endpoint must opt out with `@Public()` and receive security review.
-- Do not add password auth as an outage fallback or create a second production auth mode.
-- Do not add a generic AND/OR auth-mode engine for hypothetical flexibility. A real service credential must use an explicit named policy with defined precedence and failure behavior.
-- Internal roles, scopes, active state and separation-of-duties rules remain in PostgreSQL.
-- Never trust client-provided role claims without mapping them through the trusted identity boundary.
-- Tests normally use signed/fake principal fixtures; only dedicated auth E2E requires Keycloak.
-
-## Files and jobs
-
-- Business code depends on the object-storage port, not AWS/MinIO/Cloudflare SDKs.
-- MinIO is local/test; Cloudflare R2 is production; both use the S3-compatible adapter.
-- Buckets are private. Authorize before issuing a short-lived presigned URL.
-- Treat file name, MIME, contents, CSV/XLSX cells and queue payloads as untrusted.
-- Every retryable job must be idempotent and store important status in PostgreSQL.
-
-## API and localization
-
-- REST base path is `/api/v1`; resource paths are plural kebab-case.
-- Errors use stable machine-readable codes. UI text is localized by FE; do not make FE branch on error messages.
-- Backend localization is limited to backend-rendered email, notification and export templates.
-- Store UTC timestamps and machine-readable enum/status values.
-
-## Quality and safety
-
-- Add or update tests before behavior changes. Unit-test policies/use cases; integration-test adapters; keep E2E for critical workflows.
-- Run `pnpm check` before handoff.
-- Do not commit `.env`, tokens, keys, generated build output or real imported data.
-- Do not weaken validation, CORS, authorization, file limits or rate limits to make a test pass.
-- Do not add dependencies without checking official documentation, maintenance, license and audit impact.
-
-## Writing docs, specs and plans
-
-Read `docs/README.md` for the full convention. The rules that matter most:
-
-- **Planned work lives in `docs/workspace/items/NNNN-slug/`**, holding `spec.md`, `plan.md` and `todo.md`. One folder per unit of work; file names inside are fixed. Copy `docs/workspace/_template/` to start, register the item in `docs/workspace/INDEX.md`, and give every file frontmatter with `item`, `title`, `kind`, `status`, `started`, `completed`.
-- **`docs/workspace/PROGRESS.md` is the session memory.** Read it before exploring `src/` to find out where the project stands, and update it at the end of a session that changed something.
-- **These paths override any default your tooling suggests.** Planning and spec skills ship with their own conventions — `superpowers:writing-plans` defaults to `docs/superpowers/plans/YYYY-MM-DD-<name>.md`, and `agent-skills:spec-driven-development` defaults to `SPEC.md` at the repository root plus `tasks/plan.md` and `tasks/todo.md`. Do not create any of those. Use the item structure above instead; the skill content is still what you follow, only its output location changes.
-- **Do not add a `docs/ARCHITECTURE.md`, `SPEC.md` or `tasks/` directory.** `ARCHITECTURE.md` at the repository root is the only architecture document. A second one has already been created once by accident and had to be removed before it drifted.
-- **Promote approved architecture specifications to `docs/architecture/` and accepted decisions to `docs/decisions/`**; these are shared project context and must remain versioned. `docs/workspace/` is Git-ignored and must never hold secrets or real data.
-- **Write a new ADR rather than editing an accepted one** when a decision changes. Annotating an accepted ADR is only for recording that a later ADR amended it, or that part of it is not implemented yet.
-- **Update `ARCHITECTURE.md` and the relevant durable ADR or spec** when an accepted decision or an implemented boundary changes.
+`AGENTS.md` là điểm vào; nội dung chi tiết nằm trong `docs/rules/`.
+File hướng dẫn cho Claude/Copilot/Windsurf chỉ dẫn tới đây, không giữ bản sao rules.

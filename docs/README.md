@@ -6,6 +6,8 @@ The `docs/` directory has two intentionally different lifecycles.
 
 These documents are reviewed with code and must remain in Git:
 
+- `rules/`: contributor rules and task playbooks, entered through the root `AGENTS.md`; see [rules/README.md](rules/README.md). These are durable instructions, not ignored work plans.
+
 - `architecture/`: approved specifications that describe the current or intended system design.
 - `decisions/`: accepted, superseded or deprecated Architecture Decision Records (ADRs).
 - `guides/`: stable onboarding, operations and development guides.
@@ -36,7 +38,7 @@ An earlier layout kept `specs/` and `plans/` as flat directories. After a dozen 
 
 ### Rules
 
-- **`PROGRESS.md` is the entry point.** A session that needs to know where the project stands reads it instead of re-reading `src/`. Update it whenever something changes; a memory nobody maintains is one nobody can trust.
+- **`PROGRESS.md` is a navigation aid when present.** Read it to locate relevant work, then verify current behavior in the affected source/tests and accepted decisions. Historical results are not evidence for the current diff. If absent, continue with versioned docs and source; do not block on ignored memory. Update it when a session changes something.
 - **`INDEX.md` is updated in the same change that opens or closes an item.** An index that lags makes people trust a stale answer.
 - **The item number never changes.** The slug is a lowercase kebab-case noun phrase describing the outcome.
 - **File names inside an item are fixed:** `spec.md`, `plan.md`, `todo.md`. The folder already carries the identity.

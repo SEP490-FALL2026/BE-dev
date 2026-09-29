@@ -1,3 +1,6 @@
-# Claude project instructions
+# SaaS-Sentry instructions
 
-Read and follow `AGENTS.md`, then load only the relevant section of `ARCHITECTURE.md` and the active spec/ADR. `AGENTS.md` is canonical when this adapter is shorter.
+Read [AGENTS.md](AGENTS.md), then the [rules router](docs/rules/README.md)
+and [context](docs/rules/context.md). Follow the task routing table and load the
+relevant playbook/topic rules. Markdown links are relative to this file.
+Do not duplicate those rules in this adapter. Verify according to change impact.

@@ -13,6 +13,14 @@ on:
       - 'tsconfig*.json'
       - 'eslint.config.mjs'
       - '.github/workflows/ci.yml'
+      - 'AGENTS.md'
+      - 'CLAUDE.md'
+      - '.windsurfrules'
+      - '.github/copilot-instructions.md'
+      - 'docs/**'
+      - 'rules-check.config.json'
+      - '.prettierrc'
+      - '.prettierignore'
   push:
     branches: [main]
     paths:
@@ -26,6 +34,14 @@ on:
       - 'tsconfig*.json'
       - 'eslint.config.mjs'
       - '.github/workflows/ci.yml'
+      - 'AGENTS.md'
+      - 'CLAUDE.md'
+      - '.windsurfrules'
+      - '.github/copilot-instructions.md'
+      - 'docs/**'
+      - 'rules-check.config.json'
+      - '.prettierrc'
+      - '.prettierignore'
 
 permissions:
   contents: read
@@ -38,6 +54,16 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+
+      - name: Set up Node.js for rules
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Check rules graph and regression fixtures
+        run: |
+          node scripts/check-rules.mjs
+          node --test scripts/check-rules.test.mjs
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
