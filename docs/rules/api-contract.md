@@ -19,7 +19,7 @@ Paths in backticks below are relative to the repository root unless stated other
 - Errors use stable machine-readable codes. UI text is localized by FE; do not make FE branch on error messages.
 - Backend localization is limited to backend-rendered email, notification and export templates.
 - Store UTC timestamps and machine-readable enum/status values.
-- Preserve deliberate error codes; `INTERNAL_SERVER_ERROR` is the fallback for 5xx without one. Document `503 TOKEN_VERIFICATION_UNAVAILABLE` on authenticated operations; invalid tokens remain `401 INVALID_ACCESS_TOKEN`. Follow accepted ADR-0004 and the current filter rather than interpreting a shorthand “all 5xx” sentence as a blanket override.
+- Preserve deliberate error codes; `INTERNAL_SERVER_ERROR` is the fallback for 5xx without one. OIDC baseline operations document `503 TOKEN_VERIFICATION_UNAVAILABLE`; the planned native replacement uses the contract in [native identity design](../architecture/native-identity-workforce-design.md) under [ADR-0010](../decisions/0010-native-password-authentication.md). Invalid tokens remain 401; dependency outages remain 503. Update DTO/OpenAPI/tests together when changing a code; never blanket-replace intentional codes with INTERNAL_SERVER_ERROR.
 
 ## Contract handoff to frontend
 
