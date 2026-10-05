@@ -2,6 +2,12 @@
 
 NestJS modular monolith for internal software-license, approval, usage and technology-cost management.
 
+## Native Auth transition — 2026-10-03
+
+Owner selected backend-managed email/password login. See [ADR-0010](docs/decisions/0010-native-password-authentication.md), [design](docs/architecture/native-identity-workforce-design.md), [API verification plan](docs/guides/native-identity-verification.md), [maintenance](docs/guides/native-identity-maintenance.md), and [employee CSV/XLSX templates with 15 synthetic employees](docs/examples/employee-import/README.md).
+
+**Not implemented yet:** code/config/test were restored to HEAD `78cb675`, which still has OIDC foundation and health/catalog APIs. Native login/account/profile/import endpoints and slice-1 seed scripts described in historical instructions below are not currently available. Follow the new design/build plan after review. Git restore did not migrate/reset databases or change `.env`.
+
 ## Requirements
 
 - Node.js 22 or 24
@@ -10,36 +16,36 @@ NestJS modular monolith for internal software-license, approval, usage and techn
 
 On Windows PowerShell, use `pnpm.cmd` when the machine execution policy blocks `pnpm.ps1`.
 
-## Quick start
+## Historical S0 quick start — not runnable after restore
+
+The step-by-step local and demo guide is [docs/guides/local-demo-runbook.md](docs/guides/local-demo-runbook.md). In short:
 
 ```bash
 pnpm install --frozen-lockfile
-docker compose up -d postgres redis minio
-pnpm prisma:generate
-pnpm db:migrate:dev --name init
+docker compose up -d postgres keycloak   # .env sets COMPOSE_PROJECT_NAME=slm-demo, POSTGRES_HOST_PORT=55432
+pnpm db:migrate:deploy
+pnpm db:seed:demo                        # synthetic demo organization, idempotent
+pnpm keycloak:demo-users                 # sets DEMO_USER_PASSWORD (from .env) on the local realm users
 pnpm start:dev
 ```
 
 - API liveness: `http://localhost:3000/api/v1/health/live`
 - API readiness (pings PostgreSQL): `http://localhost:3000/api/v1/health/ready`
-- Swagger UI: `http://localhost:3000/api/docs`
-- MinIO console: `http://localhost:9001`
+- Swagger UI: `http://localhost:3000/api/docs` — **Authorize** signs in through Keycloak (Authorization Code + PKCE)
 
 Copy `.env.example` to `.env` only for local overrides. Never commit `.env` or production credentials.
 
-## Optional OIDC provider
+## Historical S0 OIDC setup
 
-Most unit, integration and ordinary API E2E tests do not need Keycloak. Start it only when testing the real OIDC browser flow:
+The internal-account resolver and demo setup described here were removed by restore. The HEAD OIDC token verifier remains until native authentication replaces it.
 
-```bash
-docker compose --profile auth up -d keycloak
-```
+Keycloak is the identity provider: it holds passwords and sessions; the API never sees a password and has no login endpoint. The API verifies the access token, then resolves the internal account and its roles from PostgreSQL on every request (ADR-0006).
 
-The imported realm contains no application users or client secrets. Create local users through the Keycloak admin console. Production may use Keycloak or another trusted OIDC provider without changing the API verifier boundary.
+The imported realm contains public PKCE clients (`software-license-web`, `software-license-swagger`, `software-license-e2e`) and synthetic demo users with fixed ids, but **no credentials or client secrets**; `pnpm keycloak:demo-users` sets the demo password from `.env`. Production may use Keycloak or another trusted OIDC provider by configuration (`OIDC_ISSUER`, `OIDC_AUDIENCE`, `OIDC_JWKS_URI`).
 
 OIDC is the login protocol; JWT is the access-token format used by the API. FE calls protected endpoints with an access token, not an ID token.
 
-Business routes are protected by default. Only explicitly reviewed routes marked `@Public()` bypass OIDC authentication.
+Business routes are protected by default. Only explicitly reviewed routes marked `@Public()` bypass authentication.
 
 ## API contract
 
@@ -59,6 +65,8 @@ Application-wide technical concerns are explicit under `src/infrastructure`: `co
 Both use the same AWS SDK v3 adapter. Business modules depend only on `ObjectStoragePort`.
 
 ## Commands
+
+`package.json` is authoritative. The old S0 commands `db:seed`, `db:seed:demo`, `keycloak:demo-users` and `test:live` no longer exist after the 2026-10-03 restore and were removed from the table below; they are described only in the historical runbook. Every command in the table exists in `package.json`.
 
 | Command                             | Purpose                                   |
 | ----------------------------------- | ----------------------------------------- |
@@ -82,8 +90,7 @@ Both use the same AWS SDK v3 adapter. Business modules depend only on `ObjectSto
 
 ```bash
 docker compose up -d
-NODE_ENV=test pnpm db:migrate:deploy   # creates and migrates <database>_test
-NODE_ENV=test pnpm test:integration
+NODE_ENV=test pnpm test:integration   # rebuilds <database>_test from the migrations, then runs
 ```
 
 `NODE_ENV=test` appends `_test` to the database name, so the suite can truncate its own rows without ever touching the database you develop against.

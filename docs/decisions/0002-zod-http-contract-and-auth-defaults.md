@@ -2,6 +2,10 @@
 
 ## Status
 
+**Accepted 2026-08-12 — superseded in part by [ADR-0010](0010-native-password-authentication.md) (2026-10-03).** Superseded: "OIDC Bearer" as the authentication mechanism. Still in force: Zod HTTP contracts, response envelope, deny-by-default with `@Public()` opt-out.
+
+**2026-10-03 amendment:** [ADR-0010](0010-native-password-authentication.md) supersedes the external-OIDC-only authentication direction. Zod HTTP contracts and deny-by-default remain accepted. The restored HEAD still contains OIDC foundation code; native password authentication is not implemented yet.
+
 Accepted. Amended by ADR-0004, which fixes the single 5xx error code, adds 503 for an unreachable identity provider, makes request-id trust configuration-derived, and gives the raw-response exception its concrete form.
 
 ## Date

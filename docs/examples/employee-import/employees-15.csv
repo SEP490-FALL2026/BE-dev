@@ -1,0 +1,16 @@
+﻿employeeCode,fullName,workEmail,employmentType,hireDate,costCenterCode,managerEmployeeCode,departmentLabel
+EMP001,Nguyễn Minh An,an.emp001@example.test,STAFF,2025-01-01,COMPANY,,Ban điều hành
+EMP002,Trần Hoàng Bình,binh.emp002@example.test,STAFF,2025-02-01,ENG,EMP001,Kỹ thuật
+EMP003,Lê Thu Chi,chi.emp003@example.test,STAFF,2025-02-01,FIN,EMP001,Tài chính
+EMP004,Phạm Quốc Dũng,dung.emp004@example.test,STAFF,2025-02-01,PRJ-ALPHA,EMP001,Dự án Alpha
+EMP005,Hoàng Ngọc Hà,ha.emp005@example.test,STAFF,2025-03-01,ENG,EMP002,Kỹ thuật
+EMP006,Vũ Gia Huy,huy.emp006@example.test,STAFF,2025-03-01,ENG,EMP002,Kỹ thuật
+EMP007,Đặng Mai Lan,lan.emp007@example.test,STAFF,2025-04-01,ENG,EMP002,Kỹ thuật
+EMP008,Bùi Đức Long,long.emp008@example.test,STAFF,2025-04-01,ENG,EMP002,Kỹ thuật
+EMP009,Đỗ Bảo Ngọc,ngoc.emp009@example.test,STAFF,2025-05-01,ENG,EMP002,Kỹ thuật
+EMP010,Hồ Thanh Phúc,phuc.emp010@example.test,STAFF,2025-05-01,ENG,EMP002,Kỹ thuật
+EMP011,Ngô Thảo Quyên,quyen.emp011@example.test,STAFF,2025-03-01,FIN,EMP003,Tài chính
+EMP012,Dương Văn Sơn,son.emp012@example.test,STAFF,2025-04-01,FIN,EMP003,Tài chính
+EMP013,Lý Khánh Trang,trang.emp013@example.test,CONTRACTOR,2025-06-01,PRJ-ALPHA,EMP004,Dự án Alpha
+EMP014,Mai Anh Tú,tu.emp014@example.test,FREELANCER,2025-07-01,PRJ-ALPHA,EMP004,Dự án Alpha
+EMP015,Tạ Hải Yến,yen.emp015@example.test,INTERN,2025-08-01,PRJ-ALPHA,EMP004,Dự án Alpha

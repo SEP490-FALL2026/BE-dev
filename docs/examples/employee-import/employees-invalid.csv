@@ -1,0 +1,7 @@
+﻿employeeCode,fullName,workEmail,employmentType,hireDate,costCenterCode,managerEmployeeCode,departmentLabel
+BAD001,Dữ liệu hợp lệ,fixture@example.test,STAFF,2025-01-01,COMPANY,,Kiểm thử
+BAD002,Thiếu Cost Center,missing@example.test,STAFF,2025-01-01,,,Kiểm thử
+BAD003,Quản lý không tồn tại,manager@example.test,STAFF,2025-01-01,COMPANY,UNKNOWN,Kiểm thử
+BAD004,Email trùng sau chuẩn hóa,fixture+alias@example.test,STAFF,2025-01-01,COMPANY,,Kiểm thử
+BAD005,Chu trình quản lý A,cycle.a@example.test,STAFF,2025-01-01,COMPANY,BAD006,Kiểm thử
+BAD006,Chu trình quản lý B,cycle.b@example.test,STAFF,2025-01-01,COMPANY,BAD005,Kiểm thử
