@@ -26,6 +26,14 @@ const backendRoot = resolve(here, '..', '..', '..');
 const manifestPath = join(backendRoot, 'docs', 'guides', 'native-handoff-manifest.json');
 const BE_DIR = 'Code/BE-dev-software-license-management';
 
+// Text files are hashed over LF-normalized bytes (CRLF -> LF): with core.autocrlf=true a fresh checkout writes CRLF,
+// and a raw-byte hash would then differ from the preparing workspace for files nobody changed.
+const TEXT_EXT = /\.(md|json|mjs|js|ts|py|csv|html|drawio|txt|ya?ml|ps1|mmd)$/i;
+function digest(path, bytes = readFileSync(path)) {
+  const data = TEXT_EXT.test(path) ? Buffer.from(bytes.toString('latin1').replace(/\r\n/g, '\n'), 'latin1') : bytes;
+  return createHash('sha256').update(data).digest('hex');
+}
+
 const USAGE =
   'usage: build-native-handoff-manifest.mjs [--write | --check | --bundle <new dir> | --compare <BE checkout> <Docs checkout>] [--docs <Docs root>] [--backend-only]';
 const argv = process.argv.slice(2);
@@ -156,6 +164,34 @@ const DOCS_FILES = [
   'Diagrams/workflows-activity-diagram/SaaS-Sentry-Activity-Diagrams.drawio',
   'Diagrams/workflows-activity-diagram/artifact-manifest.json',
   'Diagrams/workflows-activity-diagram/png/WF-03.png',
+  'Diagrams/workflows-activity-diagram/drawio/WF-07.drawio',
+  'Diagrams/workflows-activity-diagram/png/WF-07.png',
+  // 05/10/2026: the WF PNGs deleted by Docs commit 2462d75 were restored (Owner decision); untracked, so they travel here
+  'Diagrams/workflows-activity-diagram/png/WF-01.png',
+  'Diagrams/workflows-activity-diagram/png/WF-02.png',
+  'Diagrams/workflows-activity-diagram/png/WF-04.png',
+  'Diagrams/workflows-activity-diagram/png/WF-05.png',
+  'Diagrams/workflows-activity-diagram/png/WF-06.png',
+  'Diagrams/workflows-activity-diagram/png/WF-08.png',
+  'Diagrams/workflows-activity-diagram/png/WF-09.png',
+  'Diagrams/workflows-activity-diagram/png/WF-09a.png',
+  'Diagrams/workflows-activity-diagram/png/WF-10.png',
+  'Diagrams/workflows-activity-diagram/png/WF-11.png',
+  'Diagrams/workflows-activity-diagram/png/WF-12.png',
+  'Diagrams/workflows-activity-diagram/png/WF-12a.png',
+  'Diagrams/workflows-activity-diagram/png/WF-13.png',
+  'Diagrams/workflows-activity-diagram/png/WF-13a.png',
+  'Diagrams/workflows-activity-diagram/png/WF-14.png',
+  'Diagrams/workflows-activity-diagram/png/WF-15.png',
+  'Diagrams/workflows-activity-diagram/png/WF-16.png',
+  'Diagrams/workflows-activity-diagram/png/WF-17.png',
+  'Diagrams/workflows-activity-diagram/png/WF-17a.png',
+  'Diagrams/workflows-activity-diagram/png/WF-18.png',
+  'Diagrams/user-flows/drawio/UF-09.drawio',
+  'Diagrams/main-workflows-activity-diagram/index.md',
+  'Diagrams/main-workflows-activity-diagram/05-offboarding-access-reclaim.drawio',
+  'Diagrams/main-workflows-activity-diagram/main-workflows-reading-script.md',
+  'Diagrams/main-workflows-activity-diagram/tools/specs_main_flows.py',
   'Diagrams/use-case-diagram/saas-sentry-use-case-diagram-edited.drawio',
   'Diagrams/use-case-diagram/use-case-specification.md',
   'Diagrams/use-case-diagram/use-case-drawing-guide.md',
@@ -175,20 +211,41 @@ const DOCS_FILES = [
 // Session reports of the Docs repository. Docs/.gitignore ignores Reviews/, so a checkout never has them: they
 // travel only in the bundle. Informational (what was done and checked), never a source of business rules.
 const DOCS_REPORTS = [
+  'Reviews/native-handover-sync-2026-10-05.md',
   'Reviews/native-handoff-finalization-2026-10-05.md',
   'Reviews/native-handoff-completion-2026-10-04.md',
 ];
 
 function git(root, args) {
   try {
-    return execFileSync('git', ['-C', root, ...args], {
+    const out = execFileSync('git', ['-C', root, ...args], {
       encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'ignore'],
+      stdio: ['ignore', 'pipe', 'pipe'],
       maxBuffer: 64 * 1024 * 1024,
     });
-  } catch {
+    return { ok: true, out };
+  } catch (error) {
+    const err = (error.stderr ? error.stderr.toString() : error.message).trim().split('\n')[0];
+    return { ok: false, err, code: error.status ?? error.code };
+  }
+}
+
+// A git failure is reported with git's own message; it never turns into "skip the Docs files".
+function gitFailure(root, args, res) {
+  const msg =
+    `cannot read the git state of ${root}: git ${args[0]} failed (exit ${res.code}): ${res.err}\n` +
+    'Typical causes: git not on PATH, "detected dubious ownership" (add the folder to safe.directory), ' +
+    'a stale .git/index.lock, or a checkout that is not a git repository.';
+  if (check) {
+    console.error(
+      `note: ${msg}\nnote: gitState is not needed for --check; the SHA-256 of every listed file is still verified.`,
+    );
     return null;
   }
+  console.error(
+    `${msg}\nThe manifest records gitState, so --write/--bundle stop here (exit 3); fix git and run again.`,
+  );
+  process.exit(3);
 }
 
 function gitStates(root, files) {
@@ -196,9 +253,14 @@ function gitStates(root, files) {
   const states = new Map();
   // Limited to the listed paths (literal pathspecs): a whole-repository --ignored listing includes node_modules.
   const specs = ['--', ...files.map((f) => `:(literal)${f}`)];
-  const tracked = new Set((git(root, ['ls-files', '-z', ...specs]) ?? '').split('\0'));
-  const status = git(root, ['status', '--porcelain=v1', '-z', '--ignored', '--untracked-files=all', ...specs]);
-  if (status === null) throw new Error(`git status failed in ${root}`);
+  const lsArgs = ['ls-files', '-z', ...specs];
+  const ls = git(root, lsArgs);
+  if (!ls.ok) return gitFailure(root, lsArgs, ls);
+  const tracked = new Set(ls.out.split('\0'));
+  const stArgs = ['status', '--porcelain=v1', '-z', '--ignored', '--untracked-files=all', ...specs];
+  const st = git(root, stArgs);
+  if (!st.ok) return gitFailure(root, stArgs, st);
+  const status = st.out;
   const flagged = new Map();
   for (const rec of status.split('\0')) if (rec.length > 3) flagged.set(rec.slice(3), rec.slice(0, 2));
   for (const file of files) {
@@ -219,7 +281,7 @@ function entries(root, files, optional) {
     const bytes = readFileSync(abs);
     const entry = {
       path: file,
-      sha256: createHash('sha256').update(bytes).digest('hex'),
+      sha256: digest(abs, bytes),
       bytes: bytes.length,
       status: 'present',
     };
@@ -229,13 +291,15 @@ function entries(root, files, optional) {
 }
 
 function baseline(root) {
-  const head = git(root, ['rev-parse', 'HEAD']);
-  return head ? { head: head.trim() } : null;
+  if (!existsSync(join(root, '.git'))) return null;
+  const res = git(root, ['rev-parse', 'HEAD']);
+  if (!res.ok) return gitFailure(root, ['rev-parse', 'HEAD'], res);
+  return { head: res.out.trim() };
 }
 
 const built = {
-  schema: 'native-handoff-manifest/2',
-  note: 'Checksums of the documents a developer needs. Generated by docs/guides/tools/build-native-handoff-manifest.mjs over the files as they exist on disk; nothing here is committed, signed or approved by GVHD. A mismatch means your copy differs from the one the hand-over was prepared with. gitState = the file in the preparing workspace relative to the baseline HEAD (tracked-unchanged files are byte-identical to that HEAD).',
+  schema: 'native-handoff-manifest/3',
+  note: 'Checksums of the documents a developer needs. Generated by docs/guides/tools/build-native-handoff-manifest.mjs over the files as they exist on disk (SHA-256 of text files is taken over LF-normalized bytes, CRLF -> LF, so a checkout with core.autocrlf=true matches; binary files are hashed raw); nothing here is committed, signed or approved by GVHD. A mismatch means your copy differs from the one the hand-over was prepared with. gitState = the file in the preparing workspace relative to the baseline HEAD (tracked-unchanged files are byte-identical to that HEAD).',
   authority:
     'Owner decisions through the 2026-10-04 and 2026-10-05 prompts (Docs QĐ-47, QĐ-48); not a GVHD confirmation. Documents only: nothing is implemented, committed or verified.',
   baseline: { backend: baseline(backendRoot), docsRepository: baseline(docsRoot) },
@@ -245,7 +309,7 @@ const built = {
 };
 
 function sha(path) {
-  return createHash('sha256').update(readFileSync(path)).digest('hex');
+  return digest(path);
 }
 
 if (check) {
