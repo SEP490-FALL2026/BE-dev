@@ -70,7 +70,7 @@ _Bản 1.1: WP-01 hạng mục 4, WP-03, WP-04, WP-11 và WP-12 ở trạng thá
 
 > Bảng 1.1–1.2 là baseline **trước restore**, giữ để tra bằng chứng. HEAD hiện tại không chứa migration/module/test của lát 1; không dùng cột IMPLEMENTED bên dưới để xác nhận hiện trạng.
 
-Đọc từ code và tài liệu ngày 03/10/2026 (bản 1.0 không đổi code nên baseline giữ nguyên). **Bằng chứng test** là kết quả phiên BE 02/10 ghi ở [s0-identity-audit-slice.md](s0-identity-audit-slice.md) mục 9, trên code **chưa commit** — chỉ chứng minh hành vi đã test ở phiên bản đó, **không** chứng minh AC mới của `QĐ-39`/`QĐ-40`. Phiên này **không** chạy lại test.
+Đọc từ code và tài liệu ngày 03/10/2026 (bản 1.0 không đổi code nên baseline giữ nguyên). **Bằng chứng test** là kết quả phiên BE 02/10 ghi ở s0-identity-audit-slice.md (đã xóa 05/10/2026; còn trong lịch sử Git) mục 9, trên code **chưa commit** — chỉ chứng minh hành vi đã test ở phiên bản đó, **không** chứng minh AC mới của `QĐ-39`/`QĐ-40`. Phiên này **không** chạy lại test.
 
 ### 1.1. Theo hạng mục
 
@@ -364,7 +364,7 @@ G0 (Owner commit baseline)
 
 **Điều kiện bắt đầu.** Cổng `G0` (mục 3): code lát 1 + tài liệu này có trên nhánh chung (hiện **chưa commit** — Docs `Reviews/s0-handoff-roadmap-2026-10-03.md` mục 6); Compose `slm-demo` + Keycloak theo `docs/guides/local-demo-runbook.md`; ADR-0008 đã đọc; ADR-0009 đã đọc nếu làm hạng mục 4 — **hạng mục 4 chỉ bắt đầu sau khi Owner xem lại** (`DESIGN UPDATE PENDING REVIEW`).
 
-**Hoàn thành khi.** (a) R-01→R-03 (hạng mục 1–3) có output **đỏ** trên code lát 1 và **xanh** sau sửa, lưu trong bằng chứng PR; R-04→R-06 (hạng mục 4) cũng đỏ→xanh **sau khi Owner xem lại hạng mục 4**; (b) N-01→N-05 xanh cả trước và sau; (c) các test còn lại mục 4.4 xanh (I-04 và L-* của hạng mục 4 theo thời điểm mở); (d) mutation: tạm bỏ kiểm lại actor ⟹ R-04, R-05, R-06 đỏ; (e) cổng mục 4.5 xanh; (f) diff `openapi.json` đúng mục 4.2. Cập nhật tài liệu (`s0-identity-audit-slice.md` mục 3, Docs Logical ERD 7.2/9 cột _Implement_, bảng mục 3 cột _Hiện thực_) **sau** khi Owner cho phép merge và có bằng chứng. _(Chú thích ADR-0006 → ADR-0008 đã ghi khi ADR-0008 Accepted.)_ _(Bản 1.1: không còn mutation "đổi phép đếm về `status = ACTIVE`" và test I-04 cũ — phép đếm *dùng được* bị `QĐ-44` thay.)_
+**Hoàn thành khi.** (a) R-01→R-03 (hạng mục 1–3) có output **đỏ** trên code lát 1 và **xanh** sau sửa, lưu trong bằng chứng PR; R-04→R-06 (hạng mục 4) cũng đỏ→xanh **sau khi Owner xem lại hạng mục 4**; (b) N-01→N-05 xanh cả trước và sau; (c) các test còn lại mục 4.4 xanh (I-04 và L-* của hạng mục 4 theo thời điểm mở); (d) mutation: tạm bỏ kiểm lại actor ⟹ R-04, R-05, R-06 đỏ; (e) cổng mục 4.5 xanh; (f) diff `openapi.json` đúng mục 4.2. Cập nhật tài liệu (`s0-identity-audit-slice.md` (đã xóa 05/10/2026; còn trong lịch sử Git) mục 3, Docs Logical ERD 7.2/9 cột _Implement_, bảng mục 3 cột _Hiện thực_) **sau** khi Owner cho phép merge và có bằng chứng. _(Chú thích ADR-0006 → ADR-0008 đã ghi khi ADR-0008 Accepted.)_ _(Bản 1.1: không còn mutation "đổi phép đếm về `status = ACTIVE`" và test I-04 cũ — phép đếm *dùng được* bị `QĐ-44` thay.)_
 
 ### 4.2. Design
 
@@ -802,7 +802,7 @@ POST /imports/{id}/cancel ─► CANCELLED
 
 - **CI integration (WP-10b — Owner đồng ý kế hoạch 03/10, `D-10` kèm `QĐ-43`; dev sửa workflow trong WP-10b, sau WP-01):** job `test:integration` với service `postgres:17-alpine` (có `btree_gist`) trong `.github/workflows/ci.yml`. Năm điều kiện: (1) chạy được trên **DB test riêng, rỗng** do chính job tạo, chỉ bằng biến môi trường của job; (2) < 5 phút; (3) không phụ thuộc cổng/volume local; (4) không cần Keycloak/MinIO (bộ MinIO/Redis của WP-08/09 tách riêng, thêm sau); (5) Owner xem diff workflow trước merge. **Không** credential, secret hay dữ liệu của môi trường dùng chung trong CI; mật khẩu DB test là giá trị cục bộ của service container. Live **không** vào CI tới khi có realm import tự động + secret.
 - **OpenAPI:** CI đã `git diff --exit-code openapi.json`; FE snapshot chỉ cập nhật khi FE dùng endpoint.
-- **Tài liệu:** sau mỗi WP được merge: Logical ERD 7.2/9 (Docs), `s0-identity-audit-slice.md` (nếu lát 1 đổi), `ARCHITECTURE.md` (nếu ranh giới đổi).
+- **Tài liệu:** sau mỗi WP được merge: Logical ERD 7.2/9 (Docs), `s0-identity-audit-slice.md` (đã xóa 05/10/2026; còn trong lịch sử Git) (nếu lát 1 đổi), `ARCHITECTURE.md` (nếu ranh giới đổi).
 - **`LR-14`:** trước `migrate deploy` lên môi trường dùng chung: `prisma migrate status` + đếm dòng bảng phác thảo, ghi kết quả; nhóm xác nhận.
 
 ### WP-11 — Khôi phục Super Admin ngoài ứng dụng (`LR-15`, `QĐ-41b`)

@@ -2,11 +2,11 @@ import { INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { App } from 'supertest/types';
-import { AppModule } from './../src/app.module';
-import { configureApplication } from './../src/bootstrap';
-import { ACCESS_TOKEN_VERIFIER } from './../src/infrastructure/security/tokens/access-token-verifier.port';
-import { CatalogRepo } from './../src/modules/catalog/catalog.repo';
-import { ApplicationSlugTakenError } from './../src/modules/catalog/errors/catalog.errors';
+import { AppModule } from '../../src/app.module';
+import { configureApplication } from '../../src/bootstrap';
+import { ACCESS_TOKEN_VERIFIER } from '../../src/infrastructure/security/tokens/access-token-verifier.port';
+import { CatalogRepo } from '../../src/modules/catalog/catalog.repo';
+import { ApplicationSlugTakenError } from '../../src/modules/catalog/errors/catalog.errors';
 
 const RECORD = {
   id: '4f24d10d-63ad-49b1-a7a1-c988765990ae',

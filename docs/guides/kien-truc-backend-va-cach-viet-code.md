@@ -690,7 +690,7 @@ createApplication(@Body() body: CreateApplicationBodyDto, @CurrentExternalIdenti
 | Unit         | Policy, hàm thuần, mapper — không HTTP, không DB     | `approval.policy.spec.ts`, `pagination.spec.ts`               |
 | Architecture | Ranh giới module và quyền sở hữu bảng                | `architecture-boundaries.spec.ts`                             |
 | Integration  | Adapter chạm hạ tầng thật                            | `test/integration/catalog.repo.integration-spec.ts`           |
-| E2E          | Hợp đồng qua HTTP; kiểm tra dependency nào được stub | `test/app.e2e-spec.ts`, không chứng minh toàn bộ hạ tầng thật |
+| E2E          | Hợp đồng qua HTTP; kiểm tra dependency nào được stub | `test/e2e/app.e2e-spec.ts`, không chứng minh toàn bộ hạ tầng thật |
 
 Nguyên tắc:
 

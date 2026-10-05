@@ -6,13 +6,13 @@ The `docs/` directory has two intentionally different lifecycles.
 
 ## Reading the current design
 
-| Question                                                       | Source and interpretation                                                                                                                                                                                                                                                |
-| -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| What currently runs?                                           | Source, `package.json`, migrations and exported OpenAPI at the checked-out commit. The restored foundation is not the previous S0 slice.                                                                                                                                 |
+| Question                                                       | Source and interpretation                                                                                                                                                                                                                                                                                                      |
+| -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| What currently runs?                                           | Source, `package.json`, migrations and exported OpenAPI at the checked-out commit. The restored foundation is not the previous S0 slice.                                                                                                                                                                                       |
 | Which architecture is accepted?                                | See the [ADR index](#adr-index). In short: ADR-0001–0005, ADR-0007 and ADR-0008 are Accepted; ADR-0002/0004/0006 are Accepted but superseded in part by ADR-0010 (native passwords, which also retains the single-Super-Admin business invariant); ADR-0009 (single Super Admin, transfer, recovery) is Accepted (2026-10-04). |
-| What should the next identity/workforce implementation follow? | `architecture/native-identity-workforce-design.md` v1.2 (Accepted for implementation) and its verification/maintenance guides; start from `guides/native-handoff.md`.                                                                                                                                               |
-| How do the older S0 documents apply?                           | Native design supersedes their identity/workforce/auth-lock flows; license, money and other unaffected business design remain references with their own status. Do not combine two lock orders or resurrect removed seed scripts.                                        |
-| Where is the audit evidence?                                   | Local [2026-10-03 docs audit](workspace/research/2026-10-03-backend-docs-audit.md), when present. It is ignored session evidence, not a required file in a clean checkout.                                                                                               |
+| What should the next identity/workforce implementation follow? | `architecture/native-identity-workforce-design.md` v1.2 (Accepted for implementation) and its verification/maintenance guides; start from `guides/native-handoff.md`.                                                                                                                                                          |
+| How do the older S0 documents apply?                           | Native design supersedes their identity/workforce/auth-lock flows; license, money and other unaffected business design remain references with their own status. Do not combine two lock orders or resurrect removed seed scripts.                                                                                              |
+| Where is the audit evidence?                                   | Local `workspace/tracking/evidence/` and `workspace/tracking/findings.md`, when present. They are ignored session evidence, not required files in a clean checkout.                                                                                                                                                            |
 
 Durable specifications must explain their contracts and verification criteria without
 depending on an ignored plan being present. Links into `workspace/` are optional
@@ -37,18 +37,18 @@ Do not delete an old ADR when a decision changes. Add a new ADR that supersedes 
 
 Keep this table in the same change that adds or re-labels an ADR. Identify an ADR by repository and path: BE `ADR-0008` is neither Docs `ADR-08` nor work item `0008`. Note that `decisions/0005`–`0010` and the native documents may still be untracked in Git until the Owner decides to commit; the [bundle manifest](guides/native-handoff-manifest.json) lists exactly what a developer needs to receive.
 
-| ADR                                                                          | Topic                                                                                     | Status                                                                        |
-| ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| [0001](decisions/0001-modular-monolith.md)                                   | Modular monolith                                                                          | Accepted                                                                      |
-| [0002](decisions/0002-zod-http-contract-and-auth-defaults.md)                | Zod HTTP contract, deny-by-default auth                                                   | Accepted; OIDC part superseded by 0010                                        |
-| [0003](decisions/0003-flat-feature-module-layout.md)                         | Flat feature modules                                                                      | Accepted                                                                      |
-| [0004](decisions/0004-error-contract-availability-and-request-id-trust.md)   | Error contract, request-id trust                                                          | Accepted; IdP-503 part superseded by 0010                                     |
-| [0005](decisions/0005-database-constraints-outside-prisma.md)                | Hand-written DB constraints, drift control                                                | Accepted                                                                      |
-| [0006](decisions/0006-principal-provisioning-and-authorization.md)           | Principal provisioning, DB authorization                                                  | Accepted; OIDC binding superseded by 0010; §2 amended by 0008                 |
-| [0007](decisions/0007-money-representation.md)                               | Money representation                                                                      | Accepted (not implemented)                                                    |
-| [0008](decisions/0008-effective-roles-super-admin-and-terminated-holders.md) | Effective roles, terminated holders                                                       | Accepted (not implemented); decision 4 count superseded by 0009 |
-| [0009](decisions/0009-single-super-admin-and-transfer.md)                    | Single Super Admin, transfer and offline recovery (rewritten for native 2026-10-04) | Accepted 2026-10-04 (not implemented)         |
-| [0010](decisions/0010-native-password-authentication.md)                     | Native password authentication                                                            | Accepted (direction 2026-10-03; details 2026-10-04; not implemented) |
+| ADR                                                                          | Topic                                                                               | Status                                                               |
+| ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| [0001](decisions/0001-modular-monolith.md)                                   | Modular monolith                                                                    | Accepted                                                             |
+| [0002](decisions/0002-zod-http-contract-and-auth-defaults.md)                | Zod HTTP contract, deny-by-default auth                                             | Accepted; OIDC part superseded by 0010                               |
+| [0003](decisions/0003-flat-feature-module-layout.md)                         | Flat feature modules                                                                | Accepted                                                             |
+| [0004](decisions/0004-error-contract-availability-and-request-id-trust.md)   | Error contract, request-id trust                                                    | Accepted; IdP-503 part superseded by 0010                            |
+| [0005](decisions/0005-database-constraints-outside-prisma.md)                | Hand-written DB constraints, drift control                                          | Accepted                                                             |
+| [0006](decisions/0006-principal-provisioning-and-authorization.md)           | Principal provisioning, DB authorization                                            | Accepted; OIDC binding superseded by 0010; §2 amended by 0008        |
+| [0007](decisions/0007-money-representation.md)                               | Money representation                                                                | Accepted (not implemented)                                           |
+| [0008](decisions/0008-effective-roles-super-admin-and-terminated-holders.md) | Effective roles, terminated holders                                                 | Accepted (not implemented); decision 4 count superseded by 0009      |
+| [0009](decisions/0009-single-super-admin-and-transfer.md)                    | Single Super Admin, transfer and offline recovery (rewritten for native 2026-10-04) | Accepted 2026-10-04 (not implemented)                                |
+| [0010](decisions/0010-native-password-authentication.md)                     | Native password authentication                                                      | Accepted (direction 2026-10-03; details 2026-10-04; not implemented) |
 
 ## Local working documents
 
@@ -57,15 +57,15 @@ Keep this table in the same change that adds or re-labels an ADR. Identify an AD
 ```text
 docs/
 └── workspace/                  # ignored by Git
-    ├── PROGRESS.md             # session memory — read this first
+    ├── PROGRESS.md             # pointer to tracking/
+    ├── tracking/               # board per package, session log, open findings, evidence
     ├── INDEX.md                # registry of every work item
     ├── _template/              # copy this to start an item
-    ├── items/
-    │   └── NNNN-slug/          # one folder per unit of work
-    │       ├── spec.md         # what and why (omit for small work)
-    │       ├── plan.md         # how, task by task
-    │       └── todo.md         # checklist
-    └── research/               # links, experiments, investigation notes
+    └── items/
+        └── NNNN-slug/          # one folder per unit of work
+            ├── spec.md         # what and why (omit for small work)
+            ├── plan.md         # how, task by task
+            └── todo.md         # checklist
 ```
 
 ### Why one folder per item
@@ -80,7 +80,7 @@ An earlier layout kept `specs/` and `plans/` as flat directories. After a dozen 
 - **File names inside an item are fixed:** `spec.md`, `plan.md`, `todo.md`. The folder already carries the identity.
 - **Every file carries frontmatter** with `item`, `title`, `kind`, `status`, `started` and `completed`. Status is one of `proposed`, `active`, `done`, `superseded`, `abandoned`.
 - **At most one item is `active`.**
-- **Closed items are never deleted.** What was tried and rejected is exactly what a future contributor would otherwise redo.
+- **A closed item is kept until the Owner decides to remove it.** What was tried and rejected is what a future contributor would otherwise redo; decisions worth keeping belong in `decisions/` and `ARCHITECTURE.md`, which outlive the workspace. On 2026-10-05 the Owner removed items 0001–0007 and the old research notes; a copy exists outside the repository only as long as the Owner keeps it.
 - **Omit files you do not need.** A one-day fix needs no spec; creating an empty one to look complete helps nobody.
 - **An unticked box in a closed item must be explained** — put it under a "Not in scope (deliberate)" heading, or it reads as forgotten work.
 
@@ -88,7 +88,7 @@ Do not place secrets, production data, access tokens or personal data in `worksp
 
 ## Promotion workflow
 
-1. Explore under `docs/workspace/research/`.
+1. Explore in a scratch location or `docs/workspace/` notes, never in versioned folders.
 2. Open an item: copy `_template/` to `items/NNNN-slug/`, add its row to `INDEX.md`.
 3. Review the proposal with the team.
 4. Build it, ticking the todo only against verified results.

@@ -21,7 +21,7 @@ Giữ đúng thứ tự và tên 8 cột. Dấu `*` ở bảng hướng dẫn ch
 
 | Cột                   | Bắt buộc | Quy tắc                                                                                   |
 | --------------------- | -------- | ----------------------------------------------------------------------------------------- |
-| `employeeCode`        | Có       | Mã duy nhất, tối đa 32 ký tự `[A-Z0-9_-]+`                                                |
+| `employeeCode`        | Có       | Mã duy nhất, tối đa 32 ký tự `[A-Z0-9][A-Z0-9_-]{0,31}` (không bắt đầu bằng `-` hay `_`)  |
 | `fullName`            | Có       | Họ tên, tối đa 200 ký tự                                                                  |
 | `workEmail`           | Không    | Email công việc; không tự trở thành email đăng nhập; tối đa 254 ký tự                     |
 | `employmentType`      | Có       | `STAFF`, `CONTRACTOR`, `FREELANCER`, `INTERN`                                             |
