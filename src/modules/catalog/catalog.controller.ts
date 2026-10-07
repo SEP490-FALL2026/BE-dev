@@ -9,7 +9,7 @@ import { CatalogApplicationPageResponseDto, CatalogApplicationResponseDto } from
 import { CreateApplicationBodyDto } from './dto/create-application.dto';
 import { ListApplicationsQueryDto } from './dto/list-applications.dto';
 
-/** Every authenticated route can also answer 503 while the identity provider is unreachable. */
+/** Protected routes return 503 while authentication is unconfigured or unavailable. */
 const AUTHENTICATION_ERRORS = [
   { status: HttpStatus.UNAUTHORIZED, description: 'Authentication is required.' },
   { status: HttpStatus.SERVICE_UNAVAILABLE, description: 'Authentication is temporarily unavailable.' },

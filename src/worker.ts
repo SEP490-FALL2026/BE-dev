@@ -10,10 +10,11 @@ async function bootstrapWorker(): Promise<void> {
   app.enableShutdownHooks();
 
   // No queue is registered yet: BullMQ wiring is deliberately deferred until a job exists
-  // that is genuinely slow or needs retries (ARCHITECTURE.md section 16). Nothing holds the
+  // that is genuinely slow or needs retries. Nothing holds the
   // event loop open, so this process starts and exits. Say so — a silent immediate exit
   // reads as a defect, and someone will spend an afternoon looking for one.
   new Logger('Worker').warn('Worker started with no registered queue processors; exiting until one exists.');
+  await app.close();
 }
 
 void bootstrapWorker().catch((error: unknown) => {

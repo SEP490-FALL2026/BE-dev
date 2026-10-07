@@ -6,7 +6,7 @@ import {
   S3Client,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { Injectable } from '@nestjs/common';
+import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EnvironmentVariables } from '../config/env-schema';
 import {
@@ -17,7 +17,7 @@ import {
 } from './object-storage.port';
 
 @Injectable()
-export class S3CompatibleObjectStorageAdapter implements ObjectStoragePort {
+export class S3CompatibleObjectStorageAdapter implements ObjectStoragePort, OnModuleDestroy {
   private readonly bucket: string;
   private readonly client: S3Client;
 
@@ -38,6 +38,10 @@ export class S3CompatibleObjectStorageAdapter implements ObjectStoragePort {
         }),
       },
     });
+  }
+
+  onModuleDestroy(): void {
+    this.client.destroy();
   }
 
   createUploadUrl(input: CreateUploadUrlInput): Promise<string> {

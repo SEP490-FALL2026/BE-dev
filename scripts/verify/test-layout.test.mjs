@@ -11,14 +11,13 @@ const GOOD = [
   'test/integration/catalog.repo.integration-spec.ts',
   'test/support/disposable-database.ts',
   'test/config/unused.ts',
-  'test/browser/playwright.config.ts',
 ];
 
 test('a correct tree has no problems', () => {
   assert.deepEqual(layoutProblems(GOOD), []);
 });
 
-// The trap named in the delivery plan: a `.spec.ts` directly under test/ is run by no runner.
+// A test outside registered roots must not pass silently.
 test('a spec outside every runner directory is reported', () => {
   const problems = layoutProblems([...GOOD, 'test/api-inventory.spec.ts']);
   assert.equal(problems.length, 1);
@@ -26,7 +25,7 @@ test('a spec outside every runner directory is reported', () => {
 });
 
 test('a spec with the wrong suffix for its directory is reported', () => {
-  const problems = layoutProblems([...GOOD, 'test/e2e/native-auth.integration-spec.ts']);
+  const problems = layoutProblems([...GOOD, 'test/e2e/catalog.integration-spec.ts']);
   assert.match(problems.join('\n'), /wrong suffix for the e2e runner/);
 });
 
@@ -38,9 +37,8 @@ test('a spec inside a support directory is reported', () => {
   assert.match(layoutProblems([...GOOD, 'test/support/helper.e2e-spec.ts']).join('\n'), /inside test\/support/);
 });
 
-test('a helper inside a runner directory is reported, the browser config is allowed', () => {
+test('a helper inside a runner directory is reported', () => {
   assert.match(layoutProblems([...GOOD, 'test/e2e/helpers.ts']).join('\n'), /non-spec file inside the e2e runner/);
-  assert.deepEqual(layoutProblems(['test/browser/playwright.config.ts']), []);
 });
 
 test('listing differences are reported in both directions', () => {

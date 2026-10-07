@@ -1,15 +1,28 @@
-# Documentation
+# Quy ước tài liệu
 
-Paths in backticks below are relative to the repository root unless stated otherwise.
+- [README](../../README.md): giới thiệu, setup, link bắt đầu.
+- [CONTRIBUTING](../../CONTRIBUTING.md): workflow, lệnh kiểm tra, tiêu chí PR.
+- [ARCHITECTURE](../../ARCHITECTURE.md): code hiện có, trách nhiệm và boundary.
+- [AGENTS](../../AGENTS.md): chỉ dẫn ngắn cho AI; adapter không sao chép rule.
+- `docs/guides/`: thao tác cụ thể đã đối chiếu với code/lệnh.
+- `docs/decisions/`: quyết định có bối cảnh, trạng thái, hệ quả.
+- `docs/architecture/`: thiết kế chi tiết khi task thực sự cần.
 
-## Writing docs, specs and plans
+Một task nhỏ dùng issue/PR; không bắt tạo spec/plan/todo, frontmatter, số work item
+hoặc dùng skill cụ thể. `docs/workspace/` là scratch local tùy chọn, không chứa
+nguồn duy nhất mà contributor/CI cần. Tài liệu được review cùng code phải commit
+ở vị trí phù hợp hoặc nằm trong issue/PR team truy cập được.
 
-Read `docs/README.md` for the full convention. The rules that matter most:
+Phân biệt **Proposed**, **Accepted**, **Superseded/Deprecated** với **Implemented/Verified**.
+Muốn nói đã verified phải có kết quả chạy đúng source và phạm vi kiểm tra.
+Đổi quyết định được chấp nhận bằng ADR mới; giữ ADR cũ và ghi liên kết thay thế.
+Cập nhật [chỉ mục](../README.md) trong cùng thay đổi.
 
-- **Planned work lives in `docs/workspace/items/NNNN-slug/`**, holding `spec.md`, `plan.md` and `todo.md`. One folder per unit of work; file names inside are fixed. Copy `docs/workspace/_template/` to start, register the item in `docs/workspace/INDEX.md`, and give every file frontmatter with `item`, `title`, `kind`, `status`, `started`, `completed`.
-- **`docs/workspace/PROGRESS.md` is optional session memory.** When present, use it to navigate, then verify the relevant source/tests. If absent, continue with versioned docs and source. Update it at the end of a session that changed something; historical results do not prove current behavior.
-- **These paths override any default your tooling suggests.** Planning and spec skills ship with their own conventions — `superpowers:writing-plans` defaults to `docs/superpowers/plans/YYYY-MM-DD-<name>.md`, and `agent-skills:spec-driven-development` defaults to `SPEC.md` at the repository root plus `tasks/plan.md` and `tasks/todo.md`. Do not create any of those. Use the item structure above instead; the skill content is still what you follow, only its output location changes.
-- **Do not add a `docs/ARCHITECTURE.md`, `SPEC.md` or `tasks/` directory.** `ARCHITECTURE.md` at the repository root is the only architecture document. A second one has already been created once by accident and had to be removed before it drifted.
-- **Promote architecture specifications to `docs/architecture/` and decisions to `docs/decisions/`**; these are shared project context and must remain versioned. A **Proposed** document may live there for review only with a status line at the top; implement only from **Accepted** documents, and never describe a Proposed one as approved, implemented or verified (`docs/README.md`, _Status labels_). `docs/workspace/` is Git-ignored and must never hold secrets or real data.
-- **Write a new ADR rather than editing an accepted one** when a decision changes. Annotating an accepted ADR is only for recording that a later ADR amended it, or that part of it is not implemented yet.
-- **Update `ARCHITECTURE.md` and the relevant durable ADR or spec** when an accepted decision or an implemented boundary changes.
+Không dựng kiến trúc thứ hai ở `docs/ARCHITECTURE.md`. Dùng link tới nguồn sở hữu,
+không lặp cả đoạn chỉ để giúp mọi file tự đầy đủ. Khi chuyển nội dung, sửa link
+của tài liệu đang dùng; tài liệu lịch sử cần ghi rõ phạm vi không còn áp dụng.
+Không lưu secrets, dữ liệu thật hoặc đường dẫn cá nhân vào tài liệu chung.
+
+Trước bàn giao: `pnpm rules:check`, `pnpm rules:format`, đọc diff. Bộ kiểm tra
+có phạm vi tường minh trong `rules-check.config.json`; không chứng nhận toàn bộ
+link trong các snapshot lịch sử hoặc nội dung trang web bên ngoài.

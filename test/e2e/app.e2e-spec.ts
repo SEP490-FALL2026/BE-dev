@@ -214,21 +214,21 @@ describe('Application foundation (e2e)', () => {
       });
   });
 
-  it('returns a stable code for an invalid access token', () => {
+  it('rejects supplied tokens until authentication is implemented', () => {
     return request(app!.getHttpServer())
       .get('/api/v1/protected-probe')
       .set('authorization', 'Bearer malformed-token')
-      .expect(401)
+      .expect(503)
       .expect((response) => {
         expect(response.body).toMatchObject({
           success: false,
-          error: { code: 'INVALID_ACCESS_TOKEN' },
+          error: { code: 'AUTHENTICATION_NOT_CONFIGURED' },
         });
       });
   });
 
-  it('answers 503 without describing the infrastructure when the identity provider is unreachable', async () => {
-    // The token here is fine. Only the identity provider is unreachable, so the caller must be
+  it('answers 503 without describing the infrastructure when the authentication service is unreachable', async () => {
+    // The token here is fine. Only the authentication service is unreachable, so the caller must be
     // told to retry rather than to sign in again — and must learn nothing about why.
     const outage = new TokenVerificationUnavailableError(
       Object.assign(new Error('connect ECONNREFUSED 10.0.0.5:8443'), { code: 'ECONNREFUSED' }),
@@ -327,7 +327,7 @@ describe('Global guard order (e2e)', () => {
 
   /**
    * Rate limiting must reject a flood before token verification runs, so an
-   * unauthenticated caller cannot drive one JWKS lookup per request.
+   * unauthenticated caller cannot drive expensive verification work per request.
    *
    * If AuthenticationGuard were registered first, every request would short-circuit
    * with 401 and the throttler would never count any of them, so the request after

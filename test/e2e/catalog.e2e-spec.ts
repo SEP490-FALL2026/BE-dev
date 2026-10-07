@@ -32,13 +32,11 @@ describe('Catalog applications (e2e)', () => {
     };
 
     const moduleFixture: TestingModule = await Test.createTestingModule({ imports: [AppModule] })
-      // Stub the verifier so authenticated routes are reachable without a real identity provider.
+      // Stub the verifier so authenticated routes are reachable without a real authentication service.
       .overrideProvider(ACCESS_TOKEN_VERIFIER)
       .useValue({
         verify: jest.fn().mockResolvedValue({
-          issuer: 'https://identity.example.com/realms/internal',
-          subject: 'oidc-subject-1',
-          email: 'tester@example.com',
+          subject: 'test-user-1',
         }),
       })
       // Stub the repository so this suite stays database-free, like the rest of the E2E tests.

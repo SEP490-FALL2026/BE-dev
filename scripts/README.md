@@ -1,28 +1,27 @@
-# Scripts
+# Development scripts
 
-| Location          | Holds                                                                                      | Rule                                                                                                                         |
-| ----------------- | ------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
-| `scripts/` (root) | `check-rules.mjs`, `check-rules.test.mjs`; later the operational commands the design names | the rules gate keeps its path because the CI workflow calls it; operational commands keep the names the design documents use |
-| `scripts/dev/`    | developer tooling that needs no database: `export-openapi.ts` (`pnpm openapi:export`)      | never connects to a database or a shared service                                                                             |
-| `scripts/verify/` | verification tooling: the test taxonomy, discovery, traceability, DB preflight             | read-only. Reports counts and names, never credentials or row contents                                                       |
+Thư mục root scripts/ chứa công cụ hỗ trợ dev/CI; không chứa business service.
+Scripts không tự chạy khi API nhận request. package.json khai lệnh gọi chúng.
 
-## `scripts/verify/`
+| File                             | Lệnh                | Trách nhiệm                                                        |
+| -------------------------------- | ------------------- | ------------------------------------------------------------------ |
+| check-rules.mjs                  | pnpm rules:check    | Kiểm tra link và quan hệ instruction trong rules-check.config.json |
+| check-rules.test.mjs             | pnpm rules:test     | Regression cho checker                                             |
+| dev/export-openapi.ts            | pnpm openapi:export | Tạo Nest app không listen, sinh openapi.json rồi đóng app          |
+| verify/runners.mjs               | Đọc bởi discovery   | Registry runner, suffix, thư mục                                   |
+| verify/test-layout.mjs           | Đọc bởi discovery   | Logic phát hiện layout sai                                         |
+| verify/test-layout.test.mjs      | pnpm test:scripts   | Regression layout                                                  |
+| verify/verify-test-discovery.mjs | pnpm test:discovery | Đối chiếu file trên disk với Jest --listTests                      |
 
-| File                         | Command               | What it does                                                                                       |
-| ---------------------------- | --------------------- | -------------------------------------------------------------------------------------------------- |
-| `runners.mjs`                | (data)                | the test taxonomy: runner, directory, suffix, command, prerequisites                               |
-| `test-layout.mjs`            | (library)             | pure layout rules used by discovery and covered by `test-layout.test.mjs`                          |
-| `verify-test-discovery.mjs`  | `pnpm test:discovery` | every spec file belongs to exactly one runner and every Jest runner lists what the layout promises |
-| `trace-coverage.mjs`         | `pnpm test:trace`     | acceptance IDs (verification guide) <-> package (delivery plan) <-> test titles in the code        |
-| `native-db-preflight.ts`     | `pnpm db:preflight`   | read-only report of what the native migration would destroy or reshape in `DATABASE_URL`           |
-| `browser-runner-pending.mjs` | `pnpm test:browser`   | fails loudly while no browser runner is installed                                                  |
-| `*.test.mjs`                 | `pnpm test:scripts`   | tests of the tools above (`node:test`); the rules gate is tested by `pnpm rules:test`              |
+## Khi thêm script
 
-`pnpm check` runs `test:scripts`, `test:discovery` and `test:trace` together with the existing gates.
+Đọc [AGENTS](../AGENTS.md), [documentation rules](../docs/rules/documentation.md)
+và rule chuyên đề liên quan. AGENTS áp dụng toàn repo, bao gồm scripts/ và test/.
 
-## Adding an operational command
-
-The design names these (`bootstrap-native.ts`, `auth-keys.ts`, `auth-cleanup.ts`, `auth-outbox-status.ts`, `recover-super-admin.ts`,
-`identity-continuity-check.ts`). Put each at `scripts/<name>.ts`, import code from `src/` through the owning module's public contract,
-print no token, password or key, support `--dry-run` where it writes, and add its integration test under `test/integration/`.
-The verification tools of the same plan belong in `scripts/verify/`: `scripts/verify/verify-api.ts` (B10a).
+- Đặt tên/mục đích rõ, thêm command vào package.json và ghi input/output ở đây.
+- Validation sai phải exit nonzero; không nuốt lỗi để CI xanh.
+- Không chứa business logic đáng lẽ thuộc module; gọi public service khi thật sự cần.
+- Không hardcode credentials, in token hoặc dump dữ liệu thật.
+- Script chạm DB phải kiểm tra đúng target; thao tác phá hủy cần opt-in và ownership.
+- Đóng app/client trong finally. Test script có logic quyết định hoặc thao tác dữ liệu.
+- Không tạo công cụ trace/spec phụ thuộc một kế hoạch dự án đã bỏ.

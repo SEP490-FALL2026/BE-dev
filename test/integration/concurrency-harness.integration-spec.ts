@@ -5,7 +5,7 @@ import {
   provisionDisposableDatabase,
 } from '../support/disposable-database';
 
-describe('Concurrency harness (B1a self-test)', () => {
+describe('Concurrency harness', () => {
   let database: DisposableDatabase;
   let harness: ConcurrencyHarness;
 
@@ -15,11 +15,11 @@ describe('Concurrency harness (B1a self-test)', () => {
   });
 
   afterAll(async () => {
-    await harness.close();
-    await dropDisposableDatabase(database);
+    await harness?.close();
+    if (database) await dropDisposableDatabase(database);
   });
 
-  it('N19/B1a — two real connections interleave in the same order on every round', async () => {
+  it('two real connections interleave in the same order on every round', async () => {
     const a = await harness.session('A');
     const b = await harness.session('B');
 
@@ -31,9 +31,12 @@ describe('Concurrency harness (B1a self-test)', () => {
 
       const queued = b.queueBehind(round);
       let acquired = false;
-      void queued.acquired.then(() => {
-        acquired = true;
-      });
+      void queued.acquired.then(
+        () => {
+          acquired = true;
+        },
+        () => undefined,
+      );
       await queued.blocked;
       events.push('B blocked');
       expect(acquired).toBe(false);
@@ -48,7 +51,7 @@ describe('Concurrency harness (B1a self-test)', () => {
     }
   });
 
-  it('N19/B1a — a request on a free lock is never reported as blocked', async () => {
+  it('a request on a free lock is never reported as blocked', async () => {
     const c = await harness.session('C');
 
     const queued = c.queueBehind(1_000_001);
@@ -58,7 +61,22 @@ describe('Concurrency harness (B1a self-test)', () => {
     await c.release();
   });
 
-  it('N19/B1a — a barrier opens only once every party has arrived', async () => {
+  it('closes sessions even when a lock request is still waiting', async () => {
+    const pending = await ConcurrencyHarness.connect(database.url);
+    try {
+      const holder = await pending.session('cleanup-holder');
+      const waiter = await pending.session('cleanup-waiter');
+      await holder.holdLock(2000001);
+      const queued = waiter.queueBehind(2000001);
+      await queued.blocked;
+      await pending.close();
+      await Promise.allSettled([queued.acquired]);
+    } finally {
+      await pending.close();
+    }
+  });
+
+  it('a barrier opens only once every party has arrived', async () => {
     const barrier = new Barrier(3);
     const order: string[] = [];
     const party = async (name: string): Promise<void> => {

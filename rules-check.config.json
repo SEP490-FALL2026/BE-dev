@@ -4,54 +4,32 @@
     "root": ".",
     "entry": "AGENTS.md",
     "rules": "docs/rules",
-    "files": ["AGENTS.md", "CLAUDE.md", ".github/copilot-instructions.md", ".windsurfrules"],
-    "siblings": ["../../Docs", "../FE-web"],
-    "requiredEdges": [
-      ["AGENTS.md", "docs/rules/README.md"],
-      ["docs/rules/README.md", "../../Docs/rules/skill-workflow.md"],
-      ["docs/rules/implementation.md", "../../Docs/rules/skill-workflow.md"],
-      ["docs/rules/README.md", "docs/rules/implementation.md"],
-      ["docs/rules/README.md", "docs/rules/debug.md"],
-      ["docs/rules/README.md", "docs/rules/audit.md"]
-    ]
-  },
-  {
-    "name": "FE",
-    "root": "../FE-web",
-    "entry": "AGENTS.md",
-    "rules": "rules",
     "files": [
+      "README.md",
+      "CONTRIBUTING.md",
+      "ARCHITECTURE.md",
       "AGENTS.md",
       "CLAUDE.md",
+      "GEMINI.md",
+      ".cursor/rules/database.mdc",
       ".github/copilot-instructions.md",
       ".windsurfrules",
-      ".agents/skills/saas-sentry-web/SKILL.md",
-      ".agents/skills/saas-sentry-web/references/verification.md"
+      "docs/README.md",
+      "docs/guides/ai-tools.md",
+      "docs/guides/kien-truc-backend-va-cach-viet-code.md",
+      "docs/reviews/backend-baseline-review.md",
+      "test/README.md",
+      "scripts/README.md",
+      "docs/guides/containers.md"
     ],
-    "siblings": ["../../Docs", "../BE-dev-software-license-management"],
+    "siblings": [],
     "requiredEdges": [
-      ["AGENTS.md", "rules/README.md"],
-      ["rules/README.md", "../../Docs/rules/skill-workflow.md"],
-      ["rules/implementation.md", "../../Docs/rules/skill-workflow.md"],
-      ["rules/README.md", "rules/implementation.md"],
-      ["rules/README.md", "rules/debug.md"],
-      ["rules/README.md", "rules/audit.md"]
-    ]
-  },
-  {
-    "name": "Docs",
-    "root": "../../Docs",
-    "entry": "AGENTS.md",
-    "rules": "rules",
-    "files": ["AGENTS.md", "CLAUDE.md", ".github/copilot-instructions.md", ".windsurfrules"],
-    "siblings": ["../Code/BE-dev-software-license-management", "../Code/FE-web"],
-    "requiredEdges": [
-      ["AGENTS.md", "rules/README.md"],
-      ["rules/README.md", "rules/skill-workflow.md"],
-      ["rules/implementation.md", "rules/skill-workflow.md"],
-      ["rules/README.md", "rules/implementation.md"],
-      ["rules/README.md", "rules/debug.md"],
-      ["rules/README.md", "rules/audit.md"]
+      ["AGENTS.md", "CONTRIBUTING.md"],
+      ["AGENTS.md", "ARCHITECTURE.md"],
+      ["AGENTS.md", "docs/rules/README.md"],
+      ["CLAUDE.md", "AGENTS.md"],
+      ["GEMINI.md", "AGENTS.md"],
+      [".cursor/rules/database.mdc", "docs/rules/database-business.md"]
     ]
   }
 ]

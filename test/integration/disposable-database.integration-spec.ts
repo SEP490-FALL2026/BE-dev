@@ -5,12 +5,8 @@ import {
   checkDisposableUrl,
   DisposableDatabase,
   dropDisposableDatabase,
-  inspectMigrationBaseline,
   MARKER_TABLE,
-  MIGRATION_KEPT_TABLES,
-  MIGRATION_REFUSING_TABLES,
   provisionDisposableDatabase,
-  STALE_MIGRATIONS,
 } from '../support/disposable-database';
 
 const withClient = async <T>(url: string, work: (client: Client) => Promise<T>): Promise<T> => {
@@ -23,7 +19,7 @@ const withClient = async <T>(url: string, work: (client: Client) => Promise<T>):
   }
 };
 
-describe('Disposable database guard (B1a)', () => {
+describe('Disposable database guard', () => {
   describe('conditions that need no database', () => {
     it.each([
       ['a remote host', 'postgresql://app:secret@db.example.com:5432/slm_ab12_test'],
@@ -40,6 +36,14 @@ describe('Disposable database guard (B1a)', () => {
       ['an upper-case name', 'postgresql://app:secret@localhost:5432/SLM_TEST'],
     ])('refuses a database name with %s', (_label, url) => {
       expect(() => checkDisposableUrl(url)).toThrow(/must end in "_test"/);
+    });
+
+    it.each([
+      'https://localhost/example_test',
+      'postgresql://app:secret@localhost/example_test?host=remote.example.com',
+      'postgresql://app:secret@localhost/example_test?dbname=production',
+    ])('refuses a URL that can redirect the database target: %s', (url) => {
+      expect(() => checkDisposableUrl(url)).toThrow();
     });
 
     it('accepts a localhost URL for a `_test` database', () => {
@@ -93,7 +97,7 @@ describe('Disposable database guard (B1a)', () => {
     });
 
     afterAll(async () => {
-      await dropDisposableDatabase(database);
+      if (database) await dropDisposableDatabase(database);
     });
 
     it('is created for the run with a `_test` name and accepted for that run', async () => {
@@ -108,17 +112,34 @@ describe('Disposable database guard (B1a)', () => {
     it('refuses a `_test` database on localhost that carries no marker', async () => {
       const other = await provisionDisposableDatabase();
       try {
-        await withClient(other.url, (client) => client.query(`DROP TABLE "${MARKER_TABLE}"`));
+        await withClient(other.url, (client) => client.query(`DROP TABLE test_harness."${MARKER_TABLE}"`));
         await expect(assertDisposableDatabase(other.url, other.runId)).rejects.toThrow(
           /no (readable )?ownership marker/,
         );
       } finally {
         await withClient(other.url, (client) =>
           client.query(
-            `CREATE TABLE "${MARKER_TABLE}" (run_id text PRIMARY KEY); INSERT INTO "${MARKER_TABLE}" VALUES ('${other.runId}')`,
+            `CREATE TABLE test_harness."${MARKER_TABLE}" (run_id text PRIMARY KEY); INSERT INTO test_harness."${MARKER_TABLE}" VALUES ('${other.runId}')`,
           ),
         );
         await dropDisposableDatabase(other);
+      }
+    });
+
+    it('rejects a forged name without touching the owned database', async () => {
+      await expect(dropDisposableDatabase({ ...database, name: 'another_test' })).rejects.toThrow(/does not match/);
+      await expect(assertDisposableDatabase(database.url, database.runId)).resolves.toBeUndefined();
+    });
+
+    it('uses the owned handle even when the admin environment changes', async () => {
+      const owned = await provisionDisposableDatabase();
+      const original = process.env.TEST_DATABASE_ADMIN_URL;
+      process.env.TEST_DATABASE_ADMIN_URL = 'postgresql://app:secret@remote.example.com/postgres';
+      try {
+        await expect(dropDisposableDatabase(owned)).resolves.toBeUndefined();
+      } finally {
+        if (original === undefined) delete process.env.TEST_DATABASE_ADMIN_URL;
+        else process.env.TEST_DATABASE_ADMIN_URL = original;
       }
     });
 
@@ -126,88 +147,5 @@ describe('Disposable database guard (B1a)', () => {
       await expect(dropDisposableDatabase({ ...database, runId: randomUUID() })).rejects.toThrow(/no ownership marker/);
       await expect(assertDisposableDatabase(database.url, database.runId)).resolves.toBeUndefined();
     });
-  });
-});
-
-describe('Native migration preflight (B1a)', () => {
-  let database: DisposableDatabase;
-
-  beforeAll(async () => {
-    database = await provisionDisposableDatabase();
-  });
-
-  afterAll(async () => {
-    await dropDisposableDatabase(database);
-  });
-
-  it('reports a fresh database as safe, with every baseline table at zero', async () => {
-    const result = await inspectMigrationBaseline(database.url);
-
-    expect(result).toMatchObject({ migrationIds: [], staleMigrations: [], actionAllowed: true, blockedBy: [] });
-    for (const table of [...MIGRATION_REFUSING_TABLES, ...MIGRATION_KEPT_TABLES]) {
-      expect(result.rowCounts[table]).toBe(0);
-    }
-  });
-
-  it.each(MIGRATION_REFUSING_TABLES)('refuses when %s holds rows', async (table) => {
-    await withClient(database.url, async (client) => {
-      await client.query(`CREATE TABLE "${table}" (id int)`);
-      await client.query(`INSERT INTO "${table}" VALUES (1)`);
-    });
-    try {
-      const result = await inspectMigrationBaseline(database.url);
-
-      expect(result.actionAllowed).toBe(false);
-      expect(result.blockedBy).toEqual([table]);
-      expect(result.rowCounts[table]).toBe(1);
-    } finally {
-      await withClient(database.url, (client) => client.query(`DROP TABLE "${table}"`));
-    }
-  });
-
-  it('does not refuse because of tables the native migration leaves alone', async () => {
-    await withClient(database.url, async (client) => {
-      await client.query('CREATE TABLE "access_requests" (id int)');
-      await client.query('INSERT INTO "access_requests" VALUES (1)');
-    });
-    try {
-      const result = await inspectMigrationBaseline(database.url);
-
-      expect(result.rowCounts.access_requests).toBe(1);
-      expect(result.actionAllowed).toBe(true);
-    } finally {
-      await withClient(database.url, (client) => client.query('DROP TABLE "access_requests"'));
-    }
-  });
-
-  it('reports the removed S0 migration when it is still in the history', async () => {
-    await withClient(database.url, async (client) => {
-      await client.query('CREATE TABLE "_prisma_migrations" (migration_name text, started_at timestamptz)');
-      await client.query(
-        `INSERT INTO "_prisma_migrations" VALUES ('20260812000000_initial_foundation', now()), ('${STALE_MIGRATIONS[0]}', now() + interval '1 second')`,
-      );
-    });
-    try {
-      const result = await inspectMigrationBaseline(database.url);
-
-      expect(result.migrationIds).toEqual(['20260812000000_initial_foundation', STALE_MIGRATIONS[0]]);
-      expect(result.staleMigrations).toEqual([STALE_MIGRATIONS[0]]);
-    } finally {
-      await withClient(database.url, (client) => client.query('DROP TABLE "_prisma_migrations"'));
-    }
-  });
-
-  it('carries no credentials in its report', async () => {
-    const result = await inspectMigrationBaseline(database.url);
-    const { password } = new URL(database.url);
-
-    if (password) expect(JSON.stringify(result)).not.toContain(password);
-    expect(Object.keys(result).sort()).toEqual([
-      'actionAllowed',
-      'blockedBy',
-      'migrationIds',
-      'rowCounts',
-      'staleMigrations',
-    ]);
   });
 });

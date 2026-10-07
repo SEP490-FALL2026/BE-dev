@@ -1,5 +1,12 @@
 overrides:
-  js-yaml: 5.2.2
+  # Security fixes; review/remove pins when upstream dependencies include these versions.
+  js-yaml: 5.4.1
+  proxy-addr: 2.0.8
+  multer: 2.4.0
+  qs: 6.16.0
+  fast-uri: 3.1.8
+  mysql2: 3.23.1
+  '@prisma/config>deepmerge-ts': 8.0.0
 
 allowBuilds:
   '@prisma/engines': true

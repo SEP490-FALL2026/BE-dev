@@ -29,7 +29,7 @@ describe('API inventory (e2e)', () => {
     await app.close();
   });
 
-  it('G01/B1a — the operations exported in OpenAPI are exactly the operations in the coverage manifest', () => {
+  it('the operations exported in OpenAPI are exactly the operations in the coverage manifest', () => {
     const exported = operations.map((operation) => operation.key).sort();
     const manifest = [...API_COVERAGE_MANIFEST].sort();
 
@@ -38,7 +38,7 @@ describe('API inventory (e2e)', () => {
     expect(exported).toEqual(manifest);
   });
 
-  it('G01/B1a — every exported operation has a unique operationId', () => {
+  it('every exported operation has a unique operationId', () => {
     const ids = operations.map((operation) => operation.operationId);
 
     expect(ids.every((id) => typeof id === 'string' && id.length > 0)).toBe(true);

@@ -95,3 +95,25 @@ test('CLI returns nonzero for defects so CI cannot silently pass', (t) => {
   assert.equal(failed.status, 1);
   assert.match(failed.stderr, /missing link target/);
 });
+
+test('Claude and Gemini instruction imports resolve to the shared instructions', (t) => {
+  const f = fixture(t);
+  f.write('CLAUDE.md', '@AGENTS.md\n');
+  f.write('GEMINI.md', '@./AGENTS.md\n');
+  f.config.files.push('CLAUDE.md', 'GEMINI.md');
+  f.config.requiredEdges.push(['CLAUDE.md', 'AGENTS.md'], ['GEMINI.md', 'AGENTS.md']);
+  assert.deepEqual(f.check().errors, []);
+  f.write('GEMINI.md', '@./missing.md\n');
+  assert.ok(f.check().errors.some((e) => e.includes('missing link target ./missing.md')));
+  assert.ok(f.check().errors.some((e) => e.includes('Missing workflow edge: GEMINI.md -> AGENTS.md')));
+});
+
+test('fenced import examples do not load instructions or satisfy required edges', (t) => {
+  const f = fixture(t);
+  f.write('CLAUDE.md', '~~~md\n@AGENTS.md\n@missing.md\n~~~\n');
+  f.config.files.push('CLAUDE.md');
+  f.config.requiredEdges.push(['CLAUDE.md', 'AGENTS.md']);
+  const errors = f.check().errors;
+  assert.ok(errors.some((e) => e.includes('Missing workflow edge: CLAUDE.md -> AGENTS.md')));
+  assert.ok(!errors.some((e) => e.includes('missing link target')));
+});

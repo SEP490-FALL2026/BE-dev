@@ -46,10 +46,8 @@ export function run() {
         result = listed(runner);
       } catch (error) {
         const detail = String(error.stdout ?? '') + String(error.stderr ?? '');
-        // jest exits non-zero when it finds no tests; that is fine only if the disk agrees.
-        result = onDisk.length === 0 ? [] : null;
-        if (result === null)
-          problems.push(`${runner.name}: jest --listTests failed: ${detail.trim() || error.message}`);
+        result = null;
+        problems.push(`${runner.name}: jest --listTests failed: ${detail.trim() || error.message}`);
       }
       if (result) problems.push(...listingProblems(runner, result, files));
     }
