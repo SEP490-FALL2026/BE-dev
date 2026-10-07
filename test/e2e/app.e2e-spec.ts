@@ -5,17 +5,17 @@ import { createZodDto } from 'nestjs-zod';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { z } from 'zod';
-import { AppModule } from './../src/app.module';
-import { configureApplication, createOpenApiDocument } from './../src/bootstrap';
-import { EnvironmentVariables } from './../src/infrastructure/config/env-schema';
-import { ApiSuccessResponse } from './../src/infrastructure/http/decorators/api-success-response.decorator';
-import { RawResponse } from './../src/infrastructure/http/decorators/raw-response.decorator';
-import { successEnvelopeSchema } from './../src/infrastructure/http/dto/success-envelope.dto';
-import { Public } from './../src/infrastructure/security/decorators/public.decorator';
+import { AppModule } from '../../src/app.module';
+import { configureApplication, createOpenApiDocument } from '../../src/bootstrap';
+import { EnvironmentVariables } from '../../src/infrastructure/config/env-schema';
+import { ApiSuccessResponse } from '../../src/infrastructure/http/decorators/api-success-response.decorator';
+import { RawResponse } from '../../src/infrastructure/http/decorators/raw-response.decorator';
+import { successEnvelopeSchema } from '../../src/infrastructure/http/dto/success-envelope.dto';
+import { Public } from '../../src/infrastructure/security/decorators/public.decorator';
 import {
   ACCESS_TOKEN_VERIFIER,
   TokenVerificationUnavailableError,
-} from './../src/infrastructure/security/tokens/access-token-verifier.port';
+} from '../../src/infrastructure/security/tokens/access-token-verifier.port';
 
 const ContractProbeRequestSchema = z.strictObject({
   name: z.string().trim().min(1),

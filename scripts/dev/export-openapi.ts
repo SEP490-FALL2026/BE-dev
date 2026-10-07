@@ -2,8 +2,8 @@ import { NestFactory } from '@nestjs/core';
 import { writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { format, resolveConfig } from 'prettier';
-import { AppModule } from '../src/app.module';
-import { configureApplication, createOpenApiDocument } from '../src/bootstrap';
+import { AppModule } from '../../src/app.module';
+import { configureApplication, createOpenApiDocument } from '../../src/bootstrap';
 
 async function exportOpenApi(): Promise<void> {
   const app = await NestFactory.create(AppModule, { logger: false });

@@ -33,7 +33,9 @@ obtain the relevant requirements before implementing unknown business behavior.
 
 The BRD owns business requirements; local accepted ADRs own implementation choices.
 Identify an ADR by repository/path as well as number: BE `ADR-0002` is not BRD
-`ADR-02`. Do not undo accepted OIDC authentication because a BRD open-question table
-still says the identity provider is undecided. Conversely, an authentication
-foundation is not evidence that business authorization is already implemented.
+`ADR-02`. Owner explicitly replaced the OIDC direction with native passwords on
+2026-10-03; see [ADR-0010](../decisions/0010-native-password-authentication.md).
+Older BRD/ADR OIDC statements require synchronization, not a return to OIDC.
+The restored HEAD still contains OIDC; the native design v1.2 is Accepted and unbuilt.
+An authentication foundation is not evidence that business authorization is implemented.
 Report conflicting current requirements and resolve only the affected decision.

@@ -6,9 +6,9 @@ Tài liệu này dành cho người mới vào codebase, hoặc cho AI agent c�
 - `AGENTS.md` là danh sách luật ngắn gọn, dạng mệnh lệnh.
 - Tài liệu này giải thích **lý do đằng sau các luật đó** và **quy trình viết một tính năng từ đầu đến cuối**.
 
-Khi tài liệu này mâu thuẫn với `ARCHITECTURE.md` hoặc một ADR trong `docs/decisions/`, ADR thắng — và bạn nên sửa tài liệu này.
+BRD sở hữu nghiệp vụ; ADR **Accepted còn hiệu lực** sở hữu quyết định hiện thực. Kiểm tra chú thích superseded trước khi áp dụng ADR. Tài liệu Proposed dùng để review; khi có mâu thuẫn, ghi rõ phạm vi và nguồn thay vì coi mọi ADR đều có quyền ghi đè BRD.
 
-> **Lưu ý về trạng thái hiện tại.** Mọi thứ tài liệu này mô tả đều đã tồn tại trong code, gồm cả module `catalog` ở mục 6 — nó là reference module thật, không phải ví dụ giả định. Mở `src/modules/catalog/` để đối chiếu.
+> **Baseline đối chiếu 2026-10-03: HEAD `78cb675`.** Foundation và module `catalog` tồn tại trong source; ví dụ mục 6 được rút gọn từ module này. Identity/workforce, audit/outbox và `src/core/money` thuộc thiết kế chưa được implement sau restore. Native password là hướng Accepted theo [ADR-0010](../decisions/0010-native-password-authentication.md); chi tiết native v1 vẫn Proposed. Các quy tắc bên dưới phân biệt baseline với yêu cầu cho tính năng mới.
 >
 > Một khác biệt so với bản mô tả ban đầu: route param cũng phải có Zod DTO. Pipe validation toàn cục chạy với `strictSchemaDeclaration`, nên `@Param('id')` kiểu primitive sẽ ném `ZodSchemaDeclarationException` và trả 500 thay vì 422. Xem `dto/application-id.dto.ts`.
 
@@ -20,11 +20,11 @@ Hệ thống là **một ứng dụng NestJS duy nhất, deploy một lần, dù
 
 Điều này khác hai thái cực thường gặp:
 
-| Kiểu | Chia theo | Vấn đề |
-| --- | --- | --- |
-| Layered monolith | `controllers/`, `services/`, `repositories/` | Sửa một tính năng phải nhảy qua 5 thư mục. Không ai biết ranh giới nghiệp vụ ở đâu. |
-| Microservices | mỗi capability một service riêng | Trả giá vận hành (network, deploy, distributed transaction) cho một đội nhỏ chưa cần. |
-| **Modular monolith (đang dùng)** | mỗi capability một thư mục, ranh giới enforce bằng test | Đơn giản như monolith, nhưng ranh giới đủ rõ để sau này tách được nếu thật sự cần. |
+| Kiểu                             | Chia theo                                               | Vấn đề                                                                                |
+| -------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| Layered monolith                 | `controllers/`, `services/`, `repositories/`            | Sửa một tính năng phải nhảy qua 5 thư mục. Không ai biết ranh giới nghiệp vụ ở đâu.   |
+| Microservices                    | mỗi capability một service riêng                        | Trả giá vận hành (network, deploy, distributed transaction) cho một đội nhỏ chưa cần. |
+| **Modular monolith (đang dùng)** | mỗi capability một thư mục, ranh giới enforce bằng test | Đơn giản như monolith, nhưng ranh giới đủ rõ để sau này tách được nếu thật sự cần.    |
 
 Lý do chọn: ADR `docs/decisions/0001-modular-monolith.md`.
 
@@ -70,7 +70,7 @@ modules/A  ──X──►  modules/B (private) (cấm — chỉ được gọi
 
 TypeScript thuần, **không được import** `@nestjs/*`, `@prisma/*`, `@aws-sdk/*`, `bullmq`, hay bất cứ thứ gì trong `infrastructure/`.
 
-Hiện chỉ có `core/application/pagination.ts`. Đây là chỗ cho những thứ *nhỏ, ổn định, test được mà không cần dựng app*.
+Hiện chỉ có `core/application/pagination.ts`. Đây là chỗ cho những thứ _nhỏ, ổn định, test được mà không cần dựng app_.
 
 > **Cảnh báo:** `core/` rất dễ biến thành bãi rác `utils/`. Trước khi bỏ file vào đây, hỏi: "cái này có thật sự dùng chung cho nhiều module, và có thật sự không phụ thuộc framework không?" Nếu chỉ một module dùng, để trong module đó.
 
@@ -80,22 +80,22 @@ Luật này được enforce bởi test `keeps core framework-free` trong `src/a
 
 Mỗi thư mục con là **một trách nhiệm kỹ thuật**, không phải một tầng:
 
-| Thư mục | Trách nhiệm | File chính |
-| --- | --- | --- |
-| `config/` | validate biến môi trường bằng Joi, expose typed config | `env-schema.ts`, `cors.ts` |
-| `http/` | vòng đời HTTP: pipe, interceptor, filter, DTO envelope, decorator OpenAPI | `http-infrastructure.module.ts` |
-| `security/` | xác thực OIDC/JWT, guard toàn cục, rate limit | `authentication.guard.ts`, `oidc-jwt.verifier.ts` |
-| `database/` | kết nối Prisma | `prisma.service.ts` |
-| `queue/` | cấu hình BullMQ, chuẩn job envelope | `queue-infrastructure.module.ts` |
-| `object-storage/` | port lưu file + adapter S3-compatible | `object-storage.port.ts` |
-| `observability/` | request ID, AsyncLocalStorage context, structured log | `request-id.middleware.ts` |
-| `health/` | liveness/readiness probe | `health.controller.ts` |
+| Thư mục           | Trách nhiệm                                                               | File chính                                        |
+| ----------------- | ------------------------------------------------------------------------- | ------------------------------------------------- |
+| `config/`         | validate biến môi trường bằng Joi, expose typed config                    | `env-schema.ts`, `cors.ts`                        |
+| `http/`           | vòng đời HTTP: pipe, interceptor, filter, DTO envelope, decorator OpenAPI | `http-infrastructure.module.ts`                   |
+| `security/`       | xác thực (baseline: OIDC/JWT; đích: native, ADR-0010), guard toàn cục, rate limit | `authentication.guard.ts`, `oidc-jwt.verifier.ts` (baseline) |
+| `database/`       | kết nối Prisma                                                            | `prisma.service.ts`                               |
+| `queue/`          | cấu hình BullMQ, chuẩn job envelope                                       | `queue-infrastructure.module.ts`                  |
+| `object-storage/` | port lưu file + adapter S3-compatible                                     | `object-storage.port.ts`                          |
+| `observability/`  | request ID, AsyncLocalStorage context, structured log                     | `request-id.middleware.ts`                        |
+| `health/`         | liveness/readiness probe                                                  | `health.controller.ts`                            |
 
 **Nguyên tắc:** `infrastructure/` biết về kỹ thuật, **không biết gì về nghiệp vụ**. Nó không được import `modules/`. Nếu bạn định thêm "license" hay "approval" vào một file trong `infrastructure/`, bạn đang đặt sai chỗ.
 
 ### `src/modules/<domain>/` — capability nghiệp vụ
 
-Một module = một năng lực nghiệp vụ end-to-end. Bảng chủ sở hữu đầy đủ nằm ở `ARCHITECTURE.md` mục 3. Ví dụ: `licenses` sở hữu license pool và seat assignment; `access-requests` sở hữu request và approval step; `organization` sở hữu employee và department.
+Một module = một năng lực nghiệp vụ end-to-end. Bảng chủ sở hữu nằm ở `ARCHITECTURE.md`; source baseline mới có reference slice `catalog` và policy của `access-requests`. Trong thiết kế nghiệp vụ, `licenses` sở hữu subscription và assignment; `access-requests` sở hữu request và approval step; `organization` sở hữu Employee, Cost Center và lịch sử quản lý trực tiếp. Department trong schema phác thảo không phải ranh giới phân quyền hoặc định tuyến hiện hành.
 
 ---
 
@@ -170,14 +170,14 @@ Nếu controller trả về dữ liệu không khớp DTO, `ZodSerializerInterce
 
 `src/architecture-boundaries.spec.ts` đọc source dưới dạng text và fail build nếu ai đó phá luật. Đây là thứ giữ cho kiến trúc không mục theo thời gian.
 
-| Test | Chặn điều gì |
-| --- | --- |
-| `keeps core framework-free` | `core/` import NestJS/Prisma/AWS/BullMQ hoặc `infrastructure/` |
+| Test                                                         | Chặn điều gì                                                                              |
+| ------------------------------------------------------------ | ----------------------------------------------------------------------------------------- |
+| `keeps core framework-free`                                  | `core/` import NestJS/Prisma/AWS/BullMQ hoặc `infrastructure/`                            |
 | `prevents imports of another business module private layers` | Module A import `modules/B/services/...`, `modules/B/policies/...`, `modules/B/*.repo.ts` |
-| `keeps business modules flat` | Tạo lại `api/`, `application/`, `domain/`, `infrastructure/` bên trong module |
-| `assigns every Prisma model to an owning module` | Thêm model mới mà quên khai chủ sở hữu |
-| `lets only the owning module touch its Prisma tables` | `licenses` gọi `prisma.employee` thay vì gọi facade của `organization` |
-| `confines PrismaService to repository files` | Controller/policy/service tự query DB thay vì đi qua `*.repo.ts` |
+| `keeps business modules flat`                                | Tạo lại `api/`, `application/`, `domain/`, `infrastructure/` bên trong module             |
+| `assigns every Prisma model to an owning module`             | Thêm model mới mà quên khai chủ sở hữu                                                    |
+| `lets only the owning module touch its Prisma tables`        | `licenses` gọi `prisma.employee` thay vì gọi facade của `organization`                    |
+| `confines PrismaService to repository files`                 | Controller/policy/service tự query DB thay vì đi qua `*.repo.ts`                          |
 
 **Tại sao ranh giới DB quan trọng nhất:** trong monolith, `PrismaService` cho phép mọi module đọc mọi bảng. Ranh giới import còn dễ thấy khi review, nhưng một dòng `prisma.employee.findMany()` lọt vào module `licenses` thì gần như không ai nhận ra — và sau 6 tháng, tách module trở thành bất khả thi. Test ownership là thứ chặn việc đó ngay từ commit đầu tiên.
 
@@ -185,7 +185,7 @@ Nếu controller trả về dữ liệu không khớp DTO, `ZodSerializerInterce
 
 ## 5. Giải phẫu một feature module
 
-Layout **phẳng**: file chính nằm ngay ở gốc module. Chỉ tạo thư mục con khi **thật sự có file cần bỏ vào**.
+Layout **phẳng**: file chính nằm ngay ở gốc module. Chỉ tạo thư mục con khi **thật sự có file cần bỏ vào**. Cây dưới mô tả vị trí được phép; `policies/` và `services/` không mặc nhiên tồn tại trong `catalog`.
 
 ```text
 src/modules/catalog/
@@ -208,7 +208,7 @@ src/modules/catalog/
 
 **`*.controller.ts`** — chỉ làm 3 việc: khai báo route + OpenAPI, nhận DTO đã validate, gọi service. **Không** if/else nghiệp vụ, **không** đụng Prisma. Nếu controller dài hơn ~15 dòng cho một endpoint, logic đang nằm sai chỗ.
 
-**`*.service.ts`** — facade công khai của module, là thứ module khác gọi. Nó *điều phối*: gọi repo, gọi policy, map kết quả, dịch lỗi nghiệp vụ sang lỗi HTTP.
+**`*.service.ts`** — facade công khai của module, là thứ module khác gọi. Nó _điều phối_: gọi repo, gọi policy, map kết quả, dịch lỗi nghiệp vụ sang lỗi HTTP.
 
 > **Cấm:** facade chỉ gọi lại một hàm khác mà không thêm gì (`return this.policy.canDecide(ctx)`). Đó là pass-through wrapper — thêm một tầng để đọc, không thêm giá trị. Nếu chưa có gì để điều phối thì chưa cần facade.
 
@@ -216,7 +216,7 @@ src/modules/catalog/
 
 **`policies/`** — quyết định nghiệp vụ thuần: "được duyệt request này không?". Nhận input thuần, trả kết quả thuần, không async, không DB, không HTTP. Đây là chỗ dễ test nhất và là chỗ nên chứa rule quan trọng nhất. Xem `access-requests/policies/approval.policy.ts` làm mẫu.
 
-**`mappers/`** — chuyển Prisma record sang wire shape. `Date` → ISO string, `Decimal` → string, `BigInt` → string. **Không bao giờ** trả Prisma model thẳng ra HTTP.
+**`mappers/`** — chuyển Prisma record sang wire shape. `Date` → ISO string, `Decimal` (tỷ giá) → string, `BigInt` → string. ADR-0007 quy định tiền dùng minor-unit `bigint` và chuỗi decimal trên dây; `src/core/money`/`formatAmount` là boundary cần xây, chưa có trong baseline sau restore. **Không bao giờ** trả Prisma model thẳng ra HTTP.
 
 ---
 
@@ -224,7 +224,7 @@ src/modules/catalog/
 
 Làm theo thứ tự này. Mỗi bước nhỏ, có test, commit được.
 
-Ví dụ: module `catalog`, hai endpoint — liệt kê và tạo application.
+Ví dụ rút gọn: hai endpoint liệt kê và tạo application của `catalog`; source còn có endpoint detail. Ví dụ minh họa cấu trúc HTTP/persistence, chưa phải mẫu phân quyền nghiệp vụ hoàn chỉnh.
 
 ### Bước 1 — Xác nhận quyền sở hữu dữ liệu
 
@@ -311,7 +311,7 @@ export class CatalogRepo {
   async findPage(input: FindPageInput): Promise<{ rows: CatalogApplicationRecord[]; totalItems: number }> {
     const where = input.status === undefined ? {} : { status: input.status };
 
-    // $transaction để count và findMany đọc cùng một snapshot.
+    // Một transaction; isolation mặc định không bảo đảm chung snapshot cho hai SELECT.
     const [rows, totalItems] = await this.prisma.$transaction([
       this.prisma.catalogApplication.findMany({
         where,
@@ -344,7 +344,9 @@ Ba điểm đáng học ở đây:
 
 1. **Không check-then-insert.** Hai request đồng thời sẽ cùng vượt qua bước "kiểm tra chưa tồn tại" rồi cùng insert. Để database unique index quyết định, rồi dịch lỗi `P2002`.
 2. **Repo ném lỗi nghiệp vụ**, không ném `HttpException`. Repo không biết gì về HTTP.
-3. **Repo chỉ đụng bảng của module mình.** Cần tên phòng ban? Gọi facade của `organization`, đừng join sang bảng `employees`.
+3. **Repo chỉ đụng bảng của module mình.** Cần Cost Center hoặc quản lý trực tiếp? Gọi facade của `organization`, đừng join sang bảng `employees`.
+
+**Giới hạn của baseline:** `$transaction([...])` phía trên dùng isolation của DB. PostgreSQL mặc định `ReadCommitted`, nên page và count có thể nhìn hai snapshot khi có ghi đồng thời. Nếu contract yêu cầu cùng snapshot, cần chọn `RepeatableRead` tường minh và kiểm thử trên PostgreSQL; sắp xếp thêm khóa duy nhất như `id` khi trường `name` trùng (`database-business.md` bắt buộc cả hai). **Đây là finding mở của code baseline** — `catalog.repo.ts` hiện chưa có isolation tường minh lẫn tie-breaker, và comment "cùng snapshot" trong file đó chưa đúng với ReadCommitted — nên đoạn mã trên **không phải mẫu để sao chép** cho list endpoint mới. Lượt audit tài liệu không sửa code. Xem [PostgreSQL isolation](https://www.postgresql.org/docs/17/transaction-iso.html) và [Prisma transaction options](https://www.prisma.io/docs/orm/prisma-client/queries/transactions).
 
 ### Bước 5 — DTO HTTP
 
@@ -595,7 +597,7 @@ export class CatalogModule {}
 ### Envelope thành công
 
 ```json
-{ "success": true, "message": "COMMON.SUCCESS", "data": { } }
+{ "success": true, "message": "COMMON.SUCCESS", "data": {} }
 ```
 
 Tự động do `SuccessEnvelopeInterceptor` bọc. Controller chỉ cần `return data`.
@@ -618,28 +620,28 @@ Tự động do `SuccessEnvelopeInterceptor` bọc. Controller chỉ cần `retu
 
 ### Quy tắc bắt buộc
 
-| Chủ đề | Luật |
-| --- | --- |
-| Base path | `/api/v1`, resource số nhiều kebab-case (`catalog-applications`) |
-| Validation | Zod 4 qua `nestjs-zod`. Không dùng `class-validator`. Request dùng `z.strictObject` |
-| Thời gian | Lưu UTC; trên dây là ISO-8601 string, không phải `Date` |
-| Số tiền | `Decimal` trong DB, string trên dây. **Không dùng JS `number` cho tiền** |
-| Error code | `UPPER_SNAKE` có namespace, ổn định. FE branch theo code, không theo message |
-| `message` | Khoá localization (`COMMON.SUCCESS`), không phải câu hiển thị |
-| Ngoại lệ | Stream/redirect/file/204 được phép bỏ envelope, nhưng phải document và test rõ |
+| Chủ đề     | Luật                                                                                                                                                                                                                             |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Base path  | `/api/v1`, resource số nhiều kebab-case (`catalog-applications`)                                                                                                                                                                 |
+| Validation | Zod 4 qua `nestjs-zod`. Không dùng `class-validator`. Request dùng `z.strictObject`                                                                                                                                              |
+| Thời gian  | Lưu UTC; trên dây là ISO-8601 string, không phải `Date`                                                                                                                                                                          |
+| Số tiền    | ADR-0007: `*_amount_minor BIGINT` + mã tiền tệ trong DB, `bigint` trong code, chuỗi thập phân trường `amount` trên dây. `src/core/money` chưa có trong baseline. **Không dùng JS `number`, `parseFloat`, `toNumber()` cho tiền** |
+| Error code | `UPPER_SNAKE` có namespace, ổn định. FE branch theo code, không theo message                                                                                                                                                     |
+| `message`  | Success dùng khoá localization (`COMMON.SUCCESS`); `error.message` là mô tả kỹ thuật an toàn. FE xử lý lỗi bằng `error.code`, không parse câu chữ                                                                                |
+| Ngoại lệ   | Stream/redirect/file/204 được phép bỏ envelope, nhưng phải document và test rõ                                                                                                                                                   |
 
 ---
 
 ## 8. Xác thực và phân quyền
 
-- **OIDC là giao thức đăng nhập.** API chỉ verify **access token** (JWT). Không dùng ID token để gọi API.
+- **Baseline hiện tại còn OIDC; hướng thay thế là native password theo ADR-0010.** Thiết kế native v1.2 đã Accepted cho triển khai (2026-10-04) nhưng chưa implement; không dùng phần OIDC dưới đây làm hướng dẫn xây tính năng mới. Baseline API chỉ verify **access token** (JWT), không dùng ID token để gọi API.
 - **Deny-by-default.** `AuthenticationGuard` là guard toàn cục. Mọi endpoint đều cần token, trừ khi có `@Public()`.
 - Thêm `@Public()` là một **quyết định bảo mật** — phải được review, không phải cách nhanh để test cho qua.
 - Guard verify chữ ký, `issuer`, `audience`, thuật toán `RS256`, rồi gắn `ExternalIdentity` (`issuer`, `subject`, `email`) vào request.
-- **Danh tính ngoài ≠ quyền trong hệ thống.** `ExternalIdentity` chỉ nói "đây là ai theo IdP". Role, scope, trạng thái active, quy tắc phân quyền nội bộ nằm ở PostgreSQL, thuộc module `identity-access`. **Không bao giờ tin claim role do client gửi.**
+- **Danh tính ngoài ≠ quyền trong hệ thống.** `ExternalIdentity` baseline chỉ nói "đây là ai theo IdP". Boundary `identity-access` phải lấy role, scope và trạng thái từ PostgreSQL; việc đó chưa có trong source sau restore. **Không bao giờ tin claim role do client gửi.**
 - Không thêm password auth làm phương án dự phòng, không tạo engine AND/OR auth-mode cho nhu cầu giả định.
 
-Lấy danh tính trong controller:
+Ví dụ đọc danh tính OIDC ở baseline (không phải chữ ký hiện tại của `CatalogService`; service phải có contract nhận actor đã thiết kế riêng trước khi dùng):
 
 ```ts
 import { CurrentExternalIdentity } from '../../infrastructure/security/models/current-principal';
@@ -647,7 +649,9 @@ import type { ExternalIdentity } from '../../infrastructure/security/tokens/acce
 
 @Post()
 createApplication(@Body() body: CreateApplicationBodyDto, @CurrentExternalIdentity() identity: ExternalIdentity) {
-  return this.catalog.createApplication(body, identity.subject);
+  // identity.subject chỉ là subject IdP, không tự trở thành AppUser ID hay quyền nghiệp vụ.
+  // Baseline CatalogService chưa nhận actor; kiểm quyền nghiệp vụ là phần cần xây.
+  return this.catalog.createApplication(body);
 }
 ```
 
@@ -660,7 +664,7 @@ createApplication(@Body() body: CreateApplicationBodyDto, @CurrentExternalIdenti
 - **Constraint ở database vẫn bắt buộc.** Validation ở application không thay thế được foreign key, unique index, check constraint.
 - **Một use case = một transaction boundary.** Cần ghi nhiều bảng nguyên tử thì bọc trong `$transaction`, đừng dựa vào may mắn.
 - Ghi cross-module cần nguyên tử: facade phải nhận transaction context tường minh. Đừng giả vờ hai lệnh ghi rời rạc là nguyên tử.
-- Side effect không quyết định kết quả chính (audit, notification) là **eventually consistent** — đừng nhét vào transaction chính.
+- **Audit nghiệp vụ bắt buộc cùng transaction với mutation**; audit thất bại thì rollback. Ghi outbox trong transaction đó, gửi email/queue/provider sau commit với retry/idempotency. Chỉ việc giao nhận external side effect là eventually consistent; không làm mất bằng chứng audit khi process crash.
 - **Không hard-delete** audit event, approval decision, financial fact.
 - Migration được commit. Production chỉ chạy `migrate deploy` trong release step, **không** chạy `migrate dev` lúc app khởi động.
 
@@ -681,19 +685,19 @@ createApplication(@Body() body: CreateApplicationBodyDto, @CurrentExternalIdenti
 
 ## 11. Chiến lược test
 
-| Loại | Test cái gì | Ví dụ trong repo |
-| --- | --- | --- |
-| Unit | Policy, hàm thuần, mapper — không HTTP, không DB | `approval.policy.spec.ts`, `pagination.spec.ts` |
-| Architecture | Ranh giới module và quyền sở hữu bảng | `architecture-boundaries.spec.ts` |
-| Integration | Adapter chạm hạ tầng thật | (thêm khi có adapter thật) |
-| E2E | Luồng quan trọng qua HTTP thật | `test/app.e2e-spec.ts` |
+| Loại         | Test cái gì                                          | Ví dụ trong repo                                              |
+| ------------ | ---------------------------------------------------- | ------------------------------------------------------------- |
+| Unit         | Policy, hàm thuần, mapper — không HTTP, không DB     | `approval.policy.spec.ts`, `pagination.spec.ts`               |
+| Architecture | Ranh giới module và quyền sở hữu bảng                | `architecture-boundaries.spec.ts`                             |
+| Integration  | Adapter chạm hạ tầng thật                            | `test/integration/catalog.repo.integration-spec.ts`           |
+| E2E          | Hợp đồng qua HTTP; kiểm tra dependency nào được stub | `test/e2e/app.e2e-spec.ts`, không chứng minh toàn bộ hạ tầng thật |
 
 Nguyên tắc:
 
 - **Viết/cập nhật test trước khi đổi hành vi.** Xem test fail trước, để biết nó thật sự kiểm tra được cái gì.
 - Test phải fail vì lý do đúng. Một test luôn xanh kể cả khi code sai là **tệ hơn không có test** — nó tạo cảm giác an toàn giả.
 - **Không được nới lỏng** validation, CORS, phân quyền, giới hạn file hay rate limit chỉ để test đi qua. Nếu test đòi bạn làm vậy, test hoặc thiết kế đang sai.
-- Auth trong test dùng principal giả đã ký; chỉ E2E auth chuyên biệt mới cần Keycloak thật.
+- Test HTTP có thể dùng token/principal giả đã ký để kiểm hợp đồng, nhưng không chứng minh auth live. Native acceptance cần password/hash/session thật, PostgreSQL, SMTP sink và browser theo [test guide](native-identity-verification.md), với Keycloak tắt.
 
 Lệnh:
 
@@ -701,7 +705,7 @@ Lệnh:
 pnpm test                       # unit + architecture
 pnpm test -- approval.policy    # chạy một file
 pnpm test:e2e                   # E2E
-pnpm check                      # format + lint + prisma validate + typecheck + test + build
+pnpm check                      # rules gates + format + lint + prisma validate + typecheck + test + build
 ```
 
 ---
@@ -715,7 +719,7 @@ pnpm check                      # format + lint + prisma validate + typecheck + 
 - [ ] `Date`/`Decimal`/`BigInt` đã map sang ISO/string trong mapper.
 - [ ] Endpoint mới có `@ApiSuccessResponse` với DTO envelope đầy đủ, và `@ApiErrorResponses` cho các mã lỗi thực tế.
 - [ ] Endpoint ẩn danh có `@Public()` và đã được review bảo mật.
-- [ ] Error code ổn định, có namespace; `message` là khoá localization.
+- [ ] Error code ổn định, có namespace; success `message` là khoá localization; lỗi không lộ chi tiết nhạy cảm.
 - [ ] Test viết trước, đã thấy nó fail, giờ đã pass.
 - [ ] `pnpm check` xanh.
 - [ ] Nếu ranh giới hoặc quyết định kiến trúc thay đổi: đã cập nhật `ARCHITECTURE.md` và ADR tương ứng.
@@ -724,31 +728,31 @@ pnpm check                      # format + lint + prisma validate + typecheck + 
 
 ## 13. Anti-pattern — dấu hiệu code đang sai chỗ
 
-| Dấu hiệu | Vì sao sai | Làm đúng |
-| --- | --- | --- |
-| `prisma.employee` trong module `licenses` | Phá quyền sở hữu dữ liệu; sau này không tách được | Gọi facade của `organization` |
-| Facade chỉ `return this.policy.x(input)` | Pass-through wrapper, thêm tầng không thêm giá trị | Bỏ facade cho đến khi có gì để điều phối |
-| `if` nghiệp vụ trong controller | Logic tản mát, không test được nếu không dựng HTTP | Đưa vào service hoặc policy |
-| Tạo `api/`, `application/`, `domain/` trong module | Kiến trúc trang trí; đọc một tính năng phải mở 5 thư mục | Giữ layout phẳng |
-| `forwardRef()` để chữa circular dependency | Che giấu lỗi phân chia trách nhiệm | Xem lại ownership hoặc nâng orchestration lên module cao hơn |
-| Trả Prisma model thẳng ra HTTP | Rò field nội bộ; đổi DB thành breaking change cho FE | Dùng mapper + response DTO |
-| Tạo `utils/` hoặc `common/` chứa logic nghiệp vụ | Bãi rác, không ai sở hữu | Đặt vào module sở hữu nghiệp vụ đó |
-| Base controller/service/repository generic | Trừu tượng sai, chặn từng module tiến hoá riêng | Viết cụ thể cho từng module |
-| Check-then-insert để chống trùng | Race condition | Dùng unique constraint + dịch lỗi `P2002` |
-| Scaffold hàng loạt folder rỗng cho 11 module | Cấu trúc rỗng không chứng minh được gì | Làm từng vertical slice hoàn chỉnh |
-| Nới validation/CORS/authz cho test pass | Biến lỗ hổng bảo mật thành vĩnh viễn | Sửa test hoặc sửa thiết kế |
+| Dấu hiệu                                           | Vì sao sai                                               | Làm đúng                                                     |
+| -------------------------------------------------- | -------------------------------------------------------- | ------------------------------------------------------------ |
+| `prisma.employee` trong module `licenses`          | Phá quyền sở hữu dữ liệu; sau này không tách được        | Gọi facade của `organization`                                |
+| Facade chỉ `return this.policy.x(input)`           | Pass-through wrapper, thêm tầng không thêm giá trị       | Bỏ facade cho đến khi có gì để điều phối                     |
+| `if` nghiệp vụ trong controller                    | Logic tản mát, không test được nếu không dựng HTTP       | Đưa vào service hoặc policy                                  |
+| Tạo `api/`, `application/`, `domain/` trong module | Kiến trúc trang trí; đọc một tính năng phải mở 5 thư mục | Giữ layout phẳng                                             |
+| `forwardRef()` để chữa circular dependency         | Che giấu lỗi phân chia trách nhiệm                       | Xem lại ownership hoặc nâng orchestration lên module cao hơn |
+| Trả Prisma model thẳng ra HTTP                     | Rò field nội bộ; đổi DB thành breaking change cho FE     | Dùng mapper + response DTO                                   |
+| Tạo `utils/` hoặc `common/` chứa logic nghiệp vụ   | Bãi rác, không ai sở hữu                                 | Đặt vào module sở hữu nghiệp vụ đó                           |
+| Base controller/service/repository generic         | Trừu tượng sai, chặn từng module tiến hoá riêng          | Viết cụ thể cho từng module                                  |
+| Check-then-insert để chống trùng                   | Race condition                                           | Dùng unique constraint + dịch lỗi `P2002`                    |
+| Scaffold hàng loạt folder rỗng cho 11 module       | Cấu trúc rỗng không chứng minh được gì                   | Làm từng vertical slice hoàn chỉnh                           |
+| Nới validation/CORS/authz cho test pass            | Biến lỗ hổng bảo mật thành vĩnh viễn                     | Sửa test hoặc sửa thiết kế                                   |
 
 ---
 
 ## 14. Đọc tiếp
 
-| Cần gì | Đọc file nào |
-| --- | --- |
-| Thiết kế hệ thống đầy đủ, bảng sở hữu module | `ARCHITECTURE.md` |
-| Luật ngắn gọn cho người/AI đóng góp code | `AGENTS.md` |
-| Lý do chọn modular monolith | `docs/decisions/0001-modular-monolith.md` |
-| Lý do chọn Zod + auth mặc định | `docs/decisions/0002-zod-http-contract-and-auth-defaults.md` |
-| Lý do layout module phẳng | `docs/decisions/0003-flat-feature-module-layout.md` |
-| Quy ước thư mục `docs/` | `docs/README.md` |
-| Mẫu policy đã có test | `src/modules/access-requests/policies/approval.policy.ts` |
-| Ranh giới được enforce thế nào | `src/architecture-boundaries.spec.ts` |
+| Cần gì                                       | Đọc file nào                                                 |
+| -------------------------------------------- | ------------------------------------------------------------ |
+| Thiết kế hệ thống đầy đủ, bảng sở hữu module | `ARCHITECTURE.md`                                            |
+| Luật ngắn gọn cho người/AI đóng góp code     | `AGENTS.md`                                                  |
+| Lý do chọn modular monolith                  | `docs/decisions/0001-modular-monolith.md`                    |
+| Lý do chọn Zod + auth mặc định               | `docs/decisions/0002-zod-http-contract-and-auth-defaults.md` |
+| Lý do layout module phẳng                    | `docs/decisions/0003-flat-feature-module-layout.md`          |
+| Quy ước thư mục `docs/`                      | `docs/README.md`                                             |
+| Mẫu policy đã có test                        | `src/modules/access-requests/policies/approval.policy.ts`    |
+| Ranh giới được enforce thế nào               | `src/architecture-boundaries.spec.ts`                        |

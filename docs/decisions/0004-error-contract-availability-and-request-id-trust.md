@@ -2,7 +2,9 @@
 
 ## Status
 
-Accepted. Amends ADR-0002, which it does not replace.
+Accepted 2026-08-21. Amends ADR-0002, which it does not replace.
+
+**2026-10-03 annotation:** the "unreachable identity provider is 503 `TOKEN_VERIFICATION_UNAVAILABLE`" decision describes the OIDC baseline and is superseded in part by [ADR-0010](0010-native-password-authentication.md): the native replacement defines its own dependency-failure contract in the [native design](../architecture/native-identity-workforce-design.md) (Proposed). The single-5xx-code, request-id-trust, route-param and `@RawResponse()` decisions are unaffected, as is the 401-versus-503 distinction.
 
 ## Date
 
