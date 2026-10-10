@@ -117,3 +117,22 @@ test('fenced import examples do not load instructions or satisfy required edges'
   assert.ok(errors.some((e) => e.includes('Missing workflow edge: CLAUDE.md -> AGENTS.md')));
   assert.ok(!errors.some((e) => e.includes('missing link target')));
 });
+
+test('shared planning checks nested items but excludes personal scratch', (t) => {
+  const f = fixture(t);
+  mkdirSync(join(f.root, 'workspace/items/example'), { recursive: true });
+  mkdirSync(join(f.root, 'workspace/local'), { recursive: true });
+  f.config.directories = ['workspace'];
+  f.config.excludeDirectories = ['workspace/local'];
+  f.write('workspace/local/note.md', '[private](missing-local.md)');
+  f.write('workspace/items/example/spec.md', '[broken](missing-shared.md)');
+  assert.ok(f.check().errors.some((e) => e.includes('missing-shared.md')));
+  assert.ok(!f.check().errors.some((e) => e.includes('missing-local.md')));
+  f.write('workspace/items/example/spec.md', '# Shared spec');
+  assert.deepEqual(f.check().errors, []);
+});
+test('missing configured documentation directory fails', (t) => {
+  const f = fixture(t);
+  f.config.directories = ['missing-workspace'];
+  assert.ok(f.check().errors.some((e) => e.includes('Missing documentation directory')));
+});

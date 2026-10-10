@@ -11,7 +11,7 @@ không phải bộ chức năng đã hoàn thành.
 | decisions/ | Vì sao chọn một hướng kỹ thuật; ghi rõ accepted khác implemented          |
 | examples/  | Dữ liệu mẫu/template tham khảo, không phải runtime hay acceptance đã pass |
 | reviews/   | Kết quả review và phạm vi đã kiểm chứng                                   |
-| workspace/ | Ghi chú local tùy chọn, không version; giữ _template để viết kế hoạch mới |
+| workspace/ | Spec/plan chung trên Git; chỉ local/ là nháp cá nhân                      |
 
 Kiến trúc hiện hành nằm ở ARCHITECTURE.md root. Không cần tạo một bản song song
 trong docs/architecture. Các gói triển khai auth/US cũ đã được dọn khỏi baseline.
@@ -29,3 +29,5 @@ Số ADR bị khuyết không cần đánh lại. Định hướng tài khoản/
 ở ARCHITECTURE; thiết kế chi tiết sẽ được lập lại theo US.
 
 [Rules](rules/README.md) · [Tests](../test/README.md) · [Scripts](../scripts/README.md)
+
+[Quy trình thiết kế](workspace/README.md) · [Roadmap](roadmap.md) · [Nguồn BRD/US](workspace/sources.md)

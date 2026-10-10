@@ -47,3 +47,7 @@ Nguồn chính thức, đối chiếu 2026-10-07:
 - [Claude Code memory/imports](https://code.claude.com/docs/en/memory)
 - [Gemini CLI context](https://geminicli.com/docs/cli/gemini-md/)
 - [Cursor rules](https://cursor.com/docs/rules)
+
+## Thiết kế và bàn giao
+
+Dùng [workspace chung](../workspace/README.md) và [roadmap](../roadmap.md). Superpowers tùy chọn; dùng mẫu/vị trí của repo, không sinh spec/plan trùng lặp. Dev ngang quyền review lẫn nhau; người hoặc AI nhận cùng tài liệu đã review, không phụ thuộc chat.

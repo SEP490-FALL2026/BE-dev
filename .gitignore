@@ -45,9 +45,8 @@ lerna-debug.log*
 .env.*
 !.env.example
 
-# Local documentation workspace. Research notes, working plans and draft specs
-# may contain unfinished assumptions and are intentionally not versioned.
-/docs/workspace/
+# Shared planning is versioned; only personal scratch is ignored.
+/docs/workspace/local/
 
 # Durable documentation under /docs/architecture, /docs/decisions and
 # /docs/guides remains versioned as shared project context.

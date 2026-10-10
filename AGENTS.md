@@ -29,7 +29,9 @@ Scope: this backend repository. Work from its root with the pnpm version in `pac
 - Generated `src/generated/`, `dist/` and `openapi.json` change through their generators.
 - Do not load every ADR, design document or external repository by default.
   Obtain the relevant requirement before inventing missing business behavior.
-- No mandatory skill, private workspace, work-item numbering or multi-agent workflow.
+- For US design and implementation handoff, follow [shared planning](docs/workspace/README.md).
+- Use reviewed BRD/US revisions and spec/plan; never invent approvals or acceptance.
+- No mandatory skill, private workspace, sequential numbering or multi-agent workflow.
 
 ## Verify and hand off
 

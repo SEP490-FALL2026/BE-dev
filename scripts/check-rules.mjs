@@ -42,10 +42,11 @@ export function anchors(text) {
   return ids;
 }
 
-function markdownFiles(directory) {
+function markdownFiles(directory, excluded = new Set()) {
+  if (excluded.has(directory)) return [];
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
     const path = resolve(directory, entry.name);
-    return entry.isDirectory() ? markdownFiles(path) : entry.name.endsWith('.md') ? [path] : [];
+    return entry.isDirectory() ? markdownFiles(path, excluded) : entry.name.endsWith('.md') ? [path] : [];
   });
 }
 
@@ -57,7 +58,16 @@ export function checkRepository(root, config, strict = false) {
   const rules = resolve(root, config.rules);
   if (!existsSync(rules)) return { errors: [`Missing rules directory: ${rules}`], unavailable: [], files: 0, links: 0 };
   const ruleFiles = markdownFiles(rules);
-  const files = [...new Set([...ruleFiles, ...config.files.map((path) => resolve(root, path))])];
+  const excluded = new Set((config.excludeDirectories ?? []).map((path) => resolve(root, path)));
+  const extraFiles = (config.directories ?? []).flatMap((path) => {
+    const directory = resolve(root, path);
+    if (!existsSync(directory)) {
+      errors.push('Missing documentation directory: ' + path);
+      return [];
+    }
+    return markdownFiles(directory, excluded);
+  });
+  const files = [...new Set([...ruleFiles, ...extraFiles, ...config.files.map((path) => resolve(root, path))])];
   const graph = new Map();
   let links = 0;
   for (const file of files) {

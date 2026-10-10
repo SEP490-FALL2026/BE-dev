@@ -15,9 +15,7 @@ Bug fix cần test tái hiện lỗi ở boundary phù hợp. Refactor giữ pub
 không gộp tính năng hoặc nâng dependency không liên quan. Sửa tài liệu cần kiểm tra
 nội dung, link và format; không cần test giả cho một câu văn.
 
-Task nhỏ dùng issue/PR, không cần spec/plan/todo hay work-item ID riêng.
-Thay đổi nhiều bước có thể ghi kế hoạch trong issue/PR. Quyết định kiến trúc lâu dài
-dùng ADR. `docs/workspace/` là ghi chú local tùy chọn, không phải đầu vào bắt buộc.
+Task nhỏ không đổi nghiệp vụ/contract dùng issue/PR. Tính năng US hoặc thay đổi nhiều bước dùng [quy trình chung](docs/workspace/README.md) và [roadmap](docs/roadmap.md): làm rõ BRD/US → thiết kế → dev khác review → bàn giao cho người hoặc AI implement. Dev ngang quyền, luân phiên vai trò theo hạng mục. Không bắt skill/plugin. Quyết định kiến trúc lâu dài dùng ADR.
 
 ## Lệnh kiểm tra
 

@@ -40,7 +40,7 @@
     "check": "pnpm rules:check && pnpm rules:test && pnpm rules:format && pnpm format:check && pnpm lint && pnpm prisma:validate && pnpm prisma:generate && pnpm typecheck && pnpm test && pnpm test:scripts && pnpm test:discovery && pnpm build",
     "rules:check": "node scripts/check-rules.mjs",
     "rules:test": "node --test scripts/check-rules.test.mjs",
-    "rules:format": "prettier --check README.md CONTRIBUTING.md ARCHITECTURE.md AGENTS.md CLAUDE.md GEMINI.md .github/copilot-instructions.md docs/README.md \"docs/rules/*.md\" docs/guides/ai-tools.md docs/guides/containers.md docs/guides/kien-truc-backend-va-cach-viet-code.md docs/reviews/backend-baseline-review.md test/README.md scripts/README.md \"scripts/check-rules*.mjs\" rules-check.config.json .github/workflows/ci.yml && prettier --check --parser markdown .windsurfrules \".cursor/rules/*.mdc\""
+    "rules:format": "prettier --check README.md CONTRIBUTING.md ARCHITECTURE.md AGENTS.md CLAUDE.md GEMINI.md .github/copilot-instructions.md docs/README.md docs/roadmap.md \"docs/workspace/**/*.md\" \"!docs/workspace/local/**\" \"docs/rules/*.md\" docs/guides/ai-tools.md docs/guides/containers.md docs/guides/kien-truc-backend-va-cach-viet-code.md docs/reviews/backend-baseline-review.md test/README.md scripts/README.md \"scripts/check-rules*.mjs\" rules-check.config.json .github/workflows/ci.yml && prettier --check --parser markdown .windsurfrules \".cursor/rules/*.mdc\""
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1107.0",

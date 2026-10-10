@@ -20,7 +20,8 @@
       "docs/reviews/backend-baseline-review.md",
       "test/README.md",
       "scripts/README.md",
-      "docs/guides/containers.md"
+      "docs/guides/containers.md",
+      "docs/roadmap.md"
     ],
     "siblings": [],
     "requiredEdges": [
@@ -30,6 +31,8 @@
       ["CLAUDE.md", "AGENTS.md"],
       ["GEMINI.md", "AGENTS.md"],
       [".cursor/rules/database.mdc", "docs/rules/database-business.md"]
-    ]
+    ],
+    "directories": ["docs/workspace"],
+    "excludeDirectories": ["docs/workspace/local"]
   }
 ]
