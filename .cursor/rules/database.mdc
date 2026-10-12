@@ -1,0 +1,8 @@
+---
+description: Database changes in this backend
+globs: prisma/**, src/modules/**/*.repo.ts, test/integration/**
+alwaysApply: false
+---
+
+Before changing persistence, read [database rules](../../docs/rules/database-business.md).
+Use the isolated setup in [test guide](../../test/README.md) for database verification.

@@ -7,8 +7,6 @@ interface FindPageInput {
   page: number;
   pageSize: number;
   status?: CatalogApplicationStatus;
-  /** Test-only isolation hook so an integration run cannot see rows it did not create. */
-  slugPrefix?: string;
 }
 
 interface CreateInput {
@@ -34,22 +32,23 @@ export class CatalogRepo {
   async findPage(input: FindPageInput): Promise<{ rows: CatalogApplicationRecord[]; totalItems: number }> {
     const where = {
       ...(input.status === undefined ? {} : { status: input.status }),
-      ...(input.slugPrefix === undefined ? {} : { slug: { startsWith: input.slugPrefix } }),
     };
 
     // One transaction so the page and the count read the same snapshot; otherwise a
     // concurrent insert makes totalItems disagree with the rows just returned.
-    const [rows, totalItems] = await this.prisma.$transaction([
-      this.prisma.catalogApplication.findMany({
-        where,
-        orderBy: { name: 'asc' },
-        skip: (input.page - 1) * input.pageSize,
-        take: input.pageSize,
-      }),
-      this.prisma.catalogApplication.count({ where }),
-    ]);
-
-    return { rows, totalItems };
+    return this.prisma.$transaction(
+      async (tx) => {
+        const rows = await tx.catalogApplication.findMany({
+          where,
+          orderBy: [{ name: 'asc' }, { id: 'asc' }],
+          skip: (input.page - 1) * input.pageSize,
+          take: input.pageSize,
+        });
+        const totalItems = await tx.catalogApplication.count({ where });
+        return { rows, totalItems };
+      },
+      { isolationLevel: 'RepeatableRead' },
+    );
   }
 
   findById(id: string): Promise<CatalogApplicationRecord | null> {

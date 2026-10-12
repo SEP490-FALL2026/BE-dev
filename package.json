@@ -11,8 +11,8 @@
   },
   "scripts": {
     "build": "pnpm prisma:generate && nest build",
-    "format": "prettier --write \"{src,test,scripts}/**/*.ts\" \"*.{json,md}\"",
-    "format:check": "prettier --check \"{src,test,scripts}/**/*.ts\" \"*.{json,md}\"",
+    "format": "prettier --write \"{src,test,scripts}/**/*.{ts,mjs,cjs}\" \"*.{json,md}\"",
+    "format:check": "prettier --check \"{src,test,scripts}/**/*.{ts,mjs,cjs}\" \"*.{json,md}\"",
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
@@ -24,7 +24,7 @@
     "prisma:format": "prisma format",
     "prisma:generate": "prisma generate",
     "prisma:validate": "prisma validate",
-    "openapi:export": "ts-node scripts/export-openapi.ts",
+    "openapi:export": "ts-node scripts/dev/export-openapi.ts",
     "db:migrate:dev": "prisma migrate dev",
     "db:migrate:deploy": "prisma migrate deploy",
     "db:studio": "prisma studio",
@@ -32,14 +32,15 @@
     "test": "jest --runInBand",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
-    "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "jest --config ./test/jest-e2e.json --runInBand",
-    "test:integration": "jest --config ./test/integration/jest-integration.json --runInBand",
-    "check": "pnpm rules:check && pnpm rules:test && pnpm rules:format && pnpm format:check && pnpm lint && pnpm prisma:validate && pnpm typecheck && pnpm test && pnpm build",
+    "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/jest/bin/jest.js --runInBand",
+    "test:e2e": "jest --config ./test/config/jest.e2e.cjs --runInBand",
+    "test:integration": "jest --config ./test/config/jest.integration.cjs --runInBand",
+    "test:discovery": "node scripts/verify/verify-test-discovery.mjs",
+    "test:scripts": "node --test \"scripts/verify/*.test.mjs\"",
+    "check": "pnpm rules:check && pnpm rules:test && pnpm rules:format && pnpm format:check && pnpm lint && pnpm prisma:validate && pnpm prisma:generate && pnpm typecheck && pnpm test && pnpm test:scripts && pnpm test:discovery && pnpm build",
     "rules:check": "node scripts/check-rules.mjs",
-    "rules:check:workspace": "node scripts/check-rules.mjs --workspace",
     "rules:test": "node --test scripts/check-rules.test.mjs",
-    "rules:format": "prettier --check AGENTS.md CLAUDE.md .github/copilot-instructions.md docs/README.md \"docs/rules/*.md\" \"scripts/check-rules*.mjs\" rules-check.config.json .github/workflows/ci.yml && prettier --check --parser markdown .windsurfrules"
+    "rules:format": "prettier --check README.md CONTRIBUTING.md ARCHITECTURE.md AGENTS.md CLAUDE.md GEMINI.md .github/copilot-instructions.md docs/README.md docs/roadmap.md \"docs/workspace/**/*.md\" \"!docs/workspace/local/**\" \"docs/rules/*.md\" docs/guides/ai-tools.md docs/guides/containers.md docs/guides/kien-truc-backend-va-cach-viet-code.md docs/reviews/backend-baseline-review.md test/README.md scripts/README.md \"scripts/check-rules*.mjs\" rules-check.config.json .github/workflows/ci.yml && prettier --check --parser markdown .windsurfrules \".cursor/rules/*.mdc\""
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1107.0",
@@ -57,8 +58,7 @@
     "bullmq": "^6.0.11",
     "dotenv": "^17.4.2",
     "helmet": "^8.3.0",
-    "joi": "^18.2.3",
-    "jose": "^5.10.0",
+    "joi": "^18.2.9",
     "nestjs-zod": "5.5.0",
     "pg": "^8.23.0",
     "reflect-metadata": "^0.2.2",
@@ -104,7 +104,11 @@
       "^.+\\.(t|j)s$": "ts-jest"
     },
     "collectCoverageFrom": [
-      "**/*.(t|j)s"
+      "src/**/*.ts",
+      "!src/generated/**",
+      "!src/**/*.spec.ts",
+      "!src/main.ts",
+      "!src/worker.ts"
     ],
     "coverageDirectory": "coverage",
     "testEnvironment": "node"

@@ -7,13 +7,26 @@ on:
       - 'test/**'
       - 'scripts/**'
       - 'prisma/**'
+      - 'prisma.config.ts'
+      - 'compose.yaml'
+      - 'Dockerfile'
+      - '.dockerignore'
+      - 'infra/**'
+      - '.env.example'
+      - 'openapi.json'
       - 'package.json'
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
       - 'tsconfig*.json'
       - 'eslint.config.mjs'
       - '.github/workflows/ci.yml'
+      - 'README.md'
+      - 'CONTRIBUTING.md'
+      - 'ARCHITECTURE.md'
       - 'AGENTS.md'
+      - 'GEMINI.md'
+      - '.cursor/rules/**'
+      - '.claude/**'
       - 'CLAUDE.md'
       - '.windsurfrules'
       - '.github/copilot-instructions.md'
@@ -22,19 +35,32 @@ on:
       - '.prettierrc'
       - '.prettierignore'
   push:
-    branches: [main]
+    branches: [main, dev]
     paths:
       - 'src/**'
       - 'test/**'
       - 'scripts/**'
       - 'prisma/**'
+      - 'prisma.config.ts'
+      - 'compose.yaml'
+      - 'Dockerfile'
+      - '.dockerignore'
+      - 'infra/**'
+      - '.env.example'
+      - 'openapi.json'
       - 'package.json'
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
       - 'tsconfig*.json'
       - 'eslint.config.mjs'
       - '.github/workflows/ci.yml'
+      - 'README.md'
+      - 'CONTRIBUTING.md'
+      - 'ARCHITECTURE.md'
       - 'AGENTS.md'
+      - 'GEMINI.md'
+      - '.cursor/rules/**'
+      - '.claude/**'
       - 'CLAUDE.md'
       - '.windsurfrules'
       - '.github/copilot-instructions.md'
@@ -49,21 +75,23 @@ permissions:
 jobs:
   quality:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: app
+          POSTGRES_PASSWORD: test-only
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U app -d postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 10
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
-
-      - name: Set up Node.js for rules
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-
-      - name: Check rules graph and regression fixtures
-        run: |
-          node scripts/check-rules.mjs
-          node --test scripts/check-rules.test.mjs
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
@@ -85,6 +113,16 @@ jobs:
 
       - name: Run API E2E tests
         run: pnpm test:e2e
+
+      - name: Run isolated PostgreSQL integration tests
+        run: pnpm test:integration
+        env:
+          TEST_DATABASE_ADMIN_URL: postgresql://app:test-only@127.0.0.1:5432/postgres
+
+      - name: Validate Compose and build runtime
+        run: |
+          docker compose config --quiet
+          docker build -t slm-api:ci .
 
       - name: Verify OpenAPI export
         run: |

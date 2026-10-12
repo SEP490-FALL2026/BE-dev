@@ -1,5 +1,9 @@
 # ADR-0007: Store money as integer minor units with a frozen reporting snapshot
 
+> Retained technical decision only. Old work-package IDs and implementation notes below
+> are historical; they do not require rebuilding the removed plans. No money schema or
+> implementation exists in the reset baseline. Start new work from the current US.
+
 ## Status
 
 **Accepted** — 2026-10-03, by the project Owner (revision 2 decision text unchanged; only this _Status_ section was updated on acceptance). Closes `LR-11` of Docs `ERD/logical/LOGICAL-ERD-S0.md` (v0.4). **Accepted is not implemented:** no code or migration implements it yet (work package WP-05); the only money-related object in the database is `currencies.minor_unit`. The worked examples below were checked with an independent exact computation (Python `decimal`, 2026-10-03) — that is a check of the design examples, **not** of `core/money`, which does not exist yet.

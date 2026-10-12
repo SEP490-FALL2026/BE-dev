@@ -25,9 +25,6 @@ export interface EnvironmentVariables {
   REDIS_USERNAME: string;
   REDIS_PASSWORD: string;
   REDIS_TLS: boolean;
-  OIDC_ISSUER: string;
-  OIDC_AUDIENCE: string;
-  OIDC_JWKS_URI: string;
 }
 
 const environmentSchema = Joi.object({
@@ -91,27 +88,6 @@ const environmentSchema = Joi.object({
   REDIS_USERNAME: Joi.string().allow('').default(''),
   REDIS_PASSWORD: Joi.string().allow('').default(''),
   REDIS_TLS: Joi.boolean().default(false),
-  OIDC_ISSUER: Joi.string()
-    .uri()
-    .when('NODE_ENV', {
-      is: 'production',
-      then: Joi.required(),
-      otherwise: Joi.string().default('http://localhost:8080/realms/software-license-management'),
-    }),
-  OIDC_AUDIENCE: Joi.string().when('NODE_ENV', {
-    is: 'production',
-    then: Joi.required(),
-    otherwise: Joi.string().default('software-license-api'),
-  }),
-  OIDC_JWKS_URI: Joi.string()
-    .uri()
-    .when('NODE_ENV', {
-      is: 'production',
-      then: Joi.required(),
-      otherwise: Joi.string().default(
-        'http://localhost:8080/realms/software-license-management/protocol/openid-connect/certs',
-      ),
-    }),
 }).unknown(true);
 
 export function validateEnvironment(input: Record<string, unknown>): EnvironmentVariables {
@@ -139,12 +115,12 @@ export function validateEnvironment(input: Record<string, unknown>): Environment
     if (!result.REDIS_PASSWORD) {
       throw new Error(
         'Environment validation failed: REDIS_PASSWORD must be set in production. ' +
-          'Redis holds queue payloads and rate-limit state, so an unauthenticated instance is ' +
+          'Redis holds queue payloads, so an unauthenticated instance is ' +
           'readable and writable by anything that reaches its network.',
       );
     }
 
-    for (const key of ['OIDC_ISSUER', 'OIDC_JWKS_URI', 'OBJECT_STORAGE_ENDPOINT'] as const) {
+    for (const key of ['OBJECT_STORAGE_ENDPOINT'] as const) {
       if (!isHttpsUrl(result[key])) {
         throw new Error(`Environment validation failed: ${key} must use HTTPS in production`);
       }
@@ -165,9 +141,8 @@ function isHttpsUrl(value: string): boolean {
 /**
  * Resolves the database this process should actually use.
  *
- *  gets its own database by default, so a suite that truncates rows can
- * never do that to the database someone is developing against. An explicit
- *  wins when it is set.
+ * NODE_ENV=test uses a separate database URL by default; TEST_DATABASE_URL overrides it.
+ * This naming rule is not an ownership check. Destructive tests use the disposable harness.
  *
  * Exported so the Prisma CLI config can reuse it: the CLI runs outside Nest and would
  * otherwise need a second copy of this rule that could drift from this one.

@@ -11,7 +11,7 @@ import {
 } from '../tokens/access-token-verifier.port';
 import { AuthenticationGuard } from './authentication.guard';
 
-const IDENTITY = { issuer: 'https://identity.example.com/realms/internal', subject: 'oidc-subject-1', email: null };
+const IDENTITY = { issuer: 'https://identity.example.com/realms/internal', subject: 'test-user-1', email: null };
 
 interface LoggerDouble extends LoggerService {
   error: jest.Mock;
@@ -110,7 +110,7 @@ describe('AuthenticationGuard', () => {
     expect(logger.error).not.toHaveBeenCalled();
   });
 
-  it('answers 503 when the identity provider is unreachable', async () => {
+  it('answers 503 when the authentication service is unreachable', async () => {
     const rejection = guardWith(jest.fn().mockRejectedValue(outage())).canActivate(
       contextFor('Bearer good-token').context,
     );

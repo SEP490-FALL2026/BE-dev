@@ -42,10 +42,11 @@ export function anchors(text) {
   return ids;
 }
 
-function markdownFiles(directory) {
+function markdownFiles(directory, excluded = new Set()) {
+  if (excluded.has(directory)) return [];
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
     const path = resolve(directory, entry.name);
-    return entry.isDirectory() ? markdownFiles(path) : entry.name.endsWith('.md') ? [path] : [];
+    return entry.isDirectory() ? markdownFiles(path, excluded) : entry.name.endsWith('.md') ? [path] : [];
   });
 }
 
@@ -57,7 +58,16 @@ export function checkRepository(root, config, strict = false) {
   const rules = resolve(root, config.rules);
   if (!existsSync(rules)) return { errors: [`Missing rules directory: ${rules}`], unavailable: [], files: 0, links: 0 };
   const ruleFiles = markdownFiles(rules);
-  const files = [...new Set([...ruleFiles, ...config.files.map((path) => resolve(root, path))])];
+  const excluded = new Set((config.excludeDirectories ?? []).map((path) => resolve(root, path)));
+  const extraFiles = (config.directories ?? []).flatMap((path) => {
+    const directory = resolve(root, path);
+    if (!existsSync(directory)) {
+      errors.push('Missing documentation directory: ' + path);
+      return [];
+    }
+    return markdownFiles(directory, excluded);
+  });
+  const files = [...new Set([...ruleFiles, ...extraFiles, ...config.files.map((path) => resolve(root, path))])];
   const graph = new Map();
   let links = 0;
   for (const file of files) {
@@ -69,10 +79,20 @@ export function checkRepository(root, config, strict = false) {
     const text = prose(read(file)).replace(/(`+)[^\n]*?\1/g, '');
     if (/\[[^\]\n]+\]\s*\[[^\]\n]*\]|^\s*\[[^\]\n]+\]:/m.test(text))
       errors.push(`${file}: use inline links, not reference-style links`);
-    for (const match of text.matchAll(/\[[^\]\n]*\]\(\s*(?:<([^>]+)>|([^\s)]+))(?:\s+"[^"]*")?\s*\)/g)) {
-      const href = match[1] ?? match[2];
+    const references = [
+      ...[...text.matchAll(/\[[^\]\n]*\]\(\s*(?:<([^>]+)>|([^\s)]+))(?:\s+"[^"]*")?\s*\)/g)].map((match) => ({
+        href: match[1] ?? match[2],
+        index: match.index,
+      })),
+      // Claude Code / Gemini CLI imports are checked like Markdown links.
+      ...[...text.matchAll(/^@([^\s]+\.md)[ \t]*$/gm)].map((match) => ({
+        href: match[1],
+        index: match.index,
+      })),
+    ];
+    for (const { href, index } of references) {
       if (/^(?:https?:|mailto:)/i.test(href)) continue;
-      const label = `${relative(root, file)}:${text.slice(0, match.index).split('\n').length}`;
+      const label = `${relative(root, file)}:${text.slice(0, index).split('\n').length}`;
       if (/^[a-z][a-z\d+.-]*:|^[/\\]/i.test(href)) {
         errors.push(`${label}: non-relative file link ${href}`);
         continue;
@@ -116,7 +136,7 @@ export function checkRepository(root, config, strict = false) {
   }
   for (const file of ruleFiles)
     if (!seen.has(file)) errors.push(`Unreachable rule from ${config.entry}: ${relative(root, file)}`);
-  // Require direct router/playbook links, even when the sibling is not checked out.
+  // Required entry-point links/imports keep shared instructions reachable.
   for (const [from, to] of config.requiredEdges) {
     if (!graph.get(resolve(root, from))?.has(resolve(root, to))) errors.push(`Missing workflow edge: ${from} -> ${to}`);
   }

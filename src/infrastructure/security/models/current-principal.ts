@@ -1,15 +1,15 @@
 import { createParamDecorator, ExecutionContext } from '@nestjs/common';
 import type { Request } from 'express';
-import { ExternalIdentity } from '../tokens/access-token-verifier.port';
+import { AuthenticatedPrincipal } from '../tokens/access-token-verifier.port';
 
 export const AUTHENTICATED_IDENTITY = Symbol('AUTHENTICATED_IDENTITY');
 
 type AuthenticatedRequest = Request & {
-  [AUTHENTICATED_IDENTITY]?: ExternalIdentity;
+  [AUTHENTICATED_IDENTITY]?: AuthenticatedPrincipal;
 };
 
-export const CurrentExternalIdentity = createParamDecorator(
-  (_data: unknown, context: ExecutionContext): ExternalIdentity => {
+export const CurrentPrincipal = createParamDecorator(
+  (_data: unknown, context: ExecutionContext): AuthenticatedPrincipal => {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
     const identity = request[AUTHENTICATED_IDENTITY];
 

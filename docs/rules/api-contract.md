@@ -1,35 +1,33 @@
-# Api Contract
+# API contract
 
-Paths in backticks below are relative to the repository root unless stated otherwise.
+## DTO và pipeline
 
-## HTTP contracts
+- Base path mặc định `/api/v1`; resource plural kebab-case, JSON camelCase.
+- Dùng Zod 4 DTO qua `nestjs-zod`; request object dùng `z.strictObject`.
+- Khai schema cho body, query **và params**. Ví dụ `@Param() params: ApplicationIdParamDto`.
+  Global pipe dùng strict schema declaration; param primitive không có schema có thể trả 500.
+- Guards chạy trước pipe. Kiểm tra quyền theo input/resource đã validate ở use case.
+- Response DTO mô tả wire data; map Date/Decimal/BigInt trước khi trả, không lộ Prisma record.
+- `@ApiSuccessResponse` khai full envelope. Handler trả data; interceptor bọc
+  `{ success: true, message, data }`, sau đó serializer validate.
+- Success `message` là key như `CATALOG.APPLICATION_CREATED`. FE không branch theo error message.
+- Stream/file/redirect/204 dùng `@RawResponse()` có contract/test phù hợp; không dùng để né DTO.
 
-- Use Zod 4 DTOs through `nestjs-zod`; do not add `class-validator` DTOs or plain interfaces at an HTTP boundary.
-- Request objects use `z.strictObject`. Request and response schemas are separate when coercion/defaults or wire/domain representations differ.
-- Wire dates are ISO strings. Map Prisma `Date`, `Decimal`, `BigInt` and entities before returning; never expose Prisma values directly.
-- Ordinary JSON success responses use `{ success: true, message, data }`. Apply `@ApiSuccessResponse(...)` with the complete envelope DTO so runtime validation and OpenAPI agree.
-- `message` is an uppercase localization key such as `COMMON.SUCCESS`, not English/Vietnamese display copy.
-- Streams, redirects, files, raw responses and 204 responses are explicit exceptions; document and test them rather than bypassing the interceptor casually.
-- Guards run before pipes. Never inspect body/query/params in an authorization guard as if Zod has already validated them.
-- Declare route params with a Zod DTO (for example `@Param() params: IdParamsDto`), not primitive `@Param('id')`. The global pipe uses `strictSchemaDeclaration`; an undeclared schema fails as a server error. See accepted [ADR-0004](../decisions/0004-error-contract-availability-and-request-id-trust.md).
+## Errors
 
-## API and localization
+Lỗi: `{ success: false, error: { code, message, requestId, details? } }`.
+`details` là object đã chọn trường an toàn. Filter giữ mã lỗi chủ đích;
+`INTERNAL_SERVER_ERROR` là fallback cho server error không có mã riêng.
+The guard returns 401 for missing credentials. Supplied tokens currently receive
+503 `AUTHENTICATION_NOT_CONFIGURED`; account/password + JWT is not implemented.
 
-- REST base path is `/api/v1`; resource paths are plural kebab-case.
-- Errors use stable machine-readable codes. UI text is localized by FE; do not make FE branch on error messages.
-- Backend localization is limited to backend-rendered email, notification and export templates.
-- Store UTC timestamps and machine-readable enum/status values.
-- Preserve deliberate error codes; `INTERNAL_SERVER_ERROR` is the fallback for 5xx without one. OIDC baseline operations document `503 TOKEN_VERIFICATION_UNAVAILABLE`; the planned native replacement uses the contract in [native identity design](../architecture/native-identity-workforce-design.md) under [ADR-0010](../decisions/0010-native-password-authentication.md). Invalid tokens remain 401; dependency outages remain 503. Update DTO/OpenAPI/tests together when changing a code; never blanket-replace intentional codes with INTERNAL_SERVER_ERROR.
+## Handoff
 
-## Contract handoff to frontend
+- Operation ID ổn định, tag theo domain, mô tả đầy đủ success/error response.
+- Cập nhật [API inventory](../../test/support/api-coverage-manifest.ts) khi thêm/bỏ operation.
+- Chạy `pnpm test:e2e`, `pnpm openapi:export`; review diff `openapi.json`.
+- Contract sinh từ controller/DTO. Không sửa JSON hoặc generated FE client bằng tay.
+- Nếu thay contract có consumer FE, nêu operation/schema thay đổi và phối hợp regenerate client.
 
-After an HTTP/DTO change, run relevant API E2E tests and `pnpm openapi:export`, then
-review `openapi.json`. Use stable operation IDs, exactly one declared business tag
-per operation, `*Request` body schemas and `*Response` success schemas compatible
-with the frontend validator. Describe the full runtime envelope and error responses.
-
-Coordinate the FE snapshot `openapi/openapi.yaml`, `pnpm api:generate` and consumer
-checks in the same task when both repositories are available. Do not edit generated
-FE code or change an API only in the FE snapshot. Verify URL/version composition
-against the real API. If a consumer update cannot be completed, identify the exact
-contract changes and outstanding validation in the handoff.
+Ví dụ hiện có: [catalog controller](../../src/modules/catalog/catalog.controller.ts).
+Cách thêm endpoint: [development guide](../guides/kien-truc-backend-va-cach-viet-code.md).

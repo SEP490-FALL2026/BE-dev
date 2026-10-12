@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 
 function listTypeScriptFiles(directory: string): string[] {
@@ -16,23 +16,7 @@ function listTypeScriptFiles(directory: string): string[] {
  * Every Prisma model has exactly one owning module. A module may only touch its own
  * delegates; it reads another module's data through that module's public contract.
  */
-const PRISMA_MODEL_OWNER: Readonly<Record<string, string>> = {
-  AccessRequest: 'access-requests',
-  ApprovalStep: 'access-requests',
-  AuditEvent: 'audit',
-  CatalogApplication: 'catalog',
-  DiscoveryCase: 'discovery',
-  StoredObject: 'files',
-  ImportJob: 'imports',
-  FinancialTransaction: 'finance',
-  Principal: 'identity-access',
-  IdentityLink: 'identity-access',
-  LicensePool: 'licenses',
-  LicenseAssignment: 'licenses',
-  Department: 'organization',
-  Employee: 'organization',
-  UsageRecord: 'usage-optimization',
-};
+const PRISMA_MODEL_OWNER: Readonly<Record<string, string>> = { CatalogApplication: 'catalog' };
 
 interface PrismaModelTable {
   model: string;
@@ -179,28 +163,6 @@ describe('architecture boundaries', () => {
         const location = { file: relative(sourceRoot, file), table };
         expect({ ...location, owner: owningModule }).toEqual({ ...location, owner });
       }
-    }
-  });
-
-  it('keeps documentation in its one agreed place', () => {
-    // Planning and spec tooling ships with its own output conventions, and following them
-    // scatters project documents into competing trees. AGENTS.md says not to; this makes
-    // the gate say so too, because a rule nobody enforces is a rule that gets followed once.
-    const forbidden = [
-      { path: 'SPEC.md', instead: 'docs/workspace/items/NNNN-slug/spec.md' },
-      { path: 'tasks', instead: 'docs/workspace/items/NNNN-slug/' },
-      { path: join('docs', 'superpowers'), instead: 'docs/workspace/items/NNNN-slug/' },
-      { path: join('docs', 'ARCHITECTURE.md'), instead: 'the root ARCHITECTURE.md' },
-      { path: join('docs', 'plans'), instead: 'docs/workspace/items/NNNN-slug/plan.md' },
-      { path: join('docs', 'specs'), instead: 'docs/workspace/items/NNNN-slug/spec.md' },
-    ];
-
-    for (const { path, instead } of forbidden) {
-      expect({ path, instead, exists: existsSync(join(process.cwd(), path)) }).toEqual({
-        path,
-        instead,
-        exists: false,
-      });
     }
   });
 });

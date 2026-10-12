@@ -10,9 +10,6 @@ describe('validateEnvironment', () => {
     OBJECT_STORAGE_SECRET_ACCESS_KEY: 'test-secret-key',
     REDIS_HOST: 'redis.internal',
     REDIS_PASSWORD: 'redis-secret-password',
-    OIDC_ISSUER: 'https://identity.example.com/realms/internal',
-    OIDC_AUDIENCE: 'software-license-api',
-    OIDC_JWKS_URI: 'https://identity.example.com/realms/internal/protocol/openid-connect/certs',
   };
 
   it('applies safe development defaults', () => {
@@ -76,12 +73,6 @@ describe('validateEnvironment', () => {
     expect(config.REDIS_PASSWORD).toBe('');
   });
 
-  it('requires OIDC verification metadata in production', () => {
-    const { OIDC_ISSUER: issuer, ...withoutIssuer } = productionInfrastructure;
-    void issuer;
-    expect(() => validateEnvironment({ NODE_ENV: 'production', ...withoutIssuer })).toThrow('OIDC_ISSUER');
-  });
-
   it.each([
     '',
     '*',
@@ -94,14 +85,14 @@ describe('validateEnvironment', () => {
     ).toThrow('CORS_ORIGINS');
   });
 
-  it('requires HTTPS OIDC metadata in production', () => {
+  it('requires HTTPS object storage in production', () => {
     expect(() =>
       validateEnvironment({
         NODE_ENV: 'production',
         ...productionInfrastructure,
-        OIDC_ISSUER: 'http://identity.example.com/realms/internal',
+        OBJECT_STORAGE_ENDPOINT: 'http://storage.example.com',
       }),
-    ).toThrow('OIDC_ISSUER');
+    ).toThrow('OBJECT_STORAGE_ENDPOINT');
   });
 
   it('applies rate-limit defaults', () => {

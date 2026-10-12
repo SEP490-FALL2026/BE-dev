@@ -1,12 +1,44 @@
-# SaaS-Sentry — Backend
+# Backend agent instructions
 
-Áp dụng cho toàn bộ repo này, cho dev và AI agent.
+Scope: this backend repository. Work from its root with the pnpm version in `package.json`.
 
-1. Đọc [docs/rules/README.md](docs/rules/README.md) và [docs/rules/context.md](docs/rules/context.md) trước khi làm việc; đã đọc trong cùng task thì chỉ nạp lại khi nguồn thay đổi.
-2. Chọn playbook theo nhiệm vụ trong bảng README. Đọc các quy tắc chuyên đề mà task chạm tới; không nạp mọi file mặc định.
-3. Quy tắc trong các file được dẫn có hiệu lực như hướng dẫn tại đây. BRD sở hữu nghiệp vụ; ADR/kiến trúc tại repo sở hữu cách hiện thực. Ghi rõ mâu thuẫn hiện hành, không tự chọn bản tiện nhất.
-4. Giữ thay đổi có sẵn của người khác; không đưa secrets/dữ liệu thật vào artefact. Hoàn tất công việc đã được giao, chỉ hỏi về quyết định còn thiếu làm thay đổi phạm vi/hành vi/quyền.
-5. Kiểm chứng theo tác động và báo kết quả thực chạy. Không tự commit, push, deploy hoặc thao tác dữ liệu môi trường dùng chung khi chưa được ủy quyền.
+## Start here
 
-`AGENTS.md` là điểm vào; nội dung chi tiết nằm trong `docs/rules/`.
-File hướng dẫn cho Claude/Copilot/Windsurf chỉ dẫn tới đây, không giữ bản sao rules.
+- Read [CONTRIBUTING.md](CONTRIBUTING.md) for workflow and verification commands.
+- Read [ARCHITECTURE.md](ARCHITECTURE.md) before changing module boundaries.
+- Check the branch, working diff and relevant source/tests; preserve existing changes.
+- Current runtime is health/catalog plus infrastructure. Authentication is a fail-closed
+  placeholder; account/password + JWT and other US workflows are not implemented.
+
+## Read only what the task needs
+
+| Task                                         | Reference                                                                                                        |
+| -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Add an endpoint                              | [Development guide](docs/guides/kien-truc-backend-va-cach-viet-code.md), [API rules](docs/rules/api-contract.md) |
+| Model, query, transaction, business behavior | [Database rules](docs/rules/database-business.md)                                                                |
+| Authentication, files, jobs                  | [Security rules](docs/rules/security-jobs.md)                                                                    |
+| Add or change a script                       | [Script guide](scripts/README.md)                                                                                |
+| Add or update tests                          | [Test guide](test/README.md)                                                                                     |
+| Documentation or ADR                         | [Documentation rules](docs/rules/documentation.md)                                                               |
+
+## Repository constraints
+
+- Use flat feature modules. Controllers map HTTP; services coordinate; `*.repo.ts` owns persistence.
+- Cross-module calls use exported facades/contracts; never import another module's private files or query its tables.
+- Keep framework-free primitives in `src/core`; technical adapters in `src/infrastructure`.
+- Generated `src/generated/`, `dist/` and `openapi.json` change through their generators.
+- Do not load every ADR, design document or external repository by default.
+  Obtain the relevant requirement before inventing missing business behavior.
+- For US design and implementation handoff, follow [shared planning](docs/workspace/README.md).
+- Use reviewed BRD/US revisions and spec/plan; never invent approvals or acceptance.
+- No mandatory skill, private workspace, sequential numbering or multi-agent workflow.
+
+## Verify and hand off
+
+- Docs: `pnpm rules:check` and `pnpm rules:format`.
+- Source/config: `pnpm check`; HTTP changes also require `pnpm test:e2e` and `pnpm openapi:export`.
+- Database changes need the isolated integration setup in the test guide.
+- Report actual commands/results and unverified boundaries. Do not silently skip a failed gate.
+- Keep secrets and real data out of artifacts. Do not commit, push, deploy or change shared data unless authorized.
+
+[All topic rules](docs/rules/README.md).
