@@ -25,6 +25,10 @@ trong docs/architecture. Các gói triển khai auth/US cũ đã được dọn 
 - [Constraint ngoài Prisma](decisions/0005-database-constraints-outside-prisma.md).
 - [Money](decisions/0007-money-representation.md): quyết định thiết kế, chưa implement.
 
+## Quyết định đề xuất (chưa Accepted)
+
+- [Xác thực nội bộ, phiên và quy ước persistence vùng danh tính](decisions/0011-internal-authentication-and-sessions.md) — Proposed 12/10/2026, chờ dev review; khi Accepted sẽ thay một câu của ADR-0002 và ADR-0004.
+
 Số ADR bị khuyết không cần đánh lại. Định hướng tài khoản/mật khẩu + JWT hiện ghi
 ở ARCHITECTURE; thiết kế chi tiết sẽ được lập lại theo US.
 
