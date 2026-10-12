@@ -52,3 +52,22 @@ migration đã commit. Cleanup chỉ drop đúng URL/name/runId; query parameter
 
 Nếu process bị kill trước cleanup, DB tạm có thể còn lại. Kiểm tra tên, marker và
 connection trước khi dọn thủ công; không xóa theo wildcard.
+
+## HTTP trên PostgreSQL thật
+
+`support/http-test-app.ts` dựng **toàn bộ** ứng dụng Nest (pipe, guard, filter, cookie parser) trên một
+database dùng riêng đã áp migration, cho các ca mà stub repo không chứng minh được: ràng buộc, khóa dòng,
+cookie. `createHttpTestApp()` trả `{ app, sql, close }`; `seedInstallation(app)` tạo bộ dữ liệu tối thiểu
+của lệnh khởi tạo qua service thật; `insertAccountFixture` tạo thêm tài khoản bằng SQL cho tới khi lát tạo
+tài khoản (1b) có API. Dùng `bodyOf(response)` (`support/api-body.ts`) thay cho `response.body` (kiểu `any`).
+
+- `ConfigModule` kiểm tra env **lúc import** `AppModule`, nên helper đặt biến môi trường rồi mới `import()` động.
+- `support/placement-coverage.ts`: truy vấn kiểm coverage của placement (bắt khoảng trống mà exclusion
+  constraint cho phép). Chạy ở cuối test ghi dữ liệu tổ chức.
+- `support/test-config.ts`: `ConfigService` có kiểu cho test tự dựng service.
+- Test đua khóa (`auth-concurrency.integration-spec.ts`) giữ khóa dòng ở một kết nối `pg` riêng và chờ
+  `pg_locks` báo có tiến trình đang chờ trước khi nhả khóa; không dùng `sleep` để ép thứ tự.
+- PostgreSQL phải chạy ở UTC **hoặc** để `PrismaService` ghim `TimeZone=UTC` (đã làm). Test
+  `audit.integration-spec.ts` ("stores an instant exactly") bắt lỗi lệch múi giờ.
+- Máy không chạy được Docker: PostgreSQL 17 nhúng (`embedded-postgres`) đủ cho `TEST_DATABASE_ADMIN_URL`;
+  role của nó là superuser nên không kiểm chứng được `btree_gist` trusted-extension như môi trường thật.

@@ -23,23 +23,29 @@ nghiệp vụ thật trước khi có authentication và authorization theo US.
 
 ```text
 src/
-  main.ts, bootstrap.ts       # HTTP, CORS, versioning, Swagger
+  main.ts, bootstrap.ts       # HTTP, CORS, cookie parser, versioning, Swagger
   app.module.ts               # ghép module API
   worker.ts, worker.module.ts # worker application context
-  core/application/           # primitives thuần TypeScript: pagination
+  installation-cli.ts         # lệnh khởi tạo một lần, ngoài HTTP (pnpm ops:bootstrap)
+  core/                       # thuần TypeScript: pagination, email, business-date
   infrastructure/
     config/                   # environment validation
     http/                     # pipe, envelope, serializer, filter
-    security/                 # guard, verifier port, rate limiting
-    database/                 # Prisma service
+    security/                 # guard khai báo/xác thực/phân quyền, verifier port, rate limiting
+    database/                 # Prisma service, TransactionRunner
     queue/                    # BullMQ connection
     object-storage/           # port và S3-compatible adapter
     observability/            # request context, request ID, logger
     health/                   # health controller
-  modules/catalog/            # module mẫu
+  modules/
+    audit/                    # AuditEvent chỉ ghi thêm (facade record(tx, event))
+    organization/             # tổ chức, Cost Center, phòng, chức vụ, nhân viên + placement
+    identity-access/          # tài khoản, mật khẩu, vai gán, phiên, đăng nhập, /me
+    installation/             # use case khởi tạo; không sở hữu bảng
+    catalog/                  # module mẫu cấu trúc, KHÔNG đăng ký vào AppModule
 prisma/
   schema.prisma               # generator, datasource
-  models/catalog.prisma
+  models/                     # audit, organization, identity-access, catalog
   migrations/                 # lịch sử SQL cho baseline mới
 scripts/                      # công cụ dev/verification, không phải runtime API
 test/
@@ -55,7 +61,9 @@ test/
 - Module dùng layout phẳng. Chỉ tạo dto/errors/mappers/policies/services khi có nhu cầu thật.
 - Module khác gọi facade/contract được export; không import private repo/DTO/policy,
   không truy cập bảng thuộc module khác.
-- Cross-module atomic write cần contract transaction rõ ràng. Chưa có transaction runner chung.
+- Cross-module atomic write: facade nhận `tx` của người gọi (`DbTx`); `TransactionRunner.run`
+  mở giao dịch Read Committed với `lock_timeout`/`statement_timeout` riêng cho giao dịch.
+  Khóa dòng của module khác chỉ qua facade (ví dụ `organization.lockEmployeeForShare(tx, id)`).
 - Không dùng vòng phụ thuộc, generic base repository hoặc scaffold hàng loạt khi chưa có US.
 
 [Architecture tests](src/architecture-boundaries.spec.ts) quét một số boundary;
@@ -65,23 +73,43 @@ không thay thế review dependency và hành vi.
 
 ```text
 RequestIdMiddleware
-  → ThrottlerGuard → AuthenticationGuard
+  → ThrottlerGuard → AccessDeclarationGuard → AuthenticationGuard → AuthorizationGuard
   → ApplicationZodValidationPipe
   → controller → service → repo
   → mapper → success envelope → Zod response validation
 ```
 
 Exception qua HttpExceptionFilter. Guard chạy trước DTO pipe.
-`@Public()` bỏ authentication, không bỏ rate limit.
-Thiếu token: 401 AUTHENTICATION_REQUIRED. Có token nhưng chưa implement auth:
-503 AUTHENTICATION_NOT_CONFIGURED. Sau khi triển khai verifier, token sai trả 401;
-dependency không sẵn sàng trả 503, không lộ thông tin nội bộ.
+Mỗi route phải khai báo **đúng một** trong `@Public()`, `@AuthenticatedOnly()`,
+`@RequireRoles(...)`; thiếu hoặc mâu thuẫn thì 500 và log lỗi lập trình
+(`AccessDeclarationGuard`, fail closed). `@Public()` bỏ authentication, không bỏ rate limit.
+Thiếu token: 401 AUTHENTICATION_REQUIRED. Token sai chữ ký/hết hạn, phiên bị thu hồi,
+tài khoản khóa hoặc nhân viên _đã nghỉ việc_: 401 INVALID_ACCESS_TOKEN, kiểm ở **mỗi** request
+nên có hiệu lực ngay request kế tiếp. Vai không nằm trong token. Database không sẵn sàng:
+503 TOKEN_VERIFICATION_UNAVAILABLE (route auth: 503 AUTH.UNAVAILABLE), không lộ thông tin nội bộ.
+Sai vai: 403 AUTHORIZATION.FORBIDDEN.
 
 Rate limit hiện dùng bộ nhớ của từng process, **không dùng Redis**.
 TRUST_PROXY_HOPS chỉ cấu hình khi ingress đáng tin cậy; proxy phải thay header
 request ID do client gửi. Baseline chưa giải quyết rate limit phân tán.
 
 ## Persistence và hạ tầng
+
+Vùng tổ chức-danh tính dùng ràng buộc ở PostgreSQL (migration SQL, ADR-0005): một Organization,
+múi giờ bất biến, Department gắn Cost Center `UNIT`, placement không chồng lấn (`btree_gist`),
+một grant `SUPER_ADMIN` hiệu lực, audit chỉ ghi thêm. Cột bảng mới snake_case qua `@map`;
+`catalog_applications` giữ camelCase tới khi thiết kế lại. `PrismaService` ghim `TimeZone=UTC`
+cho mỗi kết nối: adapter-pg đọc/ghi `timestamptz` như thể phiên là UTC. Instant truyền vào raw SQL
+dùng chuỗi ISO-8601 (`toISOString()`) kèm `::timestamptz`. Ghim này gửi tham số khởi động `options`:
+qua PgBouncer hoặc pooler quản lý phải cho phép (`ignore_startup_parameters = options`) hoặc đổi cách ghim
+(`ALTER ROLE ... SET timezone`) — chưa kiểm chứng với pooler nào.
+
+Authentication: tài khoản nội bộ, access token JWT HS256 ngắn hạn cộng refresh token xoay vòng trong cookie
+`HttpOnly`/`SameSite=Strict`/`Path=/<prefix>/v1/auth`; phát lại refresh token thì thu hồi phiên. Giao thức
+khóa và hợp đồng đăng xuất: [spec nền](docs/workspace/items/foundation-org-identity-boundary/spec.md),
+[spec lát 1a](docs/workspace/items/us-01-bootstrap-login-session/spec.md); ADR-0011 còn **Proposed**.
+Khởi tạo cài đặt: `pnpm build` rồi `pnpm ops:bootstrap --help` (chạy bởi chính người giữ vai Super Admin;
+mật khẩu nhập ở prompt ẩn, không nhận qua tham số hay biến môi trường).
 
 Catalog dùng unique slug ở PostgreSQL; phân trang sort name/id, transaction
 RepeatableRead để page/count dùng cùng snapshot. Snapshot không cố định giữa các

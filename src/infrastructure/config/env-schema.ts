@@ -14,6 +14,10 @@ export interface EnvironmentVariables {
   SWAGGER_ENABLED: boolean;
   DATABASE_URL: string;
   TEST_DATABASE_URL: string;
+  DB_LOCK_TIMEOUT_MS: number;
+  DB_STATEMENT_TIMEOUT_MS: number;
+  DB_TRANSACTION_TIMEOUT_MS: number;
+  DB_TRANSACTION_MAX_WAIT_MS: number;
   OBJECT_STORAGE_ENDPOINT: string;
   OBJECT_STORAGE_REGION: string;
   OBJECT_STORAGE_BUCKET: string;
@@ -25,7 +29,21 @@ export interface EnvironmentVariables {
   REDIS_USERNAME: string;
   REDIS_PASSWORD: string;
   REDIS_TLS: boolean;
+  AUTH_ACCESS_TOKEN_SECRET: string;
+  AUTH_ACCESS_TOKEN_TTL_SECONDS: number;
+  AUTH_SESSION_IDLE_SECONDS: number;
+  AUTH_SESSION_ABSOLUTE_SECONDS: number;
+  AUTH_LOGIN_MAX_FAILURES: number;
+  AUTH_LOGIN_WINDOW_SECONDS: number;
+  AUTH_LOGIN_BLOCK_SECONDS: number;
+  AUTH_THROTTLE_PEPPER: string;
+  AUTH_COOKIE_SECURE: boolean;
+  AUTH_JWT_ISSUER: string;
+  AUTH_JWT_AUDIENCE: string;
 }
+
+const DEVELOPMENT_ACCESS_TOKEN_SECRET = 'development-only-access-token-secret-not-for-production';
+const DEVELOPMENT_THROTTLE_PEPPER = 'development-only-throttle-pepper';
 
 const environmentSchema = Joi.object({
   NODE_ENV: Joi.string().valid('development', 'test', 'production').default('development'),
@@ -53,6 +71,13 @@ const environmentSchema = Joi.object({
       otherwise: Joi.forbidden(),
     })
     .default(''),
+  // Per-transaction limits for the organization/identity area. The ordering lock < statement <
+  // transaction makes PostgreSQL stop a slow statement (55P03/57014) before Prisma closes the
+  // transaction itself (P2028); validateEnvironment enforces it.
+  DB_LOCK_TIMEOUT_MS: Joi.number().integer().min(100).max(60_000).default(3_000),
+  DB_STATEMENT_TIMEOUT_MS: Joi.number().integer().min(100).max(120_000).default(5_000),
+  DB_TRANSACTION_TIMEOUT_MS: Joi.number().integer().min(100).max(180_000).default(10_000),
+  DB_TRANSACTION_MAX_WAIT_MS: Joi.number().integer().min(100).max(60_000).default(2_000),
   OBJECT_STORAGE_ENDPOINT: Joi.string()
     .uri()
     .when('NODE_ENV', {
@@ -88,6 +113,31 @@ const environmentSchema = Joi.object({
   REDIS_USERNAME: Joi.string().allow('').default(''),
   REDIS_PASSWORD: Joi.string().allow('').default(''),
   REDIS_TLS: Joi.boolean().default(false),
+  // Secrets have a default only outside production so a fresh checkout runs; production must
+  // supply its own. A default is never a secret, which is why it is rejected in production below.
+  AUTH_ACCESS_TOKEN_SECRET: Joi.string()
+    .min(32)
+    .when('NODE_ENV', {
+      is: 'production',
+      then: Joi.required(),
+      otherwise: Joi.string().default(DEVELOPMENT_ACCESS_TOKEN_SECRET),
+    }),
+  AUTH_ACCESS_TOKEN_TTL_SECONDS: Joi.number().integer().min(60).max(3_600).default(600),
+  AUTH_SESSION_IDLE_SECONDS: Joi.number().integer().min(300).max(2_592_000).default(28_800),
+  AUTH_SESSION_ABSOLUTE_SECONDS: Joi.number().integer().min(300).max(7_776_000).default(604_800),
+  AUTH_LOGIN_MAX_FAILURES: Joi.number().integer().min(3).max(100).default(5),
+  AUTH_LOGIN_WINDOW_SECONDS: Joi.number().integer().min(30).max(86_400).default(900),
+  AUTH_LOGIN_BLOCK_SECONDS: Joi.number().integer().min(30).max(86_400).default(900),
+  AUTH_THROTTLE_PEPPER: Joi.string()
+    .min(16)
+    .when('NODE_ENV', {
+      is: 'production',
+      then: Joi.required(),
+      otherwise: Joi.string().default(DEVELOPMENT_THROTTLE_PEPPER),
+    }),
+  AUTH_COOKIE_SECURE: Joi.boolean(),
+  AUTH_JWT_ISSUER: Joi.string().default('slm-api'),
+  AUTH_JWT_AUDIENCE: Joi.string().default('slm-web'),
 }).unknown(true);
 
 export function validateEnvironment(input: Record<string, unknown>): EnvironmentVariables {
@@ -100,16 +150,47 @@ export function validateEnvironment(input: Record<string, unknown>): Environment
     throw new Error(`Environment validation failed: ${validation.error.message}`);
   }
 
-  const parsed = validation.value as Omit<EnvironmentVariables, 'SWAGGER_ENABLED'> & { SWAGGER_ENABLED?: boolean };
+  const parsed = validation.value as Omit<EnvironmentVariables, 'SWAGGER_ENABLED' | 'AUTH_COOKIE_SECURE'> & {
+    SWAGGER_ENABLED?: boolean;
+    AUTH_COOKIE_SECURE?: boolean;
+  };
   const result = {
     ...parsed,
     SWAGGER_ENABLED: parsed.SWAGGER_ENABLED ?? parsed.NODE_ENV !== 'production',
+    AUTH_COOKIE_SECURE: parsed.AUTH_COOKIE_SECURE ?? parsed.NODE_ENV !== 'development',
     // Resolved here rather than at each consumer, so every reader of DATABASE_URL — the
     // Prisma client, a migration script, an integration harness — sees the same database.
     DATABASE_URL: resolveDatabaseUrl(parsed.NODE_ENV, parsed.DATABASE_URL, parsed.TEST_DATABASE_URL),
   };
 
+  if (
+    result.DB_LOCK_TIMEOUT_MS > result.DB_STATEMENT_TIMEOUT_MS ||
+    result.DB_STATEMENT_TIMEOUT_MS >= result.DB_TRANSACTION_TIMEOUT_MS
+  ) {
+    throw new Error(
+      'Environment validation failed: DB_LOCK_TIMEOUT_MS must not exceed DB_STATEMENT_TIMEOUT_MS, ' +
+        'and DB_STATEMENT_TIMEOUT_MS must be lower than DB_TRANSACTION_TIMEOUT_MS',
+    );
+  }
+
+  if (result.AUTH_SESSION_IDLE_SECONDS > result.AUTH_SESSION_ABSOLUTE_SECONDS) {
+    throw new Error(
+      'Environment validation failed: AUTH_SESSION_IDLE_SECONDS must not exceed AUTH_SESSION_ABSOLUTE_SECONDS',
+    );
+  }
+
   if (result.NODE_ENV === 'production') {
+    if (
+      result.AUTH_ACCESS_TOKEN_SECRET === DEVELOPMENT_ACCESS_TOKEN_SECRET ||
+      result.AUTH_THROTTLE_PEPPER === DEVELOPMENT_THROTTLE_PEPPER
+    ) {
+      throw new Error('Environment validation failed: production must not use the development auth secrets');
+    }
+
+    if (!result.AUTH_COOKIE_SECURE) {
+      throw new Error('Environment validation failed: AUTH_COOKIE_SECURE must be true in production');
+    }
+
     validateProductionCorsOrigins(parseCorsOrigins(result.CORS_ORIGINS));
 
     if (!result.REDIS_PASSWORD) {

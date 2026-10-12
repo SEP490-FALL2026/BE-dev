@@ -2,7 +2,7 @@
 
 - [Spec](spec.md); revision đã review: chưa review.
 - Implement: chưa phân công; reviewer: chưa phân công.
-- Triển khai: not-started. PR: chưa có.
+- Triển khai: in-progress (qua lát 1a, đồng bộ roadmap; hạng mục này không có PR riêng). PR: chưa có.
 
 ## Trước khi code
 

@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
 import { createZodDto } from 'nestjs-zod';
 import request from 'supertest';
+import { bodyOf } from '../support/api-body';
 import { App } from 'supertest/types';
 import { z } from 'zod';
 import { AppModule } from '../../src/app.module';
@@ -11,6 +12,8 @@ import { EnvironmentVariables } from '../../src/infrastructure/config/env-schema
 import { ApiSuccessResponse } from '../../src/infrastructure/http/decorators/api-success-response.decorator';
 import { RawResponse } from '../../src/infrastructure/http/decorators/raw-response.decorator';
 import { successEnvelopeSchema } from '../../src/infrastructure/http/dto/success-envelope.dto';
+import { ApiException } from '../../src/infrastructure/http/errors/api.exception';
+import { AuthenticatedOnly, RequireRoles } from '../../src/infrastructure/security/decorators/access.decorators';
 import { Public } from '../../src/infrastructure/security/decorators/public.decorator';
 import {
   ACCESS_TOKEN_VERIFIER,
@@ -49,14 +52,57 @@ class ContractProbeController {
   raw(): { plain: true } {
     return { plain: true };
   }
+
+  // A deliberate, coded business error: the wire shape every future 4xx follows.
+  @Get('conflict')
+  @Public()
+  conflict(): never {
+    throw new ApiException(HttpStatus.CONFLICT, {
+      code: 'CONTRACT_PROBE.CONFLICT',
+      message: 'The probe conflicts with existing state.',
+      details: { field: 'name' },
+    });
+  }
 }
 
 @Controller({ path: 'protected-probe', version: '1' })
 class ProtectedProbeController {
   @Get()
+  @AuthenticatedOnly()
   getProbe(): { status: 'protected' } {
     return { status: 'protected' };
   }
+}
+
+/** Declares nothing: must fail closed rather than become public or private by accident. */
+@Controller({ path: 'undeclared-probe', version: '1' })
+class UndeclaredProbeController {
+  @Get()
+  get(): { status: 'reachable' } {
+    return { status: 'reachable' };
+  }
+}
+
+/** Exercises @RequireRoles, which no production route uses until slice 1b. Test module only. */
+@Controller({ path: 'role-probe', version: '1' })
+class RoleProbeController {
+  @Get()
+  @RequireRoles('IT_ADMIN')
+  get(): { status: 'allowed' } {
+    return { status: 'allowed' };
+  }
+}
+
+function principalWithRoles(...roles: string[]) {
+  return {
+    subject: 'u1',
+    appUserId: 'u1',
+    sessionId: 's1',
+    employeeId: 'e1',
+    directRoles: roles,
+    derivedRoles: [],
+    roles,
+  };
 }
 
 describe('Application foundation (e2e)', () => {
@@ -65,7 +111,7 @@ describe('Application foundation (e2e)', () => {
   beforeEach(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
-      controllers: [ProtectedProbeController, ContractProbeController],
+      controllers: [ProtectedProbeController, ContractProbeController, UndeclaredProbeController],
     }).compile();
 
     app = moduleFixture.createNestApplication();
@@ -93,7 +139,7 @@ describe('Application foundation (e2e)', () => {
       .get('/api/v1/protected-probe')
       .expect(401)
       .expect((response) => {
-        expect(response.body).toMatchObject({
+        expect(bodyOf(response)).toMatchObject({
           success: false,
           error: { code: 'AUTHENTICATION_REQUIRED' },
         });
@@ -105,7 +151,7 @@ describe('Application foundation (e2e)', () => {
       .get('/api/v1/does-not-exist')
       .expect(404)
       .expect((response) => {
-        const body = response.body as {
+        const body = bodyOf(response) as {
           success: boolean;
           error: { code: string; requestId: string };
         };
@@ -154,14 +200,14 @@ describe('Application foundation (e2e)', () => {
       .get('/api/v1/contract-probe/raw')
       .expect(200)
       .expect((response) => {
-        expect(response.body).toEqual({ plain: true });
+        expect(bodyOf(response)).toEqual({ plain: true });
       });
 
     await request(app!.getHttpServer())
       .get('/api/v1/health/live')
       .expect(200)
       .expect((response) => {
-        expect(response.body).toEqual({ success: true, message: 'COMMON.SUCCESS', data: { status: 'ok' } });
+        expect(bodyOf(response)).toEqual({ success: true, message: 'COMMON.SUCCESS', data: { status: 'ok' } });
       });
   });
   it('returns a request ID for successful responses', () => {
@@ -189,7 +235,7 @@ describe('Application foundation (e2e)', () => {
       .send({ name: 'invalid', nested: { count: 1, unexpected: true } })
       .expect(422)
       .expect((response) => {
-        expect(response.body).toMatchObject({
+        expect(bodyOf(response)).toMatchObject({
           success: false,
           error: {
             code: 'VALIDATION_ERROR',
@@ -206,25 +252,101 @@ describe('Application foundation (e2e)', () => {
       .get('/api/v1/contract-probe/invalid-response')
       .expect(500)
       .expect((response) => {
-        expect(response.body).toMatchObject({
+        expect(bodyOf(response)).toMatchObject({
           success: false,
           error: { code: 'INTERNAL_SERVER_ERROR' },
         });
-        expect(JSON.stringify(response.body)).not.toContain('not-a-boolean');
+        expect(JSON.stringify(bodyOf(response))).not.toContain('not-a-boolean');
       });
   });
 
-  it('rejects supplied tokens until authentication is implemented', () => {
+  it('rejects a token signed with a different key without touching the database', () => {
+    const forged = `eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ4Iiwic2lkIjoieSJ9.${Buffer.from('not-the-signature').toString('base64url')}`;
+
     return request(app!.getHttpServer())
       .get('/api/v1/protected-probe')
-      .set('authorization', 'Bearer malformed-token')
-      .expect(503)
+      .set('authorization', `Bearer ${forged}`)
+      .expect(401)
       .expect((response) => {
-        expect(response.body).toMatchObject({
-          success: false,
-          error: { code: 'AUTHENTICATION_NOT_CONFIGURED' },
-        });
+        expect(bodyOf(response)).toMatchObject({ success: false, error: { code: 'INVALID_ACCESS_TOKEN' } });
       });
+  });
+
+  it('requires a Bearer token on /me', () => {
+    return request(app!.getHttpServer())
+      .get('/api/v1/me')
+      .expect(401)
+      .expect((response) => {
+        expect(bodyOf(response)).toMatchObject({ success: false, error: { code: 'AUTHENTICATION_REQUIRED' } });
+      });
+  });
+
+  it('rejects unknown fields and oversize values on login with 422 before any lookup', async () => {
+    await request(app!.getHttpServer())
+      .post('/api/v1/auth/login')
+      .send({ email: 'a@b.vn', password: 'x', role: 'SUPER_ADMIN' })
+      .expect(422)
+      .expect((response) => {
+        expect(bodyOf(response)).toMatchObject({ success: false, error: { code: 'VALIDATION_ERROR' } });
+      });
+    await request(app!.getHttpServer())
+      .post('/api/v1/auth/login')
+      .send({ email: 'a@b.vn', password: 'p'.repeat(257) })
+      .expect(422);
+  });
+
+  it('answers a coded 409 with details and no internal fields', () => {
+    return request(app!.getHttpServer())
+      .get('/api/v1/contract-probe/conflict')
+      .expect(409)
+      .expect((response) => {
+        expect(bodyOf(response)).toMatchObject({
+          success: false,
+          error: { code: 'CONTRACT_PROBE.CONFLICT', details: { field: 'name' } },
+        });
+        expect(Object.keys(bodyOf(response).error).sort()).toEqual(['code', 'details', 'message', 'requestId']);
+      });
+  });
+
+  it('fails closed with 500 when a route declares no access rule, even without a token', () => {
+    return request(app!.getHttpServer())
+      .get('/api/v1/undeclared-probe')
+      .expect(500)
+      .expect((response) => {
+        expect(bodyOf(response)).toMatchObject({ success: false, error: { code: 'INTERNAL_SERVER_ERROR' } });
+        expect(JSON.stringify(bodyOf(response))).not.toContain('reachable');
+      });
+  });
+
+  it('enforces @RequireRoles: 403 for the wrong role, 200 for the right one', async () => {
+    for (const [roles, status] of [
+      [['EMPLOYEE'], 403],
+      [[], 403],
+      [['IT_ADMIN'], 200],
+    ] as const) {
+      const moduleFixture: TestingModule = await Test.createTestingModule({
+        imports: [AppModule],
+        controllers: [RoleProbeController],
+      })
+        .overrideProvider(ACCESS_TOKEN_VERIFIER)
+        .useValue({ verify: jest.fn().mockResolvedValue(principalWithRoles(...roles)) })
+        .compile();
+      const roleApp: INestApplication<App> = moduleFixture.createNestApplication();
+      configureApplication(roleApp);
+      await roleApp.init();
+
+      try {
+        const response = await request(roleApp.getHttpServer())
+          .get('/api/v1/role-probe')
+          .set('authorization', 'Bearer any')
+          .expect(status);
+        if (status === 403) {
+          expect(bodyOf(response)).toMatchObject({ success: false, error: { code: 'AUTHORIZATION.FORBIDDEN' } });
+        }
+      } finally {
+        await roleApp.close();
+      }
+    }
   });
 
   it('answers 503 without describing the infrastructure when the authentication service is unreachable', async () => {
@@ -251,11 +373,11 @@ describe('Application foundation (e2e)', () => {
         .set('authorization', 'Bearer good-token')
         .expect(503)
         .expect((response) => {
-          expect(response.body).toMatchObject({
+          expect(bodyOf(response)).toMatchObject({
             success: false,
             error: { code: 'TOKEN_VERIFICATION_UNAVAILABLE' },
           });
-          const wire = JSON.stringify(response.body);
+          const wire = JSON.stringify(bodyOf(response));
           expect(wire).not.toContain('10.0.0.5');
           expect(wire).not.toContain('ECONNREFUSED');
         });
@@ -346,7 +468,7 @@ describe('Global guard order (e2e)', () => {
       .get('/api/v1/protected-probe')
       .expect(429)
       .expect((response) => {
-        expect(response.body).toMatchObject({
+        expect(bodyOf(response)).toMatchObject({
           success: false,
           error: { code: 'HTTP_TOO_MANY_REQUESTS' },
         });

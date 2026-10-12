@@ -1,0 +1,123 @@
+enum AppUserStatus {
+  ACTIVE
+  LOCKED
+}
+
+enum ActivationState {
+  INVITED
+  ACTIVATED
+}
+
+enum EmailVerificationSource {
+  BOOTSTRAP_ASSERTED
+  INVITATION_REDEEMED
+}
+
+enum AppRole {
+  SUPER_ADMIN
+  IT_ADMIN
+  FINANCE
+  EMPLOYEE
+}
+
+enum SessionRevokedReason {
+  LOGOUT
+  REPLAY_DETECTED
+  ACCOUNT_LOCKED
+}
+
+// A login account, separate from the HR record (ADR-08). employee_id is a plain foreign key
+// to the organization module's table; identity never reads employees directly.
+model AppUser {
+  id                      String                   @id @default(uuid()) @db.Uuid
+  organizationId          String                   @map("organization_id") @db.Uuid
+  employeeId              String                   @unique @map("employee_id") @db.Uuid
+  loginEmail              String                   @map("login_email")
+  normalizedLoginEmail    String                   @map("normalized_login_email")
+  status                  AppUserStatus            @default(ACTIVE)
+  activationState         ActivationState          @default(INVITED) @map("activation_state")
+  emailVerificationSource EmailVerificationSource? @map("email_verification_source")
+  emailVerifiedAt         DateTime?                @map("email_verified_at") @db.Timestamptz(3)
+  createdAt               DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt               DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  employee   Employee            @relation(fields: [employeeId], references: [id])
+  credential PasswordCredential?
+  roleGrants RoleGrant[]
+  sessions   AuthSession[]
+
+  @@unique([organizationId, normalizedLoginEmail])
+  @@map("app_users")
+}
+
+model PasswordCredential {
+  appUserId         String   @id @map("app_user_id") @db.Uuid
+  hash              String
+  hashPolicyVersion Int      @map("hash_policy_version")
+  changedAt         DateTime @default(now()) @map("changed_at") @db.Timestamptz(3)
+
+  appUser AppUser @relation(fields: [appUserId], references: [id])
+
+  @@map("password_credentials")
+}
+
+// Direct role grants with history. MANAGER and the spending approver are derived, never stored here.
+model RoleGrant {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  appUserId      String    @map("app_user_id") @db.Uuid
+  role           AppRole
+  grantedAt      DateTime  @default(now()) @map("granted_at") @db.Timestamptz(3)
+  grantedBy      String?   @map("granted_by") @db.Uuid
+  revokedAt      DateTime? @map("revoked_at") @db.Timestamptz(3)
+  revokedBy      String?   @map("revoked_by") @db.Uuid
+
+  appUser AppUser @relation(fields: [appUserId], references: [id])
+
+  @@index([appUserId])
+  @@map("role_grants")
+}
+
+model AuthSession {
+  id                String                @id @default(uuid()) @db.Uuid
+  appUserId         String                @map("app_user_id") @db.Uuid
+  createdAt         DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
+  lastRefreshedAt   DateTime              @default(now()) @map("last_refreshed_at") @db.Timestamptz(3)
+  idleExpiresAt     DateTime              @map("idle_expires_at") @db.Timestamptz(3)
+  absoluteExpiresAt DateTime              @map("absolute_expires_at") @db.Timestamptz(3)
+  revokedAt         DateTime?             @map("revoked_at") @db.Timestamptz(3)
+  revokedReason     SessionRevokedReason? @map("revoked_reason")
+
+  appUser       AppUser        @relation(fields: [appUserId], references: [id])
+  refreshTokens RefreshToken[]
+
+  @@index([appUserId])
+  @@map("auth_sessions")
+}
+
+// Only the SHA-256 of the token is stored.
+model RefreshToken {
+  tokenHash  String    @id @map("token_hash")
+  sessionId  String    @map("session_id") @db.Uuid
+  expiresAt  DateTime  @map("expires_at") @db.Timestamptz(3)
+  consumedAt DateTime? @map("consumed_at") @db.Timestamptz(3)
+  replacedBy String?   @map("replaced_by")
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  session AuthSession @relation(fields: [sessionId], references: [id])
+
+  @@index([sessionId])
+  @@map("refresh_tokens")
+}
+
+// Keyed by an HMAC of the normalized email, so unknown emails are throttled too without storing them.
+model LoginThrottle {
+  organizationId  String    @map("organization_id") @db.Uuid
+  emailKeyHash    String    @map("email_key_hash")
+  failureCount    Int       @default(0) @map("failure_count")
+  windowStartedAt DateTime  @map("window_started_at") @db.Timestamptz(3)
+  blockedUntil    DateTime? @map("blocked_until") @db.Timestamptz(3)
+
+  @@id([organizationId, emailKeyHash])
+  @@map("login_throttles")
+}

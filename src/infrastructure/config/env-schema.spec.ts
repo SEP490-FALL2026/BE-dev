@@ -10,6 +10,8 @@ describe('validateEnvironment', () => {
     OBJECT_STORAGE_SECRET_ACCESS_KEY: 'test-secret-key',
     REDIS_HOST: 'redis.internal',
     REDIS_PASSWORD: 'redis-secret-password',
+    AUTH_ACCESS_TOKEN_SECRET: 'production-access-token-secret-with-enough-entropy',
+    AUTH_THROTTLE_PEPPER: 'production-throttle-pepper',
   };
 
   it('applies safe development defaults', () => {
@@ -21,6 +23,52 @@ describe('validateEnvironment', () => {
       API_PREFIX: 'api',
       SWAGGER_ENABLED: true,
     });
+  });
+
+  it('defaults the database timeouts to lock 3 s < statement 5 s < transaction 10 s', () => {
+    expect(validateEnvironment({})).toMatchObject({
+      DB_LOCK_TIMEOUT_MS: 3000,
+      DB_STATEMENT_TIMEOUT_MS: 5000,
+      DB_TRANSACTION_TIMEOUT_MS: 10000,
+      DB_TRANSACTION_MAX_WAIT_MS: 2000,
+    });
+  });
+
+  it('rejects database timeouts that let Prisma close a transaction before PostgreSQL stops the statement', () => {
+    expect(() => validateEnvironment({ DB_STATEMENT_TIMEOUT_MS: '9000', DB_TRANSACTION_TIMEOUT_MS: '9000' })).toThrow(
+      'DB_STATEMENT_TIMEOUT_MS',
+    );
+    expect(() => validateEnvironment({ DB_LOCK_TIMEOUT_MS: '6000', DB_STATEMENT_TIMEOUT_MS: '5000' })).toThrow(
+      'DB_LOCK_TIMEOUT_MS',
+    );
+  });
+
+  it('requires explicit auth secrets in production and rejects the development defaults', () => {
+    const { AUTH_ACCESS_TOKEN_SECRET: _secret, ...withoutSecret } = productionInfrastructure;
+    void _secret;
+    expect(() => validateEnvironment({ NODE_ENV: 'production', ...withoutSecret })).toThrow('AUTH_ACCESS_TOKEN_SECRET');
+    expect(() =>
+      validateEnvironment({
+        NODE_ENV: 'production',
+        ...productionInfrastructure,
+        AUTH_ACCESS_TOKEN_SECRET: 'development-only-access-token-secret-not-for-production',
+      }),
+    ).toThrow('development auth secrets');
+  });
+
+  it('keeps the refresh cookie Secure everywhere except development', () => {
+    expect(validateEnvironment({}).AUTH_COOKIE_SECURE).toBe(false);
+    expect(validateEnvironment({ NODE_ENV: 'test' }).AUTH_COOKIE_SECURE).toBe(true);
+    expect(validateEnvironment({ NODE_ENV: 'production', ...productionInfrastructure }).AUTH_COOKIE_SECURE).toBe(true);
+    expect(() =>
+      validateEnvironment({ NODE_ENV: 'production', ...productionInfrastructure, AUTH_COOKIE_SECURE: 'false' }),
+    ).toThrow('AUTH_COOKIE_SECURE');
+  });
+
+  it('rejects an idle session limit longer than the absolute limit', () => {
+    expect(() =>
+      validateEnvironment({ AUTH_SESSION_IDLE_SECONDS: '9000', AUTH_SESSION_ABSOLUTE_SECONDS: '3600' }),
+    ).toThrow('AUTH_SESSION_IDLE_SECONDS');
   });
 
   it('rejects an invalid port', () => {

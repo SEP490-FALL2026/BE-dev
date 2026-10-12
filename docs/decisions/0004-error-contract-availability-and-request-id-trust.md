@@ -9,7 +9,8 @@ survive the exception filter, including availability errors.
 
 Invalid credentials return 401. An unavailable authentication dependency returns
 503 TOKEN_VERIFICATION_UNAVAILABLE, with details only in sanitized internal logs.
-The unimplemented verifier returns 503 AUTHENTICATION_NOT_CONFIGURED.
+_Update 12/10/2026:_ the unimplemented verifier and `503 AUTHENTICATION_NOT_CONFIGURED` no longer exist;
+the real verifier is described in [ADR-0011](0011-internal-authentication-and-sessions.md) (Proposed).
 
 Never log bearer tokens, cookies or passwords. Rejected tokens must not cause one
 error log per request, which would amplify abuse.

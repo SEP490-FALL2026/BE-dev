@@ -1,0 +1,27 @@
+enum AuditActorKind {
+  USER
+  SYSTEM
+  OPERATOR
+}
+
+// Append-only. organization_id and actor_app_user_id are plain values, deliberately without
+// foreign keys: the log must stay independent of the modules it records (INV-05).
+model AuditEvent {
+  id                 String         @id @default(uuid()) @db.Uuid
+  organizationId     String         @map("organization_id") @db.Uuid
+  occurredAt         DateTime       @default(now()) @map("occurred_at") @db.Timestamptz(3)
+  actorKind          AuditActorKind @map("actor_kind")
+  actorAppUserId     String?        @map("actor_app_user_id") @db.Uuid
+  actorRoles         String[]       @map("actor_roles")
+  action             String
+  resourceType       String         @map("resource_type")
+  resourceId         String         @map("resource_id")
+  before             Json?
+  after              Json?
+  correlationId      String         @map("correlation_id")
+  operatorReference  String?        @map("operator_reference")
+
+  @@index([organizationId, occurredAt])
+  @@index([resourceType, resourceId])
+  @@map("audit_events")
+}

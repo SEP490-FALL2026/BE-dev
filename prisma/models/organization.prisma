@@ -1,0 +1,119 @@
+enum CostCenterKind {
+  UNIT
+  COMPANY
+}
+
+enum EmploymentType {
+  STAFF
+  CONTRACTOR
+  FREELANCER
+  INTERN
+}
+
+enum EmployeeStatus {
+  ACTIVE
+  TERMINATED
+}
+
+// One row per installation (ADR-01); the migration enforces it.
+model Organization {
+  id                   String    @id @default(uuid()) @db.Uuid
+  name                 String
+  timeZone             String    @map("time_zone")
+  reportingCurrency    String    @map("reporting_currency")
+  bootstrapCompletedAt DateTime? @map("bootstrap_completed_at") @db.Timestamptz(3)
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  costCenters CostCenter[]
+  departments Department[]
+  jobTitles   JobTitle[]
+  employees   Employee[]
+
+  @@map("organizations")
+}
+
+model CostCenter {
+  id             String         @id @default(uuid()) @db.Uuid
+  organizationId String         @map("organization_id") @db.Uuid
+  code           String
+  name           String
+  kind           CostCenterKind
+  createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  department   Department?
+
+  @@unique([organizationId, code])
+  @@map("cost_centers")
+}
+
+model Department {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  code           String
+  name           String
+  costCenterId   String   @unique @map("cost_center_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  organization Organization        @relation(fields: [organizationId], references: [id])
+  costCenter   CostCenter          @relation(fields: [costCenterId], references: [id])
+  placements   EmployeePlacement[]
+
+  @@unique([organizationId, code])
+  @@map("departments")
+}
+
+model JobTitle {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  name           String
+  normalizedName String   @map("normalized_name")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  organization Organization        @relation(fields: [organizationId], references: [id])
+  placements   EmployeePlacement[]
+
+  @@unique([organizationId, normalizedName])
+  @@map("job_titles")
+}
+
+model Employee {
+  id                   String         @id @default(uuid()) @db.Uuid
+  organizationId       String         @map("organization_id") @db.Uuid
+  employeeCode         String         @map("employee_code")
+  fullName             String         @map("full_name")
+  workEmail            String?        @map("work_email")
+  normalizedWorkEmail  String?        @map("normalized_work_email")
+  employmentType       EmploymentType @map("employment_type")
+  hireDate             DateTime       @map("hire_date") @db.Date
+  status               EmployeeStatus @default(ACTIVE)
+  createdAt            DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt            DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization        @relation(fields: [organizationId], references: [id])
+  placements   EmployeePlacement[]
+  appUser      AppUser?
+
+  @@unique([organizationId, employeeCode])
+  @@unique([organizationId, normalizedWorkEmail])
+  @@map("employees")
+}
+
+// Effective-dated placement (ADR-04). [validFrom, validTo) — validTo null means open.
+model EmployeePlacement {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  employeeId     String    @map("employee_id") @db.Uuid
+  departmentId   String    @map("department_id") @db.Uuid
+  jobTitleId     String    @map("job_title_id") @db.Uuid
+  validFrom      DateTime  @map("valid_from") @db.Date
+  validTo        DateTime? @map("valid_to") @db.Date
+
+  employee   Employee   @relation(fields: [employeeId], references: [id])
+  department Department @relation(fields: [departmentId], references: [id])
+  jobTitle   JobTitle   @relation(fields: [jobTitleId], references: [id])
+
+  @@unique([employeeId, validFrom])
+  @@index([departmentId])
+  @@map("employee_placements")
+}
