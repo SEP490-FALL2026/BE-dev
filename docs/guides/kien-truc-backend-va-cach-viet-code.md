@@ -10,8 +10,11 @@ Ghi input, output, actor/quyền và lỗi cần trả. Chọn module sở hữu
 Nếu sửa catalog thì làm ngay trong catalog; nếu capability mới thì tạo module khi
 có workflow thật. Chỉ tạo `policies/`, `services/`, `mappers/` khi có nội dung cần tách.
 
-Catalog hiện có list/get/create nhưng chưa có role/resource authorization.
-Không sao chép giới hạn đó thành chính sách cho tính năng nghiệp vụ mới.
+Catalog hiện có list/get/create nhưng chưa có role/resource authorization và **không được
+đăng ký vào `AppModule`** (404 trên HTTP): nó chỉ còn là mẫu cấu trúc. Không sao chép giới hạn đó
+thành chính sách cho tính năng nghiệp vụ mới. Mọi route mới phải khai báo đúng một trong
+`@Public()`, `@AuthenticatedOnly()`, `@RequireRoles(...)`; ví dụ HTTP test: module `identity-access`
+(`test/integration/auth-http.integration-spec.ts`).
 
 ## 2. Lần theo một endpoint đang có
 

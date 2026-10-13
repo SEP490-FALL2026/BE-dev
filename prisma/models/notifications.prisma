@@ -1,0 +1,33 @@
+enum EmailOutboxStatus {
+  PENDING
+  SENDING
+  SENT
+  FAILED
+  CANCELLED
+}
+
+// Transactional outbox: written in the same transaction as the business change, delivered by
+// the worker. action_token_hash is a plain value (no foreign key): this module never reads the
+// identity tables; the dispatcher asks identity-access whether the token is still usable.
+model EmailOutbox {
+  id                String            @id @default(uuid()) @db.Uuid
+  organizationId    String            @map("organization_id") @db.Uuid
+  recipient         String
+  template          String
+  locale            String
+  actionTokenHash   String            @unique @map("action_token_hash")
+  status            EmailOutboxStatus @default(PENDING)
+  attempts          Int               @default(0)
+  nextAttemptAt     DateTime          @map("next_attempt_at") @db.Timestamptz(3)
+  leaseId           String?           @map("lease_id") @db.Uuid
+  leaseExpiresAt    DateTime?         @map("lease_expires_at") @db.Timestamptz(3)
+  payloadCiphertext Bytes?            @map("payload_ciphertext")
+  payloadKeyId      String?           @map("payload_key_id")
+  lastErrorCode     String?           @map("last_error_code")
+  sentAt            DateTime?         @map("sent_at") @db.Timestamptz(3)
+  createdAt         DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([status, nextAttemptAt])
+  @@map("email_outbox")
+}

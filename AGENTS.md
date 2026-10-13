@@ -7,8 +7,10 @@ Scope: this backend repository. Work from its root with the pnpm version in `pac
 - Read [CONTRIBUTING.md](CONTRIBUTING.md) for workflow and verification commands.
 - Read [ARCHITECTURE.md](ARCHITECTURE.md) before changing module boundaries.
 - Check the branch, working diff and relevant source/tests; preserve existing changes.
-- Current runtime is health/catalog plus infrastructure. Authentication is a fail-closed
-  placeholder; account/password + JWT and other US workflows are not implemented.
+- Current runtime: health, `/auth/*`, `/me` plus infrastructure; first-run installation is a CLI
+  (`pnpm ops:bootstrap`). Super Admin account administration (create, invite, activate, lock, role
+  grants) is implemented as slice 1b, unreviewed. Catalog is a structural sample and is not mounted.
+  Password change/reset and all other US workflows are not implemented.
 
 ## Read only what the task needs
 

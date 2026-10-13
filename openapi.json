@@ -41,9 +41,208 @@
         "tags": ["health"]
       }
     },
-    "/api/v1/catalog-applications": {
+    "/api/v1/auth/login": {
+      "post": {
+        "operationId": "authLogin",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/LoginBodyDto" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "Signed in. The refresh token is set as an HttpOnly cookie.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SessionTokenResponseDto" } } }
+          },
+          "401": {
+            "description": "The email or password is not valid (one answer for every reason).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "422": {
+            "description": "The request body is invalid.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "429": {
+            "description": "Too many failed attempts; see retryAfterSeconds.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "503": {
+            "description": "The database is temporarily unavailable. Retry shortly.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          }
+        },
+        "summary": "",
+        "tags": ["auth"]
+      }
+    },
+    "/api/v1/auth/refresh": {
+      "post": {
+        "operationId": "authRefresh",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "A new access token; the refresh cookie is rotated.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SessionTokenResponseDto" } } }
+          },
+          "401": {
+            "description": "The session is missing, expired, revoked or replayed. The cookie is cleared.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "503": {
+            "description": "The database is temporarily unavailable. Retry shortly.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          }
+        },
+        "summary": "",
+        "tags": ["auth"]
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "operationId": "authLogout",
+        "parameters": [],
+        "responses": {
+          "204": { "description": "Signed out (or there was nothing to sign out)." },
+          "503": {
+            "description": "The database is temporarily unavailable. Retry shortly.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          }
+        },
+        "summary": "",
+        "tags": ["auth"]
+      }
+    },
+    "/api/v1/auth/invitations/redeem": {
+      "post": {
+        "operationId": "authRedeemInvitation",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RedeemInvitationBodyDto" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "The account is activated. The user signs in with the login route.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/AccountActivatedResponseDto" } }
+            }
+          },
+          "400": {
+            "description": "The link is not valid (unknown, used, replaced, expired, or the account cannot be activated).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "422": {
+            "description": "The body is invalid or the password does not meet the policy.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "503": {
+            "description": "The database is temporarily unavailable. Retry shortly.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          }
+        },
+        "summary": "",
+        "tags": ["auth"]
+      }
+    },
+    "/api/v1/me": {
       "get": {
-        "operationId": "catalogListApplications",
+        "operationId": "meGet",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The signed-in account, its employee record and its effective roles.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MeResponseDto" } } }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "503": {
+            "description": "Authentication is temporarily unavailable.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          }
+        },
+        "summary": "",
+        "tags": ["me"]
+      }
+    },
+    "/api/v1/account-candidates": {
+      "get": {
+        "operationId": "accountCandidatesList",
+        "parameters": [
+          { "name": "search", "required": false, "in": "query", "schema": { "maxLength": 100, "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Employees who have not left and have no account yet (at most 20).",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/AccountCandidatesResponseDto" } }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "403": {
+            "description": "Only the Super Admin may call this route.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "422": {
+            "description": "The query is invalid.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "503": {
+            "description": "The service is temporarily unavailable.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          }
+        },
+        "summary": "",
+        "tags": ["app-users"]
+      }
+    },
+    "/api/v1/app-users": {
+      "post": {
+        "operationId": "appUserCreate",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CreateAppUserBodyDto" } } }
+        },
+        "responses": {
+          "201": {
+            "description": "The account was created (invited) and its invitation queued.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AccountDetailResponseDto" } } }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "403": {
+            "description": "Only the Super Admin may call this route.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "404": {
+            "description": "The employee does not exist.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "409": {
+            "description": "The employee left, already has an account, or the email or Finance seat is taken.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "422": {
+            "description": "The body is invalid or a requested role cannot be granted by hand.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "503": {
+            "description": "The service is temporarily unavailable.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          }
+        },
+        "summary": "",
+        "tags": ["app-users"]
+      },
+      "get": {
+        "operationId": "appUserList",
         "parameters": [
           {
             "name": "page",
@@ -67,70 +266,50 @@
             "name": "status",
             "required": false,
             "in": "query",
-            "schema": { "type": "string", "enum": ["ACTIVE", "INACTIVE", "UNDER_REVIEW"] }
+            "schema": { "type": "string", "enum": ["ACTIVE", "LOCKED"] }
+          },
+          {
+            "name": "activationState",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string", "enum": ["INVITED", "ACTIVATED"] }
+          },
+          {
+            "name": "role",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string", "enum": ["SUPER_ADMIN", "IT_ADMIN", "FINANCE", "EMPLOYEE"] }
           }
         ],
         "responses": {
           "200": {
-            "description": "A page of catalog applications.",
-            "content": {
-              "application/json": { "schema": { "$ref": "#/components/schemas/CatalogApplicationPageResponseDto" } }
-            }
+            "description": "A page of accounts.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AccountPageResponseDto" } } }
           },
           "401": {
-            "description": "Authentication is required.",
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "403": {
+            "description": "Only the Super Admin may call this route.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
-            "description": "The query parameters are invalid.",
+            "description": "The query is invalid.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "503": {
-            "description": "Authentication is temporarily unavailable.",
+            "description": "The service is temporarily unavailable.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           }
         },
         "summary": "",
-        "tags": ["catalog"]
-      },
-      "post": {
-        "operationId": "catalogCreateApplication",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CreateApplicationBodyDto" } } }
-        },
-        "responses": {
-          "201": {
-            "description": "The catalog application was created.",
-            "content": {
-              "application/json": { "schema": { "$ref": "#/components/schemas/CatalogApplicationResponseDto" } }
-            }
-          },
-          "401": {
-            "description": "Authentication is required.",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
-          },
-          "409": {
-            "description": "The slug is already used.",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
-          },
-          "422": {
-            "description": "The request body is invalid.",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
-          },
-          "503": {
-            "description": "Authentication is temporarily unavailable.",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
-          }
-        },
-        "summary": "",
-        "tags": ["catalog"]
+        "tags": ["app-users"]
       }
     },
-    "/api/v1/catalog-applications/{id}": {
+    "/api/v1/app-users/{id}": {
       "get": {
-        "operationId": "catalogGetApplication",
+        "operationId": "appUserGet",
         "parameters": [
           {
             "name": "id",
@@ -145,17 +324,19 @@
         ],
         "responses": {
           "200": {
-            "description": "The requested catalog application.",
-            "content": {
-              "application/json": { "schema": { "$ref": "#/components/schemas/CatalogApplicationResponseDto" } }
-            }
+            "description": "The account with its role history and invitation state.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AccountDetailResponseDto" } } }
           },
           "401": {
-            "description": "Authentication is required.",
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "403": {
+            "description": "Only the Super Admin may call this route.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "404": {
-            "description": "No application has this identifier.",
+            "description": "No account has this identifier.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
@@ -163,12 +344,258 @@
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "503": {
-            "description": "Authentication is temporarily unavailable.",
+            "description": "The service is temporarily unavailable.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           }
         },
         "summary": "",
-        "tags": ["catalog"]
+        "tags": ["app-users"]
+      }
+    },
+    "/api/v1/app-users/{id}/invitations": {
+      "post": {
+        "operationId": "appUserResendInvitation",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "A new invitation was queued; the previous one no longer works.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AccountDetailResponseDto" } } }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "403": {
+            "description": "Only the Super Admin may call this route.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "404": {
+            "description": "No account has this identifier.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "409": {
+            "description": "The account is activated, locked, belongs to a departed employee, or is the caller.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "503": {
+            "description": "The service is temporarily unavailable.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          }
+        },
+        "summary": "",
+        "tags": ["app-users"]
+      }
+    },
+    "/api/v1/app-users/{id}/lock": {
+      "post": {
+        "operationId": "appUserLock",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The account is locked; its sessions and unused invitation are ended.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AccountDetailResponseDto" } } }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "403": {
+            "description": "Only the Super Admin may call this route.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "404": {
+            "description": "No account has this identifier.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "409": {
+            "description": "The caller, or the holder of SUPER_ADMIN, cannot be locked.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "503": {
+            "description": "The service is temporarily unavailable.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          }
+        },
+        "summary": "",
+        "tags": ["app-users"]
+      }
+    },
+    "/api/v1/app-users/{id}/unlock": {
+      "post": {
+        "operationId": "appUserUnlock",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The account is active again.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AccountDetailResponseDto" } } }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "403": {
+            "description": "Only the Super Admin may call this route.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "404": {
+            "description": "No account has this identifier.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "409": {
+            "description": "The caller cannot change their own account.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "503": {
+            "description": "The service is temporarily unavailable.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          }
+        },
+        "summary": "",
+        "tags": ["app-users"]
+      }
+    },
+    "/api/v1/app-users/{id}/role-grants": {
+      "post": {
+        "operationId": "appUserGrantRole",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GrantRoleBodyDto" } } }
+        },
+        "responses": {
+          "201": {
+            "description": "The role is granted and takes effect at the account next request.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AccountDetailResponseDto" } } }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "403": {
+            "description": "Only the Super Admin may call this route.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "404": {
+            "description": "No account has this identifier.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "409": {
+            "description": "Already granted, forbidden combination, Finance seat taken, or the caller.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "422": {
+            "description": "The role is derived or moves only by transfer.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "503": {
+            "description": "The service is temporarily unavailable.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          }
+        },
+        "summary": "",
+        "tags": ["app-users"]
+      }
+    },
+    "/api/v1/app-users/{id}/role-grants/{role}": {
+      "delete": {
+        "operationId": "appUserRevokeRole",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "type": "string"
+            }
+          },
+          {
+            "name": "role",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string",
+              "enum": ["SUPER_ADMIN", "IT_ADMIN", "FINANCE", "EMPLOYEE", "MANAGER", "SPENDING_APPROVER"]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The role is revoked (the last role may be revoked); it stops at the next request.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AccountDetailResponseDto" } } }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "403": {
+            "description": "Only the Super Admin may call this route.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "404": {
+            "description": "No such account, or it does not hold this role.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "409": {
+            "description": "The caller cannot change their own account.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "422": {
+            "description": "The role is derived or moves only by transfer.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "503": {
+            "description": "The service is temporarily unavailable.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          }
+        },
+        "summary": "",
+        "tags": ["app-users"]
       }
     }
   },
@@ -245,7 +672,121 @@
         "required": ["success", "message", "data"],
         "additionalProperties": false
       },
-      "CatalogApplicationPageResponseDto": {
+      "LoginBodyDto": {
+        "type": "object",
+        "properties": {
+          "email": { "type": "string", "maxLength": 254 },
+          "password": { "type": "string", "minLength": 1, "maxLength": 256 }
+        },
+        "required": ["email", "password"],
+        "additionalProperties": false
+      },
+      "SessionTokenResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "accessToken": { "type": "string" },
+              "tokenType": { "type": "string", "enum": ["Bearer"] },
+              "expiresAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              }
+            },
+            "required": ["accessToken", "tokenType", "expiresAt"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "RedeemInvitationBodyDto": {
+        "type": "object",
+        "properties": {
+          "token": { "type": "string", "minLength": 1, "maxLength": 256 },
+          "password": { "type": "string", "minLength": 1, "maxLength": 1024 }
+        },
+        "required": ["token", "password"],
+        "additionalProperties": false
+      },
+      "AccountActivatedResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": { "activated": { "type": "boolean", "enum": [true] } },
+            "required": ["activated"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "MeResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "appUserId": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "loginEmail": { "type": "string" },
+              "employee": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "employeeCode": { "type": "string" },
+                  "fullName": { "type": "string" },
+                  "department": {
+                    "type": "object",
+                    "properties": { "code": { "type": "string" }, "name": { "type": "string" } },
+                    "required": ["code", "name"],
+                    "additionalProperties": false,
+                    "nullable": true
+                  },
+                  "jobTitle": { "type": "string", "nullable": true }
+                },
+                "required": ["id", "employeeCode", "fullName", "department", "jobTitle"],
+                "additionalProperties": false
+              },
+              "roles": {
+                "type": "object",
+                "properties": {
+                  "direct": { "type": "array", "items": { "type": "string" } },
+                  "derived": { "type": "array", "items": { "type": "string" } },
+                  "effective": { "type": "array", "items": { "type": "string" } }
+                },
+                "required": ["direct", "derived", "effective"],
+                "additionalProperties": false
+              },
+              "selfServiceOnly": { "type": "boolean" }
+            },
+            "required": ["appUserId", "loginEmail", "employee", "roles", "selfServiceOnly"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "AccountCandidatesResponseDto": {
         "type": "object",
         "properties": {
           "success": { "type": "boolean", "enum": [true] },
@@ -263,17 +804,205 @@
                       "format": "uuid",
                       "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                     },
-                    "slug": { "type": "string" },
-                    "name": { "type": "string" },
-                    "vendor": { "type": "string" },
-                    "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE", "UNDER_REVIEW"] },
+                    "employeeCode": { "type": "string" },
+                    "fullName": { "type": "string" },
+                    "workEmail": { "type": "string", "nullable": true },
+                    "department": { "type": "string", "nullable": true }
+                  },
+                  "required": ["id", "employeeCode", "fullName", "workEmail", "department"],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": ["items"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "CreateAppUserBodyDto": {
+        "type": "object",
+        "properties": {
+          "employeeId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "loginEmail": { "type": "string", "maxLength": 254 },
+          "roles": {
+            "default": [],
+            "maxItems": 6,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["SUPER_ADMIN", "IT_ADMIN", "FINANCE", "EMPLOYEE", "MANAGER", "SPENDING_APPROVER"]
+            }
+          }
+        },
+        "required": ["employeeId"],
+        "additionalProperties": false
+      },
+      "AccountDetailResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "loginEmail": { "type": "string" },
+              "status": { "type": "string", "enum": ["ACTIVE", "LOCKED"] },
+              "activationState": { "type": "string", "enum": ["INVITED", "ACTIVATED"] },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              "employee": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "employeeCode": { "type": "string" },
+                  "fullName": { "type": "string" }
+                },
+                "required": ["id", "employeeCode", "fullName"],
+                "additionalProperties": false,
+                "nullable": true
+              },
+              "roles": {
+                "type": "array",
+                "items": { "type": "string", "enum": ["SUPER_ADMIN", "IT_ADMIN", "FINANCE", "EMPLOYEE"] }
+              },
+              "roleHistory": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "role": { "type": "string", "enum": ["SUPER_ADMIN", "IT_ADMIN", "FINANCE", "EMPLOYEE"] },
+                    "grantedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                    },
+                    "revokedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                      "nullable": true
+                    }
+                  },
+                  "required": ["role", "grantedAt", "revokedAt"],
+                  "additionalProperties": false
+                }
+              },
+              "invitation": {
+                "type": "object",
+                "properties": {
+                  "usable": { "type": "boolean" },
+                  "expiresAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                  },
+                  "delivery": {
+                    "type": "object",
+                    "properties": {
+                      "status": { "type": "string", "enum": ["PENDING", "SENDING", "SENT", "FAILED", "CANCELLED"] },
+                      "attempts": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
+                      "lastErrorCode": { "type": "string", "nullable": true },
+                      "sentAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                        "nullable": true
+                      }
+                    },
+                    "required": ["status", "attempts", "lastErrorCode", "sentAt"],
+                    "additionalProperties": false,
+                    "nullable": true
+                  }
+                },
+                "required": ["usable", "expiresAt", "delivery"],
+                "additionalProperties": false,
+                "nullable": true
+              }
+            },
+            "required": [
+              "id",
+              "loginEmail",
+              "status",
+              "activationState",
+              "createdAt",
+              "employee",
+              "roles",
+              "roleHistory",
+              "invitation"
+            ],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "AccountPageResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "loginEmail": { "type": "string" },
+                    "status": { "type": "string", "enum": ["ACTIVE", "LOCKED"] },
+                    "activationState": { "type": "string", "enum": ["INVITED", "ACTIVATED"] },
                     "createdAt": {
                       "type": "string",
                       "format": "date-time",
                       "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                    },
+                    "employee": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "employeeCode": { "type": "string" },
+                        "fullName": { "type": "string" }
+                      },
+                      "required": ["id", "employeeCode", "fullName"],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "roles": {
+                      "type": "array",
+                      "items": { "type": "string", "enum": ["SUPER_ADMIN", "IT_ADMIN", "FINANCE", "EMPLOYEE"] }
                     }
                   },
-                  "required": ["id", "slug", "name", "vendor", "status", "createdAt"],
+                  "required": ["id", "loginEmail", "status", "activationState", "createdAt", "employee", "roles"],
                   "additionalProperties": false
                 }
               },
@@ -302,45 +1031,15 @@
         "required": ["success", "message", "data"],
         "additionalProperties": false
       },
-      "CatalogApplicationResponseDto": {
+      "GrantRoleBodyDto": {
         "type": "object",
         "properties": {
-          "success": { "type": "boolean", "enum": [true] },
-          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
-          "data": {
-            "type": "object",
-            "properties": {
-              "id": {
-                "type": "string",
-                "format": "uuid",
-                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-              },
-              "slug": { "type": "string" },
-              "name": { "type": "string" },
-              "vendor": { "type": "string" },
-              "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE", "UNDER_REVIEW"] },
-              "createdAt": {
-                "type": "string",
-                "format": "date-time",
-                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
-              }
-            },
-            "required": ["id", "slug", "name", "vendor", "status", "createdAt"],
-            "additionalProperties": false,
-            "nullable": true
+          "role": {
+            "type": "string",
+            "enum": ["SUPER_ADMIN", "IT_ADMIN", "FINANCE", "EMPLOYEE", "MANAGER", "SPENDING_APPROVER"]
           }
         },
-        "required": ["success", "message", "data"],
-        "additionalProperties": false
-      },
-      "CreateApplicationBodyDto": {
-        "type": "object",
-        "properties": {
-          "slug": { "type": "string", "maxLength": 80, "pattern": "^[a-z][a-z0-9-]*$" },
-          "name": { "type": "string", "minLength": 1, "maxLength": 200 },
-          "vendor": { "type": "string", "minLength": 1, "maxLength": 200 }
-        },
-        "required": ["slug", "name", "vendor"],
+        "required": ["role"],
         "additionalProperties": false
       }
     }

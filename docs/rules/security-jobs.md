@@ -2,13 +2,19 @@
 
 ## Authentication and authorization
 
-- Target: account/password + JWT. Login, password hashing, token issuance, refresh
-  and account lifecycle are not implemented. Design them from the relevant US.
-- Global Bearer guard denies access by default. Missing token returns 401; the
-  placeholder refuses supplied tokens with 503 AUTHENTICATION_NOT_CONFIGURED.
-  Never use an always-accept verifier outside isolated tests.
-- Public routes need @Public() and anonymous HTTP tests. Catalog has no role/resource
-  policy; add authorization from the US before opening real business access.
+- Internal accounts: Argon2id passwords, short-lived HS256 access token, rotating refresh token in an
+  `HttpOnly` `SameSite=Strict` cookie scoped to the auth routes (design: ADR-0011, Proposed). Login,
+  refresh, logout and `/me` exist; invitations, activation, locking and password reset are later slices.
+- Global guards deny by default: every route declares one of `@Public()`, `@AuthenticatedOnly()`,
+  `@RequireRoles(...)` (missing means 500). Session, account status and employee status are checked in the
+  database on every request; roles are never read from the token. Never use an always-accept verifier
+  outside isolated tests.
+- Public routes need @Public(), an entry in the public allowlist of `test/e2e/api-inventory.e2e-spec.ts`
+  and anonymous HTTP tests. Catalog has no role/resource policy and is not mounted; add authorization
+  from the US before opening real business access.
+- Passwords are typed only at the installation prompt or sent to `/auth/login`; they are never accepted
+  as arguments or environment variables, and never logged or stored in audit (`AuditService` rejects
+  keys that look like secrets).
 - Never trust client-supplied privileges. A signed JWT alone does not establish
   current account status or resource permission.
 - Distinguish invalid credentials from unavailable dependencies. Do not log secrets.

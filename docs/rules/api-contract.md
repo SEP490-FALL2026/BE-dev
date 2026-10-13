@@ -18,8 +18,13 @@
 Lỗi: `{ success: false, error: { code, message, requestId, details? } }`.
 `details` là object đã chọn trường an toàn. Filter giữ mã lỗi chủ đích;
 `INTERNAL_SERVER_ERROR` là fallback cho server error không có mã riêng.
-The guard returns 401 for missing credentials. Supplied tokens currently receive
-503 `AUTHENTICATION_NOT_CONFIGURED`; account/password + JWT is not implemented.
+Every route declares exactly one of `@Public()`, `@AuthenticatedOnly()`, `@RequireRoles(...)`;
+a route with none (or two kinds) answers 500 and is logged as a programming error. The guard returns
+401 `AUTHENTICATION_REQUIRED` for a missing token and 401 `INVALID_ACCESS_TOKEN` for a token that is
+bad or whose session/account is no longer usable; a wrong role is 403 `AUTHORIZATION.FORBIDDEN`;
+an unreachable database is 503 (`TOKEN_VERIFICATION_UNAVAILABLE`, or `AUTH.UNAVAILABLE` on auth routes),
+never 401; account administration routes use 503 `SERVICE_UNAVAILABLE` for a transient database failure.
+Request-body validation errors are 422 `VALIDATION_ERROR`.
 
 ## Handoff
 

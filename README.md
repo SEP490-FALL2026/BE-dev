@@ -3,9 +3,10 @@
 Foundation để triển khai User Story bằng NestJS 11, TypeScript, PostgreSQL/Prisma,
 Redis/BullMQ và S3-compatible storage. Giữ catalog làm module mẫu.
 
-**Chưa triển khai đăng nhập tài khoản/mật khẩu và phát hành JWT.** API được bảo vệ
-trả 401 khi thiếu Bearer token; khi có token trả 503 AUTHENTICATION_NOT_CONFIGURED.
-Health là public. Không có tài khoản demo hay token hợp lệ trong baseline.
+**Đã có (lát 1a, chưa review):** lệnh khởi tạo `pnpm ops:bootstrap`, đăng nhập/làm mới/đăng xuất
+(`/api/v1/auth/*`) và `GET /api/v1/me`. Chưa có tạo tài khoản qua API, lời mời, đổi/đặt lại mật khẩu
+(lát 1b/1c). Route catalog **không còn trên HTTP** (module vẫn là mẫu cấu trúc). Health là public.
+Không có tài khoản demo: tạo Super Admin bằng lệnh khởi tạo trên database mới.
 
 ## Chạy local
 

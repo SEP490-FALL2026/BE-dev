@@ -28,6 +28,7 @@ trong docs/architecture. Các gói triển khai auth/US cũ đã được dọn 
 ## Quyết định đề xuất (chưa Accepted)
 
 - [Xác thực nội bộ, phiên và quy ước persistence vùng danh tính](decisions/0011-internal-authentication-and-sessions.md) — Proposed 12/10/2026, chờ dev review; khi Accepted sẽ thay một câu của ADR-0002 và ADR-0004.
+- [Gửi thư vòng đời tài khoản: outbox, thư viện SMTP, dispatcher](decisions/0012-account-email-delivery.md) — Proposed 12/10/2026, chờ dev review; áp dụng cho lát 1b.
 
 Số ADR bị khuyết không cần đánh lại. Định hướng tài khoản/mật khẩu + JWT hiện ghi
 ở ARCHITECTURE; thiết kế chi tiết sẽ được lập lại theo US.

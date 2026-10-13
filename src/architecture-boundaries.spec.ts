@@ -16,7 +16,24 @@ function listTypeScriptFiles(directory: string): string[] {
  * Every Prisma model has exactly one owning module. A module may only touch its own
  * delegates; it reads another module's data through that module's public contract.
  */
-const PRISMA_MODEL_OWNER: Readonly<Record<string, string>> = { CatalogApplication: 'catalog' };
+const PRISMA_MODEL_OWNER: Readonly<Record<string, string>> = {
+  CatalogApplication: 'catalog',
+  AuditEvent: 'audit',
+  Organization: 'organization',
+  CostCenter: 'organization',
+  Department: 'organization',
+  JobTitle: 'organization',
+  Employee: 'organization',
+  EmployeePlacement: 'organization',
+  AppUser: 'identity-access',
+  PasswordCredential: 'identity-access',
+  RoleGrant: 'identity-access',
+  AuthSession: 'identity-access',
+  RefreshToken: 'identity-access',
+  LoginThrottle: 'identity-access',
+  AccountActionToken: 'identity-access',
+  EmailOutbox: 'notifications',
+};
 
 interface PrismaModelTable {
   model: string;

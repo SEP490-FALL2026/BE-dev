@@ -11,6 +11,11 @@ export class PrismaService extends PrismaClient implements OnModuleDestroy {
     // adapter has nothing left to decide.
     const adapter = new PrismaPg({
       connectionString: config.get('DATABASE_URL', { infer: true }),
+      // The adapter reads and writes timestamptz as if the session zone were UTC. On a server
+      // whose default TimeZone is anything else, every instant is silently shifted by the offset
+      // (observed on a PostgreSQL started in Asia/Bangkok). Pin the zone per connection so the
+      // result does not depend on how the database server was installed.
+      options: '-c TimeZone=UTC',
     });
     super({ adapter });
   }

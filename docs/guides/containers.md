@@ -35,6 +35,11 @@ docker run --rm --env-file .env.container -p 127.0.0.1:3000:3000 slm-api:foundat
 The migration image requires DATABASE_URL with migration privileges. The runtime
 does not run migrations automatically. The baseline is for a fresh database;
 existing databases need a separately reviewed transition, never an automatic reset.
+First-run installation (once, on an empty database after migrations) is an interactive command in the
+same runtime image: `docker run --rm -it --env-file .env.container slm-api:foundation node dist/installation-cli.js --help`.
+It needs a terminal (`-it`) because the Super Admin password is typed at a hidden prompt; it refuses to
+read it from arguments, the environment or a pipe. NOT verified in a container or on a real TTY by the
+implementing session: check on PowerShell and a Linux shell before relying on it.
 The worker uses the same runtime image with command node dist/worker.js. No business
 processor exists yet.
 
