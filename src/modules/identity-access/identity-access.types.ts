@@ -66,6 +66,43 @@ export interface BootstrapSuperAdminInput {
   hashPolicyVersion: number;
 }
 
+// --- account management (slice 1b) --------------------------------------------------
+
+export type ActionTokenRevokedReason = 'SUPERSEDED' | 'ACCOUNT_LOCKED';
+
+export interface ActionTokenSnapshot {
+  tokenHash: string;
+  appUserId: string;
+  purpose: 'INVITE';
+  expiresAt: Date;
+  consumedAt: Date | null;
+  revokedAt: Date | null;
+}
+
+export interface RoleGrantRecord {
+  role: AppRole;
+  grantedAt: Date;
+  revokedAt: Date | null;
+}
+
+export interface AccountRecord {
+  id: string;
+  organizationId: string;
+  employeeId: string;
+  loginEmail: string;
+  status: AppUserStatus;
+  activationState: ActivationState;
+  createdAt: Date;
+}
+
+export interface AccountListFilter {
+  status?: AppUserStatus;
+  activationState?: ActivationState;
+  role?: AppRole;
+  skip: number;
+  take: number;
+}
+
 export interface IssuedSession {
   accessToken: string;
   accessTokenExpiresAt: Date;

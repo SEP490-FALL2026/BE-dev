@@ -6,6 +6,7 @@ import {
   CreateDepartmentInput,
   CreateEmployeeWithPlacementInput,
   CreateOrganizationInput,
+  EmployeeCandidate,
   EmployeeProfile,
   EmployeeRecord,
   OrganizationRecord,
@@ -57,6 +58,16 @@ export class OrganizationService {
   /** Unlocked read. Pass `tx` to read inside a transaction without taking a lock. */
   getEmployee(employeeId: string, tx?: DbTx): Promise<EmployeeRecord | null> {
     return this.repo.findEmployee(employeeId, tx);
+  }
+
+  /** Several employees in one read, for list views. Unknown ids are simply absent. */
+  getEmployees(employeeIds: string[]): Promise<EmployeeRecord[]> {
+    return this.repo.findEmployees(employeeIds);
+  }
+
+  /** Employees who have not left, matched on code, name or work email; newest codes last. */
+  searchActiveEmployees(search: string | undefined, onDate: Date, limit: number): Promise<EmployeeCandidate[]> {
+    return this.repo.searchActiveEmployees(search, onDate, limit);
   }
 
   getEmployeeProfile(employeeId: string, onDate: Date): Promise<EmployeeProfile | null> {

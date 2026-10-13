@@ -5,7 +5,10 @@ import { DatabaseModule } from '../../infrastructure/database/database.module';
 import { EnvironmentVariables } from '../../infrastructure/config/env-schema';
 import { ACCESS_TOKEN_VERIFIER } from '../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditModule } from '../audit/audit.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { OrganizationModule } from '../organization/organization.module';
+import { AccountManagementService } from './account-management.service';
+import { AppUsersController } from './app-users.controller';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { IdentityAccessRepo } from './identity-access.repo';
@@ -22,6 +25,7 @@ import { TokenService } from './token.service';
     DatabaseModule,
     OrganizationModule,
     AuditModule,
+    NotificationsModule,
     JwtModule.registerAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService<EnvironmentVariables, true>) => ({
@@ -41,10 +45,11 @@ import { TokenService } from './token.service';
       }),
     }),
   ],
-  controllers: [AuthController, MeController],
+  controllers: [AuthController, MeController, AppUsersController],
   providers: [
     IdentityAccessRepo,
     IdentityAccessService,
+    AccountManagementService,
     AuthService,
     MeService,
     PasswordHasher,
@@ -53,6 +58,6 @@ import { TokenService } from './token.service';
     JwtAccessTokenVerifier,
     { provide: ACCESS_TOKEN_VERIFIER, useExisting: JwtAccessTokenVerifier },
   ],
-  exports: [ACCESS_TOKEN_VERIFIER, IdentityAccessService],
+  exports: [ACCESS_TOKEN_VERIFIER, IdentityAccessService, AccountManagementService],
 })
 export class IdentityAccessModule {}

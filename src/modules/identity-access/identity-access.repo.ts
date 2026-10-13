@@ -2,11 +2,16 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { DbTx } from '../../infrastructure/database/transaction-runner';
 import {
+  AccountListFilter,
+  AccountRecord,
   AccountSnapshot,
+  ActionTokenRevokedReason,
+  ActionTokenSnapshot,
   AppRole,
   CreateAppUserInput,
   PrincipalContext,
   RefreshTokenSnapshot,
+  RoleGrantRecord,
   SessionRevokedReason,
   SessionSnapshot,
   ThrottleSnapshot,
@@ -22,6 +27,25 @@ const ACCOUNT_SELECT = {
   status: true,
   activationState: true,
   credential: { select: { hash: true } },
+} as const;
+
+const ACCOUNT_RECORD_SELECT = {
+  id: true,
+  organizationId: true,
+  employeeId: true,
+  loginEmail: true,
+  status: true,
+  activationState: true,
+  createdAt: true,
+} as const;
+
+const TOKEN_SELECT = {
+  tokenHash: true,
+  appUserId: true,
+  purpose: true,
+  expiresAt: true,
+  consumedAt: true,
+  revokedAt: true,
 } as const;
 
 interface AccountRow {
@@ -91,7 +115,7 @@ export class IdentityAccessRepo {
 
   async grantRole(
     tx: DbTx,
-    input: { organizationId: string; appUserId: string; role: AppRole },
+    input: { organizationId: string; appUserId: string; role: AppRole; grantedBy?: string },
   ): Promise<{ id: string }> {
     return tx.roleGrant.create({ data: input, select: { id: true } });
   }
@@ -252,5 +276,200 @@ export class IdentityAccessRepo {
 
   async clearThrottle(tx: DbTx, organizationId: string, emailKeyHash: string): Promise<void> {
     await tx.loginThrottle.deleteMany({ where: { organizationId, emailKeyHash } });
+  }
+
+  // --- account management -----------------------------------------------------------
+
+  async findAccountEmployeeIds(employeeIds: string[]): Promise<Set<string>> {
+    if (employeeIds.length === 0) return new Set();
+
+    const rows = await this.prisma.appUser.findMany({
+      where: { employeeId: { in: employeeIds } },
+      select: { employeeId: true },
+    });
+
+    return new Set(rows.map((row) => row.employeeId));
+  }
+
+  async findAccountIdByEmployee(tx: DbTx, employeeId: string): Promise<string | null> {
+    const row = await tx.appUser.findUnique({ where: { employeeId }, select: { id: true } });
+
+    return row?.id ?? null;
+  }
+
+  async findAccountRecord(appUserId: string, tx?: DbTx): Promise<AccountRecord | null> {
+    return (tx ?? this.prisma).appUser.findUnique({ where: { id: appUserId }, select: ACCOUNT_RECORD_SELECT });
+  }
+
+  async listAccountRecords(filter: AccountListFilter): Promise<{ items: AccountRecord[]; total: number }> {
+    const where = {
+      ...(filter.status ? { status: filter.status } : {}),
+      ...(filter.activationState ? { activationState: filter.activationState } : {}),
+      ...(filter.role ? { roleGrants: { some: { role: filter.role, revokedAt: null } } } : {}),
+    };
+    const [items, total] = await Promise.all([
+      this.prisma.appUser.findMany({
+        where,
+        orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+        skip: filter.skip,
+        take: filter.take,
+        select: ACCOUNT_RECORD_SELECT,
+      }),
+      this.prisma.appUser.count({ where }),
+    ]);
+
+    return { items, total };
+  }
+
+  async setStatus(tx: DbTx, appUserId: string, status: 'ACTIVE' | 'LOCKED'): Promise<void> {
+    await tx.appUser.update({ where: { id: appUserId }, data: { status } });
+  }
+
+  async markActivated(tx: DbTx, appUserId: string, now: Date): Promise<void> {
+    await tx.appUser.update({
+      where: { id: appUserId },
+      data: { activationState: 'ACTIVATED', emailVerificationSource: 'INVITATION_REDEEMED', emailVerifiedAt: now },
+    });
+  }
+
+  /** Revokes every open session of the account. Returns how many were open. */
+  async revokeAllSessions(tx: DbTx, appUserId: string, reason: SessionRevokedReason, now: Date): Promise<number> {
+    const result = await tx.authSession.updateMany({
+      where: { appUserId, revokedAt: null },
+      data: { revokedAt: now, revokedReason: reason },
+    });
+
+    return result.count;
+  }
+
+  // --- role grants ------------------------------------------------------------------
+
+  async effectiveRoles(appUserId: string, tx?: DbTx): Promise<AppRole[]> {
+    const rows = await (tx ?? this.prisma).roleGrant.findMany({
+      where: { appUserId, revokedAt: null },
+      select: { role: true },
+      orderBy: { role: 'asc' },
+    });
+
+    return rows.map((row) => row.role);
+  }
+
+  async effectiveRolesFor(appUserIds: string[]): Promise<Map<string, AppRole[]>> {
+    const rows = await this.prisma.roleGrant.findMany({
+      where: { appUserId: { in: appUserIds }, revokedAt: null },
+      select: { appUserId: true, role: true },
+      orderBy: { role: 'asc' },
+    });
+    const byUser = new Map<string, AppRole[]>();
+    for (const row of rows) byUser.set(row.appUserId, [...(byUser.get(row.appUserId) ?? []), row.role]);
+
+    return byUser;
+  }
+
+  async grantHistory(appUserId: string): Promise<RoleGrantRecord[]> {
+    return this.prisma.roleGrant.findMany({
+      where: { appUserId },
+      orderBy: [{ grantedAt: 'asc' }, { id: 'asc' }],
+      select: { role: true, grantedAt: true, revokedAt: true },
+    });
+  }
+
+  /** True when any account in the organization holds an effective FINANCE grant, whatever its state (QĐ-67e). */
+  async financeIsHeld(tx: DbTx, organizationId: string): Promise<boolean> {
+    const row = await tx.roleGrant.findFirst({
+      where: { organizationId, role: 'FINANCE', revokedAt: null },
+      select: { id: true },
+    });
+
+    return row !== null;
+  }
+
+  async revokeRole(
+    tx: DbTx,
+    input: { appUserId: string; role: AppRole; revokedBy: string; now: Date },
+  ): Promise<boolean> {
+    const result = await tx.roleGrant.updateMany({
+      where: { appUserId: input.appUserId, role: input.role, revokedAt: null },
+      data: { revokedAt: input.now, revokedBy: input.revokedBy },
+    });
+
+    return result.count === 1;
+  }
+
+  // --- action tokens ----------------------------------------------------------------
+
+  async insertActionToken(
+    tx: DbTx,
+    input: { tokenHash: string; appUserId: string; expiresAt: Date; createdBy: string },
+  ): Promise<void> {
+    await tx.accountActionToken.create({ data: { ...input, purpose: 'INVITE' } });
+  }
+
+  /** Tokens that are neither consumed nor revoked, whether or not they have expired. */
+  async findUsableTokens(tx: DbTx, appUserId: string): Promise<ActionTokenSnapshot[]> {
+    return tx.accountActionToken.findMany({
+      where: { appUserId, consumedAt: null, revokedAt: null },
+      select: TOKEN_SELECT,
+    });
+  }
+
+  async revokeTokens(tx: DbTx, tokenHashes: string[], reason: ActionTokenRevokedReason, now: Date): Promise<void> {
+    if (tokenHashes.length === 0) return;
+
+    await tx.accountActionToken.updateMany({
+      where: { tokenHash: { in: tokenHashes }, consumedAt: null, revokedAt: null },
+      data: { revokedAt: now, revokedReason: reason },
+    });
+  }
+
+  /** Unlocked: maps a presented token to its account so the account can be locked first. */
+  async findActionTokenOwner(tokenHash: string): Promise<string | null> {
+    const row = await this.prisma.accountActionToken.findUnique({ where: { tokenHash }, select: { appUserId: true } });
+
+    return row?.appUserId ?? null;
+  }
+
+  async lockActionToken(tx: DbTx, tokenHash: string): Promise<ActionTokenSnapshot | null> {
+    const locked = await tx.$queryRaw<
+      { token_hash: string }[]
+    >`SELECT token_hash FROM account_action_tokens WHERE token_hash = ${tokenHash} FOR UPDATE`;
+    if (locked.length === 0) return null;
+
+    return tx.accountActionToken.findUnique({ where: { tokenHash }, select: TOKEN_SELECT });
+  }
+
+  async consumeToken(tx: DbTx, tokenHash: string, now: Date): Promise<void> {
+    await tx.accountActionToken.update({ where: { tokenHash }, data: { consumedAt: now } });
+  }
+
+  /** Unlocked read for the dispatcher: would redeeming this token succeed right now? */
+  async isTokenRedeemable(tokenHash: string, now: Date): Promise<boolean> {
+    const row = await this.prisma.accountActionToken.findUnique({
+      where: { tokenHash },
+      select: {
+        consumedAt: true,
+        revokedAt: true,
+        expiresAt: true,
+        appUser: { select: { status: true, activationState: true } },
+      },
+    });
+
+    return (
+      row !== null &&
+      row.consumedAt === null &&
+      row.revokedAt === null &&
+      row.expiresAt > now &&
+      row.appUser.status === 'ACTIVE' &&
+      row.appUser.activationState === 'INVITED'
+    );
+  }
+
+  /** The newest token of an account, used or not, with its expiry, for the detail view. */
+  async latestToken(appUserId: string): Promise<ActionTokenSnapshot | null> {
+    return this.prisma.accountActionToken.findFirst({
+      where: { appUserId },
+      orderBy: { createdAt: 'desc' },
+      select: TOKEN_SELECT,
+    });
   }
 }

@@ -1,4 +1,4 @@
-import { INestApplication } from '@nestjs/common';
+import { INestApplication, Type } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { Client } from 'pg';
 import { App } from 'supertest/types';
@@ -26,7 +26,7 @@ export interface HttpTestApp {
  * migrated, disposable PostgreSQL database. Use it for the cases a stubbed repository cannot
  * prove: constraints, locking, and cookies.
  */
-export async function createHttpTestApp(): Promise<HttpTestApp> {
+export async function createHttpTestApp(options: { extraControllers?: Type<unknown>[] } = {}): Promise<HttpTestApp> {
   const database = await provisionDisposableDatabase();
   await migrateDisposableDatabase(database);
 
@@ -38,7 +38,10 @@ export async function createHttpTestApp(): Promise<HttpTestApp> {
   // ConfigModule.forRoot validates process.env when AppModule is first imported, so the import
   // must happen after the variables above are set — a static import would read the real ones.
   const { AppModule } = await import('../../src/app.module');
-  const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
+  const moduleRef = await Test.createTestingModule({
+    imports: [AppModule],
+    controllers: options.extraControllers ?? [],
+  }).compile();
   const app = moduleRef.createNestApplication<INestApplication<App>>();
   configureApplication(app, { mountDocs: false });
   await app.init();
@@ -164,5 +167,36 @@ export async function insertAccountFixture(
     }
 
     return { appUserId: rows[0].id, employeeId: employee.id };
+  });
+}
+
+/**
+ * An employee without an account. `terminated` marks them as having left (the state a later slice
+ * will reach through the offboarding flow, which does not exist yet).
+ */
+export async function insertEmployeeFixture(
+  app: INestApplication,
+  seed: SeededInstallation,
+  options: { code: string; email: string | null; terminated?: boolean },
+): Promise<{ employeeId: string }> {
+  const runner = app.get(TransactionRunner);
+  const organization = app.get(OrganizationService);
+
+  return runner.run(async (tx) => {
+    const employee = await organization.createEmployeeWithPlacement(tx, {
+      organizationId: seed.organizationId,
+      employeeCode: options.code,
+      fullName: `Person ${options.code}`,
+      workEmail: options.email,
+      employmentType: 'STAFF',
+      hireDate: '2026-01-05',
+      departmentId: seed.departmentId,
+      jobTitleId: seed.jobTitleId,
+    });
+    if (options.terminated) {
+      await tx.$executeRaw`UPDATE employees SET status = 'TERMINATED' WHERE id = ${employee.id}::uuid`;
+    }
+
+    return { employeeId: employee.id };
   });
 }

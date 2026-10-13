@@ -12,6 +12,12 @@ describe('validateEnvironment', () => {
     REDIS_PASSWORD: 'redis-secret-password',
     AUTH_ACCESS_TOKEN_SECRET: 'production-access-token-secret-with-enough-entropy',
     AUTH_THROTTLE_PEPPER: 'production-throttle-pepper',
+    APP_PUBLIC_URL: 'https://licenses.example.com',
+    OUTBOX_PAYLOAD_KEY: Buffer.alloc(32, 7).toString('base64'),
+    OUTBOX_PAYLOAD_KEY_ID: 'prod-1',
+    SMTP_HOST: 'smtp.example.com',
+    SMTP_FROM: 'no-reply@licenses.example.com',
+    SMTP_TLS: 'true',
   };
 
   it('applies safe development defaults', () => {
@@ -200,5 +206,77 @@ describe('DATABASE_URL resolution through validateEnvironment', () => {
     expect(() => validateEnvironment({ TEST_DATABASE_URL: 'postgresql://app:app@localhost:5432/x' })).toThrow(
       'TEST_DATABASE_URL',
     );
+  });
+});
+
+describe('invitation email configuration', () => {
+  const productionBase = {
+    NODE_ENV: 'production',
+    CORS_ORIGINS: 'https://licenses.example.com',
+    DATABASE_URL: 'postgresql://app:secret@database:5432/app',
+    OBJECT_STORAGE_ENDPOINT: 'https://account-id.r2.cloudflarestorage.com',
+    OBJECT_STORAGE_BUCKET: 'software-license-files',
+    OBJECT_STORAGE_ACCESS_KEY_ID: 'test-access-key',
+    OBJECT_STORAGE_SECRET_ACCESS_KEY: 'test-secret-key',
+    REDIS_HOST: 'redis.internal',
+    REDIS_PASSWORD: 'redis-secret-password',
+    AUTH_ACCESS_TOKEN_SECRET: 'production-access-token-secret-with-enough-entropy',
+    AUTH_THROTTLE_PEPPER: 'production-throttle-pepper',
+    APP_PUBLIC_URL: 'https://licenses.example.com',
+    OUTBOX_PAYLOAD_KEY: Buffer.alloc(32, 7).toString('base64'),
+    OUTBOX_PAYLOAD_KEY_ID: 'prod-1',
+    SMTP_HOST: 'smtp.example.com',
+    SMTP_FROM: 'no-reply@licenses.example.com',
+    SMTP_TLS: 'true',
+  };
+
+  it('defaults the invitation lifetime to 72 hours and polls the outbox every 3 seconds', () => {
+    expect(validateEnvironment({})).toMatchObject({
+      AUTH_INVITATION_TTL_SECONDS: 259_200,
+      OUTBOX_POLL_INTERVAL_MS: 3_000,
+    });
+  });
+
+  it('runs in development without any mail or outbox setting', () => {
+    const config = validateEnvironment({});
+
+    expect(config.OUTBOX_PAYLOAD_KEY_ID).toBe('development');
+    expect(Buffer.from(config.OUTBOX_PAYLOAD_KEY, 'base64')).toHaveLength(32);
+  });
+
+  it('accepts a complete production mail setup', () => {
+    expect(() => validateEnvironment(productionBase)).not.toThrow();
+  });
+
+  it.each(['APP_PUBLIC_URL', 'OUTBOX_PAYLOAD_KEY', 'OUTBOX_PAYLOAD_KEY_ID', 'SMTP_HOST', 'SMTP_FROM'])(
+    'requires %s in production',
+    (key) => {
+      const rest = Object.fromEntries(Object.entries(productionBase).filter(([name]) => name !== key));
+
+      expect(() => validateEnvironment(rest)).toThrow(key);
+    },
+  );
+
+  it('rejects the development payload key in production', () => {
+    const development = validateEnvironment({}).OUTBOX_PAYLOAD_KEY;
+
+    expect(() => validateEnvironment({ ...productionBase, OUTBOX_PAYLOAD_KEY: development })).toThrow('development');
+  });
+
+  it('rejects a payload key that is not 32 bytes of base64', () => {
+    expect(() => validateEnvironment({ OUTBOX_PAYLOAD_KEY: Buffer.from('short').toString('base64') })).toThrow(
+      '32 bytes',
+    );
+  });
+
+  it('requires an HTTPS public URL in production', () => {
+    expect(() => validateEnvironment({ ...productionBase, APP_PUBLIC_URL: 'http://licenses.example.com' })).toThrow(
+      'APP_PUBLIC_URL',
+    );
+  });
+
+  it('requires TLS for SMTP in production, because the mail carries a bearer activation link', () => {
+    expect(() => validateEnvironment({ ...productionBase, SMTP_TLS: 'false' })).toThrow('SMTP_TLS');
+    expect(() => validateEnvironment({ ...productionBase, SMTP_TLS: undefined })).toThrow('SMTP_TLS');
   });
 });

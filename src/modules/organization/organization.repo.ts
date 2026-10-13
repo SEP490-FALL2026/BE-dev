@@ -15,6 +15,7 @@ import {
   CreateDepartmentInput,
   CreateEmployeeWithPlacementInput,
   CreateOrganizationInput,
+  EmployeeCandidate,
   EmployeeProfile,
   EmployeeRecord,
   OrganizationRecord,
@@ -130,6 +131,61 @@ export class OrganizationRepo {
       status: row.status,
       hireDate: fromDateColumn(row.hireDate),
     };
+  }
+
+  async findEmployees(employeeIds: string[]): Promise<EmployeeRecord[]> {
+    if (employeeIds.length === 0) return [];
+
+    const rows = await this.prisma.employee.findMany({ where: { id: { in: employeeIds } } });
+
+    return rows.map((row) => ({
+      id: row.id,
+      organizationId: row.organizationId,
+      employeeCode: row.employeeCode,
+      fullName: row.fullName,
+      workEmail: row.workEmail,
+      status: row.status,
+      hireDate: fromDateColumn(row.hireDate),
+    }));
+  }
+
+  async searchActiveEmployees(search: string | undefined, onDate: Date, limit: number): Promise<EmployeeCandidate[]> {
+    const term = search?.trim();
+    const rows = await this.prisma.employee.findMany({
+      where: {
+        status: 'ACTIVE',
+        ...(term
+          ? {
+              OR: [
+                { employeeCode: { contains: term, mode: 'insensitive' as const } },
+                { fullName: { contains: term, mode: 'insensitive' as const } },
+                { workEmail: { contains: term, mode: 'insensitive' as const } },
+              ],
+            }
+          : {}),
+      },
+      orderBy: { employeeCode: 'asc' },
+      take: limit,
+      select: {
+        id: true,
+        employeeCode: true,
+        fullName: true,
+        workEmail: true,
+        placements: {
+          where: { validFrom: { lte: onDate }, OR: [{ validTo: null }, { validTo: { gt: onDate } }] },
+          select: { department: { select: { name: true } } },
+          take: 1,
+        },
+      },
+    });
+
+    return rows.map((row) => ({
+      id: row.id,
+      employeeCode: row.employeeCode,
+      fullName: row.fullName,
+      workEmail: row.workEmail,
+      department: row.placements[0]?.department.name ?? null,
+    }));
   }
 
   /** Name, department and job title at `onDate` (a date-column value) for /me. */

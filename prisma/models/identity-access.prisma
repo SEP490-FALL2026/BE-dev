@@ -41,10 +41,11 @@ model AppUser {
   createdAt               DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt               DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  employee   Employee            @relation(fields: [employeeId], references: [id])
-  credential PasswordCredential?
-  roleGrants RoleGrant[]
-  sessions   AuthSession[]
+  employee     Employee             @relation(fields: [employeeId], references: [id])
+  credential   PasswordCredential?
+  roleGrants   RoleGrant[]
+  sessions     AuthSession[]
+  actionTokens AccountActionToken[]
 
   @@unique([organizationId, normalizedLoginEmail])
   @@map("app_users")
@@ -120,4 +121,33 @@ model LoginThrottle {
 
   @@id([organizationId, emailKeyHash])
   @@map("login_throttles")
+}
+
+enum AccountActionPurpose {
+  INVITE
+}
+
+enum AccountActionTokenRevokedReason {
+  SUPERSEDED
+  ACCOUNT_LOCKED
+}
+
+// One-time token behind an emailed link. Only the SHA-256 of the token is stored. "Usable" is
+// the stored state (not consumed, not revoked); expiry is checked at redemption because a
+// partial-index predicate cannot use now().
+model AccountActionToken {
+  tokenHash     String                           @id @map("token_hash")
+  appUserId     String                           @map("app_user_id") @db.Uuid
+  purpose       AccountActionPurpose
+  expiresAt     DateTime                         @map("expires_at") @db.Timestamptz(3)
+  consumedAt    DateTime?                        @map("consumed_at") @db.Timestamptz(3)
+  revokedAt     DateTime?                        @map("revoked_at") @db.Timestamptz(3)
+  revokedReason AccountActionTokenRevokedReason? @map("revoked_reason")
+  createdBy     String?                          @map("created_by") @db.Uuid
+  createdAt     DateTime                         @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  appUser AppUser @relation(fields: [appUserId], references: [id])
+
+  @@index([appUserId])
+  @@map("account_action_tokens")
 }

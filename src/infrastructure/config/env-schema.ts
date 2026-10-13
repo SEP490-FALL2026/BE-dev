@@ -40,10 +40,25 @@ export interface EnvironmentVariables {
   AUTH_COOKIE_SECURE: boolean;
   AUTH_JWT_ISSUER: string;
   AUTH_JWT_AUDIENCE: string;
+  AUTH_INVITATION_TTL_SECONDS: number;
+  APP_PUBLIC_URL: string;
+  OUTBOX_PAYLOAD_KEY: string;
+  OUTBOX_PAYLOAD_KEY_ID: string;
+  /** `id:base64` pairs separated by commas: keys that may still seal pending rows after a rotation. */
+  OUTBOX_PAYLOAD_PREVIOUS_KEYS: string;
+  OUTBOX_POLL_INTERVAL_MS: number;
+  SMTP_HOST: string;
+  SMTP_PORT: number;
+  SMTP_USER: string;
+  SMTP_PASSWORD: string;
+  SMTP_FROM: string;
+  SMTP_TLS: boolean;
 }
 
 const DEVELOPMENT_ACCESS_TOKEN_SECRET = 'development-only-access-token-secret-not-for-production';
 const DEVELOPMENT_THROTTLE_PEPPER = 'development-only-throttle-pepper';
+const DEVELOPMENT_OUTBOX_PAYLOAD_KEY = Buffer.alloc(32, 0x5a).toString('base64');
+const DEVELOPMENT_OUTBOX_PAYLOAD_KEY_ID = 'development';
 
 const environmentSchema = Joi.object({
   NODE_ENV: Joi.string().valid('development', 'test', 'production').default('development'),
@@ -138,6 +153,45 @@ const environmentSchema = Joi.object({
   AUTH_COOKIE_SECURE: Joi.boolean(),
   AUTH_JWT_ISSUER: Joi.string().default('slm-api'),
   AUTH_JWT_AUDIENCE: Joi.string().default('slm-web'),
+  AUTH_INVITATION_TTL_SECONDS: Joi.number().integer().min(3_600).max(1_209_600).default(259_200),
+  // Links in invitation mail point here; the token travels in the URL fragment.
+  APP_PUBLIC_URL: Joi.string()
+    .uri({ scheme: ['http', 'https'] })
+    .when('NODE_ENV', {
+      is: 'production',
+      then: Joi.required(),
+      otherwise: Joi.string().default('http://localhost:5173'),
+    }),
+  // AES-256-GCM key for outbox payloads (base64 of 32 bytes). Like the auth secrets, the
+  // development default is rejected in production.
+  OUTBOX_PAYLOAD_KEY: Joi.string().when('NODE_ENV', {
+    is: 'production',
+    then: Joi.required(),
+    otherwise: Joi.string().default(DEVELOPMENT_OUTBOX_PAYLOAD_KEY),
+  }),
+  OUTBOX_PAYLOAD_KEY_ID: Joi.string()
+    .pattern(/^[A-Za-z0-9._-]{1,32}$/)
+    .when('NODE_ENV', {
+      is: 'production',
+      then: Joi.required(),
+      otherwise: Joi.string().default(DEVELOPMENT_OUTBOX_PAYLOAD_KEY_ID),
+    }),
+  OUTBOX_PAYLOAD_PREVIOUS_KEYS: Joi.string().allow('').default(''),
+  OUTBOX_POLL_INTERVAL_MS: Joi.number().integer().min(500).max(60_000).default(3_000),
+  SMTP_HOST: Joi.string().when('NODE_ENV', {
+    is: 'production',
+    then: Joi.required(),
+    otherwise: Joi.string().default('localhost'),
+  }),
+  SMTP_PORT: Joi.number().port().default(1025),
+  SMTP_USER: Joi.string().allow('').default(''),
+  SMTP_PASSWORD: Joi.string().allow('').default(''),
+  SMTP_FROM: Joi.string().when('NODE_ENV', {
+    is: 'production',
+    then: Joi.required(),
+    otherwise: Joi.string().default('no-reply@localhost'),
+  }),
+  SMTP_TLS: Joi.boolean().default(false),
 }).unknown(true);
 
 export function validateEnvironment(input: Record<string, unknown>): EnvironmentVariables {
@@ -179,7 +233,25 @@ export function validateEnvironment(input: Record<string, unknown>): Environment
     );
   }
 
+  if (Buffer.from(result.OUTBOX_PAYLOAD_KEY, 'base64').length !== 32) {
+    throw new Error('Environment validation failed: OUTBOX_PAYLOAD_KEY must be 32 bytes encoded as base64');
+  }
+
   if (result.NODE_ENV === 'production') {
+    if (result.OUTBOX_PAYLOAD_KEY === DEVELOPMENT_OUTBOX_PAYLOAD_KEY) {
+      throw new Error('Environment validation failed: production must not use the development outbox payload key');
+    }
+
+    if (!result.SMTP_TLS) {
+      throw new Error(
+        'Environment validation failed: SMTP_TLS must be true in production (the mail carries a bearer activation link)',
+      );
+    }
+
+    if (!isHttpsUrl(result.APP_PUBLIC_URL)) {
+      throw new Error('Environment validation failed: APP_PUBLIC_URL must use HTTPS in production');
+    }
+
     if (
       result.AUTH_ACCESS_TOKEN_SECRET === DEVELOPMENT_ACCESS_TOKEN_SECRET ||
       result.AUTH_THROTTLE_PEPPER === DEVELOPMENT_THROTTLE_PEPPER

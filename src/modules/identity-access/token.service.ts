@@ -53,6 +53,21 @@ export class TokenService {
     return createHash('sha256').update(token).digest('hex');
   }
 
+  /** One-time token behind an emailed link: 256 bits of randomness, only its SHA-256 is stored. */
+  newActionToken(): { token: string; hash: string } {
+    const token = randomBytes(32).toString('base64url');
+
+    return { token, hash: this.hashRefreshToken(token) };
+  }
+
+  hashActionToken(token: string): string {
+    return this.hashRefreshToken(token);
+  }
+
+  isWellFormedActionToken(token: string): boolean {
+    return REFRESH_TOKEN_SHAPE.test(token);
+  }
+
   isWellFormedRefreshToken(token: string): boolean {
     return REFRESH_TOKEN_SHAPE.test(token);
   }

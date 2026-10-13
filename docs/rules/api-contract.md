@@ -23,7 +23,8 @@ a route with none (or two kinds) answers 500 and is logged as a programming erro
 401 `AUTHENTICATION_REQUIRED` for a missing token and 401 `INVALID_ACCESS_TOKEN` for a token that is
 bad or whose session/account is no longer usable; a wrong role is 403 `AUTHORIZATION.FORBIDDEN`;
 an unreachable database is 503 (`TOKEN_VERIFICATION_UNAVAILABLE`, or `AUTH.UNAVAILABLE` on auth routes),
-never 401. Request-body validation errors are 422 `VALIDATION_ERROR`.
+never 401; account administration routes use 503 `SERVICE_UNAVAILABLE` for a transient database failure.
+Request-body validation errors are 422 `VALIDATION_ERROR`.
 
 ## Handoff
 

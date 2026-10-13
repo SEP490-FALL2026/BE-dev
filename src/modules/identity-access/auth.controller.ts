@@ -7,7 +7,10 @@ import { ApiSuccessResponse } from '../../infrastructure/http/decorators/api-suc
 import { RawResponse } from '../../infrastructure/http/decorators/raw-response.decorator';
 import { ApiException } from '../../infrastructure/http/errors/api.exception';
 import { Public } from '../../infrastructure/security/decorators/public.decorator';
+import { AccountManagementService } from './account-management.service';
+import { toAccountApiException } from './account-management.http-errors';
 import { AuthService } from './auth.service';
+import { AccountActivatedResponseDto, RedeemInvitationBodyDto } from './dto/account-management.dto';
 import { LoginBodyDto, SessionTokenResponseDto } from './dto/auth.dto';
 import {
   InvalidCredentialsError,
@@ -34,6 +37,7 @@ function unavailable(): ApiException {
 export class AuthController {
   constructor(
     private readonly auth: AuthService,
+    private readonly accounts: AccountManagementService,
     private readonly cookie: RefreshCookie,
   ) {}
 
@@ -133,6 +137,38 @@ export class AuthController {
     }
 
     this.cookie.clear(response);
+  }
+
+  /**
+   * Sets the first password from an invitation link and activates the account. Public: the caller
+   * has no account yet. It does not sign the user in; they use the login route afterwards.
+   */
+  @Post('invitations/redeem')
+  @Public()
+  @ApiOperation({ operationId: 'authRedeemInvitation' })
+  @ApiSuccessResponse(AccountActivatedResponseDto, {
+    message: 'AUTH.ACCOUNT_ACTIVATED',
+    description: 'The account is activated. The user signs in with the login route.',
+  })
+  @ApiErrorResponses(
+    {
+      status: HttpStatus.BAD_REQUEST,
+      description: 'The link is not valid (unknown, used, replaced, expired, or the account cannot be activated).',
+    },
+    {
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      description: 'The body is invalid or the password does not meet the policy.',
+    },
+    UNAVAILABLE,
+  )
+  async redeemInvitation(@Body() body: RedeemInvitationBodyDto): Promise<{ activated: true }> {
+    try {
+      await this.accounts.redeemInvitation(body.token, body.password);
+
+      return { activated: true };
+    } catch (error) {
+      throw toAccountApiException(error);
+    }
   }
 
   private respondWithSession(

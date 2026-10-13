@@ -17,6 +17,7 @@ import { API_COVERAGE_MANIFEST } from '../support/api-coverage-manifest';
 const PUBLIC_ALLOWLIST = [
   'AuthController.login',
   'AuthController.logout',
+  'AuthController.redeemInvitation',
   'AuthController.refresh',
   'HealthController.getLiveness',
   'HealthController.getReadiness',

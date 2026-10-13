@@ -8,8 +8,9 @@ Scope: this backend repository. Work from its root with the pnpm version in `pac
 - Read [ARCHITECTURE.md](ARCHITECTURE.md) before changing module boundaries.
 - Check the branch, working diff and relevant source/tests; preserve existing changes.
 - Current runtime: health, `/auth/*`, `/me` plus infrastructure; first-run installation is a CLI
-  (`pnpm ops:bootstrap`). Catalog is a structural sample and is not mounted. Account creation,
-  invitations, password reset and all other US workflows are not implemented.
+  (`pnpm ops:bootstrap`). Super Admin account administration (create, invite, activate, lock, role
+  grants) is implemented as slice 1b, unreviewed. Catalog is a structural sample and is not mounted.
+  Password change/reset and all other US workflows are not implemented.
 
 ## Read only what the task needs
 

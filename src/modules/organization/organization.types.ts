@@ -57,3 +57,12 @@ export interface OrganizationRecord {
   timeZone: string;
   reportingCurrency: string;
 }
+
+export interface EmployeeCandidate {
+  id: string;
+  employeeCode: string;
+  fullName: string;
+  workEmail: string | null;
+  /** Department name at the date asked about. */
+  department: string | null;
+}

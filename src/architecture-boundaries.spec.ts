@@ -31,6 +31,8 @@ const PRISMA_MODEL_OWNER: Readonly<Record<string, string>> = {
   AuthSession: 'identity-access',
   RefreshToken: 'identity-access',
   LoginThrottle: 'identity-access',
+  AccountActionToken: 'identity-access',
+  EmailOutbox: 'notifications',
 };
 
 interface PrismaModelTable {

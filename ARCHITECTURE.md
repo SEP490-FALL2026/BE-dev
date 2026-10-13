@@ -40,12 +40,13 @@ src/
   modules/
     audit/                    # AuditEvent chỉ ghi thêm (facade record(tx, event))
     organization/             # tổ chức, Cost Center, phòng, chức vụ, nhân viên + placement
-    identity-access/          # tài khoản, mật khẩu, vai gán, phiên, đăng nhập, /me
+    identity-access/          # tài khoản, mật khẩu, vai gán, phiên, đăng nhập, /me, quản trị tài khoản, lời mời
+    notifications/            # EmailOutbox (mã hóa payload), dispatcher gửi thư; không import identity-access
     installation/             # use case khởi tạo; không sở hữu bảng
     catalog/                  # module mẫu cấu trúc, KHÔNG đăng ký vào AppModule
 prisma/
   schema.prisma               # generator, datasource
-  models/                     # audit, organization, identity-access, catalog
+  models/                     # audit, organization, identity-access, notifications, catalog
   migrations/                 # lịch sử SQL cho baseline mới
 scripts/                      # công cụ dev/verification, không phải runtime API
 test/
@@ -115,7 +116,12 @@ Catalog dùng unique slug ở PostgreSQL; phân trang sort name/id, transaction
 RepeatableRead để page/count dùng cùng snapshot. Snapshot không cố định giữa các
 request phân trang khác nhau.
 
-AppModule chưa dùng queue. WorkerModule chỉ cấu hình BullMQ.
+AppModule chưa dùng queue. WorkerModule cấu hình BullMQ (chưa có job) và chạy `EmailDispatchLoop`
+(`src/email-dispatch.loop.ts`): vòng thăm dò PostgreSQL mỗi `OUTBOX_POLL_INTERVAL_MS` gửi thư trong
+EmailOutbox ([ADR-0012](docs/decisions/0012-account-email-delivery.md), vẫn **Proposed**) — không cần Redis cho việc này.
+Vòng lặp nằm ở gốc ghép vì nối hai module không được import nhau: `notifications` gửi thư,
+`identity-access` trả lời liên kết trong thư còn dùng được không. Quản trị tài khoản (lát 1b): route
+`/app-users`, `/account-candidates` chỉ Super Admin; kích hoạt qua `POST /auth/invitations/redeem`.
 Storage adapter hỗ trợ endpoint S3-compatible; chưa có file ownership/API.
 Readiness chỉ chứng minh PostgreSQL có thể ping, không chứng minh schema/migration,
 Redis, storage hoặc chức năng đăng nhập đã sẵn sàng.
