@@ -26,14 +26,23 @@ export interface HttpTestApp {
  * migrated, disposable PostgreSQL database. Use it for the cases a stubbed repository cannot
  * prove: constraints, locking, and cookies.
  */
-export async function createHttpTestApp(options: { extraControllers?: Type<unknown>[] } = {}): Promise<HttpTestApp> {
+export async function createHttpTestApp(
+  options: {
+    extraControllers?: Type<unknown>[];
+    /** The URL the application connects through (for example a PgRelay); assertions still use the direct URL. */
+    appDatabaseUrl?: (directUrl: string) => Promise<string> | string;
+    /** Extra environment for this application, such as shorter database timeouts. */
+    env?: Record<string, string>;
+  } = {},
+): Promise<HttpTestApp> {
   const database = await provisionDisposableDatabase();
   await migrateDisposableDatabase(database);
 
   const previous = { ...process.env };
-  process.env.TEST_DATABASE_URL = database.url;
+  process.env.TEST_DATABASE_URL = options.appDatabaseUrl ? await options.appDatabaseUrl(database.url) : database.url;
   // Many sign-ins from one address in a test run must not trip the generic IP rate limit.
   process.env.RATE_LIMIT_LIMIT = '10000';
+  Object.assign(process.env, options.env ?? {});
 
   // ConfigModule.forRoot validates process.env when AppModule is first imported, so the import
   // must happen after the variables above are set — a static import would read the real ones.
