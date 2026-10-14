@@ -1,4 +1,4 @@
-import { InstallationArgumentError, parseInstallationArguments } from './installation.arguments';
+import { INSTALLATION_USAGE, InstallationArgumentError, parseInstallationArguments } from './installation.arguments';
 
 const full = [
   '--timezone=Asia/Ho_Chi_Minh',
@@ -44,6 +44,15 @@ describe('parseInstallationArguments', () => {
   it('rejects an unknown option and positional arguments', () => {
     expect(() => parseInstallationArguments([...full, '--bogus=1'])).toThrow(InstallationArgumentError);
     expect(() => parseInstallationArguments([...full, 'extra'])).toThrow(InstallationArgumentError);
+  });
+
+  it('does not promise that exit code 1 means nothing was written (a lost COMMIT leaves the outcome unknown)', () => {
+    expect(INSTALLATION_USAGE).not.toMatch(/nothing written/i);
+    expect(INSTALLATION_USAGE).toContain('check the installation state before running again');
+    // The other exit codes stay documented.
+    expect(INSTALLATION_USAGE).toMatch(/0 installed/);
+    expect(INSTALLATION_USAGE).toMatch(/2 already installed/);
+    expect(INSTALLATION_USAGE).toMatch(/130 cancelled/);
   });
 
   it('recognises --help', () => {

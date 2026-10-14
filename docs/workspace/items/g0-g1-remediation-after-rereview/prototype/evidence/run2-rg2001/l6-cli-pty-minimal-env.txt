@@ -1,0 +1,40 @@
+# L6 CLI on slmrg-be:remediation-6dc8a85 with ENV_FILE=cli-min.env (only DATABASE_URL via -e; NODE_ENV=production from image), 2026-10-14T21:29:08+07:00
+## reset-live.sh (drop/create slm_live_rr_rg2001, migrate deploy, success scenario)
+exit=0
+password_in_transcript=0
+## rerun
+exit=2
+msg_complete=0
+msg_already=1
+password_in_transcript=0
+prompt_seen=1
+## notty
+exit=1
+msg_no_terminal=1
+password_in_transcript=0
+prompt_seen=0
+## passopt
+exit=1
+msg_refused=1
+password_in_transcript=0
+prompt_seen=0
+## mismatch
+exit=1
+msg_mismatch=1
+password_in_transcript=0
+prompt_seen=1
+## weak
+exit=1
+msg_policy=1
+password_in_transcript=0
+prompt_seen=1
+## ctrlc
+exit=0
+CLI_EXIT=130
+echo_restored=yes
+canon=on
+password_in_transcript=0
+prompt_seen=1
+app_users=1
+audit_operator=8
+credentials=1

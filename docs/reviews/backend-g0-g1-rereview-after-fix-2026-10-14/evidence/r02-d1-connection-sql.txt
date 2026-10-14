@@ -1,0 +1,212 @@
+Relay view of the API connection held in D1 (SQL text only, offsets from the held UPDATE)
+conn 10
+-0.10s SELECT "public"."app_users"."id", "public"."app_users"."login_email" FROM "public"."app_us
+-0.10s SELECT "public"."employees"."id", "public"."employees"."employee_code", "public"."employee
+-0.09s SELECT "public"."employee_placements"."id", "public"."employee_placements"."department_id"
+-0.09s SELECT "public"."departments"."id", "public"."departments"."code", "public"."departments".
+-0.08s SELECT 1
+-0.08s SELECT "public"."organizations"."id", "public"."organizations"."name", "public"."organizat
+-0.08s SELECT "public"."login_throttles"."organization_id", "public"."login_throttles"."email_key
+-0.08s SELECT "public"."app_users"."id", "public"."app_users"."organization_id", "public"."app_us
+-0.07s SELECT "public"."password_credentials"."app_user_id", "public"."password_credentials"."has
+-0.06s SELECT "public"."employees"."id", "public"."employees"."organization_id", "public"."employ
+-0.06s BEGIN
+-0.06s SELECT set_config('lock_timeout', $1, true), set_config('statement_timeout', $2, true)
+-0.06s SELECT id FROM app_users WHERE id = $1::uuid FOR SHARE
+-0.06s SELECT "public"."app_users"."id", "public"."app_users"."organization_id", "public"."app_us
+-0.05s SELECT "public"."password_credentials"."app_user_id", "public"."password_credentials"."has
+-0.05s SELECT "public"."employees"."id", "public"."employees"."organization_id", "public"."employ
+-0.05s INSERT INTO "public"."auth_sessions" ("id","app_user_id","created_at","last_refreshed_at",
+-0.05s INSERT INTO "public"."refresh_tokens" ("token_hash","session_id","expires_at","created_at"
+-0.05s DELETE FROM "public"."login_throttles" WHERE ("public"."login_throttles"."organization_id"
+-0.04s COMMIT
+-0.02s SELECT "public"."auth_sessions"."id", "public"."auth_sessions"."revoked_at", "public"."aut
+-0.02s SELECT "public"."app_users"."id", "public"."app_users"."employee_id", "public"."app_users"
+-0.02s SELECT "public"."role_grants"."id", "public"."role_grants"."role"::text, "public"."role_gr
+-0.02s SELECT "public"."employees"."id", "public"."employees"."organization_id", "public"."employ
+-0.01s BEGIN
+-0.01s SELECT set_config('lock_timeout', $1, true), set_config('statement_timeout', $2, true)
+-0.01s SELECT id FROM app_users WHERE id = $1::uuid FOR UPDATE
+-0.01s SELECT "public"."app_users"."id", "public"."app_users"."organization_id", "public"."app_us
+-0.01s SELECT "public"."role_grants"."id", "public"."role_grants"."role"::text FROM "public"."rol
+0.00s UPDATE "public"."app_users" SET "status" = CAST($1::text AS "public"."AppUserStatus"), "up
+17.04s SELECT "public"."auth_sessions"."id", "public"."auth_sessions"."revoked_at", "public"."aut
+17.04s SELECT "public"."app_users"."id", "public"."app_users"."employee_id", "public"."app_users"
+17.04s SELECT "public"."role_grants"."id", "public"."role_grants"."role"::text, "public"."role_gr
+17.04s SELECT "public"."employees"."id", "public"."employees"."organization_id", "public"."employ
+17.04s SELECT "public"."organizations"."id", "public"."organizations"."name", "public"."organizat
+17.06s SELECT "public"."job_titles"."id", "public"."job_titles"."name" FROM "public"."job_titles"
+17.06s SELECT "public"."auth_sessions"."id", "public"."auth_sessions"."revoked_at", "public"."aut
+17.06s SELECT "public"."app_users"."id", "public"."app_users"."employee_id", "public"."app_users"
+17.06s SELECT "public"."role_grants"."id", "public"."role_grants"."role"::text, "public"."role_gr
+17.07s SELECT "public"."employees"."id", "public"."employees"."organization_id", "public"."employ
+17.07s SELECT "public"."organizations"."id", "public"."organizations"."name", "public"."organizat
+17.07s SELECT "public"."job_titles"."id", "public"."job_titles"."name" FROM "public"."job_titles"
+17.08s SELECT "public"."app_users"."id", "public"."app_users"."login_email" FROM "public"."app_us
+17.08s SELECT "public"."job_titles"."id", "public"."job_titles"."name" FROM "public"."job_titles"
+17.09s SELECT "public"."app_users"."id", "public"."app_users"."login_email" FROM "public"."app_us
+17.09s SELECT "public"."employees"."id", "public"."employees"."employee_code", "public"."employee
+17.09s SELECT "public"."employee_placements"."id", "public"."employee_placements"."department_id"
+17.09s SELECT "public"."departments"."id", "public"."departments"."code", "public"."departments".
+17.10s SELECT "public"."app_users"."id", "public"."app_users"."login_email" FROM "public"."app_us
+17.10s SELECT "public"."employees"."id", "public"."employees"."employee_code", "public"."employee
+17.10s SELECT "public"."employee_placements"."id", "public"."employee_placements"."department_id"
+17.10s SELECT "public"."departments"."id", "public"."departments"."code", "public"."departments".
+17.11s SELECT "public"."app_users"."id", "public"."app_users"."login_email" FROM "public"."app_us
+17.11s SELECT "public"."employees"."id", "public"."employees"."employee_code", "public"."employee
+17.11s SELECT "public"."employee_placements"."id", "public"."employee_placements"."department_id"
+17.11s SELECT "public"."departments"."id", "public"."departments"."code", "public"."departments".
+17.12s SELECT "public"."app_users"."id", "public"."app_users"."login_email" FROM "public"."app_us
+17.13s SELECT "public"."employees"."id", "public"."employees"."employee_code", "public"."employee
+17.13s SELECT "public"."employee_placements"."id", "public"."employee_placements"."department_id"
+17.13s SELECT "public"."departments"."id", "public"."departments"."code", "public"."departments".
+17.13s SELECT "public"."auth_sessions"."id", "public"."auth_sessions"."revoked_at", "public"."aut
+17.13s SELECT "public"."app_users"."id", "public"."app_users"."employee_id", "public"."app_users"
+17.13s SELECT "public"."role_grants"."id", "public"."role_grants"."role"::text, "public"."role_gr
+17.13s SELECT "public"."employees"."id", "public"."employees"."organization_id", "public"."employ
+17.14s SELECT "public"."organizations"."id", "public"."organizations"."name", "public"."organizat
+17.14s SELECT "public"."job_titles"."id", "public"."job_titles"."name" FROM "public"."job_titles"
+17.15s SELECT "public"."app_users"."id", "public"."app_users"."login_email" FROM "public"."app_us
+17.15s SELECT "public"."employees"."id", "public"."employees"."employee_code", "public"."employee
+17.15s SELECT "public"."employee_placements"."id", "public"."employee_placements"."department_id"
+17.15s SELECT "public"."departments"."id", "public"."departments"."code", "public"."departments".
+17.16s SELECT "public"."app_users"."id", "public"."app_users"."login_email" FROM "public"."app_us
+17.16s SELECT "public"."employees"."id", "public"."employees"."employee_code", "public"."employee
+17.16s SELECT "public"."employee_placements"."id", "public"."employee_placements"."department_id"
+17.16s SELECT "public"."departments"."id", "public"."departments"."code", "public"."departments".
+17.17s SELECT "public"."app_users"."id", "public"."app_users"."login_email" FROM "public"."app_us
+17.18s SELECT "public"."employees"."id", "public"."employees"."employee_code", "public"."employee
+17.18s SELECT "public"."employee_placements"."id", "public"."employee_placements"."department_id"
+17.18s SELECT "public"."departments"."id", "public"."departments"."code", "public"."departments".
+17.19s SELECT "public"."app_users"."id", "public"."app_users"."login_email" FROM "public"."app_us
+17.19s SELECT "public"."employees"."id", "public"."employees"."employee_code", "public"."employee
+17.19s SELECT "public"."employee_placements"."id", "public"."employee_placements"."department_id"
+17.19s SELECT "public"."departments"."id", "public"."departments"."code", "public"."departments".
+17.19s SELECT "public"."auth_sessions"."id", "public"."auth_sessions"."revoked_at", "public"."aut
+17.20s SELECT "public"."app_users"."id", "public"."app_users"."employee_id", "public"."app_users"
+17.20s SELECT "public"."role_grants"."id", "public"."role_grants"."role"::text, "public"."role_gr
+17.20s SELECT "public"."employees"."id", "public"."employees"."organization_id", "public"."employ
+17.20s BEGIN
+17.20s SELECT set_config('lock_timeout', $1, true), set_config('statement_timeout', $2, true)
+17.20s SELECT id FROM app_users WHERE id = $1::uuid FOR UPDATE
+17.20s SELECT "public"."app_users"."id", "public"."app_users"."organization_id", "public"."app_us
+17.20s SELECT "public"."role_grants"."id", "public"."role_grants"."role"::text FROM "public"."rol
+17.21s UPDATE "public"."app_users" SET "status" = CAST($1::text AS "public"."AppUserStatus"), "up
+17.21s SELECT "public"."account_action_tokens"."token_hash", "public"."account_action_tokens"."ap
+17.21s UPDATE "public"."account_action_tokens" SET "revoked_at" = $1, "revoked_reason" = CAST($2:
+17.21s UPDATE "public"."email_outbox" SET "status" = CAST($1::text AS "public"."EmailOutboxStatus
+17.22s UPDATE "public"."auth_sessions" SET "revoked_at" = $1, "revoked_reason" = CAST($2::text AS
+17.22s INSERT INTO "public"."audit_events" ("id","organization_id","occurred_at","actor_kind","ac
+17.22s COMMIT
+17.23s SELECT "public"."app_users"."id", "public"."app_users"."organization_id", "public"."app_us
+17.23s SELECT "public"."employees"."id", "public"."employees"."organization_id", "public"."employ
+17.23s SELECT "public"."role_grants"."id", "public"."role_grants"."app_user_id", "public"."role_g
+17.24s SELECT "public"."role_grants"."id", "public"."role_grants"."role"::text, "public"."role_gr
+17.27s SELECT "public"."account_action_tokens"."token_hash", "public"."account_action_tokens"."ap
+17.27s SELECT "public"."email_outbox"."id", "public"."email_outbox"."action_token_hash", "public"
+17.28s SELECT "public"."auth_sessions"."id", "public"."auth_sessions"."revoked_at", "public"."aut
+17.28s SELECT "public"."app_users"."id", "public"."app_users"."employee_id", "public"."app_users"
+17.28s SELECT "public"."role_grants"."id", "public"."role_grants"."role"::text, "public"."role_gr
+17.28s SELECT "public"."employees"."id", "public"."employees"."organization_id", "public"."employ
+17.28s SELECT "public"."app_users"."id", "public"."app_users"."organization_id", "public"."app_us
+17.28s SELECT "public"."employees"."id", "public"."employees"."organization_id", "public"."employ
+17.29s SELECT "public"."role_grants"."id", "public"."role_grants"."app_user_id", "public"."role_g
+17.29s SELECT "public"."auth_sessions"."id", "public"."auth_sessions"."revoked_at", "public"."aut
+17.29s SELECT "public"."app_users"."id", "public"."app_users"."employee_id", "public"."app_users"
+17.29s SELECT "public"."role_grants"."id", "public"."role_grants"."role"::text, "public"."role_gr
+17.30s SELECT "public"."employees"."id", "public"."employees"."organization_id", "public"."employ
+17.30s SELECT "public"."app_users"."id", "public"."app_users"."organization_id", "public"."app_us
+17.30s SELECT "public"."employees"."id", "public"."employees"."organization_id", "public"."employ
+17.30s SELECT "public"."role_grants"."id", "public"."role_grants"."app_user_id", "public"."role_g
+17.30s SELECT "public"."auth_sessions"."id", "public"."auth_sessions"."revoked_at", "public"."aut
+17.31s SELECT "public"."app_users"."id", "public"."app_users"."employee_id", "public"."app_users"
+17.31s SELECT "public"."role_grants"."id", "public"."role_grants"."role"::text, "public"."role_gr
+17.31s SELECT "public"."employees"."id", "public"."employees"."organization_id", "public"."employ
+17.31s SELECT "public"."app_users"."id", "public"."app_users"."organization_id", "public"."app_us
+17.31s SELECT "public"."employees"."id", "public"."employees"."organization_id", "public"."employ
+17.31s SELECT "public"."role_grants"."id", "public"."role_grants"."app_user_id", "public"."role_g
+17.32s SELECT "public"."auth_sessions"."id", "public"."auth_sessions"."revoked_at", "public"."aut
+17.32s SELECT "public"."app_users"."id", "public"."app_users"."employee_id", "public"."app_users"
+17.32s SELECT "public"."role_grants"."id", "public"."role_grants"."role"::text, "public"."role_gr
+17.32s SELECT "public"."employees"."id", "public"."employees"."organization_id", "public"."employ
+17.32s SELECT "public"."app_users"."id", "public"."app_users"."organization_id", "public"."app_us
+17.32s SELECT "public"."employees"."id", "public"."employees"."organization_id", "public"."employ
+17.33s SELECT "public"."role_grants"."id", "public"."role_grants"."app_user_id", "public"."role_g
+17.33s SELECT "public"."auth_sessions"."id", "public"."auth_sessions"."revoked_at", "public"."aut
+17.33s SELECT "public"."app_users"."id", "public"."app_users"."employee_id", "public"."app_users"
+17.33s SELECT "public"."role_grants"."id", "public"."role_grants"."role"::text, "public"."role_gr
+17.33s SELECT "public"."employees"."id", "public"."employees"."organization_id", "public"."employ
+17.34s SELECT "public"."app_users"."id", "public"."app_users"."organization_id", "public"."app_us
+17.34s SELECT "public"."employees"."id", "public"."employees"."organization_id", "public"."employ
+17.34s SELECT "public"."role_grants"."id", "public"."role_grants"."app_user_id", "public"."role_g
+17.34s SELECT "public"."auth_sessions"."id", "public"."auth_sessions"."revoked_at", "public"."aut
+17.34s SELECT "public"."app_users"."id", "public"."app_users"."employee_id", "public"."app_users"
+17.34s SELECT "public"."role_grants"."id", "public"."role_grants"."role"::text, "public"."role_gr
+17.35s SELECT "public"."employees"."id", "public"."employees"."organization_id", "public"."employ
+17.35s SELECT "public"."app_users"."id", "public"."app_users"."organization_id", "public"."app_us
+17.35s SELECT "public"."employees"."id", "public"."employees"."organization_id", "public"."employ
+17.35s SELECT "public"."role_grants"."id", "public"."role_grants"."app_user_id", "public"."role_g
+17.36s SELECT "public"."auth_sessions"."id", "public"."auth_sessions"."revoked_at", "public"."aut
+17.36s SELECT "public"."app_users"."id", "public"."app_users"."employee_id", "public"."app_users"
+17.36s SELECT "public"."role_grants"."id", "public"."role_grants"."role"::text, "public"."role_gr
+17.36s SELECT "public"."employees"."id", "public"."employees"."organization_id", "public"."employ
+17.36s SELECT "public"."app_users"."id", "public"."app_users"."organization_id", "public"."app_us
+17.36s SELECT "public"."employees"."id", "public"."employees"."organization_id", "public"."employ
+17.36s SELECT "public"."role_grants"."id", "public"."role_grants"."app_user_id", "public"."role_g
+17.37s SELECT "public"."auth_sessions"."id", "public"."auth_sessions"."revoked_at", "public"."aut
+17.37s SELECT "public"."app_users"."id", "public"."app_users"."employee_id", "public"."app_users"
+17.37s SELECT "public"."role_grants"."id", "public"."role_grants"."role"::text, "public"."role_gr
+17.37s SELECT "public"."employees"."id", "public"."employees"."organization_id", "public"."employ
+17.37s SELECT "public"."app_users"."id", "public"."app_users"."organization_id", "public"."app_us
+17.38s SELECT "public"."employees"."id", "public"."employees"."organization_id", "public"."employ
+17.38s SELECT "public"."role_grants"."id", "public"."role_grants"."app_user_id", "public"."role_g
+17.38s SELECT "public"."auth_sessions"."id", "public"."auth_sessions"."revoked_at", "public"."aut
+17.38s SELECT "public"."app_users"."id", "public"."app_users"."employee_id", "public"."app_users"
+17.38s SELECT "public"."role_grants"."id", "public"."role_grants"."role"::text, "public"."role_gr
+17.38s SELECT "public"."employees"."id", "public"."employees"."organization_id", "public"."employ
+17.39s SELECT "public"."app_users"."id", "public"."app_users"."organization_id", "public"."app_us
+17.39s SELECT "public"."employees"."id", "public"."employees"."organization_id", "public"."employ
+17.39s SELECT "public"."role_grants"."id", "public"."role_grants"."app_user_id", "public"."role_g
+17.39s SELECT "public"."auth_sessions"."id", "public"."auth_sessions"."revoked_at", "public"."aut
+17.39s SELECT "public"."app_users"."id", "public"."app_users"."employee_id", "public"."app_users"
+17.40s SELECT "public"."role_grants"."id", "public"."role_grants"."role"::text, "public"."role_gr
+17.40s SELECT "public"."employees"."id", "public"."employees"."organization_id", "public"."employ
+17.40s SELECT "public"."app_users"."id", "public"."app_users"."organization_id", "public"."app_us
+17.40s SELECT "public"."employees"."id", "public"."employees"."organization_id", "public"."employ
+17.40s SELECT "public"."role_grants"."id", "public"."role_grants"."app_user_id", "public"."role_g
+17.41s SELECT "public"."auth_sessions"."id", "public"."auth_sessions"."revoked_at", "public"."aut
+17.41s SELECT "public"."app_users"."id", "public"."app_users"."employee_id", "public"."app_users"
+17.41s SELECT "public"."role_grants"."id", "public"."role_grants"."role"::text, "public"."role_gr
+17.41s SELECT "public"."employees"."id", "public"."employees"."organization_id", "public"."employ
+17.41s SELECT "public"."app_users"."id", "public"."app_users"."organization_id", "public"."app_us
+17.41s SELECT "public"."employees"."id", "public"."employees"."organization_id", "public"."employ
+17.41s SELECT "public"."role_grants"."id", "public"."role_grants"."app_user_id", "public"."role_g
+17.42s SELECT "public"."auth_sessions"."id", "public"."auth_sessions"."revoked_at", "public"."aut
+17.42s SELECT "public"."app_users"."id", "public"."app_users"."employee_id", "public"."app_users"
+17.42s SELECT "public"."role_grants"."id", "public"."role_grants"."role"::text, "public"."role_gr
+17.42s SELECT "public"."employees"."id", "public"."employees"."organization_id", "public"."employ
+17.42s SELECT "public"."app_users"."id", "public"."app_users"."organization_id", "public"."app_us
+17.43s SELECT "public"."employees"."id", "public"."employees"."organization_id", "public"."employ
+17.43s SELECT "public"."role_grants"."id", "public"."role_grants"."app_user_id", "public"."role_g
+17.94s SELECT "public"."auth_sessions"."id", "public"."auth_sessions"."revoked_at", "public"."aut
+17.94s SELECT "public"."app_users"."id", "public"."app_users"."employee_id", "public"."app_users"
+17.95s SELECT "public"."role_grants"."id", "public"."role_grants"."role"::text, "public"."role_gr
+17.95s SELECT "public"."employees"."id", "public"."employees"."organization_id", "public"."employ
+17.95s BEGIN
+17.95s SELECT set_config('lock_timeout', $1, true), set_config('statement_timeout', $2, true)
+17.95s SELECT id FROM app_users WHERE id = $1::uuid FOR UPDATE
+17.95s SELECT "public"."app_users"."id", "public"."app_users"."organization_id", "public"."app_us
+17.95s SELECT "public"."role_grants"."id", "public"."role_grants"."role"::text FROM "public"."rol
+17.95s COMMIT
+17.96s SELECT "public"."app_users"."id", "public"."app_users"."organization_id", "public"."app_us
+17.96s SELECT "public"."employees"."id", "public"."employees"."organization_id", "public"."employ
+17.96s SELECT "public"."role_grants"."id", "public"."role_grants"."app_user_id", "public"."role_g
+17.96s SELECT "public"."role_grants"."id", "public"."role_grants"."role"::text, "public"."role_gr
+27.03s SELECT "public"."account_action_tokens"."token_hash", "public"."account_action_tokens"."ap
+27.03s SELECT "public"."email_outbox"."id", "public"."email_outbox"."action_token_hash", "public"
+27.04s SELECT "public"."auth_sessions"."id", "public"."auth_sessions"."revoked_at", "public"."aut
+27.04s SELECT "public"."app_users"."id", "public"."app_users"."employee_id", "public"."app_users"
+27.04s SELECT "public"."role_grants"."id", "public"."role_grants"."role"::text, "public"."role_gr
+27.04s SELECT "public"."employees"."id", "public"."employees"."organization_id", "public"."employ
+27.04s BEGIN
+29.05s ROLLBACK

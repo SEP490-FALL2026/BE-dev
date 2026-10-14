@@ -1,0 +1,1652 @@
+diff --git a/src/infrastructure/config/env-schema.ts b/src/infrastructure/config/env-schema.ts
+index b48df02..88ee278 100644
+--- a/src/infrastructure/config/env-schema.ts
++++ b/src/infrastructure/config/env-schema.ts
+@@ -20,6 +20,7 @@ export interface EnvironmentVariables {
+   DB_TRANSACTION_MAX_WAIT_MS: number;
+   DB_CONNECT_TIMEOUT_MS: number;
+   DB_QUERY_TIMEOUT_MS: number;
++  DB_IDLE_IN_TRANSACTION_TIMEOUT_MS: number;
+   OBJECT_STORAGE_ENDPOINT: string;
+   OBJECT_STORAGE_REGION: string;
+   OBJECT_STORAGE_BUCKET: string;
+@@ -101,6 +102,7 @@ const environmentSchema = Joi.object({
+   // so PostgreSQL reports a slow statement first; validateEnvironment enforces it.
+   DB_CONNECT_TIMEOUT_MS: Joi.number().integer().min(100).max(60_000).default(3_000),
+   DB_QUERY_TIMEOUT_MS: Joi.number().integer().min(100).max(180_000).default(8_000),
++  DB_IDLE_IN_TRANSACTION_TIMEOUT_MS: Joi.number().integer().min(1_000).max(600_000).default(20_000),
+   OBJECT_STORAGE_ENDPOINT: Joi.string()
+     .uri()
+     .when('NODE_ENV', {
+@@ -242,6 +244,13 @@ export function validateEnvironment(input: Record<string, unknown>): Environment
+     );
+   }
+ 
++  if (result.DB_IDLE_IN_TRANSACTION_TIMEOUT_MS <= result.DB_TRANSACTION_TIMEOUT_MS) {
++    throw new Error(
++      'Environment validation failed: DB_IDLE_IN_TRANSACTION_TIMEOUT_MS must be higher than DB_TRANSACTION_TIMEOUT_MS, ' +
++        'so the server only ends sessions the application has already given up on',
++    );
++  }
++
+   if (result.AUTH_SESSION_IDLE_SECONDS > result.AUTH_SESSION_ABSOLUTE_SECONDS) {
+     throw new Error(
+       'Environment validation failed: AUTH_SESSION_IDLE_SECONDS must not exceed AUTH_SESSION_ABSOLUTE_SECONDS',
+diff --git a/src/infrastructure/database/pg-pool.ts b/src/infrastructure/database/pg-pool.ts
+new file mode 100644
+index 0000000..a52d76a
+--- /dev/null
++++ b/src/infrastructure/database/pg-pool.ts
+@@ -0,0 +1,64 @@
++import { Client, type ClientConfig, Pool, type PoolConfig } from 'pg';
++
++/** What node-postgres reports when `query_timeout` fires (pg 8.23, lib/client.js). */
++const CLIENT_QUERY_TIMEOUT = 'Query read timeout';
++
++type QueryCallback = (error: Error | null, result?: unknown) => void;
++
++/**
++ * A pooled connection that takes itself out of service as soon as one of its queries hits the
++ * client-side `query_timeout`.
++ *
++ * pg only rejects the call when that timer fires: the statement stays active on the connection and
++ * an open transaction stays open. The Prisma adapter then releases the connection to the pool without
++ * an error, and the next request would run — and commit — inside that transaction (review N-1).
++ * `end()` on a connection with an active query destroys the socket (non-pipeline branch of
++ * `Client.end`), so PostgreSQL rolls the transaction back as soon as it reads again, and pg-pool drops
++ * an ending connection on release instead of reusing it.
++ */
++export class RetireOnTimeoutClient extends Client {
++  constructor(config?: string | ClientConfig) {
++    super(config);
++    const query = super.query.bind(this) as (...args: unknown[]) => unknown;
++    // An own property keeps every overload of Client.query for callers; only the outcome is observed.
++    this.query = ((...args: unknown[]): unknown => {
++      const last = args.length - 1;
++      if (typeof args[last] === 'function') {
++        const callback = args[last] as QueryCallback;
++        args[last] = (error: Error | null, result?: unknown): void => {
++          this.retireAfter(error);
++          callback(error, result);
++        };
++      }
++      const result = query(...args);
++      if (result instanceof Promise) {
++        return result.catch((error: unknown) => {
++          this.retireAfter(error);
++          throw error;
++        });
++      }
++      return result;
++    }) as Client['query'];
++  }
++
++  /** Called once when this connection retires itself; the pool factory wires it to a log. */
++  protected onRetired(): void {}
++
++  private retireAfter(error: unknown): void {
++    if (error instanceof Error && error.message === CLIENT_QUERY_TIMEOUT) {
++      this.onRetired();
++      this.end().catch(() => undefined);
++    }
++  }
++}
++
++/** The pool behind Prisma: same settings as before, with connections that retire on a client-side timeout. */
++export function createPostgresPool(config: PoolConfig, hooks: { onRetire?: () => void } = {}): Pool {
++  class PooledClient extends RetireOnTimeoutClient {
++    protected override onRetired(): void {
++      hooks.onRetire?.();
++    }
++  }
++
++  return new Pool({ ...config, Client: PooledClient });
++}
+diff --git a/src/infrastructure/database/prisma.service.ts b/src/infrastructure/database/prisma.service.ts
+index 66462d5..33c75fe 100644
+--- a/src/infrastructure/database/prisma.service.ts
++++ b/src/infrastructure/database/prisma.service.ts
+@@ -1,29 +1,40 @@
+-import { Injectable, OnModuleDestroy } from '@nestjs/common';
++import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
+ import { ConfigService } from '@nestjs/config';
+ import { PrismaPg } from '@prisma/adapter-pg';
+ import { PrismaClient } from '../../generated/prisma/client';
+ import { EnvironmentVariables } from '../config/env-schema';
++import { createPostgresPool } from './pg-pool';
++
++const logger = new Logger('PrismaService');
+ 
+ @Injectable()
+ export class PrismaService extends PrismaClient implements OnModuleDestroy {
+   constructor(config: ConfigService<EnvironmentVariables, true>) {
+     // DATABASE_URL is already resolved per environment by validateEnvironment, so this
+     // adapter has nothing left to decide.
+-    const adapter = new PrismaPg({
+-      connectionString: config.get('DATABASE_URL', { infer: true }),
+-      // The adapter reads and writes timestamptz as if the session zone were UTC. On a server
+-      // whose default TimeZone is anything else, every instant is silently shifted by the offset
+-      // (observed on a PostgreSQL started in Asia/Bangkok). Pin the zone per connection so the
+-      // result does not depend on how the database server was installed.
+-      options: '-c TimeZone=UTC',
+-      // statement_timeout (TransactionRunner) is enforced by the server, so it cannot fire when
+-      // the server never answers (paused container, dropped network path). These two limits are
+-      // enforced here, so such a request fails in bounded time instead of waiting forever (R-02).
+-      connectionTimeoutMillis: config.get('DB_CONNECT_TIMEOUT_MS', { infer: true }),
+-      query_timeout: config.get('DB_QUERY_TIMEOUT_MS', { infer: true }),
+-      // Lets the operating system notice a dead peer on an idle pooled connection.
+-      keepAlive: true,
+-    });
++    const pool = createPostgresPool(
++      {
++        connectionString: config.get('DATABASE_URL', { infer: true }),
++        // The adapter reads and writes timestamptz as if the session zone were UTC. On a server
++        // whose default TimeZone is anything else, every instant is silently shifted by the offset
++        // (observed on a PostgreSQL started in Asia/Bangkok). Pin the zone per connection so the
++        // result does not depend on how the database server was installed.
++        options: '-c TimeZone=UTC',
++        // statement_timeout (TransactionRunner) is enforced by the server, so it cannot fire when
++        // the server never answers (paused container, dropped network path). These two limits are
++        // enforced here, so such a request fails in bounded time instead of waiting forever (R-02).
++        // A connection whose query timed out retires itself (pg-pool.ts, N-1).
++        connectionTimeoutMillis: config.get('DB_CONNECT_TIMEOUT_MS', { infer: true }),
++        query_timeout: config.get('DB_QUERY_TIMEOUT_MS', { infer: true }),
++        // Server-side backstop: PostgreSQL ends a session left idle inside a transaction.
++        idle_in_transaction_session_timeout: config.get('DB_IDLE_IN_TRANSACTION_TIMEOUT_MS', { infer: true }),
++        // Lets the operating system notice a dead peer on an idle pooled connection.
++        keepAlive: true,
++      },
++      { onRetire: () => logger.warn('A database connection was retired after a client-side query timeout') },
++    );
++    // The service owns this pool, so $disconnect ends it too.
++    const adapter = new PrismaPg(pool, { disposeExternalPool: true });
+     super({ adapter });
+   }
+ 
+diff --git a/src/infrastructure/database/transaction-runner.ts b/src/infrastructure/database/transaction-runner.ts
+index 74b2ea5..09fdbbd 100644
+--- a/src/infrastructure/database/transaction-runner.ts
++++ b/src/infrastructure/database/transaction-runner.ts
+@@ -54,6 +54,11 @@ const PG_CONNECTIVITY_MESSAGES = new Set([
+   'Connection terminated unexpectedly',
+   'Query read timeout',
+   'timeout exceeded when trying to connect',
++  // A connection that was ended (retired after a client-side timeout, pg-pool.ts) or whose socket
++  // already failed rejects the queries still queued on it with one of these.
++  'Connection terminated',
++  'Client was closed and is not queryable',
++  'Client has encountered a connection error and is not queryable',
+ ]);
+ const SOCKET_ERROR_CODES = new Set(['ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT', 'EPIPE']);
+ 
+diff --git a/src/infrastructure/database/transient-error.spec.ts b/src/infrastructure/database/transient-error.spec.ts
+index 4045e85..568789e 100644
+--- a/src/infrastructure/database/transient-error.spec.ts
++++ b/src/infrastructure/database/transient-error.spec.ts
+@@ -1,26 +1,30 @@
+-import { TransientDatabaseError, toTransientError } from './transaction-runner';
+-
+-describe('toTransientError — client-side connectivity failures', () => {
+-  // node-postgres reports a dead or silent server with plain Error objects: no SQLSTATE, no Prisma code.
+-  it.each([
+-    'Connection terminated due to connection timeout',
+-    'Connection terminated unexpectedly',
+-    'Query read timeout',
+-    'timeout exceeded when trying to connect',
+-  ])('treats "%s" as retryable', (message) => {
+-    const mapped = toTransientError(new Error(message));
+-    expect(mapped).toBeInstanceOf(TransientDatabaseError);
+-    expect(mapped?.sqlState).toBeUndefined();
+-  });
+-
+-  it.each(['ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT', 'EPIPE'])('treats a socket error %s as retryable', (code) => {
+-    const error = Object.assign(new Error(`connect ${code} 127.0.0.1:5432`), { code });
+-    expect(toTransientError(error)).toBeInstanceOf(TransientDatabaseError);
+-  });
+-
+-  it('does not hide programming or data errors behind a retryable 503', () => {
+-    expect(toTransientError(new Error('column "nope" does not exist'))).toBeUndefined();
+-    expect(toTransientError(new TypeError('Cannot read properties of undefined'))).toBeUndefined();
+-    expect(toTransientError('Query read timeout')).toBeUndefined();
+-  });
+-});
++import { TransientDatabaseError, toTransientError } from './transaction-runner';
++
++describe('toTransientError — client-side connectivity failures', () => {
++  // node-postgres reports a dead or silent server with plain Error objects: no SQLSTATE, no Prisma code.
++  it.each([
++    'Connection terminated due to connection timeout',
++    'Connection terminated unexpectedly',
++    'Query read timeout',
++    'timeout exceeded when trying to connect',
++    // Queries still queued on a connection that was ended or whose socket failed (pg 8.23 client.js).
++    'Connection terminated',
++    'Client was closed and is not queryable',
++    'Client has encountered a connection error and is not queryable',
++  ])('treats "%s" as retryable', (message) => {
++    const mapped = toTransientError(new Error(message));
++    expect(mapped).toBeInstanceOf(TransientDatabaseError);
++    expect(mapped?.sqlState).toBeUndefined();
++  });
++
++  it.each(['ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT', 'EPIPE'])('treats a socket error %s as retryable', (code) => {
++    const error = Object.assign(new Error(`connect ${code} 127.0.0.1:5432`), { code });
++    expect(toTransientError(error)).toBeInstanceOf(TransientDatabaseError);
++  });
++
++  it('does not hide programming or data errors behind a retryable 503', () => {
++    expect(toTransientError(new Error('column "nope" does not exist'))).toBeUndefined();
++    expect(toTransientError(new TypeError('Cannot read properties of undefined'))).toBeUndefined();
++    expect(toTransientError('Query read timeout')).toBeUndefined();
++  });
++});
+diff --git a/src/infrastructure/health/health.controller.spec.ts b/src/infrastructure/health/health.controller.spec.ts
+index cc433b9..89dc07f 100644
+--- a/src/infrastructure/health/health.controller.spec.ts
++++ b/src/infrastructure/health/health.controller.spec.ts
+@@ -1,4 +1,5 @@
+ import { ServiceUnavailableException } from '@nestjs/common';
++import { ApiException } from '../http/errors/api.exception';
+ import { HealthController } from './health.controller';
+ 
+ describe('HealthController readiness', () => {
+@@ -19,11 +20,21 @@ describe('HealthController readiness', () => {
+     });
+   });
+ 
+-  it('propagates the Terminus failure so the filter maps it to 503', async () => {
+-    const failure = new ServiceUnavailableException({ status: 'error' });
+-    const health = { check: jest.fn().mockRejectedValue(failure) };
++  it('answers a failed check with 503 SERVICE_UNAVAILABLE, not the generic server-error code (R-12)', async () => {
++    const health = { check: jest.fn().mockRejectedValue(new ServiceUnavailableException({ status: 'error' })) };
+     const controller = new HealthController(health as never, { pingCheck: jest.fn() } as never, {} as never);
+ 
+-    await expect(controller.getReadiness()).rejects.toBe(failure);
++    const outcome = await controller.getReadiness().catch((error: unknown) => error);
++    expect(outcome).toBeInstanceOf(ApiException);
++    expect((outcome as ApiException).getStatus()).toBe(503);
++    expect((outcome as ApiException).getResponse()).toMatchObject({ code: 'SERVICE_UNAVAILABLE' });
++  });
++
++  it('leaves any other failure to the global filter', async () => {
++    const defect = new TypeError('boom');
++    const health = { check: jest.fn().mockRejectedValue(defect) };
++    const controller = new HealthController(health as never, { pingCheck: jest.fn() } as never, {} as never);
++
++    await expect(controller.getReadiness()).rejects.toBe(defect);
+   });
+ });
+diff --git a/src/infrastructure/health/health.controller.ts b/src/infrastructure/health/health.controller.ts
+index 7299f2d..4802bbb 100644
+--- a/src/infrastructure/health/health.controller.ts
++++ b/src/infrastructure/health/health.controller.ts
+@@ -1,4 +1,4 @@
+-import { Controller, Get, HttpStatus } from '@nestjs/common';
++import { Controller, Get, HttpStatus, ServiceUnavailableException } from '@nestjs/common';
+ import { ApiOperation, ApiTags } from '@nestjs/swagger';
+ import { HealthCheckService, PrismaHealthIndicator } from '@nestjs/terminus';
+ import { createZodDto } from 'nestjs-zod';
+@@ -6,6 +6,7 @@ import { z } from 'zod';
+ import { PrismaService } from '../database/prisma.service';
+ import { ApiErrorResponses } from '../http/decorators/api-error-responses.decorator';
+ import { ApiSuccessResponse } from '../http/decorators/api-success-response.decorator';
++import { ApiException } from '../http/errors/api.exception';
+ import { successEnvelopeSchema } from '../http/dto/success-envelope.dto';
+ import { Public } from '../security/decorators/public.decorator';
+ 
+@@ -60,9 +61,19 @@ export class HealthController {
+   )
+   @Public()
+   async getReadiness(): Promise<z.infer<typeof ReadinessDataSchema>> {
+-    const result = await this.health.check([
+-      () => this.prismaHealth.pingCheck('database', this.prisma, { timeout: READINESS_TIMEOUT_MS }),
+-    ]);
++    let result;
++    try {
++      result = await this.health.check([
++        () => this.prismaHealth.pingCheck('database', this.prisma, { timeout: READINESS_TIMEOUT_MS }),
++      ]);
++    } catch (error) {
++      // Terminus reports a failed check as a bare 503; give it the availability code of the contract (R-12).
++      if (!(error instanceof ServiceUnavailableException)) throw error;
++      throw new ApiException(HttpStatus.SERVICE_UNAVAILABLE, {
++        code: 'SERVICE_UNAVAILABLE',
++        message: 'A required dependency is unavailable.',
++      });
++    }
+     const details = result.details as Record<string, { status: string }>;
+ 
+     return {
+diff --git a/src/modules/identity-access/account-management.http-errors.ts b/src/modules/identity-access/account-management.http-errors.ts
+index 5ec925b..df62589 100644
+--- a/src/modules/identity-access/account-management.http-errors.ts
++++ b/src/modules/identity-access/account-management.http-errors.ts
+@@ -26,6 +26,20 @@ function refuse(status: HttpStatus, code: string, message: string, details?: Rec
+   return new ApiException(status, { code, message, ...(details ? { details } : {}) });
+ }
+ 
++/**
++ * 503 for a database that could not answer: a transaction's TransientDatabaseError, or the driver's
++ * own error from a read outside TransactionRunner. Anything else is not an outage (undefined).
++ */
++export function toUnavailableApiException(error: unknown): ApiException | undefined {
++  if (!(error instanceof TransientDatabaseError) && !toTransientError(error)) return undefined;
++
++  return refuse(
++    HttpStatus.SERVICE_UNAVAILABLE,
++    'SERVICE_UNAVAILABLE',
++    'The service is temporarily unavailable. Retry shortly.',
++  );
++}
++
+ /**
+  * Maps the errors of account management to their HTTP answers. Anything not listed is returned
+  * unchanged so the global filter reports it as an unexpected error rather than hiding it.
+@@ -84,14 +98,5 @@ export function toAccountApiException(error: unknown): unknown {
+       violation: error.violation,
+     });
+   }
+-  // Reads outside TransactionRunner raise the driver's own error; toTransientError recognizes it.
+-  if (error instanceof TransientDatabaseError || toTransientError(error)) {
+-    return refuse(
+-      HttpStatus.SERVICE_UNAVAILABLE,
+-      'SERVICE_UNAVAILABLE',
+-      'The service is temporarily unavailable. Retry shortly.',
+-    );
+-  }
+-
+-  return error;
++  return toUnavailableApiException(error) ?? error;
+ }
+diff --git a/src/modules/identity-access/account-management.service.ts b/src/modules/identity-access/account-management.service.ts
+index ef61b67..955cd69 100644
+--- a/src/modules/identity-access/account-management.service.ts
++++ b/src/modules/identity-access/account-management.service.ts
+@@ -89,10 +89,6 @@ export interface CreateAccountInput {
+ 
+ /** The candidate list shows at most this many people (spec 1b). */
+ const CANDIDATE_LIMIT = 20;
+-/** Employees read per step while looking for candidates without an account. */
+-const CANDIDATE_PAGE_SIZE = 200;
+-/** Upper bound on steps, so one request reads at most 5 000 employees however many have accounts. */
+-const CANDIDATE_MAX_PAGES = 25;
+ 
+ /**
+  * Account administration by the Super Admin (slice 1b). Every method that changes an account
+@@ -117,26 +113,11 @@ export class AccountManagementService {
+   async listCandidates(search: string | undefined): Promise<EmployeeCandidate[]> {
+     const organization = await this.organization.getOrganization();
+     const today = toDateColumn(businessDateAt(new Date(), organization?.timeZone ?? 'UTC'));
+-    const found: EmployeeCandidate[] = [];
+-    let after: string | undefined;
+-
+-    // Walk the employees in code order, a page at a time, until 20 have no account or none are
+-    // left: the account filter lives in another module, so it cannot be part of one query, and a
+-    // single capped page would miss everyone sorting after a long run of employees with accounts.
+-    for (let page = 0; page < CANDIDATE_MAX_PAGES && found.length < CANDIDATE_LIMIT; page += 1) {
+-      const matches = await this.organization.searchActiveEmployees(search, today, CANDIDATE_PAGE_SIZE, after);
+-      if (matches.length === 0) break;
+-
+-      const withAccount = await this.repo.findAccountEmployeeIds(matches.map((match) => match.id));
+-      for (const match of matches) {
+-        if (!withAccount.has(match.id) && found.length < CANDIDATE_LIMIT) found.push(match);
+-      }
+-
+-      if (matches.length < CANDIDATE_PAGE_SIZE) break;
+-      after = matches[matches.length - 1].employeeCode;
+-    }
++    // Every employee who already has an account, handed to the organization module so it can leave
++    // them out in the same query that searches, sorts and limits: no window, no page cap (R-03).
++    const withAccount = await this.repo.findEmployeeIdsWithAccount();
+ 
+-    return found;
++    return this.organization.searchActiveEmployees(search, today, CANDIDATE_LIMIT, withAccount);
+   }
+ 
+   async listAccounts(
+@@ -390,13 +371,16 @@ export class AccountManagementService {
+     const lengthViolation = checkPasswordPolicy(password, '');
+     if (lengthViolation && lengthViolation !== 'EQUALS_LOGIN_EMAIL') throw new PasswordPolicyError(lengthViolation);
+ 
+-    // Hashing is the slow part and happens before any lock (lock protocol rule 3).
+-    const hash = await this.hasher.hash(password);
++    // Find the token first: a malformed or unknown token costs no Argon2 (R-09). The answer is the same
++    // generic error either way, and a 256-bit random token cannot be guessed from the timing.
+     if (!this.tokens.isWellFormedActionToken(token)) throw new InvitationInvalidError();
+     const tokenHash = this.tokens.hashActionToken(token);
+     const appUserId = await this.repo.findActionTokenOwner(tokenHash);
+     if (!appUserId) throw new InvitationInvalidError();
+ 
++    // Hashing is the slow part and still happens before any lock (lock protocol rule 3).
++    const hash = await this.hasher.hash(password);
++
+     const outcome = await this.runner.run<'activated' | 'invalid' | PasswordPolicyError>(async (tx) => {
+       // AppUser first, then the token (spec: the order that cannot deadlock with lock/unlock).
+       if (!(await this.repo.lockAppUser(tx, appUserId, 'UPDATE'))) return 'invalid';
+diff --git a/src/modules/identity-access/identity-access.repo.ts b/src/modules/identity-access/identity-access.repo.ts
+index cd3c048..e67a33b 100644
+--- a/src/modules/identity-access/identity-access.repo.ts
++++ b/src/modules/identity-access/identity-access.repo.ts
+@@ -280,15 +280,11 @@ export class IdentityAccessRepo {
+ 
+   // --- account management -----------------------------------------------------------
+ 
+-  async findAccountEmployeeIds(employeeIds: string[]): Promise<Set<string>> {
+-    if (employeeIds.length === 0) return new Set();
++  /** Ids of every Employee that already has an account, whatever its state (one per Employee, AC-8). */
++  async findEmployeeIdsWithAccount(): Promise<string[]> {
++    const rows = await this.prisma.appUser.findMany({ select: { employeeId: true } });
+ 
+-    const rows = await this.prisma.appUser.findMany({
+-      where: { employeeId: { in: employeeIds } },
+-      select: { employeeId: true },
+-    });
+-
+-    return new Set(rows.map((row) => row.employeeId));
++    return rows.map((row) => row.employeeId);
+   }
+ 
+   async findAccountIdByEmployee(tx: DbTx, employeeId: string): Promise<string | null> {
+@@ -307,18 +303,22 @@ export class IdentityAccessRepo {
+       ...(filter.activationState ? { activationState: filter.activationState } : {}),
+       ...(filter.role ? { roleGrants: { some: { role: filter.role, revokedAt: null } } } : {}),
+     };
+-    const [items, total] = await Promise.all([
+-      this.prisma.appUser.findMany({
+-        where,
+-        orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+-        skip: filter.skip,
+-        take: filter.take,
+-        select: ACCOUNT_RECORD_SELECT,
+-      }),
+-      this.prisma.appUser.count({ where }),
+-    ]);
+-
+-    return { items, total };
++    // One snapshot for the page and the count (database rules; same as the catalog): otherwise an
++    // account created in between makes totalItems disagree with the rows just returned (R-14).
++    return this.prisma.$transaction(
++      async (tx) => {
++        const items = await tx.appUser.findMany({
++          where,
++          orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
++          skip: filter.skip,
++          take: filter.take,
++          select: ACCOUNT_RECORD_SELECT,
++        });
++        const total = await tx.appUser.count({ where });
++        return { items, total };
++      },
++      { isolationLevel: 'RepeatableRead' },
++    );
+   }
+ 
+   async setStatus(tx: DbTx, appUserId: string, status: 'ACTIVE' | 'LOCKED'): Promise<void> {
+diff --git a/src/modules/identity-access/me.controller.spec.ts b/src/modules/identity-access/me.controller.spec.ts
+new file mode 100644
+index 0000000..73d24b1
+--- /dev/null
++++ b/src/modules/identity-access/me.controller.spec.ts
+@@ -0,0 +1,30 @@
++import { HttpStatus } from '@nestjs/common';
++import { TransientDatabaseError } from '../../infrastructure/database/transaction-runner';
++import { ApiException } from '../../infrastructure/http/errors/api.exception';
++import type { AuthenticatedPrincipal } from '../../infrastructure/security/tokens/access-token-verifier.port';
++import { MeController } from './me.controller';
++import { MeService } from './me.service';
++
++const principal = {} as AuthenticatedPrincipal;
++const controllerFailingWith = (error: Error): MeController =>
++  new MeController({ get: () => Promise.reject(error) } as unknown as MeService);
++
++describe('MeController — failures after the guard (R-15)', () => {
++  it.each([new TransientDatabaseError('57014', new Error('timeout')), new Error('Query read timeout')])(
++    'answers 503 SERVICE_UNAVAILABLE for an unreachable database: %s',
++    async (error) => {
++      const outcome = await controllerFailingWith(error)
++        .get(principal)
++        .catch((caught: unknown) => caught);
++
++      expect(outcome).toBeInstanceOf(ApiException);
++      expect((outcome as ApiException).getStatus()).toBe(HttpStatus.SERVICE_UNAVAILABLE);
++      expect((outcome as ApiException).getResponse()).toMatchObject({ code: 'SERVICE_UNAVAILABLE' });
++    },
++  );
++
++  it('keeps any other failure as it is, so it is reported as an internal error', async () => {
++    const defect = new Error('An authenticated principal lost its account or employee record');
++    await expect(controllerFailingWith(defect).get(principal)).rejects.toBe(defect);
++  });
++});
+diff --git a/src/modules/identity-access/me.controller.ts b/src/modules/identity-access/me.controller.ts
+index 6419201..390b394 100644
+--- a/src/modules/identity-access/me.controller.ts
++++ b/src/modules/identity-access/me.controller.ts
+@@ -5,6 +5,7 @@ import { ApiSuccessResponse } from '../../infrastructure/http/decorators/api-suc
+ import { AuthenticatedOnly } from '../../infrastructure/security/decorators/access.decorators';
+ import { CurrentPrincipal } from '../../infrastructure/security/models/current-principal';
+ import type { AuthenticatedPrincipal } from '../../infrastructure/security/tokens/access-token-verifier.port';
++import { toUnavailableApiException } from './account-management.http-errors';
+ import { MeResponseDto } from './dto/me.dto';
+ import { MeService, MeView } from './me.service';
+ 
+@@ -24,7 +25,12 @@ export class MeController {
+     { status: HttpStatus.UNAUTHORIZED, description: 'Authentication is required or the token is no longer valid.' },
+     { status: HttpStatus.SERVICE_UNAVAILABLE, description: 'Authentication is temporarily unavailable.' },
+   )
+-  get(@CurrentPrincipal() principal: AuthenticatedPrincipal): Promise<MeView> {
+-    return this.me.get(principal);
++  async get(@CurrentPrincipal() principal: AuthenticatedPrincipal): Promise<MeView> {
++    try {
++      return await this.me.get(principal);
++    } catch (error) {
++      // The guard already read the database; it can still stop answering before MeService does (R-15).
++      throw toUnavailableApiException(error) ?? error;
++    }
+   }
+ }
+diff --git a/src/modules/organization/organization.repo.ts b/src/modules/organization/organization.repo.ts
+index 21d9967..afa8db5 100644
+--- a/src/modules/organization/organization.repo.ts
++++ b/src/modules/organization/organization.repo.ts
+@@ -1,9 +1,9 @@
+ import { Injectable } from '@nestjs/common';
+-import { Prisma } from '../../generated/prisma/client';
+ import { fromDateColumn, toDateColumn } from '../../core/business-date';
+ import { normalizeEmail } from '../../core/email';
+ import { PrismaService } from '../../infrastructure/database/prisma.service';
+ import { DbTx } from '../../infrastructure/database/transaction-runner';
++import { isUniqueViolation } from '../../infrastructure/database/unique-violation';
+ import {
+   EmployeeCodeTakenError,
+   EmployeeEmailTakenError,
+@@ -21,12 +21,9 @@ import {
+   OrganizationRecord,
+ } from './organization.types';
+ 
+-/** True for a P2002 whose constraint or column list mentions one of `needles`. */
+-function isUniqueViolation(error: unknown, ...needles: string[]): boolean {
+-  if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') return false;
+-  const haystack = JSON.stringify(error.meta ?? {});
+-
+-  return needles.some((needle) => haystack.includes(needle));
++/** Escapes LIKE metacharacters so a search term matches literally (backslash is PostgreSQL's default escape). */
++function escapeLikePattern(term: string): string {
++  return term.replace(/[\\%_]/g, (character) => `\\${character}`);
+ }
+ 
+ const ORGANIZATION_SELECT = { id: true, name: true, timeZone: true, reportingCurrency: true } as const;
+@@ -153,44 +150,44 @@ export class OrganizationRepo {
+     search: string | undefined,
+     onDate: Date,
+     limit: number,
+-    afterEmployeeCode?: string,
++    excludeEmployeeIds: readonly string[],
+   ): Promise<EmployeeCandidate[]> {
+     const term = search?.trim();
+-    const rows = await this.prisma.employee.findMany({
+-      where: {
+-        status: 'ACTIVE',
+-        ...(afterEmployeeCode === undefined ? {} : { employeeCode: { gt: afterEmployeeCode } }),
+-        ...(term
+-          ? {
+-              OR: [
+-                { employeeCode: { contains: term, mode: 'insensitive' as const } },
+-                { fullName: { contains: term, mode: 'insensitive' as const } },
+-                { workEmail: { contains: term, mode: 'insensitive' as const } },
+-              ],
+-            }
+-          : {}),
+-      },
+-      orderBy: { employeeCode: 'asc' },
+-      take: limit,
+-      select: {
+-        id: true,
+-        employeeCode: true,
+-        fullName: true,
+-        workEmail: true,
+-        placements: {
+-          where: { validFrom: { lte: onDate }, OR: [{ validTo: null }, { validTo: { gt: onDate } }] },
+-          select: { department: { select: { name: true } } },
+-          take: 1,
+-        },
+-      },
+-    });
++    // Literal match: % and _ typed by the user are characters, not wildcards (Prisma `contains` does not
++    // escape them). The exclusion list travels as ONE uuid[] parameter: a Prisma `notIn` sends one bind
++    // parameter per id and fails beyond PostgreSQL's parameter limit.
++    const pattern = term ? `%${escapeLikePattern(term)}%` : null;
++    const day = fromDateColumn(onDate);
++    const rows = await this.prisma.$queryRaw<
++      { id: string; employee_code: string; full_name: string; work_email: string | null; department: string | null }[]
++    >`
++      SELECT e.id, e.employee_code, e.full_name, e.work_email, placement.department
++        FROM employees e
++        LEFT JOIN LATERAL (
++          SELECT d.name AS department
++            FROM employee_placements p
++            JOIN departments d ON d.id = p.department_id
++           WHERE p.employee_id = e.id
++             AND p.valid_from <= ${day}::date
++             AND (p.valid_to IS NULL OR p.valid_to > ${day}::date)
++           ORDER BY p.valid_from DESC
++           LIMIT 1
++        ) placement ON true
++       WHERE e.status = 'ACTIVE'
++         AND e.id <> ALL (${[...excludeEmployeeIds]}::uuid[])
++         AND (${pattern}::text IS NULL
++              OR e.employee_code ILIKE ${pattern}
++              OR e.full_name ILIKE ${pattern}
++              OR e.work_email ILIKE ${pattern})
++       ORDER BY e.employee_code, e.id
++       LIMIT ${limit}`;
+ 
+     return rows.map((row) => ({
+       id: row.id,
+-      employeeCode: row.employeeCode,
+-      fullName: row.fullName,
+-      workEmail: row.workEmail,
+-      department: row.placements[0]?.department.name ?? null,
++      employeeCode: row.employee_code,
++      fullName: row.full_name,
++      workEmail: row.work_email,
++      department: row.department,
+     }));
+   }
+ 
+diff --git a/src/modules/organization/organization.service.ts b/src/modules/organization/organization.service.ts
+index d4f37c9..8956304 100644
+--- a/src/modules/organization/organization.service.ts
++++ b/src/modules/organization/organization.service.ts
+@@ -66,16 +66,17 @@ export class OrganizationService {
+   }
+ 
+   /**
+-   * Employees who have not left, matched on code, name or work email, in employee-code order.
+-   * `afterEmployeeCode` continues a previous page (keyset): only codes sorting after it are returned.
++   * Employees who have not left, matched literally on code, name or work email, in employee-code
++   * order, leaving out `excludeEmployeeIds` (the caller's own filter, for example employees that
++   * already have an account). One query: the exclusion is applied before the limit.
+    */
+   searchActiveEmployees(
+     search: string | undefined,
+     onDate: Date,
+     limit: number,
+-    afterEmployeeCode?: string,
++    excludeEmployeeIds: readonly string[] = [],
+   ): Promise<EmployeeCandidate[]> {
+-    return this.repo.searchActiveEmployees(search, onDate, limit, afterEmployeeCode);
++    return this.repo.searchActiveEmployees(search, onDate, limit, excludeEmployeeIds);
+   }
+ 
+   getEmployeeProfile(employeeId: string, onDate: Date): Promise<EmployeeProfile | null> {
+diff --git a/test/integration/account-list-and-redeem.integration-spec.ts b/test/integration/account-list-and-redeem.integration-spec.ts
+new file mode 100644
+index 0000000..6333dca
+--- /dev/null
++++ b/test/integration/account-list-and-redeem.integration-spec.ts
+@@ -0,0 +1,94 @@
++import { setTimeout as sleep } from 'node:timers/promises';
++import request from 'supertest';
++import { PasswordHasher } from '../../src/modules/identity-access/password-hasher.service';
++import { bodyOf } from '../support/api-body';
++import {
++  HttpTestApp,
++  SEED_PASSWORD,
++  SeededInstallation,
++  createHttpTestApp,
++  seedInstallation,
++} from '../support/http-test-app';
++import { PgRelay } from '../support/pg-relay';
++
++/** R-14 (page and count from one snapshot) and R-09 (no Argon2 for a token that cannot be redeemed). */
++describe('account list snapshot and redeem cost (integration, real PostgreSQL)', () => {
++  let ctx: HttpTestApp;
++  let relay: PgRelay;
++  let seed: SeededInstallation;
++  let token: string;
++
++  const addInvitedAccounts = async (prefix: string, count: number): Promise<void> => {
++    await ctx.sql.query(
++      `INSERT INTO employees (id, organization_id, employee_code, full_name, work_email, normalized_work_email, employment_type, hire_date, status, updated_at)
++       SELECT gen_random_uuid(), $1::uuid, $2 || '-' || n, 'Person ' || n, lower($2) || n || '@acme.vn', lower($2) || n || '@acme.vn', 'STAFF', DATE '2026-01-05', 'ACTIVE', now()
++         FROM generate_series(1, $3::int) AS n`,
++      [seed.organizationId, prefix, count],
++    );
++    await ctx.sql.query(
++      `INSERT INTO app_users (id, organization_id, employee_id, login_email, normalized_login_email, status, activation_state, updated_at)
++       SELECT gen_random_uuid(), organization_id, id, work_email, normalized_work_email, 'ACTIVE', 'INVITED', now()
++         FROM employees WHERE employee_code LIKE $1 || '-%'`,
++      [prefix],
++    );
++  };
++
++  beforeAll(async () => {
++    ctx = await createHttpTestApp({
++      appDatabaseUrl: async (directUrl) => {
++        const url = new URL(directUrl);
++        relay = await PgRelay.start(url.hostname, Number(url.port || 5432));
++        url.port = String(relay.port);
++        return url.toString();
++      },
++    });
++    seed = await seedInstallation(ctx.app);
++    const login = await request(ctx.app.getHttpServer())
++      .post('/api/v1/auth/login')
++      .send({ email: seed.superAdmin.email, password: SEED_PASSWORD })
++      .expect(200);
++    token = bodyOf(login).data.accessToken;
++    await addInvitedAccounts('LST', 4);
++  }, 90000);
++
++  afterAll(async () => {
++    relay?.releaseHeld();
++    await ctx?.close();
++    await relay?.stop();
++  });
++
++  it('counts from the same snapshot as the page, even when an account is created in between (R-14)', async () => {
++    relay.holdWhen(/^SELECT COUNT\(\*\)/i);
++    const pending = request(ctx.app.getHttpServer())
++      .get('/api/v1/app-users?page=1&pageSize=100')
++      .set({ Authorization: `Bearer ${token}` });
++    const responsePromise = pending.then((response) => response);
++    for (let i = 0; i < 100 && !relay.holding; i += 1) await sleep(20);
++    expect(relay.holding).toBe(true);
++
++    await addInvitedAccounts('NEW', 1); // committed while the count waits
++    relay.releaseHeld();
++    const response = await responsePromise;
++
++    expect(response.status).toBe(200);
++    const data = (response.body as { data: { items: unknown[]; pagination: { totalItems: number } } }).data;
++    expect(data.pagination.totalItems).toBe(data.items.length);
++  }, 30000);
++
++  it.each([
++    ['malformed', 'not-a-token'],
++    ['unknown', 'x'.repeat(43)],
++  ])('refuses a %s invitation token without hashing the password (R-09)', async (_kind, invitation) => {
++    const hasher = ctx.app.get(PasswordHasher, { strict: false });
++    const hash = jest.spyOn(hasher, 'hash');
++
++    const response = await request(ctx.app.getHttpServer())
++      .post('/api/v1/auth/invitations/redeem')
++      .send({ token: invitation, password: 'a perfectly fine password 42' });
++
++    expect(response.status).toBe(400);
++    expect((response.body as { error: { code: string } }).error.code).toBe('AUTH.INVITATION_INVALID');
++    expect(hash).not.toHaveBeenCalled();
++    hash.mockRestore();
++  });
++});
+diff --git a/test/integration/database-stall.integration-spec.ts b/test/integration/database-stall.integration-spec.ts
+new file mode 100644
+index 0000000..9224d67
+--- /dev/null
++++ b/test/integration/database-stall.integration-spec.ts
+@@ -0,0 +1,201 @@
++import { setTimeout as sleep } from 'node:timers/promises';
++import { Logger } from '@nestjs/common';
++import { Client } from 'pg';
++import { PrismaService } from '../../src/infrastructure/database/prisma.service';
++import {
++  TransactionRunner,
++  TransientDatabaseError,
++  toTransientError,
++} from '../../src/infrastructure/database/transaction-runner';
++import {
++  DisposableDatabase,
++  dropDisposableDatabase,
++  provisionDisposableDatabase,
++} from '../support/disposable-database';
++import { PgRelay } from '../support/pg-relay';
++import { testConfig } from '../support/test-config';
++
++/**
++ * N-1 / R-02 / N-2: a statement that stops being answered on a warm connection that is already in use.
++ *
++ * Every case reaches the database through PgRelay and holds one statement, so the connection is open
++ * and acquired: the outcome cannot come from the connect timeout or from maxWait. The server-side
++ * idle-in-transaction timeout is set far above the test's duration so it cannot hide a client-side defect.
++ */
++const QUERY_TIMEOUT_MS = 2000;
++const SLACK_MS = 1500;
++const settings = {
++  DB_LOCK_TIMEOUT_MS: 500,
++  DB_STATEMENT_TIMEOUT_MS: 1500,
++  DB_TRANSACTION_TIMEOUT_MS: 4000,
++  DB_TRANSACTION_MAX_WAIT_MS: 2000,
++  DB_CONNECT_TIMEOUT_MS: 1000,
++  DB_QUERY_TIMEOUT_MS: QUERY_TIMEOUT_MS,
++  DB_IDLE_IN_TRANSACTION_TIMEOUT_MS: 120000,
++};
++
++describe('a statement that stops being answered on a warm connection (integration)', () => {
++  let database: DisposableDatabase;
++  let relay: PgRelay;
++  let prisma: PrismaService;
++  let runner: TransactionRunner;
++  let admin: Client;
++
++  /** Fails the test (not the query) when the call is still waiting; it proves nothing about cancellation. */
++  const within = async <T>(work: Promise<T>, ms: number): Promise<T | 'still waiting'> =>
++    Promise.race([work, sleep(ms).then(() => 'still waiting' as const)]);
++
++  const timed = async (work: () => Promise<unknown>): Promise<{ outcome: unknown; elapsed: number }> => {
++    const started = Date.now();
++    const outcome = await within(
++      work().catch((error: unknown) => error),
++      QUERY_TIMEOUT_MS * 3,
++    );
++    return { outcome, elapsed: Date.now() - started };
++  };
++
++  const idleInTransaction = async (): Promise<number> => {
++    const { rows } = await admin.query<{ n: number }>(
++      `SELECT count(*)::int AS n FROM pg_stat_activity
++        WHERE datname = current_database() AND pid <> pg_backend_pid() AND state LIKE 'idle in transaction%'`,
++    );
++    return rows[0].n;
++  };
++
++  const committed = async (): Promise<{ value: number; paired: number }> => {
++    const value = (await admin.query<{ v: number }>('SELECT v FROM stall_probe WHERE id = 1')).rows[0].v;
++    const paired = (
++      await admin.query<{ n: number }>(`SELECT count(*)::int AS n FROM stall_log WHERE note = $1`, [`paired ${value}`])
++    ).rows[0].n;
++    return { value, paired };
++  };
++
++  /** Ordinary traffic on the same pool: short write transactions and bare reads. */
++  const laterTraffic = async (): Promise<void> => {
++    for (let i = 0; i < 6; i += 1) {
++      await runner.run((tx) => tx.$executeRawUnsafe(`INSERT INTO stall_log (note) VALUES ('later')`));
++      await prisma.$queryRaw`SELECT 1`;
++    }
++  };
++
++  beforeAll(async () => {
++    database = await provisionDisposableDatabase();
++    admin = new Client({ connectionString: database.url });
++    await admin.connect();
++    await admin.query('CREATE TABLE stall_probe (id int PRIMARY KEY, v int NOT NULL)');
++    await admin.query('CREATE TABLE stall_log (id serial PRIMARY KEY, note text NOT NULL)');
++    await admin.query('INSERT INTO stall_probe VALUES (1, 0)');
++    const direct = new URL(database.url);
++    relay = await PgRelay.start(direct.hostname, Number(direct.port || 5432));
++    direct.port = String(relay.port);
++    prisma = new PrismaService(testConfig({ ...settings, DATABASE_URL: direct.toString() }));
++    runner = new TransactionRunner(prisma, testConfig(settings));
++    await prisma.$queryRaw`SELECT 1`; // warm the pool
++  }, 60000);
++
++  afterEach(() => relay.releaseHeld());
++
++  afterAll(async () => {
++    relay?.releaseHeld();
++    await prisma?.$disconnect();
++    await relay?.stop();
++    await admin?.end();
++    if (database) await dropDisposableDatabase(database);
++  });
++
++  it('ends a bare read on an acquired connection at the query timeout, as a transient error', async () => {
++    relay.holdWhen(/^SELECT 'stall-read'/);
++    const { outcome, elapsed } = await timed(() => prisma.$queryRawUnsafe(`SELECT 'stall-read'`));
++
++    expect(relay.holding).toBe(true); // the statement really was on an open connection
++    expect(toTransientError(outcome)).toBeInstanceOf(TransientDatabaseError);
++    // Not the connect timeout (1 s) and not maxWait: the query timeout itself ended the call.
++    expect(elapsed).toBeGreaterThanOrEqual(QUERY_TIMEOUT_MS - 100);
++    expect(elapsed).toBeLessThan(QUERY_TIMEOUT_MS + SLACK_MS);
++  }, 20000);
++
++  it('never commits a transaction whose statement was answered late (N-1)', async () => {
++    const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
++    relay.holdWhen(/^UPDATE stall_probe/);
++    const { outcome, elapsed } = await timed(() =>
++      runner.run(async (tx) => {
++        await tx.$executeRawUnsafe('UPDATE stall_probe SET v = 1 WHERE id = 1');
++        await tx.$executeRawUnsafe(`INSERT INTO stall_log (note) VALUES ('paired 1')`);
++      }),
++    );
++
++    expect(outcome).toBeInstanceOf(TransientDatabaseError);
++
++    relay.releaseHeld(); // PostgreSQL now receives the UPDATE it never saw
++    await laterTraffic();
++
++    // The integrity invariant first: nothing of the failed transaction is ever committed.
++    await expect(committed()).resolves.toEqual({ value: 0, paired: 0 });
++    expect(await idleInTransaction()).toBe(0);
++    // Then the budget: one query timeout, because the retired connection fails the rollback at once
++    // instead of waiting a second query timeout for a ROLLBACK that cannot be delivered.
++    expect(elapsed).toBeLessThan(QUERY_TIMEOUT_MS + SLACK_MS);
++    // Operators can count retired connections in the log.
++    expect(warn).toHaveBeenCalledWith(expect.stringContaining('retired after a client-side query timeout'));
++    warn.mockRestore();
++  }, 30000);
++
++  it('keeps a transaction whose COMMIT was answered late all-or-nothing', async () => {
++    relay.holdWhen(/^COMMIT/);
++    const { outcome } = await timed(() =>
++      runner.run(async (tx) => {
++        await tx.$executeRawUnsafe('UPDATE stall_probe SET v = 2 WHERE id = 1');
++        await tx.$executeRawUnsafe(`INSERT INTO stall_log (note) VALUES ('paired 2')`);
++      }),
++    );
++
++    // The caller cannot know whether PostgreSQL committed; it only learns that the call failed.
++    expect(outcome).toBeInstanceOf(TransientDatabaseError);
++    relay.releaseHeld();
++    await laterTraffic();
++
++    const state = await committed();
++    expect([
++      { value: 0, paired: 0 },
++      { value: 2, paired: 1 },
++    ]).toContainEqual(state);
++    expect(await idleInTransaction()).toBe(0);
++  }, 30000);
++
++  it('rolls back a transaction whose BEGIN was answered after maxWait', async () => {
++    relay.holdWhen(/^BEGIN/);
++    const { outcome, elapsed } = await timed(() =>
++      runner.run((tx) => tx.$executeRawUnsafe('UPDATE stall_probe SET v = 3 WHERE id = 1')),
++    );
++
++    expect(outcome).toBeInstanceOf(TransientDatabaseError);
++    expect(elapsed).toBeLessThan(settings.DB_TRANSACTION_MAX_WAIT_MS + SLACK_MS);
++    relay.releaseHeld();
++    await laterTraffic();
++
++    expect((await committed()).value).not.toBe(3);
++    expect(await idleInTransaction()).toBe(0);
++  }, 30000);
++
++  it('sets the server-side idle-in-transaction backstop on pooled sessions', async () => {
++    const rows = await prisma.$queryRaw<{ value: string }[]>`
++      SELECT current_setting('idle_in_transaction_session_timeout') AS value`;
++    expect(rows[0].value).toBe('2min');
++  });
++
++  it('keeps serving and closes every connection on disconnect', async () => {
++    await expect(runner.run((tx) => tx.$queryRaw<{ one: number }[]>`SELECT 1 AS one`)).resolves.toEqual([{ one: 1 }]);
++
++    await prisma.$disconnect();
++    // The service owns its pool: after $disconnect no connection of the application is left.
++    for (let i = 0; i < 20 && (await appConnections()) > 0; i += 1) await sleep(100);
++    expect(await appConnections()).toBe(0);
++  }, 20000);
++
++  const appConnections = async (): Promise<number> =>
++    (
++      await admin.query<{ n: number }>(
++        `SELECT count(*)::int AS n FROM pg_stat_activity WHERE datname = current_database() AND pid <> pg_backend_pid()`,
++      )
++    ).rows[0].n;
++});
+diff --git a/test/integration/me-unavailable.integration-spec.ts b/test/integration/me-unavailable.integration-spec.ts
+new file mode 100644
+index 0000000..bd644f0
+--- /dev/null
++++ b/test/integration/me-unavailable.integration-spec.ts
+@@ -0,0 +1,64 @@
++import request from 'supertest';
++import { bodyOf } from '../support/api-body';
++import { HttpTestApp, SEED_PASSWORD, createHttpTestApp, seedInstallation } from '../support/http-test-app';
++import { PgRelay } from '../support/pg-relay';
++
++/**
++ * R-15: GET /me when the database stops answering AFTER the guard has verified the token. The guard's
++ * own reads succeed; only MeService's query (the login email) is held, so the answer comes from the
++ * controller's mapping, not from the guard's TOKEN_VERIFICATION_UNAVAILABLE.
++ */
++describe('GET /me when the database stops answering after the guard (integration)', () => {
++  let ctx: HttpTestApp;
++  let relay: PgRelay;
++  let token: string;
++
++  beforeAll(async () => {
++    ctx = await createHttpTestApp({
++      appDatabaseUrl: async (directUrl) => {
++        const url = new URL(directUrl);
++        relay = await PgRelay.start(url.hostname, Number(url.port || 5432));
++        url.port = String(relay.port);
++        return url.toString();
++      },
++      env: {
++        DB_QUERY_TIMEOUT_MS: '2000',
++        DB_STATEMENT_TIMEOUT_MS: '1500',
++        DB_LOCK_TIMEOUT_MS: '500',
++        DB_CONNECT_TIMEOUT_MS: '1000',
++      },
++    });
++    const seed = await seedInstallation(ctx.app);
++    const login = await request(ctx.app.getHttpServer())
++      .post('/api/v1/auth/login')
++      .send({ email: seed.superAdmin.email, password: SEED_PASSWORD })
++      .expect(200);
++    token = bodyOf(login).data.accessToken;
++  }, 90000);
++
++  afterAll(async () => {
++    relay?.releaseHeld();
++    await ctx?.close();
++    await relay?.stop();
++  });
++
++  it('answers 503 SERVICE_UNAVAILABLE within the query timeout, not 500', async () => {
++    relay.holdWhen(/"login_email"/);
++    const started = Date.now();
++    const response = await request(ctx.app.getHttpServer())
++      .get('/api/v1/me')
++      .set({ Authorization: `Bearer ${token}` });
++    relay.releaseHeld();
++
++    expect(response.status).toBe(503);
++    expect((response.body as { error: { code: string } }).error.code).toBe('SERVICE_UNAVAILABLE');
++    expect(Date.now() - started).toBeLessThan(2000 + 1500);
++  }, 20000);
++
++  it('answers 200 again once the database answers', async () => {
++    await request(ctx.app.getHttpServer())
++      .get('/api/v1/me')
++      .set({ Authorization: `Bearer ${token}` })
++      .expect(200);
++  });
++});
+diff --git a/test/support/http-test-app.ts b/test/support/http-test-app.ts
+index 1abe3b3..250e3bb 100644
+--- a/test/support/http-test-app.ts
++++ b/test/support/http-test-app.ts
+@@ -1,202 +1,211 @@
+-import { INestApplication, Type } from '@nestjs/common';
+-import { Test } from '@nestjs/testing';
+-import { Client } from 'pg';
+-import { App } from 'supertest/types';
+-import { configureApplication } from '../../src/bootstrap';
+-import { TransactionRunner } from '../../src/infrastructure/database/transaction-runner';
+-import { IdentityAccessService } from '../../src/modules/identity-access/identity-access.service';
+-import { OrganizationService } from '../../src/modules/organization/organization.service';
+-import {
+-  DisposableDatabase,
+-  dropDisposableDatabase,
+-  migrateDisposableDatabase,
+-  provisionDisposableDatabase,
+-} from './disposable-database';
+-
+-export interface HttpTestApp {
+-  app: INestApplication<App>;
+-  database: DisposableDatabase;
+-  /** A direct connection for assertions and for fixtures the application does not (yet) expose. */
+-  sql: Client;
+-  close(): Promise<void>;
+-}
+-
+-/**
+- * Boots the whole Nest application — real pipes, guards, filters, cookie parser — against a
+- * migrated, disposable PostgreSQL database. Use it for the cases a stubbed repository cannot
+- * prove: constraints, locking, and cookies.
+- */
+-export async function createHttpTestApp(options: { extraControllers?: Type<unknown>[] } = {}): Promise<HttpTestApp> {
+-  const database = await provisionDisposableDatabase();
+-  await migrateDisposableDatabase(database);
+-
+-  const previous = { ...process.env };
+-  process.env.TEST_DATABASE_URL = database.url;
+-  // Many sign-ins from one address in a test run must not trip the generic IP rate limit.
+-  process.env.RATE_LIMIT_LIMIT = '10000';
+-
+-  // ConfigModule.forRoot validates process.env when AppModule is first imported, so the import
+-  // must happen after the variables above are set — a static import would read the real ones.
+-  const { AppModule } = await import('../../src/app.module');
+-  const moduleRef = await Test.createTestingModule({
+-    imports: [AppModule],
+-    controllers: options.extraControllers ?? [],
+-  }).compile();
+-  const app = moduleRef.createNestApplication<INestApplication<App>>();
+-  configureApplication(app, { mountDocs: false });
+-  await app.init();
+-
+-  const sql = new Client({ connectionString: database.url });
+-  await sql.connect();
+-
+-  return {
+-    app,
+-    database,
+-    sql,
+-    async close() {
+-      await sql.end();
+-      await app.close();
+-      await dropDisposableDatabase(database);
+-      process.env = previous;
+-    },
+-  };
+-}
+-
+-export interface SeededInstallation {
+-  organizationId: string;
+-  departmentId: string;
+-  jobTitleId: string;
+-  superAdmin: { appUserId: string; employeeId: string; email: string; password: string };
+-}
+-
+-export const SEED_PASSWORD = 'correct horse battery staple';
+-
+-/** Creates the minimum installation (what the bootstrap command creates) through the real services. */
+-export async function seedInstallation(app: INestApplication): Promise<SeededInstallation> {
+-  const runner = app.get(TransactionRunner);
+-  const organization = app.get(OrganizationService);
+-  const identity = app.get(IdentityAccessService);
+-  const email = 'admin@acme.vn';
+-  const credential = await identity.prepareCredential(SEED_PASSWORD, email);
+-
+-  return runner.run(async (tx) => {
+-    const org = await organization.createOrganization(tx, {
+-      name: 'Acme',
+-      timeZone: 'Asia/Ho_Chi_Minh',
+-      reportingCurrency: 'VND',
+-    });
+-    const costCenter = await organization.createUnitCostCenter(tx, {
+-      organizationId: org.id,
+-      code: 'CC-1',
+-      name: 'Ops',
+-    });
+-    const department = await organization.createDepartment(tx, {
+-      organizationId: org.id,
+-      code: 'P-OPS',
+-      name: 'Operations',
+-      costCenterId: costCenter.id,
+-    });
+-    const jobTitle = await organization.createJobTitle(tx, org.id, 'Administrator');
+-    const employee = await organization.createEmployeeWithPlacement(tx, {
+-      organizationId: org.id,
+-      employeeCode: 'E-ADMIN',
+-      fullName: 'Admin Person',
+-      workEmail: email,
+-      employmentType: 'STAFF',
+-      hireDate: '2026-01-05',
+-      departmentId: department.id,
+-      jobTitleId: jobTitle.id,
+-    });
+-    const account = await identity.createBootstrapSuperAdmin(tx, {
+-      organizationId: org.id,
+-      employeeId: employee.id,
+-      loginEmail: email,
+-      passwordHash: credential.hash,
+-      hashPolicyVersion: credential.hashPolicyVersion,
+-    });
+-
+-    return {
+-      organizationId: org.id,
+-      departmentId: department.id,
+-      jobTitleId: jobTitle.id,
+-      superAdmin: { appUserId: account.appUserId, employeeId: employee.id, email, password: SEED_PASSWORD },
+-    };
+-  });
+-}
+-
+-/**
+- * An extra employee with an account, created by SQL because account creation belongs to a later
+- * slice. `activated` false leaves the account invited (no credential).
+- */
+-export async function insertAccountFixture(
+-  app: INestApplication,
+-  seed: SeededInstallation,
+-  options: { code: string; email: string; activated: boolean; password?: string },
+-): Promise<{ appUserId: string; employeeId: string }> {
+-  const runner = app.get(TransactionRunner);
+-  const organization = app.get(OrganizationService);
+-  const identity = app.get(IdentityAccessService);
+-  const credential = options.activated
+-    ? await identity.prepareCredential(options.password ?? SEED_PASSWORD, options.email)
+-    : null;
+-
+-  return runner.run(async (tx) => {
+-    const employee = await organization.createEmployeeWithPlacement(tx, {
+-      organizationId: seed.organizationId,
+-      employeeCode: options.code,
+-      fullName: `Person ${options.code}`,
+-      workEmail: options.email,
+-      employmentType: 'STAFF',
+-      hireDate: '2026-01-05',
+-      departmentId: seed.departmentId,
+-      jobTitleId: seed.jobTitleId,
+-    });
+-    const rows = await tx.$queryRaw<{ id: string }[]>`
+-      INSERT INTO app_users (id, organization_id, employee_id, login_email, normalized_login_email, status,
+-                             activation_state, email_verification_source, email_verified_at, updated_at)
+-      VALUES (gen_random_uuid(), ${seed.organizationId}::uuid, ${employee.id}::uuid, ${options.email},
+-              ${options.email.toLowerCase()}, 'ACTIVE',
+-              ${options.activated ? 'ACTIVATED' : 'INVITED'}::"ActivationState",
+-              ${options.activated ? 'INVITATION_REDEEMED' : null}::"EmailVerificationSource",
+-              ${options.activated ? new Date().toISOString() : null}::timestamptz, now())
+-      RETURNING id`;
+-    if (credential) {
+-      await tx.$executeRaw`
+-        INSERT INTO password_credentials (app_user_id, hash, hash_policy_version)
+-        VALUES (${rows[0].id}::uuid, ${credential.hash}, ${credential.hashPolicyVersion})`;
+-    }
+-
+-    return { appUserId: rows[0].id, employeeId: employee.id };
+-  });
+-}
+-
+-/**
+- * An employee without an account. `terminated` marks them as having left (the state a later slice
+- * will reach through the offboarding flow, which does not exist yet).
+- */
+-export async function insertEmployeeFixture(
+-  app: INestApplication,
+-  seed: SeededInstallation,
+-  options: { code: string; email: string | null; terminated?: boolean },
+-): Promise<{ employeeId: string }> {
+-  const runner = app.get(TransactionRunner);
+-  const organization = app.get(OrganizationService);
+-
+-  return runner.run(async (tx) => {
+-    const employee = await organization.createEmployeeWithPlacement(tx, {
+-      organizationId: seed.organizationId,
+-      employeeCode: options.code,
+-      fullName: `Person ${options.code}`,
+-      workEmail: options.email,
+-      employmentType: 'STAFF',
+-      hireDate: '2026-01-05',
+-      departmentId: seed.departmentId,
+-      jobTitleId: seed.jobTitleId,
+-    });
+-    if (options.terminated) {
+-      await tx.$executeRaw`UPDATE employees SET status = 'TERMINATED' WHERE id = ${employee.id}::uuid`;
+-    }
+-
+-    return { employeeId: employee.id };
+-  });
+-}
++import { INestApplication, Type } from '@nestjs/common';
++import { Test } from '@nestjs/testing';
++import { Client } from 'pg';
++import { App } from 'supertest/types';
++import { configureApplication } from '../../src/bootstrap';
++import { TransactionRunner } from '../../src/infrastructure/database/transaction-runner';
++import { IdentityAccessService } from '../../src/modules/identity-access/identity-access.service';
++import { OrganizationService } from '../../src/modules/organization/organization.service';
++import {
++  DisposableDatabase,
++  dropDisposableDatabase,
++  migrateDisposableDatabase,
++  provisionDisposableDatabase,
++} from './disposable-database';
++
++export interface HttpTestApp {
++  app: INestApplication<App>;
++  database: DisposableDatabase;
++  /** A direct connection for assertions and for fixtures the application does not (yet) expose. */
++  sql: Client;
++  close(): Promise<void>;
++}
++
++/**
++ * Boots the whole Nest application — real pipes, guards, filters, cookie parser — against a
++ * migrated, disposable PostgreSQL database. Use it for the cases a stubbed repository cannot
++ * prove: constraints, locking, and cookies.
++ */
++export async function createHttpTestApp(
++  options: {
++    extraControllers?: Type<unknown>[];
++    /** The URL the application connects through (for example a PgRelay); assertions still use the direct URL. */
++    appDatabaseUrl?: (directUrl: string) => Promise<string> | string;
++    /** Extra environment for this application, such as shorter database timeouts. */
++    env?: Record<string, string>;
++  } = {},
++): Promise<HttpTestApp> {
++  const database = await provisionDisposableDatabase();
++  await migrateDisposableDatabase(database);
++
++  const previous = { ...process.env };
++  process.env.TEST_DATABASE_URL = options.appDatabaseUrl ? await options.appDatabaseUrl(database.url) : database.url;
++  // Many sign-ins from one address in a test run must not trip the generic IP rate limit.
++  process.env.RATE_LIMIT_LIMIT = '10000';
++  Object.assign(process.env, options.env ?? {});
++
++  // ConfigModule.forRoot validates process.env when AppModule is first imported, so the import
++  // must happen after the variables above are set — a static import would read the real ones.
++  const { AppModule } = await import('../../src/app.module');
++  const moduleRef = await Test.createTestingModule({
++    imports: [AppModule],
++    controllers: options.extraControllers ?? [],
++  }).compile();
++  const app = moduleRef.createNestApplication<INestApplication<App>>();
++  configureApplication(app, { mountDocs: false });
++  await app.init();
++
++  const sql = new Client({ connectionString: database.url });
++  await sql.connect();
++
++  return {
++    app,
++    database,
++    sql,
++    async close() {
++      await sql.end();
++      await app.close();
++      await dropDisposableDatabase(database);
++      process.env = previous;
++    },
++  };
++}
++
++export interface SeededInstallation {
++  organizationId: string;
++  departmentId: string;
++  jobTitleId: string;
++  superAdmin: { appUserId: string; employeeId: string; email: string; password: string };
++}
++
++export const SEED_PASSWORD = 'correct horse battery staple';
++
++/** Creates the minimum installation (what the bootstrap command creates) through the real services. */
++export async function seedInstallation(app: INestApplication): Promise<SeededInstallation> {
++  const runner = app.get(TransactionRunner);
++  const organization = app.get(OrganizationService);
++  const identity = app.get(IdentityAccessService);
++  const email = 'admin@acme.vn';
++  const credential = await identity.prepareCredential(SEED_PASSWORD, email);
++
++  return runner.run(async (tx) => {
++    const org = await organization.createOrganization(tx, {
++      name: 'Acme',
++      timeZone: 'Asia/Ho_Chi_Minh',
++      reportingCurrency: 'VND',
++    });
++    const costCenter = await organization.createUnitCostCenter(tx, {
++      organizationId: org.id,
++      code: 'CC-1',
++      name: 'Ops',
++    });
++    const department = await organization.createDepartment(tx, {
++      organizationId: org.id,
++      code: 'P-OPS',
++      name: 'Operations',
++      costCenterId: costCenter.id,
++    });
++    const jobTitle = await organization.createJobTitle(tx, org.id, 'Administrator');
++    const employee = await organization.createEmployeeWithPlacement(tx, {
++      organizationId: org.id,
++      employeeCode: 'E-ADMIN',
++      fullName: 'Admin Person',
++      workEmail: email,
++      employmentType: 'STAFF',
++      hireDate: '2026-01-05',
++      departmentId: department.id,
++      jobTitleId: jobTitle.id,
++    });
++    const account = await identity.createBootstrapSuperAdmin(tx, {
++      organizationId: org.id,
++      employeeId: employee.id,
++      loginEmail: email,
++      passwordHash: credential.hash,
++      hashPolicyVersion: credential.hashPolicyVersion,
++    });
++
++    return {
++      organizationId: org.id,
++      departmentId: department.id,
++      jobTitleId: jobTitle.id,
++      superAdmin: { appUserId: account.appUserId, employeeId: employee.id, email, password: SEED_PASSWORD },
++    };
++  });
++}
++
++/**
++ * An extra employee with an account, created by SQL because account creation belongs to a later
++ * slice. `activated` false leaves the account invited (no credential).
++ */
++export async function insertAccountFixture(
++  app: INestApplication,
++  seed: SeededInstallation,
++  options: { code: string; email: string; activated: boolean; password?: string },
++): Promise<{ appUserId: string; employeeId: string }> {
++  const runner = app.get(TransactionRunner);
++  const organization = app.get(OrganizationService);
++  const identity = app.get(IdentityAccessService);
++  const credential = options.activated
++    ? await identity.prepareCredential(options.password ?? SEED_PASSWORD, options.email)
++    : null;
++
++  return runner.run(async (tx) => {
++    const employee = await organization.createEmployeeWithPlacement(tx, {
++      organizationId: seed.organizationId,
++      employeeCode: options.code,
++      fullName: `Person ${options.code}`,
++      workEmail: options.email,
++      employmentType: 'STAFF',
++      hireDate: '2026-01-05',
++      departmentId: seed.departmentId,
++      jobTitleId: seed.jobTitleId,
++    });
++    const rows = await tx.$queryRaw<{ id: string }[]>`
++      INSERT INTO app_users (id, organization_id, employee_id, login_email, normalized_login_email, status,
++                             activation_state, email_verification_source, email_verified_at, updated_at)
++      VALUES (gen_random_uuid(), ${seed.organizationId}::uuid, ${employee.id}::uuid, ${options.email},
++              ${options.email.toLowerCase()}, 'ACTIVE',
++              ${options.activated ? 'ACTIVATED' : 'INVITED'}::"ActivationState",
++              ${options.activated ? 'INVITATION_REDEEMED' : null}::"EmailVerificationSource",
++              ${options.activated ? new Date().toISOString() : null}::timestamptz, now())
++      RETURNING id`;
++    if (credential) {
++      await tx.$executeRaw`
++        INSERT INTO password_credentials (app_user_id, hash, hash_policy_version)
++        VALUES (${rows[0].id}::uuid, ${credential.hash}, ${credential.hashPolicyVersion})`;
++    }
++
++    return { appUserId: rows[0].id, employeeId: employee.id };
++  });
++}
++
++/**
++ * An employee without an account. `terminated` marks them as having left (the state a later slice
++ * will reach through the offboarding flow, which does not exist yet).
++ */
++export async function insertEmployeeFixture(
++  app: INestApplication,
++  seed: SeededInstallation,
++  options: { code: string; email: string | null; terminated?: boolean },
++): Promise<{ employeeId: string }> {
++  const runner = app.get(TransactionRunner);
++  const organization = app.get(OrganizationService);
++
++  return runner.run(async (tx) => {
++    const employee = await organization.createEmployeeWithPlacement(tx, {
++      organizationId: seed.organizationId,
++      employeeCode: options.code,
++      fullName: `Person ${options.code}`,
++      workEmail: options.email,
++      employmentType: 'STAFF',
++      hireDate: '2026-01-05',
++      departmentId: seed.departmentId,
++      jobTitleId: seed.jobTitleId,
++    });
++    if (options.terminated) {
++      await tx.$executeRaw`UPDATE employees SET status = 'TERMINATED' WHERE id = ${employee.id}::uuid`;
++    }
++
++    return { employeeId: employee.id };
++  });
++}
+diff --git a/test/support/pg-relay.ts b/test/support/pg-relay.ts
+new file mode 100644
+index 0000000..5a1e08f
+--- /dev/null
++++ b/test/support/pg-relay.ts
+@@ -0,0 +1,157 @@
++import { connect, createServer, Server, Socket } from 'node:net';
++
++interface RelayedConnection {
++  client: Socket;
++  upstream: Socket;
++  held: boolean;
++  queue: Array<{ to: Socket; chunk: Buffer }>;
++  buffer: Buffer;
++  startup: boolean;
++}
++
++/**
++ * A TCP relay in front of PostgreSQL for tests of an unresponsive database.
++ *
++ * - `pause()` / `resume()` stop and restart every byte in both directions, which is what a paused
++ *   container or a dropped network path looks like to the client: no error, no answer.
++ * - `holdWhen(pattern)` lets traffic flow until the client sends a statement whose SQL text matches,
++ *   then holds that one connection (that statement and everything after it). `releaseHeld()` delivers
++ *   what was held, so the test can see what PostgreSQL does with a statement it receives late.
++ *
++ * Only the SQL text of Parse and Query messages is read; bind values are never inspected.
++ */
++export class PgRelay {
++  private readonly server: Server;
++  private readonly connections = new Set<RelayedConnection>();
++  private paused = false;
++  private trigger: RegExp | null = null;
++
++  private constructor(
++    private readonly upstreamHost: string,
++    private readonly upstreamPort: number,
++  ) {
++    this.server = createServer((client) => this.accept(client));
++  }
++
++  static async start(upstreamHost: string, upstreamPort: number): Promise<PgRelay> {
++    const relay = new PgRelay(upstreamHost, upstreamPort);
++    await new Promise<void>((resolve) => relay.server.listen(0, '127.0.0.1', resolve));
++    return relay;
++  }
++
++  get port(): number {
++    const address = this.server.address();
++    if (address === null || typeof address === 'string') throw new Error('relay is not listening');
++    return address.port;
++  }
++
++  pause(): void {
++    this.paused = true;
++  }
++
++  resume(): void {
++    this.paused = false;
++    for (const connection of this.connections) if (!connection.held) this.flush(connection);
++  }
++
++  /** Holds the first connection that sends a statement matching `pattern`, from that statement on. */
++  holdWhen(pattern: RegExp): void {
++    this.trigger = pattern;
++  }
++
++  /** True once a connection is being held because of `holdWhen`. */
++  get holding(): boolean {
++    return [...this.connections].some((connection) => connection.held);
++  }
++
++  releaseHeld(): void {
++    this.trigger = null;
++    for (const connection of this.connections) {
++      if (connection.held) {
++        connection.held = false;
++        this.flush(connection);
++      }
++    }
++  }
++
++  async stop(): Promise<void> {
++    for (const connection of this.connections) {
++      connection.client.destroy();
++      connection.upstream.destroy();
++    }
++    await new Promise<void>((resolve) => this.server.close(() => resolve()));
++  }
++
++  private accept(client: Socket): void {
++    const upstream = connect(this.upstreamPort, this.upstreamHost);
++    const connection: RelayedConnection = {
++      client,
++      upstream,
++      held: false,
++      queue: [],
++      buffer: Buffer.alloc(0),
++      startup: true,
++    };
++    this.connections.add(connection);
++
++    client.on('data', (chunk: Buffer) => {
++      // Parse every chunk, trigger or not: message framing is only known from the start of the stream.
++      const statements = this.statements(connection, chunk);
++      if (this.trigger && !connection.held && statements.some((sql) => this.trigger?.test(sql))) {
++        connection.held = true;
++        this.trigger = null;
++      }
++      this.forward(connection, upstream, chunk);
++    });
++    upstream.on('data', (chunk: Buffer) => this.forward(connection, client, chunk));
++
++    const close = (): void => {
++      client.destroy();
++      upstream.destroy();
++      this.connections.delete(connection);
++    };
++    client.on('close', close).on('error', close);
++    upstream.on('close', close).on('error', close);
++  }
++
++  private forward(connection: RelayedConnection, to: Socket, chunk: Buffer): void {
++    if (this.paused || connection.held) connection.queue.push({ to, chunk });
++    else if (!to.destroyed) to.write(chunk);
++  }
++
++  private flush(connection: RelayedConnection): void {
++    const queue = connection.queue;
++    connection.queue = [];
++    for (const { to, chunk } of queue) if (!to.destroyed) to.write(chunk);
++  }
++
++  /** SQL text of the Parse ('P') and Query ('Q') messages completed by this chunk. */
++  private statements(connection: RelayedConnection, chunk: Buffer): string[] {
++    connection.buffer = Buffer.concat([connection.buffer, chunk]);
++    const found: string[] = [];
++    for (;;) {
++      if (connection.startup) {
++        if (connection.buffer.length < 8) break;
++        const length = connection.buffer.readInt32BE(0);
++        if (connection.buffer.length < length) break;
++        const code = connection.buffer.readInt32BE(4);
++        connection.buffer = connection.buffer.subarray(length);
++        // SSLRequest / GSSENCRequest are followed by the real startup message.
++        if (code !== 80877103 && code !== 80877104) connection.startup = false;
++        continue;
++      }
++      if (connection.buffer.length < 5) break;
++      const type = connection.buffer[0];
++      const length = connection.buffer.readInt32BE(1);
++      if (connection.buffer.length < 1 + length) break;
++      const body = connection.buffer.subarray(5, 1 + length);
++      if (type === 0x51) found.push(body.toString('utf8', 0, body.indexOf(0)));
++      if (type === 0x50) {
++        const nameEnd = body.indexOf(0);
++        found.push(body.toString('utf8', nameEnd + 1, body.indexOf(0, nameEnd + 1)));
++      }
++      connection.buffer = connection.buffer.subarray(1 + length);
++    }
++    return found;
++  }
++}
+diff --git a/test/support/test-config.ts b/test/support/test-config.ts
+index 840947d..28b7110 100644
+--- a/test/support/test-config.ts
++++ b/test/support/test-config.ts
+@@ -12,6 +12,7 @@ export function testConfig(
+     DB_TRANSACTION_MAX_WAIT_MS: 2000,
+     DB_CONNECT_TIMEOUT_MS: 3000,
+     DB_QUERY_TIMEOUT_MS: 8000,
++    DB_IDLE_IN_TRANSACTION_TIMEOUT_MS: 20000,
+   };
+ 
+   return new ConfigService({ ...defaults, ...values }) as unknown as ConfigService<EnvironmentVariables, true>;

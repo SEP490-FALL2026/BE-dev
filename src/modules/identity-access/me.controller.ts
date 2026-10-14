@@ -5,6 +5,7 @@ import { ApiSuccessResponse } from '../../infrastructure/http/decorators/api-suc
 import { AuthenticatedOnly } from '../../infrastructure/security/decorators/access.decorators';
 import { CurrentPrincipal } from '../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../infrastructure/security/tokens/access-token-verifier.port';
+import { toUnavailableApiException } from './account-management.http-errors';
 import { MeResponseDto } from './dto/me.dto';
 import { MeService, MeView } from './me.service';
 
@@ -22,9 +23,18 @@ export class MeController {
   })
   @ApiErrorResponses(
     { status: HttpStatus.UNAUTHORIZED, description: 'Authentication is required or the token is no longer valid.' },
-    { status: HttpStatus.SERVICE_UNAVAILABLE, description: 'Authentication is temporarily unavailable.' },
+    {
+      status: HttpStatus.SERVICE_UNAVAILABLE,
+      description:
+        'Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).',
+    },
   )
-  get(@CurrentPrincipal() principal: AuthenticatedPrincipal): Promise<MeView> {
-    return this.me.get(principal);
+  async get(@CurrentPrincipal() principal: AuthenticatedPrincipal): Promise<MeView> {
+    try {
+      return await this.me.get(principal);
+    } catch (error) {
+      // The guard already read the database; it can still stop answering before MeService does (R-15).
+      throw toUnavailableApiException(error) ?? error;
+    }
   }
 }

@@ -7,6 +7,10 @@ describe('toTransientError — client-side connectivity failures', () => {
     'Connection terminated unexpectedly',
     'Query read timeout',
     'timeout exceeded when trying to connect',
+    // Queries still queued on a connection that was ended or whose socket failed (pg 8.23 client.js).
+    'Connection terminated',
+    'Client was closed and is not queryable',
+    'Client has encountered a connection error and is not queryable',
   ])('treats "%s" as retryable', (message) => {
     const mapped = toTransientError(new Error(message));
     expect(mapped).toBeInstanceOf(TransientDatabaseError);

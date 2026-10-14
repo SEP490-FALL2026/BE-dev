@@ -89,10 +89,6 @@ export interface CreateAccountInput {
 
 /** The candidate list shows at most this many people (spec 1b). */
 const CANDIDATE_LIMIT = 20;
-/** Employees read per step while looking for candidates without an account. */
-const CANDIDATE_PAGE_SIZE = 200;
-/** Upper bound on steps, so one request reads at most 5 000 employees however many have accounts. */
-const CANDIDATE_MAX_PAGES = 25;
 
 /**
  * Account administration by the Super Admin (slice 1b). Every method that changes an account
@@ -117,26 +113,11 @@ export class AccountManagementService {
   async listCandidates(search: string | undefined): Promise<EmployeeCandidate[]> {
     const organization = await this.organization.getOrganization();
     const today = toDateColumn(businessDateAt(new Date(), organization?.timeZone ?? 'UTC'));
-    const found: EmployeeCandidate[] = [];
-    let after: string | undefined;
+    // Every employee who already has an account, handed to the organization module so it can leave
+    // them out in the same query that searches, sorts and limits: no window, no page cap (R-03).
+    const withAccount = await this.repo.findEmployeeIdsWithAccount();
 
-    // Walk the employees in code order, a page at a time, until 20 have no account or none are
-    // left: the account filter lives in another module, so it cannot be part of one query, and a
-    // single capped page would miss everyone sorting after a long run of employees with accounts.
-    for (let page = 0; page < CANDIDATE_MAX_PAGES && found.length < CANDIDATE_LIMIT; page += 1) {
-      const matches = await this.organization.searchActiveEmployees(search, today, CANDIDATE_PAGE_SIZE, after);
-      if (matches.length === 0) break;
-
-      const withAccount = await this.repo.findAccountEmployeeIds(matches.map((match) => match.id));
-      for (const match of matches) {
-        if (!withAccount.has(match.id) && found.length < CANDIDATE_LIMIT) found.push(match);
-      }
-
-      if (matches.length < CANDIDATE_PAGE_SIZE) break;
-      after = matches[matches.length - 1].employeeCode;
-    }
-
-    return found;
+    return this.organization.searchActiveEmployees(search, today, CANDIDATE_LIMIT, withAccount);
   }
 
   async listAccounts(
@@ -390,12 +371,15 @@ export class AccountManagementService {
     const lengthViolation = checkPasswordPolicy(password, '');
     if (lengthViolation && lengthViolation !== 'EQUALS_LOGIN_EMAIL') throw new PasswordPolicyError(lengthViolation);
 
-    // Hashing is the slow part and happens before any lock (lock protocol rule 3).
-    const hash = await this.hasher.hash(password);
+    // Find the token first: a malformed or unknown token costs no Argon2 (R-09). The answer is the same
+    // generic error either way, and a 256-bit random token cannot be guessed from the timing.
     if (!this.tokens.isWellFormedActionToken(token)) throw new InvitationInvalidError();
     const tokenHash = this.tokens.hashActionToken(token);
     const appUserId = await this.repo.findActionTokenOwner(tokenHash);
     if (!appUserId) throw new InvitationInvalidError();
+
+    // Hashing is the slow part and still happens before any lock (lock protocol rule 3).
+    const hash = await this.hasher.hash(password);
 
     const outcome = await this.runner.run<'activated' | 'invalid' | PasswordPolicyError>(async (tx) => {
       // AppUser first, then the token (spec: the order that cannot deadlock with lock/unlock).

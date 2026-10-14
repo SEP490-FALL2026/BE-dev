@@ -1,0 +1,27 @@
+N1a   APPLIES-ONCE src/infrastructure/database/pg-pool.ts :: pool built with the plain pg Client (the retiring client class is lost)
+N1b   APPLIES-ONCE src/infrastructure/database/pg-pool.ts :: a retired connection is not ended
+N2    APPLIES-ONCE src/infrastructure/database/prisma.service.ts :: pool built without query_timeout (the R-02 budget)
+N5    APPLIES-ONCE src/infrastructure/database/transaction-runner.ts :: "Client was closed and is not queryable" no longer transient
+IDLE  APPLIES-ONCE src/infrastructure/database/prisma.service.ts :: server-side idle-in-transaction backstop not sent
+DISP  APPLIES-ONCE src/infrastructure/database/prisma.service.ts :: $disconnect leaves the service-owned pool open
+R3x   APPLIES-ONCE src/modules/organization/organization.repo.ts :: candidate query ignores the exclusion list
+R3y   APPLIES-ONCE src/modules/organization/organization.repo.ts :: search term no longer escaped (% and _ act as wildcards again)
+R3z   APPLIES-ONCE src/modules/organization/organization.repo.ts :: candidates no longer sorted by employee code
+R15   APPLIES-ONCE src/modules/identity-access/me.controller.ts :: /me no longer maps an unreachable database after the guard to 503
+R12   APPLIES-ONCE src/infrastructure/health/health.controller.ts :: readiness maps every failure to 503, including non-Terminus errors (the instanceof guard is gone)
+R14   APPLIES-ONCE src/modules/identity-access/identity-access.repo.ts :: account page and count no longer read from one snapshot
+R09   APPLIES-ONCE src/modules/identity-access/account-management.service.ts :: Argon2 hash runs before the token checks again
+C1a   APPLIES-ONCE src/infrastructure/database/pg-pool.ts :: callback found by a last-argument heuristic instead of pg's own position rule
+C1b   APPLIES-ONCE src/infrastructure/database/pg-pool.ts :: query() no longer refuses Submittable / config.callback / double-callback forms
+C1c   APPLIES-ONCE src/infrastructure/database/pg-pool.ts :: retire() is no longer idempotent
+C1d   APPLIES-ONCE src/infrastructure/database/pg-pool.ts :: the hook runs before end() and unguarded (a throwing hook skips end() and replaces the error)
+C1e   APPLIES-ONCE src/infrastructure/database/pg-pool.ts :: no release guard: a connection handed back inside a transaction is reused
+R3w   APPLIES-ONCE src/modules/organization/organization.repo.ts :: the LIKE escape class no longer contains the backslash
+R13a  APPLIES-ONCE src/modules/installation/installation.module.ts :: the installation module imports the full identity-access module again
+R13b  APPLIES-ONCE src/infrastructure/config/env-config.ts :: the installation config options use the full (API) environment validator
+R13c  APPLIES-ONCE src/infrastructure/config/env-schema.ts :: idle-in-transaction default fixed at 20 000 ms regardless of the transaction timeout
+X1-CLI-abort APPLIES-ONCE src/installation-cli.ts :: Nest may exit the process on a configuration error before the CLI can print it (operator sees nothing)
+X2-CLI-message APPLIES-ONCE src/installation-cli.ts :: a validation error is no longer reported as its own message
+X3-API-validator APPLIES-ONCE src/infrastructure/config/env-config.ts :: API and worker would validate only the database settings (fail open in production)
+X4-private-hasher APPLIES-ONCE src/modules/installation/installation.service.ts :: installation reaches into the identity-access private hasher
+26 mutation(s), 26 apply exactly once, 0 do not

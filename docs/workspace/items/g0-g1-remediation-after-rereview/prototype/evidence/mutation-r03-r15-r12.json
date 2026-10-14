@@ -1,0 +1,106 @@
+[
+  {
+    "id": "R3x",
+    "what": "candidate query ignores the exclusion list",
+    "file": "src/modules/organization/organization.repo.ts",
+    "runs": [
+      {
+        "kind": "integration",
+        "target": "test/integration/account-candidates.integration-spec.ts",
+        "exit": 1,
+        "tests": "2 failed, 1 passed, 3 total",
+        "failed": [
+          "returns the first 20 by code even when 200 earlier employees already have an account",
+          "returns fewer than 20 when fewer remain, after skipping every employee with an account"
+        ]
+      }
+    ],
+    "killed": true,
+    "restored": true
+  },
+  {
+    "id": "R3y",
+    "what": "search term no longer escaped (% and _ act as wildcards again, N-6)",
+    "file": "src/modules/organization/organization.repo.ts",
+    "runs": [
+      {
+        "kind": "integration",
+        "target": "test/integration/rr-candidates-v2.integration-spec.ts",
+        "exit": 1,
+        "tests": "2 failed, 16 passed, 18 total",
+        "failed": [
+          "search=Z_1 (underscore is literal)",
+          "search=% (percent is literal)"
+        ]
+      }
+    ],
+    "killed": true,
+    "restored": true
+  },
+  {
+    "id": "R3z",
+    "what": "candidates no longer sorted by employee code",
+    "file": "src/modules/organization/organization.repo.ts",
+    "runs": [
+      {
+        "kind": "integration",
+        "target": "test/integration/account-candidates.integration-spec.ts",
+        "exit": 1,
+        "tests": "3 failed, 3 total",
+        "failed": [
+          "returns the first 20 by code even when 200 earlier employees already have an account",
+          "applies the search filter to the same rule",
+          "returns fewer than 20 when fewer remain, after skipping every employee with an account"
+        ]
+      }
+    ],
+    "killed": true,
+    "restored": true
+  },
+  {
+    "id": "R15",
+    "what": "/me no longer maps an unreachable database after the guard to 503",
+    "file": "src/modules/identity-access/me.controller.ts",
+    "runs": [
+      {
+        "kind": "unit",
+        "target": "src/modules/identity-access/me.controller.spec.ts",
+        "exit": 1,
+        "tests": "2 failed, 1 passed, 3 total",
+        "failed": [
+          "answers 503 SERVICE_UNAVAILABLE for an unreachable database: TransientDatabaseError: The database could not complete the transaction. Retry shortly.",
+          "answers 503 SERVICE_UNAVAILABLE for an unreachable database: Error: Query read timeout"
+        ]
+      },
+      {
+        "kind": "integration",
+        "target": "test/integration/me-unavailable.integration-spec.ts",
+        "exit": 1,
+        "tests": "1 failed, 1 passed, 2 total",
+        "failed": [
+          "answers 503 SERVICE_UNAVAILABLE within the query timeout, not 500"
+        ]
+      }
+    ],
+    "killed": true,
+    "restored": true
+  },
+  {
+    "id": "R12",
+    "what": "readiness failure keeps the generic server-error code",
+    "file": "src/infrastructure/health/health.controller.ts",
+    "runs": [
+      {
+        "kind": "unit",
+        "target": "src/infrastructure/health",
+        "exit": 1,
+        "tests": "1 failed, 2 passed, 3 total",
+        "failed": [
+          "answers a failed check with 503 SERVICE_UNAVAILABLE, not the generic server-error code (R-12)"
+        ]
+      }
+    ],
+    "killed": true,
+    "restored": true
+  }
+]

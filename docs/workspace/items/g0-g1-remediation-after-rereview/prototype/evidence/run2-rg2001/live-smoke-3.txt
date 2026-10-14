@@ -1,0 +1,142 @@
+PASS H-1 API process up; GET /health/live 200 and /health/ready 200 within 30 s
+PASS H-2 readiness reports the database check — [{"name":"database","status":"up"}]
+PASS H-3 catalog is not mounted (404) — 404 HTTP_NOT_FOUND
+PASS A-1 anonymous GET /me -> 401 AUTHENTICATION_REQUIRED — AUTHENTICATION_REQUIRED
+PASS A-2 anonymous GET /app-users -> 401 — AUTHENTICATION_REQUIRED
+PASS A-3 wrong password, unknown email and malformed email give one identical 401 body (AC-10) — AUTH.INVALID_CREDENTIALS
+PASS A-4 Super Admin login 200 AUTH.LOGGED_IN with Bearer token — 200
+PASS A-5 refresh cookie HttpOnly; SameSite=Strict; Path=/api/v1/auth; Max-Age≈absolute lifetime; no Secure in development profile — slm_refresh=<redacted>; Max-Age=604800; Path=/api/v1/auth; Expires=Wed, 21 Oct 2026 14:49:02 GMT; HttpOnly; SameSite=Strict
+PASS A-6 /me: direct [SUPER_ADMIN], derived [], department IT, job title, selfServiceOnly false (AC-17 direct part) — {"direct":["SUPER_ADMIN"],"derived":[],"effective":["SUPER_ADMIN"]}
+PASS C-1 candidates lists IT001 (no account) and not SA001 — ["IT001"]
+PASS C-2 candidate search is case-insensitive — 200
+PASS C-3 candidate search over 100 chars -> 422 VALIDATION_ERROR — VALIDATION_ERROR
+PASS C-4 POST /app-users 201 APP_USER.CREATED, INVITED, roles [IT_ADMIN] — 201
+PASS C-5 second account for the same employee -> 409 APP_USER.ALREADY_EXISTS_FOR_EMPLOYEE (AC-8) — APP_USER.ALREADY_EXISTS_FOR_EMPLOYEE
+PASS C-6 INVITED account cannot log in: same generic 401 (AC-9/AC-11) — AUTH.INVALID_CREDENTIALS
+PASS C-7 audit has APP_USER.CREATED, ROLE.GRANTED, APP_USER.INVITATION_SENT for the new account (AC-1) — 3
+PASS M-1 worker delivered the invitation to the SMTP sink — received
+PASS M-2 outbox row SENT, ciphertext wiped — {"status":"SENT","wiped":true,"attempts":1}
+PASS M-3 mail carries no password and the link uses the URL fragment
+PASS R-1 weak password with a bogus token -> 422 AUTH.PASSWORD_POLICY_VIOLATION (policy before token) — AUTH.PASSWORD_POLICY_VIOLATION
+PASS R-2 unknown token -> 400 AUTH.INVITATION_INVALID — AUTH.INVITATION_INVALID
+PASS R-3 password equal to the login email -> 422 EQUALS_LOGIN_EMAIL, token kept — AUTH.PASSWORD_POLICY_VIOLATION
+PASS R-4 redeem 200 AUTH.ACCOUNT_ACTIVATED, no cookie, no access token (no auto-login) — AUTH.ACCOUNT_ACTIVATED
+PASS R-5 same token again -> 400 AUTH.INVITATION_INVALID — AUTH.INVITATION_INVALID
+PASS R-6 IT logs in after activation — 200
+PASS R-7 IT /me direct [IT_ADMIN] — {"direct":["IT_ADMIN"],"derived":[],"effective":["IT_ADMIN"]}
+PASS R-8 APP_USER.ACTIVATED audited with the user as actor — {"actor_kind":"USER","self":true}
+PASS Z-1 IT_ADMIN on admin routes -> 403 AUTHORIZATION.FORBIDDEN (list, create, candidates, lock SA) (AC-3) — 403,403,403,403
+PASS Z-2 Super Admin unchanged after the refused lock
+PASS L-1 list pageSize=1: 1 item, totalItems 2, totalPages 2 — {"page":1,"pageSize":1,"totalItems":2,"totalPages":2}
+PASS L-2 page 2 returns the other account (stable order)
+PASS L-3 filters role/activationState/status — 1,0,0
+PASS L-4 invalid list queries (pageSize 101, page 0, unknown key, role MANAGER) -> 422 — 422,422,422,422
+INFO L-5 very large page number (skip ≈ 1e11) — 200 COMMON.SUCCESS items=0
+PASS L-6 detail: roleHistory, invitation consumed (usable false), delivery SENT — {"usable":false,"expiresAt":"2026-10-17T14:49:03.547Z","delivery":{"status":"SENT","attempts":1,"lastErrorCode":null,"sentAt":"2026-10-14T14:49:04.434Z"}}
+PASS L-7 unknown id 404 APP_USER.NOT_FOUND; non-UUID 422 — 404 422
+PASS I-1 account with roles [] -> 201, roles [] (AC-16 creation) — 201
+PASS I-2 resend -> 202 APP_USER.INVITATION_SENT — 202
+PASS I-3 old token SUPERSEDED, exactly one usable token — [{"revoked_reason":"SUPERSEDED","unconsumed":true},{"revoked_reason":null,"unconsumed":true}]
+PASS I-4 superseded link -> 400 AUTH.INVITATION_INVALID (US-01-10 AC-2) — AUTH.INVITATION_INVALID
+PASS I-5 resend to activated -> 409 APP_USER.ALREADY_ACTIVATED; to self -> 409 SELF_CHANGE_FORBIDDEN — APP_USER.ALREADY_ACTIVATED APP_USER.SELF_CHANGE_FORBIDDEN
+PASS G-1 grant EMPLOYEE -> 201 ROLE.GRANTED — 201
+PASS G-2 same access token sees the new role on the next request — ["EMPLOYEE","IT_ADMIN"]
+PASS G-3 revoke IT_ADMIN -> 200; next request keeps EMPLOYEE only (AC-7) — ["EMPLOYEE"]
+PASS G-4 revoke the last role -> 200; /me selfServiceOnly true, no role added back (AC-16) — {"direct":[],"derived":[],"effective":[]}
+PASS G-5.superAdmin refusal superAdmin -> 422 APP_USER.SUPER_ADMIN_TRANSFER_ONLY (AC-4/12/13/14) — 422 APP_USER.SUPER_ADMIN_TRANSFER_ONLY
+PASS G-5.manager refusal manager -> 422 APP_USER.ROLE_DERIVED (AC-4/12/13/14) — 422 APP_USER.ROLE_DERIVED
+PASS G-5.approver refusal approver -> 422 APP_USER.ROLE_DERIVED (AC-4/12/13/14) — 422 APP_USER.ROLE_DERIVED
+PASS G-5.self refusal self -> 409 APP_USER.SELF_CHANGE_FORBIDDEN (AC-4/12/13/14) — 409 APP_USER.SELF_CHANGE_FORBIDDEN
+PASS G-5.revokeSaSelf refusal revokeSaSelf -> 409 APP_USER.SELF_CHANGE_FORBIDDEN (AC-4/12/13/14) — 409 APP_USER.SELF_CHANGE_FORBIDDEN
+PASS G-5.revokeSaOther refusal revokeSaOther -> 422 APP_USER.SUPER_ADMIN_TRANSFER_ONLY (AC-4/12/13/14) — 422 APP_USER.SUPER_ADMIN_TRANSFER_ONLY
+PASS G-5.notHeld refusal notHeld -> 404 APP_USER.ROLE_NOT_GRANTED (AC-4/12/13/14) — 404 APP_USER.ROLE_NOT_GRANTED
+PASS G-5.unknownRole refusal unknownRole -> 422 VALIDATION_ERROR (AC-4/12/13/14) — 422 VALIDATION_ERROR
+PASS G-5.createSa refusal createSa -> 422 APP_USER.SUPER_ADMIN_TRANSFER_ONLY (AC-4/12/13/14) — 422 APP_USER.SUPER_ADMIN_TRANSFER_ONLY
+PASS G-5.createMgr refusal createMgr -> 422 APP_USER.ROLE_DERIVED (AC-4/12/13/14) — 422 APP_USER.ROLE_DERIVED
+PASS G-6 refused creations wrote nothing
+PASS G-7 re-grant IT_ADMIN 201; duplicate -> 409 ROLE_ALREADY_GRANTED — 201 APP_USER.ROLE_ALREADY_GRANTED
+PASS G-8 role history keeps grants and revocations (AC-7) — ["IT_ADMIN:rev","EMPLOYEE:rev","IT_ADMIN:on"]
+PASS F-1 FINANCE held by an INVITED account still blocks a second grant -> 409 FINANCE_ALREADY_ASSIGNED — 201 APP_USER.FINANCE_ALREADY_ASSIGNED
+PASS F-2 FINANCE held by a LOCKED account still blocks -> 409 — APP_USER.FINANCE_ALREADY_ASSIGNED
+PASS F-3 revoke FINANCE -> 200 and the organization may have 0 Finance
+PASS F-4 two concurrent FINANCE grants: exactly one 201, one 409; one grant in force (AC-18) — 201,409 grants=1
+PASS K-1 lock -> 200 APP_USER.LOCKED — 200
+PASS K-2 after lock: old access token 401 INVALID_ACCESS_TOKEN, refresh 401 + cookie cleared, login generic 401 (AC-6) — INVALID_ACCESS_TOKEN AUTH.SESSION_INVALID AUTH.INVALID_CREDENTIALS
+PASS K-3 locking a locked account -> 200, no second audit
+PASS K-4 every session of the account revoked ACCOUNT_LOCKED — {"r":1,"open":0}
+PASS K-5 unlock 200; old access/refresh tokens stay dead (no resurrection) — 401 401
+PASS K-6 login works again after unlock (AC-7) — 200
+PASS K-7 Super Admin cannot lock/unlock self -> 409 SELF_CHANGE_FORBIDDEN (AC-13/AC-15 path) — APP_USER.SELF_CHANGE_FORBIDDEN APP_USER.SELF_CHANGE_FORBIDDEN
+PASS K-8 lock revokes the open invitation (ACCOUNT_LOCKED); resend while locked 409 ACCOUNT_LOCKED; link stays invalid after unlock — ACCOUNT_LOCKED APP_USER.ACCOUNT_LOCKED 400 400
+PASS S-1 refresh 200 AUTH.SESSION_REFRESHED rotates the refresh cookie — 200
+INFO S-1b access token after refresh equals the previous one when issued in the same second (HS256, no jti) — true
+PASS S-2 replaying the consumed cookie -> 401 + cleared; whole session revoked REPLAY_DETECTED; audit SESSION.REVOKED committed; new cookie dead too — 401 REPLAY_DETECTED 401
+PASS S-3 logout 204 + cleared cookie; access token 401 next request; repeat/no cookie/garbage all 204 (idempotent) — 204,401,204,204,204
+PASS S-4 logout with Bearer only -> 204 and revokes nothing (documented limitation) — 204 200
+PASS S-5 login/logout are not audited (FR-8.3)
+PASS S-6 idle-expired session (fixture): /me 401, refresh 401 + cleared — 401 401
+PASS S-7 absolute-expired session (fixture): /me 401, refresh 401, logout 204 — 401 401 204
+INFO V-1 signed token whose sid is not a UUID (hypothesis 4) — 401 INVALID_ACCESS_TOKEN
+PASS V-1b signed token with non-UUID sid answers 401 (contract: bad token is 401, 503 only for an unavailable dependency) — 401 INVALID_ACCESS_TOKEN
+PASS V-sidUnknown token sidUnknown -> 401 INVALID_ACCESS_TOKEN — 401 INVALID_ACCESS_TOKEN
+PASS V-subMismatch token subMismatch -> 401 INVALID_ACCESS_TOKEN — 401 INVALID_ACCESS_TOKEN
+PASS V-sidNumber token sidNumber -> 401 INVALID_ACCESS_TOKEN — 401 INVALID_ACCESS_TOKEN
+PASS V-expired token expired -> 401 INVALID_ACCESS_TOKEN — 401 INVALID_ACCESS_TOKEN
+PASS V-wrongAud token wrongAud -> 401 INVALID_ACCESS_TOKEN — 401 INVALID_ACCESS_TOKEN
+PASS V-wrongIss token wrongIss -> 401 INVALID_ACCESS_TOKEN — 401 INVALID_ACCESS_TOKEN
+PASS V-hs512 token hs512 -> 401 INVALID_ACCESS_TOKEN — 401 INVALID_ACCESS_TOKEN
+PASS V-none token none -> 401 INVALID_ACCESS_TOKEN — 401 INVALID_ACCESS_TOKEN
+PASS V-otherKey token otherKey -> 401 INVALID_ACCESS_TOKEN — 401 INVALID_ACCESS_TOKEN
+PASS V-garbage token garbage -> 401 INVALID_ACCESS_TOKEN — 401 INVALID_ACCESS_TOKEN
+PASS V-sidMissing token sidMissing -> 401 INVALID_ACCESS_TOKEN — 401 INVALID_ACCESS_TOKEN
+PASS V-sidNull token sidNull -> 401 INVALID_ACCESS_TOKEN — 401 INVALID_ACCESS_TOKEN
+PASS V-sidArray token sidArray -> 401 INVALID_ACCESS_TOKEN — 401 INVALID_ACCESS_TOKEN
+PASS V-sidUuidNoDashes token sidUuidNoDashes -> 401 INVALID_ACCESS_TOKEN — 401 INVALID_ACCESS_TOKEN
+PASS V-subMissing token subMissing -> 401 INVALID_ACCESS_TOKEN — 401 INVALID_ACCESS_TOKEN
+PASS V-subNotUuid token subNotUuid -> 401 INVALID_ACCESS_TOKEN — 401 INVALID_ACCESS_TOKEN
+PASS V-subUnknown token subUnknown -> 401 INVALID_ACCESS_TOKEN — 401 INVALID_ACCESS_TOKEN
+PASS V-subNumber token subNumber -> 401 INVALID_ACCESS_TOKEN — 401 INVALID_ACCESS_TOKEN
+INFO V-3 upper-case UUID claims of a live session (PostgreSQL compares UUIDs case-insensitively) — 401 INVALID_ACCESS_TOKEN
+PASS V-4 no error log line for 19 forged/malformed tokens (R-04) — 4 -> 4
+PASS V-2 malformed Authorization header -> 401 AUTHENTICATION_REQUIRED — AUTHENTICATION_REQUIRED AUTHENTICATION_REQUIRED
+PASS D-1 strict DTOs: extra/missing fields -> 422 VALIDATION_ERROR with requestId — 422,422,422,422
+INFO D-2 malformed JSON body on login — 400 HTTP_BAD_REQUEST
+PASS D-3 client x-request-id is replaced (TRUST_PROXY_HOPS=0) — ff76c59d-b3e5-483b-9731-9fe10160bdaa
+PASS D-4 invalid login email -> 422 APP_USER.LOGIN_EMAIL_INVALID — APP_USER.LOGIN_EMAIL_INVALID
+INFO D-5 login email equal to another account after normalization (+tag, case) — 409 APP_USER.ALREADY_EXISTS_FOR_EMPLOYEE
+PASS D-6 unknown employee -> 404 ORGANIZATION.EMPLOYEE_NOT_FOUND — ORGANIZATION.EMPLOYEE_NOT_FOUND
+PASS T-1 4 wrong then correct -> success and the counter is cleared — 401,401,401,401,200
+PASS T-2 5 wrong -> 6th attempt with the right password 429 AUTH.LOGIN_TEMPORARILY_BLOCKED + retryAfterSeconds; AppUser.status unchanged (US-01-10 AC-7) — 401,401,401,401,401,429 retry=30
+PASS T-3 block is per email: Super Admin still logs in — 200
+PASS T-4 after the block expires the right password works — 200
+PASS T-5 12 simultaneous wrong guesses: only 401/429, failure_count = number of 401 (>= 5), blocked, right password then 429 (R-06) — {"401":12} count=12 blocked=true right=429
+PASS T-6 7 simultaneous CORRECT logins: all 200, no throttle row (R-06) — {"200":7} rows=0
+PASS T-7 counter at 4: one correct + two wrong at once -> correct 200, wrong 401 (never 429 for the right one) (R-06) — 200,401,401 count=none
+PASS C-8 candidates without search include eligible FXZ-001..003 when 200 earlier employees already have accounts (hypothesis 1) — returned 3: FXZ-001,FXZ-002,FXZ-003
+INFO C-9 same employees with search=FXZ — 3 items
+PASS X-1 detail of an INVITED account whose employee is TERMINATED: invitation.usable false (R-05) — false delivery=PENDING
+PASS X-2 worker does not mail the invitation of a TERMINATED employee; outbox CANCELLED, ciphertext wiped (R-05) — mail not sent; outbox CANCELLED wiped=true
+PASS X-3 the link of a TERMINATED employee cannot activate (400) — AUTH.INVITATION_INVALID
+PASS X-4 TERMINATED: resend 409 and create 409 APP_USER.EMPLOYEE_TERMINATED; not a candidate (AC-5) — APP_USER.EMPLOYEE_TERMINATED APP_USER.EMPLOYEE_TERMINATED cand=0
+PASS X-5 employee TERMINATED (fixture): next request 401, refresh 401, login generic 401 (US-01-10 AC-6) — 401 401 401
+PASS B-1 audit failure at the last step of account creation: 500 and nothing left (account, grants, token, outbox, audit) — US-01-06 AC-3 — 500 INTERNAL_SERVER_ERROR {"users":0,"outbox":7,"audit":0}
+PASS B-2 audit failure while locking: 500, account still ACTIVE, sessions still open — 500 {"status":"ACTIVE","open":15} me=200
+PASS P-1 row held FOR UPDATE elsewhere: admin lock -> 503 SERVICE_UNAVAILABLE ~3 s; login -> 503 AUTH.UNAVAILABLE; guard (no lock) 200 — lock 503/SERVICE_UNAVAILABLE/3048ms login 503/AUTH.UNAVAILABLE/5073ms me 200
+PASS P-2 after the holder releases, the same operations succeed
+PASS O-1 SMTP 451: row back to PENDING with backoff, attempts 1, error code kept — {"status":"PENDING","attempts":1,"last_error_code":"SMTP_451","wait":27}
+PASS O-2 SMTP 550: FAILED, ciphertext wiped, visible in account detail — {"status":"FAILED","last_error_code":"SMTP_550","wiped":true}
+PASS O-3 resend after FAILED delivers a new mail — ok
+PASS O-4 worker stopped: mail stays PENDING; restarted worker sends it — PENDING sent
+PASS O-5 resend while the first mail is SENDING: old mail still arrives but its link is rejected; new link works — SENDING m1=true m2=true r1=400 r2=200
+PASS O-6 two worker processes, six invitations: every recipient got exactly one mail (SKIP LOCKED) — 1,1,1,1,1,1
+PASS O-7 worker killed while SENDING: row stays SENDING until the 60 s lease ends, then the restarted worker sends it (at-least-once) — {"status":"SENDING","attempts":1} -> {"status":"SENT","attempts":2} mails=2
+PASS W-1 CORS: configured origin gets ACAO + credentials; other origin gets no ACAO — http://localhost:5173 / null
+INFO W-2 refresh with a foreign Origin header and a valid cookie (no Origin check; SameSite=Strict is the browser-side defence) — 200
+PASS W-3 security headers present (helmet) — default-src 'self';base-uri 's
+PASS Y-1 no password, refresh/access/invitation token appears in any audit row (US-01-10 AC-9) — 66 secrets checked
+PASS Y-2 every terminal outbox row has its ciphertext wiped — {"bad":0,"total":19}
+PASS Y-3 token tables hold only hashes (no raw token stored) — 43
+PASS Y-4 audit DELETE refused by the database (23001 restrict_violation) — 23001
+INFO Y-5 audit actions recorded — APP_USER.ACTIVATED×3, APP_USER.CREATED×16, APP_USER.INVITATION_SENT×19, APP_USER.LOCKED×4, APP_USER.UNLOCKED×3, INSTALLATION.COST_CENTER_CREATED×1, INSTALLATION.DEPARTMENT_CREATED×1, INSTALLATION.EMPLOYEE_CREATED×2, INSTALLATION.JOB_TITLE_CREATED×1, INSTALLATION.ORGANIZATION_CREATED×1, INSTALLATION.SUPER_ADMIN_CREATED×1, ROLE.GRANTED×8, ROLE.REVOKED×3, SESSION.REVOKED×1
+PASS Y-6 API/worker logs contain none of the passwords or tokens seen in the run
+{"finishedAt":"2026-10-14T14:51:43.161Z","seconds":167,"pass":132,"fail":0,"info":9,"mails":17}

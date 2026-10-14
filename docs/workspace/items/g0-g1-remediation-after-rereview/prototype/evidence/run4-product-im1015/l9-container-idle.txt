@@ -1,0 +1,5 @@
+# L9: container boot with the idle variable (live.env, development profile, session secrets)
+dist/main.js tx=30000 idle unset: state=running started=1 validation_error=0
+dist/main.js tx=30000 idle=30000: exit=1 message=DB_IDLE_IN_TRANSACTION_TIMEOUT_MS must be higher than DB_TRANSACTION_TIMEOUT_MS
+dist/worker.js tx=30000 idle unset: state=running started=1 validation_error=0
+dist/worker.js tx=30000 idle=30000: exit=1 message=DB_IDLE_IN_TRANSACTION_TIMEOUT_MS must be higher than DB_TRANSACTION_TIMEOUT_MS
