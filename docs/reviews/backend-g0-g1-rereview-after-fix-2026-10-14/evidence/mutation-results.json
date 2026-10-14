@@ -1,0 +1,314 @@
+[
+  {
+    "id": "R1",
+    "finding": "R-01",
+    "what": "check lints before generating the Prisma client again",
+    "file": "package.json",
+    "runs": [
+      {
+        "kind": "scripts",
+        "target": "scripts/verify/check-script-order.test.mjs",
+        "exit": 1,
+        "tests": "n/a",
+        "failed": [],
+        "seconds": 0
+      }
+    ],
+    "killed": true,
+    "restored": true
+  },
+  {
+    "id": "R2a",
+    "finding": "R-02",
+    "what": "\"Query read timeout\" no longer recognised as transient",
+    "file": "src/infrastructure/database/transaction-runner.ts",
+    "runs": [
+      {
+        "kind": "unit",
+        "target": "src/infrastructure/database",
+        "exit": 1,
+        "tests": "1 failed, 8 passed, 9 total",
+        "failed": [],
+        "seconds": 3
+      },
+      {
+        "kind": "integration",
+        "target": "test/integration/database-unavailable.integration-spec.ts",
+        "exit": 0,
+        "tests": "4 passed, 4 total",
+        "failed": [],
+        "seconds": 7
+      }
+    ],
+    "killed": true,
+    "restored": true
+  },
+  {
+    "id": "R2b",
+    "finding": "R-02",
+    "what": "pool built without query_timeout",
+    "file": "src/infrastructure/database/prisma.service.ts",
+    "runs": [
+      {
+        "kind": "integration",
+        "target": "test/integration/database-unavailable.integration-spec.ts",
+        "exit": 0,
+        "tests": "4 passed, 4 total",
+        "failed": [],
+        "seconds": 7
+      }
+    ],
+    "killed": false,
+    "restored": true
+  },
+  {
+    "id": "R2c",
+    "finding": "R-02",
+    "what": "admin routes no longer map a raw driver timeout to 503",
+    "file": "src/modules/identity-access/account-management.http-errors.ts",
+    "runs": [
+      {
+        "kind": "unit",
+        "target": "src/modules/identity-access/account-management.http-errors.spec.ts",
+        "exit": 1,
+        "tests": "2 failed, 2 passed, 4 total",
+        "failed": [],
+        "seconds": 2
+      }
+    ],
+    "killed": true,
+    "restored": true
+  },
+  {
+    "id": "R3a",
+    "finding": "R-03",
+    "what": "candidates read a single page again",
+    "file": "src/modules/identity-access/account-management.service.ts",
+    "runs": [
+      {
+        "kind": "integration",
+        "target": "test/integration/account-candidates.integration-spec.ts",
+        "exit": 1,
+        "tests": "2 failed, 1 passed, 3 total",
+        "failed": [],
+        "seconds": 7
+      }
+    ],
+    "killed": true,
+    "restored": true
+  },
+  {
+    "id": "R3b",
+    "finding": "R-03",
+    "what": "keyset cursor lags one row (pages overlap)",
+    "file": "src/modules/identity-access/account-management.service.ts",
+    "runs": [
+      {
+        "kind": "integration",
+        "target": "test/integration/account-candidates.integration-spec.ts",
+        "exit": 0,
+        "tests": "3 passed, 3 total",
+        "failed": [],
+        "seconds": 6
+      }
+    ],
+    "killed": false,
+    "restored": true
+  },
+  {
+    "id": "R4a",
+    "finding": "R-04",
+    "what": "claims checked as strings only (pre-fix)",
+    "file": "src/modules/identity-access/token.service.ts",
+    "runs": [
+      {
+        "kind": "unit",
+        "target": "src/modules/identity-access/token.service.spec.ts",
+        "exit": 1,
+        "tests": "2 failed, 5 passed, 7 total",
+        "failed": [],
+        "seconds": 2
+      },
+      {
+        "kind": "integration",
+        "target": "test/integration/auth-http.integration-spec.ts",
+        "exit": 0,
+        "tests": "25 passed, 25 total",
+        "failed": [],
+        "seconds": 8
+      }
+    ],
+    "killed": true,
+    "restored": true
+  },
+  {
+    "id": "R4b",
+    "finding": "R-04",
+    "what": "verifier turns every error into 503 again (pre-fix)",
+    "file": "src/modules/identity-access/jwt-access-token.verifier.ts",
+    "runs": [
+      {
+        "kind": "unit",
+        "target": "src/modules/identity-access/jwt-access-token.verifier.spec.ts",
+        "exit": 1,
+        "tests": "1 failed, 2 passed, 3 total",
+        "failed": [],
+        "seconds": 2
+      }
+    ],
+    "killed": true,
+    "restored": true
+  },
+  {
+    "id": "R5a",
+    "finding": "R-05",
+    "what": "dispatcher callback ignores a TERMINATED employee",
+    "file": "src/modules/identity-access/account-management.service.ts",
+    "runs": [
+      {
+        "kind": "integration",
+        "target": "test/integration/account-management-http.integration-spec.ts",
+        "exit": 1,
+        "tests": "1 failed, 31 passed, 32 total",
+        "failed": [],
+        "seconds": 9
+      }
+    ],
+    "killed": true,
+    "restored": true
+  },
+  {
+    "id": "R5b",
+    "finding": "R-05",
+    "what": "detail usable ignores a TERMINATED employee",
+    "file": "src/modules/identity-access/account-management.service.ts",
+    "runs": [
+      {
+        "kind": "integration",
+        "target": "test/integration/account-management-http.integration-spec.ts",
+        "exit": 1,
+        "tests": "1 failed, 31 passed, 32 total",
+        "failed": [],
+        "seconds": 11
+      }
+    ],
+    "killed": true,
+    "restored": true
+  },
+  {
+    "id": "R6a",
+    "finding": "R-06",
+    "what": "wrong attempts are never counted",
+    "file": "src/modules/identity-access/auth.service.ts",
+    "runs": [
+      {
+        "kind": "integration",
+        "target": "test/integration/auth-http.integration-spec.ts",
+        "exit": 1,
+        "tests": "4 failed, 21 passed, 25 total",
+        "failed": [],
+        "seconds": 10
+      }
+    ],
+    "killed": true,
+    "restored": true
+  },
+  {
+    "id": "R6b",
+    "finding": "R-06",
+    "what": "every attempt is counted before the password check (the pre-fix behaviour R-06 forbids)",
+    "file": "src/modules/identity-access/auth.service.ts",
+    "runs": [
+      {
+        "kind": "integration",
+        "target": "test/integration/auth-http.integration-spec.ts",
+        "exit": 1,
+        "tests": "5 failed, 20 passed, 25 total",
+        "failed": [],
+        "seconds": 8
+      }
+    ],
+    "killed": true,
+    "restored": true
+  },
+  {
+    "id": "R6c",
+    "finding": "R-06",
+    "what": "a successful sign-in no longer clears the counter",
+    "file": "src/modules/identity-access/auth.service.ts",
+    "runs": [
+      {
+        "kind": "integration",
+        "target": "test/integration/auth-http.integration-spec.ts",
+        "exit": 1,
+        "tests": "1 failed, 24 passed, 25 total",
+        "failed": [],
+        "seconds": 8
+      }
+    ],
+    "killed": true,
+    "restored": true
+  },
+  {
+    "id": "R7a",
+    "finding": "R-07",
+    "what": "one budget per IP across all routes",
+    "file": "src/infrastructure/security/rate-limit.options.ts",
+    "runs": [
+      {
+        "kind": "e2e",
+        "target": "test/e2e/rate-limit.e2e-spec.ts",
+        "exit": 1,
+        "tests": "2 failed, 3 passed, 5 total",
+        "failed": [],
+        "seconds": 6
+      }
+    ],
+    "killed": true,
+    "restored": true
+  },
+  {
+    "id": "R7b",
+    "finding": "R-07",
+    "what": "X-Forwarded-For trusted without a configured proxy",
+    "file": "src/bootstrap.ts",
+    "runs": [
+      {
+        "kind": "e2e",
+        "target": "test/e2e/rate-limit.e2e-spec.ts",
+        "exit": 1,
+        "tests": "1 failed, 4 passed, 5 total",
+        "failed": [],
+        "seconds": 5
+      }
+    ],
+    "killed": true,
+    "restored": true
+  },
+  {
+    "id": "R8",
+    "finding": "R-08",
+    "what": "service no longer refuses to lock the SUPER_ADMIN holder (was M2, survived at 64073c4)",
+    "file": "src/modules/identity-access/account-management.service.ts",
+    "runs": [
+      {
+        "kind": "unit",
+        "target": "src/modules/identity-access",
+        "exit": 0,
+        "tests": "31 passed, 31 total",
+        "failed": [],
+        "seconds": 2
+      },
+      {
+        "kind": "integration",
+        "target": "test/integration/account-management-http.integration-spec.ts",
+        "exit": 1,
+        "tests": "2 failed, 30 passed, 32 total",
+        "failed": [],
+        "seconds": 8
+      }
+    ],
+    "killed": true,
+    "restored": true
+  }
+]

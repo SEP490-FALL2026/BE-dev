@@ -1,0 +1,8 @@
+SMTP STARTTLS re-review (local smtp-server sink, session-only CA/cert for localhost; no real recipient)
+Runner hung while closing the last sink after T5; outcome read from email_outbox. Rows of T2/T5 were PENDING (retry scheduled) and set CANCELLED by the runner cleanup.
+case|outbox status|attempts|last_error_code
+T1|SENT|1|-
+T2|CANCELLED|1|ESOCKET
+T3|FAILED|1|SMTP_500
+T4|SENT|1|-
+T5|CANCELLED|1|ESOCKET

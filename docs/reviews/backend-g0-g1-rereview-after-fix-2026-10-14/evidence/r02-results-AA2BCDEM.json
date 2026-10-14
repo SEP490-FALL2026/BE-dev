@@ -1,0 +1,248 @@
+{
+  "summary": {
+    "finishedAt": "2026-10-14T08:14:41.767Z",
+    "seconds": 69,
+    "phases": [
+      "A",
+      "A2",
+      "B",
+      "C",
+      "D",
+      "E",
+      "M"
+    ],
+    "pass": 21,
+    "fail": 3,
+    "info": 14
+  },
+  "results": [
+    {
+      "id": "A-0",
+      "name": "docker pause (warm pool), 8 s",
+      "ok": null,
+      "detail": "GET /me 503/TOKEN_VERIFICATION_UNAVAILABLE 8.0s | POST /auth/login 503/AUTH.UNAVAILABLE 8.0s | POST /auth/refresh 503/AUTH.UNAVAILABLE 3.0s | GET /app-users 503/TOKEN_VERIFICATION_UNAVAILABLE 3.0s | GET /account-candidates 503/TOKEN_VERIFICATION_UNAVAILABLE 3.0s | GET /health/ready 503/INTERNAL_SERVER_ERROR 1.5s | POST lock 503/TOKEN_VERIFICATION_UNAVAILABLE 3.0s | POST /auth/logout 503/AUTH.UNAVAILABLE 3.0s"
+    },
+    {
+      "id": "A-1",
+      "name": "every request ends on its own while PostgreSQL is paused (no client-side abort at 45 s)",
+      "ok": true,
+      "detail": "503,503,503,503,503,503,503,503"
+    },
+    {
+      "id": "A-2",
+      "name": "/me, login, list, candidates answer 503 within query timeout + slack (guard path and reads)",
+      "ok": true,
+      "detail": "503/TOKEN_VERIFICATION_UNAVAILABLE 8.0s | 503/AUTH.UNAVAILABLE 8.0s | 503/TOKEN_VERIFICATION_UNAVAILABLE 3.0s | 503/TOKEN_VERIFICATION_UNAVAILABLE 3.0s"
+    },
+    {
+      "id": "A-3",
+      "name": "availability codes only (guard TOKEN_VERIFICATION_UNAVAILABLE, login AUTH.UNAVAILABLE, service SERVICE_UNAVAILABLE); never 401/500",
+      "ok": true,
+      "detail": "TOKEN_VERIFICATION_UNAVAILABLE,AUTH.UNAVAILABLE,TOKEN_VERIFICATION_UNAVAILABLE,TOKEN_VERIFICATION_UNAVAILABLE"
+    },
+    {
+      "id": "A-4",
+      "name": "refresh / logout / lock end with 503 too, and refresh/logout keep the cookie (no Set-Cookie clear)",
+      "ok": true,
+      "detail": "503/AUTH.UNAVAILABLE 3.0s | 503/TOKEN_VERIFICATION_UNAVAILABLE 3.0s | 503/AUTH.UNAVAILABLE 3.0s"
+    },
+    {
+      "id": "A-5",
+      "name": "readiness while paused (terminus 1.5 s ping timeout; R-12 code)",
+      "ok": null,
+      "detail": "503/INTERNAL_SERVER_ERROR 1.5s"
+    },
+    {
+      "id": "A-6",
+      "name": "after unpause no connection of the API is left idle in transaction",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "id": "A-7",
+      "name": "write outcome after the paused requests got 503 (commit not known to the client)",
+      "ok": null,
+      "detail": "refresh consumed +0; lock target status ACTIVE, LOCKED audits 0"
+    },
+    {
+      "id": "A-8",
+      "name": "lock that answered 503 left no half-written state (status and audit agree)",
+      "ok": true,
+      "detail": "ACTIVE/0"
+    },
+    {
+      "id": "A-9",
+      "name": "client retries refresh with the cookie it still holds after the 503",
+      "ok": null,
+      "detail": "200/AUTH.SESSION_REFRESHED 0.0s"
+    },
+    {
+      "id": "A-10",
+      "name": "API process alive, no unhandled rejection / uncaught exception in its log",
+      "ok": true,
+      "detail": "alive=true unhandled=false"
+    },
+    {
+      "id": "A-rec",
+      "name": "after the database answers again: /me 200, ready 200, login 200 without restarting the API; process alive",
+      "ok": true,
+      "detail": "200/ME.RETRIEVED 0.0s ready 200 login 200 alive=true"
+    },
+    {
+      "id": "A2-0",
+      "name": "paused 4 s (> maxWait 2 s, < query timeout 8 s) while lock and refresh run",
+      "ok": null,
+      "detail": "lock 200/APP_USER.LOCKED 4.2s | refresh 200/AUTH.SESSION_REFRESHED 4.2s"
+    },
+    {
+      "id": "A2-1",
+      "name": "no transaction left open after the late BEGIN; lock state and audit agree",
+      "ok": true,
+      "detail": "idle-in-tx=0 status=LOCKED audits=1"
+    },
+    {
+      "id": "A2-rec",
+      "name": "after the database answers again: /me 200, ready 200, login 200 without restarting the API; process alive",
+      "ok": true,
+      "detail": "200/ME.RETRIEVED 0.0s ready 200 login 200 alive=true"
+    },
+    {
+      "id": "B-0",
+      "name": "fresh API process (no pooled connection), PostgreSQL paused",
+      "ok": null,
+      "detail": "me 503/TOKEN_VERIFICATION_UNAVAILABLE 3.1s | login 503/AUTH.UNAVAILABLE 3.1s | list 503/TOKEN_VERIFICATION_UNAVAILABLE 3.1s | ready 503/INTERNAL_SERVER_ERROR 1.6s"
+    },
+    {
+      "id": "B-1",
+      "name": "cold pool: /me, login, list answer 503 within connect timeout + query slack",
+      "ok": true,
+      "detail": "503/TOKEN_VERIFICATION_UNAVAILABLE 3.1s | 503/AUTH.UNAVAILABLE 3.1s | 503/TOKEN_VERIFICATION_UNAVAILABLE 3.1s"
+    },
+    {
+      "id": "B-rec",
+      "name": "after the database answers again: /me 200, ready 200, login 200 without restarting the API; process alive",
+      "ok": true,
+      "detail": "200/ME.RETRIEVED 0.1s ready 200 login 200 alive=true"
+    },
+    {
+      "id": "C-1",
+      "name": "connection reset while a request is in flight -> 503 SERVICE_UNAVAILABLE, no 500",
+      "ok": true,
+      "detail": "503/SERVICE_UNAVAILABLE 1.5s"
+    },
+    {
+      "id": "C-2",
+      "name": "PostgreSQL stopped",
+      "ok": null,
+      "detail": "me 503/TOKEN_VERIFICATION_UNAVAILABLE 0.0s | login 503/AUTH.UNAVAILABLE 0.0s | refresh 503/AUTH.UNAVAILABLE 0.0s | list 503/TOKEN_VERIFICATION_UNAVAILABLE 0.0s | ready 503/INTERNAL_SERVER_ERROR 0.0s | logout 503/AUTH.UNAVAILABLE 0.0s"
+    },
+    {
+      "id": "C-3",
+      "name": "stopped database: every route 503 quickly with its availability code; cookie kept",
+      "ok": true,
+      "detail": "503/TOKEN_VERIFICATION_UNAVAILABLE,503/AUTH.UNAVAILABLE,503/AUTH.UNAVAILABLE,503/TOKEN_VERIFICATION_UNAVAILABLE,503/INTERNAL_SERVER_ERROR,503/AUTH.UNAVAILABLE"
+    },
+    {
+      "id": "C-rec",
+      "name": "after the database answers again: /me 200, ready 200, login 200 without restarting the API; process alive",
+      "ok": true,
+      "detail": "200/ME.RETRIEVED 0.1s ready 200 login 200 alive=true"
+    },
+    {
+      "id": "C-4",
+      "name": "no unhandled rejection / crash across reset and restart",
+      "ok": true,
+      "detail": "alive=true unhandled=false"
+    },
+    {
+      "id": "D1-0",
+      "name": "UPDATE app_users of a lock held 20 s then delivered",
+      "ok": null,
+      "detail": "trigger=true response 503/SERVICE_UNAVAILABLE 16.0s"
+    },
+    {
+      "id": "D1-1",
+      "name": "right after release: backends idle in transaction, committed status of the victim",
+      "ok": null,
+      "detail": "[{\"pid\":42,\"state\":\"idle in transaction\",\"wrote\":true,\"xact_s\":17,\"query\":\"UPDATE \\\"public\\\".\\\"app_users\\\" SET \\\"status\\\" = CAST($1::text AS \\\"public\\\".\\\"\"}] committed=ACTIVE"
+    },
+    {
+      "id": "D1-2",
+      "name": "after the stalled lock answered, no API connection is left idle in transaction (dirty connection not reused)",
+      "ok": false,
+      "detail": "1 idle-in-tx"
+    },
+    {
+      "id": "D1-3",
+      "name": "after later traffic (12 GET /me, lock+unlock of another account, 12 GET /app-users)",
+      "ok": null,
+      "detail": "other lock 200 unlock 200; victim committed status=LOCKED, new LOCKED audits=0; idle-in-tx=0"
+    },
+    {
+      "id": "D1-4",
+      "name": "the 503-answered lock never becomes a committed LOCKED without its audit row (US-01-06 atomicity)",
+      "ok": false,
+      "detail": "status=LOCKED audits=0 openSessions=0"
+    },
+    {
+      "id": "D1-5",
+      "name": "a later lock of the same victim (row lock still held by the zombie transaction?)",
+      "ok": null,
+      "detail": "200/APP_USER.LOCKED 0.0s"
+    },
+    {
+      "id": "D2-0",
+      "name": "COMMIT of a lock held 12 s, then delivered",
+      "ok": null,
+      "detail": "trigger=true response 503/SERVICE_UNAVAILABLE 8.0s; committed status=LOCKED audits=1"
+    },
+    {
+      "id": "D2-1",
+      "name": "COMMIT outcome is all-or-nothing (status and audit agree) even though the client saw an error",
+      "ok": true,
+      "detail": "LOCKED/1"
+    },
+    {
+      "id": "D2-2",
+      "name": "client retries the lock after the 503",
+      "ok": null,
+      "detail": "200/APP_USER.LOCKED 0.0s; audits now 1"
+    },
+    {
+      "id": "D3-1",
+      "name": "BEGIN held past maxWait: 503 and the late transaction is rolled back, nothing left open",
+      "ok": true,
+      "detail": "503/SERVICE_UNAVAILABLE 2.0s idle-in-tx=0 status=ACTIVE"
+    },
+    {
+      "id": "D-9",
+      "name": "API process alive, no unhandled rejection",
+      "ok": true,
+      "detail": "alive=true unhandled=false"
+    },
+    {
+      "id": "E-1",
+      "name": "verifier hit by a non-transient DB error (relation missing) -> 500 INTERNAL_SERVER_ERROR with one error log, not 503 (R-04 change)",
+      "ok": true,
+      "detail": "500/INTERNAL_SERVER_ERROR 0.0s errors 20->21"
+    },
+    {
+      "id": "E-2",
+      "name": "table restored: /me 200",
+      "ok": true,
+      "detail": "200/ME.RETRIEVED 0.0s"
+    },
+    {
+      "id": "M-1",
+      "name": "GET /me with the MeService query (login email) unanswered; the guard already passed",
+      "ok": null,
+      "detail": "trigger=true 500/INTERNAL_SERVER_ERROR 8.0s"
+    },
+    {
+      "id": "M-2",
+      "name": "R-15: /me answers 503 (availability) when the database stops answering after the guard",
+      "ok": false,
+      "detail": "500/INTERNAL_SERVER_ERROR 8.0s"
+    }
+  ]
+}

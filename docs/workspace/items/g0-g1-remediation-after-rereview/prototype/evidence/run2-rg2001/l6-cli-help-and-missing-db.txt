@@ -1,0 +1,4 @@
+slmrg-be:a8ba88f --help (no env, NODE_ENV=production from image): exit=1 usage_printed=1 unhandled=2 stack_lines=10
+slmrg-be:a8ba88f no DATABASE_URL, no TTY: exit=1 first_line=You are creating the Super Admin account. Choose its password now. stack_lines=10
+slmrg-be:remediation-6dc8a85 --help (no env, NODE_ENV=production from image): exit=0 usage_printed=1 unhandled=0 stack_lines=0
+slmrg-be:remediation-6dc8a85 no DATABASE_URL, no TTY: exit=1 first_line=Environment validation failed: "DATABASE_URL" is required stack_lines=0

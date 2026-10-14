@@ -1,0 +1,858 @@
+{
+ "summary": {
+  "finishedAt": "2026-10-14T08:06:23.500Z",
+  "seconds": 152,
+  "pass": 132,
+  "fail": 0,
+  "info": 9,
+  "mails": 17
+ },
+ "results": [
+  {
+   "id": "H-1",
+   "name": "API process up; GET /health/live 200 and /health/ready 200 within 30 s",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "id": "H-2",
+   "name": "readiness reports the database check",
+   "ok": true,
+   "detail": "[{\"name\":\"database\",\"status\":\"up\"}]"
+  },
+  {
+   "id": "H-3",
+   "name": "catalog is not mounted (404)",
+   "ok": true,
+   "detail": "404 HTTP_NOT_FOUND"
+  },
+  {
+   "id": "A-1",
+   "name": "anonymous GET /me -> 401 AUTHENTICATION_REQUIRED",
+   "ok": true,
+   "detail": "AUTHENTICATION_REQUIRED"
+  },
+  {
+   "id": "A-2",
+   "name": "anonymous GET /app-users -> 401",
+   "ok": true,
+   "detail": "AUTHENTICATION_REQUIRED"
+  },
+  {
+   "id": "A-3",
+   "name": "wrong password, unknown email and malformed email give one identical 401 body (AC-10)",
+   "ok": true,
+   "detail": "AUTH.INVALID_CREDENTIALS"
+  },
+  {
+   "id": "A-4",
+   "name": "Super Admin login 200 AUTH.LOGGED_IN with Bearer token",
+   "ok": true,
+   "detail": "200"
+  },
+  {
+   "id": "A-5",
+   "name": "refresh cookie HttpOnly; SameSite=Strict; Path=/api/v1/auth; Max-Age≈absolute lifetime; no Secure in development profile",
+   "ok": true,
+   "detail": "slm_refresh=<redacted>; Max-Age=604800; Path=/api/v1/auth; Expires=Wed, 21 Oct 2026 08:03:53 GMT; HttpOnly; SameSite=Strict"
+  },
+  {
+   "id": "A-6",
+   "name": "/me: direct [SUPER_ADMIN], derived [], department IT, job title, selfServiceOnly false (AC-17 direct part)",
+   "ok": true,
+   "detail": "{\"direct\":[\"SUPER_ADMIN\"],\"derived\":[],\"effective\":[\"SUPER_ADMIN\"]}"
+  },
+  {
+   "id": "C-1",
+   "name": "candidates lists IT001 (no account) and not SA001",
+   "ok": true,
+   "detail": "[\"IT001\"]"
+  },
+  {
+   "id": "C-2",
+   "name": "candidate search is case-insensitive",
+   "ok": true,
+   "detail": "200"
+  },
+  {
+   "id": "C-3",
+   "name": "candidate search over 100 chars -> 422 VALIDATION_ERROR",
+   "ok": true,
+   "detail": "VALIDATION_ERROR"
+  },
+  {
+   "id": "C-4",
+   "name": "POST /app-users 201 APP_USER.CREATED, INVITED, roles [IT_ADMIN]",
+   "ok": true,
+   "detail": "201"
+  },
+  {
+   "id": "C-5",
+   "name": "second account for the same employee -> 409 APP_USER.ALREADY_EXISTS_FOR_EMPLOYEE (AC-8)",
+   "ok": true,
+   "detail": "APP_USER.ALREADY_EXISTS_FOR_EMPLOYEE"
+  },
+  {
+   "id": "C-6",
+   "name": "INVITED account cannot log in: same generic 401 (AC-9/AC-11)",
+   "ok": true,
+   "detail": "AUTH.INVALID_CREDENTIALS"
+  },
+  {
+   "id": "C-7",
+   "name": "audit has APP_USER.CREATED, ROLE.GRANTED, APP_USER.INVITATION_SENT for the new account (AC-1)",
+   "ok": true,
+   "detail": "3"
+  },
+  {
+   "id": "M-1",
+   "name": "worker delivered the invitation to the SMTP sink",
+   "ok": true,
+   "detail": "received"
+  },
+  {
+   "id": "M-2",
+   "name": "outbox row SENT, ciphertext wiped",
+   "ok": true,
+   "detail": "{\"status\":\"SENT\",\"wiped\":true,\"attempts\":1}"
+  },
+  {
+   "id": "M-3",
+   "name": "mail carries no password and the link uses the URL fragment",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "id": "R-1",
+   "name": "weak password with a bogus token -> 422 AUTH.PASSWORD_POLICY_VIOLATION (policy before token)",
+   "ok": true,
+   "detail": "AUTH.PASSWORD_POLICY_VIOLATION"
+  },
+  {
+   "id": "R-2",
+   "name": "unknown token -> 400 AUTH.INVITATION_INVALID",
+   "ok": true,
+   "detail": "AUTH.INVITATION_INVALID"
+  },
+  {
+   "id": "R-3",
+   "name": "password equal to the login email -> 422 EQUALS_LOGIN_EMAIL, token kept",
+   "ok": true,
+   "detail": "AUTH.PASSWORD_POLICY_VIOLATION"
+  },
+  {
+   "id": "R-4",
+   "name": "redeem 200 AUTH.ACCOUNT_ACTIVATED, no cookie, no access token (no auto-login)",
+   "ok": true,
+   "detail": "AUTH.ACCOUNT_ACTIVATED"
+  },
+  {
+   "id": "R-5",
+   "name": "same token again -> 400 AUTH.INVITATION_INVALID",
+   "ok": true,
+   "detail": "AUTH.INVITATION_INVALID"
+  },
+  {
+   "id": "R-6",
+   "name": "IT logs in after activation",
+   "ok": true,
+   "detail": "200"
+  },
+  {
+   "id": "R-7",
+   "name": "IT /me direct [IT_ADMIN]",
+   "ok": true,
+   "detail": "{\"direct\":[\"IT_ADMIN\"],\"derived\":[],\"effective\":[\"IT_ADMIN\"]}"
+  },
+  {
+   "id": "R-8",
+   "name": "APP_USER.ACTIVATED audited with the user as actor",
+   "ok": true,
+   "detail": "{\"actor_kind\":\"USER\",\"self\":true}"
+  },
+  {
+   "id": "Z-1",
+   "name": "IT_ADMIN on admin routes -> 403 AUTHORIZATION.FORBIDDEN (list, create, candidates, lock SA) (AC-3)",
+   "ok": true,
+   "detail": "403,403,403,403"
+  },
+  {
+   "id": "Z-2",
+   "name": "Super Admin unchanged after the refused lock",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "id": "L-1",
+   "name": "list pageSize=1: 1 item, totalItems 2, totalPages 2",
+   "ok": true,
+   "detail": "{\"page\":1,\"pageSize\":1,\"totalItems\":2,\"totalPages\":2}"
+  },
+  {
+   "id": "L-2",
+   "name": "page 2 returns the other account (stable order)",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "id": "L-3",
+   "name": "filters role/activationState/status",
+   "ok": true,
+   "detail": "1,0,0"
+  },
+  {
+   "id": "L-4",
+   "name": "invalid list queries (pageSize 101, page 0, unknown key, role MANAGER) -> 422",
+   "ok": true,
+   "detail": "422,422,422,422"
+  },
+  {
+   "id": "L-5",
+   "name": "very large page number (skip ≈ 1e11)",
+   "ok": null,
+   "detail": "200 COMMON.SUCCESS items=0"
+  },
+  {
+   "id": "L-6",
+   "name": "detail: roleHistory, invitation consumed (usable false), delivery SENT",
+   "ok": true,
+   "detail": "{\"usable\":false,\"expiresAt\":\"2026-10-17T08:03:53.410Z\",\"delivery\":{\"status\":\"SENT\",\"attempts\":1,\"lastErrorCode\":null,\"sentAt\":\"2026-10-14T08:03:55.550Z\"}}"
+  },
+  {
+   "id": "L-7",
+   "name": "unknown id 404 APP_USER.NOT_FOUND; non-UUID 422",
+   "ok": true,
+   "detail": "404 422"
+  },
+  {
+   "id": "I-1",
+   "name": "account with roles [] -> 201, roles [] (AC-16 creation)",
+   "ok": true,
+   "detail": "201"
+  },
+  {
+   "id": "I-2",
+   "name": "resend -> 202 APP_USER.INVITATION_SENT",
+   "ok": true,
+   "detail": "202"
+  },
+  {
+   "id": "I-3",
+   "name": "old token SUPERSEDED, exactly one usable token",
+   "ok": true,
+   "detail": "[{\"revoked_reason\":\"SUPERSEDED\",\"unconsumed\":true},{\"revoked_reason\":null,\"unconsumed\":true}]"
+  },
+  {
+   "id": "I-4",
+   "name": "superseded link -> 400 AUTH.INVITATION_INVALID (US-01-10 AC-2)",
+   "ok": true,
+   "detail": "AUTH.INVITATION_INVALID"
+  },
+  {
+   "id": "I-5",
+   "name": "resend to activated -> 409 APP_USER.ALREADY_ACTIVATED; to self -> 409 SELF_CHANGE_FORBIDDEN",
+   "ok": true,
+   "detail": "APP_USER.ALREADY_ACTIVATED APP_USER.SELF_CHANGE_FORBIDDEN"
+  },
+  {
+   "id": "G-1",
+   "name": "grant EMPLOYEE -> 201 ROLE.GRANTED",
+   "ok": true,
+   "detail": "201"
+  },
+  {
+   "id": "G-2",
+   "name": "same access token sees the new role on the next request",
+   "ok": true,
+   "detail": "[\"EMPLOYEE\",\"IT_ADMIN\"]"
+  },
+  {
+   "id": "G-3",
+   "name": "revoke IT_ADMIN -> 200; next request keeps EMPLOYEE only (AC-7)",
+   "ok": true,
+   "detail": "[\"EMPLOYEE\"]"
+  },
+  {
+   "id": "G-4",
+   "name": "revoke the last role -> 200; /me selfServiceOnly true, no role added back (AC-16)",
+   "ok": true,
+   "detail": "{\"direct\":[],\"derived\":[],\"effective\":[]}"
+  },
+  {
+   "id": "G-5.superAdmin",
+   "name": "refusal superAdmin -> 422 APP_USER.SUPER_ADMIN_TRANSFER_ONLY (AC-4/12/13/14)",
+   "ok": true,
+   "detail": "422 APP_USER.SUPER_ADMIN_TRANSFER_ONLY"
+  },
+  {
+   "id": "G-5.manager",
+   "name": "refusal manager -> 422 APP_USER.ROLE_DERIVED (AC-4/12/13/14)",
+   "ok": true,
+   "detail": "422 APP_USER.ROLE_DERIVED"
+  },
+  {
+   "id": "G-5.approver",
+   "name": "refusal approver -> 422 APP_USER.ROLE_DERIVED (AC-4/12/13/14)",
+   "ok": true,
+   "detail": "422 APP_USER.ROLE_DERIVED"
+  },
+  {
+   "id": "G-5.self",
+   "name": "refusal self -> 409 APP_USER.SELF_CHANGE_FORBIDDEN (AC-4/12/13/14)",
+   "ok": true,
+   "detail": "409 APP_USER.SELF_CHANGE_FORBIDDEN"
+  },
+  {
+   "id": "G-5.revokeSaSelf",
+   "name": "refusal revokeSaSelf -> 409 APP_USER.SELF_CHANGE_FORBIDDEN (AC-4/12/13/14)",
+   "ok": true,
+   "detail": "409 APP_USER.SELF_CHANGE_FORBIDDEN"
+  },
+  {
+   "id": "G-5.revokeSaOther",
+   "name": "refusal revokeSaOther -> 422 APP_USER.SUPER_ADMIN_TRANSFER_ONLY (AC-4/12/13/14)",
+   "ok": true,
+   "detail": "422 APP_USER.SUPER_ADMIN_TRANSFER_ONLY"
+  },
+  {
+   "id": "G-5.notHeld",
+   "name": "refusal notHeld -> 404 APP_USER.ROLE_NOT_GRANTED (AC-4/12/13/14)",
+   "ok": true,
+   "detail": "404 APP_USER.ROLE_NOT_GRANTED"
+  },
+  {
+   "id": "G-5.unknownRole",
+   "name": "refusal unknownRole -> 422 VALIDATION_ERROR (AC-4/12/13/14)",
+   "ok": true,
+   "detail": "422 VALIDATION_ERROR"
+  },
+  {
+   "id": "G-5.createSa",
+   "name": "refusal createSa -> 422 APP_USER.SUPER_ADMIN_TRANSFER_ONLY (AC-4/12/13/14)",
+   "ok": true,
+   "detail": "422 APP_USER.SUPER_ADMIN_TRANSFER_ONLY"
+  },
+  {
+   "id": "G-5.createMgr",
+   "name": "refusal createMgr -> 422 APP_USER.ROLE_DERIVED (AC-4/12/13/14)",
+   "ok": true,
+   "detail": "422 APP_USER.ROLE_DERIVED"
+  },
+  {
+   "id": "G-6",
+   "name": "refused creations wrote nothing",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "id": "G-7",
+   "name": "re-grant IT_ADMIN 201; duplicate -> 409 ROLE_ALREADY_GRANTED",
+   "ok": true,
+   "detail": "201 APP_USER.ROLE_ALREADY_GRANTED"
+  },
+  {
+   "id": "G-8",
+   "name": "role history keeps grants and revocations (AC-7)",
+   "ok": true,
+   "detail": "[\"IT_ADMIN:rev\",\"EMPLOYEE:rev\",\"IT_ADMIN:on\"]"
+  },
+  {
+   "id": "F-1",
+   "name": "FINANCE held by an INVITED account still blocks a second grant -> 409 FINANCE_ALREADY_ASSIGNED",
+   "ok": true,
+   "detail": "201 APP_USER.FINANCE_ALREADY_ASSIGNED"
+  },
+  {
+   "id": "F-2",
+   "name": "FINANCE held by a LOCKED account still blocks -> 409",
+   "ok": true,
+   "detail": "APP_USER.FINANCE_ALREADY_ASSIGNED"
+  },
+  {
+   "id": "F-3",
+   "name": "revoke FINANCE -> 200 and the organization may have 0 Finance",
+   "ok": true,
+   "detail": "0"
+  },
+  {
+   "id": "F-4",
+   "name": "two concurrent FINANCE grants: exactly one 201, one 409; one grant in force (AC-18)",
+   "ok": true,
+   "detail": "201,409 grants=1"
+  },
+  {
+   "id": "K-1",
+   "name": "lock -> 200 APP_USER.LOCKED",
+   "ok": true,
+   "detail": "200"
+  },
+  {
+   "id": "K-2",
+   "name": "after lock: old access token 401 INVALID_ACCESS_TOKEN, refresh 401 + cookie cleared, login generic 401 (AC-6)",
+   "ok": true,
+   "detail": "INVALID_ACCESS_TOKEN AUTH.SESSION_INVALID AUTH.INVALID_CREDENTIALS"
+  },
+  {
+   "id": "K-3",
+   "name": "locking a locked account -> 200, no second audit",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "id": "K-4",
+   "name": "every session of the account revoked ACCOUNT_LOCKED",
+   "ok": true,
+   "detail": "{\"r\":1,\"open\":0}"
+  },
+  {
+   "id": "K-5",
+   "name": "unlock 200; old access/refresh tokens stay dead (no resurrection)",
+   "ok": true,
+   "detail": "401 401"
+  },
+  {
+   "id": "K-6",
+   "name": "login works again after unlock (AC-7)",
+   "ok": true,
+   "detail": "200"
+  },
+  {
+   "id": "K-7",
+   "name": "Super Admin cannot lock/unlock self -> 409 SELF_CHANGE_FORBIDDEN (AC-13/AC-15 path)",
+   "ok": true,
+   "detail": "APP_USER.SELF_CHANGE_FORBIDDEN APP_USER.SELF_CHANGE_FORBIDDEN"
+  },
+  {
+   "id": "K-8",
+   "name": "lock revokes the open invitation (ACCOUNT_LOCKED); resend while locked 409 ACCOUNT_LOCKED; link stays invalid after unlock",
+   "ok": true,
+   "detail": "ACCOUNT_LOCKED APP_USER.ACCOUNT_LOCKED 400 400"
+  },
+  {
+   "id": "S-1",
+   "name": "refresh 200 AUTH.SESSION_REFRESHED rotates the refresh cookie",
+   "ok": true,
+   "detail": "200"
+  },
+  {
+   "id": "S-1b",
+   "name": "access token after refresh equals the previous one when issued in the same second (HS256, no jti)",
+   "ok": null,
+   "detail": "true"
+  },
+  {
+   "id": "S-2",
+   "name": "replaying the consumed cookie -> 401 + cleared; whole session revoked REPLAY_DETECTED; audit SESSION.REVOKED committed; new cookie dead too",
+   "ok": true,
+   "detail": "401 REPLAY_DETECTED 401"
+  },
+  {
+   "id": "S-3",
+   "name": "logout 204 + cleared cookie; access token 401 next request; repeat/no cookie/garbage all 204 (idempotent)",
+   "ok": true,
+   "detail": "204,401,204,204,204"
+  },
+  {
+   "id": "S-4",
+   "name": "logout with Bearer only -> 204 and revokes nothing (documented limitation)",
+   "ok": true,
+   "detail": "204 200"
+  },
+  {
+   "id": "S-5",
+   "name": "login/logout are not audited (FR-8.3)",
+   "ok": true,
+   "detail": "0"
+  },
+  {
+   "id": "S-6",
+   "name": "idle-expired session (fixture): /me 401, refresh 401 + cleared",
+   "ok": true,
+   "detail": "401 401"
+  },
+  {
+   "id": "S-7",
+   "name": "absolute-expired session (fixture): /me 401, refresh 401, logout 204",
+   "ok": true,
+   "detail": "401 401 204"
+  },
+  {
+   "id": "V-1",
+   "name": "signed token whose sid is not a UUID (hypothesis 4)",
+   "ok": null,
+   "detail": "401 INVALID_ACCESS_TOKEN"
+  },
+  {
+   "id": "V-1b",
+   "name": "signed token with non-UUID sid answers 401 (contract: bad token is 401, 503 only for an unavailable dependency)",
+   "ok": true,
+   "detail": "401 INVALID_ACCESS_TOKEN"
+  },
+  {
+   "id": "V-sidUnknown",
+   "name": "token sidUnknown -> 401 INVALID_ACCESS_TOKEN",
+   "ok": true,
+   "detail": "401 INVALID_ACCESS_TOKEN"
+  },
+  {
+   "id": "V-subMismatch",
+   "name": "token subMismatch -> 401 INVALID_ACCESS_TOKEN",
+   "ok": true,
+   "detail": "401 INVALID_ACCESS_TOKEN"
+  },
+  {
+   "id": "V-sidNumber",
+   "name": "token sidNumber -> 401 INVALID_ACCESS_TOKEN",
+   "ok": true,
+   "detail": "401 INVALID_ACCESS_TOKEN"
+  },
+  {
+   "id": "V-expired",
+   "name": "token expired -> 401 INVALID_ACCESS_TOKEN",
+   "ok": true,
+   "detail": "401 INVALID_ACCESS_TOKEN"
+  },
+  {
+   "id": "V-wrongAud",
+   "name": "token wrongAud -> 401 INVALID_ACCESS_TOKEN",
+   "ok": true,
+   "detail": "401 INVALID_ACCESS_TOKEN"
+  },
+  {
+   "id": "V-wrongIss",
+   "name": "token wrongIss -> 401 INVALID_ACCESS_TOKEN",
+   "ok": true,
+   "detail": "401 INVALID_ACCESS_TOKEN"
+  },
+  {
+   "id": "V-hs512",
+   "name": "token hs512 -> 401 INVALID_ACCESS_TOKEN",
+   "ok": true,
+   "detail": "401 INVALID_ACCESS_TOKEN"
+  },
+  {
+   "id": "V-none",
+   "name": "token none -> 401 INVALID_ACCESS_TOKEN",
+   "ok": true,
+   "detail": "401 INVALID_ACCESS_TOKEN"
+  },
+  {
+   "id": "V-otherKey",
+   "name": "token otherKey -> 401 INVALID_ACCESS_TOKEN",
+   "ok": true,
+   "detail": "401 INVALID_ACCESS_TOKEN"
+  },
+  {
+   "id": "V-garbage",
+   "name": "token garbage -> 401 INVALID_ACCESS_TOKEN",
+   "ok": true,
+   "detail": "401 INVALID_ACCESS_TOKEN"
+  },
+  {
+   "id": "V-sidMissing",
+   "name": "token sidMissing -> 401 INVALID_ACCESS_TOKEN",
+   "ok": true,
+   "detail": "401 INVALID_ACCESS_TOKEN"
+  },
+  {
+   "id": "V-sidNull",
+   "name": "token sidNull -> 401 INVALID_ACCESS_TOKEN",
+   "ok": true,
+   "detail": "401 INVALID_ACCESS_TOKEN"
+  },
+  {
+   "id": "V-sidArray",
+   "name": "token sidArray -> 401 INVALID_ACCESS_TOKEN",
+   "ok": true,
+   "detail": "401 INVALID_ACCESS_TOKEN"
+  },
+  {
+   "id": "V-sidUuidNoDashes",
+   "name": "token sidUuidNoDashes -> 401 INVALID_ACCESS_TOKEN",
+   "ok": true,
+   "detail": "401 INVALID_ACCESS_TOKEN"
+  },
+  {
+   "id": "V-subMissing",
+   "name": "token subMissing -> 401 INVALID_ACCESS_TOKEN",
+   "ok": true,
+   "detail": "401 INVALID_ACCESS_TOKEN"
+  },
+  {
+   "id": "V-subNotUuid",
+   "name": "token subNotUuid -> 401 INVALID_ACCESS_TOKEN",
+   "ok": true,
+   "detail": "401 INVALID_ACCESS_TOKEN"
+  },
+  {
+   "id": "V-subUnknown",
+   "name": "token subUnknown -> 401 INVALID_ACCESS_TOKEN",
+   "ok": true,
+   "detail": "401 INVALID_ACCESS_TOKEN"
+  },
+  {
+   "id": "V-subNumber",
+   "name": "token subNumber -> 401 INVALID_ACCESS_TOKEN",
+   "ok": true,
+   "detail": "401 INVALID_ACCESS_TOKEN"
+  },
+  {
+   "id": "V-3",
+   "name": "upper-case UUID claims of a live session (PostgreSQL compares UUIDs case-insensitively)",
+   "ok": null,
+   "detail": "401 INVALID_ACCESS_TOKEN"
+  },
+  {
+   "id": "V-4",
+   "name": "no error log line for 19 forged/malformed tokens (R-04)",
+   "ok": true,
+   "detail": "0 -> 0"
+  },
+  {
+   "id": "V-2",
+   "name": "malformed Authorization header -> 401 AUTHENTICATION_REQUIRED",
+   "ok": true,
+   "detail": "AUTHENTICATION_REQUIRED AUTHENTICATION_REQUIRED"
+  },
+  {
+   "id": "D-1",
+   "name": "strict DTOs: extra/missing fields -> 422 VALIDATION_ERROR with requestId",
+   "ok": true,
+   "detail": "422,422,422,422"
+  },
+  {
+   "id": "D-2",
+   "name": "malformed JSON body on login",
+   "ok": null,
+   "detail": "400 HTTP_BAD_REQUEST"
+  },
+  {
+   "id": "D-3",
+   "name": "client x-request-id is replaced (TRUST_PROXY_HOPS=0)",
+   "ok": true,
+   "detail": "079386ce-cb1f-4cfc-b7c6-3047a2fc4188"
+  },
+  {
+   "id": "D-4",
+   "name": "invalid login email -> 422 APP_USER.LOGIN_EMAIL_INVALID",
+   "ok": true,
+   "detail": "APP_USER.LOGIN_EMAIL_INVALID"
+  },
+  {
+   "id": "D-5",
+   "name": "login email equal to another account after normalization (+tag, case)",
+   "ok": null,
+   "detail": "409 APP_USER.ALREADY_EXISTS_FOR_EMPLOYEE"
+  },
+  {
+   "id": "D-6",
+   "name": "unknown employee -> 404 ORGANIZATION.EMPLOYEE_NOT_FOUND",
+   "ok": true,
+   "detail": "ORGANIZATION.EMPLOYEE_NOT_FOUND"
+  },
+  {
+   "id": "T-1",
+   "name": "4 wrong then correct -> success and the counter is cleared",
+   "ok": true,
+   "detail": "401,401,401,401,200"
+  },
+  {
+   "id": "T-2",
+   "name": "5 wrong -> 6th attempt with the right password 429 AUTH.LOGIN_TEMPORARILY_BLOCKED + retryAfterSeconds; AppUser.status unchanged (US-01-10 AC-7)",
+   "ok": true,
+   "detail": "401,401,401,401,401,429 retry=30"
+  },
+  {
+   "id": "T-3",
+   "name": "block is per email: Super Admin still logs in",
+   "ok": true,
+   "detail": "200"
+  },
+  {
+   "id": "T-4",
+   "name": "after the block expires the right password works",
+   "ok": true,
+   "detail": "200"
+  },
+  {
+   "id": "T-5",
+   "name": "12 simultaneous wrong guesses: only 401/429, failure_count = number of 401 (>= 5), blocked, right password then 429 (R-06)",
+   "ok": true,
+   "detail": "{\"401\":12} count=12 blocked=true right=429"
+  },
+  {
+   "id": "T-6",
+   "name": "7 simultaneous CORRECT logins: all 200, no throttle row (R-06)",
+   "ok": true,
+   "detail": "{\"200\":7} rows=0"
+  },
+  {
+   "id": "T-7",
+   "name": "counter at 4: one correct + two wrong at once -> correct 200, wrong 401 (never 429 for the right one) (R-06)",
+   "ok": true,
+   "detail": "200,401,401 count=none"
+  },
+  {
+   "id": "C-8",
+   "name": "candidates without search include eligible FXZ-001..003 when 200 earlier employees already have accounts (hypothesis 1)",
+   "ok": true,
+   "detail": "returned 3: FXZ-001,FXZ-002,FXZ-003"
+  },
+  {
+   "id": "C-9",
+   "name": "same employees with search=FXZ",
+   "ok": null,
+   "detail": "3 items"
+  },
+  {
+   "id": "X-1",
+   "name": "detail of an INVITED account whose employee is TERMINATED: invitation.usable false (R-05)",
+   "ok": true,
+   "detail": "false delivery=PENDING"
+  },
+  {
+   "id": "X-2",
+   "name": "worker does not mail the invitation of a TERMINATED employee; outbox CANCELLED, ciphertext wiped (R-05)",
+   "ok": true,
+   "detail": "mail not sent; outbox CANCELLED wiped=true"
+  },
+  {
+   "id": "X-3",
+   "name": "the link of a TERMINATED employee cannot activate (400)",
+   "ok": true,
+   "detail": "AUTH.INVITATION_INVALID"
+  },
+  {
+   "id": "X-4",
+   "name": "TERMINATED: resend 409 and create 409 APP_USER.EMPLOYEE_TERMINATED; not a candidate (AC-5)",
+   "ok": true,
+   "detail": "APP_USER.EMPLOYEE_TERMINATED APP_USER.EMPLOYEE_TERMINATED cand=0"
+  },
+  {
+   "id": "X-5",
+   "name": "employee TERMINATED (fixture): next request 401, refresh 401, login generic 401 (US-01-10 AC-6)",
+   "ok": true,
+   "detail": "401 401 401"
+  },
+  {
+   "id": "B-1",
+   "name": "audit failure at the last step of account creation: 500 and nothing left (account, grants, token, outbox, audit) — US-01-06 AC-3",
+   "ok": true,
+   "detail": "500 INTERNAL_SERVER_ERROR {\"users\":0,\"outbox\":7,\"audit\":0}"
+  },
+  {
+   "id": "B-2",
+   "name": "audit failure while locking: 500, account still ACTIVE, sessions still open",
+   "ok": true,
+   "detail": "500 {\"status\":\"ACTIVE\",\"open\":15} me=200"
+  },
+  {
+   "id": "P-1",
+   "name": "row held FOR UPDATE elsewhere: admin lock -> 503 SERVICE_UNAVAILABLE ~3 s; login -> 503 AUTH.UNAVAILABLE; guard (no lock) 200",
+   "ok": true,
+   "detail": "lock 503/SERVICE_UNAVAILABLE/3017ms login 503/AUTH.UNAVAILABLE/5032ms me 200"
+  },
+  {
+   "id": "P-2",
+   "name": "after the holder releases, the same operations succeed",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "id": "O-1",
+   "name": "SMTP 451: row back to PENDING with backoff, attempts 1, error code kept",
+   "ok": true,
+   "detail": "{\"status\":\"PENDING\",\"attempts\":1,\"last_error_code\":\"SMTP_451\",\"wait\":27}"
+  },
+  {
+   "id": "O-2",
+   "name": "SMTP 550: FAILED, ciphertext wiped, visible in account detail",
+   "ok": true,
+   "detail": "{\"status\":\"FAILED\",\"last_error_code\":\"SMTP_550\",\"wiped\":true}"
+  },
+  {
+   "id": "O-3",
+   "name": "resend after FAILED delivers a new mail",
+   "ok": true,
+   "detail": "ok"
+  },
+  {
+   "id": "O-4",
+   "name": "worker stopped: mail stays PENDING; restarted worker sends it",
+   "ok": true,
+   "detail": "PENDING sent"
+  },
+  {
+   "id": "O-5",
+   "name": "resend while the first mail is SENDING: old mail still arrives but its link is rejected; new link works",
+   "ok": true,
+   "detail": "SENDING m1=true m2=true r1=400 r2=200"
+  },
+  {
+   "id": "O-6",
+   "name": "two worker processes, six invitations: every recipient got exactly one mail (SKIP LOCKED)",
+   "ok": true,
+   "detail": "1,1,1,1,1,1"
+  },
+  {
+   "id": "O-7",
+   "name": "worker killed while SENDING: row stays SENDING until the 60 s lease ends, then the restarted worker sends it (at-least-once)",
+   "ok": true,
+   "detail": "{\"status\":\"SENDING\",\"attempts\":1} -> {\"status\":\"SENT\",\"attempts\":2} mails=2"
+  },
+  {
+   "id": "W-1",
+   "name": "CORS: configured origin gets ACAO + credentials; other origin gets no ACAO",
+   "ok": true,
+   "detail": "http://localhost:5173 / null"
+  },
+  {
+   "id": "W-2",
+   "name": "refresh with a foreign Origin header and a valid cookie (no Origin check; SameSite=Strict is the browser-side defence)",
+   "ok": null,
+   "detail": "200"
+  },
+  {
+   "id": "W-3",
+   "name": "security headers present (helmet)",
+   "ok": true,
+   "detail": "default-src 'self';base-uri 's"
+  },
+  {
+   "id": "Y-1",
+   "name": "no password, refresh/access/invitation token appears in any audit row (US-01-10 AC-9)",
+   "ok": true,
+   "detail": "65 secrets checked"
+  },
+  {
+   "id": "Y-2",
+   "name": "every terminal outbox row has its ciphertext wiped",
+   "ok": true,
+   "detail": "{\"bad\":0,\"total\":19}"
+  },
+  {
+   "id": "Y-3",
+   "name": "token tables hold only hashes (no raw token stored)",
+   "ok": true,
+   "detail": "43"
+  },
+  {
+   "id": "Y-4",
+   "name": "audit DELETE refused by the database (23001 restrict_violation)",
+   "ok": true,
+   "detail": "23001"
+  },
+  {
+   "id": "Y-5",
+   "name": "audit actions recorded",
+   "ok": null,
+   "detail": "APP_USER.ACTIVATED×3, APP_USER.CREATED×16, APP_USER.INVITATION_SENT×19, APP_USER.LOCKED×4, APP_USER.UNLOCKED×3, INSTALLATION.COST_CENTER_CREATED×1, INSTALLATION.DEPARTMENT_CREATED×1, INSTALLATION.EMPLOYEE_CREATED×2, INSTALLATION.JOB_TITLE_CREATED×1, INSTALLATION.ORGANIZATION_CREATED×1, INSTALLATION.SUPER_ADMIN_CREATED×1, ROLE.GRANTED×8, ROLE.REVOKED×3, SESSION.REVOKED×1"
+  },
+  {
+   "id": "Y-6",
+   "name": "API/worker logs contain none of the passwords or tokens seen in the run",
+   "ok": true,
+   "detail": "0"
+  }
+ ]
+}
