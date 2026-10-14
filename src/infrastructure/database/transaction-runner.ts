@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Prisma } from '../../generated/prisma/client';
-import { EnvironmentVariables } from '../config/env-schema';
+import { DatabaseEnvironmentVariables } from '../config/env-schema';
 import { PrismaService } from './prisma.service';
 
 /** The client handed to work running inside one database transaction. */
@@ -10,7 +10,10 @@ export type DbTx = Prisma.TransactionClient;
 /**
  * The database could not finish the transaction in time or was interrupted: deadlock,
  * lock/statement timeout, Prisma closing the transaction, or the connection dropping.
- * Everything was rolled back. Callers map this to a retryable 503; nothing here is retried.
+ * Before COMMIT was sent, everything was rolled back. When the error happens while COMMIT is in
+ * flight (a timeout or a dropped connection), the outcome is unknown: the server may have committed.
+ * Callers map this to a retryable 503 for the caller to try again, but must not blindly retry
+ * writes that are not idempotent; nothing here is retried.
  */
 export class TransientDatabaseError extends Error {
   constructor(
@@ -54,6 +57,11 @@ const PG_CONNECTIVITY_MESSAGES = new Set([
   'Connection terminated unexpectedly',
   'Query read timeout',
   'timeout exceeded when trying to connect',
+  // A connection that was ended (retired after a client-side timeout, pg-pool.ts) or whose socket
+  // already failed rejects the queries still queued on it with one of these.
+  'Connection terminated',
+  'Client was closed and is not queryable',
+  'Client has encountered a connection error and is not queryable',
 ]);
 const SOCKET_ERROR_CODES = new Set(['ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT', 'EPIPE']);
 
@@ -87,7 +95,7 @@ export function toTransientError(error: unknown): TransientDatabaseError | undef
 export class TransactionRunner {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly config: ConfigService<EnvironmentVariables, true>,
+    private readonly config: ConfigService<DatabaseEnvironmentVariables, true>,
   ) {}
 
   /**

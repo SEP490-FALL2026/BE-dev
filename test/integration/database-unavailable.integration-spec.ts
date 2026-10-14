@@ -1,4 +1,3 @@
-import { createServer, connect, Server, Socket } from 'node:net';
 import { PrismaService } from '../../src/infrastructure/database/prisma.service';
 import {
   TransactionRunner,
@@ -11,76 +10,12 @@ import {
   migrateDisposableDatabase,
   provisionDisposableDatabase,
 } from '../support/disposable-database';
+import { PgRelay } from '../support/pg-relay';
 import { testConfig } from '../support/test-config';
-
-/**
- * A TCP relay in front of PostgreSQL. `pause()` keeps every connection open but stops delivering
- * bytes in both directions, which is what `docker pause` or a dropped network path looks like to
- * the client: no error, no answer. `resume()` flushes what was held back.
- */
-class PausableRelay {
-  private readonly server: Server;
-  private readonly sockets = new Set<Socket>();
-  private paused = false;
-  private held: Array<() => void> = [];
-
-  private constructor(
-    private readonly upstreamHost: string,
-    private readonly upstreamPort: number,
-  ) {
-    this.server = createServer((client) => this.accept(client));
-  }
-
-  static async start(upstreamHost: string, upstreamPort: number): Promise<PausableRelay> {
-    const relay = new PausableRelay(upstreamHost, upstreamPort);
-    await new Promise<void>((resolve) => relay.server.listen(0, '127.0.0.1', resolve));
-    return relay;
-  }
-
-  get port(): number {
-    const address = this.server.address();
-    if (address === null || typeof address === 'string') throw new Error('relay is not listening');
-    return address.port;
-  }
-
-  pause(): void {
-    this.paused = true;
-  }
-
-  resume(): void {
-    this.paused = false;
-    const flush = this.held;
-    this.held = [];
-    for (const deliver of flush) deliver();
-  }
-
-  async stop(): Promise<void> {
-    for (const socket of this.sockets) socket.destroy();
-    await new Promise<void>((resolve) => this.server.close(() => resolve()));
-  }
-
-  private accept(client: Socket): void {
-    const upstream = connect(this.upstreamPort, this.upstreamHost);
-    this.sockets.add(client).add(upstream);
-    const relay = (from: Socket, to: Socket) => {
-      from.on('data', (chunk: Buffer) => {
-        const deliver = () => {
-          if (!to.destroyed) to.write(chunk);
-        };
-        if (this.paused) this.held.push(deliver);
-        else deliver();
-      });
-      from.on('close', () => to.destroy());
-      from.on('error', () => to.destroy());
-    };
-    relay(client, upstream);
-    relay(upstream, client);
-  }
-}
 
 describe('database unavailable (integration)', () => {
   let database: DisposableDatabase;
-  let relay: PausableRelay;
+  let relay: PgRelay;
   let prisma: PrismaService;
   let runner: TransactionRunner;
 
@@ -97,7 +32,7 @@ describe('database unavailable (integration)', () => {
     database = await provisionDisposableDatabase();
     await migrateDisposableDatabase(database);
     const direct = new URL(database.url);
-    relay = await PausableRelay.start(direct.hostname, Number(direct.port || 5432));
+    relay = await PgRelay.start(direct.hostname, Number(direct.port || 5432));
     direct.port = String(relay.port);
     prisma = new PrismaService(testConfig({ ...settings, DATABASE_URL: direct.toString() }));
     runner = new TransactionRunner(prisma, testConfig(settings));
