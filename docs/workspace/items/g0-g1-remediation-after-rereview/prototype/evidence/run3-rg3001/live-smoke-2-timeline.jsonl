@@ -1,0 +1,86 @@
+{"t":81,"ev":"proc.start","proc":"api","pid":34340}
+{"t":93,"ev":"worker.start","proc":"worker","pid":1752}
+{"t":2909,"ev":"worker.ready","proc":"worker","pid":1752,"ms":15}
+{"t":3872,"ev":"smtp.accept","recipient":"it.review@example.test","msg":1}
+{"t":4056,"ev":"outbox","recipient":"it.review@example.test","label":"M-2","rows":1,"from":null,"to":"SENT","attempts":1,"wiped":true,"err":null}
+{"t":4057,"ev":"outbox.wait","recipient":"it.review@example.test","label":"M-2","ok":true,"ms":7}
+{"t":6055,"ev":"smtp.accept","recipient":"fx.emp002@example.test","msg":1}
+{"t":7220,"ev":"smtp.accept","recipient":"fx.emp002@example.test","msg":2}
+{"t":8375,"ev":"smtp.accept","recipient":"fx.fin002@example.test","msg":1}
+{"t":42321,"ev":"worker.stop","proc":"worker","pid":1752}
+{"t":42401,"ev":"worker.start","proc":"worker","pid":27904}
+{"t":44161,"ev":"worker.ready","proc":"worker","pid":27904,"ms":1759}
+{"t":44165,"ev":"outbox","recipient":"fx.term01@example.test","label":"X-2","rows":1,"from":null,"to":"PENDING","attempts":0,"wiped":false,"err":null}
+{"t":44383,"ev":"outbox","recipient":"fx.term01@example.test","label":"X-2","rows":1,"from":"PENDING","to":"CANCELLED","attempts":1,"wiped":true,"err":null}
+{"t":44383,"ev":"outbox.wait","recipient":"fx.term01@example.test","label":"X-2","ok":true,"ms":222}
+{"t":46530,"ev":"smtp.accept","recipient":"fx.act01@example.test","msg":1}
+{"t":52133,"ev":"outbox","recipient":"fx.smtp01@example.test","label":"O-1","rows":1,"from":null,"to":"PENDING","attempts":0,"wiped":false,"err":null}
+{"t":52773,"ev":"outbox","recipient":"fx.smtp01@example.test","label":"O-1","rows":1,"from":"PENDING","to":"SENDING","attempts":1,"wiped":false,"err":null}
+{"t":52776,"ev":"smtp.451","recipient":"fx.smtp01@example.test","msg":1}
+{"t":52991,"ev":"outbox","recipient":"fx.smtp01@example.test","label":"O-1","rows":1,"from":"SENDING","to":"PENDING","attempts":1,"wiped":false,"err":"SMTP_451"}
+{"t":52991,"ev":"outbox.wait","recipient":"fx.smtp01@example.test","label":"O-1","ok":true,"ms":859}
+{"t":53842,"ev":"outbox","recipient":"fx.smtp01@example.test","label":"O-2","rows":1,"from":"PENDING","to":"SENDING","attempts":2,"wiped":false,"err":"SMTP_451"}
+{"t":53939,"ev":"smtp.550","recipient":"fx.smtp01@example.test","msg":2}
+{"t":54046,"ev":"outbox","recipient":"fx.smtp01@example.test","label":"O-2","rows":1,"from":"SENDING","to":"FAILED","attempts":2,"wiped":true,"err":"SMTP_550"}
+{"t":54046,"ev":"outbox.wait","recipient":"fx.smtp01@example.test","label":"O-2","ok":true,"ms":1048}
+{"t":55120,"ev":"smtp.accept","recipient":"fx.smtp01@example.test","msg":3}
+{"t":55158,"ev":"worker.stop","proc":"worker","pid":27904}
+{"t":58230,"ev":"window.negative","recipient":"fx.down01@example.test","ms":3000,"workerStopped":true,"status":"PENDING"}
+{"t":58241,"ev":"worker.start","proc":"worker","pid":35248}
+{"t":60113,"ev":"worker.ready","proc":"worker","pid":35248,"ms":1872}
+{"t":60392,"ev":"smtp.accept","recipient":"fx.down01@example.test","msg":1}
+{"t":60523,"ev":"outbox","recipient":"fx.down01@example.test","label":"O-4","rows":1,"from":null,"to":"SENT","attempts":1,"wiped":true,"err":null}
+{"t":60524,"ev":"outbox.wait","recipient":"fx.down01@example.test","label":"O-4","ok":true,"ms":4}
+{"t":60579,"ev":"outbox","recipient":"fx.sup01@example.test","label":"O-5 sending","rows":1,"from":null,"to":"PENDING","attempts":0,"wiped":false,"err":null}
+{"t":61553,"ev":"smtp.slow-start","recipient":"fx.sup01@example.test","msg":1}
+{"t":61613,"ev":"outbox","recipient":"fx.sup01@example.test","label":"O-5 sending","rows":1,"from":"PENDING","to":"SENDING","attempts":1,"wiped":false,"err":null}
+{"t":61613,"ev":"outbox.wait","recipient":"fx.sup01@example.test","label":"O-5 sending","ok":true,"ms":1036}
+{"t":69566,"ev":"smtp.slow-end","recipient":"fx.sup01@example.test","msg":1}
+{"t":69567,"ev":"smtp.accept","recipient":"fx.sup01@example.test","msg":1}
+{"t":70737,"ev":"smtp.accept","recipient":"fx.sup01@example.test","msg":2}
+{"t":71005,"ev":"outbox","recipient":"fx.sup01@example.test","label":"O-5 settle","rows":2,"from":"SENDING","to":"SENT","attempts":1,"wiped":true,"err":null}
+{"t":71006,"ev":"outbox.wait","recipient":"fx.sup01@example.test","label":"O-5 settle","ok":true,"ms":2}
+{"t":71015,"ev":"worker.start","proc":"worker2","pid":38228}
+{"t":72890,"ev":"worker.ready","proc":"worker2","pid":38228,"ms":1874}
+{"t":73113,"ev":"outbox","recipient":"fx.mw01@example.test","label":"O-6","rows":1,"from":null,"to":"PENDING","attempts":0,"wiped":false,"err":null}
+{"t":73114,"ev":"outbox","recipient":"fx.mw02@example.test","label":"O-6","rows":1,"from":null,"to":"PENDING","attempts":0,"wiped":false,"err":null}
+{"t":73115,"ev":"outbox","recipient":"fx.mw03@example.test","label":"O-6","rows":1,"from":null,"to":"PENDING","attempts":0,"wiped":false,"err":null}
+{"t":73116,"ev":"outbox","recipient":"fx.mw04@example.test","label":"O-6","rows":1,"from":null,"to":"PENDING","attempts":0,"wiped":false,"err":null}
+{"t":73117,"ev":"outbox","recipient":"fx.mw05@example.test","label":"O-6","rows":1,"from":null,"to":"PENDING","attempts":0,"wiped":false,"err":null}
+{"t":73118,"ev":"outbox","recipient":"fx.mw06@example.test","label":"O-6","rows":1,"from":null,"to":"PENDING","attempts":0,"wiped":false,"err":null}
+{"t":73931,"ev":"smtp.accept","recipient":"fx.mw05@example.test","msg":1}
+{"t":73974,"ev":"outbox","recipient":"fx.mw01@example.test","label":"O-6","rows":1,"from":"PENDING","to":"SENDING","attempts":1,"wiped":false,"err":null}
+{"t":73975,"ev":"outbox","recipient":"fx.mw02@example.test","label":"O-6","rows":1,"from":"PENDING","to":"SENDING","attempts":1,"wiped":false,"err":null}
+{"t":73976,"ev":"outbox","recipient":"fx.mw03@example.test","label":"O-6","rows":1,"from":"PENDING","to":"SENDING","attempts":1,"wiped":false,"err":null}
+{"t":73977,"ev":"outbox","recipient":"fx.mw04@example.test","label":"O-6","rows":1,"from":"PENDING","to":"SENDING","attempts":1,"wiped":false,"err":null}
+{"t":73979,"ev":"outbox","recipient":"fx.mw05@example.test","label":"O-6","rows":1,"from":"PENDING","to":"SENT","attempts":1,"wiped":true,"err":null}
+{"t":73979,"ev":"outbox.wait","recipient":"fx.mw05@example.test","label":"O-6","ok":true,"ms":868}
+{"t":73980,"ev":"outbox","recipient":"fx.mw06@example.test","label":"O-6","rows":1,"from":"PENDING","to":"SENDING","attempts":1,"wiped":false,"err":null}
+{"t":74072,"ev":"smtp.accept","recipient":"fx.mw06@example.test","msg":1}
+{"t":74184,"ev":"outbox","recipient":"fx.mw06@example.test","label":"O-6","rows":1,"from":"SENDING","to":"SENT","attempts":1,"wiped":true,"err":null}
+{"t":74184,"ev":"outbox.wait","recipient":"fx.mw06@example.test","label":"O-6","ok":true,"ms":1073}
+{"t":74212,"ev":"smtp.accept","recipient":"fx.mw02@example.test","msg":1}
+{"t":74355,"ev":"smtp.accept","recipient":"fx.mw04@example.test","msg":1}
+{"t":74383,"ev":"outbox","recipient":"fx.mw02@example.test","label":"O-6","rows":1,"from":"SENDING","to":"SENT","attempts":1,"wiped":true,"err":null}
+{"t":74384,"ev":"outbox.wait","recipient":"fx.mw02@example.test","label":"O-6","ok":true,"ms":1273}
+{"t":74385,"ev":"outbox","recipient":"fx.mw04@example.test","label":"O-6","rows":1,"from":"SENDING","to":"SENT","attempts":1,"wiped":true,"err":null}
+{"t":74386,"ev":"outbox.wait","recipient":"fx.mw04@example.test","label":"O-6","ok":true,"ms":1275}
+{"t":74493,"ev":"smtp.accept","recipient":"fx.mw03@example.test","msg":1}
+{"t":74600,"ev":"outbox","recipient":"fx.mw03@example.test","label":"O-6","rows":1,"from":"SENDING","to":"SENT","attempts":1,"wiped":true,"err":null}
+{"t":74601,"ev":"outbox.wait","recipient":"fx.mw03@example.test","label":"O-6","ok":true,"ms":1490}
+{"t":74632,"ev":"smtp.accept","recipient":"fx.mw01@example.test","msg":1}
+{"t":74816,"ev":"outbox","recipient":"fx.mw01@example.test","label":"O-6","rows":1,"from":"SENDING","to":"SENT","attempts":1,"wiped":true,"err":null}
+{"t":74817,"ev":"outbox.wait","recipient":"fx.mw01@example.test","label":"O-6","ok":true,"ms":1707}
+{"t":76853,"ev":"worker.stop","proc":"worker2","pid":38228}
+{"t":76919,"ev":"outbox","recipient":"fx.crash01@example.test","label":"O-7 sending","rows":1,"from":null,"to":"PENDING","attempts":0,"wiped":false,"err":null}
+{"t":77751,"ev":"outbox","recipient":"fx.crash01@example.test","label":"O-7 sending","rows":1,"from":"PENDING","to":"SENDING","attempts":1,"wiped":false,"err":null}
+{"t":77752,"ev":"outbox.wait","recipient":"fx.crash01@example.test","label":"O-7 sending","ok":true,"ms":835}
+{"t":77767,"ev":"worker.stop","proc":"worker","pid":35248}
+{"t":77779,"ev":"worker.start","proc":"worker","pid":39404}
+{"t":79652,"ev":"worker.ready","proc":"worker","pid":39404,"ms":1873}
+{"t":138576,"ev":"outbox","recipient":"fx.crash01@example.test","label":"O-7 recovery","rows":1,"from":"SENDING","to":"SENDING","attempts":2,"wiped":false,"err":null}
+{"t":138699,"ev":"smtp.accept","recipient":"fx.crash01@example.test","msg":1}
+{"t":138780,"ev":"outbox","recipient":"fx.crash01@example.test","label":"O-7 recovery","rows":1,"from":"SENDING","to":"SENT","attempts":2,"wiped":true,"err":null}
+{"t":138780,"ev":"outbox.wait","recipient":"fx.crash01@example.test","label":"O-7 recovery","ok":true,"ms":59127}
+{"t":139906,"ev":"proc.stop","proc":"api","pid":34340}
+{"t":139921,"ev":"worker.stop","proc":"worker","pid":39404}

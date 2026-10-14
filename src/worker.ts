@@ -9,12 +9,10 @@ async function bootstrapWorker(): Promise<void> {
   app.useLogger(new StructuredJsonLogger(app.get(RequestContextService), 'software-license-worker'));
   app.enableShutdownHooks();
 
-  // No queue is registered yet: BullMQ wiring is deliberately deferred until a job exists
-  // that is genuinely slow or needs retries. Nothing holds the
-  // event loop open, so this process starts and exits. Say so — a silent immediate exit
-  // reads as a defect, and someone will spend an afternoon looking for one.
-  new Logger('Worker').warn('Worker started with no registered queue processors; exiting until one exists.');
-  await app.close();
+  // The mail loop (EmailDispatchLoop) is the only work for now. It polls PostgreSQL, so no queue
+  // is registered and Redis is not needed; the open timer keeps the process alive until a
+  // shutdown signal closes the application (ADR-0012).
+  new Logger('Worker').log('Worker started: delivering the email outbox.');
 }
 
 void bootstrapWorker().catch((error: unknown) => {

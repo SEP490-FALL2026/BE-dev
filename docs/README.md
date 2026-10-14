@@ -27,11 +27,17 @@ trong docs/architecture. Các gói triển khai auth/US cũ đã được dọn 
 
 ## Quyết định đề xuất (chưa Accepted)
 
-- [Xác thực nội bộ, phiên và quy ước persistence vùng danh tính](decisions/0011-internal-authentication-and-sessions.md) — Proposed 12/10/2026, chờ dev review; khi Accepted sẽ thay một câu của ADR-0002 và ADR-0004.
+- [Xác thực nội bộ, phiên và quy ước persistence vùng danh tính](decisions/0011-internal-authentication-and-sessions.md) — Proposed, đã implement và merge ở `64073c4`; chờ dev review/Accepted. ADR-0002/0004 đã có ghi chú hiện thực.
+- [Gửi thư vòng đời tài khoản: outbox, thư viện SMTP, dispatcher](decisions/0012-account-email-delivery.md) — Proposed, đã implement và merge cùng lát 1b; chờ dev review/Accepted.
 
 Số ADR bị khuyết không cần đánh lại. Định hướng tài khoản/mật khẩu + JWT hiện ghi
-ở ARCHITECTURE; thiết kế chi tiết sẽ được lập lại theo US.
+ở ARCHITECTURE; spec/plan G0 và lát 1a/1b đã có tại workspace, còn chờ dev review.
 
 [Rules](rules/README.md) · [Tests](../test/README.md) · [Scripts](../scripts/README.md)
 
 [Quy trình thiết kế](workspace/README.md) · [Roadmap](roadmap.md) · [Nguồn BRD/US](workspace/sources.md)
+
+## Review G0/G1
+
+- [Báo cáo AI ngày 14/10/2026](reviews/backend-g0-g1-review-2026-10-14.md): kết quả tại BE `64073c4`, không phải phê duyệt của dev.
+- [Bàn giao sau review](workspace/g0-g1-review-follow-up.md): thứ tự sửa, quyết định Owner R-06/R-07 và việc còn lại trước nghiệm thu/G2.

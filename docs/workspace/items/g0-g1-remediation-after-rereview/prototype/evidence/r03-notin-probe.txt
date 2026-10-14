@@ -1,0 +1,4 @@
+{"n":10,"ok":true,"ms":169,"sqlLength":284,"params":13,"sqlHead":"SELECT \"public\".\"employees\".\"id\" FROM \"public\".\"employees\" WHERE (\"public\".\"employees\".\"status\" = CAST($n::text AS \"public\".\"EmployeeStatus\") AND \"public\".\"empl"}
+{"n":5000,"ok":true,"ms":40,"sqlLength":29152,"params":5003,"sqlHead":"SELECT \"public\".\"employees\".\"id\" FROM \"public\".\"employees\" WHERE (\"public\".\"employees\".\"status\" = CAST($n::text AS \"public\".\"EmployeeStatus\") AND \"public\".\"empl"}
+{"n":32766,"ok":false,"ms":57,"error":"PrismaClientKnownRequestError: → 20   await prisma.employee.findMany( The query parameter limit supported by your database is exceeded."}
+{"n":40000,"ok":false,"ms":67,"error":"PrismaClientKnownRequestError: → 20   await prisma.employee.findMany( The query parameter limit supported by your database is exceeded."}

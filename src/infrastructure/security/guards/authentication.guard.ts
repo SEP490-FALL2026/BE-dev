@@ -6,7 +6,6 @@ import { IS_PUBLIC_METADATA } from '../decorators/public.decorator';
 import { AUTHENTICATED_IDENTITY } from '../models/current-principal';
 import {
   ACCESS_TOKEN_VERIFIER,
-  AuthenticationNotConfiguredError,
   AccessTokenVerifierPort,
   InvalidAccessTokenError,
   TokenVerificationUnavailableError,
@@ -57,13 +56,6 @@ export class AuthenticationGuard implements CanActivate {
       request[AUTHENTICATED_IDENTITY] = await this.tokenVerifier.verify(token);
       return true;
     } catch (error) {
-      if (error instanceof AuthenticationNotConfiguredError) {
-        throw new ApiException(HttpStatus.SERVICE_UNAVAILABLE, {
-          code: 'AUTHENTICATION_NOT_CONFIGURED',
-          message: 'Authentication is not configured.',
-        });
-      }
-
       if (error instanceof TokenVerificationUnavailableError) {
         // During an authentication dependency outage this line is the only signal an operator gets,
         // and the caller deliberately receives none of it.

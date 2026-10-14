@@ -19,8 +19,10 @@
 - Authentication không thay authorization. Không tự duyệt; Finance tư vấn/ghi nhận,
   Spending Approver quyết định chi theo yêu cầu của task.
 - Capacity/uniqueness/overlap cần DB constraint/transaction phù hợp, không chỉ check-then-insert.
-- Cross-module atomic write cần contract/orchestration tường minh. Baseline chưa có
-  transaction runner chung; không import class được nhắc trong kế hoạch nhưng chưa tồn tại.
+- Cross-module atomic write dùng `TransactionRunner.run` và `DbTx` ở
+  [transaction-runner.ts](../../src/infrastructure/database/transaction-runner.ts).
+  Facade nhận cùng `tx`; khóa dữ liệu của module khác cũng qua facade. Runner dùng
+  Read Committed, đặt lock/statement timeout theo giao dịch; không tự mở giao dịch con.
 - Required audit/durable delivery intent cùng transaction với business write; gọi
   network sau commit. Thiết kế này phải được implement/test khi workflow được thêm.
 - PostgreSQL mặc định Read Committed: hai SELECT trong một transaction vẫn có thể

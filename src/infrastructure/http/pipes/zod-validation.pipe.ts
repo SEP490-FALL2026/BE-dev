@@ -1,9 +1,9 @@
-import { HttpStatus } from '@nestjs/common';
+import { ArgumentMetadata, HttpStatus } from '@nestjs/common';
 import { createZodValidationPipe } from 'nestjs-zod';
 import { ZodError } from 'zod';
 import { ApiException } from '../errors/api.exception';
 
-export const ApplicationZodValidationPipe = createZodValidationPipe({
+const StrictZodValidationPipe = createZodValidationPipe({
   strictSchemaDeclaration: true,
   createValidationException: (error: unknown): ApiException => {
     const issues =
@@ -16,3 +16,17 @@ export const ApplicationZodValidationPipe = createZodValidationPipe({
     });
   },
 });
+
+/**
+ * Request bodies, params and queries must be declared with a Zod DTO (strict). Parameters
+ * supplied by a custom decorator (`@CurrentPrincipal()`) are server-resolved values, not client
+ * input, so they bypass validation. A custom decorator must therefore never return raw client
+ * input; read that through a DTO.
+ */
+export class ApplicationZodValidationPipe extends StrictZodValidationPipe {
+  override transform(value: unknown, metadata: ArgumentMetadata): unknown {
+    if (metadata.type === 'custom') return value;
+
+    return super.transform(value, metadata);
+  }
+}

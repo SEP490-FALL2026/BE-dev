@@ -1,0 +1,11 @@
+2026-10-14T14:50:21+07:00
+a8ba88fd81581000ade8b84f1c1d3b4583c3d3e1
+## dev...origin/dev
+ M docs/roadmap.md
+?? docs/reviews/backend-g0-g1-rereview-after-fix-2026-10-14/evidence/00-start-state.txt
+--- diff stat
+ docs/roadmap.md | 38 +++++++++++++++++++-------------------
+ 1 file changed, 19 insertions(+), 19 deletions(-)
+--- roadmap sha256
+ee1c068ece390506c0d6102f84be1adc1e6756f532322a7b96f8344ccf289c45 *docs/roadmap.md
+4a024d6287a342a77e5d68c308d922e1532069e42670dfe9e6df7c98a6a2d3e7 *-

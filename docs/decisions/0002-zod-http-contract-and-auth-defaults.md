@@ -15,8 +15,9 @@ Ordinary JSON success uses { success: true, message, data }; message is a stable
 Describe the full envelope in OpenAPI. Raw/stream/204 responses explicitly opt out.
 
 Register authentication globally; only @Public() bypasses it. The intended mechanism
-is account/password plus JWT. Until implemented, supplied tokens receive
-503 AUTHENTICATION_NOT_CONFIGURED and missing tokens receive 401.
+is account/password plus JWT. Missing tokens receive 401. _Update 12/10/2026:_ the placeholder verifier
+and its `503 AUTHENTICATION_NOT_CONFIGURED` response were removed when [ADR-0011](0011-internal-authentication-and-sessions.md)
+(Proposed) was implemented in slice 1a; routes now also declare `@AuthenticatedOnly()`/`@RequireRoles()`.
 Do not add a bypass or speculative multi-mode authentication engine.
 
 Keep Joi for environment validation. Security behavior needs negative HTTP tests.

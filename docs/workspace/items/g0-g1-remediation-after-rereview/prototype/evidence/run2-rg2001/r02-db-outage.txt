@@ -1,0 +1,50 @@
+INFO P-1 warm pool, bytes held: bare $queryRaw — 2013ms Error: Query read timeout => transient(503)
+INFO P-2 warm pool, bytes held: model findMany — 1025ms Error: Connection terminated due to connection timeout <- Error: Connection terminated unexpectedly => transient(503)
+INFO P-3 warm pool, bytes held: TransactionRunner.run — 1010ms TransientDatabaseError: The database could not complete the transaction. Retry shortly. => NOT transient(500)
+INFO P-4 cold connection, bytes held (connect timeout): model findMany — 1010ms Error: Connection terminated due to connection timeout <- Error: Connection terminated unexpectedly => transient(503)
+INFO P-5 nothing listening (ECONNREFUSED): model findMany — 2ms PrismaClientKnownRequestError[P1001]:  => transient(503)
+INFO P-6 connection reset while a query runs: $queryRaw — 206ms Error: Connection terminated unexpectedly => transient(503)
+INFO P-7 programming error (unknown column) on a healthy database — 15ms PrismaClientKnownRequestError[P2010]:  => NOT transient(500)
+PASS P-8 a programming error is not classified as transient — uestError[P2010]:  => NOT transient(500)
+INFO A-0 docker pause (warm pool), 8 s — GET /me 503/TOKEN_VERIFICATION_UNAVAILABLE 8.0s | POST /auth/login 503/AUTH.UNAVAILABLE 8.0s | POST /auth/refresh 503/AUTH.UNAVAILABLE 3.0s | GET /app-users 503/TOKEN_VERIFICATION_UNAVAILABLE 3.0s | GET /account-candidates 503/TOKEN_VERIFICATION_UNAVAILABLE 3.0s | GET /health/ready 503/SERVICE_UNAVAILABLE 1.5s | POST lock 503/TOKEN_VERIFICATION_UNAVAILABLE 3.0s | POST /auth/logout 503/AUTH.UNAVAILABLE 3.0s
+PASS A-1 every request ends on its own while PostgreSQL is paused (no client-side abort at 45 s) — 503,503,503,503,503,503,503,503
+PASS A-2 /me, login, list, candidates answer 503 within query timeout + slack (guard path and reads) — 503/TOKEN_VERIFICATION_UNAVAILABLE 8.0s | 503/AUTH.UNAVAILABLE 8.0s | 503/TOKEN_VERIFICATION_UNAVAILABLE 3.0s | 503/TOKEN_VERIFICATION_UNAVAILABLE 3.0s
+PASS A-3 availability codes only (guard TOKEN_VERIFICATION_UNAVAILABLE, login AUTH.UNAVAILABLE, service SERVICE_UNAVAILABLE); never 401/500 — TOKEN_VERIFICATION_UNAVAILABLE,AUTH.UNAVAILABLE,TOKEN_VERIFICATION_UNAVAILABLE,TOKEN_VERIFICATION_UNAVAILABLE
+PASS A-4 refresh / logout / lock end with 503 too, and refresh/logout keep the cookie (no Set-Cookie clear) — 503/AUTH.UNAVAILABLE 3.0s | 503/TOKEN_VERIFICATION_UNAVAILABLE 3.0s | 503/AUTH.UNAVAILABLE 3.0s
+INFO A-5 readiness while paused (terminus 1.5 s ping timeout; R-12 code) — 503/SERVICE_UNAVAILABLE 1.5s
+PASS A-6 after unpause no connection of the API is left idle in transaction — []
+INFO A-7 write outcome after the paused requests got 503 (commit not known to the client) — refresh consumed +0; lock target status ACTIVE, LOCKED audits 0
+PASS A-8 lock that answered 503 left no half-written state (status and audit agree) — ACTIVE/0
+INFO A-9 client retries refresh with the cookie it still holds after the 503 — 200/AUTH.SESSION_REFRESHED 0.0s
+PASS A-10 API process alive, no unhandled rejection / uncaught exception in its log — alive=true unhandled=false
+PASS A-rec after the database answers again: /me 200, ready 200, login 200 without restarting the API; process alive — 200/ME.RETRIEVED 0.0s ready 200 login 200 alive=true
+INFO A2-0 paused 4 s (> maxWait 2 s, < query timeout 8 s) while lock and refresh run — lock 200/APP_USER.LOCKED 4.2s | refresh 200/AUTH.SESSION_REFRESHED 4.2s
+PASS A2-1 no transaction left open after the late BEGIN; lock state and audit agree — idle-in-tx=0 status=LOCKED audits=1
+PASS A2-rec after the database answers again: /me 200, ready 200, login 200 without restarting the API; process alive — 200/ME.RETRIEVED 0.0s ready 200 login 200 alive=true
+INFO B-0 fresh API process (no pooled connection), PostgreSQL paused — me 503/TOKEN_VERIFICATION_UNAVAILABLE 3.1s | login 503/AUTH.UNAVAILABLE 3.1s | list 503/TOKEN_VERIFICATION_UNAVAILABLE 3.1s | ready 503/SERVICE_UNAVAILABLE 1.6s
+PASS B-1 cold pool: /me, login, list answer 503 within connect timeout + query slack — 503/TOKEN_VERIFICATION_UNAVAILABLE 3.1s | 503/AUTH.UNAVAILABLE 3.1s | 503/TOKEN_VERIFICATION_UNAVAILABLE 3.1s
+PASS B-rec after the database answers again: /me 200, ready 200, login 200 without restarting the API; process alive — 200/ME.RETRIEVED 0.1s ready 200 login 200 alive=true
+PASS C-1 connection reset while a request is in flight -> 503 SERVICE_UNAVAILABLE, no 500 — 503/SERVICE_UNAVAILABLE 1.5s
+INFO C-2 PostgreSQL stopped — me 503/TOKEN_VERIFICATION_UNAVAILABLE 0.0s | login 503/AUTH.UNAVAILABLE 0.0s | refresh 503/AUTH.UNAVAILABLE 0.0s | list 503/TOKEN_VERIFICATION_UNAVAILABLE 0.0s | ready 503/SERVICE_UNAVAILABLE 0.0s | logout 503/AUTH.UNAVAILABLE 0.0s
+PASS C-3 stopped database: every route 503 quickly with its availability code; cookie kept — 503/TOKEN_VERIFICATION_UNAVAILABLE,503/AUTH.UNAVAILABLE,503/AUTH.UNAVAILABLE,503/TOKEN_VERIFICATION_UNAVAILABLE,503/SERVICE_UNAVAILABLE,503/AUTH.UNAVAILABLE
+PASS C-rec after the database answers again: /me 200, ready 200, login 200 without restarting the API; process alive — 200/ME.RETRIEVED 0.1s ready 200 login 200 alive=true
+PASS C-4 no unhandled rejection / crash across reset and restart — alive=true unhandled=false
+INFO D1-0 UPDATE app_users of a lock held 20 s then delivered — trigger=true response 503/SERVICE_UNAVAILABLE 8.0s
+INFO D1-1 right after release: backends idle in transaction, committed status of the victim — [] committed=ACTIVE
+PASS D1-2 after the stalled lock answered, no API connection is left idle in transaction (dirty connection not reused) — 0 idle-in-tx
+INFO D1-3 after later traffic (12 GET /me, lock+unlock of another account, 12 GET /app-users) — other lock 200 unlock 200; victim committed status=ACTIVE, new LOCKED audits=0; idle-in-tx=0
+PASS D1-4 the 503-answered lock never becomes a committed LOCKED without its audit row (US-01-06 atomicity) — status=ACTIVE audits=0 openSessions=0
+INFO D1-5 a later lock of the same victim (row lock still held by the zombie transaction?) — 200/APP_USER.LOCKED 0.0s
+INFO D2-0 COMMIT of a lock held 12 s, then delivered — trigger=true response 503/SERVICE_UNAVAILABLE 8.0s; committed status=ACTIVE audits=0
+PASS D2-1 COMMIT outcome is all-or-nothing (status and audit agree) even though the client saw an error — ACTIVE/0
+INFO D2-2 client retries the lock after the 503 — 200/APP_USER.LOCKED 0.1s; audits now 1
+PASS D3-1 BEGIN held past maxWait: 503 and the late transaction is rolled back, nothing left open — 503/SERVICE_UNAVAILABLE 2.0s idle-in-tx=0 status=ACTIVE
+PASS D-9 API process alive, no unhandled rejection — alive=true unhandled=false
+INFO D4-0 docker pause issued when the lock UPDATE was sent; unpaused after 20 s — paused=true response 503/SERVICE_UNAVAILABLE 8.0s
+INFO D4-1 after unpause: API backends idle in transaction — []
+PASS D4-2 real docker pause mid-transaction: a 503-answered lock is never committed later without its audit, token revocation and outbox cancel — other lock 200/unlock 200; victim status=ACTIVE LOCKED audits=0 usable invitation tokens=1; idle-in-tx before traffic=0
+PASS E-1 verifier hit by a non-transient DB error (relation missing) -> 500 INTERNAL_SERVER_ERROR with one error log, not 503 (R-04 change) — 500/INTERNAL_SERVER_ERROR 0.0s errors 11->12
+PASS E-2 table restored: /me 200 — 200/ME.RETRIEVED 0.0s
+INFO M-1 GET /me with the MeService query (login email) unanswered; the guard already passed — trigger=true 503/SERVICE_UNAVAILABLE 8.0s
+PASS M-2 R-15: /me answers 503 (availability) when the database stops answering after the guard — 503/SERVICE_UNAVAILABLE 8.0s
+{"finishedAt":"2026-10-14T14:42:55.891Z","seconds":81,"phases":["P","A","A2","B","C","D","D4","E","M"],"pass":26,"fail":0,"info":23}

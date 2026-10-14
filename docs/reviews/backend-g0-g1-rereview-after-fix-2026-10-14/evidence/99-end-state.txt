@@ -1,0 +1,43 @@
+2026-10-14T15:43:03+07:00
+a8ba88fd81581000ade8b84f1c1d3b4583c3d3e1
+## dev...origin/dev
+ M docs/roadmap.md
+?? docs/reviews/backend-g0-g1-rereview-after-fix-2026-10-14.md
+?? docs/reviews/backend-g0-g1-rereview-after-fix-2026-10-14/README.md
+?? docs/reviews/backend-g0-g1-rereview-after-fix-2026-10-14/evidence/00-start-state.txt
+?? docs/reviews/backend-g0-g1-rereview-after-fix-2026-10-14/evidence/99-end-state.txt
+?? docs/reviews/backend-g0-g1-rereview-after-fix-2026-10-14/evidence/docs-hashes.txt
+?? docs/reviews/backend-g0-g1-rereview-after-fix-2026-10-14/evidence/live-smoke-results.json
+?? docs/reviews/backend-g0-g1-rereview-after-fix-2026-10-14/evidence/mutation-results.json
+?? docs/reviews/backend-g0-g1-rereview-after-fix-2026-10-14/evidence/pty-results.txt
+?? docs/reviews/backend-g0-g1-rereview-after-fix-2026-10-14/evidence/r02-d1-connection-sql.txt
+?? docs/reviews/backend-g0-g1-rereview-after-fix-2026-10-14/evidence/r02-results-AA2BCDEM.json
+?? docs/reviews/backend-g0-g1-rereview-after-fix-2026-10-14/evidence/r02-results-P.json
+?? docs/reviews/backend-g0-g1-rereview-after-fix-2026-10-14/evidence/r03-candidates-scale.json
+?? docs/reviews/backend-g0-g1-rereview-after-fix-2026-10-14/evidence/r09-redeem-cost.json
+?? docs/reviews/backend-g0-g1-rereview-after-fix-2026-10-14/evidence/requirement-definitions-delta.txt
+?? docs/reviews/backend-g0-g1-rereview-after-fix-2026-10-14/evidence/sigterm-worker.json
+?? docs/reviews/backend-g0-g1-rereview-after-fix-2026-10-14/evidence/smtp-tls-outbox.txt
+?? docs/reviews/backend-g0-g1-rereview-after-fix-2026-10-14/hash-sources.py
+?? docs/reviews/backend-g0-g1-rereview-after-fix-2026-10-14/live-smoke.mjs
+?? docs/reviews/backend-g0-g1-rereview-after-fix-2026-10-14/mutate.mjs
+?? docs/reviews/backend-g0-g1-rereview-after-fix-2026-10-14/pty/cli.sh
+?? docs/reviews/backend-g0-g1-rereview-after-fix-2026-10-14/pty/mini-smtp.js
+?? docs/reviews/backend-g0-g1-rereview-after-fix-2026-10-14/pty/run.sh
+?? docs/reviews/backend-g0-g1-rereview-after-fix-2026-10-14/r02-db-outage.mjs
+?? docs/reviews/backend-g0-g1-rereview-after-fix-2026-10-14/r09-redeem-cost.mjs
+?? docs/reviews/backend-g0-g1-rereview-after-fix-2026-10-14/reset-live.sh
+?? docs/reviews/backend-g0-g1-rereview-after-fix-2026-10-14/rr-candidates-scale.integration-spec.ts
+?? docs/reviews/backend-g0-g1-rereview-after-fix-2026-10-14/sig-test.mjs
+?? docs/reviews/backend-g0-g1-rereview-after-fix-2026-10-14/smtp-tls.mjs
+--- tracked diff stat
+warning: in the working copy of 'docs/roadmap.md', LF will be replaced by CRLF the next time Git touches it
+ docs/roadmap.md | 38 +++++++++++++++++++-------------------
+ 1 file changed, 19 insertions(+), 19 deletions(-)
+--- roadmap sha256 (start: ee1c068e…c45)
+ee1c068ece390506c0d6102f84be1adc1e6756f532322a7b96f8344ccf289c45 *docs/roadmap.md
+--- Docs
+0e0bb83
+Docs uncommitted entries: 76
+--- docker after cleanup
+redis-6696

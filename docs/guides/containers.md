@@ -23,6 +23,12 @@ docker build --target migrate -t slm-migrate:foundation .
 
 The runtime defaults to production. Supply DATABASE_URL, HTTPS CORS_ORIGINS,
 REDIS_HOST/REDIS_PASSWORD, HTTPS OBJECT_STORAGE_ENDPOINT and storage credentials/bucket.
+Authentication also requires AUTH_ACCESS_TOKEN_SECRET, AUTH_THROTTLE_PEPPER and secure cookies;
+invitation delivery requires HTTPS APP_PUBLIC_URL, OUTBOX_PAYLOAD_KEY (base64 of 32 bytes),
+OUTBOX_PAYLOAD_KEY_ID, SMTP_HOST, SMTP_FROM and SMTP_TLS=true, plus the provider's port/auth settings.
+The [environment validator](../../src/infrastructure/config/env-schema.ts) owns the full constraints.
+The API and the worker validate all of these settings and refuse to start in production without them.
+The installation command validates only the database settings and NODE_ENV (see below).
 Use container-reachable hostnames: localhost means the container itself.
 
 Create untracked environment files appropriate to the target environment:
@@ -35,12 +41,29 @@ docker run --rm --env-file .env.container -p 127.0.0.1:3000:3000 slm-api:foundat
 The migration image requires DATABASE_URL with migration privileges. The runtime
 does not run migrations automatically. The baseline is for a fresh database;
 existing databases need a separately reviewed transition, never an automatic reset.
-The worker uses the same runtime image with command node dist/worker.js. No business
-processor exists yet.
+First-run installation (once, on an empty database after migrations) is an interactive command in the
+same runtime image: `docker run --rm -it --env-file .env.container slm-api:foundation node dist/installation-cli.js --help`.
+The command validates only `NODE_ENV` (the image sets it to production), `DATABASE_URL` (the runtime role)
+and the optional `DB_*` limits; it does not read the JWT, SMTP, outbox, Redis, object-storage or `APP_PUBLIC_URL`
+settings, so `docker run --rm -it -e DATABASE_URL=... slm-api:foundation node dist/installation-cli.js ...` is enough.
+`--help` and argument errors do not touch the environment at all. Passing the full env file still works;
+unrelated variables are ignored. Exit code 1 does not prove that nothing was written: if the connection or the
+reply to `COMMIT` was lost, check the installation state before running it again (a rerun that exits 2 means the
+first run committed).
+It needs a terminal (`-it`) because the Super Admin password is typed at a hidden prompt; it refuses to
+read it from arguments, the environment or a pipe. The
+[AI review at `64073c4`](../reviews/backend-g0-g1-review-2026-10-14.md) verified a real Linux PTY
+in the runtime image with automated input; manual interactive PowerShell verification is still pending.
+The worker uses the same runtime image with command `node dist/worker.js` and runs the PostgreSQL
+outbox polling loop for SMTP delivery. No BullMQ processor is registered. Compose has no SMTP sink;
+configure a reachable SMTP service separately. SMTP TLS/provider delivery remains unverified.
 
 For a local container smoke test, explicitly set NODE_ENV=development, database and
 service hostnames; do not expose development credentials to a shared environment.
-Health live checks the HTTP process; ready pings PostgreSQL only.
+Health live checks the HTTP process; ready pings PostgreSQL only and answers 503 `SERVICE_UNAVAILABLE` when it fails.
+Behind PgBouncer or a managed pooler the connection startup parameters `options` and
+`idle_in_transaction_session_timeout` need attention: see the pooler note in
+[ARCHITECTURE](../../ARCHITECTURE.md) (not verified with any pooler).
 
 References: [pnpm Docker](https://pnpm.io/docker),
 [Prisma Docker](https://docs.prisma.io/docs/guides/deployment/docker).

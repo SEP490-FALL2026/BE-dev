@@ -1,0 +1,2025 @@
+{
+  "runId": "im1015-final",
+  "status": "COMPLETED",
+  "startedAt": "2026-10-14T19:38:35.770Z",
+  "finishedAt": "2026-10-14T19:45:40.989Z",
+  "node": "v24.0.1",
+  "cloneHead": "e147782ebc89aa13619f27a3fb24b49d03dfdece",
+  "scriptSha256": "94f30fc88220d0e6f3353e67a9d9939c0b7007ddd80d362d816df34bcec63896",
+  "targetFileHashes": {
+    "src/infrastructure/database/pg-pool.ts": "806d6d38cd222b536de744437100f3878c4a5a63c3604c7be2f626217ca1a95a",
+    "src/infrastructure/database/prisma.service.ts": "72bb74267e55b6df0c31fb8bd538a3c848ffcab52465b5d3d3804e7ec6f69b87",
+    "src/infrastructure/database/transaction-runner.ts": "654ad2676a0a4a2f54947dd75ce096574475305e29ffec848cceba0e53606874",
+    "src/modules/organization/organization.repo.ts": "17a49c5a19304007e9c0a441c5af4a12a47c0e07db71ffd67b53876b6309986b",
+    "src/modules/identity-access/me.controller.ts": "af0734c6e8cb09add6da10c527d17023d33849add9fb9998dfb63409fbf1151b",
+    "src/infrastructure/health/health.controller.ts": "054cbe76695f7fbd84390b270886b58848214abfac66a5c8e82068ecdd5fff21",
+    "src/modules/identity-access/identity-access.repo.ts": "9774b405e34a32560a18f9ed82f91e09cdc83ace6d4c7007c322ab776b503878",
+    "src/modules/identity-access/account-management.service.ts": "b3988db9d21d9a727f9a604b669591a3d4f06eb7ad71b76e75b6ba4d7424d84f",
+    "src/modules/installation/installation.module.ts": "0af0b116b2f6e71a895da5ed7877b669ff9e3dc6fb90963ec794b86775bae0cd",
+    "src/infrastructure/config/env-config.ts": "8b1dde8a8bb4567fd6da9157093ae782599985baf6c1c6fceb62766f02f19ba0",
+    "src/infrastructure/config/env-schema.ts": "78eb7deac5e32fe393b7b43c3b6586f8eaeb0c74d31f0cfcc74ee6bb5415183b",
+    "src/installation-cli.ts": "c1ac502bd2fe94149d8698f32884b64c7934b1db11202accfef3c06dfee0b65b",
+    "src/modules/installation/installation.service.ts": "6b19386c660d67db12b6c71acf15ca534be7e89e8352a028fa8d2ceb46fb7f10"
+  },
+  "control": [
+    {
+      "kind": "integration",
+      "path": "test/integration/database-stall.integration-spec.ts",
+      "durationMs": 20411,
+      "exit": 0,
+      "counts": {
+        "total": 6,
+        "passed": 6,
+        "failed": 0,
+        "pending": 0
+      },
+      "targets": [
+        "never commits a transaction whose statement was answered late (N-1)",
+        "ends a bare read on an acquired connection at the query timeout, as a transient error",
+        "sets the server-side idle-in-transaction backstop on pooled sessions",
+        "keeps serving and closes every connection on disconnect"
+      ],
+      "ok": true,
+      "problems": []
+    },
+    {
+      "kind": "integration",
+      "path": "test/integration/pg-pool.integration-spec.ts",
+      "durationMs": 7516,
+      "exit": 0,
+      "counts": {
+        "total": 6,
+        "passed": 6,
+        "failed": 0,
+        "pending": 0
+      },
+      "targets": [
+        "I1: removes a connection retired on a timeout",
+        "I11: a connection released inside a transaction"
+      ],
+      "ok": true,
+      "problems": []
+    },
+    {
+      "kind": "unit",
+      "path": "src/infrastructure/database/pg-pool.spec.ts",
+      "durationMs": 9977,
+      "exit": 0,
+      "counts": {
+        "total": 27,
+        "passed": 27,
+        "failed": 0,
+        "pending": 0
+      },
+      "targets": [
+        "retires the client when",
+        "retires the client on a timeout",
+        "(text, callback, undefined)",
+        "throws UnsupportedQueryFormError synchronously",
+        "retires once when two queued queries both time out",
+        "when the hook throws (Promise form)",
+        "when the hook throws (callback form)",
+        "retires a released client whose transaction status is"
+      ],
+      "ok": true,
+      "problems": []
+    },
+    {
+      "kind": "unit",
+      "path": "src/infrastructure/database/transient-error.spec.ts",
+      "durationMs": 3304,
+      "exit": 0,
+      "counts": {
+        "total": 12,
+        "passed": 12,
+        "failed": 0,
+        "pending": 0
+      },
+      "targets": [
+        "treats \"Client was closed and is not queryable\" as retryable"
+      ],
+      "ok": true,
+      "problems": []
+    },
+    {
+      "kind": "integration",
+      "path": "test/integration/account-candidates.integration-spec.ts",
+      "durationMs": 18896,
+      "exit": 0,
+      "counts": {
+        "total": 3,
+        "passed": 3,
+        "failed": 0,
+        "pending": 0
+      },
+      "targets": [
+        "/./"
+      ],
+      "ok": true,
+      "problems": []
+    },
+    {
+      "kind": "integration",
+      "path": "test/integration/account-candidates-boundaries.integration-spec.ts",
+      "durationMs": 19855,
+      "exit": 0,
+      "counts": {
+        "total": 18,
+        "passed": 18,
+        "failed": 0,
+        "pending": 0
+      },
+      "targets": [
+        "search=Z_1 (underscore is literal)",
+        "search=% (percent is literal)",
+        "search=Y<backslash>1 (backslash is literal)"
+      ],
+      "ok": true,
+      "problems": []
+    },
+    {
+      "kind": "unit",
+      "path": "src/modules/identity-access/me.controller.spec.ts",
+      "durationMs": 5404,
+      "exit": 0,
+      "counts": {
+        "total": 3,
+        "passed": 3,
+        "failed": 0,
+        "pending": 0
+      },
+      "targets": [
+        "/503/"
+      ],
+      "ok": true,
+      "problems": []
+    },
+    {
+      "kind": "integration",
+      "path": "test/integration/me-unavailable.integration-spec.ts",
+      "durationMs": 16916,
+      "exit": 0,
+      "counts": {
+        "total": 2,
+        "passed": 2,
+        "failed": 0,
+        "pending": 0
+      },
+      "targets": [
+        "/503/"
+      ],
+      "ok": true,
+      "problems": []
+    },
+    {
+      "kind": "unit",
+      "path": "src/infrastructure/health/health.controller.spec.ts",
+      "durationMs": 4280,
+      "exit": 0,
+      "counts": {
+        "total": 3,
+        "passed": 3,
+        "failed": 0,
+        "pending": 0
+      },
+      "targets": [
+        "/SERVICE_UNAVAILABLE/",
+        "leaves any other failure to the global filter"
+      ],
+      "ok": true,
+      "problems": []
+    },
+    {
+      "kind": "integration",
+      "path": "test/integration/account-list-and-redeem.integration-spec.ts",
+      "durationMs": 10227,
+      "exit": 0,
+      "counts": {
+        "total": 3,
+        "passed": 3,
+        "failed": 0,
+        "pending": 0
+      },
+      "targets": [
+        "/R-14/",
+        "/R-09/"
+      ],
+      "ok": true,
+      "problems": []
+    },
+    {
+      "kind": "unit",
+      "path": "src/architecture-boundaries.spec.ts",
+      "durationMs": 2428,
+      "exit": 0,
+      "counts": {
+        "total": 11,
+        "passed": 11,
+        "failed": 0,
+        "pending": 0
+      },
+      "targets": [
+        "does not reach the API/worker configuration, the identity-access module, notifications or the JWT library",
+        "wires the full validator to the API options",
+        "prevents imports of another business module private layers"
+      ],
+      "ok": true,
+      "problems": []
+    },
+    {
+      "kind": "unit",
+      "path": "src/infrastructure/config/env-schema.spec.ts",
+      "durationMs": 2273,
+      "exit": 0,
+      "counts": {
+        "total": 66,
+        "passed": 66,
+        "failed": 0,
+        "pending": 0
+      },
+      "targets": [
+        "validates the installation config options with the installation validator",
+        "does not reject a longer transaction timeout when no idle limit is given"
+      ],
+      "ok": true,
+      "problems": []
+    },
+    {
+      "kind": "integration",
+      "path": "test/integration/installation-cli.integration-spec.ts",
+      "durationMs": 8789,
+      "exit": 0,
+      "counts": {
+        "total": 3,
+        "passed": 3,
+        "failed": 0,
+        "pending": 0
+      },
+      "targets": [
+        "reports a missing DATABASE_URL by name",
+        "rejects an unusable DATABASE_URL"
+      ],
+      "ok": true,
+      "problems": []
+    }
+  ],
+  "mutations": [
+    {
+      "id": "N1a",
+      "finding": "N-1",
+      "file": "src/infrastructure/database/pg-pool.ts",
+      "what": "pool built with the plain pg Client (the retiring client class is lost)",
+      "status": "KILLED",
+      "reason": null,
+      "restored": true,
+      "runs": [
+        {
+          "kind": "integration",
+          "path": "test/integration/database-stall.integration-spec.ts",
+          "exit": 1,
+          "durationMs": 17244,
+          "counts": {
+            "total": 6,
+            "passed": 5,
+            "failed": 1,
+            "pending": 0
+          },
+          "infra": false,
+          "reason": null,
+          "targets": [
+            {
+              "target": "never commits a transaction whose statement was answered late (N-1)",
+              "matchedCount": 1,
+              "passed": 0,
+              "failed": [
+                {
+                  "name": "a statement that stops being answered on a warm connection (integration) never commits a transaction whose statement was answered late (N-1)",
+                  "assertionSignature": true,
+                  "message": "Error: expect(received).resolves.toEqual(expected) // deep equality - Expected - 1 + Received + 1 Object { \"paired\": 0, - \"value\": 0, + \"value\": 1, } at Object.toEqual (C:\\Users\\Asus\\AppData\\Local\\Tem"
+                }
+              ],
+              "other": []
+            }
+          ],
+          "nonTargetFailed": [],
+          "log": "C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\fin\\mut\\logs-im1015-final\\N1a-1.log"
+        },
+        {
+          "kind": "integration",
+          "path": "test/integration/pg-pool.integration-spec.ts",
+          "exit": 1,
+          "durationMs": 19847,
+          "counts": {
+            "total": 6,
+            "passed": 3,
+            "failed": 3,
+            "pending": 0
+          },
+          "infra": false,
+          "reason": null,
+          "targets": [
+            {
+              "target": "I1: removes a connection retired on a timeout",
+              "matchedCount": 1,
+              "passed": 0,
+              "failed": [
+                {
+                  "name": "createPostgresPool with the Prisma adapter (integration) I1: removes a connection retired on a timeout for good, and counts it once",
+                  "assertionSignature": true,
+                  "message": "Error: expect(received).toContain(expected) // indexOf Expected value: 1020 Received array: [] at Object.<anonymous> (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\test\\integration\\pg-pool.integrat"
+                }
+              ],
+              "other": []
+            }
+          ],
+          "nonTargetFailed": [
+            "createPostgresPool with the Prisma adapter (integration) I7: retires each timed-out connection once when several statements stall at once",
+            "createPostgresPool with the Prisma adapter (integration) I11: a connection released inside a transaction is removed, never reused, and rolled back"
+          ],
+          "log": "C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\fin\\mut\\logs-im1015-final\\N1a-2.log"
+        }
+      ],
+      "occurrences": 1,
+      "failedTargets": [
+        {
+          "name": "a statement that stops being answered on a warm connection (integration) never commits a transaction whose statement was answered late (N-1)",
+          "message": "Error: expect(received).resolves.toEqual(expected) // deep equality - Expected - 1 + Received + 1 Object { \"paired\": 0, - \"value\": 0, + \"value\": 1, } at Object.toEqual (C:\\Users\\Asus\\AppData\\Local\\Tem"
+        },
+        {
+          "name": "createPostgresPool with the Prisma adapter (integration) I1: removes a connection retired on a timeout for good, and counts it once",
+          "message": "Error: expect(received).toContain(expected) // indexOf Expected value: 1020 Received array: [] at Object.<anonymous> (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\test\\integration\\pg-pool.integrat"
+        }
+      ]
+    },
+    {
+      "id": "N1b",
+      "finding": "N-1",
+      "file": "src/infrastructure/database/pg-pool.ts",
+      "what": "a retired connection is not ended",
+      "status": "KILLED",
+      "reason": null,
+      "restored": true,
+      "runs": [
+        {
+          "kind": "integration",
+          "path": "test/integration/database-stall.integration-spec.ts",
+          "exit": 1,
+          "durationMs": 17471,
+          "counts": {
+            "total": 6,
+            "passed": 5,
+            "failed": 1,
+            "pending": 0
+          },
+          "infra": false,
+          "reason": null,
+          "targets": [
+            {
+              "target": "never commits a transaction whose statement was answered late (N-1)",
+              "matchedCount": 1,
+              "passed": 0,
+              "failed": [
+                {
+                  "name": "a statement that stops being answered on a warm connection (integration) never commits a transaction whose statement was answered late (N-1)",
+                  "assertionSignature": true,
+                  "message": "Error: expect(received).resolves.toEqual(expected) // deep equality - Expected - 1 + Received + 1 Object { \"paired\": 0, - \"value\": 0, + \"value\": 1, } at Object.toEqual (C:\\Users\\Asus\\AppData\\Local\\Tem"
+                }
+              ],
+              "other": []
+            }
+          ],
+          "nonTargetFailed": [],
+          "log": "C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\fin\\mut\\logs-im1015-final\\N1b-1.log"
+        },
+        {
+          "kind": "unit",
+          "path": "src/infrastructure/database/pg-pool.spec.ts",
+          "exit": 1,
+          "durationMs": 5434,
+          "counts": {
+            "total": 27,
+            "passed": 17,
+            "failed": 10,
+            "pending": 0
+          },
+          "infra": false,
+          "reason": null,
+          "targets": [
+            {
+              "target": "retires the client when",
+              "matchedCount": 3,
+              "passed": 0,
+              "failed": [
+                {
+                  "name": "RetireOnTimeoutClient Promise form retires the client when text times out: end first, then the hook, then the caller",
+                  "assertionSignature": true,
+                  "message": "Error: expect(jest.fn()).toHaveBeenCalledTimes(expected) Expected number of calls: 1 Received number of calls: 0 at C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\src\\infrastructure\\database\\pg-pool"
+                },
+                {
+                  "name": "RetireOnTimeoutClient Promise form retires the client when text and values times out: end first, then the hook, then the caller",
+                  "assertionSignature": true,
+                  "message": "Error: expect(jest.fn()).toHaveBeenCalledTimes(expected) Expected number of calls: 1 Received number of calls: 0 at C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\src\\infrastructure\\database\\pg-pool"
+                },
+                {
+                  "name": "RetireOnTimeoutClient Promise form retires the client when the shape the Prisma adapter sends times out: end first, then the hook, then the caller",
+                  "assertionSignature": true,
+                  "message": "Error: expect(jest.fn()).toHaveBeenCalledTimes(expected) Expected number of calls: 1 Received number of calls: 0 at C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\src\\infrastructure\\database\\pg-pool"
+                }
+              ],
+              "other": []
+            },
+            {
+              "target": "retires the client on a timeout",
+              "matchedCount": 4,
+              "passed": 0,
+              "failed": [
+                {
+                  "name": "RetireOnTimeoutClient callback form retires the client on a timeout, before the caller callback: (text, values, callback)",
+                  "assertionSignature": true,
+                  "message": "Error: expect(jest.fn()).toHaveBeenCalledTimes(expected) Expected number of calls: 1 Received number of calls: 0 at C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\src\\infrastructure\\database\\pg-pool"
+                },
+                {
+                  "name": "RetireOnTimeoutClient callback form retires the client on a timeout, before the caller callback: (config, undefined, callback)",
+                  "assertionSignature": true,
+                  "message": "Error: expect(jest.fn()).toHaveBeenCalledTimes(expected) Expected number of calls: 1 Received number of calls: 0 at C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\src\\infrastructure\\database\\pg-pool"
+                },
+                {
+                  "name": "RetireOnTimeoutClient callback form retires the client on a timeout, before the caller callback: (text, callback)",
+                  "assertionSignature": true,
+                  "message": "Error: expect(jest.fn()).toHaveBeenCalledTimes(expected) Expected number of calls: 1 Received number of calls: 0 at C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\src\\infrastructure\\database\\pg-pool"
+                },
+                {
+                  "name": "RetireOnTimeoutClient callback form retires the client on a timeout, before the caller callback: (text, callback, undefined)",
+                  "assertionSignature": true,
+                  "message": "Error: expect(jest.fn()).toHaveBeenCalledTimes(expected) Expected number of calls: 1 Received number of calls: 0 at C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\src\\infrastructure\\database\\pg-pool"
+                }
+              ],
+              "other": []
+            }
+          ],
+          "nonTargetFailed": [
+            "RetireOnTimeoutClient Promise form retires once when two queued queries both time out, and each caller gets its own error",
+            "RetireOnTimeoutClient a failing end() or hook can neither skip the retirement nor replace the error still ends the client and reports the timeout when the hook throws (Promise form)",
+            "RetireOnTimeoutClient a failing end() or hook can neither skip the retirement nor replace the error still ends the client and calls the callback when the hook throws (callback form)"
+          ],
+          "log": "C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\fin\\mut\\logs-im1015-final\\N1b-2.log"
+        }
+      ],
+      "occurrences": 1,
+      "failedTargets": [
+        {
+          "name": "a statement that stops being answered on a warm connection (integration) never commits a transaction whose statement was answered late (N-1)",
+          "message": "Error: expect(received).resolves.toEqual(expected) // deep equality - Expected - 1 + Received + 1 Object { \"paired\": 0, - \"value\": 0, + \"value\": 1, } at Object.toEqual (C:\\Users\\Asus\\AppData\\Local\\Tem"
+        },
+        {
+          "name": "RetireOnTimeoutClient Promise form retires the client when text times out: end first, then the hook, then the caller",
+          "message": "Error: expect(jest.fn()).toHaveBeenCalledTimes(expected) Expected number of calls: 1 Received number of calls: 0 at C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\src\\infrastructure\\database\\pg-pool"
+        },
+        {
+          "name": "RetireOnTimeoutClient Promise form retires the client when text and values times out: end first, then the hook, then the caller",
+          "message": "Error: expect(jest.fn()).toHaveBeenCalledTimes(expected) Expected number of calls: 1 Received number of calls: 0 at C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\src\\infrastructure\\database\\pg-pool"
+        },
+        {
+          "name": "RetireOnTimeoutClient Promise form retires the client when the shape the Prisma adapter sends times out: end first, then the hook, then the caller",
+          "message": "Error: expect(jest.fn()).toHaveBeenCalledTimes(expected) Expected number of calls: 1 Received number of calls: 0 at C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\src\\infrastructure\\database\\pg-pool"
+        },
+        {
+          "name": "RetireOnTimeoutClient callback form retires the client on a timeout, before the caller callback: (text, values, callback)",
+          "message": "Error: expect(jest.fn()).toHaveBeenCalledTimes(expected) Expected number of calls: 1 Received number of calls: 0 at C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\src\\infrastructure\\database\\pg-pool"
+        },
+        {
+          "name": "RetireOnTimeoutClient callback form retires the client on a timeout, before the caller callback: (config, undefined, callback)",
+          "message": "Error: expect(jest.fn()).toHaveBeenCalledTimes(expected) Expected number of calls: 1 Received number of calls: 0 at C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\src\\infrastructure\\database\\pg-pool"
+        },
+        {
+          "name": "RetireOnTimeoutClient callback form retires the client on a timeout, before the caller callback: (text, callback)",
+          "message": "Error: expect(jest.fn()).toHaveBeenCalledTimes(expected) Expected number of calls: 1 Received number of calls: 0 at C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\src\\infrastructure\\database\\pg-pool"
+        },
+        {
+          "name": "RetireOnTimeoutClient callback form retires the client on a timeout, before the caller callback: (text, callback, undefined)",
+          "message": "Error: expect(jest.fn()).toHaveBeenCalledTimes(expected) Expected number of calls: 1 Received number of calls: 0 at C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\src\\infrastructure\\database\\pg-pool"
+        }
+      ]
+    },
+    {
+      "id": "N2",
+      "finding": "R-02",
+      "file": "src/infrastructure/database/prisma.service.ts",
+      "what": "pool built without query_timeout (the R-02 budget)",
+      "status": "KILLED",
+      "reason": null,
+      "restored": true,
+      "runs": [
+        {
+          "kind": "integration",
+          "path": "test/integration/database-stall.integration-spec.ts",
+          "exit": 1,
+          "durationMs": 27516,
+          "counts": {
+            "total": 6,
+            "passed": 3,
+            "failed": 3,
+            "pending": 0
+          },
+          "infra": false,
+          "reason": null,
+          "targets": [
+            {
+              "target": "ends a bare read on an acquired connection at the query timeout, as a transient error",
+              "matchedCount": 1,
+              "passed": 0,
+              "failed": [
+                {
+                  "name": "a statement that stops being answered on a warm connection (integration) ends a bare read on an acquired connection at the query timeout, as a transient error",
+                  "assertionSignature": true,
+                  "message": "Error: expect(received).toBeInstanceOf(expected) Expected constructor: TransientDatabaseError Received value has no prototype Received value: undefined at Object.<anonymous> (C:\\Users\\Asus\\AppData\\Loc"
+                }
+              ],
+              "other": []
+            }
+          ],
+          "nonTargetFailed": [
+            "a statement that stops being answered on a warm connection (integration) never commits a transaction whose statement was answered late (N-1)",
+            "a statement that stops being answered on a warm connection (integration) keeps a transaction whose COMMIT was answered late all-or-nothing"
+          ],
+          "log": "C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\fin\\mut\\logs-im1015-final\\N2-1.log"
+        }
+      ],
+      "occurrences": 1,
+      "failedTargets": [
+        {
+          "name": "a statement that stops being answered on a warm connection (integration) ends a bare read on an acquired connection at the query timeout, as a transient error",
+          "message": "Error: expect(received).toBeInstanceOf(expected) Expected constructor: TransientDatabaseError Received value has no prototype Received value: undefined at Object.<anonymous> (C:\\Users\\Asus\\AppData\\Loc"
+        }
+      ]
+    },
+    {
+      "id": "N5",
+      "finding": "N-5",
+      "file": "src/infrastructure/database/transaction-runner.ts",
+      "what": "\"Client was closed and is not queryable\" no longer transient",
+      "status": "KILLED",
+      "reason": null,
+      "restored": true,
+      "runs": [
+        {
+          "kind": "unit",
+          "path": "src/infrastructure/database/transient-error.spec.ts",
+          "exit": 1,
+          "durationMs": 2758,
+          "counts": {
+            "total": 12,
+            "passed": 11,
+            "failed": 1,
+            "pending": 0
+          },
+          "infra": false,
+          "reason": null,
+          "targets": [
+            {
+              "target": "treats \"Client was closed and is not queryable\" as retryable",
+              "matchedCount": 1,
+              "passed": 0,
+              "failed": [
+                {
+                  "name": "toTransientError — client-side connectivity failures treats \"Client was closed and is not queryable\" as retryable",
+                  "assertionSignature": true,
+                  "message": "Error: expect(received).toBeInstanceOf(expected) Expected constructor: TransientDatabaseError Received value has no prototype Received value: undefined at C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\p"
+                }
+              ],
+              "other": []
+            }
+          ],
+          "nonTargetFailed": [],
+          "log": "C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\fin\\mut\\logs-im1015-final\\N5-1.log"
+        }
+      ],
+      "occurrences": 1,
+      "failedTargets": [
+        {
+          "name": "toTransientError — client-side connectivity failures treats \"Client was closed and is not queryable\" as retryable",
+          "message": "Error: expect(received).toBeInstanceOf(expected) Expected constructor: TransientDatabaseError Received value has no prototype Received value: undefined at C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\p"
+        }
+      ]
+    },
+    {
+      "id": "IDLE",
+      "finding": "R-02",
+      "file": "src/infrastructure/database/prisma.service.ts",
+      "what": "server-side idle-in-transaction backstop not sent",
+      "status": "KILLED",
+      "reason": null,
+      "restored": true,
+      "runs": [
+        {
+          "kind": "integration",
+          "path": "test/integration/database-stall.integration-spec.ts",
+          "exit": 1,
+          "durationMs": 15435,
+          "counts": {
+            "total": 6,
+            "passed": 5,
+            "failed": 1,
+            "pending": 0
+          },
+          "infra": false,
+          "reason": null,
+          "targets": [
+            {
+              "target": "sets the server-side idle-in-transaction backstop on pooled sessions",
+              "matchedCount": 1,
+              "passed": 0,
+              "failed": [
+                {
+                  "name": "a statement that stops being answered on a warm connection (integration) sets the server-side idle-in-transaction backstop on pooled sessions",
+                  "assertionSignature": true,
+                  "message": "Error: expect(received).toBe(expected) // Object.is equality Expected: \"2min\" Received: \"0\" at Object.<anonymous> (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\test\\integration\\database-stall.inte"
+                }
+              ],
+              "other": []
+            }
+          ],
+          "nonTargetFailed": [],
+          "log": "C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\fin\\mut\\logs-im1015-final\\IDLE-1.log"
+        }
+      ],
+      "occurrences": 1,
+      "failedTargets": [
+        {
+          "name": "a statement that stops being answered on a warm connection (integration) sets the server-side idle-in-transaction backstop on pooled sessions",
+          "message": "Error: expect(received).toBe(expected) // Object.is equality Expected: \"2min\" Received: \"0\" at Object.<anonymous> (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\test\\integration\\database-stall.inte"
+        }
+      ]
+    },
+    {
+      "id": "DISP",
+      "finding": "R-02",
+      "file": "src/infrastructure/database/prisma.service.ts",
+      "what": "$disconnect leaves the service-owned pool open",
+      "status": "KILLED",
+      "reason": null,
+      "restored": true,
+      "runs": [
+        {
+          "kind": "integration",
+          "path": "test/integration/database-stall.integration-spec.ts",
+          "exit": 1,
+          "durationMs": 15852,
+          "counts": {
+            "total": 6,
+            "passed": 5,
+            "failed": 1,
+            "pending": 0
+          },
+          "infra": false,
+          "reason": null,
+          "targets": [
+            {
+              "target": "keeps serving and closes every connection on disconnect",
+              "matchedCount": 1,
+              "passed": 0,
+              "failed": [
+                {
+                  "name": "a statement that stops being answered on a warm connection (integration) keeps serving and closes every connection on disconnect",
+                  "assertionSignature": true,
+                  "message": "Error: expect(received).toBe(expected) // Object.is equality Expected: 0 Received: 1 at Object.<anonymous> (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\test\\integration\\database-stall.integration"
+                }
+              ],
+              "other": []
+            }
+          ],
+          "nonTargetFailed": [],
+          "log": "C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\fin\\mut\\logs-im1015-final\\DISP-1.log"
+        }
+      ],
+      "occurrences": 1,
+      "failedTargets": [
+        {
+          "name": "a statement that stops being answered on a warm connection (integration) keeps serving and closes every connection on disconnect",
+          "message": "Error: expect(received).toBe(expected) // Object.is equality Expected: 0 Received: 1 at Object.<anonymous> (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\test\\integration\\database-stall.integration"
+        }
+      ]
+    },
+    {
+      "id": "R3x",
+      "finding": "R-03",
+      "file": "src/modules/organization/organization.repo.ts",
+      "what": "candidate query ignores the exclusion list",
+      "status": "KILLED",
+      "reason": null,
+      "restored": true,
+      "runs": [
+        {
+          "kind": "integration",
+          "path": "test/integration/account-candidates.integration-spec.ts",
+          "exit": 1,
+          "durationMs": 11157,
+          "counts": {
+            "total": 3,
+            "passed": 1,
+            "failed": 2,
+            "pending": 0
+          },
+          "infra": false,
+          "reason": null,
+          "targets": [
+            {
+              "target": "/./",
+              "matchedCount": 3,
+              "passed": 1,
+              "failed": [
+                {
+                  "name": "account candidates beyond the first 200 employees (integration, real PostgreSQL) returns the first 20 by code even when 200 earlier employees already have an account",
+                  "assertionSignature": true,
+                  "message": "Error: expect(received).toEqual(expected) // deep equality - Expected - 20 + Received + 20 Array [ - \"FXZ-001\", - \"FXZ-002\", - \"FXZ-003\", - \"FXZ-004\", - \"FXZ-005\", - \"FXZ-006\", - \"FXZ-007\", - \"FXZ-008"
+                },
+                {
+                  "name": "account candidates beyond the first 200 employees (integration, real PostgreSQL) returns fewer than 20 when fewer remain, after skipping every employee with an account",
+                  "assertionSignature": true,
+                  "message": "Error: expect(received).toEqual(expected) // deep equality - Expected - 5 + Received + 20 Array [ - \"FXZ-001\", - \"FXZ-002\", - \"FXZ-003\", - \"FXZ-004\", - \"FXZ-005\", + \"E-ADMIN\", + \"FXA-001\", + \"FXA-002\""
+                }
+              ],
+              "other": []
+            }
+          ],
+          "nonTargetFailed": [],
+          "log": "C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\fin\\mut\\logs-im1015-final\\R3x-1.log"
+        }
+      ],
+      "occurrences": 1,
+      "failedTargets": [
+        {
+          "name": "account candidates beyond the first 200 employees (integration, real PostgreSQL) returns the first 20 by code even when 200 earlier employees already have an account",
+          "message": "Error: expect(received).toEqual(expected) // deep equality - Expected - 20 + Received + 20 Array [ - \"FXZ-001\", - \"FXZ-002\", - \"FXZ-003\", - \"FXZ-004\", - \"FXZ-005\", - \"FXZ-006\", - \"FXZ-007\", - \"FXZ-008"
+        },
+        {
+          "name": "account candidates beyond the first 200 employees (integration, real PostgreSQL) returns fewer than 20 when fewer remain, after skipping every employee with an account",
+          "message": "Error: expect(received).toEqual(expected) // deep equality - Expected - 5 + Received + 20 Array [ - \"FXZ-001\", - \"FXZ-002\", - \"FXZ-003\", - \"FXZ-004\", - \"FXZ-005\", + \"E-ADMIN\", + \"FXA-001\", + \"FXA-002\""
+        }
+      ]
+    },
+    {
+      "id": "R3y",
+      "finding": "N-6",
+      "file": "src/modules/organization/organization.repo.ts",
+      "what": "search term no longer escaped (% and _ act as wildcards again)",
+      "status": "KILLED",
+      "reason": null,
+      "restored": true,
+      "runs": [
+        {
+          "kind": "integration",
+          "path": "test/integration/account-candidates-boundaries.integration-spec.ts",
+          "exit": 1,
+          "durationMs": 12880,
+          "counts": {
+            "total": 18,
+            "passed": 15,
+            "failed": 3,
+            "pending": 0
+          },
+          "infra": false,
+          "reason": null,
+          "targets": [
+            {
+              "target": "search=Z_1 (underscore is literal)",
+              "matchedCount": 1,
+              "passed": 0,
+              "failed": [
+                {
+                  "name": "account candidates: exclusion, limit and literal search (integration, real PostgreSQL) search=Z_1 (underscore is literal)",
+                  "assertionSignature": true,
+                  "message": "Error: expect(received).toEqual(expected) // deep equality - Expected - 0 + Received + 1 Array [ + \"ZX1\", \"Z_1\", ] at C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\test\\integration\\account-candidat"
+                }
+              ],
+              "other": []
+            },
+            {
+              "target": "search=% (percent is literal)",
+              "matchedCount": 1,
+              "passed": 0,
+              "failed": [
+                {
+                  "name": "account candidates: exclusion, limit and literal search (integration, real PostgreSQL) search=% (percent is literal)",
+                  "assertionSignature": true,
+                  "message": "Error: expect(received).toEqual(expected) // deep equality - Expected - 1 + Received + 22 - Array [] + Array [ + \"B-0001\", + \"B-0002\", + \"B-0004\", + \"B-0005\", + \"B-0006\", + \"B-0007\", + \"B-0008\", + \"B-"
+                }
+              ],
+              "other": []
+            },
+            {
+              "target": "search=Y<backslash>1 (backslash is literal)",
+              "matchedCount": 1,
+              "passed": 0,
+              "failed": [
+                {
+                  "name": "account candidates: exclusion, limit and literal search (integration, real PostgreSQL) search=Y<backslash>1 (backslash is literal)",
+                  "assertionSignature": true,
+                  "message": "Error: expect(received).toEqual(expected) // deep equality - Expected - 1 + Received + 1 Array [ - \"Y\\\\1\", + \"Y1\", ] at C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\test\\integration\\account-candid"
+                }
+              ],
+              "other": []
+            }
+          ],
+          "nonTargetFailed": [],
+          "log": "C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\fin\\mut\\logs-im1015-final\\R3y-1.log"
+        }
+      ],
+      "occurrences": 1,
+      "failedTargets": [
+        {
+          "name": "account candidates: exclusion, limit and literal search (integration, real PostgreSQL) search=Z_1 (underscore is literal)",
+          "message": "Error: expect(received).toEqual(expected) // deep equality - Expected - 0 + Received + 1 Array [ + \"ZX1\", \"Z_1\", ] at C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\test\\integration\\account-candidat"
+        },
+        {
+          "name": "account candidates: exclusion, limit and literal search (integration, real PostgreSQL) search=% (percent is literal)",
+          "message": "Error: expect(received).toEqual(expected) // deep equality - Expected - 1 + Received + 22 - Array [] + Array [ + \"B-0001\", + \"B-0002\", + \"B-0004\", + \"B-0005\", + \"B-0006\", + \"B-0007\", + \"B-0008\", + \"B-"
+        },
+        {
+          "name": "account candidates: exclusion, limit and literal search (integration, real PostgreSQL) search=Y<backslash>1 (backslash is literal)",
+          "message": "Error: expect(received).toEqual(expected) // deep equality - Expected - 1 + Received + 1 Array [ - \"Y\\\\1\", + \"Y1\", ] at C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\test\\integration\\account-candid"
+        }
+      ]
+    },
+    {
+      "id": "R3z",
+      "finding": "R-03",
+      "file": "src/modules/organization/organization.repo.ts",
+      "what": "candidates no longer sorted by employee code",
+      "status": "KILLED",
+      "reason": null,
+      "restored": true,
+      "runs": [
+        {
+          "kind": "integration",
+          "path": "test/integration/account-candidates.integration-spec.ts",
+          "exit": 1,
+          "durationMs": 10453,
+          "counts": {
+            "total": 3,
+            "passed": 0,
+            "failed": 3,
+            "pending": 0
+          },
+          "infra": false,
+          "reason": null,
+          "targets": [
+            {
+              "target": "/./",
+              "matchedCount": 3,
+              "passed": 0,
+              "failed": [
+                {
+                  "name": "account candidates beyond the first 200 employees (integration, real PostgreSQL) returns the first 20 by code even when 200 earlier employees already have an account",
+                  "assertionSignature": true,
+                  "message": "Error: expect(received).toEqual(expected) // deep equality - Expected - 12 + Received + 12 Array [ + \"FXZ-005\", + \"FXZ-018\", + \"FXZ-010\", \"FXZ-001\", \"FXZ-002\", - \"FXZ-003\", - \"FXZ-004\", - \"FXZ-005\", -"
+                },
+                {
+                  "name": "account candidates beyond the first 200 employees (integration, real PostgreSQL) applies the search filter to the same rule",
+                  "assertionSignature": true,
+                  "message": "Error: expect(received).toEqual(expected) // deep equality - Expected - 6 + Received + 6 Array [ - \"FXZ-020\", - \"FXZ-021\", - \"FXZ-022\", - \"FXZ-023\", \"FXZ-024\", + \"FXZ-028\", \"FXZ-025\", - \"FXZ-026\", \"FX"
+                },
+                {
+                  "name": "account candidates beyond the first 200 employees (integration, real PostgreSQL) returns fewer than 20 when fewer remain, after skipping every employee with an account",
+                  "assertionSignature": true,
+                  "message": "Error: expect(received).toEqual(expected) // deep equality - Expected - 2 + Received + 2 Array [ + \"FXZ-005\", \"FXZ-001\", \"FXZ-002\", - \"FXZ-003\", \"FXZ-004\", - \"FXZ-005\", + \"FXZ-003\", ] at Object.<anony"
+                }
+              ],
+              "other": []
+            }
+          ],
+          "nonTargetFailed": [],
+          "log": "C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\fin\\mut\\logs-im1015-final\\R3z-1.log"
+        }
+      ],
+      "occurrences": 1,
+      "failedTargets": [
+        {
+          "name": "account candidates beyond the first 200 employees (integration, real PostgreSQL) returns the first 20 by code even when 200 earlier employees already have an account",
+          "message": "Error: expect(received).toEqual(expected) // deep equality - Expected - 12 + Received + 12 Array [ + \"FXZ-005\", + \"FXZ-018\", + \"FXZ-010\", \"FXZ-001\", \"FXZ-002\", - \"FXZ-003\", - \"FXZ-004\", - \"FXZ-005\", -"
+        },
+        {
+          "name": "account candidates beyond the first 200 employees (integration, real PostgreSQL) applies the search filter to the same rule",
+          "message": "Error: expect(received).toEqual(expected) // deep equality - Expected - 6 + Received + 6 Array [ - \"FXZ-020\", - \"FXZ-021\", - \"FXZ-022\", - \"FXZ-023\", \"FXZ-024\", + \"FXZ-028\", \"FXZ-025\", - \"FXZ-026\", \"FX"
+        },
+        {
+          "name": "account candidates beyond the first 200 employees (integration, real PostgreSQL) returns fewer than 20 when fewer remain, after skipping every employee with an account",
+          "message": "Error: expect(received).toEqual(expected) // deep equality - Expected - 2 + Received + 2 Array [ + \"FXZ-005\", \"FXZ-001\", \"FXZ-002\", - \"FXZ-003\", \"FXZ-004\", - \"FXZ-005\", + \"FXZ-003\", ] at Object.<anony"
+        }
+      ]
+    },
+    {
+      "id": "R15",
+      "finding": "R-15",
+      "file": "src/modules/identity-access/me.controller.ts",
+      "what": "/me no longer maps an unreachable database after the guard to 503",
+      "status": "KILLED",
+      "reason": null,
+      "restored": true,
+      "runs": [
+        {
+          "kind": "unit",
+          "path": "src/modules/identity-access/me.controller.spec.ts",
+          "exit": 1,
+          "durationMs": 3490,
+          "counts": {
+            "total": 3,
+            "passed": 1,
+            "failed": 2,
+            "pending": 0
+          },
+          "infra": false,
+          "reason": null,
+          "targets": [
+            {
+              "target": "/503/",
+              "matchedCount": 2,
+              "passed": 0,
+              "failed": [
+                {
+                  "name": "MeController — failures after the guard (R-15) answers 503 SERVICE_UNAVAILABLE for an unreachable database: TransientDatabaseError: The database could not complete the transaction. Retry shortly.\n    at C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\src\\modules\\identity-access\\me.controller.spec.ts:13:12\n    at _dispatchDescribe (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\node_modules\\.pnpm\\jest-circus@30.4.2\\node_modules\\jest-circus\\build\\jestAdapterInit.js:608:26)\n    at describe (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\node_modules\\.pnpm\\jest-circus@30.4.2\\node_modules\\jest-circus\\build\\jestAdapterInit.js:576:44)\n    at Object.<anonymous> (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\src\\modules\\identity-access\\me.controller.spec.ts:12:1)\n    at ModuleExecutor.exec (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\node_modules\\.pnpm\\jest-runtime@30.4.2\\node_modules\\jest-runtime\\build\\index.js:2078:26)\n    at CjsLoader.loadModule (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\node_modules\\.pnpm\\jest-runtime@30.4.2\\node_modules\\jest-runtime\\build\\index.js:323:36)\n    at CjsLoader.requireModule (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\node_modules\\.pnpm\\jest-runtime@30.4.2\\node_modules\\jest-runtime\\build\\index.js:289:12)\n    at Runtime.requireModule (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\node_modules\\.pnpm\\jest-runtime@30.4.2\\node_modules\\jest-runtime\\build\\index.js:3657:27)\n    at jestAdapter (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\node_modules\\.pnpm\\jest-circus@30.4.2\\node_modules\\jest-circus\\build\\runner.js:96:13)\n    at runTestInternal (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\node_modules\\.pnpm\\jest-runner@30.4.2\\node_modules\\jest-runner\\build\\index.js:276:16)\n    at runTest (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\node_modules\\.pnpm\\jest-runner@30.4.2\\node_modules\\jest-runner\\build\\index.js:344:7) {\n  sqlState: '57014',\n  reason: Error: timeout\n      at C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\src\\modules\\identity-access\\me.controller.spec.ts:13:48\n      at _dispatchDescribe (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\node_modules\\.pnpm\\jest-circus@30.4.2\\node_modules\\jest-circus\\build\\jestAdapterInit.js:608:26)\n      at describe (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\node_modules\\.pnpm\\jest-circus@30.4.2\\node_modules\\jest-circus\\build\\jestAdapterInit.js:576:44)\n      at Object.<anonymous> (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\src\\modules\\identity-access\\me.controller.spec.ts:12:1)\n      at ModuleExecutor.exec (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\node_modules\\.pnpm\\jest-runtime@30.4.2\\node_modules\\jest-runtime\\build\\index.js:2078:26)\n      at CjsLoader.loadModule (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\node_modules\\.pnpm\\jest-runtime@30.4.2\\node_modules\\jest-runtime\\build\\index.js:323:36)\n      at CjsLoader.requireModule (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\node_modules\\.pnpm\\jest-runtime@30.4.2\\node_modules\\jest-runtime\\build\\index.js:289:12)\n      at Runtime.requireModule (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\node_modules\\.pnpm\\jest-runtime@30.4.2\\node_modules\\jest-runtime\\build\\index.js:3657:27)\n      at jestAdapter (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\node_modules\\.pnpm\\jest-circus@30.4.2\\node_modules\\jest-circus\\build\\runner.js:96:13)\n      at runTestInternal (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\node_modules\\.pnpm\\jest-runner@30.4.2\\node_modules\\jest-runner\\build\\index.js:276:16)\n      at runTest (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\node_modules\\.pnpm\\jest-runner@30.4.2\\node_modules\\jest-runner\\build\\index.js:344:7)\n}",
+                  "assertionSignature": true,
+                  "message": "Error: expect(received).toBeInstanceOf(expected) Expected constructor: ApiException Received constructor: TransientDatabaseError at C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\src\\modules\\identit"
+                },
+                {
+                  "name": "MeController — failures after the guard (R-15) answers 503 SERVICE_UNAVAILABLE for an unreachable database: Error: Query read timeout\n    at C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\src\\modules\\identity-access\\me.controller.spec.ts:13:71\n    at _dispatchDescribe (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\node_modules\\.pnpm\\jest-circus@30.4.2\\node_modules\\jest-circus\\build\\jestAdapterInit.js:608:26)\n    at describe (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\node_modules\\.pnpm\\jest-circus@30.4.2\\node_modules\\jest-circus\\build\\jestAdapterInit.js:576:44)\n    at Object.<anonymous> (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\src\\modules\\identity-access\\me.controller.spec.ts:12:1)\n    at ModuleExecutor.exec (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\node_modules\\.pnpm\\jest-runtime@30.4.2\\node_modules\\jest-runtime\\build\\index.js:2078:26)\n    at CjsLoader.loadModule (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\node_modules\\.pnpm\\jest-runtime@30.4.2\\node_modules\\jest-runtime\\build\\index.js:323:36)\n    at CjsLoader.requireModule (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\node_modules\\.pnpm\\jest-runtime@30.4.2\\node_modules\\jest-runtime\\build\\index.js:289:12)\n    at Runtime.requireModule (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\node_modules\\.pnpm\\jest-runtime@30.4.2\\node_modules\\jest-runtime\\build\\index.js:3657:27)\n    at jestAdapter (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\node_modules\\.pnpm\\jest-circus@30.4.2\\node_modules\\jest-circus\\build\\runner.js:96:13)\n    at runTestInternal (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\node_modules\\.pnpm\\jest-runner@30.4.2\\node_modules\\jest-runner\\build\\index.js:276:16)\n    at runTest (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\node_modules\\.pnpm\\jest-runner@30.4.2\\node_modules\\jest-runner\\build\\index.js:344:7)",
+                  "assertionSignature": true,
+                  "message": "Error: expect(received).toBeInstanceOf(expected) Expected constructor: ApiException Received constructor: Error at C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\src\\modules\\identity-access\\me.contr"
+                }
+              ],
+              "other": []
+            }
+          ],
+          "nonTargetFailed": [],
+          "log": "C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\fin\\mut\\logs-im1015-final\\R15-1.log"
+        },
+        {
+          "kind": "integration",
+          "path": "test/integration/me-unavailable.integration-spec.ts",
+          "exit": 1,
+          "durationMs": 13173,
+          "counts": {
+            "total": 2,
+            "passed": 1,
+            "failed": 1,
+            "pending": 0
+          },
+          "infra": false,
+          "reason": null,
+          "targets": [
+            {
+              "target": "/503/",
+              "matchedCount": 1,
+              "passed": 0,
+              "failed": [
+                {
+                  "name": "GET /me when the database stops answering after the guard (integration) answers 503 SERVICE_UNAVAILABLE within the query timeout, not 500",
+                  "assertionSignature": true,
+                  "message": "Error: expect(received).toBe(expected) // Object.is equality Expected: 503 Received: 500 at Object.<anonymous> (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\test\\integration\\me-unavailable.integra"
+                }
+              ],
+              "other": []
+            }
+          ],
+          "nonTargetFailed": [],
+          "log": "C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\fin\\mut\\logs-im1015-final\\R15-2.log"
+        }
+      ],
+      "occurrences": 1,
+      "failedTargets": [
+        {
+          "name": "MeController — failures after the guard (R-15) answers 503 SERVICE_UNAVAILABLE for an unreachable database: TransientDatabaseError: The database could not complete the transaction. Retry shortly.\n    at C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\src\\modules\\identity-access\\me.controller.spec.ts:13:12\n    at _dispatchDescribe (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\node_modules\\.pnpm\\jest-circus@30.4.2\\node_modules\\jest-circus\\build\\jestAdapterInit.js:608:26)\n    at describe (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\node_modules\\.pnpm\\jest-circus@30.4.2\\node_modules\\jest-circus\\build\\jestAdapterInit.js:576:44)\n    at Object.<anonymous> (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\src\\modules\\identity-access\\me.controller.spec.ts:12:1)\n    at ModuleExecutor.exec (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\node_modules\\.pnpm\\jest-runtime@30.4.2\\node_modules\\jest-runtime\\build\\index.js:2078:26)\n    at CjsLoader.loadModule (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\node_modules\\.pnpm\\jest-runtime@30.4.2\\node_modules\\jest-runtime\\build\\index.js:323:36)\n    at CjsLoader.requireModule (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\node_modules\\.pnpm\\jest-runtime@30.4.2\\node_modules\\jest-runtime\\build\\index.js:289:12)\n    at Runtime.requireModule (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\node_modules\\.pnpm\\jest-runtime@30.4.2\\node_modules\\jest-runtime\\build\\index.js:3657:27)\n    at jestAdapter (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\node_modules\\.pnpm\\jest-circus@30.4.2\\node_modules\\jest-circus\\build\\runner.js:96:13)\n    at runTestInternal (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\node_modules\\.pnpm\\jest-runner@30.4.2\\node_modules\\jest-runner\\build\\index.js:276:16)\n    at runTest (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\node_modules\\.pnpm\\jest-runner@30.4.2\\node_modules\\jest-runner\\build\\index.js:344:7) {\n  sqlState: '57014',\n  reason: Error: timeout\n      at C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\src\\modules\\identity-access\\me.controller.spec.ts:13:48\n      at _dispatchDescribe (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\node_modules\\.pnpm\\jest-circus@30.4.2\\node_modules\\jest-circus\\build\\jestAdapterInit.js:608:26)\n      at describe (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\node_modules\\.pnpm\\jest-circus@30.4.2\\node_modules\\jest-circus\\build\\jestAdapterInit.js:576:44)\n      at Object.<anonymous> (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\src\\modules\\identity-access\\me.controller.spec.ts:12:1)\n      at ModuleExecutor.exec (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\node_modules\\.pnpm\\jest-runtime@30.4.2\\node_modules\\jest-runtime\\build\\index.js:2078:26)\n      at CjsLoader.loadModule (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\node_modules\\.pnpm\\jest-runtime@30.4.2\\node_modules\\jest-runtime\\build\\index.js:323:36)\n      at CjsLoader.requireModule (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\node_modules\\.pnpm\\jest-runtime@30.4.2\\node_modules\\jest-runtime\\build\\index.js:289:12)\n      at Runtime.requireModule (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\node_modules\\.pnpm\\jest-runtime@30.4.2\\node_modules\\jest-runtime\\build\\index.js:3657:27)\n      at jestAdapter (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\node_modules\\.pnpm\\jest-circus@30.4.2\\node_modules\\jest-circus\\build\\runner.js:96:13)\n      at runTestInternal (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\node_modules\\.pnpm\\jest-runner@30.4.2\\node_modules\\jest-runner\\build\\index.js:276:16)\n      at runTest (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\node_modules\\.pnpm\\jest-runner@30.4.2\\node_modules\\jest-runner\\build\\index.js:344:7)\n}",
+          "message": "Error: expect(received).toBeInstanceOf(expected) Expected constructor: ApiException Received constructor: TransientDatabaseError at C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\src\\modules\\identit"
+        },
+        {
+          "name": "MeController — failures after the guard (R-15) answers 503 SERVICE_UNAVAILABLE for an unreachable database: Error: Query read timeout\n    at C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\src\\modules\\identity-access\\me.controller.spec.ts:13:71\n    at _dispatchDescribe (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\node_modules\\.pnpm\\jest-circus@30.4.2\\node_modules\\jest-circus\\build\\jestAdapterInit.js:608:26)\n    at describe (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\node_modules\\.pnpm\\jest-circus@30.4.2\\node_modules\\jest-circus\\build\\jestAdapterInit.js:576:44)\n    at Object.<anonymous> (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\src\\modules\\identity-access\\me.controller.spec.ts:12:1)\n    at ModuleExecutor.exec (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\node_modules\\.pnpm\\jest-runtime@30.4.2\\node_modules\\jest-runtime\\build\\index.js:2078:26)\n    at CjsLoader.loadModule (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\node_modules\\.pnpm\\jest-runtime@30.4.2\\node_modules\\jest-runtime\\build\\index.js:323:36)\n    at CjsLoader.requireModule (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\node_modules\\.pnpm\\jest-runtime@30.4.2\\node_modules\\jest-runtime\\build\\index.js:289:12)\n    at Runtime.requireModule (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\node_modules\\.pnpm\\jest-runtime@30.4.2\\node_modules\\jest-runtime\\build\\index.js:3657:27)\n    at jestAdapter (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\node_modules\\.pnpm\\jest-circus@30.4.2\\node_modules\\jest-circus\\build\\runner.js:96:13)\n    at runTestInternal (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\node_modules\\.pnpm\\jest-runner@30.4.2\\node_modules\\jest-runner\\build\\index.js:276:16)\n    at runTest (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\node_modules\\.pnpm\\jest-runner@30.4.2\\node_modules\\jest-runner\\build\\index.js:344:7)",
+          "message": "Error: expect(received).toBeInstanceOf(expected) Expected constructor: ApiException Received constructor: Error at C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\src\\modules\\identity-access\\me.contr"
+        },
+        {
+          "name": "GET /me when the database stops answering after the guard (integration) answers 503 SERVICE_UNAVAILABLE within the query timeout, not 500",
+          "message": "Error: expect(received).toBe(expected) // Object.is equality Expected: 503 Received: 500 at Object.<anonymous> (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\test\\integration\\me-unavailable.integra"
+        }
+      ]
+    },
+    {
+      "id": "R12",
+      "finding": "R-12",
+      "file": "src/infrastructure/health/health.controller.ts",
+      "what": "readiness maps every failure to 503, including non-Terminus errors (the instanceof guard is gone)",
+      "status": "KILLED",
+      "reason": null,
+      "restored": true,
+      "runs": [
+        {
+          "kind": "unit",
+          "path": "src/infrastructure/health/health.controller.spec.ts",
+          "exit": 1,
+          "durationMs": 4072,
+          "counts": {
+            "total": 3,
+            "passed": 2,
+            "failed": 1,
+            "pending": 0
+          },
+          "infra": false,
+          "reason": null,
+          "targets": [
+            {
+              "target": "/SERVICE_UNAVAILABLE/",
+              "matchedCount": 1,
+              "passed": 1,
+              "failed": [],
+              "other": []
+            },
+            {
+              "target": "leaves any other failure to the global filter",
+              "matchedCount": 1,
+              "passed": 0,
+              "failed": [
+                {
+                  "name": "HealthController readiness leaves any other failure to the global filter",
+                  "assertionSignature": true,
+                  "message": "Error: expect(received).rejects.toBe(expected) // Object.is equality Expected: [TypeError: boom] Received: [ApiException: A required dependency is unavailable.] at Object.toBe (C:\\Users\\Asus\\AppData\\L"
+                }
+              ],
+              "other": []
+            }
+          ],
+          "nonTargetFailed": [],
+          "log": "C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\fin\\mut\\logs-im1015-final\\R12-1.log"
+        }
+      ],
+      "occurrences": 1,
+      "failedTargets": [
+        {
+          "name": "HealthController readiness leaves any other failure to the global filter",
+          "message": "Error: expect(received).rejects.toBe(expected) // Object.is equality Expected: [TypeError: boom] Received: [ApiException: A required dependency is unavailable.] at Object.toBe (C:\\Users\\Asus\\AppData\\L"
+        }
+      ]
+    },
+    {
+      "id": "R14",
+      "finding": "R-14",
+      "file": "src/modules/identity-access/identity-access.repo.ts",
+      "what": "account page and count no longer read from one snapshot",
+      "status": "KILLED",
+      "reason": null,
+      "restored": true,
+      "runs": [
+        {
+          "kind": "integration",
+          "path": "test/integration/account-list-and-redeem.integration-spec.ts",
+          "exit": 1,
+          "durationMs": 10417,
+          "counts": {
+            "total": 3,
+            "passed": 2,
+            "failed": 1,
+            "pending": 0
+          },
+          "infra": false,
+          "reason": null,
+          "targets": [
+            {
+              "target": "/R-14/",
+              "matchedCount": 1,
+              "passed": 0,
+              "failed": [
+                {
+                  "name": "account list snapshot and redeem cost (integration, real PostgreSQL) counts from the same snapshot as the page, even when an account is created in between (R-14)",
+                  "assertionSignature": true,
+                  "message": "Error: expect(received).toBe(expected) // Object.is equality Expected: 5 Received: 6 at Object.<anonymous> (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\test\\integration\\account-list-and-redeem.in"
+                }
+              ],
+              "other": []
+            }
+          ],
+          "nonTargetFailed": [],
+          "log": "C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\fin\\mut\\logs-im1015-final\\R14-1.log"
+        }
+      ],
+      "occurrences": 1,
+      "failedTargets": [
+        {
+          "name": "account list snapshot and redeem cost (integration, real PostgreSQL) counts from the same snapshot as the page, even when an account is created in between (R-14)",
+          "message": "Error: expect(received).toBe(expected) // Object.is equality Expected: 5 Received: 6 at Object.<anonymous> (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\test\\integration\\account-list-and-redeem.in"
+        }
+      ]
+    },
+    {
+      "id": "R09",
+      "finding": "R-09",
+      "file": "src/modules/identity-access/account-management.service.ts",
+      "what": "Argon2 hash runs before the token checks again",
+      "status": "KILLED",
+      "reason": null,
+      "restored": true,
+      "runs": [
+        {
+          "kind": "integration",
+          "path": "test/integration/account-list-and-redeem.integration-spec.ts",
+          "exit": 1,
+          "durationMs": 15923,
+          "counts": {
+            "total": 3,
+            "passed": 1,
+            "failed": 2,
+            "pending": 0
+          },
+          "infra": false,
+          "reason": null,
+          "targets": [
+            {
+              "target": "/R-09/",
+              "matchedCount": 2,
+              "passed": 0,
+              "failed": [
+                {
+                  "name": "account list snapshot and redeem cost (integration, real PostgreSQL) refuses a malformed invitation token without hashing the password (R-09)",
+                  "assertionSignature": true,
+                  "message": "Error: expect(jest.fn()).not.toHaveBeenCalled() Expected number of calls: 0 Received number of calls: 1 1: \"a perfectly fine password 42\" at C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\test\\integ"
+                },
+                {
+                  "name": "account list snapshot and redeem cost (integration, real PostgreSQL) refuses a unknown invitation token without hashing the password (R-09)",
+                  "assertionSignature": true,
+                  "message": "Error: expect(jest.fn()).not.toHaveBeenCalled() Expected number of calls: 0 Received number of calls: 1 1: \"a perfectly fine password 42\" at C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\test\\integ"
+                }
+              ],
+              "other": []
+            }
+          ],
+          "nonTargetFailed": [],
+          "log": "C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\fin\\mut\\logs-im1015-final\\R09-1.log"
+        }
+      ],
+      "occurrences": 1,
+      "failedTargets": [
+        {
+          "name": "account list snapshot and redeem cost (integration, real PostgreSQL) refuses a malformed invitation token without hashing the password (R-09)",
+          "message": "Error: expect(jest.fn()).not.toHaveBeenCalled() Expected number of calls: 0 Received number of calls: 1 1: \"a perfectly fine password 42\" at C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\test\\integ"
+        },
+        {
+          "name": "account list snapshot and redeem cost (integration, real PostgreSQL) refuses a unknown invitation token without hashing the password (R-09)",
+          "message": "Error: expect(jest.fn()).not.toHaveBeenCalled() Expected number of calls: 0 Received number of calls: 1 1: \"a perfectly fine password 42\" at C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\test\\integ"
+        }
+      ]
+    },
+    {
+      "id": "C1a",
+      "finding": "N-1",
+      "file": "src/infrastructure/database/pg-pool.ts",
+      "what": "callback found by a last-argument heuristic instead of pg's own position rule",
+      "status": "KILLED",
+      "reason": null,
+      "restored": true,
+      "runs": [
+        {
+          "kind": "unit",
+          "path": "src/infrastructure/database/pg-pool.spec.ts",
+          "exit": 1,
+          "durationMs": 6187,
+          "counts": {
+            "total": 27,
+            "passed": 26,
+            "failed": 1,
+            "pending": 0
+          },
+          "infra": false,
+          "reason": null,
+          "targets": [
+            {
+              "target": "(text, callback, undefined)",
+              "matchedCount": 1,
+              "passed": 0,
+              "failed": [
+                {
+                  "name": "RetireOnTimeoutClient callback form retires the client on a timeout, before the caller callback: (text, callback, undefined)",
+                  "assertionSignature": true,
+                  "message": "Error: expect(jest.fn()).toHaveBeenCalledTimes(expected) Expected number of calls: 1 Received number of calls: 0 at C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\src\\infrastructure\\database\\pg-pool"
+                }
+              ],
+              "other": []
+            }
+          ],
+          "nonTargetFailed": [],
+          "log": "C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\fin\\mut\\logs-im1015-final\\C1a-1.log"
+        }
+      ],
+      "occurrences": 1,
+      "failedTargets": [
+        {
+          "name": "RetireOnTimeoutClient callback form retires the client on a timeout, before the caller callback: (text, callback, undefined)",
+          "message": "Error: expect(jest.fn()).toHaveBeenCalledTimes(expected) Expected number of calls: 1 Received number of calls: 0 at C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\src\\infrastructure\\database\\pg-pool"
+        }
+      ]
+    },
+    {
+      "id": "C1b",
+      "finding": "N-1",
+      "file": "src/infrastructure/database/pg-pool.ts",
+      "what": "query() no longer refuses Submittable / config.callback / double-callback forms",
+      "status": "KILLED",
+      "reason": null,
+      "restored": true,
+      "runs": [
+        {
+          "kind": "unit",
+          "path": "src/infrastructure/database/pg-pool.spec.ts",
+          "exit": 1,
+          "durationMs": 4463,
+          "counts": {
+            "total": 27,
+            "passed": 21,
+            "failed": 6,
+            "pending": 0
+          },
+          "infra": false,
+          "reason": null,
+          "targets": [
+            {
+              "target": "throws UnsupportedQueryFormError synchronously",
+              "matchedCount": 5,
+              "passed": 0,
+              "failed": [
+                {
+                  "name": "RetireOnTimeoutClient forms that are refused (nothing is queued, nothing is retired) throws UnsupportedQueryFormError synchronously for a pg.Query with a callback",
+                  "assertionSignature": true,
+                  "message": "Error: expect(received).toBeInstanceOf(expected) Expected constructor: UnsupportedQueryFormError Received value has no prototype Received value: undefined at C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-imp"
+                },
+                {
+                  "name": "RetireOnTimeoutClient forms that are refused (nothing is queued, nothing is retired) throws UnsupportedQueryFormError synchronously for a pg.Query",
+                  "assertionSignature": true,
+                  "message": "Error: expect(received).toBeInstanceOf(expected) Expected constructor: UnsupportedQueryFormError Received value has no prototype Received value: undefined at C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-imp"
+                },
+                {
+                  "name": "RetireOnTimeoutClient forms that are refused (nothing is queued, nothing is retired) throws UnsupportedQueryFormError synchronously for a Submittable",
+                  "assertionSignature": true,
+                  "message": "Error: expect(received).toBeInstanceOf(expected) Expected constructor: UnsupportedQueryFormError Received value has no prototype Received value: undefined at C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-imp"
+                },
+                {
+                  "name": "RetireOnTimeoutClient forms that are refused (nothing is queued, nothing is retired) throws UnsupportedQueryFormError synchronously for a config object with a callback property",
+                  "assertionSignature": true,
+                  "message": "Error: expect(received).toBeInstanceOf(expected) Expected constructor: UnsupportedQueryFormError Received value has no prototype Received value: undefined at C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-imp"
+                },
+                {
+                  "name": "RetireOnTimeoutClient forms that are refused (nothing is queued, nothing is retired) throws UnsupportedQueryFormError synchronously for a double callback",
+                  "assertionSignature": true,
+                  "message": "Error: expect(received).toBeInstanceOf(expected) Expected constructor: UnsupportedQueryFormError Received value has no prototype Received value: undefined at C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-imp"
+                }
+              ],
+              "other": []
+            }
+          ],
+          "nonTargetFailed": [
+            "RetireOnTimeoutClient a failing end() or hook can neither skip the retirement nor replace the error still ends the client and reports the timeout when the hook throws (Promise form)"
+          ],
+          "log": "C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\fin\\mut\\logs-im1015-final\\C1b-1.log"
+        }
+      ],
+      "occurrences": 1,
+      "failedTargets": [
+        {
+          "name": "RetireOnTimeoutClient forms that are refused (nothing is queued, nothing is retired) throws UnsupportedQueryFormError synchronously for a pg.Query with a callback",
+          "message": "Error: expect(received).toBeInstanceOf(expected) Expected constructor: UnsupportedQueryFormError Received value has no prototype Received value: undefined at C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-imp"
+        },
+        {
+          "name": "RetireOnTimeoutClient forms that are refused (nothing is queued, nothing is retired) throws UnsupportedQueryFormError synchronously for a pg.Query",
+          "message": "Error: expect(received).toBeInstanceOf(expected) Expected constructor: UnsupportedQueryFormError Received value has no prototype Received value: undefined at C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-imp"
+        },
+        {
+          "name": "RetireOnTimeoutClient forms that are refused (nothing is queued, nothing is retired) throws UnsupportedQueryFormError synchronously for a Submittable",
+          "message": "Error: expect(received).toBeInstanceOf(expected) Expected constructor: UnsupportedQueryFormError Received value has no prototype Received value: undefined at C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-imp"
+        },
+        {
+          "name": "RetireOnTimeoutClient forms that are refused (nothing is queued, nothing is retired) throws UnsupportedQueryFormError synchronously for a config object with a callback property",
+          "message": "Error: expect(received).toBeInstanceOf(expected) Expected constructor: UnsupportedQueryFormError Received value has no prototype Received value: undefined at C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-imp"
+        },
+        {
+          "name": "RetireOnTimeoutClient forms that are refused (nothing is queued, nothing is retired) throws UnsupportedQueryFormError synchronously for a double callback",
+          "message": "Error: expect(received).toBeInstanceOf(expected) Expected constructor: UnsupportedQueryFormError Received value has no prototype Received value: undefined at C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-imp"
+        }
+      ]
+    },
+    {
+      "id": "C1c",
+      "finding": "N-1",
+      "file": "src/infrastructure/database/pg-pool.ts",
+      "what": "retire() is no longer idempotent",
+      "status": "KILLED",
+      "reason": null,
+      "restored": true,
+      "runs": [
+        {
+          "kind": "unit",
+          "path": "src/infrastructure/database/pg-pool.spec.ts",
+          "exit": 1,
+          "durationMs": 4887,
+          "counts": {
+            "total": 27,
+            "passed": 26,
+            "failed": 1,
+            "pending": 0
+          },
+          "infra": false,
+          "reason": null,
+          "targets": [
+            {
+              "target": "retires once when two queued queries both time out",
+              "matchedCount": 1,
+              "passed": 0,
+              "failed": [
+                {
+                  "name": "RetireOnTimeoutClient Promise form retires once when two queued queries both time out, and each caller gets its own error",
+                  "assertionSignature": true,
+                  "message": "Error: expect(jest.fn()).toHaveBeenCalledTimes(expected) Expected number of calls: 1 Received number of calls: 2 at Object.<anonymous> (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\src\\infrastruct"
+                }
+              ],
+              "other": []
+            }
+          ],
+          "nonTargetFailed": [],
+          "log": "C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\fin\\mut\\logs-im1015-final\\C1c-1.log"
+        }
+      ],
+      "occurrences": 1,
+      "failedTargets": [
+        {
+          "name": "RetireOnTimeoutClient Promise form retires once when two queued queries both time out, and each caller gets its own error",
+          "message": "Error: expect(jest.fn()).toHaveBeenCalledTimes(expected) Expected number of calls: 1 Received number of calls: 2 at Object.<anonymous> (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\src\\infrastruct"
+        }
+      ]
+    },
+    {
+      "id": "C1d",
+      "finding": "N-1",
+      "file": "src/infrastructure/database/pg-pool.ts",
+      "what": "the hook runs before end() and unguarded (a throwing hook skips end() and replaces the error)",
+      "status": "KILLED",
+      "reason": null,
+      "restored": true,
+      "runs": [
+        {
+          "kind": "unit",
+          "path": "src/infrastructure/database/pg-pool.spec.ts",
+          "exit": 1,
+          "durationMs": 5386,
+          "counts": {
+            "total": 27,
+            "passed": 17,
+            "failed": 10,
+            "pending": 0
+          },
+          "infra": false,
+          "reason": null,
+          "targets": [
+            {
+              "target": "retires the client when",
+              "matchedCount": 3,
+              "passed": 0,
+              "failed": [
+                {
+                  "name": "RetireOnTimeoutClient Promise form retires the client when text times out: end first, then the hook, then the caller",
+                  "assertionSignature": true,
+                  "message": "Error: expect(received).toEqual(expected) // deep equality - Expected - 1 + Received + 1 Array [ - \"end\", \"hook\", + \"end\", \"caller\", ] at C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\src\\infrastru"
+                },
+                {
+                  "name": "RetireOnTimeoutClient Promise form retires the client when text and values times out: end first, then the hook, then the caller",
+                  "assertionSignature": true,
+                  "message": "Error: expect(received).toEqual(expected) // deep equality - Expected - 1 + Received + 1 Array [ - \"end\", \"hook\", + \"end\", \"caller\", ] at C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\src\\infrastru"
+                },
+                {
+                  "name": "RetireOnTimeoutClient Promise form retires the client when the shape the Prisma adapter sends times out: end first, then the hook, then the caller",
+                  "assertionSignature": true,
+                  "message": "Error: expect(received).toEqual(expected) // deep equality - Expected - 1 + Received + 1 Array [ - \"end\", \"hook\", + \"end\", \"caller\", ] at C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\src\\infrastru"
+                }
+              ],
+              "other": []
+            },
+            {
+              "target": "when the hook throws (Promise form)",
+              "matchedCount": 1,
+              "passed": 0,
+              "failed": [
+                {
+                  "name": "RetireOnTimeoutClient a failing end() or hook can neither skip the retirement nor replace the error still ends the client and reports the timeout when the hook throws (Promise form)",
+                  "assertionSignature": true,
+                  "message": "Error: expect(received).toBe(expected) // Object.is equality Expected: \"Query read timeout\" Received: \"hook failed\" at expectOriginalAndQuiet (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\src\\infr"
+                }
+              ],
+              "other": []
+            },
+            {
+              "target": "when the hook throws (callback form)",
+              "matchedCount": 1,
+              "passed": 0,
+              "failed": [
+                {
+                  "name": "RetireOnTimeoutClient a failing end() or hook can neither skip the retirement nor replace the error still ends the client and calls the callback when the hook throws (callback form)",
+                  "assertionSignature": true,
+                  "message": "Error: hook failed at TestClient.client.hook (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\src\\infrastructure\\database\\pg-pool.spec.ts:220:15) at TestClient.onRetired (C:\\Users\\Asus\\AppData\\Local\\"
+                }
+              ],
+              "other": []
+            }
+          ],
+          "nonTargetFailed": [
+            "RetireOnTimeoutClient callback form retires the client on a timeout, before the caller callback: (text, values, callback)",
+            "RetireOnTimeoutClient callback form retires the client on a timeout, before the caller callback: (config, undefined, callback)",
+            "RetireOnTimeoutClient callback form retires the client on a timeout, before the caller callback: (text, callback)",
+            "RetireOnTimeoutClient callback form retires the client on a timeout, before the caller callback: (text, callback, undefined)",
+            "RetireOnTimeoutClient a failing end() or hook can neither skip the retirement nor replace the error reports the timeout (both forms) when end() throws synchronously"
+          ],
+          "log": "C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\fin\\mut\\logs-im1015-final\\C1d-1.log"
+        }
+      ],
+      "occurrences": 1,
+      "failedTargets": [
+        {
+          "name": "RetireOnTimeoutClient Promise form retires the client when text times out: end first, then the hook, then the caller",
+          "message": "Error: expect(received).toEqual(expected) // deep equality - Expected - 1 + Received + 1 Array [ - \"end\", \"hook\", + \"end\", \"caller\", ] at C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\src\\infrastru"
+        },
+        {
+          "name": "RetireOnTimeoutClient Promise form retires the client when text and values times out: end first, then the hook, then the caller",
+          "message": "Error: expect(received).toEqual(expected) // deep equality - Expected - 1 + Received + 1 Array [ - \"end\", \"hook\", + \"end\", \"caller\", ] at C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\src\\infrastru"
+        },
+        {
+          "name": "RetireOnTimeoutClient Promise form retires the client when the shape the Prisma adapter sends times out: end first, then the hook, then the caller",
+          "message": "Error: expect(received).toEqual(expected) // deep equality - Expected - 1 + Received + 1 Array [ - \"end\", \"hook\", + \"end\", \"caller\", ] at C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\src\\infrastru"
+        },
+        {
+          "name": "RetireOnTimeoutClient a failing end() or hook can neither skip the retirement nor replace the error still ends the client and reports the timeout when the hook throws (Promise form)",
+          "message": "Error: expect(received).toBe(expected) // Object.is equality Expected: \"Query read timeout\" Received: \"hook failed\" at expectOriginalAndQuiet (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\src\\infr"
+        },
+        {
+          "name": "RetireOnTimeoutClient a failing end() or hook can neither skip the retirement nor replace the error still ends the client and calls the callback when the hook throws (callback form)",
+          "message": "Error: hook failed at TestClient.client.hook (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\src\\infrastructure\\database\\pg-pool.spec.ts:220:15) at TestClient.onRetired (C:\\Users\\Asus\\AppData\\Local\\"
+        }
+      ]
+    },
+    {
+      "id": "C1e",
+      "finding": "N-1",
+      "file": "src/infrastructure/database/pg-pool.ts",
+      "what": "no release guard: a connection handed back inside a transaction is reused",
+      "status": "KILLED",
+      "reason": null,
+      "restored": true,
+      "runs": [
+        {
+          "kind": "unit",
+          "path": "src/infrastructure/database/pg-pool.spec.ts",
+          "exit": 1,
+          "durationMs": 5369,
+          "counts": {
+            "total": 27,
+            "passed": 24,
+            "failed": 3,
+            "pending": 0
+          },
+          "infra": false,
+          "reason": null,
+          "targets": [
+            {
+              "target": "retires a released client whose transaction status is",
+              "matchedCount": 3,
+              "passed": 0,
+              "failed": [
+                {
+                  "name": "createPostgresPool release guard retires a released client whose transaction status is \"T\"",
+                  "assertionSignature": true,
+                  "message": "Error: expect(jest.fn()).toHaveBeenCalledTimes(expected) Expected number of calls: 1 Received number of calls: 0 at C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\src\\infrastructure\\database\\pg-pool"
+                },
+                {
+                  "name": "createPostgresPool release guard retires a released client whose transaction status is \"E\"",
+                  "assertionSignature": true,
+                  "message": "Error: expect(jest.fn()).toHaveBeenCalledTimes(expected) Expected number of calls: 1 Received number of calls: 0 at C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\src\\infrastructure\\database\\pg-pool"
+                },
+                {
+                  "name": "createPostgresPool release guard retires a released client whose transaction status is null",
+                  "assertionSignature": true,
+                  "message": "Error: expect(jest.fn()).toHaveBeenCalledTimes(expected) Expected number of calls: 1 Received number of calls: 0 at C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\src\\infrastructure\\database\\pg-pool"
+                }
+              ],
+              "other": []
+            }
+          ],
+          "nonTargetFailed": [],
+          "log": "C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\fin\\mut\\logs-im1015-final\\C1e-1.log"
+        },
+        {
+          "kind": "integration",
+          "path": "test/integration/pg-pool.integration-spec.ts",
+          "exit": 1,
+          "durationMs": 11789,
+          "counts": {
+            "total": 6,
+            "passed": 5,
+            "failed": 1,
+            "pending": 0
+          },
+          "infra": false,
+          "reason": null,
+          "targets": [
+            {
+              "target": "I11: a connection released inside a transaction",
+              "matchedCount": 1,
+              "passed": 0,
+              "failed": [
+                {
+                  "name": "createPostgresPool with the Prisma adapter (integration) I11: a connection released inside a transaction is removed, never reused, and rolled back",
+                  "assertionSignature": true,
+                  "message": "Error: expect(received).toHaveLength(expected) Expected length: 1 Received length: 0 Received array: [] at Object.<anonymous> (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\test\\integration\\pg-pool"
+                }
+              ],
+              "other": []
+            }
+          ],
+          "nonTargetFailed": [],
+          "log": "C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\fin\\mut\\logs-im1015-final\\C1e-2.log"
+        }
+      ],
+      "occurrences": 1,
+      "failedTargets": [
+        {
+          "name": "createPostgresPool release guard retires a released client whose transaction status is \"T\"",
+          "message": "Error: expect(jest.fn()).toHaveBeenCalledTimes(expected) Expected number of calls: 1 Received number of calls: 0 at C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\src\\infrastructure\\database\\pg-pool"
+        },
+        {
+          "name": "createPostgresPool release guard retires a released client whose transaction status is \"E\"",
+          "message": "Error: expect(jest.fn()).toHaveBeenCalledTimes(expected) Expected number of calls: 1 Received number of calls: 0 at C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\src\\infrastructure\\database\\pg-pool"
+        },
+        {
+          "name": "createPostgresPool release guard retires a released client whose transaction status is null",
+          "message": "Error: expect(jest.fn()).toHaveBeenCalledTimes(expected) Expected number of calls: 1 Received number of calls: 0 at C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\src\\infrastructure\\database\\pg-pool"
+        },
+        {
+          "name": "createPostgresPool with the Prisma adapter (integration) I11: a connection released inside a transaction is removed, never reused, and rolled back",
+          "message": "Error: expect(received).toHaveLength(expected) Expected length: 1 Received length: 0 Received array: [] at Object.<anonymous> (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\test\\integration\\pg-pool"
+        }
+      ]
+    },
+    {
+      "id": "R3w",
+      "finding": "N-6",
+      "file": "src/modules/organization/organization.repo.ts",
+      "what": "the LIKE escape class no longer contains the backslash",
+      "status": "KILLED",
+      "reason": null,
+      "restored": true,
+      "runs": [
+        {
+          "kind": "integration",
+          "path": "test/integration/account-candidates-boundaries.integration-spec.ts",
+          "exit": 1,
+          "durationMs": 16671,
+          "counts": {
+            "total": 18,
+            "passed": 17,
+            "failed": 1,
+            "pending": 0
+          },
+          "infra": false,
+          "reason": null,
+          "targets": [
+            {
+              "target": "search=Y<backslash>1 (backslash is literal)",
+              "matchedCount": 1,
+              "passed": 0,
+              "failed": [
+                {
+                  "name": "account candidates: exclusion, limit and literal search (integration, real PostgreSQL) search=Y<backslash>1 (backslash is literal)",
+                  "assertionSignature": true,
+                  "message": "Error: expect(received).toEqual(expected) // deep equality - Expected - 1 + Received + 1 Array [ - \"Y\\\\1\", + \"Y1\", ] at C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\test\\integration\\account-candid"
+                }
+              ],
+              "other": []
+            }
+          ],
+          "nonTargetFailed": [],
+          "log": "C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\fin\\mut\\logs-im1015-final\\R3w-1.log"
+        }
+      ],
+      "occurrences": 1,
+      "failedTargets": [
+        {
+          "name": "account candidates: exclusion, limit and literal search (integration, real PostgreSQL) search=Y<backslash>1 (backslash is literal)",
+          "message": "Error: expect(received).toEqual(expected) // deep equality - Expected - 1 + Received + 1 Array [ - \"Y\\\\1\", + \"Y1\", ] at C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\test\\integration\\account-candid"
+        }
+      ]
+    },
+    {
+      "id": "R13a",
+      "finding": "R-13",
+      "file": "src/modules/installation/installation.module.ts",
+      "what": "the installation module imports the full identity-access module again",
+      "status": "KILLED",
+      "reason": null,
+      "restored": true,
+      "runs": [
+        {
+          "kind": "unit",
+          "path": "src/architecture-boundaries.spec.ts",
+          "exit": 1,
+          "durationMs": 2283,
+          "counts": {
+            "total": 11,
+            "passed": 10,
+            "failed": 1,
+            "pending": 0
+          },
+          "infra": false,
+          "reason": null,
+          "targets": [
+            {
+              "target": "does not reach the API/worker configuration, the identity-access module, notifications or the JWT library",
+              "matchedCount": 1,
+              "passed": 0,
+              "failed": [
+                {
+                  "name": "installation command dependency boundary (R-13) does not reach the API/worker configuration, the identity-access module, notifications or the JWT library",
+                  "assertionSignature": true,
+                  "message": "Error: expect(received).not.toContain(expected) // indexOf Expected value: not \"modules/identity-access/identity-access.module.ts\" Received array: [\"installation-cli.ts\", \"modules/installation/install"
+                }
+              ],
+              "other": []
+            }
+          ],
+          "nonTargetFailed": [],
+          "log": "C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\fin\\mut\\logs-im1015-final\\R13a-1.log"
+        }
+      ],
+      "occurrences": 1,
+      "failedTargets": [
+        {
+          "name": "installation command dependency boundary (R-13) does not reach the API/worker configuration, the identity-access module, notifications or the JWT library",
+          "message": "Error: expect(received).not.toContain(expected) // indexOf Expected value: not \"modules/identity-access/identity-access.module.ts\" Received array: [\"installation-cli.ts\", \"modules/installation/install"
+        }
+      ]
+    },
+    {
+      "id": "R13b",
+      "finding": "R-13",
+      "file": "src/infrastructure/config/env-config.ts",
+      "what": "the installation config options use the full (API) environment validator",
+      "status": "KILLED",
+      "reason": null,
+      "restored": true,
+      "runs": [
+        {
+          "kind": "unit",
+          "path": "src/infrastructure/config/env-schema.spec.ts",
+          "exit": 1,
+          "durationMs": 2631,
+          "counts": {
+            "total": 66,
+            "passed": 65,
+            "failed": 1,
+            "pending": 0
+          },
+          "infra": false,
+          "reason": null,
+          "targets": [
+            {
+              "target": "validates the installation config options with the installation validator",
+              "matchedCount": 1,
+              "passed": 0,
+              "failed": [
+                {
+                  "name": "installation environment (database keys only) validates the installation config options with the installation validator (R-13)",
+                  "assertionSignature": true,
+                  "message": "Error: expect(received).not.toThrow() Error name: \"EnvironmentValidationError\" Error message: \"Environment validation failed: \\\"OBJECT_STORAGE_ENDPOINT\\\" is required. \\\"OBJECT_STORAGE_BUCKET\\\" is requ"
+                }
+              ],
+              "other": []
+            }
+          ],
+          "nonTargetFailed": [],
+          "log": "C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\fin\\mut\\logs-im1015-final\\R13b-1.log"
+        }
+      ],
+      "occurrences": 1,
+      "failedTargets": [
+        {
+          "name": "installation environment (database keys only) validates the installation config options with the installation validator (R-13)",
+          "message": "Error: expect(received).not.toThrow() Error name: \"EnvironmentValidationError\" Error message: \"Environment validation failed: \\\"OBJECT_STORAGE_ENDPOINT\\\" is required. \\\"OBJECT_STORAGE_BUCKET\\\" is requ"
+        }
+      ]
+    },
+    {
+      "id": "R13c",
+      "finding": "R-13",
+      "file": "src/infrastructure/config/env-schema.ts",
+      "what": "idle-in-transaction default fixed at 20 000 ms regardless of the transaction timeout",
+      "status": "KILLED",
+      "reason": null,
+      "restored": true,
+      "runs": [
+        {
+          "kind": "unit",
+          "path": "src/infrastructure/config/env-schema.spec.ts",
+          "exit": 1,
+          "durationMs": 2844,
+          "counts": {
+            "total": 66,
+            "passed": 62,
+            "failed": 4,
+            "pending": 0
+          },
+          "infra": false,
+          "reason": null,
+          "targets": [
+            {
+              "target": "does not reject a longer transaction timeout when no idle limit is given",
+              "matchedCount": 2,
+              "passed": 0,
+              "failed": [
+                {
+                  "name": "installation environment (database keys only) idle-in-transaction default through validateInstallationEnvironment does not reject a longer transaction timeout when no idle limit is given",
+                  "assertionSignature": true,
+                  "message": "Error: expect(received).not.toThrow() Error name: \"EnvironmentValidationError\" Error message: \"Environment validation failed: DB_IDLE_IN_TRANSACTION_TIMEOUT_MS must be higher than DB_TRANSACTION_TIMEO"
+                },
+                {
+                  "name": "installation environment (database keys only) idle-in-transaction default through validateEnvironment does not reject a longer transaction timeout when no idle limit is given",
+                  "assertionSignature": true,
+                  "message": "Error: expect(received).not.toThrow() Error name: \"EnvironmentValidationError\" Error message: \"Environment validation failed: DB_IDLE_IN_TRANSACTION_TIMEOUT_MS must be higher than DB_TRANSACTION_TIMEO"
+                }
+              ],
+              "other": []
+            }
+          ],
+          "nonTargetFailed": [
+            "installation environment (database keys only) idle-in-transaction default through validateInstallationEnvironment follows a longer transaction timeout instead of failing to boot after an upgrade",
+            "installation environment (database keys only) idle-in-transaction default through validateEnvironment follows a longer transaction timeout instead of failing to boot after an upgrade"
+          ],
+          "log": "C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\fin\\mut\\logs-im1015-final\\R13c-1.log"
+        }
+      ],
+      "occurrences": 1,
+      "failedTargets": [
+        {
+          "name": "installation environment (database keys only) idle-in-transaction default through validateInstallationEnvironment does not reject a longer transaction timeout when no idle limit is given",
+          "message": "Error: expect(received).not.toThrow() Error name: \"EnvironmentValidationError\" Error message: \"Environment validation failed: DB_IDLE_IN_TRANSACTION_TIMEOUT_MS must be higher than DB_TRANSACTION_TIMEO"
+        },
+        {
+          "name": "installation environment (database keys only) idle-in-transaction default through validateEnvironment does not reject a longer transaction timeout when no idle limit is given",
+          "message": "Error: expect(received).not.toThrow() Error name: \"EnvironmentValidationError\" Error message: \"Environment validation failed: DB_IDLE_IN_TRANSACTION_TIMEOUT_MS must be higher than DB_TRANSACTION_TIMEO"
+        }
+      ]
+    },
+    {
+      "id": "X1-CLI-abort",
+      "finding": "R-13",
+      "file": "src/installation-cli.ts",
+      "what": "Nest may exit the process on a configuration error before the CLI can print it (operator sees nothing)",
+      "status": "KILLED",
+      "reason": null,
+      "restored": true,
+      "runs": [
+        {
+          "kind": "integration",
+          "path": "test/integration/installation-cli.integration-spec.ts",
+          "exit": 1,
+          "durationMs": 11994,
+          "counts": {
+            "total": 3,
+            "passed": 1,
+            "failed": 2,
+            "pending": 0
+          },
+          "infra": false,
+          "reason": null,
+          "targets": [
+            {
+              "target": "reports a missing DATABASE_URL by name",
+              "matchedCount": 1,
+              "passed": 0,
+              "failed": [
+                {
+                  "name": "installation command (integration, spawned process) reports a missing DATABASE_URL by name, before asking for a password, without a stack",
+                  "assertionSignature": true,
+                  "message": "Error: expect(received).toContain(expected) // indexOf Expected substring: \"Environment validation failed: \\\"DATABASE_URL\\\" is required\" Received string: \"\" at Object.<anonymous> (C:\\Users\\Asus\\AppDat"
+                }
+              ],
+              "other": []
+            },
+            {
+              "target": "rejects an unusable DATABASE_URL",
+              "matchedCount": 1,
+              "passed": 0,
+              "failed": [
+                {
+                  "name": "installation command (integration, spawned process) rejects an unusable DATABASE_URL with a clean message that does not echo the password in it",
+                  "assertionSignature": true,
+                  "message": "Error: expect(received).toContain(expected) // indexOf Expected substring: \"Environment validation failed\" Received string: \"\" at Object.<anonymous> (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\t"
+                }
+              ],
+              "other": []
+            }
+          ],
+          "nonTargetFailed": [],
+          "log": "C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\fin\\mut\\logs-im1015-final\\X1-CLI-abort-1.log"
+        }
+      ],
+      "occurrences": 1,
+      "failedTargets": [
+        {
+          "name": "installation command (integration, spawned process) reports a missing DATABASE_URL by name, before asking for a password, without a stack",
+          "message": "Error: expect(received).toContain(expected) // indexOf Expected substring: \"Environment validation failed: \\\"DATABASE_URL\\\" is required\" Received string: \"\" at Object.<anonymous> (C:\\Users\\Asus\\AppDat"
+        },
+        {
+          "name": "installation command (integration, spawned process) rejects an unusable DATABASE_URL with a clean message that does not echo the password in it",
+          "message": "Error: expect(received).toContain(expected) // indexOf Expected substring: \"Environment validation failed\" Received string: \"\" at Object.<anonymous> (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\t"
+        }
+      ]
+    },
+    {
+      "id": "X2-CLI-message",
+      "finding": "R-13",
+      "file": "src/installation-cli.ts",
+      "what": "a validation error is no longer reported as its own message",
+      "status": "KILLED",
+      "reason": null,
+      "restored": true,
+      "runs": [
+        {
+          "kind": "integration",
+          "path": "test/integration/installation-cli.integration-spec.ts",
+          "exit": 1,
+          "durationMs": 11256,
+          "counts": {
+            "total": 3,
+            "passed": 1,
+            "failed": 2,
+            "pending": 0
+          },
+          "infra": false,
+          "reason": null,
+          "targets": [
+            {
+              "target": "reports a missing DATABASE_URL by name",
+              "matchedCount": 1,
+              "passed": 0,
+              "failed": [
+                {
+                  "name": "installation command (integration, spawned process) reports a missing DATABASE_URL by name, before asking for a password, without a stack",
+                  "assertionSignature": true,
+                  "message": "Error: expect(received).toContain(expected) // indexOf Expected substring: \"Environment validation failed: \\\"DATABASE_URL\\\" is required\" Received string: \"Installation failed; check the installation s"
+                }
+              ],
+              "other": []
+            },
+            {
+              "target": "rejects an unusable DATABASE_URL",
+              "matchedCount": 1,
+              "passed": 0,
+              "failed": [
+                {
+                  "name": "installation command (integration, spawned process) rejects an unusable DATABASE_URL with a clean message that does not echo the password in it",
+                  "assertionSignature": true,
+                  "message": "Error: expect(received).toContain(expected) // indexOf Expected substring: \"Environment validation failed\" Received string: \"Installation failed; check the installation state before retrying: Environm"
+                }
+              ],
+              "other": []
+            }
+          ],
+          "nonTargetFailed": [],
+          "log": "C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\fin\\mut\\logs-im1015-final\\X2-CLI-message-1.log"
+        }
+      ],
+      "occurrences": 1,
+      "failedTargets": [
+        {
+          "name": "installation command (integration, spawned process) reports a missing DATABASE_URL by name, before asking for a password, without a stack",
+          "message": "Error: expect(received).toContain(expected) // indexOf Expected substring: \"Environment validation failed: \\\"DATABASE_URL\\\" is required\" Received string: \"Installation failed; check the installation s"
+        },
+        {
+          "name": "installation command (integration, spawned process) rejects an unusable DATABASE_URL with a clean message that does not echo the password in it",
+          "message": "Error: expect(received).toContain(expected) // indexOf Expected substring: \"Environment validation failed\" Received string: \"Installation failed; check the installation state before retrying: Environm"
+        }
+      ]
+    },
+    {
+      "id": "X3-API-validator",
+      "finding": "R-13",
+      "file": "src/infrastructure/config/env-config.ts",
+      "what": "API and worker would validate only the database settings (fail open in production)",
+      "status": "KILLED",
+      "reason": null,
+      "restored": true,
+      "runs": [
+        {
+          "kind": "unit",
+          "path": "src/architecture-boundaries.spec.ts",
+          "exit": 1,
+          "durationMs": 2749,
+          "counts": {
+            "total": 11,
+            "passed": 10,
+            "failed": 1,
+            "pending": 0
+          },
+          "infra": false,
+          "reason": null,
+          "targets": [
+            {
+              "target": "wires the full validator to the API options",
+              "matchedCount": 1,
+              "passed": 0,
+              "failed": [
+                {
+                  "name": "installation command dependency boundary (R-13) wires the full validator to the API options and the database-only validator to the command options",
+                  "assertionSignature": true,
+                  "message": "Error: expect(received).toBe(expected) // Object.is equality Expected: [Function validateEnvironment] Received: [Function validateInstallationEnvironment] at Object.<anonymous> (C:\\Users\\Asus\\AppData\\"
+                }
+              ],
+              "other": []
+            }
+          ],
+          "nonTargetFailed": [],
+          "log": "C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\fin\\mut\\logs-im1015-final\\X3-API-validator-1.log"
+        }
+      ],
+      "occurrences": 1,
+      "failedTargets": [
+        {
+          "name": "installation command dependency boundary (R-13) wires the full validator to the API options and the database-only validator to the command options",
+          "message": "Error: expect(received).toBe(expected) // Object.is equality Expected: [Function validateEnvironment] Received: [Function validateInstallationEnvironment] at Object.<anonymous> (C:\\Users\\Asus\\AppData\\"
+        }
+      ]
+    },
+    {
+      "id": "X4-private-hasher",
+      "finding": "R-13",
+      "file": "src/modules/installation/installation.service.ts",
+      "what": "installation reaches into the identity-access private hasher",
+      "status": "KILLED",
+      "reason": null,
+      "restored": true,
+      "runs": [
+        {
+          "kind": "unit",
+          "path": "src/architecture-boundaries.spec.ts",
+          "exit": 1,
+          "durationMs": 2694,
+          "counts": {
+            "total": 11,
+            "passed": 10,
+            "failed": 1,
+            "pending": 0
+          },
+          "infra": false,
+          "reason": null,
+          "targets": [
+            {
+              "target": "prevents imports of another business module private layers",
+              "matchedCount": 1,
+              "passed": 0,
+              "failed": [
+                {
+                  "name": "architecture boundaries prevents imports of another business module private layers",
+                  "assertionSignature": true,
+                  "message": "Error: expect(received).toBe(expected) // Object.is equality Expected: \"installation\" Received: \"identity-access\" at Object.<anonymous> (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\src\\architectu"
+                }
+              ],
+              "other": []
+            }
+          ],
+          "nonTargetFailed": [],
+          "log": "C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\fin\\mut\\logs-im1015-final\\X4-private-hasher-1.log"
+        }
+      ],
+      "occurrences": 1,
+      "failedTargets": [
+        {
+          "name": "architecture boundaries prevents imports of another business module private layers",
+          "message": "Error: expect(received).toBe(expected) // Object.is equality Expected: \"installation\" Received: \"identity-access\" at Object.<anonymous> (C:\\Users\\Asus\\AppData\\Local\\Temp\\slmrg-impl\\pmut\\src\\architectu"
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "killed": 26,
+    "survived": 0,
+    "unapplied": 0,
+    "infraError": 0,
+    "otherFailure": 0,
+    "restoreFailed": 0
+  },
+  "gitStatusAfter": "",
+  "durationMs": 425217,
+  "targetFileHashesAfter": {
+    "src/infrastructure/database/pg-pool.ts": "806d6d38cd222b536de744437100f3878c4a5a63c3604c7be2f626217ca1a95a",
+    "src/infrastructure/database/prisma.service.ts": "72bb74267e55b6df0c31fb8bd538a3c848ffcab52465b5d3d3804e7ec6f69b87",
+    "src/infrastructure/database/transaction-runner.ts": "654ad2676a0a4a2f54947dd75ce096574475305e29ffec848cceba0e53606874",
+    "src/modules/organization/organization.repo.ts": "17a49c5a19304007e9c0a441c5af4a12a47c0e07db71ffd67b53876b6309986b",
+    "src/modules/identity-access/me.controller.ts": "af0734c6e8cb09add6da10c527d17023d33849add9fb9998dfb63409fbf1151b",
+    "src/infrastructure/health/health.controller.ts": "054cbe76695f7fbd84390b270886b58848214abfac66a5c8e82068ecdd5fff21",
+    "src/modules/identity-access/identity-access.repo.ts": "9774b405e34a32560a18f9ed82f91e09cdc83ace6d4c7007c322ab776b503878",
+    "src/modules/identity-access/account-management.service.ts": "b3988db9d21d9a727f9a604b669591a3d4f06eb7ad71b76e75b6ba4d7424d84f",
+    "src/modules/installation/installation.module.ts": "0af0b116b2f6e71a895da5ed7877b669ff9e3dc6fb90963ec794b86775bae0cd",
+    "src/infrastructure/config/env-config.ts": "8b1dde8a8bb4567fd6da9157093ae782599985baf6c1c6fceb62766f02f19ba0",
+    "src/infrastructure/config/env-schema.ts": "78eb7deac5e32fe393b7b43c3b6586f8eaeb0c74d31f0cfcc74ee6bb5415183b",
+    "src/installation-cli.ts": "c1ac502bd2fe94149d8698f32884b64c7934b1db11202accfef3c06dfee0b65b",
+    "src/modules/installation/installation.service.ts": "6b19386c660d67db12b6c71acf15ca534be7e89e8352a028fa8d2ceb46fb7f10"
+  }
+}
