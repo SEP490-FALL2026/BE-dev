@@ -18,6 +18,8 @@ export interface EnvironmentVariables {
   DB_STATEMENT_TIMEOUT_MS: number;
   DB_TRANSACTION_TIMEOUT_MS: number;
   DB_TRANSACTION_MAX_WAIT_MS: number;
+  DB_CONNECT_TIMEOUT_MS: number;
+  DB_QUERY_TIMEOUT_MS: number;
   OBJECT_STORAGE_ENDPOINT: string;
   OBJECT_STORAGE_REGION: string;
   OBJECT_STORAGE_BUCKET: string;
@@ -93,6 +95,12 @@ const environmentSchema = Joi.object({
   DB_STATEMENT_TIMEOUT_MS: Joi.number().integer().min(100).max(120_000).default(5_000),
   DB_TRANSACTION_TIMEOUT_MS: Joi.number().integer().min(100).max(180_000).default(10_000),
   DB_TRANSACTION_MAX_WAIT_MS: Joi.number().integer().min(100).max(60_000).default(2_000),
+  // Client-side limits for a database that accepts the connection but never answers (paused
+  // container, dropped network path). The server-side timeouts above cannot fire in that case,
+  // so without these a request waits forever. The query limit sits above the statement timeout
+  // so PostgreSQL reports a slow statement first; validateEnvironment enforces it.
+  DB_CONNECT_TIMEOUT_MS: Joi.number().integer().min(100).max(60_000).default(3_000),
+  DB_QUERY_TIMEOUT_MS: Joi.number().integer().min(100).max(180_000).default(8_000),
   OBJECT_STORAGE_ENDPOINT: Joi.string()
     .uri()
     .when('NODE_ENV', {
@@ -224,6 +232,13 @@ export function validateEnvironment(input: Record<string, unknown>): Environment
     throw new Error(
       'Environment validation failed: DB_LOCK_TIMEOUT_MS must not exceed DB_STATEMENT_TIMEOUT_MS, ' +
         'and DB_STATEMENT_TIMEOUT_MS must be lower than DB_TRANSACTION_TIMEOUT_MS',
+    );
+  }
+
+  if (result.DB_QUERY_TIMEOUT_MS <= result.DB_STATEMENT_TIMEOUT_MS) {
+    throw new Error(
+      'Environment validation failed: DB_QUERY_TIMEOUT_MS must be higher than DB_STATEMENT_TIMEOUT_MS, ' +
+        'so PostgreSQL reports a slow statement before the driver gives up',
     );
   }
 

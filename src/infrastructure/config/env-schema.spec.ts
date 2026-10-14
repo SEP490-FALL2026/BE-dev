@@ -40,6 +40,19 @@ describe('validateEnvironment', () => {
     });
   });
 
+  it('defaults the client-side limits so PostgreSQL reports a slow statement before the driver gives up', () => {
+    expect(validateEnvironment({})).toMatchObject({
+      DB_CONNECT_TIMEOUT_MS: 3000,
+      DB_QUERY_TIMEOUT_MS: 8000,
+    });
+  });
+
+  it('rejects a driver query limit that would cut off a statement PostgreSQL is still allowed to run', () => {
+    expect(() => validateEnvironment({ DB_QUERY_TIMEOUT_MS: '5000', DB_STATEMENT_TIMEOUT_MS: '5000' })).toThrow(
+      'DB_QUERY_TIMEOUT_MS',
+    );
+  });
+
   it('rejects database timeouts that let Prisma close a transaction before PostgreSQL stops the statement', () => {
     expect(() => validateEnvironment({ DB_STATEMENT_TIMEOUT_MS: '9000', DB_TRANSACTION_TIMEOUT_MS: '9000' })).toThrow(
       'DB_STATEMENT_TIMEOUT_MS',

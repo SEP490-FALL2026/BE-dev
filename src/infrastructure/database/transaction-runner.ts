@@ -43,7 +43,30 @@ export function readSqlState(error: unknown): string | undefined {
   return typeof state === 'string' ? state : undefined;
 }
 
+/**
+ * node-postgres reports a silent or dead server with plain `Error` objects: the client-side
+ * timeouts (`connectionTimeoutMillis`, `query_timeout`) and a dropped socket carry no SQLSTATE and
+ * no Prisma code, so the only stable handle is the message pg itself writes. Anything else stays
+ * an error, so a programming mistake is never reported as a retryable 503.
+ */
+const PG_CONNECTIVITY_MESSAGES = new Set([
+  'Connection terminated due to connection timeout',
+  'Connection terminated unexpectedly',
+  'Query read timeout',
+  'timeout exceeded when trying to connect',
+]);
+const SOCKET_ERROR_CODES = new Set(['ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT', 'EPIPE']);
+
+function isPgConnectivityError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  const code = (error as { code?: unknown }).code;
+
+  return PG_CONNECTIVITY_MESSAGES.has(error.message) || (typeof code === 'string' && SOCKET_ERROR_CODES.has(code));
+}
+
 export function toTransientError(error: unknown): TransientDatabaseError | undefined {
+  if (isPgConnectivityError(error)) return new TransientDatabaseError(undefined, error);
+
   const sqlState = readSqlState(error);
   if (sqlState !== undefined && TRANSIENT_SQL_STATES.has(sqlState)) {
     return new TransientDatabaseError(sqlState, error);

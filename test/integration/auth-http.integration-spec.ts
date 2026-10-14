@@ -199,17 +199,57 @@ describe('authentication over HTTP (integration, real PostgreSQL)', () => {
       await loginAdmin();
     });
 
-    it('does not let parallel guesses slip past the block: at most five are ever checked', async () => {
-      // Twelve simultaneous wrong guesses. A block that is only consulted before the slow password
-      // check would let every one of them through the gate at once.
+    // R-06 (Owner, 14/10/2026): only a wrong attempt raises the failure counter. An attempt still
+    // being checked, or one that succeeds, is not a failure. Overload protection for a burst of
+    // guesses is a separate mechanism that needs its own design and review.
+    it('counts every parallel wrong guess exactly once and then refuses the right password', async () => {
       const statuses = (
         await Promise.all(Array.from({ length: 12 }, (_, i) => login(seed.superAdmin.email, `wrong guess number ${i}`)))
       ).map((response) => response.status);
 
-      expect(statuses.filter((status) => status === 401).length).toBeLessThanOrEqual(5);
-      expect(statuses.filter((status) => status === 429).length).toBeGreaterThanOrEqual(7);
-      // And the correct password is refused until the block ends.
+      expect(statuses.every((status) => status === 401 || status === 429)).toBe(true);
+      const { rows } = await ctx.sql.query<{ failure_count: number }>('SELECT failure_count FROM login_throttles');
+      expect(rows[0].failure_count).toBe(statuses.filter((status) => status === 401).length);
+      expect(rows[0].failure_count).toBeGreaterThanOrEqual(5);
       await login(seed.superAdmin.email, SEED_PASSWORD).expect(429);
+    });
+
+    it('does not let simultaneous correct sign-ins block each other', async () => {
+      const statuses = (
+        await Promise.all(Array.from({ length: 8 }, () => login(seed.superAdmin.email, SEED_PASSWORD)))
+      ).map((response) => response.status);
+
+      expect(statuses).toEqual(Array.from({ length: 8 }, () => 200));
+      const { rows } = await ctx.sql.query('SELECT 1 FROM login_throttles');
+      expect(rows).toHaveLength(0);
+    });
+
+    it('keeps correct and wrong attempts apart when they arrive together', async () => {
+      const attempts = [
+        ...Array.from({ length: 3 }, (_, i) => ({ password: `wrong mix ${i}`, expected: 401 })),
+        ...Array.from({ length: 7 }, () => ({ password: SEED_PASSWORD, expected: 200 })),
+      ];
+
+      const statuses = (await Promise.all(attempts.map((a) => login(seed.superAdmin.email, a.password)))).map(
+        (response) => response.status,
+      );
+
+      expect(statuses).toEqual(attempts.map((a) => a.expected));
+      // At most the three wrong ones were counted (a success clears the counter), never ten.
+      const { rows } = await ctx.sql.query<{ failure_count: number }>('SELECT failure_count FROM login_throttles');
+      expect(rows.length === 0 || rows[0].failure_count <= 3).toBe(true);
+    });
+
+    it('lets a correct sign-in clear earlier failures, so the block needs five new wrong attempts', async () => {
+      for (let attempt = 0; attempt < 4; attempt += 1) {
+        await login(seed.superAdmin.email, `wrong before ${attempt}`).expect(401);
+      }
+      await loginAdmin();
+      for (let attempt = 0; attempt < 4; attempt += 1) {
+        await login(seed.superAdmin.email, `wrong after ${attempt}`).expect(401);
+      }
+
+      await loginAdmin();
     });
 
     it('also throttles an unknown email, so existence is not revealed', async () => {

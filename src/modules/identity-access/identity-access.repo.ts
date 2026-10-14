@@ -442,26 +442,31 @@ export class IdentityAccessRepo {
     await tx.accountActionToken.update({ where: { tokenHash }, data: { consumedAt: now } });
   }
 
-  /** Unlocked read for the dispatcher: would redeeming this token succeed right now? */
-  async isTokenRedeemable(tokenHash: string, now: Date): Promise<boolean> {
+  /**
+   * Unlocked read for the dispatcher: the Employee behind this token when the account side would
+   * accept it right now, otherwise null. Whether that Employee has left is the organization
+   * module's to say, so the caller asks it.
+   */
+  async redeemableTokenEmployeeId(tokenHash: string, now: Date): Promise<string | null> {
     const row = await this.prisma.accountActionToken.findUnique({
       where: { tokenHash },
       select: {
         consumedAt: true,
         revokedAt: true,
         expiresAt: true,
-        appUser: { select: { status: true, activationState: true } },
+        appUser: { select: { status: true, activationState: true, employeeId: true } },
       },
     });
 
-    return (
+    const redeemable =
       row !== null &&
       row.consumedAt === null &&
       row.revokedAt === null &&
       row.expiresAt > now &&
       row.appUser.status === 'ACTIVE' &&
-      row.appUser.activationState === 'INVITED'
-    );
+      row.appUser.activationState === 'INVITED';
+
+    return redeemable ? row.appUser.employeeId : null;
   }
 
   /** The newest token of an account, used or not, with its expiry, for the detail view. */

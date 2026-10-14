@@ -3,15 +3,16 @@
 Thư mục root scripts/ chứa công cụ hỗ trợ dev/CI; không chứa business service.
 Scripts không tự chạy khi API nhận request. package.json khai lệnh gọi chúng.
 
-| File                             | Lệnh                | Trách nhiệm                                                        |
-| -------------------------------- | ------------------- | ------------------------------------------------------------------ |
-| check-rules.mjs                  | pnpm rules:check    | Kiểm tra link và quan hệ instruction trong rules-check.config.json |
-| check-rules.test.mjs             | pnpm rules:test     | Regression cho checker                                             |
-| dev/export-openapi.ts            | pnpm openapi:export | Tạo Nest app không listen, sinh openapi.json rồi đóng app          |
-| verify/runners.mjs               | Đọc bởi discovery   | Registry runner, suffix, thư mục                                   |
-| verify/test-layout.mjs           | Đọc bởi discovery   | Logic phát hiện layout sai                                         |
-| verify/test-layout.test.mjs      | pnpm test:scripts   | Regression layout                                                  |
-| verify/verify-test-discovery.mjs | pnpm test:discovery | Đối chiếu file trên disk với Jest --listTests                      |
+| File                               | Lệnh                | Trách nhiệm                                                           |
+| ---------------------------------- | ------------------- | --------------------------------------------------------------------- |
+| check-rules.mjs                    | pnpm rules:check    | Kiểm tra link và quan hệ instruction trong rules-check.config.json    |
+| check-rules.test.mjs               | pnpm rules:test     | Regression cho checker                                                |
+| dev/export-openapi.ts              | pnpm openapi:export | Tạo Nest app không listen, sinh openapi.json rồi đóng app             |
+| verify/runners.mjs                 | Đọc bởi discovery   | Registry runner, suffix, thư mục                                      |
+| verify/check-script-order.test.mjs | pnpm test:scripts   | Regression: `check` generate Prisma client trước lint; CI path filter |
+| verify/test-layout.mjs             | Đọc bởi discovery   | Logic phát hiện layout sai                                            |
+| verify/test-layout.test.mjs        | pnpm test:scripts   | Regression layout                                                     |
+| verify/verify-test-discovery.mjs   | pnpm test:discovery | Đối chiếu file trên disk với Jest --listTests                         |
 
 ## Khi thêm script
 

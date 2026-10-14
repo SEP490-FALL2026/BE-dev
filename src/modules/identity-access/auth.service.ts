@@ -62,16 +62,6 @@ export class AuthService {
       throw new LoginTemporarilyBlockedError(Math.ceil((throttle.blockedUntil.getTime() - now.getTime()) / 1000));
     }
 
-    // Count this attempt BEFORE the slow password check, atomically. Reading the block once and
-    // counting failures afterwards lets any number of simultaneous guesses through the gate; counting
-    // first bounds the checked guesses to the maximum no matter how many arrive at once. The
-    // counter is cleared by a successful sign-in, so a legitimate user is not penalised.
-    const attempt = await this.reserveAttempt(organization.id, keyHash);
-    if (attempt.failureCount > this.config.get('AUTH_LOGIN_MAX_FAILURES', { infer: true })) {
-      const blockedUntil = attempt.blockedUntil ?? new Date(now.getTime() + 1000);
-      throw new LoginTemporarilyBlockedError(Math.max(1, Math.ceil((blockedUntil.getTime() - now.getTime()) / 1000)));
-    }
-
     // Everything CPU-heavy happens before the transaction (lock protocol rule 3).
     const account = await this.repo.findAccountByLoginEmail(organization.id, normalized);
     const verifiedHash = await this.verifyPassword(account, password);
@@ -84,7 +74,13 @@ export class AuthService {
       employee !== null &&
       employee.status !== 'TERMINATED';
 
-    if (!usable) throw new InvalidCredentialsError();
+    if (!usable) {
+      // Only a wrong attempt is a failure. An attempt still being checked, or one that succeeds, is
+      // not counted (R-06): the counter is raised here, after the check, in one atomic statement so
+      // simultaneous wrong guesses are all counted.
+      await this.recordFailure(organization.id, keyHash);
+      throw new InvalidCredentialsError();
+    }
 
     const result = await this.runner.run(async (tx) => {
       // AppUser FOR SHARE first: a lock or password change that committed earlier is now visible.
@@ -122,12 +118,12 @@ export class AuthService {
     return (await this.hasher.verify(account.credentialHash, password)) ? account.credentialHash : null;
   }
 
-  private async reserveAttempt(organizationId: string, emailKeyHash: string) {
+  private async recordFailure(organizationId: string, emailKeyHash: string): Promise<void> {
     const now = new Date();
     const windowMs = this.config.get('AUTH_LOGIN_WINDOW_SECONDS', { infer: true }) * 1000;
     const blockMs = this.config.get('AUTH_LOGIN_BLOCK_SECONDS', { infer: true }) * 1000;
 
-    return this.repo.recordLoginFailure({
+    await this.repo.recordLoginFailure({
       organizationId,
       emailKeyHash,
       now,
