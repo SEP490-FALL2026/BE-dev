@@ -13,6 +13,11 @@ export interface AccessTokenClaims {
 }
 
 const REFRESH_TOKEN_SHAPE = /^[A-Za-z0-9_-]{43}$/;
+const UUID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function isUuid(value: unknown): value is string {
+  return typeof value === 'string' && UUID_SHAPE.test(value);
+}
 
 @Injectable()
 export class TokenService {
@@ -37,7 +42,9 @@ export class TokenService {
       throw new InvalidAccessTokenError();
     }
 
-    if (typeof payload.sub !== 'string' || typeof payload.sid !== 'string') throw new InvalidAccessTokenError();
+    // Both ids end up in a UUID column. A validly signed token with anything else is still a bad token
+    // (401); letting it reach the database would turn the driver's type error into a 503 (R-04).
+    if (!isUuid(payload.sub) || !isUuid(payload.sid)) throw new InvalidAccessTokenError();
 
     return { sub: payload.sub, sid: payload.sid };
   }

@@ -65,9 +65,17 @@ export class OrganizationService {
     return this.repo.findEmployees(employeeIds);
   }
 
-  /** Employees who have not left, matched on code, name or work email; newest codes last. */
-  searchActiveEmployees(search: string | undefined, onDate: Date, limit: number): Promise<EmployeeCandidate[]> {
-    return this.repo.searchActiveEmployees(search, onDate, limit);
+  /**
+   * Employees who have not left, matched on code, name or work email, in employee-code order.
+   * `afterEmployeeCode` continues a previous page (keyset): only codes sorting after it are returned.
+   */
+  searchActiveEmployees(
+    search: string | undefined,
+    onDate: Date,
+    limit: number,
+    afterEmployeeCode?: string,
+  ): Promise<EmployeeCandidate[]> {
+    return this.repo.searchActiveEmployees(search, onDate, limit, afterEmployeeCode);
   }
 
   getEmployeeProfile(employeeId: string, onDate: Date): Promise<EmployeeProfile | null> {

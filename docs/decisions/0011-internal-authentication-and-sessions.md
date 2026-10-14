@@ -50,9 +50,11 @@ pnpm 11.1.3 with an explicit `allowBuilds` list, and CI runs
    are verified against a dummy hash to keep response time similar.
 6. **Login throttling.** The key is HMAC-SHA256 of the normalized email with
    `AUTH_THROTTLE_PEPPER` (`node:crypto`). Owner confirmation on 14/10/2026 (R-06):
-   only failed logins increase the failure counter; in-flight attempts must not be counted
-   as failures. Current code reserves attempts before password verification and needs a fix.
-   Any separate overload protection needs its own design and review. The global throttler
+   only failed logins increase the failure counter; in-flight attempts are not counted
+   as failures. The counter is raised after the password check fails, in one atomic statement,
+   so simultaneous wrong guesses are all counted. A burst of simultaneous guesses is therefore no
+   longer capped at the failure limit before it is checked; it is bounded only by the global
+   throttler below. Any separate overload protection needs its own design and review. The global throttler
    stays enabled on every route with a separate counter per route and IP (Owner decision
    14/10/2026, R-07); it is independent of the email failure counter and uses process-local memory.
 7. **Installation password prompt.** No dependency: `process.stdin.setRawMode(true)`
@@ -109,7 +111,7 @@ The [research note](../workspace/items/us-01-bootstrap-login-session/research.md
 the initial isolated experiments. The [AI review of `64073c4`](../reviews/backend-g0-g1-review-2026-10-14.md)
 records 223 unit, 28 E2E and 147 integration passes on PostgreSQL 17.11, plus live HTTP,
 SMTP and Linux PTY checks. It also records failed cases and missing evidence: the clean-checkout
-gate, stalled DB requests, malformed JWT claims and login throttling still need fixes;
-manual PowerShell bootstrap and SMTP TLS remain unverified.
+gate, stalled DB requests, malformed JWT claims and login throttling were fixed after that review
+(see the follow-up for the evidence); manual PowerShell bootstrap and SMTP TLS remain unverified.
 See [follow-up and Owner decisions](../workspace/g0-g1-review-follow-up.md).
 These results belong to that revision and do not close acceptance.

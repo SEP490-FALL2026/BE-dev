@@ -10,6 +10,8 @@ export function testConfig(
     DB_STATEMENT_TIMEOUT_MS: 5000,
     DB_TRANSACTION_TIMEOUT_MS: 10000,
     DB_TRANSACTION_MAX_WAIT_MS: 2000,
+    DB_CONNECT_TIMEOUT_MS: 3000,
+    DB_QUERY_TIMEOUT_MS: 8000,
   };
 
   return new ConfigService({ ...defaults, ...values }) as unknown as ConfigService<EnvironmentVariables, true>;

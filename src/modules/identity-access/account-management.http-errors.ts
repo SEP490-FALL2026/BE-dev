@@ -1,5 +1,5 @@
 import { HttpStatus } from '@nestjs/common';
-import { TransientDatabaseError } from '../../infrastructure/database/transaction-runner';
+import { TransientDatabaseError, toTransientError } from '../../infrastructure/database/transaction-runner';
 import { ApiException } from '../../infrastructure/http/errors/api.exception';
 import { EmployeeNotFoundError } from '../organization/organization.errors';
 import {
@@ -84,7 +84,8 @@ export function toAccountApiException(error: unknown): unknown {
       violation: error.violation,
     });
   }
-  if (error instanceof TransientDatabaseError) {
+  // Reads outside TransactionRunner raise the driver's own error; toTransientError recognizes it.
+  if (error instanceof TransientDatabaseError || toTransientError(error)) {
     return refuse(
       HttpStatus.SERVICE_UNAVAILABLE,
       'SERVICE_UNAVAILABLE',

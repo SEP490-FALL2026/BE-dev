@@ -91,9 +91,9 @@ nên có hiệu lực ngay request kế tiếp. Vai không nằm trong token. Da
 Sai vai: 403 AUTHORIZATION.FORBIDDEN.
 
 Rate limit hiện dùng bộ nhớ của từng process, theo **từng route trên mỗi IP**, **không dùng Redis**.
-Owner chốt giữ phạm vi này ngày 14/10/2026 (R-07); dev cần bổ sung test xác nhận.
+Owner chốt giữ phạm vi này ngày 14/10/2026 (R-07); `test/e2e/rate-limit.e2e-spec.ts` ghim hành vi này.
 Throttle đăng nhập theo email là cơ chế riêng: chỉ lần sai được tăng bộ đếm thất bại theo spec;
-code tại `64073c4` còn đếm lượt đang xử lý, cần sửa R-06.
+bộ đếm tăng sau khi kiểm mật khẩu thất bại, trong một câu lệnh nguyên tử (R-06).
 TRUST_PROXY_HOPS chỉ cấu hình khi ingress đáng tin cậy; proxy phải thay header
 request ID do client gửi. Baseline chưa giải quyết rate limit phân tán.
 

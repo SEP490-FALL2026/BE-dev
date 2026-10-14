@@ -1,4 +1,6 @@
 import request from 'supertest';
+import { AccountManagementService } from '../../src/modules/identity-access/account-management.service';
+import { SuperAdminHolderNotLockableError } from '../../src/modules/identity-access/errors/identity-access.errors';
 import { PAYLOAD_CIPHER } from '../../src/modules/notifications/notifications.tokens';
 import { PayloadCipher } from '../../src/modules/notifications/payload-cipher';
 import { bodyOf } from '../support/api-body';
@@ -615,6 +617,58 @@ describe('account management over HTTP (integration, real PostgreSQL)', () => {
 
       expect(detail.invitation).toMatchObject({ usable: true, delivery: { status: 'PENDING' } });
       await admin.get('/api/v1/app-users/9b8c6f5e-0000-4000-8000-000000000000').expect(404);
+    });
+  });
+
+  // R-08: through HTTP the caller is the holder, so the self-change rule answers first and the
+  // holder protection is never reached. Only a call from another account (a later transfer or
+  // recovery flow) exercises it, so it is pinned here at the service.
+  describe('locking the SUPER_ADMIN holder from another account (R-08)', () => {
+    it('is refused and leaves the account untouched', async () => {
+      const other = await activatedAccount(['IT_ADMIN']);
+      const actor = {
+        subject: other.appUserId,
+        appUserId: other.appUserId,
+        sessionId: other.appUserId,
+        employeeId: other.employeeId,
+        directRoles: ['IT_ADMIN'],
+        derivedRoles: [],
+        roles: ['IT_ADMIN'],
+      };
+      const lockedBefore = await countAudit('APP_USER.LOCKED', seed.superAdmin.appUserId);
+
+      await expect(ctx.app.get(AccountManagementService).lock(actor, seed.superAdmin.appUserId)).rejects.toBeInstanceOf(
+        SuperAdminHolderNotLockableError,
+      );
+
+      const { rows } = await ctx.sql.query<{ status: string }>('SELECT status FROM app_users WHERE id = $1', [
+        seed.superAdmin.appUserId,
+      ]);
+      expect(rows[0].status).toBe('ACTIVE');
+      expect(await countAudit('APP_USER.LOCKED', seed.superAdmin.appUserId)).toBe(lockedBefore);
+    });
+  });
+
+  // R-05: redeeming already refuses an employee who has left (US-01-10 AC-6); the detail view and
+  // the mail dispatcher must agree, or a dead link is advertised as usable and still e-mailed.
+  describe('the invitation of an employee who has left (R-05)', () => {
+    it('is reported unusable and is not offered to the mail dispatcher', async () => {
+      const employee = await newEmployee();
+      const account = dataOf(await admin.post('/api/v1/app-users', { employeeId: employee.employeeId }).expect(201));
+      const tokenHash = (
+        await ctx.sql.query<{ token_hash: string }>(
+          'SELECT token_hash FROM account_action_tokens WHERE app_user_id = $1',
+          [account.id],
+        )
+      ).rows[0].token_hash;
+      const accounts = ctx.app.get(AccountManagementService);
+      await expect(accounts.isInvitationLinkUsable(tokenHash)).resolves.toBe(true);
+
+      await ctx.sql.query("UPDATE employees SET status = 'TERMINATED' WHERE id = $1", [employee.employeeId]);
+
+      const detail = dataOf(await admin.get(`/api/v1/app-users/${account.id}`).expect(200));
+      expect(detail.invitation?.usable).toBe(false);
+      await expect(accounts.isInvitationLinkUsable(tokenHash)).resolves.toBe(false);
     });
   });
 });

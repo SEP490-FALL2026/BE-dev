@@ -149,11 +149,17 @@ export class OrganizationRepo {
     }));
   }
 
-  async searchActiveEmployees(search: string | undefined, onDate: Date, limit: number): Promise<EmployeeCandidate[]> {
+  async searchActiveEmployees(
+    search: string | undefined,
+    onDate: Date,
+    limit: number,
+    afterEmployeeCode?: string,
+  ): Promise<EmployeeCandidate[]> {
     const term = search?.trim();
     const rows = await this.prisma.employee.findMany({
       where: {
         status: 'ACTIVE',
+        ...(afterEmployeeCode === undefined ? {} : { employeeCode: { gt: afterEmployeeCode } }),
         ...(term
           ? {
               OR: [

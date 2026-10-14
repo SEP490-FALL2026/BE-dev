@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { toTransientError } from '../../infrastructure/database/transaction-runner';
 import {
   AccessTokenVerifierPort,
   AuthenticatedPrincipal,
@@ -34,7 +35,9 @@ export class JwtAccessTokenVerifier implements AccessTokenVerifierPort {
       employeeStatus = context ? ((await this.organization.getEmployee(context.employeeId))?.status ?? null) : null;
     } catch (error) {
       // Could not reach the database: the token may be fine, so this is a 503, never a 401.
-      throw new TokenVerificationUnavailableError(error);
+      // Anything toTransientError does not recognise is a defect, and stays one (a 500 with a log).
+      if (toTransientError(error)) throw new TokenVerificationUnavailableError(error);
+      throw error;
     }
 
     const now = new Date();

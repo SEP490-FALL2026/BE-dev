@@ -50,8 +50,7 @@ trong `env-schema.ts` cho dịch vụ thư local (mặc định `localhost:1025`
 
 `pnpm check` chạy gate không cần dịch vụ ngoài; `pnpm test:e2e` kiểm tra HTTP
 với boundary thay thế. Integration test cần PostgreSQL riêng: xem [test guide](test/README.md).
-**Lỗi đã biết R-01 tại `64073c4`:** checkout sạch cần `pnpm prisma:generate` trước `pnpm check`,
-vì script hiện lint trước generate. Đây là cách chạy tạm; dev vẫn phải sửa thứ tự gate và kiểm checkout sạch.
+`pnpm check` sinh Prisma client trước lint nên chạy được trực tiếp trên checkout sạch (R-01).
 
 `docker build -t slm-api:foundation .` tạo runtime image.
 Container chạy với `--env-file` dành riêng cho container; localhost trong container

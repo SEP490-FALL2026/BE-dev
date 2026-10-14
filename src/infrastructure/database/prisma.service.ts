@@ -16,6 +16,13 @@ export class PrismaService extends PrismaClient implements OnModuleDestroy {
       // (observed on a PostgreSQL started in Asia/Bangkok). Pin the zone per connection so the
       // result does not depend on how the database server was installed.
       options: '-c TimeZone=UTC',
+      // statement_timeout (TransactionRunner) is enforced by the server, so it cannot fire when
+      // the server never answers (paused container, dropped network path). These two limits are
+      // enforced here, so such a request fails in bounded time instead of waiting forever (R-02).
+      connectionTimeoutMillis: config.get('DB_CONNECT_TIMEOUT_MS', { infer: true }),
+      query_timeout: config.get('DB_QUERY_TIMEOUT_MS', { infer: true }),
+      // Lets the operating system notice a dead peer on an idle pooled connection.
+      keepAlive: true,
     });
     super({ adapter });
   }

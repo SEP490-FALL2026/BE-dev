@@ -87,6 +87,13 @@ export interface CreateAccountInput {
   roles: RequestedRole[];
 }
 
+/** The candidate list shows at most this many people (spec 1b). */
+const CANDIDATE_LIMIT = 20;
+/** Employees read per step while looking for candidates without an account. */
+const CANDIDATE_PAGE_SIZE = 200;
+/** Upper bound on steps, so one request reads at most 5 000 employees however many have accounts. */
+const CANDIDATE_MAX_PAGES = 25;
+
 /**
  * Account administration by the Super Admin (slice 1b). Every method that changes an account
  * takes the AppUser row lock first and re-reads what it decides on (lock protocol rules 1 and 2).
@@ -110,10 +117,26 @@ export class AccountManagementService {
   async listCandidates(search: string | undefined): Promise<EmployeeCandidate[]> {
     const organization = await this.organization.getOrganization();
     const today = toDateColumn(businessDateAt(new Date(), organization?.timeZone ?? 'UTC'));
-    const matches = await this.organization.searchActiveEmployees(search, today, 200);
-    const withAccount = await this.repo.findAccountEmployeeIds(matches.map((match) => match.id));
+    const found: EmployeeCandidate[] = [];
+    let after: string | undefined;
 
-    return matches.filter((match) => !withAccount.has(match.id)).slice(0, 20);
+    // Walk the employees in code order, a page at a time, until 20 have no account or none are
+    // left: the account filter lives in another module, so it cannot be part of one query, and a
+    // single capped page would miss everyone sorting after a long run of employees with accounts.
+    for (let page = 0; page < CANDIDATE_MAX_PAGES && found.length < CANDIDATE_LIMIT; page += 1) {
+      const matches = await this.organization.searchActiveEmployees(search, today, CANDIDATE_PAGE_SIZE, after);
+      if (matches.length === 0) break;
+
+      const withAccount = await this.repo.findAccountEmployeeIds(matches.map((match) => match.id));
+      for (const match of matches) {
+        if (!withAccount.has(match.id) && found.length < CANDIDATE_LIMIT) found.push(match);
+      }
+
+      if (matches.length < CANDIDATE_PAGE_SIZE) break;
+      after = matches[matches.length - 1].employeeCode;
+    }
+
+    return found;
   }
 
   async listAccounts(
@@ -422,11 +445,21 @@ export class AccountManagementService {
   }
 
   /** Whether the link behind this token hash would still work; the dispatcher asks this before sending. */
-  isInvitationLinkUsable(tokenHash: string): Promise<boolean> {
-    return this.repo.isTokenRedeemable(tokenHash, new Date());
+  async isInvitationLinkUsable(tokenHash: string): Promise<boolean> {
+    const employeeId = await this.repo.redeemableTokenEmployeeId(tokenHash, new Date());
+    if (employeeId === null) return false;
+
+    // Redeeming refuses an employee who has left, so a link to one is dead and must not be mailed.
+    return this.employeeHasNotLeft(employeeId);
   }
 
   // --- internals --------------------------------------------------------------------
+
+  private async employeeHasNotLeft(employeeId: string): Promise<boolean> {
+    const employee = await this.organization.getEmployee(employeeId);
+
+    return employee !== null && employee.status !== 'TERMINATED';
+  }
 
   private async lockAndRead(tx: DbTx, appUserId: string): Promise<AccountRecord> {
     if (!(await this.repo.lockAppUser(tx, appUserId, 'UPDATE'))) throw new AccountNotFoundError();
@@ -550,7 +583,11 @@ export class AccountManagementService {
       const delivery = (await this.notifications.deliveryStates([token.tokenHash])).get(token.tokenHash) ?? null;
       invitation = {
         delivery,
-        usable: token.consumedAt === null && token.revokedAt === null && token.expiresAt > new Date(),
+        usable:
+          token.consumedAt === null &&
+          token.revokedAt === null &&
+          token.expiresAt > new Date() &&
+          (await this.employeeHasNotLeft(record.employeeId)),
         expiresAt: token.expiresAt,
       };
     }

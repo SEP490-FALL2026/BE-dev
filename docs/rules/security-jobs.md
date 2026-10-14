@@ -20,10 +20,9 @@
   current account status or resource permission.
 - Distinguish invalid credentials from unavailable dependencies. Do not log secrets.
 - Global rate limiting uses per-process memory, with a separate counter for each route and IP
-  (Owner decision 14/10/2026, R-07; developer verification tests still required).
-  Login failure throttling is separately keyed by normalized email: only failed logins may increase
-  its failure counter (Owner confirmed the existing spec, R-06). The current code counts in-flight
-  attempts before password verification and still needs fixing; do not describe it as compliant.
+  (Owner decision 14/10/2026, R-07; pinned by `test/e2e/rate-limit.e2e-spec.ts`).
+  Login failure throttling is separately keyed by normalized email: only failed logins increase
+  its failure counter, after the password check (Owner confirmed the existing spec, R-06).
   See [review follow-up](../workspace/g0-g1-review-follow-up.md). Redis is queue infrastructure.
 - Configure TRUST_PROXY_HOPS only for trusted ingress that overwrites client headers.
 
