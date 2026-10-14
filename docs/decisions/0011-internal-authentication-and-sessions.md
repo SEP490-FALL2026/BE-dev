@@ -1,9 +1,9 @@
 # ADR-0011: Internal authentication, sessions and identity persistence conventions
 
-Status: **Proposed** (12/10/2026). Not implemented. Items marked _lead decision_ were
-chosen by the project lead on 12/10/2026 in a design session; every item still needs
-the BE developer's feasibility review before slice 1a is coded. An AI assistant did the
-research and drafting; that is not a review or an approval.
+Status: **Proposed** (12/10/2026). Implemented in slice 1a and merged through PR #4
+(`64073c4`); developer review and acceptance are still pending as of 14/10/2026.
+Items marked _lead decision_ were chosen on 12/10/2026; the planned pre-merge review
+gate was not completed. AI research, drafting and testing do not constitute developer approval.
 
 Number 0011 is used because 0006 and 0008–0010 still exist in Git history
 (`1e8d0a1`) for the earlier native-identity design; they are not reused.
@@ -49,8 +49,12 @@ pnpm 11.1.3 with an explicit `allowBuilds` list, and CI runs
    minimum), stored as a PHC string with `hashPolicyVersion = 1`. Unknown accounts
    are verified against a dummy hash to keep response time similar.
 6. **Login throttling.** The key is HMAC-SHA256 of the normalized email with
-   `AUTH_THROTTLE_PEPPER` (`node:crypto`). It is independent of the global per-IP
-   throttler, which stays enabled on every route.
+   `AUTH_THROTTLE_PEPPER` (`node:crypto`). Owner confirmation on 14/10/2026 (R-06):
+   only failed logins increase the failure counter; in-flight attempts must not be counted
+   as failures. Current code reserves attempts before password verification and needs a fix.
+   Any separate overload protection needs its own design and review. The global throttler
+   stays enabled on every route with a separate counter per route and IP (Owner decision
+   14/10/2026, R-07); it is independent of the email failure counter and uses process-local memory.
 7. **Installation password prompt.** No dependency: `process.stdin.setRawMode(true)`
    with manual Enter/Backspace/Ctrl+C handling. The command refuses to run without a TTY.
 8. **Transactions** (_lead decision_ for the values). A `TransactionRunner` wraps the
@@ -86,22 +90,26 @@ pnpm 11.1.3 with an explicit `allowBuilds` list, and CI runs
 
 ## Consequences
 
-- When this ADR is **Accepted**, it replaces the sentence _"Until implemented, supplied
-  tokens receive 503 AUTHENTICATION_NOT_CONFIGURED"_ of ADR-0002 and _"The unimplemented
-  verifier returns 503 AUTHENTICATION_NOT_CONFIGURED"_ of ADR-0004; both ADRs then get a
-  link to this one. Until then they are unchanged. Slice 1a removes
-  `UnconfiguredTokenVerifier` and updates the security/API rules and ARCHITECTURE.
-- The migration role needs `CREATE` on the target database for `btree_gist`; confirm
+- Slice 1a already removed `UnconfiguredTokenVerifier` and its
+  `503 AUTHENTICATION_NOT_CONFIGURED` response. ADR-0002 and ADR-0004 already contain
+  implementation notes linking here; those notes do not make this ADR Accepted.
+- The migration role needs `CREATE` on the target database for the baseline's
+  `CREATE SCHEMA IF NOT EXISTS public` and `btree_gist`; confirm
   for every shared environment before deploying.
 - The database temporarily has two column conventions (catalog camelCase, new tables
   snake_case) until the catalog is redesigned in G3.
 - New dependencies must pass `pnpm install --frozen-lockfile` and the CI audit gate.
-- Acceptance gate: the lead moves this ADR to Accepted, with the BE developer's review
-  link, before slice 1a merges; the same PR adds the link notes to ADR-0002 and ADR-0004.
+- Acceptance remains open after merge: a BE developer must review the design and code,
+  then the lead records the acceptance decision with the reviewer, revision and review link.
+  The original pre-merge gate was missed; do not retroactively mark it fulfilled.
 
 ## Verification
 
-Evidence so far is limited to isolated experiments listed in the research note
-(library behaviour in CommonJS/ts-jest, pnpm 11 install behaviour, the runtime image,
-PostgreSQL extension/constraint/lock behaviour). Product behaviour is unverified until
-slice 1a's unit, e2e and PostgreSQL integration/concurrency tests pass.
+The [research note](../workspace/items/us-01-bootstrap-login-session/research.md) records
+the initial isolated experiments. The [AI review of `64073c4`](../reviews/backend-g0-g1-review-2026-10-14.md)
+records 223 unit, 28 E2E and 147 integration passes on PostgreSQL 17.11, plus live HTTP,
+SMTP and Linux PTY checks. It also records failed cases and missing evidence: the clean-checkout
+gate, stalled DB requests, malformed JWT claims and login throttling still need fixes;
+manual PowerShell bootstrap and SMTP TLS remain unverified.
+See [follow-up and Owner decisions](../workspace/g0-g1-review-follow-up.md).
+These results belong to that revision and do not close acceptance.

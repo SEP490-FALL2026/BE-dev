@@ -5,19 +5,19 @@ API và worker có entry point riêng trong cùng codebase.
 
 ## Trạng thái foundation
 
-| Thành phần     | Đã có                                                             | Chưa triển khai                                   |
-| -------------- | ----------------------------------------------------------------- | ------------------------------------------------- |
-| HTTP           | Zod DTO, response envelope, exception filter, OpenAPI, rate limit | API theo các US còn lại                           |
-| Health         | Liveness và PostgreSQL readiness                                  | Probe queue/storage                               |
-| Catalog        | List/get/create, service, repo, mapper, tests                     | Quyền theo role/resource                          |
-| Authentication | Bearer guard, verifier port, mặc định từ chối                     | Tài khoản/mật khẩu, JWT, session và authorization |
-| Database       | Catalog schema và migration baseline cho DB mới                   | Schema nghiệp vụ khác                             |
-| Queue/storage  | BullMQ configuration, worker context, S3 adapter                  | Queue processor và file API                       |
+| Thành phần     | Đã có                                                                                            | Chưa triển khai                                                     |
+| -------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------- |
+| HTTP           | Zod DTO, response envelope, exception filter, OpenAPI, rate limit                                | API theo các US còn lại                                             |
+| Health         | Liveness và PostgreSQL readiness                                                                 | Probe queue/storage                                                 |
+| Catalog        | Source list/get/create và tests làm mẫu; không mount HTTP                                        | Nghiệp vụ catalog G3 và quyền theo role/resource                    |
+| Authentication | Argon2id, JWT/refresh session, guards, CLI bootstrap, `/me`, quản trị tài khoản và lời mời       | Đổi/đặt lại mật khẩu, vai suy ra, chuyển giao/khôi phục Super Admin |
+| Database       | Catalog, audit, organization, identity-access, notifications; 5 migration và `TransactionRunner` | Schema cho các lát tiếp theo                                        |
+| Queue/storage  | S3 adapter, BullMQ configuration; worker gửi SMTP từ outbox PostgreSQL                           | BullMQ queue processor và file API                                  |
 
-Hướng auth đã chọn là tài khoản/mật khẩu + JWT. Chưa có bảng tài khoản, password
-hash, login endpoint hoặc token signing. Verifier placeholder luôn từ chối token;
-không dùng nó làm cơ chế đăng nhập. Catalog là mẫu cấu trúc, chưa sẵn sàng cung cấp
-nghiệp vụ thật trước khi có authentication và authorization theo US.
+G0 và lát 1a/1b đã merge qua PR #4 (`64073c4`), có 16 operation HTTP.
+Spec/plan và ADR-0011/0012 chưa được dev review/nghiệm thu; kết quả AI review và lỗi còn mở
+được dẫn ở [theo dõi sau review](docs/workspace/g0-g1-review-follow-up.md).
+Catalog là mẫu cấu trúc, chưa cung cấp nghiệp vụ G3.
 
 ## Bản đồ source
 
@@ -90,7 +90,10 @@ nên có hiệu lực ngay request kế tiếp. Vai không nằm trong token. Da
 503 TOKEN_VERIFICATION_UNAVAILABLE (route auth: 503 AUTH.UNAVAILABLE), không lộ thông tin nội bộ.
 Sai vai: 403 AUTHORIZATION.FORBIDDEN.
 
-Rate limit hiện dùng bộ nhớ của từng process, **không dùng Redis**.
+Rate limit hiện dùng bộ nhớ của từng process, theo **từng route trên mỗi IP**, **không dùng Redis**.
+Owner chốt giữ phạm vi này ngày 14/10/2026 (R-07); dev cần bổ sung test xác nhận.
+Throttle đăng nhập theo email là cơ chế riêng: chỉ lần sai được tăng bộ đếm thất bại theo spec;
+code tại `64073c4` còn đếm lượt đang xử lý, cần sửa R-06.
 TRUST_PROXY_HOPS chỉ cấu hình khi ingress đáng tin cậy; proxy phải thay header
 request ID do client gửi. Baseline chưa giải quyết rate limit phân tán.
 

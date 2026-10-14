@@ -12,9 +12,14 @@ BRD sở hữu nghiệp vụ; US dẫn xuất phạm vi/AC; sổ quyết định
 
 Vị trí trên chỉ để nhận diện tài liệu, không bắt contributor có thư mục cạnh checkout BE. Mỗi spec pin revision thực sự dùng.
 
-## Snapshot `S-2026-10-12b` (hiện hành)
+## Snapshot `S-2026-10-12b` (baseline của G0, lát 1a/1b)
 
-Repo Docs có remote `SEP490-FALL2026/docs` theo cấu hình Git của bản local. Nền là commit **`982ea92`** trên `main` (đã có trên `origin/main` lúc kiểm 12/10/2026) — commit này chứa đúng snapshot `S-2026-10-12` bên dưới. Trên nền đó, lượt khép thiết kế 12/10/2026 có **thay đổi chưa commit**: sổ quyết định (`QĐ-67`), BRD v3.36, nguồn US (`src/00-head.md`, `src/99-tail.md`, `src/EP-01.md`, `src/EP-02.md`) và các tệp US sinh lại từ nguồn. Đối chiếu bằng SHA-256 của nội dung tệp (LF, không BOM):
+Snapshot đã nằm nguyên vẹn ở repo `SEP490-FALL2026/docs`, commit
+**`0e0bb83e30d1584c847c1723ac3f7adaa923e171`** (`0e0bb83`). Ngày 14/10/2026 đã kiểm lại
+**12/12 tệp** bằng `git show 0e0bb83:<tệp>` và SHA-256 chuẩn hóa LF, không BOM: khớp bảng dưới.
+`982ea92` chỉ là snapshot lịch sử trước `QĐ-67`; không còn mô tả baseline này là thay đổi chưa commit.
+Người nhận lấy đúng commit từ [repo Docs](https://github.com/SEP490-FALL2026/docs/commit/0e0bb83e30d1584c847c1723ac3f7adaa923e171),
+không lấy working tree mới hơn để thay ngầm nguồn của spec.
 
 | Tệp (tính từ gốc Docs)                                                              | SHA-256                                                            |
 | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
@@ -31,7 +36,25 @@ Repo Docs có remote `SEP490-FALL2026/docs` theo cấu hình Git của bản loc
 | BE-UserStory/src/EP-02.md                                                           | `6f449360edd2812feb754ffc45657b1f7091a3e90e02e8f22d36cfd03285f644` |
 | ERD/CONCEPTUAL ERD - DANH SÁCH ENTITY.md                                            | `6ab348ec9f1af01512a264c493599f1ddf778b82b82caf4250ff6746c89cc8c0` |
 
-**Điều kiện bàn giao:** người nhận chưa đọc được các tệp trên thì chưa bàn giao được. Owner commit/push Docs hoặc chia sẻ đúng các tệp có hash khớp, rồi ghi commit Docs vào cột revision ở trên. Nguồn US canonical là `BE-UserStory/src/` + `BE-UserStory/tools/build_us.py`; tệp sinh không sửa tay.
+**Điều kiện bàn giao:** nguồn đã có commit tái lập; người nhận vẫn cần xác nhận truy cập được đúng
+commit/tệp có hash khớp. Việc kiểm hash local không xác nhận quyền truy cập remote của dev và không
+phê duyệt spec. Nguồn US canonical là `BE-UserStory/src/` + `BE-UserStory/tools/build_us.py`;
+tệp sinh không sửa tay.
+
+## Delta sau baseline: `QĐ-68` (chưa thay snapshot của G0/1a/1b)
+
+[Review 14/10/2026](../reviews/backend-g0-g1-review-2026-10-14.md) ghi nhận working tree Docs
+BRD v3.37, Phạm vi v1.25 và `QĐ-68a`→`68f`; phần này đang được chỉnh riêng, chưa được pin thành
+snapshot bàn giao mới tại đây. EP-01 và các định nghĩa yêu cầu của ba spec được kiểm trong báo cáo
+vẫn khớp baseline. Không coi toàn bộ working tree đã được review hoặc đã được BE hiện thực.
+
+- R-10: trước G2, refine JobTitle theo `QĐ-68a/b/d`: danh mục chung, chuẩn hóa khoảng trắng thừa,
+  không phân biệt hoa/thường nhưng giữ dấu, có trạng thái ngừng dùng.
+- R-11: review lại I-2 theo `QĐ-66ak` và `QĐ-68f`: thời điểm ghi nhận thành viên phòng khác thời điểm
+  bắt đầu quyền theo ngày vào. Theo dõi `OQ-A-26` cho ngày vào đã qua; không tự chốt.
+  Ngoại lệ placement khởi tạo từ ngày vào của `QĐ-67a`/`QĐ-68f` giữ nguyên.
+- Khi thiết kế G2, pin commit/hash mới, lập impact/migration/test plan và dev review trước phần phụ thuộc.
+  Xem [theo dõi sau review](g0-g1-review-follow-up.md).
 
 ## Snapshot `S-2026-10-12` (lịch sử)
 

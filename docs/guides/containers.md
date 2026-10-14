@@ -23,6 +23,12 @@ docker build --target migrate -t slm-migrate:foundation .
 
 The runtime defaults to production. Supply DATABASE_URL, HTTPS CORS_ORIGINS,
 REDIS_HOST/REDIS_PASSWORD, HTTPS OBJECT_STORAGE_ENDPOINT and storage credentials/bucket.
+Authentication also requires AUTH_ACCESS_TOKEN_SECRET, AUTH_THROTTLE_PEPPER and secure cookies;
+invitation delivery requires HTTPS APP_PUBLIC_URL, OUTBOX_PAYLOAD_KEY (base64 of 32 bytes),
+OUTBOX_PAYLOAD_KEY_ID, SMTP_HOST, SMTP_FROM and SMTP_TLS=true, plus the provider's port/auth settings.
+The [environment validator](../../src/infrastructure/config/env-schema.ts) owns the full constraints.
+These shared settings are validated for API, worker and bootstrap CLI, including settings a particular
+entry point may not use (review R-13).
 Use container-reachable hostnames: localhost means the container itself.
 
 Create untracked environment files appropriate to the target environment:
@@ -38,10 +44,12 @@ existing databases need a separately reviewed transition, never an automatic res
 First-run installation (once, on an empty database after migrations) is an interactive command in the
 same runtime image: `docker run --rm -it --env-file .env.container slm-api:foundation node dist/installation-cli.js --help`.
 It needs a terminal (`-it`) because the Super Admin password is typed at a hidden prompt; it refuses to
-read it from arguments, the environment or a pipe. NOT verified in a container or on a real TTY by the
-implementing session: check on PowerShell and a Linux shell before relying on it.
-The worker uses the same runtime image with command node dist/worker.js. No business
-processor exists yet.
+read it from arguments, the environment or a pipe. The
+[AI review at `64073c4`](../reviews/backend-g0-g1-review-2026-10-14.md) verified a real Linux PTY
+in the runtime image with automated input; manual interactive PowerShell verification is still pending.
+The worker uses the same runtime image with command `node dist/worker.js` and runs the PostgreSQL
+outbox polling loop for SMTP delivery. No BullMQ processor is registered. Compose has no SMTP sink;
+configure a reachable SMTP service separately. SMTP TLS/provider delivery remains unverified.
 
 For a local container smoke test, explicitly set NODE_ENV=development, database and
 service hostnames; do not expose development credentials to a shared environment.

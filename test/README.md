@@ -10,7 +10,9 @@ test/ chứa các suite qua nhiều lớp và helper dùng riêng cho test.
 | Integration | test/integration/*.integration-spec.ts | pnpm test:integration                | PostgreSQL thật, migration, constraint, repository, concurrency harness      |
 | Script      | scripts/**/*.test.mjs                  | pnpm rules:test và pnpm test:scripts | Công cụ kiểm tra tài liệu/test discovery                                     |
 
-Chưa có browser/live runner. Không tạo lệnh giả pass cho suite chưa triển khai.
+Chưa có browser suite. [Runner review G0/G1](../docs/reviews/backend-g0-g1-review-2026-10-14/README.md)
+đã chạy HTTP/SMTP thật tại `64073c4`; đây là công cụ review riêng, chưa tích hợp vào CI.
+Không tạo lệnh giả pass cho suite chưa triển khai.
 
 ## Quy tắc viết test
 
@@ -58,8 +60,10 @@ connection trước khi dọn thủ công; không xóa theo wildcard.
 `support/http-test-app.ts` dựng **toàn bộ** ứng dụng Nest (pipe, guard, filter, cookie parser) trên một
 database dùng riêng đã áp migration, cho các ca mà stub repo không chứng minh được: ràng buộc, khóa dòng,
 cookie. `createHttpTestApp()` trả `{ app, sql, close }`; `seedInstallation(app)` tạo bộ dữ liệu tối thiểu
-của lệnh khởi tạo qua service thật; `insertAccountFixture` tạo thêm tài khoản bằng SQL cho tới khi lát tạo
-tài khoản (1b) có API. Dùng `bodyOf(response)` (`support/api-body.ts`) thay cho `response.body` (kiểu `any`).
+của lệnh khởi tạo qua service thật; `insertAccountFixture` tạo trạng thái tài khoản bằng SQL để cô lập
+ca kiểm thử. Lát 1b đã có API tạo/mời/kích hoạt: test workflow đó phải đi qua API thật;
+fixture SQL không chứng minh workflow tạo tài khoản. Dùng `bodyOf(response)`
+(`support/api-body.ts`) thay cho `response.body` (kiểu `any`).
 
 - `ConfigModule` kiểm tra env **lúc import** `AppModule`, nên helper đặt biến môi trường rồi mới `import()` động.
 - `support/placement-coverage.ts`: truy vấn kiểm coverage của placement (bắt khoảng trống mà exclusion

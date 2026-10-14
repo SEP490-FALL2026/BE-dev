@@ -6,6 +6,8 @@
 - Trạng thái yêu cầu: `OWNER-PROVISIONAL` (`L-2`) — quyết định Owner, chưa GVHD. Logical, giao thức khóa, định nghĩa token _dùng được_ và chiến lược migration: [spec nền](../foundation-org-identity-boundary/spec.md) (thêm AccountActionToken, EmailOutbox).
 - [Kế hoạch](plan.md). Phụ thuộc: [lát 1a](../us-01-bootstrap-login-session/spec.md) (đăng nhập, guard, khai báo quyền, audit, bảng danh tính, Employee IT từ khởi tạo).
 
+**Đối chiếu 14/10/2026:** code đã merge PR #4 (`64073c4`); thiết kế vẫn draft, chưa dev review/nghiệm thu. Nguồn baseline là Docs `0e0bb83` (snapshot `S-2026-10-12b`). Xem [theo dõi sau review](../../g0-g1-review-follow-up.md) và [báo cáo AI](../../../reviews/backend-g0-g1-review-2026-10-14.md).
+
 ## Vấn đề và phạm vi
 
 Sau lát 1a chỉ Super Admin dùng được hệ thống. Lát này cho Super Admin tạo tài khoản từ một Employee đã có (lúc đầu là Employee IT do khởi tạo tạo), gửi lời mời dùng một lần; người dùng tự đặt mật khẩu rồi đăng nhập theo lát 1a. Super Admin khóa/mở tài khoản và gán/thu hồi vai gán tay; thay đổi có hiệu lực từ request kế tiếp.
@@ -70,7 +72,7 @@ Thứ tự khóa của từng thao tác theo [giao thức khóa chung](../founda
 
 - Module `notifications` sở hữu EmailOutbox. Thư gồm liên kết `{APP_PUBLIC_URL}/activate#token=…` (token ở fragment để không vào log máy chủ hay Referer), hạn dùng, không có mật khẩu.
 - Payload chứa token nên được mã hóa AES-256-GCM bằng khóa cấu hình (`OUTBOX_PAYLOAD_KEY` + id khóa), ràng buộc với id dòng; xóa ciphertext khi thư ở trạng thái kết thúc. Không log payload.
-- Dispatcher chạy ở worker (hiện `WorkerModule` chỉ cấu hình BullMQ, chưa có module nghiệp vụ hay lịch chạy) theo [ADR-0012](../../../decisions/0012-account-email-delivery.md) (Proposed; Owner chọn 12/10/2026): đăng ký module `notifications` vào worker và một **vòng lặp thăm dò CSDL** mỗi vài giây — **không** dùng job BullMQ, nên gửi thư không cần Redis. Theo dòng _Dispatcher outbox_ của giao thức khóa: giao dịch ngắn nhận dòng `PENDING` đến hạn bằng `FOR UPDATE SKIP LOCKED`, đặt `SENDING` + lease, commit; **trước khi gửi**, đọc lại token liên kết — đã thu hồi/tiêu thụ ⟹ đặt `CANCELLED`, không gửi; gửi SMTP ngoài giao dịch; cập nhật kết quả có điều kiện (`status = SENDING` và đúng lease) nên không ghi đè `CANCELLED`. Lease hết hạn mà dòng vẫn `SENDING` ⟹ dòng được nhận lại ở lượt sau. Thử lại có giãn cách tới tối đa 5 lần, sau đó `FAILED`; trạng thái gửi hiện ở chi tiết tài khoản để Super Admin gửi lại. Gửi trùng do crash sau khi SMTP nhận nhưng trước khi đánh dấu là rủi ro chấp nhận (cùng một token, không tạo quyền mới). Dispatcher không bao giờ khóa AppUser hay token. _Lệch so với bản draft trước (BullMQ) — reviewer có thể đảo lại._
+- Dispatcher chạy ở worker (`WorkerModule` hiện đăng ký `EmailDispatchLoop`, `notifications` và `identity-access`) theo [ADR-0012](../../../decisions/0012-account-email-delivery.md) (Proposed; Owner chọn 12/10/2026): đăng ký module `notifications` vào worker và một **vòng lặp thăm dò CSDL** mỗi vài giây — **không** dùng job BullMQ, nên gửi thư không cần Redis. Theo dòng _Dispatcher outbox_ của giao thức khóa: giao dịch ngắn nhận dòng `PENDING` đến hạn bằng `FOR UPDATE SKIP LOCKED`, đặt `SENDING` + lease, commit; **trước khi gửi**, đọc lại token liên kết — đã thu hồi/tiêu thụ ⟹ đặt `CANCELLED`, không gửi; gửi SMTP ngoài giao dịch; cập nhật kết quả có điều kiện (`status = SENDING` và đúng lease) nên không ghi đè `CANCELLED`. Lease hết hạn mà dòng vẫn `SENDING` ⟹ dòng được nhận lại ở lượt sau. Thử lại có giãn cách tới tối đa 5 lần, sau đó `FAILED`; trạng thái gửi hiện ở chi tiết tài khoản để Super Admin gửi lại. Gửi trùng do crash sau khi SMTP nhận nhưng trước khi đánh dấu là rủi ro chấp nhận (cùng một token, không tạo quyền mới). Dispatcher không bao giờ khóa AppUser hay token. _Lệch so với bản draft trước (BullMQ) — reviewer có thể đảo lại._
 - Thư viện gửi: `nodemailer` 10.0.12 ghim đúng phiên bản (ADR-0012). Test integration dùng SMTP giả `smtp-server` 3.19.15 chạy trong tiến trình, không cần Docker. Phát triển tay có thể dùng Mailpit (tùy chọn, ghi trong runbook). Câu R-5 ở [research lát 1a](../us-01-bootstrap-login-session/research.md) được trả lời bằng ADR-0012.
 
 ### Dữ liệu và migration
@@ -156,8 +158,9 @@ Kết quả mong đợi khi tranh chấp (cơ chế ở giao thức khóa chung)
 
 ## Sẵn sàng bàn giao
 
-- [ ] Lát 1a đã merge hoặc nhánh nền đã thống nhất; spec nền được review.
-- [ ] Người nhận truy cập được Docs `S-2026-10-12b` (xem [sources](../../sources.md)).
+- [x] Lát 1a đã merge qua PR #4 (`64073c4`).
+- [ ] Spec nền được dev khác review.
+- [ ] Người nhận xác nhận truy cập được Docs `S-2026-10-12b` tại commit `0e0bb83` (xem [sources](../../sources.md)).
 - [x] `OQ-A-03` đã chốt (`QĐ-67e`); không còn câu Owner chặn lát này.
 - [ ] Reviewer chốt câu R-5 (SMTP local) và thư viện SMTP trong ADR Proposed; chốt cấu hình/khóa mã hóa; xác nhận mã lỗi (gồm tên mã 503 chung).
 - [ ] Dev khác xác nhận spec + plan với link review và revision cụ thể.
@@ -169,3 +172,5 @@ Kết quả mong đợi khi tranh chấp (cơ chế ở giao thức khóa chung)
 - 13/10/2026 (review fresh-context, một lượt sửa): thêm gia hạn lease ngay trước khi gửi (hai worker không gửi trùng khi batch chậm), vòng lặp dừng ở `onModuleDestroy` và đợi tick đang chạy, email đăng nhập lấy từ nhân viên đã khóa, production bắt buộc `SMTP_TLS`. **Hoãn (Minor, chưa sửa):** `isTokenRedeemable` chưa kiểm nhân viên `TERMINATED` và payload không giải mã được của token đã thu hồi thành `FAILED` thay vì `CANCELLED` (cả hai chỉ có tác động từ G6); trigger tổ hợp cấm chưa kiểm `UPDATE app_user_id` và chỉ an toàn đua khi mọi bên ghi giữ khóa AppUser (đường chuyển giao `US-01-09` phải giữ); chưa có test email đăng nhập trùng đồng thời.
 - 13/10/2026: implement toàn bộ lát (code + test), chưa review, chưa nghiệm thu; xem _Bằng chứng thực chạy_ và _Quyết định khi implement_.
 - 12/10/2026 (khép thiết kế): `OQ-A-03` chốt theo `QĐ-67e` (AC-18 thêm vế `INVITED`/`LOCKED`, cho phép 0 Finance); redeem khóa AppUser trước token, khóa/gửi lại/refresh theo giao thức khóa chung (K-02); partial unique `FINANCE` thuộc migration của lát này, sửa tham chiếu _từ lát 1a_ (K-04); token _dùng được_ không phụ thuộc thời gian, gửi lại thu hồi cả token hết hạn; dispatcher bỏ thư của token đã thu hồi; lỗi DTO 422 và lỗi chính sách mật khẩu kiểm trước token. Chưa review, chưa implement, chưa nghiệm thu.
+
+- 14/10/2026: đồng bộ trạng thái merge, nguồn `0e0bb83` và liên kết review/follow-up. Giữ draft và các điều kiện review/nghiệm thu chưa hoàn tất.
