@@ -5,7 +5,7 @@
 - Phạm vi: sửa các finding sau review G0/1a/1b, không thêm nghiệp vụ mới.
 - Base đã review lại: `dev` tại `a8ba88f`.
 - Bản implement: nhánh `fix/g0-g1-remediation-2026-10-15`, commit `a0cf5f1`.
-- Trạng thái: đã implement và kiểm chứng bằng AI; chưa merge, chưa được dev khác review hoặc nghiệm thu.
+- Trạng thái: đã implement và kiểm chứng bằng AI; đã vào `origin/dev` qua PR #7/#8, chưa được dev khác review hoặc nghiệm thu.
 - Báo cáo duy nhất: [review G0/G1](../../../reviews/g0-g1-remediation-2026-10-15/README.md).
 - ADR-0011 và ADR-0012 vẫn `Proposed`.
 

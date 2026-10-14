@@ -30,7 +30,9 @@ Optional
   --admin-type <type>          --it-type <type>     STAFF (default), CONTRACTOR, FREELANCER, INTERN
   --help
 
-Exit codes: 0 installed · 2 already installed (nothing changed) · 1 error (nothing written) · 130 cancelled.
+Exit codes: 0 installed · 2 already installed (nothing changed) · 130 cancelled · 1 error.
+Exit 1 does not prove nothing was written: if the failure happened while the database was answering COMMIT,
+check the installation state before running again (a rerun that exits 2 means the first run did install).
 Values must be real: placeholders such as "N/A" or "Chưa phân loại" are rejected.`;
 
 const OPTIONS = {

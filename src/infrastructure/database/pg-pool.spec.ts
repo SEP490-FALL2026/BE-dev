@@ -28,9 +28,9 @@ const call = (client: RetireOnTimeoutClient, ...args: unknown[]): unknown =>
 const loose = (config: Record<string, unknown>): never => config as never;
 
 describe('RetireOnTimeoutClient', () => {
+  // An unhandled rejection or uncaught exception raised during a test fails that test: Jest (jest-circus)
+  // handles them on the real process, so no listener is needed here (a listener on the sandboxed `process` never fires).
   let events: string[];
-  let stray: unknown[];
-  const onStray = (reason: unknown): void => void stray.push(reason);
 
   /** An unconnected client with `end` and the retire hook recorded in `events`. */
   const build = (): { client: TestClient; end: jest.Mock | jest.SpyInstance } => {
@@ -57,14 +57,9 @@ describe('RetireOnTimeoutClient', () => {
 
   beforeEach(() => {
     events = [];
-    stray = [];
-    process.on('unhandledRejection', onStray);
-    process.on('uncaughtException', onStray);
   });
 
   afterEach(() => {
-    process.off('unhandledRejection', onStray);
-    process.off('uncaughtException', onStray);
     jest.restoreAllMocks();
   });
 
@@ -216,8 +211,7 @@ describe('RetireOnTimeoutClient', () => {
   describe('a failing end() or hook can neither skip the retirement nor replace the error', () => {
     const expectOriginalAndQuiet = async (error: unknown): Promise<void> => {
       expect((error as Error).message).toBe(TIMEOUT);
-      await sleep(SETTLE_MS);
-      expect(stray).toEqual([]);
+      await sleep(SETTLE_MS); // long enough for a floating rejection to surface and fail the test
     };
 
     const throwingHook = (client: TestClient): void => {

@@ -50,7 +50,9 @@ Không mount volume dữ liệu thật vào container test.
 
 Mỗi suite tạo slm_<random>_test với ownership marker riêng. Catalog suite áp dụng
 migration đã commit. Cleanup chỉ drop đúng URL/name/runId; query parameters bị từ chối
-để tránh chuyển hướng target. afterAll phải đóng kết nối và dọn DB cả khi assertion lỗi.
+để tránh chuyển hướng target. afterAll phải đóng kết nối và dọn DB cả khi assertion lỗi:
+dừng relay, đóng ứng dụng/pool rồi mới `dropDisposableDatabase`. Sau một lượt chạy sạch không còn database
+`slm_<random>_test` hay backend treo nào của lượt đó; suite thêm vào mà để lại DB là lỗi của suite.
 
 Nếu process bị kill trước cleanup, DB tạm có thể còn lại. Kiểm tra tên, marker và
 connection trước khi dọn thủ công; không xóa theo wildcard.
@@ -69,6 +71,27 @@ fixture SQL không chứng minh workflow tạo tài khoản. Dùng `bodyOf(respo
 - `support/placement-coverage.ts`: truy vấn kiểm coverage của placement (bắt khoảng trống mà exclusion
   constraint cho phép). Chạy ở cuối test ghi dữ liệu tổ chức.
 - `support/test-config.ts`: `ConfigService` có kiểu cho test tự dựng service.
+- `support/pg-relay.ts`: `PgRelay`, relay TCP trước PostgreSQL trên `127.0.0.1` (cổng ngẫu nhiên) để mô phỏng
+  database ngừng trả lời mà không cần pause container. `pause()`/`resume()` dừng và nối lại mọi byte hai chiều (không
+  lỗi, không phản hồi). `holdWhen(regex)` cho lưu lượng đi qua tới khi một kết nối gửi câu lệnh có **văn bản SQL**
+  khớp (chỉ đọc message Parse/Query, không bao giờ đọc giá trị bind), rồi giữ kết nối đó từ câu lệnh ấy trở đi;
+  `holding` cho biết đã giữ thật; `releaseHeld()` chuyển phần đã giữ đi; `stop()` đóng relay. Dùng cho ca ngừng trả
+  lời (R-02, N-1, R-15) và **không** viết relay thứ hai. Nối vào ứng dụng qua
+  `createHttpTestApp({ appDatabaseUrl: (directUrl) => relayUrl, env: { DB_QUERY_TIMEOUT_MS: '2000', ... } })`:
+  ứng dụng đi qua relay, còn `sql` và các khẳng định đọc trạng thái đi qua URL trực tiếp. `env` đặt thêm biến
+  môi trường cho riêng ứng dụng đó (ví dụ timeout ngắn hơn).
+- Cách khẳng định với relay: giữ đúng một câu lệnh trên kết nối đang mở (kiểm `relay.holding`), để kết quả không đến từ
+  connect timeout hay `maxWait`; chặn thời gian bằng timeout đã cấu hình cộng độ trễ nhỏ (quy ước `QUERY_TIMEOUT_MS + SLACK_MS`, 1,5 s), không dùng `sleep` để suy ra thứ tự; kiểm `pg_stat_activity` để chắc không còn backend
+  `idle in transaction` khi cần chứng minh không có phần ghi dở.
+- Suite theo gói remediation: `database-stall.integration-spec.ts` (câu lệnh ngừng được trả lời trên kết nối đang dùng,
+  N-1/R-02/N-2, qua `TransactionRunner` thật), `pg-pool.integration-spec.ts` (pool `createPostgresPool` cùng adapter Prisma:
+  kết nối bị loại, không tái sử dụng), `me-unavailable.integration-spec.ts` (`GET /me` ngừng trả lời **sau** guard ⟹ 503
+  `SERVICE_UNAVAILABLE`, khác `TOKEN_VERIFICATION_UNAVAILABLE` của guard), cùng unit `src/infrastructure/database/pg-pool.spec.ts`.
+- `installation-minimal-env.integration-spec.ts` chạy lệnh khởi tạo trong tiến trình với môi trường chỉ có
+  `DATABASE_URL` và `NODE_ENV=production` (R-13). `installation-cli.integration-spec.ts` khởi chạy (spawn) mã nguồn CLI thật (`src/installation-cli.ts` qua `ts-node`) với môi trường
+  tối thiểu, không cần database: `--help` chạy khi chưa cấu hình gì, thiếu `DATABASE_URL` được báo thành một dòng trước
+  prompt mật khẩu và không có stack, URL bị từ chối không in lại mật khẩu. Nó chứng minh mã thoát và đầu ra của tiến trình,
+  không chỉ của service.
 - Test đua khóa (`auth-concurrency.integration-spec.ts`) giữ khóa dòng ở một kết nối `pg` riêng và chờ
   `pg_locks` báo có tiến trình đang chờ trước khi nhả khóa; không dùng `sleep` để ép thứ tự.
 - PostgreSQL phải chạy ở UTC **hoặc** để `PrismaService` ghim `TimeZone=UTC` (đã làm). Test

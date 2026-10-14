@@ -81,14 +81,16 @@ describe('account list snapshot and redeem cost (integration, real PostgreSQL)',
   ])('refuses a %s invitation token without hashing the password (R-09)', async (_kind, invitation) => {
     const hasher = ctx.app.get(PasswordHasher, { strict: false });
     const hash = jest.spyOn(hasher, 'hash');
+    try {
+      const response = await request(ctx.app.getHttpServer())
+        .post('/api/v1/auth/invitations/redeem')
+        .send({ token: invitation, password: 'a perfectly fine password 42' });
 
-    const response = await request(ctx.app.getHttpServer())
-      .post('/api/v1/auth/invitations/redeem')
-      .send({ token: invitation, password: 'a perfectly fine password 42' });
-
-    expect(response.status).toBe(400);
-    expect((response.body as { error: { code: string } }).error.code).toBe('AUTH.INVITATION_INVALID');
-    expect(hash).not.toHaveBeenCalled();
-    hash.mockRestore();
+      expect(response.status).toBe(400);
+      expect((response.body as { error: { code: string } }).error.code).toBe('AUTH.INVITATION_INVALID');
+      expect(hash).not.toHaveBeenCalled();
+    } finally {
+      hash.mockRestore(); // also when an expectation fails, so the next case counts its own calls
+    }
   });
 });

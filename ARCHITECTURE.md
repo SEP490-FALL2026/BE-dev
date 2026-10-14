@@ -15,12 +15,10 @@ API và worker có entry point riêng trong cùng codebase.
 | Queue/storage  | S3 adapter, BullMQ configuration; worker gửi SMTP từ outbox PostgreSQL                           | BullMQ queue processor và file API                                  |
 
 G0 và lát 1a/1b đã merge qua PR #4 (`64073c4`), có 16 operation HTTP.
-ADR-0011/0012 vẫn Proposed, chưa ghi nghiệm thu. Kết quả AI review và remediation
-được dẫn ở [báo cáo G0/G1](docs/reviews/g0-g1-remediation-2026-10-15/README.md).
+Gói remediation tại `a0cf5f1` đã vào `origin/dev` qua PR #7 và #8. Spec/plan,
+ADR-0011/0012 (vẫn Proposed) và code chưa được dev review/nghiệm thu.
+Kết quả kiểm chứng và phần còn mở nằm trong [báo cáo review G0/G1](docs/reviews/g0-g1-remediation-2026-10-15/README.md).
 Catalog là mẫu cấu trúc, chưa cung cấp nghiệp vụ G3.
-
-Ngày 15/10/2026, remediation đã được implement trên nhánh `fix/g0-g1-remediation-2026-10-15`
-tại `a0cf5f1`; chưa merge hoặc được dev khác review.
 
 ## Bản đồ source
 
@@ -111,9 +109,14 @@ múi giờ bất biến, Department gắn Cost Center `UNIT`, placement không c
 một grant `SUPER_ADMIN` hiệu lực, audit chỉ ghi thêm. Cột bảng mới snake_case qua `@map`;
 `catalog_applications` giữ camelCase tới khi thiết kế lại. `PrismaService` ghim `TimeZone=UTC`
 cho mỗi kết nối: adapter-pg đọc/ghi `timestamptz` như thể phiên là UTC. Instant truyền vào raw SQL
-dùng chuỗi ISO-8601 (`toISOString()`) kèm `::timestamptz`. Ghim này gửi tham số khởi động `options`:
-qua PgBouncer hoặc pooler quản lý phải cho phép (`ignore_startup_parameters = options`) hoặc đổi cách ghim
-(`ALTER ROLE ... SET timezone`) — chưa kiểm chứng với pooler nào.
+dùng chuỗi ISO-8601 (`toISOString()`) kèm `::timestamptz`. Mỗi kết nối gửi hai tham số khởi động ngoài
+chuẩn: `options` (`-c TimeZone=UTC`, ghim múi giờ) và `idle_in_transaction_session_timeout`
+(backstop N-1 bên dưới; `pg` gửi nó như tham số khởi động riêng, không qua `options`). PgBouncer và pooler
+quản lý từ chối tham số không theo dõi (`unsupported startup parameter`) trừ khi liệt kê trong
+`ignore_startup_parameters`, và khi liệt kê thì **âm thầm bỏ** tham số đó: mất ghim UTC và/hoặc backstop idle
+mà không có cảnh báo. Sau pooler, đặt hai giá trị ở phía server (`ALTER ROLE <role> SET timezone = 'UTC'` và
+`ALTER ROLE <role> SET idle_in_transaction_session_timeout = '<ms>'`, hoặc cấu hình theo database) thay vì
+dựa vào tham số khởi động — chưa kiểm chứng với pooler nào.
 
 `PrismaService` sở hữu pool qua `createPostgresPool`; `PrismaPg` nhận pool ngoài với
 `disposeExternalPool: true` để `$disconnect` đóng pool. `RetireOnTimeoutClient` đóng kết nối ngay
@@ -140,10 +143,13 @@ Catalog dùng unique slug ở PostgreSQL; phân trang sort name/id, transaction
 RepeatableRead để page/count dùng cùng snapshot. Snapshot không cố định giữa các
 request phân trang khác nhau.
 
-Danh sách AppUser cũng dùng RepeatableRead cho page/count cùng snapshot (R-14).
+Danh sách AppUser cũng dùng RepeatableRead cho page/count cùng snapshot (R-14). Hai giao dịch snapshot
+này (danh sách tài khoản, catalog) gọi thẳng `prisma.$transaction`, nên chạy theo giới hạn interactive mặc
+định của Prisma (timeout 5 s, maxWait 2 s), không theo `DB_TRANSACTION_TIMEOUT_MS`/`DB_TRANSACTION_MAX_WAIT_MS`
+như `TransactionRunner`; chúng chỉ đọc nên quá hạn không làm mất dữ liệu (danh sách tài khoản trả 503).
 Candidates lấy danh sách Employee đã có tài khoản qua repo identity, truyền vào facade organization
 để loại trừ trong query trước sort/limit 20; không còn cửa sổ 200/5 000 nhân viên (R-03).
-Search `%`/`_` là ký tự nhập literal (N-6). Redeem kiểm dạng token và tra chủ token trước Argon2;
+Search `%`, `_`, `\` là ký tự nhập literal (N-6). Redeem kiểm dạng token và tra chủ token trước Argon2;
 hash mật khẩu vẫn ở ngoài transaction, rồi kiểm lại trạng thái dưới khóa (R-09).
 
 AppModule chưa dùng queue. WorkerModule cấu hình BullMQ (chưa có job) và chạy `EmailDispatchLoop`

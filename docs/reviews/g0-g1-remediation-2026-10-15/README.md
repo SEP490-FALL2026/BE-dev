@@ -7,7 +7,7 @@ lịch sử vẫn có thể truy hồi bằng Git.
 
 - Baseline ban đầu: `64073c4`; bản sửa vòng đầu merge vào `dev` tại `a8ba88f`.
 - Nhánh remediation: `fix/g0-g1-remediation-2026-10-15`, commit cuối đã kiểm `a0cf5f1`.
-- Code sản phẩm đã được implement và nhánh đã được đẩy lên origin; chưa có PR/merge vì công cụ GitHub chưa đăng nhập.
+- Code sản phẩm tại `a0cf5f1` đã vào `origin/dev` qua PR #7 và #8.
 - Chưa có dev khác review code/spec/plan. ADR-0011/0012 vẫn `Proposed`; không ghi nghiệm thu.
 - Spec và kế hoạch: [g0-g1-remediation-after-rereview](../../workspace/items/g0-g1-remediation-after-rereview/spec.md).
 
@@ -47,18 +47,18 @@ Một lượt integration cuối có 203/203 test pass nhưng suite fail ở `af
 đều xanh. Chưa có metadata `pg_stat_activity` tại thời điểm fail nên không kết luận autovacuum hay loại trừ hoàn toàn leak
 của test. Đây là độ ổn định của test harness, chưa có bằng chứng là hồi quy N-1.
 
-Trước merge, dev reviewer cần quyết định cách khép teardown: thu metadata an toàn khi fail, sửa lifecycle nếu có leak, và
+Dev reviewer cần quyết định cách khép teardown: thu metadata an toàn khi fail, sửa lifecycle nếu có leak, và
 nếu retry thì chỉ retry có giới hạn cho lỗi cấu trúc đã xác định; không đổi test role thành superuser để che lỗi.
 
-Chưa kiểm: GitHub Actions trên PR, PgBouncer, HA failover, mạng blackhole, tải đồng thời lớn và SMTP nhà cung cấp thật.
+Chưa đối chiếu kết quả GitHub Actions của revision đã merge; chưa kiểm PgBouncer, HA failover, mạng blackhole,
+tải đồng thời lớn và SMTP nhà cung cấp thật.
 Khi mất phản hồi ở `COMMIT`, client vẫn có thể nhận 503 dù dữ liệu đã commit; không tự retry thao tác ghi.
 
 ## Bàn giao
 
-1. Tạo PR từ `fix/g0-g1-remediation-2026-10-15` vào `dev` bằng tài khoản người dùng.
-2. Dev khác review source, spec/plan và lỗi teardown; chạy required checks trên revision PR.
-3. Người có quyền merge sau khi branch protection được đáp ứng.
-4. Dev A chỉ bắt đầu lát G1 tiếp theo/G2 sau khi nhận revision đã merge; không cần implement lại remediation.
+1. Dev khác review source, spec/plan và lỗi teardown trên revision đã merge; đối chiếu required checks.
+2. Dev A cập nhật checkout từ `dev` sau khi review và không implement lại remediation.
+3. Chỉ bắt đầu lát G1 tiếp theo/G2 khi các dependency tương ứng trong roadmap đã được đáp ứng.
 
 Tệp SQL kiểm tra dữ liệu từng chạy trên phiên bản có N-1 được giữ tại
 [n1-consistency-check.sql](n1-consistency-check.sql). Không chạy trên môi trường dùng chung khi chưa có người vận hành phê duyệt.

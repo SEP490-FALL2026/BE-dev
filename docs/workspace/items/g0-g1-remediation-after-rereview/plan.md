@@ -13,9 +13,9 @@ Liên kết: [spec](spec.md) · [báo cáo review](../../../reviews/g0-g1-remedi
 | R-13                | Đã implement trên nhánh sửa | CLI chỉ dùng cấu hình CSDL; API/worker vẫn fail closed                        |
 | N-4                 | Đã cập nhật                 | Tài liệu runtime và OpenAPI đồng bộ với code                                  |
 | Review của dev      | Chưa có                     | Không ghi approved/accepted trước khi có người review thật                    |
-| Merge vào `dev`     | Chưa có                     | Nhánh sửa đã được đẩy; AI không tự push hoặc merge thêm                       |
+| Merge vào `dev`     | Đã có                       | `a0cf5f1` đã vào `origin/dev` qua PR #7 và #8                                 |
 
-## Kiểm chứng bắt buộc trước merge
+## Kiểm chứng và review sau merge
 
 - [x] `pnpm check` trên checkout sạch.
 - [x] E2E và OpenAPI không drift.
@@ -26,7 +26,7 @@ Liên kết: [spec](spec.md) · [báo cáo review](../../../reviews/g0-g1-remedi
 - [x] Docker build, Compose và dependency audit.
 - [ ] Khép lỗi teardown hiếm của harness integration hoặc ghi disposition được dev review.
 - [ ] Dev khác review diff và các lựa chọn facade/timeout.
-- [ ] Tạo PR và merge theo branch protection.
+- [x] PR đã merge vào `origin/dev`.
 
 Kết quả số lượng test, revision và giới hạn môi trường được giữ ở
 [báo cáo review](../../../reviews/g0-g1-remediation-2026-10-15/README.md), không sao chép evidence thô vào workspace.

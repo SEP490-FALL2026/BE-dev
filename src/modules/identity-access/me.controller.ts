@@ -23,7 +23,11 @@ export class MeController {
   })
   @ApiErrorResponses(
     { status: HttpStatus.UNAUTHORIZED, description: 'Authentication is required or the token is no longer valid.' },
-    { status: HttpStatus.SERVICE_UNAVAILABLE, description: 'Authentication is temporarily unavailable.' },
+    {
+      status: HttpStatus.SERVICE_UNAVAILABLE,
+      description:
+        'Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).',
+    },
   )
   async get(@CurrentPrincipal() principal: AuthenticatedPrincipal): Promise<MeView> {
     try {

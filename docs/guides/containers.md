@@ -43,21 +43,27 @@ does not run migrations automatically. The baseline is for a fresh database;
 existing databases need a separately reviewed transition, never an automatic reset.
 First-run installation (once, on an empty database after migrations) is an interactive command in the
 same runtime image: `docker run --rm -it --env-file .env.container slm-api:foundation node dist/installation-cli.js --help`.
-The command needs only `DATABASE_URL` (the runtime role) and `NODE_ENV`, which the image sets to production;
-it does not read the JWT, SMTP, outbox, Redis, object-storage or `APP_PUBLIC_URL` settings, so
-`docker run --rm -it -e DATABASE_URL=... slm-api:foundation node dist/installation-cli.js --help` is enough
-and `--help` never touches the environment. Passing the full env file still works; unrelated variables are ignored.
+The command validates only `NODE_ENV` (the image sets it to production), `DATABASE_URL` (the runtime role)
+and the optional `DB_*` limits; it does not read the JWT, SMTP, outbox, Redis, object-storage or `APP_PUBLIC_URL`
+settings, so `docker run --rm -it -e DATABASE_URL=... slm-api:foundation node dist/installation-cli.js ...` is enough.
+`--help` and argument errors do not touch the environment at all. Passing the full env file still works;
+unrelated variables are ignored. Exit code 1 does not prove that nothing was written: if the connection or the
+reply to `COMMIT` was lost, check the installation state before running it again (a rerun that exits 2 means the
+first run committed).
 It needs a terminal (`-it`) because the Super Admin password is typed at a hidden prompt; it refuses to
-read it from arguments, the environment or a pipe. The
-[G0/G1 remediation review](../reviews/g0-g1-remediation-2026-10-15/README.md) verified a real Linux PTY
-in the runtime image with automated input; manual interactive PowerShell verification is still pending.
+read it from arguments, the environment or a pipe. The consolidated
+[G0/G1 review](../reviews/g0-g1-remediation-2026-10-15/README.md) records the Linux PTY verification
+through the remediation revision; manual interactive PowerShell verification is still pending.
 The worker uses the same runtime image with command `node dist/worker.js` and runs the PostgreSQL
 outbox polling loop for SMTP delivery. No BullMQ processor is registered. Compose has no SMTP sink;
 configure a reachable SMTP service separately. SMTP TLS/provider delivery remains unverified.
 
 For a local container smoke test, explicitly set NODE_ENV=development, database and
 service hostnames; do not expose development credentials to a shared environment.
-Health live checks the HTTP process; ready pings PostgreSQL only.
+Health live checks the HTTP process; ready pings PostgreSQL only and answers 503 `SERVICE_UNAVAILABLE` when it fails.
+Behind PgBouncer or a managed pooler the connection startup parameters `options` and
+`idle_in_transaction_session_timeout` need attention: see the pooler note in
+[ARCHITECTURE](../../ARCHITECTURE.md) (not verified with any pooler).
 
 References: [pnpm Docker](https://pnpm.io/docker),
 [Prisma Docker](https://docs.prisma.io/docs/guides/deployment/docker).

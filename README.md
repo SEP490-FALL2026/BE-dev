@@ -3,17 +3,17 @@
 Foundation để triển khai User Story bằng NestJS 11, TypeScript, PostgreSQL/Prisma,
 Redis/BullMQ và S3-compatible storage. Giữ catalog làm module mẫu.
 
-**Đã merge G0, lát 1a/1b:** lệnh khởi tạo `pnpm ops:bootstrap`,
+**Đã merge G0, lát 1a/1b và gói remediation (chưa được dev review/nghiệm thu):** lệnh khởi tạo `pnpm ops:bootstrap`,
 đăng nhập/làm mới/đăng xuất, `/me`, tạo tài khoản từ Employee, mời/kích hoạt, khóa/mở và gán/thu hồi vai.
 Có 16 operation HTTP gồm health; xem [roadmap](docs/roadmap.md) và
-[review/remediation G0/G1](docs/reviews/g0-g1-remediation-2026-10-15/README.md).
+[báo cáo review G0/G1](docs/reviews/g0-g1-remediation-2026-10-15/README.md).
 Đổi/đặt lại mật khẩu (1c), tra cứu Audit Trail, chuyển giao/khôi phục Super Admin và vai suy ra chưa có.
 Route catalog **không còn trên HTTP** (module vẫn là mẫu cấu trúc). Health là public.
 Không có tài khoản demo: tạo Super Admin bằng lệnh khởi tạo trên database mới.
 
-Bản sửa remediation nằm trên nhánh `fix/g0-g1-remediation-2026-10-15` tại `a0cf5f1`; chưa merge,
-chưa được dev khác review hoặc nghiệm thu. ADR-0011/0012 vẫn Proposed. Xem
-[báo cáo G0/G1](docs/reviews/g0-g1-remediation-2026-10-15/README.md).
+Bản sửa remediation tại `a0cf5f1` đã vào `origin/dev` qua PR #7 và #8; kết quả kiểm chứng và giới hạn
+nằm trong [báo cáo review G0/G1](docs/reviews/g0-g1-remediation-2026-10-15/README.md).
+Chưa được dev review/nghiệm thu; ADR-0011/0012 vẫn Proposed.
 
 ## Chạy local
 
@@ -53,7 +53,8 @@ Worker: `pnpm start:worker` chạy `EmailDispatchLoop`, thăm dò outbox Postgre
 Gửi thư không dùng BullMQ/Redis; BullMQ mới có cấu hình, chưa có queue/processor được đăng ký.
 Compose chưa cung cấp SMTP sink: cấu hình `SMTP_HOST`, `SMTP_PORT`, `SMTP_FROM` và các biến SMTP
 trong `env-schema.ts` cho dịch vụ thư local (mặc định `localhost:1025`, `SMTP_TLS=false`).
-`SMTP_TLS=false` chỉ tắt TLS ngay khi kết nối; Nodemailer vẫn có thể nâng lên STARTTLS nếu máy chủ
+`SMTP_TLS` chỉ điều khiển `requireTLS` (`true` = bắt buộc STARTTLS); TLS ngay khi kết nối chỉ do
+`SMTP_PORT=465` quyết định. Với `SMTP_TLS=false`, Nodemailer vẫn có thể nâng lên STARTTLS nếu máy chủ
 quảng bá hỗ trợ, và chứng chỉ không tin cậy sẽ làm gửi thất bại. Không dùng cấu hình này để suy ra
 thư luôn được gửi plaintext.
 `APP_PUBLIC_URL` là địa chỉ FE nhận link kích hoạt (mặc định `http://localhost:5173`).
@@ -66,8 +67,12 @@ với boundary thay thế. Integration test cần PostgreSQL riêng: xem [test g
 
 Pool database do ứng dụng sở hữu: query hết `DB_QUERY_TIMEOUT_MS` làm kết nối bị loại khỏi pool,
 không được tái sử dụng transaction còn dở. `DB_IDLE_IN_TRANSACTION_TIMEOUT_MS` là backstop phía
-PostgreSQL (mặc định ít nhất 20 000 ms, luôn lớn hơn timeout transaction). Khi mất phản hồi COMMIT,
-503 có thể đi cùng kết quả đã commit nguyên tử; không tự retry thao tác ghi.
+PostgreSQL (mặc định `max(20000, DB_TRANSACTION_TIMEOUT_MS + 10000)`, luôn lớn hơn timeout transaction); `pg`
+gửi nó như tham số khởi động của kết nối: pooler (PgBouncer/managed) từ chối tham số này hoặc, nếu liệt kê trong
+`ignore_startup_parameters`, âm thầm bỏ nó (mất backstop); sau pooler hãy đặt ở phía server bằng
+`ALTER ROLE … SET idle_in_transaction_session_timeout` (xem [ARCHITECTURE](ARCHITECTURE.md), mục Persistence và hạ tầng;
+chưa kiểm chứng với pooler nào). Khi mất phản hồi COMMIT, 503 có thể đi cùng kết quả đã commit nguyên tử;
+không tự retry thao tác ghi.
 
 `docker build -t slm-api:foundation .` tạo runtime image.
 Container chạy với `--env-file` dành riêng cho container; localhost trong container

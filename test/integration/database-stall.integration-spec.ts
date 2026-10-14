@@ -142,28 +142,31 @@ describe('a statement that stops being answered on a warm connection (integratio
 
   it('never commits a transaction whose statement was answered late (N-1)', async () => {
     const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
-    relay.holdWhen(/^UPDATE stall_probe/);
-    const { outcome, elapsed } = await timed(() =>
-      runner.run(async (tx) => {
-        await tx.$executeRawUnsafe('UPDATE stall_probe SET v = 1 WHERE id = 1');
-        await tx.$executeRawUnsafe(`INSERT INTO stall_log (note) VALUES ('paired 1')`);
-      }),
-    );
+    try {
+      relay.holdWhen(/^UPDATE stall_probe/);
+      const { outcome, elapsed } = await timed(() =>
+        runner.run(async (tx) => {
+          await tx.$executeRawUnsafe('UPDATE stall_probe SET v = 1 WHERE id = 1');
+          await tx.$executeRawUnsafe(`INSERT INTO stall_log (note) VALUES ('paired 1')`);
+        }),
+      );
 
-    expect(outcome).toBeInstanceOf(TransientDatabaseError);
+      expect(outcome).toBeInstanceOf(TransientDatabaseError);
 
-    relay.releaseHeld(); // PostgreSQL now receives the UPDATE it never saw
-    await laterTraffic();
+      relay.releaseHeld(); // PostgreSQL now receives the UPDATE it never saw
+      await laterTraffic();
 
-    // The integrity invariant first: nothing of the failed transaction is ever committed.
-    await expect(committed()).resolves.toEqual({ value: 0, paired: 0 });
-    expect(await idleInTransaction()).toBe(0);
-    // Then the budget: one query timeout, because the retired connection fails the rollback at once
-    // instead of waiting a second query timeout for a ROLLBACK that cannot be delivered.
-    expect(elapsed).toBeLessThan(QUERY_TIMEOUT_MS + SLACK_MS);
-    // Operators can count retired connections in the log.
-    expect(warn).toHaveBeenCalledWith(expect.stringContaining('A database connection was retired'));
-    warn.mockRestore();
+      // The integrity invariant first: nothing of the failed transaction is ever committed.
+      await expect(committed()).resolves.toEqual({ value: 0, paired: 0 });
+      expect(await idleInTransaction()).toBe(0);
+      // Then the budget: one query timeout, because the retired connection fails the rollback at once
+      // instead of waiting a second query timeout for a ROLLBACK that cannot be delivered.
+      expect(elapsed).toBeLessThan(QUERY_TIMEOUT_MS + SLACK_MS);
+      // Operators can count retired connections in the log.
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('A database connection was retired'));
+    } finally {
+      warn.mockRestore(); // also when an expectation fails, so later cases keep their log output
+    }
   }, 30000);
 
   it('keeps a transaction whose COMMIT was answered late all-or-nothing', async () => {

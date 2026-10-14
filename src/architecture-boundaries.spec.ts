@@ -1,5 +1,7 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve, sep } from 'node:path';
+import { environmentConfigOptions, installationEnvironmentConfigOptions } from './infrastructure/config/env-config';
+import { validateEnvironment, validateInstallationEnvironment } from './infrastructure/config/env-schema';
 
 function listTypeScriptFiles(directory: string): string[] {
   return readdirSync(directory).flatMap((entry) => {
@@ -91,6 +93,10 @@ describe('architecture boundaries', () => {
         ...source.matchAll(new RegExp(`from\\s+['"](?:\\.\\./)+([^/'"]+)/(${privateFolders})/`, 'g')),
         ...source.matchAll(/modules\/([^/'"]+)\/[^/'"]+\.repo(?:\.ts)?['"]/g),
         ...source.matchAll(/from\s+['"](?:\.\.\/)+([^/'"]+)\/[^/'"]+\.repo(?:\.ts)?['"]/g),
+        // Flat files the layer folders above do not cover. The identity-access facade module also exports
+        // PasswordHasher, so a module that imports it could inject it; credentials stay behind IdentityAccessService.
+        ...source.matchAll(/modules\/([^/'"]+)\/password-hasher\.service(?:\.ts)?['"]/g),
+        ...source.matchAll(/from\s+['"](?:\.\.\/)+([^/'"]+)\/password-hasher\.service(?:\.ts)?['"]/g),
       ];
 
       for (const match of privateImports) {
@@ -235,6 +241,23 @@ describe('installation command dependency boundary (R-13)', () => {
     expect(files).not.toContain('modules/identity-access/identity-access.module.ts');
     expect(files.filter((file) => file.startsWith('modules/notifications/'))).toEqual([]);
     expect(files.filter((file) => /@nestjs\/jwt/.test(reachable.get(join(sourceRoot, file)) ?? ''))).toEqual([]);
+  });
+
+  it('wires the full validator to the API options and the database-only validator to the command options', () => {
+    expect(environmentConfigOptions.validate).toBe(validateEnvironment);
+    expect(installationEnvironmentConfigOptions.validate).toBe(validateInstallationEnvironment);
+  });
+
+  it('keeps the command-only configuration module out of everything the API and the worker load', () => {
+    for (const entry of ['main.ts', 'worker.ts']) {
+      const files = toRelative(listReachableSourceFiles(join(sourceRoot, entry)).keys());
+
+      expect({ entry, files: files.filter((file) => file.includes('installation-configuration.module')) }).toEqual({
+        entry,
+        files: [],
+      });
+      expect(files).toContain('infrastructure/config/configuration.module.ts');
+    }
   });
 
   it('keeps the full environment validation on the API and the worker', () => {

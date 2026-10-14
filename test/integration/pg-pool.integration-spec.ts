@@ -27,8 +27,8 @@ describe('createPostgresPool with the Prisma adapter (integration)', () => {
   let relay: PgRelay;
   let admin: Client;
   let relayUrl: string;
-  let stray: unknown[];
-  const onStray = (reason: unknown): void => void stray.push(reason);
+  // An unhandled rejection or uncaught exception raised during a test fails that test: Jest (jest-circus)
+  // handles them on the real process, so no listener is needed here (a listener on the sandboxed `process` never fires).
   const cleanups: Array<() => Promise<void>> = [];
 
   interface App {
@@ -118,18 +118,10 @@ describe('createPostgresPool with the Prisma adapter (integration)', () => {
     relayUrl = direct.toString();
   }, 60000);
 
-  beforeEach(() => {
-    stray = [];
-    process.on('unhandledRejection', onStray);
-    process.on('uncaughtException', onStray);
-  });
-
   afterEach(async () => {
     relay.resume();
     relay.releaseHeld();
     for (const cleanup of cleanups.splice(0)) await cleanup();
-    process.off('unhandledRejection', onStray);
-    process.off('uncaughtException', onStray);
     await admin.query('UPDATE stall_probe SET v = 0 WHERE id = 1');
     await admin.query('DELETE FROM stall_log');
   });
@@ -174,7 +166,6 @@ describe('createPostgresPool with the Prisma adapter (integration)', () => {
     expect(app.retired()).toBe(1);
     expect(await probeValue()).toBe(0);
     expect(await noteCount('paired 1')).toBe(0);
-    expect(stray).toEqual([]);
   }, 20000);
 
   it('I3: parameters and named prepared statements work through the wrapped client', async () => {
@@ -229,7 +220,6 @@ describe('createPostgresPool with the Prisma adapter (integration)', () => {
     expect(app.acquiredSince(mark).filter((pid) => warm.includes(pid))).toEqual([]);
     for (let i = 0; i < 4; i += 1) await expect(app.prisma.$queryRaw`SELECT 1 AS one`).resolves.toEqual([{ one: 1 }]);
     expect(app.acquiredSince(mark).filter((pid) => warm.includes(pid))).toEqual([]);
-    expect(stray).toEqual([]);
   }, 20000);
 
   it('I9: disconnecting twice is quiet and leaves no backend of the application', async () => {
@@ -243,7 +233,6 @@ describe('createPostgresPool with the Prisma adapter (integration)', () => {
     await sleep(100);
 
     expect(await appBackends()).toBe(0);
-    expect(stray).toEqual([]);
     expect(app.poolErrors).toEqual([]);
   }, 20000);
 
@@ -288,6 +277,5 @@ describe('createPostgresPool with the Prisma adapter (integration)', () => {
     expect(await noteCount('leaked')).toBe(0); // the server rolled the open transaction back
     expect(app.retired()).toBe(1);
     expect(app.poolErrors).toEqual([]);
-    expect(stray).toEqual([]);
   }, 20000);
 });
