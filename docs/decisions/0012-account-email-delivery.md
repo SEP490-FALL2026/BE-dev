@@ -1,8 +1,9 @@
 # ADR-0012: Account lifecycle email delivery (outbox, SMTP library, dispatcher)
 
 Status: **Proposed** (12/10/2026). Implemented in slice 1b on 13/10/2026 (unreviewed). The project owner chose the dispatcher
-approach on 12/10/2026 in a design session; the library choice and everything else still need
-the BE developer's feasibility review before slice 1b is coded. An AI assistant did the
+approach on 12/10/2026 in a design session; the library choice and remaining design still need
+the BE developer's review. Slice 1b has since merged through PR #4 (`64073c4`), with that review
+gate still open. An AI assistant did the
 research and drafting; that is not a review or an approval.
 
 ## Context
@@ -11,8 +12,8 @@ Slice 1b ([spec](../workspace/items/us-01-account-invitation-activation/spec.md)
 account invitation email (`QĐ-46`, `FR-3.11` exception for account lifecycle mail). The slice 1a
 research left R-5 (local SMTP) open. The worker (`src/worker.module.ts`) has BullMQ
 infrastructure but no registered queue, and ADR-0001 deferred queues until a genuinely slow or
-retryable job exists. The development machine has no Redis running and Docker could not be run
-during slice 1a.
+retryable job exists. Docker could not be run during the initial slice 1a experiments;
+this historical limitation does not describe the later review environment.
 
 ## Decision
 
@@ -42,8 +43,18 @@ during slice 1a.
 - Delivery is at-least-once: a crash after SMTP accepts the message but before the row is
   marked sent can send a duplicate of the same invitation. Accepted in the spec (same token,
   no new authority).
-- Running the worker needs only PostgreSQL for this feature.
+- Delivery needs PostgreSQL and a reachable SMTP server, without Redis queue operations.
+  The worker still imports shared configuration, which requires Redis/storage settings
+  in production even though this delivery loop does not use them (review R-13).
 - This deviates from the slice 1b spec text ("BullMQ repeat job"); the spec is updated in the
   same change and the deviation is open for the reviewer to reverse.
 - Both libraries must pass `pnpm audit --prod --audit-level high` and install without
   `ERR_PNPM_IGNORED_BUILDS` before they are accepted.
+
+## Verification
+
+The [AI review at `64073c4`](../reviews/backend-g0-g1-review-2026-10-14.md) exercised
+API and worker as separate processes with a real SMTP sink, including graceful shutdown.
+R-05 remains open: mail and the invitation detail can still treat a terminated employee's
+invitation as usable, although redemption is blocked. SMTP TLS and provider deliverability
+were not verified. See [follow-up](../workspace/g0-g1-review-follow-up.md) for developer handoff.

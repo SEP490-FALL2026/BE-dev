@@ -5,6 +5,14 @@ type LogLevel = 'debug' | 'error' | 'fatal' | 'info' | 'verbose' | 'warn';
 
 const MESSAGE_LIMIT = 2_000;
 const STACK_LIMIT = 8_000;
+const LEVEL_COLORS: Record<LogLevel, string> = {
+  info: '32',
+  warn: '33',
+  error: '31',
+  fatal: '1;31',
+  debug: '34',
+  verbose: '90',
+};
 
 export class StructuredJsonLogger implements LoggerService {
   constructor(
@@ -56,6 +64,18 @@ export class StructuredJsonLogger implements LoggerService {
       ...(stack ? { stack: this.sanitize(stack, STACK_LIMIT) } : {}),
     };
     const destination = level === 'error' || level === 'fatal' ? process.stderr : process.stdout;
+    if (destination.isTTY && process.env.NODE_ENV !== 'production') {
+      const useColor = process.env.NO_COLOR === undefined && process.env.TERM !== 'dumb';
+      const paint = (text: string, color: string): string => (useColor ? `\u001b[${color}m${text}\u001b[0m` : text);
+      const correlation = requestId ? ` ${paint(`requestId=${this.sanitize(requestId, 120)}`, '90')}` : '';
+      const details = entry.stack ? `\n  ${paint(entry.stack, '90')}` : '';
+      destination.write(
+        `${paint(entry.timestamp, '90')} ${paint(level.toUpperCase().padEnd(7), LEVEL_COLORS[level])} ` +
+          `${paint(`[${entry.service}]`, '90')} ${paint(`[${entry.context}]`, '36')} ` +
+          `${paint(entry.message, LEVEL_COLORS[level])}${correlation}${details}\n`,
+      );
+      return;
+    }
     destination.write(`${JSON.stringify(entry)}\n`);
   }
 
