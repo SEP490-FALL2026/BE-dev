@@ -1,0 +1,43 @@
+mutate-prototype run=im1015-final head=e147782 node=v24.0.1 script=94f30fc88220 mutations=N1a,N1b,N2,N5,IDLE,DISP,R3x,R3y,R3z,R15,R12,R14,R09,C1a,C1b,C1c,C1d,C1e,R3w,R13a,R13b,R13c,X1-CLI-abort,X2-CLI-message,X3-API-validator,X4-private-hasher
+control OK  integration:test/integration/database-stall.integration-spec.ts 6/6 passed 
+control OK  integration:test/integration/pg-pool.integration-spec.ts 6/6 passed 
+control OK  unit:src/infrastructure/database/pg-pool.spec.ts 27/27 passed 
+control OK  unit:src/infrastructure/database/transient-error.spec.ts 12/12 passed 
+control OK  integration:test/integration/account-candidates.integration-spec.ts 3/3 passed 
+control OK  integration:test/integration/account-candidates-boundaries.integration-spec.ts 18/18 passed 
+control OK  unit:src/modules/identity-access/me.controller.spec.ts 3/3 passed 
+control OK  integration:test/integration/me-unavailable.integration-spec.ts 2/2 passed 
+control OK  unit:src/infrastructure/health/health.controller.spec.ts 3/3 passed 
+control OK  integration:test/integration/account-list-and-redeem.integration-spec.ts 3/3 passed 
+control OK  unit:src/architecture-boundaries.spec.ts 11/11 passed 
+control OK  unit:src/infrastructure/config/env-schema.spec.ts 66/66 passed 
+control OK  integration:test/integration/installation-cli.integration-spec.ts 3/3 passed 
+N1a   KILLED restored=true 37s pool built with the plain pg Client (the retiring client class is lost) :: failed: a statement that stops being answered on a warm connection (integration) never commits a transaction whose statement was answered late (N-1) | createPostgresPool with the Prisma adapter (integration) 
+N1b   KILLED restored=true 23s a retired connection is not ended :: failed: a statement that stops being answered on a warm connection (integration) never commits a transaction whose statement was answered late (N-1) | RetireOnTimeoutClient Promise form retires the client whe
+N2    KILLED restored=true 28s pool built without query_timeout (the R-02 budget) :: failed: a statement that stops being answered on a warm connection (integration) ends a bare read on an acquired connection at the query timeout, as a transient error
+N5    KILLED restored=true 3s "Client was closed and is not queryable" no longer transient :: failed: toTransientError — client-side connectivity failures treats "Client was closed and is not queryable" as retryable
+IDLE  KILLED restored=true 15s server-side idle-in-transaction backstop not sent :: failed: a statement that stops being answered on a warm connection (integration) sets the server-side idle-in-transaction backstop on pooled sessions
+DISP  KILLED restored=true 16s $disconnect leaves the service-owned pool open :: failed: a statement that stops being answered on a warm connection (integration) keeps serving and closes every connection on disconnect
+R3x   KILLED restored=true 11s candidate query ignores the exclusion list :: failed: account candidates beyond the first 200 employees (integration, real PostgreSQL) returns the first 20 by code even when 200 earlier employees already have an account | account candidates beyond the fi
+R3y   KILLED restored=true 13s search term no longer escaped (% and _ act as wildcards again) :: failed: account candidates: exclusion, limit and literal search (integration, real PostgreSQL) search=Z_1 (underscore is literal) | account candidates: exclusion, limit and literal search (integration, real P
+R3z   KILLED restored=true 10s candidates no longer sorted by employee code :: failed: account candidates beyond the first 200 employees (integration, real PostgreSQL) returns the first 20 by code even when 200 earlier employees already have an account | account candidates beyond the fi
+R15   KILLED restored=true 17s /me no longer maps an unreachable database after the guard to 503 :: failed: MeController — failures after the guard (R-15) answers 503 SERVICE_UNAVAILABLE for an unreachable database: TransientDatabaseError: The database could not complete the transaction. Retry shortly.
+    
+R12   KILLED restored=true 4s readiness maps every failure to 503, including non-Terminus errors (the instanceof guard is gone) :: failed: HealthController readiness leaves any other failure to the global filter
+R14   KILLED restored=true 10s account page and count no longer read from one snapshot :: failed: account list snapshot and redeem cost (integration, real PostgreSQL) counts from the same snapshot as the page, even when an account is created in between (R-14)
+R09   KILLED restored=true 16s Argon2 hash runs before the token checks again :: failed: account list snapshot and redeem cost (integration, real PostgreSQL) refuses a malformed invitation token without hashing the password (R-09) | account list snapshot and redeem cost (integration, real
+C1a   KILLED restored=true 6s callback found by a last-argument heuristic instead of pg's own position rule :: failed: RetireOnTimeoutClient callback form retires the client on a timeout, before the caller callback: (text, callback, undefined)
+C1b   KILLED restored=true 4s query() no longer refuses Submittable / config.callback / double-callback forms :: failed: RetireOnTimeoutClient forms that are refused (nothing is queued, nothing is retired) throws UnsupportedQueryFormError synchronously for a pg.Query with a callback | RetireOnTimeoutClient forms that ar
+C1c   KILLED restored=true 5s retire() is no longer idempotent :: failed: RetireOnTimeoutClient Promise form retires once when two queued queries both time out, and each caller gets its own error
+C1d   KILLED restored=true 5s the hook runs before end() and unguarded (a throwing hook skips end() and replaces the error) :: failed: RetireOnTimeoutClient Promise form retires the client when text times out: end first, then the hook, then the caller | RetireOnTimeoutClient Promise form retires the client when text and values times 
+C1e   KILLED restored=true 17s no release guard: a connection handed back inside a transaction is reused :: failed: createPostgresPool release guard retires a released client whose transaction status is "T" | createPostgresPool release guard retires a released client whose transaction status is "E" | createPostgres
+R3w   KILLED restored=true 17s the LIKE escape class no longer contains the backslash :: failed: account candidates: exclusion, limit and literal search (integration, real PostgreSQL) search=Y<backslash>1 (backslash is literal)
+R13a  KILLED restored=true 2s the installation module imports the full identity-access module again :: failed: installation command dependency boundary (R-13) does not reach the API/worker configuration, the identity-access module, notifications or the JWT library
+R13b  KILLED restored=true 3s the installation config options use the full (API) environment validator :: failed: installation environment (database keys only) validates the installation config options with the installation validator (R-13)
+R13c  KILLED restored=true 3s idle-in-transaction default fixed at 20 000 ms regardless of the transaction timeout :: failed: installation environment (database keys only) idle-in-transaction default through validateInstallationEnvironment does not reject a longer transaction timeout when no idle limit is given | installatio
+X1-CLI-abort KILLED restored=true 12s Nest may exit the process on a configuration error before the CLI can print it (operator sees nothing) :: failed: installation command (integration, spawned process) reports a missing DATABASE_URL by name, before asking for a password, without a stack | installation command (integration, spawned process) rejects 
+X2-CLI-message KILLED restored=true 11s a validation error is no longer reported as its own message :: failed: installation command (integration, spawned process) reports a missing DATABASE_URL by name, before asking for a password, without a stack | installation command (integration, spawned process) rejects 
+X3-API-validator KILLED restored=true 3s API and worker would validate only the database settings (fail open in production) :: failed: installation command dependency boundary (R-13) wires the full validator to the API options and the database-only validator to the command options
+X4-private-hasher KILLED restored=true 3s installation reaches into the identity-access private hasher :: failed: architecture boundaries prevents imports of another business module private layers
+summary {"killed":26,"survived":0,"unapplied":0,"infraError":0,"otherFailure":0,"restoreFailed":0} status=COMPLETED runtime=425s result=C:\Users\Asus\AppData\Local\Temp\slmrg-impl\fin\mut\mutation-im1015-final.json
+exit=0

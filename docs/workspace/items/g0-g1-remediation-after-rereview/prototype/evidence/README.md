@@ -117,3 +117,22 @@ OpenAPI, Compose — dẫn [lượt 2](#lượt-2). Số thư 16/17 giữa các 
 có thể vẫn tới sink), assertion O-7 không đổi. Nguyên nhân FAIL M-2/X-2 của lượt 2 vẫn chỉ được giải thích bằng race
 của runner gốc (đọc trạng thái không chờ worker); runner gốc không tái hiện trong lượt này, runner mới loại cách đọc đó.
 Không chạy: GitHub Actions, PgBouncer/HA, SMTP nhà cung cấp thật.
+
+## Lượt 4
+
+Run id `im1015`, 15/10/2026: kiểm chứng **mã sản phẩm** của nhánh `fix/g0-g1-remediation-2026-10-15` (không còn prototype).
+Clone sạch của commit `e147782` (cây `cf30bf89127f4e75621c404a22866392c4014803`); kết quả, lệnh, môi trường và giới hạn nằm ở
+[báo cáo tích hợp](../../../../../reviews/backend-g0-g1-integration-2026-10-15.md); tệp ở
+[`run4-product-im1015/`](run4-product-im1015/):
+
+| Tệp                                                                                             | Nội dung                                                                                   |
+| ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `gates-local.txt`, `audit-local.txt`                                                            | install, check, e2e, integration, OpenAPI, audit, Compose, Docker build (Windows, Node 24) |
+| `ci-node22-linux.txt`                                                                           | cùng gate trong container Linux Node 22.23.3 (mô phỏng CI, không thay CI)                  |
+| `l6-cli-pty.txt`, `l7-fail-closed-and-cli-help.txt`, `l9-container-idle.txt`                    | image mới: CLI PTY, API/worker thiếu secret, biến idle                                     |
+| `live-smoke-<n>.txt`, `*-timeline.jsonl`, `reset-live-<n>.txt`                                  | ba lượt `live-smoke-remediation.mjs`, reset DB mỗi lượt                                    |
+| `r02-db-outage.txt`                                                                             | runner DB-outage (D1/D4, `/me` 503, readiness) trên build của commit                       |
+| `mutation-im1015-final.json`, `mutation-list.txt`, `mutation-console.txt`, `logs-im1015-final/` | 22 mutation sản phẩm + 4 mutation cho test mới (`../../mutations-product-extra.json`)      |
+
+`mutate-prototype.mjs` đã đổi tên hằng số candidates sang test sản phẩm; hash script của lượt 2–3 trong chỉ mục trên là hash
+lịch sử, hash hiện hành nằm trong `scriptSha256` của `mutation-im1015-final.json`.
