@@ -6,9 +6,9 @@
 - Trạng thái yêu cầu: `US-01-01`, `US-01-10` là `OWNER-PROVISIONAL` (`L-2`); `US-01-06` là `BASELINED` — quyết định Owner, chưa GVHD. Logical, giao thức khóa và chiến lược migration: [spec nền](../foundation-org-identity-boundary/spec.md) (draft). Thư viện: [research](research.md) (draft).
 - [Kế hoạch](plan.md). Phụ thuộc: [foundation-org-identity-boundary](../foundation-org-identity-boundary/spec.md). Lát sau: [us-01-account-invitation-activation](../us-01-account-invitation-activation/spec.md).
 
-**Đối chiếu 14/10/2026:** code đã merge PR #4 (`64073c4`); thiết kế vẫn draft, chưa dev review/nghiệm thu. Nguồn baseline là Docs `0e0bb83` (snapshot `S-2026-10-12b`). Xem [theo dõi sau review](../../g0-g1-review-follow-up.md) và [báo cáo AI](../../../reviews/backend-g0-g1-review-2026-10-14.md).
+**Đối chiếu 15/10/2026:** code nền đã merge PR #4 (`64073c4`); remediation nằm tại `a0cf5f1`, chưa merge hoặc được dev review/nghiệm thu. Nguồn baseline là Docs `0e0bb83` (snapshot `S-2026-10-12b`). Xem [báo cáo G0/G1](../../../reviews/g0-g1-remediation-2026-10-15/README.md).
 
-**Owner chốt 14/10/2026:** R-06 giữ bộ đếm chỉ tăng khi đăng nhập sai; lượt đang xử lý/thành công không được tính là thất bại. Đã sửa code và test (xem [theo dõi](../../g0-g1-review-follow-up.md)). R-07 giữ global rate limit theo từng route trên mỗi IP, đã bổ sung test xác nhận. Các lựa chọn còn mở khác và ADR-0011 chưa được phê duyệt.
+**Owner chốt 14/10/2026:** R-06 giữ bộ đếm chỉ tăng khi đăng nhập sai; lượt đang xử lý/thành công không được tính là thất bại. R-07 giữ global rate limit theo từng route trên mỗi IP. Code và test nằm trên nhánh remediation; các lựa chọn còn mở khác và ADR-0011 chưa được phê duyệt.
 
 ## Vấn đề và phạm vi
 

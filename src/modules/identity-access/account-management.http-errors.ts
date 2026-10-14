@@ -27,6 +27,20 @@ function refuse(status: HttpStatus, code: string, message: string, details?: Rec
 }
 
 /**
+ * 503 for a database that could not answer: a transaction's TransientDatabaseError, or the driver's
+ * own error from a read outside TransactionRunner. Anything else is not an outage (undefined).
+ */
+export function toUnavailableApiException(error: unknown): ApiException | undefined {
+  if (!(error instanceof TransientDatabaseError) && !toTransientError(error)) return undefined;
+
+  return refuse(
+    HttpStatus.SERVICE_UNAVAILABLE,
+    'SERVICE_UNAVAILABLE',
+    'The service is temporarily unavailable. Retry shortly.',
+  );
+}
+
+/**
  * Maps the errors of account management to their HTTP answers. Anything not listed is returned
  * unchanged so the global filter reports it as an unexpected error rather than hiding it.
  */
@@ -84,14 +98,5 @@ export function toAccountApiException(error: unknown): unknown {
       violation: error.violation,
     });
   }
-  // Reads outside TransactionRunner raise the driver's own error; toTransientError recognizes it.
-  if (error instanceof TransientDatabaseError || toTransientError(error)) {
-    return refuse(
-      HttpStatus.SERVICE_UNAVAILABLE,
-      'SERVICE_UNAVAILABLE',
-      'The service is temporarily unavailable. Retry shortly.',
-    );
-  }
-
-  return error;
+  return toUnavailableApiException(error) ?? error;
 }

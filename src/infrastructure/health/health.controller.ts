@@ -1,4 +1,4 @@
-import { Controller, Get, HttpStatus } from '@nestjs/common';
+import { Controller, Get, HttpStatus, ServiceUnavailableException } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { HealthCheckService, PrismaHealthIndicator } from '@nestjs/terminus';
 import { createZodDto } from 'nestjs-zod';
@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { PrismaService } from '../database/prisma.service';
 import { ApiErrorResponses } from '../http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../http/decorators/api-success-response.decorator';
+import { ApiException } from '../http/errors/api.exception';
 import { successEnvelopeSchema } from '../http/dto/success-envelope.dto';
 import { Public } from '../security/decorators/public.decorator';
 
@@ -60,9 +61,19 @@ export class HealthController {
   )
   @Public()
   async getReadiness(): Promise<z.infer<typeof ReadinessDataSchema>> {
-    const result = await this.health.check([
-      () => this.prismaHealth.pingCheck('database', this.prisma, { timeout: READINESS_TIMEOUT_MS }),
-    ]);
+    let result;
+    try {
+      result = await this.health.check([
+        () => this.prismaHealth.pingCheck('database', this.prisma, { timeout: READINESS_TIMEOUT_MS }),
+      ]);
+    } catch (error) {
+      // Terminus reports a failed check as a bare 503; give it the availability code of the contract (R-12).
+      if (!(error instanceof ServiceUnavailableException)) throw error;
+      throw new ApiException(HttpStatus.SERVICE_UNAVAILABLE, {
+        code: 'SERVICE_UNAVAILABLE',
+        message: 'A required dependency is unavailable.',
+      });
+    }
     const details = result.details as Record<string, { status: string }>;
 
     return {

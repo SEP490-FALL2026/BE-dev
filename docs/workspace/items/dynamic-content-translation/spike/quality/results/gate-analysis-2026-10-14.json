@@ -1,0 +1,186 @@
+{
+ "date": "2026-10-14",
+ "note": "segments of non-long fixture items, protected mode, batch size 1",
+ "directions": {
+  "vi-en": {
+   "segments": 87,
+   "sentToModel": 80,
+   "gateFail": 18,
+   "missing": 14,
+   "extra": 0,
+   "duplicated": 4,
+   "missingWithDamagedForm": 8,
+   "bySpanCount": {
+    "1": {
+     "sent": 23,
+     "failed": 5
+    },
+    "2": {
+     "sent": 25,
+     "failed": 4
+    },
+    "3": {
+     "sent": 23,
+     "failed": 5
+    },
+    "4": {
+     "sent": 5,
+     "failed": 0
+    },
+    "5": {
+     "sent": 3,
+     "failed": 3
+    },
+    "6": {
+     "sent": 1,
+     "failed": 1
+    }
+   },
+   "examples": [
+    {
+     "id": "vi-007",
+     "protectedText": "Chúng tôi chưa <x0> giấy phép <x1> vì ngân sách chưa được phê duyệt.",
+     "modelOutput": "We haven't got a permit <x0> because the budget hasn't been approved yet."
+    },
+    {
+     "id": "vi-010",
+     "protectedText": "Yêu cầu này không được tự động duyệt; <x0> phải xác nhận trước.",
+     "modelOutput": "This request is not automatically browsing; x0> must first be verified."
+    },
+    {
+     "id": "vi-020",
+     "protectedText": "Phê duyệt có điều kiện: chỉ cấp <x0> <x1> cho nhóm thiết kế đến hết <x2>.",
+     "modelOutput": "Qualifications: only <x0> <x1> <x1> for design group to come to an end <x2>."
+    },
+    {
+     "id": "vi-028",
+     "protectedText": "Rất tiếc, chúng tôi không thể duyệt yêu cầu cài <x0> trên máy cá nhân.",
+     "modelOutput": "Sorry, we can't browse the request for a personal (x0)."
+    },
+    {
+     "id": "vi-032",
+     "protectedText": "<x0> chuyển sang <x1> Kinh doanh nên cần <x2> <x3> <x4> cũ và cấp <x5> mới.",
+     "modelOutput": "So business should need <x2> <x3> <x4> old and level <x5>."
+    },
+    {
+     "id": "vi-033",
+     "protectedText": "Không <x0> tài khoản trước khi <x1> xong.",
+     "modelOutput": "Not <x0> account before x1> is finished."
+    },
+    {
+     "id": "vi-034",
+     "protectedText": "Yêu cầu <x0> toàn bộ <x1> chưa dùng trong <x2> ngày.",
+     "modelOutput": "Request <x0> whole <x1> is not used in x2> days."
+    },
+    {
+     "id": "vi-035",
+     "protectedText": "Việc <x0> <x1> <x2> của <x3> đã được <x4> xác nhận.",
+     "modelOutput": "The job <x0> <x1> <x2> of <x3> has been reported."
+    },
+    {
+     "id": "vi-036",
+     "protectedText": "<x0> <x1> toàn bộ tài khoản <x2> cho <x3> trước ngày <x4>.",
+     "modelOutput": "<x0> <x1> The entire account <x2> <x3> for <x3> prior to the date <x4>."
+    },
+    {
+     "id": "vi-038",
+     "protectedText": "<x0> là <x1> ngày trước khi <x2>.",
+     "modelOutput": "The x0> is <x1>day before <x2>."
+    },
+    {
+     "id": "vi-040",
+     "protectedText": "Nhắc: <x0> <x1> còn <x2> ngày, nếu không hủy sẽ tự động <x3> <x4> tháng.",
+     "modelOutput": "prompt: <x0> <x1> and <x2> The date, if not canceling, will automatically <x3> <x4> <x4> Month."
+    },
+    {
+     "id": "vi-043",
+     "protectedText": "Mỗi <x0> <x1> có giá <x2> mỗi năm.",
+     "modelOutput": "Each times x0> <x1> is worth <x2> every year."
+    },
+    {
+     "id": "vi-065",
+     "protectedText": "Chúng tôi đề xuất chuyển từ <x0> sang <x1> để tiết kiệm chi phí.",
+     "modelOutput": "We propose to switch from x0 to <x1> to save our expenses."
+    },
+    {
+     "id": "vi-068",
+     "protectedText": "Toi can cai dat <x0> cho du an moi cua phong thiet ke.",
+     "modelOutput": "I can take it from the neck."
+    },
+    {
+     "id": "vi-072",
+     "protectedText": "Em cần request thêm <x0> <x1> cho project <x2>, đã confirm với team lead.",
+     "modelOutput": "I need the request to add the request rate <x0> <x1> <x1> for the project <x2>, which is also a game with the team lead."
+    }
+   ]
+  },
+  "en-vi": {
+   "segments": 87,
+   "sentToModel": 79,
+   "gateFail": 7,
+   "missing": 6,
+   "extra": 0,
+   "duplicated": 1,
+   "missingWithDamagedForm": 4,
+   "bySpanCount": {
+    "1": {
+     "sent": 23,
+     "failed": 1
+    },
+    "2": {
+     "sent": 25,
+     "failed": 2
+    },
+    "3": {
+     "sent": 21,
+     "failed": 1
+    },
+    "4": {
+     "sent": 6,
+     "failed": 1
+    },
+    "5": {
+     "sent": 4,
+     "failed": 2
+    }
+   },
+   "examples": [
+    {
+     "id": "en-017",
+     "protectedText": "Approved: <x0> <x1> for another <x2> months.",
+     "modelOutput": "Được chấp nhận: <x0> <x1> cho một <x2 tháng nữa."
+    },
+    {
+     "id": "en-036",
+     "protectedText": "<x0> will <x1> all <x2> accounts to <x3> before <x4>.",
+     "modelOutput": "<x0> sẽ <x1> Tất cả <x2> <x3> tường trình về <x3> trước <x4>."
+    },
+    {
+     "id": "en-041",
+     "protectedText": "Reminder: the <x0> <x1> is <x2> days away; if not cancelled it will <x3> automatically for <x4> months.",
+     "modelOutput": "Nhắc nhở: <x0> <x1> là <x2 ngày qua; nếu không hủy bỏ nó sẽ <x3> tự động cho <x4 tháng."
+    },
+    {
+     "id": "en-046",
+     "protectedText": "The total is <x0>, excluding <x1> VAT.",
+     "modelOutput": "Tổng cộng là <x0>, trừ [x1> VAT."
+    },
+    {
+     "id": "en-071",
+     "protectedText": "Please <x0> the <x1> <x2> of the Marketing <x3>.",
+     "modelOutput": "Làm ơn <x0> <x1> <x2> of the ix3>."
+    },
+    {
+     "id": "en-074",
+     "protectedText": "Deadline là <x0>, so please <x1> soon.",
+     "modelOutput": "Deadline đaX0>, vì vậy làm ơn <x1> sớm."
+    },
+    {
+     "id": "en-080",
+     "protectedText": "<x0> complete.",
+     "modelOutput": "\"X0> Hoàn tất."
+    }
+   ]
+  }
+ }
+}

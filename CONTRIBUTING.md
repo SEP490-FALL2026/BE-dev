@@ -39,7 +39,7 @@ E2E, integration, OpenAPI export và dependency audit chạy riêng theo tác đ
 CI also runs HTTP E2E, isolated PostgreSQL integration, OpenAPI drift, Docker build and dependency audit.
 
 `pnpm check` sinh Prisma client trước lint nên chạy được trực tiếp trên checkout sạch (R-01,
-xem [theo dõi review G0/G1](docs/workspace/g0-g1-review-follow-up.md)).
+xem [review G0/G1](docs/reviews/g0-g1-remediation-2026-10-15/README.md)).
 
 ## Chọn tài liệu theo tác vụ
 

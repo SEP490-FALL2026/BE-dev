@@ -6,7 +6,7 @@
 - Trạng thái yêu cầu: các Story liên quan là `BASELINED`/`OWNER-PROVISIONAL` — quyết định Owner, chưa GVHD. Logical S0 0.10 ở Docs viết theo cây `manager_id` và **không** dùng cho vùng này; Logical của vùng nằm ở mục _Logical vùng_ dưới đây.
 - [Kế hoạch](plan.md). Lát dùng spec này: [lát 1a](../us-01-bootstrap-login-session/spec.md), [lát 1b](../us-01-account-invitation-activation/spec.md).
 
-**Đối chiếu 14/10/2026:** code đã merge PR #4 (`64073c4`); thiết kế vẫn draft, chưa dev review/nghiệm thu. Nguồn baseline là Docs `0e0bb83` (snapshot `S-2026-10-12b`). Xem [theo dõi sau review](../../g0-g1-review-follow-up.md) và [báo cáo AI](../../../reviews/backend-g0-g1-review-2026-10-14.md).
+**Đối chiếu 15/10/2026:** code nền đã merge PR #4 (`64073c4`); remediation nằm tại `a0cf5f1`, chưa merge hoặc được dev review/nghiệm thu. Nguồn baseline là Docs `0e0bb83` (snapshot `S-2026-10-12b`). Xem [báo cáo G0/G1](../../../reviews/g0-g1-remediation-2026-10-15/README.md).
 
 **Trước G2:** Logical JobTitle và I-2 dưới đây là baseline của lát 1a/1b. R-10/R-11 yêu cầu đánh giá `QĐ-68`/`QĐ-66ak`, `OQ-A-26` và pin nguồn mới trước khi tái sử dụng cho import/nhập nhân viên. Không suy placement từ ngày vào trong bootstrap thành quy tắc chung của G2.
 

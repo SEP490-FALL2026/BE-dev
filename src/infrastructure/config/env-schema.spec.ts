@@ -1,4 +1,10 @@
-import { resolveDatabaseUrl, validateEnvironment } from './env-schema';
+import {
+  EnvironmentValidationError,
+  resolveDatabaseUrl,
+  validateEnvironment,
+  validateInstallationEnvironment,
+} from './env-schema';
+import { installationEnvironmentConfigOptions } from './env-config';
 
 describe('validateEnvironment', () => {
   const productionInfrastructure = {
@@ -291,5 +297,175 @@ describe('invitation email configuration', () => {
   it('requires TLS for SMTP in production, because the mail carries a bearer activation link', () => {
     expect(() => validateEnvironment({ ...productionBase, SMTP_TLS: 'false' })).toThrow('SMTP_TLS');
     expect(() => validateEnvironment({ ...productionBase, SMTP_TLS: undefined })).toThrow('SMTP_TLS');
+  });
+});
+
+describe('installation environment (database keys only)', () => {
+  const minimal = { NODE_ENV: 'production', DATABASE_URL: 'postgresql://u:p@db:5432/x' };
+  const fullProduction = {
+    NODE_ENV: 'production',
+    CORS_ORIGINS: 'https://licenses.example.com',
+    DATABASE_URL: 'postgresql://app:secret@database:5432/app',
+    OBJECT_STORAGE_ENDPOINT: 'https://account-id.r2.cloudflarestorage.com',
+    OBJECT_STORAGE_BUCKET: 'software-license-files',
+    OBJECT_STORAGE_ACCESS_KEY_ID: 'test-access-key',
+    OBJECT_STORAGE_SECRET_ACCESS_KEY: 'test-secret-key',
+    REDIS_HOST: 'redis.internal',
+    REDIS_PASSWORD: 'redis-secret-password',
+    AUTH_ACCESS_TOKEN_SECRET: 'production-access-token-secret-with-enough-entropy',
+    AUTH_THROTTLE_PEPPER: 'production-throttle-pepper',
+    APP_PUBLIC_URL: 'https://licenses.example.com',
+    OUTBOX_PAYLOAD_KEY: Buffer.alloc(32, 7).toString('base64'),
+    OUTBOX_PAYLOAD_KEY_ID: 'prod-1',
+    SMTP_HOST: 'smtp.example.com',
+    SMTP_FROM: 'no-reply@licenses.example.com',
+    SMTP_TLS: 'true',
+  };
+
+  it('validates the installation config options with the installation validator (R-13)', () => {
+    expect(() => installationEnvironmentConfigOptions.validate(minimal)).not.toThrow();
+    expect(installationEnvironmentConfigOptions.validate(minimal)).toEqual(validateInstallationEnvironment(minimal));
+  });
+
+  it('accepts only NODE_ENV and DATABASE_URL in production and applies the database defaults', () => {
+    expect(validateInstallationEnvironment(minimal)).toEqual({
+      NODE_ENV: 'production',
+      DATABASE_URL: 'postgresql://u:p@db:5432/x',
+      TEST_DATABASE_URL: '',
+      DB_LOCK_TIMEOUT_MS: 3000,
+      DB_STATEMENT_TIMEOUT_MS: 5000,
+      DB_TRANSACTION_TIMEOUT_MS: 10000,
+      DB_TRANSACTION_MAX_WAIT_MS: 2000,
+      DB_CONNECT_TIMEOUT_MS: 3000,
+      DB_QUERY_TIMEOUT_MS: 8000,
+      DB_IDLE_IN_TRANSACTION_TIMEOUT_MS: 20000,
+    });
+  });
+
+  it('still requires DATABASE_URL in production', () => {
+    expect(() => validateInstallationEnvironment({ NODE_ENV: 'production' })).toThrow('DATABASE_URL');
+  });
+
+  it('rejects a DATABASE_URL that is not PostgreSQL', () => {
+    expect(() =>
+      validateInstallationEnvironment({ NODE_ENV: 'production', DATABASE_URL: 'mysql://u:p@db:3306/x' }),
+    ).toThrow('DATABASE_URL');
+  });
+
+  it('rejects TEST_DATABASE_URL outside the test environment', () => {
+    expect(() =>
+      validateInstallationEnvironment({ ...minimal, TEST_DATABASE_URL: 'postgresql://u:p@db:5432/x_test' }),
+    ).toThrow('TEST_DATABASE_URL');
+  });
+
+  it('resolves the test database like the full validator does', () => {
+    const explicit = 'postgresql://app:app@localhost:5432/custom_test_db';
+
+    expect(validateInstallationEnvironment({ NODE_ENV: 'test', TEST_DATABASE_URL: explicit }).DATABASE_URL).toBe(
+      explicit,
+    );
+    expect(validateInstallationEnvironment({ NODE_ENV: 'test' }).DATABASE_URL).toBe(
+      validateEnvironment({ NODE_ENV: 'test' }).DATABASE_URL,
+    );
+  });
+
+  it('enforces the same database timeout ordering as the full validator', () => {
+    expect(() => validateInstallationEnvironment({ ...minimal, DB_LOCK_TIMEOUT_MS: '6000' })).toThrow(
+      'DB_LOCK_TIMEOUT_MS',
+    );
+    expect(() =>
+      validateInstallationEnvironment({
+        ...minimal,
+        DB_STATEMENT_TIMEOUT_MS: '9000',
+        DB_TRANSACTION_TIMEOUT_MS: '9000',
+      }),
+    ).toThrow('DB_STATEMENT_TIMEOUT_MS');
+    expect(() =>
+      validateInstallationEnvironment({ ...minimal, DB_QUERY_TIMEOUT_MS: '5000', DB_STATEMENT_TIMEOUT_MS: '5000' }),
+    ).toThrow('DB_QUERY_TIMEOUT_MS');
+    expect(() =>
+      validateInstallationEnvironment({
+        ...minimal,
+        DB_IDLE_IN_TRANSACTION_TIMEOUT_MS: '10000',
+        DB_TRANSACTION_TIMEOUT_MS: '10000',
+      }),
+    ).toThrow('DB_IDLE_IN_TRANSACTION_TIMEOUT_MS must be higher than DB_TRANSACTION_TIMEOUT_MS');
+  });
+
+  it('accepts the complete production environment too (an env file shared with the API still works)', () => {
+    expect(() => validateInstallationEnvironment(fullProduction)).not.toThrow();
+  });
+
+  it('keeps the API and worker validator fail-closed on the same minimal environment', () => {
+    let message = '';
+    try {
+      validateEnvironment(minimal);
+    } catch (error) {
+      message = (error as Error).message;
+    }
+
+    for (const key of [
+      'AUTH_ACCESS_TOKEN_SECRET',
+      'OUTBOX_PAYLOAD_KEY',
+      'SMTP_HOST',
+      'REDIS_HOST',
+      'OBJECT_STORAGE_ENDPOINT',
+    ]) {
+      expect(message).toContain(key);
+    }
+  });
+
+  it('throws a typed EnvironmentValidationError from both validators', () => {
+    expect(() => validateInstallationEnvironment({ NODE_ENV: 'production' })).toThrow(EnvironmentValidationError);
+    expect(() => validateEnvironment({ NODE_ENV: 'production' })).toThrow(EnvironmentValidationError);
+    expect(() => validateEnvironment({ DB_LOCK_TIMEOUT_MS: '6000' })).toThrow(EnvironmentValidationError);
+    expect(new EnvironmentValidationError('x')).toMatchObject({ name: 'EnvironmentValidationError' });
+    expect(new EnvironmentValidationError('x')).toBeInstanceOf(Error);
+  });
+
+  describe.each([
+    ['validateInstallationEnvironment', validateInstallationEnvironment],
+    ['validateEnvironment', validateEnvironment],
+  ] as const)('idle-in-transaction default through %s', (_name, validate) => {
+    it('keeps 20 s with the default transaction timeout', () => {
+      expect(validate({}).DB_IDLE_IN_TRANSACTION_TIMEOUT_MS).toBe(20000);
+    });
+
+    it('follows a longer transaction timeout instead of failing to boot after an upgrade', () => {
+      expect(
+        validate({
+          DB_TRANSACTION_TIMEOUT_MS: '60000',
+          DB_STATEMENT_TIMEOUT_MS: '30000',
+          DB_QUERY_TIMEOUT_MS: '40000',
+        }),
+      ).toMatchObject({
+        DB_TRANSACTION_TIMEOUT_MS: 60000,
+        DB_IDLE_IN_TRANSACTION_TIMEOUT_MS: 70000,
+      });
+    });
+
+    it('does not reject a longer transaction timeout when no idle limit is given', () => {
+      expect(() =>
+        validate({
+          DB_TRANSACTION_TIMEOUT_MS: '60000',
+          DB_STATEMENT_TIMEOUT_MS: '30000',
+          DB_QUERY_TIMEOUT_MS: '40000',
+        }),
+      ).not.toThrow();
+    });
+
+    it('keeps the 20 s floor when the transaction timeout is short', () => {
+      expect(validate({ DB_TRANSACTION_TIMEOUT_MS: '6000' }).DB_IDLE_IN_TRANSACTION_TIMEOUT_MS).toBe(20000);
+    });
+
+    it('rejects an explicit idle limit that is not above the transaction timeout', () => {
+      expect(() =>
+        validate({ DB_IDLE_IN_TRANSACTION_TIMEOUT_MS: '10000', DB_TRANSACTION_TIMEOUT_MS: '10000' }),
+      ).toThrow('DB_IDLE_IN_TRANSACTION_TIMEOUT_MS must be higher than DB_TRANSACTION_TIMEOUT_MS');
+    });
+
+    it('honours an explicit idle limit above the transaction timeout', () => {
+      expect(validate({ DB_IDLE_IN_TRANSACTION_TIMEOUT_MS: '15000' }).DB_IDLE_IN_TRANSACTION_TIMEOUT_MS).toBe(15000);
+    });
   });
 });

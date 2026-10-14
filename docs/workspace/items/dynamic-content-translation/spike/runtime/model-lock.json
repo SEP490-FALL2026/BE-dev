@@ -1,0 +1,83 @@
+{
+  "schema": 1,
+  "source": "Derived from .models/translation/manifest.json (16 files). Hashes equal the Hugging Face published hashes at the pinned revisions (confirmed independently by the coordinator, 2026-10-15).",
+  "allowExtra": [
+    "manifest.json"
+  ],
+  "models": {
+    "Xenova/opus-mt-vi-en": {
+      "revision": "541dfd72ec07e8f1563795e0224408ad8d729e80",
+      "files": {
+        "README.md": {
+          "bytes": 571,
+          "sha256": "0309dbabda663d5083661a9240e74b637d7f3cd8d05326617493cf34a7ff5e62"
+        },
+        "config.json": {
+          "bytes": 1389,
+          "sha256": "c62a203a0183755af37b96a33cc125e7f74f97c1e90aaae1d1f404fd8a42eea8"
+        },
+        "generation_config.json": {
+          "bytes": 293,
+          "sha256": "44f2c9011a9087c5ec93a1671066a4a59a7a8c00c03e84a6ecac0d840926566b"
+        },
+        "tokenizer.json": {
+          "bytes": 5169708,
+          "sha256": "c41cc5afd26c053770b60e1031577bb7a8e2f3c2eeacde2a34f5c15abfd4eafd"
+        },
+        "tokenizer_config.json": {
+          "bytes": 282,
+          "sha256": "0221122d916f6f230d6b1967644457745aa01514e054897f62b8c6b419460ceb"
+        },
+        "special_tokens_map.json": {
+          "bytes": 74,
+          "sha256": "5e4d1f5e759d74cb1c2fe1d165cfc62b5237aa904de759380cd6f43042eec723"
+        },
+        "onnx/encoder_model_quantized.onnx": {
+          "bytes": 47133597,
+          "sha256": "fa7bd78e8bed6bdc03728f62f1592c4bb52d9e12795496604c1e990e102abdb2"
+        },
+        "onnx/decoder_model_merged_quantized.onnx": {
+          "bytes": 54401611,
+          "sha256": "540edbcc08bab0b42c03576a759fd9b4d5fc99996ac3178630733916dc2325cb"
+        }
+      }
+    },
+    "Xenova/opus-mt-en-vi": {
+      "revision": "30bcd461c0d7338ad106b36314d3eedc2d4e998c",
+      "files": {
+        "README.md": {
+          "bytes": 571,
+          "sha256": "c67d16db154fd911f9cb2741c45cc1794ff06c3802493422ffead1d1b89e1cf4"
+        },
+        "config.json": {
+          "bytes": 1389,
+          "sha256": "0c5ab981c2f5a4878c78522c8a61e3d733f5e3be6b1f83b68bbfb7f00e604637"
+        },
+        "generation_config.json": {
+          "bytes": 293,
+          "sha256": "621eef69f7a1c7eff4bd5c696a113bd773de03e985f0a382b2c2e21002804dd2"
+        },
+        "tokenizer.json": {
+          "bytes": 5163544,
+          "sha256": "0e8bf67ccde0948009d8fe4254beb6e0df7df2950b627c9e53324a9857789a80"
+        },
+        "tokenizer_config.json": {
+          "bytes": 282,
+          "sha256": "51777ca2be47ccea798ad6e1457efbf8fcff1067258b21c6de7f834e1f4fa198"
+        },
+        "special_tokens_map.json": {
+          "bytes": 74,
+          "sha256": "5e4d1f5e759d74cb1c2fe1d165cfc62b5237aa904de759380cd6f43042eec723"
+        },
+        "onnx/encoder_model_quantized.onnx": {
+          "bytes": 47105950,
+          "sha256": "dfcd7a32be3fdd21cbcf5d354520d626f1768fd6e205ca62a6a11a4641d31f36"
+        },
+        "onnx/decoder_model_merged_quantized.onnx": {
+          "bytes": 54373748,
+          "sha256": "1cfc6a84f9c189e6928c9710b281fae3f1f42d4ffbba109e7b4ec8e31ceb06dd"
+        }
+      }
+    }
+  }
+}

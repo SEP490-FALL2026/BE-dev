@@ -27,8 +27,8 @@ Authentication also requires AUTH_ACCESS_TOKEN_SECRET, AUTH_THROTTLE_PEPPER and 
 invitation delivery requires HTTPS APP_PUBLIC_URL, OUTBOX_PAYLOAD_KEY (base64 of 32 bytes),
 OUTBOX_PAYLOAD_KEY_ID, SMTP_HOST, SMTP_FROM and SMTP_TLS=true, plus the provider's port/auth settings.
 The [environment validator](../../src/infrastructure/config/env-schema.ts) owns the full constraints.
-These shared settings are validated for API, worker and bootstrap CLI, including settings a particular
-entry point may not use (review R-13).
+The API and the worker validate all of these settings and refuse to start in production without them.
+The installation command validates only the database settings and NODE_ENV (see below).
 Use container-reachable hostnames: localhost means the container itself.
 
 Create untracked environment files appropriate to the target environment:
@@ -43,9 +43,13 @@ does not run migrations automatically. The baseline is for a fresh database;
 existing databases need a separately reviewed transition, never an automatic reset.
 First-run installation (once, on an empty database after migrations) is an interactive command in the
 same runtime image: `docker run --rm -it --env-file .env.container slm-api:foundation node dist/installation-cli.js --help`.
+The command needs only `DATABASE_URL` (the runtime role) and `NODE_ENV`, which the image sets to production;
+it does not read the JWT, SMTP, outbox, Redis, object-storage or `APP_PUBLIC_URL` settings, so
+`docker run --rm -it -e DATABASE_URL=... slm-api:foundation node dist/installation-cli.js --help` is enough
+and `--help` never touches the environment. Passing the full env file still works; unrelated variables are ignored.
 It needs a terminal (`-it`) because the Super Admin password is typed at a hidden prompt; it refuses to
 read it from arguments, the environment or a pipe. The
-[AI review at `64073c4`](../reviews/backend-g0-g1-review-2026-10-14.md) verified a real Linux PTY
+[G0/G1 remediation review](../reviews/g0-g1-remediation-2026-10-15/README.md) verified a real Linux PTY
 in the runtime image with automated input; manual interactive PowerShell verification is still pending.
 The worker uses the same runtime image with command `node dist/worker.js` and runs the PostgreSQL
 outbox polling loop for SMTP delivery. No BullMQ processor is registered. Compose has no SMTP sink;

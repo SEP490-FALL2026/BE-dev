@@ -280,15 +280,11 @@ export class IdentityAccessRepo {
 
   // --- account management -----------------------------------------------------------
 
-  async findAccountEmployeeIds(employeeIds: string[]): Promise<Set<string>> {
-    if (employeeIds.length === 0) return new Set();
+  /** Ids of every Employee that already has an account, whatever its state (one per Employee, AC-8). */
+  async findEmployeeIdsWithAccount(): Promise<string[]> {
+    const rows = await this.prisma.appUser.findMany({ select: { employeeId: true } });
 
-    const rows = await this.prisma.appUser.findMany({
-      where: { employeeId: { in: employeeIds } },
-      select: { employeeId: true },
-    });
-
-    return new Set(rows.map((row) => row.employeeId));
+    return rows.map((row) => row.employeeId);
   }
 
   async findAccountIdByEmployee(tx: DbTx, employeeId: string): Promise<string | null> {
@@ -307,18 +303,22 @@ export class IdentityAccessRepo {
       ...(filter.activationState ? { activationState: filter.activationState } : {}),
       ...(filter.role ? { roleGrants: { some: { role: filter.role, revokedAt: null } } } : {}),
     };
-    const [items, total] = await Promise.all([
-      this.prisma.appUser.findMany({
-        where,
-        orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
-        skip: filter.skip,
-        take: filter.take,
-        select: ACCOUNT_RECORD_SELECT,
-      }),
-      this.prisma.appUser.count({ where }),
-    ]);
-
-    return { items, total };
+    // One snapshot for the page and the count (database rules; same as the catalog): otherwise an
+    // account created in between makes totalItems disagree with the rows just returned (R-14).
+    return this.prisma.$transaction(
+      async (tx) => {
+        const items = await tx.appUser.findMany({
+          where,
+          orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+          skip: filter.skip,
+          take: filter.take,
+          select: ACCOUNT_RECORD_SELECT,
+        });
+        const total = await tx.appUser.count({ where });
+        return { items, total };
+      },
+      { isolationLevel: 'RepeatableRead' },
+    );
   }
 
   async setStatus(tx: DbTx, appUserId: string, status: 'ACTIVE' | 'LOCKED'): Promise<void> {

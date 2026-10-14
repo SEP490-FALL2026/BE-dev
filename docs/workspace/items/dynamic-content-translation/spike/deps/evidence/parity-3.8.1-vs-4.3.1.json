@@ -1,0 +1,296 @@
+{
+  "a": {
+    "label": "t381",
+    "version": "3.8.1"
+  },
+  "b": {
+    "label": "t431",
+    "version": "4.3.1"
+  },
+  "summary": {
+    "vi-en/default": {
+      "identical": 9,
+      "different": 1
+    },
+    "en-vi/default": {
+      "identical": 1,
+      "different": 9
+    },
+    "en-vi/noPrefix": {
+      "identical": 8,
+      "different": 2
+    }
+  },
+  "rows": [
+    {
+      "dir": "vi-en",
+      "variant": "default",
+      "input": "Giấy phép phần mềm sẽ hết hạn vào cuối tháng này.",
+      "t381": "Software license expires by the end of the month.",
+      "t431": "Software license expires by the end of the month.",
+      "identical": true,
+      "sourceTokenIdsIdentical": true
+    },
+    {
+      "dir": "vi-en",
+      "variant": "default",
+      "input": "Vui lòng liên hệ bộ phận hỗ trợ để gia hạn.",
+      "t381": "Please contact the support unit for extension.",
+      "t431": "Please contact the support unit for extension.",
+      "identical": true,
+      "sourceTokenIdsIdentical": true
+    },
+    {
+      "dir": "vi-en",
+      "variant": "default",
+      "input": "Nhân viên mới cần được cấp quyền truy cập vào hệ thống quản lý giấy phép.",
+      "t381": "New employees need access to license management.",
+      "t431": "New employees need access to license management.",
+      "identical": true,
+      "sourceTokenIdsIdentical": true
+    },
+    {
+      "dir": "vi-en",
+      "variant": "default",
+      "input": "Hóa đơn tháng mười đã được gửi qua email cho khách hàng.",
+      "t381": "The October bill was emailed to the client.",
+      "t431": "The October bill was emailed to the client.",
+      "identical": true,
+      "sourceTokenIdsIdentical": true
+    },
+    {
+      "dir": "vi-en",
+      "variant": "default",
+      "input": "Gói dịch vụ doanh nghiệp bao gồm năm mươi giấy phép người dùng.",
+      "t381": "The business package includes 50 user permits.",
+      "t431": "The business package includes 50 user permits.",
+      "identical": true,
+      "sourceTokenIdsIdentical": true
+    },
+    {
+      "dir": "vi-en",
+      "variant": "default",
+      "input": "Quản trị viên có thể thu hồi giấy phép của nhân viên đã nghỉ việc.",
+      "t381": "The administrator can revoke the employee's permission to leave.",
+      "t431": "The administrator can revoke the employee's permission to leave.",
+      "identical": true,
+      "sourceTokenIdsIdentical": true
+    },
+    {
+      "dir": "vi-en",
+      "variant": "default",
+      "input": "Xin chào, tôi muốn đổi mật khẩu của tài khoản.",
+      "t381": "Hi, I'd like to change your account password.",
+      "t431": "Hi, I'd like to change your account password.",
+      "identical": true,
+      "sourceTokenIdsIdentical": true
+    },
+    {
+      "dir": "vi-en",
+      "variant": "default",
+      "input": "Hợp đồng sẽ được gia hạn tự động nếu không có thông báo hủy.",
+      "t381": "The contract will be automatically extended without an abort notice.",
+      "t431": "The contract will be automatically extended without an abort notice.",
+      "identical": true,
+      "sourceTokenIdsIdentical": true
+    },
+    {
+      "dir": "vi-en",
+      "variant": "default",
+      "input": "Báo cáo sử dụng phần mềm được cập nhật hàng tuần.",
+      "t381": "The software application report is updated every week.",
+      "t431": "The software application report is updated every week.",
+      "identical": true,
+      "sourceTokenIdsIdentical": true
+    },
+    {
+      "dir": "vi-en",
+      "variant": "default",
+      "input": "Thiết bị này đã đạt đến số lượng kích hoạt tối đa.",
+      "t381": "This device has reached maximum trigger count.",
+      "t431": "This device has reached maximum number of triggers.",
+      "identical": false,
+      "sourceTokenIdsIdentical": true
+    },
+    {
+      "dir": "en-vi",
+      "variant": "default",
+      "input": ">>vie<< The license will expire at the end of this month.",
+      "t381": "Giấy phép sẽ hết hạn vào cuối tháng này.",
+      "t431": "Giấy phép sẽ được đánh giá vào cuối tháng này.",
+      "identical": false,
+      "sourceTokenIdsIdentical": false
+    },
+    {
+      "dir": "en-vi",
+      "variant": "noPrefix",
+      "input": ">>vie<< The license will expire at the end of this month.",
+      "t381": "Giấy phép sẽ được bỏ phiếu vào cuối tháng này.",
+      "t431": "Giấy phép sẽ được bỏ phiếu vào cuối tháng này.",
+      "identical": true,
+      "sourceTokenIdsIdentical": true
+    },
+    {
+      "dir": "en-vi",
+      "variant": "default",
+      "input": ">>vie<< Please contact support to renew your subscription.",
+      "t381": "Vui lòng liên lạc với bên ngoài để đăng ký lại.",
+      "t431": "Vui lòng liên lạc với bạn để gửi kèm theo lời nhắn.",
+      "identical": false,
+      "sourceTokenIdsIdentical": false
+    },
+    {
+      "dir": "en-vi",
+      "variant": "noPrefix",
+      "input": ">>vie<< Please contact support to renew your subscription.",
+      "t381": "Hãy liên lạc với máy chủ đơn.",
+      "t431": "Hãy liên lạc với người nhận dạng « #% 1 » cần ghi nhớ.",
+      "identical": false,
+      "sourceTokenIdsIdentical": true
+    },
+    {
+      "dir": "en-vi",
+      "variant": "default",
+      "input": ">>vie<< New employees must be granted access to the license management system.",
+      "t381": "Nhân viên mới phải được phép truy cập vào hệ thống quản lý bằng lái.",
+      "t431": "Các nhân viên mới phải có quyền truy cập vào hệ thống quản lý.",
+      "identical": false,
+      "sourceTokenIdsIdentical": false
+    },
+    {
+      "dir": "en-vi",
+      "variant": "noPrefix",
+      "input": ">>vie<< New employees must be granted access to the license management system.",
+      "t381": "Nhân viên mới phải được phép sử dụng hệ thống quản lý.",
+      "t431": "Nhân viên mới phải được phép sử dụng hệ thống quản lý.",
+      "identical": true,
+      "sourceTokenIdsIdentical": true
+    },
+    {
+      "dir": "en-vi",
+      "variant": "default",
+      "input": ">>vie<< The October invoice has been emailed to the customer.",
+      "t381": "Hóa đơn tháng 10 đã được gửi email cho khách hàng.",
+      "t431": "Các hóa đơn tháng 10 đã được gửi đến khách hàng.",
+      "identical": false,
+      "sourceTokenIdsIdentical": false
+    },
+    {
+      "dir": "en-vi",
+      "variant": "noPrefix",
+      "input": ">>vie<< The October invoice has been emailed to the customer.",
+      "t381": "Tờ hóa đơn tháng 10 đã được gửi cho khách hàng.",
+      "t431": "Tờ hóa đơn tháng 10 đã được gửi cho khách hàng.",
+      "identical": true,
+      "sourceTokenIdsIdentical": true
+    },
+    {
+      "dir": "en-vi",
+      "variant": "default",
+      "input": ">>vie<< The enterprise plan includes fifty user licenses.",
+      "t381": "Kế hoạch kinh doanh bao gồm 50 giấy phép sử dụng.",
+      "t431": "Ghi chú xe đạp.",
+      "identical": false,
+      "sourceTokenIdsIdentical": false
+    },
+    {
+      "dir": "en-vi",
+      "variant": "noPrefix",
+      "input": ">>vie<< The enterprise plan includes fifty user licenses.",
+      "t381": "Kế hoạch tăng thêm 50 giấy phép sử dụng.",
+      "t431": "Kế hoạch tăng thêm 50 giấy phép sử dụng.",
+      "identical": true,
+      "sourceTokenIdsIdentical": true
+    },
+    {
+      "dir": "en-vi",
+      "variant": "default",
+      "input": ">>vie<< An administrator can revoke the license of an employee who has left.",
+      "t381": "Quản lý có thể thu hồi giấy phép của một nhân viên đã bỏ đi.",
+      "t431": "Quản lý có thể hủy bỏ giấy phép nhân viên còn lại.",
+      "identical": false,
+      "sourceTokenIdsIdentical": false
+    },
+    {
+      "dir": "en-vi",
+      "variant": "noPrefix",
+      "input": ">>vie<< An administrator can revoke the license of an employee who has left.",
+      "t381": "Quản lý có thể tịch thu giấy phép của một nhân viên đã rời đi.",
+      "t431": "Quản lý có thể tịch thu giấy phép của một nhân viên đã rời đi.",
+      "identical": true,
+      "sourceTokenIdsIdentical": true
+    },
+    {
+      "dir": "en-vi",
+      "variant": "default",
+      "input": ">>vie<< Hello, I would like to change my account password.",
+      "t381": "Xin chào, tôi muốn đổi mật khẩu tài khoản.",
+      "t431": "Xin chào, tôi muốn đổi mật khẩu tài khoản.",
+      "identical": true,
+      "sourceTokenIdsIdentical": false
+    },
+    {
+      "dir": "en-vi",
+      "variant": "noPrefix",
+      "input": ">>vie<< Hello, I would like to change my account password.",
+      "t381": "Xin chào, tôi muốn đổi mật khẩu tài khoản.",
+      "t431": "Xin chào, tôi muốn đổi mật khẩu tài khoản.",
+      "identical": true,
+      "sourceTokenIdsIdentical": true
+    },
+    {
+      "dir": "en-vi",
+      "variant": "default",
+      "input": ">>vie<< The contract renews automatically unless a cancellation notice is given.",
+      "t381": "Hợp đồng tự động làm mới lại trừ khi thông báo hủy bỏ được đưa ra.",
+      "t431": "Cái hợp đồng sẽ được ký trừ khi có thông báo.",
+      "identical": false,
+      "sourceTokenIdsIdentical": false
+    },
+    {
+      "dir": "en-vi",
+      "variant": "noPrefix",
+      "input": ">>vie<< The contract renews automatically unless a cancellation notice is given.",
+      "t381": "Hợp đồng lập tức xác định trừ khi một thông báo đã được đưa ra.",
+      "t431": "Hợp đồng ký tự sẽ là tạm trừ khi có thông báo.",
+      "identical": false,
+      "sourceTokenIdsIdentical": true
+    },
+    {
+      "dir": "en-vi",
+      "variant": "default",
+      "input": ">>vie<< The software usage report is updated every week.",
+      "t381": "Báo cáo sử dụng phần mềm được cập nhật mỗi tuần.",
+      "t431": "Tập tin cập nhật các thông tin về máy chủ được cập nhật mỗi tuần.",
+      "identical": false,
+      "sourceTokenIdsIdentical": false
+    },
+    {
+      "dir": "en-vi",
+      "variant": "noPrefix",
+      "input": ">>vie<< The software usage report is updated every week.",
+      "t381": "Báo cáo phần mềm được cập nhật mỗi tuần.",
+      "t431": "Báo cáo phần mềm được cập nhật mỗi tuần.",
+      "identical": true,
+      "sourceTokenIdsIdentical": true
+    },
+    {
+      "dir": "en-vi",
+      "variant": "default",
+      "input": ">>vie<< This device has reached the maximum number of activations.",
+      "t381": "Thiết bị này đã đạt đến số hiệu kích hoạt tối đa.",
+      "t431": "Thiết bị này đã đạt đến số tối đa của các số lượng các số người dùng.",
+      "identical": false,
+      "sourceTokenIdsIdentical": false
+    },
+    {
+      "dir": "en-vi",
+      "variant": "noPrefix",
+      "input": ">>vie<< This device has reached the maximum number of activations.",
+      "t381": "Thiết bị này đã tới số tối đa của các số lượng.",
+      "t431": "Thiết bị này đã tới số tối đa của các số lượng.",
+      "identical": true,
+      "sourceTokenIdsIdentical": true
+    }
+  ]
+}

@@ -10,8 +10,8 @@ test/ chứa các suite qua nhiều lớp và helper dùng riêng cho test.
 | Integration | test/integration/*.integration-spec.ts | pnpm test:integration                | PostgreSQL thật, migration, constraint, repository, concurrency harness      |
 | Script      | scripts/**/*.test.mjs                  | pnpm rules:test và pnpm test:scripts | Công cụ kiểm tra tài liệu/test discovery                                     |
 
-Chưa có browser suite. [Runner review G0/G1](../docs/reviews/backend-g0-g1-review-2026-10-14/README.md)
-đã chạy HTTP/SMTP thật tại `64073c4`; đây là công cụ review riêng, chưa tích hợp vào CI.
+Chưa có browser suite. [Review/remediation G0/G1](../docs/reviews/g0-g1-remediation-2026-10-15/README.md)
+ghi kết quả chạy HTTP/SMTP thật; runner review riêng không được giữ trong repo hoặc tích hợp vào CI.
 Không tạo lệnh giả pass cho suite chưa triển khai.
 
 ## Quy tắc viết test

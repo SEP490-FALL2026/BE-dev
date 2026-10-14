@@ -15,9 +15,12 @@ API và worker có entry point riêng trong cùng codebase.
 | Queue/storage  | S3 adapter, BullMQ configuration; worker gửi SMTP từ outbox PostgreSQL                           | BullMQ queue processor và file API                                  |
 
 G0 và lát 1a/1b đã merge qua PR #4 (`64073c4`), có 16 operation HTTP.
-Spec/plan và ADR-0011/0012 chưa được dev review/nghiệm thu; kết quả AI review và lỗi còn mở
-được dẫn ở [theo dõi sau review](docs/workspace/g0-g1-review-follow-up.md).
+ADR-0011/0012 vẫn Proposed, chưa ghi nghiệm thu. Kết quả AI review và remediation
+được dẫn ở [báo cáo G0/G1](docs/reviews/g0-g1-remediation-2026-10-15/README.md).
 Catalog là mẫu cấu trúc, chưa cung cấp nghiệp vụ G3.
+
+Ngày 15/10/2026, remediation đã được implement trên nhánh `fix/g0-g1-remediation-2026-10-15`
+tại `a0cf5f1`; chưa merge hoặc được dev khác review.
 
 ## Bản đồ source
 
@@ -42,7 +45,7 @@ src/
     organization/             # tổ chức, Cost Center, phòng, chức vụ, nhân viên + placement
     identity-access/          # tài khoản, mật khẩu, vai gán, phiên, đăng nhập, /me, quản trị tài khoản, lời mời
     notifications/            # EmailOutbox (mã hóa payload), dispatcher gửi thư; không import identity-access
-    installation/             # use case khởi tạo; không sở hữu bảng
+    installation/             # use case khởi tạo; không sở hữu bảng; import IdentityAccessFacadeModule (không import IdentityAccessModule) và chỉ xác thực biến môi trường DB
     catalog/                  # module mẫu cấu trúc, KHÔNG đăng ký vào AppModule
 prisma/
   schema.prisma               # generator, datasource
@@ -90,6 +93,10 @@ nên có hiệu lực ngay request kế tiếp. Vai không nằm trong token. Da
 503 TOKEN_VERIFICATION_UNAVAILABLE (route auth: 503 AUTH.UNAVAILABLE), không lộ thông tin nội bộ.
 Sai vai: 403 AUTHORIZATION.FORBIDDEN.
 
+Lỗi DB tạm thời sau khi guard đã thành công tại `/me` được controller ánh xạ thành
+503 `SERVICE_UNAVAILABLE` (R-15); readiness thất bại cũng trả 503 với mã này (R-12).
+Lỗi không được nhận diện là tạm thời vẫn là 500, không bị che thành lỗi availability.
+
 Rate limit hiện dùng bộ nhớ của từng process, theo **từng route trên mỗi IP**, **không dùng Redis**.
 Owner chốt giữ phạm vi này ngày 14/10/2026 (R-07); `test/e2e/rate-limit.e2e-spec.ts` ghim hành vi này.
 Throttle đăng nhập theo email là cơ chế riêng: chỉ lần sai được tăng bộ đếm thất bại theo spec;
@@ -108,6 +115,16 @@ dùng chuỗi ISO-8601 (`toISOString()`) kèm `::timestamptz`. Ghim này gửi t
 qua PgBouncer hoặc pooler quản lý phải cho phép (`ignore_startup_parameters = options`) hoặc đổi cách ghim
 (`ALTER ROLE ... SET timezone`) — chưa kiểm chứng với pooler nào.
 
+`PrismaService` sở hữu pool qua `createPostgresPool`; `PrismaPg` nhận pool ngoài với
+`disposeExternalPool: true` để `$disconnect` đóng pool. `RetireOnTimeoutClient` đóng kết nối ngay
+khi query hết timeout phía client; release guard loại kết nối đang trong transaction khỏi pool.
+Hợp đồng client chỉ hỗ trợ query text/config dạng Promise hoặc callback được quan sát; từ chối
+Submittable (`pg.Query`), config callback, double callback, pipeline và custom Promise trước khi
+gửi query. Đây là client nội bộ cho adapter Prisma, không phải wrapper cho mọi API của pg.
+`DB_IDLE_IN_TRANSACTION_TIMEOUT_MS` bổ sung backstop ở PostgreSQL (mặc định ít nhất 20 s,
+lớn hơn timeout transaction). Khi mất phản hồi COMMIT, dữ liệu có thể đã commit nguyên tử dù
+client nhận 503; không tự retry ghi. Xem [spec remediation](docs/workspace/items/g0-g1-remediation-after-rereview/spec.md).
+
 Authentication: tài khoản nội bộ, access token JWT HS256 ngắn hạn cộng refresh token xoay vòng trong cookie
 `HttpOnly`/`SameSite=Strict`/`Path=/<prefix>/v1/auth`; phát lại refresh token thì thu hồi phiên. Giao thức
 khóa và hợp đồng đăng xuất: [spec nền](docs/workspace/items/foundation-org-identity-boundary/spec.md),
@@ -115,9 +132,19 @@ khóa và hợp đồng đăng xuất: [spec nền](docs/workspace/items/foundat
 Khởi tạo cài đặt: `pnpm build` rồi `pnpm ops:bootstrap --help` (chạy bởi chính người giữ vai Super Admin;
 mật khẩu nhập ở prompt ẩn, không nhận qua tham số hay biến môi trường).
 
+CLI dùng `InstallationConfigurationModule` chỉ validate môi trường và DB; API/worker giữ config
+đầy đủ. `IdentityAccessFacadeModule` cung cấp facade cùng repo/hasher dùng chung instance cho
+module identity runtime, không kéo JWT, SMTP hay worker vào CLI (R-13).
+
 Catalog dùng unique slug ở PostgreSQL; phân trang sort name/id, transaction
 RepeatableRead để page/count dùng cùng snapshot. Snapshot không cố định giữa các
 request phân trang khác nhau.
+
+Danh sách AppUser cũng dùng RepeatableRead cho page/count cùng snapshot (R-14).
+Candidates lấy danh sách Employee đã có tài khoản qua repo identity, truyền vào facade organization
+để loại trừ trong query trước sort/limit 20; không còn cửa sổ 200/5 000 nhân viên (R-03).
+Search `%`/`_` là ký tự nhập literal (N-6). Redeem kiểm dạng token và tra chủ token trước Argon2;
+hash mật khẩu vẫn ở ngoài transaction, rồi kiểm lại trạng thái dưới khóa (R-09).
 
 AppModule chưa dùng queue. WorkerModule cấu hình BullMQ (chưa có job) và chạy `EmailDispatchLoop`
 (`src/email-dispatch.loop.ts`): vòng thăm dò PostgreSQL mỗi `OUTBOX_POLL_INTERVAL_MS` gửi thư trong

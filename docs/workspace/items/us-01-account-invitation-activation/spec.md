@@ -6,7 +6,7 @@
 - Trạng thái yêu cầu: `OWNER-PROVISIONAL` (`L-2`) — quyết định Owner, chưa GVHD. Logical, giao thức khóa, định nghĩa token _dùng được_ và chiến lược migration: [spec nền](../foundation-org-identity-boundary/spec.md) (thêm AccountActionToken, EmailOutbox).
 - [Kế hoạch](plan.md). Phụ thuộc: [lát 1a](../us-01-bootstrap-login-session/spec.md) (đăng nhập, guard, khai báo quyền, audit, bảng danh tính, Employee IT từ khởi tạo).
 
-**Đối chiếu 14/10/2026:** code đã merge PR #4 (`64073c4`); thiết kế vẫn draft, chưa dev review/nghiệm thu. Nguồn baseline là Docs `0e0bb83` (snapshot `S-2026-10-12b`). Xem [theo dõi sau review](../../g0-g1-review-follow-up.md) và [báo cáo AI](../../../reviews/backend-g0-g1-review-2026-10-14.md).
+**Đối chiếu 15/10/2026:** code nền đã merge PR #4 (`64073c4`); remediation nằm tại `a0cf5f1`, chưa merge hoặc được dev review/nghiệm thu. Nguồn baseline là Docs `0e0bb83` (snapshot `S-2026-10-12b`). Xem [báo cáo G0/G1](../../../reviews/g0-g1-remediation-2026-10-15/README.md).
 
 ## Vấn đề và phạm vi
 

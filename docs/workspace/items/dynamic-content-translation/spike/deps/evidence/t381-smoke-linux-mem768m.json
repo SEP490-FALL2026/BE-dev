@@ -1,0 +1,156 @@
+{
+  "label": "t381-linux",
+  "node": "v24.21.0",
+  "platform": "linux-x64",
+  "user": "node",
+  "ok": true,
+  "install": {
+    "packages": [
+      "@huggingface+jinja@0.5.10",
+      "@huggingface+transformers@3.8.1",
+      "@img+colour@1.1.0",
+      "@img+sharp-libvips-linux-x64@1.2.4",
+      "@img+sharp-linux-x64@0.34.5",
+      "onnxruntime-common@1.21.0",
+      "onnxruntime-common@1.22.0-dev.20250409-89f8206ba4",
+      "onnxruntime-node@1.21.0",
+      "onnxruntime-web@1.22.0-dev.20250409-89f8206ba4",
+      "sharp@0.34.5"
+    ],
+    "onnxruntimeNodeBinaries": [
+      {
+        "file": "napi-v3/darwin/arm64/libonnxruntime.1.21.0.dylib",
+        "mb": 30.4
+      },
+      {
+        "file": "napi-v3/darwin/arm64/onnxruntime_binding.node",
+        "mb": 0.2
+      },
+      {
+        "file": "napi-v3/darwin/x64/libonnxruntime.1.21.0.dylib",
+        "mb": 34
+      },
+      {
+        "file": "napi-v3/darwin/x64/onnxruntime_binding.node",
+        "mb": 0.2
+      },
+      {
+        "file": "napi-v3/linux/arm64/libonnxruntime.so.1",
+        "mb": 16.6
+      },
+      {
+        "file": "napi-v3/linux/arm64/libonnxruntime.so.1.21.0",
+        "mb": 16.6
+      },
+      {
+        "file": "napi-v3/linux/arm64/onnxruntime_binding.node",
+        "mb": 0.4
+      },
+      {
+        "file": "napi-v3/linux/x64/libonnxruntime.so.1",
+        "mb": 20.9
+      },
+      {
+        "file": "napi-v3/linux/x64/libonnxruntime.so.1.21.0",
+        "mb": 20.9
+      },
+      {
+        "file": "napi-v3/linux/x64/libonnxruntime_providers_shared.so",
+        "mb": 0
+      },
+      {
+        "file": "napi-v3/linux/x64/onnxruntime_binding.node",
+        "mb": 0.3
+      },
+      {
+        "file": "napi-v3/win32/arm64/DirectML.dll",
+        "mb": 17.6
+      },
+      {
+        "file": "napi-v3/win32/arm64/onnxruntime.dll",
+        "mb": 16
+      },
+      {
+        "file": "napi-v3/win32/arm64/onnxruntime_binding.node",
+        "mb": 0.3
+      },
+      {
+        "file": "napi-v3/win32/x64/DirectML.dll",
+        "mb": 17.7
+      },
+      {
+        "file": "napi-v3/win32/x64/onnxruntime.dll",
+        "mb": 15.3
+      },
+      {
+        "file": "napi-v3/win32/x64/onnxruntime_binding.node",
+        "mb": 0.3
+      }
+    ],
+    "sharpNative": [
+      {
+        "pkg": "@img+sharp-linux-x64@0.34.5",
+        "file": "node_modules/@img/sharp-linux-x64/lib/sharp-linux-x64.node",
+        "mb": 0.4
+      }
+    ]
+  },
+  "importMs": 280,
+  "exports": {
+    "pipeline": "function",
+    "env": "object"
+  },
+  "transformersVersion": "3.8.1",
+  "env4": {
+    "useWasmCache": null,
+    "hasEnvFetch": false
+  },
+  "models": {
+    "vi-en": {
+      "id": "Xenova/opus-mt-vi-en",
+      "loadMs": 9411,
+      "rssAfterLoadMb": 567.7,
+      "sentences": [
+        {
+          "input": "Giấy phép phần mềm sẽ hết hạn vào cuối tháng này.",
+          "output": "Software license expires by the end of the month.",
+          "firstMs": 1494,
+          "secondMs": 1003
+        },
+        {
+          "input": "Vui lòng liên hệ bộ phận hỗ trợ để gia hạn.",
+          "output": "Please contact the support unit for extension.",
+          "firstMs": 717,
+          "secondMs": 791
+        }
+      ]
+    },
+    "en-vi": {
+      "id": "Xenova/opus-mt-en-vi",
+      "loadMs": 6612,
+      "rssAfterLoadMb": 663.9,
+      "sentences": [
+        {
+          "input": ">>vie<< The license will expire at the end of this month.",
+          "output": "Giấy phép sẽ hết hạn vào cuối tháng này.",
+          "firstMs": 1044,
+          "secondMs": 874
+        },
+        {
+          "input": ">>vie<< Please contact support to renew your subscription.",
+          "output": "Vui lòng liên lạc với bên ngoài để đăng ký lại.",
+          "firstMs": 1085,
+          "secondMs": 933
+        }
+      ]
+    }
+  },
+  "peakRssSampledMb": 770.5,
+  "maxRssResourceUsageMb": 770.5,
+  "vmHwmMb": 770.5,
+  "fetchCalls": {
+    "count": 0,
+    "hosts": [],
+    "envFetchLocalCalls": 0
+  }
+}

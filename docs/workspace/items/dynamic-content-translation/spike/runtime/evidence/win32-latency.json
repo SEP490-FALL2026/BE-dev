@@ -1,0 +1,315 @@
+{
+  "scenario": "latency",
+  "profile": "win32",
+  "node": "v24.0.1",
+  "platform": "win32-x64",
+  "transformersPath": "direct-generate",
+  "seconds": 196,
+  "cgroupAfter": {
+    "memoryPeakMb": null,
+    "memoryCurrentMb": null,
+    "memoryMax": null,
+    "cpuMax": null,
+    "cpuStat": null
+  },
+  "result": {
+    "cells": [
+      {
+        "direction": "vi-en",
+        "concurrency": 1,
+        "chars": 200,
+        "requests": 4,
+        "ok": 4,
+        "segmentsPerRequest": 5,
+        "totalMs": {
+          "n": 4,
+          "min": 1528,
+          "p50": 1665,
+          "p95": 1723,
+          "p99": 1723,
+          "max": 1723,
+          "mean": 1659
+        },
+        "workerRunMs": {
+          "n": 4,
+          "min": 1525,
+          "p50": 1661,
+          "p95": 1720,
+          "p99": 1720,
+          "max": 1720,
+          "mean": 1656
+        },
+        "maxStepGapMs": {
+          "n": 4,
+          "min": 41,
+          "p50": 42,
+          "p95": 49,
+          "p99": 49,
+          "max": 49,
+          "mean": 44
+        },
+        "firstStepMs": {
+          "n": 4,
+          "min": 42,
+          "p50": 48,
+          "p95": 70,
+          "p99": 70,
+          "max": 70,
+          "mean": 52
+        },
+        "fitsIn10s": "4/4",
+        "p95Under10s": true
+      },
+      {
+        "direction": "vi-en",
+        "concurrency": 1,
+        "chars": 1000,
+        "requests": 3,
+        "ok": 3,
+        "segmentsPerRequest": 21,
+        "totalMs": {
+          "n": 3,
+          "min": 7382,
+          "p50": 7435,
+          "p95": 7919,
+          "p99": 7919,
+          "max": 7919,
+          "mean": 7579
+        },
+        "workerRunMs": {
+          "n": 3,
+          "min": 7379,
+          "p50": 7430,
+          "p95": 7916,
+          "p99": 7916,
+          "max": 7916,
+          "mean": 7575
+        },
+        "maxStepGapMs": {
+          "n": 3,
+          "min": 43,
+          "p50": 46,
+          "p95": 46,
+          "p99": 46,
+          "max": 46,
+          "mean": 45
+        },
+        "firstStepMs": {
+          "n": 3,
+          "min": 47,
+          "p50": 49,
+          "p95": 50,
+          "p99": 50,
+          "max": 50,
+          "mean": 49
+        },
+        "fitsIn10s": "3/3",
+        "p95Under10s": true
+      },
+      {
+        "direction": "vi-en",
+        "concurrency": 1,
+        "chars": 4000,
+        "requests": 2,
+        "ok": 2,
+        "segmentsPerRequest": 81,
+        "totalMs": {
+          "n": 2,
+          "min": 29050,
+          "p50": 29050,
+          "p95": 29671,
+          "p99": 29671,
+          "max": 29671,
+          "mean": 29360
+        },
+        "workerRunMs": {
+          "n": 2,
+          "min": 29046,
+          "p50": 29046,
+          "p95": 29665,
+          "p99": 29665,
+          "max": 29665,
+          "mean": 29356
+        },
+        "maxStepGapMs": {
+          "n": 2,
+          "min": 49,
+          "p50": 49,
+          "p95": 51,
+          "p99": 51,
+          "max": 51,
+          "mean": 50
+        },
+        "firstStepMs": {
+          "n": 2,
+          "min": 52,
+          "p50": 52,
+          "p95": 55,
+          "p99": 55,
+          "max": 55,
+          "mean": 54
+        },
+        "fitsIn10s": "0/2",
+        "p95Under10s": false
+      },
+      {
+        "direction": "vi-en",
+        "concurrency": 1,
+        "note": "api",
+        "apiRssMb": 51.9,
+        "apiEldMaxMs": 36.5,
+        "workerRss": [
+          null
+        ]
+      },
+      {
+        "direction": "en-vi",
+        "concurrency": 1,
+        "chars": 200,
+        "requests": 4,
+        "ok": 4,
+        "segmentsPerRequest": 5,
+        "totalMs": {
+          "n": 4,
+          "min": 1890,
+          "p50": 2001,
+          "p95": 2314,
+          "p99": 2314,
+          "max": 2314,
+          "mean": 2121
+        },
+        "workerRunMs": {
+          "n": 4,
+          "min": 1886,
+          "p50": 1997,
+          "p95": 2311,
+          "p99": 2311,
+          "max": 2311,
+          "mean": 2117
+        },
+        "maxStepGapMs": {
+          "n": 4,
+          "min": 41,
+          "p50": 41,
+          "p95": 49,
+          "p99": 49,
+          "max": 49,
+          "mean": 44
+        },
+        "firstStepMs": {
+          "n": 4,
+          "min": 44,
+          "p50": 46,
+          "p95": 48,
+          "p99": 48,
+          "max": 48,
+          "mean": 47
+        },
+        "fitsIn10s": "4/4",
+        "p95Under10s": true
+      },
+      {
+        "direction": "en-vi",
+        "concurrency": 1,
+        "chars": 1000,
+        "requests": 3,
+        "ok": 3,
+        "segmentsPerRequest": 19,
+        "totalMs": {
+          "n": 3,
+          "min": 8446,
+          "p50": 8577,
+          "p95": 8879,
+          "p99": 8879,
+          "max": 8879,
+          "mean": 8634
+        },
+        "workerRunMs": {
+          "n": 3,
+          "min": 8443,
+          "p50": 8574,
+          "p95": 8875,
+          "p99": 8875,
+          "max": 8875,
+          "mean": 8631
+        },
+        "maxStepGapMs": {
+          "n": 3,
+          "min": 40,
+          "p50": 49,
+          "p95": 57,
+          "p99": 57,
+          "max": 57,
+          "mean": 49
+        },
+        "firstStepMs": {
+          "n": 3,
+          "min": 47,
+          "p50": 49,
+          "p95": 51,
+          "p99": 51,
+          "max": 51,
+          "mean": 49
+        },
+        "fitsIn10s": "3/3",
+        "p95Under10s": true
+      },
+      {
+        "direction": "en-vi",
+        "concurrency": 1,
+        "chars": 4000,
+        "requests": 2,
+        "ok": 2,
+        "segmentsPerRequest": 74,
+        "totalMs": {
+          "n": 2,
+          "min": 33148,
+          "p50": 33148,
+          "p95": 33986,
+          "p99": 33986,
+          "max": 33986,
+          "mean": 33567
+        },
+        "workerRunMs": {
+          "n": 2,
+          "min": 33143,
+          "p50": 33143,
+          "p95": 33980,
+          "p99": 33980,
+          "max": 33980,
+          "mean": 33562
+        },
+        "maxStepGapMs": {
+          "n": 2,
+          "min": 50,
+          "p50": 50,
+          "p95": 54,
+          "p99": 54,
+          "max": 54,
+          "mean": 52
+        },
+        "firstStepMs": {
+          "n": 2,
+          "min": 49,
+          "p50": 49,
+          "p95": 53,
+          "p99": 53,
+          "max": 53,
+          "mean": 51
+        },
+        "fitsIn10s": "0/2",
+        "p95Under10s": false
+      },
+      {
+        "direction": "en-vi",
+        "concurrency": 1,
+        "note": "api",
+        "apiRssMb": 52,
+        "apiEldMaxMs": 33.78,
+        "workerRss": [
+          null
+        ]
+      }
+    ]
+  }
+}

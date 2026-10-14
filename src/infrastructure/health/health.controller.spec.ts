@@ -1,4 +1,5 @@
 import { ServiceUnavailableException } from '@nestjs/common';
+import { ApiException } from '../http/errors/api.exception';
 import { HealthController } from './health.controller';
 
 describe('HealthController readiness', () => {
@@ -19,11 +20,21 @@ describe('HealthController readiness', () => {
     });
   });
 
-  it('propagates the Terminus failure so the filter maps it to 503', async () => {
-    const failure = new ServiceUnavailableException({ status: 'error' });
-    const health = { check: jest.fn().mockRejectedValue(failure) };
+  it('answers a failed check with 503 SERVICE_UNAVAILABLE, not the generic server-error code (R-12)', async () => {
+    const health = { check: jest.fn().mockRejectedValue(new ServiceUnavailableException({ status: 'error' })) };
     const controller = new HealthController(health as never, { pingCheck: jest.fn() } as never, {} as never);
 
-    await expect(controller.getReadiness()).rejects.toBe(failure);
+    const outcome = await controller.getReadiness().catch((error: unknown) => error);
+    expect(outcome).toBeInstanceOf(ApiException);
+    expect((outcome as ApiException).getStatus()).toBe(503);
+    expect((outcome as ApiException).getResponse()).toMatchObject({ code: 'SERVICE_UNAVAILABLE' });
+  });
+
+  it('leaves any other failure to the global filter', async () => {
+    const defect = new TypeError('boom');
+    const health = { check: jest.fn().mockRejectedValue(defect) };
+    const controller = new HealthController(health as never, { pingCheck: jest.fn() } as never, {} as never);
+
+    await expect(controller.getReadiness()).rejects.toBe(defect);
   });
 });

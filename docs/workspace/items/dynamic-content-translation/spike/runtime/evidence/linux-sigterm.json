@@ -1,0 +1,118 @@
+{
+  "scenario": "sigterm",
+  "profile": "linux",
+  "node": "v24.21.0",
+  "platform": "linux-x64",
+  "transformersPath": "direct-generate",
+  "seconds": 12,
+  "cgroupAfter": {
+    "memoryPeakMb": 518.7,
+    "memoryCurrentMb": 25.6,
+    "memoryMax": "2147483648",
+    "cpuMax": "200000 100000",
+    "cpuStat": {
+      "nrPeriods": 126,
+      "nrThrottled": 13,
+      "throttledMs": 3127
+    }
+  },
+  "result": {
+    "trials": [
+      {
+        "phase": "during-run",
+        "apiExit": {
+          "code": 0,
+          "signal": null
+        },
+        "apiExitMs": 48,
+        "workerGoneMs": 48,
+        "orphanAfter": [],
+        "clientStatus": "UNAVAILABLE",
+        "summary": {
+          "reason": "SIGTERM",
+          "ms": 42,
+          "exits": [
+            {
+              "pid": 27,
+              "code": 0,
+              "signal": null
+            }
+          ],
+          "killSent": []
+        }
+      },
+      {
+        "phase": "during-run",
+        "apiExit": {
+          "code": 0,
+          "signal": null
+        },
+        "apiExitMs": 66,
+        "workerGoneMs": 66,
+        "orphanAfter": [],
+        "clientStatus": "UNAVAILABLE",
+        "summary": {
+          "reason": "SIGTERM",
+          "ms": 57,
+          "exits": [
+            {
+              "pid": 58,
+              "code": 0,
+              "signal": null
+            }
+          ],
+          "killSent": []
+        }
+      },
+      {
+        "phase": "during-run",
+        "apiExit": {
+          "code": 0,
+          "signal": null
+        },
+        "apiExitMs": 55,
+        "workerGoneMs": 55,
+        "orphanAfter": [],
+        "clientStatus": "UNAVAILABLE",
+        "summary": {
+          "reason": "SIGTERM",
+          "ms": 45,
+          "exits": [
+            {
+              "pid": 89,
+              "code": 0,
+              "signal": null
+            }
+          ],
+          "killSent": []
+        }
+      },
+      {
+        "phase": "during-cold-load",
+        "apiExit": {
+          "code": 0,
+          "signal": null
+        },
+        "apiExitMs": 808,
+        "workerGoneMs": 808,
+        "orphanAfter": [],
+        "clientStatus": "UNAVAILABLE",
+        "summary": {
+          "reason": "SIGTERM",
+          "ms": 801,
+          "exits": [
+            {
+              "pid": 120,
+              "code": 0,
+              "signal": null
+            }
+          ],
+          "killSent": []
+        }
+      }
+    ],
+    "graceMs": 5000,
+    "allWithinGracePlus1s": true,
+    "allCodeZero": true
+  }
+}

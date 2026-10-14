@@ -1,0 +1,384 @@
+{
+  "date": "2026-10-14",
+  "tag": "4.3.1b",
+  "fixtureSet": "heldout",
+  "fixtureFile": {
+    "file": "fixtures/heldout-vi-en.json",
+    "sha256": "fe29b4685767d599b088651b490eb4648a6ff673ea95eaca234442970b5c376f",
+    "items": 54
+  },
+  "direction": "vi-en",
+  "mode": "protected",
+  "options": {
+    "warmup": 2,
+    "repetitions": 3,
+    "maxSegmentTokens": 128,
+    "maxNewTokensRule": "min(512, 2*inputTokens+16)",
+    "batchSize": 1,
+    "limit": null,
+    "knownTerms": "fixture",
+    "decoding": "greedy (num_beams ignored by transformers.js), forced_eos_token_id disabled in generate()"
+  },
+  "environment": {
+    "os": "Windows_NT 10.0.26200 (win32 x64)",
+    "cpuModel": "11th Gen Intel(R) Core(TM) i7-11800H @ 2.30GHz",
+    "cpuCount": 16,
+    "totalMemGb": 15.7,
+    "node": "v24.0.1",
+    "transformers": "4.3.1",
+    "dtype": "q8",
+    "device": "cpu"
+  },
+  "lockfile": {
+    "file": "pnpm-lock.yaml",
+    "sha256": "1492a4edda12069377a4972716d869cc51826f2fe077d5a5fb381a36bf3231e5",
+    "versions": {
+      "@huggingface/transformers": "4.3.1",
+      "onnxruntime-node": "1.30.0",
+      "sharp": "0.35.5",
+      "@huggingface/tokenizers": "0.2.0"
+    }
+  },
+  "libSha256": {
+    "lib/chrf.mjs": "dd34291ce919966fa2185524befcb009f82a2cf4277f377c999e7330383dabc4",
+    "lib/cli.mjs": "0b59ec3df543c5cd795a1708f671f4d18d0fab69554298af42ca35ef76fb24c0",
+    "lib/generate-adapter.mjs": "8949feb86b8dda5c1774c593a95247e3de699c96e832b543c62df22b2c8fc210",
+    "lib/glossary.mjs": "831f0e273b891d2bf3a5781a5b44e1d2f1a86c8882b037889318fc75a2bc321d",
+    "lib/metrics.mjs": "97672836ac8b2a9460c53d5f8ec8ecbf53faa754388ab88522fdd07d0a6848b6",
+    "lib/model.mjs": "cf552faa2e971152a6d36ce191370c472aee643b34c0724a0ec5d8a0d853dc3c",
+    "lib/pipeline.mjs": "36555bb1e906d478ac585a4d5e4a2c8cfa4ab8c54ed1476d2e01b121c541cd3a",
+    "lib/polarity.mjs": "0831f68e2c8d91e0f0502fc07a0b3076dd0a58caa968be09daaae6b4353c8c54",
+    "lib/protect.mjs": "d9342e20bbaee794d4e4bac8f49d66976066032bdc7249668e3dafcd221ea137",
+    "lib/report.mjs": "1d0eef46fa7ba4aa8058003d5a7f2ab1dc546b49d37eb91e247576093c71c5a1",
+    "lib/segmenter.mjs": "134fa1026ca6a25223f83a556a915186f6414fc281c0c1a58ffbf8321dccd59a"
+  },
+  "adapter": {
+    "transformersVersion": "4.3.1",
+    "modelId": "Xenova/opus-mt-vi-en"
+  },
+  "model": {
+    "id": "Xenova/opus-mt-vi-en",
+    "revision": "541dfd72ec07e8f1563795e0224408ad8d729e80",
+    "langTokenId": null,
+    "eosTokenId": 0,
+    "decoderStartTokenId": 53738,
+    "files": [
+      {
+        "file": "README.md",
+        "bytes": 571,
+        "sha256": "0309dbabda663d5083661a9240e74b637d7f3cd8d05326617493cf34a7ff5e62"
+      },
+      {
+        "file": "config.json",
+        "bytes": 1389,
+        "sha256": "c62a203a0183755af37b96a33cc125e7f74f97c1e90aaae1d1f404fd8a42eea8"
+      },
+      {
+        "file": "generation_config.json",
+        "bytes": 293,
+        "sha256": "44f2c9011a9087c5ec93a1671066a4a59a7a8c00c03e84a6ecac0d840926566b"
+      },
+      {
+        "file": "tokenizer.json",
+        "bytes": 5169708,
+        "sha256": "c41cc5afd26c053770b60e1031577bb7a8e2f3c2eeacde2a34f5c15abfd4eafd"
+      },
+      {
+        "file": "tokenizer_config.json",
+        "bytes": 282,
+        "sha256": "0221122d916f6f230d6b1967644457745aa01514e054897f62b8c6b419460ceb"
+      },
+      {
+        "file": "special_tokens_map.json",
+        "bytes": 74,
+        "sha256": "5e4d1f5e759d74cb1c2fe1d165cfc62b5237aa904de759380cd6f43042eec723"
+      },
+      {
+        "file": "onnx/encoder_model_quantized.onnx",
+        "bytes": 47133597,
+        "sha256": "fa7bd78e8bed6bdc03728f62f1592c4bb52d9e12795496604c1e990e102abdb2"
+      },
+      {
+        "file": "onnx/decoder_model_merged_quantized.onnx",
+        "bytes": 54401611,
+        "sha256": "540edbcc08bab0b42c03576a759fd9b4d5fc99996ac3178630733916dc2325cb"
+      }
+    ]
+  },
+  "loadMs": 2039,
+  "peakRssMb": 580,
+  "wallSec": 199.4,
+  "unstableItems": [],
+  "aggregate": {
+    "items": 54,
+    "corpusChrF": 39.74,
+    "preservedPct": 100,
+    "meaningPassPct": 64.58,
+    "fallbackSegmentPct": 30.65,
+    "silentMeaningFailures": 2,
+    "polarity": {
+      "negation": {
+        "n": 22,
+        "pass": 13,
+        "pct": 59.09,
+        "silentFailures": 1
+      },
+      "approve": {
+        "n": 11,
+        "pass": 8,
+        "pct": 72.73,
+        "silentFailures": 0
+      },
+      "reject": {
+        "n": 10,
+        "pass": 4,
+        "pct": 40,
+        "silentFailures": 1
+      },
+      "revoke": {
+        "n": 11,
+        "pass": 6,
+        "pct": 54.55,
+        "silentFailures": 1
+      }
+    },
+    "latency": {
+      "p50": 984.5,
+      "p95": 2212.1,
+      "max": 4855.4
+    },
+    "perCategory": {
+      "approve": {
+        "items": 11,
+        "corpusChrF": 47.8,
+        "preservedPct": 100,
+        "meaningPassPct": 72.73,
+        "fallbackSegmentPct": 30.77
+      },
+      "code": {
+        "items": 3,
+        "corpusChrF": 65.27,
+        "preservedPct": 100,
+        "meaningPassPct": 0,
+        "fallbackSegmentPct": 33.33
+      },
+      "collision": {
+        "items": 2,
+        "corpusChrF": 38.76,
+        "preservedPct": 100,
+        "meaningPassPct": 50,
+        "fallbackSegmentPct": 50
+      },
+      "date": {
+        "items": 6,
+        "corpusChrF": 58.14,
+        "preservedPct": 100,
+        "meaningPassPct": 80,
+        "fallbackSegmentPct": 12.5
+      },
+      "email": {
+        "items": 3,
+        "corpusChrF": 76.1,
+        "preservedPct": 100,
+        "meaningPassPct": 100,
+        "fallbackSegmentPct": 0
+      },
+      "glossary": {
+        "items": 25,
+        "corpusChrF": 33.38,
+        "preservedPct": 100,
+        "meaningPassPct": 68,
+        "fallbackSegmentPct": 32.26
+      },
+      "long": {
+        "items": 2,
+        "corpusChrF": 13.44,
+        "preservedPct": 100,
+        "meaningPassPct": 50,
+        "fallbackSegmentPct": 100
+      },
+      "mixed": {
+        "items": 2,
+        "corpusChrF": 30.48,
+        "preservedPct": null,
+        "meaningPassPct": 50,
+        "fallbackSegmentPct": 100
+      },
+      "name": {
+        "items": 8,
+        "corpusChrF": 53.65,
+        "preservedPct": 100,
+        "meaningPassPct": 50,
+        "fallbackSegmentPct": 25
+      },
+      "negation": {
+        "items": 22,
+        "corpusChrF": 36.38,
+        "preservedPct": 100,
+        "meaningPassPct": 59.09,
+        "fallbackSegmentPct": 36
+      },
+      "number": {
+        "items": 7,
+        "corpusChrF": 52.1,
+        "preservedPct": 100,
+        "meaningPassPct": 75,
+        "fallbackSegmentPct": 14.29
+      },
+      "plain": {
+        "items": 10,
+        "corpusChrF": 35.47,
+        "preservedPct": null,
+        "meaningPassPct": 70,
+        "fallbackSegmentPct": 30
+      },
+      "reject": {
+        "items": 10,
+        "corpusChrF": 38.92,
+        "preservedPct": 100,
+        "meaningPassPct": 40,
+        "fallbackSegmentPct": 41.67
+      },
+      "revoke": {
+        "items": 11,
+        "corpusChrF": 30.65,
+        "preservedPct": 100,
+        "meaningPassPct": 54.55,
+        "fallbackSegmentPct": 35.71
+      },
+      "software": {
+        "items": 19,
+        "corpusChrF": 31.72,
+        "preservedPct": 100,
+        "meaningPassPct": 70.59,
+        "fallbackSegmentPct": 32
+      },
+      "unaccented": {
+        "items": 3,
+        "corpusChrF": 27.2,
+        "preservedPct": 100,
+        "meaningPassPct": 0,
+        "fallbackSegmentPct": 100
+      }
+    }
+  },
+  "fields": {
+    "items": 54,
+    "notNeeded": 0,
+    "translated": 37,
+    "translatedPct": 68.52,
+    "fallback": {
+      "n": 17,
+      "pct": 31.48,
+      "byReason": {
+        "placeholder": 6,
+        "polarity": 10,
+        "too_long": 0,
+        "max_new_tokens": 1,
+        "other": 0
+      }
+    },
+    "chrF": {
+      "corpus": 39.74,
+      "translatedOnly": 59.59
+    },
+    "preservation": {
+      "translatedPct": 100,
+      "n": 26
+    },
+    "automaticFlags": {
+      "translatedFields": 37,
+      "meaningFlags": 2,
+      "meaningFlagPct": 6.45,
+      "preservationFlags": 0,
+      "polarity": {
+        "negation": {
+          "n": 14,
+          "flags": 1
+        },
+        "approve": {
+          "n": 7,
+          "flags": 0
+        },
+        "reject": {
+          "n": 5,
+          "flags": 1
+        },
+        "revoke": {
+          "n": 7,
+          "flags": 1
+        }
+      }
+    },
+    "latency": {
+      "field": {
+        "p50": 984.5,
+        "p95": 2212.1,
+        "max": 4855.4,
+        "n": 54
+      },
+      "segment": {
+        "p50": 929.1,
+        "p95": 2184.7,
+        "max": 4962.6,
+        "n": 180
+      }
+    }
+  },
+  "items": [
+    {"id":"h-vi-001","categories":["negation","plain"],"output":"We don't have enough budgets to buy more permits.","chrf":48.29,"hasProtected":false,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":727.8,"latencySamplesMs":[754.1,608.2,727.8],"segmentMs":[752.2,606.8,726.1]},
+    {"id":"h-vi-002","categories":["negation","plain"],"output":"Do not send the password via email.","chrf":63.12,"hasProtected":false,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":475.5,"latencySamplesMs":[451.4,475.5,812.5],"segmentMs":[450,472.5,809.3]},
+    {"id":"h-vi-003","categories":["negation","plain"],"output":"Nhân viên mới chưa được cấp quyền truy cập kho mã nguồn.","chrf":7.65,"hasProtected":false,"preserved":{"all":true,"missing":[]},"meaning":{"pass":false,"hasChecks":true,"failedContain":["not | n't | no  | never | cannot | unable | without | nobody | none | neither | nothing"],"failedNotContain":[]},"status":"NOT_TRANSLATED","reason":"QUALITY_GATE","detail":{"polarity":{"required":["negation"],"missing":["negation"]}},"counts":{"total":1,"translated":0,"fallback":1},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":1614.3,"latencySamplesMs":[2413.1,1614.3,1412.4],"segmentMs":[2397.1,1609.4,1406.7]},
+    {"id":"h-vi-004","categories":["negation","plain"],"output":"No one in the group knows who created this account.","chrf":68.82,"hasProtected":false,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":933.3,"latencySamplesMs":[974.3,699.1,933.3],"segmentMs":[967.5,697.6,930.5]},
+    {"id":"h-vi-005","categories":["negation","glossary"],"output":"The contract is not automatically renew without notice.","chrf":73.06,"hasProtected":false,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":864,"latencySamplesMs":[1060.4,737.6,864],"segmentMs":[984.4,734.3,861]},
+    {"id":"h-vi-006","categories":["negation","plain"],"output":"Do not install software from an unknown source.","chrf":56.32,"hasProtected":false,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":633.7,"latencySamplesMs":[707.6,633.7,553.5],"segmentMs":[705.3,632.2,551.8]},
+    {"id":"h-vi-007","categories":["negation","plain"],"output":"We can't pay our bills before the deadline.","chrf":37.98,"hasProtected":false,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":878.7,"latencySamplesMs":[935.2,878.7,860.6],"segmentMs":[932.5,876.2,859.5]},
+    {"id":"h-vi-008","categories":["negation","glossary"],"output":"This week's report shows no seat wasted.","chrf":68.02,"hasProtected":false,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":901.1,"latencySamplesMs":[913.7,804.6,901.1],"segmentMs":[911.1,802.7,899]},
+    {"id":"h-vi-009","categories":["negation","glossary"],"output":"This tool has never been used at department=*.","chrf":66.03,"hasProtected":false,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":977.8,"latencySamplesMs":[977.8,1135.8,893.8],"segmentMs":[974.9,1131.6,891.1]},
+    {"id":"h-vi-010","categories":["negation","plain"],"output":"The system does not allow login from two devices at once.","chrf":66.73,"hasProtected":false,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":930.2,"latencySamplesMs":[930.2,894.4,930.4],"segmentMs":[927.6,889.9,928.6]},
+    {"id":"h-vi-011","categories":["approve","name"],"output":"The finance manager approved the budget for the project Orion.","chrf":75.02,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":1024.6,"latencySamplesMs":[1024.6,1198.1,921],"segmentMs":[1021.7,1190.6,912.5]},
+    {"id":"h-vi-012","categories":["approve","software","glossary"],"output":"We agree renew to package Zoom add one year.","chrf":38.48,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":1350.6,"latencySamplesMs":[1350.6,1227,1527.1],"segmentMs":[1339.5,1219.1,1523.7]},
+    {"id":"h-vi-013","categories":["approve","software"],"output":"The offer to buy Postman was approved this morning.","chrf":80.57,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":1008.6,"latencySamplesMs":[919,1038.3,1008.6],"segmentMs":[913.3,1037.1,1005.5]},
+    {"id":"h-vi-014","categories":["approve","software","glossary"],"output":"Spending Approver Approving to move to package Microsoft Teams.","chrf":52.47,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":1358,"latencySamplesMs":[1006.5,1358,1401.5],"segmentMs":[1004.4,1356,1400.1]},
+    {"id":"h-vi-015","categories":["approve","software","number","glossary"],"output":"Upgrade request Notion is accepted under the condition of a reduction 2 seat.","chrf":57.04,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":1467.3,"latencySamplesMs":[1919.8,1148.9,1467.3],"segmentMs":[1916.6,1147,1463.7]},
+    {"id":"h-vi-016","categories":["approve","name","glossary"],"output":"Trưởng phòng ký duyệt đề xuất của Đặng Minh Khoa.","chrf":25.05,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":false,"hasChecks":true,"failedContain":["department head | head of department | head of the department","approv | endors | accept | agree | grant | signed off | sign off"],"failedNotContain":[]},"status":"NOT_TRANSLATED","reason":"QUALITY_GATE","detail":{"polarity":{"required":["approve"],"missing":["approve"]}},"counts":{"total":1,"translated":0,"fallback":1},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":965.7,"latencySamplesMs":[1590.7,965.7,806.5],"segmentMs":[1573.3,949.5,805.5]},
+    {"id":"h-vi-017","categories":["approve","software","number","glossary"],"output":"Sau khi xem xét, tôi chấp thuận cấp thêm 4 seat Jira.","chrf":13.04,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":false,"hasChecks":true,"failedContain":["approv | endors | accept | agree | grant | signed off | sign off"],"failedNotContain":[]},"status":"NOT_TRANSLATED","reason":"QUALITY_GATE","detail":{"polarity":{"required":["approve"],"missing":["approve"]}},"counts":{"total":1,"translated":0,"fallback":1},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":1525.9,"latencySamplesMs":[1364.3,2908.6,1525.9],"segmentMs":[1361.3,2893.3,1523.3]},
+    {"id":"h-vi-018","categories":["approve","software"],"output":"The administration agreed to use Slack on the project Atlas.","chrf":42.18,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":977.8,"latencySamplesMs":[977.8,1030.4,916.5],"segmentMs":[974.4,1029.1,914.5]},
+    {"id":"h-vi-019","categories":["reject","plain"],"output":"We refuse to report the supplier's prices for being too high.","chrf":27.38,"hasProtected":false,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":855.3,"latencySamplesMs":[843.9,1119.2,855.3],"segmentMs":[841.2,1117.2,853.8]},
+    {"id":"h-vi-020","categories":["reject","negation","software"],"output":"Đề xuất dùng Dropbox bị bác bỏ do chưa qua đánh giá bảo mật.","chrf":11.71,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":false,"hasChecks":true,"failedContain":["reject | declin | denied | deny | refus | turned down | not approv | not accept | not agree | disagree | cannot approve | cannot accept | unable to approve","not | n't | no  | never | cannot | unable | without | nobody | none | neither | nothing"],"failedNotContain":[]},"status":"NOT_TRANSLATED","reason":"QUALITY_GATE","detail":{"polarity":{"required":["reject","negation"],"missing":["negation"]}},"counts":{"total":1,"translated":0,"fallback":1},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":1073.7,"latencySamplesMs":[1073.7,1143,901.8],"segmentMs":[1071.8,1136.9,898.1]},
+    {"id":"h-vi-021","categories":["reject","negation","code"],"output":"Yêu cầu REQ-2026-0211 không được chấp thuận.","chrf":34.71,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":false,"hasChecks":true,"failedContain":["reject | declin | denied | deny | refus | turned down | not approv | not accept | not agree | disagree | cannot approve | cannot accept | unable to approve","not | n't | no  | never | cannot | unable | without | nobody | none | neither | nothing"],"failedNotContain":[]},"status":"NOT_TRANSLATED","reason":"QUALITY_GATE","detail":{"polarity":{"required":["reject"],"missing":["reject"]}},"counts":{"total":1,"translated":0,"fallback":1},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":613.4,"latencySamplesMs":[640.8,573.2,613.4],"segmentMs":[639.5,571.4,611.9]},
+    {"id":"h-vi-022","categories":["reject","negation","software","glossary"],"output":"Department head does not agree to add level seat Figma for the test group.","chrf":49.75,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":1284.2,"latencySamplesMs":[1128.4,1429.1,1284.2],"segmentMs":[1125.3,1425.4,1282.2]},
+    {"id":"h-vi-023","categories":["reject","number","glossary"],"output":"Spending Approver has refused payment 9.500.000 đồng for the training course.","chrf":66.2,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":864.1,"latencySamplesMs":[824.4,864.1,918.6],"segmentMs":[822.4,862.2,916.9]},
+    {"id":"h-vi-024","categories":["reject","name"],"output":"Sorry, the board application for the administrator's Lê Hoàng Nam was uncleed.","chrf":55.52,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":false,"hasChecks":true,"failedContain":["reject | declin | denied | deny | refus | turned down | not approv | not accept | not agree | disagree | cannot approve | cannot accept | unable to approve"],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":921.4,"latencySamplesMs":[1100,921.4,848.3],"segmentMs":[1098.8,919.8,846.9]},
+    {"id":"h-vi-025","categories":["reject","negation","glossary"],"output":"Khoản chi này không được duyệt vì chưa có Cost Center.","chrf":20.18,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":false,"hasChecks":true,"failedContain":["reject | declin | denied | deny | refus | turned down | not approv | not accept | not agree | disagree | cannot approve | cannot accept | unable to approve","not | n't | no  | never | cannot | unable | without | nobody | none | neither | nothing"],"failedNotContain":[]},"status":"NOT_TRANSLATED","reason":"PLACEHOLDER_GATE","detail":{"gate":{"ok":false,"missing":[0],"extra":[],"duplicated":[]}},"counts":{"total":1,"translated":0,"fallback":1},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":756.9,"latencySamplesMs":[754.3,756.9,787.6],"segmentMs":[753.2,753.9,785.9]},
+    {"id":"h-vi-026","categories":["reject","glossary"],"output":"Phòng IT khước từ yêu cầu cài phần mềm chưa được kiểm định.","chrf":4.94,"hasProtected":false,"preserved":{"all":true,"missing":[]},"meaning":{"pass":false,"hasChecks":true,"failedContain":["department","reject | declin | denied | deny | refus | turned down | not approv | not accept | not agree | disagree | cannot approve | cannot accept | unable to approve"],"failedNotContain":[]},"status":"NOT_TRANSLATED","reason":"QUALITY_GATE","detail":{"polarity":{"required":["reject","negation"],"missing":["negation"]}},"counts":{"total":1,"translated":0,"fallback":1},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":800.1,"latencySamplesMs":[826.4,800.1,784.2],"segmentMs":[824.7,797.7,782.5]},
+    {"id":"h-vi-027","categories":["revoke","name"],"output":"The administrator withdrew the access permissions of Phạm Quỳnh Anh after she moved in.","chrf":64.93,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":921.2,"latencySamplesMs":[779.8,970.7,921.2],"segmentMs":[778.1,966.9,917]},
+    {"id":"h-vi-028","categories":["revoke","software","negation","glossary"],"output":"Need to revoke license MATLAB from machine no longer using.","chrf":49.88,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":844,"latencySamplesMs":[1096.6,844,759.9],"segmentMs":[1095,841,758.2]},
+    {"id":"h-vi-029","categories":["revoke","plain"],"output":"Quyền quản trị của tài khoản dùng chung sẽ bị hủy quyền vào cuối tháng.","chrf":8.54,"hasProtected":false,"preserved":{"all":true,"missing":[]},"meaning":{"pass":false,"hasChecks":true,"failedContain":["revok | withdr | remov | rescind"],"failedNotContain":[]},"status":"NOT_TRANSLATED","reason":"QUALITY_GATE","detail":{"polarity":{"required":["revoke"],"missing":["revoke"]}},"counts":{"total":1,"translated":0,"fallback":1},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":877.8,"latencySamplesMs":[931.1,877.8,761.7],"segmentMs":[929.6,876.2,760.3]},
+    {"id":"h-vi-030","categories":["revoke","software","number","glossary"],"output":"We've already been revoked 12 seat Tableau not activated.","chrf":56.19,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":1159.9,"latencySamplesMs":[1089.4,1159.9,1817.5],"segmentMs":[1087.8,1066.1,1773.3]},
+    {"id":"h-vi-031","categories":["revoke","name","glossary"],"output":"After handover, the old account of Hoàng Ngọc Lan is revoked right away.","chrf":57.89,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":1391.8,"latencySamplesMs":[1839.6,1243.6,1391.8],"segmentMs":[1837.4,1242.1,1390.5]},
+    {"id":"h-vi-032","categories":["revoke","plain"],"output":"Yêu cầu tước quyền truy cập của nhà thầu đã hết hạn hợp đồng.","chrf":7.26,"hasProtected":false,"preserved":{"all":true,"missing":[]},"meaning":{"pass":false,"hasChecks":true,"failedContain":["revok | withdr | remov | rescind"],"failedNotContain":[]},"status":"NOT_TRANSLATED","reason":"QUALITY_GATE","detail":{"polarity":{"required":["revoke"],"missing":["revoke"]}},"counts":{"total":1,"translated":0,"fallback":1},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":765.4,"latencySamplesMs":[854.3,698.8,765.4],"segmentMs":[852.5,697.2,762.2]},
+    {"id":"h-vi-033","categories":["revoke","negation","glossary"],"output":"No revocation seat of the staff who are on maternity leave.","chrf":50.4,"hasProtected":false,"preserved":{"all":true,"missing":[]},"meaning":{"pass":false,"hasChecks":true,"failedContain":["revok | withdr | remov | rescind"],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":1008.6,"latencySamplesMs":[1012.4,942.4,1008.6],"segmentMs":[1011,940.6,1005.7]},
+    {"id":"h-vi-034","categories":["revoke","date","glossary"],"output":"Limited hand over device and revoke account is 30/12/2026.","chrf":49.08,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":1010.5,"latencySamplesMs":[1017.1,915.3,1010.5],"segmentMs":[1015.7,914.1,1007.9]},
+    {"id":"h-vi-035","categories":["name","number","software"],"output":"Công ty Sao Mai Demo Pays 18.750.000 đồng for packages Atlassian.","chrf":74.46,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":false,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":859.7,"latencySamplesMs":[845.3,859.7,1204.8],"segmentMs":[831.6,858.6,1203.3]},
+    {"id":"h-vi-036","categories":["code","email","date"],"output":"The bill INV-2026-0881 will send to ke.toan@sao-mai-demo.example before ngày 5 tháng 12 năm 2026.","chrf":83.54,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":false,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":934.1,"latencySamplesMs":[1086.4,911.3,934.1],"segmentMs":[1085.1,906.1,932.8]},
+    {"id":"h-vi-037","categories":["date","glossary"],"output":"The license sweep meeting takes place 14/01/2027 at the conference room 2.","chrf":50.03,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":991.1,"latencySamplesMs":[991.1,945.4,1079.3],"segmentMs":[895.9,869.8,1075.7]},
+    {"id":"h-vi-038","categories":["name","software"],"output":"Phan Văn Tài Offer installation GitLab and SonarQube for test group.","chrf":60.88,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":false,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":1159,"latencySamplesMs":[1409.6,1159,1095.1],"segmentMs":[1407.4,1157.6,1092.2]},
+    {"id":"h-vi-039","categories":["code","number"],"output":"The contract HD-2027-03 is valuable 24.000 USD and timeout 24 month.","chrf":55.05,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":false,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":1120.1,"latencySamplesMs":[1120.1,1191.2,1022.9],"segmentMs":[1118.8,1189.9,1021.2]},
+    {"id":"h-vi-040","categories":["email"],"output":"Access information sent to tai.pham@sao-mai-demo.example.","chrf":69.12,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":false,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":714.7,"latencySamplesMs":[714.7,718.3,476.1],"segmentMs":[608.8,661.9,475]},
+    {"id":"h-vi-041","categories":["glossary","date","software"],"output":"The contract Cancellation deadline is Dropbox is 31/12/2026, then the mark will automatically renew.","chrf":65.73,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":1325.3,"latencySamplesMs":[1325.3,1260.5,1367.1],"segmentMs":[1321.2,1137.4,1316.3]},
+    {"id":"h-vi-042","categories":["number"],"output":"The price of the price 3,2 triệu đồng every year, goes down 12% for three years.","chrf":35.74,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":false,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":1049.4,"latencySamplesMs":[1049.4,1046.2,1141],"segmentMs":[1048,1044.8,1139.6]},
+    {"id":"h-vi-043","categories":["unaccented","approve","software"],"output":"Yeu cau cai dat Visual Studio Code da duoc phe duyet.","chrf":34.44,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":false,"hasChecks":true,"failedContain":["approv | endors | accept | agree | grant | signed off | sign off"],"failedNotContain":[]},"status":"NOT_TRANSLATED","reason":"QUALITY_GATE","detail":{"polarity":{"required":["approve"],"missing":["approve"]}},"counts":{"total":1,"translated":0,"fallback":1},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":1000.2,"latencySamplesMs":[1000.2,1142.7,995.8],"segmentMs":[948.6,1141.3,941.1]},
+    {"id":"h-vi-044","categories":["unaccented","negation","revoke","date"],"output":"Chung toi khong the thu hoi tai khoan truoc ngay 20/12/2026.","chrf":31.57,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":false,"hasChecks":true,"failedContain":["not | n't | no  | never | cannot | unable | without | nobody | none | neither | nothing","revok | withdr | remov | rescind"],"failedNotContain":[]},"status":"NOT_TRANSLATED","reason":"PLACEHOLDER_GATE","detail":{"gate":{"ok":false,"missing":[1],"extra":[],"duplicated":[]}},"counts":{"total":1,"translated":0,"fallback":1},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":719.9,"latencySamplesMs":[745,719.9,589.6],"segmentMs":[714.4,719,588.6]},
+    {"id":"h-vi-045","categories":["unaccented","reject","software","glossary"],"output":"Truong phong tu choi de xuat mua them seat Slack.","chrf":16.95,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":false,"hasChecks":true,"failedContain":["department head | head of department | head of the department","reject | declin | denied | deny | refus | turned down | not approv | not accept | not agree | disagree | cannot approve | cannot accept | unable to approve"],"failedNotContain":[]},"status":"NOT_TRANSLATED","reason":"QUALITY_GATE","detail":{"polarity":{"required":["reject"],"missing":["reject"]}},"counts":{"total":1,"translated":0,"fallback":1},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":971.9,"latencySamplesMs":[961.5,971.9,1079.1],"segmentMs":[958.2,970.2,1077.4]},
+    {"id":"h-vi-046","categories":["mixed","approve"],"output":"Anh ơi, please approve giúp em request này trước thứ Sáu nhé.","chrf":39.44,"hasProtected":false,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"NOT_TRANSLATED","reason":"MAX_NEW_TOKENS","detail":{"finishReason":"max_new_tokens"},"counts":{"total":1,"translated":0,"fallback":1},"modelCalls":1,"finishReasons":{"max_new_tokens":1},"latencyMs":2253.3,"latencySamplesMs":[2253.3,2024.1,2446.5],"segmentMs":[2179.7,2023,2280]},
+    {"id":"h-vi-047","categories":["mixed","negation","glossary"],"output":"Team em không cần license mới, chỉ cần renew seat cũ thôi.","chrf":22.44,"hasProtected":false,"preserved":{"all":true,"missing":[]},"meaning":{"pass":false,"hasChecks":true,"failedContain":["not | n't | no  | never | cannot | unable | without | nobody | none | neither | nothing"],"failedNotContain":[]},"status":"NOT_TRANSLATED","reason":"PLACEHOLDER_GATE","detail":{"gate":{"ok":false,"missing":[0],"extra":[],"duplicated":[]}},"counts":{"total":1,"translated":0,"fallback":1},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":1071.4,"latencySamplesMs":[1384.7,1071.4,1059.6],"segmentMs":[1327.4,1069.1,1058.6]},
+    {"id":"h-vi-048","categories":["collision","negation"],"output":"The field <x0> in the print template is not the actual required code.","chrf":64.36,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":1107,"latencySamplesMs":[1107.8,1088.7,1107],"segmentMs":[1104.4,1086.2,1105.3]},
+    {"id":"h-vi-049","categories":["collision","negation","name"],"output":"Mẫu thư dùng <x2> thay cho tên Phan Văn Tài, không được xóa.","chrf":18.5,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":false,"hasChecks":true,"failedContain":["not | n't | no  | never | cannot | unable | without | nobody | none | neither | nothing"],"failedNotContain":[]},"status":"NOT_TRANSLATED","reason":"PLACEHOLDER_GATE","detail":{"gate":{"ok":false,"missing":[0,1],"extra":[],"duplicated":[]}},"counts":{"total":1,"translated":0,"fallback":1},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":619.7,"latencySamplesMs":[696.9,619.7,617.3],"segmentMs":[694.3,618.7,616.2]},
+    {"id":"h-vi-050","categories":["approve","software","date","glossary"],"output":"Project Orion needs more test tools. Requesting a level 6 seat JMeter Cloud reached out 30/06/2027. The budget is approved.","chrf":53.25,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":3,"translated":3,"fallback":0},"modelCalls":3,"finishReasons":{"eos":3},"latencyMs":2147.8,"latencySamplesMs":[2147.8,2233.9,2116.6],"segmentMs":[611,1157.3,374.9,588.8,1119.6,355.6,557.7,1254.3,301.3]},
+    {"id":"h-vi-051","categories":["reject","revoke","software","glossary"],"output":"We're refusing renew Dropbox. The team will transfer the data to the internal archive. The old account will get revoked after 30 day.","chrf":64.9,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":3,"translated":3,"fallback":0},"modelCalls":3,"finishReasons":{"eos":3},"latencyMs":2189.9,"latencySamplesMs":[1918.9,2189.9,2249.4],"segmentMs":[579,548.5,786.2,673.4,604.8,908.8,737.6,665.4,840.4]},
+    {"id":"h-vi-052","categories":["negation","email"],"output":"Do not disable two layers of authentication. Security policy doesn't allow exceptions. Contact it-helpdesk@sao-mai-demo.example if you need backup.","chrf":74.19,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":3,"translated":3,"fallback":0},"modelCalls":3,"finishReasons":{"eos":3},"latencyMs":1617.7,"latencySamplesMs":[1650,1517.1,1617.7],"segmentMs":[474.1,504.9,495.4,489.2,459,565.7,592.8,472.5,549.5]},
+    {"id":"h-vi-L1","categories":["long","software","glossary"],"output":"Chúng tôi viết đề nghị này để trình bày kế hoạch dùng chung công cụ đo kiểm hiệu năng cho ba nhóm sản phẩm, trong đó nhóm thanh toán cần mười seat Datadog để theo dõi độ trễ của giao dịch, nhóm tìm kiếm cần năm seat để so sánh số liệu trước và sau mỗi lần cập nhật hệ thống, và nhóm di động cần thêm bốn seat vì số sự cố trong quý này tăng gần gấp đôi, nhưng ngân sách hiện tại chỉ đủ cho tám seat, nên chúng tôi đề nghị phòng Tài chính xem xét tạm ứng khoản chi cho phần còn thiếu, để cả ba nhóm có thể bắt đầu từ đầu quý sau.","chrf":12.9,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"NOT_TRANSLATED","reason":"PLACEHOLDER_GATE","detail":{"gate":{"ok":false,"missing":[3,4],"extra":[],"duplicated":[]}},"counts":{"total":2,"translated":0,"fallback":2},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":4490,"latencySamplesMs":[4850,4490,4433.4],"segmentMs":[4816.6,4351.4,4290.3]},
+    {"id":"h-vi-L2","categories":["long","negation","revoke","software","glossary"],"output":"Báo cáo kiểm kê giấy phép cuối năm cho thấy phòng Vận hành còn mười hai seat Confluence chưa dùng, phòng Kỹ thuật đang chia sẻ một tài khoản GitHub giữa ba người dù chính sách không cho phép, nhóm thiết kế đã mua trùng hai gói Figma do hai trưởng nhóm cùng gửi yêu cầu, trong khi nhóm kiểm thử vẫn chưa có công cụ quản lý ca kiểm thử nào ngoài bảng tính, vì vậy chúng tôi đề xuất thu hồi các seat chưa dùng, hợp nhất gói Figma, cấp riêng tài khoản cho từng người và mua một công cụ quản lý ca kiểm thử trong quý sau, miễn là tổng chi phí không vượt hạn mức đã được duyệt cho năm 2027.","chrf":13.94,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":false,"hasChecks":true,"failedContain":["department","not | n't | no  | never | cannot | unable | without | nobody | none | neither | nothing","revok | withdr | remov | rescind"],"failedNotContain":[]},"status":"NOT_TRANSLATED","reason":"PLACEHOLDER_GATE","detail":{"gate":{"ok":false,"missing":[7,8],"extra":[],"duplicated":[]}},"counts":{"total":2,"translated":0,"fallback":2},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":4855.4,"latencySamplesMs":[5084.4,4855.4,4707.7],"segmentMs":[4962.6,4686.3,4563.2]}
+  ]
+}

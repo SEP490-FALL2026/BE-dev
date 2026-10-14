@@ -1,5 +1,5 @@
-import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { join, relative, sep } from 'node:path';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { dirname, join, relative, resolve, sep } from 'node:path';
 
 function listTypeScriptFiles(directory: string): string[] {
   return readdirSync(directory).flatMap((entry) => {
@@ -180,6 +180,80 @@ describe('architecture boundaries', () => {
         const location = { file: relative(sourceRoot, file), table };
         expect({ ...location, owner: owningModule }).toEqual({ ...location, owner });
       }
+    }
+  });
+});
+
+/** Follows relative `import ... from`, `export ... from` and `import('...')` specifiers from an entry file. */
+function listReachableSourceFiles(entry: string): Map<string, string> {
+  const reachable = new Map<string, string>();
+  const pending = [entry];
+
+  while (pending.length > 0) {
+    const file = pending.pop() as string;
+    if (reachable.has(file)) continue;
+
+    const source = readFileSync(file, 'utf8');
+    reachable.set(file, source);
+    // Generated code has its own import style and no Nest wiring; it is a leaf here.
+    if (file.includes(`${sep}generated${sep}`)) continue;
+
+    const specifiers = [
+      ...source.matchAll(/\b(?:import|export)\b[^;'"]*?\bfrom\s*['"]([^'"]+)['"]/g),
+      ...source.matchAll(/\bimport\s*['"]([^'"]+)['"]/g),
+      ...source.matchAll(/\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/g),
+    ].map((match) => match[1]);
+
+    for (const specifier of specifiers) {
+      if (!specifier.startsWith('.')) continue;
+      const base = resolve(dirname(file), specifier);
+      const target = [`${base}.ts`, join(base, 'index.ts')].find((candidate) => existsSync(candidate));
+      if (target === undefined) {
+        throw new Error(`${relative(process.cwd(), file)} imports ${specifier}, which does not resolve to a .ts file`);
+      }
+      pending.push(target);
+    }
+  }
+
+  return reachable;
+}
+
+describe('installation command dependency boundary (R-13)', () => {
+  const sourceRoot = join(process.cwd(), 'src');
+  const toRelative = (files: Iterable<string>) =>
+    [...files].map((file) => relative(sourceRoot, file).split(sep).join('/'));
+
+  it('does not reach the API/worker configuration, the identity-access module, notifications or the JWT library', () => {
+    // installation.module is loaded by a dynamic import in the command, after --help and argument parsing.
+    const reachable = listReachableSourceFiles(join(sourceRoot, 'installation-cli.ts'));
+    const files = toRelative(reachable.keys());
+
+    expect(files).toContain('modules/installation/installation.module.ts');
+    expect(files).toContain('infrastructure/config/installation-configuration.module.ts');
+    expect(files).toContain('modules/identity-access/identity-access-facade.module.ts');
+    expect(files).not.toContain('infrastructure/config/configuration.module.ts');
+    expect(files).not.toContain('modules/identity-access/identity-access.module.ts');
+    expect(files.filter((file) => file.startsWith('modules/notifications/'))).toEqual([]);
+    expect(files.filter((file) => /@nestjs\/jwt/.test(reachable.get(join(sourceRoot, file)) ?? ''))).toEqual([]);
+  });
+
+  it('keeps the full environment validation on the API and the worker', () => {
+    for (const entry of ['app.module.ts', 'worker.module.ts']) {
+      const source = readFileSync(join(sourceRoot, entry), 'utf8');
+
+      expect({
+        entry,
+        importsConfigurationModule: /\bConfigurationModule\b/.test(
+          source.replace(/InstallationConfigurationModule/g, ''),
+        ),
+      }).toEqual({
+        entry,
+        importsConfigurationModule: true,
+      });
+      expect({ entry, importsInstallationConfiguration: source.includes('InstallationConfigurationModule') }).toEqual({
+        entry,
+        importsInstallationConfiguration: false,
+      });
     }
   });
 });

@@ -1,0 +1,311 @@
+{
+  "date": "2026-10-14",
+  "direction": "vi-en",
+  "mode": "raw",
+  "options": {
+    "warmup": 2,
+    "repetitions": 3,
+    "maxTokens": 512,
+    "batchSize": 1,
+    "limit": null
+  },
+  "environment": {
+    "os": "Windows_NT 10.0.26200 (win32 x64)",
+    "cpuModel": "11th Gen Intel(R) Core(TM) i7-11800H @ 2.30GHz",
+    "cpuCount": 16,
+    "totalMemGb": 15.7,
+    "node": "v24.0.1",
+    "transformers": "3.8.1",
+    "dtype": "q8",
+    "device": "cpu"
+  },
+  "model": {
+    "id": "Xenova/opus-mt-vi-en",
+    "revision": "541dfd72ec07e8f1563795e0224408ad8d729e80",
+    "files": [
+      {
+        "file": "README.md",
+        "bytes": 571,
+        "sha256": "0309dbabda663d5083661a9240e74b637d7f3cd8d05326617493cf34a7ff5e62"
+      },
+      {
+        "file": "config.json",
+        "bytes": 1389,
+        "sha256": "c62a203a0183755af37b96a33cc125e7f74f97c1e90aaae1d1f404fd8a42eea8"
+      },
+      {
+        "file": "generation_config.json",
+        "bytes": 293,
+        "sha256": "44f2c9011a9087c5ec93a1671066a4a59a7a8c00c03e84a6ecac0d840926566b"
+      },
+      {
+        "file": "tokenizer.json",
+        "bytes": 5169708,
+        "sha256": "c41cc5afd26c053770b60e1031577bb7a8e2f3c2eeacde2a34f5c15abfd4eafd"
+      },
+      {
+        "file": "tokenizer_config.json",
+        "bytes": 282,
+        "sha256": "0221122d916f6f230d6b1967644457745aa01514e054897f62b8c6b419460ceb"
+      },
+      {
+        "file": "special_tokens_map.json",
+        "bytes": 74,
+        "sha256": "5e4d1f5e759d74cb1c2fe1d165cfc62b5237aa904de759380cd6f43042eec723"
+      },
+      {
+        "file": "onnx/encoder_model_quantized.onnx",
+        "bytes": 47133597,
+        "sha256": "fa7bd78e8bed6bdc03728f62f1592c4bb52d9e12795496604c1e990e102abdb2"
+      },
+      {
+        "file": "onnx/decoder_model_merged_quantized.onnx",
+        "bytes": 54401611,
+        "sha256": "540edbcc08bab0b42c03576a759fd9b4d5fc99996ac3178630733916dc2325cb"
+      }
+    ]
+  },
+  "loadMs": 3638,
+  "peakRssMb": 658,
+  "wallSec": 441.3,
+  "unstableItems": [],
+  "aggregate": {
+    "items": 84,
+    "corpusChrF": 35.84,
+    "preservedPct": 34.29,
+    "meaningPassPct": 43.55,
+    "fallbackSegmentPct": 0,
+    "silentMeaningFailures": 35,
+    "polarity": {
+      "negation": {
+        "n": 19,
+        "pass": 9,
+        "pct": 47.37,
+        "silentFailures": 10
+      },
+      "approve": {
+        "n": 9,
+        "pass": 2,
+        "pct": 22.22,
+        "silentFailures": 7
+      },
+      "reject": {
+        "n": 10,
+        "pass": 6,
+        "pct": 60,
+        "silentFailures": 4
+      },
+      "revoke": {
+        "n": 10,
+        "pass": 2,
+        "pct": 20,
+        "silentFailures": 8
+      }
+    },
+    "latency": {
+      "p50": 703.7,
+      "p95": 2746.4,
+      "max": 26636.2
+    },
+    "perCategory": {
+      "approve": {
+        "items": 9,
+        "corpusChrF": 49.33,
+        "preservedPct": 25,
+        "meaningPassPct": 22.22,
+        "fallbackSegmentPct": 0
+      },
+      "code": {
+        "items": 8,
+        "corpusChrF": 49.55,
+        "preservedPct": 50,
+        "meaningPassPct": 20,
+        "fallbackSegmentPct": 0
+      },
+      "collision": {
+        "items": 3,
+        "corpusChrF": 63.66,
+        "preservedPct": 66.67,
+        "meaningPassPct": 100,
+        "fallbackSegmentPct": 0
+      },
+      "date": {
+        "items": 14,
+        "corpusChrF": 44.69,
+        "preservedPct": 7.69,
+        "meaningPassPct": 40,
+        "fallbackSegmentPct": 0
+      },
+      "email": {
+        "items": 3,
+        "corpusChrF": 43.68,
+        "preservedPct": 0,
+        "meaningPassPct": 50,
+        "fallbackSegmentPct": 0
+      },
+      "glossary": {
+        "items": 42,
+        "corpusChrF": 43.97,
+        "preservedPct": 28.57,
+        "meaningPassPct": 28.57,
+        "fallbackSegmentPct": 0
+      },
+      "long": {
+        "items": 4,
+        "corpusChrF": 28.48,
+        "preservedPct": 0,
+        "meaningPassPct": null,
+        "fallbackSegmentPct": 0
+      },
+      "mixed": {
+        "items": 3,
+        "corpusChrF": 43.48,
+        "preservedPct": 50,
+        "meaningPassPct": 33.33,
+        "fallbackSegmentPct": 0
+      },
+      "name": {
+        "items": 17,
+        "corpusChrF": 43.43,
+        "preservedPct": 0,
+        "meaningPassPct": 50,
+        "fallbackSegmentPct": 0
+      },
+      "negation": {
+        "items": 19,
+        "corpusChrF": 49.45,
+        "preservedPct": 54.55,
+        "meaningPassPct": 47.37,
+        "fallbackSegmentPct": 0
+      },
+      "number": {
+        "items": 12,
+        "corpusChrF": 39.9,
+        "preservedPct": 20,
+        "meaningPassPct": 36.36,
+        "fallbackSegmentPct": 0
+      },
+      "plain": {
+        "items": 7,
+        "corpusChrF": 57.17,
+        "preservedPct": 0,
+        "meaningPassPct": 83.33,
+        "fallbackSegmentPct": 0
+      },
+      "reject": {
+        "items": 10,
+        "corpusChrF": 46.5,
+        "preservedPct": 66.67,
+        "meaningPassPct": 60,
+        "fallbackSegmentPct": 0
+      },
+      "revoke": {
+        "items": 10,
+        "corpusChrF": 42.43,
+        "preservedPct": 0,
+        "meaningPassPct": 20,
+        "fallbackSegmentPct": 0
+      },
+      "software": {
+        "items": 34,
+        "corpusChrF": 48.82,
+        "preservedPct": 50,
+        "meaningPassPct": 53.57,
+        "fallbackSegmentPct": 0
+      },
+      "unaccented": {
+        "items": 4,
+        "corpusChrF": 16.13,
+        "preservedPct": 33.33,
+        "meaningPassPct": 0,
+        "fallbackSegmentPct": 0
+      }
+    }
+  },
+  "items": [
+    {"id":"vi-001","categories":["negation","plain"],"output":"I don't need to install any more software for this project.","chrf":59.53,"hasProtected":false,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":705.5,"latencySamplesMs":[785.8,705.5,623.7]},
+    {"id":"vi-002","categories":["negation","name"],"output":"The request for the Ark was not granted for a lack of detailed reason.","chrf":27.71,"hasProtected":true,"preserved":{"all":false,"missing":["Nguyễn Văn An"]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":818.8,"latencySamplesMs":[861.7,714.2,818.8]},
+    {"id":"vi-003","categories":["negation","plain"],"output":"This tool is not on the standard company list.","chrf":57.71,"hasProtected":false,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":647.4,"latencySamplesMs":[598.4,673.6,647.4]},
+    {"id":"vi-004","categories":["negation","revoke","name","glossary"],"output":"I don't agree with the seat recovery proposal of Chen Shik.","chrf":44,"hasProtected":true,"preserved":{"all":false,"missing":["Trần Thị Bích"]},"meaning":{"pass":false,"hasChecks":true,"failedContain":["revok | revocation"],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":773.3,"latencySamplesMs":[773.3,684.6,805.7]},
+    {"id":"vi-005","categories":["negation","software"],"output":"The Figma account must not be shared among its members.","chrf":42.15,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":633.8,"latencySamplesMs":[735.9,575.4,633.8]},
+    {"id":"vi-006","categories":["negation","date","glossary"],"output":"The team couldn't complete the delivery desk before November 30, 2026.","chrf":47.62,"hasProtected":true,"preserved":{"all":false,"missing":["30/11/2026"]},"meaning":{"pass":false,"hasChecks":true,"failedContain":["hand over | handed over | handover | hands over | handing over | hand-over"],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":723.2,"latencySamplesMs":[750.7,723.2,713.1]},
+    {"id":"vi-007","categories":["negation","software","glossary"],"output":"We haven't extended Jira's license because the budget's not approved yet.","chrf":57.01,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":false,"hasChecks":true,"failedContain":["renew"],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":701.9,"latencySamplesMs":[733.2,629,701.9]},
+    {"id":"vi-008","categories":["negation","glossary"],"output":"This staff no longer works in Engineering.","chrf":49.66,"hasProtected":false,"preserved":{"all":true,"missing":[]},"meaning":{"pass":false,"hasChecks":true,"failedContain":["department"],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":360,"latencySamplesMs":[405.1,333.4,360]},
+    {"id":"vi-009","categories":["negation","software","glossary"],"output":"There is no seat left in the current Slack package.","chrf":53.65,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":595.6,"latencySamplesMs":[542.1,627.5,595.6]},
+    {"id":"vi-010","categories":["negation","glossary"],"output":"This request was not automatically approved; the manager had to confirm it first.","chrf":55.4,"hasProtected":false,"preserved":{"all":true,"missing":[]},"meaning":{"pass":false,"hasChecks":true,"failedContain":["department head | head of department | head of the department"],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":769.5,"latencySamplesMs":[769.5,633.8,841.6]},
+    {"id":"vi-011","categories":["negation","revoke","name","glossary"],"output":"Don't collect the accounts from the Prince of Nam before we deliver the data.","chrf":37.8,"hasProtected":true,"preserved":{"all":false,"missing":["Lê Hoàng Nam"]},"meaning":{"pass":false,"hasChecks":true,"failedContain":["revok | revocation","hand over | handed over | handover | hands over | handing over | hand-over"],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":719.8,"latencySamplesMs":[876.8,662.5,719.8]},
+    {"id":"vi-012","categories":["negation","plain"],"output":"This report does not contain client's personal data.","chrf":67.12,"hasProtected":false,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":473.8,"latencySamplesMs":[473.8,391.2,506.8]},
+    {"id":"vi-013","categories":["approve","software"],"output":"I've approved the request for the Trio Studio Code for the whole group.","chrf":61.51,"hasProtected":true,"preserved":{"all":false,"missing":["Visual Studio Code"]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":745.5,"latencySamplesMs":[745.5,673.6,753.1]},
+    {"id":"vi-014","categories":["approve","code"],"output":"Requesting 7Q-2026-042 approved.","chrf":60.74,"hasProtected":true,"preserved":{"all":false,"missing":["REQ-2026-0042"]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":578.3,"latencySamplesMs":[656.7,578.3,486.5]},
+    {"id":"vi-015","categories":["approve","software","glossary"],"output":"The warden approved the exception for the Notion tool because the marketing team needed to cooperate in real time.","chrf":62.45,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":false,"hasChecks":true,"failedContain":["department head | head of department | head of the department"],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":845.5,"latencySamplesMs":[954.3,841.3,845.5]},
+    {"id":"vi-016","categories":["approve","number","software","glossary"],"output":"The checker approved the cost of $2,400,000 for Postman's license.","chrf":38.47,"hasProtected":true,"preserved":{"all":false,"missing":["2.400.000 đồng"]},"meaning":{"pass":false,"hasChecks":true,"failedContain":["spending approver"],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":851.4,"latencySamplesMs":[851.4,807.9,974.6]},
+    {"id":"vi-017","categories":["approve","software","glossary"],"output":"Browseed: Slack extension for 12 months.","chrf":38.61,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":false,"hasChecks":true,"failedContain":["approv","renew"],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":428.7,"latencySamplesMs":[397.5,428.7,433.3]},
+    {"id":"vi-018","categories":["approve","name","software"],"output":"We're accepting the British proposal to use Figma instead of Adobe XD.","chrf":62.04,"hasProtected":true,"preserved":{"all":false,"missing":["Phạm Quỳnh Anh"]},"meaning":{"pass":false,"hasChecks":true,"failedContain":["approv"],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":834.6,"latencySamplesMs":[834.6,820.1,869.6]},
+    {"id":"vi-019","categories":["approve","plain"],"output":"The request was valid, so I immediately did the review.","chrf":60.99,"hasProtected":false,"preserved":{"all":true,"missing":[]},"meaning":{"pass":false,"hasChecks":true,"failedContain":["approv"],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":579.6,"latencySamplesMs":[567.7,579.6,839.4]},
+    {"id":"vi-020","categories":["approve","number","date","glossary"],"output":"Qualifications: only 3 seat levels for design crews reached the end of December 31, 2026.","chrf":31.12,"hasProtected":true,"preserved":{"all":false,"missing":["31/12/2026"]},"meaning":{"pass":false,"hasChecks":true,"failedContain":["approv"],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":1027.5,"latencySamplesMs":[908.4,1125.7,1027.5]},
+    {"id":"vi-021","categories":["reject","software"],"output":"The request was rejected because the tool matches the current Microsoft Teams.","chrf":57.94,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":677.6,"latencySamplesMs":[670.5,758.4,677.6]},
+    {"id":"vi-022","categories":["reject","negation","software","glossary"],"output":"Rejected: Jira was given to the Engineering Department without further purchases.","chrf":45.82,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":599.2,"latencySamplesMs":[609,541.9,599.2]},
+    {"id":"vi-023","categories":["reject","software"],"output":"I refuse to offer the Tableau because this quarterly budget is over.","chrf":48.81,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":468.3,"latencySamplesMs":[478.5,447.7,468.3]},
+    {"id":"vi-024","categories":["reject","code","glossary"],"output":"The chief of defense refuses to request REQ-2026-0107, which is why there is no Cost Center.","chrf":49.09,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":false,"hasChecks":true,"failedContain":["department head | head of department | head of the department"],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":862.9,"latencySamplesMs":[690.7,960.8,862.9]},
+    {"id":"vi-025","categories":["reject","number","glossary"],"output":"The browser turned down about 18,000,000 dollars because of his limitations.","chrf":20.55,"hasProtected":true,"preserved":{"all":false,"missing":["18.000.000 đồng"]},"meaning":{"pass":false,"hasChecks":true,"failedContain":["spending approver"],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":532.6,"latencySamplesMs":[532.6,467,584.8]},
+    {"id":"vi-026","categories":["reject","negation","name"],"output":"The request was not accepted because of the absence of the signature of De Ming Yi.","chrf":48.97,"hasProtected":true,"preserved":{"all":false,"missing":["Đặng Minh Khoa"]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":565.1,"latencySamplesMs":[538.8,565.1,572.4]},
+    {"id":"vi-027","categories":["reject","plain"],"output":"The proposal was rejected for the security risks of this software.","chrf":71.37,"hasProtected":false,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":455.7,"latencySamplesMs":[537.5,447.8,455.7]},
+    {"id":"vi-028","categories":["reject","negation","software"],"output":"Sorry, we can't approve the Docker Desktop request on a personal computer.","chrf":57.34,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":false,"hasChecks":true,"failedContain":["reject | declin | denied | deny | refus | turned down | not approv | disapprov | not accept | dismiss | cannot approve | unable to approve | not be approved | unable to accept"],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":665.5,"latencySamplesMs":[743.7,591.8,665.5]},
+    {"id":"vi-029","categories":["revoke","name","software","glossary"],"output":"Returned to seat Ghehub of Wu Qingxia for quitting.","chrf":14.66,"hasProtected":true,"preserved":{"all":false,"missing":["Võ Thanh Hà","GitHub"]},"meaning":{"pass":false,"hasChecks":true,"failedContain":["revok | revocation"],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":488.5,"latencySamplesMs":[469.5,488.5,530.6]},
+    {"id":"vi-030","categories":["revoke","name","software","date"],"output":"The access of the Confluence of the CPD will be revoked on November 15, 2026.","chrf":51.67,"hasProtected":true,"preserved":{"all":false,"missing":["Bùi Gia Huy","15/11/2026"]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":784.2,"latencySamplesMs":[787,682.3,784.2]},
+    {"id":"vi-031","categories":["revoke","software","glossary"],"output":"Got my Adobe-Monch revoked and handed it over to IT.","chrf":35.8,"hasProtected":true,"preserved":{"all":false,"missing":["Adobe Photoshop"]},"meaning":{"pass":false,"hasChecks":true,"failedContain":["hand over | handed over | handover | hands over | handing over | hand-over","department"],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":646.8,"latencySamplesMs":[646.8,732.8,633.8]},
+    {"id":"vi-032","categories":["revoke","name","software","glossary"],"output":"The Jade Emperor moved to the business room, so he needed to revoke the old seat Slack and the new seat level.","chrf":36.4,"hasProtected":true,"preserved":{"all":false,"missing":["Hoàng Ngọc Lan"]},"meaning":{"pass":false,"hasChecks":true,"failedContain":["department"],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":875.9,"latencySamplesMs":[863.5,945.3,875.9]},
+    {"id":"vi-033","categories":["revoke","negation","glossary"],"output":"Do not revoke your account before the handout is completed.","chrf":74.59,"hasProtected":false,"preserved":{"all":true,"missing":[]},"meaning":{"pass":false,"hasChecks":true,"failedContain":["hand over | handed over | handover | hands over | handing over | hand-over"],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":494.5,"latencySamplesMs":[494.5,421.9,541.1]},
+    {"id":"vi-034","categories":["revoke","number","glossary"],"output":"The entire seat's claim is not in 90 days.","chrf":23.15,"hasProtected":false,"preserved":{"all":true,"missing":[]},"meaning":{"pass":false,"hasChecks":true,"failedContain":["revok | revocation"],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":593,"latencySamplesMs":[581.8,593,638.7]},
+    {"id":"vi-035","categories":["revoke","name","software","glossary"],"output":"The repossession of seat Figma by the Daji festival has been confirmed by the chief of staff.","chrf":44.75,"hasProtected":true,"preserved":{"all":false,"missing":["Đỗ Thế Vinh"]},"meaning":{"pass":false,"hasChecks":true,"failedContain":["revok | revocation","department head | head of department | head of the department"],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":1324.7,"latencySamplesMs":[1324.7,1337.3,913.3]},
+    {"id":"vi-036","categories":["name","software","date","glossary"],"output":"The British mission handed over all Jira's accounts to Wu Fangspi before November 20, 2026.","chrf":38.95,"hasProtected":true,"preserved":{"all":false,"missing":["Phạm Quỳnh Anh","Ngô Phương Thảo","20/11/2026"]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":961,"latencySamplesMs":[949.5,1119.8,961]},
+    {"id":"vi-037","categories":["glossary","date","software"],"output":"Zoom's cancel permission is January 1,26.","chrf":18.53,"hasProtected":true,"preserved":{"all":false,"missing":["01/10/2026"]},"meaning":{"pass":false,"hasChecks":true,"failedContain":["cancellation deadline"],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":627.7,"latencySamplesMs":[614.5,627.7,726.9]},
+    {"id":"vi-038","categories":["glossary","number"],"output":"The cancel is 30 days before the deadline.","chrf":58.76,"hasProtected":false,"preserved":{"all":true,"missing":[]},"meaning":{"pass":false,"hasChecks":true,"failedContain":["cancellation deadline","renew"],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":417,"latencySamplesMs":[519.4,410,417]},
+    {"id":"vi-039","categories":["date","software","glossary"],"output":"The Microsoft Office 365 should be extended before December 15, 2026, or the license will expire.","chrf":73.08,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":false,"hasChecks":true,"failedContain":["renew"],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":835.4,"latencySamplesMs":[835.4,860,660.9]},
+    {"id":"vi-040","categories":["glossary","number","software"],"output":"Repeat: The timeout for aborting the Tableau is five days, or the abort will automatically extend to 12 months.","chrf":37.18,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":false,"hasChecks":true,"failedContain":["cancellation deadline","renew"],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":1030.5,"latencySamplesMs":[936.3,1030.5,1236.9]},
+    {"id":"vi-041","categories":["number","glossary"],"output":"The extra cost this year is 36.5, an 8.5 increase over the previous year.","chrf":28.11,"hasProtected":true,"preserved":{"all":false,"missing":["36.500.000 đồng","8,5%"]},"meaning":{"pass":false,"hasChecks":true,"failedContain":["renew"],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":888.9,"latencySamplesMs":[973.1,829,888.9]},
+    {"id":"vi-042","categories":["number","software","glossary"],"output":"The total budget suggests 12,000,000 dollars for 5 seat Notion.","chrf":32.57,"hasProtected":true,"preserved":{"all":false,"missing":["12.000.000 đồng"]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":542,"latencySamplesMs":[551.5,505.6,542]},
+    {"id":"vi-043","categories":["number","software","glossary"],"output":"Every seat JetBrains IntelliJ IDEA costs $649 a year.","chrf":60.21,"hasProtected":true,"preserved":{"all":false,"missing":["649 USD"]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":727.9,"latencySamplesMs":[611,727.9,844]},
+    {"id":"vi-044","categories":["number","glossary"],"output":"Down 15% if you buy 10 seat or so.","chrf":19.89,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":477.3,"latencySamplesMs":[477.3,468.5,488.4]},
+    {"id":"vi-045","categories":["number"],"output":"The total cost is 1,25,000, not even VAT 10%.","chrf":41.34,"hasProtected":true,"preserved":{"all":false,"missing":["1.250.000 đồng"]},"meaning":{"pass":true,"hasChecks":false,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":466.4,"latencySamplesMs":[555.7,461.7,466.4]},
+    {"id":"vi-046","categories":["date","plain"],"output":"The staff started using tools from January 1,26.","chrf":21.67,"hasProtected":true,"preserved":{"all":false,"missing":["01/10/2026"]},"meaning":{"pass":true,"hasChecks":false,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":365.5,"latencySamplesMs":[365.5,356.4,489.3]},
+    {"id":"vi-047","categories":["date"],"output":"The deadline for the treatment request is November 25th, 2026, and the deadline for the report is May 5,2026.","chrf":42.73,"hasProtected":true,"preserved":{"all":false,"missing":["25/11/2026","05/12/2026"]},"meaning":{"pass":true,"hasChecks":false,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":1012.2,"latencySamplesMs":[1158.9,848.4,1012.2]},
+    {"id":"vi-048","categories":["date"],"output":"The license is at 2026-10-1 through 2027-09-30.","chrf":59.74,"hasProtected":true,"preserved":{"all":false,"missing":["2026-10-01"]},"meaning":{"pass":true,"hasChecks":false,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":622.7,"latencySamplesMs":[733.7,622.7,525.4]},
+    {"id":"vi-049","categories":["date"],"output":"The budget review meeting took place on November 3rd.","chrf":60.7,"hasProtected":false,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":343.8,"latencySamplesMs":[343.8,328,346.2]},
+    {"id":"vi-050","categories":["date"],"output":"Please finish by 17:00 on November 28, 2026.","chrf":34.44,"hasProtected":true,"preserved":{"all":false,"missing":["28/11/2026"]},"meaning":{"pass":true,"hasChecks":false,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":320.1,"latencySamplesMs":[320.1,302.2,333.2]},
+    {"id":"vi-051","categories":["email"],"output":"Please send your reason via an email. Please send an email or an email@acme-demo. phrase.","chrf":33.03,"hasProtected":true,"preserved":{"all":false,"missing":["an.nguyen@acme-demo.example","it-helpdesk@acme-demo.example"]},"meaning":{"pass":true,"hasChecks":false,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":865.8,"latencySamplesMs":[833.7,1032.6,865.8]},
+    {"id":"vi-052","categories":["email","name","glossary"],"output":"Contact the Bich.tran@acme-demo.example to hand over the account.","chrf":73.57,"hasProtected":true,"preserved":{"all":false,"missing":["Trần Thị Bích","bich.tran@acme-demo.example"]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":741.7,"latencySamplesMs":[720.3,741.7,824.1]},
+    {"id":"vi-053","categories":["email","glossary"],"output":"The message has been sent to the phongquentials@acme-demo. The first and second room manager.","chrf":31.14,"hasProtected":true,"preserved":{"all":false,"missing":["finance-approvers@acme-demo.example"]},"meaning":{"pass":false,"hasChecks":true,"failedContain":["department head | head of department | head of the department"],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":871.7,"latencySamplesMs":[871.7,853.3,1009.3]},
+    {"id":"vi-054","categories":["code"],"output":"See the request details for REQ-2026-0042 and the contract HD-2026-15.","chrf":77.03,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":false,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":793.6,"latencySamplesMs":[730,793.6,836.1]},
+    {"id":"vi-055","categories":["code","glossary"],"output":"The license license number lingol-2026-0007-2 is Cost CC-0042.","chrf":46.19,"hasProtected":true,"preserved":{"all":false,"missing":["LIC-2026-0007-2","Cost Center"]},"meaning":{"pass":false,"hasChecks":true,"failedContain":["cost center"],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":710.8,"latencySamplesMs":[710.8,785.9,652.6]},
+    {"id":"vi-056","categories":["code"],"output":"The application for PO-2026-118 has been sent to the supplier.","chrf":60.95,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":false,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":486.4,"latencySamplesMs":[509.9,485.2,486.4]},
+    {"id":"vi-057","categories":["name","software","glossary"],"output":"Prince Nam offered the seat Docker Desktop additional grant to the Devops.","chrf":45.21,"hasProtected":true,"preserved":{"all":false,"missing":["Lê Hoàng Nam","DevOps"]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":629.3,"latencySamplesMs":[629.3,641.2,582.5]},
+    {"id":"vi-058","categories":["name"],"output":"According to the opinion of the Dao Wing and Wu Fangstong, this tool is essential to the process of testing.","chrf":40.8,"hasProtected":true,"preserved":{"all":false,"missing":["Đỗ Thế Vinh","Ngô Phương Thảo"]},"meaning":{"pass":true,"hasChecks":false,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":938.4,"latencySamplesMs":[920.7,938.4,1111.2]},
+    {"id":"vi-059","categories":["name"],"output":"The Jade Queen is in charge of the Demo Star Fund.","chrf":31.63,"hasProtected":true,"preserved":{"all":false,"missing":["Hoàng Ngọc Lan","Công ty TNHH Sao Mai Demo"]},"meaning":{"pass":true,"hasChecks":false,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":565.7,"latencySamplesMs":[585.5,565.7,534.2]},
+    {"id":"vi-060","categories":["name","glossary"],"output":"Mr. Judo Hu is the browser of Acme Demo Co.","chrf":41.24,"hasProtected":true,"preserved":{"all":false,"missing":["Bùi Gia Huy"]},"meaning":{"pass":false,"hasChecks":true,"failedContain":["spending approver"],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":734.6,"latencySamplesMs":[509.6,905.4,734.6]},
+    {"id":"vi-061","categories":["software"],"output":"We ran a test test on GitHub Actions and Postman to test the API.","chrf":62.43,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":false,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":905.4,"latencySamplesMs":[905.4,771.1,1004]},
+    {"id":"vi-062","categories":["software","glossary"],"output":"Offer to install HsuLAB and AutoCAR to the lab.","chrf":44.9,"hasProtected":true,"preserved":{"all":false,"missing":["MATLAB","AutoCAD"]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":662.9,"latencySamplesMs":[755.5,662.9,559.9]},
+    {"id":"vi-063","categories":["software"],"output":"Adobe-kun is too expensive for Figma.","chrf":43.32,"hasProtected":true,"preserved":{"all":false,"missing":["Adobe Photoshop"]},"meaning":{"pass":true,"hasChecks":false,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":534.1,"latencySamplesMs":[552,510.5,534.1]},
+    {"id":"vi-064","categories":["software"],"output":"The data team needs Tableau and Microsoft Power BI to do the fuckin' fuckin' fuckin' fuckin' fuckin' fuckin' fuckin' fuckin' fuckin' fuckin' fuckin' fuckin' fuckin' fuckin' fuckin' fuckin' fuckin' fuckin' fuckin' fuckin' fuckin' fuckin' fuckin' fuckin' fuckin' fuckin' shit.","chrf":46.16,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":false,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":2813.2,"latencySamplesMs":[2576.1,3749.5,2813.2]},
+    {"id":"vi-065","categories":["software"],"output":"We propose moving from Slack to Microsoft Teams to save our expenses.","chrf":73.55,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":false,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":640.5,"latencySamplesMs":[707.1,640.5,589.4]},
+    {"id":"vi-066","categories":["software"],"output":"Use ChatGPT for work to be secured.","chrf":40.98,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":false,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":381.9,"latencySamplesMs":[434.1,381.9,348.9]},
+    {"id":"vi-067","categories":["glossary"],"output":"Third floor meeting has been ordered for budget reviews.","chrf":48.57,"hasProtected":false,"preserved":{"all":true,"missing":[]},"meaning":{"pass":false,"hasChecks":true,"failedContain":["room"],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":373.7,"latencySamplesMs":[374.4,367.7,373.7]},
+    {"id":"vi-068","categories":["unaccented","software"],"output":"I can take care of the Figma for every cop in town.","chrf":23.88,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":false,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":505,"latencySamplesMs":[427.8,505,610.8]},
+    {"id":"vi-069","categories":["unaccented","negation"],"output":"The sour lemur lecom permort because of the tiet.","chrf":18.33,"hasProtected":false,"preserved":{"all":true,"missing":[]},"meaning":{"pass":false,"hasChecks":true,"failedContain":["not | n't | no  | never | cannot | unable | without | nobody | none | neither"],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":571.1,"latencySamplesMs":[499.6,592.2,571.1]},
+    {"id":"vi-070","categories":["unaccented","reject","code","glossary"],"output":"Truong is a monk, and he is a gratuital, so to speak.","chrf":7.17,"hasProtected":true,"preserved":{"all":false,"missing":["REQ-2026-0042"]},"meaning":{"pass":false,"hasChecks":true,"failedContain":["reject | declin | denied | deny | refus | turned down | not approv | disapprov | not accept | dismiss | cannot approve | unable to approve | not be approved | unable to accept","department head | head of department | head of the department"],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":649.8,"latencySamplesMs":[610.8,649.8,754.4]},
+    {"id":"vi-071","categories":["unaccented","glossary","date"],"output":"Han is a 15-11/2026, family member.","chrf":16.87,"hasProtected":true,"preserved":{"all":false,"missing":["15/11/2026"]},"meaning":{"pass":false,"hasChecks":true,"failedContain":["cancellation deadline","renew"],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":471.6,"latencySamplesMs":[633.4,470.5,471.6]},
+    {"id":"vi-072","categories":["mixed","glossary"],"output":"I need two seat more men's menalades for the project Atlas, which is a game with the team lead.","chrf":50.15,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":971.4,"latencySamplesMs":[971.4,1004.1,942.1]},
+    {"id":"vi-073","categories":["mixed","approve","code","date"],"output":"Please, sweetie, help me with the red-hot 2026-0042, the C.S. is November 15th, 2026.","chrf":31.26,"hasProtected":true,"preserved":{"all":false,"missing":["REQ-2026-0042","15/11/2026"]},"meaning":{"pass":false,"hasChecks":true,"failedContain":["approv"],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":892.9,"latencySamplesMs":[892.9,907,888.2]},
+    {"id":"vi-074","categories":["mixed","negation","glossary"],"output":"This is the company that's not in the catalog, so I asked for a pizza from the head of the room.","chrf":47.57,"hasProtected":false,"preserved":{"all":true,"missing":[]},"meaning":{"pass":false,"hasChecks":true,"failedContain":["department head | head of department | head of the department"],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":924.3,"latencySamplesMs":[932.3,859.2,924.3]},
+    {"id":"vi-075","categories":["collision","code"],"output":"Reference code <x0> in the old log still used for REQ-2026-0042.","chrf":77.89,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":false,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":823.7,"latencySamplesMs":[934.2,823.7,754.3]},
+    {"id":"vi-076","categories":["collision","name"],"output":"The display pattern <x1> instead of the Phoenix.","chrf":39.47,"hasProtected":true,"preserved":{"all":false,"missing":["Trần Thị Bích"]},"meaning":{"pass":true,"hasChecks":false,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":580.7,"latencySamplesMs":[580.7,572.2,597.6]},
+    {"id":"vi-077","categories":["collision","negation"],"output":"Template value: <x0>, <x1>, <x2> is not real data.","chrf":67.73,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":1001.4,"latencySamplesMs":[911.4,1001.4,1179]},
+    {"id":"vi-078","categories":["plain","software","number","date","glossary"],"output":"I'm a software engineer at the Engineering Department. The new project has requested to design interfaces on Figma. There's only 2 seat groups, so there's not enough. I suggest 3 seat to the end of 31/03,2027.","chrf":57.01,"hasProtected":true,"preserved":{"all":false,"missing":["31/03/2027"]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":4,"translated":4,"fallback":0},"fallbackReasons":[],"latencyMs":2368.1,"latencySamplesMs":[2286.2,2547.8,2368.1]},
+    {"id":"vi-079","categories":["reject","software"],"output":"Reasons for refusing: tool duplicate function with Slack. Please use the current Slack. If you still need to send back the price request.","chrf":53.03,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":3,"translated":3,"fallback":0},"fallbackReasons":[],"latencyMs":1280.7,"latencySamplesMs":[1280.7,1287,1048.5]},
+    {"id":"vi-080","categories":["revoke","name","software","glossary"],"output":"The handover is complete. Seat Jira passed it on to Wu Fangstung. The old account has been revoked.","chrf":52.47,"hasProtected":true,"preserved":{"all":false,"missing":["Ngô Phương Thảo"]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":3,"translated":3,"fallback":0},"fallbackReasons":[],"latencyMs":1174,"latencySamplesMs":[1174,1291.3,1149.7]},
+    {"id":"vi-L1","categories":["long"],"output":"I wrote this motion to explain the need to add permits to our team of projects, and I would like to add that the design team needs to add Figma's license to complete its new interface, and the Western City Chen will leave the motions between 10/2026 and 24/11/2026, and the budget for permits is $4200 per year, the date of the current contract is 15/2026, the CPDC will be able to deliver the Jira Wattttt, the head of the department confirms that this tool does not match the current software, or SLAD, which will be used on its own time, but that the application will be approved by the director of the CSMMFLMFLFLFFFFFF, which requires a complete testing if the application of the application to see the application required to see the application's support of the application that the application that the application's the application's the application's the application's the application's the application's the application's the application's the application's the application's's's's there's's's the application's's'll need to see the application's'll need to see the application'll need to see to be tested's the application's the application's the application's the application's the application's the application's the application's the application's the application's the application's the application's the application's'll if it'll be actually actually be allowed'll be allowed'll if it'll be tested'll be allowed'll be allowed to be checked for the application'll be checked for the application for the application's the application's's the application's''s's's's'll on the application for the application's's's's's's's's's account, so that'll for the application's's's's the application'll be tested to be allowed to see the application's the application's the application's the application's the application's the application's the application's the application's the application's the application's the application's's'll to be the application's's's","chrf":35.15,"hasProtected":true,"preserved":{"all":false,"missing":["Trần Thị Bích","10/11/2026","4200 USD","15/11/2026","Lê Hoàng Nam","Ngô Phương Thảo","Slack","GitHub Copilot","20%","CC-0042","Postman","HD-2026-15","Notion","Atlas","Đặng Minh Khoa","Docker Desktop"]},"meaning":{"pass":true,"hasChecks":false,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":19152.2,"latencySamplesMs":[19152.2,18152.9,21250.5]},
+    {"id":"vi-L2","categories":["long"],"output":"I wrote this motion to explain the need to add permits to our team of projects, and I asked that the design team need more SIX license to complete the new interface, and the Yellow Chenx will leave the power of 10/2026 to 24/226, and the budget for the project team is $4200 a year, the date's notice of the current contract is 15/2526, the CPD will be able to deliver the account to the State Office, the head of the company will confirm that the tool will not match the software, and that each available on the basis 6 hours, the default date will be used by the seat of the seat of the Washington CSIBIBPM, and the user will need to write down the application to the application to the application to the US before the US Office, but the UlM, the company will need to see the application's application will need to see the application's application's the application's application's the application's application's application's the application's permission's the application's application's application's permission's permission's will need to see the application's to see that they want to see the application's's's's's's to see the application's the application's the application's the application's the application's the application's the application's the application's's's's's the application's's online online to see the application's online application's'll need to use the application'll need to see the application'll the application's's's personal'll have to see the application's personal application's online'll be allowed for the application's's's'll be allowed for the application's's's's's personal application's, so that's's's's's's worth to use for the application's personal treatment's's personal treatment's's's's's personal treatment to see the application to see the application's the application's rights rights rights rights rights rights rights rights rights the application's the application's worth to the application to the application's's's's's's's's","chrf":32.11,"hasProtected":true,"preserved":{"all":false,"missing":["Figma","Trần Thị Bích","10/11/2026","24/11/2026","4200 USD","15/11/2026","Lê Hoàng Nam","Jira","Ngô Phương Thảo","Slack","GitHub Copilot","20%","CC-0042","Postman","HD-2026-15","Notion","Atlas","Đặng Minh Khoa","Docker Desktop","Adobe XD","25/11/2026","Phạm Quỳnh Anh","Tableau","Hoàng Ngọc Lan","ngoc.hoang@acme-demo.example"]},"meaning":{"pass":true,"hasChecks":false,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":22293,"latencySamplesMs":[30212.7,22293,19494.4]},
+    {"id":"vi-L3","categories":["long"],"output":"I wrote this motion to solve the need to add permissions to our project group, and I wrote this suggestion to try to solve the new interface, and the Street Chenx will leave early school plans to use 10/2026 to 24/2026, and the budget for permits is $4200 per year, the date canceler will be 15/252, the CSI will be able to submit the account to the State Office, the head of the company will confirm that the company's terminal test for this company's application should be allowed to use the application to use the application, so that the company will not be checked by the application before the application is approved, if the application is approved for the application to use the application will be approved on the MIM, the application will be approved to the application to the application to the application to the application before the application will be approved on the U, but if the UlMMMMMLM, the application will need to the application will need to the application will be approved application will need to the application will need to use the application to the application to the application to use the application to the application before it's to use the application to use the application to use the application to the application to the application to the application to the application to the application to the application to the application to the application to the application to the application to use the application to use the application to use the application to the application to the application to use the application to the application to the application to use the application to use the application to the application to the application to use the application to the application to the application to the application to use the application to the application to the application to the application to the application to the application to the application to the application to the application to the application to the application to the application to the application to the application to the application to the application to the application to use the application to the application to use the application to the application to use to use to the application to the application to the application to the application to the application to use the application to the application to the application to use the application to use the application to the application to the application to the application to the application to the application to the application to the application to the application to the application to use the application to the application to the application to use the application to use the application to the application to the application to the application to the application to the application to the application to use of the","chrf":24.94,"hasProtected":true,"preserved":{"all":false,"missing":["Figma","Trần Thị Bích","10/11/2026","24/11/2026","4200 USD","15/11/2026","Lê Hoàng Nam","Jira","Ngô Phương Thảo","Slack","GitHub Copilot","20%","CC-0042","Postman","HD-2026-15","Notion","Atlas","Đặng Minh Khoa","Docker Desktop","Adobe XD","25/11/2026","Phạm Quỳnh Anh","Tableau","Hoàng Ngọc Lan","ngoc.hoang@acme-demo.example","300 USD","Visual Studio Code","8%","Võ Thanh Hà"]},"meaning":{"pass":true,"hasChecks":false,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":26636.2,"latencySamplesMs":[20158.5,27823.7,26636.2]},
+    {"id":"vi-L4","categories":["long"],"output":"I wrote this motion to solve the job required additional permits for our project team, and I wrote this suggestion to solve my proposal to the level with the application and the company's request to add additional permissions to the company project using the application to add additional permissions to the company project, and I want to add a copy IDMMM IDI license to complete new interface, so the MIMPMPMX will quit permission from 10/226/2026 to 24/ USMM client should need to power companies have a new company program write a new company program using the application, the application required application will need to power client using the application before the application is approved using the application will use the application will use the application before the KDE MIM-right setting, the application will receive the application will receive the application will be checked the application required application required for the application to use the application required application's'S's's application's application'ap application'ap application before the application to use the application using the application using the application before the application use the application using the application using the application before the application use the application use the application use the application before the application use the application before the application before the application has the application has the application has started using's's's use the application use the application use the application use the application use the application use the application use the application use the application use the application use the application use the application use the application use the application use the application use the application use the application use the application use the application use the application use the application use the application using the application using the application using the application using the application using using using using using using using using using using the application use the application using the application using the application using the application use the application use the application using the application use the application using the application using using using using using using using using using using using the application use the application using the application using using using using using the application using using using the application using the application using the application using the application before the application before the application using the application using the application using the application should use the application should should use the application using the application using the application to use the application will use the application should use the application using the application using the application using the application will use the application will use the application will use the application will use the application will use the application will use the application will use the application will use the application will use the","chrf":25.33,"hasProtected":true,"preserved":{"all":false,"missing":["Figma","Trần Thị Bích","10/11/2026","24/11/2026","4200 USD","15/11/2026","Lê Hoàng Nam","Jira","Ngô Phương Thảo","Slack","GitHub Copilot","20%","CC-0042","Postman","HD-2026-15","Notion","Atlas","Đặng Minh Khoa","Docker Desktop","Adobe XD","25/11/2026","Phạm Quỳnh Anh","Tableau","Hoàng Ngọc Lan","ngoc.hoang@acme-demo.example","300 USD","Visual Studio Code","8%","Võ Thanh Hà","Microsoft Teams","Zoom","JetBrains IntelliJ IDEA","Bùi Gia Huy","01/12/2026","MATLAB","Confluence","Adobe Photoshop","AutoCAD"]},"meaning":{"pass":true,"hasChecks":false,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","counts":{"total":1,"translated":1,"fallback":0},"fallbackReasons":[],"latencyMs":19764.3,"latencySamplesMs":[19764.3,15384.1,21101.3]}
+  ]
+}

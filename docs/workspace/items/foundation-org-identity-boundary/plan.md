@@ -2,7 +2,7 @@
 
 - [Spec](spec.md); revision đã review: chưa review.
 - Implement: chưa phân công; reviewer: chưa phân công.
-- Triển khai: **merged**, chưa accepted — code G0 và lát 1a/1b đã vào `dev` qua [PR #4](https://github.com/SEP490-FALL2026/BE-dev/pull/4), commit `64073c4`. Spec/plan chưa dev khác review; các cổng review/phê duyệt ban đầu còn mở. Xem [việc cần xử lý](../../g0-g1-review-follow-up.md).
+- Triển khai: **merged**, chưa accepted — code G0 và lát 1a/1b đã vào `dev` qua [PR #4](https://github.com/SEP490-FALL2026/BE-dev/pull/4), commit `64073c4`. Remediation ở `a0cf5f1` chưa merge; spec/plan chưa dev khác review. Xem [báo cáo G0/G1](../../../reviews/g0-g1-remediation-2026-10-15/README.md).
 
 ## Trước khi code
 
@@ -17,7 +17,7 @@ Hạng mục này **không** có PR code riêng. Phần hiện thực của nó 
 
 ## Kiểm chứng và bàn giao
 
-**Cập nhật 14/10/2026:** [AI review tại `64073c4`](../../../reviews/backend-g0-g1-review-2026-10-14.md) ghi 223 unit, 28 E2E, 147 integration đạt trên PostgreSQL 17.11 (role không superuser); live HTTP 117 PASS / 2 FAIL, 16/16 operation. Gate checkout sạch còn R-01; các finding và nghiệm thu vẫn mở. Bảng dưới giữ kết quả lịch sử của phiên implement, không phải kết quả chạy lại ngày 14/10.
+**Cập nhật 15/10/2026:** kết quả review ban đầu và remediation được tổng hợp tại [báo cáo G0/G1](../../../reviews/g0-g1-remediation-2026-10-15/README.md). Bảng dưới giữ kết quả lịch sử của phiên implement; chưa thay review hoặc nghiệm thu của dev.
 
 Plan riêng này kiểm tài liệu bằng `pnpm rules:check`, `pnpm rules:format`; test hiện thực G0 nằm trong các lát dùng nó và báo cáo được dẫn ở trên.
 

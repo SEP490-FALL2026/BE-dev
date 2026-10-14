@@ -108,10 +108,7 @@ pnpm 11.1.3 with an explicit `allowBuilds` list, and CI runs
 ## Verification
 
 The [research note](../workspace/items/us-01-bootstrap-login-session/research.md) records
-the initial isolated experiments. The [AI review of `64073c4`](../reviews/backend-g0-g1-review-2026-10-14.md)
-records 223 unit, 28 E2E and 147 integration passes on PostgreSQL 17.11, plus live HTTP,
-SMTP and Linux PTY checks. It also records failed cases and missing evidence: the clean-checkout
-gate, stalled DB requests, malformed JWT claims and login throttling were fixed after that review
-(see the follow-up for the evidence); manual PowerShell bootstrap and SMTP TLS remain unverified.
-See [follow-up and Owner decisions](../workspace/g0-g1-review-follow-up.md).
+the initial isolated experiments. The [G0/G1 remediation review](../reviews/g0-g1-remediation-2026-10-15/README.md)
+records the initial findings, later fixes and verification on the remediation branch. Manual
+PowerShell bootstrap and SMTP provider delivery remain unverified.
 These results belong to that revision and do not close acceptance.
