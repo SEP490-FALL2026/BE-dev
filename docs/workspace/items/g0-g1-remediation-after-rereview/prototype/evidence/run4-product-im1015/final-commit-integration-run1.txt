@@ -1,0 +1,52 @@
+$ jest --config ./test/config/jest.integration.cjs --runInBand
+[Nest] 9144  - 10/15/2026, 3:08:26 AM    WARN [PrismaService] A database connection was retired (client-side query timeout, or released inside a transaction)
+[Nest] 9144  - 10/15/2026, 3:08:30 AM    WARN [PrismaService] A database connection was retired (client-side query timeout, or released inside a transaction)
+[Nest] 9144  - 10/15/2026, 3:08:32 AM    WARN [PrismaService] A database connection was retired (client-side query timeout, or released inside a transaction)
+FAIL test/integration/installation-minimal-env.integration-spec.ts
+
+
+  ● Test suite failed to run
+
+    error: permission denied to terminate process
+
+      121 |   try {
+      122 |     await client.connect();
+    > 123 |     await client.query('DROP DATABASE ' + quote(name) + ' WITH (FORCE)');
+          |     ^
+      124 |   } finally {
+      125 |     await client.end();
+      126 |   }
+
+      at node_modules/.pnpm/pg@8.23.0/node_modules/pg/lib/client.js:694:17
+      at dropDisposableDatabase (test/support/disposable-database.ts:123:5)
+      at Object.<anonymous> (test/integration/installation-minimal-env.integration-spec.ts:124:19)
+
+[Nest] 9144  - 10/15/2026, 3:09:32 AM    WARN [PrismaService] A database connection was retired (client-side query timeout, or released inside a transaction)
+
+Summary of all failing tests
+FAIL test/integration/installation-minimal-env.integration-spec.ts
+
+
+  ● Test suite failed to run
+
+    error: permission denied to terminate process
+
+      121 |   try {
+      122 |     await client.connect();
+    > 123 |     await client.query('DROP DATABASE ' + quote(name) + ' WITH (FORCE)');
+          |     ^
+      124 |   } finally {
+      125 |     await client.end();
+      126 |   }
+
+      at node_modules/.pnpm/pg@8.23.0/node_modules/pg/lib/client.js:694:17
+      at dropDisposableDatabase (test/support/disposable-database.ts:123:5)
+      at Object.<anonymous> (test/integration/installation-minimal-env.integration-spec.ts:124:19)
+
+
+Test Suites: 1 failed, 23 passed, 24 total
+Tests:       203 passed, 203 total
+Snapshots:   0 total
+Time:        96.308 s
+Ran all test suites.
+[ELIFECYCLE] Command failed with exit code 1.
