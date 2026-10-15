@@ -1,12 +1,12 @@
 # Spec: Khởi tạo tổ chức, đăng nhập và phiên (lát 1a)
 
-- Phụ trách: chưa phân công; reviewer: chưa phân công (một dev khác, ngang quyền).
-- Thiết kế: **draft** (12/10/2026, sửa cùng ngày sau vòng khép thiết kế). Review: chưa review.
+- Phụ trách: BE Dev A (theo roadmap). Thiết kế ban đầu bởi: Owner. Peer review: review toàn bộ spec/code là tùy chọn theo [quy trình](../../README.md); review **giá trị kỹ thuật `US-01-10`** (thời hạn lời mời/phiên, chính sách mật khẩu, giới hạn tần suất) **bắt buộc theo nguồn — `pending`**, xem _Sẵn sàng bàn giao_.
+- Thiết kế: ready (đã implement). Triển khai: `verified` local tại `d60d306`; refactor module sau đó ở `ab0c43a`. Owner review cuối: chưa có; chưa `accepted`/`released`.
 - Nguồn: [snapshot `S-2026-10-12b`](../../sources.md) — US v0.15 (bổ sung `QĐ-67`) `US-01-01`, `US-01-06`, `US-01-10` (`EP-01`); BRD v3.36 `FR-8.1`, `FR-8.3`, `FR-8.6`→`FR-8.11`, `FR-9.8`, 7.2; quyết định `QĐ-41a`, `QĐ-44`, `QĐ-46a`, `QĐ-47a`, `QĐ-47c`, `QĐ-47d`, `QĐ-52d`, `QĐ-67a`, `QĐ-67b`.
-- Trạng thái yêu cầu: `US-01-01`, `US-01-10` là `OWNER-PROVISIONAL` (`L-2`); `US-01-06` là `BASELINED` — quyết định Owner, chưa GVHD. Logical, giao thức khóa và chiến lược migration: [spec nền](../foundation-org-identity-boundary/spec.md) (draft). Thư viện: [research](research.md) (draft).
+- Trạng thái yêu cầu: `US-01-01`, `US-01-06`, `US-01-10` là `BASELINED` theo `QĐ-72` tại Docs `3341ea0` (GVHD đã duyệt hướng `L-2` theo thông báo của Owner; snapshot gốc `S-2026-10-12b` ghi `OWNER-PROVISIONAL`). Logical, giao thức khóa và chiến lược migration: [spec nền](../foundation-org-identity-boundary/spec.md). Thư viện: [research](research.md).
 - [Kế hoạch](plan.md). Phụ thuộc: [foundation-org-identity-boundary](../foundation-org-identity-boundary/spec.md). Lát sau: [us-01-account-invitation-activation](../us-01-account-invitation-activation/spec.md).
 
-**Đối chiếu 15/10/2026:** code nền đã merge PR #4 (`64073c4`); remediation `a0cf5f1` đã vào `origin/dev` qua PR #7/#8; code/spec/plan chưa được dev khác review/nghiệm thu. Nguồn baseline là Docs `0e0bb83` (snapshot `S-2026-10-12b`). Xem [báo cáo G0/G1](../../../reviews/g0-g1-remediation-2026-10-15/README.md).
+**Trạng thái 15/10/2026 (Task 3B):** code vào `dev` qua PR #4 (`64073c4`), remediation qua PR #7/#8 (`a0cf5f1`) và Task 1B; baseline `verified` local tại `d60d306`. Refactor Task 2/2B ở `ab0c43a` giữ nguyên nghiệp vụ và 16 HTTP operation. Nguồn thiết kế của lát là Docs `0e0bb83` (`S-2026-10-12b`); nguồn hiện hành Docs `3341ea0` ghi các Story liên quan `BASELINED` theo `QĐ-72`, còn thay đổi nguồn sau đó thuộc lát khác (`QĐ-73a` AC-12 → 1c; `QĐ-68`/`QĐ-70` → G2 đầu). Remote CI và Owner review cuối chưa có. Xem [báo cáo G0/G1](../../../reviews/g0-g1-remediation-2026-10-15/README.md).
 
 **Owner chốt 14/10/2026:** R-06 giữ bộ đếm chỉ tăng khi đăng nhập sai; lượt đang xử lý/thành công không được tính là thất bại. R-07 giữ global rate limit theo từng route trên mỗi IP. Code và test nằm trên nhánh remediation; các lựa chọn còn mở khác và ADR-0011 chưa được phê duyệt.
 
@@ -214,15 +214,16 @@ Planned khác passed. Lệnh và môi trường ghi ở plan.
 
 ## Sẵn sàng bàn giao
 
-Điều kiện thật, theo thứ tự; lát 1a chỉ được giao code khi mọi ô đều được đánh dấu. Ô chỉ được đánh dấu bởi người có thẩm quyền ghi ở ô đó, kèm ngày và bằng chứng; AI không đánh dấu thay. Theo kế hoạch ban đầu, **ADR-0011 Accepted** là cổng **trước merge** (plan bước 8), không phải điều kiện trước code. Code nay đã merge khi cổng này chưa thỏa; giữ các ô chưa xác nhận để xử lý trước nghiệm thu:
+_Lịch sử — điều kiện trước khi code theo quy trình cũ; lát đã implement và `verified`. Theo quy trình hiện hành, ô review toàn bộ của dev khác là tùy chọn, ô của lead/Owner được xử lý ở Owner review cuối; riêng review giá trị kỹ thuật `US-01-10` là ô bắt buộc theo nguồn ở cuối danh sách._ Điều kiện ban đầu, theo thứ tự; lát 1a chỉ được giao code khi mọi ô đều được đánh dấu. Ô chỉ được đánh dấu bởi người có thẩm quyền ghi ở ô đó, kèm ngày và bằng chứng; AI không đánh dấu thay. Theo kế hoạch ban đầu, **ADR-0011 Accepted** là cổng **trước merge** (plan bước 8), không phải điều kiện trước code. Code nay đã merge khi cổng này chưa thỏa; giữ các ô chưa xác nhận để xử lý trước nghiệm thu:
 
 - [ ] Người nhận truy cập được nguồn: Docs `S-2026-10-12b` tại commit `0e0bb83`, 12/12 hash đã kiểm khớp — người nhận xác nhận truy cập theo [sources](../../sources.md).
 - [x] Quyết định khởi tạo đã ghi sổ: `QĐ-67a`, `QĐ-67b` (12/10/2026), đồng bộ BRD `FR-9.8` và `US-01-01` AC-19. Không còn câu Owner chặn lát này.
 - [x] R-1 → R-4 của [research](research.md) đã trả lời (R-1 → R-3 có thử nghiệm; R-4 chỉ dựa trên tài liệu Node, **chưa thử tương tác**); [ADR-0011](../../../decisions/0011-internal-authentication-and-sessions.md) **Proposed** ghi thư viện + phiên bản ghim (12/10/2026).
 - [x] Lead chốt (12/10/2026): `@node-rs/argon2` 2.2.2, cột snake_case qua `@map`, `btree_gist`, timeout giao dịch 3 s / 5 s / 10 s.
 - [ ] Lead xác nhận phần còn là đề xuất của trợ lý: R-2 (JWT), R-4 (prompt ẩn), TTL phiên/throttle, tên cookie, có kiểm `Origin` cho `refresh`/`logout` hay không, hợp đồng đăng xuất.
-- [ ] **Dev BE** review khả thi spec nền + spec/plan/research lát 1a + ADR-0011 ở đúng revision/hash bàn giao (giao thức khóa, I-2, migration, route/test catalog, hợp đồng đăng xuất, cấu hình timeout); finding chặn đã xử lý và được dev kiểm lại.
-- [ ] Ghi **xác nhận** vào mục đầu spec này và spec nền: link review (PR/issue), người review, revision/commit hoặc SHA-256 đã review, ngày — chỉ sau ô trên. Đây là bằng chứng thay cho chữ _approved_; trạng thái thiết kế chỉ đổi sang `approved` sau bước này.
+- [ ] _(Tùy chọn theo quy trình hiện hành — review toàn bộ; không chặn Owner review cuối.)_ **Dev BE** review khả thi spec nền + spec/plan/research lát 1a + ADR-0011 ở đúng revision/hash bàn giao (giao thức khóa, I-2, migration, route/test catalog, hợp đồng đăng xuất, cấu hình timeout); finding chặn đã xử lý và được dev kiểm lại.
+- [ ] Ghi **xác nhận** vào mục đầu spec này và spec nền: link review (PR/issue), người review, revision/commit hoặc SHA-256 đã review, ngày — chỉ sau ô trên. Đây là bằng chứng bổ sung khi có peer review; trạng thái thiết kế dùng `ready` theo roadmap, không dùng `approved`.
+- [ ] **Bắt buộc theo nguồn (`US-01-10` _Business rules_, Docs `3341ea0`) — `pending`:** dev khác review giá trị kỹ thuật của lát: `AUTH_ACCESS_TOKEN_TTL_SECONDS`, `AUTH_SESSION_IDLE_SECONDS`, `AUTH_SESSION_ABSOLUTE_SECONDS`, `AUTH_LOGIN_MAX_FAILURES`/`AUTH_LOGIN_WINDOW_SECONDS`/`AUTH_LOGIN_BLOCK_SECONDS`, throttler chung (`RATE_LIMIT_*`) và chính sách mật khẩu (`auth/password.policy.ts`); ghi người review, link và revision. Code đã ở `dev` và `verified` tại `d60d306`: gate này được khôi phục ngày 15/10/2026 sau khi code đã merge, không hạ trạng thái triển khai và không chặn được việc code trước đó; nó chặn `accepted`/`main`/production.
 
 ## Thay đổi và nghiệm thu
 

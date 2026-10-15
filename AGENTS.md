@@ -36,15 +36,24 @@ Scope: this backend repository. Work from its root with the pnpm version in `pac
   Obtain the relevant requirement before inventing missing business behavior.
 - For US design and implementation handoff, follow [shared planning](docs/workspace/README.md).
 - Use pinned BRD/US revisions and the current spec/plan. The assignee owns design, implementation,
-  tests and plan maintenance; peer review is optional. Never invent Owner approval or acceptance.
-- No mandatory skill, private workspace, sequential numbering or multi-agent workflow.
+  tests and plan maintenance; peer review is optional, except where a pinned requirement, decision or spec
+  explicitly requires it (for example the US-01-10 technical values) — then it is a recorded gate before
+  `accepted`. Never invent Owner approval, peer review or acceptance.
+- No specific AI vendor or external skill package is required. An AI that supports skills should follow
+  the phase-specific guidance in [shared planning](docs/workspace/README.md); repository rules, pinned
+  requirements, the current spec/plan and acceptance criteria remain authoritative.
+- Multi-agent work is optional. Use it only for independent, clearly bounded tasks; one primary agent
+  must own integration, final diff review and verification. Do not let agents edit the same files,
+  operate on the same test database or perform Git publication concurrently.
 
 ## Verify and hand off
 
 - Docs: `pnpm rules:check` and `pnpm rules:format`.
 - Source/config: `pnpm check`; HTTP changes also require `pnpm test:e2e` and `pnpm openapi:export`.
 - Database changes need the isolated integration setup in the test guide.
-- Report actual commands/results and unverified boundaries. Do not silently skip a failed gate.
+- Before handoff, self-review the final diff against the assigned spec/plan and AC; update affected
+  operational documentation or runbooks. Report actual commands/results and unverified boundaries.
+  Do not silently skip a failed gate.
 - Keep secrets and real data out of artifacts. Do not commit, push, deploy or change shared data unless authorized.
 
 [All topic rules](docs/rules/README.md).

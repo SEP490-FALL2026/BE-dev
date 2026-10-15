@@ -6,9 +6,11 @@ Workspace được lưu trên Git để dev và AI cùng dùng. Chỉ local/ là
 
 Mỗi hạng mục có một **người phụ trách** sở hữu xuyên suốt: làm rõ yêu cầu, hoàn thiện spec/plan và thiết kế test, implement source/test, cập nhật checklist cùng bằng chứng sau khi chạy. Người phụ trách có thể là người hoặc AI được giao việc. Không bắt buộc một dev khác review trước khi bắt đầu thiết kế, code hoặc tích hợp lên `dev`.
 
+`Maintain` trong quy trình này nghĩa là giữ spec/plan/test design và tài liệu vận hành hoặc runbook bị ảnh hưởng luôn khớp với implementation, đồng thời ghi cách kiểm tra và bảo trì cho người tiếp theo. Nó không có nghĩa người hay AI của một phiên sẽ tự vận hành hệ thống mãi sau khi phiên kết thúc.
+
 Roadmap ghi riêng **người thiết kế ban đầu** để biết ai đã soạn hoặc chốt đầu vào spec/plan/test/decision. Owner có thể thiết kế trước rồi giao dev implement; dev cũng có thể tự thiết kế và implement. Khi nhận hạng mục do người khác thiết kế, người phụ trách tiếp tục sở hữu việc duy trì tài liệu và phải cập nhật chúng nếu implementation làm rõ hoặc thay đổi thiết kế.
 
-Owner BE là reviewer cuối của cả gói spec/plan/decision, source, test và bằng chứng trên một revision cụ thể trước khi đưa lên `main`/production. Peer review của dev khác được khuyến khích khi hữu ích nhưng là bằng chứng bổ sung, không phải gate bắt buộc. AI không tự ghi Owner đã duyệt hoặc đã nghiệm thu.
+Owner BE là reviewer cuối của cả gói spec/plan/decision, source, test và bằng chứng trên một revision cụ thể trước khi đưa lên `main`/production. Peer review của dev khác được khuyến khích khi hữu ích nhưng là bằng chứng bổ sung, không phải gate bắt buộc — **trừ khi** requirement, decision hoặc spec đã pin yêu cầu cụ thể (ví dụ `US-01-10` _Business rules_: giá trị kỹ thuật về thời hạn lời mời/phiên, chính sách mật khẩu, giới hạn tần suất phải được dev khác review). Khi đó review là gate trước `accepted`: ghi người review, link và revision; chưa có thì ghi `pending`. AI không tự ghi Owner đã duyệt, peer review đã xong hoặc đã nghiệm thu.
 
 Nếu nguồn mâu thuẫn hoặc cần đổi nghiệp vụ, người phụ trách ghi rõ câu hỏi, giả định và phần bị ảnh hưởng; không tự thay baseline nghiệp vụ. Có thể tiếp tục phần độc lập. Quyết định Owner đã có phải được cập nhật lại vào nguồn/spec để phiên sau không phụ thuộc chat.
 
@@ -25,8 +27,8 @@ Nếu nguồn mâu thuẫn hoặc cần đổi nghiệp vụ, người phụ tr�
 1. Chọn lát US/AC hoặc technical enabler; kiểm tra roadmap tránh trùng, ghi người phụ trách và người thiết kế ban đầu. Hai vai có thể cùng một người.
 2. Người phụ trách dùng mẫu trong `_template/` để tạo hoặc tiếp quản spec/plan. Ghi [nguồn BRD/US](sources.md) có revision, phạm vi, quyết định và câu hỏi. Chỉ tạo research.md/test-plan.md khi chúng có nội dung riêng cần duy trì.
 3. Làm rõ hành vi, API, dữ liệu, quyền, lỗi, migration, thiết kế test và cách kiểm chứng. Phần không liên quan ghi không áp dụng cùng lý do. Khi đủ đầu vào để code, đánh dấu thiết kế `ready`; trạng thái này không có nghĩa Owner đã duyệt.
-4. Người phụ trách implement source/test theo spec/plan, cập nhật checklist và kết quả thực chạy ngay trong hạng mục. Nếu implementation làm đổi hành vi/contract, cập nhật spec/plan cùng thay đổi; không để tài liệu mô tả bản cũ.
-5. Có thể nhờ dev khác peer review ở bất kỳ thời điểm nào và lưu link/bằng chứng, nhưng không bắt buộc chờ peer review để bắt đầu hoặc tiếp tục phần không bị blocker.
+4. Người phụ trách implement source/test theo spec/plan, tự review diff theo AC, cập nhật checklist và kết quả thực chạy ngay trong hạng mục. Nếu implementation làm đổi hành vi/contract hoặc cách vận hành, cập nhật spec/plan và tài liệu/runbook liên quan cùng thay đổi; không để tài liệu mô tả bản cũ.
+5. Có thể nhờ dev khác peer review ở bất kỳ thời điểm nào và lưu link/bằng chứng, nhưng không bắt buộc chờ peer review để bắt đầu hoặc tiếp tục phần không bị blocker. Peer review do nguồn bắt buộc (mục trên) phải xong trước `accepted`.
 6. Sau khi kiểm chứng đạt, có thể tích hợp lên `dev` theo quy trình Git của nhóm. Ghi `merged-dev` theo sự kiện thật; trạng thái này chưa phải Owner nghiệm thu và chưa cho phép tự đưa lên `main`/production.
 7. Owner review cuối trên revision cụ thể, đối chiếu spec/plan/decision, source, test, AC và bằng chứng. Nếu cần sửa, ghi `changes-requested`; nếu đạt, ghi `accepted` cùng Owner, revision, môi trường và bằng chứng. Chỉ revision `accepted` mới đủ điều kiện đưa lên `main`/production; `released` chỉ ghi sau sự kiện triển khai thật.
 
@@ -38,9 +40,25 @@ Mỗi spec ghi link/revision/US/AC thực sự dùng, không chỉ nói “bản
 
 Giao đường dẫn spec/plan, revision đầu vào, phạm vi task và môi trường kiểm tra. Người nhận làm được từ checkout và nguồn chung, không phụ thuộc chat. Prompt mẫu:
 
-> Đọc AGENTS.md và spec/plan của hạng mục được giao. Đối chiếu revision đầu vào với code hiện tại. Tiếp quản và cập nhật spec/plan/test design khi cần, implement phần được giao, kiểm tra theo CONTRIBUTING và test guide; ghi kết quả thực chạy và phần chưa kiểm chứng. Làm rõ blocker trước khi làm phần phụ thuộc. Không tự ghi Owner đã phê duyệt hoặc nghiệm thu.
+> Đọc AGENTS.md và spec/plan của hạng mục được giao. Đối chiếu revision đầu vào với code hiện tại. Tiếp quản và cập nhật spec/plan/test design khi cần, implement phần được giao, tự review diff theo AC, kiểm tra theo CONTRIBUTING và test guide, cập nhật tài liệu/runbook bị ảnh hưởng; ghi kết quả thực chạy và phần chưa kiểm chứng. Làm rõ blocker trước khi làm phần phụ thuộc. Không tự ghi Owner đã phê duyệt hoặc nghiệm thu.
 
-Superpowers hỗ trợ làm rõ yêu cầu và viết plan khi dev muốn dùng. Yêu cầu dùng mẫu/vị trí của repo này; không sinh bộ song song ở docs/superpowers/. Người và AI bàn giao cùng định dạng.
+## Skill và subagent cho AI
+
+Repo bắt buộc **quy trình và kết quả kiểm chứng**, không bắt một AI hoặc gói skill cụ thể. Dev dùng Claude chỉ cài Superpowers vẫn đủ để làm theo workflow này. Khi có Superpowers, dùng bộ nhỏ theo đúng pha:
+
+| Pha                        | Skill nên dùng                                    | Mục đích                                                                                          |
+| -------------------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| Bắt đầu task               | `using-superpowers`                               | Chọn đúng workflow trước khi đọc/sửa file                                                         |
+| Làm rõ hoặc thiết kế mới   | `brainstorming`                                   | Chốt phạm vi, giả định, lựa chọn và AC; chỉ dùng khi còn điểm chưa rõ hoặc có quyết định thiết kế |
+| Viết/cập nhật plan         | `writing-plans`                                   | Chia lát theo dependency, nêu file, test và điều kiện hoàn thành                                  |
+| Implement plan đã sẵn sàng | `executing-plans`, `test-driven-development`      | Làm từng lát, có test hành vi và kiểm tra sau mỗi lát                                             |
+| Điều tra lỗi/test đỏ       | `systematic-debugging`                            | Tìm nguyên nhân và tạo ca tái hiện trước khi sửa                                                  |
+| Trước khi báo hoàn thành   | `verification-before-completion`                  | Chạy gate trên mã cuối và báo đúng phần chưa kiểm chứng                                           |
+| Nhờ review khi cần         | `requesting-code-review`, `receiving-code-review` | Kiểm tra diff hoặc xử lý finding; peer review vẫn là tùy chọn                                     |
+
+Không cần gọi mọi skill trong một task. Spec/plan đã `ready` thì không chạy lại brainstorming nếu không xuất hiện câu hỏi hoặc quyết định mới. Tên skill có thể khác trên công cụ khác; dùng workflow tương đương. Mẫu, vị trí và trạng thái trong repo này vẫn là nguồn bàn giao chính; không sinh bộ song song ở `docs/superpowers/`.
+
+`subagent-driven-development` hoặc cơ chế subagent khác chỉ dùng khi có từ hai phần **độc lập** với phạm vi file, đầu vào và tiêu chí hoàn thành rõ. Agent chính giữ trách nhiệm tích hợp, review từng kết quả, chạy gate trên cây cuối và báo cáo. Các subagent không được đồng thời sửa cùng file, dùng chung database kiểm thử có thể phá hủy, tự đổi baseline nghiệp vụ, tự ghi Owner đã duyệt, hoặc commit/push/merge/deploy khi chưa được giao. Task nhỏ, thay đổi xuyên suốt một flow hoặc sửa transaction dùng một agent để tránh phân mảnh context.
 
 ## Kiểm tra và Git
 

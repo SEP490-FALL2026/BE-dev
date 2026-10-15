@@ -1,12 +1,12 @@
 # Plan: Tài khoản từ Employee, lời mời, kích hoạt, khóa và vai gán (lát 1b)
 
-- [Spec](spec.md); revision đã review: chưa review.
-- Implement: chưa phân công (người hoặc AI); reviewer: chưa phân công.
-- Triển khai: **merged**, chưa accepted — code G0 và lát 1a/1b đã vào `dev` qua [PR #4](https://github.com/SEP490-FALL2026/BE-dev/pull/4), commit `64073c4`. Remediation `a0cf5f1` đã vào `origin/dev` qua PR #7/#8; code/spec/plan chưa dev khác review. Xem [báo cáo G0/G1](../../../reviews/g0-g1-remediation-2026-10-15/README.md).
+- [Spec](spec.md); revision thiết kế: Docs `0e0bb83` (`S-2026-10-12b`).
+- Phụ trách: BE Dev A. Thiết kế ban đầu bởi: Owner. Owner review: chưa review cuối. Peer review: review toàn bộ code/spec tùy chọn; review giá trị kỹ thuật `US-01-10` **bắt buộc theo nguồn — `pending`**, chặn `accepted`.
+- Triển khai: `verified` local tại `d60d306` (PR #4 `64073c4`, remediation PR #7/#8 `a0cf5f1`, Task 1B); refactor ở `ab0c43a`. Chưa `accepted`. Xem [báo cáo G0/G1](../../../reviews/g0-g1-remediation-2026-10-15/README.md).
 
 ## Trước khi code
 
-Chỉ bắt đầu khi mọi ô ở mục _Sẵn sàng bàn giao_ của [spec](spec.md) đã đánh dấu — gồm: lát 1a đã merge (hoặc nhánh nền thống nhất); spec/plan này được dev khác review ở revision cụ thể; thư viện SMTP và SMTP local (câu R-5) đã chốt trong ADR Proposed — **không** chọn ở bước code.
+_Lịch sử — điều kiện trước khi code theo quy trình cũ; lát đã implement và `verified`. Review toàn bộ của dev khác nay là tùy chọn, riêng review giá trị kỹ thuật `US-01-10` vẫn bắt buộc theo nguồn và đang `pending`._ Chỉ bắt đầu khi mọi ô ở mục _Sẵn sàng bàn giao_ của [spec](spec.md) đã đánh dấu — gồm: lát 1a đã merge (hoặc nhánh nền thống nhất); spec/plan này được dev khác review ở revision cụ thể; thư viện SMTP và SMTP local (câu R-5) đã chốt trong ADR Proposed — **không** chọn ở bước code.
 
 Đọc AGENTS.md, CONTRIBUTING.md, ARCHITECTURE.md, rules database/security/API, test guide. Đối chiếu code thật của lát 1a (guard, khai báo quyền, verifier, transaction runner, audit, bảng danh tính, giao thức khóa đã hiện thực) với giả định của spec; lệch thì cập nhật spec và review lại phần ảnh hưởng trước khi code phần đó.
 
@@ -17,7 +17,7 @@ Chỉ bắt đầu khi mọi ô ở mục _Sẵn sàng bàn giao_ của [spec](s
 - [x] **Bước 3 — Tạo tài khoản và gợi ý ứng viên.** `GET /account-candidates` (facade organization), `POST /app-users`, `GET /app-users`, `GET /app-users/{id}`; khóa Employee `FOR SHARE` qua facade; kiểm vai, Finance tối đa một (`QĐ-67e`), tổ hợp cấm; audit. Kiểm chứng: e2e mã lỗi/403; integration unique và đồng thời.
 - [x] **Bước 4 — Lời mời và kích hoạt.** `POST /app-users/{id}/invitations`, `POST /auth/invitations/redeem`; redeem khóa **AppUser trước token**; chính sách mật khẩu dùng chung với khởi tạo và kiểm trước khi tra token. Kiểm chứng: integration hết hạn/đã dùng/bị thay/đồng thời; gửi lại ↔ gửi lại; đăng nhập sau kích hoạt bằng route lát 1a.
 - [x] **Bước 5 — Khóa, mở, gán/thu hồi vai.** Bốn route quản trị, thu hồi token/phiên/thư khi khóa theo đúng thứ tự giao thức, kiểm _chính mình_ và người giữ `SUPER_ADMIN`. Kiểm chứng: integration HTTP (harness của lát 1a) request kế tiếp bị từ chối, dùng controller thăm dò chỉ có trong module test cho vai IT/Employee; unit policy tổ hợp cấm và người giữ `SUPER_ADMIN`; **concurrency** (harness, cả hai thứ tự commit): redeem ↔ khóa, đăng nhập ↔ khóa, refresh ↔ khóa, cấp `FINANCE` đồng thời, N vòng thứ tự ngẫu nhiên không `40P01`.
-- [ ] **Bước 6 — Hợp đồng và tài liệu.** _Contract đã triển khai; tài liệu đồng bộ 14/10, còn dev review và kiểm lại finding._ API manifest, `pnpm openapi:export` + review diff, cập nhật allowlist public, ARCHITECTURE (module notifications, worker dispatcher), security/API rules nếu đổi (mã 503 chung). Ghi kết quả thực chạy, cập nhật roadmap.
+- [ ] **Bước 6 — Hợp đồng và tài liệu.** _Contract đã triển khai; tài liệu đồng bộ 14/10, finding kiểm lại trong [báo cáo G0/G1](../../../reviews/g0-g1-remediation-2026-10-15/README.md); peer review tùy chọn._ API manifest, `pnpm openapi:export` + review diff, cập nhật allowlist public, ARCHITECTURE (module notifications, worker dispatcher), security/API rules nếu đổi (mã 503 chung). Ghi kết quả thực chạy, cập nhật roadmap.
 
 Rollback/migration: như lát 1a — migration của lát chỉ sửa/tạo lại khi mới áp lên database tạm của PR; đã merge hoặc áp lên môi trường dùng chung thì chỉ sửa bằng migration mới; không reset database dùng chung. Thư đã gửi không thu hồi được; thu hồi token là biện pháp khắc phục.
 
@@ -34,5 +34,6 @@ Rollback/migration: như lát 1a — migration của lát chỉ sửa/tạo lạ
 | Thử tay: tạo tài khoản IT → nhận thư local → kích hoạt → đăng nhập → khóa → request kế tiếp bị từ chối | local                                                          | chưa chạy                                                                                                                    | không ghi token/mật khẩu vào bằng chứng                                        |
 
 - [ ] AC trong scope có bằng chứng; lỗi đã xử lý hoặc ghi blocker.
-- [ ] Dev khác review code; spec phản ánh thay đổi đã thống nhất.
+- [ ] Spec phản ánh implementation cuối; _(Tùy chọn theo quy trình hiện hành — không chặn Owner review cuối.)_ dev khác review code, ghi link nếu có.
+- [ ] Dev khác review giá trị kỹ thuật `US-01-10` của lát — **bắt buộc theo nguồn, `pending`**; ghi người/link/revision vào spec; chặn `accepted`/`main`/production, không hạ `verified`.
 - [x] Đã ghi sự kiện merge PR #4 (`64073c4`) vào plan/roadmap ngày 14/10/2026; **accepted vẫn chưa được xác nhận**.

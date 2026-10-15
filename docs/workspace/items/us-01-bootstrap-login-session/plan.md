@@ -1,12 +1,12 @@
 # Plan: Khởi tạo tổ chức, đăng nhập và phiên (lát 1a)
 
-- [Spec](spec.md); revision đã review: chưa review.
-- Implement: chưa phân công (người hoặc AI); reviewer: chưa phân công.
-- Triển khai: **merged**, chưa accepted — code G0 và lát 1a/1b đã vào `dev` qua [PR #4](https://github.com/SEP490-FALL2026/BE-dev/pull/4), commit `64073c4`. Remediation `a0cf5f1` đã vào `origin/dev` qua PR #7/#8; code/spec/plan chưa dev khác review. Xem [báo cáo G0/G1](../../../reviews/g0-g1-remediation-2026-10-15/README.md).
+- [Spec](spec.md); revision thiết kế: Docs `0e0bb83` (`S-2026-10-12b`).
+- Phụ trách: BE Dev A. Thiết kế ban đầu bởi: Owner. Owner review: chưa review cuối. Peer review: review toàn bộ code/spec tùy chọn; review giá trị kỹ thuật `US-01-10` **bắt buộc theo nguồn — `pending`**, chặn `accepted`.
+- Triển khai: `verified` local tại `d60d306` (PR #4 `64073c4`, remediation PR #7/#8 `a0cf5f1`, Task 1B); refactor ở `ab0c43a`. Chưa `accepted`. Xem [báo cáo G0/G1](../../../reviews/g0-g1-remediation-2026-10-15/README.md).
 
 ## Trước khi code
 
-Chỉ bắt đầu khi mọi ô ở mục _Sẵn sàng bàn giao_ của [spec](spec.md) đã đánh dấu — gồm: nguồn Docs `S-2026-10-12b` truy cập được; spec nền và spec này được dev khác review ở revision cụ thể; [research](research.md) và [ADR-0011](../../../decisions/0011-internal-authentication-and-sessions.md) đã được dev review và lead xác nhận phần còn là đề xuất; convention cột và `btree_gist` đã chốt (lead, 12/10/2026). Các lựa chọn đó **không** được quyết trong lúc code.
+_Lịch sử — điều kiện trước khi code theo quy trình cũ; lát đã implement và `verified`. Review toàn bộ của dev khác nay là tùy chọn, riêng review giá trị kỹ thuật `US-01-10` vẫn bắt buộc theo nguồn và đang `pending`._ Chỉ bắt đầu khi mọi ô ở mục _Sẵn sàng bàn giao_ của [spec](spec.md) đã đánh dấu — gồm: nguồn Docs `S-2026-10-12b` truy cập được; spec nền và spec này được dev khác review ở revision cụ thể; [research](research.md) và [ADR-0011](../../../decisions/0011-internal-authentication-and-sessions.md) đã được dev review và lead xác nhận phần còn là đề xuất; convention cột và `btree_gist` đã chốt (lead, 12/10/2026). Các lựa chọn đó **không** được quyết trong lúc code.
 
 Đọc AGENTS.md, CONTRIBUTING.md, ARCHITECTURE.md, [database rules](../../../rules/database-business.md), [security rules](../../../rules/security-jobs.md), [API rules](../../../rules/api-contract.md), [test guide](../../../../test/README.md). Đối chiếu spec với code ở revision được giao (baseline lập plan: `dev` `d1ee03b` — chỉ health/catalog, verifier placeholder). Database phát triển đã preflight hoặc là database mới. Không restore code từ `feat/native-schema` hay lịch sử; chỉ đọc khi cần đối chiếu và ghi revision.
 
@@ -40,5 +40,6 @@ Chạy từ gốc BE. Integration cần `TEST_DATABASE_ADMIN_URL` trỏ PostgreS
 | Khởi tạo thủ công trên database mới + đăng nhập + `/me` + đăng xuất          | local                                                                                                                                   | **chưa chạy**: `node dist/installation-cli.js --help`, từ chối không-TTY và từ chối `--password` đã chạy; khởi tạo thật (prompt ẩn) chưa thử; luồng khởi tạo → đăng nhập → `/me` → đăng xuất được kiểm bằng integration (`installation`, `auth-http`)                                                                                | cần dev thử tay trên PowerShell và Linux                                                                                                  |
 
 - [ ] AC trong scope có bằng chứng; lỗi đã xử lý hoặc ghi blocker.
-- [ ] Dev khác review code; spec phản ánh thay đổi đã thống nhất.
+- [ ] Spec phản ánh implementation cuối; _(Tùy chọn theo quy trình hiện hành — không chặn Owner review cuối.)_ dev khác review code, ghi link nếu có.
+- [ ] Dev khác review giá trị kỹ thuật `US-01-10` của lát — **bắt buộc theo nguồn, `pending`**; ghi người/link/revision vào spec; chặn `accepted`/`main`/production, không hạ `verified`.
 - [x] Đã ghi sự kiện merge PR #4 (`64073c4`) vào plan/roadmap ngày 14/10/2026; **accepted vẫn chưa được xác nhận**.

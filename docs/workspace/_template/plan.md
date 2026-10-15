@@ -13,7 +13,7 @@
 
 - [ ] Bước 1: kết quả review được; file/module dự kiến; dependency; cách kiểm chứng và kết quả mong đợi.
 - [ ] Bước 2: kết quả; AC/test liên quan; lệnh phù hợp.
-- [ ] Bước 3: tích hợp, tài liệu/API/migration nếu ảnh hưởng, review diff.
+- [ ] Bước 3: tích hợp; tự review diff theo spec/AC; cập nhật tài liệu, runbook, API hoặc migration nếu ảnh hưởng.
 
 Chỉ giữ bước cần thiết. Không tạo todo song song. Ghi rollback/migration strategy nếu thay đổi dữ liệu hoặc triển khai có rủi ro.
 
@@ -26,4 +26,5 @@ Chọn lệnh theo CONTRIBUTING.md và test/README.md, chạy từ gốc BE. L�
 
 - [ ] AC trong scope có bằng chứng; lỗi đã xử lý hoặc ghi blocker.
 - [ ] Spec/plan/test design phản ánh đúng implementation cuối; peer review nếu có đã được xử lý hoặc ghi disposition.
+- [ ] Diff cuối đã được tự review; tài liệu vận hành/runbook bị ảnh hưởng đã cập nhật; phần chưa kiểm chứng được ghi rõ.
 - [ ] Giao Owner review trên revision cụ thể; cập nhật roadmap/PR. Chỉ ghi `merged-dev`, `accepted` và `released` sau đúng sự kiện thật.

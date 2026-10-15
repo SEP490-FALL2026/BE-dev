@@ -15,7 +15,7 @@ Bug fix cần test tái hiện lỗi ở boundary phù hợp. Refactor giữ pub
 không gộp tính năng hoặc nâng dependency không liên quan. Sửa tài liệu cần kiểm tra
 nội dung, link và format; không cần test giả cho một câu văn.
 
-Task nhỏ không đổi nghiệp vụ/contract dùng issue/PR. Tính năng US hoặc thay đổi nhiều bước dùng [quy trình chung](docs/workspace/README.md) và [roadmap](docs/roadmap.md): giao người phụ trách → thiết kế spec/plan/test → implement và kiểm chứng → tích hợp `dev` → Owner review cuối trước `main`/production. Người phụ trách có thể tự thiết kế và code; Owner cũng có thể chuẩn bị thiết kế rồi bàn giao. Peer review của dev khác là tùy chọn, không phải gate bắt buộc. Không bắt skill/plugin. Quyết định kiến trúc lâu dài dùng ADR.
+Task nhỏ không đổi nghiệp vụ/contract dùng issue/PR. Tính năng US hoặc thay đổi nhiều bước dùng [quy trình chung](docs/workspace/README.md) và [roadmap](docs/roadmap.md): giao người phụ trách → thiết kế spec/plan/test → implement và kiểm chứng → tích hợp `dev` → Owner review cuối trước `main`/production. Người phụ trách có thể tự thiết kế và code; Owner cũng có thể chuẩn bị thiết kế rồi bàn giao. Peer review của dev khác là tùy chọn, không phải gate bắt buộc. Không bắt một AI hoặc gói skill cụ thể; nếu công cụ hỗ trợ skill/subagent thì áp dụng theo quy tắc trong workspace. Quyết định kiến trúc lâu dài dùng ADR.
 
 ## Lệnh kiểm tra
 
@@ -62,6 +62,10 @@ Khi hai nguồn khác nhau, ghi rõ khoảng cách, không mặc định kế ho
 - Thay đổi đúng phạm vi; giữ nguyên công việc có sẵn của người khác.
 - API đổi thì đồng bộ DTO, test, manifest API và OpenAPI. Nêu tác động FE trong PR.
 - Schema đổi thì có migration được review và kiểm tra trên database riêng.
-- Cập nhật hướng dẫn khi lệnh, workflow hoặc boundary thay đổi.
+- Tự review diff cuối theo spec/plan và AC; sửa finding trực tiếp trước khi bàn giao.
+- Peer review của dev khác mặc định là tùy chọn; **bắt buộc** khi requirement/decision/spec đã pin yêu cầu cụ thể
+  (ví dụ giá trị kỹ thuật của `US-01-10`). Khi đó ghi người review, link và revision; chưa có thì ghi `pending` và
+  hạng mục chưa được `accepted`.
+- Cập nhật hướng dẫn/runbook khi lệnh, cấu hình, workflow, vận hành hoặc boundary thay đổi.
 - Báo lệnh thực chạy, kết quả và giới hạn; mock không chứng minh hạ tầng thật.
 - Không commit secrets/dữ liệu thật. Không tự push, deploy hoặc thao tác dữ liệu dùng chung khi chưa được giao.

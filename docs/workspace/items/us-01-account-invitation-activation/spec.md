@@ -1,12 +1,12 @@
 # Spec: Tài khoản từ Employee, lời mời, kích hoạt, khóa và vai gán (lát 1b)
 
-- Phụ trách: chưa phân công; reviewer: chưa phân công (một dev khác, ngang quyền).
-- Thiết kế: **draft** (12/10/2026, sửa cùng ngày sau vòng khép thiết kế). Review: chưa review.
+- Phụ trách: BE Dev A (theo roadmap). Thiết kế ban đầu bởi: Owner. Peer review: review toàn bộ spec/code là tùy chọn theo [quy trình](../../README.md); review **giá trị kỹ thuật `US-01-10`** (thời hạn lời mời/phiên, chính sách mật khẩu, giới hạn tần suất) **bắt buộc theo nguồn — `pending`**, xem _Sẵn sàng bàn giao_.
+- Thiết kế: ready (đã implement). Triển khai: `verified` local tại `d60d306`; refactor module sau đó ở `ab0c43a`. Owner review cuối: chưa có; chưa `accepted`/`released`.
 - Nguồn: [snapshot `S-2026-10-12b`](../../sources.md) — US v0.15 (bổ sung `QĐ-67`) `US-01-01`, `US-01-10` (`EP-01`); BRD v3.36 `FR-8.1`, `FR-8.3`, `FR-8.6`→`FR-8.11`, `FR-3.11` (ngoại lệ thư vòng đời tài khoản), bảng vai trò 4.1 (Finance); quyết định `QĐ-39b`, `QĐ-39c`, `QĐ-41a`, `QĐ-44`, `QĐ-46a`, `QĐ-47c`, `QĐ-52d`, `QĐ-67e`.
-- Trạng thái yêu cầu: `OWNER-PROVISIONAL` (`L-2`) — quyết định Owner, chưa GVHD. Logical, giao thức khóa, định nghĩa token _dùng được_ và chiến lược migration: [spec nền](../foundation-org-identity-boundary/spec.md) (thêm AccountActionToken, EmailOutbox).
+- Trạng thái yêu cầu: `US-01-01`, `US-01-10` là `BASELINED` theo `QĐ-72` tại Docs `3341ea0` (snapshot gốc `S-2026-10-12b` ghi `OWNER-PROVISIONAL`, `L-2`). Logical, giao thức khóa, định nghĩa token _dùng được_ và chiến lược migration: [spec nền](../foundation-org-identity-boundary/spec.md) (thêm AccountActionToken, EmailOutbox).
 - [Kế hoạch](plan.md). Phụ thuộc: [lát 1a](../us-01-bootstrap-login-session/spec.md) (đăng nhập, guard, khai báo quyền, audit, bảng danh tính, Employee IT từ khởi tạo).
 
-**Đối chiếu 15/10/2026:** code nền đã merge PR #4 (`64073c4`); remediation `a0cf5f1` đã vào `origin/dev` qua PR #7/#8; code/spec/plan chưa được dev khác review/nghiệm thu. Nguồn baseline là Docs `0e0bb83` (snapshot `S-2026-10-12b`). Xem [báo cáo G0/G1](../../../reviews/g0-g1-remediation-2026-10-15/README.md).
+**Trạng thái 15/10/2026 (Task 3B):** code vào `dev` qua PR #4 (`64073c4`), remediation qua PR #7/#8 (`a0cf5f1`) và Task 1B; baseline `verified` local tại `d60d306`. Refactor Task 2/2B ở `ab0c43a` giữ nguyên nghiệp vụ và 16 HTTP operation. Nguồn thiết kế của lát là Docs `0e0bb83` (`S-2026-10-12b`); nguồn hiện hành Docs `3341ea0` ghi các Story liên quan `BASELINED` theo `QĐ-72`, còn thay đổi nguồn sau đó thuộc lát khác (`QĐ-73a` AC-12 → 1c; `QĐ-68`/`QĐ-70` → G2 đầu). Remote CI và Owner review cuối chưa có. Xem [báo cáo G0/G1](../../../reviews/g0-g1-remediation-2026-10-15/README.md).
 
 ## Vấn đề và phạm vi
 
@@ -159,11 +159,12 @@ Kết quả mong đợi khi tranh chấp (cơ chế ở giao thức khóa chung)
 ## Sẵn sàng bàn giao
 
 - [x] Lát 1a đã merge qua PR #4 (`64073c4`).
-- [ ] Spec nền được dev khác review.
+- [ ] _(Tùy chọn theo quy trình hiện hành — không chặn Owner review cuối.)_ Spec nền được dev khác review.
 - [ ] Người nhận xác nhận truy cập được Docs `S-2026-10-12b` tại commit `0e0bb83` (xem [sources](../../sources.md)).
 - [x] `OQ-A-03` đã chốt (`QĐ-67e`); không còn câu Owner chặn lát này.
-- [ ] Reviewer chốt câu R-5 (SMTP local) và thư viện SMTP trong ADR Proposed; chốt cấu hình/khóa mã hóa; xác nhận mã lỗi (gồm tên mã 503 chung).
-- [ ] Dev khác xác nhận spec + plan với link review và revision cụ thể.
+- [ ] Owner review cuối xác nhận câu R-5 (SMTP local) và thư viện SMTP trong ADR Proposed; chốt cấu hình/khóa mã hóa; xác nhận mã lỗi (gồm tên mã 503 chung).
+- [ ] _(Tùy chọn theo quy trình hiện hành — review toàn bộ; không chặn Owner review cuối.)_ Dev khác xác nhận spec + plan với link review và revision cụ thể.
+- [ ] **Bắt buộc theo nguồn (`US-01-10` _Business rules_, Docs `3341ea0`) — `pending`:** dev khác review giá trị kỹ thuật của lát: `AUTH_INVITATION_TTL_SECONDS` (thời hạn lời mời) và việc redeem dùng chính sách mật khẩu của 1a; ghi người review, link và revision. Code đã ở `dev` và `verified` tại `d60d306`: gate này được khôi phục ngày 15/10/2026 sau khi code đã merge, không hạ trạng thái triển khai và không chặn được việc code trước đó; nó chặn `accepted`/`main`/production.
 
 ## Thay đổi và nghiệm thu
 

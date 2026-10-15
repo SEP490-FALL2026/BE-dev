@@ -2,13 +2,13 @@
 
 BRD sở hữu nghiệp vụ; US dẫn xuất phạm vi/AC; sổ quyết định ghi thay đổi nghiệp vụ. ARCHITECTURE/ADR của BE sở hữu cách hiện thực, không ghi đè yêu cầu.
 
-| Nguồn      | Vị trí nhận diện trong bộ tài liệu dự án                                                 | Link chia sẻ / revision                                         |
-| ---------- | ---------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
-| BRD        | Docs/Requiments/BRD - HỆ THỐNG QUẢN TRỊ BẢN QUYỀN PHẦN MỀM & TỐI ƯU CHI PHÍ CÔNG NGHỆ.md | v3.36 `S-2026-10-12b`; v3.39 `S-2026-10-14`                     |
-| Phạm vi    | Docs/Requiments/Định nghĩa phạm vi & nghiệp vụ.md                                        | v1.24 `S-2026-10-12b`; v1.27 `S-2026-10-14`                     |
-| US         | Docs/BE-UserStory/user-stories-and-epics.md và Docs/BE-UserStory/epics/                  | v0.15 (`QĐ-67`) `S-2026-10-12b`; v0.15 (`QĐ-73`) `S-2026-10-14` |
-| Quyết định | Docs/Decisions/project-decisions.md                                                      | QĐ-01 → QĐ-67 `S-2026-10-12b`; → QĐ-73 `S-2026-10-14`           |
-| Conceptual | Docs/ERD/CONCEPTUAL ERD - DANH SÁCH ENTITY.md                                            | v5.1 (21 · 42), không đổi, `S-2026-10-12b`                      |
+| Nguồn      | Vị trí nhận diện trong bộ tài liệu dự án                                                 | Link chia sẻ / revision                                       |
+| ---------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| BRD        | Docs/Requiments/BRD - HỆ THỐNG QUẢN TRỊ BẢN QUYỀN PHẦN MỀM & TỐI ƯU CHI PHÍ CÔNG NGHỆ.md | v3.36 `S-2026-10-12b`; v3.39 `S-2026-10-14b` = Docs `3341ea0` |
+| Phạm vi    | Docs/Requiments/Định nghĩa phạm vi & nghiệp vụ.md                                        | v1.24 `S-2026-10-12b`; v1.27 `S-2026-10-14b` = Docs `3341ea0` |
+| US         | Docs/BE-UserStory/src/ (canonical), sinh ra user-stories-and-epics.md và epics/          | v0.15 (`QĐ-67`) `S-2026-10-12b`; v0.15 (`QĐ-73`) `3341ea0`    |
+| Quyết định | Docs/Decisions/project-decisions.md                                                      | QĐ-01 → QĐ-67 `S-2026-10-12b`; → QĐ-73 `3341ea0`              |
+| Conceptual | Docs/ERD/CONCEPTUAL ERD - DANH SÁCH ENTITY.md                                            | v5.1 (21 · 42), không đổi, `S-2026-10-12b`                    |
 
 Vị trí trên chỉ để nhận diện tài liệu, không bắt contributor có thư mục cạnh checkout BE. Mỗi spec pin revision thực sự dùng.
 
@@ -41,19 +41,30 @@ commit/tệp có hash khớp. Việc kiểm hash local không xác nhận quyề
 phê duyệt spec. Nguồn US canonical là `BE-UserStory/src/` + `BE-UserStory/tools/build_us.py`;
 tệp sinh không sửa tay.
 
-## Snapshot `S-2026-10-14b` (working tree Docs — chưa commit; thay `S-2026-10-14`)
+## Snapshot `S-2026-10-14b` (Docs commit `3341ea0`; thay `S-2026-10-14`)
 
-Lập 14/10/2026 sau delta `QĐ-73b` trên workflow: Docs HEAD `0e0bb83` **cộng thay đổi chưa commit** — BRD v3.39, Phạm vi v1.27,
-sổ `QĐ-01` → `QĐ-73`, User Stories v0.15 (147 mã, 143 dùng, 1 408 AC), `WF-01` v3.3 (hồ sơ Finance đầu tiên nhập tay hoặc
-import), `WF-04` (ghi ngoại lệ), Conceptual v5.1 (không đổi). Hash: SHA-256 nội dung chuẩn hóa LF, bỏ BOM (49 files);
-cột _Git_ là trạng thái so với `0e0bb83` (`M` sửa, `??` mới). Mọi tệp bắt buộc nằm ngoài `Reviews/` và evidence bị ignore.
+**Hướng dẫn hiện hành.** Người nhận lấy đúng Docs commit **`3341ea03fd3355d19d1a234931463d75be887af0`** (`3341ea0`,
+14/10/2026) từ [repo Docs](https://github.com/SEP490-FALL2026/docs/commit/3341ea03fd3355d19d1a234931463d75be887af0) — không
+lấy working tree mới hơn để thay ngầm nguồn của spec. Ngày 15/10/2026 đã kiểm **49/49 tệp** trong bảng dưới bằng
+`git show 3341ea0:<tệp>` và SHA-256 chuẩn hóa LF, không BOM: khớp. Snapshot gồm BRD v3.39, Phạm vi v1.27, sổ `QĐ-01` →
+`QĐ-73`, User Stories v0.15 (147 mã, 143 dùng, 1 408 AC), `WF-01` v3.3, `WF-04`, Conceptual v5.1 (không đổi). Spec 1c,
+tra cứu Audit Trail và G2 đầu pin `3341ea0`; G0/1a/1b giữ nguồn thiết kế `S-2026-10-12b`. Kiểm hash local không xác nhận
+quyền truy cập remote của người nhận và không phê duyệt spec.
 
-**Dùng cho bước nào.** _Bắt đầu refinement/design_ (hai lát 1c, G2 đầu): người nhận có **đúng các tệp** dưới đây và
-hash khớp. Cùng máy: đọc thẳng working tree Docs. Khác máy: nhận **gói snapshot** — đúng 49 tệp theo đường dẫn
-trong bảng (ví dụ nén từ gốc Docs) — rồi kiểm lại hash; bảng hash một mình **không** đủ để làm việc. _Giao implementation_:
-nguồn phải được **cố định và truy cập được** cho mọi người làm/review; khi nhóm dùng Git, cách ưu tiên là commit Docs rồi
-pin snapshot bằng commit (như `S-2026-10-12b`) — đây là quy ước ưu tiên của tài liệu này, **không** phải quyết định Owner;
-chưa thấy quy định bắt buộc commit trong [quy trình](README.md) (chỉ yêu cầu snapshot có version/hash cho nguồn chưa commit).
+_Lịch sử — lúc lập snapshot (14/10/2026), không còn là hướng dẫn hiện hành:_ snapshot được lập trên Docs HEAD `0e0bb83`
+cộng thay đổi chưa commit; cột _Git_ dưới đây là trạng thái so với `0e0bb83` (`M` sửa, `??` mới) tại thời điểm đó. Khi ấy
+người làm refinement đọc working tree cùng máy hoặc nhận gói 49 tệp và kiểm hash, và việc giao implementation chờ Docs
+được commit rồi pin bằng commit — điều kiện này nay đã đạt ở `3341ea0`.
+
+### Việc bảo trì nguồn còn mở (sửa ở commit Docs sau; không đổi `3341ea0`)
+
+Hai lệch dưới đây nằm trong nguồn đã pin. BE **không** sửa nguồn và không đổi hash/snapshot; cả hai **không** đổi contract
+của ba item Task 3 (1c, tra cứu Audit Trail, G2 đầu). Người sửa Docs ghi commit mới và lập snapshot mới khi cần.
+
+| Vị trí tại `3341ea0`                                              | Lệch                                                                                | Sửa đúng                                                                                                     |
+| ----------------------------------------------------------------- | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `BE-UserStory/src/EP-01.md` dòng 388 (`US-01-10` _Preconditions_) | Mô tả trạng thái BE "đã merge ở BE `64073c4`, chưa accepted; lát 1c chưa implement" | Trạng thái BE thuộc roadmap BE: G0/1a/1b `verified` local tại `d60d306`, refactor `ab0c43a`; nên trỏ roadmap |
+| BRD mục 7.2 (dòng 1238) và `OQ-15` (dòng 1723)                    | Còn trỏ BE ADR-0010 (đã rời baseline BE)                                            | Trỏ BE ADR-0011 và ADR-0012 (_Proposed_), như `US-01-10` _Source traceability_                               |
 
 | Tệp (tính từ gốc Docs)                                                              | Git   | SHA-256 (LF, không BOM)                                            |
 | ----------------------------------------------------------------------------------- | ----- | ------------------------------------------------------------------ |
@@ -174,16 +185,18 @@ Không chép BRD vào spec; spec dẫn mục/AC theo hash này. `S-2026-10-12b` 
 ## Delta sau baseline: `QĐ-68` (chưa thay snapshot của G0/1a/1b)
 
 [Review G0/G1](../reviews/g0-g1-remediation-2026-10-15/README.md) ghi nhận working tree Docs
-BRD v3.37, Phạm vi v1.25 và `QĐ-68a`→`68f`; phần này đang được chỉnh riêng, chưa được pin thành
-snapshot bàn giao mới tại đây. EP-01 và các định nghĩa yêu cầu của ba spec được kiểm trong báo cáo
-vẫn khớp baseline. Không coi toàn bộ working tree đã được review hoặc đã được BE hiện thực.
+BRD v3.37, Phạm vi v1.25 và `QĐ-68a`→`68f`; các thay đổi này nay nằm trong `S-2026-10-14b` = Docs `3341ea0`.
+G0/1a/1b giữ nguồn thiết kế `S-2026-10-12b`; EP-01 và các định nghĩa yêu cầu của ba spec đó được kiểm trong báo cáo
+vẫn khớp baseline. Delta không có nghĩa BE đã hiện thực các quyết định này.
 
 - R-10: trước G2, refine JobTitle theo `QĐ-68a/b/d`: danh mục chung, chuẩn hóa khoảng trắng thừa,
   không phân biệt hoa/thường nhưng giữ dấu, có trạng thái ngừng dùng.
 - R-11: review lại I-2 theo `QĐ-66ak` và `QĐ-68f`: thời điểm ghi nhận thành viên phòng khác thời điểm
-  bắt đầu quyền theo ngày vào. Theo dõi `OQ-A-26` cho ngày vào đã qua; không tự chốt.
+  bắt đầu quyền theo ngày vào. `OQ-A-26` **đã đóng** ở `QĐ-70c` (có trong `3341ea0`): không đổi nguồn hiện hành, nhập
+  lịch sử phòng từ ngày vào đã qua là thay đổi tương lai, không là blocker.
   Ngoại lệ placement khởi tạo từ ngày vào của `QĐ-67a`/`QĐ-68f` giữ nguyên.
-- Khi thiết kế G2, pin commit/hash mới, lập impact/migration/test plan và dev review trước phần phụ thuộc.
+- R-10/R-11 đã được đưa vào thiết kế [G2 đầu](items/g2-job-title-catalogue-and-manual-employee/spec.md) (pin `3341ea0`,
+  migration/test plan trong plan của item); peer review là tùy chọn theo [quy trình](README.md).
   Xem [review G0/G1](../reviews/g0-g1-remediation-2026-10-15/README.md).
 
 ## Snapshot `S-2026-10-12` (lịch sử)
