@@ -38,6 +38,7 @@
     "test:integration": "jest --config ./test/config/jest.integration.cjs --runInBand",
     "test:discovery": "node scripts/verify/verify-test-discovery.mjs",
     "test:scripts": "node --test \"scripts/verify/*.test.mjs\"",
+    "test:mutation": "node scripts/verify/targeted-mutation.mjs",
     "check": "pnpm rules:check && pnpm rules:test && pnpm rules:format && pnpm format:check && pnpm prisma:validate && pnpm prisma:generate && pnpm lint && pnpm typecheck && pnpm test && pnpm test:scripts && pnpm test:discovery && pnpm build",
     "rules:check": "node scripts/check-rules.mjs",
     "rules:test": "node --test scripts/check-rules.test.mjs",
@@ -46,7 +47,6 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1107.0",
     "@aws-sdk/s3-request-presigner": "^3.1107.0",
-    "@huggingface/transformers": "3.8.1",
     "@nestjs/bullmq": "^11.0.5",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.4",
@@ -74,6 +74,7 @@
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",
     "@eslint/js": "^9.18.0",
+    "@huggingface/transformers": "3.8.1",
     "@nestjs/cli": "^11.0.0",
     "@nestjs/schematics": "^11.0.0",
     "@nestjs/testing": "^11.0.1",

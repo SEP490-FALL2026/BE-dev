@@ -107,6 +107,15 @@ describe('account management over HTTP (integration, real PostgreSQL)', () => {
     await ctx.sql.query('DELETE FROM login_throttles');
   });
 
+  it.each(['invitations', 'lock', 'unlock'])(
+    'rejects an invalid account UUID on POST /app-users/:id/%s with 422 VALIDATION_ERROR',
+    async (action) => {
+      const response = await admin.post(`/api/v1/app-users/not-a-uuid/${action}`).expect(422);
+
+      expect(errorCode(response)).toBe('VALIDATION_ERROR');
+    },
+  );
+
   describe('candidates and creation (US-01-01 AC-1, AC-5, AC-8, AC-16)', () => {
     it('lists employees without an account, excluding the departed, and finds them by name or code', async () => {
       const candidate = await newEmployee('candidate.one@acme.vn');

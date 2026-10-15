@@ -157,6 +157,7 @@ export class AppUsersController {
       status: HttpStatus.CONFLICT,
       description: 'The account is activated, locked, belongs to a departed employee, or is the caller.',
     },
+    { status: HttpStatus.UNPROCESSABLE_ENTITY, description: 'The identifier is not a UUID (VALIDATION_ERROR).' },
   )
   async resendInvitation(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: AppUserIdParamDto) {
     try {
@@ -176,6 +177,7 @@ export class AppUsersController {
     ...COMMON_ERRORS,
     { status: HttpStatus.NOT_FOUND, description: 'No account has this identifier.' },
     { status: HttpStatus.CONFLICT, description: 'The caller, or the holder of SUPER_ADMIN, cannot be locked.' },
+    { status: HttpStatus.UNPROCESSABLE_ENTITY, description: 'The identifier is not a UUID (VALIDATION_ERROR).' },
   )
   async lock(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: AppUserIdParamDto) {
     try {
@@ -195,6 +197,7 @@ export class AppUsersController {
     ...COMMON_ERRORS,
     { status: HttpStatus.NOT_FOUND, description: 'No account has this identifier.' },
     { status: HttpStatus.CONFLICT, description: 'The caller cannot change their own account.' },
+    { status: HttpStatus.UNPROCESSABLE_ENTITY, description: 'The identifier is not a UUID (VALIDATION_ERROR).' },
   )
   async unlock(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: AppUserIdParamDto) {
     try {

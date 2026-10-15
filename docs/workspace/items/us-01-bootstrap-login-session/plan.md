@@ -2,7 +2,7 @@
 
 - [Spec](spec.md); revision đã review: chưa review.
 - Implement: chưa phân công (người hoặc AI); reviewer: chưa phân công.
-- Triển khai: **merged**, chưa accepted — code G0 và lát 1a/1b đã vào `dev` qua [PR #4](https://github.com/SEP490-FALL2026/BE-dev/pull/4), commit `64073c4`. Remediation ở `a0cf5f1` chưa merge; spec/plan chưa dev khác review. Xem [báo cáo G0/G1](../../../reviews/g0-g1-remediation-2026-10-15/README.md).
+- Triển khai: **merged**, chưa accepted — code G0 và lát 1a/1b đã vào `dev` qua [PR #4](https://github.com/SEP490-FALL2026/BE-dev/pull/4), commit `64073c4`. Remediation `a0cf5f1` đã vào `origin/dev` qua PR #7/#8; code/spec/plan chưa dev khác review. Xem [báo cáo G0/G1](../../../reviews/g0-g1-remediation-2026-10-15/README.md).
 
 ## Trước khi code
 

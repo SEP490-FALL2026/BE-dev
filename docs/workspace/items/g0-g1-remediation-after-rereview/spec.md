@@ -55,3 +55,43 @@
 5. Dev khác review code/spec/plan; PR được merge theo quy trình của dự án.
 
 Chi tiết kết quả chạy và giới hạn còn lại nằm trong báo cáo review duy nhất được dẫn ở trên.
+
+## Bổ sung sau review `3d03f00` — 15/10/2026
+
+Đây là các task nhỏ phát sinh từ RV-01→RV-08 trong mục _Review revision hiện tại_ của báo cáo, chưa implement.
+Nguồn nghiệp vụ G0/1a/1b vẫn là `S-2026-10-12b` tại Docs `0e0bb83`; không mở rộng sang 1c/G2.
+Các checklist kiểm chứng cũ không đóng các finding mới này.
+
+| Finding                                        | Thay đổi cần làm và acceptance                                                                                                                                                                                                                                          | Test/kiểm chứng cần có                                                                                                                                                                                                                                                                                  |
+| ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| RV-01, P2: dependency audit fail               | Bỏ/tách dependency nghiên cứu không cần runtime hoặc nâng tổ hợp transformers/sharp được hỗ trợ; production graph không còn high theo gate. Không ép override khi chưa kiểm tương thích; giữ script nghiên cứu có cách chạy rõ nếu tách dependency                      | Audit production exit 0; frozen install/build và smoke API/worker; nếu vẫn dùng thư viện thì kiểm chức năng thực sự sử dụng nó                                                                                                                                                                          |
+| RV-02, P2: hai spec khác cửa sổ replay         | Dev review thống nhất spec nền và spec 1a về token đã consumed nhưng expired trong phiên còn sống; ghi lựa chọn và lý do. Chỉ sửa AuthService nếu hợp đồng đã thống nhất yêu cầu revoke trường hợp này; không tự đổi nghiệp vụ trong review                             | Integration A→B, A expired nhưng B/session còn hạn: A luôn 401, không được mint token. Assert rõ B/access còn dùng được hay bị revoke theo kết luận; nếu revoke thì audit đúng một dòng đã commit dù A trả 401. Đối chứng replay A còn hạn, token chưa consumed nhưng expired, phiên đã hết hạn/revoked |
+| RV-03, P2: CI dùng superuser                   | CI provision role `NOSUPERUSER CREATEDB NOCREATEROLE NOREPLICATION` trên PostgreSQL 17 riêng và dùng role này chạy integration; assert thuộc tính role trước suite. Khi teardown lỗi, thu metadata an toàn và đóng đúng resource; không đổi sang superuser để che 42501 | Một full integration gate dưới role thường; guard từ chối cấu hình superuser. Nếu cần retry teardown thì chỉ có giới hạn cho nguyên nhân đã phân loại và không che leak; không log query/credential/dữ liệu thật                                                                                        |
+| RV-04, P2: chưa kiểm post-commit response loss | Mở rộng relay hiện có đủ nhỏ để COMMIT tới server nhưng response bị giữ; chứng minh DB đã commit qua connection độc lập. Caller báo lỗi availability hữu hạn, không tự retry write; business/audit nguyên tử, pool phục hồi                                             | Test response-loss sau actual COMMIT tách biệt pre-COMMIT stall; test rollback trước commit và connection retirement hiện có tiếp tục đạt. Tránh test chấp nhận cả rollback/commit mà không chứng minh nhánh cần kiểm                                                                                   |
+| RV-05, P2: không có runner mutation duy trì    | Một runner nhỏ có control, xác nhận mutant áp đúng, restore trong finally + so hash; setup failure khác test bắt mutant. Không xây framework hoặc tính mutation score toàn dự án                                                                                        | Control xanh, tối đa ba mutant N-1/authorization/invitation; kiểm restore cả khi test/setup lỗi. Khi control fail thì không báo mutant killed; workspace sau chạy khớp bytes ban đầu                                                                                                                    |
+| RV-06, P3: OpenAPI thiếu 422                   | Bổ sung response `422 VALIDATION_ERROR` cho resend/lock/unlock ở decorator; regenerate OpenAPI bằng script hiện có                                                                                                                                                      | HTTP invalid UUID cho cả ba operation; assertion generated document có 422, body envelope khớp; generator không drift sau commit thay đổi                                                                                                                                                               |
+| RV-07, P3: trạng thái merge cũ                 | Đồng bộ dòng trạng thái trong spec/plan 1a/1b theo ancestry `a0cf5f1` đã merge; vẫn ghi chưa dev review, ADR Proposed                                                                                                                                                   | Đối chiếu Git ancestry/PR; docs rules/link/format đạt; không biến merge thành nghiệm thu                                                                                                                                                                                                                |
+| RV-08, P2: rollback target chưa được kiểm      | Ghi artifact/commit rollback giữ pool retirement/disposal/idle backstop của N-1, schema compatibility và cách tiến lên lại. Không lấy `a8ba88f`/`64073c4` hoặc revert `2eda0f1` làm đường rollback mặc định                                                             | Dry-run/đọc diff của target; trên môi trường riêng xác nhận timeout hữu hạn, retirement, atomicity và migrate compatibility. Không revert repo thật hay xóa dữ liệu dùng chung để kiểm plan                                                                                                             |
+
+Không kết luận RV-02 là lỗi code trước khi khép mâu thuẫn nguồn. RV-04/05/08 là thiếu bằng chứng đã xác định,
+không phải kết quả test sản phẩm fail. Teardown 42501 lịch sử giữ mở: lượt role thường mới đạt nhưng chưa chứng minh căn nguyên.
+
+## Quyết định và remediation Task 1B — 15/10/2026
+
+RV-02 đã được người giao Task 1B chốt: refresh token expired luôn 401 trước consumed, không mint và không thu hồi
+successor/session; consumed còn hạn trong phiên còn sống mới revoke family + đúng một audit commit rồi 401.
+Hai spec nền/1a đã đồng bộ. Regression kiểm snapshot session/token/audit khi expired và B/access còn dùng được;
+AuthService hiện đúng nên không sửa logic auth. Không còn blocker quyết định ở RV-02.
+
+RV-01/03/04/05/06 đã có implementation và focused tests; RV-07 đã đồng bộ merge status.
+RV-08 có tiêu chí artifact sau merge và dry-run riêng; rollout thực/remote CI không tự ghi PASS.
+Kết quả final verification, fingerprint cây được kiểm và disposition từng finding nằm trong báo cáo hiện có.
+Giữ nguyên các finding ban đầu để reviewer thấy trước/sau, không dùng checklist lịch sử làm bằng chứng mới.
+
+Final Task 1B: frozen install, check (321 unit/19 script), E2E 36, integration 242 bằng role thường, production audit,
+OpenAPI chỉ ba 422, Docker build/live 16 operation/CLI/SMTP/shutdown đều exit 0. N-1 dry-run 27 unit + 13 integration
+probe và final control + ba mutant KILLED đạt, restore bytes/hash đúng, owner không đổi. Không thêm migration.
+RV-01/03/04/05/06/07 FIXED trong implementation/local acceptance; RV-02 DISPOSITIONED theo quyết định task.
+RV-08 DISPOSITIONED với criteria và dry-run; artifact release sau merge và remote CI vẫn UNVERIFIED, không bịa evidence.
+Dev khác chưa review/nghiệm thu, ADR-0011/0012 vẫn Proposed. Không còn blocker quyết định RV-02 hoặc P2 code/test
+chưa xử lý trong phạm vi remediation; không tự triển khai Task 2.

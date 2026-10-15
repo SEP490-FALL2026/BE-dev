@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import request from 'supertest';
 import { bodyOf } from '../support/api-body';
 import {
@@ -321,6 +322,90 @@ describe('authentication over HTTP (integration, real PostgreSQL)', () => {
         after: { revoked: true, reason: 'REPLAY_DETECTED' },
       });
       await ctx.sql.query('DELETE FROM auth_sessions WHERE false');
+    });
+
+    it('rejects an expired consumed token without revoking its live successor or minting a token', async () => {
+      const first = await loginAdmin();
+      const oldCookie = cookieValue(refreshCookie(first) as string);
+      const second = await request(server())
+        .post('/api/v1/auth/refresh')
+        .set('Cookie', `${REFRESH_COOKIE}=${oldCookie}`)
+        .expect(200);
+      const nextCookie = cookieValue(refreshCookie(second) as string);
+      const oldHash = createHash('sha256').update(oldCookie).digest('hex');
+      const { rows } = await ctx.sql.query<{ session_id: string }>(
+        `UPDATE refresh_tokens SET expires_at = now() - interval '1 second'
+         WHERE token_hash = $1 AND consumed_at IS NOT NULL RETURNING session_id`,
+        [oldHash],
+      );
+      expect(rows).toHaveLength(1);
+      const sessionId = rows[0].session_id;
+      const snapshot = async () => ({
+        session: (await ctx.sql.query('SELECT * FROM auth_sessions WHERE id = $1', [sessionId])).rows,
+        tokens: (
+          await ctx.sql.query('SELECT * FROM refresh_tokens WHERE session_id = $1 ORDER BY token_hash', [sessionId])
+        ).rows,
+        audit: (
+          await ctx.sql.query(`SELECT id FROM audit_events WHERE action = 'SESSION.REVOKED' AND resource_id = $1`, [
+            sessionId,
+          ])
+        ).rows,
+      });
+      const before = await snapshot();
+      expect(before.session[0]).toMatchObject({ revoked_at: null });
+      expect(before.audit).toHaveLength(0);
+
+      const rejected = await request(server())
+        .post('/api/v1/auth/refresh')
+        .set('Cookie', `${REFRESH_COOKIE}=${oldCookie}`)
+        .expect(401);
+      expect(bodyOf(rejected).error.code).toBe('AUTH.SESSION_INVALID');
+      expect(bodyOf(rejected).data).toBeUndefined();
+      expect(refreshCookie(rejected)).toMatch(/Max-Age=0|Expires=Thu, 01 Jan 1970/);
+      expect(await snapshot()).toEqual(before);
+
+      await request(server())
+        .get('/api/v1/me')
+        .set('Authorization', `Bearer ${bodyOf(second).data.accessToken}`)
+        .expect(200);
+      await request(server()).post('/api/v1/auth/refresh').set('Cookie', `${REFRESH_COOKIE}=${nextCookie}`).expect(200);
+      expect((await snapshot()).audit).toHaveLength(0);
+    });
+
+    it('rejects an expired unconsumed token without changing the session or minting a token', async () => {
+      const first = await loginAdmin();
+      const cookie = cookieValue(refreshCookie(first) as string);
+      const hash = createHash('sha256').update(cookie).digest('hex');
+      const { rows } = await ctx.sql.query<{ session_id: string }>(
+        `UPDATE refresh_tokens SET expires_at = now() - interval '1 second'
+         WHERE token_hash = $1 AND consumed_at IS NULL RETURNING session_id`,
+        [hash],
+      );
+      expect(rows).toHaveLength(1);
+      const sessionId = rows[0].session_id;
+      const readState = async () => ({
+        session: (await ctx.sql.query('SELECT * FROM auth_sessions WHERE id = $1', [sessionId])).rows,
+        tokens: (await ctx.sql.query('SELECT * FROM refresh_tokens WHERE session_id = $1', [sessionId])).rows,
+        audit: (
+          await ctx.sql.query(`SELECT id FROM audit_events WHERE action = 'SESSION.REVOKED' AND resource_id = $1`, [
+            sessionId,
+          ])
+        ).rows,
+      });
+      const before = await readState();
+      const rejected = await request(server())
+        .post('/api/v1/auth/refresh')
+        .set('Cookie', `${REFRESH_COOKIE}=${cookie}`)
+        .expect(401);
+      expect(bodyOf(rejected).error.code).toBe('AUTH.SESSION_INVALID');
+      expect(bodyOf(rejected).data).toBeUndefined();
+      expect(refreshCookie(rejected)).toMatch(/Max-Age=0|Expires=Thu, 01 Jan 1970/);
+      expect(await readState()).toEqual(before);
+      expect(before.audit).toHaveLength(0);
+      await request(server())
+        .get('/api/v1/me')
+        .set('Authorization', `Bearer ${bodyOf(first).data.accessToken}`)
+        .expect(200);
     });
 
     it('rejects a missing, malformed or unknown cookie and clears it', async () => {

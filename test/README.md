@@ -33,16 +33,26 @@ Developer viết tay cũng dùng cùng quy tắc.
 
 Tất cả integration suite dùng support/disposable-database.ts. Cấu hình
 TEST_DATABASE_ADMIN_URL một cách rõ ràng; helper không fallback sang DATABASE_URL.
-Server phải ở localhost/127.0.0.1 và role có CREATEDB. Không trỏ đến shared server.
+Server phải ở localhost/127.0.0.1; integration dùng role LOGIN NOSUPERUSER CREATEDB NOCREATEROLE
+NOREPLICATION NOBYPASSRLS. Helper assert thuộc tính bằng SQL trước CREATE DATABASE và từ chối bootstrap
+superuser. Không trỏ đến shared server. Helper chỉ đọc env được truyền vào, không tự load `.env`.
 
 Ví dụ tạo server test tách khỏi Compose/dev DB:
 
 ```powershell
-docker run --name slm-foundation-test-db -d -p 127.0.0.1:55432:5432 -e POSTGRES_USER=app -e POSTGRES_PASSWORD=test-only -e POSTGRES_DB=postgres postgres:17-alpine
-$env:TEST_DATABASE_ADMIN_URL = 'postgresql://app:test-only@127.0.0.1:55432/postgres'
-pnpm test:integration
-docker rm -f slm-foundation-test-db
-Remove-Item Env:TEST_DATABASE_ADMIN_URL
+docker run --name slm-foundation-test-db -d -p 127.0.0.1:55432:5432 -e POSTGRES_USER=ci_bootstrap -e POSTGRES_PASSWORD=ci-bootstrap-only -e POSTGRES_DB=postgres postgres:17-alpine
+try {
+  # Chờ pg_isready trả exit 0 trước khi provision role và chạy suite.
+  docker exec slm-foundation-test-db pg_isready -U ci_bootstrap -d postgres
+  if ($LASTEXITCODE -ne 0) { throw 'Test PostgreSQL is not ready.' }
+  docker exec slm-foundation-test-db psql -X -U ci_bootstrap -d postgres -v ON_ERROR_STOP=1 -c "CREATE ROLE ci_integration LOGIN NOSUPERUSER CREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS PASSWORD 'ci-integration-only';"
+  if ($LASTEXITCODE -ne 0) { throw 'Integration role provisioning failed.' }
+  $env:TEST_DATABASE_ADMIN_URL = 'postgresql://ci_integration:ci-integration-only@127.0.0.1:55432/postgres'
+  pnpm test:integration
+} finally {
+  docker rm -f slm-foundation-test-db
+  Remove-Item Env:TEST_DATABASE_ADMIN_URL -ErrorAction SilentlyContinue
+}
 ```
 
 Chờ pg_isready thành công trước khi chạy test. Dùng tên/port khác nếu đã có container.
@@ -53,6 +63,13 @@ migration đã commit. Cleanup chỉ drop đúng URL/name/runId; query parameter
 để tránh chuyển hướng target. afterAll phải đóng kết nối và dọn DB cả khi assertion lỗi:
 dừng relay, đóng ứng dụng/pool rồi mới `dropDisposableDatabase`. Sau một lượt chạy sạch không còn database
 `slm_<random>_test` hay backend treo nào của lượt đó; suite thêm vào mà để lại DB là lỗi của suite.
+
+Nếu DROP hoặc đóng client thất bại, helper chỉ giữ SQLSTATE và metadata database/application name,
+pid/state/wait event của đúng database. Truy vấn diagnostics có timeout 5 giây; lỗi diagnostics/đóng client
+không thay thế lỗi gốc. Không in SQL text, URL, credential hay dữ liệu nghiệp vụ; không retry DROP.
+CI provision role qua bootstrap riêng rồi assert SQL trước integration; helper lặp lại role assertion
+cho mỗi database local. Chạy local không thay thế kết quả GitHub Actions: remote CI vẫn `UNVERIFIED`
+khi chưa có run của revision đang review.
 
 Nếu process bị kill trước cleanup, DB tạm có thể còn lại. Kiểm tra tên, marker và
 connection trước khi dọn thủ công; không xóa theo wildcard.
@@ -87,6 +104,14 @@ fixture SQL không chứng minh workflow tạo tài khoản. Dùng `bodyOf(respo
   N-1/R-02/N-2, qua `TransactionRunner` thật), `pg-pool.integration-spec.ts` (pool `createPostgresPool` cùng adapter Prisma:
   kết nối bị loại, không tái sử dụng), `me-unavailable.integration-spec.ts` (`GET /me` ngừng trả lời **sau** guard ⟹ 503
   `SERVICE_UNAVAILABLE`, khác `TOKEN_VERIFICATION_UNAVAILABLE` của guard), cùng unit `src/infrastructure/database/pg-pool.spec.ts`.
+- `PgRelay.holdCommitResponse(timeoutMs)` cho COMMIT tới server và chỉ giữ response của connection đó;
+  `held` là sự kiện đã giữ byte trả về, `release()`/`dispose()` kết thúc hold và `stop()` dọn timer/socket.
+  Test post-COMMIT đọc `organizations` và `audit_events` qua connection trực tiếp để chứng minh cả hai đã commit
+  khi caller còn chờ, rồi kiểm timeout hữu hạn, không retry và PID mới. `holdWhen(/^COMMIT/)` là chặn chiều request,
+  có thể commit khi hàng đợi được thả: chỉ khẳng định all-or-nothing. Probe UPDATE trước COMMIT mới khẳng định rollback.
+- `pnpm test:mutation` chạy control + đúng ba mutant trên disposable copy, cần cùng role thường/DB riêng;
+  xem [runner guide](../scripts/README.md#targeted-mutation-verification). Không sửa checkout trong lúc runner chạy;
+  exit/setup failure không được tính là killed và mọi mutant phải restore bytes/hash trước khi dọn copy.
 - `installation-minimal-env.integration-spec.ts` chạy lệnh khởi tạo trong tiến trình với môi trường chỉ có
   `DATABASE_URL` và `NODE_ENV=production` (R-13). `installation-cli.integration-spec.ts` khởi chạy (spawn) mã nguồn CLI thật (`src/installation-cli.ts` qua `ts-node`) với môi trường
   tối thiểu, không cần database: `--help` chạy khi chưa cấu hình gì, thiếu `DATABASE_URL` được báo thành một dòng trước
@@ -97,4 +122,5 @@ fixture SQL không chứng minh workflow tạo tài khoản. Dùng `bodyOf(respo
 - PostgreSQL phải chạy ở UTC **hoặc** để `PrismaService` ghim `TimeZone=UTC` (đã làm). Test
   `audit.integration-spec.ts` ("stores an instant exactly") bắt lỗi lệch múi giờ.
 - Máy không chạy được Docker: PostgreSQL 17 nhúng (`embedded-postgres`) đủ cho `TEST_DATABASE_ADMIN_URL`;
-  role của nó là superuser nên không kiểm chứng được `btree_gist` trusted-extension như môi trường thật.
+  dùng bootstrap superuser của nó để provision role ordinary cùng thuộc tính phía trên trước khi chạy suite.
+  `TEST_DATABASE_ADMIN_URL` phải dùng role ordinary đó để kiểm chứng cả `btree_gist` trusted-extension.

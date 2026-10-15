@@ -15,6 +15,9 @@ import {
 } from '../support/disposable-database';
 import { PgRelay } from '../support/pg-relay';
 import { testConfig } from '../support/test-config';
+import { AuditRepo } from '../../src/modules/audit/audit.repo';
+import { AuditService } from '../../src/modules/audit/audit.service';
+import { migrateDisposableDatabase } from '../support/disposable-database';
 
 /**
  * N-1 / R-02 / N-2: a statement that stops being answered on a warm connection that is already in use.
@@ -97,6 +100,7 @@ describe('a statement that stops being answered on a warm connection (integratio
 
   beforeAll(async () => {
     database = await provisionDisposableDatabase();
+    await migrateDisposableDatabase(database);
     admin = new Client({ connectionString: database.url });
     await admin.connect();
     await admin.query('CREATE TABLE stall_probe (id int PRIMARY KEY, v int NOT NULL)');
@@ -169,7 +173,7 @@ describe('a statement that stops being answered on a warm connection (integratio
     }
   }, 30000);
 
-  it('keeps a transaction whose COMMIT was answered late all-or-nothing', async () => {
+  it('keeps a transaction whose COMMIT request was held before delivery all-or-nothing', async () => {
     relay.holdWhen(/^COMMIT/);
     const { outcome } = await timed(() =>
       runner.run(async (tx) => {
@@ -178,17 +182,105 @@ describe('a statement that stops being answered on a warm connection (integratio
       }),
     );
 
-    // The caller cannot know whether PostgreSQL committed; it only learns that the call failed.
     expect(outcome).toBeInstanceOf(TransientDatabaseError);
     relay.releaseHeld();
     await laterTraffic();
 
+    // This is the original request-direction race: release can beat the peer's close event, so
+    // PostgreSQL may receive COMMIT. The separate response-direction case below proves actual commit.
     const state = await committed();
     expect([
       { value: 0, paired: 0 },
       { value: 2, paired: 1 },
     ]).toContainEqual(state);
     expect(await idleInTransaction()).toBe(0);
+  }, 30000);
+
+  it('commits business and audit before a lost COMMIT response times out, without retrying the write', async () => {
+    const response = relay.holdCommitResponse(QUERY_TIMEOUT_MS * 4);
+    const organizationId = '11111111-1111-4111-8111-111111111104';
+    const correlationId = 'post-commit-response-loss';
+    const audit = new AuditService(new AuditRepo());
+    let attempts = 0;
+    let settled = false;
+    let transactionPid = 0;
+    const started = Date.now();
+    const call = runner
+      .run(async (tx) => {
+        attempts += 1;
+        transactionPid = (await tx.$queryRaw<{ pid: number }[]>`SELECT pg_backend_pid() AS pid`)[0].pid;
+        await tx.organization.create({
+          data: { id: organizationId, name: 'Committed probe', timeZone: 'UTC', reportingCurrency: 'USD' },
+        });
+        await audit.record(tx, {
+          organizationId,
+          actorKind: 'SYSTEM',
+          action: 'PROBE.COMMITTED',
+          resourceType: 'Organization',
+          resourceId: organizationId,
+          after: { name: 'Committed probe' },
+          correlationId,
+        });
+      })
+      .then(
+        (value) => {
+          settled = true;
+          return value;
+        },
+        (error: unknown) => {
+          settled = true;
+          return error;
+        },
+      );
+    try {
+      await response.held; // response-direction event, after COMMIT has been forwarded
+      // Independent, direct connection: both actual application tables are already durable while
+      // the original caller is still awaiting the withheld response. No timing sleep infers commit.
+      const visible = await admin.query<{ business: number; audit: number }>(
+        `SELECT (SELECT count(*)::int FROM organizations WHERE id = $1) AS business,
+                (SELECT count(*)::int FROM audit_events WHERE correlation_id = $2) AS audit`,
+        [organizationId, correlationId],
+      );
+      expect(visible.rows[0]).toEqual({ business: 1, audit: 1 });
+      expect(settled).toBe(false);
+      // A second relayed connection must continue serving while the first response is held.
+      const independentUrl = new URL(database.url);
+      independentUrl.port = String(relay.port);
+      const independent = new Client({
+        connectionString: independentUrl.toString(),
+        connectionTimeoutMillis: 1000,
+        query_timeout: 1000,
+      });
+      try {
+        await independent.connect();
+        await expect(independent.query('SELECT 1 AS one')).resolves.toMatchObject({ rows: [{ one: 1 }] });
+      } finally {
+        await independent.end();
+      }
+
+      const outcome = await within(call, QUERY_TIMEOUT_MS + SLACK_MS);
+      expect(outcome).toBeInstanceOf(TransientDatabaseError);
+      const elapsed = Date.now() - started;
+      expect(elapsed).toBeGreaterThanOrEqual(QUERY_TIMEOUT_MS - 100);
+      expect(elapsed).toBeLessThan(QUERY_TIMEOUT_MS + SLACK_MS);
+      expect(attempts).toBe(1);
+      response.release();
+
+      const freshPid = (await prisma.$queryRaw<{ pid: number }[]>`SELECT pg_backend_pid() AS pid`)[0].pid;
+      expect(freshPid).not.toBe(transactionPid);
+      await laterTraffic();
+      const final = await admin.query<{ business: number; audit: number }>(
+        `SELECT (SELECT count(*)::int FROM organizations WHERE id = $1) AS business,
+                (SELECT count(*)::int FROM audit_events WHERE correlation_id = $2) AS audit`,
+        [organizationId, correlationId],
+      );
+      expect(final.rows[0]).toEqual({ business: 1, audit: 1 });
+      expect(attempts).toBe(1);
+      expect(await idleInTransaction()).toBe(0);
+    } finally {
+      response.dispose();
+      await call; // disposal unblocks a failed assertion's pending caller before teardown
+    }
   }, 30000);
 
   it('rolls back a transaction whose BEGIN was answered after maxWait', async () => {
