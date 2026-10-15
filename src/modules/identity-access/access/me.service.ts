@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import { businessDateAt, toDateColumn } from '../../core/business-date';
-import type { AuthenticatedPrincipal } from '../../infrastructure/security/tokens/access-token-verifier.port';
-import { OrganizationService } from '../organization/organization.service';
-import { IdentityAccessRepo } from './identity-access.repo';
+import { businessDateAt, toDateColumn } from '../../../core/business-date';
+import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
+import { OrganizationService } from '../../organization/organization.service';
+import { AccountRepo } from '../accounts/account.repo';
 
 export interface MeView {
   appUserId: string;
@@ -21,14 +21,14 @@ export interface MeView {
 @Injectable()
 export class MeService {
   constructor(
-    private readonly repo: IdentityAccessRepo,
+    private readonly accounts: AccountRepo,
     private readonly organization: OrganizationService,
   ) {}
 
   /** The caller's own identity and effective roles. Roles come from the principal resolved this request. */
   async get(principal: AuthenticatedPrincipal): Promise<MeView> {
     const [loginEmail, organization] = await Promise.all([
-      this.repo.findLoginEmail(principal.appUserId),
+      this.accounts.findLoginEmail(principal.appUserId),
       this.organization.getOrganization(),
     ]);
     // The placement in force today, in the organization's own calendar.

@@ -1,6 +1,5 @@
 import request from 'supertest';
 import { Client } from 'pg';
-import { PAYLOAD_CIPHER } from '../../src/modules/notifications/notifications.tokens';
 import { PayloadCipher } from '../../src/modules/notifications/payload-cipher';
 import { bodyOf } from '../support/api-body';
 import {
@@ -60,7 +59,7 @@ describe('lock protocol: account administration races (integration, real Postgre
   });
 
   const invitationToken = async (appUserId: string): Promise<string> => {
-    const cipher = ctx.app.get<PayloadCipher>(PAYLOAD_CIPHER, { strict: false });
+    const cipher = ctx.app.get<PayloadCipher>(PayloadCipher, { strict: false });
     const { rows } = await ctx.sql.query<{ id: string; payload_key_id: string; payload_ciphertext: Buffer }>(
       `SELECT o.id, o.payload_key_id, o.payload_ciphertext FROM email_outbox o
          JOIN account_action_tokens t ON t.token_hash = o.action_token_hash

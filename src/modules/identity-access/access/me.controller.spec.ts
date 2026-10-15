@@ -1,7 +1,7 @@
 import { HttpStatus } from '@nestjs/common';
-import { TransientDatabaseError } from '../../infrastructure/database/transaction-runner';
-import { ApiException } from '../../infrastructure/http/errors/api.exception';
-import type { AuthenticatedPrincipal } from '../../infrastructure/security/tokens/access-token-verifier.port';
+import { TransientDatabaseError } from '../../../infrastructure/database/transaction-runner';
+import { ApiException } from '../../../infrastructure/http/errors/api.exception';
+import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { MeController } from './me.controller';
 import { MeService } from './me.service';
 

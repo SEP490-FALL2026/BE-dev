@@ -15,7 +15,7 @@ Bug fix cần test tái hiện lỗi ở boundary phù hợp. Refactor giữ pub
 không gộp tính năng hoặc nâng dependency không liên quan. Sửa tài liệu cần kiểm tra
 nội dung, link và format; không cần test giả cho một câu văn.
 
-Task nhỏ không đổi nghiệp vụ/contract dùng issue/PR. Tính năng US hoặc thay đổi nhiều bước dùng [quy trình chung](docs/workspace/README.md) và [roadmap](docs/roadmap.md): làm rõ BRD/US → thiết kế → dev khác review → bàn giao cho người hoặc AI implement. Dev ngang quyền, luân phiên vai trò theo hạng mục. Không bắt skill/plugin. Quyết định kiến trúc lâu dài dùng ADR.
+Task nhỏ không đổi nghiệp vụ/contract dùng issue/PR. Tính năng US hoặc thay đổi nhiều bước dùng [quy trình chung](docs/workspace/README.md) và [roadmap](docs/roadmap.md): giao người phụ trách → thiết kế spec/plan/test → implement và kiểm chứng → tích hợp `dev` → Owner review cuối trước `main`/production. Người phụ trách có thể tự thiết kế và code; Owner cũng có thể chuẩn bị thiết kế rồi bàn giao. Peer review của dev khác là tùy chọn, không phải gate bắt buộc. Không bắt skill/plugin. Quyết định kiến trúc lâu dài dùng ADR.
 
 ## Lệnh kiểm tra
 

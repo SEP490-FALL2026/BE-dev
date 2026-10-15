@@ -1,18 +1,18 @@
-import { TokenVerificationUnavailableError } from '../../infrastructure/security/tokens/access-token-verifier.port';
-import { OrganizationService } from '../organization/organization.service';
-import { IdentityAccessRepo } from './identity-access.repo';
+import { TokenVerificationUnavailableError } from '../../../infrastructure/security/tokens/access-token-verifier.port';
+import { OrganizationService } from '../../organization/organization.service';
+import { SessionRepo } from '../auth/session.repo';
+import { TokenService } from '../auth/token.service';
 import { JwtAccessTokenVerifier } from './jwt-access-token.verifier';
-import { TokenService } from './token.service';
 
 const SUB = '3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11';
 const SID = 'a8b6c4d2-1f3e-4a5b-9c7d-0e2f4a6b8c10';
 
 function verifierFailingWith(error: Error): JwtAccessTokenVerifier {
   const tokens = { verifyAccessToken: () => Promise.resolve({ sub: SUB, sid: SID }) } as unknown as TokenService;
-  const repo = { findPrincipalContext: () => Promise.reject(error) } as unknown as IdentityAccessRepo;
+  const sessions = { findPrincipalContext: () => Promise.reject(error) } as unknown as SessionRepo;
   const organization = {} as OrganizationService;
 
-  return new JwtAccessTokenVerifier(tokens, repo, organization);
+  return new JwtAccessTokenVerifier(tokens, sessions, organization);
 }
 
 describe('JwtAccessTokenVerifier — database failures', () => {

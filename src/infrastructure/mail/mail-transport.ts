@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createTransport, Transporter } from 'nodemailer';
-import { EnvironmentVariables } from '../../infrastructure/config/env-schema';
+import { EnvironmentVariables } from '../config/env-schema';
 
 export interface OutgoingMail {
   to: string;

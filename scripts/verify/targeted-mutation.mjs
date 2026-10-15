@@ -26,8 +26,8 @@ export const MUTANTS = [
   },
   {
     id: 'invitation-invalidation',
-    file: 'src/modules/identity-access/account-management.service.ts',
-    before: "await this.repo.revokeTokens(tx, hashes, 'SUPERSEDED', now);",
+    file: 'src/modules/identity-access/accounts/account-invitation.service.ts',
+    before: "await this.accounts.revokeTokens(tx, hashes, 'SUPERSEDED', now);",
     after: 'void hashes; // mutant: omit superseded invitation revocation',
     probes: [
       {

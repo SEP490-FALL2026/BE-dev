@@ -18,10 +18,3 @@ export class EmployeeEmailTakenError extends Error {
     this.name = 'EmployeeEmailTakenError';
   }
 }
-
-export class EmployeeNotFoundError extends Error {
-  constructor(readonly employeeId: string) {
-    super(`Employee not found: ${employeeId}`);
-    this.name = 'EmployeeNotFoundError';
-  }
-}

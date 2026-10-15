@@ -1,7 +1,7 @@
 import type { INestApplicationContext, LoggerService } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { EnvironmentValidationError } from './infrastructure/config/env-schema';
-import { PasswordPolicyError } from './modules/identity-access/errors/identity-access.errors';
+import { PasswordPolicyError } from './modules/identity-access/identity-access.errors';
 import { NoTerminalError, PromptCancelledError, readHiddenLine } from './modules/installation/hidden-prompt';
 import {
   INSTALLATION_USAGE,

@@ -275,3 +275,107 @@ Kiểm tài liệu cuối: `pnpm.cmd rules:check` exit 0 (54 file, 324 link, 0 l
 và đổi các checkbox RV có acceptance đạt. Git cuối: `dev@3d03f00`, upstream local cùng HEAD, ahead/behind 0/0;
 25 file modified và hai file mới `scripts/verify/targeted-mutation.mjs`, `scripts/verify/targeted-mutation.test.mjs`.
 Không unmerged entry hoặc merge/rebase/cherry-pick/revert đang dở; repo Docs sạch. Không có raw log/scratch trong repo.
+
+## Module cleanup
+
+Task 2, 16:31–17:00 UTC+7 ngày 15/10/2026 trên `dev@d60d306` (cây ban đầu sạch, Task 1/1B đã commit). Chỉ refactor
+`identity-access`, `notifications`, `installation`; không đổi nghiệp vụ, schema/migration, dependency hay hợp đồng của
+16 HTTP operation (OpenAPI không drift). Opus chốt kiến trúc và review diff; một Sonnet implement tuần tự Batch A rồi B.
+
+### Trước và sau
+
+```text
+Trước (identity-access phẳng, 23 file)        Sau (27 file, tối đa hai tầng)
+identity-access/                              identity-access/
+  identity-access.repo.ts        480            identity-access.module.ts, identity-access-facade.module.ts
+  account-management.service.ts  581            identity-access.service.ts (facade), identity-access.types.ts,
+                                                identity-access.errors.ts (lỗi public, Task 2B)
+  auth.service.ts                301            dto/, errors/
+  app-users/auth/me controller, me.service      auth/      login.service 170, session.service 158, session.repo 174,
+  token, refresh-cookie, password-hasher,                  auth.controller, token.service, refresh-cookie,
+  password.policy, roles.policy, account-policy,           password-hasher.service, password.policy
+  jwt verifier, http-errors, facade, types      accounts/  account-query.service 142, account-invitation.service 254,
+                                                           account-status.service 165, account.repo 314,
+notifications/ (9 file)                                    app-users.controller, account-policy (gồm audit event),
+  mail-transport.ts, notifications.tokens.ts               account.http-errors
+                                                access/    me.controller, me.service, jwt-access-token.verifier
+                                              notifications/ (7 file, phẳng)
+                                              infrastructure/mail/mail-transport.ts (port + SMTP adapter, chuyển nguyên)
+```
+
+`installation` giữ nguyên (5 file, 462 dòng): đã nhỏ, chỉ gọi `IdentityAccessService`, `OrganizationService`,
+`AuditService`; không có vấn đề cấu trúc thật nên không tạo batch C.
+
+| Chỉ số                                 | Trước                                                          | Sau                                                                                                                                  |
+| -------------------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| File production `src` (không spec/gen) | 112                                                            | 115 (+3: hai repo, ba service tài khoản, hai service auth, file lỗi public thay bốn file; bỏ token file)                             |
+| `identity-access` / `notifications`    | 23 file, 2 885 dòng / 9 file, 553 dòng                         | 27 file, 2 996 dòng / 7 file, 490 dòng                                                                                               |
+| Service/repo lớn nhất                  | 581 dòng (`AccountManagementService`)                          | 314 dòng (`account.repo.ts`); không file nào trên 400                                                                                |
+| Constructor dependency lớn nhất        | 8 (`AccountManagementService`)                                 | 7 (`AccountInvitationService`, `LoginService`, `SessionService`); query 3, status 5                                                  |
+| Kiểm “nhân viên chưa nghỉ việc”        | 8 biểu thức lặp                                                | 1 helper `employeeHasNotLeft` (account-policy), có unit test                                                                         |
+| Repo chạm bảng identity                | 1 repo tổng quát                                               | `AccountRepo` (AppUser, PasswordCredential, RoleGrant, AccountActionToken), `SessionRepo` (AuthSession, RefreshToken, LoginThrottle) |
+| Worker graph                           | `IdentityAccessModule`: 3 controller, JwtModule, auth workflow | `IdentityAccessFacadeModule`; 0 controller, không JwtModule                                                                          |
+
+Provider/export: `IdentityAccessFacadeModule` khai báo duy nhất `AccountRepo`, `PasswordHasher`, `IdentityAccessService`
+(facade thêm `isInvitationLinkUsable` cho worker); `IdentityAccessModule` dùng lại hai provider đó, chỉ export
+`ACCESS_TOKEN_VERIFIER`. `PayloadCipher` inject theo class, bỏ symbol một dòng. `organization.errors.ts` hết là file
+re-export: chứa thật `EmployeeNotFoundError` (lỗi public của facade organization).
+
+Architecture test: `architecture-boundaries.spec.ts` resolve import tương đối thật và chỉ cho module khác import file
+ở gốc module, không `*.repo.ts`/`password-hasher.service.ts`; `src/module-graph.spec.ts` đọc metadata Nest của
+AppModule/WorkerModule/InstallationModule (không khởi tạo, `ConfigModule.forRoot` được stub để không nạp env): không
+token nào khai báo ở hai module, `AccountRepo`/`PasswordHasher`/`IdentityAccessService`/`MailTransport`/`PayloadCipher`
+đúng một lần, worker/CLI không controller, worker không `IdentityAccessModule`/`JwtModule`, CLI không notifications/queue/JWT.
+Mutant `invitation-invalidation` trỏ sang `accounts/account-invitation.service.ts`.
+
+### Gate
+
+Chạy một lượt trên cây sau refactor; mọi tiến trình preload chặn đọc `.env*`, smoke chạy từ thư mục tạm ngoài repo.
+
+| Gate                                                           | Kết quả                                                                                                                                                        |
+| -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm check`                                                   | exit 0; 35 suite / 332 unit test (thêm module graph, `employeeHasNotLeft`, `newInvitationToken`), 19 script test, build đạt                                    |
+| `pnpm test:e2e`                                                | exit 0; 4 suite / 36 test                                                                                                                                      |
+| `pnpm test:integration`, PostgreSQL 17.11, role thường riêng   | exit 0; 25 suite / 242 test, 116 s; sau đó 0 DB `slm_*_test`, 0 backend của role                                                                               |
+| `pnpm openapi:export` + `git diff --exit-code -- openapi.json` | exit 0; không drift                                                                                                                                            |
+| Live smoke `dist`: API + worker + Mailpit, DB đã migrate riêng | 27 PASS / 0 FAIL: 16 operation, 422 UUID sai, 403 non-admin, replay 401, access sau logout 401; worker gửi đúng 1 thư, outbox SENT=1/CANCELLED=2, 19 audit row |
+| CLI `dist/installation-cli.js`                                 | `--help` exit 0; chỉ `DATABASE_URL` + non-TTY: dựng graph rồi từ chối trước prompt, exit 1; thiếu `DATABASE_URL`: báo một dòng, exit 1                         |
+
+Không chạy mutation campaign. Container PostgreSQL/Mailpit riêng của Task 2 đã dọn; không chạm dữ liệu dùng chung.
+
+### Task 2B — đóng public contract
+
+Lượt đóng ngắn trên cùng working tree, không làm lại refactor. `PasswordPolicyError` (lỗi facade ném cho CLI) chuyển
+định nghĩa thật sang `identity-access/identity-access.errors.ts` ở gốc module; `errors/identity-access.errors.ts` không
+còn sở hữu hay re-export nó. CLI, facade, hai file `accounts/` và integration test installation import từ file gốc.
+Helper audit event (`accountAuditEvent`, hàm thuần) gộp vào `accounts/account-policy.ts` để giữ trần 115 file; không
+public hóa repo, hasher, mapper hay DTO.
+
+Architecture test: rule boundary tách thành hàm `privateModuleImport` trên import đã resolve, áp cho mọi file trong
+`modules/` **và** các composition root `src/*.ts` (API, worker, CLI). Test tổng hợp xác nhận import
+`identity-access/errors/**` và `auth/password-hasher.service` bị báo private, file gốc thì không. Trước khi sửa, test
+composition root fail đúng ở import cũ của CLI (RED), sau sửa đạt.
+
+Verdict giữ nguyên, không tạo folder mới:
+
+- `notifications`: 7 file/490 dòng ở gốc, không import module nghiệp vụ nào; SMTP adapter đã ở
+  `src/infrastructure/mail/`. `NotificationsService` (enqueue/hủy/trạng thái cho identity-access) và `EmailDispatcher`
+  (composition root gọi) phải ở gốc vì là contract; `PayloadCipher` dùng chung cả hai phía nên tách `email/`/`outbox/`
+  chỉ dời được `email-templates.ts`, không làm đường dẫn rõ hơn.
+- `installation`: 5 file/462 dòng (module, service, input, arguments, hidden prompt), mỗi file một trách nhiệm; chỉ
+  gọi file gốc của audit/identity-access/organization, CLI chỉ import file gốc của installation và identity-access.
+
+| Gate Task 2B                                                              | Kết quả                                                           |
+| ------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| Focused `architecture-boundaries`, `module-graph`, `accounts/*` spec      | 4 suite / 39 test đạt; lint, typecheck đạt                        |
+| Integration `test/integration/installation*` (PostgreSQL 17, role thường) | 3 suite / 15 test đạt; 0 DB tạm còn lại, container đã dọn         |
+| `pnpm check`                                                              | exit 0; 35 suite / 334 unit, 14 rules + 19 script test, build đạt |
+
+Không sửa source notifications/worker trong 2B nên dùng evidence worker/mail và live smoke của bảng Gate ở trên.
+
+### Còn mở
+
+- Prompt mật khẩu qua PTY thật chưa chạy lại trong lượt này (Windows, không PTY); mã `installation` không đổi, seed smoke
+  đi qua `InstallationService` thật. Worker/API dừng bằng kill của Windows, chưa kiểm shutdown SIGTERM lúc đang gửi.
+- PTY thật, SIGTERM lúc đang gửi, remote CI, Node 22/Linux parity và SMTP TLS/provider thật vẫn `UNVERIFIED`; thuộc
+  vòng review/release cuối. Chưa có Owner review; không ghi nghiệm thu.

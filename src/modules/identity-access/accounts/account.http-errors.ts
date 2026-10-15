@@ -1,7 +1,7 @@
 import { HttpStatus } from '@nestjs/common';
-import { TransientDatabaseError, toTransientError } from '../../infrastructure/database/transaction-runner';
-import { ApiException } from '../../infrastructure/http/errors/api.exception';
-import { EmployeeNotFoundError } from '../organization/organization.errors';
+import { TransientDatabaseError, toTransientError } from '../../../infrastructure/database/transaction-runner';
+import { ApiException } from '../../../infrastructure/http/errors/api.exception';
+import { EmployeeNotFoundError } from '../../organization/organization.errors';
 import {
   AccountAlreadyActivatedError,
   AccountAlreadyExistsError,
@@ -13,14 +13,14 @@ import {
   LoginEmailInvalidError,
   LoginEmailRequiredError,
   LoginEmailTakenError,
-  PasswordPolicyError,
   RoleAlreadyGrantedError,
   RoleCombinationForbiddenError,
   RoleNotGrantedError,
   RoleRequestRefusedError,
   SelfChangeForbiddenError,
   SuperAdminHolderNotLockableError,
-} from './errors/identity-access.errors';
+} from '../errors/identity-access.errors';
+import { PasswordPolicyError } from '../identity-access.errors';
 
 function refuse(status: HttpStatus, code: string, message: string, details?: Record<string, unknown>): ApiException {
   return new ApiException(status, { code, message, ...(details ? { details } : {}) });

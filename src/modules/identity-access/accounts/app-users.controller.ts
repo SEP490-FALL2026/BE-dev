@@ -1,12 +1,14 @@
 import { Body, Controller, Delete, Get, HttpStatus, Param, Post, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import { ApiErrorResponses } from '../../infrastructure/http/decorators/api-error-responses.decorator';
-import { ApiSuccessResponse } from '../../infrastructure/http/decorators/api-success-response.decorator';
-import { RequireRoles } from '../../infrastructure/security/decorators/access.decorators';
-import { CurrentPrincipal } from '../../infrastructure/security/models/current-principal';
-import type { AuthenticatedPrincipal } from '../../infrastructure/security/tokens/access-token-verifier.port';
-import { toAccountApiException } from './account-management.http-errors';
-import { AccountDetailView, AccountManagementService, AccountView } from './account-management.service';
+import { ApiErrorResponses } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
+import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
+import { RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
+import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
+import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
+import { AccountInvitationService } from './account-invitation.service';
+import { AccountDetailView, AccountQueryService, AccountView } from './account-query.service';
+import { AccountStatusService } from './account-status.service';
+import { toAccountApiException } from './account.http-errors';
 import {
   AccountCandidatesQueryDto,
   AccountCandidatesResponseDto,
@@ -17,7 +19,7 @@ import {
   CreateAppUserBodyDto,
   GrantRoleBodyDto,
   ListAppUsersQueryDto,
-} from './dto/account-management.dto';
+} from '../dto/account-management.dto';
 
 const iso = (value: Date): string => value.toISOString();
 
@@ -61,7 +63,11 @@ const COMMON_ERRORS = [
 @Controller({ version: '1' })
 @RequireRoles('SUPER_ADMIN')
 export class AppUsersController {
-  constructor(private readonly accounts: AccountManagementService) {}
+  constructor(
+    private readonly queries: AccountQueryService,
+    private readonly invitations: AccountInvitationService,
+    private readonly status: AccountStatusService,
+  ) {}
 
   @Get('account-candidates')
   @ApiOperation({ operationId: 'accountCandidatesList' })
@@ -75,7 +81,7 @@ export class AppUsersController {
   })
   async listCandidates(@Query() query: AccountCandidatesQueryDto) {
     try {
-      return { items: await this.accounts.listCandidates(query.search) };
+      return { items: await this.queries.listCandidates(query.search) };
     } catch (error) {
       throw toAccountApiException(error);
     }
@@ -102,7 +108,9 @@ export class AppUsersController {
   )
   async create(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: CreateAppUserBodyDto) {
     try {
-      return toDetailWire(await this.accounts.createAccount(actor, body));
+      const id = await this.invitations.createAccount(actor, body);
+
+      return toDetailWire(await this.queries.getAccount(id));
     } catch (error) {
       throw toAccountApiException(error);
     }
@@ -117,7 +125,7 @@ export class AppUsersController {
   })
   async list(@Query() query: ListAppUsersQueryDto) {
     try {
-      const page = await this.accounts.listAccounts(query);
+      const page = await this.queries.listAccounts(query);
 
       return { items: page.items.map(toAccountWire), pagination: page.pagination };
     } catch (error) {
@@ -137,7 +145,7 @@ export class AppUsersController {
   )
   async get(@Param() params: AppUserIdParamDto) {
     try {
-      return toDetailWire(await this.accounts.getAccount(params.id));
+      return toDetailWire(await this.queries.getAccount(params.id));
     } catch (error) {
       throw toAccountApiException(error);
     }
@@ -161,7 +169,9 @@ export class AppUsersController {
   )
   async resendInvitation(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: AppUserIdParamDto) {
     try {
-      return toDetailWire(await this.accounts.resendInvitation(actor, params.id));
+      await this.invitations.resendInvitation(actor, params.id);
+
+      return toDetailWire(await this.queries.getAccount(params.id));
     } catch (error) {
       throw toAccountApiException(error);
     }
@@ -181,7 +191,9 @@ export class AppUsersController {
   )
   async lock(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: AppUserIdParamDto) {
     try {
-      return toDetailWire(await this.accounts.lock(actor, params.id));
+      await this.status.lock(actor, params.id);
+
+      return toDetailWire(await this.queries.getAccount(params.id));
     } catch (error) {
       throw toAccountApiException(error);
     }
@@ -201,7 +213,9 @@ export class AppUsersController {
   )
   async unlock(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: AppUserIdParamDto) {
     try {
-      return toDetailWire(await this.accounts.unlock(actor, params.id));
+      await this.status.unlock(actor, params.id);
+
+      return toDetailWire(await this.queries.getAccount(params.id));
     } catch (error) {
       throw toAccountApiException(error);
     }
@@ -229,7 +243,9 @@ export class AppUsersController {
     @Body() body: GrantRoleBodyDto,
   ) {
     try {
-      return toDetailWire(await this.accounts.grantRole(actor, params.id, body.role));
+      await this.status.grantRole(actor, params.id, body.role);
+
+      return toDetailWire(await this.queries.getAccount(params.id));
     } catch (error) {
       throw toAccountApiException(error);
     }
@@ -249,7 +265,9 @@ export class AppUsersController {
   )
   async revokeRole(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: AppUserRoleParamDto) {
     try {
-      return toDetailWire(await this.accounts.revokeRole(actor, params.id, params.role));
+      await this.status.revokeRole(actor, params.id, params.role);
+
+      return toDetailWire(await this.queries.getAccount(params.id));
     } catch (error) {
       throw toAccountApiException(error);
     }

@@ -1,7 +1,7 @@
 import { HttpStatus } from '@nestjs/common';
-import { TransientDatabaseError } from '../../infrastructure/database/transaction-runner';
-import { ApiException } from '../../infrastructure/http/errors/api.exception';
-import { toAccountApiException } from './account-management.http-errors';
+import { TransientDatabaseError } from '../../../infrastructure/database/transaction-runner';
+import { ApiException } from '../../../infrastructure/http/errors/api.exception';
+import { toAccountApiException } from './account.http-errors';
 
 function expectUnavailable(mapped: unknown): void {
   expect(mapped).toBeInstanceOf(ApiException);

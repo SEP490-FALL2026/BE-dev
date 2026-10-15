@@ -9,7 +9,8 @@ Scope: this backend repository. Work from its root with the pnpm version in `pac
 - Check the branch, working diff and relevant source/tests; preserve existing changes.
 - Current runtime: health, `/auth/*`, `/me` plus infrastructure; first-run installation is a CLI
   (`pnpm ops:bootstrap`). Super Admin account administration (create, invite, activate, lock, role
-  grants) is implemented as slice 1b, unreviewed. Catalog is a structural sample and is not mounted.
+  grants) is implemented as slice 1b and verified locally at `d60d306`; final acceptance is pending.
+  Catalog is a structural sample and is not mounted.
   Password change/reset and all other US workflows are not implemented.
 
 ## Read only what the task needs
@@ -25,14 +26,17 @@ Scope: this backend repository. Work from its root with the pnpm version in `pac
 
 ## Repository constraints
 
-- Use flat feature modules. Controllers map HTTP; services coordinate; `*.repo.ts` owns persistence.
+- Default to flat feature modules. A module with several distinct capabilities may group files by capability,
+  with at most two directory levels, as documented in `ARCHITECTURE.md`. Controllers map HTTP; services
+  coordinate; `*.repo.ts` owns persistence.
 - Cross-module calls use exported facades/contracts; never import another module's private files or query its tables.
 - Keep framework-free primitives in `src/core`; technical adapters in `src/infrastructure`.
 - Generated `src/generated/`, `dist/` and `openapi.json` change through their generators.
 - Do not load every ADR, design document or external repository by default.
   Obtain the relevant requirement before inventing missing business behavior.
 - For US design and implementation handoff, follow [shared planning](docs/workspace/README.md).
-- Use reviewed BRD/US revisions and spec/plan; never invent approvals or acceptance.
+- Use pinned BRD/US revisions and the current spec/plan. The assignee owns design, implementation,
+  tests and plan maintenance; peer review is optional. Never invent Owner approval or acceptance.
 - No mandatory skill, private workspace, sequential numbering or multi-agent workflow.
 
 ## Verify and hand off

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { CookieOptions, Request, Response } from 'express';
-import { EnvironmentVariables } from '../../infrastructure/config/env-schema';
+import { EnvironmentVariables } from '../../../infrastructure/config/env-schema';
 
 export const REFRESH_COOKIE_NAME = 'slm_refresh';
 

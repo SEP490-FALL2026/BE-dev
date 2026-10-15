@@ -82,27 +82,43 @@ describe('architecture boundaries', () => {
 
   it('prevents imports of another business module private layers', () => {
     const modulesRoot = join(sourceRoot, 'modules');
-    const privateFolders = 'adapters|dto|errors|helpers|mappers|policies|schemas|services';
 
     for (const file of listTypeScriptFiles(modulesRoot)) {
-      const relativePath = relative(modulesRoot, file);
-      const owner = relativePath.split(sep)[0];
-      const source = readFileSync(file, 'utf8').replaceAll('\\', '/');
-      const privateImports = [
-        ...source.matchAll(new RegExp(`modules/([^/'"]+)/(${privateFolders})/`, 'g')),
-        ...source.matchAll(new RegExp(`from\\s+['"](?:\\.\\./)+([^/'"]+)/(${privateFolders})/`, 'g')),
-        ...source.matchAll(/modules\/([^/'"]+)\/[^/'"]+\.repo(?:\.ts)?['"]/g),
-        ...source.matchAll(/from\s+['"](?:\.\.\/)+([^/'"]+)\/[^/'"]+\.repo(?:\.ts)?['"]/g),
-        // Flat files the layer folders above do not cover. The identity-access facade module also exports
-        // PasswordHasher, so a module that imports it could inject it; credentials stay behind IdentityAccessService.
-        ...source.matchAll(/modules\/([^/'"]+)\/password-hasher\.service(?:\.ts)?['"]/g),
-        ...source.matchAll(/from\s+['"](?:\.\.\/)+([^/'"]+)\/password-hasher\.service(?:\.ts)?['"]/g),
-      ];
-
-      for (const match of privateImports) {
-        expect(match[1]).toBe(owner);
-      }
+      const violations = listResolvedRelativeImports(file).flatMap((target) =>
+        privateModuleImport(sourceRoot, file, target),
+      );
+      expect({ file: relative(sourceRoot, file), violations }).toEqual({
+        file: relative(sourceRoot, file),
+        violations: [],
+      });
     }
+  });
+
+  it('holds the composition roots (API, worker, CLI entry files) to the same public module contract', () => {
+    const rootFiles = readdirSync(sourceRoot)
+      .map((entry) => join(sourceRoot, entry))
+      .filter((path) => statSync(path).isFile() && path.endsWith('.ts') && !path.endsWith('.spec.ts'));
+    expect(rootFiles).toContain(join(sourceRoot, 'installation-cli.ts'));
+
+    for (const file of rootFiles) {
+      const violations = listResolvedRelativeImports(file).flatMap((target) =>
+        privateModuleImport(sourceRoot, file, target),
+      );
+      expect({ file: relative(sourceRoot, file), violations }).toEqual({
+        file: relative(sourceRoot, file),
+        violations: [],
+      });
+    }
+  });
+
+  it('reports an import of a module subfolder such as identity-access/errors as private', () => {
+    const cli = join(sourceRoot, 'installation-cli.ts');
+    const identity = join(sourceRoot, 'modules', 'identity-access');
+
+    expect(privateModuleImport(sourceRoot, cli, join(identity, 'errors', 'identity-access.errors.ts'))).toHaveLength(1);
+    expect(privateModuleImport(sourceRoot, cli, join(identity, 'auth', 'password-hasher.service.ts'))).toHaveLength(1);
+    expect(privateModuleImport(sourceRoot, cli, join(identity, 'identity-access.errors.ts'))).toEqual([]);
+    expect(privateModuleImport(sourceRoot, cli, join(identity, 'identity-access.service.ts'))).toEqual([]);
   });
 
   it('keeps business modules flat instead of recreating application layers', () => {
@@ -190,6 +206,50 @@ describe('architecture boundaries', () => {
   });
 });
 
+/** The relative module specifiers of a source file: `import ... from`, `export ... from`, `import '...'` and `import('...')`. */
+function listRelativeSpecifiers(source: string): string[] {
+  return [
+    ...source.matchAll(/\b(?:import|export)\b[^;'"]*?\bfrom\s*['"]([^'"]+)['"]/g),
+    ...source.matchAll(/\bimport\s*['"]([^'"]+)['"]/g),
+    ...source.matchAll(/\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/g),
+  ]
+    .map((match) => match[1])
+    .filter((specifier) => specifier.startsWith('.'));
+}
+
+/** Resolves a relative specifier of `file` to the `.ts` file it names (`x.ts` or `x/index.ts`). */
+function resolveRelativeImport(file: string, specifier: string): string {
+  const base = resolve(dirname(file), specifier);
+  const target = [`${base}.ts`, join(base, 'index.ts')].find((candidate) => existsSync(candidate));
+  if (target === undefined) {
+    throw new Error(`${relative(process.cwd(), file)} imports ${specifier}, which does not resolve to a .ts file`);
+  }
+
+  return target;
+}
+
+/**
+ * Resolved from the real import graph, not from folder names: code outside a business module (another
+ * module or a composition root in src/) may import only a file directly in that module's root (facade
+ * service, module, types, public errors), never a subfolder file, a repo or the credential hasher.
+ * Returns a description of the violation, or nothing.
+ */
+function privateModuleImport(sourceRoot: string, importer: string, target: string): string[] {
+  const modulesRoot = join(sourceRoot, 'modules');
+  const parts = relative(modulesRoot, target).split(sep);
+  if (parts[0] === '..') return [];
+  const importerParts = relative(modulesRoot, importer).split(sep);
+  if (importerParts[0] !== '..' && importerParts[0] === parts[0]) return [];
+
+  const isPublic = parts.length === 2 && !target.endsWith('.repo.ts') && !target.endsWith('password-hasher.service.ts');
+
+  return isPublic ? [] : [relative(sourceRoot, target).split(sep).join('/')];
+}
+
+function listResolvedRelativeImports(file: string): string[] {
+  return listRelativeSpecifiers(readFileSync(file, 'utf8')).map((specifier) => resolveRelativeImport(file, specifier));
+}
+
 /** Follows relative `import ... from`, `export ... from` and `import('...')` specifiers from an entry file. */
 function listReachableSourceFiles(entry: string): Map<string, string> {
   const reachable = new Map<string, string>();
@@ -204,21 +264,7 @@ function listReachableSourceFiles(entry: string): Map<string, string> {
     // Generated code has its own import style and no Nest wiring; it is a leaf here.
     if (file.includes(`${sep}generated${sep}`)) continue;
 
-    const specifiers = [
-      ...source.matchAll(/\b(?:import|export)\b[^;'"]*?\bfrom\s*['"]([^'"]+)['"]/g),
-      ...source.matchAll(/\bimport\s*['"]([^'"]+)['"]/g),
-      ...source.matchAll(/\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/g),
-    ].map((match) => match[1]);
-
-    for (const specifier of specifiers) {
-      if (!specifier.startsWith('.')) continue;
-      const base = resolve(dirname(file), specifier);
-      const target = [`${base}.ts`, join(base, 'index.ts')].find((candidate) => existsSync(candidate));
-      if (target === undefined) {
-        throw new Error(`${relative(process.cwd(), file)} imports ${specifier}, which does not resolve to a .ts file`);
-      }
-      pending.push(target);
-    }
+    for (const specifier of listRelativeSpecifiers(source)) pending.push(resolveRelativeImport(file, specifier));
   }
 
   return reachable;

@@ -1,24 +1,25 @@
 import { Body, Controller, HttpCode, HttpStatus, Post, Req, Res } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
-import { TransientDatabaseError } from '../../infrastructure/database/transaction-runner';
-import { ApiErrorResponses } from '../../infrastructure/http/decorators/api-error-responses.decorator';
-import { ApiSuccessResponse } from '../../infrastructure/http/decorators/api-success-response.decorator';
-import { RawResponse } from '../../infrastructure/http/decorators/raw-response.decorator';
-import { ApiException } from '../../infrastructure/http/errors/api.exception';
-import { Public } from '../../infrastructure/security/decorators/public.decorator';
-import { AccountManagementService } from './account-management.service';
-import { toAccountApiException } from './account-management.http-errors';
-import { AuthService } from './auth.service';
-import { AccountActivatedResponseDto, RedeemInvitationBodyDto } from './dto/account-management.dto';
-import { LoginBodyDto, SessionTokenResponseDto } from './dto/auth.dto';
+import { TransientDatabaseError } from '../../../infrastructure/database/transaction-runner';
+import { ApiErrorResponses } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
+import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
+import { RawResponse } from '../../../infrastructure/http/decorators/raw-response.decorator';
+import { ApiException } from '../../../infrastructure/http/errors/api.exception';
+import { Public } from '../../../infrastructure/security/decorators/public.decorator';
+import { AccountInvitationService } from '../accounts/account-invitation.service';
+import { toAccountApiException } from '../accounts/account.http-errors';
+import { AccountActivatedResponseDto, RedeemInvitationBodyDto } from '../dto/account-management.dto';
+import { LoginBodyDto, SessionTokenResponseDto } from '../dto/auth.dto';
 import {
   InvalidCredentialsError,
   LoginTemporarilyBlockedError,
   SessionInvalidError,
-} from './errors/identity-access.errors';
-import { IssuedSession } from './identity-access.types';
+} from '../errors/identity-access.errors';
+import { IssuedSession } from '../identity-access.types';
+import { LoginService } from './login.service';
 import { RefreshCookie } from './refresh-cookie';
+import { SessionService } from './session.service';
 
 const UNAVAILABLE = {
   status: HttpStatus.SERVICE_UNAVAILABLE,
@@ -36,8 +37,9 @@ function unavailable(): ApiException {
 @Controller({ path: 'auth', version: '1' })
 export class AuthController {
   constructor(
-    private readonly auth: AuthService,
-    private readonly accounts: AccountManagementService,
+    private readonly logins: LoginService,
+    private readonly sessions: SessionService,
+    private readonly invitations: AccountInvitationService,
     private readonly cookie: RefreshCookie,
   ) {}
 
@@ -62,7 +64,7 @@ export class AuthController {
     @Res({ passthrough: true }) response: Response,
   ): Promise<{ accessToken: string; tokenType: 'Bearer'; expiresAt: string }> {
     try {
-      return this.respondWithSession(response, await this.auth.login(body.email, body.password));
+      return this.respondWithSession(response, await this.logins.login(body.email, body.password));
     } catch (error) {
       if (error instanceof InvalidCredentialsError) {
         throw new ApiException(HttpStatus.UNAUTHORIZED, {
@@ -102,7 +104,7 @@ export class AuthController {
     @Res({ passthrough: true }) response: Response,
   ): Promise<{ accessToken: string; tokenType: 'Bearer'; expiresAt: string }> {
     try {
-      return this.respondWithSession(response, await this.auth.refresh(this.cookie.read(request)));
+      return this.respondWithSession(response, await this.sessions.refresh(this.cookie.read(request)));
     } catch (error) {
       if (error instanceof SessionInvalidError) {
         this.cookie.clear(response);
@@ -129,7 +131,7 @@ export class AuthController {
   @ApiErrorResponses(UNAVAILABLE)
   async logout(@Req() request: Request, @Res({ passthrough: true }) response: Response): Promise<void> {
     try {
-      await this.auth.logout(this.cookie.read(request));
+      await this.sessions.logout(this.cookie.read(request));
     } catch (error) {
       // Not signed out for certain, so keep the cookie and let the client retry.
       if (error instanceof TransientDatabaseError) throw unavailable();
@@ -163,7 +165,7 @@ export class AuthController {
   )
   async redeemInvitation(@Body() body: RedeemInvitationBodyDto): Promise<{ activated: true }> {
     try {
-      await this.accounts.redeemInvitation(body.token, body.password);
+      await this.invitations.redeemInvitation(body.token, body.password);
 
       return { activated: true };
     } catch (error) {

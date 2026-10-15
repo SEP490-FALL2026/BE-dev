@@ -2,8 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { createHash, createHmac, randomBytes } from 'node:crypto';
-import { EnvironmentVariables } from '../../infrastructure/config/env-schema';
-import { InvalidAccessTokenError } from '../../infrastructure/security/tokens/access-token-verifier.port';
+import { EnvironmentVariables } from '../../../infrastructure/config/env-schema';
+import { InvalidAccessTokenError } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 
 export interface AccessTokenClaims {
   /** AppUser id. */
@@ -60,11 +60,15 @@ export class TokenService {
     return createHash('sha256').update(token).digest('hex');
   }
 
-  /** One-time token behind an emailed link: 256 bits of randomness, only its SHA-256 is stored. */
-  newActionToken(): { token: string; hash: string } {
+  /**
+   * One-time token behind an emailed invitation link: 256 bits of randomness, only its SHA-256 is
+   * stored. It expires AUTH_INVITATION_TTL_SECONDS after `now`.
+   */
+  newInvitationToken(now: Date): { token: string; hash: string; expiresAt: Date } {
+    const ttlMs = this.config.get('AUTH_INVITATION_TTL_SECONDS', { infer: true }) * 1000;
     const token = randomBytes(32).toString('base64url');
 
-    return { token, hash: this.hashRefreshToken(token) };
+    return { token, hash: this.hashRefreshToken(token), expiresAt: new Date(now.getTime() + ttlMs) };
   }
 
   hashActionToken(token: string): string {

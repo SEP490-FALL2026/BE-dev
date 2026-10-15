@@ -1,4 +1,11 @@
-import { checkRoleRequest, forbidsCombination, isSelfChange, stopsLocking, validateRoleSet } from './account-policy';
+import {
+  checkRoleRequest,
+  employeeHasNotLeft,
+  forbidsCombination,
+  isSelfChange,
+  stopsLocking,
+  validateRoleSet,
+} from './account-policy';
 
 describe('account policy', () => {
   describe('checkRoleRequest', () => {
@@ -58,6 +65,18 @@ describe('account policy', () => {
       expect(stopsLocking(['SUPER_ADMIN'])).toBe(true);
       expect(stopsLocking(['IT_ADMIN', 'EMPLOYEE'])).toBe(false);
       expect(stopsLocking([])).toBe(false);
+    });
+  });
+
+  describe('employeeHasNotLeft', () => {
+    it('is false when there is no employee record', () => {
+      expect(employeeHasNotLeft(null)).toBe(false);
+      expect(employeeHasNotLeft(undefined)).toBe(false);
+    });
+
+    it('is true for an employee who is still active and false for one who left', () => {
+      expect(employeeHasNotLeft({ status: 'ACTIVE' })).toBe(true);
+      expect(employeeHasNotLeft({ status: 'TERMINATED' })).toBe(false);
     });
   });
 });

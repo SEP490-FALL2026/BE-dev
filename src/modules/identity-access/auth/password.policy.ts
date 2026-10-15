@@ -1,4 +1,4 @@
-import { normalizeEmail } from '../../core/email';
+import { normalizeEmail } from '../../../core/email';
 
 export const PASSWORD_MIN_LENGTH = 12;
 export const PASSWORD_MAX_LENGTH = 128;
