@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { fromDateColumn, toDateColumn } from '../../core/business-date';
 import { normalizeEmail } from '../../core/email';
+import { Prisma } from '../../generated/prisma/client';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { DbTx } from '../../infrastructure/database/transaction-runner';
 import { isUniqueViolation } from '../../infrastructure/database/unique-violation';
@@ -9,6 +10,7 @@ import {
   EmployeeEmailTakenError,
   OrganizationAlreadyExistsError,
 } from './errors/organization.errors';
+import { displayJobTitleName, normalizeJobTitleName } from './job-title-name';
 import { EmployeeNotFoundError } from './organization.errors';
 import {
   CreateCostCenterInput,
@@ -18,6 +20,9 @@ import {
   EmployeeCandidate,
   EmployeeProfile,
   EmployeeRecord,
+  JobTitleListFilter,
+  JobTitleRecord,
+  JobTitleStatus,
   OrganizationRecord,
 } from './organization.types';
 
@@ -27,6 +32,14 @@ function escapeLikePattern(term: string): string {
 }
 
 const ORGANIZATION_SELECT = { id: true, name: true, timeZone: true, reportingCurrency: true } as const;
+const JOB_TITLE_SELECT = {
+  id: true,
+  name: true,
+  status: true,
+  version: true,
+  createdAt: true,
+  updatedAt: true,
+} as const;
 
 @Injectable()
 export class OrganizationRepo {
@@ -59,16 +72,165 @@ export class OrganizationRepo {
     return tx.department.create({ data: input, select: { id: true } });
   }
 
+  /** The installation path and the API share one name rule (T-12): shown as the display name, compared as the normalized one. */
   async createJobTitle(tx: DbTx, organizationId: string, name: string): Promise<{ id: string }> {
     return tx.jobTitle.create({
-      data: { organizationId, name, normalizedName: name.trim().normalize('NFC').toLowerCase() },
+      data: { organizationId, name: displayJobTitleName(name), normalizedName: normalizeJobTitleName(name) },
       select: { id: true },
     });
   }
 
+  // --- job title catalogue (slice G2) ------------------------------------------------
+
+  async insertJobTitle(tx: DbTx, organizationId: string, name: string): Promise<JobTitleRecord> {
+    return tx.jobTitle.create({
+      data: { organizationId, name: displayJobTitleName(name), normalizedName: normalizeJobTitleName(name) },
+      select: JOB_TITLE_SELECT,
+    });
+  }
+
+  /**
+   * Takes the title's row lock (`FOR UPDATE` to change it, `FOR SHARE` to rely on it staying as it is), then
+   * reads it in a separate statement so what is read is what the lock now protects. Null when it does not exist.
+   */
+  async lockJobTitle(tx: DbTx, jobTitleId: string, mode: 'SHARE' | 'UPDATE'): Promise<JobTitleRecord | null> {
+    const rows =
+      mode === 'SHARE'
+        ? await tx.$queryRaw<{ id: string }[]>`SELECT id FROM job_titles WHERE id = ${jobTitleId}::uuid FOR SHARE`
+        : await tx.$queryRaw<{ id: string }[]>`SELECT id FROM job_titles WHERE id = ${jobTitleId}::uuid FOR UPDATE`;
+    if (rows.length === 0) return null;
+
+    return tx.jobTitle.findUnique({ where: { id: jobTitleId }, select: JOB_TITLE_SELECT });
+  }
+
+  /** Unlocked: the title that has this normalized name, whatever its status, to name it in a conflict. */
+  async findJobTitleByNormalizedName(organizationId: string, normalizedName: string): Promise<JobTitleRecord | null> {
+    return this.prisma.jobTitle.findUnique({
+      where: { organizationId_normalizedName: { organizationId, normalizedName } },
+      select: JOB_TITLE_SELECT,
+    });
+  }
+
+  /** Renames a title and raises its version. The caller holds the row lock. */
+  async renameJobTitle(tx: DbTx, jobTitleId: string, name: string, now: Date): Promise<JobTitleRecord> {
+    return tx.jobTitle.update({
+      where: { id: jobTitleId },
+      data: {
+        name: displayJobTitleName(name),
+        normalizedName: normalizeJobTitleName(name),
+        version: { increment: 1 },
+        updatedAt: now,
+      },
+      select: JOB_TITLE_SELECT,
+    });
+  }
+
+  /** Changes a title's status and raises its version. The caller holds the row lock. */
+  async setJobTitleStatus(tx: DbTx, jobTitleId: string, status: JobTitleStatus, now: Date): Promise<JobTitleRecord> {
+    return tx.jobTitle.update({
+      where: { id: jobTitleId },
+      data: { status, version: { increment: 1 }, updatedAt: now },
+      select: JOB_TITLE_SELECT,
+    });
+  }
+
+  /**
+   * One page of the catalogue in normalized-name order, and the total for the same filter, from one snapshot
+   * (RepeatableRead). The search is a literal substring of the normalized name: `%` and `_` are characters.
+   */
+  async listJobTitles(filter: JobTitleListFilter): Promise<{ items: JobTitleRecord[]; total: number }> {
+    const conditions = [
+      ...(filter.status ? [Prisma.sql`status = ${filter.status}::"JobTitleStatus"`] : []),
+      ...(filter.search ? [Prisma.sql`strpos(normalized_name, ${filter.search}) > 0`] : []),
+    ];
+    const where = conditions.length > 0 ? Prisma.sql`WHERE ${Prisma.join(conditions, ' AND ')}` : Prisma.empty;
+
+    return this.prisma.$transaction(
+      async (tx) => {
+        const items = await tx.$queryRaw<
+          { id: string; name: string; status: JobTitleStatus; version: number; created_at: Date; updated_at: Date }[]
+        >`SELECT id, name, status, version, created_at, updated_at FROM job_titles ${where}
+           ORDER BY normalized_name, id LIMIT ${filter.take} OFFSET ${filter.skip}`;
+        const counted = await tx.$queryRaw<{ total: number }[]>`SELECT count(*)::int AS total FROM job_titles ${where}`;
+
+        return {
+          items: items.map((row) => ({
+            id: row.id,
+            name: row.name,
+            status: row.status,
+            version: row.version,
+            createdAt: row.created_at,
+            updatedAt: row.updated_at,
+          })),
+          total: counted[0].total,
+        };
+      },
+      { isolationLevel: 'RepeatableRead' },
+    );
+  }
+
   // --- employees --------------------------------------------------------------------
 
-  /** The single writer of employees and their placements: every path opens exactly one placement from hireDate. */
+  /**
+   * Takes the department's row lock (`FOR SHARE`: it must still exist, and its cost center must not change, until
+   * commit) and reads it. Null when there is no department with this code.
+   */
+  async lockDepartmentByCode(
+    tx: DbTx,
+    organizationId: string,
+    code: string,
+  ): Promise<{ id: string; code: string; name: string; active: boolean; costCenterActive: boolean } | null> {
+    const rows = await tx.$queryRaw<
+      { id: string; code: string; name: string; cost_center_id: string; status: string }[]
+    >`
+      SELECT id, code, name, cost_center_id, status::text AS status FROM departments
+       WHERE organization_id = ${organizationId}::uuid AND code = ${code} FOR SHARE`;
+    const department = rows[0];
+    if (!department) return null;
+
+    // Read after the lock, in a statement of its own (lock protocol rule 7): a retirement of the cost center that
+    // committed while this waited for the department is seen here.
+    const centers = await tx.$queryRaw<{ status: string }[]>`
+      SELECT status::text AS status FROM cost_centers WHERE id = ${department.cost_center_id}::uuid`;
+
+    return {
+      id: department.id,
+      code: department.code,
+      name: department.name,
+      active: department.status === 'ACTIVE',
+      costCenterActive: centers[0]?.status === 'ACTIVE',
+    };
+  }
+
+  /** The database clock at the start of the transaction: the instant `created_at` defaults to. */
+  async databaseNow(tx: DbTx): Promise<Date> {
+    const rows = await tx.$queryRaw<{ now: Date }[]>`SELECT now() AS now`;
+
+    return rows[0].now;
+  }
+
+  async employeeCodeExists(tx: DbTx, organizationId: string, employeeCode: string): Promise<boolean> {
+    const row = await tx.employee.findUnique({
+      where: { organizationId_employeeCode: { organizationId, employeeCode } },
+      select: { id: true },
+    });
+
+    return row !== null;
+  }
+
+  async workEmailExists(tx: DbTx, organizationId: string, normalizedWorkEmail: string): Promise<boolean> {
+    const row = await tx.employee.findUnique({
+      where: { organizationId_normalizedWorkEmail: { organizationId, normalizedWorkEmail } },
+      select: { id: true },
+    });
+
+    return row !== null;
+  }
+
+  /**
+   * The single writer of employees and their placements: every path opens exactly one placement, from the hire
+   * date (installation) or from the day the person is recorded (everything else, R-11).
+   */
   async createEmployeeWithPlacement(tx: DbTx, input: CreateEmployeeWithPlacementInput): Promise<{ id: string }> {
     const workEmail = input.workEmail?.trim() || null;
 
@@ -92,7 +254,7 @@ export class OrganizationRepo {
           employeeId: employee.id,
           departmentId: input.departmentId,
           jobTitleId: input.jobTitleId,
-          validFrom: toDateColumn(input.hireDate),
+          validFrom: toDateColumn(input.memberSince ?? input.hireDate),
         },
       });
 
@@ -117,6 +279,22 @@ export class OrganizationRepo {
   /** Unlocked read: the per-request guard must not take locks (and must not deadlock with termination). */
   async findEmployee(employeeId: string, tx?: DbTx): Promise<EmployeeRecord | null> {
     const row = await (tx ?? this.prisma).employee.findUnique({ where: { id: employeeId } });
+    if (!row) return null;
+
+    return {
+      id: row.id,
+      organizationId: row.organizationId,
+      employeeCode: row.employeeCode,
+      fullName: row.fullName,
+      workEmail: row.workEmail,
+      status: row.status,
+      hireDate: fromDateColumn(row.hireDate),
+    };
+  }
+
+  /** Unlocked read by the code of the employee, for the operator procedures that name people by code. */
+  async findEmployeeByCode(employeeCode: string, tx?: DbTx): Promise<EmployeeRecord | null> {
+    const row = await (tx ?? this.prisma).employee.findFirst({ where: { employeeCode } });
     if (!row) return null;
 
     return {

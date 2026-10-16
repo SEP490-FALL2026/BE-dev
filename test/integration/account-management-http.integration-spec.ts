@@ -671,13 +671,13 @@ describe('account management over HTTP (integration, real PostgreSQL)', () => {
         )
       ).rows[0].token_hash;
       const identity = ctx.app.get(IdentityAccessService);
-      await expect(identity.isInvitationLinkUsable(tokenHash)).resolves.toBe(true);
+      await expect(identity.isActionLinkUsable(tokenHash)).resolves.toBe(true);
 
       await ctx.sql.query("UPDATE employees SET status = 'TERMINATED' WHERE id = $1", [employee.employeeId]);
 
       const detail = dataOf(await admin.get(`/api/v1/app-users/${account.id}`).expect(200));
       expect(detail.invitation?.usable).toBe(false);
-      await expect(identity.isInvitationLinkUsable(tokenHash)).resolves.toBe(false);
+      await expect(identity.isActionLinkUsable(tokenHash)).resolves.toBe(false);
     });
   });
 });

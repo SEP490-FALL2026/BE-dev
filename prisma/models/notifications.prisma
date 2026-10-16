@@ -8,14 +8,16 @@ enum EmailOutboxStatus {
 
 // Transactional outbox: written in the same transaction as the business change, delivered by
 // the worker. action_token_hash is a plain value (no foreign key): this module never reads the
-// identity tables; the dispatcher asks identity-access whether the token is still usable.
+// identity tables; the dispatcher asks identity-access whether the token is still usable. It is
+// null for a notice with no link (password changed); PostgreSQL lets any number of NULLs share a
+// unique index, so only real token hashes stay unique.
 model EmailOutbox {
   id                String            @id @default(uuid()) @db.Uuid
   organizationId    String            @map("organization_id") @db.Uuid
   recipient         String
   template          String
   locale            String
-  actionTokenHash   String            @unique @map("action_token_hash")
+  actionTokenHash   String?           @unique @map("action_token_hash")
   status            EmailOutboxStatus @default(PENDING)
   attempts          Int               @default(0)
   nextAttemptAt     DateTime          @map("next_attempt_at") @db.Timestamptz(3)

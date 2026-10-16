@@ -48,7 +48,7 @@ export class EmailDispatchLoop implements OnApplicationBootstrap, OnModuleDestro
 
   private async tick(): Promise<void> {
     try {
-      await this.dispatcher.dispatchDue((hash) => this.identity.isInvitationLinkUsable(hash));
+      await this.dispatcher.dispatchDue((hash) => this.identity.isActionLinkUsable(hash));
     } catch (error) {
       this.logger.error(`Mail dispatch tick failed: ${(error as Error).name}`);
     } finally {

@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { EnvironmentVariables } from '../../infrastructure/config/env-schema';
 import { TransactionRunner } from '../../infrastructure/database/transaction-runner';
 import { MailSendError, MailTransport } from '../../infrastructure/mail/mail-transport';
-import { renderEmail } from './email-templates';
+import { UnknownEmailTemplateError, renderEmail } from './email-templates';
 import { NotificationsRepo } from './notifications.repo';
 import { ClaimedEmail, EmailTemplate, TokenUsability } from './notifications.types';
 import { PayloadCipher, PayloadDecryptionError } from './payload-cipher';
@@ -22,7 +22,8 @@ function backoffMs(attempts: number): number {
 /**
  * Delivers the outbox. A tick takes due rows in one short transaction, then does the network
  * work outside any transaction (ADR-0012). It never touches identity tables: whether a link is
- * still worth sending is answered by the `isUsable` callback the caller supplies.
+ * still worth sending is answered by the `isUsable` callback the caller supplies, and only for mail
+ * that carries a token.
  */
 @Injectable()
 export class EmailDispatcher {
@@ -67,8 +68,9 @@ export class EmailDispatcher {
       return;
     }
 
-    // The link is worthless once its token is revoked or used: do not send it.
-    if (!(await isUsable(email.actionTokenHash))) {
+    // The link is worthless once its token is revoked or used: do not send it. A notice has no link
+    // and no token, so there is nothing to check and it goes out as queued.
+    if (email.actionTokenHash !== null && !(await isUsable(email.actionTokenHash))) {
       await this.repo.markCancelled(email.id, leaseId);
       return;
     }
@@ -79,12 +81,20 @@ export class EmailDispatcher {
       return;
     }
 
-    const rendered = renderEmail(
-      email.template as EmailTemplate,
-      email.locale,
-      payload,
-      this.config.get('APP_PUBLIC_URL', { infer: true }),
-    );
+    let rendered: ReturnType<typeof renderEmail>;
+    try {
+      rendered = renderEmail(
+        email.template as EmailTemplate,
+        email.locale,
+        payload,
+        this.config.get('APP_PUBLIC_URL', { infer: true }),
+      );
+    } catch (error) {
+      if (!(error instanceof UnknownEmailTemplateError)) throw error;
+      // Retrying cannot help: this build has no such template. Fail it once, for good.
+      await this.repo.markFailed(email.id, leaseId, 'TEMPLATE_UNKNOWN');
+      return;
+    }
 
     try {
       await this.transport.send({ to: email.recipient, subject: rendered.subject, text: rendered.text });

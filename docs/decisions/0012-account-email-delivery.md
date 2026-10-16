@@ -37,6 +37,18 @@ this historical limitation does not describe the later review environment.
 5. **Payload protection** as in the spec: AES-256-GCM with a configured key and key id, bound
    to the outbox row id; ciphertext cleared when the row reaches a terminal state; payload is
    never logged.
+6. **Three templates, one of them without a link (slice 1c).** Besides `ACCOUNT_INVITATION`, the outbox
+   carries `PASSWORD_RESET` (a link to `${APP_PUBLIC_URL}/reset-password#token=…`, token in the fragment like
+   the activation link) and `PASSWORD_CHANGED_NOTICE` (what happened and when; no link, no token). The notice
+   has no action token, so `email_outbox.action_token_hash` is nullable; the existing unique index still keeps
+   real hashes unique because PostgreSQL lets any number of `NULL`s share one. The dispatcher asks whether a
+   link is still worth sending only for a row that has a token: an invitation or reset link whose token was
+   used, revoked or expired, whose account was locked or whose employee left, is cancelled instead of sent
+   (`IdentityAccessService.isActionLinkUsable`, by token purpose). A notice is sent as queued. A reset
+   that succeeds also cancels the unsent mail that carried its own link.
+7. **A failed notice never undoes the change.** The notice is written in the same transaction as the
+   password change, so it exists exactly when the change committed; sending is retried by the worker like any
+   other mail, and a permanent SMTP failure leaves the change in force and the row `FAILED`.
 
 ## Consequences
 

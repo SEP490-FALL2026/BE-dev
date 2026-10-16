@@ -44,6 +44,10 @@ export interface EnvironmentVariables {
   AUTH_JWT_ISSUER: string;
   AUTH_JWT_AUDIENCE: string;
   AUTH_INVITATION_TTL_SECONDS: number;
+  /** How long a password-reset link works (T-1). */
+  AUTH_PASSWORD_RESET_TTL_SECONDS: number;
+  /** Reset links one account can be issued in any 60 minutes; further requests are answered the same but issue none (T-2). */
+  AUTH_PASSWORD_RESET_MAX_PER_HOUR: number;
   APP_PUBLIC_URL: string;
   OUTBOX_PAYLOAD_KEY: string;
   OUTBOX_PAYLOAD_KEY_ID: string;
@@ -196,6 +200,8 @@ const environmentSchema = Joi.object({
   AUTH_JWT_ISSUER: Joi.string().default('slm-api'),
   AUTH_JWT_AUDIENCE: Joi.string().default('slm-web'),
   AUTH_INVITATION_TTL_SECONDS: Joi.number().integer().min(3_600).max(1_209_600).default(259_200),
+  AUTH_PASSWORD_RESET_TTL_SECONDS: Joi.number().integer().min(300).max(86_400).default(1_800),
+  AUTH_PASSWORD_RESET_MAX_PER_HOUR: Joi.number().integer().min(1).max(100).default(3),
   // Links in invitation mail point here; the token travels in the URL fragment.
   APP_PUBLIC_URL: Joi.string()
     .uri({ scheme: ['http', 'https'] })

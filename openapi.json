@@ -41,6 +41,1775 @@
         "tags": ["health"]
       }
     },
+    "/api/v1/audit-events": {
+      "get": {
+        "operationId": "auditEventList",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 9007199254740991,
+              "exclusiveMinimum": true,
+              "default": 1,
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": { "maximum": 100, "exclusiveMinimum": true, "default": 20, "type": "integer", "minimum": 0 }
+          },
+          {
+            "name": "resourceType",
+            "required": false,
+            "in": "query",
+            "schema": { "minLength": 1, "maxLength": 100, "type": "string" }
+          },
+          {
+            "name": "resourceId",
+            "required": false,
+            "in": "query",
+            "schema": { "minLength": 1, "maxLength": 200, "type": "string" }
+          },
+          {
+            "name": "actorAppUserId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "type": "string"
+            }
+          },
+          {
+            "name": "action",
+            "required": false,
+            "in": "query",
+            "schema": { "minLength": 1, "maxLength": 100, "type": "string" }
+          },
+          {
+            "name": "occurredFrom",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+              "type": "string"
+            }
+          },
+          {
+            "name": "occurredTo",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of the Audit Trail, newest first, optionally narrowed by resource, actor, action and time window [occurredFrom, occurredTo).",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/AuditEventPageResponseDto" } }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "403": {
+            "description": "Only the Super Admin may read the Audit Trail.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "422": {
+            "description": "The query is invalid (VALIDATION_ERROR).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          }
+        },
+        "summary": "",
+        "tags": ["audit"]
+      }
+    },
+    "/api/v1/job-titles": {
+      "get": {
+        "operationId": "jobTitleList",
+        "parameters": [
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string", "enum": ["ACTIVE", "INACTIVE"] }
+          },
+          { "name": "search", "required": false, "in": "query", "schema": { "maxLength": 100, "type": "string" } },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 9007199254740991,
+              "exclusiveMinimum": true,
+              "default": 1,
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": { "maximum": 100, "exclusiveMinimum": true, "default": 20, "type": "integer", "minimum": 0 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of job titles in name order, optionally by status or a literal search of the name.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/JobTitlePageResponseDto" } } }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "403": {
+            "description": "Only an IT Admin may maintain the job title catalogue.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "422": {
+            "description": "The request is invalid (VALIDATION_ERROR), or the name is empty or too long.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          }
+        },
+        "summary": "",
+        "tags": ["job-titles"]
+      },
+      "post": {
+        "operationId": "jobTitleCreate",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/JobTitleNameBodyDto" } } }
+        },
+        "responses": {
+          "201": {
+            "description": "The title was added and is active.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/JobTitleResponseDto" } } }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "403": {
+            "description": "Only an IT Admin may maintain the job title catalogue.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "409": {
+            "description": "Another title, active or not, already has this name once case and whitespace are ignored (JOB_TITLE.NAME_TAKEN; details.conflict names it).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "422": {
+            "description": "The request is invalid (VALIDATION_ERROR), or the name is empty or too long.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          }
+        },
+        "summary": "",
+        "tags": ["job-titles"]
+      }
+    },
+    "/api/v1/job-titles/{id}": {
+      "patch": {
+        "operationId": "jobTitleRename",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/JobTitleNameBodyDto" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "The title has its new name; everyone who holds it keeps it.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/JobTitleResponseDto" } } }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "403": {
+            "description": "Only an IT Admin may maintain the job title catalogue.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "404": {
+            "description": "The job title does not exist.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "409": {
+            "description": "Another title already has this name (JOB_TITLE.NAME_TAKEN; details.conflict names it).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "422": {
+            "description": "The request is invalid (VALIDATION_ERROR), or the name is empty or too long.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          }
+        },
+        "summary": "",
+        "tags": ["job-titles"]
+      }
+    },
+    "/api/v1/job-titles/{id}/deactivate": {
+      "post": {
+        "operationId": "jobTitleDeactivate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The title is inactive; nobody who holds it loses it. Already inactive ⟹ the same answer.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/JobTitleResponseDto" } } }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "403": {
+            "description": "Only an IT Admin may maintain the job title catalogue.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "404": {
+            "description": "The job title does not exist.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "422": {
+            "description": "The request is invalid (VALIDATION_ERROR), or the name is empty or too long.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          }
+        },
+        "summary": "",
+        "tags": ["job-titles"]
+      }
+    },
+    "/api/v1/job-titles/{id}/reactivate": {
+      "post": {
+        "operationId": "jobTitleReactivate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The title is active again. Already active ⟹ the same answer.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/JobTitleResponseDto" } } }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "403": {
+            "description": "Only an IT Admin may maintain the job title catalogue.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "404": {
+            "description": "The job title does not exist.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "422": {
+            "description": "The request is invalid (VALIDATION_ERROR), or the name is empty or too long.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          }
+        },
+        "summary": "",
+        "tags": ["job-titles"]
+      }
+    },
+    "/api/v1/employees": {
+      "post": {
+        "operationId": "employeeCreate",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CreateEmployeeBodyDto" } } }
+        },
+        "responses": {
+          "201": {
+            "description": "The employee and their placement were created. No account, role, invitation or mail is created. The person is a member of the department from the day they are recorded.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/EmployeeResponseDto" } } }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "403": {
+            "description": "Only an IT Admin may enter people.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "422": {
+            "description": "The body is malformed (VALIDATION_ERROR), or the row cannot become an employee (EMPLOYEE.ROW_INVALID; details.reasons lists every field and code).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          }
+        },
+        "summary": "",
+        "tags": ["employees"]
+      }
+    },
+    "/api/v1/cost-centers": {
+      "get": {
+        "operationId": "costCenterList",
+        "parameters": [
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string", "enum": ["ACTIVE", "INACTIVE"] }
+          },
+          {
+            "name": "kind",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string", "enum": ["UNIT", "COMPANY"] }
+          },
+          { "name": "search", "required": false, "in": "query", "schema": { "maxLength": 100, "type": "string" } },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 9007199254740991,
+              "exclusiveMinimum": true,
+              "default": 1,
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": { "maximum": 100, "exclusiveMinimum": true, "default": 20, "type": "integer", "minimum": 0 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of cost centers in code order, with the department charged to each.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/CostCenterPageResponseDto" } }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "403": {
+            "description": "Only Finance and the IT Admin read the Cost Center catalogue.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          }
+        },
+        "summary": "",
+        "tags": ["cost-centers"]
+      },
+      "post": {
+        "operationId": "costCenterCreate",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CreateCostCenterBodyDto" } } }
+        },
+        "responses": {
+          "201": {
+            "description": "The cost center is in the catalogue, in use, with no department yet.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CostCenterResponseDto" } } }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "403": {
+            "description": "Only Finance maintains the Cost Center catalogue (US-04-09 AC-2).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "409": {
+            "description": "The code is already taken (COST_CENTER.CODE_TAKEN).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "422": {
+            "description": "The request is invalid (VALIDATION_ERROR), the kind is not UNIT or COMPANY (COST_CENTER.KIND_NOT_SUPPORTED), or the name is empty, too long (COST_CENTER.NAME_INVALID) or reserved (COST_CENTER.NAME_RESERVED).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          }
+        },
+        "summary": "",
+        "tags": ["cost-centers"]
+      }
+    },
+    "/api/v1/cost-centers/{id}": {
+      "patch": {
+        "operationId": "costCenterRename",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RenameCostCenterBodyDto" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "The cost center has its new name; its code, department and history do not change.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CostCenterResponseDto" } } }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "403": {
+            "description": "Only Finance maintains the Cost Center catalogue (US-04-09 AC-2).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "404": {
+            "description": "The cost center does not exist.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "422": {
+            "description": "The request is invalid (VALIDATION_ERROR), the kind is not UNIT or COMPANY (COST_CENTER.KIND_NOT_SUPPORTED), or the name is empty, too long (COST_CENTER.NAME_INVALID) or reserved (COST_CENTER.NAME_RESERVED).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          }
+        },
+        "summary": "",
+        "tags": ["cost-centers"]
+      }
+    },
+    "/api/v1/cost-centers/{id}/deactivate": {
+      "post": {
+        "operationId": "costCenterDeactivate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The cost center is no longer in use. Already retired ⟹ the same answer.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CostCenterResponseDto" } } }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "403": {
+            "description": "Only Finance maintains the Cost Center catalogue (US-04-09 AC-2).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "404": {
+            "description": "The cost center does not exist.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "409": {
+            "description": "The department charged to it still has people (COST_CENTER.IN_USE; details lists the department and the people).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "422": {
+            "description": "The request is invalid (VALIDATION_ERROR), the kind is not UNIT or COMPANY (COST_CENTER.KIND_NOT_SUPPORTED), or the name is empty, too long (COST_CENTER.NAME_INVALID) or reserved (COST_CENTER.NAME_RESERVED).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          }
+        },
+        "summary": "",
+        "tags": ["cost-centers"]
+      }
+    },
+    "/api/v1/cost-centers/{id}/employees": {
+      "get": {
+        "operationId": "costCenterEmployeeList",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 9007199254740991,
+              "exclusiveMinimum": true,
+              "default": 1,
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": { "maximum": 100, "exclusiveMinimum": true, "default": 20, "type": "integer", "minimum": 0 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The people in the cost center today, reduced to code, name and that they are working: no email, contract, dates or manager (QĐ-41c).",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/CostCenterEmployeesResponseDto" } }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "403": {
+            "description": "Only Finance maintains the Cost Center catalogue (US-04-09 AC-2).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "404": {
+            "description": "The cost center does not exist.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "422": {
+            "description": "The request is invalid (VALIDATION_ERROR), the kind is not UNIT or COMPANY (COST_CENTER.KIND_NOT_SUPPORTED), or the name is empty, too long (COST_CENTER.NAME_INVALID) or reserved (COST_CENTER.NAME_RESERVED).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          }
+        },
+        "summary": "",
+        "tags": ["cost-centers"]
+      }
+    },
+    "/api/v1/departments": {
+      "get": {
+        "operationId": "departmentList",
+        "parameters": [
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string", "enum": ["ACTIVE", "INACTIVE"] }
+          },
+          { "name": "search", "required": false, "in": "query", "schema": { "maxLength": 100, "type": "string" } },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 9007199254740991,
+              "exclusiveMinimum": true,
+              "default": 1,
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": { "maximum": 100, "exclusiveMinimum": true, "default": 20, "type": "integer", "minimum": 0 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of departments in code order, each with its head today, its people count and its warnings.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/DepartmentPageResponseDto" } }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "403": {
+            "description": "Only an IT Admin changes department data (US-03-06 AC-16).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "422": {
+            "description": "The request is invalid (VALIDATION_ERROR) or a rule of the department refuses it; details name the reason.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          }
+        },
+        "summary": "",
+        "tags": ["departments"]
+      },
+      "post": {
+        "operationId": "departmentCreate",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CreateDepartmentBodyDto" } } }
+        },
+        "responses": {
+          "201": {
+            "description": "The department exists, charged to the UNIT Cost Center chosen, with nobody heading it yet. warnings says what is still missing.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DepartmentResponseDto" } } }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "403": {
+            "description": "Only an IT Admin changes department data (US-03-06 AC-16).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "409": {
+            "description": "The code is taken (DEPARTMENT.CODE_TAKEN) or another department already has the Cost Center (DEPARTMENT.COST_CENTER_TAKEN).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "422": {
+            "description": "The request is invalid (VALIDATION_ERROR) or a rule of the department refuses it; details name the reason.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          }
+        },
+        "summary": "",
+        "tags": ["departments"]
+      }
+    },
+    "/api/v1/departments/{id}": {
+      "get": {
+        "operationId": "departmentGet",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The profile: Cost Center, IT Admin in charge, head today and before, people count, projects, warnings.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DepartmentResponseDto" } } }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "403": {
+            "description": "Not an IT Admin, or a department head asking about a department that is not theirs (DEPARTMENT.OUT_OF_SCOPE).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "404": {
+            "description": "The department does not exist.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "422": {
+            "description": "The request is invalid (VALIDATION_ERROR) or a rule of the department refuses it; details name the reason.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          }
+        },
+        "summary": "",
+        "tags": ["departments"]
+      },
+      "patch": {
+        "operationId": "departmentUpdate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UpdateDepartmentBodyDto" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "The name, the description or the IT Admin in charge changed. The Cost Center and the people do not.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DepartmentResponseDto" } } }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "403": {
+            "description": "Only an IT Admin changes department data (US-03-06 AC-16).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "404": {
+            "description": "The department does not exist.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "422": {
+            "description": "The request is invalid (VALIDATION_ERROR) or a rule of the department refuses it; details name the reason.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          }
+        },
+        "summary": "",
+        "tags": ["departments"]
+      }
+    },
+    "/api/v1/departments/{id}/deactivate": {
+      "post": {
+        "operationId": "departmentDeactivate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The department is retired: it takes no new member or head. Already retired ⟹ the same answer.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DepartmentResponseDto" } } }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "403": {
+            "description": "Only an IT Admin changes department data (US-03-06 AC-16).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "404": {
+            "description": "The department does not exist.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "409": {
+            "description": "It still has members (DEPARTMENT.IN_USE; details lists them).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "422": {
+            "description": "The request is invalid (VALIDATION_ERROR) or a rule of the department refuses it; details name the reason.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          }
+        },
+        "summary": "",
+        "tags": ["departments"]
+      }
+    },
+    "/api/v1/departments/{id}/head-assignments": {
+      "post": {
+        "operationId": "departmentHeadAssign",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AssignHeadBodyDto" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "The person heads the department from the date; the head before ends the day before. The person must be a member of the department that day.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DepartmentResponseDto" } } }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "403": {
+            "description": "Only an IT Admin changes department data (US-03-06 AC-16).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "404": {
+            "description": "The department does not exist.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "422": {
+            "description": "The request is invalid (VALIDATION_ERROR) or a rule of the department refuses it; details name the reason.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          }
+        },
+        "summary": "",
+        "tags": ["departments"]
+      }
+    },
+    "/api/v1/departments/{id}/head-vacancies": {
+      "post": {
+        "operationId": "departmentHeadVacate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/VacateHeadBodyDto" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "Nobody heads the department from the date; it shows as missing a head. Nothing to end ⟹ no change.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DepartmentResponseDto" } } }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "403": {
+            "description": "Only an IT Admin changes department data (US-03-06 AC-16).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "404": {
+            "description": "The department does not exist.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "422": {
+            "description": "The request is invalid (VALIDATION_ERROR) or a rule of the department refuses it; details name the reason.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          }
+        },
+        "summary": "",
+        "tags": ["departments"]
+      }
+    },
+    "/api/v1/departments/{id}/employees": {
+      "get": {
+        "operationId": "departmentMemberList",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 9007199254740991,
+              "exclusiveMinimum": true,
+              "default": 1,
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": { "maximum": 100, "exclusiveMinimum": true, "default": 20, "type": "integer", "minimum": 0 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The people in the department today: code, name, status, whether they have a work email, and since when. No email, contract or finance data (QĐ-41c).",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/DepartmentMembersResponseDto" } }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "403": {
+            "description": "Not an IT Admin, or a department head asking about a department that is not theirs.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "404": {
+            "description": "The department does not exist.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "422": {
+            "description": "The request is invalid (VALIDATION_ERROR) or a rule of the department refuses it; details name the reason.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          }
+        },
+        "summary": "",
+        "tags": ["departments"]
+      }
+    },
+    "/api/v1/department-warnings": {
+      "get": {
+        "operationId": "departmentWarningList",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The active departments that miss a head or a usable IT Admin in charge. The Super Admin sees these and nothing else of the departments.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/DepartmentWarningsResponseDto" } }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "403": {
+            "description": "Only the IT Admin and the Super Admin see department warnings.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          }
+        },
+        "summary": "",
+        "tags": ["departments"]
+      }
+    },
+    "/api/v1/projects": {
+      "get": {
+        "operationId": "projectList",
+        "parameters": [
+          {
+            "name": "departmentId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The projects, optionally those a department takes part in.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ProjectListResponseDto" } } }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "403": {
+            "description": "Only an IT Admin keeps the projects described on department profiles.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "422": {
+            "description": "The request is invalid (VALIDATION_ERROR) or the project is not valid (PROJECT.INVALID).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          }
+        },
+        "summary": "",
+        "tags": ["projects"]
+      },
+      "post": {
+        "operationId": "projectCreate",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CreateProjectBodyDto" } } }
+        },
+        "responses": {
+          "201": {
+            "description": "The project is described and appears on the profile of each department that takes part.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ProjectResponseDto" } } }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "403": {
+            "description": "Only an IT Admin keeps the projects described on department profiles.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "422": {
+            "description": "The request is invalid (VALIDATION_ERROR) or the project is not valid (PROJECT.INVALID).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          }
+        },
+        "summary": "",
+        "tags": ["projects"]
+      }
+    },
+    "/api/v1/projects/{id}": {
+      "patch": {
+        "operationId": "projectUpdate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UpdateProjectBodyDto" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "The project has its new description, status or departments.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ProjectResponseDto" } } }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "403": {
+            "description": "Only an IT Admin keeps the projects described on department profiles.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "404": {
+            "description": "The project does not exist (PROJECT.NOT_FOUND).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "422": {
+            "description": "The request is invalid (VALIDATION_ERROR) or the project is not valid (PROJECT.INVALID).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          }
+        },
+        "summary": "",
+        "tags": ["projects"]
+      }
+    },
+    "/api/v1/operating-parameters": {
+      "get": {
+        "operationId": "operatingParameterList",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Every parameter with the value in force, its default, its unit and the domain a value must stay in.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ParameterListResponseDto" } } }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "403": {
+            "description": "Only the Super Admin configures the operating parameters (AC-6).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          }
+        },
+        "summary": "",
+        "tags": ["operating-parameters"]
+      }
+    },
+    "/api/v1/operating-parameters/{key}": {
+      "put": {
+        "operationId": "operatingParameterSet",
+        "parameters": [
+          {
+            "name": "key",
+            "required": true,
+            "in": "path",
+            "schema": { "pattern": "^[A-Z][A-Z0-9_]{0,99}$", "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SetParameterBodyDto" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "The value applies to what is created from now on; what already runs keeps the value it was created with. The same value again changes nothing.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ParameterResponseDto" } } }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "403": {
+            "description": "Only the Super Admin configures the operating parameters (AC-6).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "404": {
+            "description": "There is no such parameter (PARAMETER.NOT_FOUND).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "422": {
+            "description": "The request is invalid (VALIDATION_ERROR).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          }
+        },
+        "summary": "",
+        "tags": ["operating-parameters"]
+      }
+    },
+    "/api/v1/operating-parameters/{key}/history": {
+      "get": {
+        "operationId": "operatingParameterHistory",
+        "parameters": [
+          {
+            "name": "key",
+            "required": true,
+            "in": "path",
+            "schema": { "pattern": "^[A-Z][A-Z0-9_]{0,99}$", "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The values the parameter has had, newest first.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ParameterHistoryResponseDto" } }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "403": {
+            "description": "Only the Super Admin configures the operating parameters (AC-6).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "404": {
+            "description": "There is no such parameter (PARAMETER.NOT_FOUND).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "422": {
+            "description": "The request is invalid (VALIDATION_ERROR).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          }
+        },
+        "summary": "",
+        "tags": ["operating-parameters"]
+      }
+    },
+    "/api/v1/non-working-dates": {
+      "get": {
+        "operationId": "nonWorkingDateList",
+        "parameters": [
+          { "name": "from", "required": false, "in": "query", "schema": { "type": "string" } },
+          { "name": "to", "required": false, "in": "query", "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "The days nobody works, in date order, optionally between two dates.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/NonWorkingDateListResponseDto" } }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "403": {
+            "description": "Only the Super Admin configures the operating parameters (AC-6).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "422": {
+            "description": "The request is invalid (VALIDATION_ERROR).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          }
+        },
+        "summary": "",
+        "tags": ["operating-parameters"]
+      },
+      "post": {
+        "operationId": "nonWorkingDateAdd",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AddNonWorkingDateBodyDto" } } }
+        },
+        "responses": {
+          "201": {
+            "description": "The day is a non-working date from now on. Today or a later day only.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/NonWorkingDateResponseDto" } }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "403": {
+            "description": "Only the Super Admin configures the operating parameters (AC-6).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "409": {
+            "description": "The day is already a non-working date (NON_WORKING_DATE.TAKEN).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "422": {
+            "description": "The request is invalid (VALIDATION_ERROR).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          }
+        },
+        "summary": "",
+        "tags": ["operating-parameters"]
+      }
+    },
+    "/api/v1/non-working-dates/{date}": {
+      "patch": {
+        "operationId": "nonWorkingDateRename",
+        "parameters": [{ "name": "date", "required": true, "in": "path", "schema": { "type": "string" } }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/RenameNonWorkingDateBodyDto" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The reason of a non-working date changes. A day before today is refused (NON_WORKING_DATE.IN_PAST).",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/NonWorkingDateResponseDto" } }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "403": {
+            "description": "Only the Super Admin configures the operating parameters (AC-6).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "404": {
+            "description": "The day is not a non-working date (NON_WORKING_DATE.NOT_FOUND).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "422": {
+            "description": "The request is invalid (VALIDATION_ERROR).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          }
+        },
+        "summary": "",
+        "tags": ["operating-parameters"]
+      },
+      "delete": {
+        "operationId": "nonWorkingDateRemove",
+        "parameters": [{ "name": "date", "required": true, "in": "path", "schema": { "type": "string" } }],
+        "responses": {
+          "200": {
+            "description": "The day is a working day again. A day before today is refused (NON_WORKING_DATE.IN_PAST).",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/NonWorkingDateResponseDto" } }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "403": {
+            "description": "Only the Super Admin configures the operating parameters (AC-6).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "404": {
+            "description": "The day is not a non-working date (NON_WORKING_DATE.NOT_FOUND).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "422": {
+            "description": "The request is invalid (VALIDATION_ERROR).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          }
+        },
+        "summary": "",
+        "tags": ["operating-parameters"]
+      }
+    },
+    "/api/v1/employee-imports": {
+      "post": {
+        "operationId": "employeeImportUpload",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["file"],
+                "properties": { "file": { "type": "string", "format": "binary" } }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The file was read and every row judged: nothing is written yet. The summary says how many rows are valid, wrong, there already, and the people by department.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/EmployeeImportResponseDto" } }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "403": {
+            "description": "Only an IT Admin imports people (US-02-02 AC-12).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "422": {
+            "description": "The file cannot be used as a whole: missing, empty, not text, unreadable, too many rows, or lacking a required column such as the department or the job title (IMPORT.FILE_*).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          }
+        },
+        "summary": "",
+        "tags": ["employee-imports"]
+      }
+    },
+    "/api/v1/employee-imports/{id}": {
+      "get": {
+        "operationId": "employeeImportGet",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The import with its preview or its result.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/EmployeeImportResponseDto" } }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "403": {
+            "description": "Only an IT Admin imports people (US-02-02 AC-12).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "404": {
+            "description": "The import does not exist (IMPORT.NOT_FOUND).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          }
+        },
+        "summary": "",
+        "tags": ["employee-imports"]
+      }
+    },
+    "/api/v1/employee-imports/{id}/rows": {
+      "get": {
+        "operationId": "employeeImportRowList",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "type": "string"
+            }
+          },
+          {
+            "name": "outcome",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string", "enum": ["VALID", "ERROR", "EXISTS_SAME", "EXISTS_DIFFERENT"] }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 9007199254740991,
+              "exclusiveMinimum": true,
+              "default": 1,
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": { "maximum": 200, "exclusiveMinimum": true, "default": 50, "type": "integer", "minimum": 0 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The rows of the file with what the preview made of each: the line, the cells, the errors with their column and code, the differences of a person already there. Filter by outcome to download the errors.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/EmployeeImportRowsResponseDto" } }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "403": {
+            "description": "Only an IT Admin imports people (US-02-02 AC-12).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "404": {
+            "description": "The import does not exist (IMPORT.NOT_FOUND).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          }
+        },
+        "summary": "",
+        "tags": ["employee-imports"]
+      }
+    },
+    "/api/v1/employee-imports/{id}/preview-refreshes": {
+      "post": {
+        "operationId": "employeeImportPreviewRefresh",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The same rows are judged again against the data as it is now, as a new preview version; the older version can no longer be confirmed.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/EmployeeImportResponseDto" } }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "403": {
+            "description": "Only an IT Admin imports people (US-02-02 AC-12).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "404": {
+            "description": "The import does not exist (IMPORT.NOT_FOUND).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "409": {
+            "description": "The import is no longer a preview (IMPORT.CANCELLED, IMPORT.NOT_PREVIEW).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          }
+        },
+        "summary": "",
+        "tags": ["employee-imports"]
+      }
+    },
+    "/api/v1/employee-imports/{id}/confirmations": {
+      "post": {
+        "operationId": "employeeImportConfirm",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ConfirmImportBodyDto" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "The people the preview promised are created, once. The same confirmation sent again (same idempotency key) returns the first answer with replayed set.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/EmployeeImportConfirmationResponseDto" } }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "403": {
+            "description": "Only an IT Admin imports people (US-02-02 AC-12).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "404": {
+            "description": "The import does not exist (IMPORT.NOT_FOUND).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "409": {
+            "description": "The preview is not the current one (IMPORT.PREVIEW_OUTDATED), the data changed since it (IMPORT.PREVIEW_STALE), the file was imported before and not acknowledged (IMPORT.DUPLICATE_FILE_NOT_ACKNOWLEDGED), the import was already written with another key (IMPORT.ALREADY_CONFIRMED), or it was cancelled or expired. Nothing was written.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "422": {
+            "description": "The request is invalid (VALIDATION_ERROR).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          }
+        },
+        "summary": "",
+        "tags": ["employee-imports"]
+      }
+    },
+    "/api/v1/employee-imports/{id}/cancellations": {
+      "post": {
+        "operationId": "employeeImportCancel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The preview is thrown away; nothing was written and nothing will be. Cancelling twice is the same.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/EmployeeImportResponseDto" } }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "403": {
+            "description": "Only an IT Admin imports people (US-02-02 AC-12).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "404": {
+            "description": "The import does not exist (IMPORT.NOT_FOUND).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "409": {
+            "description": "The import was already written (IMPORT.NOT_PREVIEW).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          }
+        },
+        "summary": "",
+        "tags": ["employee-imports"]
+      }
+    },
+    "/api/v1/onboarding-checklist": {
+      "get": {
+        "operationId": "onboardingChecklistGet",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The five steps and where each stands, judged from the data that exists. Step 1 says what is missing and which departments lack a head or an IT Admin; steps 2 to 5 are not built yet and say so.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/OnboardingChecklistResponseDto" } }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "403": {
+            "description": "Only an IT Admin sees the onboarding checklist.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          }
+        },
+        "summary": "",
+        "tags": ["onboarding"]
+      }
+    },
     "/api/v1/auth/login": {
       "post": {
         "operationId": "authLogin",
@@ -112,6 +1881,74 @@
         "tags": ["auth"]
       }
     },
+    "/api/v1/auth/password-reset-requests": {
+      "post": {
+        "operationId": "authRequestPasswordReset",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/PasswordResetRequestBodyDto" } }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "The request was accepted. The same answer is given for every email.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/PasswordResetRequestedResponseDto" } }
+            }
+          },
+          "422": {
+            "description": "The body is invalid (VALIDATION_ERROR).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "429": {
+            "description": "Too many requests from this address.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "503": {
+            "description": "The database is temporarily unavailable. Retry shortly.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          }
+        },
+        "summary": "",
+        "tags": ["auth"]
+      }
+    },
+    "/api/v1/auth/password-resets": {
+      "post": {
+        "operationId": "authResetPassword",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PasswordResetBodyDto" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "The password was replaced and every session ended. The user signs in with the new one.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PasswordResetResponseDto" } } }
+          },
+          "400": {
+            "description": "The link is not valid (unknown, used, replaced, expired, or the account cannot use it). One answer for all.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "422": {
+            "description": "The body is invalid or the password does not meet the policy.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "429": {
+            "description": "Too many requests from this address.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "503": {
+            "description": "The database is temporarily unavailable. Retry shortly.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          }
+        },
+        "summary": "",
+        "tags": ["auth"]
+      }
+    },
     "/api/v1/auth/invitations/redeem": {
       "post": {
         "operationId": "authRedeemInvitation",
@@ -155,6 +1992,42 @@
           },
           "401": {
             "description": "Authentication is required or the token is no longer valid.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          }
+        },
+        "summary": "",
+        "tags": ["me"]
+      }
+    },
+    "/api/v1/me/password": {
+      "post": {
+        "operationId": "meChangePassword",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ChangePasswordBodyDto" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "The password was replaced and every session ended, this one included. Sign in again.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/PasswordChangedResponseDto" } }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid (also: locked account, departed employee).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "422": {
+            "description": "The body is invalid (VALIDATION_ERROR), the current password is wrong (AUTH.CURRENT_PASSWORD_INVALID) or the new one breaks the policy (AUTH.PASSWORD_POLICY_VIOLATION).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "429": {
+            "description": "Too many wrong passwords for this email; see retryAfterSeconds (AUTH.LOGIN_TEMPORARILY_BLOCKED).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "503": {
@@ -609,6 +2482,117 @@
         "summary": "",
         "tags": ["app-users"]
       }
+    },
+    "/api/v1/approval-roles": {
+      "get": {
+        "operationId": "approvalRoleList",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The three approval roles, who holds each now (or nobody) and who held it before.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApprovalRolesResponseDto" } } }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "403": {
+            "description": "Only the Super Admin configures the approval roles (US-01-03 AC-4).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          }
+        },
+        "summary": "",
+        "tags": ["approval-roles"]
+      }
+    },
+    "/api/v1/approval-roles/{role}": {
+      "put": {
+        "operationId": "approvalRoleSet",
+        "parameters": [
+          {
+            "name": "role",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string", "enum": ["SPENDING_APPROVER", "CONFLICT_SUBSTITUTE", "FALLBACK_APPROVER"] }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SetApprovalRoleBodyDto" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "The person holds the role from now on; whoever held it before stops. Naming the person who already holds it changes nothing.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApprovalRolesResponseDto" } } }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "403": {
+            "description": "Only the Super Admin configures the approval roles (US-01-03 AC-4).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "404": {
+            "description": "The employee does not exist (ORGANIZATION.EMPLOYEE_NOT_FOUND).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "422": {
+            "description": "The request is invalid (VALIDATION_ERROR), the person has left or has no account that can sign in (APPROVAL_ROLE.EMPLOYEE_NOT_ACTIVE, APPROVAL_ROLE.NO_USABLE_ACCOUNT), holds the Super Admin role (APPROVAL_ROLE.SUPER_ADMIN_CANNOT_HOLD), or the substitute would be the spending approver (APPROVAL_ROLE.SUBSTITUTE_MUST_DIFFER).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          }
+        },
+        "summary": "",
+        "tags": ["approval-roles"]
+      }
+    },
+    "/api/v1/super-admin-transfers": {
+      "post": {
+        "operationId": "superAdminTransfer",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SuperAdminTransferBodyDto" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "The successor holds the Super Admin role and the caller no longer does; from the caller’s next request on they hold only the roles they had besides it.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/SuperAdminTransferResponseDto" } }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "403": {
+            "description": "The caller does not hold the Super Admin role (any more).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "404": {
+            "description": "The successor account does not exist (SUPER_ADMIN_TRANSFER.SUCCESSOR_NOT_FOUND).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "422": {
+            "description": "The request is invalid (VALIDATION_ERROR) or the successor does not qualify: the caller themselves, a locked account, a person who is not working, an account not activated or with an unverified email, one holding the IT Admin or Finance role, an approval role, or heading a department.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "503": {
+            "description": "The service is temporarily unavailable.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          }
+        },
+        "summary": "",
+        "tags": ["super-admin-transfers"]
+      }
     }
   },
   "info": {
@@ -684,6 +2668,1810 @@
         "required": ["success", "message", "data"],
         "additionalProperties": false
       },
+      "AuditEventPageResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "occurredAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                    },
+                    "actorKind": { "type": "string", "enum": ["USER", "SYSTEM", "OPERATOR"] },
+                    "actorAppUserId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+                      "nullable": true
+                    },
+                    "actorRoles": { "type": "array", "items": { "type": "string" } },
+                    "action": { "type": "string" },
+                    "resourceType": { "type": "string" },
+                    "resourceId": { "type": "string" },
+                    "before": {
+                      "type": "object",
+                      "propertyNames": { "type": "string" },
+                      "additionalProperties": {},
+                      "nullable": true
+                    },
+                    "after": {
+                      "type": "object",
+                      "propertyNames": { "type": "string" },
+                      "additionalProperties": {},
+                      "nullable": true
+                    },
+                    "correlationId": { "type": "string" },
+                    "operatorReference": { "type": "string", "nullable": true }
+                  },
+                  "required": [
+                    "id",
+                    "occurredAt",
+                    "actorKind",
+                    "actorAppUserId",
+                    "actorRoles",
+                    "action",
+                    "resourceType",
+                    "resourceId",
+                    "before",
+                    "after",
+                    "correlationId",
+                    "operatorReference"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "pagination": {
+                "type": "object",
+                "properties": {
+                  "page": { "type": "integer", "exclusiveMinimum": true, "maximum": 9007199254740991, "minimum": 0 },
+                  "pageSize": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  },
+                  "totalItems": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "totalPages": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                },
+                "required": ["page", "pageSize", "totalItems", "totalPages"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["items", "pagination"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "JobTitlePageResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "name": { "type": "string" },
+                    "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE"] },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                    }
+                  },
+                  "required": ["id", "name", "status", "createdAt", "updatedAt"],
+                  "additionalProperties": false
+                }
+              },
+              "pagination": {
+                "type": "object",
+                "properties": {
+                  "page": { "type": "integer", "exclusiveMinimum": true, "maximum": 9007199254740991, "minimum": 0 },
+                  "pageSize": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  },
+                  "totalItems": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "totalPages": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                },
+                "required": ["page", "pageSize", "totalItems", "totalPages"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["items", "pagination"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "JobTitleNameBodyDto": {
+        "type": "object",
+        "properties": { "name": { "type": "string", "maxLength": 1000 } },
+        "required": ["name"],
+        "additionalProperties": false
+      },
+      "JobTitleResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "name": { "type": "string" },
+              "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE"] },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              "updatedAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              }
+            },
+            "required": ["id", "name", "status", "createdAt", "updatedAt"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "CreateEmployeeBodyDto": {
+        "type": "object",
+        "properties": {
+          "employeeCode": { "type": "string", "minLength": 1, "maxLength": 50 },
+          "fullName": { "type": "string", "minLength": 1, "maxLength": 200 },
+          "workEmail": { "type": "string", "maxLength": 254, "nullable": true },
+          "employmentType": { "type": "string", "enum": ["STAFF", "CONTRACTOR", "FREELANCER", "INTERN"] },
+          "hireDate": { "type": "string" },
+          "departmentCode": { "type": "string", "maxLength": 50, "nullable": true },
+          "jobTitleId": { "type": "string", "maxLength": 64, "nullable": true }
+        },
+        "required": ["employeeCode", "fullName", "employmentType", "hireDate"],
+        "additionalProperties": false
+      },
+      "EmployeeResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "employeeCode": { "type": "string" },
+              "fullName": { "type": "string" },
+              "workEmail": { "type": "string", "nullable": true },
+              "employmentType": { "type": "string", "enum": ["STAFF", "CONTRACTOR", "FREELANCER", "INTERN"] },
+              "hireDate": { "type": "string" },
+              "status": { "type": "string", "enum": ["ACTIVE"] },
+              "memberSince": { "type": "string" },
+              "department": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "code": { "type": "string" },
+                  "name": { "type": "string" }
+                },
+                "required": ["id", "code", "name"],
+                "additionalProperties": false
+              },
+              "jobTitle": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "name": { "type": "string" }
+                },
+                "required": ["id", "name"],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "id",
+              "employeeCode",
+              "fullName",
+              "workEmail",
+              "employmentType",
+              "hireDate",
+              "status",
+              "memberSince",
+              "department",
+              "jobTitle"
+            ],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "CostCenterPageResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "code": { "type": "string" },
+                    "name": { "type": "string" },
+                    "kind": { "type": "string", "enum": ["UNIT", "COMPANY"] },
+                    "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE"] },
+                    "department": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "code": { "type": "string" },
+                        "name": { "type": "string" }
+                      },
+                      "required": ["id", "code", "name"],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                    },
+                    "deactivatedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "code",
+                    "name",
+                    "kind",
+                    "status",
+                    "department",
+                    "createdAt",
+                    "updatedAt",
+                    "deactivatedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "pagination": {
+                "type": "object",
+                "properties": {
+                  "page": { "type": "integer", "exclusiveMinimum": true, "maximum": 9007199254740991, "minimum": 0 },
+                  "pageSize": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  },
+                  "totalItems": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "totalPages": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                },
+                "required": ["page", "pageSize", "totalItems", "totalPages"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["items", "pagination"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "CreateCostCenterBodyDto": {
+        "type": "object",
+        "properties": {
+          "code": { "type": "string", "minLength": 1, "maxLength": 50, "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$" },
+          "name": { "type": "string", "maxLength": 1000 },
+          "kind": { "type": "string", "maxLength": 40 }
+        },
+        "required": ["code", "name", "kind"],
+        "additionalProperties": false
+      },
+      "CostCenterResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "code": { "type": "string" },
+              "name": { "type": "string" },
+              "kind": { "type": "string", "enum": ["UNIT", "COMPANY"] },
+              "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE"] },
+              "department": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "code": { "type": "string" },
+                  "name": { "type": "string" }
+                },
+                "required": ["id", "code", "name"],
+                "additionalProperties": false,
+                "nullable": true
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              "updatedAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              "deactivatedAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                "nullable": true
+              }
+            },
+            "required": [
+              "id",
+              "code",
+              "name",
+              "kind",
+              "status",
+              "department",
+              "createdAt",
+              "updatedAt",
+              "deactivatedAt"
+            ],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "RenameCostCenterBodyDto": {
+        "type": "object",
+        "properties": { "name": { "type": "string", "maxLength": 1000 } },
+        "required": ["name"],
+        "additionalProperties": false
+      },
+      "CostCenterEmployeesResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "costCenter": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "code": { "type": "string" }
+                },
+                "required": ["id", "code"],
+                "additionalProperties": false
+              },
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "employeeCode": { "type": "string" },
+                    "fullName": { "type": "string" },
+                    "status": { "type": "string", "enum": ["WORKING"] }
+                  },
+                  "required": ["employeeCode", "fullName", "status"],
+                  "additionalProperties": false
+                }
+              },
+              "pagination": {
+                "type": "object",
+                "properties": {
+                  "page": { "type": "integer", "exclusiveMinimum": true, "maximum": 9007199254740991, "minimum": 0 },
+                  "pageSize": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  },
+                  "totalItems": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "totalPages": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                },
+                "required": ["page", "pageSize", "totalItems", "totalPages"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["costCenter", "items", "pagination"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "DepartmentPageResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "code": { "type": "string" },
+                    "name": { "type": "string" },
+                    "function": { "type": "string", "nullable": true },
+                    "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE"] },
+                    "costCenter": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "code": { "type": "string" },
+                        "name": { "type": "string" },
+                        "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE"] }
+                      },
+                      "required": ["id", "code", "name", "status"],
+                      "additionalProperties": false
+                    },
+                    "itAdmin": {
+                      "type": "object",
+                      "properties": {
+                        "employeeId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "employeeCode": { "type": "string" },
+                        "fullName": { "type": "string" },
+                        "usable": { "type": "boolean" }
+                      },
+                      "required": ["employeeId", "employeeCode", "fullName", "usable"],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "head": {
+                      "type": "object",
+                      "properties": {
+                        "employeeId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "employeeCode": { "type": "string" },
+                        "fullName": { "type": "string" },
+                        "since": { "type": "string" }
+                      },
+                      "required": ["employeeId", "employeeCode", "fullName", "since"],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "memberCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                    "warnings": {
+                      "type": "array",
+                      "items": { "type": "string", "enum": ["MISSING_HEAD", "MISSING_IT_ADMIN"] }
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                    },
+                    "deactivatedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "code",
+                    "name",
+                    "function",
+                    "status",
+                    "costCenter",
+                    "itAdmin",
+                    "head",
+                    "memberCount",
+                    "warnings",
+                    "createdAt",
+                    "updatedAt",
+                    "deactivatedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "pagination": {
+                "type": "object",
+                "properties": {
+                  "page": { "type": "integer", "exclusiveMinimum": true, "maximum": 9007199254740991, "minimum": 0 },
+                  "pageSize": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  },
+                  "totalItems": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "totalPages": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                },
+                "required": ["page", "pageSize", "totalItems", "totalPages"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["items", "pagination"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "CreateDepartmentBodyDto": {
+        "type": "object",
+        "properties": {
+          "code": { "type": "string", "minLength": 1, "maxLength": 50, "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$" },
+          "name": { "type": "string", "maxLength": 1000 },
+          "function": { "type": "string", "maxLength": 5000, "nullable": true },
+          "costCenterId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "itAdminEmployeeId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+            "nullable": true
+          }
+        },
+        "required": ["code", "name", "costCenterId"],
+        "additionalProperties": false
+      },
+      "DepartmentResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "code": { "type": "string" },
+              "name": { "type": "string" },
+              "function": { "type": "string", "nullable": true },
+              "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE"] },
+              "costCenter": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "code": { "type": "string" },
+                  "name": { "type": "string" },
+                  "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE"] }
+                },
+                "required": ["id", "code", "name", "status"],
+                "additionalProperties": false
+              },
+              "itAdmin": {
+                "type": "object",
+                "properties": {
+                  "employeeId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "employeeCode": { "type": "string" },
+                  "fullName": { "type": "string" },
+                  "usable": { "type": "boolean" }
+                },
+                "required": ["employeeId", "employeeCode", "fullName", "usable"],
+                "additionalProperties": false,
+                "nullable": true
+              },
+              "head": {
+                "type": "object",
+                "properties": {
+                  "employeeId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "employeeCode": { "type": "string" },
+                  "fullName": { "type": "string" },
+                  "since": { "type": "string" }
+                },
+                "required": ["employeeId", "employeeCode", "fullName", "since"],
+                "additionalProperties": false,
+                "nullable": true
+              },
+              "memberCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              "warnings": {
+                "type": "array",
+                "items": { "type": "string", "enum": ["MISSING_HEAD", "MISSING_IT_ADMIN"] }
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              "updatedAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              "deactivatedAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                "nullable": true
+              },
+              "headHistory": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "employeeId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "employeeCode": { "type": "string" },
+                    "fullName": { "type": "string" },
+                    "validFrom": { "type": "string" },
+                    "validTo": { "type": "string", "nullable": true }
+                  },
+                  "required": ["employeeId", "employeeCode", "fullName", "validFrom", "validTo"],
+                  "additionalProperties": false
+                }
+              },
+              "projects": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "name": { "type": "string" },
+                    "description": { "type": "string", "nullable": true },
+                    "status": { "type": "string", "enum": ["RUNNING", "FINISHED"] },
+                    "departments": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "code": { "type": "string" },
+                          "name": { "type": "string" }
+                        },
+                        "required": ["id", "code", "name"],
+                        "additionalProperties": false
+                      }
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                    }
+                  },
+                  "required": ["id", "name", "description", "status", "departments", "createdAt", "updatedAt"],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "id",
+              "code",
+              "name",
+              "function",
+              "status",
+              "costCenter",
+              "itAdmin",
+              "head",
+              "memberCount",
+              "warnings",
+              "createdAt",
+              "updatedAt",
+              "deactivatedAt",
+              "headHistory",
+              "projects"
+            ],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "UpdateDepartmentBodyDto": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "maxLength": 1000 },
+          "function": { "type": "string", "maxLength": 5000, "nullable": true },
+          "itAdminEmployeeId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "AssignHeadBodyDto": {
+        "type": "object",
+        "properties": {
+          "employeeId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "effectiveFrom": { "type": "string" }
+        },
+        "required": ["employeeId", "effectiveFrom"],
+        "additionalProperties": false
+      },
+      "VacateHeadBodyDto": {
+        "type": "object",
+        "properties": { "effectiveFrom": { "type": "string" } },
+        "required": ["effectiveFrom"],
+        "additionalProperties": false
+      },
+      "DepartmentMembersResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "employeeCode": { "type": "string" },
+                    "fullName": { "type": "string" },
+                    "status": { "type": "string", "enum": ["ACTIVE", "TERMINATED"] },
+                    "hasWorkEmail": { "type": "boolean" },
+                    "memberSince": { "type": "string" }
+                  },
+                  "required": ["employeeCode", "fullName", "status", "hasWorkEmail", "memberSince"],
+                  "additionalProperties": false
+                }
+              },
+              "pagination": {
+                "type": "object",
+                "properties": {
+                  "page": { "type": "integer", "exclusiveMinimum": true, "maximum": 9007199254740991, "minimum": 0 },
+                  "pageSize": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  },
+                  "totalItems": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "totalPages": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                },
+                "required": ["page", "pageSize", "totalItems", "totalPages"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["items", "pagination"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "DepartmentWarningsResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "departmentId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "code": { "type": "string" },
+                    "name": { "type": "string" },
+                    "warning": { "type": "string", "enum": ["MISSING_HEAD", "MISSING_IT_ADMIN"] }
+                  },
+                  "required": ["departmentId", "code", "name", "warning"],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": ["items"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "ProjectListResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "name": { "type": "string" },
+                    "description": { "type": "string", "nullable": true },
+                    "status": { "type": "string", "enum": ["RUNNING", "FINISHED"] },
+                    "departments": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "code": { "type": "string" },
+                          "name": { "type": "string" }
+                        },
+                        "required": ["id", "code", "name"],
+                        "additionalProperties": false
+                      }
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                    }
+                  },
+                  "required": ["id", "name", "description", "status", "departments", "createdAt", "updatedAt"],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": ["items"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "CreateProjectBodyDto": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "maxLength": 1000 },
+          "description": { "type": "string", "maxLength": 5000, "nullable": true },
+          "status": { "type": "string", "enum": ["RUNNING", "FINISHED"] },
+          "departmentIds": {
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        },
+        "required": ["name", "departmentIds"],
+        "additionalProperties": false
+      },
+      "ProjectResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "name": { "type": "string" },
+              "description": { "type": "string", "nullable": true },
+              "status": { "type": "string", "enum": ["RUNNING", "FINISHED"] },
+              "departments": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "code": { "type": "string" },
+                    "name": { "type": "string" }
+                  },
+                  "required": ["id", "code", "name"],
+                  "additionalProperties": false
+                }
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              "updatedAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              }
+            },
+            "required": ["id", "name", "description", "status", "departments", "createdAt", "updatedAt"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "UpdateProjectBodyDto": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "maxLength": 1000 },
+          "description": { "type": "string", "maxLength": 5000, "nullable": true },
+          "status": { "type": "string", "enum": ["RUNNING", "FINISHED"] },
+          "departmentIds": {
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "ParameterListResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "key": { "type": "string" },
+                    "value": {
+                      "anyOf": [
+                        { "type": "number" },
+                        { "type": "string" },
+                        { "type": "array", "items": { "type": "number" } }
+                      ]
+                    },
+                    "default": {
+                      "anyOf": [
+                        { "type": "number" },
+                        { "type": "string" },
+                        { "type": "array", "items": { "type": "number" } }
+                      ]
+                    },
+                    "isDefault": { "type": "boolean" },
+                    "unit": { "type": "string" },
+                    "description": { "type": "string" },
+                    "constraints": { "type": "object", "additionalProperties": {} },
+                    "changedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "key",
+                    "value",
+                    "default",
+                    "isDefault",
+                    "unit",
+                    "description",
+                    "constraints",
+                    "changedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": ["items"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "SetParameterBodyDto": {
+        "type": "object",
+        "properties": { "value": {} },
+        "required": ["value"],
+        "additionalProperties": false
+      },
+      "ParameterResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "key": { "type": "string" },
+              "value": {
+                "anyOf": [
+                  { "type": "number" },
+                  { "type": "string" },
+                  { "type": "array", "items": { "type": "number" } }
+                ]
+              },
+              "default": {
+                "anyOf": [
+                  { "type": "number" },
+                  { "type": "string" },
+                  { "type": "array", "items": { "type": "number" } }
+                ]
+              },
+              "isDefault": { "type": "boolean" },
+              "unit": { "type": "string" },
+              "description": { "type": "string" },
+              "constraints": { "type": "object", "additionalProperties": {} },
+              "changedAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                "nullable": true
+              }
+            },
+            "required": ["key", "value", "default", "isDefault", "unit", "description", "constraints", "changedAt"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "ParameterHistoryResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "value": {
+                      "anyOf": [
+                        { "type": "number" },
+                        { "type": "string" },
+                        { "type": "array", "items": { "type": "number" } }
+                      ]
+                    },
+                    "from": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                    },
+                    "until": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                      "nullable": true
+                    }
+                  },
+                  "required": ["value", "from", "until"],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": ["items"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "NonWorkingDateListResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": { "date": { "type": "string" }, "reason": { "type": "string" } },
+                  "required": ["date", "reason"],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": ["items"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "AddNonWorkingDateBodyDto": {
+        "type": "object",
+        "properties": { "date": { "type": "string" }, "reason": { "type": "string", "maxLength": 1000 } },
+        "required": ["date", "reason"],
+        "additionalProperties": false
+      },
+      "NonWorkingDateResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": { "date": { "type": "string" }, "reason": { "type": "string" } },
+            "required": ["date", "reason"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "RenameNonWorkingDateBodyDto": {
+        "type": "object",
+        "properties": { "reason": { "type": "string", "maxLength": 1000 } },
+        "required": ["reason"],
+        "additionalProperties": false
+      },
+      "EmployeeImportResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "fileName": { "type": "string" },
+              "status": { "type": "string", "enum": ["PREVIEW", "COMPLETED", "CANCELLED"] },
+              "previewVersion": {
+                "type": "integer",
+                "exclusiveMinimum": true,
+                "maximum": 9007199254740991,
+                "minimum": 0
+              },
+              "ignoredColumns": { "type": "array", "items": { "type": "string" } },
+              "summary": {
+                "type": "object",
+                "properties": {
+                  "totalRows": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "valid": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "errors": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "existingSame": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "existingDifferent": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "newPeopleByDepartment": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "departmentCode": { "type": "string" },
+                        "count": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                      },
+                      "required": ["departmentCode", "count"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "departmentsWithoutHead": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": { "code": { "type": "string" }, "name": { "type": "string" } },
+                      "required": ["code", "name"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "duplicateOf": {
+                    "type": "object",
+                    "properties": {
+                      "importId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      "fileName": { "type": "string" },
+                      "confirmedAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                      }
+                    },
+                    "required": ["importId", "fileName", "confirmedAt"],
+                    "additionalProperties": false,
+                    "nullable": true
+                  }
+                },
+                "required": [
+                  "totalRows",
+                  "valid",
+                  "errors",
+                  "existingSame",
+                  "existingDifferent",
+                  "newPeopleByDepartment",
+                  "departmentsWithoutHead",
+                  "duplicateOf"
+                ],
+                "additionalProperties": false
+              },
+              "result": {
+                "type": "object",
+                "properties": {
+                  "created": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "existingSame": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "existingDifferent": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "errors": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "createdByDepartment": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "departmentCode": { "type": "string" },
+                        "count": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                      },
+                      "required": ["departmentCode", "count"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "departmentsWithoutHead": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": { "code": { "type": "string" }, "name": { "type": "string" } },
+                      "required": ["code", "name"],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": [
+                  "created",
+                  "existingSame",
+                  "existingDifferent",
+                  "errors",
+                  "createdByDepartment",
+                  "departmentsWithoutHead"
+                ],
+                "additionalProperties": false,
+                "nullable": true
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              "expiresAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              "confirmedAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                "nullable": true
+              },
+              "cancelledAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                "nullable": true
+              }
+            },
+            "required": [
+              "id",
+              "fileName",
+              "status",
+              "previewVersion",
+              "ignoredColumns",
+              "summary",
+              "result",
+              "createdAt",
+              "expiresAt",
+              "confirmedAt",
+              "cancelledAt"
+            ],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "EmployeeImportRowsResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "line": { "type": "integer", "exclusiveMinimum": true, "maximum": 9007199254740991, "minimum": 0 },
+                    "outcome": { "type": "string", "enum": ["VALID", "ERROR", "EXISTS_SAME", "EXISTS_DIFFERENT"] },
+                    "cells": { "type": "object", "additionalProperties": { "type": "string" } },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": { "column": { "type": "string" }, "code": { "type": "string" } },
+                        "required": ["column", "code"],
+                        "additionalProperties": false
+                      }
+                    },
+                    "differences": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "column": { "type": "string" },
+                          "current": { "type": "string" },
+                          "incoming": { "type": "string" }
+                        },
+                        "required": ["column", "current", "incoming"],
+                        "additionalProperties": false
+                      },
+                      "nullable": true
+                    }
+                  },
+                  "required": ["line", "outcome", "cells", "errors", "differences"],
+                  "additionalProperties": false
+                }
+              },
+              "pagination": {
+                "type": "object",
+                "properties": {
+                  "page": { "type": "integer", "exclusiveMinimum": true, "maximum": 9007199254740991, "minimum": 0 },
+                  "pageSize": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  },
+                  "totalItems": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "totalPages": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                },
+                "required": ["page", "pageSize", "totalItems", "totalPages"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["items", "pagination"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "ConfirmImportBodyDto": {
+        "type": "object",
+        "properties": {
+          "previewVersion": { "type": "integer", "exclusiveMinimum": true, "maximum": 9007199254740991, "minimum": 0 },
+          "idempotencyKey": { "type": "string", "minLength": 8, "maxLength": 100 },
+          "acknowledgeDuplicateFile": { "default": false, "type": "boolean" }
+        },
+        "required": ["previewVersion", "idempotencyKey"],
+        "additionalProperties": false
+      },
+      "EmployeeImportConfirmationResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "replayed": { "type": "boolean" },
+              "import": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "fileName": { "type": "string" },
+                  "status": { "type": "string", "enum": ["PREVIEW", "COMPLETED", "CANCELLED"] },
+                  "previewVersion": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  },
+                  "ignoredColumns": { "type": "array", "items": { "type": "string" } },
+                  "summary": {
+                    "type": "object",
+                    "properties": {
+                      "totalRows": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                      "valid": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                      "errors": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                      "existingSame": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                      "existingDifferent": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                      "newPeopleByDepartment": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "departmentCode": { "type": "string" },
+                            "count": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                          },
+                          "required": ["departmentCode", "count"],
+                          "additionalProperties": false
+                        }
+                      },
+                      "departmentsWithoutHead": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": { "code": { "type": "string" }, "name": { "type": "string" } },
+                          "required": ["code", "name"],
+                          "additionalProperties": false
+                        }
+                      },
+                      "duplicateOf": {
+                        "type": "object",
+                        "properties": {
+                          "importId": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "fileName": { "type": "string" },
+                          "confirmedAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                          }
+                        },
+                        "required": ["importId", "fileName", "confirmedAt"],
+                        "additionalProperties": false,
+                        "nullable": true
+                      }
+                    },
+                    "required": [
+                      "totalRows",
+                      "valid",
+                      "errors",
+                      "existingSame",
+                      "existingDifferent",
+                      "newPeopleByDepartment",
+                      "departmentsWithoutHead",
+                      "duplicateOf"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "result": {
+                    "type": "object",
+                    "properties": {
+                      "created": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                      "existingSame": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                      "existingDifferent": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                      "errors": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                      "createdByDepartment": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "departmentCode": { "type": "string" },
+                            "count": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                          },
+                          "required": ["departmentCode", "count"],
+                          "additionalProperties": false
+                        }
+                      },
+                      "departmentsWithoutHead": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": { "code": { "type": "string" }, "name": { "type": "string" } },
+                          "required": ["code", "name"],
+                          "additionalProperties": false
+                        }
+                      }
+                    },
+                    "required": [
+                      "created",
+                      "existingSame",
+                      "existingDifferent",
+                      "errors",
+                      "createdByDepartment",
+                      "departmentsWithoutHead"
+                    ],
+                    "additionalProperties": false,
+                    "nullable": true
+                  },
+                  "createdAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                  },
+                  "expiresAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                  },
+                  "confirmedAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                    "nullable": true
+                  },
+                  "cancelledAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                    "nullable": true
+                  }
+                },
+                "required": [
+                  "id",
+                  "fileName",
+                  "status",
+                  "previewVersion",
+                  "ignoredColumns",
+                  "summary",
+                  "result",
+                  "createdAt",
+                  "expiresAt",
+                  "confirmedAt",
+                  "cancelledAt"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": ["replayed", "import"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "OnboardingChecklistResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "steps": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "step": { "type": "integer", "minimum": 1, "maximum": 5 },
+                    "key": { "type": "string" },
+                    "status": { "type": "string", "enum": ["DONE", "INCOMPLETE", "BLOCKED", "NOT_AVAILABLE"] },
+                    "reasons": { "type": "array", "items": { "type": "string" } },
+                    "facts": {
+                      "type": "object",
+                      "properties": {
+                        "activeDepartments": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                        "activeEmployees": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                        "freeCostCenters": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                        "latestImport": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "format": "uuid",
+                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                            },
+                            "status": { "type": "string", "enum": ["PREVIEW", "COMPLETED"] },
+                            "errorRows": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                          },
+                          "required": ["id", "status", "errorRows"],
+                          "additionalProperties": false,
+                          "nullable": true
+                        }
+                      },
+                      "required": ["activeDepartments", "activeEmployees", "freeCostCenters", "latestImport"],
+                      "additionalProperties": false
+                    },
+                    "createDepartmentBlockedBy": {
+                      "type": "string",
+                      "enum": ["NO_FREE_COST_CENTER", null],
+                      "nullable": true
+                    },
+                    "warnings": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "code": { "type": "string", "enum": ["MISSING_HEAD", "MISSING_IT_ADMIN"] },
+                          "departmentCode": { "type": "string" },
+                          "departmentName": { "type": "string" }
+                        },
+                        "required": ["code", "departmentCode", "departmentName"],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": ["step", "key", "status", "reasons"],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": ["steps"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
       "LoginBodyDto": {
         "type": "object",
         "properties": {
@@ -710,6 +4498,53 @@
               }
             },
             "required": ["accessToken", "tokenType", "expiresAt"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "PasswordResetRequestBodyDto": {
+        "type": "object",
+        "properties": { "email": { "type": "string", "minLength": 1, "maxLength": 320 } },
+        "required": ["email"],
+        "additionalProperties": false
+      },
+      "PasswordResetRequestedResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": { "requested": { "type": "boolean", "enum": [true] } },
+            "required": ["requested"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "PasswordResetBodyDto": {
+        "type": "object",
+        "properties": {
+          "token": { "type": "string", "minLength": 1, "maxLength": 256 },
+          "newPassword": { "type": "string", "minLength": 1, "maxLength": 1024 }
+        },
+        "required": ["token", "newPassword"],
+        "additionalProperties": false
+      },
+      "PasswordResetResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": { "passwordReset": { "type": "boolean", "enum": [true] } },
+            "required": ["passwordReset"],
             "additionalProperties": false,
             "nullable": true
           }
@@ -791,6 +4626,31 @@
               "selfServiceOnly": { "type": "boolean" }
             },
             "required": ["appUserId", "loginEmail", "employee", "roles", "selfServiceOnly"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "ChangePasswordBodyDto": {
+        "type": "object",
+        "properties": {
+          "currentPassword": { "type": "string", "minLength": 1, "maxLength": 256 },
+          "newPassword": { "type": "string", "minLength": 1, "maxLength": 256 }
+        },
+        "required": ["currentPassword", "newPassword"],
+        "additionalProperties": false
+      },
+      "PasswordChangedResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": { "passwordChanged": { "type": "boolean", "enum": [true] } },
+            "required": ["passwordChanged"],
             "additionalProperties": false,
             "nullable": true
           }
@@ -1052,6 +4912,155 @@
           }
         },
         "required": ["role"],
+        "additionalProperties": false
+      },
+      "ApprovalRolesResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "role": {
+                      "type": "string",
+                      "enum": ["SPENDING_APPROVER", "CONFLICT_SUBSTITUTE", "FALLBACK_APPROVER"]
+                    },
+                    "holder": {
+                      "type": "object",
+                      "properties": {
+                        "employeeId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "employeeCode": { "type": "string" },
+                        "fullName": { "type": "string" },
+                        "since": {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                        }
+                      },
+                      "required": ["employeeId", "employeeCode", "fullName", "since"],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "history": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "employeeId": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "employeeCode": { "type": "string" },
+                          "fullName": { "type": "string" },
+                          "from": {
+                            "type": "string",
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                          },
+                          "until": {
+                            "type": "string",
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                            "nullable": true
+                          }
+                        },
+                        "required": ["employeeId", "employeeCode", "fullName", "from", "until"],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": ["role", "holder", "history"],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": ["items"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "SetApprovalRoleBodyDto": {
+        "type": "object",
+        "properties": {
+          "employeeId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": ["employeeId"],
+        "additionalProperties": false
+      },
+      "SuperAdminTransferBodyDto": {
+        "type": "object",
+        "properties": {
+          "successorAppUserId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": ["successorAppUserId"],
+        "additionalProperties": false
+      },
+      "SuperAdminTransferResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "transferId": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "from": {
+                "type": "object",
+                "properties": {
+                  "appUserId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  }
+                },
+                "required": ["appUserId"],
+                "additionalProperties": false
+              },
+              "to": {
+                "type": "object",
+                "properties": {
+                  "appUserId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  }
+                },
+                "required": ["appUserId"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["transferId", "from", "to"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
         "additionalProperties": false
       }
     }

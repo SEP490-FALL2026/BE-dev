@@ -14,8 +14,16 @@ import { AppUsersController } from './accounts/app-users.controller';
 import { JwtAccessTokenVerifier } from './access/jwt-access-token.verifier';
 import { MeController } from './access/me.controller';
 import { MeService } from './access/me.service';
+import { ApprovalRolesController } from './approval-roles/approval-roles.controller';
+import { ApprovalRoleService } from './approval-roles/approval-role.service';
+import { SuperAdminTransferService } from './accounts/super-admin-transfer.service';
+import { SuperAdminTransfersController } from './accounts/super-admin-transfers.controller';
 import { AuthController } from './auth/auth.controller';
+import { CredentialChangeService } from './auth/credential-change.service';
 import { LoginService } from './auth/login.service';
+import { LoginThrottle } from './auth/login-throttle.service';
+import { PasswordChangeService } from './auth/password-change.service';
+import { PasswordResetService } from './auth/password-reset.service';
 import { RefreshCookie } from './auth/refresh-cookie';
 import { SessionRepo } from './auth/session.repo';
 import { SessionService } from './auth/session.service';
@@ -48,12 +56,24 @@ import { IdentityAccessFacadeModule } from './identity-access-facade.module';
       }),
     }),
   ],
-  controllers: [AuthController, MeController, AppUsersController],
+  controllers: [
+    AuthController,
+    MeController,
+    AppUsersController,
+    ApprovalRolesController,
+    SuperAdminTransfersController,
+  ],
   providers: [
+    ApprovalRoleService,
+    SuperAdminTransferService,
     AccountQueryService,
     AccountInvitationService,
     AccountStatusService,
+    CredentialChangeService,
     LoginService,
+    LoginThrottle,
+    PasswordChangeService,
+    PasswordResetService,
     SessionService,
     SessionRepo,
     MeService,

@@ -256,6 +256,31 @@ describe('invitation email configuration', () => {
     });
   });
 
+  describe('password reset settings (T-1, T-2)', () => {
+    it('defaults the reset link to 30 minutes and three requests per hour', () => {
+      expect(validateEnvironment({})).toMatchObject({
+        AUTH_PASSWORD_RESET_TTL_SECONDS: 1_800,
+        AUTH_PASSWORD_RESET_MAX_PER_HOUR: 3,
+      });
+    });
+
+    it('reads both from the environment', () => {
+      expect(
+        validateEnvironment({ AUTH_PASSWORD_RESET_TTL_SECONDS: '600', AUTH_PASSWORD_RESET_MAX_PER_HOUR: '5' }),
+      ).toMatchObject({ AUTH_PASSWORD_RESET_TTL_SECONDS: 600, AUTH_PASSWORD_RESET_MAX_PER_HOUR: 5 });
+    });
+
+    it.each([
+      ['a link that lives under 5 minutes', { AUTH_PASSWORD_RESET_TTL_SECONDS: '299' }],
+      ['a link that lives over 24 hours', { AUTH_PASSWORD_RESET_TTL_SECONDS: '86401' }],
+      ['no request allowed per hour', { AUTH_PASSWORD_RESET_MAX_PER_HOUR: '0' }],
+      ['an unbounded number of requests per hour', { AUTH_PASSWORD_RESET_MAX_PER_HOUR: '101' }],
+      ['a fractional limit', { AUTH_PASSWORD_RESET_MAX_PER_HOUR: '2.5' }],
+    ])('rejects %s', (_name, env) => {
+      expect(() => validateEnvironment(env)).toThrow(/AUTH_PASSWORD_RESET/);
+    });
+  });
+
   it('runs in development without any mail or outbox setting', () => {
     const config = validateEnvironment({});
 

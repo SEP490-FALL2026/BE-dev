@@ -5,14 +5,14 @@ API và worker có entry point riêng trong cùng codebase.
 
 ## Trạng thái foundation
 
-| Thành phần     | Đã có                                                                                            | Chưa triển khai                                                     |
-| -------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------- |
-| HTTP           | Zod DTO, response envelope, exception filter, OpenAPI, rate limit                                | API theo các US còn lại                                             |
-| Health         | Liveness và PostgreSQL readiness                                                                 | Probe queue/storage                                                 |
-| Catalog        | Source list/get/create và tests làm mẫu; không mount HTTP                                        | Nghiệp vụ catalog G3 và quyền theo role/resource                    |
-| Authentication | Argon2id, JWT/refresh session, guards, CLI bootstrap, `/me`, quản trị tài khoản và lời mời       | Đổi/đặt lại mật khẩu, vai suy ra, chuyển giao/khôi phục Super Admin |
-| Database       | Catalog, audit, organization, identity-access, notifications; 5 migration và `TransactionRunner` | Schema cho các lát tiếp theo                                        |
-| Queue/storage  | S3 adapter, BullMQ configuration; worker gửi SMTP từ outbox PostgreSQL                           | BullMQ queue processor và file API                                  |
+| Thành phần     | Đã có                                                                                                                                                                                    | Chưa triển khai                                  |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| HTTP           | Zod DTO, response envelope, exception filter, OpenAPI, rate limit                                                                                                                        | API theo các US còn lại                          |
+| Health         | Liveness và PostgreSQL readiness                                                                                                                                                         | Probe queue/storage                              |
+| Catalog        | Source list/get/create và tests làm mẫu; không mount HTTP                                                                                                                                | Nghiệp vụ catalog G3 và quyền theo role/resource |
+| Authentication | Argon2id, JWT/refresh session, guards, CLI bootstrap, `/me`, tài khoản, lời mời, mật khẩu, vai suy ra (Manager, Người duyệt chi), chuyển giao Super Admin, CLI khôi phục (`ops:recover`) | Phân quyền theo phạm vi của lát G3–G7            |
+| Database       | Catalog, audit, organization, identity-access, notifications; 5 migration và `TransactionRunner`                                                                                         | Schema cho các lát tiếp theo                     |
+| Queue/storage  | S3 adapter, BullMQ configuration; worker gửi SMTP từ outbox PostgreSQL                                                                                                                   | BullMQ queue processor và file API               |
 
 G0 và lát 1a/1b đã merge qua PR #4 (`64073c4`), có 16 operation HTTP.
 Gói remediation tại `a0cf5f1` đã vào `origin/dev` qua PR #7 và #8. Spec/plan,
@@ -28,6 +28,7 @@ src/
   app.module.ts               # ghép module API
   worker.ts, worker.module.ts # worker application context
   installation-cli.ts         # lệnh khởi tạo một lần, ngoài HTTP (pnpm ops:bootstrap)
+  recovery-cli.ts, recovery-cli.module.ts  # lệnh khôi phục Super Admin theo phiếu, ngoài HTTP (pnpm ops:recover)
   core/                       # thuần TypeScript: pagination, email, business-date
   infrastructure/
     config/                   # environment validation
@@ -40,18 +41,22 @@ src/
     observability/            # request context, request ID, logger
     health/                   # health controller
   modules/
-    audit/                    # AuditEvent chỉ ghi thêm (facade record(tx, event))
-    organization/             # tổ chức, Cost Center, phòng, chức vụ, nhân viên + placement
-    identity-access/          # facade, module, types ở gốc; dto/, errors/ dùng chung
+    audit/                    # AuditEvent chỉ ghi thêm (facade record(tx, event)); tra cứu cho Super Admin ở AuditHttpModule riêng
+    organization/             # tổ chức, Cost Center (vòng đời), phòng + hồ sơ + giai đoạn trưởng phòng, dự án, chức vụ, nhân viên + placement; API ở OrganizationHttpModule riêng (lớp HTTP này được gọi IdentityAccessFacadeModule để kiểm IT Admin phụ trách — ngoại lệ duy nhất của chiều organization → identity)
+    operating-parameters/     # tham số vận hành (giá trị, lịch sử, ngày không làm việc) + API Super Admin
+    data-import/              # import nhân sự CSV xem trước – xác nhận (employee_imports); gọi organization qua facade
+    onboarding/               # checklist khởi tạo: tổng hợp đọc từ organization và identity-access, không sở hữu bảng
+    identity-access/          # facade, module, types ở gốc; dto/, errors/ dùng chung; recovery.* (RecoveryModule, chỉ nạp bởi lệnh khôi phục)
       auth/                   # đăng nhập, refresh/logout, phiên + refresh token + throttle (session.repo), token, mật khẩu
-      accounts/               # truy vấn, tạo/mời/kích hoạt, khóa/vai; account.repo (AppUser, credential, vai, action token)
+      accounts/               # truy vấn, tạo/mời/kích hoạt, khóa/vai, chuyển giao Super Admin; account.repo (AppUser, credential, vai, action token)
+      approval-roles/         # Người duyệt chi, người thay thế, approver dự phòng (approval_role_holders)
       access/                 # /me và verifier access token cho guard
     notifications/            # EmailOutbox (mã hóa payload), dispatcher gửi thư; không import identity-access
     installation/             # use case khởi tạo; không sở hữu bảng; import IdentityAccessFacadeModule (không import IdentityAccessModule) và chỉ xác thực biến môi trường DB
     catalog/                  # module mẫu cấu trúc, KHÔNG đăng ký vào AppModule
 prisma/
   schema.prisma               # generator, datasource
-  models/                     # audit, organization, identity-access, notifications, catalog
+  models/                     # audit, organization, identity-access, operating-parameters, data-import, notifications, catalog
   migrations/                 # lịch sử SQL cho baseline mới
 scripts/                      # công cụ dev/verification, không phải runtime API
 test/
@@ -71,6 +76,10 @@ test/
 - Cross-module atomic write: facade nhận `tx` của người gọi (`DbTx`); `TransactionRunner.run`
   mở giao dịch Read Committed với `lock_timeout`/`statement_timeout` riêng cho giao dịch.
   Khóa dòng của module khác chỉ qua facade (ví dụ `organization.lockEmployeeForShare(tx, id)`).
+- Advisory lock đầu giao dịch (trước khóa dòng): `6173204001` khởi tạo cài đặt; `7300001` đổi vai duyệt;
+  `hashtextextended('operating-parameter:<key>')` mỗi tham số. Thứ tự khóa dòng: Employee → AppUser → … (spec nền).
+- Lệnh ngoài HTTP (`ops:bootstrap`, `ops:recover`) có đồ thị module riêng, không controller/guard; mọi thay đổi
+  dữ liệu đi qua service trong `TransactionRunner` cùng audit như API.
 - Không dùng vòng phụ thuộc, generic base repository hoặc scaffold hàng loạt khi chưa có US.
 
 [Architecture tests](src/architecture-boundaries.spec.ts) quét một số boundary;
@@ -147,6 +156,12 @@ CLI dùng `InstallationConfigurationModule` chỉ validate môi trường và DB
 CLI và worker chỉ import module này nên không dựng controller, JWT hay workflow đăng nhập; CLI cũng không kéo
 SMTP/outbox (R-13). [Module graph test](src/module-graph.spec.ts) đọc metadata Nest thật: mỗi provider token chỉ khai
 báo ở một module trong graph API/worker/CLI và các graph không chứa module không dùng.
+
+Lớp HTTP của `audit` và `organization` nằm ở module riêng (`AuditHttpModule`, `OrganizationHttpModule`) mà chỉ
+`AppModule` nạp: lệnh khởi tạo và worker import `AuditModule`/`OrganizationModule` chỉ để dùng facade, và module graph
+test cấm controller trong hai đồ thị đó. Repo ghi (`AuditRepo`) tách khỏi repo đọc (`AuditQueryRepo`); `OrganizationRepo` được
+`OrganizationModule` export chỉ để `OrganizationHttpModule` cùng thư mục dùng chung một instance (như `AccountRepo`). Ánh xạ 503
+dùng chung nằm ở `infrastructure/http/errors/service-unavailable.ts` để module không import ruột của module khác.
 
 Catalog dùng unique slug ở PostgreSQL; phân trang sort name/id, transaction
 RepeatableRead để page/count dùng cùng snapshot. Snapshot không cố định giữa các

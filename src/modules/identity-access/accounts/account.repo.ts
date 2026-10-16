@@ -5,12 +5,14 @@ import {
   AccountListFilter,
   AccountRecord,
   AccountSnapshot,
+  ActionTokenPurpose,
   ActionTokenRevokedReason,
   ActionTokenSnapshot,
   AppRole,
   CreateAppUserInput,
   RoleGrantRecord,
 } from '../identity-access.types';
+import { ActionLinkState } from './account-policy';
 
 type LockMode = 'SHARE' | 'UPDATE';
 
@@ -41,6 +43,9 @@ const TOKEN_SELECT = {
   expiresAt: true,
   consumedAt: true,
   revokedAt: true,
+  recoveryTicketId: true,
+  newLoginEmail: true,
+  newNormalizedLoginEmail: true,
 } as const;
 
 interface AccountRow {
@@ -80,6 +85,13 @@ export class AccountRepo {
     return row ? toAccount(row) : null;
   }
 
+  /** Unlocked read of one account by id, with its credential hash, used before the transaction to decide what to verify. */
+  async findAccountById(appUserId: string): Promise<AccountSnapshot | null> {
+    const row = await this.prisma.appUser.findUnique({ where: { id: appUserId }, select: ACCOUNT_SELECT });
+
+    return row ? toAccount(row) : null;
+  }
+
   /**
    * Takes the account's row lock. This is the linearization point for everything that changes
    * or depends on one account (lock protocol rule 1). Read state in a separate statement after.
@@ -107,6 +119,17 @@ export class AccountRepo {
     await tx.passwordCredential.create({ data: { appUserId, hash, hashPolicyVersion } });
   }
 
+  /** Replaces an activated account's password hash. The credential row already exists (activation made it). */
+  async replaceCredential(
+    tx: DbTx,
+    appUserId: string,
+    hash: string,
+    hashPolicyVersion: number,
+    now: Date,
+  ): Promise<void> {
+    await tx.passwordCredential.update({ where: { appUserId }, data: { hash, hashPolicyVersion, changedAt: now } });
+  }
+
   async grantRole(
     tx: DbTx,
     input: { organizationId: string; appUserId: string; role: AppRole; grantedBy?: string },
@@ -125,6 +148,56 @@ export class AccountRepo {
     const rows = await this.prisma.appUser.findMany({ select: { employeeId: true } });
 
     return rows.map((row) => row.employeeId);
+  }
+
+  /** Among the employee ids given, those whose account is active and activated and holds an effective IT_ADMIN grant. */
+  async findUsableItAdminEmployeeIds(employeeIds: readonly string[]): Promise<Set<string>> {
+    if (employeeIds.length === 0) return new Set();
+    const rows = await this.prisma.appUser.findMany({
+      where: {
+        employeeId: { in: [...employeeIds] },
+        status: 'ACTIVE',
+        activationState: 'ACTIVATED',
+        roleGrants: { some: { role: 'IT_ADMIN', revokedAt: null } },
+      },
+      select: { employeeId: true },
+    });
+
+    return new Set(rows.map((row) => row.employeeId));
+  }
+
+  /** How the login email of the account was verified; null when it never was (an account not yet activated). */
+  async readEmailVerificationSource(tx: DbTx, appUserId: string): Promise<string | null> {
+    const row = await tx.appUser.findUnique({ where: { id: appUserId }, select: { emailVerificationSource: true } });
+
+    return row?.emailVerificationSource ?? null;
+  }
+
+  /** The account that holds the effective SUPER_ADMIN grant, whatever its state; null when nobody does. */
+  async findSuperAdminHolderId(tx: DbTx): Promise<string | null> {
+    const row = await tx.roleGrant.findFirst({
+      where: { role: 'SUPER_ADMIN', revokedAt: null },
+      select: { appUserId: true },
+    });
+
+    return row?.appUserId ?? null;
+  }
+
+  /** Moves the account to a login email that was confirmed by a recovery link (US-01-09 AC-10). */
+  async changeLoginEmail(
+    tx: DbTx,
+    appUserId: string,
+    input: { loginEmail: string; normalizedLoginEmail: string; now: Date },
+  ): Promise<void> {
+    await tx.appUser.update({
+      where: { id: appUserId },
+      data: {
+        loginEmail: input.loginEmail,
+        normalizedLoginEmail: input.normalizedLoginEmail,
+        emailVerificationSource: 'RECOVERY_VERIFIED',
+        emailVerifiedAt: input.now,
+      },
+    });
   }
 
   async findAccountIdByEmployee(tx: DbTx, employeeId: string): Promise<string | null> {
@@ -226,17 +299,33 @@ export class AccountRepo {
 
   async insertActionToken(
     tx: DbTx,
-    input: { tokenHash: string; appUserId: string; expiresAt: Date; createdBy: string },
+    input: {
+      tokenHash: string;
+      appUserId: string;
+      purpose: ActionTokenPurpose;
+      expiresAt: Date;
+      /** Null when the token was requested by the account's owner rather than by an administrator. */
+      createdBy: string | null;
+      /** A link the recovery procedure sent belongs to its ticket and may carry the address the account takes (US-01-09). */
+      recoveryTicketId?: string;
+      newLoginEmail?: string;
+      newNormalizedLoginEmail?: string;
+    },
   ): Promise<void> {
-    await tx.accountActionToken.create({ data: { ...input, purpose: 'INVITE' } });
+    await tx.accountActionToken.create({ data: input });
   }
 
-  /** Tokens that are neither consumed nor revoked, whether or not they have expired. */
-  async findUsableTokens(tx: DbTx, appUserId: string): Promise<ActionTokenSnapshot[]> {
+  /** Tokens that are neither consumed nor revoked, whether or not they have expired. One purpose, or all. */
+  async findUsableTokens(tx: DbTx, appUserId: string, purpose?: ActionTokenPurpose): Promise<ActionTokenSnapshot[]> {
     return tx.accountActionToken.findMany({
-      where: { appUserId, consumedAt: null, revokedAt: null },
+      where: { appUserId, consumedAt: null, revokedAt: null, ...(purpose ? { purpose } : {}) },
       select: TOKEN_SELECT,
     });
+  }
+
+  /** How many tokens of this purpose the account was issued since `since`, whatever became of them (T-2). */
+  async countTokensSince(tx: DbTx, appUserId: string, purpose: ActionTokenPurpose, since: Date): Promise<number> {
+    return tx.accountActionToken.count({ where: { appUserId, purpose, createdAt: { gte: since } } });
   }
 
   async revokeTokens(tx: DbTx, tokenHashes: string[], reason: ActionTokenRevokedReason, now: Date): Promise<void> {
@@ -255,6 +344,20 @@ export class AccountRepo {
     return row?.appUserId ?? null;
   }
 
+  /** Unlocked: what a presented token is and what became of it, so a link that cannot work is refused before any hashing. */
+  async findActionTokenHeader(tokenHash: string): Promise<{
+    appUserId: string;
+    purpose: ActionTokenPurpose;
+    expiresAt: Date;
+    consumedAt: Date | null;
+    revokedAt: Date | null;
+  } | null> {
+    return this.prisma.accountActionToken.findUnique({
+      where: { tokenHash },
+      select: { appUserId: true, purpose: true, expiresAt: true, consumedAt: true, revokedAt: true },
+    });
+  }
+
   async lockActionToken(tx: DbTx, tokenHash: string): Promise<ActionTokenSnapshot | null> {
     const locked = await tx.$queryRaw<
       { token_hash: string }[]
@@ -269,36 +372,30 @@ export class AccountRepo {
   }
 
   /**
-   * Unlocked read for the dispatcher: the Employee behind this token when the account side would
-   * accept it right now, otherwise null. Whether that Employee has left is the organization
-   * module's to say, so the caller asks it.
+   * Unlocked read for the dispatcher: the stored state of the link behind this token and of its
+   * account. Whether the account side would accept it is `isActionLinkRedeemable`'s to say; whether
+   * the Employee has left is the organization module's, so the caller asks it.
    */
-  async redeemableTokenEmployeeId(tokenHash: string, now: Date): Promise<string | null> {
-    const row = await this.prisma.accountActionToken.findUnique({
+  async findActionLink(tokenHash: string): Promise<(ActionLinkState & { appUser: { employeeId: string } }) | null> {
+    return this.prisma.accountActionToken.findUnique({
       where: { tokenHash },
       select: {
+        purpose: true,
         consumedAt: true,
         revokedAt: true,
         expiresAt: true,
         appUser: { select: { status: true, activationState: true, employeeId: true } },
       },
     });
-
-    const redeemable =
-      row !== null &&
-      row.consumedAt === null &&
-      row.revokedAt === null &&
-      row.expiresAt > now &&
-      row.appUser.status === 'ACTIVE' &&
-      row.appUser.activationState === 'INVITED';
-
-    return redeemable ? row.appUser.employeeId : null;
   }
 
-  /** The newest token of an account, used or not, with its expiry, for the detail view. */
+  /**
+   * The newest invitation of an account, used or not, with its expiry, for the detail view. Only
+   * invitations: a password-reset token is not an invitation and must never be shown as one.
+   */
   async latestToken(appUserId: string): Promise<ActionTokenSnapshot | null> {
     return this.prisma.accountActionToken.findFirst({
-      where: { appUserId },
+      where: { appUserId, purpose: 'INVITE' },
       orderBy: { createdAt: 'desc' },
       select: TOKEN_SELECT,
     });

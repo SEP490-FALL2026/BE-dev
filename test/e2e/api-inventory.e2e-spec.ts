@@ -20,6 +20,8 @@ const PUBLIC_ALLOWLIST = [
   'AuthController.logout',
   'AuthController.redeemInvitation',
   'AuthController.refresh',
+  'AuthController.requestPasswordReset',
+  'AuthController.resetPassword',
   'HealthController.getLiveness',
   'HealthController.getReadiness',
 ];

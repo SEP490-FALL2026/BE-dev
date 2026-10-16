@@ -4,6 +4,7 @@ import { JwtService } from '@nestjs/jwt';
 import { createHash, createHmac, randomBytes } from 'node:crypto';
 import { EnvironmentVariables } from '../../../infrastructure/config/env-schema';
 import { InvalidAccessTokenError } from '../../../infrastructure/security/tokens/access-token-verifier.port';
+import { newActionToken } from './action-token';
 
 export interface AccessTokenClaims {
   /** AppUser id. */
@@ -65,10 +66,15 @@ export class TokenService {
    * stored. It expires AUTH_INVITATION_TTL_SECONDS after `now`.
    */
   newInvitationToken(now: Date): { token: string; hash: string; expiresAt: Date } {
-    const ttlMs = this.config.get('AUTH_INVITATION_TTL_SECONDS', { infer: true }) * 1000;
-    const token = randomBytes(32).toString('base64url');
+    return newActionToken(now, this.config.get('AUTH_INVITATION_TTL_SECONDS', { infer: true }) * 1000);
+  }
 
-    return { token, hash: this.hashRefreshToken(token), expiresAt: new Date(now.getTime() + ttlMs) };
+  /**
+   * One-time token behind an emailed password-reset link (T-1): the same 256 bits and SHA-256 as an
+   * invitation, but it expires AUTH_PASSWORD_RESET_TTL_SECONDS after `now`.
+   */
+  newPasswordResetToken(now: Date): { token: string; hash: string; expiresAt: Date } {
+    return newActionToken(now, this.config.get('AUTH_PASSWORD_RESET_TTL_SECONDS', { infer: true }) * 1000);
   }
 
   hashActionToken(token: string): string {

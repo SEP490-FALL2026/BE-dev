@@ -1,13 +1,70 @@
 import {
+  canReceiveResetMail,
   checkRoleRequest,
   employeeHasNotLeft,
   forbidsCombination,
+  isActionLinkRedeemable,
   isSelfChange,
+  resolveEffectiveRoles,
   stopsLocking,
   validateRoleSet,
 } from './account-policy';
 
 describe('account policy', () => {
+  describe('isActionLinkRedeemable (T-10)', () => {
+    const now = new Date('2026-10-16T10:00:00.000Z');
+    const fresh = {
+      consumedAt: null,
+      revokedAt: null,
+      expiresAt: new Date('2026-10-16T11:00:00.000Z'),
+      appUser: { status: 'ACTIVE' as const, activationState: 'INVITED' as const },
+    };
+    const reset = { ...fresh, appUser: { status: 'ACTIVE' as const, activationState: 'ACTIVATED' as const } };
+
+    it('accepts an invitation for an invited, active account and a reset for an activated, active one', () => {
+      expect(isActionLinkRedeemable({ ...fresh, purpose: 'INVITE' }, now)).toBe(true);
+      expect(isActionLinkRedeemable({ ...reset, purpose: 'RESET_PASSWORD' }, now)).toBe(true);
+    });
+
+    it('does not let one purpose pass for the other (a reset needs an activated account, an invitation an invited one)', () => {
+      expect(isActionLinkRedeemable({ ...reset, purpose: 'INVITE' }, now)).toBe(false);
+      expect(isActionLinkRedeemable({ ...fresh, purpose: 'RESET_PASSWORD' }, now)).toBe(false);
+    });
+
+    it.each(['INVITE', 'RESET_PASSWORD'] as const)('refuses a used, revoked or expired %s link', (purpose) => {
+      const base = purpose === 'INVITE' ? fresh : reset;
+
+      expect(isActionLinkRedeemable({ ...base, purpose, consumedAt: now }, now)).toBe(false);
+      expect(isActionLinkRedeemable({ ...base, purpose, revokedAt: now }, now)).toBe(false);
+      expect(isActionLinkRedeemable({ ...base, purpose, expiresAt: now }, now)).toBe(false);
+    });
+
+    it.each(['INVITE', 'RESET_PASSWORD'] as const)('refuses a %s link for a locked account (AC-6)', (purpose) => {
+      const base = purpose === 'INVITE' ? fresh : reset;
+
+      expect(isActionLinkRedeemable({ ...base, purpose, appUser: { ...base.appUser, status: 'LOCKED' } }, now)).toBe(
+        false,
+      );
+    });
+  });
+
+  describe('canReceiveResetMail (AC-3, AC-6)', () => {
+    const activeAndActivated = { status: 'ACTIVE' as const, activationState: 'ACTIVATED' as const };
+
+    it('is true only for an active, activated account whose employee has not left', () => {
+      expect(canReceiveResetMail(activeAndActivated, { status: 'ACTIVE' })).toBe(true);
+    });
+
+    it('is false for a locked account, an invited one, a departed employee or a missing employee', () => {
+      expect(canReceiveResetMail({ ...activeAndActivated, status: 'LOCKED' }, { status: 'ACTIVE' })).toBe(false);
+      expect(canReceiveResetMail({ ...activeAndActivated, activationState: 'INVITED' }, { status: 'ACTIVE' })).toBe(
+        false,
+      );
+      expect(canReceiveResetMail(activeAndActivated, { status: 'TERMINATED' })).toBe(false);
+      expect(canReceiveResetMail(activeAndActivated, null)).toBe(false);
+    });
+  });
+
   describe('checkRoleRequest', () => {
     it.each(['IT_ADMIN', 'FINANCE', 'EMPLOYEE'] as const)('accepts a hand-granted %s', (role) => {
       expect(checkRoleRequest(role)).toBeNull();
@@ -77,6 +134,33 @@ describe('account policy', () => {
     it('is true for an employee who is still active and false for one who left', () => {
       expect(employeeHasNotLeft({ status: 'ACTIVE' })).toBe(true);
       expect(employeeHasNotLeft({ status: 'TERMINATED' })).toBe(false);
+    });
+  });
+
+  describe('resolveEffectiveRoles (US-01-02, US-01-03)', () => {
+    it('adds MANAGER for the head of a department and SPENDING_APPROVER for the configured approver, never as a grant', () => {
+      expect(resolveEffectiveRoles(['EMPLOYEE'], { headsDepartment: true, isSpendingApprover: true })).toEqual({
+        direct: ['EMPLOYEE'],
+        derived: ['MANAGER', 'SPENDING_APPROVER'],
+        effective: ['EMPLOYEE', 'MANAGER', 'SPENDING_APPROVER'],
+      });
+    });
+
+    it('adds nothing when the facts are false or unknown', () => {
+      expect(resolveEffectiveRoles(['IT_ADMIN'])).toEqual({
+        direct: ['IT_ADMIN'],
+        derived: [],
+        effective: ['IT_ADMIN'],
+      });
+      expect(resolveEffectiveRoles([], { headsDepartment: false, isSpendingApprover: false }).derived).toEqual([]);
+    });
+
+    it('never derives a role for the Super Admin, whatever the data says (FR-8.7, US-01-03 AC-2)', () => {
+      expect(resolveEffectiveRoles(['SUPER_ADMIN'], { headsDepartment: true, isSpendingApprover: true })).toEqual({
+        direct: ['SUPER_ADMIN'],
+        derived: [],
+        effective: ['SUPER_ADMIN'],
+      });
     });
   });
 });

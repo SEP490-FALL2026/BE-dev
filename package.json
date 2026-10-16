@@ -20,6 +20,7 @@
     "start:worker": "nest start --entryFile worker --watch",
     "start:worker:prod": "node dist/worker",
     "ops:bootstrap": "node dist/installation-cli",
+    "ops:recover": "node dist/recovery-cli",
     "lint": "eslint \"{src,test,scripts}/**/*.ts\"",
     "lint:fix": "eslint \"{src,test,scripts}/**/*.ts\" --fix",
     "prisma:format": "prisma format",

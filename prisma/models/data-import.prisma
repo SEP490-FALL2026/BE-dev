@@ -1,0 +1,51 @@
+enum EmployeeImportStatus {
+  PREVIEW
+  COMPLETED
+  CANCELLED
+}
+
+// One upload of a people file and what became of it (US-02-01). The file is read once into rows; nothing in the
+// business tables changes until the person confirms the preview, and then it changes exactly once.
+model EmployeeImport {
+  id             String               @id @default(uuid()) @db.Uuid
+  organizationId String               @map("organization_id") @db.Uuid
+  uploadedBy     String               @map("uploaded_by") @db.Uuid
+  fileName       String               @map("file_name")
+  // SHA-256 of the bytes that were uploaded, to warn when the same file comes again (AC-4).
+  contentHash    String               @map("content_hash")
+  status         EmployeeImportStatus @default(PREVIEW)
+  // Raised every time the preview is computed again; a confirmation names the version it was shown (AC-10).
+  previewVersion Int                  @default(1) @map("preview_version")
+  ignoredColumns String[]             @map("ignored_columns")
+  summary        Json
+  result         Json?
+  // The idempotency key of the confirmation that wrote, so the same request again gets the same answer (AC-10).
+  confirmKey     String?              @map("confirm_key")
+  createdAt      DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
+  expiresAt      DateTime             @map("expires_at") @db.Timestamptz(3)
+  confirmedAt    DateTime?            @map("confirmed_at") @db.Timestamptz(3)
+  cancelledAt    DateTime?            @map("cancelled_at") @db.Timestamptz(3)
+
+  rows EmployeeImportRow[]
+
+  @@index([organizationId, contentHash])
+  @@index([organizationId, createdAt(sort: Desc)])
+  @@map("employee_imports")
+}
+
+// One data row of the file: what it said (cells, as read), and what the preview made of it.
+model EmployeeImportRow {
+  importId    String @map("import_id") @db.Uuid
+  // The line of the file where the row begins; the header is line 1.
+  lineNumber  Int    @map("line_number")
+  cells       Json
+  outcome     String
+  errors      Json
+  differences Json?
+
+  import EmployeeImport @relation(fields: [importId], references: [id], onDelete: Cascade)
+
+  @@id([importId, lineNumber])
+  @@index([importId, outcome])
+  @@map("employee_import_rows")
+}

@@ -249,6 +249,72 @@ describe('email outbox and dispatcher (integration, PostgreSQL + in-process SMTP
     expect(await rowOf(sent.id)).toMatchObject({ status: 'SENT' });
   });
 
+  describe('a notice that carries no link (AC-12)', () => {
+    const enqueueNotice = (recipient = 'stored.login@acme.vn') =>
+      runner.run((tx) =>
+        notifications.enqueueEmail(tx, {
+          organizationId: seed.organizationId,
+          recipient,
+          template: 'PASSWORD_CHANGED_NOTICE',
+          locale: 'en',
+          actionTokenHash: null,
+          payload: { event: 'PASSWORD_RESET', at: '2026-10-16T09:00:00.000Z', fullName: 'Stored Login' },
+        }),
+      );
+
+    it('lets several notices coexist, because only a real token hash is unique', async () => {
+      const first = await enqueueNotice();
+      const second = await enqueueNotice();
+
+      expect(first.id).not.toEqual(second.id);
+      expect(await rowOf(first.id)).toMatchObject({ action_token_hash: null, status: 'PENDING' });
+      expect(await rowOf(second.id)).toMatchObject({ action_token_hash: null, status: 'PENDING' });
+    });
+
+    it('is sent without ever asking whether a link is usable, and the mail holds no link', async () => {
+      const notice = await enqueueNotice();
+      const asked: string[] = [];
+
+      await dispatcher.dispatchDue((hash) => {
+        asked.push(hash);
+        return Promise.resolve(false);
+      });
+
+      expect(asked).toEqual([]);
+      expect(received).toHaveLength(1);
+      expect(received[0].to).toEqual(['stored.login@acme.vn']);
+      expect(received[0].body).toContain('2026-10-16T09:00:00.000Z');
+      expect(received[0].body).not.toContain('#token=');
+      expect(await rowOf(notice.id)).toMatchObject({ status: 'SENT', payload_ciphertext: null });
+    });
+
+    it('is not touched when pending mail for tokens is cancelled', async () => {
+      const notice = await enqueueNotice();
+      const withLink = await enqueue('cancel-this-one');
+
+      await runner.run((tx) => notifications.cancelPendingForTokens(tx, [withLink.hash]));
+
+      expect(await rowOf(withLink.id)).toMatchObject({ status: 'CANCELLED' });
+      expect(await rowOf(notice.id)).toMatchObject({ status: 'PENDING' });
+    });
+  });
+
+  it('fails a row whose template this build does not know, once, instead of retrying it for ever', async () => {
+    const mail = await enqueue();
+    await ctx.sql.query("UPDATE email_outbox SET template = 'FROM_A_FUTURE_BUILD' WHERE id = $1", [mail.id]);
+
+    await dispatcher.dispatchDue(usableAlways);
+
+    expect(received).toHaveLength(0);
+    expect(await rowOf(mail.id)).toMatchObject({
+      status: 'FAILED',
+      attempts: 1,
+      last_error_code: 'TEMPLATE_UNKNOWN',
+      payload_ciphertext: null,
+    });
+    expect(await dispatcher.dispatchDue(usableAlways)).toBe(0);
+  });
+
   it('reports delivery state per token for the account detail view', async () => {
     const mail = await enqueue('state');
 

@@ -8,7 +8,7 @@ interface ClaimedRow {
   recipient: string;
   template: string;
   locale: string;
-  action_token_hash: string;
+  action_token_hash: string | null;
   attempts: number;
   payload_ciphertext: Buffer | null;
   payload_key_id: string | null;
@@ -26,7 +26,7 @@ export class NotificationsRepo {
       recipient: string;
       template: string;
       locale: string;
-      actionTokenHash: string;
+      actionTokenHash: string | null;
       payloadCiphertext: Buffer;
       payloadKeyId: string;
       nextAttemptAt: Date;
@@ -128,12 +128,19 @@ export class NotificationsRepo {
       select: { actionTokenHash: true, status: true, attempts: true, lastErrorCode: true, sentAt: true },
     });
 
-    return new Map(
-      rows.map((row) => [
-        row.actionTokenHash,
-        { status: row.status, attempts: row.attempts, lastErrorCode: row.lastErrorCode, sentAt: row.sentAt },
-      ]),
-    );
+    const states = new Map<string, DeliveryState>();
+    for (const row of rows) {
+      // Only mail with a token can be asked about by token; a notice without one has no key.
+      if (row.actionTokenHash === null) continue;
+      states.set(row.actionTokenHash, {
+        status: row.status,
+        attempts: row.attempts,
+        lastErrorCode: row.lastErrorCode,
+        sentAt: row.sentAt,
+      });
+    }
+
+    return states;
   }
 
   private async finish(

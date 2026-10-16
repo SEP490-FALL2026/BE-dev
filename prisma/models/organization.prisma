@@ -3,11 +3,31 @@ enum CostCenterKind {
   COMPANY
 }
 
+enum CostCenterStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum DepartmentStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum ProjectStatus {
+  RUNNING
+  FINISHED
+}
+
 enum EmploymentType {
   STAFF
   CONTRACTOR
   FREELANCER
   INTERN
+}
+
+enum JobTitleStatus {
+  ACTIVE
+  INACTIVE
 }
 
 enum EmployeeStatus {
@@ -28,17 +48,21 @@ model Organization {
   departments Department[]
   jobTitles   JobTitle[]
   employees   Employee[]
+  projects    Project[]
 
   @@map("organizations")
 }
 
 model CostCenter {
-  id             String         @id @default(uuid()) @db.Uuid
-  organizationId String         @map("organization_id") @db.Uuid
+  id             String           @id @default(uuid()) @db.Uuid
+  organizationId String           @map("organization_id") @db.Uuid
   code           String
   name           String
   kind           CostCenterKind
-  createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  status         CostCenterStatus @default(ACTIVE)
+  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deactivatedAt  DateTime?        @map("deactivated_at") @db.Timestamptz(3)
 
   organization Organization @relation(fields: [organizationId], references: [id])
   department   Department?
@@ -48,27 +72,89 @@ model CostCenter {
 }
 
 model Department {
-  id             String   @id @default(uuid()) @db.Uuid
-  organizationId String   @map("organization_id") @db.Uuid
-  code           String
-  name           String
-  costCenterId   String   @unique @map("cost_center_id") @db.Uuid
-  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  id                  String           @id @default(uuid()) @db.Uuid
+  organizationId      String           @map("organization_id") @db.Uuid
+  code                String
+  name                String
+  functionDescription String?          @map("function_description")
+  status              DepartmentStatus @default(ACTIVE)
+  costCenterId        String           @unique @map("cost_center_id") @db.Uuid
+  // The IT Admin who answers for the department's technical work (US-01-11); null until one is named.
+  itAdminEmployeeId   String?          @map("it_admin_employee_id") @db.Uuid
+  createdAt           DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt           DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deactivatedAt       DateTime?        @map("deactivated_at") @db.Timestamptz(3)
 
-  organization Organization        @relation(fields: [organizationId], references: [id])
-  costCenter   CostCenter          @relation(fields: [costCenterId], references: [id])
+  organization Organization           @relation(fields: [organizationId], references: [id])
+  costCenter   CostCenter             @relation(fields: [costCenterId], references: [id])
+  itAdmin      Employee?              @relation("DepartmentItAdmin", fields: [itAdminEmployeeId], references: [id], onDelete: Restrict)
   placements   EmployeePlacement[]
+  headPeriods  DepartmentHeadPeriod[]
+  projects     ProjectDepartment[]
 
   @@unique([organizationId, code])
+  @@index([itAdminEmployeeId])
   @@map("departments")
 }
 
-model JobTitle {
-  id             String   @id @default(uuid()) @db.Uuid
-  organizationId String   @map("organization_id") @db.Uuid
+// Who heads a department, with history (US-03-06, INV-19). [validFrom, validTo) - validTo null means open.
+// The migration keeps at most one head per department and one department per person at any date, and
+// that the head is a member of the department for the whole period.
+model DepartmentHeadPeriod {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  departmentId   String    @map("department_id") @db.Uuid
+  employeeId     String    @map("employee_id") @db.Uuid
+  validFrom      DateTime  @map("valid_from") @db.Date
+  validTo        DateTime? @map("valid_to") @db.Date
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  department Department @relation(fields: [departmentId], references: [id])
+  employee   Employee   @relation(fields: [employeeId], references: [id])
+
+  @@index([departmentId])
+  @@index([employeeId])
+  @@map("department_head_periods")
+}
+
+// A project is a description kept on department profiles (US-03-06 AC-14): no members, no budget, no approval step.
+model Project {
+  id             String        @id @default(uuid()) @db.Uuid
+  organizationId String        @map("organization_id") @db.Uuid
   name           String
-  normalizedName String   @map("normalized_name")
-  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  description    String?
+  status         ProjectStatus @default(RUNNING)
+  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization        @relation(fields: [organizationId], references: [id])
+  departments  ProjectDepartment[]
+
+  @@map("projects")
+}
+
+model ProjectDepartment {
+  projectId    String @map("project_id") @db.Uuid
+  departmentId String @map("department_id") @db.Uuid
+
+  project    Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  department Department @relation(fields: [departmentId], references: [id])
+
+  @@id([projectId, departmentId])
+  @@index([departmentId])
+  @@map("project_departments")
+}
+
+model JobTitle {
+  id             String         @id @default(uuid()) @db.Uuid
+  organizationId String         @map("organization_id") @db.Uuid
+  name           String
+  normalizedName String         @map("normalized_name")
+  status         JobTitleStatus @default(ACTIVE)
+  // Raised by every rename, deactivation and reactivation, so a later import preview can tell it went stale.
+  version        Int            @default(1)
+  createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   organization Organization        @relation(fields: [organizationId], references: [id])
   placements   EmployeePlacement[]
@@ -78,21 +164,24 @@ model JobTitle {
 }
 
 model Employee {
-  id                   String         @id @default(uuid()) @db.Uuid
-  organizationId       String         @map("organization_id") @db.Uuid
-  employeeCode         String         @map("employee_code")
-  fullName             String         @map("full_name")
-  workEmail            String?        @map("work_email")
-  normalizedWorkEmail  String?        @map("normalized_work_email")
-  employmentType       EmploymentType @map("employment_type")
-  hireDate             DateTime       @map("hire_date") @db.Date
-  status               EmployeeStatus @default(ACTIVE)
-  createdAt            DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt            DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
+  id                  String         @id @default(uuid()) @db.Uuid
+  organizationId      String         @map("organization_id") @db.Uuid
+  employeeCode        String         @map("employee_code")
+  fullName            String         @map("full_name")
+  workEmail           String?        @map("work_email")
+  normalizedWorkEmail String?        @map("normalized_work_email")
+  employmentType      EmploymentType @map("employment_type")
+  hireDate            DateTime       @map("hire_date") @db.Date
+  status              EmployeeStatus @default(ACTIVE)
+  createdAt           DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt           DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  organization Organization        @relation(fields: [organizationId], references: [id])
-  placements   EmployeePlacement[]
-  appUser      AppUser?
+  organization  Organization           @relation(fields: [organizationId], references: [id])
+  placements    EmployeePlacement[]
+  appUser       AppUser?
+  itAdminOf     Department[]           @relation("DepartmentItAdmin")
+  headPeriods   DepartmentHeadPeriod[]
+  approvalRoles ApprovalRoleHolder[]
 
   @@unique([organizationId, employeeCode])
   @@unique([organizationId, normalizedWorkEmail])

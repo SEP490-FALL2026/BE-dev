@@ -1,18 +1,22 @@
 import { HttpStatus } from '@nestjs/common';
-import { TransientDatabaseError, toTransientError } from '../../../infrastructure/database/transaction-runner';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
+import { toUnavailableApiException } from '../../../infrastructure/http/errors/service-unavailable';
 import { EmployeeNotFoundError } from '../../organization/organization.errors';
 import {
   AccountAlreadyActivatedError,
   AccountAlreadyExistsError,
   AccountLockedError,
+  AccountNoLongerUsableError,
   AccountNotFoundError,
+  CurrentPasswordInvalidError,
   EmployeeTerminatedError,
   FinanceAlreadyAssignedError,
   InvitationInvalidError,
   LoginEmailInvalidError,
   LoginEmailRequiredError,
   LoginEmailTakenError,
+  LoginTemporarilyBlockedError,
+  PasswordResetInvalidError,
   RoleAlreadyGrantedError,
   RoleCombinationForbiddenError,
   RoleNotGrantedError,
@@ -26,19 +30,8 @@ function refuse(status: HttpStatus, code: string, message: string, details?: Rec
   return new ApiException(status, { code, message, ...(details ? { details } : {}) });
 }
 
-/**
- * 503 for a database that could not answer: a transaction's TransientDatabaseError, or the driver's
- * own error from a read outside TransactionRunner. Anything else is not an outage (undefined).
- */
-export function toUnavailableApiException(error: unknown): ApiException | undefined {
-  if (!(error instanceof TransientDatabaseError) && !toTransientError(error)) return undefined;
-
-  return refuse(
-    HttpStatus.SERVICE_UNAVAILABLE,
-    'SERVICE_UNAVAILABLE',
-    'The service is temporarily unavailable. Retry shortly.',
-  );
-}
+// The 503 mapping is shared with the audit module (it moved to infrastructure); kept here for existing importers.
+export { toUnavailableApiException };
 
 /**
  * Maps the errors of account management to their HTTP answers. Anything not listed is returned
@@ -92,6 +85,22 @@ export function toAccountApiException(error: unknown): unknown {
   }
   if (error instanceof InvitationInvalidError) {
     return refuse(HttpStatus.BAD_REQUEST, 'AUTH.INVITATION_INVALID', 'The invitation link is not valid.');
+  }
+  if (error instanceof LoginTemporarilyBlockedError) {
+    return refuse(HttpStatus.TOO_MANY_REQUESTS, 'AUTH.LOGIN_TEMPORARILY_BLOCKED', error.message, {
+      retryAfterSeconds: error.retryAfterSeconds,
+    });
+  }
+  // 422, not 401: the caller is signed in, and 401 is what tells a client the session ended.
+  if (error instanceof CurrentPasswordInvalidError) {
+    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'AUTH.CURRENT_PASSWORD_INVALID', error.message);
+  }
+  // The same answer the guard gives from the next request on.
+  if (error instanceof AccountNoLongerUsableError) {
+    return refuse(HttpStatus.UNAUTHORIZED, 'INVALID_ACCESS_TOKEN', 'The access token is invalid.');
+  }
+  if (error instanceof PasswordResetInvalidError) {
+    return refuse(HttpStatus.BAD_REQUEST, 'AUTH.PASSWORD_RESET_INVALID', 'The password reset link is not valid.');
   }
   if (error instanceof PasswordPolicyError) {
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'AUTH.PASSWORD_POLICY_VIOLATION', error.message, {

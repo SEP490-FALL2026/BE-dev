@@ -2,6 +2,8 @@ import { Type } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { MailTransport } from './infrastructure/mail/mail-transport';
+import { AuditController } from './modules/audit/audit.controller';
+import { AuditQueryRepo } from './modules/audit/audit-query.repo';
 import { AccountRepo } from './modules/identity-access/accounts/account.repo';
 import { AppUsersController } from './modules/identity-access/accounts/app-users.controller';
 import { MeController } from './modules/identity-access/access/me.controller';
@@ -188,6 +190,14 @@ describe('module graph', () => {
       expect(modules).not.toContain(forbidden);
     }
     expect(moduleNames(graph)).not.toContain('JwtModule');
+  });
+
+  it('mounts the Audit Trail reader in the API, and nowhere the facade alone is meant to go', () => {
+    expect(controllersOf(collectGraph(AppModule))).toContain(AuditController);
+    for (const root of [WorkerModule, InstallationModule]) {
+      expect(controllersOf(collectGraph(root))).not.toContain(AuditController);
+      expect(declarationsOf(collectGraph(root), AuditQueryRepo)).toHaveLength(0);
+    }
   });
 
   it('mounts the identity-access module and its three controllers in the API', () => {

@@ -10,8 +10,16 @@ Scope: this backend repository. Work from its root with the pnpm version in `pac
 - Current runtime: health, `/auth/*`, `/me` plus infrastructure; first-run installation is a CLI
   (`pnpm ops:bootstrap`). Super Admin account administration (create, invite, activate, lock, role
   grants) is implemented as slice 1b and verified locally at `d60d306`; final acceptance is pending.
+  Slice 1c adds forgot/reset password (`POST /auth/password-reset-requests`, `/auth/password-resets`) and
+  change password (`POST /me/password`), the Super Admin's Audit Trail query (`GET /audit-events`), and the IT
+  Admin's job title catalogue and manual employee entry (`/job-titles`, `POST /employees`); all are verified
+  locally, not yet reviewed or accepted. G1/G2 are complete in the working tree (also uncommitted, verified
+  locally, not reviewed): Cost Center catalogue, department profile with head periods and the derived Manager
+  role, spending-approver roles, operating parameters, CSV employee import (preview then confirm), the
+  onboarding checklist (step 1), Super Admin transfer (`POST /super-admin-transfers`) and the out-of-HTTP
+  recovery command (`pnpm ops:recover --help`). What each slice leaves to G3–G6 is listed in its spec.
   Catalog is a structural sample and is not mounted.
-  Password change/reset and all other US workflows are not implemented.
+  All other US workflows are not implemented.
 
 ## Read only what the task needs
 

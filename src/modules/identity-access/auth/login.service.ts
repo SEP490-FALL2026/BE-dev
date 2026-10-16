@@ -6,8 +6,9 @@ import { DbTx, TransactionRunner, toTransientError } from '../../../infrastructu
 import { OrganizationService } from '../../organization/organization.service';
 import { employeeHasNotLeft } from '../accounts/account-policy';
 import { AccountRepo } from '../accounts/account.repo';
-import { InvalidCredentialsError, LoginTemporarilyBlockedError } from '../errors/identity-access.errors';
+import { InvalidCredentialsError } from '../errors/identity-access.errors';
 import { AccountSnapshot, IssuedSession } from '../identity-access.types';
+import { LoginThrottle } from './login-throttle.service';
 import { PasswordHasher } from './password-hasher.service';
 import { SessionRepo } from './session.repo';
 import { TokenService } from './token.service';
@@ -20,6 +21,7 @@ export class LoginService {
     private readonly organization: OrganizationService,
     private readonly hasher: PasswordHasher,
     private readonly tokens: TokenService,
+    private readonly throttle: LoginThrottle,
     private readonly runner: TransactionRunner,
     private readonly config: ConfigService<EnvironmentVariables, true>,
   ) {}
@@ -45,12 +47,8 @@ export class LoginService {
 
     const normalized = this.safeNormalize(email);
     const keyHash = this.tokens.throttleKey(normalized);
-    const now = new Date();
 
-    const throttle = await this.sessions.findThrottle(organization.id, keyHash);
-    if (throttle?.blockedUntil && throttle.blockedUntil > now) {
-      throw new LoginTemporarilyBlockedError(Math.ceil((throttle.blockedUntil.getTime() - now.getTime()) / 1000));
-    }
+    await this.throttle.assertNotBlocked(organization.id, keyHash);
 
     // Everything CPU-heavy happens before the transaction (lock protocol rule 3).
     const account = await this.accounts.findAccountByLoginEmail(organization.id, normalized);
@@ -67,7 +65,7 @@ export class LoginService {
       // Only a wrong attempt is a failure. An attempt still being checked, or one that succeeds, is
       // not counted (R-06): the counter is raised here, after the check, in one atomic statement so
       // simultaneous wrong guesses are all counted.
-      await this.recordFailure(organization.id, keyHash);
+      await this.throttle.recordFailure(organization.id, keyHash);
       throw new InvalidCredentialsError();
     }
 
@@ -104,21 +102,6 @@ export class LoginService {
     }
 
     return (await this.hasher.verify(account.credentialHash, password)) ? account.credentialHash : null;
-  }
-
-  private async recordFailure(organizationId: string, emailKeyHash: string): Promise<void> {
-    const now = new Date();
-    const windowMs = this.config.get('AUTH_LOGIN_WINDOW_SECONDS', { infer: true }) * 1000;
-    const blockMs = this.config.get('AUTH_LOGIN_BLOCK_SECONDS', { infer: true }) * 1000;
-
-    await this.sessions.recordLoginFailure({
-      organizationId,
-      emailKeyHash,
-      now,
-      windowCutoff: new Date(now.getTime() - windowMs),
-      maxFailures: this.config.get('AUTH_LOGIN_MAX_FAILURES', { infer: true }),
-      blockedUntil: new Date(now.getTime() + blockMs),
-    });
   }
 
   /** An unparseable email still goes through throttling and the dummy hash, under its raw form. */

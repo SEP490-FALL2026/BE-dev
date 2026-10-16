@@ -2,12 +2,12 @@ import { Injectable } from '@nestjs/common';
 import { normalizeEmail } from '../../core/email';
 import { DbTx } from '../../infrastructure/database/transaction-runner';
 import { OrganizationService } from '../organization/organization.service';
-import { employeeHasNotLeft } from './accounts/account-policy';
+import { employeeHasNotLeft, isActionLinkRedeemable } from './accounts/account-policy';
 import { AccountRepo } from './accounts/account.repo';
 import { PASSWORD_HASH_POLICY_VERSION, PasswordHasher } from './auth/password-hasher.service';
 import { checkPasswordPolicy } from './auth/password.policy';
 import { PasswordPolicyError } from './identity-access.errors';
-import { BootstrapSuperAdminInput } from './identity-access.types';
+import { BootstrapSuperAdminInput, EmployeeAccountInspection } from './identity-access.types';
 
 /** Public facade of the identity-access module. */
 @Injectable()
@@ -55,12 +55,41 @@ export class IdentityAccessService {
     return { appUserId: user.id };
   }
 
-  /** Whether the link behind this token hash would still work; the dispatcher asks this before sending. */
-  async isInvitationLinkUsable(tokenHash: string): Promise<boolean> {
-    const employeeId = await this.accounts.redeemableTokenEmployeeId(tokenHash, new Date());
-    if (employeeId === null) return false;
+  /**
+   * Whether the link behind this token hash would still work, for an invitation or a password reset;
+   * the dispatcher asks this before sending (T-10).
+   */
+  async isActionLinkUsable(tokenHash: string): Promise<boolean> {
+    const link = await this.accounts.findActionLink(tokenHash);
+    if (link === null || !isActionLinkRedeemable(link, new Date())) return false;
 
     // Redeeming refuses an employee who has left, so a link to one is dead and must not be mailed.
-    return employeeHasNotLeft(await this.organization.getEmployee(employeeId));
+    return employeeHasNotLeft(await this.organization.getEmployee(link.appUser.employeeId));
+  }
+
+  /**
+   * The account of an employee as another module needs to judge it: does it exist, can it sign in, which roles it
+   * holds. Takes the account's row lock `FOR SHARE` first (lock protocol: the employee, then the account) and reads
+   * in a statement of its own, so a grant or a lock that commits after this cannot change what was judged before
+   * commit.
+   */
+  async inspectEmployeeAccount(tx: DbTx, employeeId: string): Promise<EmployeeAccountInspection> {
+    const appUserId = await this.accounts.findAccountIdByEmployee(tx, employeeId);
+    if (appUserId === null) return { hasAccount: false, usable: false, roles: [] };
+
+    await this.accounts.lockAppUser(tx, appUserId, 'SHARE');
+    const account = await this.accounts.readAccount(tx, appUserId);
+    const roles = await this.accounts.effectiveRoles(appUserId, tx);
+
+    return {
+      hasAccount: account !== null,
+      usable: account !== null && account.status === 'ACTIVE' && account.activationState === 'ACTIVATED',
+      roles,
+    };
+  }
+
+  /** Among these employees, those who hold the IT Admin role on a usable account (an unlocked read, for lists). */
+  findUsableItAdminEmployeeIds(employeeIds: readonly string[]): Promise<Set<string>> {
+    return this.accounts.findUsableItAdminEmployeeIds(employeeIds);
   }
 }

@@ -1,5 +1,6 @@
 import { TokenVerificationUnavailableError } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { OrganizationService } from '../../organization/organization.service';
+import { ApprovalRoleRepo } from '../approval-roles/approval-role.repo';
 import { SessionRepo } from '../auth/session.repo';
 import { TokenService } from '../auth/token.service';
 import { JwtAccessTokenVerifier } from './jwt-access-token.verifier';
@@ -12,7 +13,7 @@ function verifierFailingWith(error: Error): JwtAccessTokenVerifier {
   const sessions = { findPrincipalContext: () => Promise.reject(error) } as unknown as SessionRepo;
   const organization = {} as OrganizationService;
 
-  return new JwtAccessTokenVerifier(tokens, sessions, organization);
+  return new JwtAccessTokenVerifier(tokens, sessions, organization, {} as ApprovalRoleRepo);
 }
 
 describe('JwtAccessTokenVerifier — database failures', () => {
