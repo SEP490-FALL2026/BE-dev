@@ -1,0 +1,100 @@
+{
+  "scenario": "clock",
+  "profile": "linux",
+  "node": "v24.21.0",
+  "platform": "linux-x64",
+  "transformersPath": "direct-generate",
+  "seconds": 40,
+  "cgroupAfter": {
+    "memoryPeakMb": 528.4,
+    "memoryCurrentMb": 25,
+    "memoryMax": "2147483648",
+    "cpuMax": "200000 100000",
+    "cpuStat": {
+      "nrPeriods": 405,
+      "nrThrottled": 29,
+      "throttledMs": 11808
+    }
+  },
+  "result": {
+    "coldTrials": [
+      {
+        "status": "OK",
+        "dispatchToLoadedMs": 4365.6,
+        "workerLoadMs": 4252,
+        "workerLockMs": 1787.3,
+        "dispatchToRunSentMs": 4365.8,
+        "computeWindowMs": 1500,
+        "runMs": 892,
+        "totalMs": 5281.9,
+        "killSent": 0,
+        "deadlineEvents": 0
+      },
+      {
+        "status": "OK",
+        "dispatchToLoadedMs": 4139.8,
+        "workerLoadMs": 4011,
+        "workerLockMs": 1841.7,
+        "dispatchToRunSentMs": 4140,
+        "computeWindowMs": 1499,
+        "runMs": 689,
+        "totalMs": 4842.3,
+        "killSent": 0,
+        "deadlineEvents": 0
+      },
+      {
+        "status": "OK",
+        "dispatchToLoadedMs": 3931.4,
+        "workerLoadMs": 3820,
+        "workerLockMs": 1597.1,
+        "dispatchToRunSentMs": 3931.7,
+        "computeWindowMs": 1500,
+        "runMs": 808,
+        "totalMs": 4757.5,
+        "killSent": 0,
+        "deadlineEvents": 0
+      },
+      {
+        "status": "OK",
+        "dispatchToLoadedMs": 3886.7,
+        "workerLoadMs": 3784,
+        "workerLockMs": 1673.2,
+        "dispatchToRunSentMs": 3887,
+        "computeWindowMs": 1500,
+        "runMs": 752,
+        "totalMs": 4650.9,
+        "killSent": 0,
+        "deadlineEvents": 0
+      },
+      {
+        "status": "OK",
+        "dispatchToLoadedMs": 4092,
+        "workerLoadMs": 3972,
+        "workerLockMs": 1850.7,
+        "dispatchToRunSentMs": 4092.2,
+        "computeWindowMs": 1500,
+        "runMs": 741,
+        "totalMs": 4851.5,
+        "killSent": 0,
+        "deadlineEvents": 0
+      }
+    ],
+    "allColdOk": true,
+    "allKillFree": true,
+    "computeMaxMsUsed": 0,
+    "loadLongerThanComputeWindow": 5,
+    "responseDeadlineDuringLoad": {
+      "firstStatus": "TIMEOUT",
+      "firstReason": "timeout",
+      "firstMs": 715,
+      "laterStatus": "OK",
+      "runSentCount": 1,
+      "loadStartCount": 1,
+      "releaseBy": [
+        "cancelled-before-run",
+        "done"
+      ],
+      "spawnCount": 1
+    }
+  }
+}

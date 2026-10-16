@@ -20,6 +20,9 @@ lerna-debug.log*
 /coverage
 /.nyc_output
 
+# Public model weights; download separately, never commit them.
+/.models/
+
 # IDEs and editors
 /.idea
 .project

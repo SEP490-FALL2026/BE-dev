@@ -53,8 +53,6 @@ this historical limitation does not describe the later review environment.
 
 ## Verification
 
-The [AI review at `64073c4`](../reviews/backend-g0-g1-review-2026-10-14.md) exercised
-API and worker as separate processes with a real SMTP sink, including graceful shutdown.
-R-05 remains open: mail and the invitation detail can still treat a terminated employee's
-invitation as usable, although redemption is blocked. SMTP TLS and provider deliverability
-were not verified. See [follow-up](../workspace/g0-g1-review-follow-up.md) for developer handoff.
+The [G0/G1 remediation review](../reviews/g0-g1-remediation-2026-10-15/README.md) records
+API and worker checks as separate processes with an SMTP sink, including graceful shutdown.
+SMTP provider deliverability was not verified.

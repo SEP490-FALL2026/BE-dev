@@ -1,12 +1,12 @@
 # Spec: Ranh giới dữ liệu nền tổ chức – danh tính (G0)
 
-- Phụ trách: chưa phân công; reviewer: chưa phân công (một dev khác, ngang quyền).
-- Thiết kế: **draft** (12/10/2026, sửa cùng ngày sau vòng khép thiết kế). Review: chưa review.
+- Phụ trách: BE Dev A (theo roadmap). Thiết kế ban đầu bởi: Owner. Peer review: tùy chọn theo [quy trình](../../README.md); chưa có link review.
+- Thiết kế: ready (đã implement). Triển khai: `verified` local tại `d60d306`; refactor module sau đó ở `ab0c43a`. Owner review cuối: chưa có; chưa `accepted`/`released`.
 - Nguồn: [snapshot `S-2026-10-12b`](../../sources.md) — BRD v3.36 mục 4.1–4.3, `FR-2.1`, `FR-8.1`, `FR-8.3`, `FR-8.6`→`FR-8.11`, `FR-9.7`, `FR-9.8`, `INV-05`, `INV-15`, `INV-19`, `INV-20`, `ADR-01`, `ADR-04`; US v0.15 (bổ sung `QĐ-67`) `US-01-01`, `US-01-06`, `US-01-10`, `US-02-02`, `US-02-03`, `US-03-06`, `US-04-09`, `TE-02`, `TE-03`, `TE-09`, `TE-15`; quyết định `QĐ-39`, `QĐ-41a`, `QĐ-42c`, `QĐ-44`, `QĐ-46`, `QĐ-47`, `QĐ-52a`, `QĐ-52d`, `QĐ-66a`, `QĐ-66c`, `QĐ-67a`→`QĐ-67e`; Conceptual v5.1 (21 · 42).
-- Trạng thái yêu cầu: các Story liên quan là `BASELINED`/`OWNER-PROVISIONAL` — quyết định Owner, chưa GVHD. Logical S0 0.10 ở Docs viết theo cây `manager_id` và **không** dùng cho vùng này; Logical của vùng nằm ở mục _Logical vùng_ dưới đây.
+- Trạng thái yêu cầu: các Story liên quan là `BASELINED` theo `QĐ-72` tại Docs `3341ea0` (snapshot gốc `S-2026-10-12b` còn ghi một phần `OWNER-PROVISIONAL`). I-2 dưới đây sẽ được lát [G2 đầu](../g2-job-title-catalogue-and-manual-employee/spec.md) sửa theo R-11 (`QĐ-70c`). Logical S0 0.10 ở Docs viết theo cây `manager_id` và **không** dùng cho vùng này; Logical của vùng nằm ở mục _Logical vùng_ dưới đây.
 - [Kế hoạch](plan.md). Lát dùng spec này: [lát 1a](../us-01-bootstrap-login-session/spec.md), [lát 1b](../us-01-account-invitation-activation/spec.md).
 
-**Đối chiếu 14/10/2026:** code đã merge PR #4 (`64073c4`); thiết kế vẫn draft, chưa dev review/nghiệm thu. Nguồn baseline là Docs `0e0bb83` (snapshot `S-2026-10-12b`). Xem [theo dõi sau review](../../g0-g1-review-follow-up.md) và [báo cáo AI](../../../reviews/backend-g0-g1-review-2026-10-14.md).
+**Trạng thái 15/10/2026 (Task 3B):** code vào `dev` qua PR #4 (`64073c4`), remediation qua PR #7/#8 (`a0cf5f1`) và Task 1B; baseline `verified` local tại `d60d306`. Refactor Task 2/2B ở `ab0c43a` giữ nguyên nghiệp vụ và 16 HTTP operation. Nguồn thiết kế của lát là Docs `0e0bb83` (`S-2026-10-12b`); nguồn hiện hành Docs `3341ea0` ghi các Story liên quan `BASELINED` theo `QĐ-72`, còn thay đổi nguồn sau đó thuộc lát khác (`QĐ-73a` AC-12 → 1c; `QĐ-68`/`QĐ-70` → G2 đầu). Remote CI và Owner review cuối chưa có. Xem [báo cáo G0/G1](../../../reviews/g0-g1-remediation-2026-10-15/README.md).
 
 **Trước G2:** Logical JobTitle và I-2 dưới đây là baseline của lát 1a/1b. R-10/R-11 yêu cầu đánh giá `QĐ-68`/`QĐ-66ak`, `OQ-A-26` và pin nguồn mới trước khi tái sử dụng cho import/nhập nhân viên. Không suy placement từ ngày vào trong bootstrap thành quy tắc chung của G2.
 
@@ -168,6 +168,13 @@ Baseline chưa có transaction runner chung (ARCHITECTURE). Đề xuất thêm �
 
 **Áp dụng cho từng thao tác** (lát hiện thực trong ngoặc):
 
+**Cửa sổ replay refresh — quyết định Task 1B ngày 15/10/2026:** sau khi khóa và kiểm lại chủ sở hữu/phiên,
+kiểm `expiresAt` **trước** `consumedAt`. Token hết hạn luôn 401 và không mint, không thay đổi phiên hoặc token kế tiếp,
+kể cả record đã consumed. Chỉ token consumed **còn hạn** trong phiên còn sống mới thu hồi family + đúng một audit
+`REPLAY_DETECTED` đã commit rồi 401. Token chưa consumed nhưng expired, token không tồn tại và phiên expired/revoked
+vẫn 401 theo hợp đồng hiện hành. Cách này chặn replay-mint và tránh dùng token cũ đã expired để gây session DoS.
+Spec 1a áp dụng cùng thứ tự; không tự chuyển trạng thái draft/review hoặc ADR Proposed thành phê duyệt.
+
 | Thao tác                                   | Trước giao dịch (không khóa)                                                                                                                                                 | Trong giao dịch, theo thứ tự                                                                                                                                                                                                                                                                                                                               | Kết quả khi tranh chấp                                                                                                                                                                                                                                         |
 | ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Khởi tạo (1a)                              | kiểm đầu vào, chính sách mật khẩu, băm mật khẩu                                                                                                                              | advisory lock → kiểm chưa có Organization → chèn Organization, CostCenter, Department, JobTitle, Employee ×2, placement ×2, AppUser, PasswordCredential, RoleGrant `SUPER_ADMIN` → audit                                                                                                                                                                   | lần chạy thứ hai chờ advisory lock rồi thấy đã có tổ chức ⟹ thoát mã 2, không ghi; unique một Organization là phòng thủ cuối                                                                                                                                   |
@@ -243,8 +250,8 @@ Spec nền không có AC người dùng riêng; các bất biến được kiể
 - [ ] Người nhận truy cập được nguồn và revision: Docs `S-2026-10-12b` = commit `0e0bb83`, 12/12 hash đã kiểm khớp; người nhận cần xác nhận truy cập — xem [nguồn](../../sources.md).
 - [x] Quyết định khởi tạo ghi vào sổ quyết định Docs ở `QĐ-67a`/`QĐ-67b` (12/10/2026, trong snapshot `S-2026-10-12b`, đã commit ở `0e0bb83`); BRD `FR-9.8`, US `US-01-01` AC-19 đồng bộ.
 - [x] Lead chốt convention cột (snake_case qua `@map`) và `btree_gist` (12/10/2026) — [ADR-0011](../../../decisions/0011-internal-authentication-and-sessions.md).
-- [ ] Dev khác review Logical vùng, ownership, giao thức khóa, bảo đảm I-2, chiến lược migration và hai lựa chọn trên về khả thi.
-- [ ] Dev khác xác nhận với link review và revision cụ thể.
+- [ ] _(Tùy chọn theo quy trình hiện hành — không chặn Owner review cuối.)_ Dev khác review Logical vùng, ownership, giao thức khóa, bảo đảm I-2, chiến lược migration và hai lựa chọn trên về khả thi.
+- [ ] _(Tùy chọn theo quy trình hiện hành — không chặn Owner review cuối.)_ Dev khác xác nhận với link review và revision cụ thể.
 
 ## Thay đổi và nghiệm thu
 

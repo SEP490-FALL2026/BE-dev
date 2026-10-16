@@ -23,7 +23,7 @@
   (Owner decision 14/10/2026, R-07; pinned by `test/e2e/rate-limit.e2e-spec.ts`).
   Login failure throttling is separately keyed by normalized email: only failed logins increase
   its failure counter, after the password check (Owner confirmed the existing spec, R-06).
-  See [review follow-up](../workspace/g0-g1-review-follow-up.md). Redis is queue infrastructure.
+  See [G0/G1 remediation review](../reviews/g0-g1-remediation-2026-10-15/README.md). Redis is queue infrastructure.
 - Configure TRUST_PROXY_HOPS only for trusted ingress that overwrites client headers.
 
 ## Storage and jobs

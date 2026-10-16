@@ -51,9 +51,9 @@ unrelated variables are ignored. Exit code 1 does not prove that nothing was wri
 reply to `COMMIT` was lost, check the installation state before running it again (a rerun that exits 2 means the
 first run committed).
 It needs a terminal (`-it`) because the Super Admin password is typed at a hidden prompt; it refuses to
-read it from arguments, the environment or a pipe. The
-[AI review at `64073c4`](../reviews/backend-g0-g1-review-2026-10-14.md) verified a real Linux PTY
-in the runtime image with automated input; manual interactive PowerShell verification is still pending.
+read it from arguments, the environment or a pipe. The consolidated
+[G0/G1 review](../reviews/g0-g1-remediation-2026-10-15/README.md) records the Linux PTY verification
+through the remediation revision; manual interactive PowerShell verification is still pending.
 The worker uses the same runtime image with command `node dist/worker.js` and runs the PostgreSQL
 outbox polling loop for SMTP delivery. No BullMQ processor is registered. Compose has no SMTP sink;
 configure a reachable SMTP service separately. SMTP TLS/provider delivery remains unverified.

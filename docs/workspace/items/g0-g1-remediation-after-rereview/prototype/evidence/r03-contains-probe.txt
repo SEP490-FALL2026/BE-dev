@@ -1,3 +1,0 @@
-{"term":"SA0_1","matched":["SA001"],"params":"[\"SA0_1\",\"0\"]","sqlTail":".\"id\", \"employees\".\"employee_code\" FROM \"employees\" WHERE \"employees\".\"employee_code\" ILIKE ('%' || $1 || '%') OFFSET $2"}
-{"term":"%","matched":["SA001","IT001"],"params":"[\"%\",\"0\"]","sqlTail":".\"id\", \"employees\".\"employee_code\" FROM \"employees\" WHERE \"employees\".\"employee_code\" ILIKE ('%' || $1 || '%') OFFSET $2"}
-{"term":"SA_01","matched":["SA001"],"params":"[\"SA_01\",\"0\"]","sqlTail":".\"id\", \"employees\".\"employee_code\" FROM \"employees\" WHERE \"employees\".\"employee_code\" ILIKE ('%' || $1 || '%') OFFSET $2"}

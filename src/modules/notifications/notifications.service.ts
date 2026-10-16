@@ -1,8 +1,7 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { DbTx } from '../../infrastructure/database/transaction-runner';
 import { NotificationsRepo } from './notifications.repo';
-import { PAYLOAD_CIPHER } from './notifications.tokens';
 import { DeliveryState, EnqueueEmailInput } from './notifications.types';
 import { PayloadCipher } from './payload-cipher';
 
@@ -11,7 +10,7 @@ import { PayloadCipher } from './payload-cipher';
 export class NotificationsService {
   constructor(
     private readonly repo: NotificationsRepo,
-    @Inject(PAYLOAD_CIPHER) private readonly cipher: PayloadCipher,
+    private readonly cipher: PayloadCipher,
   ) {}
 
   /**

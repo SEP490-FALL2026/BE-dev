@@ -12,5 +12,9 @@ allowBuilds:
   '@prisma/engines': true
   '@scarf/scarf': false
   msgpackr-extract: false
+  # CPU binaries are bundled. Do not download optional CUDA binaries during install.
+  onnxruntime-node: false
   prisma: true
+  protobufjs: false
+  sharp: false
   unrs-resolver: true

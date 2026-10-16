@@ -15,14 +15,10 @@ API và worker có entry point riêng trong cùng codebase.
 | Queue/storage  | S3 adapter, BullMQ configuration; worker gửi SMTP từ outbox PostgreSQL                           | BullMQ queue processor và file API                                  |
 
 G0 và lát 1a/1b đã merge qua PR #4 (`64073c4`), có 16 operation HTTP.
-Spec/plan, ADR-0011/0012 (vẫn Proposed) và code chưa được dev review/nghiệm thu. Owner thông báo
-đã có dev review bản sửa PR #6, nhưng phạm vi/revision chưa đối chiếu nên chưa ghi là review.
-Kết quả AI review và lỗi còn mở được dẫn ở [theo dõi sau review](docs/workspace/g0-g1-review-follow-up.md).
+Gói remediation tại `a0cf5f1` đã vào `origin/dev` qua PR #7 và #8. Spec/plan,
+ADR-0011/0012 (vẫn Proposed) và code chưa được dev review/nghiệm thu.
+Kết quả kiểm chứng và phần còn mở nằm trong [báo cáo review G0/G1](docs/reviews/g0-g1-remediation-2026-10-15/README.md).
 Catalog là mẫu cấu trúc, chưa cung cấp nghiệp vụ G3.
-
-Bản sửa remediation sau re-review (N-1, R-02, R-03, R-09, R-12→R-15) nằm ở nhánh
-`fix/g0-g1-remediation-2026-10-15` (PR về `dev`); kết quả kiểm chứng và giới hạn:
-[báo cáo tích hợp](docs/reviews/backend-g0-g1-integration-2026-10-15.md). Chưa được dev review/nghiệm thu.
 
 ## Bản đồ source
 
@@ -39,13 +35,17 @@ src/
     security/                 # guard khai báo/xác thực/phân quyền, verifier port, rate limiting
     database/                 # Prisma service, TransactionRunner
     queue/                    # BullMQ connection
+    mail/                     # port MailTransport và SMTP adapter (nodemailer)
     object-storage/           # port và S3-compatible adapter
     observability/            # request context, request ID, logger
     health/                   # health controller
   modules/
     audit/                    # AuditEvent chỉ ghi thêm (facade record(tx, event))
     organization/             # tổ chức, Cost Center, phòng, chức vụ, nhân viên + placement
-    identity-access/          # tài khoản, mật khẩu, vai gán, phiên, đăng nhập, /me, quản trị tài khoản, lời mời
+    identity-access/          # facade, module, types ở gốc; dto/, errors/ dùng chung
+      auth/                   # đăng nhập, refresh/logout, phiên + refresh token + throttle (session.repo), token, mật khẩu
+      accounts/               # truy vấn, tạo/mời/kích hoạt, khóa/vai; account.repo (AppUser, credential, vai, action token)
+      access/                 # /me và verifier access token cho guard
     notifications/            # EmailOutbox (mã hóa payload), dispatcher gửi thư; không import identity-access
     installation/             # use case khởi tạo; không sở hữu bảng; import IdentityAccessFacadeModule (không import IdentityAccessModule) và chỉ xác thực biến môi trường DB
     catalog/                  # module mẫu cấu trúc, KHÔNG đăng ký vào AppModule
@@ -64,9 +64,10 @@ test/
 - Core không import Nest, Prisma, SDK hoặc business module.
 - Infrastructure cung cấp kỹ thuật; business workflow nằm trong feature module.
 - Controller map HTTP/DTO; service điều phối; repo sở hữu persistence; mapper tạo wire data.
-- Module dùng layout phẳng. Chỉ tạo dto/errors/mappers/policies/services khi có nhu cầu thật.
-- Module khác gọi facade/contract được export; không import private repo/DTO/policy,
-  không truy cập bảng thuộc module khác.
+- Module dùng layout phẳng. Chỉ tạo dto/errors/mappers/policies/services khi có nhu cầu thật; module đã có
+  nhiều capability (như `identity-access`) nhóm theo capability, tối đa hai tầng thư mục.
+- Module khác chỉ import file ở **gốc** module (facade, module, types, errors public); không import repo,
+  `password-hasher.service` hay file trong thư mục con, và không truy cập bảng thuộc module khác.
 - Cross-module atomic write: facade nhận `tx` của người gọi (`DbTx`); `TransactionRunner.run`
   mở giao dịch Read Committed với `lock_timeout`/`statement_timeout` riêng cho giao dịch.
   Khóa dòng của module khác chỉ qua facade (ví dụ `organization.lockEmployeeForShare(tx, id)`).
@@ -133,15 +134,19 @@ lớn hơn timeout transaction). Khi mất phản hồi COMMIT, dữ liệu có 
 client nhận 503; không tự retry ghi. Xem [spec remediation](docs/workspace/items/g0-g1-remediation-after-rereview/spec.md).
 
 Authentication: tài khoản nội bộ, access token JWT HS256 ngắn hạn cộng refresh token xoay vòng trong cookie
-`HttpOnly`/`SameSite=Strict`/`Path=/<prefix>/v1/auth`; phát lại refresh token thì thu hồi phiên. Giao thức
+`HttpOnly`/`SameSite=Strict`/`Path=/<prefix>/v1/auth`; phát lại refresh token đã consumed nhưng còn hạn thì thu hồi phiên.
+Token hết hạn trả 401 trước khi xét consumed và không thu hồi phiên/token kế tiếp (quyết định Task 1B, tránh session DoS). Giao thức
 khóa và hợp đồng đăng xuất: [spec nền](docs/workspace/items/foundation-org-identity-boundary/spec.md),
 [spec lát 1a](docs/workspace/items/us-01-bootstrap-login-session/spec.md); ADR-0011 còn **Proposed**.
 Khởi tạo cài đặt: `pnpm build` rồi `pnpm ops:bootstrap --help` (chạy bởi chính người giữ vai Super Admin;
 mật khẩu nhập ở prompt ẩn, không nhận qua tham số hay biến môi trường).
 
 CLI dùng `InstallationConfigurationModule` chỉ validate môi trường và DB; API/worker giữ config
-đầy đủ. `IdentityAccessFacadeModule` cung cấp facade cùng repo/hasher dùng chung instance cho
-module identity runtime, không kéo JWT, SMTP hay worker vào CLI (R-13).
+đầy đủ. `IdentityAccessFacadeModule` (DatabaseModule + OrganizationModule) cung cấp facade
+`IdentityAccessService` cùng `AccountRepo`/`PasswordHasher` dùng chung instance cho `IdentityAccessModule`;
+CLI và worker chỉ import module này nên không dựng controller, JWT hay workflow đăng nhập; CLI cũng không kéo
+SMTP/outbox (R-13). [Module graph test](src/module-graph.spec.ts) đọc metadata Nest thật: mỗi provider token chỉ khai
+báo ở một module trong graph API/worker/CLI và các graph không chứa module không dùng.
 
 Catalog dùng unique slug ở PostgreSQL; phân trang sort name/id, transaction
 RepeatableRead để page/count dùng cùng snapshot. Snapshot không cố định giữa các
@@ -160,7 +165,7 @@ AppModule chưa dùng queue. WorkerModule cấu hình BullMQ (chưa có job) và
 (`src/email-dispatch.loop.ts`): vòng thăm dò PostgreSQL mỗi `OUTBOX_POLL_INTERVAL_MS` gửi thư trong
 EmailOutbox ([ADR-0012](docs/decisions/0012-account-email-delivery.md), vẫn **Proposed**) — không cần Redis cho việc này.
 Vòng lặp nằm ở gốc ghép vì nối hai module không được import nhau: `notifications` gửi thư,
-`identity-access` trả lời liên kết trong thư còn dùng được không. Quản trị tài khoản (lát 1b): route
+facade `IdentityAccessService.isInvitationLinkUsable` trả lời liên kết trong thư còn dùng được không. Quản trị tài khoản (lát 1b): route
 `/app-users`, `/account-candidates` chỉ Super Admin; kích hoạt qua `POST /auth/invitations/redeem`.
 Storage adapter hỗ trợ endpoint S3-compatible; chưa có file ownership/API.
 Readiness chỉ chứng minh PostgreSQL có thể ping, không chứng minh schema/migration,

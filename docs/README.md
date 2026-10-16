@@ -39,5 +39,8 @@ Số ADR bị khuyết không cần đánh lại. Định hướng tài khoản/
 
 ## Review G0/G1
 
-- [Báo cáo AI ngày 14/10/2026](reviews/backend-g0-g1-review-2026-10-14.md): kết quả tại BE `64073c4`, không phải phê duyệt của dev.
-- [Bàn giao sau review](workspace/g0-g1-review-follow-up.md): thứ tự sửa, quyết định Owner R-06/R-07 và việc còn lại trước nghiệm thu/G2.
+- [Review và remediation G0/1a/1b](reviews/g0-g1-remediation-2026-10-15/README.md): lịch sử finding, bản sửa `a0cf5f1`, kết quả kiểm chứng và phần còn mở; không phải phê duyệt của dev.
+
+## Review dịch EN–VI
+
+- [Nghiên cứu và spike dịch nội dung động](reviews/dynamic-content-translation-2026-10-15/README.md): kết quả chất lượng âm tính, trạng thái pending và các finding còn lại; không phải phê duyệt của dev.

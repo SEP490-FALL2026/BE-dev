@@ -1,3 +1,0 @@
-Requirement definitions used by G0/1a/1b: block hash (SHA-256, first 12) at Docs 0e0bb83 vs Docs working tree (BRD v3.38, uncommitted), measured 14/10/2026
-FR-8.1 FR-8.3 FR-8.6 FR-8.7 FR-8.8 FR-8.9 FR-8.10 FR-8.11 FR-9.8 INV-05 INV-15 INV-20: all identical (see report section 2)
-EP-01 (epics + src): identical hash (docs-hashes.txt)

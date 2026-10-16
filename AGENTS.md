@@ -9,7 +9,8 @@ Scope: this backend repository. Work from its root with the pnpm version in `pac
 - Check the branch, working diff and relevant source/tests; preserve existing changes.
 - Current runtime: health, `/auth/*`, `/me` plus infrastructure; first-run installation is a CLI
   (`pnpm ops:bootstrap`). Super Admin account administration (create, invite, activate, lock, role
-  grants) is implemented as slice 1b, unreviewed. Catalog is a structural sample and is not mounted.
+  grants) is implemented as slice 1b and verified locally at `d60d306`; final acceptance is pending.
+  Catalog is a structural sample and is not mounted.
   Password change/reset and all other US workflows are not implemented.
 
 ## Read only what the task needs
@@ -25,22 +26,34 @@ Scope: this backend repository. Work from its root with the pnpm version in `pac
 
 ## Repository constraints
 
-- Use flat feature modules. Controllers map HTTP; services coordinate; `*.repo.ts` owns persistence.
+- Default to flat feature modules. A module with several distinct capabilities may group files by capability,
+  with at most two directory levels, as documented in `ARCHITECTURE.md`. Controllers map HTTP; services
+  coordinate; `*.repo.ts` owns persistence.
 - Cross-module calls use exported facades/contracts; never import another module's private files or query its tables.
 - Keep framework-free primitives in `src/core`; technical adapters in `src/infrastructure`.
 - Generated `src/generated/`, `dist/` and `openapi.json` change through their generators.
 - Do not load every ADR, design document or external repository by default.
   Obtain the relevant requirement before inventing missing business behavior.
 - For US design and implementation handoff, follow [shared planning](docs/workspace/README.md).
-- Use reviewed BRD/US revisions and spec/plan; never invent approvals or acceptance.
-- No mandatory skill, private workspace, sequential numbering or multi-agent workflow.
+- Use pinned BRD/US revisions and the current spec/plan. The assignee owns design, implementation,
+  tests and plan maintenance; peer review is optional, except where a pinned requirement, decision or spec
+  explicitly requires it (for example the US-01-10 technical values) — then it is a recorded gate before
+  `accepted`. Never invent Owner approval, peer review or acceptance.
+- No specific AI vendor or external skill package is required. An AI that supports skills should follow
+  the phase-specific guidance in [shared planning](docs/workspace/README.md); repository rules, pinned
+  requirements, the current spec/plan and acceptance criteria remain authoritative.
+- Multi-agent work is optional. Use it only for independent, clearly bounded tasks; one primary agent
+  must own integration, final diff review and verification. Do not let agents edit the same files,
+  operate on the same test database or perform Git publication concurrently.
 
 ## Verify and hand off
 
 - Docs: `pnpm rules:check` and `pnpm rules:format`.
 - Source/config: `pnpm check`; HTTP changes also require `pnpm test:e2e` and `pnpm openapi:export`.
 - Database changes need the isolated integration setup in the test guide.
-- Report actual commands/results and unverified boundaries. Do not silently skip a failed gate.
+- Before handoff, self-review the final diff against the assigned spec/plan and AC; update affected
+  operational documentation or runbooks. Report actual commands/results and unverified boundaries.
+  Do not silently skip a failed gate.
 - Keep secrets and real data out of artifacts. Do not commit, push, deploy or change shared data unless authorized.
 
 [All topic rules](docs/rules/README.md).

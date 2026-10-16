@@ -6,10 +6,10 @@ describe('EmailDispatchLoop', () => {
 
   function build(dispatchDue: jest.Mock) {
     const config = { get: () => 1000 };
-    const accounts = { isInvitationLinkUsable: jest.fn().mockResolvedValue(true) };
-    const loop = new EmailDispatchLoop({ dispatchDue } as never, accounts as never, config as never);
+    const identity = { isInvitationLinkUsable: jest.fn().mockResolvedValue(true) };
+    const loop = new EmailDispatchLoop({ dispatchDue } as never, identity as never, config as never);
 
-    return { loop, accounts };
+    return { loop, identity };
   }
 
   it('dispatches immediately and then once per interval until the application shuts down', async () => {
@@ -41,12 +41,12 @@ describe('EmailDispatchLoop', () => {
 
   it('hands the dispatcher the account module answer to whether a link still works', async () => {
     const dispatchDue = jest.fn().mockImplementation((isUsable: (hash: string) => Promise<boolean>) => isUsable('h1'));
-    const { loop, accounts } = build(dispatchDue);
+    const { loop, identity } = build(dispatchDue);
 
     loop.onApplicationBootstrap();
     await jest.advanceTimersByTimeAsync(0);
 
-    expect(accounts.isInvitationLinkUsable).toHaveBeenCalledWith('h1');
+    expect(identity.isInvitationLinkUsable).toHaveBeenCalledWith('h1');
     void loop.onModuleDestroy();
   });
 

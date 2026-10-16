@@ -1,7 +1,0 @@
-# Development runs of live-smoke-remediation (Sonnet B, outB/, pbase = 61e92fb, same runtime tree); r4 = runner after a cosmetic edit; final runner sha256 a6c03382…
-base: {"finishedAt":"2026-10-14T16:33:07.566Z","seconds":159,"pass":132,"fail":0,"info":9,"mails":17}
-r1: {"runner":"live-smoke-remediation","finishedAt":"2026-10-14T16:36:03.938Z","seconds":137,"pass":132,"fail":0,"info":9,"mails":16}
-r2: {"runner":"live-smoke-remediation","finishedAt":"2026-10-14T16:38:53.876Z","seconds":135,"pass":132,"fail":0,"info":9,"mails":16}
-r3: {"runner":"live-smoke-remediation","finishedAt":"2026-10-14T16:41:38.666Z","seconds":135,"pass":132,"fail":0,"info":9,"mails":17}
-r4: {"runner":"live-smoke-remediation","finishedAt":"2026-10-14T16:49:42.542Z","seconds":139,"pass":132,"fail":0,"info":9,"mails":17}
-neg (deliberately broken ready line, NOT evidence): 9 FAIL, all 'worker not ready'

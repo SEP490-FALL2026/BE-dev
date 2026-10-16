@@ -1,7 +1,7 @@
 import request from 'supertest';
-import { AccountManagementService } from '../../src/modules/identity-access/account-management.service';
+import { AccountStatusService } from '../../src/modules/identity-access/accounts/account-status.service';
 import { SuperAdminHolderNotLockableError } from '../../src/modules/identity-access/errors/identity-access.errors';
-import { PAYLOAD_CIPHER } from '../../src/modules/notifications/notifications.tokens';
+import { IdentityAccessService } from '../../src/modules/identity-access/identity-access.service';
 import { PayloadCipher } from '../../src/modules/notifications/payload-cipher';
 import { bodyOf } from '../support/api-body';
 import {
@@ -54,7 +54,7 @@ describe('account management over HTTP (integration, real PostgreSQL)', () => {
 
   /** The raw token behind an account's current invitation, read the way the dispatcher would. */
   const invitationToken = async (appUserId: string): Promise<string> => {
-    const cipher = ctx.app.get<PayloadCipher>(PAYLOAD_CIPHER, { strict: false });
+    const cipher = ctx.app.get<PayloadCipher>(PayloadCipher, { strict: false });
     const { rows } = await ctx.sql.query<{ id: string; payload_key_id: string; payload_ciphertext: Buffer }>(
       `SELECT o.id, o.payload_key_id, o.payload_ciphertext FROM email_outbox o
          JOIN account_action_tokens t ON t.token_hash = o.action_token_hash
@@ -106,6 +106,15 @@ describe('account management over HTTP (integration, real PostgreSQL)', () => {
   afterEach(async () => {
     await ctx.sql.query('DELETE FROM login_throttles');
   });
+
+  it.each(['invitations', 'lock', 'unlock'])(
+    'rejects an invalid account UUID on POST /app-users/:id/%s with 422 VALIDATION_ERROR',
+    async (action) => {
+      const response = await admin.post(`/api/v1/app-users/not-a-uuid/${action}`).expect(422);
+
+      expect(errorCode(response)).toBe('VALIDATION_ERROR');
+    },
+  );
 
   describe('candidates and creation (US-01-01 AC-1, AC-5, AC-8, AC-16)', () => {
     it('lists employees without an account, excluding the departed, and finds them by name or code', async () => {
@@ -637,7 +646,7 @@ describe('account management over HTTP (integration, real PostgreSQL)', () => {
       };
       const lockedBefore = await countAudit('APP_USER.LOCKED', seed.superAdmin.appUserId);
 
-      await expect(ctx.app.get(AccountManagementService).lock(actor, seed.superAdmin.appUserId)).rejects.toBeInstanceOf(
+      await expect(ctx.app.get(AccountStatusService).lock(actor, seed.superAdmin.appUserId)).rejects.toBeInstanceOf(
         SuperAdminHolderNotLockableError,
       );
 
@@ -661,14 +670,14 @@ describe('account management over HTTP (integration, real PostgreSQL)', () => {
           [account.id],
         )
       ).rows[0].token_hash;
-      const accounts = ctx.app.get(AccountManagementService);
-      await expect(accounts.isInvitationLinkUsable(tokenHash)).resolves.toBe(true);
+      const identity = ctx.app.get(IdentityAccessService);
+      await expect(identity.isInvitationLinkUsable(tokenHash)).resolves.toBe(true);
 
       await ctx.sql.query("UPDATE employees SET status = 'TERMINATED' WHERE id = $1", [employee.employeeId]);
 
       const detail = dataOf(await admin.get(`/api/v1/app-users/${account.id}`).expect(200));
       expect(detail.invitation?.usable).toBe(false);
-      await expect(accounts.isInvitationLinkUsable(tokenHash)).resolves.toBe(false);
+      await expect(identity.isInvitationLinkUsable(tokenHash)).resolves.toBe(false);
     });
   });
 });

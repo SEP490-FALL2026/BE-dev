@@ -7,10 +7,10 @@ import { AuditService } from '../../src/modules/audit/audit.service';
 import {
   PASSWORD_HASH_POLICY_VERSION,
   PasswordHasher,
-} from '../../src/modules/identity-access/password-hasher.service';
+} from '../../src/modules/identity-access/auth/password-hasher.service';
 import { AlreadyInstalledError, InstallationService } from '../../src/modules/installation/installation.service';
-import { MailTransport } from '../../src/modules/notifications/mail-transport';
-import { PAYLOAD_CIPHER } from '../../src/modules/notifications/notifications.tokens';
+import { MailTransport } from '../../src/infrastructure/mail/mail-transport';
+import { PayloadCipher } from '../../src/modules/notifications/payload-cipher';
 import {
   DisposableDatabase,
   dropDisposableDatabase,
@@ -131,7 +131,7 @@ describe('installation command with only DATABASE_URL and NODE_ENV=production (i
       app.get(JwtService, { strict: false });
     }).toThrow();
     expect(() => {
-      app.get(PAYLOAD_CIPHER, { strict: false });
+      app.get(PayloadCipher, { strict: false });
     }).toThrow();
     expect(() => {
       app.get(MailTransport, { strict: false });

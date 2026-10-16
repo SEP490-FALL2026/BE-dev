@@ -7,9 +7,9 @@ import { isUniqueViolation } from '../../infrastructure/database/unique-violatio
 import {
   EmployeeCodeTakenError,
   EmployeeEmailTakenError,
-  EmployeeNotFoundError,
   OrganizationAlreadyExistsError,
 } from './errors/organization.errors';
+import { EmployeeNotFoundError } from './organization.errors';
 import {
   CreateCostCenterInput,
   CreateDepartmentInput,

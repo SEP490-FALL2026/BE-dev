@@ -1,8 +1,0 @@
-# Final commit 2901152 (docs-only after e147782), fresh clone, Windows Node 24, 2026-10-15T03:26:37+07:00
-HEAD 2901152662a58e5225392c4b3832afc83f62d482 tree 0b23bdd72b1c80df93235ab123decaa6d1cf2129; src 0aa88ab6329c035f037687bc53baa561a7b3fc24 test c62c7bbe4cfbf934b4c4bbdcfe2796e3d03d02ae (identical to e147782)
-pnpm install --frozen-lockfile: exit 0
-pnpm check: exit 0 — Test Suites: 34 passed, 34 total / Tests:       321 passed, 321 total; BE: 45 files, 388 links, 0 errors
-pnpm test:e2e: exit 0 — Tests:       33 passed, 33 total
-pnpm test:integration run 1: exit 1 — Test Suites: 1 failed, 23 passed, 24 total / Tests:       203 passed, 203 total: every test passed, suite installation-minimal-env failed in afterAll (dropDisposableDatabase: 'permission denied to terminate process', SQLSTATE 42501, DROP DATABASE ... WITH (FORCE) as a NOSUPERUSER role)
-pnpm test:integration run 2 (same clone, same server): exit 0 — Test Suites: 24 passed, 24 total / Tests:       203 passed, 203 total
-installation-minimal-env alone x8: 0 failures; installation (pre-existing suite) alone x8: 0 failures

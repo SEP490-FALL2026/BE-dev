@@ -388,6 +388,10 @@
             "description": "The account is activated, locked, belongs to a departed employee, or is the caller.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
+          "422": {
+            "description": "The identifier is not a UUID (VALIDATION_ERROR).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "503": {
             "description": "The service is temporarily unavailable.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
@@ -433,6 +437,10 @@
             "description": "The caller, or the holder of SUPER_ADMIN, cannot be locked.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
+          "422": {
+            "description": "The identifier is not a UUID (VALIDATION_ERROR).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "503": {
             "description": "The service is temporarily unavailable.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
@@ -476,6 +484,10 @@
           },
           "409": {
             "description": "The caller cannot change their own account.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "422": {
+            "description": "The identifier is not a UUID (VALIDATION_ERROR).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "503": {

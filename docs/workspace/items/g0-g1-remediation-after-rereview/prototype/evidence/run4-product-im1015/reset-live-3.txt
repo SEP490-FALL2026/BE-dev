@@ -1,2 +1,0 @@
-exit=0
-password_in_transcript=0

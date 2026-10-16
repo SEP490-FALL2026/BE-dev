@@ -4,6 +4,7 @@ import { ModulesContainer, Reflector } from '@nestjs/core';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { Test } from '@nestjs/testing';
+import type { OpenAPIObject } from '@nestjs/swagger';
 import { AppModule } from '../../src/app.module';
 import { configureApplication, createOpenApiDocument } from '../../src/bootstrap';
 import {
@@ -28,6 +29,7 @@ const HTTP_METHODS = ['get', 'post', 'put', 'patch', 'delete'] as const;
 describe('API inventory (e2e)', () => {
   let app: INestApplication<App>;
   let operations: { key: string; operationId: string | undefined }[];
+  let document: OpenAPIObject;
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
@@ -35,7 +37,7 @@ describe('API inventory (e2e)', () => {
     configureApplication(app, { mountDocs: false });
     await app.init();
 
-    const document = createOpenApiDocument(app);
+    document = createOpenApiDocument(app);
     operations = Object.entries(document.paths).flatMap(([path, item]) =>
       HTTP_METHODS.flatMap((method) => {
         const operation = item[method];
@@ -63,6 +65,19 @@ describe('API inventory (e2e)', () => {
     expect(ids.every((id) => typeof id === 'string' && id.length > 0)).toBe(true);
     expect(new Set(ids).size).toBe(ids.length);
   });
+
+  it.each(['invitations', 'lock', 'unlock'])(
+    'documents 422 VALIDATION_ERROR for an invalid UUID on POST /app-users/{id}/%s',
+    (action) => {
+      const operation = document.paths[`/api/v1/app-users/{id}/${action}`]?.post;
+      const response = operation?.responses['422'];
+      if (!response || '$ref' in response) throw new Error('Expected an explicit 422 response');
+      expect(response.description).toContain('VALIDATION_ERROR');
+      expect(response.content?.['application/json']?.schema).toEqual({
+        $ref: '#/components/schemas/ErrorEnvelopeDto',
+      });
+    },
+  );
 
   interface RouteHandler {
     name: string;

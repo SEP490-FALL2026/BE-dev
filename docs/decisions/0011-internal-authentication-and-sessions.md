@@ -1,7 +1,8 @@
 # ADR-0011: Internal authentication, sessions and identity persistence conventions
 
-Status: **Proposed** (12/10/2026). Implemented in slice 1a and merged through PR #4
-(`64073c4`); developer review and acceptance are still pending as of 15/10/2026.
+Status: **Proposed** (12/10/2026). Implemented in slice 1a through PR #4 (`64073c4`),
+with remediation `a0cf5f1` incorporated into `origin/dev` through PR #7/#8;
+developer review and acceptance are still pending as of 15/10/2026.
 Items marked _lead decision_ were chosen on 12/10/2026; the planned pre-merge review
 gate was not completed. AI research, drafting and testing do not constitute developer approval.
 
@@ -124,18 +125,9 @@ pnpm 11.1.3 with an explicit `allowBuilds` list, and CI runs
 ## Verification
 
 The [research note](../workspace/items/us-01-bootstrap-login-session/research.md) records
-the initial isolated experiments. The [AI review of `64073c4`](../reviews/backend-g0-g1-review-2026-10-14.md)
-records 223 unit, 28 E2E and 147 integration passes on PostgreSQL 17.11, plus live HTTP,
-SMTP and Linux PTY checks. It also records failed cases and missing evidence: the clean-checkout
-gate, stalled DB requests, malformed JWT claims and login throttling were addressed after that review
-(see the follow-up for the evidence); manual PowerShell bootstrap and SMTP TLS remain unverified.
-The stalled-request fix of `cbd8b5c` (PR #6: client-side `connectionTimeoutMillis` and `query_timeout`)
-was not sufficient on its own: the [re-review](../reviews/backend-g0-g1-rereview-after-fix-2026-10-14.md)
-showed that a pooled connection whose query timed out could be reused in the middle of a transaction (N-1).
-The remediation on branch `fix/g0-g1-remediation-2026-10-15` (pull request to `dev`) retires such connections;
-see the [remediation spec](../workspace/items/g0-g1-remediation-after-rereview/spec.md) and the
-[integration report](../reviews/backend-g0-g1-integration-2026-10-15.md) for results and limits.
-The Owner stated that a developer reviewed the earlier fix (PR #6); the scope and revision of that review
-could not be verified, so it is not recorded as acceptance.
-See [follow-up and Owner decisions](../workspace/g0-g1-review-follow-up.md).
-These results belong to the named revisions and do not close acceptance; this ADR remains Proposed.
+the initial isolated experiments. The consolidated
+[G0/G1 review and remediation report](../reviews/g0-g1-remediation-2026-10-15/README.md)
+records the findings, test results and remaining limits through `a0cf5f1`. That remediation retires
+pooled connections after client-side query timeout and has entered `origin/dev` through PR #7/#8.
+The results belong to the named revisions and do not close developer review or acceptance;
+this ADR remains Proposed.

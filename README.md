@@ -3,16 +3,16 @@
 Foundation để triển khai User Story bằng NestJS 11, TypeScript, PostgreSQL/Prisma,
 Redis/BullMQ và S3-compatible storage. Giữ catalog làm module mẫu.
 
-**Đã merge G0, lát 1a/1b (chưa được dev review/nghiệm thu):** lệnh khởi tạo `pnpm ops:bootstrap`,
+**Đã merge G0, lát 1a/1b và gói remediation (chưa được dev review/nghiệm thu):** lệnh khởi tạo `pnpm ops:bootstrap`,
 đăng nhập/làm mới/đăng xuất, `/me`, tạo tài khoản từ Employee, mời/kích hoạt, khóa/mở và gán/thu hồi vai.
 Có 16 operation HTTP gồm health; xem [roadmap](docs/roadmap.md) và
-[việc cần xử lý sau review](docs/workspace/g0-g1-review-follow-up.md).
+[báo cáo review G0/G1](docs/reviews/g0-g1-remediation-2026-10-15/README.md).
 Đổi/đặt lại mật khẩu (1c), tra cứu Audit Trail, chuyển giao/khôi phục Super Admin và vai suy ra chưa có.
 Route catalog **không còn trên HTTP** (module vẫn là mẫu cấu trúc). Health là public.
 Không có tài khoản demo: tạo Super Admin bằng lệnh khởi tạo trên database mới.
 
-Bản sửa remediation sau re-review nằm ở nhánh `fix/g0-g1-remediation-2026-10-15` (PR về `dev`);
-kết quả kiểm chứng và giới hạn: [báo cáo tích hợp](docs/reviews/backend-g0-g1-integration-2026-10-15.md).
+Bản sửa remediation tại `a0cf5f1` đã vào `origin/dev` qua PR #7 và #8; kết quả kiểm chứng và giới hạn
+nằm trong [báo cáo review G0/G1](docs/reviews/g0-g1-remediation-2026-10-15/README.md).
 Chưa được dev review/nghiệm thu; ADR-0011/0012 vẫn Proposed.
 
 ## Chạy local

@@ -1,0 +1,106 @@
+{
+  "scenario": "saturation",
+  "profile": "win32",
+  "node": "v24.0.1",
+  "platform": "win32-x64",
+  "transformersPath": "direct-generate",
+  "seconds": 22,
+  "cgroupAfter": {
+    "memoryPeakMb": null,
+    "memoryCurrentMb": null,
+    "memoryMax": null,
+    "cpuMax": null,
+    "cpuStat": null
+  },
+  "result": {
+    "warmStatus": "OK",
+    "requests": 740,
+    "durationMs": 17969,
+    "externalKills": 10,
+    "killPhases": {
+      "EXECUTING": 10
+    },
+    "byStatus": {
+      "BUSY/busy": 715,
+      "TIMEOUT/deadline": 15,
+      "UNAVAILABLE/crash": 10
+    },
+    "latencyMs": {
+      "n": 740,
+      "min": 0.8,
+      "p50": 1.6,
+      "p95": 4.8,
+      "p99": 4760.1,
+      "max": 5167.1,
+      "mean": 118.1
+    },
+    "health": {
+      "n": 299,
+      "min": 0.4,
+      "p50": 1,
+      "p95": 2.1,
+      "p99": 12.2,
+      "max": 19.7,
+      "mean": 1.3,
+      "errors": 0
+    },
+    "apiEld": {
+      "min": 9.04,
+      "mean": 15.53,
+      "p50": 15.43,
+      "p99": 20.73,
+      "p999": 32.96,
+      "max": 34.6,
+      "count": 1176,
+      "resolutionMs": 10
+    },
+    "liveSampler": {
+      "maxLiveWorkers": 1,
+      "samples": 304,
+      "method": "pids seen via /stats + kill(pid,0)"
+    },
+    "eventAnalysis": {
+      "violations": [],
+      "maxLive": 1,
+      "maxConcurrentRuns": 1,
+      "dispatches": 26,
+      "kills": 0,
+      "releasesByExit": 10,
+      "events": 187
+    },
+    "supervisorFailures": {
+      "deadline": 15,
+      "crash": 10
+    },
+    "deadlineToDoneMs_supervisorSide": {
+      "n": 4,
+      "min": 7.1,
+      "p50": 9.3,
+      "p95": 23.7,
+      "p99": 23.7,
+      "max": 23.7,
+      "mean": 14
+    },
+    "workerReportedOverrunMs": {
+      "n": 1,
+      "min": 0,
+      "p50": 0,
+      "p95": 0,
+      "p99": 0,
+      "max": 0,
+      "mean": 0
+    },
+    "deadlineNotCached": {
+      "statusFirst": "TIMEOUT",
+      "reasonFirst": "deadline",
+      "cacheEntriesBefore": 1,
+      "cacheEntriesAfterDeadlineHit": 1,
+      "secondCacheHit": false,
+      "secondStatus": "TIMEOUT"
+    },
+    "inflightMaxObserved": 5,
+    "inflightBound": 5,
+    "enqueueCountTotal": 28,
+    "apiRssMb": 55.8
+  }
+}

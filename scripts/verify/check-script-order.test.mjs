@@ -22,3 +22,31 @@ test('check generates the Prisma client before every step that reads it', () => 
 test('CI path filters only list files that exist in the repository', () => {
   assert.ok(!ciWorkflow.includes("'.env.example'"), '.env.example was removed; its CI path filter is stale');
 });
+
+test('CI provisions and asserts an ordinary integration role before running the suite', () => {
+  assert.match(ciWorkflow, /POSTGRES_USER: ci_bootstrap/);
+  assert.match(
+    ciWorkflow,
+    /CREATE ROLE ci_integration LOGIN NOSUPERUSER CREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS/,
+  );
+  const provision = ciWorkflow.indexOf('CREATE ROLE ci_integration');
+  const assertion = ciWorkflow.indexOf('Assert ordinary integration role');
+  const integration = ciWorkflow.indexOf('run: pnpm test:integration');
+  assert.ok(provision >= 0 && provision < assertion && assertion < integration);
+  const roleAssertion = ciWorkflow.slice(assertion, integration);
+  for (const attribute of [
+    'rolsuper',
+    'rolcreatedb',
+    'rolcreaterole',
+    'rolreplication',
+    'rolcanlogin',
+    'rolbypassrls',
+  ]) {
+    assert.ok(roleAssertion.includes(attribute), `CI must assert ${attribute}`);
+  }
+  assert.match(
+    ciWorkflow,
+    /TEST_DATABASE_ADMIN_URL: postgresql:\/\/ci_integration:ci-integration-only@127\.0\.0\.1:5432\/postgres/,
+  );
+  assert.doesNotMatch(ciWorkflow, /TEST_DATABASE_ADMIN_URL:.*ci_bootstrap/);
+});

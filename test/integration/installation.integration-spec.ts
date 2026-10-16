@@ -8,7 +8,7 @@ import {
   InstallationInputError,
   InstallationService,
 } from '../../src/modules/installation/installation.service';
-import { PasswordPolicyError } from '../../src/modules/identity-access/errors/identity-access.errors';
+import { PasswordPolicyError } from '../../src/modules/identity-access/identity-access.errors';
 import {
   DisposableDatabase,
   dropDisposableDatabase,

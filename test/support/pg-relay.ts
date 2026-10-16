@@ -4,9 +4,17 @@ interface RelayedConnection {
   client: Socket;
   upstream: Socket;
   held: boolean;
+  responseHeld: boolean;
   queue: Array<{ to: Socket; chunk: Buffer }>;
   buffer: Buffer;
   startup: boolean;
+}
+
+export interface HeldCommitResponse {
+  /** Resolves when a server response to the forwarded COMMIT is actually withheld. */
+  held: Promise<void>;
+  release(): void;
+  dispose(): void;
 }
 
 /**
@@ -25,6 +33,12 @@ export class PgRelay {
   private readonly connections = new Set<RelayedConnection>();
   private paused = false;
   private trigger: RegExp | null = null;
+  private commitResponse: {
+    connection?: RelayedConnection;
+    received: () => void;
+    failed: (error: Error) => void;
+    cleanup: () => void;
+  } | null = null;
 
   private constructor(
     private readonly upstreamHost: string,
@@ -51,7 +65,7 @@ export class PgRelay {
 
   resume(): void {
     this.paused = false;
-    for (const connection of this.connections) if (!connection.held) this.flush(connection);
+    for (const connection of this.connections) if (!connection.held && !connection.responseHeld) this.flush(connection);
   }
 
   /** Holds the first connection that sends a statement matching `pattern`, from that statement on. */
@@ -69,12 +83,54 @@ export class PgRelay {
     for (const connection of this.connections) {
       if (connection.held) {
         connection.held = false;
-        this.flush(connection);
+        if (!connection.responseHeld && !this.paused) this.flush(connection);
       }
     }
   }
 
+  /**
+   * Forwards the next COMMIT, then holds only that connection's server-to-client traffic.
+   * Unlike holdWhen, PostgreSQL really receives COMMIT. The finite safety timer discards that
+   * connection (never releases an unexpected late response); release/dispose/stop clear the timer.
+   */
+  holdCommitResponse(timeoutMs: number): HeldCommitResponse {
+    if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) throw new Error('A finite positive hold timeout is required');
+    if (this.commitResponse) throw new Error('A COMMIT response hold is already active');
+    let received!: () => void;
+    let failed!: (error: Error) => void;
+    const held = new Promise<void>((resolve, reject) => {
+      received = resolve;
+      failed = reject;
+    });
+    const hold = {
+      received,
+      failed,
+      cleanup: (): void => clearTimeout(timer),
+      connection: undefined as RelayedConnection | undefined,
+    };
+    const finish = (discard: boolean): void => {
+      if (this.commitResponse !== hold) return;
+      this.commitResponse = null;
+      hold.cleanup();
+      if (hold.connection) {
+        hold.connection.responseHeld = false;
+        if (discard) {
+          hold.connection.client.destroy();
+          hold.connection.upstream.destroy();
+          hold.connection.queue = [];
+        } else if (!this.paused && !hold.connection.held) this.flush(hold.connection);
+      }
+      failed(new Error('COMMIT response hold ended before receiving a response'));
+    };
+    const timer = setTimeout(() => finish(true), timeoutMs);
+    this.commitResponse = hold;
+    return { held, release: () => finish(false), dispose: () => finish(true) };
+  }
+
   async stop(): Promise<void> {
+    this.commitResponse?.cleanup();
+    this.commitResponse?.failed(new Error('relay stopped before receiving a COMMIT response'));
+    this.commitResponse = null;
     for (const connection of this.connections) {
       connection.client.destroy();
       connection.upstream.destroy();
@@ -88,6 +144,7 @@ export class PgRelay {
       client,
       upstream,
       held: false,
+      responseHeld: false,
       queue: [],
       buffer: Buffer.alloc(0),
       startup: true,
@@ -101,21 +158,35 @@ export class PgRelay {
         connection.held = true;
         this.trigger = null;
       }
+      const response = this.commitResponse;
+      if (response && !response.connection && statements.some((sql) => /^COMMIT\b/i.test(sql))) {
+        response.connection = connection;
+        connection.responseHeld = true;
+      }
       this.forward(connection, upstream, chunk);
     });
-    upstream.on('data', (chunk: Buffer) => this.forward(connection, client, chunk));
+    upstream.on('data', (chunk: Buffer) => {
+      this.forward(connection, client, chunk);
+      if (connection.responseHeld) this.commitResponse?.received();
+    });
 
     const close = (): void => {
       client.destroy();
       upstream.destroy();
       this.connections.delete(connection);
+      if (this.commitResponse?.connection === connection) {
+        this.commitResponse.cleanup();
+        this.commitResponse.failed(new Error('COMMIT connection closed before receiving a response'));
+        this.commitResponse = null;
+      }
     };
     client.on('close', close).on('error', close);
     upstream.on('close', close).on('error', close);
   }
 
   private forward(connection: RelayedConnection, to: Socket, chunk: Buffer): void {
-    if (this.paused || connection.held) connection.queue.push({ to, chunk });
+    if (this.paused || connection.held || (connection.responseHeld && to === connection.client))
+      connection.queue.push({ to, chunk });
     else if (!to.destroyed) to.write(chunk);
   }
 

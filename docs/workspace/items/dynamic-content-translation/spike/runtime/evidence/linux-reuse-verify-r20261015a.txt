@@ -1,0 +1,4 @@
+reuse (read-only, nothing is modified): spike-runtime-deps
+VERSION=4.3.1
+LOCKSHA=1492a4edda12069377a4972716d869cc51826f2fe077d5a5fb381a36bf3231e5
+SPIKE_DEPS_VOLUME=spike-runtime-deps

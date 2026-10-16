@@ -5,7 +5,7 @@ import { ObjectStorageModule } from './infrastructure/object-storage/object-stor
 import { QueueInfrastructureModule } from './infrastructure/queue/queue-infrastructure.module';
 import { ObservabilityModule } from './infrastructure/observability/observability.module';
 import { EmailDispatchLoop } from './email-dispatch.loop';
-import { IdentityAccessModule } from './modules/identity-access/identity-access.module';
+import { IdentityAccessFacadeModule } from './modules/identity-access/identity-access-facade.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 
 @Module({
@@ -16,7 +16,7 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
     ObjectStorageModule,
     QueueInfrastructureModule,
     NotificationsModule,
-    IdentityAccessModule,
+    IdentityAccessFacadeModule,
   ],
   providers: [EmailDispatchLoop],
 })
