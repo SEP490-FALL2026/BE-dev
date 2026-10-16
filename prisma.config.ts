@@ -1,11 +1,20 @@
 import 'dotenv/config';
 import { defineConfig, env } from 'prisma/config';
-import { resolveDatabaseUrl } from './src/infrastructure/config/env-schema';
+
+function resolveDatabaseUrl(nodeEnv: string, databaseUrl: string, testDatabaseUrl: string): string {
+  if (nodeEnv !== 'test') {
+    return databaseUrl;
+  }
+  if (testDatabaseUrl) {
+    return testDatabaseUrl;
+  }
+  const url = new URL(databaseUrl);
+  url.pathname = `${url.pathname.replace(/\/$/, '')}_test`;
+  return url.toString();
+}
 
 const localDatabaseUrl = 'postgresql://app:app@localhost:5432/software_license_management';
 
-// The CLI runs outside Nest, so it cannot read ConfigService. It reuses the same
-// resolution rule rather than carrying a second copy that could drift from it.
 const databaseUrl =
   process.env.NODE_ENV === 'production'
     ? env('DATABASE_URL')

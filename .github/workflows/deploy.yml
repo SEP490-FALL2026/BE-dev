@@ -1,0 +1,128 @@
+name: Backend CD (Deploy to VPS)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-and-push:
+    name: Build & Push Production Image
+    runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.meta.outputs.image }}
+      tag: ${{ steps.meta.outputs.tag }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute lowercase image name and short SHA tag
+        id: meta
+        run: |
+          IMAGE_LOWERCASE=$(echo "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}" | tr '[:upper:]' '[:lower:]')
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          echo "image=${IMAGE_LOWERCASE}" >> $GITHUB_OUTPUT
+          echo "tag=${SHORT_SHA}" >> $GITHUB_OUTPUT
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          target: runtime
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.image }}:latest
+            ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.tag }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    name: Deploy to VPS over SSH
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Copy Compose and Caddyfile to VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          source: "docker-compose.prod.yml,Caddyfile"
+          target: "${{ secrets.VPS_APP_DIR || '/opt/slm/backend' }}"
+          overwrite: true
+
+      - name: Deploy on VPS
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          CR_PAT: ${{ secrets.GHCR_PAT || secrets.GITHUB_TOKEN }}
+          REGISTRY_USER: ${{ github.actor }}
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          envs: CR_PAT,REGISTRY_USER
+          timeout: 30m
+          command_timeout: 30m
+          script: |
+            set -e
+
+            # 1. Chuyển vào thư mục chứa project trên VPS
+            APP_DIR="${{ secrets.VPS_APP_DIR }}"
+            if [ -z "$APP_DIR" ]; then
+              APP_DIR="/opt/slm/backend"
+            fi
+
+            cd "$APP_DIR"
+
+            # 2. Kiểm tra file .env an toàn
+            if [ ! -f .env ]; then
+              echo "❌ LỖI: Không tìm thấy file .env tại $APP_DIR. Hãy tạo file .env trước khi deploy!"
+              exit 1
+            fi
+
+            # 2.5. Đăng nhập GHCR (hỗ trợ private image khi Organization chặn public package)
+            if [ -n "$CR_PAT" ]; then
+              echo "$CR_PAT" | docker login ghcr.io -u "$REGISTRY_USER" --password-stdin || true
+            fi
+
+            # 3. Đặt biến môi trường image cho docker-compose
+            export API_IMAGE="${{ needs.build-and-push.outputs.image }}:latest"
+
+            echo "🚀 Đang pull image mới nhất: $API_IMAGE"
+            docker compose -f docker-compose.prod.yml pull api worker
+
+            echo "📦 Khởi động database & cache nếu chưa chạy..."
+            docker compose -f docker-compose.prod.yml up -d postgres redis caddy
+
+            echo "🔄 Chạy Prisma Migration cập nhật Database..."
+            docker compose -f docker-compose.prod.yml run --rm --no-deps api node node_modules/prisma/build/index.js migrate deploy
+
+            echo "♻️ Khởi chạy lại container API & Worker với code mới..."
+            docker compose -f docker-compose.prod.yml up -d --force-recreate api worker
+
+            echo "🧹 Dọn dẹp Docker images cũ..."
+            docker image prune -f
+
+            echo "🎉 Hoàn tất deploy Backend lên VPS thành công!"

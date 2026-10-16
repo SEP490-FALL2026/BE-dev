@@ -24,9 +24,13 @@ CMD ["pnpm", "db:migrate:deploy"]
 FROM node:24-bookworm-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
-COPY --from=production-dependencies --chown=node:node /app/node_modules ./node_modules
+RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+COPY --from=build --chown=node:node /app/node_modules ./node_modules
 COPY --from=build --chown=node:node /app/dist ./dist
-COPY --chown=node:node package.json ./
+COPY --chown=node:node prisma ./prisma
+COPY --chown=node:node prisma.config.ts package.json ./
+RUN ln -s /app/node_modules/prisma/build/index.js /usr/local/bin/prisma
 USER node
 EXPOSE 3000
 CMD ["node", "dist/main.js"]
