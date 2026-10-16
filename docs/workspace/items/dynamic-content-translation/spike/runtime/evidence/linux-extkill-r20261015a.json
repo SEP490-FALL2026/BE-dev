@@ -1,0 +1,479 @@
+{
+  "scenario": "extkill",
+  "profile": "linux",
+  "node": "v24.21.0",
+  "platform": "linux-x64",
+  "transformersPath": "direct-generate",
+  "seconds": 68,
+  "cgroupAfter": {
+    "memoryPeakMb": 527.5,
+    "memoryCurrentMb": 33.9,
+    "memoryMax": "2147483648",
+    "cpuMax": "200000 100000",
+    "cpuStat": {
+      "nrPeriods": 682,
+      "nrThrottled": 43,
+      "throttledMs": 12529
+    }
+  },
+  "result": {
+    "phaseA_breaker": {
+      "trials": [
+        {
+          "settleAfterKillMs": 40,
+          "status": "UNAVAILABLE",
+          "reason": "crash",
+          "breaker": {
+            "state": "CLOSED",
+            "cooldownMs": 30000,
+            "opens": 0,
+            "recentFailures": 1
+          }
+        },
+        {
+          "settleAfterKillMs": 33,
+          "status": "UNAVAILABLE",
+          "reason": "crash",
+          "breaker": {
+            "state": "CLOSED",
+            "cooldownMs": 30000,
+            "opens": 0,
+            "recentFailures": 2
+          }
+        },
+        {
+          "settleAfterKillMs": 61,
+          "status": "UNAVAILABLE",
+          "reason": "crash",
+          "breaker": {
+            "state": "OPEN",
+            "cooldownMs": 30000,
+            "opens": 1,
+            "recentFailures": 0
+          }
+        }
+      ],
+      "afterOpen": {
+        "status": "UNAVAILABLE",
+        "reason": "breaker-open",
+        "ms": 4.1
+      }
+    },
+    "method": "tKill/tSettle stamped in the orchestrator process (Date.now) around process.kill and the waiter HTTP response; API-side exit/settled event wall stamps split the interval; cgroup cpu.stat delta per trial; see rawTrials",
+    "rawTrials": [
+      {
+        "trial": 1,
+        "workerPid": 89,
+        "tKillEpochMs": 1792006241944,
+        "tSettleEpochMs": 1792006241979,
+        "settleAfterKillMs": 35,
+        "status": "UNAVAILABLE",
+        "reason": "crash",
+        "clientMsOfRequest": 185.9,
+        "cpuStatBefore": {
+          "nrPeriods": 220,
+          "nrThrottled": 15,
+          "throttledMs": 3861
+        },
+        "cpuStatAfter": {
+          "nrPeriods": 220,
+          "nrThrottled": 15,
+          "throttledMs": 3861
+        },
+        "nrThrottledDelta": 0,
+        "throttledMsDelta": 0,
+        "loadavg": [
+          1.37,
+          0.71,
+          0.4
+        ],
+        "apiEldMaxMsDuringTrial": 10.89,
+        "apiEldP99MsDuringTrial": 10.89,
+        "apiExitEventEpochMs": 1792006241978,
+        "apiSettledEventEpochMs": 1792006241978,
+        "killToApiExitEventMs": 34,
+        "exitEventToSettledMs": 0,
+        "settledToClientMs": 1
+      },
+      {
+        "trial": 2,
+        "workerPid": 108,
+        "tKillEpochMs": 1792006246823,
+        "tSettleEpochMs": 1792006246866,
+        "settleAfterKillMs": 43,
+        "status": "UNAVAILABLE",
+        "reason": "crash",
+        "clientMsOfRequest": 4884.3,
+        "cpuStatBefore": {
+          "nrPeriods": 269,
+          "nrThrottled": 18,
+          "throttledMs": 4861
+        },
+        "cpuStatAfter": {
+          "nrPeriods": 269,
+          "nrThrottled": 18,
+          "throttledMs": 4861
+        },
+        "nrThrottledDelta": 0,
+        "throttledMsDelta": 0,
+        "loadavg": [
+          1.34,
+          0.71,
+          0.4
+        ],
+        "apiEldMaxMsDuringTrial": 10.22,
+        "apiEldP99MsDuringTrial": 10.22,
+        "apiExitEventEpochMs": 1792006246865,
+        "apiSettledEventEpochMs": 1792006246865,
+        "killToApiExitEventMs": 42,
+        "exitEventToSettledMs": 0,
+        "settledToClientMs": 1
+      },
+      {
+        "trial": 3,
+        "workerPid": 127,
+        "tKillEpochMs": 1792006251066,
+        "tSettleEpochMs": 1792006251109,
+        "settleAfterKillMs": 43,
+        "status": "UNAVAILABLE",
+        "reason": "crash",
+        "clientMsOfRequest": 4240.9,
+        "cpuStatBefore": {
+          "nrPeriods": 311,
+          "nrThrottled": 20,
+          "throttledMs": 4917
+        },
+        "cpuStatAfter": {
+          "nrPeriods": 311,
+          "nrThrottled": 20,
+          "throttledMs": 4917
+        },
+        "nrThrottledDelta": 0,
+        "throttledMsDelta": 0,
+        "loadavg": [
+          1.31,
+          0.72,
+          0.41
+        ],
+        "apiEldMaxMsDuringTrial": 10.2,
+        "apiEldP99MsDuringTrial": 10.2,
+        "apiExitEventEpochMs": 1792006251108,
+        "apiSettledEventEpochMs": 1792006251108,
+        "killToApiExitEventMs": 42,
+        "exitEventToSettledMs": 0,
+        "settledToClientMs": 1
+      },
+      {
+        "trial": 4,
+        "workerPid": 139,
+        "tKillEpochMs": 1792006255628,
+        "tSettleEpochMs": 1792006255660,
+        "settleAfterKillMs": 32,
+        "status": "UNAVAILABLE",
+        "reason": "crash",
+        "clientMsOfRequest": 4549.5,
+        "cpuStatBefore": {
+          "nrPeriods": 357,
+          "nrThrottled": 20,
+          "throttledMs": 4917
+        },
+        "cpuStatAfter": {
+          "nrPeriods": 357,
+          "nrThrottled": 20,
+          "throttledMs": 4917
+        },
+        "nrThrottledDelta": 0,
+        "throttledMsDelta": 0,
+        "loadavg": [
+          1.31,
+          0.72,
+          0.41
+        ],
+        "apiEldMaxMsDuringTrial": 10.26,
+        "apiEldP99MsDuringTrial": 10.26,
+        "apiExitEventEpochMs": 1792006255659,
+        "apiSettledEventEpochMs": 1792006255659,
+        "killToApiExitEventMs": 31,
+        "exitEventToSettledMs": 0,
+        "settledToClientMs": 1
+      },
+      {
+        "trial": 5,
+        "workerPid": 151,
+        "tKillEpochMs": 1792006260123,
+        "tSettleEpochMs": 1792006260156,
+        "settleAfterKillMs": 33,
+        "status": "UNAVAILABLE",
+        "reason": "crash",
+        "clientMsOfRequest": 4494.7,
+        "cpuStatBefore": {
+          "nrPeriods": 402,
+          "nrThrottled": 22,
+          "throttledMs": 5500
+        },
+        "cpuStatAfter": {
+          "nrPeriods": 402,
+          "nrThrottled": 22,
+          "throttledMs": 5500
+        },
+        "nrThrottledDelta": 0,
+        "throttledMsDelta": 0,
+        "loadavg": [
+          1.21,
+          0.7,
+          0.41
+        ],
+        "apiEldMaxMsDuringTrial": 10.66,
+        "apiEldP99MsDuringTrial": 10.66,
+        "apiExitEventEpochMs": 1792006260155,
+        "apiSettledEventEpochMs": 1792006260155,
+        "killToApiExitEventMs": 32,
+        "exitEventToSettledMs": 0,
+        "settledToClientMs": 1
+      },
+      {
+        "trial": 6,
+        "workerPid": 170,
+        "tKillEpochMs": 1792006264422,
+        "tSettleEpochMs": 1792006264453,
+        "settleAfterKillMs": 31,
+        "status": "UNAVAILABLE",
+        "reason": "crash",
+        "clientMsOfRequest": 4295.8,
+        "cpuStatBefore": {
+          "nrPeriods": 445,
+          "nrThrottled": 27,
+          "throttledMs": 7263
+        },
+        "cpuStatAfter": {
+          "nrPeriods": 445,
+          "nrThrottled": 27,
+          "throttledMs": 7263
+        },
+        "nrThrottledDelta": 0,
+        "throttledMsDelta": 0,
+        "loadavg": [
+          1.27,
+          0.73,
+          0.41
+        ],
+        "apiEldMaxMsDuringTrial": 10.23,
+        "apiEldP99MsDuringTrial": 10.23,
+        "apiExitEventEpochMs": 1792006264452,
+        "apiSettledEventEpochMs": 1792006264453,
+        "killToApiExitEventMs": 30,
+        "exitEventToSettledMs": 1,
+        "settledToClientMs": 0
+      },
+      {
+        "trial": 7,
+        "workerPid": 189,
+        "tKillEpochMs": 1792006268318,
+        "tSettleEpochMs": 1792006268347,
+        "settleAfterKillMs": 29,
+        "status": "UNAVAILABLE",
+        "reason": "crash",
+        "clientMsOfRequest": 3892.4,
+        "cpuStatBefore": {
+          "nrPeriods": 484,
+          "nrThrottled": 29,
+          "throttledMs": 7916
+        },
+        "cpuStatAfter": {
+          "nrPeriods": 484,
+          "nrThrottled": 29,
+          "throttledMs": 7916
+        },
+        "nrThrottledDelta": 0,
+        "throttledMsDelta": 0,
+        "loadavg": [
+          1.25,
+          0.73,
+          0.42
+        ],
+        "apiEldMaxMsDuringTrial": 10.16,
+        "apiEldP99MsDuringTrial": 10.16,
+        "apiExitEventEpochMs": 1792006268346,
+        "apiSettledEventEpochMs": 1792006268346,
+        "killToApiExitEventMs": 28,
+        "exitEventToSettledMs": 0,
+        "settledToClientMs": 1
+      },
+      {
+        "trial": 8,
+        "workerPid": 208,
+        "tKillEpochMs": 1792006272601,
+        "tSettleEpochMs": 1792006272639,
+        "settleAfterKillMs": 38,
+        "status": "UNAVAILABLE",
+        "reason": "crash",
+        "clientMsOfRequest": 4294.5,
+        "cpuStatBefore": {
+          "nrPeriods": 526,
+          "nrThrottled": 30,
+          "throttledMs": 7918
+        },
+        "cpuStatAfter": {
+          "nrPeriods": 527,
+          "nrThrottled": 30,
+          "throttledMs": 7918
+        },
+        "nrThrottledDelta": 0,
+        "throttledMsDelta": 0,
+        "loadavg": [
+          1.23,
+          0.74,
+          0.42
+        ],
+        "apiEldMaxMsDuringTrial": 10.18,
+        "apiEldP99MsDuringTrial": 10.18,
+        "apiExitEventEpochMs": 1792006272638,
+        "apiSettledEventEpochMs": 1792006272638,
+        "killToApiExitEventMs": 37,
+        "exitEventToSettledMs": 0,
+        "settledToClientMs": 1
+      },
+      {
+        "trial": 9,
+        "workerPid": 220,
+        "tKillEpochMs": 1792006277475,
+        "tSettleEpochMs": 1792006277545,
+        "settleAfterKillMs": 70,
+        "status": "UNAVAILABLE",
+        "reason": "crash",
+        "clientMsOfRequest": 4904.4,
+        "cpuStatBefore": {
+          "nrPeriods": 575,
+          "nrThrottled": 32,
+          "throttledMs": 8331
+        },
+        "cpuStatAfter": {
+          "nrPeriods": 576,
+          "nrThrottled": 33,
+          "throttledMs": 8968
+        },
+        "nrThrottledDelta": 1,
+        "throttledMsDelta": 637,
+        "loadavg": [
+          1.21,
+          0.74,
+          0.42
+        ],
+        "apiEldMaxMsDuringTrial": 10.19,
+        "apiEldP99MsDuringTrial": 10.19,
+        "apiExitEventEpochMs": 1792006277544,
+        "apiSettledEventEpochMs": 1792006277544,
+        "killToApiExitEventMs": 69,
+        "exitEventToSettledMs": 0,
+        "settledToClientMs": 1
+      },
+      {
+        "trial": 10,
+        "workerPid": 239,
+        "tKillEpochMs": 1792006282523,
+        "tSettleEpochMs": 1792006282559,
+        "settleAfterKillMs": 36,
+        "status": "UNAVAILABLE",
+        "reason": "crash",
+        "clientMsOfRequest": 5012.9,
+        "cpuStatBefore": {
+          "nrPeriods": 626,
+          "nrThrottled": 36,
+          "throttledMs": 10174
+        },
+        "cpuStatAfter": {
+          "nrPeriods": 626,
+          "nrThrottled": 36,
+          "throttledMs": 10174
+        },
+        "nrThrottledDelta": 0,
+        "throttledMsDelta": 0,
+        "loadavg": [
+          1.59,
+          0.83,
+          0.45
+        ],
+        "apiEldMaxMsDuringTrial": 10.17,
+        "apiEldP99MsDuringTrial": 10.17,
+        "apiExitEventEpochMs": 1792006282558,
+        "apiSettledEventEpochMs": 1792006282559,
+        "killToApiExitEventMs": 35,
+        "exitEventToSettledMs": 1,
+        "settledToClientMs": 0
+      }
+    ],
+    "cgroupAfterPhaseB": {
+      "memoryPeakMb": 527.5,
+      "memoryCurrentMb": 495,
+      "memoryMax": "2147483648",
+      "cpuMax": "200000 100000",
+      "cpuStat": {
+        "nrPeriods": 682,
+        "nrThrottled": 43,
+        "throttledMs": 12529
+      }
+    },
+    "phaseB_settle": {
+      "trials": 10,
+      "settleAfterKillMs": {
+        "n": 10,
+        "min": 29,
+        "p50": 35,
+        "p95": 70,
+        "p99": 70,
+        "max": 70,
+        "mean": 39
+      },
+      "allUnavailableCrash": true,
+      "under100ms": 10
+    },
+    "respawnAfterExitMs": {
+      "n": 10,
+      "min": 4.5,
+      "p50": 5.9,
+      "p95": 8.4,
+      "p99": 8.4,
+      "max": 8.4,
+      "mean": 6.2
+    },
+    "killToApiExitEventMs": {
+      "n": 10,
+      "min": 28,
+      "p50": 34,
+      "p95": 69,
+      "p99": 69,
+      "max": 69,
+      "mean": 38
+    },
+    "exitEventToSettledMs": {
+      "n": 10,
+      "min": 0,
+      "p50": 0,
+      "p95": 1,
+      "p99": 1,
+      "max": 1,
+      "mean": 0.2
+    },
+    "settledToClientMs": {
+      "n": 10,
+      "min": 0,
+      "p50": 1,
+      "p95": 1,
+      "p99": 1,
+      "max": 1,
+      "mean": 0.8
+    },
+    "eventAnalysis": {
+      "violations": [],
+      "maxLive": 1,
+      "maxConcurrentRuns": 1,
+      "dispatches": 12,
+      "kills": 0,
+      "releasesByExit": 10,
+      "events": 117
+    },
+    "failuresByKind": {
+      "crash": 10
+    }
+  }
+}

@@ -1,12 +1,11 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'node:crypto';
 import { EnvironmentVariables } from '../../infrastructure/config/env-schema';
 import { TransactionRunner } from '../../infrastructure/database/transaction-runner';
+import { MailSendError, MailTransport } from '../../infrastructure/mail/mail-transport';
 import { renderEmail } from './email-templates';
-import { MailSendError, MailTransport } from './mail-transport';
 import { NotificationsRepo } from './notifications.repo';
-import { PAYLOAD_CIPHER } from './notifications.tokens';
 import { ClaimedEmail, EmailTemplate, TokenUsability } from './notifications.types';
 import { PayloadCipher, PayloadDecryptionError } from './payload-cipher';
 
@@ -33,7 +32,7 @@ export class EmailDispatcher {
     private readonly repo: NotificationsRepo,
     private readonly runner: TransactionRunner,
     private readonly transport: MailTransport,
-    @Inject(PAYLOAD_CIPHER) private readonly cipher: PayloadCipher,
+    private readonly cipher: PayloadCipher,
     private readonly config: ConfigService<EnvironmentVariables, true>,
   ) {}
 

@@ -1,5 +1,7 @@
-import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { join, relative, sep } from 'node:path';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { dirname, join, relative, resolve, sep } from 'node:path';
+import { environmentConfigOptions, installationEnvironmentConfigOptions } from './infrastructure/config/env-config';
+import { validateEnvironment, validateInstallationEnvironment } from './infrastructure/config/env-schema';
 
 function listTypeScriptFiles(directory: string): string[] {
   return readdirSync(directory).flatMap((entry) => {
@@ -80,23 +82,43 @@ describe('architecture boundaries', () => {
 
   it('prevents imports of another business module private layers', () => {
     const modulesRoot = join(sourceRoot, 'modules');
-    const privateFolders = 'adapters|dto|errors|helpers|mappers|policies|schemas|services';
 
     for (const file of listTypeScriptFiles(modulesRoot)) {
-      const relativePath = relative(modulesRoot, file);
-      const owner = relativePath.split(sep)[0];
-      const source = readFileSync(file, 'utf8').replaceAll('\\', '/');
-      const privateImports = [
-        ...source.matchAll(new RegExp(`modules/([^/'"]+)/(${privateFolders})/`, 'g')),
-        ...source.matchAll(new RegExp(`from\\s+['"](?:\\.\\./)+([^/'"]+)/(${privateFolders})/`, 'g')),
-        ...source.matchAll(/modules\/([^/'"]+)\/[^/'"]+\.repo(?:\.ts)?['"]/g),
-        ...source.matchAll(/from\s+['"](?:\.\.\/)+([^/'"]+)\/[^/'"]+\.repo(?:\.ts)?['"]/g),
-      ];
-
-      for (const match of privateImports) {
-        expect(match[1]).toBe(owner);
-      }
+      const violations = listResolvedRelativeImports(file).flatMap((target) =>
+        privateModuleImport(sourceRoot, file, target),
+      );
+      expect({ file: relative(sourceRoot, file), violations }).toEqual({
+        file: relative(sourceRoot, file),
+        violations: [],
+      });
     }
+  });
+
+  it('holds the composition roots (API, worker, CLI entry files) to the same public module contract', () => {
+    const rootFiles = readdirSync(sourceRoot)
+      .map((entry) => join(sourceRoot, entry))
+      .filter((path) => statSync(path).isFile() && path.endsWith('.ts') && !path.endsWith('.spec.ts'));
+    expect(rootFiles).toContain(join(sourceRoot, 'installation-cli.ts'));
+
+    for (const file of rootFiles) {
+      const violations = listResolvedRelativeImports(file).flatMap((target) =>
+        privateModuleImport(sourceRoot, file, target),
+      );
+      expect({ file: relative(sourceRoot, file), violations }).toEqual({
+        file: relative(sourceRoot, file),
+        violations: [],
+      });
+    }
+  });
+
+  it('reports an import of a module subfolder such as identity-access/errors as private', () => {
+    const cli = join(sourceRoot, 'installation-cli.ts');
+    const identity = join(sourceRoot, 'modules', 'identity-access');
+
+    expect(privateModuleImport(sourceRoot, cli, join(identity, 'errors', 'identity-access.errors.ts'))).toHaveLength(1);
+    expect(privateModuleImport(sourceRoot, cli, join(identity, 'auth', 'password-hasher.service.ts'))).toHaveLength(1);
+    expect(privateModuleImport(sourceRoot, cli, join(identity, 'identity-access.errors.ts'))).toEqual([]);
+    expect(privateModuleImport(sourceRoot, cli, join(identity, 'identity-access.service.ts'))).toEqual([]);
   });
 
   it('keeps business modules flat instead of recreating application layers', () => {
@@ -180,6 +202,127 @@ describe('architecture boundaries', () => {
         const location = { file: relative(sourceRoot, file), table };
         expect({ ...location, owner: owningModule }).toEqual({ ...location, owner });
       }
+    }
+  });
+});
+
+/** The relative module specifiers of a source file: `import ... from`, `export ... from`, `import '...'` and `import('...')`. */
+function listRelativeSpecifiers(source: string): string[] {
+  return [
+    ...source.matchAll(/\b(?:import|export)\b[^;'"]*?\bfrom\s*['"]([^'"]+)['"]/g),
+    ...source.matchAll(/\bimport\s*['"]([^'"]+)['"]/g),
+    ...source.matchAll(/\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/g),
+  ]
+    .map((match) => match[1])
+    .filter((specifier) => specifier.startsWith('.'));
+}
+
+/** Resolves a relative specifier of `file` to the `.ts` file it names (`x.ts` or `x/index.ts`). */
+function resolveRelativeImport(file: string, specifier: string): string {
+  const base = resolve(dirname(file), specifier);
+  const target = [`${base}.ts`, join(base, 'index.ts')].find((candidate) => existsSync(candidate));
+  if (target === undefined) {
+    throw new Error(`${relative(process.cwd(), file)} imports ${specifier}, which does not resolve to a .ts file`);
+  }
+
+  return target;
+}
+
+/**
+ * Resolved from the real import graph, not from folder names: code outside a business module (another
+ * module or a composition root in src/) may import only a file directly in that module's root (facade
+ * service, module, types, public errors), never a subfolder file, a repo or the credential hasher.
+ * Returns a description of the violation, or nothing.
+ */
+function privateModuleImport(sourceRoot: string, importer: string, target: string): string[] {
+  const modulesRoot = join(sourceRoot, 'modules');
+  const parts = relative(modulesRoot, target).split(sep);
+  if (parts[0] === '..') return [];
+  const importerParts = relative(modulesRoot, importer).split(sep);
+  if (importerParts[0] !== '..' && importerParts[0] === parts[0]) return [];
+
+  const isPublic = parts.length === 2 && !target.endsWith('.repo.ts') && !target.endsWith('password-hasher.service.ts');
+
+  return isPublic ? [] : [relative(sourceRoot, target).split(sep).join('/')];
+}
+
+function listResolvedRelativeImports(file: string): string[] {
+  return listRelativeSpecifiers(readFileSync(file, 'utf8')).map((specifier) => resolveRelativeImport(file, specifier));
+}
+
+/** Follows relative `import ... from`, `export ... from` and `import('...')` specifiers from an entry file. */
+function listReachableSourceFiles(entry: string): Map<string, string> {
+  const reachable = new Map<string, string>();
+  const pending = [entry];
+
+  while (pending.length > 0) {
+    const file = pending.pop() as string;
+    if (reachable.has(file)) continue;
+
+    const source = readFileSync(file, 'utf8');
+    reachable.set(file, source);
+    // Generated code has its own import style and no Nest wiring; it is a leaf here.
+    if (file.includes(`${sep}generated${sep}`)) continue;
+
+    for (const specifier of listRelativeSpecifiers(source)) pending.push(resolveRelativeImport(file, specifier));
+  }
+
+  return reachable;
+}
+
+describe('installation command dependency boundary (R-13)', () => {
+  const sourceRoot = join(process.cwd(), 'src');
+  const toRelative = (files: Iterable<string>) =>
+    [...files].map((file) => relative(sourceRoot, file).split(sep).join('/'));
+
+  it('does not reach the API/worker configuration, the identity-access module, notifications or the JWT library', () => {
+    // installation.module is loaded by a dynamic import in the command, after --help and argument parsing.
+    const reachable = listReachableSourceFiles(join(sourceRoot, 'installation-cli.ts'));
+    const files = toRelative(reachable.keys());
+
+    expect(files).toContain('modules/installation/installation.module.ts');
+    expect(files).toContain('infrastructure/config/installation-configuration.module.ts');
+    expect(files).toContain('modules/identity-access/identity-access-facade.module.ts');
+    expect(files).not.toContain('infrastructure/config/configuration.module.ts');
+    expect(files).not.toContain('modules/identity-access/identity-access.module.ts');
+    expect(files.filter((file) => file.startsWith('modules/notifications/'))).toEqual([]);
+    expect(files.filter((file) => /@nestjs\/jwt/.test(reachable.get(join(sourceRoot, file)) ?? ''))).toEqual([]);
+  });
+
+  it('wires the full validator to the API options and the database-only validator to the command options', () => {
+    expect(environmentConfigOptions.validate).toBe(validateEnvironment);
+    expect(installationEnvironmentConfigOptions.validate).toBe(validateInstallationEnvironment);
+  });
+
+  it('keeps the command-only configuration module out of everything the API and the worker load', () => {
+    for (const entry of ['main.ts', 'worker.ts']) {
+      const files = toRelative(listReachableSourceFiles(join(sourceRoot, entry)).keys());
+
+      expect({ entry, files: files.filter((file) => file.includes('installation-configuration.module')) }).toEqual({
+        entry,
+        files: [],
+      });
+      expect(files).toContain('infrastructure/config/configuration.module.ts');
+    }
+  });
+
+  it('keeps the full environment validation on the API and the worker', () => {
+    for (const entry of ['app.module.ts', 'worker.module.ts']) {
+      const source = readFileSync(join(sourceRoot, entry), 'utf8');
+
+      expect({
+        entry,
+        importsConfigurationModule: /\bConfigurationModule\b/.test(
+          source.replace(/InstallationConfigurationModule/g, ''),
+        ),
+      }).toEqual({
+        entry,
+        importsConfigurationModule: true,
+      });
+      expect({ entry, importsInstallationConfiguration: source.includes('InstallationConfigurationModule') }).toEqual({
+        entry,
+        importsInstallationConfiguration: false,
+      });
     }
   });
 });

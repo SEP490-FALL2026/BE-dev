@@ -1,7 +1,8 @@
 # Spec: tên hạng mục
 
-- Phụ trách: điền dev; reviewer: một dev khác, ngang quyền.
-- Thiết kế: draft. Review: chưa review; bổ sung link, người xác nhận, ngày và revision.
+- Phụ trách: người hoặc AI sở hữu thiết kế, implementation, test và cập nhật plan/evidence.
+- Thiết kế ban đầu bởi: Owner hoặc dev đã soạn/chốt đầu vào; có thể trùng người phụ trách.
+- Thiết kế: draft. Owner review: chưa review; bổ sung trạng thái, ngày, revision và bằng chứng khi có.
 - Nguồn: BRD link/revision/mục; US link/revision/US/AC; quyết định liên quan.
 - Trạng thái yêu cầu và điều kiện thiết kế/code: ghi theo nguồn, gồm ERD nếu cần.
 - [Kế hoạch](plan.md).
@@ -34,9 +35,9 @@ Bao gồm từ chối và edge case liên quan. Planned khác passed. Bằng ch�
 
 - [ ] Người nhận truy cập được nguồn và revision.
 - [ ] Scope/AC/thiết kế rõ; dependency và điều kiện nguồn được đáp ứng.
-- [ ] Không còn blocker cho lát bàn giao; plan được review cùng spec.
-- [ ] Dev khác xác nhận với link review và revision cụ thể.
+- [ ] Không còn blocker cho phần sẽ implement; plan và spec thống nhất.
+- [ ] Người phụ trách nhận ownership duy trì spec/plan/test design đến hết hạng mục.
 
 ## Thay đổi và nghiệm thu
 
-Ghi thay đổi thiết kế/nguồn, lý do và link review lại. Nghiệm thu ghi AC đạt/chưa đạt, người xác nhận, revision, môi trường, PR và giới hạn. Chưa implement thì ghi chưa nghiệm thu.
+Ghi thay đổi thiết kế/nguồn và lý do. Peer review nếu có ghi link và revision như bằng chứng bổ sung. Owner review cuối ghi AC đạt/chưa đạt, người xác nhận, revision, môi trường, PR và giới hạn. Chưa có xác nhận thật thì ghi chưa nghiệm thu.

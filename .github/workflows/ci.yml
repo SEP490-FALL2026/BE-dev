@@ -78,13 +78,13 @@ jobs:
       postgres:
         image: postgres:17-alpine
         env:
-          POSTGRES_USER: app
-          POSTGRES_PASSWORD: test-only
+          POSTGRES_USER: ci_bootstrap
+          POSTGRES_PASSWORD: ci-bootstrap-only
           POSTGRES_DB: postgres
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U app -d postgres"
+          --health-cmd "pg_isready -U ci_bootstrap -d postgres"
           --health-interval 5s --health-timeout 5s --health-retries 10
 
     steps:
@@ -112,10 +112,35 @@ jobs:
       - name: Run API E2E tests
         run: pnpm test:e2e
 
+      - name: Provision ordinary integration role
+        run: |
+          docker exec -i "${{ job.services.postgres.id }}" psql -X -U ci_bootstrap -d postgres -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE ROLE ci_integration LOGIN NOSUPERUSER CREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS PASSWORD 'ci-integration-only';
+          SQL
+
+      - name: Assert ordinary integration role
+        env:
+          PGPASSWORD: ci-integration-only
+        run: |
+          docker exec -i -e PGPASSWORD "${{ job.services.postgres.id }}" psql -X -h 127.0.0.1 -U ci_integration -d postgres -v ON_ERROR_STOP=1 <<'SQL'
+          DO $$
+          BEGIN
+            IF NOT EXISTS (
+              SELECT 1 FROM pg_roles
+              WHERE rolname = current_user
+                AND rolcanlogin AND rolcreatedb AND NOT rolsuper
+                AND NOT rolcreaterole AND NOT rolreplication AND NOT rolbypassrls
+            ) THEN
+              RAISE EXCEPTION 'Integration requires an ordinary LOGIN CREATEDB role';
+            END IF;
+          END;
+          $$;
+          SQL
+
       - name: Run isolated PostgreSQL integration tests
         run: pnpm test:integration
         env:
-          TEST_DATABASE_ADMIN_URL: postgresql://app:test-only@127.0.0.1:5432/postgres
+          TEST_DATABASE_ADMIN_URL: postgresql://ci_integration:ci-integration-only@127.0.0.1:5432/postgres
 
       - name: Validate Compose and build runtime
         run: |

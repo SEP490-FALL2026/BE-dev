@@ -7,24 +7,27 @@ import { ACCESS_TOKEN_VERIFIER } from '../../infrastructure/security/tokens/acce
 import { AuditModule } from '../audit/audit.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { OrganizationModule } from '../organization/organization.module';
-import { AccountManagementService } from './account-management.service';
-import { AppUsersController } from './app-users.controller';
-import { AuthController } from './auth.controller';
-import { AuthService } from './auth.service';
-import { IdentityAccessRepo } from './identity-access.repo';
-import { IdentityAccessService } from './identity-access.service';
-import { JwtAccessTokenVerifier } from './jwt-access-token.verifier';
-import { MeController } from './me.controller';
-import { MeService } from './me.service';
-import { PasswordHasher } from './password-hasher.service';
-import { RefreshCookie } from './refresh-cookie';
-import { TokenService } from './token.service';
+import { AccountInvitationService } from './accounts/account-invitation.service';
+import { AccountQueryService } from './accounts/account-query.service';
+import { AccountStatusService } from './accounts/account-status.service';
+import { AppUsersController } from './accounts/app-users.controller';
+import { JwtAccessTokenVerifier } from './access/jwt-access-token.verifier';
+import { MeController } from './access/me.controller';
+import { MeService } from './access/me.service';
+import { AuthController } from './auth/auth.controller';
+import { LoginService } from './auth/login.service';
+import { RefreshCookie } from './auth/refresh-cookie';
+import { SessionRepo } from './auth/session.repo';
+import { SessionService } from './auth/session.service';
+import { TokenService } from './auth/token.service';
+import { IdentityAccessFacadeModule } from './identity-access-facade.module';
 
 @Module({
   imports: [
     DatabaseModule,
     OrganizationModule,
     AuditModule,
+    IdentityAccessFacadeModule,
     NotificationsModule,
     JwtModule.registerAsync({
       inject: [ConfigService],
@@ -47,17 +50,18 @@ import { TokenService } from './token.service';
   ],
   controllers: [AuthController, MeController, AppUsersController],
   providers: [
-    IdentityAccessRepo,
-    IdentityAccessService,
-    AccountManagementService,
-    AuthService,
+    AccountQueryService,
+    AccountInvitationService,
+    AccountStatusService,
+    LoginService,
+    SessionService,
+    SessionRepo,
     MeService,
-    PasswordHasher,
     TokenService,
     RefreshCookie,
     JwtAccessTokenVerifier,
     { provide: ACCESS_TOKEN_VERIFIER, useExisting: JwtAccessTokenVerifier },
   ],
-  exports: [ACCESS_TOKEN_VERIFIER, IdentityAccessService, AccountManagementService],
+  exports: [ACCESS_TOKEN_VERIFIER],
 })
 export class IdentityAccessModule {}

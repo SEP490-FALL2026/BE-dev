@@ -1,0 +1,93 @@
+{
+  "scenario": "extkill",
+  "profile": "linux",
+  "node": "v24.21.0",
+  "platform": "linux-x64",
+  "transformersPath": "direct-generate",
+  "seconds": 34,
+  "cgroupAfter": {
+    "memoryPeakMb": 518.2,
+    "memoryCurrentMb": 30.8,
+    "memoryMax": "2147483648",
+    "cpuMax": "200000 100000"
+  },
+  "result": {
+    "phaseA_breaker": {
+      "trials": [
+        {
+          "settleAfterKillMs": 52,
+          "status": "UNAVAILABLE",
+          "reason": "crash",
+          "breaker": {
+            "state": "CLOSED",
+            "cooldownMs": 30000,
+            "opens": 0,
+            "recentFailures": 1
+          }
+        },
+        {
+          "settleAfterKillMs": 36,
+          "status": "UNAVAILABLE",
+          "reason": "crash",
+          "breaker": {
+            "state": "CLOSED",
+            "cooldownMs": 30000,
+            "opens": 0,
+            "recentFailures": 2
+          }
+        },
+        {
+          "settleAfterKillMs": 66,
+          "status": "UNAVAILABLE",
+          "reason": "crash",
+          "breaker": {
+            "state": "OPEN",
+            "cooldownMs": 30000,
+            "opens": 1,
+            "recentFailures": 0
+          }
+        }
+      ],
+      "afterOpen": {
+        "status": "UNAVAILABLE",
+        "reason": "breaker-open",
+        "ms": 0.9
+      }
+    },
+    "phaseB_settle": {
+      "trials": 10,
+      "settleAfterKillMs": {
+        "n": 10,
+        "min": 22,
+        "p50": 24,
+        "p95": 103,
+        "p99": 103,
+        "max": 103,
+        "mean": 38.5
+      },
+      "allUnavailableCrash": true,
+      "under100ms": 9
+    },
+    "respawnAfterExitMs": {
+      "n": 10,
+      "min": 3.2,
+      "p50": 4,
+      "p95": 4.9,
+      "p99": 4.9,
+      "max": 4.9,
+      "mean": 4
+    },
+    "eventAnalysis": {
+      "violations": [],
+      "maxLive": 1,
+      "maxConcurrentRuns": 1,
+      "dispatches": 12,
+      "kills": 0,
+      "releasesByExit": 10,
+      "events": 105
+    },
+    "failuresByKind": {
+      "crash": 10
+    }
+  }
+}

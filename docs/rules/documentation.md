@@ -8,7 +8,7 @@
 - `docs/decisions/`: quyết định có bối cảnh, trạng thái, hệ quả.
 - `docs/architecture/`: thiết kế chi tiết khi task thực sự cần.
 
-Spec/plan lưu trên Git tại [workspace](../workspace/README.md), dùng mẫu chung và liên kết [roadmap](../roadmap.md). Chỉ workspace/local/ là scratch bị ignore. Task nhỏ không đổi nghiệp vụ/contract có thể dùng issue/PR. Không bắt skill/AI cụ thể. Dev ngang quyền khác review; AI không tự xác nhận phê duyệt. BRD/US phải truy cập được và có revision trong spec.
+Spec/plan lưu trên Git tại [workspace](../workspace/README.md), dùng mẫu chung và liên kết [roadmap](../roadmap.md). Chỉ workspace/local/ là scratch bị ignore. Task nhỏ không đổi nghiệp vụ/contract có thể dùng issue/PR. Không bắt skill/AI cụ thể. Người phụ trách sở hữu thiết kế, implementation, test và việc duy trì plan; peer review của dev khác là tùy chọn. Owner review cuối trước `main`/production. AI không tự xác nhận Owner đã phê duyệt hoặc nghiệm thu. BRD/US phải truy cập được và có revision trong spec.
 
 Phân biệt **Proposed**, **Accepted**, **Superseded/Deprecated** với **Implemented/Verified**.
 Muốn nói đã verified phải có kết quả chạy đúng source và phạm vi kiểm tra.

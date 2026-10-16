@@ -1,7 +1,8 @@
 # ADR-0011: Internal authentication, sessions and identity persistence conventions
 
-Status: **Proposed** (12/10/2026). Implemented in slice 1a and merged through PR #4
-(`64073c4`); developer review and acceptance are still pending as of 14/10/2026.
+Status: **Proposed** (12/10/2026). Implemented in slice 1a through PR #4 (`64073c4`),
+with remediation `a0cf5f1` incorporated into `origin/dev` through PR #7/#8;
+developer review and acceptance are still pending as of 15/10/2026.
 Items marked _lead decision_ were chosen on 12/10/2026; the planned pre-merge review
 gate was not completed. AI research, drafting and testing do not constitute developer approval.
 
@@ -66,11 +67,27 @@ pnpm 11.1.3 with an explicit `allowBuilds` list, and CI runs
    parameters in `SET`), so a single slow statement fails in PostgreSQL first; a
    multi-statement transaction may still reach Prisma's `P2028`, which maps the same way. Row locks use
    `$queryRaw` inside the transaction. `40P01`, `55P03`, `57014`, Prisma `P2028`
-   and connection loss roll back and map to 503. With `@prisma/adapter-pg` 7.9.1 the first
+   and connection loss before `COMMIT` is sent roll back and map to 503. A timeout or a lost
+   connection while `COMMIT` is in flight also maps to 503, but the outcome is unknown: the server
+   may already have committed, so a write is never retried automatically and the caller reads the
+   state again first. With `@prisma/adapter-pg` 7.9.1 the first
    three (and exclusion violation `23P01`) arrive as `P2010`/`P2039` with the SQLSTATE in
    `meta.driverAdapterError.cause`; only `23505` (`P2002`) and `40001` (`P2034`) have
    dedicated codes. Integration tests must trigger `55P03` and `57014` for real. The lock order is the foundation
    spec's _Giao thức khóa chung_.
+
+   The server-side limits above cannot fire when PostgreSQL never answers, so the pool also has
+   client-side limits: `DB_CONNECT_TIMEOUT_MS` (default 3 s) and `DB_QUERY_TIMEOUT_MS` (default 8 s, higher
+   than the statement timeout). A pg `query_timeout` only rejects the call; the statement and an open
+   transaction stay active on the connection. The application therefore owns the pool
+   (`src/infrastructure/database/pg-pool.ts`, handed to `PrismaPg` with `disposeExternalPool`): a
+   connection whose query timed out is retired (`end()`), never reused, and a connection released while a
+   transaction is still open is retired too (review N-1). `DB_IDLE_IN_TRANSACTION_TIMEOUT_MS` is the
+   PostgreSQL-side backstop (`idle_in_transaction_session_timeout`; default
+   `max(20000, DB_TRANSACTION_TIMEOUT_MS + 10000)`, validated to be higher than
+   `DB_TRANSACTION_TIMEOUT_MS`). Design and evidence:
+   [remediation spec](../workspace/items/g0-g1-remediation-after-rereview/spec.md).
+
 9. **Persistence conventions for new tables** (_lead decision_). Columns are snake_case
    through `@map`; tables are snake_case plural through `@@map`. Placement overlap
    is prevented by `btree_gist` and an `EXCLUDE` constraint. Migrations follow the
@@ -108,10 +125,9 @@ pnpm 11.1.3 with an explicit `allowBuilds` list, and CI runs
 ## Verification
 
 The [research note](../workspace/items/us-01-bootstrap-login-session/research.md) records
-the initial isolated experiments. The [AI review of `64073c4`](../reviews/backend-g0-g1-review-2026-10-14.md)
-records 223 unit, 28 E2E and 147 integration passes on PostgreSQL 17.11, plus live HTTP,
-SMTP and Linux PTY checks. It also records failed cases and missing evidence: the clean-checkout
-gate, stalled DB requests, malformed JWT claims and login throttling were fixed after that review
-(see the follow-up for the evidence); manual PowerShell bootstrap and SMTP TLS remain unverified.
-See [follow-up and Owner decisions](../workspace/g0-g1-review-follow-up.md).
-These results belong to that revision and do not close acceptance.
+the initial isolated experiments. The consolidated
+[G0/G1 review and remediation report](../reviews/g0-g1-remediation-2026-10-15/README.md)
+records the findings, test results and remaining limits through `a0cf5f1`. That remediation retires
+pooled connections after client-side query timeout and has entered `origin/dev` through PR #7/#8.
+The results belong to the named revisions and do not close developer review or acceptance;
+this ADR remains Proposed.

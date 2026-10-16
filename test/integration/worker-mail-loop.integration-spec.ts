@@ -22,6 +22,7 @@ describe('worker mail loop (integration, PostgreSQL + in-process SMTP)', () => {
   beforeAll(async () => {
     smtp = new SMTPServer({
       authOptional: true,
+      disableReverseLookup: true,
       disabledCommands: ['STARTTLS'],
       onData(stream, session, callback) {
         stream.resume();
@@ -67,18 +68,21 @@ describe('worker mail loop (integration, PostgreSQL + in-process SMTP)', () => {
     const { WorkerModule } = await import('../../src/worker.module');
     worker = await NestFactory.createApplicationContext(WorkerModule, { logger: false });
 
+    const accountId = (created.body as { data: { id: string } }).data.id;
     const deadline = Date.now() + 15000;
-    while (received.length === 0 && Date.now() < deadline) {
+    let mailStatus: string | undefined;
+    while (Date.now() < deadline) {
+      const mail = await ctx.sql.query<{ status: string }>(
+        `SELECT o.status FROM email_outbox o JOIN account_action_tokens t ON t.token_hash = o.action_token_hash
+          WHERE t.app_user_id = $1`,
+        [accountId],
+      );
+      mailStatus = mail.rows[0]?.status;
+      if (received.length > 0 && mailStatus === 'SENT') break;
       await new Promise<void>((resolve) => setTimeout(resolve, 200));
     }
 
     expect(received).toEqual(['worker.target@acme.vn']);
-    const accountId = (created.body as { data: { id: string } }).data.id;
-    const mail = await ctx.sql.query(
-      `SELECT o.status FROM email_outbox o JOIN account_action_tokens t ON t.token_hash = o.action_token_hash
-        WHERE t.app_user_id = $1`,
-      [accountId],
-    );
-    expect(mail.rows).toEqual([{ status: 'SENT' }]);
+    expect(mailStatus).toBe('SENT');
   }, 60000);
 });

@@ -20,7 +20,7 @@ describe('authentication while the database is down (e2e)', () => {
     process.env.TEST_DATABASE_URL = 'postgresql://app:unused@127.0.0.1:1/none_test';
     const { AppModule } = await import('../../src/app.module');
     const { configureApplication } = await import('../../src/bootstrap');
-    const { TokenService } = await import('../../src/modules/identity-access/token.service');
+    const { TokenService } = await import('../../src/modules/identity-access/auth/token.service');
 
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
     app = moduleRef.createNestApplication<INestApplication<App>>();

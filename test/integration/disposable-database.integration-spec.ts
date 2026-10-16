@@ -2,12 +2,21 @@ import { randomUUID } from 'node:crypto';
 import { Client } from 'pg';
 import {
   assertDisposableDatabase,
+  assertIntegrationDatabaseRole,
   checkDisposableUrl,
   DisposableDatabase,
+  DisposableDatabaseError,
   dropDisposableDatabase,
   MARKER_TABLE,
   provisionDisposableDatabase,
 } from '../support/disposable-database';
+
+// pg exposes callback overloads last; select its promise API for these boundary stubs.
+const promiseClientPrototype = Client.prototype as unknown as {
+  connect(): Promise<void>;
+  end(): Promise<void>;
+  query(sql: string): Promise<{ rows: Record<string, unknown>[]; rowCount?: number }>;
+};
 
 const withClient = async <T>(url: string, work: (client: Client) => Promise<T>): Promise<T> => {
   const client = new Client({ connectionString: url });
@@ -20,6 +29,140 @@ const withClient = async <T>(url: string, work: (client: Client) => Promise<T>):
 };
 
 describe('Disposable database guard', () => {
+  describe('ordinary integration role assertion without a database', () => {
+    const ordinaryRole = {
+      rolsuper: false,
+      rolcreatedb: true,
+      rolcreaterole: false,
+      rolreplication: false,
+      rolcanlogin: true,
+      rolbypassrls: false,
+    };
+
+    afterEach(() => jest.restoreAllMocks());
+
+    it('accepts only a login role with CREATEDB and no elevated attributes', async () => {
+      await expect(
+        assertIntegrationDatabaseRole({ query: () => Promise.resolve({ rows: [ordinaryRole] }) }),
+      ).resolves.toBeUndefined();
+    });
+
+    it.each([
+      ['a superuser', { rolsuper: true }],
+      ['a role without CREATEDB', { rolcreatedb: false }],
+      ['a role creator', { rolcreaterole: true }],
+      ['a replication role', { rolreplication: true }],
+      ['a role without LOGIN', { rolcanlogin: false }],
+      ['a role with BYPASSRLS', { rolbypassrls: true }],
+    ])('refuses %s', async (_label, attributes) => {
+      await expect(
+        assertIntegrationDatabaseRole({ query: () => Promise.resolve({ rows: [{ ...ordinaryRole, ...attributes }] }) }),
+      ).rejects.toThrow(/NOSUPERUSER CREATEDB NOCREATEROLE NOREPLICATION/);
+    });
+
+    it('fails closed when the role is missing or attributes are unreadable', async () => {
+      await expect(assertIntegrationDatabaseRole({ query: () => Promise.resolve({ rows: [] }) })).rejects.toThrow();
+      await expect(
+        assertIntegrationDatabaseRole({
+          query: () => Promise.resolve({ rows: [{ ...ordinaryRole, rolcreatedb: null }] }),
+        }),
+      ).rejects.toThrow();
+    });
+
+    it('refuses a superuser before creating any database', async () => {
+      const original = process.env.TEST_DATABASE_ADMIN_URL;
+      process.env.TEST_DATABASE_ADMIN_URL = 'postgresql://bootstrap:test-only@127.0.0.1:5432/postgres';
+      jest.spyOn(promiseClientPrototype, 'connect').mockResolvedValue(undefined);
+      jest.spyOn(promiseClientPrototype, 'end').mockResolvedValue(undefined);
+      const query = jest
+        .spyOn(promiseClientPrototype, 'query')
+        .mockResolvedValue({ rows: [{ ...ordinaryRole, rolsuper: true }] });
+      try {
+        await expect(provisionDisposableDatabase()).rejects.toThrow(/Do not use the bootstrap role/);
+        expect(query).toHaveBeenCalledTimes(1);
+        expect(query.mock.calls[0][0]).not.toContain('CREATE DATABASE');
+      } finally {
+        if (original === undefined) delete process.env.TEST_DATABASE_ADMIN_URL;
+        else process.env.TEST_DATABASE_ADMIN_URL = original;
+      }
+    });
+  });
+
+  describe('teardown diagnostics without a database', () => {
+    const database = {
+      url: 'postgresql://app:hunter2@127.0.0.1:5432/slm_ab12_test',
+      name: 'slm_ab12_test',
+      runId: 'run-id',
+    };
+
+    afterEach(() => jest.restoreAllMocks());
+
+    it.each([
+      [false, false],
+      [true, false],
+      [false, true],
+      [true, true],
+    ])(
+      'preserves the DROP SQLSTATE with diagnostics failure %s and close failure %s',
+      async (diagnosticsFail, closeFail) => {
+        jest.spyOn(promiseClientPrototype, 'connect').mockResolvedValue(undefined);
+        let closes = 0;
+        jest.spyOn(promiseClientPrototype, 'end').mockImplementation(() => {
+          if (++closes > 1 && closeFail) return Promise.reject(Object.assign(new Error('hunter2'), { code: '08006' }));
+          return Promise.resolve();
+        });
+        const query = jest.spyOn(promiseClientPrototype, 'query').mockImplementation((sql: string) => {
+          if (sql.startsWith('SELECT run_id')) return Promise.resolve({ rowCount: 1, rows: [{ run_id: 'run-id' }] });
+          if (sql.startsWith('DROP DATABASE')) {
+            return Promise.reject(
+              Object.assign(new Error('query includes hunter2 and private business data'), { code: '55006' }),
+            );
+          }
+          if (sql.includes('pg_stat_activity')) {
+            if (diagnosticsFail) return Promise.reject(Object.assign(new Error('hunter2'), { code: '42501' }));
+            return Promise.resolve({
+              rows: [
+                {
+                  database: database.name,
+                  application_name: 'slm-api',
+                  pid: 123,
+                  state: 'idle in transaction',
+                  wait_event_type: 'Client',
+                  wait_event: 'ClientRead',
+                  query: 'SELECT private_business_data',
+                  password: 'hunter2',
+                },
+              ],
+            });
+          }
+          throw new Error('Unexpected diagnostic query');
+        });
+
+        let failure: unknown;
+        try {
+          await dropDisposableDatabase(database);
+        } catch (error) {
+          failure = error;
+        }
+
+        expect(failure).toBeInstanceOf(DisposableDatabaseError);
+        expect(failure).toMatchObject({ sqlState: '55006' });
+        expect(
+          query.mock.calls.filter(([sql]) => typeof sql === 'string' && sql.startsWith('DROP DATABASE')),
+        ).toHaveLength(1);
+        const serialized = JSON.stringify(failure) + (failure as Error).message;
+        expect(serialized).not.toMatch(/hunter2|private_business_data|postgresql:\/\//);
+        if (diagnosticsFail) expect(serialized).toContain('42501');
+        else {
+          expect(serialized).toContain('slm-api');
+          expect(serialized).toContain('idle in transaction');
+          expect(serialized).toContain('123');
+        }
+        if (closeFail) expect(serialized).toContain('08006');
+      },
+    );
+  });
+
   describe('conditions that need no database', () => {
     it.each([
       ['a remote host', 'postgresql://app:secret@db.example.com:5432/slm_ab12_test'],
@@ -103,6 +246,12 @@ describe('Disposable database guard', () => {
     it('is created for the run with a `_test` name and accepted for that run', async () => {
       expect(database.name).toMatch(/^slm_[0-9a-f]{8}_test$/);
       await expect(assertDisposableDatabase(database.url, database.runId)).resolves.toBeUndefined();
+    });
+
+    it('uses the ordinary CREATEDB role required by CI', async () => {
+      await withClient(database.url, async (client) => {
+        await expect(assertIntegrationDatabaseRole(client)).resolves.toBeUndefined();
+      });
     });
 
     it('refuses a run id that does not own the database', async () => {

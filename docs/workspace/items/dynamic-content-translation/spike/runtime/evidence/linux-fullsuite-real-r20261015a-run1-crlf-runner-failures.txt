@@ -1,0 +1,419 @@
+VERSION=4.3.1
+LOCKSHA=1492a4edda12069377a4972716d869cc51826f2fe077d5a5fb381a36bf3231e5
+RUN_ID=r20261015a resources: cpus=2 memory=2g memory-swap=2g network=none user=node timeout=900s deps-volume=spike-runtime-deps (ro) image=node:24-bookworm-slim
+✔ a clean single-slot history has no violations (3.348936ms)
+✔ dispatch into a busy slot is a violation (0.632446ms)
+✔ release by exit without a preceding exit event is a violation (0.403943ms)
+✔ spawn before the previous process of the slot exited is a violation; live > concurrency too (0.543516ms)
+✔ killSent must be followed by exit before the slot is reused (0.404778ms)
+✔ run intervals (started..done) of different jobs never overlap per slot; concurrent slots may overlap (0.446695ms)
+✔ async spawn failure (no process ever existed) closes the slot like an exit; sync failure never opened it (0.309531ms)
+✔ a synthetic exit (lost exit event, child fields show dead) is a normal exit for the checker (0.330733ms)
+✔ closed by default and admits everything (2.109615ms)
+✔ 2 failures do not open; 3 failures within 5 min open (0.393256ms)
+✔ failures older than the 5 min window do not count (0.213604ms)
+✔ after the 30 s cooldown exactly one probe is admitted (HALF_OPEN) (0.675322ms)
+✔ probe success closes the circuit and resets cooldown (0.382955ms)
+✔ probe failure re-opens with doubled cooldown, capped at 5 min (1.156656ms)
+✔ probe released without outcome (e.g. cache hit / abandoned) frees the probe slot (0.361297ms)
+✔ permanent failure: UNAVAILABLE forever, never half-opens (0.304798ms)
+✔ late failures while OPEN do not extend or change the cooldown (0.601964ms)
+✔ normalizeText: NFC + trim + collapse whitespace (incl. NBSP and ZWSP) (2.637931ms)
+✔ key is deterministic within a cache instance and a 64-hex HMAC (2.713856ms)
+✔ key changes when any identity field changes (1.780879ms)
+✔ key does not leak raw text and differs between cache instances (per-process random HMAC key) (2.589479ms)
+✔ field boundaries cannot be forged by concatenation (JSON array encoding) (0.490566ms)
+✔ get/set round trip and miss (0.605228ms)
+✔ LRU evicts by entry count; get refreshes recency (0.518975ms)
+✔ LRU evicts by bytes: (key.length+value.length)*2 approximation (0.732246ms)
+✔ a single value larger than maxBytes is not stored and evicts nothing (0.52927ms)
+✔ overwrite updates bytes accounting (0.805434ms)
+✔ TTL: lazy expiry on get, entry removed and bytes released (0.58471ms)
+✔ defaults: 500 entries, 8 MiB, 24 h TTL (0.457063ms)
+✔ exposes no list/delete/keys API (0.337068ms)
+✔ cold load slower than computeMaxMs (but inside loadTimeoutMs) does not consume the compute budget (844.243892ms)
+✔ the compute deadline still applies after the load: measured from run-sent, not from dispatch (635.778061ms)
+✔ kill timer = run-sent + computeMaxMs + killGraceMs (a cold load does not shorten it) (711.522972ms)
+✔ no compute deadline / kill fires during the load; cancel during load is CANCELLED (not DEADLINE) and holds the slot until loaded (556.003162ms)
+✔ loadTimeoutMs still bounds a load (the load budget replaces, not removes, the bound) (309.586893ms)
+✔ warm path unchanged: run is sent at dispatch, deadline and kill follow computeMaxMs / +grace from there (306.837744ms)
+✔ coordinator: cold load > computeMaxMs still returns OK when the waiter budget allows it (821.070218ms)
+✔ coordinator: the waiter response deadline fires during a long load; job cancelled, no run is sent, model stays loaded for the next call (974.477397ms)
+✔ coordinator: queue timeout during a cold load removes only the queued waiter; the loading job completes (679.066477ms)
+✔ no override: effective = stored; direction from stored; OK metadata (66.789739ms)
+✔ override wins: model direction and result metadata follow the override; stored value is reported unchanged (62.765125ms)
+✔ same-language shortcut uses the EFFECTIVE source: stored vi, target en, override en -> original text, no worker, text language disputed (null) (1.072389ms)
+✔ same-language shortcut without override: textLanguage = the shared language; override equal to stored is not an override (1.178403ms)
+✔ stored == target but the reader overrides the source to the other language -> translated (override decides) (63.265918ms)
+✔ cache key uses the effective source: stored vi == stored en + override vi share an entry; different effective sources do not (60.835005ms)
+✔ fallback (original text is what the product returns): textLanguage = effective source when not overridden, null when overridden (202.583434ms)
+✔ BUSY fallbacks carry the same metadata (718.604018ms)
+✔ empty text returns the original unchanged with metadata; legacy `source` still works as storedSource (49.656612ms)
+✔ spawn failure at coordinator level: UNAVAILABLE/spawn-failed, counted by the breaker (opens after 3), shutdown fine (2.802015ms)
+✔ OK path: segments are batched, outputs joined, result cached; second call is a cache hit with no dispatch (66.537102ms)
+✔ empty text and unsupported language pair never reach a worker (1.341681ms)
+✔ N callers with the same key join ONE job: worker run is called once; no queue slot consumed (258.9974ms)
+✔ one waiter times out alone; the others still get the result and the job is NOT cancelled (357.26518ms)
+✔ abort signal settles only that waiter (TIMEOUT/aborted) (302.810716ms)
+✔ all callers leave while QUEUED: the job is removed and never dispatched (533.433543ms)
+✔ all callers leave while RUNNING: cancel is sent, slot is held until the worker says done, next job dispatches after (154.10982ms)
+✔ queue full: immediate BUSY, nothing enqueued, no probe/slot consumed (661.152367ms)
+✔ late complete result: cached, never delivered to the waiter that already timed out (395.009041ms)
+✔ deadline-hit result is never cached: the next identical call is a miss and dispatches again (395.805709ms)
+✔ incomplete (complete:false) results are never cached and map to UNAVAILABLE/TIMEOUT, not OK (65.918512ms)
+✔ a new caller for a key whose job is CANCEL_REQUESTED gets a FRESH job (727.259406ms)
+✔ responseDeadline includes queue time and settles the queued waiter alone (658.945402ms)
+✔ cache is isolated per organization and per scope (55.371824ms)
+✔ inflight size never exceeds queueMax + concurrency; excess is BUSY (113.948889ms)
+✔ circuit opens after 3 failures (deadline hits): immediate UNAVAILABLE, then a single half-open probe (1334.801383ms)
+✔ half-open admits exactly one probe; concurrent distinct callers get UNAVAILABLE (942.272908ms)
+✔ external SIGKILL of the worker: waiters settle fast with UNAVAILABLE; breaker counts it; respawn after exit (120.309093ms)
+✔ permanent load failure (integrity): UNAVAILABLE forever for that direction only (68.032571ms)
+✔ shutdown: queued waiters UNAVAILABLE, running cancelled, new calls UNAVAILABLE, all processes gone (95.202543ms)
+✔ coordinator exposes no cache read/list/delete API (0.594239ms)
+✔ is an instance of the supplied StoppingCriteria base and callable as a function (3.054376ms)
+✔ returns one boolean per sequence; counts calls (proves it was invoked) (0.415482ms)
+✔ stops every sequence once the compute deadline passed; hit flag set; overrun recorded (1.734168ms)
+✔ stops at deadline boundary (>=) (0.497595ms)
+✔ cancel flag stops generation and is reported separately from deadline hit (0.458921ms)
+✔ once stopped it stays stopped (0.341635ms)
+✔ tracks the longest gap between consecutive calls (max decoder step as seen by the loop) (0.370382ms)
+✔ computeMaxNewTokens = min(512, 2*inputTokens + 16) (0.198001ms)
+✔ records the time of the first invocation (encoder + first decoder step happen before it) (0.571892ms)
+✔ (a) normal GET whose handler waits for a fake translation: abort NOT fired, listener removed after the response (359.677531ms)
+✔ characterisation: IncomingMessage "close" DOES fire for a normal GET while the handler is still waiting (why the spec hook was wrong) (396.987593ms)
+✔ (b) client destroys the socket while waiting: abort fired once, that waiter settles, another subscriber on the same key still gets its result (550.781132ms)
+✔ (b2) the only client disconnects while RUNNING: abort once, job cancelled, slot freed after done, next request OK (151.838187ms)
+✔ (c) keep-alive: two sequential requests on one socket never trigger the hook; closing the idle socket afterwards does not either (174.229882ms)
+✔ (d) client closes right after reading the response: writableFinished is true, no abort (89.31834ms)
+✔ (e) POST-like request with a body that is fully sent, then a normal response: no abort (body consumption closes req, not res) (203.140071ms)
+✔ unit: the hook fires at most once and dispose() removes it (0.987766ms)
+✔ permanent loadFailed code is surfaced in the outcome and the event; hostile codes are sanitised (150.910441ms)
+✔ coordinator exposes the code in stats and trips the breaker to PERMANENT (78.936879ms)
+✔ real: vi->en translates, criterion invoked each decoder step, no network attempts, direct-generate path (6813.587803ms)
+✔ real: compute deadline stops generation cooperatively (deadlineHit, incomplete, small overrun, no kill) (5598.980998ms)
+# real cancel->done latency 8 ms
+✔ real: cancel mid-run stops the native generation loop within about one decoder step; slot held until done (5251.23358ms)
+# real external SIGKILL settle 39 ms
+✔ real: SIGKILL of the worker mid-run: parent survives, exit is fast, a respawned worker serves the next job (9887.832012ms)
+# en->vi (direct path): ["Giấy phép sẽ hết hạn vào cuối tháng này.","Vui lòng liên lạc với bên ngoài để đăng ký lại."]
+✔ real: en->vi uses the language-token id (self-test passed) and gives a Vietnamese translation (5333.028377ms)
+✔ real: truncation is detected with a tiny max_new_tokens (3): FAILED/TRUNCATED, no outputs, coordinator returns UNAVAILABLE/truncated and caches nothing (4543.696826ms)
+# real lock check {"ok":true,"files":16,"bytes":213353376,"ms":3237.2,"models":["Xenova/opus-mt-vi-en","Xenova/opus-mt-en-vi"]}
+# worker lock verification ms (vi-en dir only): 1580.8
+✔ real: the lock is verified against the REAL models dir (16 files) and the worker reports the time spent before the model load (8336.210581ms)
+✔ real: a tampered COPY of the models dir (one byte flipped in tokenizer.json) fails with MODEL_LOCK_MISMATCH before any inference; the real dir is untouched (11178.191984ms)
+✔ all segments end with EOS: complete, outputs in order, handle and text passed to the adapter (3.075678ms)
+✔ TRUNCATED: a segment that reaches max_new_tokens without EOS makes the whole job incomplete; no outputs; later segments are not run (0.536864ms)
+✔ no override: maxNewTokens is left to the adapter default; our rule equals the adapter default (min(512, 2n+16)) (0.365123ms)
+✔ maxNewTokens override (tests/bench): an integer budget is passed through to the adapter (1.036261ms)
+✔ DEADLINE: criterion hit -> finishReason stopped -> done{complete:false, reason DEADLINE, deadlineHit} (0.447689ms)
+✔ DEADLINE already passed before a segment starts: no adapter call, deadlineHit (0.38072ms)
+✔ CANCELLED mid-segment: criterion sees the cancel -> stopped -> done{complete:false, reason CANCELLED, cancelled} (0.420855ms)
+✔ CANCELLED before the first segment: no adapter call (0.236868ms)
+✔ fail closed on contradictory or unknown adapter results: incomplete, never OK (0.971013ms)
+✔ finishReason stopped without a deadline or cancel flag is INCOMPLETE (someone else stopped it) (0.429383ms)
+✔ criterion never invoked: cannot claim enforcement -> error CRITERION_NOT_INVOKED (thrown with a code) (0.364898ms)
+✔ adapter errors propagate (the worker maps them to RUN_FAILED; raw messages never leave the worker) (2.281545ms)
+✔ a TRUNCATED segment after a deadline-free first segment still reports only TRUNCATED, and a later deadline cannot hide it (0.318551ms)
+✖ install: fresh run creates a NEW volume named after the run id, labelled owner+run; never calls volume rm (25.469516ms)
+✖ install refuses to overwrite an existing volume (labelled or not) unless told explicitly; nothing is removed or created (15.473639ms)
+✖ --force-own: refused for an UNLABELLED volume and for the protected spike-runtime-deps (even if someone labelled it) (14.476676ms)
+✖ --force-own on a volume labelled with the spike owner label: removed and re-created with the labels (13.929337ms)
+✖ --reuse spike-runtime-deps: read-only mount, prints version and lockfile hash, creates/removes nothing (13.440709ms)
+✖ --reuse refuses a volume that is missing or holds another transformers version (22.242758ms)
+✖ bench: every container is named + labelled with the run id, deps volume read-only, --network none, resources recorded; removed afterwards only if labelled (13.528093ms)
+✖ cleanup trap does NOT remove a container whose label is not this run id (14.160954ms)
+✖ test/bench without SPIKE_DEPS_VOLUME fail (no implicit default volume); a missing volume fails; a failing container propagates its exit code and is still cleaned (41.83783ms)
+✖ rm-volume: only owner-labelled, non-protected volumes; list shows only our labels (29.680433ms)
+✔ empty / whitespace only gives no segments (2.782914ms)
+✔ splits on sentence punctuation followed by whitespace, trims, keeps order (0.755241ms)
+✔ does not split decimals or abbreviations without trailing space (0.371974ms)
+✔ text without punctuation is a single segment (1.51463ms)
+✔ over-long segments are split at whitespace, never exceed maxChars, nothing lost (1.553406ms)
+✔ a single token longer than maxChars is hard-cut (0.504572ms)
+✔ joinSegments joins with a single space (0.253308ms)
+✔ cancel RUNNING: cancel is sent, slot is held until the worker answers done, then the next job dispatches (191.959592ms)
+✔ cancel is idempotent and cancel(QUEUED) removes the job (75.056365ms)
+✔ cooperative compute deadline: worker stops itself; job ABANDONED/DEADLINE; failure(deadline); no kill (241.111259ms)
+✔ unresponsive worker (ignores cancel+deadline): SIGKILL at computeDeadline+grace; slot released only after exit; respawn after exit (469.424366ms)
+✔ native hang (event loop blocked): killed; kill->exit is quick; slot held until exit (302.203903ms)
+✔ cancel while EXECUTING re-arms the kill timer to cancel+grace (does not wait for computeDeadline+grace) (204.496379ms)
+✔ external SIGKILL mid-run: job FAILED/CRASHED fast, failure(crash), slot released by exit, respawn after exit (212.535968ms)
+✔ worker process.exit(13) mid-run behaves like a crash (49.409445ms)
+✔ a complete result that races with a cancel is still DONE (so it can be cached) and holds the slot until done (179.633742ms)
+✔ worker error: job FAILED/ERROR with a mapped code, slot released by error, worker reused (156.786474ms)
+✔ cancel during a (blocking) model load: slot held until loaded, run is never sent, worker stays loaded (456.579052ms)
+✔ kill timer is cleared on normal completion (no kill long after the job finished) (476.186212ms)
+✔ live workers never exceed concurrency under a mix of crash / kill / hang / cancel (events AND OS pids) (787.851457ms)
+✔ shutdown sequence: queued -> SHUTDOWN, running cancelled and awaited, then shutdown message, workers exit 0 (81.868635ms)
+✔ shutdown with an unresponsive worker: SIGKILL when the grace expires, promise resolves after exit (460.333417ms)
+✔ shutdown with idle workers sends shutdown immediately and they exit 0 (158.079315ms)
+✔ deadlineCancel:false: no cancel is sent at the compute deadline; the worker enforces it itself (worker-reported deadlineHit) (223.828238ms)
+✔ V-3 sync throw from spawnFn: job settles FAILED/SPAWN_FAILED once, slot released, failure counted, queue proceeds, shutdown completes (22.06544ms)
+✔ V-3 sync throw while others are queued: every queued job settles, none hangs, liveWorkers stays 0 (1.854703ms)
+✔ V-3 async spawn failure: error with no pid and NO exit event ever -> slot released, job SPAWN_FAILED, next job proceeds (3.944454ms)
+✔ V-3 async spawn failure: shutdown() completes while the failed child never exits (2.167494ms)
+✔ V-3 pre-spawn error followed by a late exit: settled once, late exit ignored, no double release (53.518288ms)
+✔ V-3 error on a LIVE child (IPC error): slot NOT released at error; killed by its own handle; released by exit; respawn only after exit (48.090757ms)
+✔ V-3 error on a live child, kill() throws, no exit event, fields still say running -> slot stays held (never releases a live process) (457.600982ms)
+✔ V-3 kill() returning false with exitCode set and no exit event: slot marked dead at the bound (exitCode !== null) (157.814879ms)
+✔ V-3 a kill() that throws on the kill-timer path (unresponsive worker) does not wedge the supervisor (242.350249ms)
+✔ V-3 live workers never exceed concurrency under mixed spawn failures, errors and exits (concurrency 2) (3.648423ms)
+✔ V-3 shutdown while a live child has an IPC error: completes after the exit (7.141008ms)
+✔ cold start: spawn -> load -> run -> done; outcome DONE with outputs; worker is reused (273.289033ms)
+✔ a second direction triggers a second load in the same worker (257.310833ms)
+✔ concurrency 1: jobs run strictly one after another (no overlapping run intervals) (462.256767ms)
+✔ concurrency 2: two jobs overlap, never more than 2 live processes, a third waits (463.150519ms)
+✔ removeQueued: QUEUED job becomes ABANDONED and is never dispatched (287.078241ms)
+✔ permanent load failure: job FAILED, direction PERMANENT, later jobs fail fast without spawning (49.404981ms)
+✔ transient load failure: backoff blocks retries, then a retry can succeed; backoff doubles (274.332816ms)
+✔ backoff doubles 1s -> 60s (scaled) on repeated transient failures (504.051065ms)
+✔ loadTimeoutMs kills a stuck loader; slot freed only after exit; respawn serves the next job (2459.327583ms)
+✔ unload: READY -> DISPOSING -> UNLOADED, then a new job reloads (261.749357ms)
+✔ worker stderr/stdout are drained and never echoed in outcomes (181.306579ms)
+✔ outcome never settles twice and settled resolves exactly once (191.687704ms)
+✔ supervisor: worker done{complete:false, reason:TRUNCATED} -> FAILED/TRUNCATED, no outputs, NOT a breaker failure (73.030891ms)
+✔ coordinator: truncated result -> UNAVAILABLE/truncated, text null, never cached, identical call dispatches again, breaker stays CLOSED (113.032966ms)
+✔ coordinator: a half-open probe that ends TRUNCATED releases the probe (no wedge) (552.86332ms)
+✔ matching tree: ok, counts files and bytes, error code constant is MODEL_LOCK_MISMATCH (49.753267ms)
+✔ wrong hash with the SAME size: reason hash (35.211115ms)
+✔ wrong size is rejected BEFORE hashing (reason size) (20.937288ms)
+✔ missing file: reason missing; a directory where a file is expected: reason missing (47.985882ms)
+✔ unexpected extra file is rejected (also nested, also at the root); manifest.json passes only when allowExtra lists it (75.294381ms)
+✔ an extra file that differs only by case is an extra file (not silently the locked one) (16.789766ms)
+✔ models filter: verifies only the selected model (corruption/extras elsewhere are ignored), but still strict inside it (35.885258ms)
+✔ symlinked file is rejected (lstat); skipped with a reason where the OS forbids creating symlinks (19.685493ms)
+✔ a symlinked / junction DIRECTORY inside the tree is rejected and cannot lead outside the root (19.79278ms)
+✔ hostile lock paths are rejected before touching the filesystem (reason bad-lock) (17.433225ms)
+✔ case-insensitive duplicates in the lock are rejected (they would alias on Windows/macOS) (16.246455ms)
+✔ malformed lock entries: bad sha256, bad bytes, bad revision, no files, wrong schema, not an object (20.886391ms)
+✔ root problems: missing root, root is a file (25.273662ms)
+✔ the verification result never contains file contents (43.470429ms)
+✔ lock mismatch (wrong hash): loadFailed permanent MODEL_LOCK_MISMATCH, the library is never imported (no import error in stderr) (126.519959ms)
+✔ lock mismatch (extra file in the model dir): permanent MODEL_LOCK_MISMATCH (127.923458ms)
+✔ unreadable / missing lock file fails closed as MODEL_LOCK_MISMATCH (397.465127ms)
+✔ lock passes -> only then the library is imported: with no library installed the failure comes from the library import (ENOENT, existing rule: permanent) and carries NO lock code (272.136189ms)
+ℹ tests 188
+ℹ suites 0
+ℹ pass 178
+ℹ fail 10
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 98024.268208
+
+✖ failing tests:
+
+test at test/run-linux.test.mjs:45:1
+✖ install: fresh run creates a NEW volume named after the run id, labelled owner+run; never calls volume rm (25.469516ms)
+  AssertionError [ERR_ASSERTION]: /spike/runtime/run-linux.sh: line 27: set: pipefail: invalid option name
+  
+  
+  2 !== 0
+  
+      at TestContext.<anonymous> (file:///spike/runtime/test/run-linux.test.mjs:48:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.start (node:internal/test_runner/test:1262:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test/run-linux.test.mjs:59:1
+✖ install refuses to overwrite an existing volume (labelled or not) unless told explicitly; nothing is removed or created (15.473639ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /already exists/i. Input:
+  
+  '/spike/runtime/run-linux.sh: line 27: set: pipefail\r: invalid option name\n'
+  
+      at TestContext.<anonymous> (file:///spike/runtime/test/run-linux.test.mjs:64:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '/spike/runtime/run-linux.sh: line 27: set: pipefail\r: invalid option name\n',
+    expected: /already exists/i,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at test/run-linux.test.mjs:71:1
+✖ --force-own: refused for an UNLABELLED volume and for the protected spike-runtime-deps (even if someone labelled it) (14.476676ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /not labelled/i. Input:
+  
+  '/spike/runtime/run-linux.sh: line 27: set: pipefail\r: invalid option name\n'
+  
+      at TestContext.<anonymous> (file:///spike/runtime/test/run-linux.test.mjs:75:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '/spike/runtime/run-linux.sh: line 27: set: pipefail\r: invalid option name\n',
+    expected: /not labelled/i,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at test/run-linux.test.mjs:83:1
+✖ --force-own on a volume labelled with the spike owner label: removed and re-created with the labels (13.929337ms)
+  AssertionError [ERR_ASSERTION]: /spike/runtime/run-linux.sh: line 27: set: pipefail: invalid option name
+  
+  
+  2 !== 0
+  
+      at TestContext.<anonymous> (file:///spike/runtime/test/run-linux.test.mjs:86:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test/run-linux.test.mjs:93:1
+✖ --reuse spike-runtime-deps: read-only mount, prints version and lockfile hash, creates/removes nothing (13.440709ms)
+  AssertionError [ERR_ASSERTION]: /spike/runtime/run-linux.sh: line 27: set: pipefail: invalid option name
+  
+  
+  2 !== 0
+  
+      at TestContext.<anonymous> (file:///spike/runtime/test/run-linux.test.mjs:96:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test/run-linux.test.mjs:107:1
+✖ --reuse refuses a volume that is missing or holds another transformers version (22.242758ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /4\.3\.1/. Input:
+  
+  '/spike/runtime/run-linux.sh: line 27: set: pipefail\r: invalid option name\n'
+  
+      at TestContext.<anonymous> (file:///spike/runtime/test/run-linux.test.mjs:113:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '/spike/runtime/run-linux.sh: line 27: set: pipefail\r: invalid option name\n',
+    expected: /4\.3\.1/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at test/run-linux.test.mjs:116:1
+✖ bench: every container is named + labelled with the run id, deps volume read-only, --network none, resources recorded; removed afterwards only if labelled (13.528093ms)
+  AssertionError [ERR_ASSERTION]: /spike/runtime/run-linux.sh: line 27: set: pipefail: invalid option name
+  
+  
+  2 !== 0
+  
+      at TestContext.<anonymous> (file:///spike/runtime/test/run-linux.test.mjs:119:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test/run-linux.test.mjs:137:1
+✖ cleanup trap does NOT remove a container whose label is not this run id (14.160954ms)
+  AssertionError [ERR_ASSERTION]: /spike/runtime/run-linux.sh: line 27: set: pipefail: invalid option name
+  
+  
+  2 !== 0
+  
+      at TestContext.<anonymous> (file:///spike/runtime/test/run-linux.test.mjs:140:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test/run-linux.test.mjs:144:1
+✖ test/bench without SPIKE_DEPS_VOLUME fail (no implicit default volume); a missing volume fails; a failing container propagates its exit code and is still cleaned (41.83783ms)
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+  
+    assert.ok(d.log().some((l) => /^rm -f spike-r9-/.test(l)))
+  
+      at TestContext.<anonymous> (file:///spike/runtime/test/run-linux.test.mjs:150:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at test/run-linux.test.mjs:153:1
+✖ rm-volume: only owner-labelled, non-protected volumes; list shows only our labels (29.680433ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  2 !== 0
+  
+      at TestContext.<anonymous> (file:///spike/runtime/test/run-linux.test.mjs:157:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

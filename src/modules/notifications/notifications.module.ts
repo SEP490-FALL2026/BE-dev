@@ -2,11 +2,10 @@ import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EnvironmentVariables } from '../../infrastructure/config/env-schema';
 import { DatabaseModule } from '../../infrastructure/database/database.module';
+import { MailTransport, SmtpMailTransport } from '../../infrastructure/mail/mail-transport';
 import { EmailDispatcher } from './email-dispatcher.service';
-import { MailTransport, SmtpMailTransport } from './mail-transport';
 import { NotificationsRepo } from './notifications.repo';
 import { NotificationsService } from './notifications.service';
-import { PAYLOAD_CIPHER } from './notifications.tokens';
 import { PayloadCipher } from './payload-cipher';
 
 /** `id:base64` pairs separated by commas. */
@@ -31,7 +30,7 @@ function parsePreviousKeys(value: string): Record<string, string> {
     EmailDispatcher,
     { provide: MailTransport, useClass: SmtpMailTransport },
     {
-      provide: PAYLOAD_CIPHER,
+      provide: PayloadCipher,
       inject: [ConfigService],
       useFactory: (config: ConfigService<EnvironmentVariables, true>) =>
         new PayloadCipher({

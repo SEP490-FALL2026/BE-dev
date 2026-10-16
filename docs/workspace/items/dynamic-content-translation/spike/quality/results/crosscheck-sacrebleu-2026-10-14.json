@@ -1,0 +1,46 @@
+{
+  "sacrebleu": "2.6.0",
+  "files": [
+    {
+      "file": "2026-10-14-vi-en-raw.json",
+      "direction": "vi-en",
+      "mode": "raw",
+      "corpusChrF_js": 35.84,
+      "corpusChrF_sacrebleu": 35.84,
+      "abs_diff": 0.0024,
+      "max_sentence_abs_diff": 0.0049,
+      "non_nfc_hypotheses": 0
+    },
+    {
+      "file": "2026-10-14-vi-en-protected.json",
+      "direction": "vi-en",
+      "mode": "protected",
+      "corpusChrF_js": 36.65,
+      "corpusChrF_sacrebleu": 36.65,
+      "abs_diff": 0.0009,
+      "max_sentence_abs_diff": 0.005,
+      "non_nfc_hypotheses": 0
+    },
+    {
+      "file": "2026-10-14-en-vi-raw.json",
+      "direction": "en-vi",
+      "mode": "raw",
+      "corpusChrF_js": 28.93,
+      "corpusChrF_sacrebleu": 28.93,
+      "abs_diff": 0.0038,
+      "max_sentence_abs_diff": 0.005,
+      "non_nfc_hypotheses": 2
+    },
+    {
+      "file": "2026-10-14-en-vi-protected.json",
+      "direction": "en-vi",
+      "mode": "protected",
+      "corpusChrF_js": 40.87,
+      "corpusChrF_sacrebleu": 40.87,
+      "abs_diff": 0.0015,
+      "max_sentence_abs_diff": 0.0049,
+      "non_nfc_hypotheses": 0
+    }
+  ],
+  "signature": "nrefs:1|case:mixed|eff:yes|nc:6|nw:0|space:no|version:2.6.0"
+}

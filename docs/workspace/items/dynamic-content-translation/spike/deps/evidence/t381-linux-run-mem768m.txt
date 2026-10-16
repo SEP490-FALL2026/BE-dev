@@ -1,0 +1,3 @@
+uid=1000 user=node node=v24.21.0
+network probe failed as expected: EAI_AGAIN
+cjs require ok function

@@ -1,7 +1,7 @@
 import { Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EnvironmentVariables } from './infrastructure/config/env-schema';
-import { AccountManagementService } from './modules/identity-access/account-management.service';
+import { IdentityAccessService } from './modules/identity-access/identity-access.service';
 import { EmailDispatcher } from './modules/notifications/email-dispatcher.service';
 
 /**
@@ -19,7 +19,7 @@ export class EmailDispatchLoop implements OnApplicationBootstrap, OnModuleDestro
 
   constructor(
     private readonly dispatcher: EmailDispatcher,
-    private readonly accounts: AccountManagementService,
+    private readonly identity: IdentityAccessService,
     private readonly config: ConfigService<EnvironmentVariables, true>,
   ) {}
 
@@ -48,7 +48,7 @@ export class EmailDispatchLoop implements OnApplicationBootstrap, OnModuleDestro
 
   private async tick(): Promise<void> {
     try {
-      await this.dispatcher.dispatchDue((hash) => this.accounts.isInvitationLinkUsable(hash));
+      await this.dispatcher.dispatchDue((hash) => this.identity.isInvitationLinkUsable(hash));
     } catch (error) {
       this.logger.error(`Mail dispatch tick failed: ${(error as Error).name}`);
     } finally {

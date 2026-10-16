@@ -1,0 +1,81 @@
+{
+  "scenario": "killcycles",
+  "profile": "linux",
+  "node": "v24.21.0",
+  "platform": "linux-x64",
+  "transformersPath": "direct-generate",
+  "seconds": 42,
+  "cgroupAfter": {
+    "memoryPeakMb": 516.1,
+    "memoryCurrentMb": 22.5,
+    "memoryMax": "2147483648",
+    "cpuMax": "200000 100000",
+    "cpuStat": {
+      "nrPeriods": 421,
+      "nrThrottled": 64,
+      "throttledMs": 20740
+    }
+  },
+  "result": {
+    "cycles": 20,
+    "apiRssStartMb": 81.1,
+    "apiRssEndMb": 83.3,
+    "apiRssDeltaMb": 2.2,
+    "apiRssSeriesMb": [
+      82.4,
+      82.7,
+      82.8,
+      82.8,
+      83.1,
+      83.1,
+      83.1,
+      83.1,
+      83.1,
+      83.1,
+      83.1,
+      83.1,
+      83.3,
+      83.3,
+      83.3,
+      83.3,
+      83.3,
+      83.3,
+      83.3,
+      83.3
+    ],
+    "workerHwmMbPerCycle": [
+      496.6,
+      528.7,
+      498.6,
+      507.6,
+      505.9,
+      496.2,
+      505.7,
+      499.2,
+      496,
+      503.3,
+      508.6,
+      507.8,
+      506.2,
+      509.6,
+      510.2,
+      506.7,
+      506.7,
+      504.8,
+      506.5,
+      506.5
+    ],
+    "allOk": true,
+    "maxChildrenAlive": 1,
+    "eventAnalysis": {
+      "violations": [],
+      "maxLive": 1,
+      "maxConcurrentRuns": 1,
+      "dispatches": 20,
+      "kills": 0,
+      "releasesByExit": 0,
+      "events": 200
+    },
+    "spawns": 20
+  }
+}

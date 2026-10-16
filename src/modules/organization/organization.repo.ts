@@ -1,15 +1,15 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma } from '../../generated/prisma/client';
 import { fromDateColumn, toDateColumn } from '../../core/business-date';
 import { normalizeEmail } from '../../core/email';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { DbTx } from '../../infrastructure/database/transaction-runner';
+import { isUniqueViolation } from '../../infrastructure/database/unique-violation';
 import {
   EmployeeCodeTakenError,
   EmployeeEmailTakenError,
-  EmployeeNotFoundError,
   OrganizationAlreadyExistsError,
 } from './errors/organization.errors';
+import { EmployeeNotFoundError } from './organization.errors';
 import {
   CreateCostCenterInput,
   CreateDepartmentInput,
@@ -21,12 +21,9 @@ import {
   OrganizationRecord,
 } from './organization.types';
 
-/** True for a P2002 whose constraint or column list mentions one of `needles`. */
-function isUniqueViolation(error: unknown, ...needles: string[]): boolean {
-  if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') return false;
-  const haystack = JSON.stringify(error.meta ?? {});
-
-  return needles.some((needle) => haystack.includes(needle));
+/** Escapes LIKE metacharacters so a search term matches literally (backslash is PostgreSQL's default escape). */
+function escapeLikePattern(term: string): string {
+  return term.replace(/[\\%_]/g, (character) => `\\${character}`);
 }
 
 const ORGANIZATION_SELECT = { id: true, name: true, timeZone: true, reportingCurrency: true } as const;
@@ -153,44 +150,44 @@ export class OrganizationRepo {
     search: string | undefined,
     onDate: Date,
     limit: number,
-    afterEmployeeCode?: string,
+    excludeEmployeeIds: readonly string[],
   ): Promise<EmployeeCandidate[]> {
     const term = search?.trim();
-    const rows = await this.prisma.employee.findMany({
-      where: {
-        status: 'ACTIVE',
-        ...(afterEmployeeCode === undefined ? {} : { employeeCode: { gt: afterEmployeeCode } }),
-        ...(term
-          ? {
-              OR: [
-                { employeeCode: { contains: term, mode: 'insensitive' as const } },
-                { fullName: { contains: term, mode: 'insensitive' as const } },
-                { workEmail: { contains: term, mode: 'insensitive' as const } },
-              ],
-            }
-          : {}),
-      },
-      orderBy: { employeeCode: 'asc' },
-      take: limit,
-      select: {
-        id: true,
-        employeeCode: true,
-        fullName: true,
-        workEmail: true,
-        placements: {
-          where: { validFrom: { lte: onDate }, OR: [{ validTo: null }, { validTo: { gt: onDate } }] },
-          select: { department: { select: { name: true } } },
-          take: 1,
-        },
-      },
-    });
+    // Literal match: % and _ typed by the user are characters, not wildcards (Prisma `contains` does not
+    // escape them). The exclusion list travels as ONE uuid[] parameter: a Prisma `notIn` sends one bind
+    // parameter per id and fails beyond PostgreSQL's parameter limit.
+    const pattern = term ? `%${escapeLikePattern(term)}%` : null;
+    const day = fromDateColumn(onDate);
+    const rows = await this.prisma.$queryRaw<
+      { id: string; employee_code: string; full_name: string; work_email: string | null; department: string | null }[]
+    >`
+      SELECT e.id, e.employee_code, e.full_name, e.work_email, placement.department
+        FROM employees e
+        LEFT JOIN LATERAL (
+          SELECT d.name AS department
+            FROM employee_placements p
+            JOIN departments d ON d.id = p.department_id
+           WHERE p.employee_id = e.id
+             AND p.valid_from <= ${day}::date
+             AND (p.valid_to IS NULL OR p.valid_to > ${day}::date)
+           ORDER BY p.valid_from DESC
+           LIMIT 1
+        ) placement ON true
+       WHERE e.status = 'ACTIVE'
+         AND e.id <> ALL (${[...excludeEmployeeIds]}::uuid[])
+         AND (${pattern}::text IS NULL
+              OR e.employee_code ILIKE ${pattern}
+              OR e.full_name ILIKE ${pattern}
+              OR e.work_email ILIKE ${pattern})
+       ORDER BY e.employee_code, e.id
+       LIMIT ${limit}`;
 
     return rows.map((row) => ({
       id: row.id,
-      employeeCode: row.employeeCode,
-      fullName: row.fullName,
-      workEmail: row.workEmail,
-      department: row.placements[0]?.department.name ?? null,
+      employeeCode: row.employee_code,
+      fullName: row.full_name,
+      workEmail: row.work_email,
+      department: row.department,
     }));
   }
 

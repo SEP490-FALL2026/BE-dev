@@ -66,16 +66,17 @@ export class OrganizationService {
   }
 
   /**
-   * Employees who have not left, matched on code, name or work email, in employee-code order.
-   * `afterEmployeeCode` continues a previous page (keyset): only codes sorting after it are returned.
+   * Employees who have not left, matched literally on code, name or work email, in employee-code
+   * order, leaving out `excludeEmployeeIds` (the caller's own filter, for example employees that
+   * already have an account). One query: the exclusion is applied before the limit.
    */
   searchActiveEmployees(
     search: string | undefined,
     onDate: Date,
     limit: number,
-    afterEmployeeCode?: string,
+    excludeEmployeeIds: readonly string[] = [],
   ): Promise<EmployeeCandidate[]> {
-    return this.repo.searchActiveEmployees(search, onDate, limit, afterEmployeeCode);
+    return this.repo.searchActiveEmployees(search, onDate, limit, excludeEmployeeIds);
   }
 
   getEmployeeProfile(employeeId: string, onDate: Date): Promise<EmployeeProfile | null> {

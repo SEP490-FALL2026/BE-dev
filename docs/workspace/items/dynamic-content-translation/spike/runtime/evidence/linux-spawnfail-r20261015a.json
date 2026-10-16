@@ -1,0 +1,255 @@
+{
+  "scenario": "spawnfail",
+  "profile": "linux",
+  "node": "v24.21.0",
+  "platform": "linux-x64",
+  "transformersPath": "direct-generate",
+  "seconds": 6,
+  "cgroupAfter": {
+    "memoryPeakMb": 79.8,
+    "memoryCurrentMb": 20.7,
+    "memoryMax": "2147483648",
+    "cpuMax": "200000 100000",
+    "cpuStat": {
+      "nrPeriods": 58,
+      "nrThrottled": 0,
+      "throttledMs": 0
+    }
+  },
+  "result": {
+    "missingExecPath": {
+      "results": [
+        {
+          "status": "UNAVAILABLE",
+          "reason": "spawn-failed",
+          "ms": 41.8,
+          "liveWorkerPids": 0,
+          "breaker": "CLOSED"
+        },
+        {
+          "status": "UNAVAILABLE",
+          "reason": "spawn-failed",
+          "ms": 9,
+          "liveWorkerPids": 0,
+          "breaker": "CLOSED"
+        },
+        {
+          "status": "UNAVAILABLE",
+          "reason": "spawn-failed",
+          "ms": 8.9,
+          "liveWorkerPids": 0,
+          "breaker": "OPEN"
+        },
+        {
+          "status": "UNAVAILABLE",
+          "reason": "breaker-open",
+          "ms": 3.8,
+          "liveWorkerPids": 0,
+          "breaker": "OPEN"
+        },
+        {
+          "status": "UNAVAILABLE",
+          "reason": "breaker-open",
+          "ms": 3.6,
+          "liveWorkerPids": 0,
+          "breaker": "OPEN"
+        }
+      ],
+      "spawnFailedEvents": [
+        {
+          "phase": "async",
+          "code": "ENOENT"
+        },
+        {
+          "phase": "async",
+          "code": "ENOENT"
+        },
+        {
+          "phase": "async",
+          "code": "ENOENT"
+        }
+      ],
+      "failuresByKind": {
+        "spawnFailed": 3
+      },
+      "eventAnalysis": {
+        "violations": [],
+        "maxLive": 1,
+        "maxConcurrentRuns": 0,
+        "dispatches": 3,
+        "kills": 0,
+        "releasesByExit": 0,
+        "events": 21
+      },
+      "apiShutdownMs": 16,
+      "apiExit": {
+        "code": 0,
+        "signal": null
+      },
+      "shutdownSummary": {
+        "reason": "SIGTERM",
+        "ms": 0,
+        "exits": [],
+        "killSent": []
+      },
+      "neverHung": true
+    },
+    "missingCwd": {
+      "results": [
+        {
+          "status": "UNAVAILABLE",
+          "reason": "spawn-failed",
+          "ms": 26.4,
+          "liveWorkerPids": 0,
+          "breaker": "CLOSED"
+        },
+        {
+          "status": "UNAVAILABLE",
+          "reason": "spawn-failed",
+          "ms": 8.1,
+          "liveWorkerPids": 0,
+          "breaker": "CLOSED"
+        },
+        {
+          "status": "UNAVAILABLE",
+          "reason": "spawn-failed",
+          "ms": 8.7,
+          "liveWorkerPids": 0,
+          "breaker": "OPEN"
+        },
+        {
+          "status": "UNAVAILABLE",
+          "reason": "breaker-open",
+          "ms": 3.9,
+          "liveWorkerPids": 0,
+          "breaker": "OPEN"
+        },
+        {
+          "status": "UNAVAILABLE",
+          "reason": "breaker-open",
+          "ms": 4.1,
+          "liveWorkerPids": 0,
+          "breaker": "OPEN"
+        }
+      ],
+      "spawnFailedEvents": [
+        {
+          "phase": "async",
+          "code": "ENOENT"
+        },
+        {
+          "phase": "async",
+          "code": "ENOENT"
+        },
+        {
+          "phase": "async",
+          "code": "ENOENT"
+        }
+      ],
+      "failuresByKind": {
+        "spawnFailed": 3
+      },
+      "eventAnalysis": {
+        "violations": [],
+        "maxLive": 1,
+        "maxConcurrentRuns": 0,
+        "dispatches": 3,
+        "kills": 0,
+        "releasesByExit": 0,
+        "events": 21
+      },
+      "apiShutdownMs": 16,
+      "apiExit": {
+        "code": 0,
+        "signal": null
+      },
+      "shutdownSummary": {
+        "reason": "SIGTERM",
+        "ms": 0,
+        "exits": [],
+        "killSent": []
+      },
+      "neverHung": true
+    },
+    "missingWorkerScript": {
+      "results": [
+        {
+          "status": "UNAVAILABLE",
+          "reason": "crash",
+          "ms": 68,
+          "liveWorkerPids": 0,
+          "breaker": "CLOSED"
+        },
+        {
+          "status": "UNAVAILABLE",
+          "reason": "crash",
+          "ms": 54.9,
+          "liveWorkerPids": 0,
+          "breaker": "CLOSED"
+        },
+        {
+          "status": "UNAVAILABLE",
+          "reason": "crash",
+          "ms": 53.4,
+          "liveWorkerPids": 0,
+          "breaker": "OPEN"
+        },
+        {
+          "status": "UNAVAILABLE",
+          "reason": "breaker-open",
+          "ms": 3.8,
+          "liveWorkerPids": 0,
+          "breaker": "OPEN"
+        },
+        {
+          "status": "UNAVAILABLE",
+          "reason": "breaker-open",
+          "ms": 3.3,
+          "liveWorkerPids": 0,
+          "breaker": "OPEN"
+        }
+      ],
+      "spawnFailedEvents": [],
+      "failuresByKind": {
+        "crash": 3
+      },
+      "eventAnalysis": {
+        "violations": [],
+        "maxLive": 1,
+        "maxConcurrentRuns": 0,
+        "dispatches": 3,
+        "kills": 0,
+        "releasesByExit": 3,
+        "events": 21
+      },
+      "apiShutdownMs": 14,
+      "apiExit": {
+        "code": 0,
+        "signal": null
+      },
+      "shutdownSummary": {
+        "reason": "SIGTERM",
+        "ms": 1,
+        "exits": [
+          {
+            "pid": 57,
+            "code": 1,
+            "signal": null
+          },
+          {
+            "pid": 64,
+            "code": 1,
+            "signal": null
+          },
+          {
+            "pid": 71,
+            "code": 1,
+            "signal": null
+          }
+        ],
+        "killSent": []
+      },
+      "neverHung": true
+    }
+  }
+}

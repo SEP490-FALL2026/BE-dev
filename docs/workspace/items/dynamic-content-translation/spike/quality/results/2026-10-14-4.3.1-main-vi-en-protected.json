@@ -1,0 +1,414 @@
+{
+  "date": "2026-10-14",
+  "tag": "4.3.1",
+  "fixtureSet": "main",
+  "fixtureFile": {
+    "file": "fixtures/vi-en.json",
+    "sha256": "acf33bd37b3e4c669a48c7ce3f1cff862e48fb78a07222f9c3a23703df164357",
+    "items": 84
+  },
+  "direction": "vi-en",
+  "mode": "protected",
+  "options": {
+    "warmup": 2,
+    "repetitions": 3,
+    "maxSegmentTokens": 128,
+    "maxNewTokensRule": "min(512, 2*inputTokens+16)",
+    "batchSize": 1,
+    "limit": null,
+    "knownTerms": "fixture",
+    "decoding": "greedy (num_beams ignored by transformers.js), forced_eos_token_id disabled in generate()"
+  },
+  "environment": {
+    "os": "Windows_NT 10.0.26200 (win32 x64)",
+    "cpuModel": "11th Gen Intel(R) Core(TM) i7-11800H @ 2.30GHz",
+    "cpuCount": 16,
+    "totalMemGb": 15.7,
+    "node": "v24.0.1",
+    "transformers": "4.3.1",
+    "dtype": "q8",
+    "device": "cpu"
+  },
+  "lockfile": {
+    "file": "pnpm-lock.yaml",
+    "sha256": "1492a4edda12069377a4972716d869cc51826f2fe077d5a5fb381a36bf3231e5",
+    "versions": {
+      "@huggingface/transformers": "4.3.1",
+      "onnxruntime-node": "1.30.0",
+      "sharp": "0.35.5",
+      "@huggingface/tokenizers": "0.2.0"
+    }
+  },
+  "libSha256": {
+    "lib/chrf.mjs": "dd34291ce919966fa2185524befcb009f82a2cf4277f377c999e7330383dabc4",
+    "lib/cli.mjs": "0b59ec3df543c5cd795a1708f671f4d18d0fab69554298af42ca35ef76fb24c0",
+    "lib/generate-adapter.mjs": "8949feb86b8dda5c1774c593a95247e3de699c96e832b543c62df22b2c8fc210",
+    "lib/glossary.mjs": "831f0e273b891d2bf3a5781a5b44e1d2f1a86c8882b037889318fc75a2bc321d",
+    "lib/metrics.mjs": "97672836ac8b2a9460c53d5f8ec8ecbf53faa754388ab88522fdd07d0a6848b6",
+    "lib/model.mjs": "cf552faa2e971152a6d36ce191370c472aee643b34c0724a0ec5d8a0d853dc3c",
+    "lib/pipeline.mjs": "36555bb1e906d478ac585a4d5e4a2c8cfa4ab8c54ed1476d2e01b121c541cd3a",
+    "lib/polarity.mjs": "bcd51bcc55a52db06d75f9ef265f28d67804a5cb706a6f8f8492cf46be9c20bf",
+    "lib/protect.mjs": "d9342e20bbaee794d4e4bac8f49d66976066032bdc7249668e3dafcd221ea137",
+    "lib/report.mjs": "1d0eef46fa7ba4aa8058003d5a7f2ab1dc546b49d37eb91e247576093c71c5a1",
+    "lib/segmenter.mjs": "134fa1026ca6a25223f83a556a915186f6414fc281c0c1a58ffbf8321dccd59a"
+  },
+  "adapter": {
+    "transformersVersion": "4.3.1",
+    "modelId": "Xenova/opus-mt-vi-en"
+  },
+  "model": {
+    "id": "Xenova/opus-mt-vi-en",
+    "revision": "541dfd72ec07e8f1563795e0224408ad8d729e80",
+    "langTokenId": null,
+    "eosTokenId": 0,
+    "decoderStartTokenId": 53738,
+    "files": [
+      {
+        "file": "README.md",
+        "bytes": 571,
+        "sha256": "0309dbabda663d5083661a9240e74b637d7f3cd8d05326617493cf34a7ff5e62"
+      },
+      {
+        "file": "config.json",
+        "bytes": 1389,
+        "sha256": "c62a203a0183755af37b96a33cc125e7f74f97c1e90aaae1d1f404fd8a42eea8"
+      },
+      {
+        "file": "generation_config.json",
+        "bytes": 293,
+        "sha256": "44f2c9011a9087c5ec93a1671066a4a59a7a8c00c03e84a6ecac0d840926566b"
+      },
+      {
+        "file": "tokenizer.json",
+        "bytes": 5169708,
+        "sha256": "c41cc5afd26c053770b60e1031577bb7a8e2f3c2eeacde2a34f5c15abfd4eafd"
+      },
+      {
+        "file": "tokenizer_config.json",
+        "bytes": 282,
+        "sha256": "0221122d916f6f230d6b1967644457745aa01514e054897f62b8c6b419460ceb"
+      },
+      {
+        "file": "special_tokens_map.json",
+        "bytes": 74,
+        "sha256": "5e4d1f5e759d74cb1c2fe1d165cfc62b5237aa904de759380cd6f43042eec723"
+      },
+      {
+        "file": "onnx/encoder_model_quantized.onnx",
+        "bytes": 47133597,
+        "sha256": "fa7bd78e8bed6bdc03728f62f1592c4bb52d9e12795496604c1e990e102abdb2"
+      },
+      {
+        "file": "onnx/decoder_model_merged_quantized.onnx",
+        "bytes": 54401611,
+        "sha256": "540edbcc08bab0b42c03576a759fd9b4d5fc99996ac3178630733916dc2325cb"
+      }
+    ]
+  },
+  "loadMs": 971,
+  "peakRssMb": 569,
+  "wallSec": 176.1,
+  "unstableItems": [],
+  "aggregate": {
+    "items": 84,
+    "corpusChrF": 35.24,
+    "preservedPct": 100,
+    "meaningPassPct": 66.13,
+    "fallbackSegmentPct": 41.9,
+    "silentMeaningFailures": 1,
+    "polarity": {
+      "negation": {
+        "n": 19,
+        "pass": 13,
+        "pct": 68.42,
+        "silentFailures": 0
+      },
+      "approve": {
+        "n": 9,
+        "pass": 6,
+        "pct": 66.67,
+        "silentFailures": 1
+      },
+      "reject": {
+        "n": 10,
+        "pass": 6,
+        "pct": 60,
+        "silentFailures": 0
+      },
+      "revoke": {
+        "n": 10,
+        "pass": 5,
+        "pct": 50,
+        "silentFailures": 0
+      }
+    },
+    "latency": {
+      "p50": 558.8,
+      "p95": 1700.1,
+      "max": 2879.1
+    },
+    "perCategory": {
+      "approve": {
+        "items": 9,
+        "corpusChrF": 55.7,
+        "preservedPct": 100,
+        "meaningPassPct": 66.67,
+        "fallbackSegmentPct": 33.33
+      },
+      "code": {
+        "items": 8,
+        "corpusChrF": 61.18,
+        "preservedPct": 100,
+        "meaningPassPct": 60,
+        "fallbackSegmentPct": 37.5
+      },
+      "collision": {
+        "items": 3,
+        "corpusChrF": 77.11,
+        "preservedPct": 100,
+        "meaningPassPct": 100,
+        "fallbackSegmentPct": 0
+      },
+      "date": {
+        "items": 14,
+        "corpusChrF": 53.96,
+        "preservedPct": 100,
+        "meaningPassPct": 60,
+        "fallbackSegmentPct": 29.41
+      },
+      "email": {
+        "items": 3,
+        "corpusChrF": 79.7,
+        "preservedPct": 100,
+        "meaningPassPct": 100,
+        "fallbackSegmentPct": 0
+      },
+      "glossary": {
+        "items": 42,
+        "corpusChrF": 45.6,
+        "preservedPct": 100,
+        "meaningPassPct": 61.9,
+        "fallbackSegmentPct": 40.43
+      },
+      "long": {
+        "items": 4,
+        "corpusChrF": 23.66,
+        "preservedPct": 100,
+        "meaningPassPct": null,
+        "fallbackSegmentPct": 100
+      },
+      "mixed": {
+        "items": 3,
+        "corpusChrF": 56.57,
+        "preservedPct": 100,
+        "meaningPassPct": 100,
+        "fallbackSegmentPct": 33.33
+      },
+      "name": {
+        "items": 17,
+        "corpusChrF": 55.22,
+        "preservedPct": 100,
+        "meaningPassPct": 64.29,
+        "fallbackSegmentPct": 31.58
+      },
+      "negation": {
+        "items": 19,
+        "corpusChrF": 44.19,
+        "preservedPct": 100,
+        "meaningPassPct": 68.42,
+        "fallbackSegmentPct": 31.58
+      },
+      "number": {
+        "items": 12,
+        "corpusChrF": 45.02,
+        "preservedPct": 100,
+        "meaningPassPct": 63.64,
+        "fallbackSegmentPct": 33.33
+      },
+      "plain": {
+        "items": 7,
+        "corpusChrF": 61.89,
+        "preservedPct": 100,
+        "meaningPassPct": 100,
+        "fallbackSegmentPct": 0
+      },
+      "reject": {
+        "items": 10,
+        "corpusChrF": 43.27,
+        "preservedPct": 100,
+        "meaningPassPct": 60,
+        "fallbackSegmentPct": 33.33
+      },
+      "revoke": {
+        "items": 10,
+        "corpusChrF": 37.36,
+        "preservedPct": 100,
+        "meaningPassPct": 50,
+        "fallbackSegmentPct": 58.33
+      },
+      "software": {
+        "items": 34,
+        "corpusChrF": 45.01,
+        "preservedPct": 100,
+        "meaningPassPct": 60.71,
+        "fallbackSegmentPct": 36.59
+      },
+      "unaccented": {
+        "items": 4,
+        "corpusChrF": 24.83,
+        "preservedPct": 100,
+        "meaningPassPct": 33.33,
+        "fallbackSegmentPct": 75
+      }
+    }
+  },
+  "fields": {
+    "items": 84,
+    "notNeeded": 0,
+    "translated": 56,
+    "translatedPct": 66.67,
+    "fallback": {
+      "n": 28,
+      "pct": 33.33,
+      "byReason": {
+        "placeholder": 18,
+        "polarity": 9,
+        "too_long": 0,
+        "max_new_tokens": 1,
+        "other": 0
+      }
+    },
+    "chrF": {
+      "corpus": 35.24,
+      "translatedOnly": 63.87
+    },
+    "preservation": {
+      "translatedPct": 100,
+      "n": 48
+    },
+    "automaticFlags": {
+      "translatedFields": 56,
+      "meaningFlags": 1,
+      "meaningFlagPct": 2.5,
+      "preservationFlags": 0,
+      "polarity": {
+        "negation": {
+          "n": 13,
+          "flags": 0
+        },
+        "approve": {
+          "n": 6,
+          "flags": 1
+        },
+        "reject": {
+          "n": 6,
+          "flags": 0
+        },
+        "revoke": {
+          "n": 5,
+          "flags": 0
+        }
+      }
+    },
+    "latency": {
+      "field": {
+        "p50": 558.8,
+        "p95": 1700.1,
+        "max": 2879.1,
+        "n": 84
+      },
+      "segment": {
+        "p50": 536.4,
+        "p95": 1325.5,
+        "max": 3433.8,
+        "n": 267
+      }
+    }
+  },
+  "items": [
+    {"id":"vi-001","categories":["negation","plain"],"output":"I don't need to install any more software for this project.","chrf":59.53,"hasProtected":false,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":618.3,"latencySamplesMs":[618.3,592.3,717.6],"segmentMs":[616.6,590.2,715.2]},
+    {"id":"vi-002","categories":["negation","name"],"output":"The request of Nguyễn Văn An is not approved for no detailed reason.","chrf":42.51,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":836.2,"latencySamplesMs":[627.8,1115.7,836.2],"segmentMs":[625.6,1114.5,834.4]},
+    {"id":"vi-003","categories":["negation","plain"],"output":"This tool is not on the standard company list.","chrf":57.71,"hasProtected":false,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":483.2,"latencySamplesMs":[561.8,483.2,421.1],"segmentMs":[560.1,481.4,420]},
+    {"id":"vi-004","categories":["negation","revoke","name","glossary"],"output":"I don't agree with the proposition revoke seat of Trần Thị Bích.","chrf":65.49,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":904.1,"latencySamplesMs":[1135.1,904.1,824.4],"segmentMs":[1124,901.2,754.3]},
+    {"id":"vi-005","categories":["negation","software"],"output":"Không được phép chia sẻ tài khoản Figma giữa các thành viên.","chrf":12.13,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":false,"hasChecks":true,"failedContain":["not | n't | no  | never | cannot | unable | without | nobody | none | neither"],"failedNotContain":[]},"status":"NOT_TRANSLATED","reason":"QUALITY_GATE","detail":{"polarity":{"required":["negation"],"missing":["negation"]}},"counts":{"total":1,"translated":0,"fallback":1},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":841.5,"latencySamplesMs":[610.9,850.1,841.5],"segmentMs":[573.3,848.1,741.7]},
+    {"id":"vi-006","categories":["negation","date","glossary"],"output":"The team cannot complete hand over before the date 30/11/2026.","chrf":87.76,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":613.4,"latencySamplesMs":[894.5,587.9,613.4],"segmentMs":[848.8,586.7,612.2]},
+    {"id":"vi-007","categories":["negation","software","glossary"],"output":"Chúng tôi chưa gia hạn giấy phép Jira vì ngân sách chưa được phê duyệt.","chrf":9.78,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":false,"hasChecks":true,"failedContain":["not | n't | no  | never | cannot | unable | without | nobody | none | neither","renew"],"failedNotContain":[]},"status":"NOT_TRANSLATED","reason":"PLACEHOLDER_GATE","detail":{"gate":{"ok":false,"missing":[1],"extra":[],"duplicated":[]}},"counts":{"total":1,"translated":0,"fallback":1},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":750.4,"latencySamplesMs":[849.7,750.4,678.2],"segmentMs":[848.4,676.6,645.7]},
+    {"id":"vi-008","categories":["negation","glossary"],"output":"This employee no longer works at department engineering.","chrf":77.39,"hasProtected":false,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":469.4,"latencySamplesMs":[446.9,555.8,469.4],"segmentMs":[371.2,517.9,468.3]},
+    {"id":"vi-009","categories":["negation","software","glossary"],"output":"No other seat is available in the package Slack currently.","chrf":52.17,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":581.5,"latencySamplesMs":[581.5,701.6,434.6],"segmentMs":[580.4,700.5,433.4]},
+    {"id":"vi-010","categories":["negation","glossary"],"output":"Yêu cầu này không được tự động duyệt; trưởng phòng phải xác nhận trước.","chrf":6.27,"hasProtected":false,"preserved":{"all":true,"missing":[]},"meaning":{"pass":false,"hasChecks":true,"failedContain":["not | n't | no  | never | cannot | unable | without | nobody | none | neither","department head | head of department | head of the department"],"failedNotContain":[]},"status":"NOT_TRANSLATED","reason":"PLACEHOLDER_GATE","detail":{"gate":{"ok":false,"missing":[0],"extra":[],"duplicated":[]}},"counts":{"total":1,"translated":0,"fallback":1},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":435,"latencySamplesMs":[388.6,442.5,435],"segmentMs":[387.6,441.5,434]},
+    {"id":"vi-011","categories":["negation","revoke","name","glossary"],"output":"Don't revoke account of Lê Hoàng Nam before handover data.","chrf":56.82,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":479.5,"latencySamplesMs":[586.4,468.2,479.5],"segmentMs":[585.1,467,478.3]},
+    {"id":"vi-012","categories":["negation","plain"],"output":"This report does not contain a client's personal data.","chrf":69.04,"hasProtected":false,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":323.2,"latencySamplesMs":[323.2,299.3,347.3],"segmentMs":[322.1,298.3,346]},
+    {"id":"vi-013","categories":["approve","software"],"output":"I've approved the installation request Visual Studio Code for the whole group.","chrf":71.89,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":700.2,"latencySamplesMs":[437.4,757.8,700.2],"segmentMs":[436.1,684.6,650.1]},
+    {"id":"vi-014","categories":["approve","code"],"output":"Request REQ-2026-0042 approved.","chrf":84.98,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":227.5,"latencySamplesMs":[234.1,227.5,216.1],"segmentMs":[233.1,226.7,215.3]},
+    {"id":"vi-015","categories":["approve","software","glossary"],"output":"Department head has approved exception for tool Notion because marketing groups need to cooperate in real time.","chrf":55.99,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":751.7,"latencySamplesMs":[622.8,765.6,751.7],"segmentMs":[620.8,687,715.5]},
+    {"id":"vi-016","categories":["approve","number","software","glossary"],"output":"Spending Approver already approved the budget 2.400.000 đồng for a license Postman.","chrf":66.35,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":742.6,"latencySamplesMs":[742.6,626.5,795.7],"segmentMs":[741.2,625.4,726]},
+    {"id":"vi-017","categories":["approve","software","glossary"],"output":"Đã duyệt: gia hạn Slack thêm 12 tháng.","chrf":14.42,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":false,"hasChecks":true,"failedContain":["approv","renew"],"failedNotContain":[]},"status":"NOT_TRANSLATED","reason":"QUALITY_GATE","detail":{"polarity":{"required":["approve"],"missing":["approve"]}},"counts":{"total":1,"translated":0,"fallback":1},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":495.8,"latencySamplesMs":[615.5,495.8,459.4],"segmentMs":[580,494.8,458.4]},
+    {"id":"vi-018","categories":["approve","name","software"],"output":"We're accepting the proposition of Phạm Quỳnh Anh on using Figma instead of Adobe XD.","chrf":60.14,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":false,"hasChecks":true,"failedContain":["approv"],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":595,"latencySamplesMs":[595,557.7,599.9],"segmentMs":[593.9,556.4,598.6]},
+    {"id":"vi-019","categories":["approve","plain"],"output":"The request was valid, so I immediately approved.","chrf":70.67,"hasProtected":false,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":290.5,"latencySamplesMs":[289.3,290.5,322.6],"segmentMs":[288.4,289.7,321.6]},
+    {"id":"vi-020","categories":["approve","number","date","glossary"],"output":"Phê duyệt có điều kiện: chỉ cấp 3 seat cho nhóm thiết kế đến hết 31/12/2026.","chrf":21.51,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":false,"hasChecks":true,"failedContain":["approv"],"failedNotContain":[]},"status":"NOT_TRANSLATED","reason":"PLACEHOLDER_GATE","detail":{"gate":{"ok":false,"missing":[],"extra":[],"duplicated":[1]}},"counts":{"total":1,"translated":0,"fallback":1},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":848.3,"latencySamplesMs":[848.3,820.8,943.2],"segmentMs":[846.8,745.4,906.8]},
+    {"id":"vi-021","categories":["reject","software"],"output":"The request was rejected because the tool is in sync with Microsoft Teams existing.","chrf":57.04,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":478,"latencySamplesMs":[510.7,478,447.5],"segmentMs":[509.6,477,446.5]},
+    {"id":"vi-022","categories":["reject","negation","software","glossary"],"output":"Rejected: Jira has been given department Technology, without further buying.","chrf":40.07,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":621.9,"latencySamplesMs":[565.7,621.9,655.2],"segmentMs":[564.4,620.7,654]},
+    {"id":"vi-023","categories":["reject","software"],"output":"I refuse to offer a purchase of Tableau because this quarter budget is over.","chrf":48.9,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":472.8,"latencySamplesMs":[561.9,472.8,452.7],"segmentMs":[561,471.7,451.8]},
+    {"id":"vi-024","categories":["reject","code","glossary"],"output":"Trưởng phòng từ chối yêu cầu REQ-2026-0107, lý do: chưa có Cost Center.","chrf":33.32,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":false,"hasChecks":true,"failedContain":["reject | declin | denied | deny | refus | turned down | not approv | disapprov | not accept | dismiss | cannot approve | unable to approve | not be approved | unable to accept","department head | head of department | head of the department"],"failedNotContain":[]},"status":"NOT_TRANSLATED","reason":"QUALITY_GATE","detail":{"polarity":{"required":["reject","negation"],"missing":["reject"]}},"counts":{"total":1,"translated":0,"fallback":1},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":543.3,"latencySamplesMs":[572.8,529.8,543.3],"segmentMs":[571.4,528.7,542.3]},
+    {"id":"vi-025","categories":["reject","number","glossary"],"output":"Người duyệt chi từ chối khoản 18.000.000 đồng vì vượt hạn mức.","chrf":22.14,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":false,"hasChecks":true,"failedContain":["reject | declin | denied | deny | refus | turned down | not approv | disapprov | not accept | dismiss | cannot approve | unable to approve | not be approved | unable to accept","spending approver"],"failedNotContain":[]},"status":"NOT_TRANSLATED","reason":"QUALITY_GATE","detail":{"polarity":{"required":["reject","approve"],"missing":["reject","approve"]}},"counts":{"total":1,"translated":0,"fallback":1},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":578.6,"latencySamplesMs":[578.6,623.9,521.9],"segmentMs":[577.4,622.8,520.9]},
+    {"id":"vi-026","categories":["reject","negation","name"],"output":"The request was not accepted due to lack of signatures of Đặng Minh Khoa.","chrf":69.37,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":425.7,"latencySamplesMs":[437.1,425.7,415.8],"segmentMs":[435.4,424.7,414.9]},
+    {"id":"vi-027","categories":["reject","plain"],"output":"The proposal was rejected for the security risks of this software.","chrf":71.37,"hasProtected":false,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":278.2,"latencySamplesMs":[278.2,274,342.9],"segmentMs":[277.4,273,342]},
+    {"id":"vi-028","categories":["reject","negation","software"],"output":"Rất tiếc, chúng tôi không thể duyệt yêu cầu cài Docker Desktop trên máy cá nhân.","chrf":19.26,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":false,"hasChecks":true,"failedContain":["not | n't | no  | never | cannot | unable | without | nobody | none | neither","reject | declin | denied | deny | refus | turned down | not approv | disapprov | not accept | dismiss | cannot approve | unable to approve | not be approved | unable to accept"],"failedNotContain":[]},"status":"NOT_TRANSLATED","reason":"PLACEHOLDER_GATE","detail":{"gate":{"ok":false,"missing":[0],"extra":[],"duplicated":[]}},"counts":{"total":1,"translated":0,"fallback":1},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":404.2,"latencySamplesMs":[404.2,375.9,445.6],"segmentMs":[403.2,375.1,444.6]},
+    {"id":"vi-029","categories":["revoke","name","software","glossary"],"output":"Revoke seat GitHub of Võ Thanh Hà for quitting.","chrf":39.24,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":496.3,"latencySamplesMs":[462.7,496.3,514.2],"segmentMs":[461.7,495.5,513.2]},
+    {"id":"vi-030","categories":["revoke","name","software","date"],"output":"Access rights Confluence of Bùi Gia Huy will be revoked on the day 15/11/2026.","chrf":72.63,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":760.6,"latencySamplesMs":[744.5,760.6,798.5],"segmentMs":[743,691.1,766.8]},
+    {"id":"vi-031","categories":["revoke","software","glossary"],"output":"Already revoke license Adobe Photoshop and hand over back for department IT.","chrf":54.62,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":863.7,"latencySamplesMs":[869.4,863.7,640.5],"segmentMs":[853.9,862.4,639.1]},
+    {"id":"vi-032","categories":["revoke","name","software","glossary"],"output":"Hoàng Ngọc Lan chuyển sang phòng Kinh doanh nên cần thu hồi seat Slack cũ và cấp seat mới.","chrf":24.29,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":false,"hasChecks":true,"failedContain":["revok | revocation","department"],"failedNotContain":[]},"status":"NOT_TRANSLATED","reason":"PLACEHOLDER_GATE","detail":{"gate":{"ok":false,"missing":[0,1],"extra":[],"duplicated":[]}},"counts":{"total":1,"translated":0,"fallback":1},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":686.6,"latencySamplesMs":[686.6,795.2,659],"segmentMs":[685.1,794.2,657.7]},
+    {"id":"vi-033","categories":["revoke","negation","glossary"],"output":"Không thu hồi tài khoản trước khi bàn giao xong.","chrf":8.54,"hasProtected":false,"preserved":{"all":true,"missing":[]},"meaning":{"pass":false,"hasChecks":true,"failedContain":["not | n't | no  | never | cannot | unable | without | nobody | none | neither","revok | revocation","hand over | handed over | handover | hands over | handing over | hand-over"],"failedNotContain":[]},"status":"NOT_TRANSLATED","reason":"PLACEHOLDER_GATE","detail":{"gate":{"ok":false,"missing":[1],"extra":[],"duplicated":[]}},"counts":{"total":1,"translated":0,"fallback":1},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":385.1,"latencySamplesMs":[402.1,385.1,328.3],"segmentMs":[334.6,355.9,327.5]},
+    {"id":"vi-034","categories":["revoke","number","glossary"],"output":"Yêu cầu thu hồi toàn bộ seat chưa dùng trong 90 ngày.","chrf":11.5,"hasProtected":false,"preserved":{"all":true,"missing":[]},"meaning":{"pass":false,"hasChecks":true,"failedContain":["revok | revocation"],"failedNotContain":[]},"status":"NOT_TRANSLATED","reason":"PLACEHOLDER_GATE","detail":{"gate":{"ok":false,"missing":[2],"extra":[],"duplicated":[]}},"counts":{"total":1,"translated":0,"fallback":1},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":566.8,"latencySamplesMs":[566.8,552.3,601.8],"segmentMs":[565.8,551.2,538.6]},
+    {"id":"vi-035","categories":["revoke","name","software","glossary"],"output":"Việc thu hồi seat Figma của Đỗ Thế Vinh đã được trưởng phòng xác nhận.","chrf":20.76,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":false,"hasChecks":true,"failedContain":["revok | revocation","department head | head of department | head of the department"],"failedNotContain":[]},"status":"NOT_TRANSLATED","reason":"PLACEHOLDER_GATE","detail":{"gate":{"ok":false,"missing":[4],"extra":[],"duplicated":[]}},"counts":{"total":1,"translated":0,"fallback":1},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":614.9,"latencySamplesMs":[623.5,614.9,608],"segmentMs":[595.4,614,607.1]},
+    {"id":"vi-036","categories":["name","software","date","glossary"],"output":"Phạm Quỳnh Anh bàn giao toàn bộ tài khoản Jira cho Ngô Phương Thảo trước ngày 20/11/2026.","chrf":50.27,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":false,"hasChecks":true,"failedContain":["hand over | handed over | handover | hands over | handing over | hand-over"],"failedNotContain":[]},"status":"NOT_TRANSLATED","reason":"PLACEHOLDER_GATE","detail":{"gate":{"ok":false,"missing":[],"extra":[],"duplicated":[3]}},"counts":{"total":1,"translated":0,"fallback":1},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":977.4,"latencySamplesMs":[856.7,981.7,977.4],"segmentMs":[855.4,913.1,947.3]},
+    {"id":"vi-037","categories":["glossary","date","software"],"output":"The pass Cancellation deadline is Zoom 01/10/2026.","chrf":58.43,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":530.5,"latencySamplesMs":[530.5,717.2,525.9],"segmentMs":[528.1,715.8,524.7]},
+    {"id":"vi-038","categories":["glossary","number"],"output":"Cancellation deadline is 30 The day before renewal.","chrf":79.98,"hasProtected":false,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":588.4,"latencySamplesMs":[588.4,579.6,678.1],"segmentMs":[587.4,578.8,677.2]},
+    {"id":"vi-039","categories":["date","software","glossary"],"output":"Cần gia hạn Microsoft Office 365 trước ngày 15 tháng 12 năm 2026, nếu không giấy phép sẽ hết hạn.","chrf":26.84,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":false,"hasChecks":true,"failedContain":["renew","december"],"failedNotContain":[]},"status":"NOT_TRANSLATED","reason":"QUALITY_GATE","detail":{"polarity":{"required":["negation"],"missing":["negation"]}},"counts":{"total":1,"translated":0,"fallback":1},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":875.3,"latencySamplesMs":[875.3,905.1,867.9],"segmentMs":[873.2,903.2,866.4]},
+    {"id":"vi-040","categories":["glossary","number","software"],"output":"Nhắc: hạn báo hủy Tableau còn 5 ngày, nếu không hủy sẽ tự động gia hạn 12 tháng.","chrf":11.2,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":false,"hasChecks":true,"failedContain":["cancellation deadline","renew"],"failedNotContain":[]},"status":"NOT_TRANSLATED","reason":"PLACEHOLDER_GATE","detail":{"gate":{"ok":false,"missing":[],"extra":[],"duplicated":[4]}},"counts":{"total":1,"translated":0,"fallback":1},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":992.5,"latencySamplesMs":[1031.8,988.4,992.5],"segmentMs":[1029.1,987.3,991.3]},
+    {"id":"vi-041","categories":["number","glossary"],"output":"The cost of renewal this year is 36.500.000 đồng, increase 8,5% versus the previous year.","chrf":53.91,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":636.6,"latencySamplesMs":[694.6,636.6,634.4],"segmentMs":[693.6,635.6,633.3]},
+    {"id":"vi-042","categories":["number","software","glossary"],"output":"The total budget suggests: 12.000.000 đồng for 5 seat Notion.","chrf":57.48,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":523.8,"latencySamplesMs":[646,511.3,523.8],"segmentMs":[645.2,510.5,522.8]},
+    {"id":"vi-043","categories":["number","software","glossary"],"output":"Mỗi seat JetBrains IntelliJ IDEA có giá 649 USD mỗi năm.","chrf":52.84,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"NOT_TRANSLATED","reason":"PLACEHOLDER_GATE","detail":{"gate":{"ok":false,"missing":[0],"extra":[],"duplicated":[]}},"counts":{"total":1,"translated":0,"fallback":1},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":433.5,"latencySamplesMs":[407.1,433.5,549.2],"segmentMs":[406.4,432.8,548.6]},
+    {"id":"vi-044","categories":["number","glossary"],"output":"Down the price 15% if bought from 10 seat and upward.","chrf":22.12,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":543.5,"latencySamplesMs":[537.3,543.5,794.9],"segmentMs":[536.4,542.6,793.8]},
+    {"id":"vi-045","categories":["number"],"output":"The total cost is 1.250.000 đồng, not including VAT 10%.","chrf":75.97,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":false,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":490.7,"latencySamplesMs":[595.5,462.7,490.7],"segmentMs":[594,461.7,489.8]},
+    {"id":"vi-046","categories":["date","plain"],"output":"The staff starts using the tool 01/10/2026.","chrf":46.33,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":false,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":289.2,"latencySamplesMs":[279.4,300.9,289.2],"segmentMs":[278.4,300,288.4]},
+    {"id":"vi-047","categories":["date"],"output":"The processing term is 25/11/2026 and the report is 05/12/2026.","chrf":60.58,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":false,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":497.5,"latencySamplesMs":[497.5,446.1,647],"segmentMs":[496.3,445.3,646.1]},
+    {"id":"vi-048","categories":["date"],"output":"The license is valid from 2026-10-01 to 2027-09-30.","chrf":100,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":false,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":445.4,"latencySamplesMs":[689.7,445.4,355.2],"segmentMs":[687.7,444.1,354.3]},
+    {"id":"vi-049","categories":["date"],"output":"Cuộc họp duyệt ngân sách diễn ra vào ngày 3 tháng 11.","chrf":7.76,"hasProtected":false,"preserved":{"all":true,"missing":[]},"meaning":{"pass":false,"hasChecks":true,"failedContain":["november"],"failedNotContain":[]},"status":"NOT_TRANSLATED","reason":"QUALITY_GATE","detail":{"polarity":{"required":["approve"],"missing":["approve"]}},"counts":{"total":1,"translated":0,"fallback":1},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":254,"latencySamplesMs":[254,253.3,269.4],"segmentMs":[253.1,252.6,268.6]},
+    {"id":"vi-050","categories":["date"],"output":"Please finish before 17:00 Day 28/11/2026.","chrf":57.95,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":false,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":466.1,"latencySamplesMs":[466.1,445.3,543.4],"segmentMs":[465.3,444.7,542.6]},
+    {"id":"vi-051","categories":["email"],"output":"Please send the reason via email an.nguyen@acme-demo.example or it-helpdesk@acme-demo.example.","chrf":74.67,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":false,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":455.3,"latencySamplesMs":[442.1,455.3,479.5],"segmentMs":[441.1,454.4,478.5]},
+    {"id":"vi-052","categories":["email","name","glossary"],"output":"Contact Trần Thị Bích (bich.tran@acme-demo.example) to hand over account.","chrf":92.38,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":612.9,"latencySamplesMs":[701.6,612.9,590.6],"segmentMs":[700.6,611.7,589.7]},
+    {"id":"vi-053","categories":["email","glossary"],"output":"Message sent to finance-approvers@acme-demo.example and department head.","chrf":74.69,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":350.1,"latencySamplesMs":[364.7,350.1,330.3],"segmentMs":[363.4,348.9,329.5]},
+    {"id":"vi-054","categories":["code"],"output":"See the request details REQ-2026-0042 and the contract HD-2026-15.","chrf":77.28,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":false,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":443.3,"latencySamplesMs":[420,443.3,450.3],"segmentMs":[419.1,442.4,449.4]},
+    {"id":"vi-055","categories":["code","glossary"],"output":"License code LIC-2026-0007-2 belongs to Cost Center CC-0042.","chrf":100,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":470.9,"latencySamplesMs":[431.1,470.9,479.6],"segmentMs":[429.8,470.2,478.7]},
+    {"id":"vi-056","categories":["code"],"output":"Single purchase PO-2026-118 sent to the supplier.","chrf":47.13,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":false,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":349.8,"latencySamplesMs":[290.5,349.8,398.5],"segmentMs":[289.8,348.9,395.4]},
+    {"id":"vi-057","categories":["name","software","glossary"],"output":"Lê Hoàng Nam Request additional level seat Docker Desktop for group DevOps.","chrf":53.89,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":566.1,"latencySamplesMs":[566.1,545.4,612.7],"segmentMs":[565.2,544.5,611.7]},
+    {"id":"vi-058","categories":["name"],"output":"In the opinion of Đỗ Thế Vinh and Ngô Phương Thảo, this tool is needed for testing processes.","chrf":68.88,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":false,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":584.2,"latencySamplesMs":[584.2,587.9,570.7],"segmentMs":[583.1,586.9,569.8]},
+    {"id":"vi-059","categories":["name"],"output":"I'm Hoàng Ngọc Lan in charge of the budget Công ty TNHH Sao Mai Demo.","chrf":81.2,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":false,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":451.4,"latencySamplesMs":[437.4,499,451.4],"segmentMs":[436.5,498.2,450.3]},
+    {"id":"vi-060","categories":["name","glossary"],"output":"He Bùi Gia Huy is Spending Approver of Acme Demo Co.","chrf":82.15,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":551.5,"latencySamplesMs":[551.5,446.5,582.6],"segmentMs":[550.8,445.6,580.6]},
+    {"id":"vi-061","categories":["software"],"output":"We use GitHub Actions to run tests and Postman to test API.","chrf":96.45,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":false,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":698.6,"latencySamplesMs":[737.8,698.6,514.6],"segmentMs":[736.7,697.5,513.5]},
+    {"id":"vi-062","categories":["software","glossary"],"output":"Suggests to install MATLAB and AutoCAD for the lab.","chrf":70.93,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":461.2,"latencySamplesMs":[427.3,464.1,461.2],"segmentMs":[426.3,463,460.3]},
+    {"id":"vi-063","categories":["software"],"output":"Adobe Photoshop too expensive for Figma.","chrf":59.67,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":false,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":352.2,"latencySamplesMs":[352.2,366.6,312.8],"segmentMs":[351.4,365.9,312.1]},
+    {"id":"vi-064","categories":["software"],"output":"The data group needs Tableau and Microsoft Power BI to do the belongs since the scene.","chrf":61.99,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":false,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":600.5,"latencySamplesMs":[569.5,695.8,600.5],"segmentMs":[568.6,694.7,599.4]},
+    {"id":"vi-065","categories":["software"],"output":"Chúng tôi đề xuất chuyển từ Slack sang Microsoft Teams để tiết kiệm chi phí.","chrf":32.64,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":false,"failedContain":[],"failedNotContain":[]},"status":"NOT_TRANSLATED","reason":"PLACEHOLDER_GATE","detail":{"gate":{"ok":false,"missing":[0],"extra":[],"duplicated":[]}},"counts":{"total":1,"translated":0,"fallback":1},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":493.4,"latencySamplesMs":[493.4,478,506],"segmentMs":[492.5,476.9,504.5]},
+    {"id":"vi-066","categories":["software"],"output":"Use ChatGPT for jobs to be secured.","chrf":31.18,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":false,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":336.2,"latencySamplesMs":[453.7,335.2,336.2],"segmentMs":[452.3,333.7,335.3]},
+    {"id":"vi-067","categories":["glossary"],"output":"Phòng họp tầng 3 đã được đặt cho buổi duyệt ngân sách.","chrf":6.58,"hasProtected":false,"preserved":{"all":true,"missing":[]},"meaning":{"pass":false,"hasChecks":true,"failedContain":["room"],"failedNotContain":[]},"status":"NOT_TRANSLATED","reason":"QUALITY_GATE","detail":{"polarity":{"required":["approve"],"missing":["approve"]}},"counts":{"total":1,"translated":0,"fallback":1},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":452,"latencySamplesMs":[439.8,452,501.9],"segmentMs":[438.5,451.1,500.9]},
+    {"id":"vi-068","categories":["unaccented","software"],"output":"Toi can cai dat Figma cho du an moi cua phong thiet ke.","chrf":13.05,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":false,"failedContain":[],"failedNotContain":[]},"status":"NOT_TRANSLATED","reason":"PLACEHOLDER_GATE","detail":{"gate":{"ok":false,"missing":[0],"extra":[],"duplicated":[]}},"counts":{"total":1,"translated":0,"fallback":1},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":274.7,"latencySamplesMs":[297.9,209.5,274.7],"segmentMs":[274.8,208.7,274.1]},
+    {"id":"vi-069","categories":["unaccented","negation"],"output":"Yeu cau chua duoc duyet vi thieu ly do chi tiet.","chrf":9.69,"hasProtected":false,"preserved":{"all":true,"missing":[]},"meaning":{"pass":false,"hasChecks":true,"failedContain":["not | n't | no  | never | cannot | unable | without | nobody | none | neither"],"failedNotContain":[]},"status":"NOT_TRANSLATED","reason":"QUALITY_GATE","detail":{"polarity":{"required":["reject"],"missing":["reject"]}},"counts":{"total":1,"translated":0,"fallback":1},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":569.2,"latencySamplesMs":[488.5,569.2,629.5],"segmentMs":[481.1,568.1,628.3]},
+    {"id":"vi-070","categories":["unaccented","reject","code","glossary"],"output":"Truong phong tu choi yeu cau REQ-2026-0042 vi vuot ngan sach.","chrf":22.7,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":false,"hasChecks":true,"failedContain":["reject | declin | denied | deny | refus | turned down | not approv | disapprov | not accept | dismiss | cannot approve | unable to approve | not be approved | unable to accept","department head | head of department | head of the department"],"failedNotContain":[]},"status":"NOT_TRANSLATED","reason":"QUALITY_GATE","detail":{"polarity":{"required":["reject"],"missing":["reject"]}},"counts":{"total":1,"translated":0,"fallback":1},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":622.5,"latencySamplesMs":[622.5,630.5,525.5],"segmentMs":[621.3,629.7,524.8]},
+    {"id":"vi-071","categories":["unaccented","glossary","date"],"output":"Cancellation deadline la 15/11/2026, can renew som.","chrf":56.45,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":532.5,"latencySamplesMs":[564.3,532.5,483.4],"segmentMs":[563.4,531.7,482.5]},
+    {"id":"vi-072","categories":["mixed","glossary"],"output":"I need the other giáollite 2 seat for the project Atlas, that's also the game with the team lead.","chrf":46.86,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":854,"latencySamplesMs":[854,816.1,865.8],"segmentMs":[791.6,788.4,864.7]},
+    {"id":"vi-073","categories":["mixed","approve","code","date"],"output":"Please approve giúp em yêu cầu REQ-2026-0042 nhé, deadline là 15/11/2026.","chrf":59.17,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"NOT_TRANSLATED","reason":"MAX_NEW_TOKENS","detail":{"finishReason":"max_new_tokens"},"counts":{"total":1,"translated":0,"fallback":1},"modelCalls":1,"finishReasons":{"max_new_tokens":1},"latencyMs":1403.2,"latencySamplesMs":[1839.9,1403.2,1287.8],"segmentMs":[1759.8,1367,1228.6]},
+    {"id":"vi-074","categories":["mixed","negation","glossary"],"output":"This level is not in the catalog, so I'm asking for a cure from department head.","chrf":64.3,"hasProtected":false,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":646.3,"latencySamplesMs":[627.8,677,646.3],"segmentMs":[574,647.7,645]},
+    {"id":"vi-075","categories":["collision","code"],"output":"The reference code <x0> in the old log is still used for REQ-2026-0042.","chrf":86.76,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":false,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":619.9,"latencySamplesMs":[648.2,544.5,619.9],"segmentMs":[647.1,543.4,618.7]},
+    {"id":"vi-076","categories":["collision","name"],"output":"The display pattern <x1> instead of the name Trần Thị Bích.","chrf":72.36,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":false,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":451.5,"latencySamplesMs":[548.6,451.5,424.4],"segmentMs":[481.3,424.6,423.7]},
+    {"id":"vi-077","categories":["collision","negation"],"output":"Template value: <x0>, <x1>, <x2> is not real data.","chrf":67.73,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":1,"translated":1,"fallback":0},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":695.9,"latencySamplesMs":[695.9,859.9,690.1],"segmentMs":[694.6,857.2,688.7]},
+    {"id":"vi-078","categories":["plain","software","number","date","glossary"],"output":"I'm a software engineer of department engineering. The new project requires the interface design on Figma. The group only 2 seat is not enough. Request additional level 3 seat to the end 31/03/2027.","chrf":60.29,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":4,"translated":4,"fallback":0},"modelCalls":4,"finishReasons":{"eos":4},"latencyMs":1752.5,"latencySamplesMs":[1754.6,1752.5,1707.6],"segmentMs":[338,317.1,479.5,523.7,402.3,371.2,407.2,568.5,353.5,356.1,399.3,506.5]},
+    {"id":"vi-079","categories":["reject","software"],"output":"Reasons for refusal: tool is duplicated function with Slack. Please use the current Slack. If you still need to send back the price request.","chrf":50.67,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":true,"failedContain":[],"failedNotContain":[]},"status":"TRANSLATED","reason":null,"detail":null,"counts":{"total":3,"translated":3,"fallback":0},"modelCalls":3,"finishReasons":{"eos":3},"latencyMs":931.4,"latencySamplesMs":[970.5,880.6,931.4],"segmentMs":[434.6,220,313.7,379.4,217.3,281.4,378.1,267,284.8]},
+    {"id":"vi-080","categories":["revoke","name","software","glossary"],"output":"Bàn giao hoàn tất. Seat Jira đã chuyển cho Ngô Phương Thảo. Tài khoản cũ đã bị thu hồi.","chrf":24.17,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":false,"hasChecks":true,"failedContain":["revok | revocation","hand over | handed over | handover | hands over | handing over | hand-over"],"failedNotContain":[]},"status":"NOT_TRANSLATED","reason":"PLACEHOLDER_GATE","detail":{"gate":{"ok":false,"missing":[0],"extra":[],"duplicated":[]}},"counts":{"total":3,"translated":0,"fallback":3},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":189.6,"latencySamplesMs":[197.4,189.6,180.5],"segmentMs":[195.3,188.1,179.6]},
+    {"id":"vi-L1","categories":["long"],"output":"Tôi viết đề nghị này để giải trình việc cần cấp thêm giấy phép cho nhóm dự án của chúng tôi, và xin nêu thêm rằng nhóm thiết kế cần thêm giấy phép Figma để hoàn thiện giao diện mới, Trần Thị Bích sẽ nghỉ phép từ 10/11/2026 đến 24/11/2026, ngân sách dự kiến cho các giấy phép là 4200 USD mỗi năm, hạn báo hủy của hợp đồng hiện tại là 15/11/2026, Lê Hoàng Nam sẽ bàn giao các tài khoản Jira cho Ngô Phương Thảo, trưởng phòng đã xác nhận rằng công cụ này không trùng với phần mềm đang có, mỗi seat Slack hiện được dùng trung bình 6 giờ mỗi ngày, các seat không dùng trong 90 ngày sẽ bị thu hồi, GitHub Copilot giúp giảm 20% thời gian viết mã kiểm thử, Người duyệt chi cần xác nhận Cost Center CC-0042 trước khi mua, khoản chi này đã nằm trong kế hoạch ngân sách năm 2026, đội kiểm thử cần Postman để chạy bộ kiểm thử API tự động, nhà cung cấp đề nghị ký hợp đồng HD-2026-15 trước cuối tháng, quản trị viên sẽ cấp quyền sau khi yêu cầu được duyệt, Notion được dùng để quản lý tài liệu của dự án Atlas, nếu không gia hạn đúng hạn, nhóm sẽ mất quyền truy cập dữ liệu, Đặng Minh Khoa đề nghị dùng chung một tài khoản cho cả nhóm nhưng chính sách không cho phép, Docker Desktop cần được cài trên 8 máy của nhóm hạ tầng, vì vậy rất mong được xem xét sớm.","chrf":21.66,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":false,"failedContain":[],"failedNotContain":[]},"status":"NOT_TRANSLATED","reason":"PLACEHOLDER_GATE","detail":{"gate":{"ok":false,"missing":[2,10],"extra":[],"duplicated":[5,9]}},"counts":{"total":3,"translated":0,"fallback":3},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":2879.1,"latencySamplesMs":[2879.1,2845.4,3158.6],"segmentMs":[2842.7,2759.7,3096.1]},
+    {"id":"vi-L2","categories":["long"],"output":"Tôi viết đề nghị này để giải trình việc cần cấp thêm giấy phép cho nhóm dự án của chúng tôi, và xin nêu thêm rằng nhóm thiết kế cần thêm giấy phép Figma để hoàn thiện giao diện mới, Trần Thị Bích sẽ nghỉ phép từ 10/11/2026 đến 24/11/2026, ngân sách dự kiến cho các giấy phép là 4200 USD mỗi năm, hạn báo hủy của hợp đồng hiện tại là 15/11/2026, Lê Hoàng Nam sẽ bàn giao các tài khoản Jira cho Ngô Phương Thảo, trưởng phòng đã xác nhận rằng công cụ này không trùng với phần mềm đang có, mỗi seat Slack hiện được dùng trung bình 6 giờ mỗi ngày, các seat không dùng trong 90 ngày sẽ bị thu hồi, GitHub Copilot giúp giảm 20% thời gian viết mã kiểm thử, Người duyệt chi cần xác nhận Cost Center CC-0042 trước khi mua, khoản chi này đã nằm trong kế hoạch ngân sách năm 2026, đội kiểm thử cần Postman để chạy bộ kiểm thử API tự động, nhà cung cấp đề nghị ký hợp đồng HD-2026-15 trước cuối tháng, quản trị viên sẽ cấp quyền sau khi yêu cầu được duyệt, Notion được dùng để quản lý tài liệu của dự án Atlas, nếu không gia hạn đúng hạn, nhóm sẽ mất quyền truy cập dữ liệu, Đặng Minh Khoa đề nghị dùng chung một tài khoản cho cả nhóm nhưng chính sách không cho phép, Docker Desktop cần được cài trên 8 máy của nhóm hạ tầng, báo cáo quý trước cho thấy phòng Kinh doanh còn 4 seat chưa dùng, chúng tôi đã so sánh Figma với Adobe XD và thấy Figma phù hợp hơn, thời hạn xử lý yêu cầu này là 25/11/2026, Phạm Quỳnh Anh sẽ phụ trách quản lý giấy phép sau khi bàn giao, Tableau được dùng cho báo cáo tài chính hàng tháng, Hoàng Ngọc Lan đã gửi báo giá qua email ngoc.hoang@acme-demo.example, vì vậy rất mong được xem xét sớm.","chrf":23.97,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":false,"failedContain":[],"failedNotContain":[]},"status":"NOT_TRANSLATED","reason":"PLACEHOLDER_GATE","detail":{"gate":{"ok":false,"missing":[2,10],"extra":[],"duplicated":[5,9]}},"counts":{"total":4,"translated":0,"fallback":4},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":2828.6,"latencySamplesMs":[2622.4,2828.6,3425.2],"segmentMs":[2539.1,2772.5,3350.7]},
+    {"id":"vi-L3","categories":["long"],"output":"Tôi viết đề nghị này để giải trình việc cần cấp thêm giấy phép cho nhóm dự án của chúng tôi, và xin nêu thêm rằng nhóm thiết kế cần thêm giấy phép Figma để hoàn thiện giao diện mới, Trần Thị Bích sẽ nghỉ phép từ 10/11/2026 đến 24/11/2026, ngân sách dự kiến cho các giấy phép là 4200 USD mỗi năm, hạn báo hủy của hợp đồng hiện tại là 15/11/2026, Lê Hoàng Nam sẽ bàn giao các tài khoản Jira cho Ngô Phương Thảo, trưởng phòng đã xác nhận rằng công cụ này không trùng với phần mềm đang có, mỗi seat Slack hiện được dùng trung bình 6 giờ mỗi ngày, các seat không dùng trong 90 ngày sẽ bị thu hồi, GitHub Copilot giúp giảm 20% thời gian viết mã kiểm thử, Người duyệt chi cần xác nhận Cost Center CC-0042 trước khi mua, khoản chi này đã nằm trong kế hoạch ngân sách năm 2026, đội kiểm thử cần Postman để chạy bộ kiểm thử API tự động, nhà cung cấp đề nghị ký hợp đồng HD-2026-15 trước cuối tháng, quản trị viên sẽ cấp quyền sau khi yêu cầu được duyệt, Notion được dùng để quản lý tài liệu của dự án Atlas, nếu không gia hạn đúng hạn, nhóm sẽ mất quyền truy cập dữ liệu, Đặng Minh Khoa đề nghị dùng chung một tài khoản cho cả nhóm nhưng chính sách không cho phép, Docker Desktop cần được cài trên 8 máy của nhóm hạ tầng, báo cáo quý trước cho thấy phòng Kinh doanh còn 4 seat chưa dùng, chúng tôi đã so sánh Figma với Adobe XD và thấy Figma phù hợp hơn, thời hạn xử lý yêu cầu này là 25/11/2026, Phạm Quỳnh Anh sẽ phụ trách quản lý giấy phép sau khi bàn giao, Tableau được dùng cho báo cáo tài chính hàng tháng, Hoàng Ngọc Lan đã gửi báo giá qua email ngoc.hoang@acme-demo.example, chi phí đào tạo người dùng mới ước tính 300 USD, nhóm bảo mật yêu cầu bật xác thực hai lớp cho mọi tài khoản, Visual Studio Code là công cụ chuẩn nên không cần phê duyệt riêng, lần gia hạn trước đã tăng giá 8% so với hợp đồng gốc, Võ Thanh Hà đã xác nhận danh sách người dùng cuối cùng, vì vậy rất mong được xem xét sớm.","chrf":23.17,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":false,"failedContain":[],"failedNotContain":[]},"status":"NOT_TRANSLATED","reason":"PLACEHOLDER_GATE","detail":{"gate":{"ok":false,"missing":[2,10],"extra":[],"duplicated":[5,9]}},"counts":{"total":5,"translated":0,"fallback":5},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":2584.5,"latencySamplesMs":[2928.9,2570.7,2584.5],"segmentMs":[2805.9,2512.4,2530.9]},
+    {"id":"vi-L4","categories":["long"],"output":"Tôi viết đề nghị này để giải trình việc cần cấp thêm giấy phép cho nhóm dự án của chúng tôi, và xin nêu thêm rằng nhóm thiết kế cần thêm giấy phép Figma để hoàn thiện giao diện mới, Trần Thị Bích sẽ nghỉ phép từ 10/11/2026 đến 24/11/2026, ngân sách dự kiến cho các giấy phép là 4200 USD mỗi năm, hạn báo hủy của hợp đồng hiện tại là 15/11/2026, Lê Hoàng Nam sẽ bàn giao các tài khoản Jira cho Ngô Phương Thảo, trưởng phòng đã xác nhận rằng công cụ này không trùng với phần mềm đang có, mỗi seat Slack hiện được dùng trung bình 6 giờ mỗi ngày, các seat không dùng trong 90 ngày sẽ bị thu hồi, GitHub Copilot giúp giảm 20% thời gian viết mã kiểm thử, Người duyệt chi cần xác nhận Cost Center CC-0042 trước khi mua, khoản chi này đã nằm trong kế hoạch ngân sách năm 2026, đội kiểm thử cần Postman để chạy bộ kiểm thử API tự động, nhà cung cấp đề nghị ký hợp đồng HD-2026-15 trước cuối tháng, quản trị viên sẽ cấp quyền sau khi yêu cầu được duyệt, Notion được dùng để quản lý tài liệu của dự án Atlas, nếu không gia hạn đúng hạn, nhóm sẽ mất quyền truy cập dữ liệu, Đặng Minh Khoa đề nghị dùng chung một tài khoản cho cả nhóm nhưng chính sách không cho phép, Docker Desktop cần được cài trên 8 máy của nhóm hạ tầng, báo cáo quý trước cho thấy phòng Kinh doanh còn 4 seat chưa dùng, chúng tôi đã so sánh Figma với Adobe XD và thấy Figma phù hợp hơn, thời hạn xử lý yêu cầu này là 25/11/2026, Phạm Quỳnh Anh sẽ phụ trách quản lý giấy phép sau khi bàn giao, Tableau được dùng cho báo cáo tài chính hàng tháng, Hoàng Ngọc Lan đã gửi báo giá qua email ngoc.hoang@acme-demo.example, chi phí đào tạo người dùng mới ước tính 300 USD, nhóm bảo mật yêu cầu bật xác thực hai lớp cho mọi tài khoản, Visual Studio Code là công cụ chuẩn nên không cần phê duyệt riêng, lần gia hạn trước đã tăng giá 8% so với hợp đồng gốc, Võ Thanh Hà đã xác nhận danh sách người dùng cuối cùng, Microsoft Teams đã đáp ứng nhu cầu họp nhóm nên không cần thêm Zoom, JetBrains IntelliJ IDEA cần cho 5 lập trình viên của nhóm backend, Bùi Gia Huy sẽ kiểm tra việc sử dụng seat vào ngày 01/12/2026, MATLAB chỉ được dùng trong học kỳ này cho môn mô phỏng, Confluence lưu toàn bộ tài liệu quy trình của phòng Vận hành, Adobe Photoshop chỉ cần cho hai thiết kế viên trong ba tháng, AutoCAD được dùng cho bản vẽ kỹ thuật của dự án mới, Docker Desktop và Postman đều đã có trong danh mục chuẩn, vì vậy rất mong được xem xét sớm.","chrf":24.87,"hasProtected":true,"preserved":{"all":true,"missing":[]},"meaning":{"pass":true,"hasChecks":false,"failedContain":[],"failedNotContain":[]},"status":"NOT_TRANSLATED","reason":"PLACEHOLDER_GATE","detail":{"gate":{"ok":false,"missing":[2,10],"extra":[],"duplicated":[5,9]}},"counts":{"total":6,"translated":0,"fallback":6},"modelCalls":1,"finishReasons":{"eos":1},"latencyMs":2829.2,"latencySamplesMs":[2829.2,3525.5,2717.3],"segmentMs":[2745,3433.8,2626.3]}
+  ]
+}
