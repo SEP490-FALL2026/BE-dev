@@ -14,12 +14,23 @@ export interface ApiBody {
     expiresAt: string;
     appUserId: string;
     loginEmail: string;
+    /** Account detail: the latest invitation, or null when there is none. */
+    invitation: { usable: boolean } | null;
+    /** Password self-service (slice 1c). */
+    requested: boolean;
+    passwordReset: boolean;
+    passwordChanged: boolean;
   };
   error: {
     code: string;
     message: string;
     requestId: string;
-    details: { retryAfterSeconds: number; issues: Array<{ code: string; path: string }>; field: string };
+    details: {
+      retryAfterSeconds: number;
+      issues: Array<{ code: string; path: string }>;
+      field: string;
+      violation: string;
+    };
   };
 }
 

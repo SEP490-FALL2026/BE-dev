@@ -2,7 +2,8 @@
 
 Status: **Proposed** (12/10/2026). Implemented in slice 1a through PR #4 (`64073c4`),
 with remediation `a0cf5f1` incorporated into `origin/dev` through PR #7/#8;
-developer review and acceptance are still pending as of 15/10/2026.
+developer review and acceptance are still pending as of 15/10/2026. Slice 1c (decision 11) is implemented
+in the working tree on 16/10/2026, locally verified only and not reviewed.
 Items marked _lead decision_ were chosen on 12/10/2026; the planned pre-merge review
 gate was not completed. AI research, drafting and testing do not constitute developer approval.
 
@@ -94,6 +95,26 @@ pnpm 11.1.3 with an explicit `allowBuilds` list, and CI runs
    foundation spec's order: three in slice 1a, one in slice 1b.
 10. **Platform boundary.** Stay on Nest 11 and CommonJS. Do not add ESM-only packages
     (`@nestjs/jwt` 12.x, `jose` 6.x) until the repository migrates as a separate decision.
+11. **Forgot, reset and change password (slice 1c, `US-01-10` AC-3 → AC-7, AC-12).** Values are the `T-*`
+    table of the [slice 1c spec](../workspace/items/us-01-password-self-service/spec.md); they still need the
+    developer review that `US-01-10` _Business rules_ requires before the slice leaves local verification.
+    A reset link is a one-time token of 32 random bytes, stored as SHA-256 in `account_action_tokens` with
+    purpose `RESET_PASSWORD`, valid `AUTH_PASSWORD_RESET_TTL_SECONDS` (default 1800; 300–86400). An account may
+    be issued `AUTH_PASSWORD_RESET_MAX_PER_HOUR` links in any 60 minutes (default 3; 1–100), counted from the
+    token table under the AppUser row lock; a further request is answered like every other and issues nothing.
+    A new request revokes the previous usable link (`SUPERSEDED`) and cancels its unsent mail, so one link works
+    at a time. Reset or change replaces the hash, revokes every other usable link (`CREDENTIAL_CHANGED`) and every
+    open session (`PASSWORD_RESET` / `PASSWORD_CHANGED`, the current one included), clears the email's
+    `login_throttles` row so the owner is not left blocked, queues a notice mail and writes the audit event in the
+    same transaction (`CredentialChangeService`). A wrong current password counts on the same failure counter as
+    a wrong sign-in (`LoginThrottle`, shared with `LoginService`), answers 422 (not 401, which tells a client its
+    session ended) and never locks the account. The two public routes carry a route throttle of 10 requests a
+    minute per address on top of the global one.
+    _Known residual risk (spec Q-6):_ the answer to a reset request has the same content for every email. An email
+    that cannot get a link (unknown, not activated, locked, employee left) leaves after the same unlocked reads
+    without opening a transaction; only the one case that writes a token and a mail takes a few milliseconds
+    longer, and no artificial delay is added. A caller who can measure that can still tell which emails have an account that may use a
+    link. Accepted for the MVP; the route throttle limits how much of it one address can measure.
 
 ## Alternatives rejected
 

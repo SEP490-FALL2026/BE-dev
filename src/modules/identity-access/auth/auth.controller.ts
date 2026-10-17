@@ -1,5 +1,6 @@
 import { Body, Controller, HttpCode, HttpStatus, Post, Req, Res } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
 import { TransientDatabaseError } from '../../../infrastructure/database/transaction-runner';
 import { ApiErrorResponses } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
@@ -10,7 +11,14 @@ import { Public } from '../../../infrastructure/security/decorators/public.decor
 import { AccountInvitationService } from '../accounts/account-invitation.service';
 import { toAccountApiException } from '../accounts/account.http-errors';
 import { AccountActivatedResponseDto, RedeemInvitationBodyDto } from '../dto/account-management.dto';
-import { LoginBodyDto, SessionTokenResponseDto } from '../dto/auth.dto';
+import {
+  LoginBodyDto,
+  PasswordResetBodyDto,
+  PasswordResetRequestBodyDto,
+  PasswordResetRequestedResponseDto,
+  PasswordResetResponseDto,
+  SessionTokenResponseDto,
+} from '../dto/auth.dto';
 import {
   InvalidCredentialsError,
   LoginTemporarilyBlockedError,
@@ -18,6 +26,7 @@ import {
 } from '../errors/identity-access.errors';
 import { IssuedSession } from '../identity-access.types';
 import { LoginService } from './login.service';
+import { PasswordResetService } from './password-reset.service';
 import { RefreshCookie } from './refresh-cookie';
 import { SessionService } from './session.service';
 
@@ -40,6 +49,7 @@ export class AuthController {
     private readonly logins: LoginService,
     private readonly sessions: SessionService,
     private readonly invitations: AccountInvitationService,
+    private readonly passwordResets: PasswordResetService,
     private readonly cookie: RefreshCookie,
   ) {}
 
@@ -139,6 +149,72 @@ export class AuthController {
     }
 
     this.cookie.clear(response);
+  }
+
+  /**
+   * Asks for a password-reset link. The answer is the same for every email, whether or not it belongs
+   * to an account that may use one, so it cannot be used to find out which emails exist (AC-3).
+   */
+  @Post('password-reset-requests')
+  @Public()
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @ApiOperation({ operationId: 'authRequestPasswordReset' })
+  @ApiSuccessResponse(PasswordResetRequestedResponseDto, {
+    message: 'AUTH.PASSWORD_RESET_REQUESTED',
+    description: 'The request was accepted. The same answer is given for every email.',
+    status: HttpStatus.ACCEPTED,
+  })
+  @ApiErrorResponses(
+    { status: HttpStatus.UNPROCESSABLE_ENTITY, description: 'The body is invalid (VALIDATION_ERROR).' },
+    { status: HttpStatus.TOO_MANY_REQUESTS, description: 'Too many requests from this address.' },
+    UNAVAILABLE,
+  )
+  async requestPasswordReset(@Body() body: PasswordResetRequestBodyDto): Promise<{ requested: true }> {
+    try {
+      await this.passwordResets.requestReset(body.email);
+
+      return { requested: true };
+    } catch (error) {
+      if (error instanceof TransientDatabaseError) throw unavailable();
+      throw error;
+    }
+  }
+
+  /**
+   * Sets a new password from a reset link. Public: the caller has forgotten the old one. It does not
+   * sign the user in and does not unlock anything; every existing session ends.
+   */
+  @Post('password-resets')
+  @Public()
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @ApiOperation({ operationId: 'authResetPassword' })
+  @ApiSuccessResponse(PasswordResetResponseDto, {
+    message: 'AUTH.PASSWORD_RESET',
+    description: 'The password was replaced and every session ended. The user signs in with the new one.',
+  })
+  @ApiErrorResponses(
+    {
+      status: HttpStatus.BAD_REQUEST,
+      description:
+        'The link is not valid (unknown, used, replaced, expired, or the account cannot use it). One answer for all.',
+    },
+    {
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      description: 'The body is invalid or the password does not meet the policy.',
+    },
+    { status: HttpStatus.TOO_MANY_REQUESTS, description: 'Too many requests from this address.' },
+    UNAVAILABLE,
+  )
+  async resetPassword(@Body() body: PasswordResetBodyDto): Promise<{ passwordReset: true }> {
+    try {
+      await this.passwordResets.resetPassword(body.token, body.newPassword);
+
+      return { passwordReset: true };
+    } catch (error) {
+      // A public route: an outage is AUTH.UNAVAILABLE, like login and refresh.
+      if (error instanceof TransientDatabaseError) throw unavailable();
+      throw toAccountApiException(error);
+    }
   }
 
   /**

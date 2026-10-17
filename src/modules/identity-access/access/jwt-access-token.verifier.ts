@@ -9,6 +9,7 @@ import {
 import { OrganizationService } from '../../organization/organization.service';
 import { EmployeeRecord } from '../../organization/organization.types';
 import { employeeHasNotLeft, resolveEffectiveRoles } from '../accounts/account-policy';
+import { ApprovalRoleRepo } from '../approval-roles/approval-role.repo';
 import { SessionRepo } from '../auth/session.repo';
 import { TokenService } from '../auth/token.service';
 import { PrincipalContext } from '../identity-access.types';
@@ -24,6 +25,7 @@ export class JwtAccessTokenVerifier implements AccessTokenVerifierPort {
     private readonly tokens: TokenService,
     private readonly sessions: SessionRepo,
     private readonly organization: OrganizationService,
+    private readonly approvalRoles: ApprovalRoleRepo,
   ) {}
 
   async verify(token: string): Promise<AuthenticatedPrincipal> {
@@ -55,7 +57,23 @@ export class JwtAccessTokenVerifier implements AccessTokenVerifierPort {
       throw new InvalidAccessTokenError();
     }
 
-    const roles = resolveEffectiveRoles(context.directRoles);
+    // Roles that follow from data, read on every request like the grants: a head period that begins today applies
+    // today, one that ended yesterday no longer does (US-01-02 AC-2).
+    let headed: { departmentId: string } | null;
+    let isSpendingApprover: boolean;
+    try {
+      [headed, isSpendingApprover] = await Promise.all([
+        this.organization.getHeadedDepartment(context.employeeId),
+        this.approvalRoles.isSpendingApprover(context.employeeId),
+      ]);
+    } catch (error) {
+      if (toTransientError(error)) throw new TokenVerificationUnavailableError(error);
+      throw error;
+    }
+    const roles = resolveEffectiveRoles(context.directRoles, {
+      headsDepartment: headed !== null,
+      isSpendingApprover,
+    });
 
     return {
       subject: context.appUserId,

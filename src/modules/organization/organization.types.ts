@@ -3,6 +3,26 @@ import { BusinessDate } from '../../core/business-date';
 export type EmploymentType = 'STAFF' | 'CONTRACTOR' | 'FREELANCER' | 'INTERN';
 export type EmployeeStatus = 'ACTIVE' | 'TERMINATED';
 
+export type JobTitleStatus = 'ACTIVE' | 'INACTIVE';
+
+/** A job title as the catalogue shows it. `version` is internal: it rises with every change, for stale-preview checks. */
+export interface JobTitleRecord {
+  id: string;
+  name: string;
+  status: JobTitleStatus;
+  version: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface JobTitleListFilter {
+  status?: JobTitleStatus;
+  /** Matched against the normalized name, as a literal substring. */
+  search?: string;
+  skip: number;
+  take: number;
+}
+
 export interface CreateOrganizationInput {
   name: string;
   timeZone: string;
@@ -29,6 +49,12 @@ export interface CreateEmployeeWithPlacementInput {
   workEmail?: string | null;
   employmentType: EmploymentType;
   hireDate: BusinessDate;
+  /**
+   * The day the person becomes a member of the department (`QĐ-66ak`, R-11). Left out, it is the hire date: only
+   * the installation command does that (`QĐ-67a`). Every path inside the application passes the day the person is
+   * recorded, so no placement is ever made up for days before the person was in the system.
+   */
+  memberSince?: BusinessDate;
   departmentId: string;
   jobTitleId: string;
 }
@@ -65,4 +91,37 @@ export interface EmployeeCandidate {
   workEmail: string | null;
   /** Department name at the date asked about. */
   department: string | null;
+}
+
+/** What a people file names, as the database knows it (for the import preview and its confirmation). */
+export interface EmployeeImportLookupData {
+  departments: { id: string; code: string; active: boolean; costCenterActive: boolean }[];
+  jobTitles: { id: string; name: string; normalizedName: string; status: JobTitleStatus }[];
+  employees: {
+    id: string;
+    employeeCode: string;
+    fullName: string;
+    workEmail: string | null;
+    employmentType: EmploymentType;
+    hireDate: BusinessDate;
+    departmentCode: string | null;
+    jobTitleName: string | null;
+  }[];
+  emailOwners: { normalizedEmail: string; employeeCode: string }[];
+}
+
+/** What the onboarding checklist needs to know about the organization (US-02-04). */
+export interface OnboardingFacts {
+  activeDepartments: number;
+  activeEmployees: number;
+  /** Active UNIT cost centers with no department yet: the department that is created next takes one of these. */
+  freeCostCenters: number;
+  departmentsWithoutHead: { code: string; name: string }[];
+  /** Active departments and the employee named IT Admin in charge, to be judged by the account side. */
+  departmentsByItAdmin: {
+    code: string;
+    name: string;
+    itAdminEmployeeId: string | null;
+    itAdminStatus: 'ACTIVE' | 'TERMINATED' | null;
+  }[];
 }

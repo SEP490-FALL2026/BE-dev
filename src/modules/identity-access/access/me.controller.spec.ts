@@ -2,12 +2,18 @@ import { HttpStatus } from '@nestjs/common';
 import { TransientDatabaseError } from '../../../infrastructure/database/transaction-runner';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
+import { PasswordChangeService } from '../auth/password-change.service';
+import { RefreshCookie } from '../auth/refresh-cookie';
 import { MeController } from './me.controller';
 import { MeService } from './me.service';
 
 const principal = {} as AuthenticatedPrincipal;
 const controllerFailingWith = (error: Error): MeController =>
-  new MeController({ get: () => Promise.reject(error) } as unknown as MeService);
+  new MeController(
+    { get: () => Promise.reject(error) } as unknown as MeService,
+    {} as PasswordChangeService,
+    {} as RefreshCookie,
+  );
 
 describe('MeController — failures after the guard (R-15)', () => {
   it.each([new TransientDatabaseError('57014', new Error('timeout')), new Error('Query read timeout')])(

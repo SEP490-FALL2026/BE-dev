@@ -3,6 +3,22 @@ export type AuditActorKind = 'USER' | 'SYSTEM' | 'OPERATOR';
 /** Plain JSON-compatible value allowed in an audit snapshot. */
 export type AuditValue = string | number | boolean | null | AuditValue[] | { [key: string]: AuditValue };
 
+/** One row of the trail as it is read back. The organization is left out: a reader never chooses it. */
+export interface StoredAuditEvent {
+  id: string;
+  occurredAt: Date;
+  actorKind: AuditActorKind;
+  actorAppUserId: string | null;
+  actorRoles: string[];
+  action: string;
+  resourceType: string;
+  resourceId: string;
+  before: { [key: string]: AuditValue } | null;
+  after: { [key: string]: AuditValue } | null;
+  correlationId: string;
+  operatorReference: string | null;
+}
+
 export interface AuditEventInput {
   organizationId: string;
   actorKind: AuditActorKind;

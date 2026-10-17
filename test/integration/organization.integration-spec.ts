@@ -6,6 +6,9 @@ import {
   EmployeeEmailTakenError,
   OrganizationAlreadyExistsError,
 } from '../../src/modules/organization/errors/organization.errors';
+import { CostCenterRepo } from '../../src/modules/organization/cost-center.repo';
+import { DepartmentRepo } from '../../src/modules/organization/department.repo';
+import { ImportLookupRepo } from '../../src/modules/organization/import-lookup.repo';
 import { OrganizationRepo } from '../../src/modules/organization/organization.repo';
 import { OrganizationService } from '../../src/modules/organization/organization.service';
 import {
@@ -34,7 +37,12 @@ describe('organization foundation (integration)', () => {
     const config = testConfig({ DATABASE_URL: database.url });
     prisma = new PrismaService(config);
     runner = new TransactionRunner(prisma, config);
-    organization = new OrganizationService(new OrganizationRepo(prisma));
+    organization = new OrganizationService(
+      new OrganizationRepo(prisma),
+      new DepartmentRepo(prisma),
+      new ImportLookupRepo(prisma),
+      new CostCenterRepo(prisma),
+    );
     sql = new Client({ connectionString: database.url });
     await sql.connect();
 
@@ -177,6 +185,24 @@ describe('organization foundation (integration)', () => {
 
     await sql.query(`DELETE FROM employee_placements WHERE employee_id = $1`, [id]);
     await sql.query(`DELETE FROM employees WHERE id = $1`, [id]);
+  });
+
+  it('creates a job title under the one name rule, so the installation path cannot disagree with the API (T-12)', async () => {
+    const created = await runner.run((tx) => organization.createJobTitle(tx, organizationId, '  Senior   Designer\t'));
+
+    const stored = await sql.query<{ name: string; normalized_name: string; status: string; version: number }>(
+      'SELECT name, normalized_name, status, version FROM job_titles WHERE id = $1',
+      [created.id],
+    );
+    expect(stored.rows).toEqual([
+      { name: 'Senior Designer', normalized_name: 'senior designer', status: 'ACTIVE', version: 1 },
+    ]);
+    // The same title typed another way is the same title.
+    await expect(
+      runner.run((tx) => organization.createJobTitle(tx, organizationId, 'SENIOR designer')),
+    ).rejects.toThrow();
+    const count = await sql.query(`SELECT 1 FROM job_titles WHERE normalized_name = 'senior designer'`);
+    expect(count.rows).toHaveLength(1);
   });
 
   it('locks an employee through the facade and reports a missing one', async () => {

@@ -223,6 +223,7 @@ export class AccountInvitationService {
     await this.accounts.insertActionToken(tx, {
       tokenHash: issued.hash,
       appUserId,
+      purpose: 'INVITE',
       expiresAt: issued.expiresAt,
       createdBy: actor.appUserId,
     });

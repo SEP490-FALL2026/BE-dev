@@ -24,10 +24,15 @@ const PRISMA_MODEL_OWNER: Readonly<Record<string, string>> = {
   Organization: 'organization',
   CostCenter: 'organization',
   Department: 'organization',
+  DepartmentHeadPeriod: 'organization',
+  Project: 'organization',
+  ProjectDepartment: 'organization',
   JobTitle: 'organization',
   Employee: 'organization',
   EmployeePlacement: 'organization',
   AppUser: 'identity-access',
+  ApprovalRoleHolder: 'identity-access',
+  RecoveryTicket: 'identity-access',
   PasswordCredential: 'identity-access',
   RoleGrant: 'identity-access',
   AuthSession: 'identity-access',
@@ -35,6 +40,10 @@ const PRISMA_MODEL_OWNER: Readonly<Record<string, string>> = {
   LoginThrottle: 'identity-access',
   AccountActionToken: 'identity-access',
   EmailOutbox: 'notifications',
+  ParameterValue: 'operating-parameters',
+  EmployeeImport: 'data-import',
+  EmployeeImportRow: 'data-import',
+  NonWorkingDate: 'operating-parameters',
 };
 
 interface PrismaModelTable {

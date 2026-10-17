@@ -1,4 +1,4 @@
-export type EmailTemplate = 'ACCOUNT_INVITATION';
+export type EmailTemplate = 'ACCOUNT_INVITATION' | 'PASSWORD_RESET' | 'PASSWORD_CHANGED_NOTICE';
 export type EmailOutboxStatus = 'PENDING' | 'SENDING' | 'SENT' | 'FAILED' | 'CANCELLED';
 
 export interface EnqueueEmailInput {
@@ -6,9 +6,13 @@ export interface EnqueueEmailInput {
   recipient: string;
   template: EmailTemplate;
   locale: string;
-  /** Identifies the action token behind the link; at most one mail per token. A value, not a foreign key. */
-  actionTokenHash: string;
-  /** Sealed before it is stored. Holds the token itself, so it never appears in a log or an audit row. */
+  /**
+   * Identifies the action token behind the link; at most one mail per token. A value, not a foreign key.
+   * Null for a message that carries no link (the password-changed notice), which is sent without any
+   * token check.
+   */
+  actionTokenHash: string | null;
+  /** Sealed before it is stored. May hold the token itself, so it never appears in a log or an audit row. */
   payload: Record<string, unknown>;
 }
 
@@ -24,7 +28,7 @@ export interface ClaimedEmail {
   recipient: string;
   template: string;
   locale: string;
-  actionTokenHash: string;
+  actionTokenHash: string | null;
   attempts: number;
   payloadCiphertext: Buffer | null;
   payloadKeyId: string | null;

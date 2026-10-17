@@ -6,7 +6,7 @@ describe('EmailDispatchLoop', () => {
 
   function build(dispatchDue: jest.Mock) {
     const config = { get: () => 1000 };
-    const identity = { isInvitationLinkUsable: jest.fn().mockResolvedValue(true) };
+    const identity = { isActionLinkUsable: jest.fn().mockResolvedValue(true) };
     const loop = new EmailDispatchLoop({ dispatchDue } as never, identity as never, config as never);
 
     return { loop, identity };
@@ -46,7 +46,7 @@ describe('EmailDispatchLoop', () => {
     loop.onApplicationBootstrap();
     await jest.advanceTimersByTimeAsync(0);
 
-    expect(identity.isInvitationLinkUsable).toHaveBeenCalledWith('h1');
+    expect(identity.isActionLinkUsable).toHaveBeenCalledWith('h1');
     void loop.onModuleDestroy();
   });
 

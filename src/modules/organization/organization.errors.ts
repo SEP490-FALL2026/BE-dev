@@ -5,3 +5,6 @@ export class EmployeeNotFoundError extends Error {
     this.name = 'EmployeeNotFoundError';
   }
 }
+
+// Thrown by the facade when a person's code or work email is already taken; callers outside the module catch them here.
+export { EmployeeCodeTakenError, EmployeeEmailTakenError } from './errors/organization.errors';

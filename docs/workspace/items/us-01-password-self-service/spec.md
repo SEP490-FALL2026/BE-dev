@@ -1,9 +1,10 @@
 # Spec: lát 1c — quên, đặt lại và đổi mật khẩu
 
-- Phụ trách: chưa phân công.
+- Phụ trách: AI theo giao việc Owner (triển khai 16/10/2026).
 - Thiết kế ban đầu bởi: AI theo giao việc Owner (draft 14/10/2026 từ review US; hoàn thiện contract/dữ liệu trong Task 3,
   15/10/2026).
-- Thiết kế: ready (15/10/2026) — đủ đầu vào để code; **không** có nghĩa Owner đã duyệt. Owner review: chưa review.
+- Thiết kế: ready (15/10/2026) — đủ đầu vào để code; **không** có nghĩa Owner đã duyệt. Triển khai: **verified** local
+  16/10/2026 (cây làm việc chưa commit trên `e833092`; xem [plan](plan.md)). Owner review: chưa review.
 - Nguồn: Docs commit `3341ea0` = snapshot `S-2026-10-14b` ([sources](../../sources.md), hash 49/49 khớp ngày 15/10/2026).
   `US-01-10` AC-3 → AC-7, AC-9, AC-12, _Business rules_, _Postconditions_ (`BE-UserStory/src/EP-01.md`); BRD v3.39
   `FR-8.1`, `FR-8.3`, `FR-8.6`, `FR-8.8`, `FR-8.9`, `FR-8.11` (a)→(i), `INV-05`; `QĐ-46a`→`QĐ-46d`, `QĐ-39c`/`39d`,
@@ -130,30 +131,34 @@ lại: chênh thời gian vài ms giữa ca (a) và còn lại — chấp nhận
 
 ## Acceptance và kiểm chứng
 
-| US/AC           | Tình huống                                                                                                                                                   | Cấp test, kết quả mong đợi                                                                       | Bằng chứng sau implement |
-| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ | ------------------------ |
-| AC-3            | Năm email (a)–(e) qua API thật; email (a) viết hoa/khoảng trắng                                                                                              | HTTP + PostgreSQL thật: status/body giống hệt; outbox chỉ (a), recipient = email đang lưu        | chưa có                  |
-| AC-3 / T-2, T-4 | Bốn yêu cầu liền cho (a) trong một giờ ⟹ 3 token, chỉ token cuối dùng được, 1 thư `PENDING`                                                                  | integration                                                                                      | chưa có                  |
-| AC-4            | Đặt lại thành công; dùng lại liên kết ⟹ 400; refresh cũ ⟹ 401; access token cũ ⟹ 401 ở request kế tiếp; vai/khóa/nhân viên không đổi                         | HTTP + PostgreSQL thật                                                                           | chưa có                  |
-| AC-5            | Sai mật khẩu hiện tại ⟹ 422; đúng ⟹ 200, mọi phiên (gồm hiện tại) bị thu hồi, cookie bị xóa; tài khoản 0 vai; Super Admin tự đổi                             | HTTP + PostgreSQL thật                                                                           | chưa có                  |
-| AC-6            | Khóa sau khi phát token ⟹ đặt lại 400; mở khóa không hồi token; nhân viên `TERMINATED` (fixture) ⟹ 400, đổi ⟹ 401 ở guard                                    | integration                                                                                      | chưa có                  |
-| AC-7            | Đăng nhập sai tới ngưỡng ⟹ 429; quên + đặt lại vẫn 200; sau đó đăng nhập được ngay (T-3); sai mật khẩu hiện tại tới ngưỡng ⟹ 429, `AppUser.status` không đổi | HTTP + PostgreSQL thật                                                                           | chưa có                  |
-| AC-9            | Audit, log, outbox không chứa mật khẩu/token/hash (grep giá trị thật trên DB và log bắt được); giao dịch lỗi không để lại audit                              | integration                                                                                      | chưa có                  |
-| AC-12           | Đổi/đặt lại thành công ⟹ đúng một thư báo tới email đang lưu, không link/mã; thất bại ⟹ 0 thư; SMTP lỗi ⟹ thao tác vẫn hiệu lực, thư `FAILED`/thử lại        | worker thật + SMTP server trong tiến trình (`smtp-server`, mẫu `worker-mail-loop`) + integration | chưa có                  |
-| T-10            | Khóa tài khoản sau khi xếp thư đặt lại ⟹ worker không gửi (`CANCELLED`/bỏ qua)                                                                               | integration `worker-mail-loop`                                                                   | chưa có                  |
-| Đồng thời       | đặt lại ↔ khóa, đặt lại ↔ đăng nhập, đổi ↔ đổi, đặt lại ↔ đặt lại cùng token, quên ↔ quên, quên ↔ khóa                                                       | integration với `concurrency-harness` (`pg_locks`, không `sleep`): một bên thắng, không `40P01`  | chưa có                  |
-| Lỗi tạm thời    | CSDL ngừng trả lời giữa giao dịch đặt lại/đổi ⟹ 503, không ghi dở                                                                                            | integration với `PgRelay`                                                                        | chưa có                  |
-| AC-8 (hồi quy)  | API inventory không có route đặt/xem mật khẩu hộ                                                                                                             | e2e `api-inventory`                                                                              | chưa có                  |
+| US/AC           | Tình huống                                                                                                                                                   | Cấp test, kết quả mong đợi                                                                       | Bằng chứng sau implement                                                                           |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
+| AC-3            | Năm email (a)–(e) qua API thật; email (a) viết hoa/khoảng trắng                                                                                              | HTTP + PostgreSQL thật: status/body giống hệt; outbox chỉ (a), recipient = email đang lưu        | PASS: `password-self-service-http` (forgot, 5 ca + 422 + giới hạn route T-9)                       |
+| AC-3 / T-2, T-4 | Bốn yêu cầu liền cho (a) trong một giờ ⟹ 3 token, chỉ token cuối dùng được, 1 thư `PENDING`                                                                  | integration                                                                                      | PASS: `password-self-service-http` (T-2/T-4)                                                       |
+| AC-4            | Đặt lại thành công; dùng lại liên kết ⟹ 400; refresh cũ ⟹ 401; access token cũ ⟹ 401 ở request kế tiếp; vai/khóa/nhân viên không đổi                         | HTTP + PostgreSQL thật                                                                           | PASS: `password-self-service-http` (reset, 400 chung, 422 policy)                                  |
+| AC-5            | Sai mật khẩu hiện tại ⟹ 422; đúng ⟹ 200, mọi phiên (gồm hiện tại) bị thu hồi, cookie bị xóa; tài khoản 0 vai; Super Admin tự đổi                             | HTTP + PostgreSQL thật                                                                           | PASS: `password-self-service-http` (change)                                                        |
+| AC-6            | Khóa sau khi phát token ⟹ đặt lại 400; mở khóa không hồi token; nhân viên `TERMINATED` (fixture) ⟹ 400, đổi ⟹ 401 ở guard                                    | integration                                                                                      | PASS: `password-self-service-http` (khóa, TERMINATED, guard 401), `action-link-purpose`            |
+| AC-7            | Đăng nhập sai tới ngưỡng ⟹ 429; quên + đặt lại vẫn 200; sau đó đăng nhập được ngay (T-3); sai mật khẩu hiện tại tới ngưỡng ⟹ 429, `AppUser.status` không đổi | HTTP + PostgreSQL thật                                                                           | PASS: `password-self-service-http` (reset gỡ chặn, đổi sai tới ngưỡng ⟹ 429, không khóa)           |
+| AC-9            | Audit, log, outbox không chứa mật khẩu/token/hash (grep giá trị thật trên DB và log bắt được); giao dịch lỗi không để lại audit                              | integration                                                                                      | PASS: `password-self-service-http` (audit, outbox, log bắt được)                                   |
+| AC-12           | Đổi/đặt lại thành công ⟹ đúng một thư báo tới email đang lưu, không link/mã; thất bại ⟹ 0 thư; SMTP lỗi ⟹ thao tác vẫn hiệu lực, thư `FAILED`/thử lại        | worker thật + SMTP server trong tiến trình (`smtp-server`, mẫu `worker-mail-loop`) + integration | PASS: `password-self-service-mail` (worker + SMTP trong tiến trình, SMTP lỗi rồi thử lại)          |
+| T-10            | Khóa tài khoản sau khi xếp thư đặt lại ⟹ worker không gửi (`CANCELLED`/bỏ qua)                                                                               | integration `worker-mail-loop`                                                                   | PASS: `password-self-service-mail` (TERMINATED sau khi xếp thư ⟹ CANCELLED), `action-link-purpose` |
+| Đồng thời       | đặt lại ↔ khóa, đặt lại ↔ đăng nhập, đổi ↔ đổi, đặt lại ↔ đặt lại cùng token, quên ↔ quên, quên ↔ khóa                                                       | integration với `concurrency-harness` (`pg_locks`, không `sleep`): một bên thắng, không `40P01`  | PASS: `password-self-service-concurrency` (6 ca × 6 vòng; không `40P01`)                           |
+| Lỗi tạm thời    | CSDL ngừng trả lời giữa giao dịch đặt lại/đổi ⟹ 503, không ghi dở                                                                                            | integration với `PgRelay`                                                                        | PASS: `password-self-service-unavailable` (503, không ghi dở, không `idle in transaction`)         |
+| AC-8 (hồi quy)  | API inventory không có route đặt/xem mật khẩu hộ                                                                                                             | e2e `api-inventory`                                                                              | PASS: e2e `api-inventory` (manifest = đúng 3 operation mới, allowlist công khai khớp)              |
 
 ## Sẵn sàng bàn giao
 
 - [x] Nguồn cố định, truy cập được: Docs `3341ea0`.
 - [x] Scope/AC/contract/dữ liệu/khóa rõ; phụ thuộc 1a/1b và remediation đã `verified` local tại `d60d306`, refactor tại `ab0c43a`.
 - [x] Plan và spec thống nhất; không còn câu hỏi nghiệp vụ chặn.
-- [ ] Người phụ trách nhận ownership; dev khác review bảng `T-*` trước khi giao `dev` (yêu cầu của `US-01-10`).
+- [x] Người phụ trách nhận ownership (AI theo giao việc Owner, 16/10/2026).
+- [ ] Dev khác review bảng `T-*` trước khi giao `dev` (yêu cầu của `US-01-10`) — **pending**.
 
 ## Thay đổi và nghiệm thu
 
 14/10/2026: tạo draft từ review US theo lát, thêm AC-12 theo `QĐ-73a`.
 15/10/2026 (Task 3): pin nguồn Docs `3341ea0`; chốt `T-1`→`T-10`, HTTP contract, migration, luồng khóa, thay đổi outbox
 cho thư không liên kết; bỏ điều kiện "chờ remediation merge" (đã có ở `d60d306`); chuyển `ready`. Chưa implement, chưa nghiệm thu.
+16/10/2026: implement xong sáu bước của plan, kiểm chứng local (unit 360, e2e 36, integration 291, `pnpm check` exit 0; chi tiết và
+các quyết định khi triển khai ở [plan](plan.md)). Khác spec: thư chứa liên kết đã dùng cũng bị hủy khi đặt lại thành công;
+hàm điều kiện nhận thư tên `canReceiveResetMail`; không có `.env.example` trong repo. Chưa review, chưa nghiệm thu.
