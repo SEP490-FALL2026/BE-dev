@@ -1,6 +1,5 @@
-import { Body, Controller, Get, HttpStatus, Post, Res } from '@nestjs/common';
+import { Body, Controller, Get, HttpStatus, Post } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import type { Response } from 'express';
 import { ApiErrorResponses } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
 import { AuthenticatedOnly } from '../../../infrastructure/security/decorators/access.decorators';
@@ -8,7 +7,6 @@ import { CurrentPrincipal } from '../../../infrastructure/security/models/curren
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { toAccountApiException, toUnavailableApiException } from '../accounts/account.http-errors';
 import { PasswordChangeService } from '../auth/password-change.service';
-import { RefreshCookie } from '../auth/refresh-cookie';
 import { ChangePasswordBodyDto, PasswordChangedResponseDto } from '../dto/auth.dto';
 import { MeResponseDto } from '../dto/me.dto';
 import { MeService, MeView } from './me.service';
@@ -19,7 +17,6 @@ export class MeController {
   constructor(
     private readonly me: MeService,
     private readonly passwordChanges: PasswordChangeService,
-    private readonly cookie: RefreshCookie,
   ) {}
 
   @Get()
@@ -48,8 +45,8 @@ export class MeController {
 
   /**
    * Changes the caller's own password. Open to every signed-in account, with or without roles; there is no
-   * route to change anyone else's (`US-01-10` AC-8). Every session ends, this one included, and the refresh
-   * cookie is cleared.
+   * route to change anyone else's (`US-01-10` AC-8). Every session ends, this one included, so every refresh
+   * token the account holds stops working.
    */
   @Post('password')
   @AuthenticatedOnly()
@@ -82,15 +79,12 @@ export class MeController {
   async changePassword(
     @CurrentPrincipal() principal: AuthenticatedPrincipal,
     @Body() body: ChangePasswordBodyDto,
-    @Res({ passthrough: true }) response: Response,
   ): Promise<{ passwordChanged: true }> {
     try {
       await this.passwordChanges.changePassword(principal, body.currentPassword, body.newPassword);
     } catch (error) {
       throw toAccountApiException(error);
     }
-    // Every session just ended, so the cookie that held this one's refresh token is worthless.
-    this.cookie.clear(response);
 
     return { passwordChanged: true };
   }

@@ -58,10 +58,10 @@ describe('authentication while the database is down (e2e)', () => {
     noLeak(bodyOf(response));
   });
 
-  it('refresh answers 503 and keeps the cookie so the client can retry', async () => {
+  it('refresh answers 503 so the client can retry with the same refresh token', async () => {
     const response = await request(app.getHttpServer())
       .post('/api/v1/auth/refresh')
-      .set('Cookie', `slm_refresh=${'A'.repeat(43)}`)
+      .send({ refreshToken: 'A'.repeat(43) })
       .expect(503);
 
     expect(bodyOf(response).error.code).toBe('AUTH.UNAVAILABLE');
@@ -72,11 +72,21 @@ describe('authentication while the database is down (e2e)', () => {
   it('logout answers 503 and does not claim the user is signed out', async () => {
     const response = await request(app.getHttpServer())
       .post('/api/v1/auth/logout')
-      .set('Cookie', `slm_refresh=${'A'.repeat(43)}`)
+      .send({ refreshToken: 'A'.repeat(43) })
       .expect(503);
 
     expect(bodyOf(response).error.code).toBe('AUTH.UNAVAILABLE');
     expect(response.headers['set-cookie']).toBeUndefined();
+  });
+
+  it('refresh ignores a cookie: the refresh token is read from the body only', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/api/v1/auth/refresh')
+      .set('Cookie', `slm_refresh=${'A'.repeat(43)}`)
+      .send({})
+      .expect(422);
+
+    expect(bodyOf(response).error.code).toBe('VALIDATION_ERROR');
   });
 
   it('a valid token gets 503 TOKEN_VERIFICATION_UNAVAILABLE, not 401', async () => {
@@ -89,7 +99,11 @@ describe('authentication while the database is down (e2e)', () => {
     noLeak(bodyOf(response));
   });
 
-  it('logout without a cookie needs no database and stays 204', async () => {
-    await request(app.getHttpServer()).post('/api/v1/auth/logout').expect(204);
+  it('logout and refresh without a refresh token in the body are a 422 and need no database', async () => {
+    for (const path of ['/api/v1/auth/logout', '/api/v1/auth/refresh']) {
+      const response = await request(app.getHttpServer()).post(path).send({}).expect(422);
+
+      expect(bodyOf(response).error.code).toBe('VALIDATION_ERROR');
+    }
   });
 });

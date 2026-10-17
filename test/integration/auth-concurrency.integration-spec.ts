@@ -10,11 +10,11 @@ import {
   seedInstallation,
 } from '../support/http-test-app';
 
-const REFRESH_COOKIE = 'slm_refresh';
+/** A well-formed token no session owns: what a client with a stale token would send. */
+const UNKNOWN_REFRESH_TOKEN = 'A'.repeat(43);
 
 function refreshToken(response: request.Response): string {
-  const cookie = (response.headers['set-cookie'] as unknown as string[]).find((c) => c.startsWith(REFRESH_COOKIE));
-  return (cookie as string).split(';')[0].slice(REFRESH_COOKIE.length + 1);
+  return bodyOf(response).data.refreshToken;
 }
 
 /** Resolves once some backend is waiting for a lock — never guesses with a fixed delay. */
@@ -37,6 +37,8 @@ describe('lock protocol: authentication races (integration, real PostgreSQL)', (
   const server = () => ctx.app.getHttpServer();
   const login = (email: string, password = SEED_PASSWORD) =>
     request(server()).post('/api/v1/auth/login').send({ email, password });
+  const refresh = (token: string) => request(server()).post('/api/v1/auth/refresh').send({ refreshToken: token });
+  const logout = (token: string) => request(server()).post('/api/v1/auth/logout').send({ refreshToken: token });
 
   beforeAll(async () => {
     ctx = await createHttpTestApp();
@@ -103,10 +105,7 @@ describe('lock protocol: authentication races (integration, real PostgreSQL)', (
     const before = tokens.rows[0].n;
     const lock = await lockAccountHolding(appUserId);
 
-    const pending = request(server())
-      .post('/api/v1/auth/refresh')
-      .set('Cookie', `${REFRESH_COOKIE}=${refreshToken(session)}`)
-      .then((response) => response);
+    const pending = refresh(refreshToken(session)).then((response) => response);
     await waitForLockWait(ctx.sql);
     await lock.commit();
     const response = await pending;
@@ -124,10 +123,7 @@ describe('lock protocol: authentication races (integration, real PostgreSQL)', (
     const { appUserId } = await insertAccountFixture(ctx.app, seed, { code: 'E-RF', email, activated: true });
     const session = await login(email).expect(200);
 
-    const refreshed = await request(server())
-      .post('/api/v1/auth/refresh')
-      .set('Cookie', `${REFRESH_COOKIE}=${refreshToken(session)}`)
-      .expect(200);
+    const refreshed = await refresh(refreshToken(session)).expect(200);
     const lock = await lockAccountHolding(appUserId);
     await lock.commit();
 
@@ -135,10 +131,7 @@ describe('lock protocol: authentication races (integration, real PostgreSQL)', (
       .get('/api/v1/me')
       .set('Authorization', `Bearer ${bodyOf(refreshed).data.accessToken}`)
       .expect(401);
-    await request(server())
-      .post('/api/v1/auth/refresh')
-      .set('Cookie', `${REFRESH_COOKIE}=${refreshToken(refreshed)}`)
-      .expect(401);
+    await refresh(refreshToken(refreshed)).expect(401);
     await unlock(appUserId);
   });
 
@@ -146,12 +139,9 @@ describe('lock protocol: authentication races (integration, real PostgreSQL)', (
     const email = 'race-twice@acme.vn';
     await insertAccountFixture(ctx.app, seed, { code: 'E-R2', email, activated: true });
     const session = await login(email).expect(200);
-    const cookie = `${REFRESH_COOKIE}=${refreshToken(session)}`;
+    const token = refreshToken(session);
 
-    const [a, b] = await Promise.all([
-      request(server()).post('/api/v1/auth/refresh').set('Cookie', cookie),
-      request(server()).post('/api/v1/auth/refresh').set('Cookie', cookie),
-    ]);
+    const [a, b] = await Promise.all([refresh(token), refresh(token)]);
 
     expect([a.status, b.status].sort()).toEqual([200, 401]);
     const winner = a.status === 200 ? a : b;
@@ -173,17 +163,11 @@ describe('lock protocol: authentication races (integration, real PostgreSQL)', (
 
     for (let round = 0; round < 12; round += 1) {
       const session = await login(email);
-      const cookie = session.status === 200 ? `${REFRESH_COOKIE}=${refreshToken(session)}` : '';
+      const token = session.status === 200 ? refreshToken(session) : UNKNOWN_REFRESH_TOKEN;
       const work: Array<Promise<unknown>> = [
         login(email).then((r) => statuses.push(r.status)),
-        request(server())
-          .post('/api/v1/auth/refresh')
-          .set('Cookie', cookie)
-          .then((r) => statuses.push(r.status)),
-        request(server())
-          .post('/api/v1/auth/logout')
-          .set('Cookie', cookie)
-          .then((r) => statuses.push(r.status)),
+        refresh(token).then((r) => statuses.push(r.status)),
+        logout(token).then((r) => statuses.push(r.status)),
         (async () => {
           const lock = await lockAccountHolding(appUserId);
           await new Promise((resolve) => setTimeout(resolve, round % 3));

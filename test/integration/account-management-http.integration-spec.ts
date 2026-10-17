@@ -392,13 +392,13 @@ describe('account management over HTTP (integration, real PostgreSQL)', () => {
       const user = await activatedAccount(['IT_ADMIN']);
       const { token, response } = await signIn(user.email, user.password);
       await request(server()).get('/api/v1/probe/it').set(as(token)).expect(200);
-      const cookie = (response.headers['set-cookie'] as unknown as string[])[0].split(';')[0];
+      const refreshToken = bodyOf(response).data.refreshToken;
 
       const locked = await admin.post(`/api/v1/app-users/${user.appUserId}/lock`).expect(200);
 
       expect(bodyOf(locked).message).toBe('APP_USER.LOCKED');
       await request(server()).get('/api/v1/probe/it').set(as(token)).expect(401);
-      await request(server()).post('/api/v1/auth/refresh').set('Cookie', cookie).expect(401);
+      await request(server()).post('/api/v1/auth/refresh').send({ refreshToken }).expect(401);
       const reasons = await ctx.sql.query<{ revoked_reason: string }>(
         'SELECT revoked_reason FROM auth_sessions WHERE app_user_id = $1',
         [user.appUserId],

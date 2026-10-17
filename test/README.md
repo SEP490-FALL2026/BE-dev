@@ -76,9 +76,9 @@ connection trước khi dọn thủ công; không xóa theo wildcard.
 
 ## HTTP trên PostgreSQL thật
 
-`support/http-test-app.ts` dựng **toàn bộ** ứng dụng Nest (pipe, guard, filter, cookie parser) trên một
-database dùng riêng đã áp migration, cho các ca mà stub repo không chứng minh được: ràng buộc, khóa dòng,
-cookie. `createHttpTestApp()` trả `{ app, sql, close }`; `seedInstallation(app)` tạo bộ dữ liệu tối thiểu
+`support/http-test-app.ts` dựng **toàn bộ** ứng dụng Nest (pipe, guard, filter) trên một
+database dùng riêng đã áp migration, cho các ca mà stub repo không chứng minh được: ràng buộc, khóa dòng.
+`createHttpTestApp()` trả `{ app, sql, close }`; `seedInstallation(app)` tạo bộ dữ liệu tối thiểu
 của lệnh khởi tạo qua service thật; `insertAccountFixture` tạo trạng thái tài khoản bằng SQL để cô lập
 ca kiểm thử. Lát 1b đã có API tạo/mời/kích hoạt: test workflow đó phải đi qua API thật;
 fixture SQL không chứng minh workflow tạo tài khoản. Dùng `bodyOf(response)`

@@ -2,7 +2,6 @@ import { INestApplication, VersioningType } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import type { OpenAPIObject } from '@nestjs/swagger';
-import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { cleanupOpenApiDoc } from 'nestjs-zod';
 import { parseCorsOrigins } from './infrastructure/config/cors';
@@ -33,12 +32,8 @@ export function configureApplication(app: INestApplication, options: ConfigureAp
   const allowedOrigins = parseCorsOrigins(config.get('CORS_ORIGINS', { infer: true }));
 
   app.use(helmet());
-  // Reads the refresh cookie. No secret: the token is already a random bearer secret stored hashed.
-  app.use(cookieParser());
-  app.enableCors({
-    origin: allowedOrigins,
-    credentials: true,
-  });
+  // Bearer tokens only: nothing in this API reads or sets a cookie, so cross-origin calls carry no credentials.
+  app.enableCors({ origin: allowedOrigins });
   requireExpressInstance(app.getHttpAdapter().getInstance()).set(
     'trust proxy',
     config.get('TRUST_PROXY_HOPS', { infer: true }),

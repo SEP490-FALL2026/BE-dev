@@ -24,7 +24,6 @@ import { LoginService } from './auth/login.service';
 import { LoginThrottle } from './auth/login-throttle.service';
 import { PasswordChangeService } from './auth/password-change.service';
 import { PasswordResetService } from './auth/password-reset.service';
-import { RefreshCookie } from './auth/refresh-cookie';
 import { SessionRepo } from './auth/session.repo';
 import { SessionService } from './auth/session.service';
 import { TokenService } from './auth/token.service';
@@ -78,7 +77,6 @@ import { IdentityAccessFacadeModule } from './identity-access-facade.module';
     SessionRepo,
     MeService,
     TokenService,
-    RefreshCookie,
     JwtAccessTokenVerifier,
     { provide: ACCESS_TOKEN_VERIFIER, useExisting: JwtAccessTokenVerifier },
   ],

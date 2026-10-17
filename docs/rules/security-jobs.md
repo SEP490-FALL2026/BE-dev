@@ -2,8 +2,10 @@
 
 ## Authentication and authorization
 
-- Internal accounts: Argon2id passwords, short-lived HS256 access token, rotating refresh token in an
-  `HttpOnly` `SameSite=Strict` cookie scoped to the auth routes (design: ADR-0011, Proposed). Login,
+- Internal accounts: Argon2id passwords, short-lived HS256 access token, rotating refresh token. Login and
+  refresh return both in the response body; refresh and logout take the refresh token in the request body.
+  The API sets and reads no cookie, so a client must keep the refresh token out of logs and URLs
+  (design: ADR-0011, Proposed, amended 17/10/2026). Login,
   refresh, logout, `/me`, account creation, invitations, activation, locking and role grants exist
   in slices 1a/1b (merged, pending developer review). Password change/reset is a later slice.
 - Global guards deny by default: every route declares one of `@Public()`, `@AuthenticatedOnly()`,

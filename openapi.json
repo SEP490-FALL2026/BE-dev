@@ -1820,7 +1820,7 @@
         },
         "responses": {
           "200": {
-            "description": "Signed in. The refresh token is set as an HttpOnly cookie.",
+            "description": "Signed in. The body carries the access token and the refresh token.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SessionTokenResponseDto" } } }
           },
           "401": {
@@ -1848,13 +1848,21 @@
       "post": {
         "operationId": "authRefresh",
         "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RefreshTokenBodyDto" } } }
+        },
         "responses": {
           "200": {
-            "description": "A new access token; the refresh cookie is rotated.",
+            "description": "A new access token and a new refresh token; the presented refresh token is spent.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SessionTokenResponseDto" } } }
           },
           "401": {
-            "description": "The session is missing, expired, revoked or replayed. The cookie is cleared.",
+            "description": "The refresh token is unknown, malformed, expired, spent or its session ended.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "422": {
+            "description": "The body has no refresh token (VALIDATION_ERROR).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "503": {
@@ -1870,8 +1878,16 @@
       "post": {
         "operationId": "authLogout",
         "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RefreshTokenBodyDto" } } }
+        },
         "responses": {
           "204": { "description": "Signed out (or there was nothing to sign out)." },
+          "422": {
+            "description": "The body has no refresh token (VALIDATION_ERROR).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "503": {
             "description": "The database is temporarily unavailable. Retry shortly.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
@@ -4495,14 +4511,21 @@
                 "type": "string",
                 "format": "date-time",
                 "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
-              }
+              },
+              "refreshToken": { "type": "string" }
             },
-            "required": ["accessToken", "tokenType", "expiresAt"],
+            "required": ["accessToken", "tokenType", "expiresAt", "refreshToken"],
             "additionalProperties": false,
             "nullable": true
           }
         },
         "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "RefreshTokenBodyDto": {
+        "type": "object",
+        "properties": { "refreshToken": { "type": "string", "minLength": 1, "maxLength": 512 } },
+        "required": ["refreshToken"],
         "additionalProperties": false
       },
       "PasswordResetRequestBodyDto": {
