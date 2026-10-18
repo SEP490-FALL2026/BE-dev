@@ -29,6 +29,14 @@ Developer viết tay cũng dùng cùng quy tắc.
   Inventory chỉ bảo đảm danh sách operation, không chứng minh coverage mọi nhánh.
 - Chạy pnpm test:discovery để phát hiện test sai tên/vị trí hoặc runner bỏ sót.
 
+### Import file private của src
+
+- Ưu tiên kiểm qua HTTP, facade hoặc contract công khai khi mục tiêu của test cho phép.
+- Unit/integration test được import repo, token hay type private khi cần chứng minh boundary nội bộ (ràng buộc, khóa
+  dòng, provider DI). Import đó phụ thuộc layout: lát move/refactor phải cập nhật nó trong cùng thay đổi.
+- Architecture gate có chủ đích không quét `test/**`. Điều đó không biến file private thành contract công khai; code
+  trong `src` vẫn theo [module structure](../docs/rules/module-structure.md).
+
 ## PostgreSQL dùng riêng cho test
 
 Tất cả integration suite dùng support/disposable-database.ts. Cấu hình

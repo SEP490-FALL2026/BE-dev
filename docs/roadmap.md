@@ -1,6 +1,6 @@
 # Roadmap backend
 
-Theo dõi lát US/AC theo [quy trình](workspace/README.md). Trạng thái hạng mục nằm tại đây; checklist chi tiết nằm trong plan. Catalog là module mẫu, không phải bằng chứng hoàn thành US. Chưa có US nào hoàn thành.
+Theo dõi lát US/AC theo [quy trình](workspace/README.md). Trạng thái hạng mục nằm tại đây; checklist chi tiết nằm trong plan. Module `catalog` chưa mount, không phải mẫu kiến trúc và không phải bằng chứng hoàn thành US; G3 quyết giữ, thay hay loại (E1). Chưa có US nào hoàn thành.
 
 **Bản draft 12/10/2026** — lập từ US v0.15 và quyết định QĐ-01 → QĐ-66; cập nhật cùng ngày theo `QĐ-67` (khởi tạo cài đặt, Employee Finance qua import, nhập tay nhân viên, `OQ-A-03`) — [snapshot nguồn](workspace/sources.md) `S-2026-10-12b`. Thứ tự và nhóm là đề xuất, không phải lịch hay phê duyệt. Người phụ trách có thể tự thiết kế rồi code, hoặc nhận thiết kế ban đầu từ Owner/người khác; không phải chờ peer review để bắt đầu. Owner review cuối trước khi đưa revision lên `main`/production.
 

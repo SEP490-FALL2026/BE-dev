@@ -1,13 +1,15 @@
 # Software License Management — Backend
 
 Foundation để triển khai User Story bằng NestJS 11, TypeScript, PostgreSQL/Prisma,
-Redis/BullMQ và S3-compatible storage. Giữ catalog làm module mẫu.
+Redis/BullMQ và S3-compatible storage. Module mới đặt file theo [module structure](docs/rules/module-structure.md) và
+architecture gate, không copy layout của một module cụ thể.
 
 **Đã có trong code:** lệnh khởi tạo `pnpm ops:bootstrap`, đăng nhập/làm mới/đăng xuất, `/me`, tạo tài khoản từ
 Employee, mời/kích hoạt, khóa/mở và gán/thu hồi vai, đổi/đặt lại mật khẩu, tra cứu Audit Trail, danh mục chức vụ/Cost
 Center, phòng và trưởng phòng (vai Manager suy ra), Người duyệt chi, tham số vận hành, import nhân sự CSV, checklist khởi
 tạo, chuyển giao Super Admin và lệnh khôi phục ngoài HTTP `pnpm ops:recover --help` (cần `pnpm build`).
-Route catalog **không còn trên HTTP** (module vẫn là mẫu cấu trúc). Health là public.
+Catalog **không có route HTTP**: source, schema và test được giữ nhưng `CatalogModule` chưa mount, chưa có access
+declaration và không phải mẫu kiến trúc; G3 quyết giữ, thay hay loại. Health là public.
 Không có tài khoản demo: tạo Super Admin bằng lệnh khởi tạo trên database mới.
 
 Có trong code không có nghĩa đã review hoặc nghiệm thu; một lát có thể mới phủ một phần Story. Trạng thái từng lát,

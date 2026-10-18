@@ -5,20 +5,22 @@ API và worker có entry point riêng trong cùng codebase.
 
 ## Năng lực hiện có
 
-| Thành phần     | Đã có                                                                                                                                                                                    | Chưa triển khai                                  |
-| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
-| HTTP           | Zod DTO, response envelope, exception filter, OpenAPI, rate limit                                                                                                                        | API theo các US còn lại                          |
-| Health         | Liveness và PostgreSQL readiness                                                                                                                                                         | Probe queue/storage                              |
-| Catalog        | Source list/get/create và tests làm mẫu; không mount HTTP                                                                                                                                | Nghiệp vụ catalog G3 và quyền theo role/resource |
-| Authentication | Argon2id, JWT/refresh session, guards, CLI bootstrap, `/me`, tài khoản, lời mời, mật khẩu, vai suy ra (Manager, Người duyệt chi), chuyển giao Super Admin, CLI khôi phục (`ops:recover`) | Phân quyền theo phạm vi của lát G3–G7            |
-| Database       | Catalog, audit, organization, identity-access, operating-parameters, data-import, notifications; migration SQL ở `prisma/migrations/`, `TransactionRunner`                               | Schema cho các lát tiếp theo                     |
-| Queue/storage  | S3 adapter, BullMQ configuration; worker gửi SMTP từ outbox PostgreSQL                                                                                                                   | BullMQ queue processor và file API               |
+| Thành phần     | Đã có                                                                                                                                                                                    | Chưa triển khai                                                |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| HTTP           | Zod DTO, response envelope, exception filter, OpenAPI, rate limit                                                                                                                        | API theo các US còn lại                                        |
+| Health         | Liveness và PostgreSQL readiness                                                                                                                                                         | Probe queue/storage                                            |
+| Catalog        | Source list/get/create, schema và test được giữ; `CatalogModule` chưa mount, chưa có access declaration, không phải mẫu kiến trúc                                                        | G3 quyết giữ, thay hay loại module/bảng; nghiệp vụ và quyền G3 |
+| Authentication | Argon2id, JWT/refresh session, guards, CLI bootstrap, `/me`, tài khoản, lời mời, mật khẩu, vai suy ra (Manager, Người duyệt chi), chuyển giao Super Admin, CLI khôi phục (`ops:recover`) | Phân quyền theo phạm vi của lát G3–G7                          |
+| Database       | Catalog, audit, organization, identity-access, operating-parameters, data-import, notifications; migration SQL ở `prisma/migrations/`, `TransactionRunner`                               | Schema cho các lát tiếp theo                                   |
+| Queue/storage  | S3 adapter, BullMQ configuration; worker gửi SMTP từ outbox PostgreSQL                                                                                                                   | BullMQ queue processor và file API                             |
 
 Bảng mô tả code đang có, không phải trạng thái nghiệm thu. Tiến độ từng lát, revision/PR, trạng thái review và kết quả
 gate nằm ở [roadmap](docs/roadmap.md); bằng chứng ở [audit nền tảng 18/10/2026](docs/reviews/be-foundation-audit-2026-10-18/README.md)
 và [review G0/G1](docs/reviews/g0-g1-remediation-2026-10-15/README.md). Kế hoạch remediation theo baseline và refactor nền
 tảng: [foundation-remediation-handoff-2026-10-18](docs/workspace/items/foundation-remediation-handoff-2026-10-18/spec.md).
-Catalog là mẫu cấu trúc, chưa cung cấp nghiệp vụ G3.
+Catalog không phải mẫu kiến trúc và chưa cung cấp nghiệp vụ G3: thay đổi mới đặt file theo
+[module structure](docs/rules/module-structure.md) và architecture gate thay vì copy một module cụ thể. Tương lai của
+catalog do G3 quyết (Owner E1 = A, [audit H4.0](docs/reviews/be-full-src-architecture-audit-2026-10-19/README.md#quyết-định-owner-09b)).
 
 ## Bản đồ source
 
@@ -53,7 +55,7 @@ src/
       access/                 # /me và verifier access token cho guard
     notifications/            # EmailOutbox (mã hóa payload), dispatcher gửi thư; không import identity-access
     installation/             # use case khởi tạo; không sở hữu bảng; import IdentityAccessFacadeModule (không import IdentityAccessModule) và chỉ xác thực biến môi trường DB
-    catalog/                  # module mẫu cấu trúc, KHÔNG đăng ký vào AppModule
+    catalog/                  # source/test giữ lại, KHÔNG đăng ký vào AppModule, không phải mẫu; G3 quyết
 prisma/
   schema.prisma               # generator, datasource
   models/                     # audit, organization, identity-access, operating-parameters, data-import, notifications, catalog
@@ -74,8 +76,12 @@ test/
   động là Nest module; điều kiện tạo Nest submodule, ownership capability, chỗ đặt lỗi và ngưỡng kích thước ở
   [module structure](docs/rules/module-structure.md). Module còn vượt ngưỡng mà vẫn phẳng (hiện là `organization`) là nợ
   ghi trong legacy ledger, đích tái cấu trúc ở [ví dụ đích](docs/rules/module-structure.md#ví-dụ-đích-chưa-di-chuyển-file).
-- Module khác chỉ import file ở **gốc** module (facade, module, types, errors public); không import repo,
-  `password-hasher.service` hay file trong thư mục con, và không truy cập bảng thuộc module khác.
+- Gốc module **không** public mặc định. Module khác và composition root chỉ import **allowlist** bề mặt công khai ở gốc
+  (`<module>.module.ts`, `*-http.module.ts`, `*-facade.module.ts`, facade `<module>.service.ts`, `*.types.ts`,
+  `*.errors.ts`); composition root được thêm đúng các entry CLI đã liệt kê. File gốc khác, repo,
+  `password-hasher.service` và file thư mục con là private; trong cùng module, gốc và capability cũng không đọc file
+  private của nhau (chỉ `*.module.ts` ghép provider). Nest module nghiệp vụ chỉ export contract đúng danh sách. Không
+  truy cập bảng thuộc module khác. Chi tiết và ledger: [module structure](docs/rules/module-structure.md#liên-module).
 - Cross-module atomic write: facade nhận `tx` của người gọi (`DbTx`); `TransactionRunner.run`
   mở giao dịch Read Committed với `lock_timeout`/`statement_timeout` riêng cho giao dịch.
   Khóa dòng của module khác chỉ qua facade (ví dụ `organization.lockEmployeeForShare(tx, id)`).
@@ -189,8 +195,10 @@ candidates, tìm kiếm literal và thứ tự kiểm khi redeem ở
 AppModule chưa dùng queue. WorkerModule cấu hình BullMQ (chưa có job) và chạy `EmailDispatchLoop`
 (`src/email-dispatch.loop.ts`): vòng thăm dò PostgreSQL mỗi `OUTBOX_POLL_INTERVAL_MS` gửi thư trong
 EmailOutbox ([ADR-0012](docs/decisions/0012-account-email-delivery.md), vẫn **Proposed**) — không cần Redis cho việc này.
-Vòng lặp nằm ở gốc ghép vì nối hai module không được import nhau: `notifications` gửi thư,
-facade `IdentityAccessService.isInvitationLinkUsable` trả lời liên kết trong thư còn dùng được không.
+Vòng lặp là orchestration có chủ đích ở composition root vì nối hai module không được import nhau: `notifications`
+gửi thư, facade `IdentityAccessService.isActionLinkUsable` trả lời liên kết trong thư còn dùng được không. Import trực
+tiếp `notifications/email-dispatcher.service.ts` của vòng lặp và export `EmailDispatcher` hiện là mục legacy ledger,
+gỡ ở ROOT.1.
 Storage adapter hỗ trợ endpoint S3-compatible; chưa có file ownership/API.
 Readiness chỉ chứng minh PostgreSQL có thể ping, không chứng minh schema/migration,
 Redis, storage hoặc chức năng đăng nhập đã sẵn sàng.

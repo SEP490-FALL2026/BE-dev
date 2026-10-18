@@ -35,12 +35,21 @@ The decision stands as written; two parts of it are not built yet, and this note
 
 | Part of the decision                                                         | Status                                                                                      |
 | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| Feature modules, one PostgreSQL, domain-split Prisma schemas, module facades | ✅ in place; `catalog` is the reference module                                              |
+| Feature modules, one PostgreSQL, domain-split Prisma schemas, module facades | ✅ in place; ~~`catalog` is the reference module~~ (superseded 2026-10-19, see amendment)   |
 | Cross-module repository access forbidden                                     | ✅ enforced by tests covering table ownership, repository confinement and raw SQL           |
 | API and worker entrypoints                                                   | ✅ both exist; the worker has no processor yet and says so on start                         |
 | MinIO local, Cloudflare R2 production, one S3 adapter                        | ⚠️ adapter built and unit-tested; no caller yet                                             |
 | Redis/BullMQ for durable background work                                     | ❌ configured, no queue registered. Deferred until a genuinely slow or retryable job exists |
 | In-process events for non-critical side effects                              | ❌ no event mechanism exists. Deferred until a real side effect needs one                   |
+
+### Amendment, 2026-10-19
+
+The claim that `catalog` is the reference module is superseded. Its source, schema, migration and tests are kept, but
+`CatalogModule` is not mounted, has no access declarations and does not follow the current
+[module structure](../rules/module-structure.md) rules, so it is no template. New code follows that rule and the
+architecture gates. G3 decides whether to keep, replace or remove the module and its table (Owner decision E1 = A in
+the [H4.0 audit](../reviews/be-full-src-architecture-audit-2026-10-19/README.md#quyết-định-owner-09b)). The rest of
+this decision is unchanged and remains accepted.
 
 ## Consequences
 
