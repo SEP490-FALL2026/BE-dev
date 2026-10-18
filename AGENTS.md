@@ -12,12 +12,14 @@ Scope: this backend repository. Work from its root with the pnpm version in `pac
   grants) is implemented as slice 1b and verified locally at `d60d306`; final acceptance is pending.
   Slice 1c adds forgot/reset password (`POST /auth/password-reset-requests`, `/auth/password-resets`) and
   change password (`POST /me/password`), the Super Admin's Audit Trail query (`GET /audit-events`), and the IT
-  Admin's job title catalogue and manual employee entry (`/job-titles`, `POST /employees`); all are verified
-  locally, not yet reviewed or accepted. G1/G2 are complete in the working tree (also uncommitted, verified
-  locally, not reviewed): Cost Center catalogue, department profile with head periods and the derived Manager
+  Admin's job title catalogue and manual employee entry (`/job-titles`, `POST /employees`). G1/G2 are complete
+  and on `dev` (commit `4ead859`, merged by PR #11 at `eae212a`; verified locally on the pre-commit tree, gates
+  not re-run on `eae212a`, not reviewed or accepted): Cost Center catalogue, department profile with head periods and the derived Manager
   role, spending-approver roles, operating parameters, CSV employee import (preview then confirm), the
   onboarding checklist (step 1), Super Admin transfer (`POST /super-admin-transfers`) and the out-of-HTTP
-  recovery command (`pnpm ops:recover --help`). What each slice leaves to G3–G6 is listed in its spec.
+  recovery command (`pnpm ops:recover --help`). What each slice leaves to G3–G6 is listed in its spec; changes
+  required by the business baseline after those specs (decisions up to `QĐ-80`) are forward remediation in
+  `docs/workspace/items/baseline-impact-and-remediation-2026-10-17/`, not yet implemented.
   Catalog is a structural sample and is not mounted.
   All other US workflows are not implemented.
 

@@ -5,9 +5,10 @@ Redis/BullMQ và S3-compatible storage. Giữ catalog làm module mẫu.
 
 **Đã merge G0, lát 1a/1b và gói remediation (chưa được dev review/nghiệm thu):** lệnh khởi tạo `pnpm ops:bootstrap`,
 đăng nhập/làm mới/đăng xuất, `/me`, tạo tài khoản từ Employee, mời/kích hoạt, khóa/mở và gán/thu hồi vai.
-Có 16 operation HTTP gồm health; xem [roadmap](docs/roadmap.md) và
+Phần này có 16 operation HTTP gồm health; xem [roadmap](docs/roadmap.md) và
 [báo cáo review G0/G1](docs/reviews/g0-g1-remediation-2026-10-15/README.md).
-Cây làm việc hiện tại (chưa commit, `verified` local, chưa review) còn có: đổi/đặt lại mật khẩu (1c), tra cứu Audit Trail,
+Nhánh `dev` (`eae212a`, merge PR #11 của commit G1/G2 `4ead859`; `verified` local trên cây trước khi commit, chưa chạy lại
+trên `eae212a`, chưa review; `openapi.json` hiện có 60 operation) còn có: đổi/đặt lại mật khẩu (1c), tra cứu Audit Trail,
 danh mục chức vụ/Cost Center, phòng và trưởng phòng (vai Manager suy ra), Người duyệt chi, tham số vận hành, import nhân sự CSV,
 checklist khởi tạo, chuyển giao Super Admin và lệnh khôi phục ngoài HTTP `pnpm ops:recover --help` (cần `pnpm build`).
 Route catalog **không còn trên HTTP** (module vẫn là mẫu cấu trúc). Health là public.

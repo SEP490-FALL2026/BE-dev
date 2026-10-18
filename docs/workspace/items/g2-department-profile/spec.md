@@ -6,6 +6,7 @@
 - Nguồn: Docs commit `3341ea0` = snapshot `S-2026-10-14b` ([sources](../../sources.md)). `US-03-06` AC-1 → AC-9, AC-14 → AC-20; `US-01-02` AC-2, AC-3, AC-5 → AC-7, AC-9; `US-01-11` AC-4, AC-7; `US-04-09` AC-5, AC-7 → AC-9 (`BE-UserStory/src/EP-01.md`, `EP-03.md`, `EP-04.md`); BRD v3.39 `FR-3.1`, `FR-3.17`, `FR-8.7`, `INV-19`, `INV-20`, `SoD-1`, `SoD-2`; `QĐ-52a`, `QĐ-52b`, `QĐ-52d`, `QĐ-58a`, `QĐ-58b`, `QĐ-62c`, `QĐ-66a`, `QĐ-66b`.
 - Trạng thái yêu cầu: các Story `BASELINED` (`QĐ-72`). Câu hỏi mở của bảng phủ (`needs-decision`: giai đoạn trưởng phòng bắt đầu trong quá khứ; `OQ-A-19` người nhận cảnh báo) được chọn mặc định ở mục _Làm rõ_ để người phụ trách làm tiếp; Owner xác nhận khi review.
 - [Kế hoạch](plan.md).
+- **Tác động baseline sau thiết kế (18/10/2026):** `QĐ-75` bỏ vế _tài khoản dùng chung_ của `US-03-06` AC-19 (còn thành viên và việc đang mở). Khóa `sharedAccounts` trong `details` của `DEPARTMENT.IN_USE` ở dưới (đã code) là lỗi thời, sẽ bỏ ở lát R-1; G4/G5 **không** cộng tài khoản dùng chung vào kiểm tra ngừng phòng. Nội dung dưới giữ nguyên là thiết kế đã dùng. Xem M-01 → M-06, M-23, M-27 của [remediation](../baseline-impact-and-remediation-2026-10-17/spec.md).
 
 ## Vấn đề và phạm vi
 

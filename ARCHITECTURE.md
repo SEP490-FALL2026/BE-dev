@@ -11,13 +11,15 @@ API và worker có entry point riêng trong cùng codebase.
 | Health         | Liveness và PostgreSQL readiness                                                                                                                                                         | Probe queue/storage                              |
 | Catalog        | Source list/get/create và tests làm mẫu; không mount HTTP                                                                                                                                | Nghiệp vụ catalog G3 và quyền theo role/resource |
 | Authentication | Argon2id, JWT/refresh session, guards, CLI bootstrap, `/me`, tài khoản, lời mời, mật khẩu, vai suy ra (Manager, Người duyệt chi), chuyển giao Super Admin, CLI khôi phục (`ops:recover`) | Phân quyền theo phạm vi của lát G3–G7            |
-| Database       | Catalog, audit, organization, identity-access, notifications; 5 migration và `TransactionRunner`                                                                                         | Schema cho các lát tiếp theo                     |
+| Database       | Catalog, audit, organization, identity-access, operating-parameters, data-import, notifications; 16 migration và `TransactionRunner`                                                     | Schema cho các lát tiếp theo                     |
 | Queue/storage  | S3 adapter, BullMQ configuration; worker gửi SMTP từ outbox PostgreSQL                                                                                                                   | BullMQ queue processor và file API               |
 
 G0 và lát 1a/1b đã merge qua PR #4 (`64073c4`), có 16 operation HTTP.
 Gói remediation tại `a0cf5f1` đã vào `origin/dev` qua PR #7 và #8. Spec/plan,
 ADR-0011/0012 (vẫn Proposed) và code chưa được dev review/nghiệm thu.
 Kết quả kiểm chứng và phần còn mở nằm trong [báo cáo review G0/G1](docs/reviews/g0-g1-remediation-2026-10-15/README.md).
+Các lát G1/G2 còn lại (commit `4ead859`) vào `dev` qua PR #11 (`eae212a`), chưa review/nghiệm thu; remediation theo
+baseline sau đó ở [baseline-impact-and-remediation-2026-10-17](docs/workspace/items/baseline-impact-and-remediation-2026-10-17/spec.md).
 Catalog là mẫu cấu trúc, chưa cung cấp nghiệp vụ G3.
 
 ## Bản đồ source
