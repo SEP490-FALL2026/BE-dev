@@ -65,10 +65,8 @@ const LEGACY = {
     'modules/identity-access/recovery.service.ts -> modules/identity-access/auth/action-token.ts',
     'modules/identity-access/recovery.service.ts -> modules/identity-access/auth/password-hasher.service.ts',
   ]),
-  /** Removed by H4 (organization by capability). */
-  controllerImports: new Set([
-    'modules/organization/projects.controller.ts -> modules/organization/departments.controller.ts',
-  ]),
+  /** Controller importing another controller. Empty since H4.1 (shared project mapper); stays as a gate. */
+  controllerImports: new Set<string>(),
   /** Error classes declared in an orchestration file (service/controller/repo). */
   errorClassesOutsideErrorFiles: new Set([
     // H5: move to accounts/errors.
@@ -84,7 +82,6 @@ const LEGACY = {
   ]),
   /** Errors matched by their class name string instead of instanceof. */
   errorMatchedByName: new Set([
-    'modules/organization/department.service.ts', // H4
     // A4-04 (GATE.1): composition roots were not scanned. ROOT.1 shares one CLI helper that uses instanceof.
     'installation-cli.ts',
     'recovery-cli.ts',

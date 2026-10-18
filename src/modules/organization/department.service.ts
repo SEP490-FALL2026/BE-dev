@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { BusinessDate } from '../../core/business-date';
-import { TransactionRunner, readSqlState } from '../../infrastructure/database/transaction-runner';
+import { DbTx, TransactionRunner, readSqlState } from '../../infrastructure/database/transaction-runner';
 import { isCheckViolation } from '../../infrastructure/database/unique-violation';
 import type { AuthenticatedPrincipal } from '../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditService } from '../audit/audit.service';
@@ -27,7 +27,7 @@ import {
 } from './errors/department.errors';
 import { displayJobTitleName } from './job-title-name';
 import { organizationAuditEvent } from './organization-audit';
-import { OrganizationRepo } from './organization.repo';
+import { EmployeeNotFoundError } from './organization.errors';
 import { OrganizationService } from './organization.service';
 
 export const DEPARTMENT_NAME_MAX_LENGTH = 200;
@@ -84,7 +84,6 @@ export class DepartmentService {
   constructor(
     private readonly repo: DepartmentRepo,
     private readonly costCenters: CostCenterRepo,
-    private readonly orgRepo: OrganizationRepo,
     private readonly organization: OrganizationService,
     private readonly identity: IdentityAccessService,
     private readonly audit: AuditService,
@@ -478,18 +477,18 @@ export class DepartmentService {
   }
 
   /** Locks the employee (`FOR SHARE`: still there, not changed, until commit) and reads it. Null when there is none. */
-  private async lockEmployee(tx: Parameters<OrganizationRepo['lockEmployee']>[0], employeeId: string) {
+  private async lockEmployee(tx: DbTx, employeeId: string) {
     try {
-      await this.orgRepo.lockEmployee(tx, employeeId, 'SHARE');
+      await this.organization.lockEmployeeForShare(tx, employeeId);
     } catch (error) {
-      if (error instanceof Error && error.name === 'EmployeeNotFoundError') return null;
+      if (error instanceof EmployeeNotFoundError) return null;
       throw error;
     }
 
-    return this.orgRepo.findEmployee(employeeId, tx);
+    return this.organization.getEmployee(employeeId, tx);
   }
 
-  private async assertUsableItAdmin(tx: Parameters<OrganizationRepo['lockEmployee']>[0], employeeId: string) {
+  private async assertUsableItAdmin(tx: DbTx, employeeId: string) {
     const employee = await this.lockEmployee(tx, employeeId);
     if (!employee || employee.status !== 'ACTIVE') throw new DepartmentItAdminInvalidError();
     const account = await this.identity.inspectEmployeeAccount(tx, employeeId);

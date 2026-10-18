@@ -9,8 +9,9 @@ import { OrganizationService } from './organization.service';
 @Module({
   imports: [DatabaseModule],
   providers: [OrganizationService, OrganizationRepo, CostCenterRepo, DepartmentRepo, ImportLookupRepo],
-  // OrganizationService is the facade other modules use. The repo is exported only so `OrganizationHttpModule`,
-  // in the same folder and owned by the same table owner, shares one instance instead of declaring a second.
-  exports: [OrganizationService, OrganizationRepo, CostCenterRepo, DepartmentRepo, ImportLookupRepo],
+  // OrganizationService is the facade other modules use. The three repos are exported only so `OrganizationHttpModule`,
+  // in the same folder and owned by the same table owner, shares one instance instead of declaring a second (Owner
+  // decision E4). ImportLookupRepo stays private: only OrganizationService reads through it.
+  exports: [OrganizationService, OrganizationRepo, CostCenterRepo, DepartmentRepo],
 })
 export class OrganizationModule {}

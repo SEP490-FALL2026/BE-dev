@@ -162,16 +162,6 @@ export class DepartmentRepo {
     );
   }
 
-  /** The cost center row the new department would be charged to (the caller holds its lock), or null. */
-  async readCostCenterForDepartment(
-    tx: DbTx,
-    costCenterId: string,
-  ): Promise<{ kind: 'UNIT' | 'COMPANY'; status: CostCenterStatus } | null> {
-    const row = await tx.costCenter.findUnique({ where: { id: costCenterId }, select: { kind: true, status: true } });
-
-    return row;
-  }
-
   // --- members ------------------------------------------------------------------------
 
   async memberCounts(departmentIds: string[], onDate: BusinessDate): Promise<Map<string, number>> {

@@ -28,6 +28,7 @@ triển khai ghi ở roadmap; bảng phủ G1/G2 dưới đây ghi trạng thái
 | [h3a-r1-department-in-use-details](h3a-r1-department-in-use-details/spec.md)                     | Lát H3a/R-1: 409 `DEPARTMENT.IN_USE` khi ngừng phòng bỏ `details.sharedAccounts` (`US-03-06` AC-19, `QĐ-75`); OpenAPI không đổi                                                                                          |
 | [h3b-r2-lock-unlock-reason](h3b-r2-lock-unlock-reason/spec.md)                                   | Lát H3b/R-2: khóa và mở khóa AppUser bắt buộc body `{ reason }` (trim, 1–1000), Audit Trail ghi lý do cùng trạng thái trước/sau (`US-01-01` AC-6/7/20, `QĐ-81`); breaking request contract                               |
 | [h3c-forgot-password-during-recovery](h3c-forgot-password-during-recovery/spec.md)               | Lát H3c: quên mật khẩu khi đang có ticket khôi phục `RESET_CREDENTIALS` chờ — phản hồi chung, không thư, liên kết khôi phục giữ nguyên (`US-01-10` AC-10); OpenAPI không đổi                                             |
+| [h4-1-organization-root-cleanup](h4-1-organization-root-cleanup/spec.md)                         | Lát H4.1: dọn bốn coupling nhỏ ở root `organization` (F-11, F-12, F-13 phần H4.1, A4-09) và gỡ đúng ba mục legacy ledger; không đổi hành vi, contract hay OpenAPI                                                        |
 
 ## Bảng phủ G1 còn lại và G2 (15/10/2026)
 

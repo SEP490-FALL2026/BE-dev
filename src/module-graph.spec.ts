@@ -44,10 +44,9 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
  * stale entry fails like a new export.
  */
 const LEGACY_PRIVATE_EXPORTS: ReadonlySet<string> = new Set([
-  // H4: OrganizationHttpModule shares these instances today; ImportLookupRepo has no consumer outside the module.
+  // E4 = A: OrganizationHttpModule shares these three instances; reviewed at H4.7/G3.
   'OrganizationModule: CostCenterRepo',
   'OrganizationModule: DepartmentRepo',
-  'OrganizationModule: ImportLookupRepo',
   'OrganizationModule: OrganizationRepo',
   // H5: IdentityAccessModule, the recovery module and the CLI share these instances today.
   'IdentityAccessFacadeModule: AccountRepo',

@@ -23,6 +23,7 @@ import {
   UpdateDepartmentBodyDto,
   VacateHeadBodyDto,
 } from './dto/department.dto';
+import { toProjectWire } from './mappers/project.mapper';
 import { toOrganizationApiException } from './organization.http-errors';
 
 const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPONSE] as const;
@@ -60,18 +61,6 @@ function toWire(view: DepartmentView) {
     createdAt: view.createdAt.toISOString(),
     updatedAt: view.updatedAt.toISOString(),
     deactivatedAt: view.deactivatedAt ? view.deactivatedAt.toISOString() : null,
-  };
-}
-
-export function toProjectWire(project: DepartmentProfileView['projects'][number]) {
-  return {
-    id: project.id,
-    name: project.name,
-    description: project.description,
-    status: project.status,
-    departments: project.departments,
-    createdAt: project.createdAt.toISOString(),
-    updatedAt: project.updatedAt.toISOString(),
   };
 }
 

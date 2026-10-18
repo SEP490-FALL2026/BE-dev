@@ -9,7 +9,7 @@ import { ApiSuccessResponse } from '../../infrastructure/http/decorators/api-suc
 import { RequireRoles } from '../../infrastructure/security/decorators/access.decorators';
 import { CurrentPrincipal } from '../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../infrastructure/security/tokens/access-token-verifier.port';
-import { toProjectWire } from './departments.controller';
+import { toProjectWire } from './mappers/project.mapper';
 import {
   CreateProjectBodyDto,
   ListProjectsQueryDto,
