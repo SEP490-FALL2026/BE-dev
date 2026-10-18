@@ -38,13 +38,19 @@ pnpm 11.1.3 with an explicit `allowBuilds` list, and CI runs
    The database stores only its SHA-256 digest (high entropy, so no slow hash).
    Rotated on every refresh. Presenting a consumed token revokes the whole session,
    writes an audit event and **commits** before the 401 is returned.
-3. **Refresh cookie.** `HttpOnly`, `SameSite=Strict`, `Secure` outside development,
-   `Path=/api/v1/auth`, `Max-Age` equal to the session's remaining absolute lifetime.
-   It is cleared with identical attributes, as Express 5 `res.clearCookie` requires.
-   Read with `cookie-parser` 1.4.7, without a signing secret.
-4. **Logout** is a `@Public()` route authenticated by the refresh cookie. It returns
-   204 for every case except 503 (database unavailable; the cookie is kept) and the
-   global throttler's 429. It revokes only the session owning the presented token
+3. **Refresh token delivery.** _Amended 17/10/2026 at the project lead's request; it replaces the
+   earlier `HttpOnly` cookie design, and developer review of the change is still pending._
+   `POST /auth/login` and `POST /auth/refresh` return the refresh token in the response body next to the
+   access token. `POST /auth/refresh` and `POST /auth/logout` take it in the request body as
+   `{ "refreshToken": "..." }`. The API neither sets nor reads a cookie (`cookie-parser` and
+   `AUTH_COOKIE_SECURE` are gone) and a cookie is ignored. Reason: one contract for the web client and the
+   native mobile app. Consequence: the client stores the token where script can read it, so an XSS flaw
+   exposes it; the token is single-use and rotated, and presenting a spent one revokes the session, which
+   bounds the damage but does not remove it. A body without a refresh token is 422 `VALIDATION_ERROR`;
+   a malformed or unknown token is 401 `AUTH.SESSION_INVALID`.
+4. **Logout** is a `@Public()` route authenticated by the refresh token in the body. It returns
+   204 for every well-formed request except 503 (database unavailable; the client keeps its token
+   and retries) and the global throttler's 429. It revokes only the session owning the presented token
    and ignores any `Authorization` header.
 5. **Password hashing** (_lead decision_). `@node-rs/argon2` 2.2.2 with explicit
    parameters `Argon2id, memoryCost 19456, timeCost 2, parallelism 1` (OWASP
@@ -123,7 +129,9 @@ pnpm 11.1.3 with an explicit `allowBuilds` list, and CI runs
   it remains a fallback.
 - `jose` 6.x and `@nestjs/jwt` 12.x: ESM-only; risky with ts-jest in CommonJS mode.
 - Bearer-authenticated logout: an expired access token or a repeated call is stopped by
-  the guard and the `HttpOnly` cookie cannot be cleared.
+  the guard, so the user could not sign out when they most need to.
+- `HttpOnly` refresh cookie (the original design of decision 3): safer against XSS, but awkward for the
+  native mobile client and a second contract to maintain next to the body-based one.
 - Overlap trigger instead of `btree_gist`: hand-written locking, extra race tests.
 - camelCase columns as in `catalog_applications`: every raw SQL statement would need
   quoted identifiers.

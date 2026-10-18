@@ -22,9 +22,9 @@ export interface HttpTestApp {
 }
 
 /**
- * Boots the whole Nest application — real pipes, guards, filters, cookie parser — against a
- * migrated, disposable PostgreSQL database. Use it for the cases a stubbed repository cannot
- * prove: constraints, locking, and cookies.
+ * Boots the whole Nest application — real pipes, guards, filters — against a migrated,
+ * disposable PostgreSQL database. Use it for the cases a stubbed repository cannot prove:
+ * constraints and locking.
  */
 export async function createHttpTestApp(
   options: {

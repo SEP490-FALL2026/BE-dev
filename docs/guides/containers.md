@@ -23,7 +23,7 @@ docker build --target migrate -t slm-migrate:foundation .
 
 The runtime defaults to production. Supply DATABASE_URL, HTTPS CORS_ORIGINS,
 REDIS_HOST/REDIS_PASSWORD, HTTPS OBJECT_STORAGE_ENDPOINT and storage credentials/bucket.
-Authentication also requires AUTH_ACCESS_TOKEN_SECRET, AUTH_THROTTLE_PEPPER and secure cookies;
+Authentication also requires AUTH_ACCESS_TOKEN_SECRET and AUTH_THROTTLE_PEPPER;
 invitation delivery requires HTTPS APP_PUBLIC_URL, OUTBOX_PAYLOAD_KEY (base64 of 32 bytes),
 OUTBOX_PAYLOAD_KEY_ID, SMTP_HOST, SMTP_FROM and SMTP_TLS=true, plus the provider's port/auth settings.
 The [environment validator](../../src/infrastructure/config/env-schema.ts) owns the full constraints.

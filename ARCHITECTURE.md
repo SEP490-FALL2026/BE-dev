@@ -26,7 +26,7 @@ Catalog là mẫu cấu trúc, chưa cung cấp nghiệp vụ G3.
 
 ```text
 src/
-  main.ts, bootstrap.ts       # HTTP, CORS, cookie parser, versioning, Swagger
+  main.ts, bootstrap.ts       # HTTP, CORS, versioning, Swagger
   app.module.ts               # ghép module API
   worker.ts, worker.module.ts # worker application context
   installation-cli.ts         # lệnh khởi tạo một lần, ngoài HTTP (pnpm ops:bootstrap)
@@ -144,8 +144,9 @@ gửi query. Đây là client nội bộ cho adapter Prisma, không phải wrapp
 lớn hơn timeout transaction). Khi mất phản hồi COMMIT, dữ liệu có thể đã commit nguyên tử dù
 client nhận 503; không tự retry ghi. Xem [spec remediation](docs/workspace/items/g0-g1-remediation-after-rereview/spec.md).
 
-Authentication: tài khoản nội bộ, access token JWT HS256 ngắn hạn cộng refresh token xoay vòng trong cookie
-`HttpOnly`/`SameSite=Strict`/`Path=/<prefix>/v1/auth`; phát lại refresh token đã consumed nhưng còn hạn thì thu hồi phiên.
+Authentication: tài khoản nội bộ, access token JWT HS256 ngắn hạn cộng refresh token xoay vòng. Cả hai nằm trong body
+của `POST /auth/login` và `/auth/refresh`; client gửi refresh token trong body của `/auth/refresh` và `/auth/logout`
+(API không đọc hay đặt cookie). Phát lại refresh token đã consumed nhưng còn hạn thì thu hồi phiên.
 Token hết hạn trả 401 trước khi xét consumed và không thu hồi phiên/token kế tiếp (quyết định Task 1B, tránh session DoS). Giao thức
 khóa và hợp đồng đăng xuất: [spec nền](docs/workspace/items/foundation-org-identity-boundary/spec.md),
 [spec lát 1a](docs/workspace/items/us-01-bootstrap-login-session/spec.md); ADR-0011 còn **Proposed**.

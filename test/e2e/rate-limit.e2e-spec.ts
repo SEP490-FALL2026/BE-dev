@@ -109,7 +109,7 @@ describe('Global rate limit (e2e)', () => {
         await exhaust(path, '198.51.100.3');
         await get(path, '198.51.100.3').expect(429);
       }
-      // Any answer counts toward the limit (a missing refresh cookie is 401), then the limiter takes over.
+      // Any answer counts toward the limit (a body without a refresh token is 422), then the limiter takes over.
       for (let attempt = 0; attempt < LIMIT; attempt += 1) {
         await request(app!.getHttpServer()).post('/api/v1/auth/refresh').set('x-forwarded-for', '198.51.100.4');
       }
@@ -117,10 +117,11 @@ describe('Global rate limit (e2e)', () => {
         .post('/api/v1/auth/refresh')
         .set('x-forwarded-for', '198.51.100.4')
         .expect(429);
+      // Each route has its own counter: logout from the same address is not limited (422 is the missing token).
       await request(app!.getHttpServer())
         .post('/api/v1/auth/logout')
         .set('x-forwarded-for', '198.51.100.4')
-        .expect(204);
+        .expect(422);
     });
   });
 

@@ -113,8 +113,6 @@ export interface IssuedSession {
   accessToken: string;
   accessTokenExpiresAt: Date;
   refreshToken: string;
-  /** Remaining absolute lifetime of the session, for the cookie Max-Age. */
-  sessionRemainingMs: number;
 }
 
 /**

@@ -101,7 +101,6 @@ export class SessionService {
           accessToken: access.token,
           accessTokenExpiresAt: access.expiresAt,
           refreshToken: next.token,
-          sessionRemainingMs: session.absoluteExpiresAt.getTime() - now.getTime(),
         },
       };
     });
