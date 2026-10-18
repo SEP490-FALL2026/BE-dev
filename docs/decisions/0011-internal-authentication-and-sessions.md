@@ -66,8 +66,10 @@ pnpm 11.1.3 with an explicit `allowBuilds` list, and CI runs
    the refresh token **in memory** and never in `localStorage`; the FE contract states this, and how a reload that
    loses the token is handled is a later UX design. Developer review of this decision remains a gate before
    `accepted`.
-   _Owner decision Q3 (18/10/2026), not implemented:_ login and refresh will add `refreshExpiresAt` in a separate
-   auth/session code change, without changing any TTL; no other field is added without a source or design.
+   _Owner decision Q3 (18/10/2026):_ login and refresh return `refreshExpiresAt`, the stored expiry of the refresh
+   token in the same response (idle timeout capped at the absolute session expiry), next to `expiresAt`, the
+   access-token expiry. No TTL changes; no other field is added without a source or design. Client handling is in the
+   [security rules](../rules/security-jobs.md#authentication-and-authorization).
 4. **Logout** is a `@Public()` route authenticated by the refresh token in the body. It returns
    204 for every well-formed request except 503 (database unavailable; the client keeps its token
    and retries) and the global throttler's 429. It revokes only the session owning the presented token

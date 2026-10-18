@@ -34,6 +34,7 @@ interface SessionTokens {
   tokenType: 'Bearer';
   expiresAt: string;
   refreshToken: string;
+  refreshExpiresAt: string;
 }
 
 const UNAVAILABLE = {
@@ -257,5 +258,6 @@ function toSessionTokens(session: IssuedSession): SessionTokens {
     tokenType: 'Bearer',
     expiresAt: session.accessTokenExpiresAt.toISOString(),
     refreshToken: session.refreshToken,
+    refreshExpiresAt: session.refreshTokenExpiresAt.toISOString(),
   };
 }

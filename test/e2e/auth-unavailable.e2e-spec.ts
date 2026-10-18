@@ -55,6 +55,7 @@ describe('authentication while the database is down (e2e)', () => {
       .expect(503);
 
     expect(bodyOf(response)).toMatchObject({ success: false, error: { code: 'AUTH.UNAVAILABLE' } });
+    expect(bodyOf(response).data).toBeUndefined();
     noLeak(bodyOf(response));
   });
 
@@ -65,6 +66,7 @@ describe('authentication while the database is down (e2e)', () => {
       .expect(503);
 
     expect(bodyOf(response).error.code).toBe('AUTH.UNAVAILABLE');
+    expect(bodyOf(response).data).toBeUndefined();
     expect(response.headers['set-cookie']).toBeUndefined();
     noLeak(bodyOf(response));
   });

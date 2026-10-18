@@ -113,6 +113,8 @@ export interface IssuedSession {
   accessToken: string;
   accessTokenExpiresAt: Date;
   refreshToken: string;
+  /** The expiry stored for `refreshToken` itself: never the access-token expiry, and not always later than it. */
+  refreshTokenExpiresAt: Date;
 }
 
 /**

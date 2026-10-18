@@ -34,13 +34,19 @@ export class SessionService {
   /** Throws SessionInvalidError for every reason a refresh cannot proceed, including replay. */
   async refresh(refreshToken: string | undefined): Promise<IssuedSession> {
     try {
-      return await this.performRefresh(refreshToken);
+      return await this.authenticateAndRotate(refreshToken);
     } catch (error) {
       throw this.asTransient(error);
     }
   }
 
-  private async performRefresh(refreshToken: string | undefined): Promise<IssuedSession> {
+  /**
+   * Authenticates the opaque refresh token and, if it is valid, spends it and issues the next pair. There is no
+   * signature to verify (it is not a JWT): the token is authenticated by its shape, the SHA-256 lookup, the row locks
+   * and the session, account, employee, expiry and consumed state read under those locks. Expiry is checked before
+   * consumption, so an expired token is refused without being treated as replay.
+   */
+  private async authenticateAndRotate(refreshToken: string | undefined): Promise<IssuedSession> {
     if (!refreshToken || !this.tokens.isWellFormedRefreshToken(refreshToken)) throw new SessionInvalidError();
 
     const tokenHash = this.tokens.hashRefreshToken(refreshToken);
@@ -101,6 +107,7 @@ export class SessionService {
           accessToken: access.token,
           accessTokenExpiresAt: access.expiresAt,
           refreshToken: next.token,
+          refreshTokenExpiresAt: idleExpiresAt,
         },
       };
     });
@@ -116,7 +123,7 @@ export class SessionService {
   // --- logout -----------------------------------------------------------------------
 
   /**
-   * Revokes the session the cookie belongs to. Idempotent: an absent, malformed, unknown,
+   * Revokes the session that owns the refresh token sent in the request body. Idempotent: an absent, malformed, unknown,
    * already-revoked or expired token is a no-op. Only a database failure surfaces.
    */
   async logout(refreshToken: string | undefined): Promise<void> {

@@ -25,6 +25,8 @@ function refreshTokenOf(response: request.Response): string {
   return bodyOf(response).data.refreshToken;
 }
 
+const sha256 = (value: string): string => createHash('sha256').update(value).digest('hex');
+
 describe('authentication over HTTP (integration, real PostgreSQL)', () => {
   let ctx: HttpTestApp;
   let seed: SeededInstallation;
@@ -48,6 +50,15 @@ describe('authentication over HTTP (integration, real PostgreSQL)', () => {
   afterEach(async () => {
     await ctx.sql.query('DELETE FROM login_throttles');
   });
+
+  /** The stored row of a refresh token, found by the hash of the raw token a response returned. */
+  const storedToken = async (rawToken: string) =>
+    (
+      await ctx.sql.query<{ expires_at: Date; session_id: string }>(
+        'SELECT expires_at, session_id FROM refresh_tokens WHERE token_hash = $1',
+        [sha256(rawToken)],
+      )
+    ).rows[0];
 
   describe('login and /me', () => {
     it('signs the Super Admin in with an access token and a refresh token in the body, and serves /me', async () => {
@@ -84,6 +95,23 @@ describe('authentication over HTTP (integration, real PostgreSQL)', () => {
           selfServiceOnly: false,
         },
       });
+    });
+
+    it('returns the stored expiry of the issued refresh token next to the access-token expiry, with TTLs unchanged', async () => {
+      const before = Date.now();
+      const response = await loginAdmin();
+      const after = Date.now();
+      const data = bodyOf(response).data;
+
+      expect(new Date(data.refreshExpiresAt).toISOString()).toBe(data.refreshExpiresAt);
+      expect(new Date(data.refreshExpiresAt)).toEqual((await storedToken(data.refreshToken)).expires_at);
+      // Defaults: access token 600 s, refresh token = idle TTL 28 800 s (the absolute TTL is longer).
+      const expiresAt = new Date(data.expiresAt).getTime();
+      const refreshExpiresAt = new Date(data.refreshExpiresAt).getTime();
+      expect(expiresAt).toBeGreaterThanOrEqual(before + 600_000);
+      expect(expiresAt).toBeLessThanOrEqual(after + 600_000);
+      expect(refreshExpiresAt).toBeGreaterThanOrEqual(before + 28_800_000);
+      expect(refreshExpiresAt).toBeLessThanOrEqual(after + 28_800_000);
     });
 
     it('requires a token for /me', async () => {
@@ -281,6 +309,40 @@ describe('authentication over HTTP (integration, real PostgreSQL)', () => {
         .expect(200);
     });
 
+    it('returns the stored expiry of the next refresh token, not the spent one or the access token', async () => {
+      const first = await loginAdmin();
+      // Give the token about to be spent its own, still valid expiry, so it cannot coincide with the next one.
+      await ctx.sql.query(`UPDATE refresh_tokens SET expires_at = now() + interval '1 hour' WHERE token_hash = $1`, [
+        sha256(refreshTokenOf(first)),
+      ]);
+      const spent = await storedToken(refreshTokenOf(first));
+
+      const second = await refresh(refreshTokenOf(first)).expect(200);
+      const data = bodyOf(second).data;
+
+      const next = await storedToken(data.refreshToken);
+      expect(new Date(data.refreshExpiresAt)).toEqual(next.expires_at);
+      expect(next.session_id).toBe(spent.session_id);
+      expect(data.refreshExpiresAt).not.toBe(spent.expires_at.toISOString());
+      expect(data.refreshExpiresAt).not.toBe(data.expiresAt);
+    });
+
+    it('caps the next refresh token at the absolute session expiry and returns exactly that value', async () => {
+      const first = await loginAdmin();
+      const { session_id: sessionId } = await storedToken(refreshTokenOf(first));
+      const { rows } = await ctx.sql.query<{ absolute_expires_at: Date }>(
+        `UPDATE auth_sessions SET absolute_expires_at = date_trunc('milliseconds', now()) + interval '90 seconds'
+         WHERE id = $1 RETURNING absolute_expires_at`,
+        [sessionId],
+      );
+
+      const second = await refresh(refreshTokenOf(first)).expect(200);
+      const data = bodyOf(second).data;
+
+      expect(new Date(data.refreshExpiresAt)).toEqual(rows[0].absolute_expires_at);
+      expect((await storedToken(data.refreshToken)).expires_at).toEqual(rows[0].absolute_expires_at);
+    });
+
     it('treats a replayed token as theft: 401, session revoked, exactly one committed audit row', async () => {
       const first = await loginAdmin();
       const oldToken = refreshTokenOf(first);
@@ -289,6 +351,7 @@ describe('authentication over HTTP (integration, real PostgreSQL)', () => {
 
       const replay = await refresh(oldToken).expect(401);
       expect(bodyOf(replay).error.code).toBe('AUTH.SESSION_INVALID');
+      expect(bodyOf(replay).data).toBeUndefined();
       expect(setCookies(replay)).toEqual([]);
 
       // The rotated token belongs to the same, now revoked, session.
@@ -486,12 +549,16 @@ describe('authentication over HTTP (integration, real PostgreSQL)', () => {
       });
       let accessToken = '';
       let refreshToken = '';
+      let rotatedAccessToken = '';
+      let rotatedRefreshToken = '';
       try {
         const session = await loginAdmin();
         accessToken = bodyOf(session).data.accessToken;
         refreshToken = refreshTokenOf(session);
         await login(seed.superAdmin.email, 'a wrong password for logging').expect(401);
-        await refresh(refreshToken);
+        const rotated = await refresh(refreshToken).expect(200);
+        rotatedAccessToken = bodyOf(rotated).data.accessToken;
+        rotatedRefreshToken = refreshTokenOf(rotated);
         await refresh(refreshToken);
       } finally {
         spy.mockRestore();
@@ -501,7 +568,16 @@ describe('authentication over HTTP (integration, real PostgreSQL)', () => {
       const hash = (await ctx.sql.query<{ hash: string }>('SELECT hash FROM password_credentials LIMIT 1')).rows[0]
         .hash;
       const everything = audit + writes.join('');
-      for (const secret of [SEED_PASSWORD, 'a wrong password for logging', hash, accessToken, refreshToken]) {
+      const secrets = [
+        SEED_PASSWORD,
+        'a wrong password for logging',
+        hash,
+        accessToken,
+        refreshToken,
+        rotatedAccessToken,
+        rotatedRefreshToken,
+      ];
+      for (const secret of secrets) {
         expect(everything).not.toContain(secret);
       }
     });

@@ -42,8 +42,7 @@ validate schema, unit + architecture test, script test, test discovery và build
 E2E, integration, OpenAPI export và dependency audit chạy riêng theo tác động.
 CI also runs HTTP E2E, isolated PostgreSQL integration, OpenAPI drift, Docker build and dependency audit.
 
-`pnpm check` sinh Prisma client trước lint nên chạy được trực tiếp trên checkout sạch (R-01,
-xem [review G0/G1](docs/reviews/g0-g1-remediation-2026-10-15/README.md)).
+`pnpm check` sinh Prisma client trước lint nên chạy được trực tiếp trên checkout sạch.
 
 ## Chọn tài liệu theo tác vụ
 
@@ -71,5 +70,7 @@ Khi hai nguồn khác nhau, ghi rõ khoảng cách, không mặc định kế ho
   (ví dụ giá trị kỹ thuật của `US-01-10`). Khi đó ghi người review, link và revision; chưa có thì ghi `pending` và
   hạng mục chưa được `accepted`.
 - Cập nhật hướng dẫn/runbook khi lệnh, cấu hình, workflow, vận hành hoặc boundary thay đổi.
+- Ghi tiến độ, revision/PR và kết quả kiểm tra vào roadmap, plan hoặc review, không vào `AGENTS.md`/`ARCHITECTURE.md`;
+  tài liệu nào sở hữu nội dung nào: [trách nhiệm tài liệu](docs/rules/documentation.md#trách-nhiệm-từng-loại-tài-liệu).
 - Báo lệnh thực chạy, kết quả và giới hạn; mock không chứng minh hạ tầng thật.
 - Không commit secrets/dữ liệu thật. Không tự push, deploy hoặc thao tác dữ liệu dùng chung khi chưa được giao.

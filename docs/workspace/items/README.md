@@ -22,6 +22,7 @@ triển khai ghi ở roadmap; bảng phủ G1/G2 dưới đây ghi trạng thái
 | [us-01-09-super-admin-transfer-recovery](us-01-09-super-admin-transfer-recovery/spec.md)         | Chuyển giao trong ứng dụng và khôi phục ngoài ứng dụng vai Super Admin                                                                                                                                                   |
 | [baseline-impact-and-remediation-2026-10-17](baseline-impact-and-remediation-2026-10-17/spec.md) | Tác động `QĐ-74` → `QĐ-80`: ma trận M-01 → M-57, remediation R-1 (G2) và R-2 (G1), đầu vào cho G3–G10; draft (R-2 phần khóa `ready`); nhóm E đã trả lời                                                                  |
 | [foundation-remediation-handoff-2026-10-18](foundation-remediation-handoff-2026-10-18/spec.md)   | Enabler 18/10/2026: chia lát H1→H8 sau audit nền tảng (auth/session contract, Swagger, R-1/R-2, refactor `organization`/`identity-access`, ops, role PostgreSQL, data-import); hạng mục đầu tiên theo mẫu vertical slice |
+| [h1-auth-session-refresh-expiry](h1-auth-session-refresh-expiry/spec.md)                         | Lát H1: thêm `refreshExpiresAt` vào login/refresh, đặt tên rõ bước xác thực refresh token (F-17, F-35, Q1–Q3); không đổi TTL hay mô hình phiên                                                                           |
 
 ## Bảng phủ G1 còn lại và G2 (15/10/2026)
 

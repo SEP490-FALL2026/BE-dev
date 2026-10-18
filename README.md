@@ -3,20 +3,18 @@
 Foundation để triển khai User Story bằng NestJS 11, TypeScript, PostgreSQL/Prisma,
 Redis/BullMQ và S3-compatible storage. Giữ catalog làm module mẫu.
 
-**Đã merge G0, lát 1a/1b và gói remediation (chưa được dev review/nghiệm thu):** lệnh khởi tạo `pnpm ops:bootstrap`,
-đăng nhập/làm mới/đăng xuất, `/me`, tạo tài khoản từ Employee, mời/kích hoạt, khóa/mở và gán/thu hồi vai.
-Phần này có 16 operation HTTP gồm health; xem [roadmap](docs/roadmap.md) và
-[báo cáo review G0/G1](docs/reviews/g0-g1-remediation-2026-10-15/README.md).
-Nhánh `dev` (`eae212a`, merge PR #11 của commit G1/G2 `4ead859`; `verified` local trên cây trước khi commit, chưa chạy lại
-trên `eae212a`, chưa review; `openapi.json` hiện có 60 operation) còn có: đổi/đặt lại mật khẩu (1c), tra cứu Audit Trail,
-danh mục chức vụ/Cost Center, phòng và trưởng phòng (vai Manager suy ra), Người duyệt chi, tham số vận hành, import nhân sự CSV,
-checklist khởi tạo, chuyển giao Super Admin và lệnh khôi phục ngoài HTTP `pnpm ops:recover --help` (cần `pnpm build`).
+**Đã có trong code:** lệnh khởi tạo `pnpm ops:bootstrap`, đăng nhập/làm mới/đăng xuất, `/me`, tạo tài khoản từ
+Employee, mời/kích hoạt, khóa/mở và gán/thu hồi vai, đổi/đặt lại mật khẩu, tra cứu Audit Trail, danh mục chức vụ/Cost
+Center, phòng và trưởng phòng (vai Manager suy ra), Người duyệt chi, tham số vận hành, import nhân sự CSV, checklist khởi
+tạo, chuyển giao Super Admin và lệnh khôi phục ngoài HTTP `pnpm ops:recover --help` (cần `pnpm build`).
 Route catalog **không còn trên HTTP** (module vẫn là mẫu cấu trúc). Health là public.
 Không có tài khoản demo: tạo Super Admin bằng lệnh khởi tạo trên database mới.
 
-Bản sửa remediation tại `a0cf5f1` đã vào `origin/dev` qua PR #7 và #8; kết quả kiểm chứng và giới hạn
-nằm trong [báo cáo review G0/G1](docs/reviews/g0-g1-remediation-2026-10-15/README.md).
-Chưa được dev review/nghiệm thu; ADR-0011/0012 vẫn Proposed.
+Có trong code không có nghĩa đã review hoặc nghiệm thu; một lát có thể mới phủ một phần Story. Trạng thái từng lát,
+revision/PR và kết quả kiểm chứng nằm ở [roadmap](docs/roadmap.md), bằng chứng ở
+[audit nền tảng](docs/reviews/be-foundation-audit-2026-10-18/README.md) và
+[review G0/G1](docs/reviews/g0-g1-remediation-2026-10-15/README.md). Danh sách operation HTTP: `openapi.json`. Trạng
+thái ADR: [chỉ mục tài liệu](docs/README.md).
 
 ## Chạy local
 
@@ -29,7 +27,7 @@ Cần Node.js 22 hoặc 24, pnpm 11.1.3, Docker Compose.
    `CORS_ORIGINS`). Đổi port PostgreSQL trong Compose thì cập nhật cả `DATABASE_URL`. Secret development mặc định công khai
    trong source và chỉ dùng cho checkout local cô lập: muốn token local không bị dùng lại ở nơi khác, tạo secret riêng
    bằng lệnh trong `.env.example`. Copy `.env.example` **chưa** đủ cho production: validator production từ chối thiếu
-   biến `@production-required` và từ chối secret development. Biến đã bỏ (ví dụ `AUTH_COOKIE_SECURE` từ `1336bd5`) bị bỏ
+   biến `@production-required` và từ chối secret development. Biến đã bỏ (ví dụ `AUTH_COOKIE_SECURE`, bỏ khi refresh token chuyển sang body) bị bỏ
    qua âm thầm — tự xóa khỏi tệp env của bạn; không có lệnh nào đọc hay sửa tệp env chứa secret.
 3. Chạy `docker compose up -d --wait` để khởi động PostgreSQL, Redis, MinIO.
 4. Với **database mới**, chạy `pnpm db:migrate:deploy`, rồi `pnpm build` để sinh Prisma client và build CLI.
@@ -37,7 +35,7 @@ Cần Node.js 22 hoặc 24, pnpm 11.1.3, Docker Compose.
 6. Chạy `pnpm start:dev`; chạy worker ở terminal riêng nếu cần gửi thư mời.
 
 CLI khởi tạo chỉ xác thực `NODE_ENV` và cấu hình database; không yêu cầu secret JWT, SMTP,
-Redis/storage hoặc khóa outbox của API/worker (R-13). API/worker vẫn dùng validation đầy đủ.
+Redis/storage hoặc khóa outbox của API/worker. API/worker vẫn dùng validation đầy đủ.
 Nếu mất phản hồi khi COMMIT, mã thoát lỗi không chứng minh chưa ghi gì: kiểm trạng thái cài đặt
 trước khi chạy lại; không tự retry thao tác ghi.
 
@@ -70,7 +68,7 @@ thư luôn được gửi plaintext.
 
 `pnpm check` chạy gate không cần dịch vụ ngoài; `pnpm test:e2e` kiểm tra HTTP
 với boundary thay thế. Integration test cần PostgreSQL riêng: xem [test guide](test/README.md).
-`pnpm check` sinh Prisma client trước lint nên chạy được trực tiếp trên checkout sạch (R-01).
+`pnpm check` sinh Prisma client trước lint nên chạy được trực tiếp trên checkout sạch.
 
 Pool database do ứng dụng sở hữu: query hết `DB_QUERY_TIMEOUT_MS` làm kết nối bị loại khỏi pool,
 không được tái sử dụng transaction còn dở. `DB_IDLE_IN_TRANSACTION_TIMEOUT_MS` là backstop phía

@@ -138,6 +138,7 @@ export class LoginService {
       accessToken: access.token,
       accessTokenExpiresAt: access.expiresAt,
       refreshToken: refresh.token,
+      refreshTokenExpiresAt: idleExpiresAt,
     };
   }
 

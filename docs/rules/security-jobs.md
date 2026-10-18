@@ -12,9 +12,17 @@
   authenticated by hash lookup, row locks and the authoritative session/account/employee state in PostgreSQL,
   rotated once per use, and a replayed token revokes the session. Never pass it to `jwt.verify`, never turn it into
   a JWT, and never add Redis or a second session store without a new ADR. Never store or print a raw token.
-- Client contract (Owner Q1/Q2, 18/10/2026): the web client keeps the refresh token in memory, not `localStorage`;
-  web and mobile single-flight refresh, because a second refresh with the same token is replay and ends the session.
-  `refreshExpiresAt` (Q3) is a pending contract change for a separate auth/session item, not implemented.
+- Client contract (Owner Q1–Q3, 18/10/2026) — the one source for web and mobile clients:
+  - Login and refresh return `expiresAt` (expiry of the access token) and `refreshExpiresAt` (stored expiry of the
+    refresh token in the same response: the idle timeout, capped at the absolute session expiry). Near the end of a
+    session `refreshExpiresAt` can be earlier than `expiresAt`; do not assume an order.
+  - Web keeps the refresh token in memory, never in `localStorage`; how a reload that loses it is handled is a later UX
+    design. Mobile storage is not decided yet: store it securely, never log it. Never put a token in a URL or a log.
+  - Single-flight refresh: one refresh at a time, and replace both tokens from each successful response. Sending a
+    spent token again is replay and ends the session; there is no grace window.
+  - Refresh before `expiresAt`; after `refreshExpiresAt` sign in again. A refresh answered 401 `AUTH.SESSION_INVALID`
+    means discard both tokens and sign in again; 503 `AUTH.UNAVAILABLE` means keep the refresh token and retry.
+  - Logout sends the refresh token in the body and is 204 whether or not a session was open.
 - Global guards deny by default: every route declares one of `@Public()`, `@AuthenticatedOnly()`,
   `@RequireRoles(...)` (missing means 500). Session, account status and employee status are checked in the
   database on every request; roles are never read from the token. Never use an always-accept verifier

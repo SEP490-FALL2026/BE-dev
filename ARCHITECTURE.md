@@ -3,7 +3,7 @@
 Modular monolith: NestJS + Express, TypeScript, PostgreSQL + Prisma.
 API và worker có entry point riêng trong cùng codebase.
 
-## Trạng thái foundation
+## Năng lực hiện có
 
 | Thành phần     | Đã có                                                                                                                                                                                    | Chưa triển khai                                  |
 | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
@@ -11,19 +11,13 @@ API và worker có entry point riêng trong cùng codebase.
 | Health         | Liveness và PostgreSQL readiness                                                                                                                                                         | Probe queue/storage                              |
 | Catalog        | Source list/get/create và tests làm mẫu; không mount HTTP                                                                                                                                | Nghiệp vụ catalog G3 và quyền theo role/resource |
 | Authentication | Argon2id, JWT/refresh session, guards, CLI bootstrap, `/me`, tài khoản, lời mời, mật khẩu, vai suy ra (Manager, Người duyệt chi), chuyển giao Super Admin, CLI khôi phục (`ops:recover`) | Phân quyền theo phạm vi của lát G3–G7            |
-| Database       | Catalog, audit, organization, identity-access, operating-parameters, data-import, notifications; 16 migration và `TransactionRunner`                                                     | Schema cho các lát tiếp theo                     |
+| Database       | Catalog, audit, organization, identity-access, operating-parameters, data-import, notifications; migration SQL ở `prisma/migrations/`, `TransactionRunner`                               | Schema cho các lát tiếp theo                     |
 | Queue/storage  | S3 adapter, BullMQ configuration; worker gửi SMTP từ outbox PostgreSQL                                                                                                                   | BullMQ queue processor và file API               |
 
-G0 và lát 1a/1b đã merge qua PR #4 (`64073c4`), có 16 operation HTTP.
-Gói remediation tại `a0cf5f1` đã vào `origin/dev` qua PR #7 và #8. Spec/plan,
-ADR-0011/0012 (vẫn Proposed) và code chưa được dev review/nghiệm thu.
-Kết quả kiểm chứng và phần còn mở nằm trong [báo cáo review G0/G1](docs/reviews/g0-g1-remediation-2026-10-15/README.md).
-Các lát G1/G2 còn lại (commit `4ead859`) vào `dev` qua PR #11 (`eae212a`), chưa review/nghiệm thu; `1336bd5` (PR #12)
-chuyển refresh token sang body. Gate trên HEAD `186ad5f` đã chạy xanh trong
-[audit nền tảng 18/10/2026](docs/reviews/be-foundation-audit-2026-10-18/README.md). Remediation theo baseline (R-1, R-2)
-và các refactor nền tảng được lập kế hoạch ở
-[foundation-remediation-handoff-2026-10-18](docs/workspace/items/foundation-remediation-handoff-2026-10-18/spec.md);
-phân tích tác động gốc ở [baseline-impact-and-remediation-2026-10-17](docs/workspace/items/baseline-impact-and-remediation-2026-10-17/spec.md).
+Bảng mô tả code đang có, không phải trạng thái nghiệm thu. Tiến độ từng lát, revision/PR, trạng thái review và kết quả
+gate nằm ở [roadmap](docs/roadmap.md); bằng chứng ở [audit nền tảng 18/10/2026](docs/reviews/be-foundation-audit-2026-10-18/README.md)
+và [review G0/G1](docs/reviews/g0-g1-remediation-2026-10-15/README.md). Kế hoạch remediation theo baseline và refactor nền
+tảng: [foundation-remediation-handoff-2026-10-18](docs/workspace/items/foundation-remediation-handoff-2026-10-18/spec.md).
 Catalog là mẫu cấu trúc, chưa cung cấp nghiệp vụ G3.
 
 ## Bản đồ source
@@ -78,7 +72,8 @@ test/
 - Module dùng layout phẳng. Chỉ tạo dto/errors/mappers/policies/services khi có nhu cầu thật; module vượt 2 controller
   hoặc 12 file ở root nhóm theo capability (như `identity-access`), tối đa hai tầng thư mục. Folder capability không tự
   động là Nest module; điều kiện tạo Nest submodule, ownership capability, chỗ đặt lỗi và ngưỡng kích thước ở
-  [module structure](docs/rules/module-structure.md). `organization` hiện còn phẳng 26 file — nợ có ledger, gỡ ở lát H4.
+  [module structure](docs/rules/module-structure.md). Module còn vượt ngưỡng mà vẫn phẳng (hiện là `organization`) là nợ
+  ghi trong legacy ledger, đích tái cấu trúc ở [ví dụ đích](docs/rules/module-structure.md#ví-dụ-đích-chưa-di-chuyển-file).
 - Module khác chỉ import file ở **gốc** module (facade, module, types, errors public); không import repo,
   `password-hasher.service` hay file trong thư mục con, và không truy cập bảng thuộc module khác.
 - Cross-module atomic write: facade nhận `tx` của người gọi (`DbTx`); `TransactionRunner.run`
@@ -116,13 +111,14 @@ nên có hiệu lực ngay request kế tiếp. Vai không nằm trong token. Da
 Sai vai: 403 AUTHORIZATION.FORBIDDEN.
 
 Lỗi DB tạm thời sau khi guard đã thành công tại `/me` được controller ánh xạ thành
-503 `SERVICE_UNAVAILABLE` (R-15); readiness thất bại cũng trả 503 với mã này (R-12).
+503 `SERVICE_UNAVAILABLE`; readiness thất bại cũng trả 503 với mã này.
 Lỗi không được nhận diện là tạm thời vẫn là 500, không bị che thành lỗi availability.
 
 Rate limit hiện dùng bộ nhớ của từng process, theo **từng route trên mỗi IP**, **không dùng Redis**.
-Owner chốt giữ phạm vi này ngày 14/10/2026 (R-07); `test/e2e/rate-limit.e2e-spec.ts` ghim hành vi này.
+Đây là phạm vi Owner chốt giữ ([spec lát 1a](docs/workspace/items/us-01-bootstrap-login-session/spec.md));
+`test/e2e/rate-limit.e2e-spec.ts` ghim hành vi này.
 Throttle đăng nhập theo email là cơ chế riêng: chỉ lần sai được tăng bộ đếm thất bại theo spec;
-bộ đếm tăng sau khi kiểm mật khẩu thất bại, trong một câu lệnh nguyên tử (R-06).
+bộ đếm tăng sau khi kiểm mật khẩu thất bại, trong một câu lệnh nguyên tử.
 TRUST_PROXY_HOPS chỉ cấu hình khi ingress đáng tin cậy; proxy phải thay header
 request ID do client gửi. Baseline chưa giải quyết rate limit phân tán.
 
@@ -135,7 +131,7 @@ một grant `SUPER_ADMIN` hiệu lực, audit chỉ ghi thêm. Cột bảng mớ
 cho mỗi kết nối: adapter-pg đọc/ghi `timestamptz` như thể phiên là UTC. Instant truyền vào raw SQL
 dùng chuỗi ISO-8601 (`toISOString()`) kèm `::timestamptz`. Mỗi kết nối gửi hai tham số khởi động ngoài
 chuẩn: `options` (`-c TimeZone=UTC`, ghim múi giờ) và `idle_in_transaction_session_timeout`
-(backstop N-1 bên dưới; `pg` gửi nó như tham số khởi động riêng, không qua `options`). PgBouncer và pooler
+(backstop idle-in-transaction bên dưới; `pg` gửi nó như tham số khởi động riêng, không qua `options`). PgBouncer và pooler
 quản lý từ chối tham số không theo dõi (`unsupported startup parameter`) trừ khi liệt kê trong
 `ignore_startup_parameters`, và khi liệt kê thì **âm thầm bỏ** tham số đó: mất ghim UTC và/hoặc backstop idle
 mà không có cảnh báo. Sau pooler, đặt hai giá trị ở phía server (`ALTER ROLE <role> SET timezone = 'UTC'` và
@@ -157,8 +153,8 @@ của `POST /auth/login` và `/auth/refresh`; client gửi refresh token trong b
 (API không đọc hay đặt cookie). Refresh token là token opaque 256 bit, **không** phải JWT: CSDL chỉ lưu SHA-256, xác thực
 bằng tra hash, khóa dòng và trạng thái phiên/tài khoản/nhân viên trong PostgreSQL — nguồn có thẩm quyền duy nhất, không
 Redis. Phát lại refresh token đã consumed nhưng còn hạn thì thu hồi phiên; web giữ token trong bộ nhớ và client
-single-flight refresh (Owner Q1/Q2, ADR-0011).
-Token hết hạn trả 401 trước khi xét consumed và không thu hồi phiên/token kế tiếp (quyết định Task 1B, tránh session DoS). Giao thức
+single-flight refresh ([ADR-0011](docs/decisions/0011-internal-authentication-and-sessions.md)).
+Token hết hạn trả 401 trước khi xét consumed và không thu hồi phiên/token kế tiếp (tránh session DoS). Giao thức
 khóa và hợp đồng đăng xuất: [spec nền](docs/workspace/items/foundation-org-identity-boundary/spec.md),
 [spec lát 1a](docs/workspace/items/us-01-bootstrap-login-session/spec.md); ADR-0011 còn **Proposed**.
 Khởi tạo cài đặt: `pnpm build` rồi `pnpm ops:bootstrap --help` (chạy bởi chính người giữ vai Super Admin;
@@ -168,7 +164,7 @@ CLI dùng `InstallationConfigurationModule` chỉ validate môi trường và DB
 đầy đủ. `IdentityAccessFacadeModule` (DatabaseModule + OrganizationModule) cung cấp facade
 `IdentityAccessService` cùng `AccountRepo`/`PasswordHasher` dùng chung instance cho `IdentityAccessModule`;
 CLI và worker chỉ import module này nên không dựng controller, JWT hay workflow đăng nhập; CLI cũng không kéo
-SMTP/outbox (R-13). [Module graph test](src/module-graph.spec.ts) đọc metadata Nest thật: mỗi provider token chỉ khai
+SMTP/outbox. [Module graph test](src/module-graph.spec.ts) đọc metadata Nest thật: mỗi provider token chỉ khai
 báo ở một module trong graph API/worker/CLI và các graph không chứa module không dùng.
 
 Lớp HTTP của `audit` và `organization` nằm ở module riêng (`AuditHttpModule`, `OrganizationHttpModule`) mà chỉ
@@ -181,21 +177,20 @@ Catalog dùng unique slug ở PostgreSQL; phân trang sort name/id, transaction
 RepeatableRead để page/count dùng cùng snapshot. Snapshot không cố định giữa các
 request phân trang khác nhau.
 
-Danh sách AppUser cũng dùng RepeatableRead cho page/count cùng snapshot (R-14). Hai giao dịch snapshot
+Danh sách AppUser cũng dùng RepeatableRead cho page/count cùng snapshot. Hai giao dịch snapshot
 này (danh sách tài khoản, catalog) gọi thẳng `prisma.$transaction`, nên chạy theo giới hạn interactive mặc
 định của Prisma (timeout 5 s, maxWait 2 s), không theo `DB_TRANSACTION_TIMEOUT_MS`/`DB_TRANSACTION_MAX_WAIT_MS`
 như `TransactionRunner`; chúng chỉ đọc nên quá hạn không làm mất dữ liệu (danh sách tài khoản trả 503).
-Candidates lấy danh sách Employee đã có tài khoản qua repo identity, truyền vào facade organization
-để loại trừ trong query trước sort/limit 20; không còn cửa sổ 200/5 000 nhân viên (R-03).
-Search `%`, `_`, `\` là ký tự nhập literal (N-6). Redeem kiểm dạng token và tra chủ token trước Argon2;
-hash mật khẩu vẫn ở ngoài transaction, rồi kiểm lại trạng thái dưới khóa (R-09).
+Băm/kiểm Argon2 tốn CPU chạy **trước** transaction, rồi trạng thái được kiểm lại dưới khóa (giao thức khóa,
+[spec nền](docs/workspace/items/foundation-org-identity-boundary/spec.md)). Chi tiết truy vấn
+candidates, tìm kiếm literal và thứ tự kiểm khi redeem ở
+[spec lát 1b](docs/workspace/items/us-01-account-invitation-activation/spec.md).
 
 AppModule chưa dùng queue. WorkerModule cấu hình BullMQ (chưa có job) và chạy `EmailDispatchLoop`
 (`src/email-dispatch.loop.ts`): vòng thăm dò PostgreSQL mỗi `OUTBOX_POLL_INTERVAL_MS` gửi thư trong
 EmailOutbox ([ADR-0012](docs/decisions/0012-account-email-delivery.md), vẫn **Proposed**) — không cần Redis cho việc này.
 Vòng lặp nằm ở gốc ghép vì nối hai module không được import nhau: `notifications` gửi thư,
-facade `IdentityAccessService.isInvitationLinkUsable` trả lời liên kết trong thư còn dùng được không. Quản trị tài khoản (lát 1b): route
-`/app-users`, `/account-candidates` chỉ Super Admin; kích hoạt qua `POST /auth/invitations/redeem`.
+facade `IdentityAccessService.isInvitationLinkUsable` trả lời liên kết trong thư còn dùng được không.
 Storage adapter hỗ trợ endpoint S3-compatible; chưa có file ownership/API.
 Readiness chỉ chứng minh PostgreSQL có thể ping, không chứng minh schema/migration,
 Redis, storage hoặc chức năng đăng nhập đã sẵn sàng.

@@ -4,7 +4,7 @@ import { JwtService } from '@nestjs/jwt';
 import { createHash, createHmac, randomBytes } from 'node:crypto';
 import { EnvironmentVariables } from '../../../infrastructure/config/env-schema';
 import { InvalidAccessTokenError } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { newActionToken } from './action-token';
+import { hashActionToken, newActionToken } from './action-token';
 
 export interface AccessTokenClaims {
   /** AppUser id. */
@@ -13,7 +13,8 @@ export interface AccessTokenClaims {
   sid: string;
 }
 
-const REFRESH_TOKEN_SHAPE = /^[A-Za-z0-9_-]{43}$/;
+/** 32 random bytes in base64url: the shape of every opaque token this service issues (refresh and action tokens). */
+const OPAQUE_TOKEN_SHAPE = /^[A-Za-z0-9_-]{43}$/;
 const UUID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function isUuid(value: unknown): value is string {
@@ -78,15 +79,15 @@ export class TokenService {
   }
 
   hashActionToken(token: string): string {
-    return this.hashRefreshToken(token);
+    return hashActionToken(token);
   }
 
   isWellFormedActionToken(token: string): boolean {
-    return REFRESH_TOKEN_SHAPE.test(token);
+    return OPAQUE_TOKEN_SHAPE.test(token);
   }
 
   isWellFormedRefreshToken(token: string): boolean {
-    return REFRESH_TOKEN_SHAPE.test(token);
+    return OPAQUE_TOKEN_SHAPE.test(token);
   }
 
   /** Throttle key: an HMAC of the normalized email, so unknown emails are throttled without being stored. */

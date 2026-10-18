@@ -145,6 +145,11 @@ describe('lock protocol: authentication races (integration, real PostgreSQL)', (
 
     expect([a.status, b.status].sort()).toEqual([200, 401]);
     const winner = a.status === 200 ? a : b;
+    const loser = winner === a ? b : a;
+    // Only the winner carries credentials and their expiries; the replayed request gets the plain error.
+    expect(new Date(bodyOf(winner).data.refreshExpiresAt).toISOString()).toBe(bodyOf(winner).data.refreshExpiresAt);
+    expect(bodyOf(loser).data).toBeUndefined();
+    expect(bodyOf(loser).error.code).toBe('AUTH.SESSION_INVALID');
     // The loser presented an already-consumed token, which is treated as replay: the whole session ends.
     await request(server())
       .get('/api/v1/me')

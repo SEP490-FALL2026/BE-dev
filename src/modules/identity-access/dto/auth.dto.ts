@@ -14,9 +14,15 @@ export const loginBodySchema = z.strictObject({
 export const sessionTokenSchema = z.strictObject({
   accessToken: z.string(),
   tokenType: z.literal('Bearer'),
-  expiresAt: z.iso.datetime(),
+  expiresAt: z.iso.datetime().describe('Expiry of the access token in this response.'),
   /** Opaque and single-use: exchanged at `/auth/refresh` for a new pair, or ended at `/auth/logout`. */
   refreshToken: z.string(),
+  refreshExpiresAt: z.iso
+    .datetime()
+    .describe(
+      'Expiry of the refresh token in this response: the session idle timeout, capped at the absolute session ' +
+        'expiry. It can be earlier than expiresAt near the end of a session.',
+    ),
 });
 
 /**
