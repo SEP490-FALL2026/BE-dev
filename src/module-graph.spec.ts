@@ -1,5 +1,7 @@
 import { Type } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { join } from 'node:path';
 import { AppModule } from './app.module';
 import { MailTransport } from './infrastructure/mail/mail-transport';
 import { AuditController } from './modules/audit/audit.controller';
@@ -20,9 +22,26 @@ import { RecoveryCliModule } from './recovery-cli.module';
 import { WorkerModule } from './worker.module';
 
 /**
- * A business module exports its facade, not its persistence or the credential hasher (docs/rules/module-structure.md).
- * These exports existed on 18/10/2026; each is removed by the named slice of
- * docs/workspace/items/foundation-remediation-handoff-2026-10-18. Entries are only removed, never added to pass a build.
+ * What a business module may export (docs/rules/module-structure.md): its facade, a port it implements for
+ * infrastructure, or the service of a CLI entry module. Every other exported token of a business module is private,
+ * whatever its name (A4-03). Exact `Module: token` pairs; a module that is not mounted (catalog) is not listed.
+ */
+const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
+  'AuditModule: AuditService',
+  'IdentityAccessFacadeModule: IdentityAccessService',
+  'IdentityAccessModule: Symbol(ACCESS_TOKEN_VERIFIER)', // port of src/infrastructure/security
+  'InstallationModule: InstallationService',
+  'NotificationsModule: NotificationsService',
+  'OperatingParametersModule: OperatingParametersService',
+  'OrganizationModule: OrganizationService',
+  'RecoveryModule: RecoveryService', // entry of `pnpm ops:recover` (Q6)
+]);
+
+/**
+ * Exports outside that contract. The 18/10/2026 entries are removed by the named slice of
+ * docs/workspace/items/foundation-remediation-handoff-2026-10-18; the GATE.1 entries (19/10/2026) by the slice of
+ * docs/reviews/be-full-src-architecture-audit-2026-10-19. Entries are only removed, never added to pass a build; a
+ * stale entry fails like a new export.
  */
 const LEGACY_PRIVATE_EXPORTS: ReadonlySet<string> = new Set([
   // H4: OrganizationHttpModule shares these instances today; ImportLookupRepo has no consumer outside the module.
@@ -35,6 +54,12 @@ const LEGACY_PRIVATE_EXPORTS: ReadonlySet<string> = new Set([
   'IdentityAccessFacadeModule: ApprovalRoleRepo',
   'IdentityAccessFacadeModule: PasswordHasher',
   'IdentityAccessFacadeModule: RecoveryRepo',
+  // A4-03 (GATE.1, E9 = A): a private token the name-suffix gate missed. H5.7 cleans the facade exports.
+  'IdentityAccessFacadeModule: SuccessorEligibility',
+  // Owner 19/10/2026 (GATE.1, extends E9): non-facade exports the contract allowlist found.
+  'DataImportModule: EmployeeImportService', // H8.3: data-import facade for onboarding (A4-10)
+  'NotificationsModule: EmailDispatcher', // ROOT.1/DOC.1: decided with the email-dispatch.loop import edge (ADR-0012)
+  'OperatingParametersModule: NonWorkingDatesService', // G3: same-context HTTP module sharing, reviewed like E4
 ]);
 
 // The real configuration modules load and validate an env file the moment they are imported. The
@@ -139,6 +164,28 @@ function controllersOf(graph: ModuleNode[]): unknown[] {
   return graph.flatMap((node) => node.controllers);
 }
 
+/** True when a module exporting `token` leaks something other than its public contract. */
+function isPrivateExport(moduleName: string, token: string): boolean {
+  return !PUBLIC_CONTRACT_EXPORTS.has(`${moduleName}: ${token}`);
+}
+
+/** The Nest modules declared under src/modules: the ones whose exports are a business contract. */
+function businessModuleNames(): ReadonlySet<string> {
+  const names = new Set<string>();
+  const visit = (directory: string): void => {
+    for (const entry of readdirSync(directory)) {
+      const path = join(directory, entry);
+      if (statSync(path).isDirectory()) visit(path);
+      else if (entry.endsWith('.module.ts')) {
+        for (const match of readFileSync(path, 'utf8').matchAll(/\bexport\s+class\s+(\w+)/g)) names.add(match[1]);
+      }
+    }
+  };
+  visit(join(process.cwd(), 'src', 'modules'));
+
+  return names;
+}
+
 describe('module graph', () => {
   const graphs: [string, Type<unknown>][] = [
     ['AppModule', AppModule],
@@ -219,13 +266,15 @@ describe('module graph', () => {
     }
   });
 
-  it('exports no repository or credential hasher from a module, except the legacy entries being removed', () => {
+  it('exports only the public contract of a business module, except the legacy entries being removed', () => {
+    const businessModules = businessModuleNames();
     const exported = new Set<string>();
     for (const root of [AppModule, WorkerModule, InstallationModule, RecoveryCliModule]) {
       for (const node of collectGraph(root)) {
+        if (!businessModules.has(node.module.name)) continue;
         for (const token of metadata(node.module, 'exports')) {
           const name = tokenName(token);
-          if (name.endsWith('Repo') || name === 'PasswordHasher') exported.add(`${node.module.name}: ${name}`);
+          if (isPrivateExport(node.module.name, name)) exported.add(`${node.module.name}: ${name}`);
         }
       }
     }
@@ -234,6 +283,28 @@ describe('module graph', () => {
       newPrivateExports: [...exported].filter((entry) => !LEGACY_PRIVATE_EXPORTS.has(entry)).sort(),
       staleLedgerEntries: [...LEGACY_PRIVATE_EXPORTS].filter((entry) => !exported.has(entry)).sort(),
     }).toEqual({ newPrivateExports: [], staleLedgerEntries: [] });
+  });
+
+  it('A4-03: judges every exported token against the public contract list, not a name suffix', () => {
+    expect(isPrivateExport('IdentityAccessFacadeModule', 'SuccessorEligibility')).toBe(true);
+    expect(isPrivateExport('NotificationsModule', 'EmailDispatcher')).toBe(true);
+    expect(isPrivateExport('OrganizationModule', 'IdentityAccessService')).toBe(true);
+    expect(isPrivateExport('OrganizationModule', 'OrganizationRepo')).toBe(true);
+    expect(isPrivateExport('IdentityAccessFacadeModule', 'PasswordHasher')).toBe(true);
+    expect(isPrivateExport('IdentityAccessFacadeModule', 'IdentityAccessService')).toBe(false);
+    expect(isPrivateExport('IdentityAccessModule', 'Symbol(ACCESS_TOKEN_VERIFIER)')).toBe(false);
+    expect(isPrivateExport('OrganizationModule', 'OrganizationService')).toBe(false);
+  });
+
+  it('applies the export contract to business modules only, not to infrastructure or composition modules', () => {
+    const names = businessModuleNames();
+
+    for (const name of ['OrganizationModule', 'IdentityAccessFacadeModule', 'NotificationsModule', 'RecoveryModule']) {
+      expect({ name, isBusiness: names.has(name) }).toEqual({ name, isBusiness: true });
+    }
+    for (const name of ['DatabaseModule', 'SecurityModule', 'WorkerModule', 'RecoveryCliModule']) {
+      expect({ name, isBusiness: names.has(name) }).toEqual({ name, isBusiness: false });
+    }
   });
 
   it('mounts the identity-access module and its three controllers in the API', () => {

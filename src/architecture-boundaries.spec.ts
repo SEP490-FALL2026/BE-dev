@@ -90,18 +90,11 @@ describe('architecture boundaries', () => {
     }
   });
 
-  it('prevents imports of another business module private layers', () => {
-    const modulesRoot = join(sourceRoot, 'modules');
+  it('prevents imports of another business module private files', () => {
+    const findings = privateModuleImportFindings(sourceRoot, listTypeScriptFiles(join(sourceRoot, 'modules')));
+    const ledger = [...LEGACY_PRIVATE_MODULE_IMPORTS].filter((entry) => entry.startsWith('modules/'));
 
-    for (const file of listTypeScriptFiles(modulesRoot)) {
-      const violations = listResolvedRelativeImports(file).flatMap((target) =>
-        privateModuleImport(sourceRoot, file, target),
-      );
-      expect({ file: relative(sourceRoot, file), violations }).toEqual({
-        file: relative(sourceRoot, file),
-        violations: [],
-      });
-    }
+    expect(againstLedger(findings, ledger)).toEqual({ newViolations: [], staleLedgerEntries: [] });
   });
 
   it('holds the composition roots (API, worker, CLI entry files) to the same public module contract', () => {
@@ -110,15 +103,14 @@ describe('architecture boundaries', () => {
       .filter((path) => statSync(path).isFile() && path.endsWith('.ts') && !path.endsWith('.spec.ts'));
     expect(rootFiles).toContain(join(sourceRoot, 'installation-cli.ts'));
 
-    for (const file of rootFiles) {
-      const violations = listResolvedRelativeImports(file).flatMap((target) =>
-        privateModuleImport(sourceRoot, file, target),
-      );
-      expect({ file: relative(sourceRoot, file), violations }).toEqual({
-        file: relative(sourceRoot, file),
-        violations: [],
-      });
-    }
+    const findings = privateModuleImportFindings(sourceRoot, rootFiles);
+    const ledger = [...LEGACY_PRIVATE_MODULE_IMPORTS].filter((entry) => !entry.startsWith('modules/'));
+
+    expect(againstLedger(findings, ledger)).toEqual({ newViolations: [], staleLedgerEntries: [] });
+  });
+
+  it('reports the ledger differences in both directions', () => {
+    expect(againstLedger(['a', 'b'], ['b', 'c'])).toEqual({ newViolations: ['a'], staleLedgerEntries: ['c'] });
   });
 
   it('reports an import of a module subfolder such as identity-access/errors as private', () => {
@@ -129,6 +121,67 @@ describe('architecture boundaries', () => {
     expect(privateModuleImport(sourceRoot, cli, join(identity, 'auth', 'password-hasher.service.ts'))).toHaveLength(1);
     expect(privateModuleImport(sourceRoot, cli, join(identity, 'identity-access.errors.ts'))).toEqual([]);
     expect(privateModuleImport(sourceRoot, cli, join(identity, 'identity-access.service.ts'))).toEqual([]);
+  });
+
+  describe('A4-02: the public surface of a module is an allowlist, not its whole root', () => {
+    const identity = join(sourceRoot, 'modules', 'identity-access');
+    const otherModule = join(sourceRoot, 'modules', 'organization', 'department.service.ts');
+    const compositionRoot = join(sourceRoot, 'recovery-cli.ts');
+
+    it('blocks an arbitrary file at the root of another module', () => {
+      expect(privateModuleImport(sourceRoot, otherModule, join(identity, 'session-helper.ts'))).toHaveLength(1);
+      expect(
+        privateModuleImport(
+          sourceRoot,
+          otherModule,
+          join(sourceRoot, 'modules', 'data-import', 'employee-import.service.ts'),
+        ),
+      ).toHaveLength(1);
+    });
+
+    it('allows each public pattern: module, HTTP and facade modules, facade service, types and public errors', () => {
+      for (const file of [
+        'identity-access.module.ts',
+        'identity-access-http.module.ts',
+        'identity-access-facade.module.ts',
+        'identity-access.service.ts',
+        'session.types.ts',
+        'identity-access.errors.ts',
+      ]) {
+        expect({ file, violations: privateModuleImport(sourceRoot, otherModule, join(identity, file)) }).toEqual({
+          file,
+          violations: [],
+        });
+      }
+    });
+
+    it('keeps repositories, the credential hasher and capability files private', () => {
+      for (const target of [
+        join(identity, 'recovery.repo.ts'),
+        join(identity, 'auth', 'password-hasher.service.ts'),
+        join(identity, 'accounts', 'account-invitation.service.ts'),
+        join(identity, 'auth', 'session.types.ts'),
+      ]) {
+        expect(privateModuleImport(sourceRoot, otherModule, target)).toHaveLength(1);
+      }
+    });
+
+    it('opens the listed CLI entry files to composition roots only', () => {
+      expect(privateModuleImport(sourceRoot, compositionRoot, join(identity, 'recovery.service.ts'))).toEqual([]);
+      expect(privateModuleImport(sourceRoot, otherModule, join(identity, 'recovery.service.ts'))).toHaveLength(1);
+      expect(privateModuleImport(sourceRoot, compositionRoot, join(identity, 'recovery.repo.ts'))).toHaveLength(1);
+    });
+
+    it('gives the same answer for Windows and POSIX separators', () => {
+      const posix = (path: string) => path.split(sep).join('/');
+
+      expect(privateModuleImport(sourceRoot, posix(otherModule), posix(join(identity, 'session-helper.ts')))).toEqual(
+        privateModuleImport(sourceRoot, otherModule, join(identity, 'session-helper.ts')),
+      );
+      expect(
+        privateModuleImport(sourceRoot, posix(otherModule), posix(join(identity, 'identity-access.service.ts'))),
+      ).toEqual([]);
+    });
   });
 
   it('keeps business modules flat instead of recreating application layers', () => {
@@ -239,10 +292,57 @@ function resolveRelativeImport(file: string, specifier: string): string {
 }
 
 /**
+ * Module files a composition root (a file directly in src/) may import besides the public surface: the CLI entry files
+ * kept at the module root (docs/rules/module-structure.md, Owner Q6). Not open to other business modules.
+ */
+const CLI_ENTRY_FILES: ReadonlySet<string> = new Set([
+  'modules/identity-access/recovery.arguments.ts',
+  'modules/identity-access/recovery.module.ts',
+  'modules/identity-access/recovery.service.ts',
+  'modules/installation/hidden-prompt.ts',
+  'modules/installation/installation.arguments.ts',
+]);
+
+/**
+ * Cross-module imports of a non-public file that existed when GATE.1 (19/10/2026, Owner decision E9 = A) replaced "any
+ * root file is public" with the allowlist (A4-02 of docs/reviews/be-full-src-architecture-audit-2026-10-19). Each
+ * entry names the slice of that report that removes it. Entries are only removed; a stale entry fails like a new
+ * violation, and adding one needs Owner/dev review.
+ */
+const LEGACY_PRIVATE_MODULE_IMPORTS: ReadonlySet<string> = new Set([
+  // H4.3a: normalizeDisplayName moves to src/core (Q6).
+  'modules/data-import/employee-import-rows.ts -> modules/organization/job-title-name.ts',
+  'modules/data-import/employee-import.service.ts -> modules/organization/job-title-name.ts',
+  // H8.3: data-import gets a facade for onboarding (A4-10).
+  'modules/onboarding/onboarding.service.ts -> modules/data-import/employee-import.service.ts',
+  // ROOT.1/DOC.1: the worker loop of ADR-0012 reaches the dispatcher; the rule for root files is decided there.
+  'email-dispatch.loop.ts -> modules/notifications/email-dispatcher.service.ts',
+]);
+
+/**
+ * The public surface of a business module, as path segments below src/modules: only these files directly in the
+ * module root — the Nest modules, the facade service, public types and public errors. Anything else in the root, a
+ * repo, the credential hasher and every subfolder file is private. Kept in step with `isModuleRootPublicSurface` of
+ * architecture-structure.spec.ts.
+ */
+function isModulePublicSurface(parts: string[]): boolean {
+  if (parts.length !== 2) return false;
+  const [moduleName, fileName] = parts;
+
+  return (
+    fileName === `${moduleName}.module.ts` ||
+    fileName.endsWith('-http.module.ts') ||
+    fileName.endsWith('-facade.module.ts') ||
+    fileName === `${moduleName}.service.ts` ||
+    fileName.endsWith('.types.ts') ||
+    fileName.endsWith('.errors.ts')
+  );
+}
+
+/**
  * Resolved from the real import graph, not from folder names: code outside a business module (another
- * module or a composition root in src/) may import only a file directly in that module's root (facade
- * service, module, types, public errors), never a subfolder file, a repo or the credential hasher.
- * Returns a description of the violation, or nothing.
+ * module or a composition root in src/) may import only the module's public surface (allowlist above);
+ * a composition root may also import the listed CLI entry files. Returns the private target, or nothing.
  */
 function privateModuleImport(sourceRoot: string, importer: string, target: string): string[] {
   const modulesRoot = join(sourceRoot, 'modules');
@@ -251,9 +351,33 @@ function privateModuleImport(sourceRoot: string, importer: string, target: strin
   const importerParts = relative(modulesRoot, importer).split(sep);
   if (importerParts[0] !== '..' && importerParts[0] === parts[0]) return [];
 
-  const isPublic = parts.length === 2 && !target.endsWith('.repo.ts') && !target.endsWith('password-hasher.service.ts');
+  const targetPath = relative(sourceRoot, target).split(sep).join('/');
+  const isCompositionRoot = relative(sourceRoot, importer).split(sep).length === 1;
+  const isPublic = isModulePublicSurface(parts) || (isCompositionRoot && CLI_ENTRY_FILES.has(targetPath));
 
-  return isPublic ? [] : [relative(sourceRoot, target).split(sep).join('/')];
+  return isPublic ? [] : [targetPath];
+}
+
+/** `importer -> target` for every private cross-module import made by `files`, paths relative to src/. */
+function privateModuleImportFindings(sourceRoot: string, files: string[]): string[] {
+  return files.flatMap((file) =>
+    listResolvedRelativeImports(file).flatMap((target) =>
+      privateModuleImport(sourceRoot, file, target).map(
+        (privateTarget) => `${relative(sourceRoot, file).split(sep).join('/')} -> ${privateTarget}`,
+      ),
+    ),
+  );
+}
+
+/** New findings and stale ledger entries, so a failure names exactly what to fix. */
+function againstLedger(findings: string[], ledger: Iterable<string>) {
+  const found = new Set(findings);
+  const legacy = new Set(ledger);
+
+  return {
+    newViolations: [...found].filter((finding) => !legacy.has(finding)).sort(),
+    staleLedgerEntries: [...legacy].filter((entry) => !found.has(entry)).sort(),
+  };
 }
 
 function listResolvedRelativeImports(file: string): string[] {
