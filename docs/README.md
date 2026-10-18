@@ -27,7 +27,7 @@ trong docs/architecture. Các gói triển khai auth/US cũ đã được dọn 
 
 ## Quyết định đề xuất (chưa Accepted)
 
-- [Xác thực nội bộ, phiên và quy ước persistence vùng danh tính](decisions/0011-internal-authentication-and-sessions.md) — Proposed, đã implement và merge ở `64073c4`; chờ dev review/Accepted. ADR-0002/0004 đã có ghi chú hiện thực.
+- [Xác thực nội bộ, phiên và quy ước persistence vùng danh tính](decisions/0011-internal-authentication-and-sessions.md) — Proposed, đã implement và merge ở `64073c4`; refresh token chuyển sang body ở `1336bd5`, ghi quyết định Owner Q1–Q3 ngày 18/10/2026; chờ dev review/Accepted. ADR-0002/0004 đã có ghi chú hiện thực.
 - [Gửi thư vòng đời tài khoản: outbox, thư viện SMTP, dispatcher](decisions/0012-account-email-delivery.md) — Proposed, đã implement và merge cùng lát 1b; chờ dev review/Accepted.
 
 Số ADR bị khuyết không cần đánh lại. Định hướng tài khoản/mật khẩu + JWT hiện ghi

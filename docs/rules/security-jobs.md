@@ -5,9 +5,16 @@
 - Internal accounts: Argon2id passwords, short-lived HS256 access token, rotating refresh token. Login and
   refresh return both in the response body; refresh and logout take the refresh token in the request body.
   The API sets and reads no cookie, so a client must keep the refresh token out of logs and URLs
-  (design: ADR-0011, Proposed, amended 17/10/2026). Login,
-  refresh, logout, `/me`, account creation, invitations, activation, locking and role grants exist
-  in slices 1a/1b (merged, pending developer review). Password change/reset is a later slice.
+  (design: ADR-0011, Proposed, amended 17/10/2026; developer review pending). Login, refresh, logout, `/me`,
+  account creation, invitations, activation, locking, role grants (slices 1a/1b), forgot/reset and change password
+  (slice 1c) and Super Admin transfer exist and are merged to `dev`; none is reviewed or accepted.
+- The refresh token is an **opaque** random 256-bit credential, not a JWT. Only its SHA-256 is stored; it is
+  authenticated by hash lookup, row locks and the authoritative session/account/employee state in PostgreSQL,
+  rotated once per use, and a replayed token revokes the session. Never pass it to `jwt.verify`, never turn it into
+  a JWT, and never add Redis or a second session store without a new ADR. Never store or print a raw token.
+- Client contract (Owner Q1/Q2, 18/10/2026): the web client keeps the refresh token in memory, not `localStorage`;
+  web and mobile single-flight refresh, because a second refresh with the same token is replay and ends the session.
+  `refreshExpiresAt` (Q3) is a pending contract change for a separate auth/session item, not implemented.
 - Global guards deny by default: every route declares one of `@Public()`, `@AuthenticatedOnly()`,
   `@RequireRoles(...)` (missing means 500). Session, account status and employee status are checked in the
   database on every request; roles are never read from the token. Never use an always-accept verifier
@@ -15,7 +22,8 @@
 - Public routes need @Public(), an entry in the public allowlist of `test/e2e/api-inventory.e2e-spec.ts`
   and anonymous HTTP tests. Catalog has no role/resource policy and is not mounted; add authorization
   from the US before opening real business access.
-- Passwords enter through the installation prompt, `/auth/login` or `/auth/invitations/redeem`; they are never accepted
+- Passwords enter through the installation prompt, `/auth/login`, `/auth/invitations/redeem`, `/auth/password-resets`
+  or `/me/password`; they are never accepted
   as arguments or environment variables, and never logged or stored in audit (`AuditService` rejects
   keys that look like secrets).
 - Never trust client-supplied privileges. A signed JWT alone does not establish

@@ -4,6 +4,7 @@
 - Thiết kế ban đầu bởi: AI theo giao việc Owner (16/10/2026). Hạng mục `g2-spending-approver-config` của bảng phủ G2.
 - Thiết kế: ready. Triển khai: **verified** local 16/10/2026 (cây làm việc chưa commit trên `e833092`; xem [plan](plan.md)). Owner review: chưa review.
 - Nguồn: Docs commit `3341ea0` ([sources](../../sources.md)). `US-01-03` AC-1, AC-2, AC-4 → AC-7 (`BE-UserStory/src/EP-01.md`); BRD v3.39 `FR-3.6`, `FR-3.12`, `FR-3.13`, `FR-3.15`, `FR-8.2`, `SoD-1`, `SoD-7`; `QĐ-22`, `QĐ-27`, `QĐ-28c`, `QĐ-39b`, `QĐ-62c`; `OI-17` (`BR-13.12`).
+- _Đính chính 18/10/2026 ([audit nền tảng](../../../reviews/be-foundation-audit-2026-10-18/README.md)):_ AC đã giao — căn cứ là bảng nghiệm thu bên dưới: `US-01-03` AC-1 (vế lưu cấu hình + audit), AC-2 (chiều chọn người giữ vai), AC-3 (vế đổi người, lịch sử, audit; xác định lại bước đang chờ ở G5), AC-4 → AC-7.
 - Trạng thái yêu cầu: Story `BASELINED` (`QĐ-72`). Không câu hỏi mở nào chặn lát này.
 - [Kế hoạch](plan.md).
 

@@ -16,7 +16,26 @@ import { InstallationModule } from './modules/installation/installation.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { PayloadCipher } from './modules/notifications/payload-cipher';
 import { QueueInfrastructureModule } from './infrastructure/queue/queue-infrastructure.module';
+import { RecoveryCliModule } from './recovery-cli.module';
 import { WorkerModule } from './worker.module';
+
+/**
+ * A business module exports its facade, not its persistence or the credential hasher (docs/rules/module-structure.md).
+ * These exports existed on 18/10/2026; each is removed by the named slice of
+ * docs/workspace/items/foundation-remediation-handoff-2026-10-18. Entries are only removed, never added to pass a build.
+ */
+const LEGACY_PRIVATE_EXPORTS: ReadonlySet<string> = new Set([
+  // H4: OrganizationHttpModule shares these instances today; ImportLookupRepo has no consumer outside the module.
+  'OrganizationModule: CostCenterRepo',
+  'OrganizationModule: DepartmentRepo',
+  'OrganizationModule: ImportLookupRepo',
+  'OrganizationModule: OrganizationRepo',
+  // H5: IdentityAccessModule, the recovery module and the CLI share these instances today.
+  'IdentityAccessFacadeModule: AccountRepo',
+  'IdentityAccessFacadeModule: ApprovalRoleRepo',
+  'IdentityAccessFacadeModule: PasswordHasher',
+  'IdentityAccessFacadeModule: RecoveryRepo',
+]);
 
 // The real configuration modules load and validate an env file the moment they are imported. The
 // graph only needs their shape, so they are replaced by an empty module.
@@ -38,7 +57,7 @@ type Token = unknown;
 /** Nest lets many providers share these on purpose (one per guard, pipe, filter or interceptor). */
 const MULTI_PROVIDER_TOKENS: ReadonlySet<Token> = new Set([APP_GUARD, APP_PIPE, APP_FILTER, APP_INTERCEPTOR]);
 
-function metadata(module: Type<unknown>, key: 'imports' | 'providers' | 'controllers'): unknown[] {
+function metadata(module: Type<unknown>, key: 'imports' | 'providers' | 'controllers' | 'exports'): unknown[] {
   return (Reflect.getMetadata(key, module) as unknown[] | undefined) ?? [];
 }
 
@@ -198,6 +217,23 @@ describe('module graph', () => {
       expect(controllersOf(collectGraph(root))).not.toContain(AuditController);
       expect(declarationsOf(collectGraph(root), AuditQueryRepo)).toHaveLength(0);
     }
+  });
+
+  it('exports no repository or credential hasher from a module, except the legacy entries being removed', () => {
+    const exported = new Set<string>();
+    for (const root of [AppModule, WorkerModule, InstallationModule, RecoveryCliModule]) {
+      for (const node of collectGraph(root)) {
+        for (const token of metadata(node.module, 'exports')) {
+          const name = tokenName(token);
+          if (name.endsWith('Repo') || name === 'PasswordHasher') exported.add(`${node.module.name}: ${name}`);
+        }
+      }
+    }
+
+    expect({
+      newPrivateExports: [...exported].filter((entry) => !LEGACY_PRIVATE_EXPORTS.has(entry)).sort(),
+      staleLedgerEntries: [...LEGACY_PRIVATE_EXPORTS].filter((entry) => !exported.has(entry)).sort(),
+    }).toEqual({ newPrivateExports: [], staleLedgerEntries: [] });
   });
 
   it('mounts the identity-access module and its three controllers in the API', () => {

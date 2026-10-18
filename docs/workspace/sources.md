@@ -4,15 +4,27 @@ BRD sở hữu nghiệp vụ; US dẫn xuất phạm vi/AC; sổ quyết định
 
 | Nguồn      | Vị trí nhận diện trong bộ tài liệu dự án                                                 | Link chia sẻ / revision                                                                                                                                                      |
 | ---------- | ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| BRD        | Docs/Requiments/BRD - HỆ THỐNG QUẢN TRỊ BẢN QUYỀN PHẦN MỀM & TỐI ƯU CHI PHÍ CÔNG NGHỆ.md | v3.36 `S-2026-10-12b`; v3.39 `S-2026-10-14b` = Docs `3341ea0`; v3.42 Docs `73e7379`; **v3.45** `S-2026-10-18` (chưa commit)                                                  |
-| Phạm vi    | Docs/Requiments/Định nghĩa phạm vi & nghiệp vụ.md                                        | v1.24 `S-2026-10-12b`; v1.27 `S-2026-10-14b` = Docs `3341ea0`; v1.30 `73e7379`; **v1.31** `S-2026-10-18` (chưa commit)                                                       |
+| BRD        | Docs/Requiments/BRD - HỆ THỐNG QUẢN TRỊ BẢN QUYỀN PHẦN MỀM & TỐI ƯU CHI PHÍ CÔNG NGHỆ.md | v3.36 `S-2026-10-12b`; v3.39 `S-2026-10-14b` = Docs `3341ea0`; v3.42 Docs `73e7379`; v3.45 `S-2026-10-18` (chưa commit); **v3.46** Docs `9416fe0`                            |
+| Phạm vi    | Docs/Requiments/Định nghĩa phạm vi & nghiệp vụ.md                                        | v1.24 `S-2026-10-12b`; v1.27 `S-2026-10-14b` = Docs `3341ea0`; v1.30 `73e7379`; v1.31 `S-2026-10-18`; **v1.31** Docs `9416fe0`                                               |
 | US         | Docs/BE-UserStory/src/ (canonical), sinh ra user-stories-and-epics.md và epics/          | v0.15 (`QĐ-67`) `S-2026-10-12b`; v0.15 (`QĐ-73`) `3341ea0`; v0.15 (`QĐ-77`, 150 mã, 1 428 AC) `73e7379`; **v0.15 (`QĐ-80`, 150 mã, 144 đang dùng, 1 433 AC)** `S-2026-10-18` |
-| Quyết định | Docs/Decisions/project-decisions.md                                                      | QĐ-01 → QĐ-67 `S-2026-10-12b`; → QĐ-73 `3341ea0`; → QĐ-77 `73e7379`; **→ QĐ-80** `S-2026-10-18` (chưa commit)                                                                |
+| Quyết định | Docs/Decisions/project-decisions.md                                                      | QĐ-01 → QĐ-67 `S-2026-10-12b`; → QĐ-73 `3341ea0`; → QĐ-77 `73e7379`; → QĐ-80 `S-2026-10-18` (chưa commit); **→ QĐ-81** Docs `9416fe0`                                        |
 | Conceptual | Docs/ERD/CONCEPTUAL ERD - DANH SÁCH ENTITY.md                                            | v5.1 (21 · 42), không đổi, `S-2026-10-12b`; v5.1 (21 · 42 · 20 bất biến), nội dung đồng bộ 17/10/2026, `S-2026-10-18`                                                        |
 
 Vị trí trên chỉ để nhận diện tài liệu, không bắt contributor có thư mục cạnh checkout BE. Mỗi spec pin revision thực sự dùng.
 Spec G0/G1/G2 giữ nguồn đã pin khi thiết kế; tác động của `QĐ-74` → `QĐ-80` lên chúng ghi ở
 [baseline-impact-and-remediation-2026-10-17](items/baseline-impact-and-remediation-2026-10-17/spec.md).
+
+## Commit Docs `9416fe0` (18/10/2026, có `QĐ-81`) — pin hiện hành cho hạng mục mới
+
+Docs `main` `9416fe0e45300c679148e76b6438ab049a014692` (18/10/2026, _update docs_) là commit đầu tiên chứa `QĐ-81a`
+(`git log -S"QĐ-81a" -- Decisions/project-decisions.md`). Kiểm ngày 18/10/2026: sổ quyết định `QĐ-01` → `QĐ-81`
+(`QĐ-81a`–`QĐ-81c` ở `project-decisions.md:2524-2526`), BRD **v3.46**, Phạm vi **v1.31**, User Stories v0.15 — **150** mã Story,
+144 đang dùng, **1 433** AC (`user-stories-and-epics.md:537`). Nguồn đã commit nên pin bằng commit, không cần hash từng tệp;
+snapshot `S-2026-10-18` (working tree chưa commit) chỉ còn giá trị lịch sử cho lượt tài liệu ngày đó.
+
+Hạng mục mới pin Docs `9416fe0` (hoặc commit sau có quyết định cần dùng). R-2 dùng commit này vì cần `QĐ-81` và
+`US-01-01` AC-6, AC-7, AC-20 bản mới. Spec G0/G1/G2 đã thiết kế giữ nguồn đã pin; đính chính claim AC ngày 18/10/2026 dựa
+trên bảng nghiệm thu của chính spec, không đổi nguồn thiết kế.
 
 ## Snapshot `S-2026-10-18` (Docs `73e7379` + working tree chưa commit)
 

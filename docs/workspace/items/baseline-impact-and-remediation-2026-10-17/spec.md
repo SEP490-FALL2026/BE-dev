@@ -129,6 +129,8 @@ Cả hai lát là **forward change** trên `dev`: thêm thay đổi, test mới 
 
 **R-0 — điều kiện trước, không phải lát code:** chạy lại cổng trên `eae212a` (M-54) để R-1, R-2 có baseline đúng cây đã merge; lỗi có sẵn ghi riêng.
 
+_Cập nhật 18/10/2026 (rebase R-0):_ `eae212a` không còn là baseline chạy code. HEAD `dev` hiện là `186ad5f` (gồm `4ead859`, `b1fb056` và `1336bd5` — refresh token chuyển sang body). [audit nền tảng 18/10/2026](../../../reviews/be-foundation-audit-2026-10-18/README.md) đã chạy trên HEAD này: `pnpm check` exit 0 (unit 510), `pnpm test:e2e` 261/261, `pnpm test:integration` 575/575 trên PostgreSQL riêng — R-0 coi như đã thỏa cho HEAD `186ad5f`; mọi lát sau đối chiếu lại HEAD thật trước khi code. Theo quyết định Owner Q4, R-1 và R-2 mở lại **sau** Prompt 02 (rule/gate) và **trước** refactor lớn `organization`; thực hiện thành lát H3 của [foundation-remediation-handoff-2026-10-18](../foundation-remediation-handoff-2026-10-18/spec.md), mỗi R một PR.
+
 ### R-1 — bỏ `sharedAccounts` khỏi lỗi ngừng phòng (`US-03-06` AC-19, `QĐ-75`)
 
 - Sửa tiếp: lát [g2-department-profile](../g2-department-profile/spec.md), code ở commit `4ead859` (vào `dev` qua PR #11 `eae212a`). Phụ thuộc: R-0.
@@ -139,6 +141,8 @@ Cả hai lát là **forward change** trên `dev`: thêm thay đổi, test mới 
 - Rollback: revert commit của lát; không có dữ liệu cần khôi phục.
 
 ### R-2 — khóa tài khoản bắt buộc lý do hoặc tham chiếu (`US-01-01` AC-20, `QĐ-77c`)
+
+_Cập nhật 18/10/2026:_ Docs `9416fe0` có `QĐ-81` — khóa **và** mở khóa đều bắt buộc lý do/tham chiếu không rỗng; thiếu ⟹ từ chối, trạng thái không đổi, không có bản ghi thành công; audit giữ người thực hiện, thời điểm, trạng thái trước/sau, lý do (`US-01-01` AC-6, AC-7, AC-20). Blocker phần mở khóa (E-1) đã gỡ; R-2 pin Docs `9416fe0` và gộp hai phần thành một lát. Code hiện tại vẫn chưa nhận lý do (`app-users.controller.ts:192`, `:214`; `account-status.service.ts:45`, `:74` tại HEAD `186ad5f`).
 
 - Sửa tiếp: lát [1b](../us-01-account-invitation-activation/spec.md) — operation lock từ PR #4 (`64073c4`), đổi vị trí ở refactor `ab0c43a`; lời gọi lock trong suite G1/G2 tới `4ead859`. Phụ thuộc: R-0; phần mở khóa thêm đồng bộ có thẩm quyền `US-01-01` AC-7/AC-20 ở Docs (E-1 = A, Owner 18/10/2026).
 - Module: `identity-access` (controller, DTO Zod, `account-status.service.ts`, audit của lát).

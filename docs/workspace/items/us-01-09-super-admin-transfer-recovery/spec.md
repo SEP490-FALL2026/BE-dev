@@ -4,6 +4,7 @@
 - Thiết kế ban đầu bởi: AI theo giao việc Owner (16/10/2026).
 - Thiết kế: ready (trừ ba điểm Owner xác nhận ở cuối). Triển khai: **verified** local 16/10/2026 (cây làm việc chưa commit trên `e833092`; xem [plan](plan.md)). Owner review: chưa review.
 - Nguồn: Docs commit `3341ea0` ([sources](../../sources.md)). `US-01-09` AC-1 → AC-14, `US-01-01` AC-12 (nhánh chuyển giao), AC-15; `US-01-10` AC-10; `QĐ-44`, `QĐ-47a`, `QĐ-47f`, `QĐ-67a`, `QĐ-67b`.
+- _Đính chính 18/10/2026 ([audit nền tảng](../../../reviews/be-foundation-audit-2026-10-18/README.md)):_ AC đã giao — căn cứ là bảng nghiệm thu bên dưới: `US-01-09` AC-1 → AC-14 (AC-3 (c)(d) và AC-8 vế nghỉ việc dùng fixture, luồng thật ở G6); `US-01-01` AC-12 (nhánh chuyển giao, qua AC-3), AC-15 (vế nghỉ việc bằng fixture). `US-01-10` AC-10 **chưa có bằng chứng**: không có hàng nghiệm thu/test, và luồng yêu cầu quên mật khẩu không kiểm phiếu khôi phục đang chờ — chuyển sang lát H3 của [foundation-remediation-handoff-2026-10-18](../foundation-remediation-handoff-2026-10-18/spec.md).
 - Trạng thái yêu cầu: Story `BASELINED` (`QĐ-72`).
 - [Kế hoạch](plan.md).
 

@@ -9,6 +9,7 @@
   (`BE-UserStory/src/EP-02.md`); BRD v3.39 `FR-2.1`, `FR-2.2`, `FR-2.13`, `FR-9.7`, `FR-9.8`, `FR-8.7`, `SoD-1`, `INV-05`;
   `QĐ-52a`, `QĐ-66c`, `QĐ-66ak`, `QĐ-67a`, `QĐ-67c`, `QĐ-67d`, `QĐ-68a`→`QĐ-68f`, `QĐ-70a`→`QĐ-70c`, `QĐ-73b`;
   `WF-01` v3.3 (đường `d_fpath` → `a_fman`).
+- _Đính chính 18/10/2026 ([audit nền tảng](../../../reviews/be-foundation-audit-2026-10-18/README.md)):_ AC đã giao — căn cứ là bảng nghiệm thu bên dưới: `US-02-07` AC-1 → AC-3, AC-4 và AC-6 (trừ vế bộ chuẩn phòng × chức vụ — G3), AC-5, AC-7 (vế nhập tay), AC-8 → AC-11; `US-02-02` AC-14, AC-15 (vế nhập tay); `US-02-03` AC-1, AC-4, AC-5 (biểu mẫu).
 - Trạng thái yêu cầu: các Story `BASELINED` (`QĐ-72`). `OQ-A-25`, `OQ-A-26`, `OQ-A-27` **đã đóng** ở `QĐ-70`; không câu hỏi
   mở nào chặn lát này. Conceptual v5.1 không đổi; Logical vùng tổ chức là G0 + phần bổ sung ở mục _Dữ liệu_ dưới đây.
 - Thiết kế kế thừa: [G0](../foundation-org-identity-boundary/spec.md) (module `organization`, facade

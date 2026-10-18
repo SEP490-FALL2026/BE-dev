@@ -18,8 +18,12 @@ G0 và lát 1a/1b đã merge qua PR #4 (`64073c4`), có 16 operation HTTP.
 Gói remediation tại `a0cf5f1` đã vào `origin/dev` qua PR #7 và #8. Spec/plan,
 ADR-0011/0012 (vẫn Proposed) và code chưa được dev review/nghiệm thu.
 Kết quả kiểm chứng và phần còn mở nằm trong [báo cáo review G0/G1](docs/reviews/g0-g1-remediation-2026-10-15/README.md).
-Các lát G1/G2 còn lại (commit `4ead859`) vào `dev` qua PR #11 (`eae212a`), chưa review/nghiệm thu; remediation theo
-baseline sau đó ở [baseline-impact-and-remediation-2026-10-17](docs/workspace/items/baseline-impact-and-remediation-2026-10-17/spec.md).
+Các lát G1/G2 còn lại (commit `4ead859`) vào `dev` qua PR #11 (`eae212a`), chưa review/nghiệm thu; `1336bd5` (PR #12)
+chuyển refresh token sang body. Gate trên HEAD `186ad5f` đã chạy xanh trong
+[audit nền tảng 18/10/2026](docs/reviews/be-foundation-audit-2026-10-18/README.md). Remediation theo baseline (R-1, R-2)
+và các refactor nền tảng được lập kế hoạch ở
+[foundation-remediation-handoff-2026-10-18](docs/workspace/items/foundation-remediation-handoff-2026-10-18/spec.md);
+phân tích tác động gốc ở [baseline-impact-and-remediation-2026-10-17](docs/workspace/items/baseline-impact-and-remediation-2026-10-17/spec.md).
 Catalog là mẫu cấu trúc, chưa cung cấp nghiệp vụ G3.
 
 ## Bản đồ source
@@ -71,8 +75,10 @@ test/
 - Core không import Nest, Prisma, SDK hoặc business module.
 - Infrastructure cung cấp kỹ thuật; business workflow nằm trong feature module.
 - Controller map HTTP/DTO; service điều phối; repo sở hữu persistence; mapper tạo wire data.
-- Module dùng layout phẳng. Chỉ tạo dto/errors/mappers/policies/services khi có nhu cầu thật; module đã có
-  nhiều capability (như `identity-access`) nhóm theo capability, tối đa hai tầng thư mục.
+- Module dùng layout phẳng. Chỉ tạo dto/errors/mappers/policies/services khi có nhu cầu thật; module vượt 2 controller
+  hoặc 12 file ở root nhóm theo capability (như `identity-access`), tối đa hai tầng thư mục. Folder capability không tự
+  động là Nest module; điều kiện tạo Nest submodule, ownership capability, chỗ đặt lỗi và ngưỡng kích thước ở
+  [module structure](docs/rules/module-structure.md). `organization` hiện còn phẳng 26 file — nợ có ledger, gỡ ở lát H4.
 - Module khác chỉ import file ở **gốc** module (facade, module, types, errors public); không import repo,
   `password-hasher.service` hay file trong thư mục con, và không truy cập bảng thuộc module khác.
 - Cross-module atomic write: facade nhận `tx` của người gọi (`DbTx`); `TransactionRunner.run`
@@ -84,8 +90,10 @@ test/
   dữ liệu đi qua service trong `TransactionRunner` cùng audit như API.
 - Không dùng vòng phụ thuộc, generic base repository hoặc scaffold hàng loạt khi chưa có US.
 
-[Architecture tests](src/architecture-boundaries.spec.ts) quét một số boundary;
-không thay thế review dependency và hành vi.
+[Architecture tests](src/architecture-boundaries.spec.ts), [structure gates](src/architecture-structure.spec.ts) và
+[module graph test](src/module-graph.spec.ts) quét các boundary liệt kê ở
+[module structure](docs/rules/module-structure.md#gate-và-legacy-ledger); vi phạm có sẵn nằm trong legacy ledger chỉ được
+co lại. Gate không thay thế review dependency và hành vi.
 
 ## HTTP pipeline
 
@@ -146,7 +154,10 @@ client nhận 503; không tự retry ghi. Xem [spec remediation](docs/workspace/
 
 Authentication: tài khoản nội bộ, access token JWT HS256 ngắn hạn cộng refresh token xoay vòng. Cả hai nằm trong body
 của `POST /auth/login` và `/auth/refresh`; client gửi refresh token trong body của `/auth/refresh` và `/auth/logout`
-(API không đọc hay đặt cookie). Phát lại refresh token đã consumed nhưng còn hạn thì thu hồi phiên.
+(API không đọc hay đặt cookie). Refresh token là token opaque 256 bit, **không** phải JWT: CSDL chỉ lưu SHA-256, xác thực
+bằng tra hash, khóa dòng và trạng thái phiên/tài khoản/nhân viên trong PostgreSQL — nguồn có thẩm quyền duy nhất, không
+Redis. Phát lại refresh token đã consumed nhưng còn hạn thì thu hồi phiên; web giữ token trong bộ nhớ và client
+single-flight refresh (Owner Q1/Q2, ADR-0011).
 Token hết hạn trả 401 trước khi xét consumed và không thu hồi phiên/token kế tiếp (quyết định Task 1B, tránh session DoS). Giao thức
 khóa và hợp đồng đăng xuất: [spec nền](docs/workspace/items/foundation-org-identity-boundary/spec.md),
 [spec lát 1a](docs/workspace/items/us-01-bootstrap-login-session/spec.md); ADR-0011 còn **Proposed**.

@@ -2,42 +2,67 @@
 
 - Phụ trách: người hoặc AI sở hữu thiết kế, implementation, test và cập nhật plan/evidence.
 - Thiết kế ban đầu bởi: Owner hoặc dev đã soạn/chốt đầu vào; có thể trùng người phụ trách.
-- Thiết kế: draft. Owner review: chưa review; bổ sung trạng thái, ngày, revision và bằng chứng khi có.
-- Nguồn: BRD link/revision/mục; US link/revision/US/AC; quyết định liên quan.
-- Trạng thái yêu cầu và điều kiện thiết kế/code: ghi theo nguồn, gồm ERD nếu cần.
+- Thiết kế: `draft`. Owner review: chưa review; bổ sung trạng thái, ngày, revision và bằng chứng khi có.
+- Nguồn: Docs `<sha>` (BRD vX, US vY — Story/AC dùng thật, quyết định `QĐ-*`), BE `<sha>`. Không ghi "bản mới nhất".
+- Nhóm roadmap: Gx — chỉ là planning container, không phải phạm vi của hạng mục này.
 - [Kế hoạch](plan.md).
 
-## Vấn đề và phạm vi
+## Business outcome
 
-Điền người dùng, kết quả mong muốn, US/AC trong lát này, ngoài scope và phần US còn lại.
+Một câu: sau lát này ai làm được gì, quan sát/kiểm được bằng cách nào. Một hạng mục = một outcome / vertical slice;
+hệ thống build và test được sau lát. Refactor không đổi hành vi và thay đổi hành vi là hai hạng mục khác nhau.
 
-## Làm rõ yêu cầu
+## Primary Story/AC
 
-| Câu hỏi / mâu thuẫn | Kết luận hoặc blocker | Nguồn xác nhận / người / revision |
-| ------------------- | --------------------- | --------------------------------- |
+| Story | AC  | Coverage | Phần còn lại thuộc |
+| ----- | --- | -------- | ------------------ |
 
-Phân biệt sự thật trong nguồn, giả định cần xác nhận và lựa chọn kỹ thuật.
+`Coverage` là `full`, `partial` hoặc `n/a`. `partial` ghi vế đã làm ở cột AC và item/nhóm sở hữu phần còn lại; không ghi
+Story hoàn thành khi còn AC `partial`. Mục tiêu **1–3 primary Story**; nhiều hơn chỉ khi cùng một outcome và cùng
+transaction boundary, kèm mục `## Size exception` giải thích lý do và người chấp nhận. Technical enabler không có Story
+ghi một dòng `—` | mã TE/finding | `n/a`.
 
-## Hành vi và thiết kế
+## Supporting references
 
-Mô tả luồng chính, biến thể, từ chối, quyền và ranh giới dữ liệu. API request/response/error; dữ liệu, constraint, transaction/concurrency; migration/tương thích; jobs/storage nếu có. Phần không liên quan ghi không áp dụng và lý do.
+Story/AC/quyết định/ADR chỉ để truy vết hoặc giải thích. **Không** tính là đã implement và không được chép lên roadmap như
+AC đã giao.
 
-Ghi module sở hữu, dependency, lựa chọn và đánh đổi; link ERD/ADR nếu cần. Không dựng kiến trúc song song.
+## Explicit out of scope
 
-## Acceptance và kiểm chứng
+Những gì người đọc dễ tưởng thuộc lát này nhưng không thuộc, kèm nơi sẽ làm (item/nhóm) nếu đã biết.
 
-| US/AC | Hành vi / tình huống | Cấp test và kết quả mong đợi | Bằng chứng sau implement |
-| ----- | -------------------- | ---------------------------- | ------------------------ |
+## Dependencies and blockers
 
-Bao gồm từ chối và edge case liên quan. Planned khác passed. Bằng chứng ghi lệnh, revision và môi trường, không chứa secrets.
+Item/migration/quyết định phải có trước; blocker kèm người theo dõi và điều kiện gỡ. Migration đi trước code phụ thuộc
+nó và tách thành task riêng.
 
-## Sẵn sàng bàn giao
+## Ownership: module, data, API
 
-- [ ] Người nhận truy cập được nguồn và revision.
-- [ ] Scope/AC/thiết kế rõ; dependency và điều kiện nguồn được đáp ứng.
-- [ ] Không còn blocker cho phần sẽ implement; plan và spec thống nhất.
-- [ ] Người phụ trách nhận ownership duy trì spec/plan/test design đến hết hạng mục.
+Module/capability sở hữu ([module structure](../../rules/module-structure.md)); bảng đọc/ghi; operation HTTP/CLI thêm hoặc
+đổi; contract phải giữ nguyên. Ghi nếu cần Nest submodule hoặc bounded context mới và điều kiện nào của rule áp dụng.
 
-## Thay đổi và nghiệm thu
+## Behavior and design
 
-Ghi thay đổi thiết kế/nguồn và lý do. Peer review nếu có ghi link và revision như bằng chứng bổ sung. Owner review cuối ghi AC đạt/chưa đạt, người xác nhận, revision, môi trường, PR và giới hạn. Chưa có xác nhận thật thì ghi chưa nghiệm thu.
+Luồng chính, biến thể, từ chối, quyền và ranh giới dữ liệu; API request/response/error (mã ổn định); transaction,
+concurrency, khóa; migration và tương thích ngược; jobs/storage. Phần không áp dụng ghi `không áp dụng` và lý do. Không
+dựng kiến trúc song song; link ERD/ADR nếu cần.
+
+## Test matrix
+
+| AC / rủi ro | Tình huống (gồm từ chối, edge case) | Cấp test | Kết quả mong đợi | Bằng chứng sau implement |
+| ----------- | ----------------------------------- | -------- | ---------------- | ------------------------ |
+
+Planned khác passed. Bằng chứng ghi lệnh, revision và môi trường, không chứa secret hay token.
+
+## Definition of Done
+
+- [ ] Mọi primary AC `full` có test đỏ-trước/xanh-sau ở cấp phù hợp; AC `partial` ghi đúng vế đã làm.
+- [ ] Gate theo [CONTRIBUTING](../../../CONTRIBUTING.md) chạy xanh trên revision cuối; HTTP đổi thì e2e + OpenAPI.
+- [ ] Spec/plan/roadmap phản ánh implementation cuối; contract đổi đã ghi và báo consumer FE.
+- [ ] Không tăng legacy ledger kiến trúc; nếu gỡ được mục nào thì xóa mục đó.
+- [ ] Tài liệu vận hành/runbook bị ảnh hưởng đã cập nhật; phần chưa kiểm chứng ghi rõ.
+
+## Changes and acceptance
+
+Ghi thay đổi thiết kế/nguồn và lý do. Peer review nếu có ghi link và revision. Owner review cuối ghi AC đạt/chưa đạt,
+người xác nhận, revision, môi trường, PR và giới hạn. Chưa có xác nhận thật thì ghi chưa nghiệm thu.

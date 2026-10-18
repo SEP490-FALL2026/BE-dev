@@ -34,5 +34,8 @@ Request-body validation errors are 422 `VALIDATION_ERROR`.
 - Contract sinh từ controller/DTO. Không sửa JSON hoặc generated FE client bằng tay.
 - Nếu thay contract có consumer FE, nêu operation/schema thay đổi và phối hợp regenerate client.
 
-Ví dụ hiện có: [catalog controller](../../src/modules/catalog/catalog.controller.ts).
+Ví dụ hiện có, đã mount và khai báo quyền đúng: [audit controller](../../src/modules/audit/audit.controller.ts)
+(`GET /api/v1/audit-events`, `@RequireRoles('SUPER_ADMIN')` ở class, `operationId`, success/error response) cùng test
+[e2e](../../test/e2e/audit-events.e2e-spec.ts) và [integration](../../test/integration/audit-query-http.integration-spec.ts).
+Catalog **không** mount và không có access declaration — không dùng làm mẫu cho route mới.
 Cách thêm endpoint: [development guide](../guides/kien-truc-backend-va-cach-viet-code.md).

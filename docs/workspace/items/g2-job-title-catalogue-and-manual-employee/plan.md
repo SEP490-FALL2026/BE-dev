@@ -3,7 +3,7 @@
 - [Spec](spec.md); revision đầu vào: Docs `3341ea0`, BE `ab0c43a` (baseline G0/1a/1b `d60d306` + refactor Task 2/2B).
 - Phụ trách: AI theo giao việc Owner (triển khai 16/10/2026). Thiết kế ban đầu bởi: AI theo giao việc Owner (14–15/10/2026).
 - Owner review: chưa review. Peer review: tùy chọn.
-- Triển khai: **verified** (local, 16/10/2026) trên cây làm việc chưa commit, nhánh `Bao_Dev`, nền `e833092`. PR: chưa có. Remote CI chưa chạy.
+- Triển khai: **verified** (local, 16/10/2026) trên cây làm việc chưa commit, nhánh `Bao_Dev`, nền `e833092`. Sau đó commit `4ead859`, vào `dev` qua PR #11 (`eae212a`) — `merged-dev`, chưa review/nghiệm thu; gate trên HEAD `186ad5f` chạy xanh ở [audit 18/10](../../../reviews/be-foundation-audit-2026-10-18/README.md). Remote CI chưa chạy.
 
 ## Trước khi code
 

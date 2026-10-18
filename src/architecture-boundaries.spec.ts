@@ -75,7 +75,8 @@ describe('architecture boundaries', () => {
   const sourceRoot = join(process.cwd(), 'src');
 
   it('keeps core framework-free', () => {
-    const forbidden = ['@nestjs/', '@prisma/', '@aws-sdk/', 'bullmq', '/infrastructure/'];
+    // `/modules/` added 18/10/2026 (docs/rules/module-structure.md): core is pure TypeScript and knows no business module.
+    const forbidden = ['@nestjs/', '@prisma/', '@aws-sdk/', 'bullmq', '/infrastructure/', '/modules/'];
 
     for (const file of listTypeScriptFiles(join(sourceRoot, 'core'))) {
       const source = readFileSync(file, 'utf8').replaceAll('\\', '/');

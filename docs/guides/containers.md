@@ -11,6 +11,8 @@ This is a local development service; review storage support/security separately 
 
 For port conflicts set POSTGRES_PORT, REDIS_PORT, MINIO_PORT and MINIO_CONSOLE_PORT
 in your shell/.env, and align DATABASE_URL/OBJECT_STORAGE_ENDPOINT with those host ports.
+All variable names (application and Compose-only) are listed in [.env.example](../../.env.example), with the variables
+production requires and how to generate secrets; it carries no values and is not a production configuration.
 
 Dockerfile builds the generated Prisma client in Linux, installs dependencies from
 the lockfile and runs the final image as the node user. Secrets, local node_modules

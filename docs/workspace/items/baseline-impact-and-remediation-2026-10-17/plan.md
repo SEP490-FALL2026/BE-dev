@@ -3,6 +3,7 @@
 - [Spec](spec.md); revision đầu vào: BE `eae212a` (`dev`, sạch); Docs `73e7379` + working tree chưa commit = snapshot [`S-2026-10-18`](../../sources.md#snapshot-s-2026-10-18-docs-73e7379--working-tree-chưa-commit).
 - Phụ trách: lượt tài liệu — AI theo giao việc Owner (18/10/2026); R-1, R-2 — chưa phân công. Thiết kế ban đầu bởi: AI theo giao việc Owner.
 - Owner review: chưa review. Peer review: không có.
+- Cập nhật 18/10/2026 (Prompt 02): baseline chạy code là HEAD `186ad5f`, đã chạy cổng xanh trong [audit nền tảng 18/10/2026](../../../reviews/be-foundation-audit-2026-10-18/README.md); nguồn R-1/R-2 pin Docs `9416fe0` (có `QĐ-81`). Bước 1–3 dưới đây thực hiện thành lát H3 của [foundation-remediation-handoff-2026-10-18](../foundation-remediation-handoff-2026-10-18/plan.md) theo Owner Q4; các dòng `eae212a`/`73e7379` ở _Trước khi code_ là lịch sử, superseded.
 - Triển khai: lượt tài liệu xong ở mức local, chưa commit (không commit/push theo giao việc); R-1, R-2 `not-started` (R-2 phần khóa thiết kế `ready`; phần mở khóa chờ đồng bộ có thẩm quyền `US-01-01` AC-7/AC-20 ở Docs). PR: chưa có.
 
 ## Trước khi code

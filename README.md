@@ -23,10 +23,14 @@ Chưa được dev review/nghiệm thu; ADR-0011/0012 vẫn Proposed.
 Cần Node.js 22 hoặc 24, pnpm 11.1.3, Docker Compose.
 
 1. Chạy `pnpm install --frozen-lockfile`.
-2. Kiểm tra port/credentials local. Repo hiện không có `.env.example`; mặc định development nằm ở
-   [env-schema.ts](src/infrastructure/config/env-schema.ts) và khớp [Compose](compose.yaml).
-   Khi cần ghi đè, tạo `.env` local không commit (ví dụ `DATABASE_URL`, `PORT`, `CORS_ORIGINS`).
-   Đổi port PostgreSQL trong Compose thì cập nhật cả `DATABASE_URL`.
+2. Kiểm tra port/credentials local. Mặc định development nằm ở
+   [env-schema.ts](src/infrastructure/config/env-schema.ts) và khớp [Compose](compose.yaml). Khi cần ghi đè, copy
+   [.env.example](.env.example) thành `.env` (không commit), chỉ bỏ comment dòng cần đổi (ví dụ `DATABASE_URL`, `PORT`,
+   `CORS_ORIGINS`). Đổi port PostgreSQL trong Compose thì cập nhật cả `DATABASE_URL`. Secret development mặc định công khai
+   trong source và chỉ dùng cho checkout local cô lập: muốn token local không bị dùng lại ở nơi khác, tạo secret riêng
+   bằng lệnh trong `.env.example`. Copy `.env.example` **chưa** đủ cho production: validator production từ chối thiếu
+   biến `@production-required` và từ chối secret development. Biến đã bỏ (ví dụ `AUTH_COOKIE_SECURE` từ `1336bd5`) bị bỏ
+   qua âm thầm — tự xóa khỏi tệp env của bạn; không có lệnh nào đọc hay sửa tệp env chứa secret.
 3. Chạy `docker compose up -d --wait` để khởi động PostgreSQL, Redis, MinIO.
 4. Với **database mới**, chạy `pnpm db:migrate:deploy`, rồi `pnpm build` để sinh Prisma client và build CLI.
 5. Khởi tạo một lần bằng `pnpm ops:bootstrap --help`, điền tham số theo help và nhập mật khẩu ở terminal.

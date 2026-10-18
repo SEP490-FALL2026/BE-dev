@@ -7,6 +7,11 @@ in the working tree on 16/10/2026, locally verified only and not reviewed.
 Items marked _lead decision_ were chosen on 12/10/2026; the planned pre-merge review
 gate was not completed. AI research, drafting and testing do not constitute developer approval.
 
+_Update 18/10/2026:_ HEAD `186ad5f` (which contains the body-delivery change `1336bd5`) passed `pnpm check`,
+e2e and isolated integration in the [BE foundation audit](../reviews/be-foundation-audit-2026-10-18/README.md). The
+Owner's technical decisions Q1–Q3 of that audit are recorded under decisions 2 and 3 below. This ADR stays
+**Proposed**: the developer review is still **pending**, and the audit and the decisions do not replace it.
+
 Number 0011 is used because 0006 and 0008–0010 still exist in Git history
 (`1e8d0a1`) for the earlier native-identity design; they are not reused.
 
@@ -38,6 +43,15 @@ pnpm 11.1.3 with an explicit `allowBuilds` list, and CI runs
    The database stores only its SHA-256 digest (high entropy, so no slow hash).
    Rotated on every refresh. Presenting a consumed token revokes the whole session,
    writes an audit event and **commits** before the 401 is returned.
+   It is **not** a JWT and is never passed to `jwt.verify`: it is authenticated by its shape, the SHA-256 lookup,
+   row locks and the authoritative session, account, employee, expiry and consumed state in PostgreSQL.
+   PostgreSQL is the only source of truth for sessions and refresh tokens; no raw token is stored, and Redis or any
+   second session store needs its own ADR backed by load, latency or availability measurements. A JWT refresh token
+   is rejected: it does not make a bearer credential safer and it makes revocation, rotation and replay detection
+   harder, while this design still needs durable server state.
+   _Owner decision Q2 (18/10/2026):_ no grace window for concurrent refresh. Web and mobile clients must
+   single-flight refresh; presenting a token that was already consumed is replay and revokes the session, exactly as
+   the code and `auth-concurrency.integration-spec.ts` behave today.
 3. **Refresh token delivery.** _Amended 17/10/2026 at the project lead's request; it replaces the
    earlier `HttpOnly` cookie design, and developer review of the change is still pending._
    `POST /auth/login` and `POST /auth/refresh` return the refresh token in the response body next to the
@@ -48,6 +62,12 @@ pnpm 11.1.3 with an explicit `allowBuilds` list, and CI runs
    exposes it; the token is single-use and rotated, and presenting a spent one revokes the session, which
    bounds the damage but does not remove it. A body without a refresh token is 422 `VALIDATION_ERROR`;
    a malformed or unknown token is 401 `AUTH.SESSION_INVALID`.
+   _Owner decision Q1 (18/10/2026):_ keep body delivery so web and mobile share one contract. The web client keeps
+   the refresh token **in memory** and never in `localStorage`; the FE contract states this, and how a reload that
+   loses the token is handled is a later UX design. Developer review of this decision remains a gate before
+   `accepted`.
+   _Owner decision Q3 (18/10/2026), not implemented:_ login and refresh will add `refreshExpiresAt` in a separate
+   auth/session code change, without changing any TTL; no other field is added without a source or design.
 4. **Logout** is a `@Public()` route authenticated by the refresh token in the body. It returns
    204 for every well-formed request except 503 (database unavailable; the client keeps its token
    and retries) and the global throttler's 429. It revokes only the session owning the presented token

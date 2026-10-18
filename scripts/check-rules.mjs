@@ -50,6 +50,129 @@ function markdownFiles(directory, excluded = new Set()) {
   });
 }
 
+const SPEC_SECTIONS = [
+  'Business outcome',
+  'Primary Story/AC',
+  'Supporting references',
+  'Explicit out of scope',
+  'Dependencies and blockers',
+  'Ownership: module, data, API',
+  'Behavior and design',
+  'Test matrix',
+  'Definition of Done',
+];
+const PLAN_SECTIONS = ['Before coding', 'Tasks', 'Verification and handoff'];
+const TASK_FIELDS = ['Files', 'Depends on', 'Acceptance', 'Verify'];
+const DESIGN_STATUSES = ['not-started', 'draft', 'ready', 'blocked', 'superseded'];
+const IMPLEMENTATION_STATUSES = [
+  'not-started',
+  'in-progress',
+  'verified',
+  'merged-dev',
+  'owner-review',
+  'accepted',
+  'released',
+  'blocked',
+];
+const MAX_PRIMARY_STORIES = 3;
+
+/** Level-2 sections of a Markdown file (outside code fences), keyed by heading text. */
+function sections(text) {
+  const result = new Map();
+  let current;
+  for (const line of prose(text).split('\n')) {
+    const heading = line.match(/^##\s+(.+?)\s*#*$/);
+    if (heading) result.set((current = heading[1]), []);
+    else if (current !== undefined) result.get(current).push(line);
+  }
+  return result;
+}
+
+/** Data rows of the first Markdown table in `lines`, as arrays of trimmed cells. */
+function tableRows(lines) {
+  const rows = lines.filter((line) => /^\s*\|/.test(line)).map((line) => line.trim().replace(/^\||\|$/g, ''));
+  return rows.slice(2).map((row) => row.split('|').map((cell) => cell.trim()));
+}
+
+/**
+ * Work-item gate (docs/workspace/README.md). Every item folder must have spec.md and plan.md and be registered in the
+ * items index. Items NOT in `legacy` must also follow the vertical-slice template: required sections, Docs/BE pins,
+ * known status words, at most MAX_PRIMARY_STORIES primary Stories unless a size exception is written, a coverage of
+ * `full`/`partial`/`n/a` on every primary row, and Files/Depends on/Acceptance/Verify on every plan task. A legacy
+ * entry whose folder no longer exists fails, so the allowlist can only shrink. The gate checks structure; it does not
+ * prove that a spec is right.
+ */
+export function checkWorkItems(root, workItems) {
+  const errors = [];
+  const directory = resolve(root, workItems.directory);
+  if (!existsSync(directory)) return [`Missing work-item directory: ${workItems.directory}`];
+  const legacy = new Set(workItems.legacy ?? []);
+  const items = readdirSync(directory, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name);
+  for (const name of legacy) if (!items.includes(name)) errors.push(`Stale legacy work item (no folder): ${name}`);
+  const index = existsSync(resolve(root, workItems.index)) ? read(resolve(root, workItems.index)) : '';
+  if (!index) errors.push(`Missing work-item index: ${workItems.index}`);
+
+  for (const name of items) {
+    const label = `${workItems.directory}/${name}`;
+    const specPath = resolve(directory, name, 'spec.md');
+    const planPath = resolve(directory, name, 'plan.md');
+    if (!existsSync(specPath) || !existsSync(planPath)) {
+      errors.push(`${label}: needs spec.md and plan.md`);
+      continue;
+    }
+    if (index && !index.includes(`(${name}/spec.md)`)) errors.push(`${label}: not registered in ${workItems.index}`);
+    if (legacy.has(name)) continue;
+
+    const spec = read(specPath);
+    const plan = read(planPath);
+    const specSections = sections(spec);
+    for (const section of SPEC_SECTIONS)
+      if (!specSections.has(section)) errors.push(`${label}/spec.md: missing section "## ${section}"`);
+    const header = prose(spec).split(/\n##\s/)[0];
+    if (!/\bDocs\s+`[0-9a-f]{7,40}`/.test(header)) errors.push(`${label}/spec.md: header must pin Docs \`<sha>\``);
+    if (!/\bBE\s+`[0-9a-f]{7,40}`/.test(header)) errors.push(`${label}/spec.md: header must pin BE \`<sha>\``);
+    const design = header.match(/Thiết kế:\s*`([^`]+)`/);
+    if (!design || !DESIGN_STATUSES.includes(design[1]))
+      errors.push(`${label}/spec.md: "Thiết kế:" must be one of ${DESIGN_STATUSES.join(', ')}`);
+
+    const primary = tableRows(specSections.get('Primary Story/AC') ?? []);
+    if (specSections.has('Primary Story/AC') && primary.length === 0)
+      errors.push(`${label}/spec.md: "## Primary Story/AC" needs a table row (use n/a for a technical enabler)`);
+    for (const row of primary)
+      if (!/^(full|partial|n\/a)$/.test(row[2] ?? ''))
+        errors.push(`${label}/spec.md: primary row "${row[0]}" needs coverage full, partial or n/a in column 3`);
+    const stories = new Set(primary.flatMap((row) => row[0].match(/US-\d{2}-\d{2}/g) ?? []));
+    if (stories.size > MAX_PRIMARY_STORIES && !specSections.has('Size exception'))
+      errors.push(
+        `${label}/spec.md: ${stories.size} primary Stories; at most ${MAX_PRIMARY_STORIES} without "## Size exception"`,
+      );
+
+    const planSections = sections(plan);
+    for (const section of PLAN_SECTIONS)
+      if (!planSections.has(section)) errors.push(`${label}/plan.md: missing section "## ${section}"`);
+    const implementation = prose(plan).match(/Triển khai:\s*`([^`]+)`/);
+    if (!implementation || !IMPLEMENTATION_STATUSES.includes(implementation[1]))
+      errors.push(`${label}/plan.md: "Triển khai:" must be one of ${IMPLEMENTATION_STATUSES.join(', ')}`);
+    // Only `### Task …` blocks are tasks; `### Checkpoint` and other notes under "## Tasks" are not.
+    const tasks = (planSections.get('Tasks') ?? [])
+      .join('\n')
+      .split(/^###\s+/m)
+      .slice(1)
+      .filter((block) => /^Task\b/i.test(block));
+    if (planSections.has('Tasks') && tasks.length === 0)
+      errors.push(`${label}/plan.md: "## Tasks" needs at least one "### Task" block`);
+    for (const task of tasks) {
+      const title = task.split('\n')[0].trim();
+      for (const field of TASK_FIELDS)
+        if (!new RegExp(`^\\s*-\\s+${field}:\\s*\\S`, 'm').test(task))
+          errors.push(`${label}/plan.md: task "${title}" needs "- ${field}:"`);
+    }
+  }
+  return errors;
+}
+
 export function checkRepository(root, config, strict = false) {
   root = resolve(root);
   const errors = [];
@@ -140,6 +263,7 @@ export function checkRepository(root, config, strict = false) {
   for (const [from, to] of config.requiredEdges) {
     if (!graph.get(resolve(root, from))?.has(resolve(root, to))) errors.push(`Missing workflow edge: ${from} -> ${to}`);
   }
+  if (config.workItems) errors.push(...checkWorkItems(root, config.workItems));
   return { errors, unavailable: [...unavailable], files: files.length, links };
 }
 

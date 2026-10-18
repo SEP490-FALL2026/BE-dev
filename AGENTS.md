@@ -12,14 +12,16 @@ Scope: this backend repository. Work from its root with the pnpm version in `pac
   grants) is implemented as slice 1b and verified locally at `d60d306`; final acceptance is pending.
   Slice 1c adds forgot/reset password (`POST /auth/password-reset-requests`, `/auth/password-resets`) and
   change password (`POST /me/password`), the Super Admin's Audit Trail query (`GET /audit-events`), and the IT
-  Admin's job title catalogue and manual employee entry (`/job-titles`, `POST /employees`). G1/G2 are complete
-  and on `dev` (commit `4ead859`, merged by PR #11 at `eae212a`; verified locally on the pre-commit tree, gates
-  not re-run on `eae212a`, not reviewed or accepted): Cost Center catalogue, department profile with head periods and the derived Manager
-  role, spending-approver roles, operating parameters, CSV employee import (preview then confirm), the
-  onboarding checklist (step 1), Super Admin transfer (`POST /super-admin-transfers`) and the out-of-HTTP
-  recovery command (`pnpm ops:recover --help`). What each slice leaves to G3–G6 is listed in its spec; changes
-  required by the business baseline after those specs (decisions up to `QĐ-80`) are forward remediation in
-  `docs/workspace/items/baseline-impact-and-remediation-2026-10-17/`, not yet implemented.
+  Admin's job title catalogue and manual employee entry (`/job-titles`, `POST /employees`). The G1/G2 slices are
+  merged to `dev` (commit `4ead859`, PR #11 at `eae212a`; refresh token moved to the body in `1336bd5`); gates
+  passed on HEAD `186ad5f` in the [foundation audit](docs/reviews/be-foundation-audit-2026-10-18/README.md). They
+  are not reviewed or accepted, and several Stories are only partly covered — the exact AC per slice is in
+  [docs/roadmap.md](docs/roadmap.md). Merged slices: Cost Center catalogue, department profile with head periods and
+  the derived Manager role, spending-approver roles, operating parameters, CSV employee import (preview then
+  confirm), the onboarding checklist (step 1), Super Admin transfer (`POST /super-admin-transfers`) and the
+  out-of-HTTP recovery command (`pnpm ops:recover --help`). What each slice leaves to G3–G6 is listed in its spec.
+  Changes required by the business baseline up to `QĐ-81` (R-1, R-2) and the foundation refactors are planned in
+  `docs/workspace/items/foundation-remediation-handoff-2026-10-18/`; none is implemented.
   Catalog is a structural sample and is not mounted.
   All other US workflows are not implemented.
 
@@ -28,6 +30,7 @@ Scope: this backend repository. Work from its root with the pnpm version in `pac
 | Task                                         | Reference                                                                                                        |
 | -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
 | Add an endpoint                              | [Development guide](docs/guides/kien-truc-backend-va-cach-viet-code.md), [API rules](docs/rules/api-contract.md) |
+| Add/move a file, capability folder or error  | [Module structure rules](docs/rules/module-structure.md)                                                         |
 | Model, query, transaction, business behavior | [Database rules](docs/rules/database-business.md)                                                                |
 | Authentication, files, jobs                  | [Security rules](docs/rules/security-jobs.md)                                                                    |
 | Add or change a script                       | [Script guide](scripts/README.md)                                                                                |
@@ -36,9 +39,10 @@ Scope: this backend repository. Work from its root with the pnpm version in `pac
 
 ## Repository constraints
 
-- Default to flat feature modules. A module with several distinct capabilities may group files by capability,
-  with at most two directory levels, as documented in `ARCHITECTURE.md`. Controllers map HTTP; services
-  coordinate; `*.repo.ts` owns persistence.
+- Default to flat feature modules; group by capability once a module root passes 2 controllers or 12 files, with
+  at most two directory levels. A capability folder is not automatically a Nest module. Controllers map HTTP;
+  services coordinate; `*.repo.ts` owns persistence; business errors live with their capability, never in a global
+  errors folder. Details and the enforced gates: [module structure](docs/rules/module-structure.md).
 - Cross-module calls use exported facades/contracts; never import another module's private files or query its tables.
 - Keep framework-free primitives in `src/core`; technical adapters in `src/infrastructure`.
 - Generated `src/generated/`, `dist/` and `openapi.json` change through their generators.

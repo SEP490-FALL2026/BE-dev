@@ -4,6 +4,7 @@
 - Thiết kế ban đầu bởi: AI theo giao việc Owner (16/10/2026). Hạng mục `g2-employee-import-preview-confirm` của bảng phủ G2; khung import dùng chung (`US-02-01`) được dựng lần đầu ở đây cho file nhân sự.
 - Thiết kế: ready. Triển khai: **verified** local 16/10/2026 (cây làm việc chưa commit trên `e833092`; xem [plan](plan.md)). Owner review: chưa review.
 - Nguồn: Docs commit `3341ea0` ([sources](../../sources.md)). `US-02-01` AC-1 → AC-10; `US-02-02` AC-1, AC-2, AC-4 (phần báo cáo), AC-6 → AC-13, AC-15; `US-02-03` AC-1 → AC-6; `US-02-07` AC-7 (vế import), AC-12 (`BE-UserStory/src/EP-02.md`); BRD v3.39 `FR-7.1` → `FR-7.6`, `FR-9.2`, `FR-9.3`, `FR-9.7`, `FR-2.1`, `FR-2.2`, `FR-8.6`; `QĐ-40b`, `QĐ-48d`, `QĐ-52a`, `QĐ-66ak`, `QĐ-66c`, `QĐ-68d`, `QĐ-70c`.
+- _Đính chính 18/10/2026 ([audit nền tảng](../../../reviews/be-foundation-audit-2026-10-18/README.md)):_ AC đã giao — căn cứ là bảng nghiệm thu bên dưới: `US-02-01` AC-1 → AC-4, AC-6 → AC-10 (AC-5 ngoài lát — G7/G9); `US-02-02` AC-1, AC-2, AC-6 → AC-13, AC-15 (AC-4 vế liên kết seat chờ G4); `US-02-03` AC-1, AC-4 → AC-6 (AC-2, AC-3 chưa có hàng nghiệm thu); `US-02-07` AC-7 (vế import), AC-12 — chỉ CSV.
 - Trạng thái yêu cầu: các Story `BASELINED` (`QĐ-72`). `OQ-A-07` (bộ cột), `OQ-A-08` (cột cũ) không chặn, được chọn mặc định ở mục _Làm rõ_.
 - [Kế hoạch](plan.md).
 

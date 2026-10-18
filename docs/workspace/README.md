@@ -22,6 +22,31 @@ Nếu nguồn mâu thuẫn hoặc cần đổi nghiệp vụ, người phụ tr�
 - research/: hướng dẫn nghiên cứu; kết quả theo hạng mục đặt cạnh spec.
 - [Roadmap](../roadmap.md): thứ tự dự kiến, phụ thuộc và tiến độ hạng mục.
 
+## Chia hạng mục theo vertical slice
+
+Quy tắc bắt buộc cho hạng mục mới (nguồn: [audit nền tảng 18/10/2026](../reviews/be-foundation-audit-2026-10-18/README.md)):
+
+- **G0–G10 là planning container**, không phải phạm vi mặc định của một spec/plan hay một PR. Không tạo spec "toàn bộ
+  G5/G7/G8"; mỗi nhóm được chia thành nhiều hạng mục.
+- **Một hạng mục = một business outcome / vertical slice**, mục tiêu **1–3 primary Story**. Nhiều hơn chỉ khi cùng
+  outcome và cùng transaction boundary, ghi ở `## Size exception` với lý do và người chấp nhận.
+- Tách **`Primary Story/AC`** (đã giao, mỗi dòng `full`/`partial`/`n/a`) khỏi **`Supporting references`** (chỉ truy
+  vết, không tính là đã implement) và **`Explicit out of scope`**. AC `partial` ghi vế đã làm và nơi làm phần còn lại;
+  không ghi Story hoàn thành khi còn AC `partial`. Roadmap và items index chép đúng bảng Primary của spec.
+- Spec ghi dependency/blocker, ownership module/data/API, transaction/concurrency/migration/tương thích khi áp dụng,
+  test matrix theo AC (gồm từ chối và edge case) và Definition of Done.
+- Mỗi task của plan có `Files`, `Depends on`, `Acceptance`, `Verify`. Task chạm quá nhiều file/subsystem hoặc có nhiều
+  outcome thì tách. Refactor tách khỏi thay đổi hành vi; migration là task riêng đi trước code phụ thuộc nó. Mỗi lát để
+  hệ thống build/test được và có checkpoint.
+- Implementation làm rõ hoặc đổi contract ⟹ cập nhật spec/plan trong cùng thay đổi; lịch sử giữ bằng Git và nhãn
+  _superseded_, không xóa bằng chứng.
+- Header spec pin Docs `<sha>` và BE `<sha>`; trạng thái chỉ dùng từ vựng của [roadmap](../roadmap.md#trạng-thái).
+
+`pnpm rules:check` enforce phần cấu trúc (mục bắt buộc, pin, từ trạng thái, cột `Coverage`, số primary Story, trường
+task, đăng ký ở items index); nó **không** chứng minh nội dung nghiệp vụ đúng. 16 hạng mục có trước 18/10/2026 nằm trong
+danh sách `legacy` của `rules-check.config.json`: chỉ bị kiểm đăng ký, **không** sửa hàng loạt cho khớp mẫu và không coi
+là đã review lại. Hạng mục legacy được chạm lớn thì chuyển sang mẫu mới và xóa khỏi danh sách; danh sách chỉ co lại.
+
 ## Quy trình
 
 1. Chọn lát US/AC hoặc technical enabler; kiểm tra roadmap tránh trùng, ghi người phụ trách và người thiết kế ban đầu. Hai vai có thể cùng một người.

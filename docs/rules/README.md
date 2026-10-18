@@ -5,6 +5,7 @@ Workflow chung ở [CONTRIBUTING](../../CONTRIBUTING.md), cấu trúc source ở
 
 | Thay đổi                              | Quy ước                                   |
 | ------------------------------------- | ----------------------------------------- |
+| Thêm/di chuyển file, capability, lỗi  | [Module structure](module-structure.md)   |
 | Controller, DTO, OpenAPI              | [API contract](api-contract.md)           |
 | Query, schema, transaction, nghiệp vụ | [Database/business](database-business.md) |
 | Auth, file, job                       | [Security/jobs](security-jobs.md)         |

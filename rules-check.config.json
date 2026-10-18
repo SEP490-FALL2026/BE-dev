@@ -33,6 +33,28 @@
       [".cursor/rules/database.mdc", "docs/rules/database-business.md"]
     ],
     "directories": ["docs/workspace"],
-    "excludeDirectories": ["docs/workspace/local"]
+    "excludeDirectories": ["docs/workspace/local"],
+    "workItems": {
+      "directory": "docs/workspace/items",
+      "index": "docs/workspace/items/README.md",
+      "legacy": [
+        "baseline-impact-and-remediation-2026-10-17",
+        "dynamic-content-translation",
+        "foundation-org-identity-boundary",
+        "g0-g1-remediation-after-rereview",
+        "g2-approval-roles",
+        "g2-cost-center-catalogue",
+        "g2-department-profile",
+        "g2-employee-import-preview-confirm",
+        "g2-job-title-catalogue-and-manual-employee",
+        "g2-onboarding-checklist",
+        "g2-operating-parameters",
+        "us-01-09-super-admin-transfer-recovery",
+        "us-01-account-invitation-activation",
+        "us-01-audit-trail-query",
+        "us-01-bootstrap-login-session",
+        "us-01-password-self-service"
+      ]
+    }
   }
 ]
