@@ -1,6 +1,10 @@
 import { Body, Controller, Get, HttpStatus, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import { ApiErrorResponses } from '../../infrastructure/http/decorators/api-error-responses.decorator';
+import {
+  ApiErrorResponses,
+  GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
+  UNAUTHENTICATED_RESPONSE,
+} from '../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../infrastructure/http/decorators/api-success-response.decorator';
 import { RequireRoles } from '../../infrastructure/security/decorators/access.decorators';
 import { CurrentPrincipal } from '../../infrastructure/security/models/current-principal';
@@ -17,13 +21,9 @@ import { toOrganizationApiException } from './organization.http-errors';
 import { JobTitleRecord } from './organization.types';
 
 const COMMON_ERRORS = [
-  { status: HttpStatus.UNAUTHORIZED, description: 'Authentication is required or the token is no longer valid.' },
+  UNAUTHENTICATED_RESPONSE,
   { status: HttpStatus.FORBIDDEN, description: 'Only an IT Admin may maintain the job title catalogue.' },
-  {
-    status: HttpStatus.SERVICE_UNAVAILABLE,
-    description:
-      'Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).',
-  },
+  GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
 ] as const;
 
 const VALIDATION_ERROR = {
@@ -55,7 +55,7 @@ export class JobTitlesController {
   constructor(private readonly titles: JobTitleService) {}
 
   @Get()
-  @ApiOperation({ operationId: 'jobTitleList' })
+  @ApiOperation({ operationId: 'jobTitleList', summary: 'List job titles' })
   @ApiSuccessResponse(JobTitlePageResponseDto, {
     message: 'JOB_TITLE.LISTED',
     description: 'A page of job titles in name order, optionally by status or a literal search of the name.',
@@ -72,7 +72,7 @@ export class JobTitlesController {
   }
 
   @Post()
-  @ApiOperation({ operationId: 'jobTitleCreate' })
+  @ApiOperation({ operationId: 'jobTitleCreate', summary: 'Add a job title' })
   @ApiSuccessResponse(JobTitleResponseDto, {
     status: HttpStatus.CREATED,
     message: 'JOB_TITLE.CREATED',
@@ -92,7 +92,7 @@ export class JobTitlesController {
   }
 
   @Patch(':id')
-  @ApiOperation({ operationId: 'jobTitleRename' })
+  @ApiOperation({ operationId: 'jobTitleRename', summary: 'Rename a job title' })
   @ApiSuccessResponse(JobTitleResponseDto, {
     message: 'JOB_TITLE.RENAMED',
     description: 'The title has its new name; everyone who holds it keeps it.',
@@ -114,10 +114,11 @@ export class JobTitlesController {
   }
 
   @Post(':id/deactivate')
-  @ApiOperation({ operationId: 'jobTitleDeactivate' })
+  @ApiOperation({ operationId: 'jobTitleDeactivate', summary: 'Stop using a job title' })
   @ApiSuccessResponse(JobTitleResponseDto, {
     message: 'JOB_TITLE.DEACTIVATED',
-    description: 'The title is inactive; nobody who holds it loses it. Already inactive ⟹ the same answer.',
+    description:
+      'The title is inactive; nobody who holds it loses it. If it is already inactive, the answer is the same.',
   })
   @ApiErrorResponses(...COMMON_ERRORS, VALIDATION_ERROR, NOT_FOUND)
   async deactivate(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: JobTitleIdParamDto) {
@@ -129,10 +130,10 @@ export class JobTitlesController {
   }
 
   @Post(':id/reactivate')
-  @ApiOperation({ operationId: 'jobTitleReactivate' })
+  @ApiOperation({ operationId: 'jobTitleReactivate', summary: 'Use a job title again' })
   @ApiSuccessResponse(JobTitleResponseDto, {
     message: 'JOB_TITLE.REACTIVATED',
-    description: 'The title is active again. Already active ⟹ the same answer.',
+    description: 'The title is active again. If it is already active, the answer is the same.',
   })
   @ApiErrorResponses(...COMMON_ERRORS, VALIDATION_ERROR, NOT_FOUND)
   async reactivate(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: JobTitleIdParamDto) {

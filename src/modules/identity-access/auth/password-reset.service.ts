@@ -86,6 +86,8 @@ export class PasswordResetService {
       const account = await this.accounts.readAccount(tx, found.id);
       const employee = account ? await this.organization.getEmployee(account.employeeId, tx) : null;
       if (!account || !canReceiveResetMail(account, employee) || !employee) return;
+      // An operator's credential reset is waiting (US-01-10 AC-10): its link stays the only one, and nothing is sent.
+      if (await this.recoveries.hasWaitingCredentialReset(tx, account.organizationId, account.id)) return;
 
       const now = new Date();
       const issuedLastHour = await this.accounts.countTokensSince(

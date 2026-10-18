@@ -1,6 +1,10 @@
 import { Body, Controller, Get, HttpStatus, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import { ApiErrorResponses } from '../../infrastructure/http/decorators/api-error-responses.decorator';
+import {
+  ApiErrorResponses,
+  GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
+  UNAUTHENTICATED_RESPONSE,
+} from '../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../infrastructure/http/decorators/api-success-response.decorator';
 import { RequireRoles } from '../../infrastructure/security/decorators/access.decorators';
 import { CurrentPrincipal } from '../../infrastructure/security/models/current-principal';
@@ -18,16 +22,12 @@ import { toOrganizationApiException } from './organization.http-errors';
 import { ProjectService } from './project.service';
 
 const AUTH_ERRORS = [
-  { status: HttpStatus.UNAUTHORIZED, description: 'Authentication is required or the token is no longer valid.' },
+  UNAUTHENTICATED_RESPONSE,
   {
     status: HttpStatus.FORBIDDEN,
     description: 'Only an IT Admin keeps the projects described on department profiles.',
   },
-  {
-    status: HttpStatus.SERVICE_UNAVAILABLE,
-    description:
-      'Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).',
-  },
+  GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
 ] as const;
 const VALIDATION_ERROR = {
   status: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -45,7 +45,7 @@ export class ProjectsController {
 
   @Get()
   @RequireRoles('IT_ADMIN')
-  @ApiOperation({ operationId: 'projectList' })
+  @ApiOperation({ operationId: 'projectList', summary: 'List projects' })
   @ApiSuccessResponse(ProjectListResponseDto, {
     message: 'PROJECT.LISTED',
     description: 'The projects, optionally those a department takes part in.',
@@ -61,7 +61,7 @@ export class ProjectsController {
 
   @Post()
   @RequireRoles('IT_ADMIN')
-  @ApiOperation({ operationId: 'projectCreate' })
+  @ApiOperation({ operationId: 'projectCreate', summary: 'Add a project to a department profile' })
   @ApiSuccessResponse(ProjectResponseDto, {
     status: HttpStatus.CREATED,
     message: 'PROJECT.CREATED',
@@ -78,7 +78,7 @@ export class ProjectsController {
 
   @Patch(':id')
   @RequireRoles('IT_ADMIN')
-  @ApiOperation({ operationId: 'projectUpdate' })
+  @ApiOperation({ operationId: 'projectUpdate', summary: 'Update a project' })
   @ApiSuccessResponse(ProjectResponseDto, {
     message: 'PROJECT.UPDATED',
     description: 'The project has its new description, status or departments.',

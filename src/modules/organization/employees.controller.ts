@@ -1,6 +1,10 @@
 import { Body, Controller, HttpStatus, Post } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import { ApiErrorResponses } from '../../infrastructure/http/decorators/api-error-responses.decorator';
+import {
+  ApiErrorResponses,
+  GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
+  UNAUTHENTICATED_RESPONSE,
+} from '../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../infrastructure/http/decorators/api-success-response.decorator';
 import { RequireRoles } from '../../infrastructure/security/decorators/access.decorators';
 import { CurrentPrincipal } from '../../infrastructure/security/models/current-principal';
@@ -20,7 +24,7 @@ export class EmployeesController {
   constructor(private readonly employees: EmployeeManualService) {}
 
   @Post()
-  @ApiOperation({ operationId: 'employeeCreate' })
+  @ApiOperation({ operationId: 'employeeCreate', summary: 'Enter one employee by hand' })
   @ApiSuccessResponse(EmployeeResponseDto, {
     status: HttpStatus.CREATED,
     message: 'EMPLOYEE.CREATED',
@@ -28,18 +32,14 @@ export class EmployeesController {
       'The employee and their placement were created. No account, role, invitation or mail is created. The person is a member of the department from the day they are recorded.',
   })
   @ApiErrorResponses(
-    { status: HttpStatus.UNAUTHORIZED, description: 'Authentication is required or the token is no longer valid.' },
+    UNAUTHENTICATED_RESPONSE,
     { status: HttpStatus.FORBIDDEN, description: 'Only an IT Admin may enter people.' },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
         'The body is malformed (VALIDATION_ERROR), or the row cannot become an employee (EMPLOYEE.ROW_INVALID; details.reasons lists every field and code).',
     },
-    {
-      status: HttpStatus.SERVICE_UNAVAILABLE,
-      description:
-        'Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).',
-    },
+    GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   )
   async create(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: CreateEmployeeBodyDto) {
     try {

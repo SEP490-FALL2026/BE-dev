@@ -3,8 +3,9 @@
 - [Spec](spec.md); revision đầu vào: Docs `9416fe0`, BE `186ad5f`.
 - Phụ trách: AI theo giao việc Owner (lập kế hoạch). Thiết kế ban đầu bởi: AI theo giao việc Owner.
 - Owner review: chưa review. Peer review: tùy chọn; ADR-0011 cần dev review trước `accepted` của H1.
-- Triển khai: `not-started`. PR: chưa có. Hạng mục chỉ lập kế hoạch; mỗi task dưới đây tạo **một** hạng mục mới, không
-  viết code.
+- Triển khai: `in-progress` (cập nhật 18/10/2026; lúc lập là `not-started`): Task 1–6 đã tạo H1, H2a, H2b, H3a,
+  H3b, H3c — trạng thái từng lát ở [roadmap](../../../roadmap.md#hạng-mục); Task 7 trở đi `not-started`. PR: chưa có. Hạng mục chỉ
+  lập kế hoạch; mỗi task dưới đây tạo **một** hạng mục mới, không viết code.
 
 ## Before coding
 
@@ -45,6 +46,8 @@ song được.
 
 ### Task 4: hạng mục H3a — R-1 bỏ `sharedAccounts`
 
+_18/10/2026:_ đã tạo [h3a-r1-department-in-use-details](../h3a-r1-department-in-use-details/spec.md); implement `verified` local, chưa commit.
+
 - Files: `docs/workspace/items/h3a-r1-department-in-use-details/{spec,plan}.md`, roadmap, items index.
 - Depends on: Prompt 02 xong (Q4); có thể song song với Task 1–3 vì khác module.
 - Acceptance: primary `US-03-06` AC-19 (vế bỏ tài khoản dùng chung, `QĐ-75`) `partial`/`full` đúng theo bảng; contract
@@ -53,6 +56,9 @@ song được.
 
 ### Task 5: hạng mục H3b — R-2 lý do khóa và mở khóa
 
+_18/10/2026:_ đã tạo [h3b-r2-lock-unlock-reason](../h3b-r2-lock-unlock-reason/spec.md); implement `verified` local, chưa
+commit. Quyết định migration: không (lý do nằm trong JSON Audit Trail).
+
 - Files: `docs/workspace/items/h3b-r2-lock-unlock-reason/{spec,plan}.md`, roadmap, items index.
 - Depends on: Prompt 02 xong (Q4); trước Task 7 (refactor `organization`) theo Q4.
 - Acceptance: primary `US-01-01` AC-6, AC-7, AC-20 theo `QĐ-81` (Docs `9416fe0`); body bắt buộc lý do, 422 khi thiếu,
@@ -60,6 +66,10 @@ song được.
 - Verify: `pnpm rules:check` → 0 lỗi.
 
 ### Task 6: hạng mục H3c — bằng chứng `US-01-10` AC-10
+
+_18/10/2026:_ đã tạo [h3c-forgot-password-during-recovery](../h3c-forgot-password-during-recovery/spec.md); test viết trước
+**đỏ** (yêu cầu quên mật khẩu thu hồi liên kết khôi phục và gửi thư mới), nên sửa: kiểm ticket `RESET_CREDENTIALS` đang chờ
+trong giao dịch quên mật khẩu; `verified` local, chưa commit; claim ở `us-01-09` cập nhật; OpenAPI không đổi.
 
 - Files: `docs/workspace/items/h3c-forgot-password-during-recovery/{spec,plan}.md`, roadmap, items index.
 - Depends on: Prompt 02 xong.

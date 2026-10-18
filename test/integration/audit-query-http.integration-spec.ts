@@ -144,7 +144,11 @@ describe('Audit Trail query over HTTP (integration, real PostgreSQL)', () => {
   describe('what the real workflows wrote', () => {
     it('lists them newest first with every field, attributed to the Super Admin', async () => {
       const account = await newAccount(['IT_ADMIN']);
-      await request(server()).post(`/api/v1/app-users/${account.id}/lock`).set(asAdmin()).expect(200);
+      await request(server())
+        .post(`/api/v1/app-users/${account.id}/lock`)
+        .set(asAdmin())
+        .send({ reason: 'Incident SEC-7: contain the account' })
+        .expect(200);
 
       const page = await pageOf(`?resourceType=AppUser&resourceId=${account.id}`);
 
@@ -179,13 +183,17 @@ describe('Audit Trail query over HTTP (integration, real PostgreSQL)', () => {
         actorAppUserId: seed.superAdmin.appUserId,
         actorRoles: ['SUPER_ADMIN'],
         before: { status: 'ACTIVE' },
-        after: { status: 'LOCKED' },
+        after: { status: 'LOCKED', reason: 'Incident SEC-7: contain the account' },
       });
     });
 
     it('answers the same set as the database, whichever filter is used', async () => {
       const lockedAccount = await newAccount(['IT_ADMIN']);
-      await request(server()).post(`/api/v1/app-users/${lockedAccount.id}/lock`).set(asAdmin()).expect(200);
+      await request(server())
+        .post(`/api/v1/app-users/${lockedAccount.id}/lock`)
+        .set(asAdmin())
+        .send({ reason: 'Locked to compare the filters' })
+        .expect(200);
 
       const byActor = await pageOf(`?actorAppUserId=${seed.superAdmin.appUserId}&pageSize=100`);
       const byAction = await pageOf('?action=APP_USER.LOCKED&pageSize=100');
@@ -326,7 +334,11 @@ describe('Audit Trail query over HTTP (integration, real PostgreSQL)', () => {
       const account = await newAccount(['IT_ADMIN']);
       await list('', { Authorization: `Bearer ${account.token}` }).expect(403);
 
-      await request(server()).post(`/api/v1/app-users/${account.id}/lock`).set(asAdmin()).expect(200);
+      await request(server())
+        .post(`/api/v1/app-users/${account.id}/lock`)
+        .set(asAdmin())
+        .send({ reason: 'Locked to end the session' })
+        .expect(200);
 
       const response = await list('', { Authorization: `Bearer ${account.token}` }).expect(401);
       expect(bodyOf(response).error.code).toBe('INVALID_ACCESS_TOKEN');

@@ -156,7 +156,11 @@ describe('handing the Super Admin role to a successor over HTTP (integration, re
 
     it('(b) refuses an account that is locked', async () => {
       const locked = await successor();
-      await request(server()).post(`/api/v1/app-users/${locked.appUserId}/lock`).set(as(admin)).expect(200);
+      await request(server())
+        .post(`/api/v1/app-users/${locked.appUserId}/lock`)
+        .set(as(admin))
+        .send({ reason: 'A locked account cannot take the Super Admin role' })
+        .expect(200);
 
       await expectRefused(admin, locked.appUserId, 422, 'SUPER_ADMIN_TRANSFER.ACCOUNT_LOCKED');
     });

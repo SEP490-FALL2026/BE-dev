@@ -35,6 +35,12 @@ báo qua thư tới email đang lưu, và không làm tài khoản khóa hoặc 
 
 Không claim hoàn thành `US-01-10`: còn AC-10, AC-11.
 
+_Ghi chú 18/10/2026:_ AC-10 được làm ở lát [H3c](../h3c-forgot-password-during-recovery/spec.md), không phải
+`us-01-09` như bảng trên ghi lúc thiết kế: `performRequest` của lát này nay bỏ qua (giao dịch không ghi gì) khi tài khoản có
+ticket khôi phục `RESET_CREDENTIALS` đang chờ; phản hồi chung, giới hạn mỗi giờ và các ca khác giữ nguyên. `verified`
+local, chưa commit — bằng chứng ở [plan H3c](../h3c-forgot-password-during-recovery/plan.md#verification-and-handoff). AC-11
+vẫn thuộc G10.
+
 ## Làm rõ yêu cầu
 
 | Câu hỏi / mâu thuẫn                                                          | Kết luận                                                                                                                                            | Nguồn / loại                                 |

@@ -42,7 +42,8 @@ export class AccountStatusService {
 
   // --- lock and unlock --------------------------------------------------------------
 
-  async lock(actor: AuthenticatedPrincipal, appUserId: string): Promise<void> {
+  /** `reason` is the trimmed reason or authority reference the request carried; it is stored only when the state changes. */
+  async lock(actor: AuthenticatedPrincipal, appUserId: string, reason: string): Promise<void> {
     if (isSelfChange(actor.appUserId, appUserId)) throw new SelfChangeForbiddenError();
 
     await this.runner.run(async (tx) => {
@@ -65,13 +66,13 @@ export class AccountStatusService {
           'APP_USER.LOCKED',
           appUserId,
           { status: 'ACTIVE' },
-          { status: 'LOCKED', sessionsRevoked: sessions, invitationsRevoked: usable.length },
+          { status: 'LOCKED', sessionsRevoked: sessions, invitationsRevoked: usable.length, reason },
         ),
       );
     });
   }
 
-  async unlock(actor: AuthenticatedPrincipal, appUserId: string): Promise<void> {
+  async unlock(actor: AuthenticatedPrincipal, appUserId: string, reason: string): Promise<void> {
     if (isSelfChange(actor.appUserId, appUserId)) throw new SelfChangeForbiddenError();
 
     await this.runner.run(async (tx) => {
@@ -88,7 +89,7 @@ export class AccountStatusService {
           'APP_USER.UNLOCKED',
           appUserId,
           { status: 'LOCKED' },
-          { status: 'ACTIVE' },
+          { status: 'ACTIVE', reason },
         ),
       );
     });

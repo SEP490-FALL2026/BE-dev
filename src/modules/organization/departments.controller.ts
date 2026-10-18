@@ -1,6 +1,10 @@
 import { Body, Controller, Get, HttpStatus, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import { ApiErrorResponses } from '../../infrastructure/http/decorators/api-error-responses.decorator';
+import {
+  ApiErrorResponses,
+  GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
+  UNAUTHENTICATED_RESPONSE,
+} from '../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../infrastructure/http/decorators/api-success-response.decorator';
 import { RequireRoles } from '../../infrastructure/security/decorators/access.decorators';
 import { CurrentPrincipal } from '../../infrastructure/security/models/current-principal';
@@ -21,18 +25,11 @@ import {
 } from './dto/department.dto';
 import { toOrganizationApiException } from './organization.http-errors';
 
-const AUTH_ERRORS = [
-  { status: HttpStatus.UNAUTHORIZED, description: 'Authentication is required or the token is no longer valid.' },
-  {
-    status: HttpStatus.SERVICE_UNAVAILABLE,
-    description:
-      'Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).',
-  },
-] as const;
+const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPONSE] as const;
 
 const IT_ONLY = {
   status: HttpStatus.FORBIDDEN,
-  description: 'Only an IT Admin changes department data (US-03-06 AC-16).',
+  description: 'Only an IT Admin changes department data.',
 } as const;
 const VALIDATION_ERROR = {
   status: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -95,7 +92,7 @@ export class DepartmentsController {
 
   @Get('departments')
   @RequireRoles('IT_ADMIN')
-  @ApiOperation({ operationId: 'departmentList' })
+  @ApiOperation({ operationId: 'departmentList', summary: 'List departments' })
   @ApiSuccessResponse(DepartmentPageResponseDto, {
     message: 'DEPARTMENT.LISTED',
     description: 'A page of departments in code order, each with its head today, its people count and its warnings.',
@@ -113,7 +110,7 @@ export class DepartmentsController {
 
   @Post('departments')
   @RequireRoles('IT_ADMIN')
-  @ApiOperation({ operationId: 'departmentCreate' })
+  @ApiOperation({ operationId: 'departmentCreate', summary: 'Create a department' })
   @ApiSuccessResponse(DepartmentResponseDto, {
     status: HttpStatus.CREATED,
     message: 'DEPARTMENT.CREATED',
@@ -143,7 +140,7 @@ export class DepartmentsController {
 
   @Get('departments/:id')
   @RequireRoles('IT_ADMIN', 'MANAGER')
-  @ApiOperation({ operationId: 'departmentGet' })
+  @ApiOperation({ operationId: 'departmentGet', summary: 'Get a department profile' })
   @ApiSuccessResponse(DepartmentResponseDto, {
     message: 'DEPARTMENT.FETCHED',
     description:
@@ -164,7 +161,7 @@ export class DepartmentsController {
 
   @Patch('departments/:id')
   @RequireRoles('IT_ADMIN')
-  @ApiOperation({ operationId: 'departmentUpdate' })
+  @ApiOperation({ operationId: 'departmentUpdate', summary: 'Update a department profile' })
   @ApiSuccessResponse(DepartmentResponseDto, {
     message: 'DEPARTMENT.UPDATED',
     description: 'The name, the description or the IT Admin in charge changed. The Cost Center and the people do not.',
@@ -190,10 +187,11 @@ export class DepartmentsController {
 
   @Post('departments/:id/deactivate')
   @RequireRoles('IT_ADMIN')
-  @ApiOperation({ operationId: 'departmentDeactivate' })
+  @ApiOperation({ operationId: 'departmentDeactivate', summary: 'Retire a department' })
   @ApiSuccessResponse(DepartmentResponseDto, {
     message: 'DEPARTMENT.DEACTIVATED',
-    description: 'The department is retired: it takes no new member or head. Already retired ⟹ the same answer.',
+    description:
+      'The department is retired: it takes no new member or head. If it is already retired, the answer is the same.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, VALIDATION_ERROR, NOT_FOUND, {
     status: HttpStatus.CONFLICT,
@@ -209,7 +207,7 @@ export class DepartmentsController {
 
   @Post('departments/:id/head-assignments')
   @RequireRoles('IT_ADMIN')
-  @ApiOperation({ operationId: 'departmentHeadAssign' })
+  @ApiOperation({ operationId: 'departmentHeadAssign', summary: 'Name the head of a department' })
   @ApiSuccessResponse(DepartmentResponseDto, {
     message: 'DEPARTMENT.HEAD_ASSIGNED',
     description:
@@ -230,10 +228,11 @@ export class DepartmentsController {
 
   @Post('departments/:id/head-vacancies')
   @RequireRoles('IT_ADMIN')
-  @ApiOperation({ operationId: 'departmentHeadVacate' })
+  @ApiOperation({ operationId: 'departmentHeadVacate', summary: 'Leave a department without a head' })
   @ApiSuccessResponse(DepartmentResponseDto, {
     message: 'DEPARTMENT.HEAD_VACATED',
-    description: 'Nobody heads the department from the date; it shows as missing a head. Nothing to end ⟹ no change.',
+    description:
+      'Nobody heads the department from the date; it shows as missing a head. If there is no head to end, nothing changes.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, VALIDATION_ERROR, NOT_FOUND)
   async vacateHead(
@@ -250,11 +249,11 @@ export class DepartmentsController {
 
   @Get('departments/:id/employees')
   @RequireRoles('IT_ADMIN', 'MANAGER')
-  @ApiOperation({ operationId: 'departmentMemberList' })
+  @ApiOperation({ operationId: 'departmentMemberList', summary: 'List the members of a department' })
   @ApiSuccessResponse(DepartmentMembersResponseDto, {
     message: 'DEPARTMENT.MEMBERS_LISTED',
     description:
-      'The people in the department today: code, name, status, whether they have a work email, and since when. No email, contract or finance data (QĐ-41c).',
+      'The people in the department today: code, name, status, whether they have a work email, and since when. No email, contract or finance data.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, VALIDATION_ERROR, NOT_FOUND, {
     status: HttpStatus.FORBIDDEN,
@@ -274,7 +273,7 @@ export class DepartmentsController {
 
   @Get('department-warnings')
   @RequireRoles('IT_ADMIN', 'SUPER_ADMIN')
-  @ApiOperation({ operationId: 'departmentWarningList' })
+  @ApiOperation({ operationId: 'departmentWarningList', summary: 'List department warnings' })
   @ApiSuccessResponse(DepartmentWarningsResponseDto, {
     message: 'DEPARTMENT.WARNINGS_LISTED',
     description:

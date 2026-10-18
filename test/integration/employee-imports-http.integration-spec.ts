@@ -812,6 +812,20 @@ describe('importing people from a file over HTTP (integration, real PostgreSQL)'
     });
   });
 
+  // The OpenAPI document declares these 422s (H2b); these cases prove the runtime answers them before they are documented.
+  it.each([
+    ['GET', '/api/v1/employee-imports/not-a-uuid'],
+    ['GET', '/api/v1/employee-imports/not-a-uuid/rows'],
+    ['GET', '/api/v1/employee-imports/3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11/rows?pageSize=0'],
+    ['POST', '/api/v1/employee-imports/not-a-uuid/preview-refreshes'],
+    ['POST', '/api/v1/employee-imports/not-a-uuid/cancellations'],
+  ])('answers 422 VALIDATION_ERROR to %s %s', async (method, path) => {
+    const call = method === 'GET' ? request(server()).get(path) : request(server()).post(path).send({});
+    const response = await call.set(asIt()).expect(422);
+
+    expect(errorOf(response).code).toBe('VALIDATION_ERROR');
+  });
+
   it('leaves every employee with exactly the placements the invariant I-2 asks for', async () => {
     expect(await findPlacementCoverageViolations(ctx.sql)).toEqual([]);
   });

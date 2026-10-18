@@ -32,3 +32,5 @@ Chạy từ gốc BE; DB dev Docker `localhost:5433`, DB integration Docker `127
 - [x] AC trong scope có bằng chứng.
 - [x] Spec/plan phản ánh implementation cuối.
 - [ ] Owner review trên revision cụ thể. Chỉ ghi `merged-dev`, `accepted`, `released` sau đúng sự kiện thật.
+
+_18/10/2026:_ [H3a](../h3a-r1-department-in-use-details/plan.md) bỏ `details.sharedAccounts` khỏi 409 `DEPARTMENT.IN_USE` (R-1, `QĐ-75`); bằng chứng mới ở plan H3a, bảng trên là lịch sử.

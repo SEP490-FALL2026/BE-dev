@@ -1,7 +1,11 @@
 import { Body, Controller, Get, HttpStatus, Param, Post, Query, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBody, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { ApiErrorResponses } from '../../infrastructure/http/decorators/api-error-responses.decorator';
+import {
+  ApiErrorResponses,
+  GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
+  UNAUTHENTICATED_RESPONSE,
+} from '../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../infrastructure/http/decorators/api-success-response.decorator';
 import { RequireRoles } from '../../infrastructure/security/decorators/access.decorators';
 import { CurrentPrincipal } from '../../infrastructure/security/models/current-principal';
@@ -28,17 +32,17 @@ interface UploadedBinary {
 }
 
 const COMMON_ERRORS = [
-  { status: HttpStatus.UNAUTHORIZED, description: 'Authentication is required or the token is no longer valid.' },
-  { status: HttpStatus.FORBIDDEN, description: 'Only an IT Admin imports people (US-02-02 AC-12).' },
-  {
-    status: HttpStatus.SERVICE_UNAVAILABLE,
-    description:
-      'Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).',
-  },
+  UNAUTHENTICATED_RESPONSE,
+  { status: HttpStatus.FORBIDDEN, description: 'Only an IT Admin imports people.' },
+  GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
 ] as const;
 const NOT_FOUND = {
   status: HttpStatus.NOT_FOUND,
   description: 'The import does not exist (IMPORT.NOT_FOUND).',
+} as const;
+const INVALID_ID = {
+  status: HttpStatus.UNPROCESSABLE_ENTITY,
+  description: 'The identifier is not a UUID (VALIDATION_ERROR).',
 } as const;
 
 function toWire(view: ImportView) {
@@ -70,7 +74,7 @@ export class EmployeeImportsController {
   @Post()
   @RequireRoles('IT_ADMIN')
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_FILE_BYTES, files: 1 } }))
-  @ApiOperation({ operationId: 'employeeImportUpload' })
+  @ApiOperation({ operationId: 'employeeImportUpload', summary: 'Upload an employee file for preview' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
     schema: { type: 'object', required: ['file'], properties: { file: { type: 'string', format: 'binary' } } },
@@ -98,12 +102,12 @@ export class EmployeeImportsController {
 
   @Get(':id')
   @RequireRoles('IT_ADMIN')
-  @ApiOperation({ operationId: 'employeeImportGet' })
+  @ApiOperation({ operationId: 'employeeImportGet', summary: 'Get an employee import' })
   @ApiSuccessResponse(EmployeeImportResponseDto, {
     message: 'EMPLOYEE_IMPORT.FETCHED',
     description: 'The import with its preview or its result.',
   })
-  @ApiErrorResponses(...COMMON_ERRORS, NOT_FOUND)
+  @ApiErrorResponses(...COMMON_ERRORS, NOT_FOUND, INVALID_ID)
   async get(@Param() params: ImportIdParamDto) {
     try {
       return toWire(await this.imports.view(params.id));
@@ -114,13 +118,16 @@ export class EmployeeImportsController {
 
   @Get(':id/rows')
   @RequireRoles('IT_ADMIN')
-  @ApiOperation({ operationId: 'employeeImportRowList' })
+  @ApiOperation({ operationId: 'employeeImportRowList', summary: 'List the rows of an employee import' })
   @ApiSuccessResponse(EmployeeImportRowsResponseDto, {
     message: 'EMPLOYEE_IMPORT.ROWS_LISTED',
     description:
       'The rows of the file with what the preview made of each: the line, the cells, the errors with their column and code, the differences of a person already there. Filter by outcome to download the errors.',
   })
-  @ApiErrorResponses(...COMMON_ERRORS, NOT_FOUND)
+  @ApiErrorResponses(...COMMON_ERRORS, NOT_FOUND, {
+    status: HttpStatus.UNPROCESSABLE_ENTITY,
+    description: 'The identifier is not a UUID, or the filter or paging query is invalid (VALIDATION_ERROR).',
+  })
   async rows(@Param() params: ImportIdParamDto, @Query() query: ListImportRowsQueryDto) {
     try {
       const page = await this.imports.rows(params.id, query);
@@ -142,13 +149,13 @@ export class EmployeeImportsController {
 
   @Post(':id/preview-refreshes')
   @RequireRoles('IT_ADMIN')
-  @ApiOperation({ operationId: 'employeeImportPreviewRefresh' })
+  @ApiOperation({ operationId: 'employeeImportPreviewRefresh', summary: 'Check an employee import again' })
   @ApiSuccessResponse(EmployeeImportResponseDto, {
     message: 'EMPLOYEE_IMPORT.PREVIEW_REFRESHED',
     description:
       'The same rows are judged again against the data as it is now, as a new preview version; the older version can no longer be confirmed.',
   })
-  @ApiErrorResponses(...COMMON_ERRORS, NOT_FOUND, {
+  @ApiErrorResponses(...COMMON_ERRORS, NOT_FOUND, INVALID_ID, {
     status: HttpStatus.CONFLICT,
     description: 'The import is no longer a preview (IMPORT.CANCELLED, IMPORT.NOT_PREVIEW).',
   })
@@ -162,7 +169,7 @@ export class EmployeeImportsController {
 
   @Post(':id/confirmations')
   @RequireRoles('IT_ADMIN')
-  @ApiOperation({ operationId: 'employeeImportConfirm' })
+  @ApiOperation({ operationId: 'employeeImportConfirm', summary: 'Confirm an employee import' })
   @ApiSuccessResponse(EmployeeImportConfirmationResponseDto, {
     message: 'EMPLOYEE_IMPORT.CONFIRMED',
     description:
@@ -197,12 +204,12 @@ export class EmployeeImportsController {
 
   @Post(':id/cancellations')
   @RequireRoles('IT_ADMIN')
-  @ApiOperation({ operationId: 'employeeImportCancel' })
+  @ApiOperation({ operationId: 'employeeImportCancel', summary: 'Cancel an employee import' })
   @ApiSuccessResponse(EmployeeImportResponseDto, {
     message: 'EMPLOYEE_IMPORT.CANCELLED',
     description: 'The preview is thrown away; nothing was written and nothing will be. Cancelling twice is the same.',
   })
-  @ApiErrorResponses(...COMMON_ERRORS, NOT_FOUND, {
+  @ApiErrorResponses(...COMMON_ERRORS, NOT_FOUND, INVALID_ID, {
     status: HttpStatus.CONFLICT,
     description: 'The import was already written (IMPORT.NOT_PREVIEW).',
   })

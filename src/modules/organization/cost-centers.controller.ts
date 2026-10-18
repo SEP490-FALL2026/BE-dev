@@ -1,6 +1,10 @@
 import { Body, Controller, Get, HttpStatus, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import { ApiErrorResponses } from '../../infrastructure/http/decorators/api-error-responses.decorator';
+import {
+  ApiErrorResponses,
+  GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
+  UNAUTHENTICATED_RESPONSE,
+} from '../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../infrastructure/http/decorators/api-success-response.decorator';
 import { RequireRoles } from '../../infrastructure/security/decorators/access.decorators';
 import { CurrentPrincipal } from '../../infrastructure/security/models/current-principal';
@@ -19,18 +23,11 @@ import {
 } from './dto/cost-center.dto';
 import { toOrganizationApiException } from './organization.http-errors';
 
-const AUTH_ERRORS = [
-  { status: HttpStatus.UNAUTHORIZED, description: 'Authentication is required or the token is no longer valid.' },
-  {
-    status: HttpStatus.SERVICE_UNAVAILABLE,
-    description:
-      'Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).',
-  },
-] as const;
+const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPONSE] as const;
 
 const FINANCE_ONLY = {
   status: HttpStatus.FORBIDDEN,
-  description: 'Only Finance maintains the Cost Center catalogue (US-04-09 AC-2).',
+  description: 'Only Finance maintains the Cost Center catalogue.',
 } as const;
 
 const NOT_FOUND = { status: HttpStatus.NOT_FOUND, description: 'The cost center does not exist.' } as const;
@@ -67,15 +64,16 @@ export class CostCentersController {
 
   @Get()
   @RequireRoles('FINANCE', 'IT_ADMIN')
-  @ApiOperation({ operationId: 'costCenterList' })
+  @ApiOperation({ operationId: 'costCenterList', summary: 'List cost centers' })
   @ApiSuccessResponse(CostCenterPageResponseDto, {
     message: 'COST_CENTER.LISTED',
     description: 'A page of cost centers in code order, with the department charged to each.',
   })
-  @ApiErrorResponses(...AUTH_ERRORS, {
-    status: HttpStatus.FORBIDDEN,
-    description: 'Only Finance and the IT Admin read the Cost Center catalogue.',
-  })
+  @ApiErrorResponses(
+    ...AUTH_ERRORS,
+    { status: HttpStatus.FORBIDDEN, description: 'Only Finance and the IT Admin read the Cost Center catalogue.' },
+    { status: HttpStatus.UNPROCESSABLE_ENTITY, description: 'The query is invalid (VALIDATION_ERROR).' },
+  )
   async list(@Query() query: ListCostCentersQueryDto) {
     try {
       const page = await this.costCenters.list(query);
@@ -88,7 +86,7 @@ export class CostCentersController {
 
   @Post()
   @RequireRoles('FINANCE')
-  @ApiOperation({ operationId: 'costCenterCreate' })
+  @ApiOperation({ operationId: 'costCenterCreate', summary: 'Add a cost center' })
   @ApiSuccessResponse(CostCenterResponseDto, {
     status: HttpStatus.CREATED,
     message: 'COST_CENTER.CREATED',
@@ -108,7 +106,7 @@ export class CostCentersController {
 
   @Patch(':id')
   @RequireRoles('FINANCE')
-  @ApiOperation({ operationId: 'costCenterRename' })
+  @ApiOperation({ operationId: 'costCenterRename', summary: 'Rename a cost center' })
   @ApiSuccessResponse(CostCenterResponseDto, {
     message: 'COST_CENTER.RENAMED',
     description: 'The cost center has its new name; its code, department and history do not change.',
@@ -128,10 +126,10 @@ export class CostCentersController {
 
   @Post(':id/deactivate')
   @RequireRoles('FINANCE')
-  @ApiOperation({ operationId: 'costCenterDeactivate' })
+  @ApiOperation({ operationId: 'costCenterDeactivate', summary: 'Retire a cost center' })
   @ApiSuccessResponse(CostCenterResponseDto, {
     message: 'COST_CENTER.DEACTIVATED',
-    description: 'The cost center is no longer in use. Already retired ⟹ the same answer.',
+    description: 'The cost center is no longer in use. If it is already retired, the answer is the same.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, FINANCE_ONLY, VALIDATION_ERROR, NOT_FOUND, {
     status: HttpStatus.CONFLICT,
@@ -148,11 +146,11 @@ export class CostCentersController {
 
   @Get(':id/employees')
   @RequireRoles('FINANCE')
-  @ApiOperation({ operationId: 'costCenterEmployeeList' })
+  @ApiOperation({ operationId: 'costCenterEmployeeList', summary: 'List the people in a cost center' })
   @ApiSuccessResponse(CostCenterEmployeesResponseDto, {
     message: 'COST_CENTER.EMPLOYEES_LISTED',
     description:
-      'The people in the cost center today, reduced to code, name and that they are working: no email, contract, dates or manager (QĐ-41c).',
+      'The people in the cost center today, reduced to code, name and that they are working: no email, contract, dates or manager.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, FINANCE_ONLY, VALIDATION_ERROR, NOT_FOUND)
   async employees(@Param() params: CostCenterIdParamDto, @Query() query: ListCostCenterEmployeesQueryDto) {

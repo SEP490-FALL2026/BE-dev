@@ -61,7 +61,7 @@ export class AuthController {
 
   @Post('login')
   @Public()
-  @ApiOperation({ operationId: 'authLogin' })
+  @ApiOperation({ operationId: 'authLogin', summary: 'Sign in with email and password' })
   @ApiSuccessResponse(SessionTokenResponseDto, {
     message: 'AUTH.LOGGED_IN',
     description: 'Signed in. The body carries the access token and the refresh token.',
@@ -72,7 +72,12 @@ export class AuthController {
       description: 'The email or password is not valid (one answer for every reason).',
     },
     { status: HttpStatus.UNPROCESSABLE_ENTITY, description: 'The request body is invalid.' },
-    { status: HttpStatus.TOO_MANY_REQUESTS, description: 'Too many failed attempts; see retryAfterSeconds.' },
+    {
+      status: HttpStatus.TOO_MANY_REQUESTS,
+      description:
+        'Too many failed sign-in attempts for this email; see retryAfterSeconds (AUTH.LOGIN_TEMPORARILY_BLOCKED). ' +
+        'Too many requests to this route from this address also answer 429 (HTTP_TOO_MANY_REQUESTS).',
+    },
     UNAVAILABLE,
   )
   async login(@Body() body: LoginBodyDto): Promise<SessionTokens> {
@@ -100,7 +105,7 @@ export class AuthController {
   @Post('refresh')
   @Public()
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ operationId: 'authRefresh' })
+  @ApiOperation({ operationId: 'authRefresh', summary: 'Exchange a refresh token for a new pair' })
   @ApiSuccessResponse(SessionTokenResponseDto, {
     message: 'AUTH.SESSION_REFRESHED',
     description: 'A new access token and a new refresh token; the presented refresh token is spent.',
@@ -137,7 +142,7 @@ export class AuthController {
   @Public()
   @RawResponse()
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ operationId: 'authLogout' })
+  @ApiOperation({ operationId: 'authLogout', summary: 'Sign out the session of a refresh token' })
   @ApiResponse({ status: HttpStatus.NO_CONTENT, description: 'Signed out (or there was nothing to sign out).' })
   @ApiErrorResponses(
     { status: HttpStatus.UNPROCESSABLE_ENTITY, description: 'The body has no refresh token (VALIDATION_ERROR).' },
@@ -160,7 +165,7 @@ export class AuthController {
   @Post('password-reset-requests')
   @Public()
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
-  @ApiOperation({ operationId: 'authRequestPasswordReset' })
+  @ApiOperation({ operationId: 'authRequestPasswordReset', summary: 'Request a password reset email' })
   @ApiSuccessResponse(PasswordResetRequestedResponseDto, {
     message: 'AUTH.PASSWORD_RESET_REQUESTED',
     description: 'The request was accepted. The same answer is given for every email.',
@@ -168,7 +173,10 @@ export class AuthController {
   })
   @ApiErrorResponses(
     { status: HttpStatus.UNPROCESSABLE_ENTITY, description: 'The body is invalid (VALIDATION_ERROR).' },
-    { status: HttpStatus.TOO_MANY_REQUESTS, description: 'Too many requests from this address.' },
+    {
+      status: HttpStatus.TOO_MANY_REQUESTS,
+      description: 'Too many requests from this address: this route allows 10 a minute (HTTP_TOO_MANY_REQUESTS).',
+    },
     UNAVAILABLE,
   )
   async requestPasswordReset(@Body() body: PasswordResetRequestBodyDto): Promise<{ requested: true }> {
@@ -189,7 +197,7 @@ export class AuthController {
   @Post('password-resets')
   @Public()
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
-  @ApiOperation({ operationId: 'authResetPassword' })
+  @ApiOperation({ operationId: 'authResetPassword', summary: 'Set a new password with a reset token' })
   @ApiSuccessResponse(PasswordResetResponseDto, {
     message: 'AUTH.PASSWORD_RESET',
     description: 'The password was replaced and every session ended. The user signs in with the new one.',
@@ -204,7 +212,10 @@ export class AuthController {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description: 'The body is invalid or the password does not meet the policy.',
     },
-    { status: HttpStatus.TOO_MANY_REQUESTS, description: 'Too many requests from this address.' },
+    {
+      status: HttpStatus.TOO_MANY_REQUESTS,
+      description: 'Too many requests from this address: this route allows 10 a minute (HTTP_TOO_MANY_REQUESTS).',
+    },
     UNAVAILABLE,
   )
   async resetPassword(@Body() body: PasswordResetBodyDto): Promise<{ passwordReset: true }> {
@@ -225,7 +236,7 @@ export class AuthController {
    */
   @Post('invitations/redeem')
   @Public()
-  @ApiOperation({ operationId: 'authRedeemInvitation' })
+  @ApiOperation({ operationId: 'authRedeemInvitation', summary: 'Activate an account from an invitation' })
   @ApiSuccessResponse(AccountActivatedResponseDto, {
     message: 'AUTH.ACCOUNT_ACTIVATED',
     description: 'The account is activated. The user signs in with the login route.',

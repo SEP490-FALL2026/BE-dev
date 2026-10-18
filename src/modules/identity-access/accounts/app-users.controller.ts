@@ -1,6 +1,10 @@
 import { Body, Controller, Delete, Get, HttpStatus, Param, Post, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import { ApiErrorResponses } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
+import {
+  ApiErrorResponses,
+  GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
+  UNAUTHENTICATED_RESPONSE,
+} from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
 import { RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
 import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
@@ -12,6 +16,7 @@ import { toAccountApiException } from './account.http-errors';
 import {
   AccountCandidatesQueryDto,
   AccountCandidatesResponseDto,
+  AccountStatusChangeBodyDto,
   AccountDetailResponseDto,
   AccountPageResponseDto,
   AppUserIdParamDto,
@@ -53,10 +58,17 @@ function toDetailWire(view: AccountDetailView) {
 }
 
 const COMMON_ERRORS = [
-  { status: HttpStatus.UNAUTHORIZED, description: 'Authentication is required or the token is no longer valid.' },
+  UNAUTHENTICATED_RESPONSE,
   { status: HttpStatus.FORBIDDEN, description: 'Only the Super Admin may call this route.' },
-  { status: HttpStatus.SERVICE_UNAVAILABLE, description: 'The service is temporarily unavailable.' },
+  GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
 ] as const;
+
+const STATUS_CHANGE_VALIDATION_ERROR = {
+  status: HttpStatus.UNPROCESSABLE_ENTITY,
+  description:
+    'The identifier is not a UUID, or the reason is missing, blank, longer than 1000 characters ' +
+    'or sent with other fields (VALIDATION_ERROR). Nothing changes.',
+} as const;
 
 /** Account administration. Super Admin only; a role other than SUPER_ADMIN gets 403 and nothing changes (AC-3). */
 @ApiTags('app-users')
@@ -70,7 +82,7 @@ export class AppUsersController {
   ) {}
 
   @Get('account-candidates')
-  @ApiOperation({ operationId: 'accountCandidatesList' })
+  @ApiOperation({ operationId: 'accountCandidatesList', summary: 'Find employees who can get an account' })
   @ApiSuccessResponse(AccountCandidatesResponseDto, {
     message: 'APP_USER.CANDIDATES_LISTED',
     description: 'Employees who have not left and have no account yet (at most 20).',
@@ -88,7 +100,7 @@ export class AppUsersController {
   }
 
   @Post('app-users')
-  @ApiOperation({ operationId: 'appUserCreate' })
+  @ApiOperation({ operationId: 'appUserCreate', summary: 'Create an account for an employee' })
   @ApiSuccessResponse(AccountDetailResponseDto, {
     status: HttpStatus.CREATED,
     message: 'APP_USER.CREATED',
@@ -117,8 +129,8 @@ export class AppUsersController {
   }
 
   @Get('app-users')
-  @ApiOperation({ operationId: 'appUserList' })
-  @ApiSuccessResponse(AccountPageResponseDto, { description: 'A page of accounts.' })
+  @ApiOperation({ operationId: 'appUserList', summary: 'List accounts' })
+  @ApiSuccessResponse(AccountPageResponseDto, { message: 'APP_USER.LISTED', description: 'A page of accounts.' })
   @ApiErrorResponses(...COMMON_ERRORS, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description: 'The query is invalid.',
@@ -134,8 +146,9 @@ export class AppUsersController {
   }
 
   @Get('app-users/:id')
-  @ApiOperation({ operationId: 'appUserGet' })
+  @ApiOperation({ operationId: 'appUserGet', summary: 'Get an account' })
   @ApiSuccessResponse(AccountDetailResponseDto, {
+    message: 'APP_USER.RETRIEVED',
     description: 'The account with its role history and invitation state.',
   })
   @ApiErrorResponses(
@@ -152,7 +165,7 @@ export class AppUsersController {
   }
 
   @Post('app-users/:id/invitations')
-  @ApiOperation({ operationId: 'appUserResendInvitation' })
+  @ApiOperation({ operationId: 'appUserResendInvitation', summary: 'Send a new invitation' })
   @ApiSuccessResponse(AccountDetailResponseDto, {
     status: HttpStatus.ACCEPTED,
     message: 'APP_USER.INVITATION_SENT',
@@ -178,7 +191,7 @@ export class AppUsersController {
   }
 
   @Post('app-users/:id/lock')
-  @ApiOperation({ operationId: 'appUserLock' })
+  @ApiOperation({ operationId: 'appUserLock', summary: 'Lock an account' })
   @ApiSuccessResponse(AccountDetailResponseDto, {
     message: 'APP_USER.LOCKED',
     description: 'The account is locked; its sessions and unused invitation are ended.',
@@ -187,11 +200,15 @@ export class AppUsersController {
     ...COMMON_ERRORS,
     { status: HttpStatus.NOT_FOUND, description: 'No account has this identifier.' },
     { status: HttpStatus.CONFLICT, description: 'The caller, or the holder of SUPER_ADMIN, cannot be locked.' },
-    { status: HttpStatus.UNPROCESSABLE_ENTITY, description: 'The identifier is not a UUID (VALIDATION_ERROR).' },
+    STATUS_CHANGE_VALIDATION_ERROR,
   )
-  async lock(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: AppUserIdParamDto) {
+  async lock(
+    @CurrentPrincipal() actor: AuthenticatedPrincipal,
+    @Param() params: AppUserIdParamDto,
+    @Body() body: AccountStatusChangeBodyDto,
+  ) {
     try {
-      await this.status.lock(actor, params.id);
+      await this.status.lock(actor, params.id, body.reason);
 
       return toDetailWire(await this.queries.getAccount(params.id));
     } catch (error) {
@@ -200,7 +217,7 @@ export class AppUsersController {
   }
 
   @Post('app-users/:id/unlock')
-  @ApiOperation({ operationId: 'appUserUnlock' })
+  @ApiOperation({ operationId: 'appUserUnlock', summary: 'Unlock an account' })
   @ApiSuccessResponse(AccountDetailResponseDto, {
     message: 'APP_USER.UNLOCKED',
     description: 'The account is active again.',
@@ -209,11 +226,15 @@ export class AppUsersController {
     ...COMMON_ERRORS,
     { status: HttpStatus.NOT_FOUND, description: 'No account has this identifier.' },
     { status: HttpStatus.CONFLICT, description: 'The caller cannot change their own account.' },
-    { status: HttpStatus.UNPROCESSABLE_ENTITY, description: 'The identifier is not a UUID (VALIDATION_ERROR).' },
+    STATUS_CHANGE_VALIDATION_ERROR,
   )
-  async unlock(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: AppUserIdParamDto) {
+  async unlock(
+    @CurrentPrincipal() actor: AuthenticatedPrincipal,
+    @Param() params: AppUserIdParamDto,
+    @Body() body: AccountStatusChangeBodyDto,
+  ) {
     try {
-      await this.status.unlock(actor, params.id);
+      await this.status.unlock(actor, params.id, body.reason);
 
       return toDetailWire(await this.queries.getAccount(params.id));
     } catch (error) {
@@ -222,7 +243,7 @@ export class AppUsersController {
   }
 
   @Post('app-users/:id/role-grants')
-  @ApiOperation({ operationId: 'appUserGrantRole' })
+  @ApiOperation({ operationId: 'appUserGrantRole', summary: 'Grant a role to an account' })
   @ApiSuccessResponse(AccountDetailResponseDto, {
     status: HttpStatus.CREATED,
     message: 'ROLE.GRANTED',
@@ -252,7 +273,7 @@ export class AppUsersController {
   }
 
   @Delete('app-users/:id/role-grants/:role')
-  @ApiOperation({ operationId: 'appUserRevokeRole' })
+  @ApiOperation({ operationId: 'appUserRevokeRole', summary: 'Revoke a role from an account' })
   @ApiSuccessResponse(AccountDetailResponseDto, {
     message: 'ROLE.REVOKED',
     description: 'The role is revoked (the last role may be revoked); it stops at the next request.',

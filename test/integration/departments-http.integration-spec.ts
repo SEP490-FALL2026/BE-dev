@@ -459,11 +459,18 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
         .set(asIt())
         .expect(409);
 
-      expect(errorOf(response).code).toBe('DEPARTMENT.IN_USE');
-      expect(errorOf(response).details).toMatchObject({
+      const error = (response.body as { error: { code: string; message: string; details: Record<string, unknown> } })
+        .error;
+      expect(error.code).toBe('DEPARTMENT.IN_USE');
+      expect(error.message).toBe('The department still has members.');
+      // Two groups only (US-03-06 AC-19): members and open work. Shared accounts are out of scope since QĐ-75, so the
+      // key is absent — not empty, not null.
+      expect(Object.keys(error.details).sort()).toEqual(['members', 'openWork', 'totalMembers']);
+      expect(Object.hasOwn(error.details, 'sharedAccounts')).toBe(false);
+      expect(response.text).not.toContain('sharedAccounts');
+      expect(error.details).toEqual({
         totalMembers: 1,
-        members: [{ employeeCode: member.code }],
-        sharedAccounts: [],
+        members: [{ employeeCode: member.code, fullName: expect.any(String) as unknown }],
         openWork: [],
       });
       expect((await getDepartment(department.id)).status).toBe('ACTIVE');

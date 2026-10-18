@@ -96,7 +96,10 @@ describe('lock protocol: password self-service races (integration, real PostgreS
       .set('Authorization', `Bearer ${accessToken}`)
       .send({ currentPassword, newPassword });
   const lock = (appUserId: string) =>
-    request(server()).post(`/api/v1/app-users/${appUserId}/lock`).set('Authorization', `Bearer ${adminToken}`);
+    request(server())
+      .post(`/api/v1/app-users/${appUserId}/lock`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ reason: 'Lock racing a password change' });
 
   const issueLink = async (account: { appUserId: string; email: string }): Promise<string> => {
     await forgot(account.email).expect(202);

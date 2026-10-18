@@ -1,6 +1,8 @@
 # Spec: chia lát remediation và refactor nền tảng sau audit 18/10/2026
 
-- Phụ trách: AI theo giao việc Owner (lập kế hoạch, 18/10/2026). Từng lát H1 → H8: chưa phân công.
+- Phụ trách: AI theo giao việc Owner (lập kế hoạch, 18/10/2026). Từng lát H1 → H8: chưa phân công lúc lập. _Cập nhật
+  18/10/2026:_ H1, H2a, H2b, H3a, H3b, H3c đã có hạng mục riêng, phụ trách AI theo giao việc Owner; trạng thái từng lát
+  ở [roadmap](../../../roadmap.md#hạng-mục). H4 trở đi chưa phân công.
 - Thiết kế ban đầu bởi: AI theo giao việc Owner, từ [audit nền tảng](../../../reviews/be-foundation-audit-2026-10-18/README.md)
   và quyết định Owner Q1–Q9 ghi ở mục 10.2 của báo cáo.
 - Thiết kế: `draft`. Owner review: chưa review.

@@ -236,6 +236,7 @@ describe('password self-service over HTTP (integration, real PostgreSQL)', () =>
 
       const refused = await forgot('nobody@acme.vn', address).expect(429);
       expect(bodyOf(refused).success).toBe(false);
+      expect(bodyOf(refused).error.code).toBe('HTTP_TOO_MANY_REQUESTS');
       // Another address is not affected.
       await forgot('nobody@acme.vn', freshAddress()).expect(202);
     });
@@ -475,11 +476,13 @@ describe('password self-service over HTTP (integration, real PostgreSQL)', () =>
       await request(server())
         .post(`/api/v1/app-users/${account.appUserId}/lock`)
         .set('Authorization', `Bearer ${token}`)
+        .send({ reason: 'Locking revokes the reset link' })
         .expect(200);
       expect(bodyOf(await reset(link).expect(400)).error.code).toBe('AUTH.PASSWORD_RESET_INVALID');
       await request(server())
         .post(`/api/v1/app-users/${account.appUserId}/unlock`)
         .set('Authorization', `Bearer ${token}`)
+        .send({ reason: 'Unlocking must not revive the old link' })
         .expect(200);
 
       expect(bodyOf(await reset(link).expect(400)).error.code).toBe('AUTH.PASSWORD_RESET_INVALID');
@@ -818,6 +821,7 @@ describe('password self-service over HTTP (integration, real PostgreSQL)', () =>
       await request(server())
         .post(`/api/v1/app-users/${locked.appUserId}/lock`)
         .set('Authorization', `Bearer ${admin.accessToken}`)
+        .send({ reason: 'A locked account must not change its password' })
         .expect(200);
       // Fixture only: the offboarding flow that terminates an employee belongs to G6.
       await ctx.sql.query(`UPDATE employees SET status = 'TERMINATED' WHERE id = $1`, [left.employeeId]);

@@ -129,7 +129,7 @@ describe('Application foundation (e2e)', () => {
       .expect(200)
       .expect({
         success: true,
-        message: 'COMMON.SUCCESS',
+        message: 'HEALTH.LIVENESS_CHECKED',
         data: { status: 'ok' },
       });
   });
@@ -207,7 +207,11 @@ describe('Application foundation (e2e)', () => {
       .get('/api/v1/health/live')
       .expect(200)
       .expect((response) => {
-        expect(bodyOf(response)).toEqual({ success: true, message: 'COMMON.SUCCESS', data: { status: 'ok' } });
+        expect(bodyOf(response)).toEqual({
+          success: true,
+          message: 'HEALTH.LIVENESS_CHECKED',
+          data: { status: 'ok' },
+        });
       });
   });
   it('returns a request ID for successful responses', () => {
@@ -420,7 +424,8 @@ describe('Application foundation (e2e)', () => {
     expect(schemas.ErrorEnvelopeDto).toMatchObject({
       required: ['success', 'error'],
       properties: {
-        success: { type: 'boolean', const: false },
+        // OpenAPI 3.0 has no `const`: the single allowed value is a one-value enum (H2a).
+        success: { type: 'boolean', enum: [false] },
         error: {
           required: ['code', 'message', 'requestId'],
         },

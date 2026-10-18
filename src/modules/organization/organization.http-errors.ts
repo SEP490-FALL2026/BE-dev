@@ -115,7 +115,6 @@ export function toOrganizationApiException(error: unknown): unknown {
     return refuse(HttpStatus.CONFLICT, 'DEPARTMENT.IN_USE', error.message, {
       members: error.members,
       totalMembers: error.totalMembers,
-      sharedAccounts: [],
       openWork: [],
     });
   }

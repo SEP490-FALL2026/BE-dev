@@ -41,6 +41,9 @@ const TICKET_SELECT = {
   completedAt: true,
 } as const;
 
+/** A ticket in one of these states has not finished: it has not completed and no newer ticket replaced it. */
+const WAITING_STATUSES: RecoveryStatusName[] = ['PENDING', 'AWAITING_ACTIVATION'];
+
 /** Owns RecoveryTicket (US-01-09): the approved tickets of the procedure that recovers the Super Admin role. */
 @Injectable()
 export class RecoveryRepo {
@@ -117,10 +120,28 @@ export class RecoveryRepo {
         targetAppUserId: appUserId,
         id: { not: exceptTicketId },
         mode: 'RESET_CREDENTIALS',
-        status: { in: ['PENDING', 'AWAITING_ACTIVATION'] },
+        status: { in: WAITING_STATUSES },
       },
       select: { id: true },
     });
+  }
+
+  /**
+   * Whether the account is waiting for an operator's credential reset (US-01-10 AC-10). The caller holds the AppUser
+   * row lock, which the recovery also takes before it writes the ticket, so a ticket committed meanwhile is seen here.
+   */
+  async hasWaitingCredentialReset(tx: DbTx, organizationId: string, appUserId: string): Promise<boolean> {
+    const waiting = await tx.recoveryTicket.findFirst({
+      where: {
+        organizationId,
+        targetAppUserId: appUserId,
+        mode: 'RESET_CREDENTIALS',
+        status: { in: WAITING_STATUSES },
+      },
+      select: { id: true },
+    });
+
+    return waiting !== null;
   }
 
   /** The ticket a link belongs to, locked, for the redemption that completes it. */

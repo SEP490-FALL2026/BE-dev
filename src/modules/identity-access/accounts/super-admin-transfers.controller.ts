@@ -1,6 +1,10 @@
 import { Body, Controller, HttpStatus, Post } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import { ApiErrorResponses } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
+import {
+  ApiErrorResponses,
+  GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
+  UNAUTHENTICATED_RESPONSE,
+} from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import { RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
@@ -38,14 +42,14 @@ export class SuperAdminTransfersController {
 
   @Post()
   @RequireRoles('SUPER_ADMIN')
-  @ApiOperation({ operationId: 'superAdminTransfer' })
+  @ApiOperation({ operationId: 'superAdminTransfer', summary: 'Transfer the Super Admin role' })
   @ApiSuccessResponse(SuperAdminTransferResponseDto, {
     message: 'SUPER_ADMIN.TRANSFERRED',
     description:
       'The successor holds the Super Admin role and the caller no longer does; from the caller’s next request on they hold only the roles they had besides it.',
   })
   @ApiErrorResponses(
-    { status: HttpStatus.UNAUTHORIZED, description: 'Authentication is required or the token is no longer valid.' },
+    UNAUTHENTICATED_RESPONSE,
     {
       status: HttpStatus.FORBIDDEN,
       description: 'The caller does not hold the Super Admin role (any more).',
@@ -59,7 +63,7 @@ export class SuperAdminTransfersController {
       description:
         'The request is invalid (VALIDATION_ERROR) or the successor does not qualify: the caller themselves, a locked account, a person who is not working, an account not activated or with an unverified email, one holding the IT Admin or Finance role, an approval role, or heading a department.',
     },
-    { status: HttpStatus.SERVICE_UNAVAILABLE, description: 'The service is temporarily unavailable.' },
+    GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   )
   async transfer(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: SuperAdminTransferBodyDto) {
     try {

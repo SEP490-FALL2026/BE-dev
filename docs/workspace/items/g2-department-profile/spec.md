@@ -103,3 +103,5 @@ Audit cùng giao dịch: `DEPARTMENT.CREATED/UPDATED/DEACTIVATED/HEAD_ASSIGNED/H
 ## Thay đổi và nghiệm thu
 
 16/10/2026: thiết kế và triển khai cùng phiên. **Việc Owner cần xác nhận khi review:** (1) ngày hiệu lực của trưởng phòng không lùi quá khứ; (2) cảnh báo thiếu IT Admin gửi IT Admin + Super Admin; (3) lớp HTTP của `organization` gọi facade `identity-access`; (4) ngừng phòng hiện chỉ kiểm thành viên — G4/G5 phải cộng tài khoản dùng chung và việc đang mở; (5) G6 phải giữ trigger "trưởng phòng là thành viên" khi điều chuyển/nghỉ việc. Chưa review, chưa nghiệm thu.
+
+_18/10/2026 — contract sau [H3a](../h3a-r1-department-in-use-details/spec.md) (R-1, `QĐ-75`):_ 409 `DEPARTMENT.IN_USE` khi ngừng phòng chỉ còn `details { members, totalMembers, openWork }`; khóa `sharedAccounts` ghi ở bảng hành vi trên là thiết kế 16/10/2026, đã bỏ. Hàng nghiệm thu và bằng chứng cũ giữ nguyên làm lịch sử.
