@@ -16,14 +16,9 @@ import {
 
 const hashOf = (token: string) => createHash('sha256').update(token).digest('hex');
 
-/** The refresh cookie of a sign-in response, as a `Cookie` header value. */
-function cookieOf(response: request.Response): string {
-  const header = response.headers['set-cookie'] as unknown;
-  const cookies = Array.isArray(header) ? (header as string[]) : typeof header === 'string' ? [header] : [];
-  const refresh = cookies.find((cookie) => cookie.startsWith('slm_refresh='));
-  if (!refresh) throw new Error('The sign-in response set no refresh cookie');
-
-  return refresh.split(';')[0];
+/** The refresh token a sign-in response carries in its body. */
+function refreshTokenOf(response: request.Response): string {
+  return bodyOf(response).data.refreshToken;
 }
 
 interface TokenRow {
@@ -320,7 +315,7 @@ describe('password self-service over HTTP (integration, real PostgreSQL)', () =>
       const account = await newAccount();
       const signedIn = await login(account.email, SEED_PASSWORD).expect(200);
       const accessToken = bodyOf(signedIn).data.accessToken;
-      const refresh = cookieOf(signedIn);
+      const refreshToken = refreshTokenOf(signedIn);
       await request(server()).get('/api/v1/me').set('Authorization', `Bearer ${accessToken}`).expect(200);
       const before = await stateOf(account.appUserId);
       const link = await issueLink(account);
@@ -342,7 +337,7 @@ describe('password self-service over HTTP (integration, real PostgreSQL)', () =>
         { status: 'CANCELLED', recipient: account.email, template: 'PASSWORD_RESET' },
       ]);
       // The old sessions are gone, at the very next request.
-      await request(server()).post('/api/v1/auth/refresh').set('Cookie', refresh).expect(401);
+      await request(server()).post('/api/v1/auth/refresh').send({ refreshToken }).expect(401);
       const stale = await request(server()).get('/api/v1/me').set('Authorization', `Bearer ${accessToken}`).expect(401);
       expect(bodyOf(stale).error.code).toBe('INVALID_ACCESS_TOKEN');
       const sessions = await ctx.sql.query<{ revoked_reason: string | null }>(
@@ -672,7 +667,7 @@ describe('password self-service over HTTP (integration, real PostgreSQL)', () =>
     const signIn = async (email: string, password = SEED_PASSWORD) => {
       const response = await login(email, password).expect(200);
 
-      return { accessToken: bodyOf(response).data.accessToken, refresh: cookieOf(response) };
+      return { accessToken: bodyOf(response).data.accessToken, refreshToken: refreshTokenOf(response) };
     };
 
     const change = (accessToken: string, currentPassword: string, newPassword: string = NEW_PASSWORD) =>
@@ -688,7 +683,7 @@ describe('password self-service over HTTP (integration, real PostgreSQL)', () =>
         ])
       ).rows[0].hash;
 
-    it('replaces the password, ends every session including this one, and clears the refresh cookie (AC-5)', async () => {
+    it('replaces the password and ends every session including this one, so no refresh token works (AC-5)', async () => {
       const account = await newAccount();
       const first = await signIn(account.email);
       const second = await signIn(account.email);
@@ -701,8 +696,7 @@ describe('password self-service over HTTP (integration, real PostgreSQL)', () =>
         message: 'AUTH.PASSWORD_CHANGED',
         data: { passwordChanged: true },
       });
-      const setCookie = (response.headers['set-cookie'] as unknown as string[] | undefined) ?? [];
-      expect(setCookie.find((cookie) => cookie.startsWith('slm_refresh=;'))).toBeDefined();
+      expect(response.headers['set-cookie']).toBeUndefined();
       expect(await credentialOf(account.appUserId)).not.toEqual(before);
       // This session and the other one end at the very next request.
       for (const session of [first, second]) {
@@ -711,7 +705,7 @@ describe('password self-service over HTTP (integration, real PostgreSQL)', () =>
           .set('Authorization', `Bearer ${session.accessToken}`)
           .expect(401);
         expect(bodyOf(stale).error.code).toBe('INVALID_ACCESS_TOKEN');
-        await request(server()).post('/api/v1/auth/refresh').set('Cookie', session.refresh).expect(401);
+        await request(server()).post('/api/v1/auth/refresh').send({ refreshToken: session.refreshToken }).expect(401);
       }
       const reasons = await ctx.sql.query<{ revoked_reason: string | null }>(
         'SELECT revoked_reason FROM auth_sessions WHERE app_user_id = $1',

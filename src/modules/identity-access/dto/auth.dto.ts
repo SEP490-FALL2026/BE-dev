@@ -15,6 +15,16 @@ export const sessionTokenSchema = z.strictObject({
   accessToken: z.string(),
   tokenType: z.literal('Bearer'),
   expiresAt: z.iso.datetime(),
+  /** Opaque and single-use: exchanged at `/auth/refresh` for a new pair, or ended at `/auth/logout`. */
+  refreshToken: z.string(),
+});
+
+/**
+ * The refresh token travels in the body of `/auth/refresh` and `/auth/logout`. Only size-bounded: a
+ * token of the wrong shape is answered like an unknown one (401), not described.
+ */
+export const refreshTokenBodySchema = z.strictObject({
+  refreshToken: z.string().min(1).max(512),
 });
 
 /**
@@ -44,6 +54,7 @@ export const changePasswordBodySchema = z.strictObject({
 const passwordChangedSchema = z.strictObject({ passwordChanged: z.literal(true) });
 
 export class LoginBodyDto extends createZodDto(loginBodySchema) {}
+export class RefreshTokenBodyDto extends createZodDto(refreshTokenBodySchema) {}
 export class PasswordResetRequestBodyDto extends createZodDto(passwordResetRequestBodySchema) {}
 export class PasswordResetRequestedResponseDto extends createZodDto(
   successEnvelopeSchema(passwordResetRequestedSchema),

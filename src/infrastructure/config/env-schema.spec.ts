@@ -81,15 +81,6 @@ describe('validateEnvironment', () => {
     ).toThrow('development auth secrets');
   });
 
-  it('keeps the refresh cookie Secure everywhere except development', () => {
-    expect(validateEnvironment({}).AUTH_COOKIE_SECURE).toBe(false);
-    expect(validateEnvironment({ NODE_ENV: 'test' }).AUTH_COOKIE_SECURE).toBe(true);
-    expect(validateEnvironment({ NODE_ENV: 'production', ...productionInfrastructure }).AUTH_COOKIE_SECURE).toBe(true);
-    expect(() =>
-      validateEnvironment({ NODE_ENV: 'production', ...productionInfrastructure, AUTH_COOKIE_SECURE: 'false' }),
-    ).toThrow('AUTH_COOKIE_SECURE');
-  });
-
   it('rejects an idle session limit longer than the absolute limit', () => {
     expect(() =>
       validateEnvironment({ AUTH_SESSION_IDLE_SECONDS: '9000', AUTH_SESSION_ABSOLUTE_SECONDS: '3600' }),

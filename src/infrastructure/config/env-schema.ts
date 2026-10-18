@@ -40,7 +40,6 @@ export interface EnvironmentVariables {
   AUTH_LOGIN_WINDOW_SECONDS: number;
   AUTH_LOGIN_BLOCK_SECONDS: number;
   AUTH_THROTTLE_PEPPER: string;
-  AUTH_COOKIE_SECURE: boolean;
   AUTH_JWT_ISSUER: string;
   AUTH_JWT_AUDIENCE: string;
   AUTH_INVITATION_TTL_SECONDS: number;
@@ -196,7 +195,6 @@ const environmentSchema = Joi.object({
       then: Joi.required(),
       otherwise: Joi.string().default(DEVELOPMENT_THROTTLE_PEPPER),
     }),
-  AUTH_COOKIE_SECURE: Joi.boolean(),
   AUTH_JWT_ISSUER: Joi.string().default('slm-api'),
   AUTH_JWT_AUDIENCE: Joi.string().default('slm-web'),
   AUTH_INVITATION_TTL_SECONDS: Joi.number().integer().min(3_600).max(1_209_600).default(259_200),
@@ -317,17 +315,15 @@ export function validateInstallationEnvironment(input: Record<string, unknown>):
 export function validateEnvironment(input: Record<string, unknown>): EnvironmentVariables {
   const parsed = validateSchema(environmentSchema, input) as Omit<
     EnvironmentVariables,
-    'SWAGGER_ENABLED' | 'AUTH_COOKIE_SECURE' | 'DB_IDLE_IN_TRANSACTION_TIMEOUT_MS'
+    'SWAGGER_ENABLED' | 'DB_IDLE_IN_TRANSACTION_TIMEOUT_MS'
   > & {
     SWAGGER_ENABLED?: boolean;
-    AUTH_COOKIE_SECURE?: boolean;
     DB_IDLE_IN_TRANSACTION_TIMEOUT_MS?: number;
   };
   const result = {
     ...parsed,
     ...resolveDatabaseSettings(parsed),
     SWAGGER_ENABLED: parsed.SWAGGER_ENABLED ?? parsed.NODE_ENV !== 'production',
-    AUTH_COOKIE_SECURE: parsed.AUTH_COOKIE_SECURE ?? parsed.NODE_ENV !== 'development',
   };
 
   assertDatabaseLimits(result);
@@ -369,12 +365,6 @@ export function validateEnvironment(input: Record<string, unknown>): Environment
     ) {
       throw new EnvironmentValidationError(
         'Environment validation failed: production must not use the development auth secrets',
-      );
-    }
-
-    if (!result.AUTH_COOKIE_SECURE) {
-      throw new EnvironmentValidationError(
-        'Environment validation failed: AUTH_COOKIE_SECURE must be true in production',
       );
     }
 

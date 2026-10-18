@@ -1,7 +1,6 @@
-import { Body, Controller, HttpCode, HttpStatus, Post, Req, Res } from '@nestjs/common';
+import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
-import type { Request, Response } from 'express';
 import { TransientDatabaseError } from '../../../infrastructure/database/transaction-runner';
 import { ApiErrorResponses } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
@@ -17,6 +16,7 @@ import {
   PasswordResetRequestBodyDto,
   PasswordResetRequestedResponseDto,
   PasswordResetResponseDto,
+  RefreshTokenBodyDto,
   SessionTokenResponseDto,
 } from '../dto/auth.dto';
 import {
@@ -27,8 +27,14 @@ import {
 import { IssuedSession } from '../identity-access.types';
 import { LoginService } from './login.service';
 import { PasswordResetService } from './password-reset.service';
-import { RefreshCookie } from './refresh-cookie';
 import { SessionService } from './session.service';
+
+interface SessionTokens {
+  accessToken: string;
+  tokenType: 'Bearer';
+  expiresAt: string;
+  refreshToken: string;
+}
 
 const UNAVAILABLE = {
   status: HttpStatus.SERVICE_UNAVAILABLE,
@@ -50,7 +56,6 @@ export class AuthController {
     private readonly sessions: SessionService,
     private readonly invitations: AccountInvitationService,
     private readonly passwordResets: PasswordResetService,
-    private readonly cookie: RefreshCookie,
   ) {}
 
   @Post('login')
@@ -58,7 +63,7 @@ export class AuthController {
   @ApiOperation({ operationId: 'authLogin' })
   @ApiSuccessResponse(SessionTokenResponseDto, {
     message: 'AUTH.LOGGED_IN',
-    description: 'Signed in. The refresh token is set as an HttpOnly cookie.',
+    description: 'Signed in. The body carries the access token and the refresh token.',
   })
   @ApiErrorResponses(
     {
@@ -69,12 +74,9 @@ export class AuthController {
     { status: HttpStatus.TOO_MANY_REQUESTS, description: 'Too many failed attempts; see retryAfterSeconds.' },
     UNAVAILABLE,
   )
-  async login(
-    @Body() body: LoginBodyDto,
-    @Res({ passthrough: true }) response: Response,
-  ): Promise<{ accessToken: string; tokenType: 'Bearer'; expiresAt: string }> {
+  async login(@Body() body: LoginBodyDto): Promise<SessionTokens> {
     try {
-      return this.respondWithSession(response, await this.logins.login(body.email, body.password));
+      return toSessionTokens(await this.logins.login(body.email, body.password));
     } catch (error) {
       if (error instanceof InvalidCredentialsError) {
         throw new ApiException(HttpStatus.UNAUTHORIZED, {
@@ -100,24 +102,21 @@ export class AuthController {
   @ApiOperation({ operationId: 'authRefresh' })
   @ApiSuccessResponse(SessionTokenResponseDto, {
     message: 'AUTH.SESSION_REFRESHED',
-    description: 'A new access token; the refresh cookie is rotated.',
+    description: 'A new access token and a new refresh token; the presented refresh token is spent.',
   })
   @ApiErrorResponses(
+    { status: HttpStatus.UNPROCESSABLE_ENTITY, description: 'The body has no refresh token (VALIDATION_ERROR).' },
     {
       status: HttpStatus.UNAUTHORIZED,
-      description: 'The session is missing, expired, revoked or replayed. The cookie is cleared.',
+      description: 'The refresh token is unknown, malformed, expired, spent or its session ended.',
     },
     UNAVAILABLE,
   )
-  async refresh(
-    @Req() request: Request,
-    @Res({ passthrough: true }) response: Response,
-  ): Promise<{ accessToken: string; tokenType: 'Bearer'; expiresAt: string }> {
+  async refresh(@Body() body: RefreshTokenBodyDto): Promise<SessionTokens> {
     try {
-      return this.respondWithSession(response, await this.sessions.refresh(this.cookie.read(request)));
+      return toSessionTokens(await this.sessions.refresh(body.refreshToken));
     } catch (error) {
       if (error instanceof SessionInvalidError) {
-        this.cookie.clear(response);
         throw new ApiException(HttpStatus.UNAUTHORIZED, {
           code: 'AUTH.SESSION_INVALID',
           message: 'The session is not valid. Sign in again.',
@@ -129,8 +128,9 @@ export class AuthController {
   }
 
   /**
-   * Authenticated by the refresh cookie, not by a Bearer token: the moment a user most needs to
-   * sign out is often after the access token has expired. Always 204 and idempotent.
+   * Authenticated by the refresh token in the body, not by a Bearer token: the moment a user most
+   * needs to sign out is often after the access token has expired. Idempotent: any well-formed
+   * request is 204, whether or not the token belongs to an open session.
    */
   @Post('logout')
   @Public()
@@ -138,17 +138,18 @@ export class AuthController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ operationId: 'authLogout' })
   @ApiResponse({ status: HttpStatus.NO_CONTENT, description: 'Signed out (or there was nothing to sign out).' })
-  @ApiErrorResponses(UNAVAILABLE)
-  async logout(@Req() request: Request, @Res({ passthrough: true }) response: Response): Promise<void> {
+  @ApiErrorResponses(
+    { status: HttpStatus.UNPROCESSABLE_ENTITY, description: 'The body has no refresh token (VALIDATION_ERROR).' },
+    UNAVAILABLE,
+  )
+  async logout(@Body() body: RefreshTokenBodyDto): Promise<void> {
     try {
-      await this.sessions.logout(this.cookie.read(request));
+      await this.sessions.logout(body.refreshToken);
     } catch (error) {
-      // Not signed out for certain, so keep the cookie and let the client retry.
+      // Not signed out for certain: the client keeps its token and retries.
       if (error instanceof TransientDatabaseError) throw unavailable();
       throw error;
     }
-
-    this.cookie.clear(response);
   }
 
   /**
@@ -248,17 +249,13 @@ export class AuthController {
       throw toAccountApiException(error);
     }
   }
+}
 
-  private respondWithSession(
-    response: Response,
-    session: IssuedSession,
-  ): { accessToken: string; tokenType: 'Bearer'; expiresAt: string } {
-    this.cookie.set(response, session.refreshToken, session.sessionRemainingMs);
-
-    return {
-      accessToken: session.accessToken,
-      tokenType: 'Bearer',
-      expiresAt: session.accessTokenExpiresAt.toISOString(),
-    };
-  }
+function toSessionTokens(session: IssuedSession): SessionTokens {
+  return {
+    accessToken: session.accessToken,
+    tokenType: 'Bearer',
+    expiresAt: session.accessTokenExpiresAt.toISOString(),
+    refreshToken: session.refreshToken,
+  };
 }

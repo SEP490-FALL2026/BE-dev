@@ -10,6 +10,8 @@ export interface ApiBody {
   message: string;
   data: {
     accessToken: string;
+    /** Login and refresh: the opaque, single-use token for `/auth/refresh` and `/auth/logout`. */
+    refreshToken: string;
     tokenType: string;
     expiresAt: string;
     appUserId: string;
