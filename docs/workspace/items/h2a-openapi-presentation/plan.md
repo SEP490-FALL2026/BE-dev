@@ -3,7 +3,8 @@
 - [Spec](spec.md); revision đầu vào: Docs `9416fe0`, BE `bd05007`.
 - Phụ trách: AI theo giao việc Owner. Thiết kế ban đầu bởi: AI theo giao việc Owner.
 - Owner review: chưa review. Peer review: tùy chọn, chưa có.
-- Triển khai: `verified` (local, cây làm việc chưa commit trên `bd05007`). PR: chưa có.
+- Triển khai: `verified` (local 18/10/2026; bằng chứng chạy trên cây làm việc chưa commit trên `bd05007`). Revision:
+  commit `5aac33f` trên `dev` = `origin/dev` (Owner push trực tiếp 19/10/2026, không PR); remote CI chưa có bằng chứng.
 
 ## Before coding
 
@@ -67,7 +68,7 @@ xóa, không chạm database dùng chung.
 - [x] Spec/plan/test design phản ánh đúng implementation cuối; peer review: chưa có.
 - [x] Diff cuối đã tự review; rule [API contract](../../../rules/api-contract.md) ghi quy ước; phần chưa kiểm chứng ghi rõ.
 - [ ] Giao Owner review trên revision cụ thể; cập nhật roadmap/PR. Chỉ ghi `merged-dev`, `accepted`, `released` sau
-      đúng sự kiện thật. Còn chờ: commit/PR, remote CI, Owner review, FE/Mobile regenerate client; H2b chưa bắt đầu.
+      đúng sự kiện thật. Còn chờ: remote CI, Owner review, FE/Mobile regenerate client; H2b chưa bắt đầu.
 
 _Đính chính 18/10/2026 (04B, chỉ helper/test/tài liệu):_ cleanup ban đầu bỏ **mọi** `pattern` cạnh `format` uuid/date-time.
 Nay chỉ bỏ cặp `format` + `pattern` trùng đúng regex Zod sinh cho `z.uuid()`, `z.iso.datetime()` và

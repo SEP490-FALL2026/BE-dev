@@ -103,3 +103,5 @@ method (inventory), và e2e kiểm mỗi operation public không có `security`.
 
 - 18/10/2026: tạo hạng mục, thiết kế `ready`; implement và `verified` local (bằng chứng ở [plan](plan.md)). Chưa commit,
   chưa Owner review, chưa nghiệm thu.
+- 19/10/2026: implementation ở commit `5aac33f` trên `dev` = `origin/dev` (Owner push trực tiếp 19/10/2026, không PR).
+  Remote CI chưa có bằng chứng, chưa Owner review, chưa nghiệm thu.

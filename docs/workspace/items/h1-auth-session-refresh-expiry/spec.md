@@ -136,3 +136,6 @@ refresh token trong bộ nhớ, không `localStorage`; single-flight refresh; l�
 
 - 18/10/2026: tạo hạng mục, thiết kế `ready`; implement và `verified` local (bằng chứng ở [plan](plan.md)). Chưa commit,
   chưa Owner review, dev review ADR-0011 `pending`, chưa nghiệm thu.
+- 19/10/2026: implementation ở commit `bd05007`, lên `origin/dev` cùng chuỗi tới `5aac33f` (Owner push trực tiếp
+  19/10/2026, không PR). ADR-0011 vẫn Proposed (dev review `pending`); remote CI chưa có bằng chứng, chưa Owner review,
+  chưa nghiệm thu.

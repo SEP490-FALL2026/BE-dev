@@ -3,7 +3,9 @@
 - [Spec](spec.md); revision đầu vào: Docs `9416fe0`, BE `e06f9ea`.
 - Phụ trách: AI theo giao việc Owner. Thiết kế ban đầu bởi: AI theo giao việc Owner.
 - Owner review: chưa review. Peer review: tùy chọn; dev review ADR-0011 `pending` (gate trước `accepted`).
-- Triển khai: `verified` (local, cây làm việc chưa commit trên `e06f9ea`). PR: chưa có.
+- Triển khai: `verified` (local 18/10/2026; bằng chứng chạy trên cây làm việc chưa commit trên `e06f9ea`). Revision:
+  commit `bd05007`, lên `origin/dev` cùng chuỗi tới `5aac33f` (Owner push trực tiếp 19/10/2026, không PR); remote CI
+  chưa có bằng chứng.
 
 ## Before coding
 
@@ -72,7 +74,7 @@ riêng; container đã xóa sau lượt chạy, không chạm database dùng chu
 - [x] Diff cuối đã tự review; contract client ở [security rule](../../../rules/security-jobs.md#authentication-and-authorization),
       spec lát 1a và ADR-0011 (vẫn Proposed) đã cập nhật; phần chưa kiểm chứng ghi rõ.
 - [ ] Giao Owner review trên revision cụ thể; cập nhật roadmap/PR. Chỉ ghi `merged-dev`, `accepted`, `released` sau
-      đúng sự kiện thật. Còn chờ: commit/PR, remote CI, dev review ADR-0011, Owner review, FE/Mobile regenerate client.
+      đúng sự kiện thật. Còn chờ: remote CI, dev review ADR-0011, Owner review, FE/Mobile regenerate client.
 
 _Đính chính tài liệu 18/10/2026 (H1B, không đổi code/test/contract):_ cấu hình và bảng nghiệm thu hiện hành của
 [spec lát 1a](../us-01-bootstrap-login-session/spec.md#acceptance-và-kiểm-chứng) không còn mô tả cookie như hợp đồng hiện hành;

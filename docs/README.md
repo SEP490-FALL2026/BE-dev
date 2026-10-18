@@ -44,6 +44,8 @@ Trạng thái triển khai của các lát dùng hai ADR trên nằm ở [roadma
 ## Audit nền tảng
 
 - [Audit BE nền tảng 18/10/2026](reviews/be-foundation-audit-2026-10-18/README.md): gate trên revision được audit, finding, quyết định kỹ thuật Q1–Q9 của Owner và giới hạn chưa kiểm chứng; không phải phê duyệt của dev.
+- [Audit kiến trúc toàn bộ `src` H4.0, 19/10/2026](reviews/be-full-src-architecture-audit-2026-10-19/README.md): inventory, finding `A4-01` → `A4-23`, backlog lát nhỏ và quyết định kỹ thuật E1–E9 của Owner; không phải phê duyệt của dev.
+- [Review checkpoint CP-0A, 19/10/2026](reviews/cp0-h1-h3c-checkpoint-review-2026-10-19/README.md): gate và review trước checkpoint `5aac33f`, manifest đường dẫn, finding `CP0-01` → `CP0-10`; không phải phê duyệt của dev.
 
 ## Review dịch EN–VI
 

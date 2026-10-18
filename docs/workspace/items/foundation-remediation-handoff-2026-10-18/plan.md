@@ -4,8 +4,10 @@
 - Phụ trách: AI theo giao việc Owner (lập kế hoạch). Thiết kế ban đầu bởi: AI theo giao việc Owner.
 - Owner review: chưa review. Peer review: tùy chọn; ADR-0011 cần dev review trước `accepted` của H1.
 - Triển khai: `in-progress` (cập nhật 18/10/2026; lúc lập là `not-started`): Task 1–6 đã tạo H1, H2a, H2b, H3a,
-  H3b, H3c — trạng thái từng lát ở [roadmap](../../../roadmap.md#hạng-mục); Task 7 trở đi `not-started`. PR: chưa có. Hạng mục chỉ
+  H3b, H3c — trạng thái từng lát ở [roadmap](../../../roadmap.md#hạng-mục); Task 7 trở đi `not-started`. PR: không có. Hạng mục chỉ
   lập kế hoạch; mỗi task dưới đây tạo **một** hạng mục mới, không viết code.
+- _Cập nhật 19/10/2026:_ H1 ở commit `bd05007`, H2a → H3c ở commit `5aac33f` trên `dev` = `origin/dev` (Owner push trực
+  tiếp 19/10/2026, không PR); remote CI chưa có bằng chứng, chưa Owner review, chưa nghiệm thu.
 
 ## Before coding
 

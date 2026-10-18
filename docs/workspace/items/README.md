@@ -57,3 +57,6 @@ _Ghi chú 18/10/2026:_ bảng trên là trạng thái thiết kế ngày 15/10/2
 
 _Đính chính 18/10/2026 (audit nền tảng):_ cột _Nguồn / AC_ ở trên đã được chép lại theo bảng nghiệm thu của từng spec — vế một phần ghi rõ, AC không có hàng nghiệm thu không còn được tính; `US-01-10` AC-10 chưa có bằng chứng. Roadmap dùng cùng nội dung. Thiết kế lát giữ nguyên. _Cập nhật 18/10/2026:_ AC-10 nay có
 bằng chứng ở [H3c](h3c-forgot-password-during-recovery/plan.md#verification-and-handoff) (`verified` local, chưa commit).
+
+_Cập nhật 19/10/2026 (checkpoint):_ H1 ở commit `bd05007`; H2a → H3c (gồm bằng chứng AC-10 của H3c) ở commit `5aac33f`
+trên `dev`, Owner push trực tiếp, không PR — trạng thái và giới hạn ở [roadmap](../../roadmap.md#hạng-mục).
