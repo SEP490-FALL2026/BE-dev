@@ -113,8 +113,8 @@ jobs:
             echo "🚀 Đang pull image mới nhất: $API_IMAGE"
             docker compose -f docker-compose.prod.yml pull api worker
 
-            echo "📦 Khởi động database & cache nếu chưa chạy..."
-            docker compose -f docker-compose.prod.yml up -d postgres redis caddy
+            echo "📦 Khởi động database & reverse proxy nếu chưa chạy..."
+            docker compose -f docker-compose.prod.yml up -d postgres caddy
 
             echo "🔄 Chạy Prisma Migration cập nhật Database..."
             docker compose -f docker-compose.prod.yml run --rm --no-deps api node node_modules/prisma/build/index.js migrate deploy

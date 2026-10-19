@@ -1,7 +1,7 @@
 # Software License Management — Backend
 
-Foundation để triển khai User Story bằng NestJS 11, TypeScript, PostgreSQL/Prisma,
-Redis/BullMQ và S3-compatible storage. Module mới đặt file theo [module structure](docs/rules/module-structure.md) và
+Foundation để triển khai User Story bằng NestJS 11, TypeScript và PostgreSQL/Prisma. Source hạ tầng Redis/BullMQ và
+S3-compatible storage được giữ nhưng chưa mount vào API/worker (E2 = A, H6.4). Module mới đặt file theo [module structure](docs/rules/module-structure.md) và
 architecture gate, không copy layout của một module cụ thể.
 
 **Đã có trong code:** lệnh khởi tạo `pnpm ops:bootstrap`, đăng nhập/làm mới/đăng xuất, `/me`, tạo tài khoản từ
@@ -26,18 +26,21 @@ Cần Node.js 22 hoặc 24, pnpm 11.1.3, Docker Compose.
 2. Kiểm tra port/credentials local. Mặc định development nằm ở
    [env-schema.ts](src/infrastructure/config/env-schema.ts) và khớp [Compose](compose.yaml). Khi cần ghi đè, copy
    [.env.example](.env.example) thành `.env` (không commit), chỉ bỏ comment dòng cần đổi (ví dụ `DATABASE_URL`, `PORT`,
-   `CORS_ORIGINS`). Đổi port PostgreSQL trong Compose thì cập nhật cả `DATABASE_URL`. Secret development mặc định công khai
-   trong source và chỉ dùng cho checkout local cô lập: muốn token local không bị dùng lại ở nơi khác, tạo secret riêng
-   bằng lệnh trong `.env.example`. Copy `.env.example` **chưa** đủ cho production: validator production từ chối thiếu
-   biến `@production-required` và từ chối secret development. Biến đã bỏ (ví dụ `AUTH_COOKIE_SECURE`, bỏ khi refresh token chuyển sang body) bị bỏ
+   `CORS_ORIGINS`). Đổi port PostgreSQL trong Compose thì cập nhật cả `DATABASE_URL`. **Development phải có secret riêng**
+   (E3 = C, H6.3): bốn biến đánh dấu `@required-outside-test` (`AUTH_ACCESS_TOKEN_SECRET`, `AUTH_THROTTLE_PEPPER`,
+   `OUTBOX_PAYLOAD_KEY`, `OUTBOX_PAYLOAD_KEY_ID`) không có giá trị mặc định ngoài `NODE_ENV=test`; tạo bằng lệnh trong
+   `.env.example` và đặt vào `.env`. Thiếu thì API, worker và `ops:recover` dừng với danh sách biến thiếu; giá trị công
+   khai trong repository (fallback của test, mặc định development cũ) bị từ chối ở development và production. Copy
+   `.env.example` **chưa** đủ cho production: validator production còn từ chối thiếu biến `@production-required`. Biến đã bỏ (ví dụ `AUTH_COOKIE_SECURE`, bỏ khi refresh token chuyển sang body) bị bỏ
    qua âm thầm — tự xóa khỏi tệp env của bạn; không có lệnh nào đọc hay sửa tệp env chứa secret.
-3. Chạy `docker compose up -d --wait` để khởi động PostgreSQL, Redis, MinIO.
+3. Chạy `docker compose up -d --wait` để khởi động PostgreSQL (đủ cho API và worker). Redis và MinIO chỉ chạy khi gọi
+   profile: `docker compose --profile queue --profile storage up -d --wait` — dùng khi thử source hạ tầng chưa mount.
 4. Với **database mới**, chạy `pnpm db:migrate:deploy`, rồi `pnpm build` để sinh Prisma client và build CLI.
 5. Khởi tạo một lần bằng `pnpm ops:bootstrap --help`, điền tham số theo help và nhập mật khẩu ở terminal.
 6. Chạy `pnpm start:dev`; chạy worker ở terminal riêng nếu cần gửi thư mời.
 
-CLI khởi tạo chỉ xác thực `NODE_ENV` và cấu hình database; không yêu cầu secret JWT, SMTP,
-Redis/storage hoặc khóa outbox của API/worker. API/worker vẫn dùng validation đầy đủ.
+CLI khởi tạo chỉ xác thực `NODE_ENV` và cấu hình database; không yêu cầu secret JWT, SMTP hoặc khóa outbox của
+API/worker. API/worker vẫn dùng validation đầy đủ; không cần Redis hay object storage vì hai module đó chưa mount.
 Nếu mất phản hồi khi COMMIT, mã thoát lỗi không chứng minh chưa ghi gì: kiểm trạng thái cài đặt
 trước khi chạy lại; không tự retry thao tác ghi.
 
@@ -49,15 +52,15 @@ Mật khẩu/token vẫn được che trước khi xuất log.
 Migration baseline chỉ phục vụ DB mới. Không chạy reset hoặc áp baseline lên DB cũ
 có migration/schema khác; tạo DB mới hoặc lập migration chuyển đổi riêng.
 
-| Địa chỉ mặc định                          | Mục đích                                                                    |
-| ----------------------------------------- | --------------------------------------------------------------------------- |
-| http://localhost:3000/api/v1/health/live  | Process đang chạy                                                           |
-| http://localhost:3000/api/v1/health/ready | Kiểm tra kết nối PostgreSQL                                                 |
-| http://localhost:3000/api/docs            | Swagger khi SWAGGER_ENABLED=true                                            |
-| http://localhost:9001                     | MinIO console; tạo bucket theo OBJECT_STORAGE_BUCKET trước khi dùng storage |
+| Địa chỉ mặc định                          | Mục đích                                                                       |
+| ----------------------------------------- | ------------------------------------------------------------------------------ |
+| http://localhost:3000/api/v1/health/live  | Process đang chạy                                                              |
+| http://localhost:3000/api/v1/health/ready | Kiểm tra kết nối PostgreSQL                                                    |
+| http://localhost:3000/api/docs            | Swagger khi SWAGGER_ENABLED=true                                               |
+| http://localhost:9001                     | MinIO console (chỉ với `--profile storage`); bucket theo OBJECT_STORAGE_BUCKET |
 
 Worker: `pnpm start:worker` chạy `EmailDispatchLoop`, thăm dò outbox PostgreSQL và gửi thư qua SMTP.
-Gửi thư không dùng BullMQ/Redis; BullMQ mới có cấu hình, chưa có queue/processor được đăng ký.
+Gửi thư không dùng BullMQ/Redis; worker không mount queue, chưa có queue/processor nào được đăng ký.
 Compose chưa cung cấp SMTP sink: cấu hình `SMTP_HOST`, `SMTP_PORT`, `SMTP_FROM` và các biến SMTP
 trong `env-schema.ts` cho dịch vụ thư local (mặc định `localhost:1025`, `SMTP_TLS=false`).
 `SMTP_TLS` chỉ điều khiển `requireTLS` (`true` = bắt buộc STARTTLS); TLS ngay khi kết nối chỉ do

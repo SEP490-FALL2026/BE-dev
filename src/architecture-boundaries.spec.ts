@@ -318,11 +318,9 @@ const CLI_ENTRY_FILES: ReadonlySet<string> = new Set([
  * entry names the slice of that report that removes it. Entries are only removed; a stale entry fails like a new
  * violation, and adding one needs Owner/dev review.
  */
-const LEGACY_PRIVATE_MODULE_IMPORTS: ReadonlySet<string> = new Set([
-  // H8.3 removed the onboarding -> employee-import.service.ts entry (A4-10): onboarding reads the data-import facade.
-  // ROOT.1/DOC.1: the worker loop of ADR-0012 reaches the dispatcher; the rule for root files is decided there.
-  'email-dispatch.loop.ts -> modules/notifications/email-dispatcher.service.ts',
-]);
+// Empty since ROOT.1. H8.3 removed the onboarding -> employee-import.service.ts entry (A4-10); ROOT.1 removed
+// email-dispatch.loop.ts -> modules/notifications/email-dispatcher.service.ts (the loop reads EmailDeliveryService).
+const LEGACY_PRIVATE_MODULE_IMPORTS: ReadonlySet<string> = new Set<string>();
 
 /**
  * The public surface of a business module, as path segments below src/modules: only these files directly in the

@@ -12,7 +12,7 @@ API và worker có entry point riêng trong cùng codebase.
 | Catalog        | Source list/get/create, schema và test được giữ; `CatalogModule` chưa mount, chưa có access declaration, không phải mẫu kiến trúc                                                        | G3 quyết giữ, thay hay loại module/bảng; nghiệp vụ và quyền G3 |
 | Authentication | Argon2id, JWT/refresh session, guards, CLI bootstrap, `/me`, tài khoản, lời mời, mật khẩu, vai suy ra (Manager, Người duyệt chi), chuyển giao Super Admin, CLI khôi phục (`ops:recover`) | Phân quyền theo phạm vi của lát G3–G7                          |
 | Database       | Catalog, audit, organization, identity-access, operating-parameters, data-import, notifications; migration SQL ở `prisma/migrations/`, `TransactionRunner`                               | Schema cho các lát tiếp theo                                   |
-| Queue/storage  | S3 adapter, BullMQ configuration; worker gửi SMTP từ outbox PostgreSQL                                                                                                                   | BullMQ queue processor và file API                             |
+| Queue/storage  | Source S3 adapter và cấu hình BullMQ được giữ nhưng chưa mount (E2 = A); worker gửi SMTP từ outbox PostgreSQL                                                                            | Mount lại, BullMQ queue processor và file API (G7/G9)          |
 
 Bảng mô tả code đang có, không phải trạng thái nghiệm thu. Tiến độ từng lát, revision/PR, trạng thái review và kết quả
 gate nằm ở [roadmap](docs/roadmap.md); bằng chứng ở [audit nền tảng 18/10/2026](docs/reviews/be-foundation-audit-2026-10-18/README.md)
@@ -33,13 +33,14 @@ src/
   recovery-cli.ts, recovery-cli.module.ts  # lệnh khôi phục Super Admin theo phiếu, ngoài HTTP (pnpm ops:recover)
   core/                       # thuần TypeScript: pagination, email, business-date
   infrastructure/
-    config/                   # environment validation
+    cli/                      # helper chung của hai CLI: ghi lỗi, logger im lặng, nhận lỗi env bằng instanceof
+    config/                   # env-schema.ts (hợp đồng validation công khai) ghép database-url/database-environment/secret-environment/environment-validation
     http/                     # pipe, envelope, serializer, filter
     security/                 # guard khai báo/xác thực/phân quyền, verifier port, rate limiting
     database/                 # Prisma service, TransactionRunner
-    queue/                    # BullMQ connection
+    queue/                    # BullMQ connection + queue.config.ts (chưa mount)
     mail/                     # port MailTransport và SMTP adapter (nodemailer)
-    object-storage/           # port và S3-compatible adapter
+    object-storage/           # port, S3-compatible adapter + object-storage.config.ts (chưa mount)
     observability/            # request context, request ID, logger
     health/                   # health controller
   modules/
@@ -208,17 +209,30 @@ Băm/kiểm Argon2 tốn CPU chạy **trước** transaction, rồi trạng thá
 candidates, tìm kiếm literal và thứ tự kiểm khi redeem ở
 [spec lát 1b](docs/workspace/items/us-01-account-invitation-activation/spec.md).
 
-AppModule chưa dùng queue. WorkerModule cấu hình BullMQ (chưa có job) và chạy `EmailDispatchLoop`
-(`src/email-dispatch.loop.ts`): vòng thăm dò PostgreSQL mỗi `OUTBOX_POLL_INTERVAL_MS` gửi thư trong
-EmailOutbox ([ADR-0012](docs/decisions/0012-account-email-delivery.md), vẫn **Proposed**) — không cần Redis cho việc này.
+Không đồ thị nào (API, worker, CLI khôi phục, CLI khởi tạo) mount `QueueInfrastructureModule` hay
+`ObjectStorageModule` (Owner E2 = A, H6.4); `module-graph.spec.ts` khóa điều đó. Source hai module được giữ; lát G7/G9
+mount lại thì factory của module gọi validator riêng (`queue.config.ts`, `object-storage.config.ts`) và production lại
+bắt buộc Redis có mật khẩu hoặc endpoint storage HTTPS kèm credentials — `env-schema.ts` không còn đọc các biến đó.
+WorkerModule chạy `EmailDispatchLoop` (`src/email-dispatch.loop.ts`): vòng thăm dò PostgreSQL mỗi
+`OUTBOX_POLL_INTERVAL_MS` gửi thư trong EmailOutbox ([ADR-0012](docs/decisions/0012-account-email-delivery.md), vẫn
+**Proposed**) — không cần Redis cho việc này.
 Vòng lặp là orchestration có chủ đích ở composition root vì nối hai module không được import nhau: `notifications`
-gửi thư, facade `IdentityAccessService.isActionLinkUsable` trả lời liên kết trong thư còn dùng được không. Import trực
-tiếp `notifications/email-dispatcher.service.ts` của vòng lặp và export `EmailDispatcher` hiện là mục legacy ledger,
-gỡ ở ROOT.1.
+gửi thư qua hợp đồng công khai `EmailDeliveryService.dispatchDue` (trong `notifications.service.ts`, đăng ký ở
+`PUBLIC_CONTRACT_EXPORTS`), facade `IdentityAccessService.isActionLinkUsable` trả lời liên kết trong thư còn dùng được
+không. `EmailDispatcher`, repo, cipher và transport vẫn private (ROOT.1).
+Hai CLI (`installation-cli.ts`, `recovery-cli.ts`) dùng chung `infrastructure/cli/cli-runtime.ts` để ghi lỗi, tắt log
+Nest và nhận `EnvironmentValidationError` bằng `instanceof`; gate cấu trúc quét cả root và infrastructure để chặn so
+khớp lỗi theo `error.name`.
 Storage adapter hỗ trợ endpoint S3-compatible; chưa có file ownership/API.
-Readiness chỉ chứng minh PostgreSQL có thể ping, không chứng minh schema/migration,
-Redis, storage hoặc chức năng đăng nhập đã sẵn sàng.
+Readiness chỉ chứng minh PostgreSQL có thể ping, không chứng minh schema/migration hoặc chức năng đăng nhập đã sẵn sàng.
 
-Compose phục vụ local PostgreSQL, Redis, MinIO; Dockerfile build runtime API/worker.
+Cấu hình: `env-schema.ts` là hợp đồng validation công khai duy nhất (`validateEnvironment`, `EnvironmentVariables`,
+`EnvironmentValidationError`, `validateInstallationEnvironment`, `resolveDatabaseUrl`), ghép từ các tệp con dưới cap
+400 dòng. `database-url.ts` không import gì để `prisma.config.ts` dùng cùng quy tắc `DATABASE_URL` mà không nạp Nest hay
+schema đầy đủ. Secret theo Owner E3 = C: chỉ `NODE_ENV=test` có fallback công khai cho bốn secret; development phải tự
+khai, development và production từ chối mọi giá trị công khai trong repository.
+
+Compose local mặc định chỉ chạy PostgreSQL; Redis và MinIO chỉ chạy với profile `queue`/`storage`. Compose production
+không còn Redis. Dockerfile build runtime API/worker.
 Migrations chạy riêng trước rollout. Xem [containers](docs/guides/containers.md),
 [database rules](docs/rules/database-business.md) và [tests](test/README.md).

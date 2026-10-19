@@ -8,7 +8,8 @@ import {
   PASSWORD_HASH_POLICY_VERSION,
   PasswordHasher,
 } from '../../src/modules/identity-access/accounts/password-hasher.service';
-import { AlreadyInstalledError, InstallationService } from '../../src/modules/installation/installation.service';
+import { AlreadyInstalledError } from '../../src/modules/installation/installation.errors';
+import { InstallationService } from '../../src/modules/installation/installation.service';
 import { MailTransport } from '../../src/infrastructure/mail/mail-transport';
 import { PayloadCipher } from '../../src/modules/notifications/payload-cipher';
 import {

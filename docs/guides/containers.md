@@ -1,6 +1,8 @@
 # Containers and migrations
 
-Compose provides local PostgreSQL, Redis and MinIO. Ports bind to loopback.
+`docker compose up -d --wait` starts local PostgreSQL only; that is all the API and the worker need. Redis and MinIO are
+optional and start only under their named profiles (`--profile queue`, `--profile storage`), for trying the queue and
+object-storage sources that are not mounted today (Owner decision E2 = A, H6.4). Ports bind to loopback.
 Check for port conflicts before starting; do not stop unrelated services.
 Create the configured MinIO bucket before using storage.
 
@@ -23,13 +25,18 @@ docker build -t slm-api:foundation .
 docker build --target migrate -t slm-migrate:foundation .
 ```
 
-The runtime defaults to production. Supply DATABASE_URL, HTTPS CORS_ORIGINS,
-REDIS_HOST/REDIS_PASSWORD, HTTPS OBJECT_STORAGE_ENDPOINT and storage credentials/bucket.
+The runtime defaults to production. Supply DATABASE_URL and HTTPS CORS_ORIGINS.
+Redis and object storage are not required: neither module is mounted in the API or the worker. A slice that mounts one
+gets its production validation back (REDIS_HOST/REDIS_PASSWORD, or an HTTPS OBJECT_STORAGE_ENDPOINT with
+credentials/bucket; the variables marked `@production-required-when-mounted` in `.env.example`).
 Authentication also requires AUTH_ACCESS_TOKEN_SECRET and AUTH_THROTTLE_PEPPER;
 invitation delivery requires HTTPS APP_PUBLIC_URL, OUTBOX_PAYLOAD_KEY (base64 of 32 bytes),
 OUTBOX_PAYLOAD_KEY_ID, SMTP_HOST, SMTP_FROM and SMTP_TLS=true, plus the provider's port/auth settings.
-The [environment validator](../../src/infrastructure/config/env-schema.ts) owns the full constraints.
+The [environment validator](../../src/infrastructure/config/env-schema.ts) owns the full constraints, and refuses in
+production (and in development) any of those four secrets whose value is public in the repository.
 The API and the worker validate all of these settings and refuse to start in production without them.
+The runtime image also carries `src/infrastructure/config/database-url.ts`, the one `DATABASE_URL` rule that both the
+validator and `prisma.config.ts` read, so `prisma` commands in the image resolve the same URL.
 The installation command validates only the database settings and NODE_ENV (see below).
 Use container-reachable hostnames: localhost means the container itself.
 
@@ -57,11 +64,14 @@ read it from arguments, the environment or a pipe. The consolidated
 [G0/G1 review](../reviews/g0-g1-remediation-2026-10-15/README.md) records the Linux PTY verification
 through the remediation revision; manual interactive PowerShell verification is still pending.
 The worker uses the same runtime image with command `node dist/worker.js` and runs the PostgreSQL
-outbox polling loop for SMTP delivery. No BullMQ processor is registered. Compose has no SMTP sink;
+outbox polling loop for SMTP delivery. It mounts no queue and registers no BullMQ processor; the production Compose
+file has no Redis service. A host that ran an earlier deploy keeps its `slm-redis` container (Compose only warns about
+an orphan; the deploy does not pass `--remove-orphans`) and its volume: remove them by hand when no longer wanted. Compose has no SMTP sink;
 configure a reachable SMTP service separately. SMTP TLS/provider delivery remains unverified.
 
 For a local container smoke test, explicitly set NODE_ENV=development, database and
-service hostnames; do not expose development credentials to a shared environment.
+service hostnames and your own development secrets (no public default exists outside NODE_ENV=test);
+do not expose development credentials to a shared environment.
 Health live checks the HTTP process; ready pings PostgreSQL only and answers 503 `SERVICE_UNAVAILABLE` when it fails.
 Behind PgBouncer or a managed pooler the connection startup parameters `options` and
 `idle_in_transaction_session_timeout` need attention: see the pooler note in

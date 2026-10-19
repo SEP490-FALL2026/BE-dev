@@ -3,7 +3,9 @@
 - [Spec](spec.md); revision đầu vào: Docs `9416fe0`, BE `c760705`.
 - Phụ trách: AI theo giao việc Owner. Thiết kế ban đầu bởi: Owner (audit H4.0 mục 9.5; Prompt 21).
 - Owner review: chưa review. Peer review: tùy chọn.
-- Triển khai: `verified` (local 19/10/2026, cây làm việc chưa commit trên `c760705`). PR: chưa có.
+- Triển khai: `verified` (local 19/10/2026, Prompt 21 + 21A trên cùng cây làm việc chưa commit trên `c760705`).
+  Revision: commit `895b729` trên `dev` = `origin/dev` (Owner commit/push trực tiếp 19/10/2026, không PR); remote CI chưa
+  có bằng chứng. PR: chưa có.
 
 ## Before coding
 

@@ -26,7 +26,9 @@ import { RecoveryModule } from './modules/identity-access/recovery.module';
 import { InstallationModule } from './modules/installation/installation.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { PayloadCipher } from './modules/notifications/payload-cipher';
+import { ObjectStorageModule } from './infrastructure/object-storage/object-storage.module';
 import { QueueInfrastructureModule } from './infrastructure/queue/queue-infrastructure.module';
+import { EmailDispatchLoop } from './email-dispatch.loop';
 import { RecoveryCliModule } from './recovery-cli.module';
 import { WorkerModule } from './worker.module';
 
@@ -49,6 +51,8 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   'IdentityAccessModule: Symbol(ACCESS_TOKEN_VERIFIER)', // port of src/infrastructure/security
   'InstallationModule: InstallationService',
   'NotificationsModule: NotificationsService',
+  // ROOT.1: the delivery contract the worker's mail loop (composition root, ADR-0012) calls; EmailDispatcher stays private.
+  'NotificationsModule: EmailDeliveryService',
   'OperatingParametersModule: OperatingParametersService',
   'OrganizationModule: OrganizationService',
   // The two entry services of `pnpm ops:recover` (Q6; E7): the holder's own account, and the role transfer.
@@ -70,8 +74,8 @@ const LEGACY_PRIVATE_EXPORTS: ReadonlySet<string> = new Set([
   'OrganizationModule: DepartmentRepo',
   'OrganizationModule: OrganizationRepo',
   // Owner 19/10/2026 (GATE.1, extends E9): non-facade exports the contract allowlist found. H8.3 removed the
-  // data-import entry (facade DataImportService).
-  'NotificationsModule: EmailDispatcher', // ROOT.1/DOC.1: decided with the email-dispatch.loop import edge (ADR-0012)
+  // data-import entry (facade DataImportService); ROOT.1 removed NotificationsModule: EmailDispatcher (the worker loop
+  // reads EmailDeliveryService).
   'OperatingParametersModule: NonWorkingDatesService', // G3: same-context HTTP module sharing, reviewed like E4
 ]);
 
@@ -425,6 +429,28 @@ describe('module graph', () => {
     for (const name of ['DatabaseModule', 'SecurityModule', 'WorkerModule', 'RecoveryCliModule']) {
       expect({ name, isBusiness: names.has(name) }).toEqual({ name, isBusiness: false });
     }
+  });
+
+  it('H6.4 (E2 = A): mounts neither the queue nor object storage in the API, the worker or either command', () => {
+    for (const [name, root] of graphs) {
+      const modules = collectGraph(root).map((node) => node.module);
+
+      expect({
+        name,
+        storage: modules.includes(ObjectStorageModule),
+        queue: modules.includes(QueueInfrastructureModule),
+      }).toEqual({ name, storage: false, queue: false });
+    }
+  });
+
+  it('H6.4: delivers mail by polling PostgreSQL in the worker, with no BullMQ queue or processor registered', () => {
+    const worker = collectGraph(WorkerModule);
+    const tokens = worker.flatMap((node) => node.providers.map((provider) => tokenName(tokenOf(provider))));
+
+    expect(declarationsOf(worker, EmailDispatchLoop)).toHaveLength(1);
+    expect(tokens.filter((token) => token.startsWith('BullQueue_'))).toEqual([]);
+    expect(sourceFilesDeclaring('registerQueue')).toEqual([]);
+    expect(sourceFilesDeclaring('@Processor(')).toEqual([]);
   });
 
   it('mounts the identity-access module and its three controllers in the API', () => {

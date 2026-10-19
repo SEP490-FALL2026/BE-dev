@@ -30,6 +30,8 @@ COPY --from=build --chown=node:node /app/node_modules ./node_modules
 COPY --from=build --chown=node:node /app/dist ./dist
 COPY --chown=node:node prisma ./prisma
 COPY --chown=node:node prisma.config.ts package.json ./
+# prisma.config.ts shares the database URL rule with the application; that one file has no import.
+COPY --chown=node:node src/infrastructure/config/database-url.ts ./src/infrastructure/config/database-url.ts
 RUN ln -s /app/node_modules/prisma/build/index.js /usr/local/bin/prisma
 USER node
 EXPOSE 3000

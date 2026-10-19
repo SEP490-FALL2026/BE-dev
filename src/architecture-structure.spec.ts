@@ -159,28 +159,19 @@ const LEGACY = {
   crossCapabilityImports: new Set<string>(),
   /** Controller importing another controller. Empty since H4.1 (shared project mapper); stays as a gate. */
   controllerImports: new Set<string>(),
-  /** Error classes declared in an orchestration file (service/controller/repo). */
-  errorClassesOutsideErrorFiles: new Set([
-    // H6: installation errors to installation.errors.ts.
-    'modules/installation/installation.service.ts: InstallationInputError',
-    'modules/installation/installation.service.ts: AlreadyInstalledError',
-  ]),
+  /** Error classes declared in an orchestration file (service/controller/repo). Empty since H6.3; stays as a gate. */
+  errorClassesOutsideErrorFiles: new Set<string>(),
   /** HTTP mapping (ApiException/HttpStatus) inside a business error file. Empty since H8.1; stays as a gate. */
   httpMappingInErrorFiles: new Set<string>(),
-  /** Errors matched by their class name string instead of instanceof. */
-  errorMatchedByName: new Set([
-    // A4-04 (GATE.1): composition roots were not scanned. ROOT.1 shares one CLI helper that uses instanceof.
-    'installation-cli.ts',
-    'recovery-cli.ts',
-  ]),
+  /** Errors matched by their class name string instead of instanceof. Empty since ROOT.1 (A4-04): both CLIs read
+   * `infrastructure/cli/cli-runtime.ts`, which uses instanceof. */
+  errorMatchedByName: new Set<string>(),
   /** HTTP mapping (ApiException/HttpStatus) inside a business service. A4-05 (GATE.1); G3 decides catalog (E1 = A). */
   httpMappingInServices: new Set(['modules/catalog/catalog.service.ts']),
-  /** Raw SQL in a business file that is not a repository. H6 (advisory lock of the installation). */
-  rawSqlOutsideRepositories: new Set(['modules/installation/installation.service.ts']),
+  /** Raw SQL in a business file that is not a repository. Empty since H6.3 (installation lock in its repo). */
+  rawSqlOutsideRepositories: new Set<string>(),
   /** File -> line cap. A listed file must not grow past its cap. */
-  oversizedFiles: new Map<string, number>([
-    ['infrastructure/config/env-schema.ts', 425], // H6
-  ]),
+  oversizedFiles: new Map<string, number>(),
   /** Module -> cap on controllers directly in the module root. H4. */
   rootControllers: new Map<string, number>(),
   /** Module -> cap on non-spec files directly in the module root. H4. */

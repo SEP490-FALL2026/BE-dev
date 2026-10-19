@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { EmailDispatchLoop } from './email-dispatch.loop';
 
 describe('EmailDispatchLoop', () => {
@@ -5,12 +6,44 @@ describe('EmailDispatchLoop', () => {
   afterEach(() => jest.useRealTimers());
 
   function build(dispatchDue: jest.Mock) {
-    const config = { get: () => 1000 };
+    const config = { get: jest.fn().mockReturnValue(1000) };
     const identity = { isActionLinkUsable: jest.fn().mockResolvedValue(true) };
     const loop = new EmailDispatchLoop({ dispatchDue } as never, identity as never, config as never);
 
-    return { loop, identity };
+    return { loop, identity, config };
   }
+
+  it('waits OUTBOX_POLL_INTERVAL_MS between ticks', async () => {
+    const dispatchDue = jest.fn().mockResolvedValue(0);
+    const { loop, config } = build(dispatchDue);
+    config.get.mockReturnValue(2500);
+
+    loop.onApplicationBootstrap();
+    await jest.advanceTimersByTimeAsync(2499);
+    expect(dispatchDue).toHaveBeenCalledTimes(1);
+    await jest.advanceTimersByTimeAsync(1);
+    expect(dispatchDue).toHaveBeenCalledTimes(2);
+
+    expect(config.get).toHaveBeenCalledWith('OUTBOX_POLL_INTERVAL_MS', { infer: true });
+    void loop.onModuleDestroy();
+  });
+
+  it('logs a failed tick by the error name only, never its message', async () => {
+    const logged = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+    const dispatchDue = jest
+      .fn()
+      .mockRejectedValueOnce(new TypeError('postgresql://user:s3cr3t@db/x'))
+      .mockResolvedValue(0);
+    const { loop } = build(dispatchDue);
+
+    loop.onApplicationBootstrap();
+    await jest.advanceTimersByTimeAsync(0);
+
+    expect(logged).toHaveBeenCalledWith('Mail dispatch tick failed: TypeError');
+    expect(JSON.stringify(logged.mock.calls)).not.toContain('s3cr3t');
+    logged.mockRestore();
+    void loop.onModuleDestroy();
+  });
 
   it('dispatches immediately and then once per interval until the application shuts down', async () => {
     const dispatchDue = jest.fn().mockResolvedValue(0);

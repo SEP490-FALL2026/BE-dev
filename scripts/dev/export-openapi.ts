@@ -2,10 +2,15 @@ import { NestFactory } from '@nestjs/core';
 import { writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { format, resolveConfig } from 'prettier';
-import { AppModule } from '../../src/app.module';
-import { configureApplication, createOpenApiDocument } from '../../src/bootstrap';
 
 async function exportOpenApi(): Promise<void> {
+  // The document depends on the routes and API_PREFIX, never on a secret. Since E3 = C (H6.3) only NODE_ENV=test has
+  // public secret fallbacks, so the export runs as test: no developer or CI secret is needed, and nothing connects to
+  // a database. The configuration module validates when it is imported, so the module graph is imported after this.
+  process.env.NODE_ENV = 'test';
+  const { AppModule } = await import('../../src/app.module');
+  const { configureApplication, createOpenApiDocument } = await import('../../src/bootstrap');
+
   const app = await NestFactory.create(AppModule, { logger: false });
   try {
     configureApplication(app, { mountDocs: false });

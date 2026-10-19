@@ -2,7 +2,7 @@ import { Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from '@ne
 import { ConfigService } from '@nestjs/config';
 import { EnvironmentVariables } from './infrastructure/config/env-schema';
 import { IdentityAccessService } from './modules/identity-access/identity-access.service';
-import { EmailDispatcher } from './modules/notifications/email-dispatcher.service';
+import { EmailDeliveryService } from './modules/notifications/notifications.service';
 
 /**
  * The worker's mail loop (ADR-0012): a database poll, not a queue job. It lives at the
@@ -18,7 +18,7 @@ export class EmailDispatchLoop implements OnApplicationBootstrap, OnModuleDestro
   private running: Promise<void> | undefined;
 
   constructor(
-    private readonly dispatcher: EmailDispatcher,
+    private readonly delivery: EmailDeliveryService,
     private readonly identity: IdentityAccessService,
     private readonly config: ConfigService<EnvironmentVariables, true>,
   ) {}
@@ -48,7 +48,7 @@ export class EmailDispatchLoop implements OnApplicationBootstrap, OnModuleDestro
 
   private async tick(): Promise<void> {
     try {
-      await this.dispatcher.dispatchDue((hash) => this.identity.isActionLinkUsable(hash));
+      await this.delivery.dispatchDue((hash) => this.identity.isActionLinkUsable(hash));
     } catch (error) {
       this.logger.error(`Mail dispatch tick failed: ${(error as Error).name}`);
     } finally {

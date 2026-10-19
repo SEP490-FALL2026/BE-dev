@@ -1,5 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import {
+  OBJECT_STORAGE_ENVIRONMENT_KEYS,
+  validateObjectStorageEnvironment,
+} from '../object-storage/object-storage.config';
+import { QUEUE_ENVIRONMENT_KEYS, validateQueueEnvironment } from '../queue/queue.config';
 import { EnvironmentValidationError, validateEnvironment } from './env-schema';
 
 /**
@@ -20,6 +25,9 @@ const COMPOSE_ONLY = new Set([
   'DOMAIN',
 ]);
 
+/** Owned by modules the API and the worker do not mount today (E2 = A); validated when a G7/G9 slice mounts them. */
+const NOT_MOUNTED: ReadonlySet<string> = new Set([...OBJECT_STORAGE_ENVIRONMENT_KEYS, ...QUEUE_ENVIRONMENT_KEYS]);
+
 /** Names that must never reappear: removed from the schema, a value would be silently ignored. */
 const REMOVED = ['AUTH_COOKIE_SECURE'];
 
@@ -30,15 +38,19 @@ interface TemplateEntry {
   value: string;
   commented: boolean;
   productionRequired: boolean;
+  requiredOutsideTest: boolean;
+  productionRequiredWhenMounted: boolean;
 }
+
+const MARKERS = ['# @production-required', '# @required-outside-test', '# @production-required-when-mounted'] as const;
 
 function readTemplate(): TemplateEntry[] {
   const entries: TemplateEntry[] = [];
-  // A `# @production-required` marker applies to the next assignment only.
-  let markedRequired = false;
+  // Markers apply to the next assignment only; several may precede it.
+  let marked = new Set<string>();
   for (const line of readFileSync(join(process.cwd(), '.env.example'), 'utf8').split(/\r?\n/)) {
-    if (line.trim() === '# @production-required') {
-      markedRequired = true;
+    if ((MARKERS as readonly string[]).includes(line.trim())) {
+      marked.add(line.trim());
       continue;
     }
     const match = /^(#\s?)?([A-Z][A-Z0-9_]*)=(.*)$/.exec(line);
@@ -47,43 +59,75 @@ function readTemplate(): TemplateEntry[] {
       name: match[2],
       value: match[3],
       commented: match[1] !== undefined,
-      productionRequired: markedRequired,
+      productionRequired: marked.has('# @production-required'),
+      requiredOutsideTest: marked.has('# @required-outside-test'),
+      productionRequiredWhenMounted: marked.has('# @production-required-when-mounted'),
     });
-    markedRequired = false;
+    marked = new Set();
   }
 
   return entries;
 }
 
-/** The variables the validator knows: every key of a fully defaulted development configuration. */
+/** The variables the validator knows: every key of a fully defaulted test configuration (the only one with all). */
 function schemaNames(): string[] {
-  return Object.keys(validateEnvironment({}));
+  return Object.keys(validateEnvironment({ NODE_ENV: 'test' }));
 }
 
-/** The variables the production validator reports as missing when nothing is set. */
-function productionRequiredNames(): string[] {
+/** The variables the validator reports as missing when nothing but NODE_ENV is set. */
+function requiredNames(nodeEnvironment: 'development' | 'production'): string[] {
   try {
-    validateEnvironment({ NODE_ENV: 'production' });
+    validateEnvironment({ NODE_ENV: nodeEnvironment });
   } catch (error) {
     if (!(error instanceof EnvironmentValidationError)) throw error;
 
     return [...error.message.matchAll(/"([A-Z][A-Z0-9_]*)" is required/g)].map((match) => match[1]);
   }
 
-  throw new Error('The production validator accepted an empty environment');
+  throw new Error(`The ${nodeEnvironment} validator accepted an empty environment`);
 }
 
 describe('.env.example', () => {
   const entries = readTemplate();
   const names = entries.map((entry) => entry.name);
 
-  it('lists every schema variable exactly once, plus the Compose-only ones and nothing else', () => {
+  it('lists every schema variable exactly once, plus the not-mounted and Compose-only ones and nothing else', () => {
     const schema = schemaNames();
 
     expect(names.filter((name, index) => names.indexOf(name) !== index)).toEqual([]);
     expect(schema.filter((name) => !names.includes(name)).sort()).toEqual([]);
-    expect(names.filter((name) => !schema.includes(name) && !COMPOSE_ONLY.has(name)).sort()).toEqual([]);
-    expect([...COMPOSE_ONLY].filter((name) => !names.includes(name))).toEqual([]);
+    expect(
+      names.filter((name) => !schema.includes(name) && !COMPOSE_ONLY.has(name) && !NOT_MOUNTED.has(name)).sort(),
+    ).toEqual([]);
+    expect([...COMPOSE_ONLY, ...NOT_MOUNTED].filter((name) => !names.includes(name))).toEqual([]);
+    expect(schema.filter((name) => NOT_MOUNTED.has(name))).toEqual([]);
+  });
+
+  it('marks exactly what object storage and the queue require in production once a module is mounted (E2 = A)', () => {
+    const required = (validate: () => unknown): string[] => {
+      try {
+        validate();
+      } catch (error) {
+        if (!(error instanceof EnvironmentValidationError)) throw error;
+
+        return [...error.message.matchAll(/"([A-Z][A-Z0-9_]*)" is required/g)].map((match) => match[1]);
+      }
+
+      return [];
+    };
+    const marked = entries.filter((entry) => entry.productionRequiredWhenMounted).map((entry) => entry.name);
+
+    expect(marked.sort()).toEqual(
+      [
+        ...required(() => validateObjectStorageEnvironment({ NODE_ENV: 'production' })),
+        ...required(() => validateQueueEnvironment({ NODE_ENV: 'production' })),
+        // Not a Joi requirement but a production rule of the queue: an unauthenticated Redis is refused.
+        'REDIS_PASSWORD',
+      ].sort(),
+    );
+    expect(() => validateQueueEnvironment({ NODE_ENV: 'production', REDIS_HOST: 'redis.internal' })).toThrow(
+      'REDIS_PASSWORD',
+    );
   });
 
   it('never lists a removed variable', () => {
@@ -103,6 +147,15 @@ describe('.env.example', () => {
   it('marks exactly the variables the production validator requires', () => {
     const marked = entries.filter((entry) => entry.productionRequired).map((entry) => entry.name);
 
-    expect(marked.sort()).toEqual(productionRequiredNames().sort());
+    expect(marked.sort()).toEqual(requiredNames('production').sort());
+  });
+
+  it('marks exactly the variables development must supply itself, the secrets with no fallback outside test (E3 = C)', () => {
+    const marked = entries.filter((entry) => entry.requiredOutsideTest).map((entry) => entry.name);
+
+    expect(marked.sort()).toEqual(requiredNames('development').sort());
+    expect(marked.sort()).toEqual(
+      ['AUTH_ACCESS_TOKEN_SECRET', 'AUTH_THROTTLE_PEPPER', 'OUTBOX_PAYLOAD_KEY', 'OUTBOX_PAYLOAD_KEY_ID'].sort(),
+    );
   });
 });

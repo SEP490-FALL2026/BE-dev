@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { RECOVERY_USAGE } from '../../src/modules/identity-access/recovery/recovery.arguments';
 
 /**
  * US-01-09: the recovery command is an operator tool, so what matters is what an operator sees. These cases run the
@@ -92,6 +93,45 @@ describe('recovery command (integration, spawned process)', () => {
       expect(result.stdout).toContain('Usage: pnpm ops:recover');
       expect(result.stdout).toMatch(/exit codes/i);
       expect(result.stderr).toBe('');
+    },
+    COLD_START_MS,
+  );
+
+  it(
+    'prints exactly the usage for --help (H6.3/ROOT.1 parity)',
+    async () => {
+      expect(await run(['--help'])).toEqual({ code: 0, stdout: `${RECOVERY_USAGE}\n`, stderr: '' });
+    },
+    COLD_START_MS,
+  );
+
+  it(
+    'reports an unexpected failure by error name only, with no stack and no configured value',
+    async () => {
+      const result = await run(['unlock', ...TICKET, '--account-email', 'a@acme.vn'], {
+        DATABASE_URL: 'postgresql://user:s3cr3t-pw@127.0.0.1:1/x',
+        CORS_ORIGINS: 'https://licenses.example.com',
+        AUTH_ACCESS_TOKEN_SECRET: 'recovery-spec-access-token-secret-0123456789',
+        AUTH_THROTTLE_PEPPER: 'recovery-spec-pepper-0123',
+        APP_PUBLIC_URL: 'https://licenses.example.com',
+        OUTBOX_PAYLOAD_KEY: Buffer.alloc(32, 4).toString('base64'),
+        OUTBOX_PAYLOAD_KEY_ID: 'recovery-1',
+        SMTP_HOST: 'smtp.example.com',
+        SMTP_FROM: 'no-reply@licenses.example.com',
+        SMTP_TLS: 'true',
+        REDIS_HOST: 'redis.internal',
+        REDIS_PASSWORD: 'recovery-spec-redis-password',
+        OBJECT_STORAGE_ENDPOINT: 'https://storage.example.com',
+        OBJECT_STORAGE_BUCKET: 'recovery-bucket',
+        OBJECT_STORAGE_ACCESS_KEY_ID: 'recovery-access',
+        OBJECT_STORAGE_SECRET_ACCESS_KEY: 'recovery-secret',
+      });
+
+      expect(result).toEqual({
+        code: 1,
+        stdout: '',
+        stderr: 'The recovery failed; check the state before running it again: PrismaClientKnownRequestError\n',
+      });
     },
     COLD_START_MS,
   );

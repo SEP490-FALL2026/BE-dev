@@ -46,7 +46,8 @@
 
 ## Storage and jobs
 
-- Storage/BullMQ adapters exist; file APIs and BullMQ processors do not.
+- Storage/BullMQ adapters exist but are not mounted in any graph (E2 = A); file APIs and BullMQ processors do not.
+  A slice that mounts one restores its production validation (Redis password, HTTPS storage endpoint).
   `EmailDispatchLoop` in the separate worker polls PostgreSQL `EmailOutbox` and sends via SMTP
   outside the business transaction (ADR-0012, Proposed). Delivery is at-least-once.
 - Business modules call ObjectStoragePort rather than vendor SDKs.

@@ -1,6 +1,10 @@
-import type { INestApplicationContext, LoggerService } from '@nestjs/common';
+import type { INestApplicationContext } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
-import { EnvironmentValidationError } from './infrastructure/config/env-schema';
+import {
+  isEnvironmentValidationError,
+  quietCliLogger,
+  writeCliFailure as fail,
+} from './infrastructure/cli/cli-runtime';
 import {
   RECOVERY_USAGE,
   RecoveryArgumentError,
@@ -13,27 +17,6 @@ import { RoleTransferRecoveryService } from './modules/identity-access/recovery/
 
 /** Exit codes are part of the command's contract (see --help). */
 const EXIT = { done: 0, failed: 1, nothingToDo: 2 } as const;
-
-function fail(message: string): number {
-  process.stderr.write(`${message}\n`);
-  return EXIT.failed;
-}
-
-/** Warnings only: the errors Nest would log carry stacks, and main() reports every failure itself. */
-const cliLogger: LoggerService = {
-  log: () => undefined,
-  error: () => undefined,
-  warn: (message: unknown) => {
-    process.stderr.write(`warning: ${typeof message === 'string' ? message : 'unexpected warning'}\n`);
-  },
-};
-
-function isEnvironmentValidationError(error: unknown): error is Error {
-  return (
-    error instanceof EnvironmentValidationError ||
-    (error instanceof Error && error.name === 'EnvironmentValidationError')
-  );
-}
 
 const NEXT_STEP: Record<RecoveryResult['outcome'], string> = {
   LINK_SENT: 'One link was queued for the mailbox. The holder sets the new password with it; you never see it.',
@@ -67,7 +50,10 @@ async function main(): Promise<number> {
   try {
     // Loaded only now: the module graph validates the whole environment, which --help and argument errors must not need.
     const { RecoveryCliModule } = await import('./recovery-cli.module');
-    app = await NestFactory.createApplicationContext(RecoveryCliModule, { logger: cliLogger, abortOnError: false });
+    app = await NestFactory.createApplicationContext(RecoveryCliModule, {
+      logger: quietCliLogger,
+      abortOnError: false,
+    });
     const holder = app.get(HolderRecoveryService);
 
     const { command } = parsed;
