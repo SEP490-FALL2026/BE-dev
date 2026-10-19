@@ -4,11 +4,11 @@ import {
   ApiErrorResponses,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
-} from '../../infrastructure/http/decorators/api-error-responses.decorator';
-import { ApiSuccessResponse } from '../../infrastructure/http/decorators/api-success-response.decorator';
-import { RequireRoles } from '../../infrastructure/security/decorators/access.decorators';
-import { CurrentPrincipal } from '../../infrastructure/security/models/current-principal';
-import type { AuthenticatedPrincipal } from '../../infrastructure/security/tokens/access-token-verifier.port';
+} from '../../../infrastructure/http/decorators/api-error-responses.decorator';
+import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
+import { RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
+import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
+import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { CostCenterService } from './cost-center.service';
 import { CostCenterRecord } from './cost-center.types';
 import {
@@ -20,8 +20,8 @@ import {
   ListCostCenterEmployeesQueryDto,
   ListCostCentersQueryDto,
   RenameCostCenterBodyDto,
-} from './dto/cost-center.dto';
-import { toOrganizationApiException } from './mappers/organization.http-errors';
+} from './cost-center.dto';
+import { toOrganizationApiException } from '../mappers/organization.http-errors';
 
 const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPONSE] as const;
 

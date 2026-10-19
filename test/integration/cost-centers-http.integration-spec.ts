@@ -302,6 +302,11 @@ describe('the Cost Center catalogue over HTTP (integration, real PostgreSQL)', (
         'COST_CENTER.CREATED',
         'COST_CENTER.DEACTIVATED',
       ]);
+      expect((await auditActions(costCenter.id))[1]).toEqual({
+        action: 'COST_CENTER.DEACTIVATED',
+        before: { status: 'ACTIVE' },
+        after: { status: 'INACTIVE' },
+      });
     });
 
     it('retires one whose department has nobody left, and keeps the department (split and merge, AC-10, AC-11)', async () => {

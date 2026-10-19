@@ -99,9 +99,9 @@ const LEGACY = {
     ['modules/organization/department.service.ts', 508], // H4
   ]),
   /** Module -> cap on controllers directly in the module root. H4. */
-  rootControllers: new Map<string, number>([['organization', 4]]),
+  rootControllers: new Map<string, number>(),
   /** Module -> cap on non-spec files directly in the module root. H4. */
-  rootFiles: new Map<string, number>([['organization', 22]]),
+  rootFiles: new Map<string, number>(),
 } as const;
 
 function listTypeScriptFiles(directory: string): string[] {

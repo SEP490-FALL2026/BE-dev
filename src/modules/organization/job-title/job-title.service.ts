@@ -1,20 +1,19 @@
 import { Injectable } from '@nestjs/common';
-import { normalizeDisplayName } from '../../core/display-name';
-import { TransactionRunner } from '../../infrastructure/database/transaction-runner';
-import { isUniqueViolation } from '../../infrastructure/database/unique-violation';
-import type { AuthenticatedPrincipal } from '../../infrastructure/security/tokens/access-token-verifier.port';
-import { AuditService } from '../audit/audit.service';
+import { normalizeDisplayName } from '../../../core/display-name';
+import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
+import { isUniqueViolation } from '../../../infrastructure/database/unique-violation';
+import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
+import { AuditService } from '../../audit/audit.service';
 import {
   JobTitleNameRequiredError,
   JobTitleNameTakenError,
   JobTitleNameTooLongError,
   JobTitleNotFoundError,
-} from './errors/organization.errors';
+} from './job-title.errors';
 import { isJobTitleNameTooLong, normalizeJobTitleName } from './job-title-name';
-import { organizationAuditEvent } from './mappers/audit-event.mapper';
-import { OrganizationRepo } from './organization.repo';
-import { OrganizationService } from './organization.service';
-import { JobTitleRecord, JobTitleStatus } from './organization.types';
+import { organizationAuditEvent } from '../mappers/audit-event.mapper';
+import { OrganizationService } from '../organization.service';
+import { JobTitleRecord, JobTitleStatus } from './job-title.types';
 
 export interface JobTitlePage {
   items: JobTitleRecord[];
@@ -28,7 +27,6 @@ export interface JobTitlePage {
 @Injectable()
 export class JobTitleService {
   constructor(
-    private readonly repo: OrganizationRepo,
     private readonly organization: OrganizationService,
     private readonly audit: AuditService,
     private readonly runner: TransactionRunner,
@@ -41,7 +39,7 @@ export class JobTitleService {
     pageSize: number;
   }): Promise<JobTitlePage> {
     const search = query.search ? normalizeJobTitleName(query.search) : '';
-    const { items, total } = await this.repo.listJobTitles({
+    const { items, total } = await this.organization.listJobTitles({
       ...(query.status ? { status: query.status } : {}),
       ...(search ? { search } : {}),
       skip: (query.page - 1) * query.pageSize,
@@ -66,7 +64,7 @@ export class JobTitleService {
 
     try {
       return await this.runner.run(async (tx) => {
-        const title = await this.repo.insertJobTitle(tx, organization.id, rawName);
+        const title = await this.organization.insertJobTitle(tx, organization.id, rawName);
         await this.audit.record(
           tx,
           organizationAuditEvent(actor, organization.id, 'JOB_TITLE.CREATED', 'JobTitle', title.id, null, {
@@ -92,11 +90,11 @@ export class JobTitleService {
 
     try {
       return await this.runner.run(async (tx) => {
-        const current = await this.repo.lockJobTitle(tx, jobTitleId, 'UPDATE');
+        const current = await this.organization.lockJobTitleForUpdate(tx, jobTitleId);
         if (!current) throw new JobTitleNotFoundError();
         if (current.name === normalizeDisplayName(rawName)) return current;
 
-        const renamed = await this.repo.renameJobTitle(tx, jobTitleId, rawName, new Date());
+        const renamed = await this.organization.renameJobTitle(tx, jobTitleId, rawName, new Date());
         await this.audit.record(
           tx,
           organizationAuditEvent(
@@ -136,12 +134,12 @@ export class JobTitleService {
     const organization = await this.requireOrganization();
 
     return this.runner.run(async (tx) => {
-      const current = await this.repo.lockJobTitle(tx, jobTitleId, 'UPDATE');
+      const current = await this.organization.lockJobTitleForUpdate(tx, jobTitleId);
       if (!current) throw new JobTitleNotFoundError();
       // Already in the state asked for: say so, write nothing, record nothing (T-13).
       if (current.status === status) return current;
 
-      const changed = await this.repo.setJobTitleStatus(tx, jobTitleId, status, new Date());
+      const changed = await this.organization.setJobTitleStatus(tx, jobTitleId, status, new Date());
       await this.audit.record(
         tx,
         organizationAuditEvent(
@@ -183,7 +181,7 @@ export class JobTitleService {
   ): Promise<unknown> {
     if (!isUniqueViolation(error, 'normalized_name')) return error;
 
-    const other = await this.repo.findJobTitleByNormalizedName(organizationId, normalizeJobTitleName(rawName));
+    const other = await this.organization.findJobTitleByNormalizedName(organizationId, normalizeJobTitleName(rawName));
     const conflict = other && other.id !== ownId ? { id: other.id, name: other.name, status: other.status } : null;
 
     return new JobTitleNameTakenError(conflict);

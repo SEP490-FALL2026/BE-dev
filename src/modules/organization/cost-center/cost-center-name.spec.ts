@@ -1,4 +1,5 @@
-import { COST_CENTER_CODE_PATTERN, isReservedCostCenterName } from './cost-center-name';
+import { isReservedCostCenterName } from './cost-center-name';
+import { COST_CENTER_CODE_PATTERN } from './cost-center.types';
 
 describe('cost center names (US-04-09 AC-4)', () => {
   it.each(['Chưa phân loại', '  chưa   PHÂN loại ', 'Chua phan loai', 'CHƯA PHÂN BỔ COST CENTER', 'Unclassified'])(

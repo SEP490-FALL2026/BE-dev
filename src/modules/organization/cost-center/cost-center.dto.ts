@@ -1,7 +1,7 @@
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
-import { COST_CENTER_CODE_MAX_LENGTH, COST_CENTER_CODE_PATTERN } from '../cost-center-name';
+import { COST_CENTER_CODE_MAX_LENGTH, COST_CENTER_CODE_PATTERN } from './cost-center.types';
 
 /**
  * Only bounded here: whether the kind is supported, and whether the name is empty, reserved or too long, is judged

@@ -1,15 +1,21 @@
 import { Client } from 'pg';
 import { PrismaService } from '../../src/infrastructure/database/prisma.service';
 import { TransactionRunner } from '../../src/infrastructure/database/transaction-runner';
+import { OrganizationAlreadyExistsError } from '../../src/modules/organization/errors/organization.errors';
+import { CostCenterCatalogueService } from '../../src/modules/organization/cost-center/cost-center-catalogue.service';
+import { CostCenterRepo } from '../../src/modules/organization/cost-center/cost-center.repo';
+import { DepartmentRepo } from '../../src/modules/organization/department.repo';
+import { EmployeeDirectoryService } from '../../src/modules/organization/employee/employee-directory.service';
+import { EmployeeRepo } from '../../src/modules/organization/employee/employee.repo';
+import { ImportLookupRepo } from '../../src/modules/organization/employee/import-lookup.repo';
+import { JobTitleCatalogueService } from '../../src/modules/organization/job-title/job-title-catalogue.service';
+import { JobTitleRepo } from '../../src/modules/organization/job-title/job-title.repo';
+import { OrganizationRepo } from '../../src/modules/organization/organization.repo';
 import {
   EmployeeCodeTakenError,
   EmployeeEmailTakenError,
-  OrganizationAlreadyExistsError,
-} from '../../src/modules/organization/errors/organization.errors';
-import { CostCenterRepo } from '../../src/modules/organization/cost-center.repo';
-import { DepartmentRepo } from '../../src/modules/organization/department.repo';
-import { ImportLookupRepo } from '../../src/modules/organization/import-lookup.repo';
-import { OrganizationRepo } from '../../src/modules/organization/organization.repo';
+  EmployeeNotFoundError,
+} from '../../src/modules/organization/organization.errors';
 import { OrganizationService } from '../../src/modules/organization/organization.service';
 import {
   DisposableDatabase,
@@ -40,8 +46,9 @@ describe('organization foundation (integration)', () => {
     organization = new OrganizationService(
       new OrganizationRepo(prisma),
       new DepartmentRepo(prisma),
-      new ImportLookupRepo(prisma),
-      new CostCenterRepo(prisma),
+      new EmployeeDirectoryService(new EmployeeRepo(prisma), new ImportLookupRepo(prisma)),
+      new CostCenterCatalogueService(new CostCenterRepo(prisma)),
+      new JobTitleCatalogueService(new JobTitleRepo(prisma)),
     );
     sql = new Client({ connectionString: database.url });
     await sql.connect();
@@ -211,5 +218,59 @@ describe('organization foundation (integration)', () => {
     await expect(
       runner.run((tx) => organization.lockEmployeeForShare(tx, '4f24d10d-63ad-49b1-a7a1-c988765990ae')),
     ).rejects.toThrow(/not found/i);
+  });
+
+  // Wave 2 characterization: what the facade answers, pinned before its job title, employee and cost center work moved
+  // to capability services. The facade calls stay the same; only who answers them behind it changes.
+  it('reports a missing employee with the public EmployeeNotFoundError, for both lock modes', async () => {
+    const missing = '0b4d7a5c-2f1e-4c3b-9a8d-7e6f5a4b3c2d';
+    const locks = [
+      (tx: Parameters<typeof organization.lockEmployeeForShare>[0]) => organization.lockEmployeeForShare(tx, missing),
+      (tx: Parameters<typeof organization.lockEmployeeForUpdate>[0]) => organization.lockEmployeeForUpdate(tx, missing),
+    ];
+    for (const lock of locks) {
+      const failure = await runner.run((tx) => lock(tx)).catch((error: unknown) => error);
+      expect(failure).toBeInstanceOf(EmployeeNotFoundError);
+      expect(failure).toMatchObject({ employeeId: missing });
+    }
+  });
+
+  it('reads several employees at once, leaving out ids it does not know', async () => {
+    const first = await hire('E-MANY1', null);
+    const second = await hire('E-MANY2', null);
+
+    await expect(organization.getEmployees([])).resolves.toEqual([]);
+    const found = await organization.getEmployees([second.id, '6e1f2a3b-4c5d-4e6f-8a7b-9c0d1e2f3a4b', first.id]);
+    expect(found.map((employee) => employee.employeeCode).sort()).toEqual(['E-MANY1', 'E-MANY2']);
+    expect(Object.keys(found[0]).sort()).toEqual([
+      'employeeCode',
+      'fullName',
+      'hireDate',
+      'id',
+      'organizationId',
+      'status',
+      'workEmail',
+    ]);
+  });
+
+  it('creates the installation cost center as a UNIT, and counts as free only active UNITs no department has', async () => {
+    const free = async () => (await organization.getOnboardingFacts()).freeCostCenters;
+    const before = await free();
+
+    const unit = await runner.run((tx) =>
+      organization.createUnitCostCenter(tx, { organizationId, code: 'CC-FREE', name: 'Free unit' }),
+    );
+    expect((await sql.query('SELECT kind, status FROM cost_centers WHERE id = $1', [unit.id])).rows).toEqual([
+      { kind: 'UNIT', status: 'ACTIVE' },
+    ]);
+    expect(await free()).toBe(before + 1);
+
+    await sql.query(`UPDATE cost_centers SET kind = 'COMPANY' WHERE id = $1`, [unit.id]);
+    expect(await free()).toBe(before);
+    await sql.query(
+      `UPDATE cost_centers SET kind = 'UNIT', status = 'INACTIVE', deactivated_at = now() WHERE id = $1`,
+      [unit.id],
+    );
+    expect(await free()).toBe(before);
   });
 });

@@ -1,5 +1,5 @@
 import { BusinessDate } from '../../core/business-date';
-import { CostCenterStatus } from './cost-center.types';
+import { CostCenterStatus } from './cost-center/cost-center.types';
 import { EmployeeStatus } from './organization.types';
 import { ProjectRecord } from './project/project.types';
 

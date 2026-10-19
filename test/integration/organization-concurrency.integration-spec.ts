@@ -2,6 +2,8 @@ import request from 'supertest';
 import { Client } from 'pg';
 import { ApiAccount, adminToken, createActivatedAccount } from '../support/api-accounts';
 import { HttpTestApp, SeededInstallation, createHttpTestApp, seedInstallation } from '../support/http-test-app';
+import { TransactionRunner } from '../../src/infrastructure/database/transaction-runner';
+import { OrganizationService } from '../../src/modules/organization/organization.service';
 import { findPlacementCoverageViolations } from '../support/placement-coverage';
 
 const ROUNDS = 6;
@@ -269,6 +271,115 @@ describe('lock protocol: job titles and manual entry races (integration, real Po
     }
     expect(await deadlocks()).toBe(deadlocksBefore);
   }, 120000);
+
+  /**
+   * Wave 2 characterization: the lock mode each path takes on the rows it relies on (lock protocol T-11), pinned
+   * before the job title, employee and cost center capabilities moved behind the organization facade. A path that
+   * takes `FOR SHARE` goes past a held `FOR SHARE`; a path that takes `FOR UPDATE` waits for it.
+   */
+  describe('lock modes kept by the Wave 2 move', () => {
+    const SETTLE_MS = 5000;
+
+    /** Settles while the holder still holds its `FOR SHARE` lock, or fails naming the path that waited. */
+    async function settlesWhileShared<T>(work: Promise<T>, what: string): Promise<T> {
+      let timer: NodeJS.Timeout | undefined;
+      try {
+        return await Promise.race([
+          work,
+          new Promise<never>((_, reject) => {
+            timer = setTimeout(() => reject(new Error(`${what} waited behind a FOR SHARE lock`)), SETTLE_MS);
+          }),
+        ]);
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+
+    const freeUnitCostCenter = async (): Promise<string> => {
+      counter += 1;
+      const code = `CC-LM${counter}`;
+
+      return (
+        await ctx.app
+          .get(TransactionRunner)
+          .run((tx) =>
+            ctx.app
+              .get(OrganizationService)
+              .createUnitCostCenter(tx, { organizationId: seed.organizationId, code, name: `Lock ${code}` }),
+          )
+      ).id;
+    };
+
+    const createDepartment = (costCenterId: string) => {
+      counter += 1;
+
+      return request(server())
+        .post('/api/v1/departments')
+        .set(asIt())
+        .send({ code: `P-LM${counter}`, name: `Lock Department ${counter}`, costCenterId })
+        .then((response) => response);
+    };
+
+    it('a manual entry shares the job title it names; a rename of that title waits', async () => {
+      const titleId = await createTitle(unique('Shared Title'));
+      await holder.query('BEGIN');
+      await holder.query('SELECT id FROM job_titles WHERE id = $1 FOR SHARE', [titleId]);
+
+      const entered = await settlesWhileShared(
+        enter(entry({ jobTitleId: titleId })).then((response) => response),
+        'the manual entry',
+      );
+      expect(entered.status).toBe(201);
+
+      const rename = request(server())
+        .patch(`/api/v1/job-titles/${titleId}`)
+        .set(asIt())
+        .send({ name: unique('Shared Title Renamed') })
+        .then((response) => response);
+      await waitForWaiters(ctx.sql, 1);
+      await holder.query('COMMIT');
+      expect((await rename).status).toBe(200);
+    });
+
+    it('creating a department shares its cost center: it passes a FOR SHARE holder and waits for a FOR UPDATE one', async () => {
+      const shared = await freeUnitCostCenter();
+      await holder.query('BEGIN');
+      await holder.query('SELECT id FROM cost_centers WHERE id = $1 FOR SHARE', [shared]);
+      expect((await settlesWhileShared(createDepartment(shared), 'the department creation')).status).toBe(201);
+      await holder.query('COMMIT');
+
+      const updated = await freeUnitCostCenter();
+      await holder.query('BEGIN');
+      await holder.query('SELECT id FROM cost_centers WHERE id = $1 FOR UPDATE', [updated]);
+      const waiting = createDepartment(updated);
+      await waitForWaiters(ctx.sql, 1);
+      await holder.query('COMMIT');
+      expect((await waiting).status).toBe(201);
+    });
+
+    it('the import locks departments and job titles FOR SHARE; the employee locks keep their two modes', async () => {
+      const organization = ctx.app.get(OrganizationService);
+      const runner = ctx.app.get(TransactionRunner);
+      const employeeId = seed.superAdmin.employeeId;
+      await holder.query('BEGIN');
+      await holder.query('SELECT id FROM departments WHERE id = $1 FOR SHARE', [seed.departmentId]);
+      await holder.query('SELECT id FROM job_titles WHERE id = $1 FOR SHARE', [seed.jobTitleId]);
+      await holder.query('SELECT id FROM employees WHERE id = $1 FOR SHARE', [employeeId]);
+
+      await settlesWhileShared(
+        runner.run((tx) => organization.lockForEmployeeImport(tx, [seed.departmentId], [seed.jobTitleId])),
+        'the import locks',
+      );
+      await settlesWhileShared(
+        runner.run((tx) => organization.lockEmployeeForShare(tx, employeeId)),
+        'the employee share lock',
+      );
+      const forUpdate = runner.run((tx) => organization.lockEmployeeForUpdate(tx, employeeId));
+      await waitForWaiters(ctx.sql, 1);
+      await holder.query('COMMIT');
+      await expect(forUpdate).resolves.toBeUndefined();
+    });
+  });
 
   it('leaves every employee with a coherent placement history (I-2 coverage)', async () => {
     await expect(findPlacementCoverageViolations(ctx.sql)).resolves.toEqual([]);

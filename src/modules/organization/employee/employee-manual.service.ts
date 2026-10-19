@@ -1,15 +1,15 @@
 import { Injectable } from '@nestjs/common';
-import { BusinessDate, businessDateAt } from '../../core/business-date';
-import { InvalidEmailError, normalizeEmail } from '../../core/email';
-import { TransactionRunner } from '../../infrastructure/database/transaction-runner';
-import type { AuthenticatedPrincipal } from '../../infrastructure/security/tokens/access-token-verifier.port';
-import { AuditService } from '../audit/audit.service';
-import { EmployeeCodeTakenError, EmployeeEmailTakenError, EmployeeRowInvalidError } from './errors/organization.errors';
+import { BusinessDate, businessDateAt } from '../../../core/business-date';
+import { InvalidEmailError, normalizeEmail } from '../../../core/email';
+import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
+import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
+import { AuditService } from '../../audit/audit.service';
+import { EmployeeCodeTakenError, EmployeeEmailTakenError } from '../organization.errors';
+import { EmployeeRowInvalidError } from './employee.errors';
 import { validateEmployeeRow } from './employee-row.validator';
-import { organizationAuditEvent } from './mappers/audit-event.mapper';
-import { OrganizationRepo } from './organization.repo';
-import { OrganizationService } from './organization.service';
-import { EmploymentType } from './organization.types';
+import { organizationAuditEvent } from '../mappers/audit-event.mapper';
+import { OrganizationService } from '../organization.service';
+import { EmploymentType } from '../organization.types';
 
 const UUID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -46,7 +46,6 @@ export interface ManualEmployeeView {
 @Injectable()
 export class EmployeeManualService {
   constructor(
-    private readonly repo: OrganizationRepo,
     private readonly organization: OrganizationService,
     private readonly audit: AuditService,
     private readonly runner: TransactionRunner,
@@ -64,15 +63,20 @@ export class EmployeeManualService {
         // The day the person is recorded, in the organization's own calendar (T-14), whatever hire date was typed.
         // Taken inside the transaction from the database clock, the same instant `created_at` will carry, unless a
         // test fixed the clock.
-        const memberSince = businessDateAt(now ?? (await this.repo.databaseNow(tx)), organization.timeZone);
+        const memberSince = businessDateAt(
+          now ?? (await this.organization.employeeRecordingInstant(tx)),
+          organization.timeZone,
+        );
         // Lock order (T-11): department, then job title, then the employee rows that get written.
         const departmentCode = input.departmentCode?.trim() ?? '';
         const department = departmentCode
-          ? await this.repo.lockDepartmentByCode(tx, organization.id, departmentCode)
+          ? await this.organization.lockDepartmentForEntry(tx, organization.id, departmentCode)
           : null;
         const jobTitleId = input.jobTitleId?.trim() ?? '';
         const jobTitle =
-          jobTitleId && UUID_SHAPE.test(jobTitleId) ? await this.repo.lockJobTitle(tx, jobTitleId, 'SHARE') : null;
+          jobTitleId && UUID_SHAPE.test(jobTitleId)
+            ? await this.organization.lockJobTitleForShare(tx, jobTitleId)
+            : null;
         const workEmail = input.workEmail?.trim() || null;
         const normalizedEmail = workEmail === null ? null : this.normalize(workEmail);
 
@@ -81,14 +85,15 @@ export class EmployeeManualService {
           {
             department,
             jobTitle,
-            employeeCodeTaken: await this.repo.employeeCodeExists(tx, organization.id, input.employeeCode),
+            employeeCodeTaken: await this.organization.isEmployeeCodeTaken(tx, organization.id, input.employeeCode),
             workEmailTaken:
-              normalizedEmail !== null && (await this.repo.workEmailExists(tx, organization.id, normalizedEmail)),
+              normalizedEmail !== null &&
+              (await this.organization.isWorkEmailTaken(tx, organization.id, normalizedEmail)),
           },
         );
         if (reasons.length > 0 || !department || !jobTitle) throw new EmployeeRowInvalidError(reasons);
 
-        const { id } = await this.repo.createEmployeeWithPlacement(tx, {
+        const { id } = await this.organization.createEmployeeWithPlacement(tx, {
           organizationId: organization.id,
           employeeCode: input.employeeCode,
           fullName: input.fullName,

@@ -127,10 +127,13 @@ mục của nó trong cùng thay đổi. Không thêm mục để làm xanh buil
 Owner/dev review. Allowlist (`CLI_ENTRY_FILES`, `PUBLIC_CONTRACT_EXPORTS`) chỉ mở rộng khi contract công khai thật sự đổi,
 cũng qua review. Gate không chứng minh thiết kế đúng — review vẫn bắt buộc.
 
-## Ví dụ đích (chưa di chuyển file)
+## Ví dụ đích và trạng thái chuyển tiếp
 
-`organization` (sau H4.2: root 22 file, 4 controller; `project/` đã tách) đích theo capability `cost-center/`,
-`department/`, `project/`, `job-title/`, `employee/`; root giữ module, HTTP module, facade, type và lỗi public;
-`normalizeDisplayName` chuyển vào `src/core` (Q6). `identity-access` giữ `auth/`, `accounts/`, `approval-roles/`,
-`access/`; lỗi và DTO chuyển vào capability sở hữu; `recovery.*` ở root làm entry CLI. Bảng file → vị trí đích ở mục 4.4
-của báo cáo audit; thực hiện ở lát H4/H5 của item handoff, mỗi capability một PR, không đổi contract.
+`organization` đích theo capability `cost-center/`, `department/`, `project/`, `job-title/`, `employee/`; root giữ
+module, HTTP module, facade, type và lỗi public; `normalizeDisplayName` ở `src/core` (Q6). **Chuyển tiếp sau Wave 2
+(H4.3b, H4.4, H4.5):** `project/`, `job-title/`, `employee/`, `cost-center/` đã tách; root còn 10 file, 1 controller —
+phần Department và `organization.repo.ts` chờ Wave 3 (H4.6, H4.7). Repo Job Title, Employee là provider riêng của
+`OrganizationModule` sau capability service mà chỉ facade dùng; use case HTTP gọi facade (E4 giữ ba repo export).
+`identity-access` giữ `auth/`, `accounts/`, `approval-roles/`, `access/`; lỗi và DTO chuyển vào capability sở hữu;
+`recovery.*` ở root làm entry CLI. Bảng file → vị trí đích ở mục 4.4 của báo cáo audit; thực hiện theo các lát/wave H4
+và H5 của item handoff, không đổi contract.

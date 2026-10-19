@@ -1,9 +1,10 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma } from '../../generated/prisma/client';
-import { PrismaService } from '../../infrastructure/database/prisma.service';
-import { DbTx } from '../../infrastructure/database/transaction-runner';
-import { isUniqueViolation } from '../../infrastructure/database/unique-violation';
-import { CostCenterCodeTakenError } from './errors/cost-center.errors';
+import { Prisma } from '../../../generated/prisma/client';
+import { PrismaService } from '../../../infrastructure/database/prisma.service';
+import { DbTx } from '../../../infrastructure/database/transaction-runner';
+import { isUniqueViolation } from '../../../infrastructure/database/unique-violation';
+import { CostCenterCodeTakenError } from './cost-center.errors';
+import { CreateCostCenterInput } from '../organization.types';
 import { CostCenterKind, CostCenterRecord, CostCenterStatus } from './cost-center.types';
 
 interface CostCenterRow {
@@ -42,10 +43,21 @@ function toRecord(row: CostCenterRow): CostCenterRecord {
   };
 }
 
-/** The Cost Center catalogue (US-04-09) and the questions retiring one needs answered about its department. */
+/**
+ * The Cost Center catalogue (US-04-09) and the questions retiring one needs answered about its department: the one
+ * writer of `cost_centers`, for the installation and for the catalogue.
+ */
 @Injectable()
 export class CostCenterRepo {
   constructor(private readonly prisma: PrismaService) {}
+
+  /**
+   * The installation's cost center: always a UNIT, created as given. Unlike `insert` it does not turn a taken code into
+   * CostCenterCodeTakenError: the installation command reports the database error as it is.
+   */
+  async createCostCenter(tx: DbTx, input: CreateCostCenterInput): Promise<{ id: string }> {
+    return tx.costCenter.create({ data: { ...input, kind: 'UNIT' }, select: { id: true } });
+  }
 
   async insert(
     tx: DbTx,

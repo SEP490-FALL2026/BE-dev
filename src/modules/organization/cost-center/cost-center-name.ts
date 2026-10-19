@@ -1,8 +1,5 @@
-import { normalizeDisplayName } from '../../core/display-name';
+import { normalizeDisplayName } from '../../../core/display-name';
 
-/** A Cost Center code: letters, digits, dot, underscore and hyphen, starting with a letter or digit. */
-export const COST_CENTER_CODE_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
-export const COST_CENTER_CODE_MAX_LENGTH = 50;
 export const COST_CENTER_NAME_MAX_LENGTH = 200;
 
 /**

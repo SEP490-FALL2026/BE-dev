@@ -3,7 +3,7 @@ import { TransactionRunner } from '../../infrastructure/database/transaction-run
 import type { AuthenticatedPrincipal } from '../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditService } from '../audit/audit.service';
 import { IdentityAccessService } from '../identity-access/identity-access.service';
-import { CostCenterRepo } from './cost-center.repo';
+import { CostCenterService } from './cost-center/cost-center.service';
 import { DepartmentRepo } from './department.repo';
 import { DepartmentService } from './department.service';
 import { DepartmentItAdminInvalidError, HeadAssignmentError } from './errors/department.errors';
@@ -45,7 +45,7 @@ describe('DepartmentService employee look-up', () => {
       providers: [
         DepartmentService,
         { provide: DepartmentRepo, useValue: departments },
-        { provide: CostCenterRepo, useValue: {} },
+        { provide: CostCenterService, useValue: {} },
         { provide: OrganizationService, useValue: organization },
         { provide: ProjectService, useValue: {} },
         { provide: IdentityAccessService, useValue: identity },

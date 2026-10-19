@@ -6,7 +6,7 @@ import { isCheckViolation } from '../../infrastructure/database/unique-violation
 import type { AuthenticatedPrincipal } from '../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditService } from '../audit/audit.service';
 import { IdentityAccessService } from '../identity-access/identity-access.service';
-import { CostCenterRepo } from './cost-center.repo';
+import { CostCenterService } from './cost-center/cost-center.service';
 import { DepartmentRepo } from './department.repo';
 import {
   DepartmentMemberRecord,
@@ -72,7 +72,7 @@ const normalizeFunction = (raw: string | null | undefined): string | null => {
 export class DepartmentService {
   constructor(
     private readonly repo: DepartmentRepo,
-    private readonly costCenters: CostCenterRepo,
+    private readonly costCenters: CostCenterService,
     private readonly organization: OrganizationService,
     private readonly projects: ProjectService,
     private readonly identity: IdentityAccessService,
@@ -189,7 +189,7 @@ export class DepartmentService {
 
     const id = await this.runner.run(async (tx) => {
       // Lock order (T-11): the cost center, the new department, then the people it names.
-      const costCenter = await this.costCenters.lock(tx, input.costCenterId, 'SHARE');
+      const costCenter = await this.costCenters.lockForDepartment(tx, input.costCenterId);
       if (!costCenter) throw new DepartmentCostCenterError('NOT_FOUND');
       if (costCenter.kind !== 'UNIT') throw new DepartmentCostCenterError('NOT_UNIT');
       if (costCenter.status !== 'ACTIVE') throw new DepartmentCostCenterError('INACTIVE');

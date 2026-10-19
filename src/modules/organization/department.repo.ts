@@ -6,7 +6,7 @@ import { DbTx } from '../../infrastructure/database/transaction-runner';
 import { isUniqueViolation } from '../../infrastructure/database/unique-violation';
 import { DepartmentMemberRecord, DepartmentRecord, DepartmentStatus, HeadPeriodRecord } from './department.types';
 import { DepartmentCodeTakenError, DepartmentCostCenterError } from './errors/department.errors';
-import { CostCenterStatus } from './cost-center.types';
+import { CostCenterStatus } from './cost-center/cost-center.types';
 import { EmployeeStatus } from './organization.types';
 
 interface DepartmentRow {

@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import { businessDateAt } from '../../core/business-date';
-import { TransactionRunner } from '../../infrastructure/database/transaction-runner';
-import type { AuthenticatedPrincipal } from '../../infrastructure/security/tokens/access-token-verifier.port';
-import { AuditService } from '../audit/audit.service';
+import { businessDateAt } from '../../../core/business-date';
+import { DbTx, TransactionRunner } from '../../../infrastructure/database/transaction-runner';
+import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
+import { AuditService } from '../../audit/audit.service';
 import { COST_CENTER_NAME_MAX_LENGTH, displayCostCenterName, isReservedCostCenterName } from './cost-center-name';
 import { CostCenterRepo } from './cost-center.repo';
 import { CostCenterKind, CostCenterRecord, CostCenterStatus } from './cost-center.types';
@@ -12,9 +12,9 @@ import {
   CostCenterNameInvalidError,
   CostCenterNameReservedError,
   CostCenterNotFoundError,
-} from './errors/cost-center.errors';
-import { organizationAuditEvent } from './mappers/audit-event.mapper';
-import { OrganizationService } from './organization.service';
+} from './cost-center.errors';
+import { organizationAuditEvent } from '../mappers/audit-event.mapper';
+import { OrganizationService } from '../organization.service';
 
 /** How many names of the people still in the department the refusal to retire a cost center lists. */
 const IN_USE_LISTED_EMPLOYEES = 20;
@@ -42,6 +42,14 @@ export class CostCenterService {
     private readonly audit: AuditService,
     private readonly runner: TransactionRunner,
   ) {}
+
+  /**
+   * `FOR SHARE` on the cost center a new department takes (it must stay as it is until the department commits;
+   * lock order T-11: the cost center first), then its row; null when it does not exist. The department judges it.
+   */
+  lockForDepartment(tx: DbTx, costCenterId: string): Promise<CostCenterRecord | null> {
+    return this.repo.lock(tx, costCenterId, 'SHARE');
+  }
 
   async list(query: {
     status?: CostCenterStatus;

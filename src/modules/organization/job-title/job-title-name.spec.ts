@@ -1,6 +1,6 @@
 import { JOB_TITLE_NAME_MAX_LENGTH, isJobTitleNameTooLong, normalizeJobTitleName } from './job-title-name';
-import { normalizeDisplayName } from '../../core/display-name';
-import { DISPLAY_NAME_CASES } from '../../../test/support/display-name-cases';
+import { normalizeDisplayName } from '../../../core/display-name';
+import { DISPLAY_NAME_CASES } from '../../../../test/support/display-name-cases';
 
 describe('job title names (T-12, US-02-07 AC-2)', () => {
   describe.each(DISPLAY_NAME_CASES)('$label', ({ input, comparison, characters }) => {

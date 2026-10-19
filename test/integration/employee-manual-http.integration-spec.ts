@@ -1,6 +1,9 @@
 import request from 'supertest';
 import type { AuthenticatedPrincipal } from '../../src/infrastructure/security/tokens/access-token-verifier.port';
-import { EmployeeManualService, ManualEmployeeInput } from '../../src/modules/organization/employee-manual.service';
+import {
+  EmployeeManualService,
+  ManualEmployeeInput,
+} from '../../src/modules/organization/employee/employee-manual.service';
 import { bodyOf } from '../support/api-body';
 import {
   ACCOUNT_PASSWORD,
@@ -176,6 +179,31 @@ describe('manual employee entry over HTTP (integration, real PostgreSQL)', () =>
           jobTitle: 'Administrator',
         },
       });
+    });
+
+    it('records exactly what was entered, with the department code, the title name and the day of membership', async () => {
+      const response = await enter(row()).expect(201);
+      const data = dataOf(response);
+
+      const audit = await ctx.sql.query<{ before: unknown; after: Record<string, unknown> }>(
+        `SELECT before, after FROM audit_events WHERE action = 'EMPLOYEE.CREATED' AND resource_id = $1`,
+        [data.id],
+      );
+      expect(audit.rows).toEqual([
+        {
+          before: null,
+          after: {
+            employeeCode: data.employeeCode,
+            fullName: data.fullName,
+            workEmail: data.workEmail,
+            employmentType: data.employmentType,
+            hireDate: data.hireDate,
+            department: data.department.code,
+            jobTitle: data.jobTitle.name,
+            memberSince: data.memberSince,
+          },
+        },
+      ]);
     });
 
     it('accepts every employment type', async () => {

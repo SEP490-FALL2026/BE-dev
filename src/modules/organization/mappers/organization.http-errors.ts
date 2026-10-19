@@ -8,7 +8,7 @@ import {
   CostCenterNameInvalidError,
   CostCenterNameReservedError,
   CostCenterNotFoundError,
-} from '../errors/cost-center.errors';
+} from '../cost-center/cost-center.errors';
 import {
   DepartmentCodeTakenError,
   DepartmentCostCenterError,
@@ -21,13 +21,13 @@ import {
   DepartmentUpdateEmptyError,
   HeadAssignmentError,
 } from '../errors/department.errors';
+import { EmployeeRowInvalidError } from '../employee/employee.errors';
 import {
-  EmployeeRowInvalidError,
   JobTitleNameRequiredError,
   JobTitleNameTakenError,
   JobTitleNameTooLongError,
   JobTitleNotFoundError,
-} from '../errors/organization.errors';
+} from '../job-title/job-title.errors';
 import { ProjectInvalidError, ProjectNotFoundError } from '../project/project.errors';
 
 function refuse(status: HttpStatus, code: string, message: string, details?: Record<string, unknown>): ApiException {

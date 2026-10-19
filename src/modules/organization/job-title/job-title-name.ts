@@ -1,4 +1,4 @@
-import { normalizeDisplayName } from '../../core/display-name';
+import { normalizeDisplayName } from '../../../core/display-name';
 
 /** A job title is at most this many characters after normalization (T-12). */
 export const JOB_TITLE_NAME_MAX_LENGTH = 100;

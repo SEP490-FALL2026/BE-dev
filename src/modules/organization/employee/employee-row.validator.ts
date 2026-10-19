@@ -1,4 +1,4 @@
-import { JobTitleStatus } from './organization.types';
+import { JobTitleStatus } from '../job-title/job-title.types';
 
 export type EmployeeRowReasonCode =
   | 'DEPARTMENT_REQUIRED'

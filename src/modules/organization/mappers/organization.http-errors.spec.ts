@@ -8,7 +8,7 @@ import {
   CostCenterNameInvalidError,
   CostCenterNameReservedError,
   CostCenterNotFoundError,
-} from '../errors/cost-center.errors';
+} from '../cost-center/cost-center.errors';
 import {
   DepartmentCodeTakenError,
   DepartmentCostCenterError,
@@ -21,17 +21,16 @@ import {
   DepartmentUpdateEmptyError,
   HeadAssignmentError,
 } from '../errors/department.errors';
+import { EmployeeRowInvalidError } from '../employee/employee.errors';
+import { OrganizationAlreadyExistsError } from '../errors/organization.errors';
 import {
-  EmployeeCodeTakenError,
-  EmployeeRowInvalidError,
   JobTitleNameRequiredError,
   JobTitleNameTakenError,
   JobTitleNameTooLongError,
   JobTitleNotFoundError,
-  OrganizationAlreadyExistsError,
-} from '../errors/organization.errors';
+} from '../job-title/job-title.errors';
 import { ProjectInvalidError, ProjectNotFoundError } from '../project/project.errors';
-import { EmployeeNotFoundError } from '../organization.errors';
+import { EmployeeCodeTakenError, EmployeeNotFoundError } from '../organization.errors';
 import { toOrganizationApiException } from './organization.http-errors';
 
 /** The HTTP answer an error becomes: status and the body the global filter writes. */

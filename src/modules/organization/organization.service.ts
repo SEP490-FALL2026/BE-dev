@@ -2,8 +2,10 @@ import { Injectable } from '@nestjs/common';
 import { BusinessDate, businessDateAt } from '../../core/business-date';
 import { DbTx } from '../../infrastructure/database/transaction-runner';
 import { DepartmentRepo } from './department.repo';
-import { CostCenterRepo } from './cost-center.repo';
-import { ImportLookupRepo } from './import-lookup.repo';
+import { CostCenterCatalogueService } from './cost-center/cost-center-catalogue.service';
+import { EmployeeDirectoryService } from './employee/employee-directory.service';
+import { JobTitleCatalogueService } from './job-title/job-title-catalogue.service';
+import { JobTitleListFilter, JobTitleRecord, JobTitleStatus } from './job-title/job-title.types';
 import { OrganizationRepo } from './organization.repo';
 import {
   CreateCostCenterInput,
@@ -30,8 +32,9 @@ export class OrganizationService {
   constructor(
     private readonly repo: OrganizationRepo,
     private readonly departments: DepartmentRepo,
-    private readonly importLookup: ImportLookupRepo,
-    private readonly costCenters: CostCenterRepo,
+    private readonly employees: EmployeeDirectoryService,
+    private readonly costCenters: CostCenterCatalogueService,
+    private readonly jobTitles: JobTitleCatalogueService,
   ) {}
 
   /** Today in the organization's own calendar (`now` is a parameter for tests). */
@@ -71,7 +74,7 @@ export class OrganizationService {
   }
 
   createUnitCostCenter(tx: DbTx, input: CreateCostCenterInput): Promise<{ id: string }> {
-    return this.repo.createCostCenter(tx, input);
+    return this.costCenters.createUnitForInstallation(tx, input);
   }
 
   createDepartment(tx: DbTx, input: CreateDepartmentInput): Promise<{ id: string }> {
@@ -79,36 +82,73 @@ export class OrganizationService {
   }
 
   createJobTitle(tx: DbTx, organizationId: string, name: string): Promise<{ id: string }> {
-    return this.repo.createJobTitle(tx, organizationId, name);
+    return this.jobTitles.createForInstallation(tx, organizationId, name);
+  }
+
+  // --- the job title catalogue, for its HTTP use cases (in their transaction) ---------------------------
+
+  /** One page of the catalogue and the total for the same filter, from one snapshot. */
+  listJobTitles(filter: JobTitleListFilter): Promise<{ items: JobTitleRecord[]; total: number }> {
+    return this.jobTitles.list(filter);
+  }
+
+  /** Adds an `ACTIVE` title under the T-12 name rule. A lost race on the name is the database error, unchanged. */
+  insertJobTitle(tx: DbTx, organizationId: string, name: string): Promise<JobTitleRecord> {
+    return this.jobTitles.insert(tx, organizationId, name);
+  }
+
+  /** `FOR UPDATE` before a change of the title, then its row; null when it does not exist. */
+  lockJobTitleForUpdate(tx: DbTx, jobTitleId: string): Promise<JobTitleRecord | null> {
+    return this.jobTitles.lock(tx, jobTitleId, 'UPDATE');
+  }
+
+  /** `FOR SHARE` when an entry relies on the title staying as it is until commit; null when it does not exist. */
+  lockJobTitleForShare(tx: DbTx, jobTitleId: string): Promise<JobTitleRecord | null> {
+    return this.jobTitles.lock(tx, jobTitleId, 'SHARE');
+  }
+
+  /** Unlocked: the title that has this normalized name, whatever its status, to name it in a conflict. */
+  findJobTitleByNormalizedName(organizationId: string, normalizedName: string): Promise<JobTitleRecord | null> {
+    return this.jobTitles.findByNormalizedName(organizationId, normalizedName);
+  }
+
+  /** Renames a title the caller has locked and raises its version. */
+  renameJobTitle(tx: DbTx, jobTitleId: string, name: string, now: Date): Promise<JobTitleRecord> {
+    return this.jobTitles.rename(tx, jobTitleId, name, now);
+  }
+
+  /** Changes the status of a title the caller has locked and raises its version. */
+  setJobTitleStatus(tx: DbTx, jobTitleId: string, status: JobTitleStatus, now: Date): Promise<JobTitleRecord> {
+    return this.jobTitles.setStatus(tx, jobTitleId, status, now);
   }
 
   /** The only way to create an employee: Employee and its first placement, in the caller's transaction. */
   createEmployeeWithPlacement(tx: DbTx, input: CreateEmployeeWithPlacementInput): Promise<{ id: string }> {
-    return this.repo.createEmployeeWithPlacement(tx, input);
+    return this.employees.createWithPlacement(tx, input);
   }
 
   /** `FOR SHARE` when the caller needs the status to stay stable; `FOR UPDATE` when it changes the employee. */
   lockEmployeeForShare(tx: DbTx, employeeId: string): Promise<void> {
-    return this.repo.lockEmployee(tx, employeeId, 'SHARE');
+    return this.employees.lock(tx, employeeId, 'SHARE');
   }
 
   lockEmployeeForUpdate(tx: DbTx, employeeId: string): Promise<void> {
-    return this.repo.lockEmployee(tx, employeeId, 'UPDATE');
+    return this.employees.lock(tx, employeeId, 'UPDATE');
   }
 
   /** Unlocked read. Pass `tx` to read inside a transaction without taking a lock. */
   getEmployee(employeeId: string, tx?: DbTx): Promise<EmployeeRecord | null> {
-    return this.repo.findEmployee(employeeId, tx);
+    return this.employees.find(employeeId, tx);
   }
 
   /** The employee with this code, or null; for the operator procedures that name people by code. */
   getEmployeeByCode(employeeCode: string, tx?: DbTx): Promise<EmployeeRecord | null> {
-    return this.repo.findEmployeeByCode(employeeCode, tx);
+    return this.employees.findByCode(employeeCode, tx);
   }
 
   /** Several employees in one read, for list views. Unknown ids are simply absent. */
   getEmployees(employeeIds: string[]): Promise<EmployeeRecord[]> {
-    return this.repo.findEmployees(employeeIds);
+    return this.employees.findMany(employeeIds);
   }
 
   /**
@@ -122,11 +162,11 @@ export class OrganizationService {
     limit: number,
     excludeEmployeeIds: readonly string[] = [],
   ): Promise<EmployeeCandidate[]> {
-    return this.repo.searchActiveEmployees(search, onDate, limit, excludeEmployeeIds);
+    return this.employees.searchActive(search, onDate, limit, excludeEmployeeIds);
   }
 
   getEmployeeProfile(employeeId: string, onDate: Date): Promise<EmployeeProfile | null> {
-    return this.repo.findProfile(employeeId, onDate);
+    return this.employees.profile(employeeId, onDate);
   }
 
   /**
@@ -142,12 +182,39 @@ export class OrganizationService {
     },
     tx?: DbTx,
   ): Promise<EmployeeImportLookupData> {
-    return this.importLookup.lookup(tx, names);
+    return this.employees.lookupForImport(tx, names);
   }
 
   /** The row locks a write of imported people needs, in protocol order: departments, then job titles (T-11). */
   lockForEmployeeImport(tx: DbTx, departmentIds: string[], jobTitleIds: string[]): Promise<void> {
-    return this.importLookup.lockForImport(tx, departmentIds, jobTitleIds);
+    return this.employees.lockForImport(tx, departmentIds, jobTitleIds);
+  }
+
+  // --- manual entry of one person, in its transaction and lock order (T-11) ------------------------------
+
+  /** The database clock at the start of the transaction: the instant the new employee's `created_at` gets. */
+  employeeRecordingInstant(tx: DbTx): Promise<Date> {
+    return this.employees.recordingInstant(tx);
+  }
+
+  /**
+   * `FOR SHARE` on the department a person is entered into (it must stay, with its cost center, until commit), then
+   * its state; null when no department has this code.
+   */
+  lockDepartmentForEntry(
+    tx: DbTx,
+    organizationId: string,
+    code: string,
+  ): Promise<{ id: string; code: string; name: string; active: boolean; costCenterActive: boolean } | null> {
+    return this.repo.lockDepartmentByCode(tx, organizationId, code);
+  }
+
+  isEmployeeCodeTaken(tx: DbTx, organizationId: string, employeeCode: string): Promise<boolean> {
+    return this.employees.isCodeTaken(tx, organizationId, employeeCode);
+  }
+
+  isWorkEmailTaken(tx: DbTx, organizationId: string, normalizedWorkEmail: string): Promise<boolean> {
+    return this.employees.isWorkEmailTaken(tx, organizationId, normalizedWorkEmail);
   }
 
   /** Among these active departments, those nobody heads today: what the people import reports at its end (AC-1). */
