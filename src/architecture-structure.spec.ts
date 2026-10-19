@@ -26,6 +26,121 @@ const MAX_DIRECTORY_DEPTH = 2;
 /** Module-level folders every capability of the same module may import. */
 const SHARED_MODULE_FOLDERS = new Set(['dto', 'errors', 'mappers', 'policies']);
 
+/**
+ * GATE.2 (19/10/2026): the exact intra-module contracts. Inside one business module, a file of another part (another
+ * capability, or a root file outside the root public surface) is public only when it is listed here, relative to src/,
+ * with why it is public. A suffix such as `*.service.ts` or `*.types.ts` opens nothing: repos, the credential hasher,
+ * policies, helpers, validators and implementation services stay private unless promoted here and documented as a
+ * contract. Every entry must exist and keep a real consumer in another part of its module; an entry that loses its
+ * last consumer must be removed (the gate below fails both ways). Listing a file is a design decision reviewed like
+ * PUBLIC_CONTRACT_EXPORTS of module-graph.spec.ts, never a way to make a red build green.
+ */
+const INTRA_MODULE_CONTRACTS: ReadonlyMap<string, string> = new Map([
+  // identity-access (Wave B: capabilities reach one another through these services, types and the shared ports).
+  [
+    'modules/identity-access/identity-access.ports.ts',
+    'session port ACCOUNT_SESSIONS: consumed by accounts and recovery, implemented by auth',
+  ],
+  [
+    'modules/identity-access/accounts/account-directory.service.ts',
+    'account lookup for access, approval-roles, auth, recovery and the facade',
+  ],
+  [
+    'modules/identity-access/accounts/account.errors.ts',
+    'account errors mapped by the shared mappers/account.http-errors.ts (accounts and auth routes)',
+  ],
+  [
+    'modules/identity-access/accounts/account.types.ts',
+    'APPROVAL_ROLE_HOLDINGS port, owned by its accounts consumer and implemented by approval-roles',
+  ],
+  [
+    'modules/identity-access/accounts/action-link-revocation.service.ts',
+    'revokes open action links when auth or recovery changes a credential',
+  ],
+  [
+    'modules/identity-access/accounts/action-link.service.ts',
+    'issues and redeems action links for auth password reset, recovery and the facade',
+  ],
+  [
+    'modules/identity-access/accounts/credential.service.ts',
+    'credential checks and writes for auth, recovery and the facade',
+  ],
+  [
+    'modules/identity-access/accounts/invitation-redemption.service.ts',
+    'invitation redemption served by the auth route',
+  ],
+  ['modules/identity-access/accounts/role-grant.service.ts', 'role grants for approval-roles, recovery and the facade'],
+  [
+    'modules/identity-access/accounts/successor-eligibility.service.ts',
+    'Super Admin successor rule shared with the recovery enrolment',
+  ],
+  [
+    'modules/identity-access/approval-roles/approval-role-directory.service.ts',
+    'approval roles held now, read by the access-token verifier',
+  ],
+  [
+    'modules/identity-access/auth/auth.errors.ts',
+    'auth errors mapped by the shared mappers/auth.http-errors.ts (auth and access routes)',
+  ],
+  [
+    'modules/identity-access/auth/password-change.service.ts',
+    'password change use case behind the /me route of access',
+  ],
+  [
+    'modules/identity-access/auth/session-directory.service.ts',
+    'session state read by the access-token verifier (implements ACCOUNT_SESSIONS)',
+  ],
+  ['modules/identity-access/auth/token.service.ts', 'access-token verification for the access verifier'],
+  [
+    'modules/identity-access/recovery/recovery-ticket.service.ts',
+    'waiting recovery tickets that block a password reset request (H3c)',
+  ],
+  // organization (Waves 2 and 3: the facade and the department use cases reach the other capabilities here; GATE2-02:
+  // the shared mappers/organization.http-errors.ts maps the errors of all five capabilities for their routes).
+  [
+    'modules/organization/cost-center/cost-center-catalogue.service.ts',
+    'installation and vacancy contract of the facade',
+  ],
+  [
+    'modules/organization/cost-center/cost-center.errors.ts',
+    'Cost Center errors mapped by the shared mappers/organization.http-errors.ts',
+  ],
+  ['modules/organization/cost-center/cost-center.service.ts', 'Cost Center lock taken by the department write'],
+  [
+    'modules/organization/cost-center/cost-center.types.ts',
+    'code format shared with departments; Cost Center views used by department records',
+  ],
+  ['modules/organization/department/department-directory.service.ts', 'department head periods behind the facade'],
+  [
+    'modules/organization/department/department.errors.ts',
+    'department errors mapped by the shared mappers/organization.http-errors.ts',
+  ],
+  ['modules/organization/department/department.types.ts', 'department views returned by the facade'],
+  ['modules/organization/employee/employee-directory.service.ts', 'employee lookup and manual entry behind the facade'],
+  [
+    'modules/organization/employee/employee.errors.ts',
+    'employee row errors mapped by the shared mappers/organization.http-errors.ts',
+  ],
+  ['modules/organization/job-title/job-title-catalogue.service.ts', 'job title catalogue behind the facade'],
+  [
+    'modules/organization/job-title/job-title.errors.ts',
+    'job title errors mapped by the shared mappers/organization.http-errors.ts',
+  ],
+  [
+    'modules/organization/job-title/job-title.types.ts',
+    'job title views for the facade, its public types and the employee row validator',
+  ],
+  [
+    'modules/organization/project/project.errors.ts',
+    'project errors mapped by the shared mappers/organization.http-errors.ts',
+  ],
+  ['modules/organization/project/project.service.ts', 'projects listed in the department profile'],
+  [
+    'modules/organization/project/project.types.ts',
+    'project record nested in department views and in the shared mappers/project.mapper.ts',
+  ],
+]);
+
 const LEGACY = {
   /**
    * importer -> target, both relative to src/. Empty since identity-access Wave B (H5.5 to H5.7): capabilities reach
@@ -162,26 +277,53 @@ function isModuleRootPublicSurface(file: string): boolean {
 }
 
 /**
- * True when `importer` reaches a private file of another part of its own business module. The module root is one more
- * part, not a free zone: a root file may not reach into a capability, nor a capability into the private root. Only a
- * Nest module file may wire every provider of its module.
+ * True when `importer` and `target` are two different parts of one business module and the import is subject to the
+ * part boundary. Direction matters (GATE2-02): every part may use a shared module folder (`dto/`, `errors/`,
+ * `mappers/`, `policies/`), and shared folders use one another, but a shared-folder file that reaches into a capability
+ * or the root crosses a boundary like any other part. Only a Nest module file wires every provider of its module.
  */
-function isPrivateCrossAreaImport(importer: string, target: string): boolean {
+function crossesModuleParts(importer: string, target: string): boolean {
   if (!importer.startsWith(modulesRoot + sep) || !target.startsWith(modulesRoot + sep)) return false;
   if (importer.endsWith('.module.ts')) return false;
 
   const from = moduleArea(importer);
   const to = moduleArea(target);
-  if (from.moduleName !== to.moduleName) return false;
-  if (from.area === SHARED_AREA || to.area === SHARED_AREA || from.area === to.area) return false;
-  if (to.area === ROOT_AREA) return !isModuleRootPublicSurface(target);
 
-  // A capability's public surface inside the module is its services and types; the credential hasher stays
-  // private, as it does across modules.
-  const isPublicSurface =
-    (target.endsWith('.service.ts') || target.endsWith('.types.ts')) && !target.endsWith('password-hasher.service.ts');
+  return from.moduleName === to.moduleName && to.area !== SHARED_AREA && from.area !== to.area;
+}
 
-  return !isPublicSurface;
+/**
+ * True when `importer` reaches a private file of another part of its own business module. The module root is one more
+ * part, not a free zone: a root file may not reach into a capability, nor a capability into the private root. Only a
+ * Nest module file may wire every provider of its module. Across parts, a target is public only when it is the root
+ * public surface or an exact entry of `contracts` (GATE.2) — never because of its file-name suffix.
+ */
+function isPrivateCrossAreaImport(
+  importer: string,
+  target: string,
+  contracts: ReadonlyMap<string, string> = INTRA_MODULE_CONTRACTS,
+): boolean {
+  if (!crossesModuleParts(importer, target)) return false;
+  if (contracts.has(toSourcePath(target))) return false;
+
+  return !(moduleArea(target).area === ROOT_AREA && isModuleRootPublicSurface(target));
+}
+
+/**
+ * Registry drift against the real import graph: entries whose file does not exist, and entries that exist but no file
+ * of another part of the module imports any more. Both must be removed from the registry.
+ */
+function contractRegistryDrift(
+  contracts: ReadonlyMap<string, string>,
+  crossPartTargets: ReadonlySet<string>,
+  fileExists: (sourcePath: string) => boolean,
+) {
+  const entries = [...contracts.keys()];
+
+  return {
+    missingFiles: entries.filter((entry) => !fileExists(entry)).sort(),
+    unusedEntries: entries.filter((entry) => fileExists(entry) && !crossPartTargets.has(entry)).sort(),
+  };
 }
 
 /** The files the `error.name` rule reads: every listed source file of src (composition roots and infrastructure too). */
@@ -220,6 +362,28 @@ describe('module structure gates (docs/rules/module-structure.md)', () => {
     );
 
     expect(againstLedger(findings, LEGACY.crossCapabilityImports)).toEqual(CLEAN);
+  });
+
+  it('GATE.2: lists exactly the intra-module contracts another part of the module imports, and nothing already public', () => {
+    const crossPartTargets = new Set(
+      moduleFiles.flatMap((file) =>
+        resolvedImports(file)
+          .filter((target) => crossesModuleParts(file, target))
+          .map(toSourcePath),
+      ),
+    );
+    const alreadyPublic = [...INTRA_MODULE_CONTRACTS.keys()].filter((entry) => {
+      const file = join(sourceRoot, entry);
+
+      return isModuleRootPublicSurface(file) || moduleArea(file).area === SHARED_AREA;
+    });
+
+    expect({
+      ...contractRegistryDrift(INTRA_MODULE_CONTRACTS, crossPartTargets, (entry) =>
+        existsSync(join(sourceRoot, entry)),
+      ),
+      alreadyPublic,
+    }).toEqual({ missingFiles: [], unusedEntries: [], alreadyPublic: [] });
   });
 
   it('never lets a controller import another controller', () => {
@@ -389,11 +553,17 @@ describe('gate rules on synthetic files (A4-01, A4-04, A4-05)', () => {
       expect(isPrivateCrossAreaImport(inModule('alpha', 'alpha.service.ts'), inModule('recovery.repo.ts'))).toBe(true);
     });
 
-    it('allows the public surface of a capability, of the root and of the shared folders', () => {
+    it('allows the registered contracts of a capability, the root public surface and the shared folders', () => {
       const importer = inModule('alpha', 'alpha.service.ts');
+      const contracts = new Map([
+        ['modules/sample/beta/beta.service.ts', 'test contract'],
+        ['modules/sample/beta/beta.types.ts', 'test contract'],
+      ]);
 
-      expect(isPrivateCrossAreaImport(inModule('sample.service.ts'), inModule('beta', 'beta.service.ts'))).toBe(false);
-      expect(isPrivateCrossAreaImport(importer, inModule('beta', 'beta.types.ts'))).toBe(false);
+      expect(
+        isPrivateCrossAreaImport(inModule('sample.service.ts'), inModule('beta', 'beta.service.ts'), contracts),
+      ).toBe(false);
+      expect(isPrivateCrossAreaImport(importer, inModule('beta', 'beta.types.ts'), contracts)).toBe(false);
       expect(isPrivateCrossAreaImport(importer, inModule('sample.errors.ts'))).toBe(false);
       expect(isPrivateCrossAreaImport(importer, inModule('sample.types.ts'))).toBe(false);
       expect(isPrivateCrossAreaImport(importer, inModule('sample.service.ts'))).toBe(false);
@@ -418,6 +588,107 @@ describe('gate rules on synthetic files (A4-01, A4-04, A4-05)', () => {
       expect(
         isPrivateCrossAreaImport(inModule('alpha', 'alpha.service.ts'), join(modulesRoot, 'other', 'other.repo.ts')),
       ).toBe(false);
+    });
+  });
+
+  describe('GATE.2: a capability is public inside its module only through an exact contract list', () => {
+    const importer = inModule('alpha', 'alpha.service.ts');
+
+    it('rejects an arbitrary helper service of another capability, whatever its suffix', () => {
+      expect(isPrivateCrossAreaImport(importer, inModule('beta', 'internal-helper.service.ts'))).toBe(true);
+    });
+
+    it('rejects arbitrary private types of another capability, whatever its suffix', () => {
+      expect(isPrivateCrossAreaImport(importer, inModule('beta', 'private-state.types.ts'))).toBe(true);
+    });
+
+    const real = (path: string) => join(sourceRoot, ...path.split('/'));
+    const realContracts: [string, string][] = [
+      [
+        'modules/identity-access/auth/login.service.ts',
+        'modules/identity-access/accounts/account-directory.service.ts',
+      ],
+      ['modules/identity-access/access/jwt-access-token.verifier.ts', 'modules/identity-access/auth/token.service.ts'],
+      [
+        'modules/identity-access/auth/password-reset-request.service.ts',
+        'modules/identity-access/recovery/recovery-ticket.service.ts',
+      ],
+      ['modules/organization/organization.service.ts', 'modules/organization/job-title/job-title-catalogue.service.ts'],
+      ['modules/organization/department/department.types.ts', 'modules/organization/project/project.types.ts'],
+    ];
+
+    it.each(realContracts)('accepts the registered Wave B/organization contract %s -> %s', (importerPath, target) => {
+      expect(isPrivateCrossAreaImport(real(importerPath), real(target))).toBe(false);
+    });
+
+    it.each(realContracts)('rejects %s -> %s once the contract leaves the registry', (importerPath, target) => {
+      const withoutIt = new Map([...INTRA_MODULE_CONTRACTS].filter(([entry]) => entry !== target));
+
+      expect(isPrivateCrossAreaImport(real(importerPath), real(target), withoutIt)).toBe(true);
+    });
+
+    it('keeps the real repositories, the credential hasher and policies private', () => {
+      const importer = real('modules/identity-access/auth/login.service.ts');
+
+      for (const target of [
+        'modules/identity-access/accounts/app-user.repo.ts',
+        'modules/identity-access/accounts/password-hasher.service.ts',
+        'modules/identity-access/accounts/account-administration.policy.ts',
+        'modules/identity-access/recovery/recovery.repo.ts',
+      ])
+        expect({ target, isPrivate: isPrivateCrossAreaImport(importer, real(target)) }).toEqual({
+          target,
+          isPrivate: true,
+        });
+    });
+
+    it('reports a registry entry with no file and one with no consumer in another part', () => {
+      const contracts = new Map([
+        ['used.service.ts', 'x'],
+        ['unused.service.ts', 'x'],
+        ['missing.types.ts', 'x'],
+      ]);
+
+      expect(
+        contractRegistryDrift(contracts, new Set(['used.service.ts']), (entry) => entry !== 'missing.types.ts'),
+      ).toEqual({ missingFiles: ['missing.types.ts'], unusedEntries: ['unused.service.ts'] });
+    });
+  });
+
+  describe('GATE2-02: a shared module folder that imports is held to the same contracts', () => {
+    it.each([
+      ['mappers', 'x.ts', 'private.repo.ts'],
+      ['policies', 'x.ts', 'internal-helper.service.ts'],
+      ['dto', 'x.ts', 'private-state.types.ts'],
+    ])('rejects %s/%s -> a capability file %s that is not a registered contract', (folder, file, target) => {
+      expect(isPrivateCrossAreaImport(inModule(folder, file), inModule('beta', target))).toBe(true);
+    });
+
+    it('rejects a shared folder that reaches a private file at the module root', () => {
+      expect(isPrivateCrossAreaImport(inModule('mappers', 'x.ts'), inModule('sample.repo.ts'))).toBe(true);
+    });
+
+    it('accepts a shared folder that reaches a registered contract or the root public surface', () => {
+      const contracts = new Map([['modules/sample/beta/beta.errors.ts', 'test contract']]);
+
+      expect(isPrivateCrossAreaImport(inModule('mappers', 'x.ts'), inModule('beta', 'beta.errors.ts'), contracts)).toBe(
+        false,
+      );
+      expect(isPrivateCrossAreaImport(inModule('mappers', 'x.ts'), inModule('sample.errors.ts'))).toBe(false);
+      expect(
+        isPrivateCrossAreaImport(
+          join(sourceRoot, 'modules', 'identity-access', 'mappers', 'account.http-errors.ts'),
+          join(sourceRoot, 'modules', 'identity-access', 'accounts', 'account.errors.ts'),
+        ),
+      ).toBe(false);
+    });
+
+    it('keeps every part free to use a shared folder, and shared folders free to use one another', () => {
+      expect(isPrivateCrossAreaImport(inModule('alpha', 'alpha.controller.ts'), inModule('mappers', 'x.ts'))).toBe(
+        false,
+      );
+      expect(isPrivateCrossAreaImport(inModule('sample.service.ts'), inModule('policies', 'x.policy.ts'))).toBe(false);
+      expect(isPrivateCrossAreaImport(inModule('mappers', 'x.ts'), inModule('dto', 'y.dto.ts'))).toBe(false);
     });
   });
 

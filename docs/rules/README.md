@@ -10,6 +10,7 @@ Workflow chung ở [CONTRIBUTING](../../CONTRIBUTING.md), cấu trúc source ở
 | Query, schema, transaction, nghiệp vụ | [Database/business](database-business.md) |
 | Auth, file, job                       | [Security/jobs](security-jobs.md)         |
 | Tài liệu, ADR                         | [Documentation](documentation.md)         |
+| Chia việc thành hạng mục, spec/plan   | [Work-item sizing](work-item-sizing.md)   |
 
 Không cần thêm một `RULES.md` khác hoặc sao chép các quy ước này sang từng công cụ AI.
 [AGENTS](../../AGENTS.md) chỉ định tài liệu cần đọc theo tác vụ.

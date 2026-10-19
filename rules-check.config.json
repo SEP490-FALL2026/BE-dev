@@ -37,6 +37,7 @@
     "workItems": {
       "directory": "docs/workspace/items",
       "index": "docs/workspace/items/README.md",
+      "roadmap": "docs/roadmap.md",
       "legacy": [
         "baseline-impact-and-remediation-2026-10-17",
         "dynamic-content-translation",
@@ -54,6 +55,22 @@
         "us-01-audit-trail-query",
         "us-01-bootstrap-login-session",
         "us-01-password-self-service"
+      ],
+      "sizingGrandfathered": [
+        "foundation-remediation-handoff-2026-10-18",
+        "h1-auth-session-refresh-expiry",
+        "h2a-openapi-presentation",
+        "h2b-openapi-wire-messages",
+        "h3a-r1-department-in-use-details",
+        "h3b-r2-lock-unlock-reason",
+        "h3c-forgot-password-during-recovery",
+        "h4-1-organization-root-cleanup",
+        "h4-2-project-capability",
+        "h4-3a-core-display-name",
+        "h4-wave2-organization-capabilities",
+        "h4-wave3-department-and-root-contracts",
+        "h5-wave-a-identity-access-contract-layout",
+        "h5-wave-b-identity-access-capability-recovery"
       ]
     }
   }

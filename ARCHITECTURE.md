@@ -48,7 +48,7 @@ src/
     operating-parameters/     # tham số vận hành (giá trị, lịch sử, ngày không làm việc) + API Super Admin
     data-import/              # import nhân sự CSV xem trước – xác nhận (employee_imports); gọi organization qua facade
     onboarding/               # checklist khởi tạo: tổng hợp đọc từ organization và identity-access, không sở hữu bảng
-    identity-access/          # gốc: module, facade module, facade, types, lỗi public, recovery.module (RecoveryModule, chỉ nạp bởi lệnh khôi phục); dto/, mappers/, policies/ dùng chung (hai capability trở lên)
+    identity-access/          # gốc: module, facade module, facade, types, lỗi public, port dùng chung ACCOUNT_SESSIONS (identity-access.ports.ts), recovery.module (RecoveryModule, chỉ nạp bởi lệnh khôi phục); dto/, mappers/, policies/ dùng chung (hai capability trở lên)
       auth/                   # đăng nhập, refresh/logout, phiên + refresh token + throttle (session.repo), đổi/đặt lại mật khẩu; SessionDirectoryService hiện thực port ACCOUNT_SESSIONS
       accounts/               # truy vấn, tạo/mời/kích hoạt, khóa/vai, chuyển giao Super Admin; repo theo aggregate (AppUser, credential, RoleGrant, action token) sau contract AccountDirectory/RoleGrant/ActionLink/Credential service; hasher và chính sách mật khẩu
       approval-roles/         # Người duyệt chi, người thay thế, approver dự phòng (approval_role_holders); ApprovalRoleDirectoryService hiện thực port APPROVAL_ROLE_HOLDINGS
@@ -81,8 +81,10 @@ test/
 - Gốc module **không** public mặc định. Module khác và composition root chỉ import **allowlist** bề mặt công khai ở gốc
   (`<module>.module.ts`, `*-http.module.ts`, `*-facade.module.ts`, facade `<module>.service.ts`, `*.types.ts`,
   `*.errors.ts`); composition root được thêm đúng các entry CLI đã liệt kê. File gốc khác, repo,
-  `password-hasher.service` và file thư mục con là private; trong cùng module, gốc và capability cũng không đọc file
-  private của nhau (chỉ `*.module.ts` ghép provider). Nest module nghiệp vụ chỉ export contract đúng danh sách. Không
+  `password-hasher.service` và file thư mục con là private; trong cùng module, gốc, capability và thư mục dùng chung
+  (khi nó là importer) chỉ đọc file của phần khác khi file đó là bề mặt public ở gốc hoặc contract nội module đăng ký
+  chính xác (registry GATE.2, không suy từ hậu tố tên file; chỉ `*.module.ts` ghép mọi provider); thư mục dùng chung
+  là đích tự do. Nest module nghiệp vụ chỉ export contract đúng danh sách. Không
   truy cập bảng thuộc module khác. Chi tiết và ledger: [module structure](docs/rules/module-structure.md#liên-module).
 - Cross-module atomic write: facade nhận `tx` của người gọi (`DbTx`); `TransactionRunner.run`
   mở giao dịch Read Committed với `lock_timeout`/`statement_timeout` riêng cho giao dịch.

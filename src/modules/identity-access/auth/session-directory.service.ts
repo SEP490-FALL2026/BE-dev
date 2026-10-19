@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { AccountSessions } from '../accounts/account.types';
+import { AccountSessions } from '../identity-access.ports';
 import { PrincipalContext, SessionRevokedReason } from '../identity-access.types';
 import { SessionRepo } from './session.repo';
 

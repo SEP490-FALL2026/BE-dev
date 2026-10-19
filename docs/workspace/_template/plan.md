@@ -12,9 +12,14 @@ dependency/môi trường/blocker. Thiết kế `ready` hoặc Owner duyệt s�
 
 ## Tasks
 
-Mỗi task là một bước review được, để hệ thống build/test được sau nó. Task dự kiến chạm quá nhiều file/subsystem
-(gợi ý: hơn 8 file hoặc hơn 1 module) hoặc có nhiều outcome thì tách. Test đi cùng task, không dồn về một bước sau.
-Refactor và thay đổi hành vi là hai task (thường hai hạng mục); migration là task riêng đi trước code phụ thuộc nó.
+Mỗi task là một bước review được, để hệ thống build/test được sau nó. Task có nhiều outcome hoặc chạm nhiều subsystem
+thì tách; số file chỉ là tín hiệu — file sinh tự động, file chỉ di chuyển và refactor giữ hành vi được đánh giá bằng
+bằng chứng (diff, test giữ nguyên), không bằng ngưỡng cứng ([work-item sizing](../../rules/work-item-sizing.md)). Test đi
+cùng task, không dồn về một bước sau. Refactor và thay đổi hành vi là hai task (thường hai hạng mục); migration là task
+riêng đi trước code phụ thuộc nó.
+
+Hạng mục có nhiều phase hoặc có `## Size exception`: nhóm task theo `### Phase …`, mỗi phase kết thúc bằng một
+`### Checkpoint` nêu gate phải xanh trước phase sau; phase là ranh giới review/rollback đã ghi ở Size exception.
 
 ### Task 1: kết quả review được
 
@@ -25,7 +30,7 @@ Refactor và thay đổi hành vi là hai task (thường hai hạng mục); mig
 
 ### Checkpoint
 
-Sau mỗi 2–3 task: gate chạy xanh, tự review diff theo spec/AC.
+Sau mỗi phase hoặc mỗi 2–3 task: gate chạy xanh, tự review diff theo spec/AC.
 
 ## Verification and handoff
 

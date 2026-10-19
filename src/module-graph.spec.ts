@@ -1,8 +1,13 @@
 import { Type } from '@nestjs/common';
+import { SELF_DECLARED_DEPS_METADATA } from '@nestjs/common/constants';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, relative, sep } from 'node:path';
 import { AppModule } from './app.module';
+import { ACCOUNT_SESSIONS } from './modules/identity-access/identity-access.ports';
+import { AccountStatusService } from './modules/identity-access/accounts/account-status.service';
+import { SessionDirectoryService } from './modules/identity-access/auth/session-directory.service';
+import { HolderCredentialReset } from './modules/identity-access/recovery/holder-credential-reset.service';
 import { MailTransport } from './infrastructure/mail/mail-transport';
 import { AuditController } from './modules/audit/audit.controller';
 import { AuditQueryRepo } from './modules/audit/audit-query.repo';
@@ -208,6 +213,27 @@ const DECLARED_FOR_API_AND_RECOVERY = [
   'Symbol(APPROVAL_ROLE_HOLDINGS)',
 ];
 
+/** GATE.2: the one file that declares the session port shared by accounts and recovery (implemented by auth). */
+const ACCOUNT_SESSIONS_OWNER = 'src/modules/identity-access/identity-access.ports.ts';
+
+/** Source files (tests and generated code excluded) whose text contains `needle`, as repository-relative paths. */
+function sourceFilesDeclaring(needle: string): string[] {
+  const found: string[] = [];
+  const visit = (directory: string): void => {
+    for (const entry of readdirSync(directory)) {
+      const path = join(directory, entry);
+      if (statSync(path).isDirectory()) {
+        if (entry !== 'generated') visit(path);
+      } else if (entry.endsWith('.ts') && !entry.endsWith('.spec.ts') && readFileSync(path, 'utf8').includes(needle)) {
+        found.push(relative(process.cwd(), path).split(sep).join('/'));
+      }
+    }
+  };
+  visit(join(process.cwd(), 'src'));
+
+  return found.sort();
+}
+
 describe('module graph', () => {
   const graphs: [string, Type<unknown>][] = [
     ['AppModule', AppModule],
@@ -271,6 +297,40 @@ describe('module graph', () => {
     const providerNames = (module: Type<unknown>) => metadata(module, 'providers').map((p) => tokenName(tokenOf(p)));
     const inBoth = providerNames(IdentityAccessModule).filter((name) => providerNames(RecoveryModule).includes(name));
     expect(inBoth.sort()).toEqual([...DECLARED_FOR_API_AND_RECOVERY].sort());
+  });
+
+  it('GATE.2: binds the one ACCOUNT_SESSIONS token to SessionDirectoryService in the API and the recovery command, and injects that token into both consumers', () => {
+    const declaringFiles = sourceFilesDeclaring("Symbol('ACCOUNT_SESSIONS')");
+    expect(declaringFiles).toEqual([ACCOUNT_SESSIONS_OWNER]);
+
+    for (const [name, root] of [
+      ['AppModule', AppModule],
+      ['RecoveryCliModule', RecoveryCliModule],
+    ] as const) {
+      const bindings = collectGraph(root).flatMap((node) =>
+        node.providers
+          .filter((provider) => tokenOf(provider) === ACCOUNT_SESSIONS)
+          .map((provider) => ({ module: node.module.name, provider })),
+      );
+      expect({ name, bindings }).toEqual({
+        name,
+        bindings: [
+          {
+            module: name === 'AppModule' ? 'IdentityAccessModule' : 'RecoveryModule',
+            provider: { provide: ACCOUNT_SESSIONS, useExisting: SessionDirectoryService },
+          },
+        ],
+      });
+    }
+    for (const consumer of [AccountStatusService, HolderCredentialReset]) {
+      const injected = (
+        (Reflect.getMetadata(SELF_DECLARED_DEPS_METADATA, consumer) as { param: unknown }[] | undefined) ?? []
+      ).filter(({ param }) => param === ACCOUNT_SESSIONS);
+      expect({ consumer: consumer.name, injections: injected.length }).toEqual({
+        consumer: consumer.name,
+        injections: 1,
+      });
+    }
   });
 
   it('keeps controllers, the identity-access API module and the JWT library out of the recovery command', () => {

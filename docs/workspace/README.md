@@ -24,28 +24,31 @@ Nếu nguồn mâu thuẫn hoặc cần đổi nghiệp vụ, người phụ tr�
 
 ## Chia hạng mục theo vertical slice
 
-Quy tắc bắt buộc cho hạng mục mới (nguồn: [audit nền tảng 18/10/2026](../reviews/be-foundation-audit-2026-10-18/README.md)):
+**Chia việc thành hạng mục** theo [work-item sizing](../rules/work-item-sizing.md) — nguồn chuẩn duy nhất: nhóm G chỉ là
+container giao việc; mỗi hạng mục là một outcome kiểm chứng độc lập, ghi `## Sizing decision` (một trong bốn chế độ
+`single-story`, `grouped-stories`, `split-story`, `technical-enabler`), mỗi AC của nhóm G có đúng một chủ trong scope map
+`### Work-item decomposition: Gx` của roadmap (lập trước hạng mục đầu tiên) và Size exception là bằng chứng đủ trường.
+Phần còn lại dưới đây là cấu trúc spec/plan (nguồn: [audit nền tảng
+18/10/2026](../reviews/be-foundation-audit-2026-10-18/README.md)):
 
-- **G0–G10 là planning container**, không phải phạm vi mặc định của một spec/plan hay một PR. Không tạo spec "toàn bộ
-  G5/G7/G8"; mỗi nhóm được chia thành nhiều hạng mục.
-- **Một hạng mục = một business outcome / vertical slice**, mục tiêu **1–3 primary Story**. Nhiều hơn chỉ khi cùng
-  outcome và cùng transaction boundary, ghi ở `## Size exception` với lý do và người chấp nhận.
-- Tách **`Primary Story/AC`** (đã giao, mỗi dòng `full`/`partial`/`n/a`) khỏi **`Supporting references`** (chỉ truy
-  vết, không tính là đã implement) và **`Explicit out of scope`**. AC `partial` ghi vế đã làm và nơi làm phần còn lại;
-  không ghi Story hoàn thành khi còn AC `partial`. Roadmap và items index chép đúng bảng Primary của spec.
+- Tách **`Primary Story/AC`** (đã giao, mỗi dòng `full`/`partial`/`n/a` theo rule sizing) khỏi **`Supporting
+references`** (chỉ truy vết, không tính là đã implement) và **`Explicit out of scope`**. Không ghi Story hoàn thành khi
+  còn AC `partial`. Roadmap và items index chép đúng bảng Primary của spec.
 - Spec ghi dependency/blocker, ownership module/data/API, transaction/concurrency/migration/tương thích khi áp dụng,
   test matrix theo AC (gồm từ chối và edge case) và Definition of Done.
-- Mỗi task của plan có `Files`, `Depends on`, `Acceptance`, `Verify`. Task chạm quá nhiều file/subsystem hoặc có nhiều
-  outcome thì tách. Refactor tách khỏi thay đổi hành vi; migration là task riêng đi trước code phụ thuộc nó. Mỗi lát để
-  hệ thống build/test được và có checkpoint.
+- Mỗi task của plan có `Files`, `Depends on`, `Acceptance`, `Verify`; hạng mục nhiều phase ghi ranh giới phase/checkpoint.
+  Refactor tách khỏi thay đổi hành vi; migration là task riêng đi trước code phụ thuộc nó. Mỗi lát để hệ thống
+  build/test được và có checkpoint.
 - Implementation làm rõ hoặc đổi contract ⟹ cập nhật spec/plan trong cùng thay đổi; lịch sử giữ bằng Git và nhãn
   _superseded_, không xóa bằng chứng.
 - Header spec pin Docs `<sha>` và BE `<sha>`; trạng thái chỉ dùng từ vựng của [roadmap](../roadmap.md#trạng-thái).
 
-`pnpm rules:check` enforce phần cấu trúc (mục bắt buộc, pin, từ trạng thái, cột `Coverage`, số primary Story, trường
-task, đăng ký ở items index); nó **không** chứng minh nội dung nghiệp vụ đúng. 16 hạng mục có trước 18/10/2026 nằm trong
-danh sách `legacy` của `rules-check.config.json`: chỉ bị kiểm đăng ký, **không** sửa hàng loạt cho khớp mẫu và không coi
-là đã review lại. Hạng mục legacy được chạm lớn thì chuyển sang mẫu mới và xóa khỏi danh sách; danh sách chỉ co lại.
+`pnpm rules:check` enforce phần cấu trúc (mục bắt buộc, pin, từ trạng thái, cột `Coverage`, trường task, đăng ký ở
+items index) và các quy tắc sizing máy kiểm được (liệt kê ở [rule sizing](../rules/work-item-sizing.md#phạm-vi-kiểm-tra-tự-động));
+nó **không** chứng minh nội dung nghiệp vụ đúng. 16 hạng mục có trước 18/10/2026 nằm trong danh sách `legacy` của
+`rules-check.config.json`: chỉ bị kiểm đăng ký, **không** sửa hàng loạt cho khớp mẫu và không coi là đã review lại.
+Hạng mục legacy được chạm lớn thì chuyển sang mẫu mới và xóa khỏi danh sách. 14 hạng mục lập từ 18/10 tới trước GOV.1
+(19/10/2026) nằm trong `sizingGrandfathered`: chỉ miễn mục `Sizing decision`. Cả hai danh sách chỉ co lại.
 
 ## Quy trình
 

@@ -23,7 +23,7 @@ import {
   SelfChangeForbiddenError,
   SuperAdminHolderNotLockableError,
 } from './account.errors';
-import { ACCOUNT_SESSIONS, AccountSessions } from './account.types';
+import { ACCOUNT_SESSIONS, AccountSessions } from '../identity-access.ports';
 import { ActionLinkRevocation } from './action-link-revocation.service';
 import { RoleGrantService } from './role-grant.service';
 

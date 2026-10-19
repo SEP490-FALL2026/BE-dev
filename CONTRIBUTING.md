@@ -17,8 +17,9 @@ không gộp tính năng hoặc nâng dependency không liên quan. Sửa tài l
 nội dung, link và format; không cần test giả cho một câu văn.
 
 Đặt file, capability folder và lỗi theo [module structure](docs/rules/module-structure.md); `pnpm check` chạy gate cấu trúc
-(`src/architecture-structure.spec.ts`) với legacy ledger chỉ được co lại. Hạng mục US mới là một vertical slice (thường
-1–3 primary Story) theo [mẫu](docs/workspace/_template/README.md); `pnpm rules:check` kiểm cấu trúc của nó.
+(`src/architecture-structure.spec.ts`) với legacy ledger chỉ được co lại. Hạng mục mới là một outcome kiểm chứng độc lập,
+chia theo Story chứ không theo nhóm G ([work-item sizing](docs/rules/work-item-sizing.md)), dùng
+[mẫu](docs/workspace/_template/README.md); `pnpm rules:check` kiểm cấu trúc và mục `Sizing decision` của nó.
 
 Task nhỏ không đổi nghiệp vụ/contract dùng issue/PR. Tính năng US hoặc thay đổi nhiều bước dùng [quy trình chung](docs/workspace/README.md) và [roadmap](docs/roadmap.md): giao người phụ trách → thiết kế spec/plan/test → implement và kiểm chứng → tích hợp `dev` → Owner review cuối trước `main`/production. Người phụ trách có thể tự thiết kế và code; Owner cũng có thể chuẩn bị thiết kế rồi bàn giao. Peer review của dev khác là tùy chọn, không phải gate bắt buộc. Không bắt một AI hoặc gói skill cụ thể; nếu công cụ hỗ trợ skill/subagent thì áp dụng theo quy tắc trong workspace. Quyết định kiến trúc lâu dài dùng ADR.
 

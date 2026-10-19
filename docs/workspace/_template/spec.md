@@ -4,7 +4,7 @@
 - Thiết kế ban đầu bởi: Owner hoặc dev đã soạn/chốt đầu vào; có thể trùng người phụ trách.
 - Thiết kế: `draft`. Owner review: chưa review; bổ sung trạng thái, ngày, revision và bằng chứng khi có.
 - Nguồn: Docs `<sha>` (BRD vX, US vY — Story/AC dùng thật, quyết định `QĐ-*`), BE `<sha>`. Không ghi "bản mới nhất".
-- Nhóm roadmap: Gx — chỉ là planning container, không phải phạm vi của hạng mục này.
+- Nhóm roadmap: Gx — chỉ là planning container, không phải phạm vi của hạng mục này (xem `## Sizing decision`).
 - [Kế hoạch](plan.md).
 
 ## Business outcome
@@ -12,15 +12,35 @@
 Một câu: sau lát này ai làm được gì, quan sát/kiểm được bằng cách nào. Một hạng mục = một outcome / vertical slice;
 hệ thống build và test được sau lát. Refactor không đổi hành vi và thay đổi hành vi là hai hạng mục khác nhau.
 
+## Sizing decision
+
+Bắt buộc cho hạng mục mới; quy tắc và ví dụ ở [work-item sizing](../../rules/work-item-sizing.md). Giữ đúng tên trường.
+
+- Container: nhóm G, H-slice, bó finding hoặc yêu cầu trực tiếp đã giao — chỉ là container, không phải ranh giới.
+- Mode: `single-story` | `grouped-stories` | `split-story` | `technical-enabler` (chọn một).
+- Outcome and owner: outcome gắn kết duy nhất và capability sở hữu.
+- Boundaries: transaction, dữ liệu/bảng, API, sự kiện/job, bảo mật/quyền.
+- Not larger: vì sao không gom thêm Story/AC.
+- Not smaller: vì sao không tách tiếp (tách theo tầng controller/service/repo không phải lý do).
+- Siblings: tên hạng mục sibling/deferred (`` `ten-hang-muc` `` hoặc link spec), hoặc `none`.
+- Scope map: một link mỗi nhóm G của Container tới `../../../roadmap.md#work-item-decomposition-g<n>`
+  ([định dạng](../../rules/work-item-sizing.md#scope-map-của-nhóm-g)); `n/a` chỉ cho `technical-enabler` ngoài nhóm G.
+
 ## Primary Story/AC
 
 | Story | AC  | Coverage | Phần còn lại thuộc |
 | ----- | --- | -------- | ------------------ |
 
-`Coverage` là `full`, `partial` hoặc `n/a`. `partial` ghi vế đã làm ở cột AC và item/nhóm sở hữu phần còn lại; không ghi
-Story hoàn thành khi còn AC `partial`. Mục tiêu **1–3 primary Story**; nhiều hơn chỉ khi cùng một outcome và cùng
-transaction boundary, kèm mục `## Size exception` giải thích lý do và người chấp nhận. Technical enabler không có Story
-ghi một dòng `—` | mã TE/finding | `n/a`.
+Mỗi dòng một Story; `Coverage` là `full`, `partial` hoặc `n/a`:
+
+- `full` — `US-02-07` | `AC-1→AC-3` | `full` | `—`: dải AC chính xác sở hữu ở đây, không còn AC nào.
+- `partial` — `US-02-01` | `AC-1, AC-6, AC-7` | `partial` | `` AC-2→AC-4: `g2-import-confirm` ``: AC sở hữu ở đây; cột
+  cuối không rỗng, nêu hạng mục sibling/deferred sở hữu từng AC còn lại. Không ghi Story hoàn thành khi còn `partial`.
+- `n/a` — `—` | `GATE2-01` | `n/a` | `` gỡ chặn `ten-hang-muc` ``: chỉ cho `technical-enabler`, không claim Story, nêu
+  hạng mục phía sau.
+
+Trên ba primary Story cần mục `## Size exception` với đủ `- Cohesion:`, `- Why not split:`, `- Checkpoints:`,
+`- Maximum scope:`, `- Accepted by:` ([rule](../../rules/work-item-sizing.md#size-exception)); xóa ghi chú này khi điền.
 
 ## Supporting references
 

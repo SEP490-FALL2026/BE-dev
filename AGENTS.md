@@ -29,6 +29,7 @@ Scope: this backend repository. Work from its root with the pnpm version in `pac
 | Add or change a script                       | [Script guide](scripts/README.md)                                                                                |
 | Add or update tests                          | [Test guide](test/README.md)                                                                                     |
 | Documentation or ADR                         | [Documentation rules](docs/rules/documentation.md)                                                               |
+| Split assigned work into items (spec/plan)   | [Work-item sizing](docs/rules/work-item-sizing.md)                                                               |
 
 ## Repository constraints
 
@@ -41,7 +42,9 @@ Scope: this backend repository. Work from its root with the pnpm version in `pac
 - Generated `src/generated/`, `dist/` and `openapi.json` change through their generators.
 - Do not load every ADR, design document or external repository by default.
   Obtain the relevant requirement before inventing missing business behavior.
-- For US design and implementation handoff, follow [shared planning](docs/workspace/README.md).
+- For US design and implementation handoff, follow [shared planning](docs/workspace/README.md). A roadmap group `G`
+  is never a spec/plan boundary: size each item by Story and outcome per
+  [work-item sizing](docs/rules/work-item-sizing.md).
 - One canonical source per fact: progress, commits/PRs and test results go to the roadmap, item plan or review, not
   into this file or ARCHITECTURE.md. Which document owns what:
   [documentation responsibilities](docs/rules/documentation.md#trách-nhiệm-từng-loại-tài-liệu).
