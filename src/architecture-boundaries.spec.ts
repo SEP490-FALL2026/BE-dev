@@ -134,7 +134,7 @@ describe('architecture boundaries', () => {
         privateModuleImport(
           sourceRoot,
           otherModule,
-          join(sourceRoot, 'modules', 'data-import', 'employee-import.service.ts'),
+          join(sourceRoot, 'modules', 'data-import', 'employee-import', 'employee-import.service.ts'),
         ),
       ).toHaveLength(1);
     });
@@ -319,8 +319,7 @@ const CLI_ENTRY_FILES: ReadonlySet<string> = new Set([
  * violation, and adding one needs Owner/dev review.
  */
 const LEGACY_PRIVATE_MODULE_IMPORTS: ReadonlySet<string> = new Set([
-  // H8.3: data-import gets a facade for onboarding (A4-10).
-  'modules/onboarding/onboarding.service.ts -> modules/data-import/employee-import.service.ts',
+  // H8.3 removed the onboarding -> employee-import.service.ts entry (A4-10): onboarding reads the data-import facade.
   // ROOT.1/DOC.1: the worker loop of ADR-0012 reaches the dispatcher; the rule for root files is decided there.
   'email-dispatch.loop.ts -> modules/notifications/email-dispatcher.service.ts',
 ]);

@@ -46,8 +46,9 @@ src/
     audit/                    # AuditEvent chỉ ghi thêm (facade record(tx, event)); tra cứu cho Super Admin ở AuditHttpModule riêng
     organization/             # tổ chức, Cost Center (vòng đời), phòng + hồ sơ + giai đoạn trưởng phòng, dự án, chức vụ, nhân viên + placement; API ở OrganizationHttpModule riêng (lớp HTTP này được gọi IdentityAccessFacadeModule để kiểm IT Admin phụ trách — ngoại lệ duy nhất của chiều organization → identity)
     operating-parameters/     # tham số vận hành (giá trị, lịch sử, ngày không làm việc) + API Super Admin
-    data-import/              # import nhân sự CSV xem trước – xác nhận (employee_imports); gọi organization qua facade
-    onboarding/               # checklist khởi tạo: tổng hợp đọc từ organization và identity-access, không sở hữu bảng
+    data-import/              # gốc: module, facade DataImportService (latestEmployeeImport) + data-import.types; gọi organization qua facade
+      employee-import/        # import nhân sự CSV xem trước – xác nhận (employee_imports): controller, service, repo, đọc file, quy tắc dòng, audit, lỗi + mapper HTTP
+    onboarding/               # checklist khởi tạo: tổng hợp đọc từ organization, identity-access và facade data-import, không sở hữu bảng
     identity-access/          # gốc: module, facade module, facade, types, lỗi public, port dùng chung ACCOUNT_SESSIONS (identity-access.ports.ts), recovery.module (RecoveryModule, chỉ nạp bởi lệnh khôi phục); dto/, mappers/, policies/ dùng chung (hai capability trở lên)
       auth/                   # đăng nhập, refresh/logout, phiên + refresh token + throttle (session.repo), đổi/đặt lại mật khẩu; SessionDirectoryService hiện thực port ACCOUNT_SESSIONS
       accounts/               # truy vấn, tạo/mời/kích hoạt, khóa/vai, chuyển giao Super Admin; repo theo aggregate (AppUser, credential, RoleGrant, action token) sau contract AccountDirectory/RoleGrant/ActionLink/Credential service; hasher và chính sách mật khẩu
@@ -77,7 +78,8 @@ test/
   động là Nest module; điều kiện tạo Nest submodule, ownership capability, chỗ đặt lỗi và ngưỡng kích thước ở
   [module structure](docs/rules/module-structure.md). `organization` đã nhóm theo capability (`cost-center/`,
   `department/`, `employee/`, `job-title/`, `project/`), root chỉ còn module, HTTP module, facade, type và lỗi public;
-  chi tiết ở [ví dụ đích](docs/rules/module-structure.md#ví-dụ-đích-và-trạng-thái-chuyển-tiếp).
+  `data-import` giữ capability `employee-import/` sau facade `DataImportService` (H8); chi tiết ở
+  [ví dụ đích](docs/rules/module-structure.md#ví-dụ-đích-và-trạng-thái-chuyển-tiếp).
 - Gốc module **không** public mặc định. Module khác và composition root chỉ import **allowlist** bề mặt công khai ở gốc
   (`<module>.module.ts`, `*-http.module.ts`, `*-facade.module.ts`, facade `<module>.service.ts`, `*.types.ts`,
   `*.errors.ts`); composition root được thêm đúng các entry CLI đã liệt kê. File gốc khác, repo,

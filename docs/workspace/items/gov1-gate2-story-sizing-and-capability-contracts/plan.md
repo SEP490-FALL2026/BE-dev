@@ -4,8 +4,9 @@
 - Phụ trách: AI theo giao việc Owner. Thiết kế ban đầu bởi: Owner (Prompt 20; finding `PLAN-01`, `GATE2-01`; Prompt
   20A; finding `PLAN-02`, `GATE2-02`).
 - Owner review: chưa review. Peer review: tùy chọn.
-- Triển khai: `verified` (local 19/10/2026, Prompt 20 + 20A trên cùng cây làm việc chưa commit trên `bdc9fe8`). PR: chưa
-  có.
+- Triển khai: `verified` (local 19/10/2026, Prompt 20 + 20A trên cùng cây làm việc chưa commit trên `bdc9fe8`).
+  Revision: commit `c760705` trên `dev` = `origin/dev` (Owner commit/push trực tiếp 19/10/2026, không PR); remote CI chưa
+  có bằng chứng.
 
 ## Before coding
 

@@ -1,6 +1,3 @@
-import { HttpStatus } from '@nestjs/common';
-import { ApiException } from '../../infrastructure/http/errors/api.exception';
-import { toUnavailableApiException } from '../../infrastructure/http/errors/service-unavailable';
 import { EmployeeColumn } from './employee-import-rows';
 
 export type FileProblem = 'FILE_REQUIRED' | 'FILE_NOT_TEXT' | 'FILE_EMPTY' | 'FILE_TOO_MANY_ROWS';
@@ -80,52 +77,4 @@ export class ImportAlreadyConfirmedError extends Error {
     super('This import has already been written.');
     this.name = 'ImportAlreadyConfirmedError';
   }
-}
-
-function refuse(status: HttpStatus, code: string, message: string, details?: Record<string, unknown>): ApiException {
-  return new ApiException(status, { code, message, ...(details ? { details } : {}) });
-}
-
-export function toImportApiException(error: unknown): unknown {
-  if (error instanceof ApiException) return error;
-  if (error instanceof ImportFileInvalidError) {
-    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, `IMPORT.${error.problem}`, error.message, error.details);
-  }
-  if (error instanceof ImportFileUnreadableError) {
-    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'IMPORT.FILE_UNREADABLE', error.message, {
-      reason: error.reason,
-      ...(error.line ? { line: error.line } : {}),
-    });
-  }
-  if (error instanceof ImportFileMissingColumnsError) {
-    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'IMPORT.FILE_MISSING_COLUMNS', error.message, {
-      missing: error.missing,
-    });
-  }
-  if (error instanceof ImportNotFoundError) return refuse(HttpStatus.NOT_FOUND, 'IMPORT.NOT_FOUND', error.message);
-  if (error instanceof ImportStateError) {
-    return refuse(HttpStatus.CONFLICT, `IMPORT.${error.problem}`, error.message);
-  }
-  if (error instanceof ImportPreviewOutdatedError) {
-    return refuse(HttpStatus.CONFLICT, 'IMPORT.PREVIEW_OUTDATED', error.message, {
-      currentVersion: error.currentVersion,
-    });
-  }
-  if (error instanceof ImportPreviewStaleError) {
-    return refuse(HttpStatus.CONFLICT, 'IMPORT.PREVIEW_STALE', error.message, { changedLines: error.changedLines });
-  }
-  if (error instanceof ImportDuplicateFileError) {
-    return refuse(HttpStatus.CONFLICT, 'IMPORT.DUPLICATE_FILE_NOT_ACKNOWLEDGED', error.message, {
-      previous: {
-        importId: error.previous.importId,
-        fileName: error.previous.fileName,
-        confirmedAt: error.previous.confirmedAt.toISOString(),
-      },
-    });
-  }
-  if (error instanceof ImportAlreadyConfirmedError) {
-    return refuse(HttpStatus.CONFLICT, 'IMPORT.ALREADY_CONFIRMED', error.message, { result: error.result });
-  }
-
-  return toUnavailableApiException(error) ?? error;
 }

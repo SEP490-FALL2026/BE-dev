@@ -5,11 +5,11 @@ import {
   ApiErrorResponses,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
-} from '../../infrastructure/http/decorators/api-error-responses.decorator';
-import { ApiSuccessResponse } from '../../infrastructure/http/decorators/api-success-response.decorator';
-import { RequireRoles } from '../../infrastructure/security/decorators/access.decorators';
-import { CurrentPrincipal } from '../../infrastructure/security/models/current-principal';
-import type { AuthenticatedPrincipal } from '../../infrastructure/security/tokens/access-token-verifier.port';
+} from '../../../infrastructure/http/decorators/api-error-responses.decorator';
+import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
+import { RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
+import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
+import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import {
   ConfirmImportBodyDto,
   EmployeeImportConfirmationResponseDto,
@@ -17,9 +17,11 @@ import {
   EmployeeImportRowsResponseDto,
   ImportIdParamDto,
   ListImportRowsQueryDto,
-} from './dto/employee-import.dto';
-import { ImportFileInvalidError, toImportApiException } from './employee-import.errors';
-import { EmployeeImportService, ImportView } from './employee-import.service';
+} from './employee-import.dto';
+import { ImportFileInvalidError } from './employee-import.errors';
+import { toImportApiException } from './employee-import.http-errors';
+import { EmployeeImportService } from './employee-import.service';
+import { ImportView } from './employee-import.types';
 
 /** The largest file the route reads: a people file of 1 000 rows is far smaller. */
 const MAX_FILE_BYTES = 2 * 1024 * 1024;

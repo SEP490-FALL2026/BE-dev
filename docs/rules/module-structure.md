@@ -103,27 +103,28 @@ trong ledger, xem dưới).
 
 Ngưỡng là **tín hiệu kiểm tra**, không phải lý do máy móc để chia nhỏ:
 
-| Tín hiệu                                    | Ngưỡng                              | Hành động                                                       |
-| ------------------------------------------- | ----------------------------------- | --------------------------------------------------------------- |
-| File non-spec trong `src/`                  | > 400 dòng (gate); > 700 dòng (cấm) | Tách trước khi thêm; file trong ledger không được vượt cap      |
-| Controller ở root module                    | > 2 (gate)                          | Chia theo capability                                            |
-| File non-spec ở root module                 | > 12 (gate)                         | Chia theo capability                                            |
-| Độ sâu thư mục trong module                 | > 2 (gate)                          | Gộp lại hoặc tách capability                                    |
-| Service nhận > 6 dependency                 | review                              | Xem service có điều phối quá nhiều capability không             |
-| Repo ghi > 1 aggregate hoặc nhiều nhóm bảng | review                              | Tách repo theo aggregate                                        |
-| Capability không có owner rõ ràng           | review                              | Ghi owner trong spec của item; tách folder hoặc bounded context |
+| Tín hiệu                                    | Ngưỡng                              | Hành động                                                                                                                |
+| ------------------------------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| File non-spec trong `src/`                  | > 400 dòng (gate); > 700 dòng (cấm) | Tách trước khi thêm; file trong ledger không được vượt cap                                                               |
+| Unit spec trong `src/modules/**`            | > 400 dòng (gate, không ledger)     | Tách theo use case; harness chung ở `test/support/` ([test guide](../../test/README.md#kích-thước-unit-spec-của-module)) |
+| Controller ở root module                    | > 2 (gate)                          | Chia theo capability                                                                                                     |
+| File non-spec ở root module                 | > 12 (gate)                         | Chia theo capability                                                                                                     |
+| Độ sâu thư mục trong module                 | > 2 (gate)                          | Gộp lại hoặc tách capability                                                                                             |
+| Service nhận > 6 dependency                 | review                              | Xem service có điều phối quá nhiều capability không                                                                      |
+| Repo ghi > 1 aggregate hoặc nhiều nhóm bảng | review                              | Tách repo theo aggregate                                                                                                 |
+| Capability không có owner rõ ràng           | review                              | Ghi owner trong spec của item; tách folder hoặc bounded context                                                          |
 
 Ngoại lệ phải ghi lý do và người sở hữu remediation trong item. Refactor cấu trúc là thay đổi riêng, không gộp với thay
 đổi hành vi.
 
 ## Gate và legacy ledger
 
-| Gate                                                                                                                                                                                                                                                                                                                                                                     | Nơi enforce                                                                  |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------- |
-| Core không import Nest/Prisma/SDK/`infrastructure`/`modules`                                                                                                                                                                                                                                                                                                             | [architecture-boundaries.spec.ts](../../src/architecture-boundaries.spec.ts) |
-| Liên module chỉ qua allowlist bề mặt công khai (+ entry CLI cho composition root); Prisma delegate và raw SQL chỉ trên bảng mình sở hữu                                                                                                                                                                                                                                  | [architecture-boundaries.spec.ts](../../src/architecture-boundaries.spec.ts) |
-| Import chéo capability (gồm root module) chỉ tới contract đăng ký chính xác, registry không thừa/thiếu, controller → controller, folder catch-all, lỗi trong service/controller/repo, lỗi trùng tên, HTTP mapping trong tệp lỗi và trong business service, so khớp `error.name` trong toàn `src`, raw SQL ngoài repo, kích thước file, số file/controller ở root, độ sâu | [architecture-structure.spec.ts](../../src/architecture-structure.spec.ts)   |
-| Module nghiệp vụ chỉ export contract trong allowlist; provider không khai trùng                                                                                                                                                                                                                                                                                          | [module-graph.spec.ts](../../src/module-graph.spec.ts)                       |
+| Gate                                                                                                                                                                                                                                                                                                                                                                                                          | Nơi enforce                                                                  |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| Core không import Nest/Prisma/SDK/`infrastructure`/`modules`                                                                                                                                                                                                                                                                                                                                                  | [architecture-boundaries.spec.ts](../../src/architecture-boundaries.spec.ts) |
+| Liên module chỉ qua allowlist bề mặt công khai (+ entry CLI cho composition root); Prisma delegate và raw SQL chỉ trên bảng mình sở hữu                                                                                                                                                                                                                                                                       | [architecture-boundaries.spec.ts](../../src/architecture-boundaries.spec.ts) |
+| Import chéo capability (gồm root module) chỉ tới contract đăng ký chính xác, registry không thừa/thiếu, controller → controller, folder catch-all, lỗi trong service/controller/repo, lỗi trùng tên, HTTP mapping trong tệp lỗi và trong business service, so khớp `error.name` trong toàn `src`, raw SQL ngoài repo, kích thước file và unit spec của module (`H8-RV-01`), số file/controller ở root, độ sâu | [architecture-structure.spec.ts](../../src/architecture-structure.spec.ts)   |
+| Module nghiệp vụ chỉ export contract trong allowlist; provider không khai trùng                                                                                                                                                                                                                                                                                                                               | [module-graph.spec.ts](../../src/module-graph.spec.ts)                       |
 
 Vi phạm có sẵn khi một gate ra đời nằm trong ledger: `LEGACY` của `architecture-structure.spec.ts`,
 `LEGACY_PRIVATE_MODULE_IMPORTS` của `architecture-boundaries.spec.ts` và `LEGACY_PRIVATE_EXPORTS` của
@@ -170,3 +171,11 @@ duy nhất `accounts`, `approval-roles` hiện thực) ở `accounts/account.typ
 type, lỗi public, port dùng chung và `recovery.module.ts`. Provider dùng cho cả API và lệnh khôi phục mà
 facade không cần khai ở cả `IdentityAccessModule` và `RecoveryModule` (E6), ghim bằng danh sách chính xác trong
 [module-graph.spec.ts](../../src/module-graph.spec.ts).
+**Sau Data Import Wave (H8.1 → H8.3):** `data-import` giữ một capability `employee-import/` (controller, service điều
+phối, repo duy nhất của `employee_imports`/`employee_import_rows`, đọc file thuần, quy tắc dòng và so judgement, builder
+audit, type, DTO, lỗi và mapper HTTP `employee-import.http-errors.ts` cạnh nhau; không `dto/` một file, không Nest
+submodule). Root 3 file non-spec: module, facade `DataImportService` (một method `latestEmployeeImport` cho
+onboarding) và `data-import.types.ts`; facade là export liên module duy nhất (`DataImportModule: DataImportService`);
+service capability là contract nội module đăng ký vì facade đọc qua nó. Không còn mục `data-import` trong ledger nào;
+`Page<T>` dùng bản core. Hai đường kiểm dòng (import và nhập tay) vẫn tách — hợp nhất là thay đổi hành vi riêng
+`beh1-employee-row-validation-alignment` (A4-11).

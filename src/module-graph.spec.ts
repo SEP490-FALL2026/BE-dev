@@ -37,6 +37,8 @@ import { WorkerModule } from './worker.module';
  */
 const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   'AuditModule: AuditService',
+  // H8.3 (A4-10): the data-import facade; onboarding reads the latest people import through it.
+  'DataImportModule: DataImportService',
   'IdentityAccessFacadeModule: IdentityAccessService',
   // H5.5 (identity-access Wave B): the account contracts the API and the recovery command reach the account persistence
   // through; the persistence itself is declared once, here, because every graph needs it.
@@ -67,8 +69,8 @@ const LEGACY_PRIVATE_EXPORTS: ReadonlySet<string> = new Set([
   'OrganizationModule: CostCenterRepo',
   'OrganizationModule: DepartmentRepo',
   'OrganizationModule: OrganizationRepo',
-  // Owner 19/10/2026 (GATE.1, extends E9): non-facade exports the contract allowlist found.
-  'DataImportModule: EmployeeImportService', // H8.3: data-import facade for onboarding (A4-10)
+  // Owner 19/10/2026 (GATE.1, extends E9): non-facade exports the contract allowlist found. H8.3 removed the
+  // data-import entry (facade DataImportService).
   'NotificationsModule: EmailDispatcher', // ROOT.1/DOC.1: decided with the email-dispatch.loop import edge (ADR-0012)
   'OperatingParametersModule: NonWorkingDatesService', // G3: same-context HTTP module sharing, reviewed like E4
 ]);

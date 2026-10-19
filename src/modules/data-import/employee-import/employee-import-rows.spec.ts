@@ -1,11 +1,15 @@
-import { DISPLAY_NAME_CASES } from '../../../test/support/display-name-cases';
+import { DISPLAY_NAME_CASES } from '../../../../test/support/display-name-cases';
 import {
   EmployeeImportLookup,
   EmployeeRowClassifier,
   ExistingEmployee,
   clean,
+  idsUsedByValidRows,
   jobTitleKey,
+  lookupNamesOf,
   mapEmployeeColumns,
+  sameJudgement,
+  toEmployeeImportLookup,
 } from './employee-import-rows';
 
 describe('cell text (T-12)', () => {
@@ -277,5 +281,111 @@ describe('EmployeeRowClassifier', () => {
       expect(result.outcome).toBe('ERROR');
       expect(result.errors).toEqual([{ column: 'employment_type', code: 'EMPLOYMENT_TYPE_INVALID' }]);
     });
+  });
+});
+
+describe('judging the rows of a preview again (US-02-01 AC-9)', () => {
+  it('asks the organization for each code, job title key and work email of the rows once, without blanks', () => {
+    expect(
+      lookupNamesOf([
+        {
+          cells: {
+            employee_code: ' N-1 ',
+            department_code: 'P-OPS',
+            job_title: '  Senior   Designer',
+            work_email: 'A@Acme.vn',
+          },
+        },
+        {
+          cells: {
+            employee_code: 'N-1',
+            department_code: '',
+            job_title: 'senior designer',
+            work_email: 'not an email',
+          },
+        },
+        { cells: {} },
+      ]),
+    ).toEqual({
+      departmentCodes: ['P-OPS'],
+      normalizedJobTitleNames: ['senior designer'],
+      employeeCodes: ['N-1'],
+      normalizedEmails: ['a@acme.vn'],
+    });
+  });
+
+  it('keys what the organization answered the way the classifier reads it', () => {
+    const lookup = toEmployeeImportLookup({
+      departments: [{ id: 'd1', code: 'P-OPS', active: true, costCenterActive: true }],
+      jobTitles: [{ id: 'j1', name: 'Designer', normalizedName: 'designer', status: 'ACTIVE' }],
+      employees: [],
+      emailOwners: [{ normalizedEmail: 'a@acme.vn', employeeCode: 'E1' }],
+    });
+
+    expect(lookup.departments.get('P-OPS')?.id).toBe('d1');
+    expect(lookup.jobTitles.get('designer')?.id).toBe('j1');
+    expect(lookup.emailOwners.get('a@acme.vn')).toBe('E1');
+  });
+
+  it('locks only what the valid rows use, each once', () => {
+    const lookup = toEmployeeImportLookup({
+      departments: [
+        { id: 'd1', code: 'P-OPS', active: true, costCenterActive: true },
+        { id: 'd2', code: 'P-DES', active: true, costCenterActive: true },
+      ],
+      jobTitles: [{ id: 'j1', name: 'Designer', normalizedName: 'designer', status: 'ACTIVE' }],
+      employees: [],
+      emailOwners: [],
+    });
+
+    expect(
+      idsUsedByValidRows(
+        [
+          { outcome: 'VALID', cells: { department_code: 'P-OPS', job_title: 'Designer' } },
+          { outcome: 'VALID', cells: { department_code: 'P-OPS', job_title: ' designer' } },
+          { outcome: 'ERROR', cells: { department_code: 'P-DES', job_title: 'Designer' } },
+        ],
+        lookup,
+      ),
+    ).toEqual({ departmentIds: ['d1'], jobTitleIds: ['j1'] });
+  });
+
+  it('compares a judgement whatever order its keys came back in, but keeps the order of its reasons', () => {
+    const stored = {
+      outcome: 'ERROR' as const,
+      errors: [
+        { code: 'HIRE_DATE_INVALID', column: 'hire_date' },
+        { code: 'JOB_TITLE_NOT_FOUND', column: 'job_title' },
+      ],
+      differences: null,
+    };
+    const fresh = {
+      outcome: 'ERROR' as const,
+      errors: [
+        { column: 'hire_date', code: 'HIRE_DATE_INVALID' },
+        { column: 'job_title', code: 'JOB_TITLE_NOT_FOUND' },
+      ],
+    };
+
+    expect(sameJudgement(fresh, stored)).toBe(true);
+    expect(sameJudgement({ ...fresh, errors: [...fresh.errors].reverse() }, stored)).toBe(false);
+    expect(sameJudgement({ ...fresh, outcome: 'VALID' }, stored)).toBe(false);
+    expect(
+      sameJudgement(
+        {
+          outcome: 'EXISTS_DIFFERENT',
+          errors: [],
+          differences: [{ column: 'full_name', current: 'A', incoming: 'B' }],
+        },
+        {
+          outcome: 'EXISTS_DIFFERENT',
+          errors: [],
+          differences: [{ incoming: 'B', current: 'A', column: 'full_name' }],
+        },
+      ),
+    ).toBe(true);
+    expect(
+      sameJudgement({ outcome: 'EXISTS_SAME', errors: [] }, { outcome: 'EXISTS_SAME', errors: [], differences: null }),
+    ).toBe(true);
   });
 });

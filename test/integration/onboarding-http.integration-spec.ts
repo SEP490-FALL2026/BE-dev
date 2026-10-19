@@ -138,7 +138,12 @@ describe('the onboarding checklist over HTTP (integration, real PostgreSQL)', ()
 
     await request(server()).post(`/api/v1/employee-imports/${uploaded.data.id}/cancellations`).set(as(it1)).expect(200);
 
-    expect((await steps())[0].status).toBe('DONE');
+    // The latest import that was kept answers instead: the clean file of the case before, never the cancelled one.
+    const after = (await steps())[0];
+    expect(after).toMatchObject({ status: 'DONE', reasons: [] });
+    expect(after.facts?.latestImport).toEqual({ id: expect.any(String) as unknown, status: 'PREVIEW', errorRows: 0 });
+    expect(after.facts?.latestImport?.id).not.toBe(uploaded.data.id);
+    expect(Object.keys(after.facts?.latestImport ?? {})).toEqual(['id', 'status', 'errorRows']);
   });
 
   it('says the later steps are not built, and what the seat step waits for (AC-2, AC-5)', async () => {

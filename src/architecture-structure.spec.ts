@@ -22,6 +22,11 @@ const HARD_MAX_FILE_LINES = 700;
 const MAX_ROOT_CONTROLLERS = 2;
 const MAX_ROOT_FILES = 12;
 const MAX_DIRECTORY_DEPTH = 2;
+/**
+ * H8-RV-01 (Prompt 21A): a unit spec of a business module is capped like a source file. A larger one is split by
+ * observable use case, its shared harness in test/support/ (test/README.md). No ledger and no exception.
+ */
+const MAX_MODULE_SPEC_LINES = 400;
 
 /** Module-level folders every capability of the same module may import. */
 const SHARED_MODULE_FOLDERS = new Set(['dto', 'errors', 'mappers', 'policies']);
@@ -36,6 +41,11 @@ const SHARED_MODULE_FOLDERS = new Set(['dto', 'errors', 'mappers', 'policies']);
  * PUBLIC_CONTRACT_EXPORTS of module-graph.spec.ts, never a way to make a red build green.
  */
 const INTRA_MODULE_CONTRACTS: ReadonlyMap<string, string> = new Map([
+  // data-import (H8.3): the module facade reads the latest kept people import through the capability service.
+  [
+    'modules/data-import/employee-import/employee-import.service.ts',
+    'latest kept people import read by the facade data-import.service.ts for the onboarding checklist',
+  ],
   // identity-access (Wave B: capabilities reach one another through these services, types and the shared ports).
   [
     'modules/identity-access/identity-access.ports.ts',
@@ -155,10 +165,8 @@ const LEGACY = {
     'modules/installation/installation.service.ts: InstallationInputError',
     'modules/installation/installation.service.ts: AlreadyInstalledError',
   ]),
-  /** HTTP mapping (ApiException/HttpStatus) inside a business error file. */
-  httpMappingInErrorFiles: new Set([
-    'modules/data-import/employee-import.errors.ts', // H8
-  ]),
+  /** HTTP mapping (ApiException/HttpStatus) inside a business error file. Empty since H8.1; stays as a gate. */
+  httpMappingInErrorFiles: new Set<string>(),
   /** Errors matched by their class name string instead of instanceof. */
   errorMatchedByName: new Set([
     // A4-04 (GATE.1): composition roots were not scanned. ROOT.1 shares one CLI helper that uses instanceof.
@@ -172,7 +180,6 @@ const LEGACY = {
   /** File -> line cap. A listed file must not grow past its cap. */
   oversizedFiles: new Map<string, number>([
     ['infrastructure/config/env-schema.ts', 425], // H6
-    ['modules/data-import/employee-import.service.ts', 545], // H8
   ]),
   /** Module -> cap on controllers directly in the module root. H4. */
   rootControllers: new Map<string, number>(),
@@ -217,6 +224,27 @@ function lineCount(file: string): number {
   const lines = text.split(/\r?\n/).length;
 
   return text.endsWith('\n') ? lines - 1 : lines;
+}
+
+/** Every unit spec (`*.spec.ts`) below `directory`, recursively. */
+function listSpecFiles(directory: string): string[] {
+  return readdirSync(directory).flatMap((entry) => {
+    const path = join(directory, entry);
+    if (statSync(path).isDirectory()) return entry === 'generated' ? [] : listSpecFiles(path);
+
+    return path.endsWith('.spec.ts') ? [path] : [];
+  });
+}
+
+/** The specs above the module unit spec cap, with their path relative to src/ and their line count. */
+function oversizedModuleSpecs(
+  specFiles: string[],
+  countLines: (file: string) => number = lineCount,
+): { file: string; lines: number }[] {
+  return specFiles
+    .map((file) => ({ file: toSourcePath(file), lines: countLines(file) }))
+    .filter(({ lines }) => lines > MAX_MODULE_SPEC_LINES)
+    .sort((a, b) => (a.file < b.file ? -1 : a.file > b.file ? 1 : 0));
 }
 
 /** Path segments below src/modules: [module, ...folders, file]. */
@@ -527,6 +555,10 @@ describe('module structure gates (docs/rules/module-structure.md)', () => {
     expect(tooDeep).toEqual([]);
   });
 
+  it('H8-RV-01: keeps every module unit spec at or under 400 lines (split by use case, harness in test/support/)', () => {
+    expect(oversizedModuleSpecs(listSpecFiles(modulesRoot))).toEqual([]);
+  });
+
   it('reports the ledger helper differences in both directions', () => {
     expect(againstLedger(['a', 'b'], new Set(['b', 'c']))).toEqual({
       newViolations: ['a'],
@@ -689,6 +721,30 @@ describe('gate rules on synthetic files (A4-01, A4-04, A4-05)', () => {
       );
       expect(isPrivateCrossAreaImport(inModule('sample.service.ts'), inModule('policies', 'x.policy.ts'))).toBe(false);
       expect(isPrivateCrossAreaImport(inModule('mappers', 'x.ts'), inModule('dto', 'y.dto.ts'))).toBe(false);
+    });
+  });
+
+  describe('H8-RV-01: the module unit spec cap', () => {
+    it('reads only the specs below src/modules, not the gate specs at src/ or anything in test/', () => {
+      const scanned = listSpecFiles(modulesRoot).map(toSourcePath);
+
+      expect(scanned.length).toBeGreaterThan(0);
+      expect(scanned.filter((file) => !file.startsWith('modules/'))).toEqual([]);
+      expect(scanned.filter((file) => !file.endsWith('.spec.ts'))).toEqual([]);
+      expect(scanned).not.toContain('architecture-structure.spec.ts');
+    });
+
+    it('names each spec over 400 lines with its exact count, and lets 400 lines pass', () => {
+      const lines: Record<string, number> = {
+        [inModule('alpha', 'big.spec.ts')]: 1084,
+        [inModule('alpha', 'edge.spec.ts')]: 400,
+        [inModule('beta', 'over.spec.ts')]: 401,
+      };
+
+      expect(oversizedModuleSpecs(Object.keys(lines), (file) => lines[file])).toEqual([
+        { file: 'modules/sample/alpha/big.spec.ts', lines: 1084 },
+        { file: 'modules/sample/beta/over.spec.ts', lines: 401 },
+      ]);
     });
   });
 

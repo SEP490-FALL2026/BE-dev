@@ -1,6 +1,7 @@
-import { isBusinessDate } from '../../core/business-date';
-import { normalizeDisplayName } from '../../core/display-name';
-import { InvalidEmailError, normalizeEmail } from '../../core/email';
+import { isBusinessDate } from '../../../core/business-date';
+import { normalizeDisplayName } from '../../../core/display-name';
+import { InvalidEmailError, normalizeEmail } from '../../../core/email';
+import type { EmployeeImportLookupData } from '../../organization/organization.types';
 
 export const EMPLOYEE_COLUMNS = [
   'employee_code',
@@ -116,7 +117,8 @@ export interface EmployeeRowResult {
   parsed?: ParsedEmployeeRow;
 }
 
-type Cells = Partial<Record<EmployeeColumn, string>>;
+/** The cells of one row of the file, by the column they were read into. */
+export type EmployeeCells = Partial<Record<EmployeeColumn, string>>;
 
 /** A cell as it is read: its display form (T-12) — NFC, ends trimmed, inner whitespace runs collapsed. */
 export const clean = (value: string | undefined): string => normalizeDisplayName(value ?? '');
@@ -139,7 +141,7 @@ export class EmployeeRowClassifier {
 
   constructor(private readonly lookup: EmployeeImportLookup) {}
 
-  classify(cells: Cells): EmployeeRowResult {
+  classify(cells: EmployeeCells): EmployeeRowResult {
     const errors: RowIssue[] = [];
     const code = clean(cells.employee_code);
     const fullName = clean(cells.full_name);
@@ -262,4 +264,87 @@ function safeNormalize(email: string): string | null {
     if (error instanceof InvalidEmailError) return null;
     throw error;
   }
+}
+
+// --- judging the rows of a preview, and judging them again --------------------------------------------------------
+
+/** The codes, job title keys and emails the rows name, each once and without blanks: what to look up for them. */
+export function lookupNamesOf(rows: readonly { cells: EmployeeCells }[]): {
+  departmentCodes: string[];
+  normalizedJobTitleNames: string[];
+  employeeCodes: string[];
+  normalizedEmails: string[];
+} {
+  const cells = rows.map((row) => row.cells);
+  const unique = (values: string[]) => [...new Set(values.filter((value) => value !== ''))];
+
+  return {
+    departmentCodes: unique(cells.map((cell) => clean(cell.department_code))),
+    normalizedJobTitleNames: unique(cells.map((cell) => jobTitleKey(clean(cell.job_title)))),
+    employeeCodes: unique(cells.map((cell) => clean(cell.employee_code))),
+    normalizedEmails: unique(cells.map((cell) => safeNormalize(clean(cell.work_email)) ?? '')),
+  };
+}
+
+/** The lookup the classifier reads, keyed the way it reads it, from what the organization facade answered. */
+export function toEmployeeImportLookup(data: EmployeeImportLookupData): EmployeeImportLookup {
+  return {
+    departments: new Map(data.departments.map((row) => [row.code, row])),
+    jobTitles: new Map(data.jobTitles.map((row) => [row.normalizedName, row])),
+    existing: new Map<string, ExistingEmployee>(data.employees.map((row) => [row.employeeCode, row])),
+    emailOwners: new Map(data.emailOwners.map((row) => [row.normalizedEmail, row.employeeCode])),
+  };
+}
+
+/** Every row judged in file order by one classifier, so a code or email seen twice in the file is caught. */
+export function judgeEmployeeRows<Row extends { lineNumber: number; cells: EmployeeCells }>(
+  rows: readonly Row[],
+  lookup: EmployeeImportLookup,
+): ({ lineNumber: number; cells: EmployeeCells } & EmployeeRowResult)[] {
+  const classifier = new EmployeeRowClassifier(lookup);
+
+  return rows.map((row) => ({ lineNumber: row.lineNumber, cells: row.cells, ...classifier.classify(row.cells) }));
+}
+
+/** The departments and job titles the rows judged valid rely on: what the confirmation locks before judging again. */
+export function idsUsedByValidRows(
+  rows: readonly { outcome: EmployeeRowOutcome; cells: EmployeeCells }[],
+  lookup: EmployeeImportLookup,
+): { departmentIds: string[]; jobTitleIds: string[] } {
+  const departmentIds = new Set<string>();
+  const jobTitleIds = new Set<string>();
+  for (const row of rows) {
+    if (row.outcome !== 'VALID') continue;
+    const department = lookup.departments.get(clean(row.cells.department_code));
+    const title = lookup.jobTitles.get(jobTitleKey(clean(row.cells.job_title)));
+    if (department) departmentIds.add(department.id);
+    if (title) jobTitleIds.add(title.id);
+  }
+
+  return { departmentIds: [...departmentIds], jobTitleIds: [...jobTitleIds] };
+}
+
+/** The same text for the same data whatever order the keys came in: PostgreSQL stores `jsonb` with its own key order. */
+function canonical(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
+  if (value !== null && typeof value === 'object') {
+    return `{${Object.entries(value)
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+      .map(([key, nested]) => `${JSON.stringify(key)}:${canonical(nested)}`)
+      .join(',')}}`;
+  }
+
+  return JSON.stringify(value) ?? 'null';
+}
+
+/** Whether a row is judged the same way now as in the preview: same outcome, same reasons, same differences. */
+export function sameJudgement(
+  fresh: { outcome: EmployeeRowOutcome; errors: unknown; differences?: unknown },
+  stored: { outcome: EmployeeRowOutcome; errors: unknown; differences: unknown },
+): boolean {
+  return (
+    fresh.outcome === stored.outcome &&
+    canonical(fresh.errors) === canonical(stored.errors) &&
+    canonical(fresh.differences ?? null) === canonical(stored.differences)
+  );
 }

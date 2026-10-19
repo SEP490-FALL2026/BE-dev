@@ -29,6 +29,20 @@ Developer viết tay cũng dùng cùng quy tắc.
   Inventory chỉ bảo đảm danh sách operation, không chứng minh coverage mọi nhánh.
 - Chạy pnpm test:discovery để phát hiện test sai tên/vị trí hoặc runner bỏ sót.
 
+### Kích thước unit spec của module
+
+- Mỗi unit spec trong `src/modules/**` (`*.spec.ts`) tối đa **400 dòng vật lý**, đếm như gate kích thước source; gate
+  `H8-RV-01` của [architecture-structure.spec.ts](../src/architecture-structure.spec.ts) báo đúng đường dẫn và số dòng,
+  không có ledger, ngoại lệ hay cap cao hơn. Gate không áp cho spec gate ở `src/` gốc hay suite trong `test/**`.
+- Vượt ngưỡng thì tách theo **use case hoặc chuyển trạng thái quan sát được**, không theo tầng kỹ thuật. Fixture/harness
+  dùng chung đặt ở `test/support/` (có kiểu, tất định, chỉ dựng đối tượng); assertion và mạch use case ở lại spec sở
+  hữu. `support/` không chứa spec.
+- **Đúng:** `employee-import-upload.spec.ts`, `employee-import-preview-lifecycle.spec.ts` và
+  `employee-import-confirm.spec.ts` dùng chung harness có kiểu `test/support/employee-import-service-harness.ts`.
+- **Sai:** một `employee-import.service.spec.ts` chứa mọi route/use case chỉ vì chúng gọi cùng một service.
+- **Lách sai:** đổi tên một ma trận test 1.000 dòng hoặc dời assertion sang script không đăng ký để né Jest/test
+  discovery. Suite phải được tìm thấy qua lệnh unit test thông thường.
+
 ### Import file private của src
 
 - Ưu tiên kiểm qua HTTP, facade hoặc contract công khai khi mục tiêu của test cho phép.

@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import request from 'supertest';
 import { Client } from 'pg';
 import { ApiAccount, adminToken, createActivatedAccount } from '../support/api-accounts';
@@ -778,6 +779,301 @@ describe('importing people from a file over HTTP (integration, real PostgreSQL)'
         expect(await count('employees')).toBe(people + 3);
       }
       expect(await deadlocks()).toBe(deadlocksBefore);
+    });
+  });
+
+  // H8 Phase 0: the exact answers and Audit Trail rows the Data Import Wave refactor must keep, byte for byte.
+  describe('the exact wire of every route and the exact Audit Trail (characterization)', () => {
+    const ISO = expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/) as unknown;
+    const IMPORT_KEYS = [
+      'id',
+      'fileName',
+      'status',
+      'previewVersion',
+      'ignoredColumns',
+      'summary',
+      'result',
+      'createdAt',
+      'expiresAt',
+      'confirmedAt',
+      'cancelledAt',
+    ];
+    interface AuditRow {
+      actor_kind: string;
+      actor_app_user_id: string | null;
+      actor_roles: string[];
+      action: string;
+      resource_type: string;
+      resource_id: string;
+      before: unknown;
+      after: unknown;
+      correlation_id: string;
+      operator_reference: string | null;
+    }
+    const auditOf = async (id: string): Promise<AuditRow[]> =>
+      (
+        await ctx.sql.query<AuditRow>(
+          `SELECT actor_kind, actor_app_user_id, actor_roles, action, resource_type, resource_id, before, after,
+                  correlation_id, operator_reference
+             FROM audit_events WHERE resource_id = $1 ORDER BY occurred_at, id`,
+          [id],
+        )
+      ).rows;
+    const sessionsOf = async (appUserId: string): Promise<string[]> =>
+      (
+        await ctx.sql.query<{ id: string }>('SELECT id::text AS id FROM auth_sessions WHERE app_user_id = $1', [
+          appUserId,
+        ])
+      ).rows.map((row) => row.id);
+    const asIt1 = (action: string, resourceId: string, before: unknown, after: unknown) => ({
+      actor_kind: 'USER',
+      actor_app_user_id: it1.appUserId,
+      actor_roles: ['IT_ADMIN'],
+      action,
+      resource_type: 'EmployeeImport',
+      resource_id: resourceId,
+      before,
+      after,
+      correlation_id: expect.any(String) as unknown,
+      operator_reference: null,
+    });
+    const people = (department: string) => {
+      const valid = {
+        employee_code: unique('EW-'),
+        full_name: 'Wire Person',
+        work_email: `${unique('wire.')}@acme.vn`,
+        department_code: department,
+      };
+      const wrong = { ...valid, employee_code: unique('EW-'), work_email: '', hire_date: 'x', full_name: 'Wrong Wire' };
+
+      return { valid, wrong, content: csv([personRow(valid), personRow(wrong)], `${HEADER},notes`) };
+    };
+
+    it('upload, view, rows, refresh, confirm and replay answer exactly these bodies; only upload and confirm are audited', async () => {
+      const department = await newDepartment();
+      const { valid, wrong, content } = people(department);
+      const summary = {
+        totalRows: 2,
+        valid: 1,
+        errors: 1,
+        existingSame: 0,
+        existingDifferent: 0,
+        newPeopleByDepartment: [{ departmentCode: department, count: 1 }],
+        departmentsWithoutHead: [{ code: department, name: `Department ${department}` }],
+        duplicateOf: null,
+      };
+
+      const uploaded = await upload(content, 'wire.csv').expect(201);
+      const id = importOf(uploaded).id;
+      const preview = {
+        id,
+        fileName: 'wire.csv',
+        status: 'PREVIEW',
+        previewVersion: 1,
+        ignoredColumns: ['notes'],
+        summary,
+        result: null,
+        createdAt: ISO,
+        expiresAt: ISO,
+        confirmedAt: null,
+        cancelledAt: null,
+      };
+      expect(uploaded.body).toEqual({ success: true, message: 'EMPLOYEE_IMPORT.UPLOADED', data: preview });
+      expect(Object.keys(importOf(uploaded))).toEqual(IMPORT_KEYS);
+      const createdAt = Date.parse((importOf(uploaded) as unknown as { createdAt: string }).createdAt);
+      const expiresAt = Date.parse((importOf(uploaded) as unknown as { expiresAt: string }).expiresAt);
+      expect(Math.abs(expiresAt - createdAt - 24 * 60 * 60 * 1000)).toBeLessThan(10_000);
+
+      const viewed = await request(server()).get(`/api/v1/employee-imports/${id}`).set(asIt()).expect(200);
+      expect(viewed.body).toEqual({ success: true, message: 'EMPLOYEE_IMPORT.FETCHED', data: importOf(uploaded) });
+
+      const page = await request(server())
+        .get(`/api/v1/employee-imports/${id}/rows?page=2&pageSize=1`)
+        .set(asIt())
+        .expect(200);
+      expect(page.body).toEqual({
+        success: true,
+        message: 'EMPLOYEE_IMPORT.ROWS_LISTED',
+        data: {
+          items: [
+            {
+              line: 3,
+              outcome: 'ERROR',
+              cells: {
+                employee_code: wrong.employee_code,
+                full_name: 'Wrong Wire',
+                work_email: '',
+                employment_type: 'STAFF',
+                hire_date: 'x',
+                department_code: department,
+                job_title: 'Administrator',
+              },
+              errors: [{ column: 'hire_date', code: 'HIRE_DATE_INVALID' }],
+              differences: null,
+            },
+          ],
+          pagination: { page: 2, pageSize: 1, totalItems: 2, totalPages: 2 },
+        },
+      });
+      expect(Object.keys((page.body as { data: { items: object[] } }).data.items[0])).toEqual([
+        'line',
+        'outcome',
+        'cells',
+        'errors',
+        'differences',
+      ]);
+
+      const refreshed = await request(server())
+        .post(`/api/v1/employee-imports/${id}/preview-refreshes`)
+        .set(asIt())
+        .expect(200);
+      expect(refreshed.body).toEqual({
+        success: true,
+        message: 'EMPLOYEE_IMPORT.PREVIEW_REFRESHED',
+        data: { ...preview, previewVersion: 2 },
+      });
+
+      const key = unique('key-wire-');
+      const confirmed = await confirm(id, { previewVersion: 2, idempotencyKey: key }).expect(200);
+      const result = {
+        created: 1,
+        existingSame: 0,
+        existingDifferent: 0,
+        errors: 1,
+        createdByDepartment: [{ departmentCode: department, count: 1 }],
+        departmentsWithoutHead: [{ code: department, name: `Department ${department}` }],
+      };
+      expect(confirmed.body).toEqual({
+        success: true,
+        message: 'EMPLOYEE_IMPORT.CONFIRMED',
+        data: {
+          replayed: false,
+          import: { ...preview, status: 'COMPLETED', previewVersion: 2, result, confirmedAt: ISO },
+        },
+      });
+      expect(Object.keys((confirmed.body as { data: object }).data)).toEqual(['replayed', 'import']);
+
+      const replay = await confirm(id, { previewVersion: 2, idempotencyKey: key }).expect(200);
+      expect(replay.body).toEqual({
+        success: true,
+        message: 'EMPLOYEE_IMPORT.CONFIRMED',
+        data: { replayed: true, import: (confirmed.body as { data: { import: unknown } }).data.import },
+      });
+
+      const audit = await auditOf(id);
+      expect(audit).toEqual([
+        asIt1('EMPLOYEE_IMPORT.UPLOADED', id, null, {
+          fileName: 'wire.csv',
+          fileDigest: createHash('sha256').update(Buffer.from(content)).digest('hex'),
+          rows: 2,
+          valid: 1,
+          errors: 1,
+        }),
+        asIt1(
+          'EMPLOYEE_IMPORT.CONFIRMED',
+          id,
+          { status: 'PREVIEW', previewVersion: 2 },
+          { status: 'COMPLETED', created: 1, existingSame: 0, existingDifferent: 0, errors: 1, repeatedFile: false },
+        ),
+      ]);
+      const sessions = await sessionsOf(it1.appUserId);
+      for (const event of audit) expect(sessions).toContain(event.correlation_id);
+      const recorded = JSON.stringify(audit);
+      for (const raw of [valid.full_name, valid.work_email, wrong.full_name, 'notes']) {
+        expect(recorded).not.toContain(raw);
+      }
+    });
+
+    it('cancel answers exactly the cancelled import twice, and is audited once', async () => {
+      const { content } = people(await newDepartment());
+      const id = importOf(await upload(content, 'cancel.csv').expect(201)).id;
+
+      const first = await request(server())
+        .post(`/api/v1/employee-imports/${id}/cancellations`)
+        .set(asIt())
+        .expect(200);
+      const second = await request(server())
+        .post(`/api/v1/employee-imports/${id}/cancellations`)
+        .set(asIt())
+        .expect(200);
+
+      expect(first.body).toEqual({
+        success: true,
+        message: 'EMPLOYEE_IMPORT.CANCELLED',
+        data: expect.objectContaining({ id, status: 'CANCELLED', cancelledAt: ISO, confirmedAt: null }) as unknown,
+      });
+      expect(Object.keys(importOf(first))).toEqual(IMPORT_KEYS);
+      expect(second.body).toEqual(first.body);
+      expect((await auditOf(id)).map((event) => [event.action, event.before, event.after])).toEqual([
+        ['EMPLOYEE_IMPORT.UPLOADED', null, expect.objectContaining({ fileName: 'cancel.csv' })],
+        ['EMPLOYEE_IMPORT.CANCELLED', { status: 'PREVIEW' }, { status: 'CANCELLED' }],
+      ]);
+      expect((await auditOf(id))[1]).toEqual(
+        asIt1('EMPLOYEE_IMPORT.CANCELLED', id, { status: 'PREVIEW' }, { status: 'CANCELLED' }),
+      );
+    });
+
+    it('answers refusals in the exact error envelope', async () => {
+      const missing = '3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11';
+      const id = importOf(await upload(people(await newDepartment()).content).expect(201)).id;
+
+      const notFound = await request(server()).get(`/api/v1/employee-imports/${missing}`).set(asIt()).expect(404);
+      const outdated = await confirm(id, { previewVersion: 5, idempotencyKey: unique('key-wire-') }).expect(409);
+      const missingColumns = await upload('employee_code,full_name\nX,Y\n').expect(422);
+
+      expect(notFound.body).toEqual({
+        success: false,
+        error: { code: 'IMPORT.NOT_FOUND', message: 'Import not found.', requestId: expect.any(String) as unknown },
+      });
+      expect(outdated.body).toEqual({
+        success: false,
+        error: {
+          code: 'IMPORT.PREVIEW_OUTDATED',
+          message: 'The preview that was confirmed is not the current one.',
+          details: { currentVersion: 1 },
+          requestId: expect.any(String) as unknown,
+        },
+      });
+      expect(missingColumns.body).toEqual({
+        success: false,
+        error: {
+          code: 'IMPORT.FILE_MISSING_COLUMNS',
+          message: 'The file lacks required columns: employment_type, hire_date, department_code, job_title.',
+          details: { missing: ['employment_type', 'hire_date', 'department_code', 'job_title'] },
+          requestId: expect.any(String) as unknown,
+        },
+      });
+    });
+
+    it('rolls a stale confirmation back whole: the preview, its rows and the Audit Trail stay as they were', async () => {
+      const department = await newDepartment();
+      const titleName = unique('Passing ');
+      const titleId = await newTitle(titleName);
+      const id = importOf(
+        await upload(csv([personRow({ department_code: department }), personRow({ job_title: titleName })])).expect(
+          201,
+        ),
+      ).id;
+      const rowsBefore = await rowsOf(id);
+      await request(server()).post(`/api/v1/job-titles/${titleId}/deactivate`).set(asIt()).expect(200);
+      const people = await count('employees');
+
+      const stale = await confirm(id, { previewVersion: 1, idempotencyKey: unique('key-wire-') }).expect(409);
+
+      expect(errorOf(stale)).toEqual({
+        code: 'IMPORT.PREVIEW_STALE',
+        message: 'The data changed since the preview; look at the preview again.',
+        details: { changedLines: [3] },
+        requestId: expect.any(String) as unknown,
+      });
+      expect(await count('employees')).toBe(people);
+      const stored = await ctx.sql.query<{ status: string; preview_version: number; confirm_key: string | null }>(
+        'SELECT status, preview_version, confirm_key, result FROM employee_imports WHERE id = $1',
+        [id],
+      );
+      expect(stored.rows[0]).toEqual({ status: 'PREVIEW', preview_version: 1, confirm_key: null, result: null });
+      expect(await rowsOf(id)).toEqual(rowsBefore);
+      expect((await auditOf(id)).map((event) => event.action)).toEqual(['EMPLOYEE_IMPORT.UPLOADED']);
     });
   });
 
