@@ -1,11 +1,11 @@
 import { Injectable } from '@nestjs/common';
+import { normalizeDisplayName } from '../../core/display-name';
 import { TransactionRunner } from '../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditService } from '../audit/audit.service';
 import { DepartmentRepo } from './department.repo';
 import { ProjectRecord, ProjectStatus } from './department.types';
 import { ProjectInvalidError, ProjectNotFoundError } from './errors/department.errors';
-import { displayJobTitleName } from './job-title-name';
 import { organizationAuditEvent } from './organization-audit';
 import { OrganizationService } from './organization.service';
 
@@ -121,7 +121,7 @@ export class ProjectService {
   }
 
   private requireName(raw: string): string {
-    const name = displayJobTitleName(raw);
+    const name = normalizeDisplayName(raw);
     if (name === '' || [...name].length > PROJECT_NAME_MAX_LENGTH) throw new ProjectInvalidError('NAME');
 
     return name;

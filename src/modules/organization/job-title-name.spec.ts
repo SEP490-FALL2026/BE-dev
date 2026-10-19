@@ -1,28 +1,15 @@
-import {
-  JOB_TITLE_NAME_MAX_LENGTH,
-  displayJobTitleName,
-  isJobTitleNameTooLong,
-  normalizeJobTitleName,
-} from './job-title-name';
+import { JOB_TITLE_NAME_MAX_LENGTH, isJobTitleNameTooLong, normalizeJobTitleName } from './job-title-name';
+import { normalizeDisplayName } from '../../core/display-name';
+import { DISPLAY_NAME_CASES } from '../../../test/support/display-name-cases';
 
 describe('job title names (T-12, US-02-07 AC-2)', () => {
-  describe('displayJobTitleName', () => {
-    it('trims the ends and collapses every run of whitespace inside to one space, keeping the case', () => {
-      expect(displayJobTitleName('  Senior   Designer \t')).toBe('Senior Designer');
+  describe.each(DISPLAY_NAME_CASES)('$label', ({ input, comparison, characters }) => {
+    it('compares as the display form in lower case', () => {
+      expect(normalizeJobTitleName(input)).toBe(comparison);
     });
 
-    it('treats the Unicode spaces people paste as spaces, not as letters', () => {
-      // no-break space, em space, ideographic space, tab, newline, zero-width no-break space (BOM)
-      expect(displayJobTitleName(' Senior 　Designer\t\n')).toBe('Senior Designer');
-      expect(displayJobTitleName('﻿Designer﻿')).toBe('Designer');
-    });
-
-    it('composes accents (NFC), so one name typed two ways is one name', () => {
-      expect(displayJobTitleName('Ké toán')).toBe('Ké toán');
-    });
-
-    it('is empty for a name made only of whitespace', () => {
-      expect(displayJobTitleName('    \t')).toBe('');
+    it('is too long only past 100 characters of the display form', () => {
+      expect(isJobTitleNameTooLong(input)).toBe(characters > JOB_TITLE_NAME_MAX_LENGTH);
     });
   });
 
@@ -45,7 +32,7 @@ describe('job title names (T-12, US-02-07 AC-2)', () => {
     });
 
     it('is the lowercase of the display name, and is the same whichever way the accents were typed', () => {
-      expect(normalizeJobTitleName(' Ké   Toán ')).toBe(displayJobTitleName('Ké toán').toLowerCase());
+      expect(normalizeJobTitleName(' Ké   Toán ')).toBe(normalizeDisplayName('Ké toán').toLowerCase());
     });
   });
 

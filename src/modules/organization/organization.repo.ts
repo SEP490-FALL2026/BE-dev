@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { fromDateColumn, toDateColumn } from '../../core/business-date';
+import { normalizeDisplayName } from '../../core/display-name';
 import { normalizeEmail } from '../../core/email';
 import { Prisma } from '../../generated/prisma/client';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
@@ -10,7 +11,7 @@ import {
   EmployeeEmailTakenError,
   OrganizationAlreadyExistsError,
 } from './errors/organization.errors';
-import { displayJobTitleName, normalizeJobTitleName } from './job-title-name';
+import { normalizeJobTitleName } from './job-title-name';
 import { EmployeeNotFoundError } from './organization.errors';
 import {
   CreateCostCenterInput,
@@ -75,7 +76,7 @@ export class OrganizationRepo {
   /** The installation path and the API share one name rule (T-12): shown as the display name, compared as the normalized one. */
   async createJobTitle(tx: DbTx, organizationId: string, name: string): Promise<{ id: string }> {
     return tx.jobTitle.create({
-      data: { organizationId, name: displayJobTitleName(name), normalizedName: normalizeJobTitleName(name) },
+      data: { organizationId, name: normalizeDisplayName(name), normalizedName: normalizeJobTitleName(name) },
       select: { id: true },
     });
   }
@@ -84,7 +85,7 @@ export class OrganizationRepo {
 
   async insertJobTitle(tx: DbTx, organizationId: string, name: string): Promise<JobTitleRecord> {
     return tx.jobTitle.create({
-      data: { organizationId, name: displayJobTitleName(name), normalizedName: normalizeJobTitleName(name) },
+      data: { organizationId, name: normalizeDisplayName(name), normalizedName: normalizeJobTitleName(name) },
       select: JOB_TITLE_SELECT,
     });
   }
@@ -116,7 +117,7 @@ export class OrganizationRepo {
     return tx.jobTitle.update({
       where: { id: jobTitleId },
       data: {
-        name: displayJobTitleName(name),
+        name: normalizeDisplayName(name),
         normalizedName: normalizeJobTitleName(name),
         version: { increment: 1 },
         updatedAt: now,

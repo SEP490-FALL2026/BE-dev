@@ -5,7 +5,6 @@ import { TransactionRunner } from '../../infrastructure/database/transaction-run
 import type { AuthenticatedPrincipal } from '../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditService } from '../audit/audit.service';
 import { EmployeeCodeTakenError, EmployeeEmailTakenError } from '../organization/organization.errors';
-import { displayJobTitleName, normalizeJobTitleName } from '../organization/job-title-name';
 import { OrganizationService } from '../organization/organization.service';
 import { CsvError, parseCsvRows } from './csv';
 import {
@@ -15,6 +14,8 @@ import {
   EmployeeRowClassifier,
   EmployeeRowOutcome,
   ExistingEmployee,
+  clean,
+  jobTitleKey,
   mapEmployeeColumns,
 } from './employee-import-rows';
 import {
@@ -78,8 +79,6 @@ export interface Page<T> {
   items: T[];
   pagination: { page: number; pageSize: number; totalItems: number; totalPages: number };
 }
-
-const clean = (value: string | undefined): string => displayJobTitleName(value ?? '');
 
 function safeNormalize(email: string): string | null {
   try {
@@ -419,7 +418,7 @@ export class EmployeeImportService {
       await this.organization.lookupForEmployeeImport(
         {
           departmentCodes: unique(cells.map((cell) => clean(cell.department_code))),
-          normalizedJobTitleNames: unique(cells.map((cell) => normalizeJobTitleName(clean(cell.job_title)))),
+          normalizedJobTitleNames: unique(cells.map((cell) => jobTitleKey(clean(cell.job_title)))),
           employeeCodes: unique(cells.map((cell) => clean(cell.employee_code))),
           normalizedEmails: unique(cells.map((cell) => safeNormalize(clean(cell.work_email)) ?? '')),
         },
@@ -450,7 +449,7 @@ export class EmployeeImportService {
     for (const row of stored) {
       if (row.outcome !== 'VALID') continue;
       const department = lookup.departments.get(clean(row.cells.department_code));
-      const title = lookup.jobTitles.get(normalizeJobTitleName(clean(row.cells.job_title)));
+      const title = lookup.jobTitles.get(jobTitleKey(clean(row.cells.job_title)));
       if (department) departmentIds.add(department.id);
       if (title) jobTitleIds.add(title.id);
     }

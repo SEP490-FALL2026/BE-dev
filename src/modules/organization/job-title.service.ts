@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { normalizeDisplayName } from '../../core/display-name';
 import { TransactionRunner } from '../../infrastructure/database/transaction-runner';
 import { isUniqueViolation } from '../../infrastructure/database/unique-violation';
 import type { AuthenticatedPrincipal } from '../../infrastructure/security/tokens/access-token-verifier.port';
@@ -9,7 +10,7 @@ import {
   JobTitleNameTooLongError,
   JobTitleNotFoundError,
 } from './errors/organization.errors';
-import { displayJobTitleName, isJobTitleNameTooLong, normalizeJobTitleName } from './job-title-name';
+import { isJobTitleNameTooLong, normalizeJobTitleName } from './job-title-name';
 import { organizationAuditEvent } from './organization-audit';
 import { OrganizationRepo } from './organization.repo';
 import { OrganizationService } from './organization.service';
@@ -93,7 +94,7 @@ export class JobTitleService {
       return await this.runner.run(async (tx) => {
         const current = await this.repo.lockJobTitle(tx, jobTitleId, 'UPDATE');
         if (!current) throw new JobTitleNotFoundError();
-        if (current.name === displayJobTitleName(rawName)) return current;
+        if (current.name === normalizeDisplayName(rawName)) return current;
 
         const renamed = await this.repo.renameJobTitle(tx, jobTitleId, rawName, new Date());
         await this.audit.record(
@@ -159,7 +160,7 @@ export class JobTitleService {
   }
 
   private assertUsableName(rawName: string): void {
-    if (displayJobTitleName(rawName) === '') throw new JobTitleNameRequiredError();
+    if (normalizeDisplayName(rawName) === '') throw new JobTitleNameRequiredError();
     if (isJobTitleNameTooLong(rawName)) throw new JobTitleNameTooLongError();
   }
 

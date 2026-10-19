@@ -310,9 +310,6 @@ const CLI_ENTRY_FILES: ReadonlySet<string> = new Set([
  * violation, and adding one needs Owner/dev review.
  */
 const LEGACY_PRIVATE_MODULE_IMPORTS: ReadonlySet<string> = new Set([
-  // H4.3a: normalizeDisplayName moves to src/core (Q6).
-  'modules/data-import/employee-import-rows.ts -> modules/organization/job-title-name.ts',
-  'modules/data-import/employee-import.service.ts -> modules/organization/job-title-name.ts',
   // H8.3: data-import gets a facade for onboarding (A4-10).
   'modules/onboarding/onboarding.service.ts -> modules/data-import/employee-import.service.ts',
   // ROOT.1/DOC.1: the worker loop of ADR-0012 reaches the dispatcher; the rule for root files is decided there.

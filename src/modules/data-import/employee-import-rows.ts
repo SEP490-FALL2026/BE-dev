@@ -1,6 +1,6 @@
 import { isBusinessDate } from '../../core/business-date';
+import { normalizeDisplayName } from '../../core/display-name';
 import { InvalidEmailError, normalizeEmail } from '../../core/email';
-import { displayJobTitleName, normalizeJobTitleName } from '../organization/job-title-name';
 
 export const EMPLOYEE_COLUMNS = [
   'employee_code',
@@ -118,7 +118,14 @@ export interface EmployeeRowResult {
 
 type Cells = Partial<Record<EmployeeColumn, string>>;
 
-const clean = (value: string | undefined): string => displayJobTitleName(value ?? '');
+/** A cell as it is read: its display form (T-12) — NFC, ends trimmed, inner whitespace runs collapsed. */
+export const clean = (value: string | undefined): string => normalizeDisplayName(value ?? '');
+
+/**
+ * The key a job title is looked up and compared by: the display form in lower case, the same rule as the
+ * catalogue's stored `normalized_name` (T-12, US-02-07 AC-2), so case and stray spaces do not matter but accents do.
+ */
+export const jobTitleKey = (text: string): string => normalizeDisplayName(text).toLowerCase();
 
 /**
  * Decides, row by row and in file order, what a row of the people file is: a person to create, a person who is
@@ -187,7 +194,7 @@ export class EmployeeRowClassifier {
       errors.push({ column: 'department_code', code: 'DEPARTMENT_COST_CENTER_INACTIVE' });
     }
 
-    const jobTitle = jobTitleText === '' ? undefined : this.lookup.jobTitles.get(normalizeJobTitleName(jobTitleText));
+    const jobTitle = jobTitleText === '' ? undefined : this.lookup.jobTitles.get(jobTitleKey(jobTitleText));
     if (jobTitleText === '') errors.push({ column: 'job_title', code: 'JOB_TITLE_REQUIRED' });
     else if (!jobTitle) errors.push({ column: 'job_title', code: 'JOB_TITLE_NOT_FOUND' });
     else if (jobTitle.status === 'INACTIVE') errors.push({ column: 'job_title', code: 'JOB_TITLE_INACTIVE' });
@@ -238,7 +245,7 @@ export class EmployeeRowClassifier {
     if ((existing.departmentCode ?? '') !== incoming.departmentCode) {
       add('department_code', existing.departmentCode ?? '', incoming.departmentCode);
     }
-    if (normalizeJobTitleName(existing.jobTitleName ?? '') !== normalizeJobTitleName(incoming.jobTitleText)) {
+    if (jobTitleKey(existing.jobTitleName ?? '') !== jobTitleKey(incoming.jobTitleText)) {
       add('job_title', existing.jobTitleName ?? '', incoming.jobTitleText);
     }
 

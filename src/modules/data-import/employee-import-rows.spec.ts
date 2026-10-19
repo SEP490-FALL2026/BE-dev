@@ -1,9 +1,28 @@
+import { DISPLAY_NAME_CASES } from '../../../test/support/display-name-cases';
 import {
   EmployeeImportLookup,
   EmployeeRowClassifier,
   ExistingEmployee,
+  clean,
+  jobTitleKey,
   mapEmployeeColumns,
 } from './employee-import-rows';
+
+describe('cell text (T-12)', () => {
+  it('reads a missing cell as empty', () => {
+    expect(clean(undefined)).toBe('');
+  });
+
+  describe.each(DISPLAY_NAME_CASES)('$label', ({ input, display, comparison }) => {
+    it('reads a cell in its display form', () => {
+      expect(clean(input)).toBe(display);
+    });
+
+    it('looks a job title up by the same key as the catalogue', () => {
+      expect(jobTitleKey(input)).toBe(comparison);
+    });
+  });
+});
 
 const lookup = (overrides: Partial<EmployeeImportLookup> = {}): EmployeeImportLookup => ({
   departments: new Map([
@@ -120,6 +139,26 @@ describe('EmployeeRowClassifier', () => {
     );
 
     expect(result).toMatchObject({ outcome: 'VALID', parsed: { jobTitleId: 'j-des', employmentType: 'INTERN' } });
+  });
+
+  it('reads the job title through Unicode spaces and decomposed accents, keeping the accents (T-12)', () => {
+    const titles = lookup({
+      jobTitles: new Map([
+        ['k\u1ebf to\u00e1n', { id: 'j-acc', name: 'K\u1ebf to\u00e1n', status: 'ACTIVE' as const }],
+      ]),
+    });
+
+    expect(
+      new EmployeeRowClassifier(titles).classify(
+        row({ job_title: '\u3000KE\u0302\u0301\u00a0\u00a0TOA\u0301N\ufeff' }),
+      ),
+    ).toMatchObject({
+      outcome: 'VALID',
+      parsed: { jobTitleId: 'j-acc', jobTitleName: 'K\u1ebf to\u00e1n' },
+    });
+    expect(new EmployeeRowClassifier(titles).classify(row({ job_title: 'Ke toan' })).errors).toEqual([
+      { column: 'job_title', code: 'JOB_TITLE_NOT_FOUND' },
+    ]);
   });
 
   it.each([
