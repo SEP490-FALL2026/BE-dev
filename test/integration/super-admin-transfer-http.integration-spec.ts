@@ -1,6 +1,6 @@
 import request from 'supertest';
 import { Client } from 'pg';
-import { AccountRepo } from '../../src/modules/identity-access/accounts/account.repo';
+import { RoleGrantRepo } from '../../src/modules/identity-access/accounts/role-grant.repo';
 import { ApiAccount, adminToken, createActivatedAccount, loginAs } from '../support/api-accounts';
 import {
   HttpTestApp,
@@ -229,7 +229,7 @@ describe('handing the Super Admin role to a successor over HTTP (integration, re
   describe('the role never ends up held twice or by nobody (AC-4, AC-5)', () => {
     it('does nothing at all when the grant to the successor fails after the holder was revoked (AC-4)', async () => {
       const u2 = await successor();
-      const accounts = ctx.app.get(AccountRepo);
+      const accounts = ctx.app.get(RoleGrantRepo);
       const events = (await transferEvents()).length;
       const failing = jest.spyOn(accounts, 'grantRole').mockRejectedValueOnce(new Error('disk full'));
 

@@ -1,8 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { OrganizationService } from '../../organization/organization.service';
-import { ApprovalRoleRepo } from '../approval-roles/approval-role.repo';
-import { AccountRepo } from './account.repo';
+import { AccountDirectoryService } from './account-directory.service';
+import { APPROVAL_ROLE_HOLDINGS, ApprovalRoleHoldings } from './account.types';
+import { RoleGrantService } from './role-grant.service';
 
 export type SuccessorProblem =
   | 'SUCCESSOR_NOT_FOUND'
@@ -26,8 +27,9 @@ const ACCEPTED_EMAIL_VERIFICATION = new Set(['INVITATION_REDEEMED', 'RECOVERY_VE
 @Injectable()
 export class SuccessorEligibility {
   constructor(
-    private readonly accounts: AccountRepo,
-    private readonly approvalRoles: ApprovalRoleRepo,
+    private readonly accounts: AccountDirectoryService,
+    private readonly grants: RoleGrantService,
+    @Inject(APPROVAL_ROLE_HOLDINGS) private readonly approvalRoles: ApprovalRoleHoldings,
     private readonly organization: OrganizationService,
   ) {}
 
@@ -46,7 +48,7 @@ export class SuccessorEligibility {
     const verification = await this.accounts.readEmailVerificationSource(tx, successorAppUserId);
     if (verification === null || !ACCEPTED_EMAIL_VERIFICATION.has(verification)) return 'EMAIL_NOT_VERIFIED';
 
-    const roles = await this.accounts.effectiveRoles(successorAppUserId, tx);
+    const roles = await this.grants.effectiveRoles(successorAppUserId, tx);
     if (roles.includes('IT_ADMIN') || roles.includes('FINANCE')) return 'WORK_ROLE_HELD';
     if ((await this.approvalRoles.rolesHeldBy(tx, successor.employeeId)).length > 0) return 'APPROVAL_ROLE_HELD';
     if (await this.organization.isDepartmentHead(successor.employeeId, tx)) return 'HEADS_DEPARTMENT';

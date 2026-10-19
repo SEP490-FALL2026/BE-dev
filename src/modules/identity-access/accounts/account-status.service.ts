@@ -1,11 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditService } from '../../audit/audit.service';
-import { NotificationsService } from '../../notifications/notifications.service';
-import { SessionRepo } from '../auth/session.repo';
 import { AppRole } from '../identity-access.types';
 import { translateAccountWriteError } from './account-constraints';
+import { AccountDirectoryService } from './account-directory.service';
 import {
   accountAuditEvent,
   checkRoleRequest,
@@ -24,7 +23,9 @@ import {
   SelfChangeForbiddenError,
   SuperAdminHolderNotLockableError,
 } from './account.errors';
-import { AccountRepo } from './account.repo';
+import { ACCOUNT_SESSIONS, AccountSessions } from './account.types';
+import { ActionLinkRevocation } from './action-link-revocation.service';
+import { RoleGrantService } from './role-grant.service';
 
 /**
  * Lock, unlock and role grants of an account (slice 1b). Every method takes the AppUser row lock
@@ -33,9 +34,10 @@ import { AccountRepo } from './account.repo';
 @Injectable()
 export class AccountStatusService {
   constructor(
-    private readonly accounts: AccountRepo,
-    private readonly sessions: SessionRepo,
-    private readonly notifications: NotificationsService,
+    private readonly accounts: AccountDirectoryService,
+    private readonly grants: RoleGrantService,
+    private readonly revocation: ActionLinkRevocation,
+    @Inject(ACCOUNT_SESSIONS) private readonly sessions: AccountSessions,
     private readonly audit: AuditService,
     private readonly runner: TransactionRunner,
   ) {}
@@ -49,14 +51,12 @@ export class AccountStatusService {
     await this.runner.run(async (tx) => {
       const account = await this.accounts.lockAndReadAccount(tx, appUserId);
       if (!account) throw new AccountNotFoundError();
-      if (stopsLocking(await this.accounts.effectiveRoles(appUserId, tx))) throw new SuperAdminHolderNotLockableError();
+      if (stopsLocking(await this.grants.effectiveRoles(appUserId, tx))) throw new SuperAdminHolderNotLockableError();
       if (account.status === 'LOCKED') return;
 
       const now = new Date();
       await this.accounts.setStatus(tx, appUserId, 'LOCKED');
-      const usable = (await this.accounts.findUsableTokens(tx, appUserId)).map((token) => token.tokenHash);
-      await this.accounts.revokeTokens(tx, usable, 'ACCOUNT_LOCKED', now);
-      await this.notifications.cancelPendingForTokens(tx, usable);
+      const usable = await this.revocation.revokeUsable(tx, appUserId, 'ACCOUNT_LOCKED', now);
       const sessions = await this.sessions.revokeAllSessions(tx, appUserId, 'ACCOUNT_LOCKED', now);
       await this.audit.record(
         tx,
@@ -107,14 +107,14 @@ export class AccountStatusService {
       .run(async (tx) => {
         const account = await this.accounts.lockAndReadAccount(tx, appUserId);
         if (!account) throw new AccountNotFoundError();
-        const held = await this.accounts.effectiveRoles(appUserId, tx);
+        const held = await this.grants.effectiveRoles(appUserId, tx);
         if (held.includes(granted)) throw new RoleAlreadyGrantedError();
         if (forbidsCombination(held, granted)) throw new RoleCombinationForbiddenError();
-        if (granted === 'FINANCE' && (await this.accounts.financeIsHeld(tx, account.organizationId))) {
+        if (granted === 'FINANCE' && (await this.grants.financeIsHeld(tx, account.organizationId))) {
           throw new FinanceAlreadyAssignedError();
         }
 
-        await this.accounts.grantRole(tx, {
+        await this.grants.grantRole(tx, {
           organizationId: account.organizationId,
           appUserId,
           role: granted,
@@ -149,10 +149,10 @@ export class AccountStatusService {
     await this.runner.run(async (tx) => {
       const account = await this.accounts.lockAndReadAccount(tx, appUserId);
       if (!account) throw new AccountNotFoundError();
-      const held = await this.accounts.effectiveRoles(appUserId, tx);
+      const held = await this.grants.effectiveRoles(appUserId, tx);
       if (!held.includes(revoked)) throw new RoleNotGrantedError();
 
-      await this.accounts.revokeRole(tx, { appUserId, role: revoked, revokedBy: actor.appUserId, now: new Date() });
+      await this.grants.revokeRole(tx, { appUserId, role: revoked, revokedBy: actor.appUserId, now: new Date() });
       await this.audit.record(
         tx,
         accountAuditEvent(

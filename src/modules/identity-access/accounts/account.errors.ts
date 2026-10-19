@@ -1,4 +1,4 @@
-import type { SuccessorProblem } from './successor-eligibility';
+import type { SuccessorProblem } from './successor-eligibility.service';
 
 export class AccountNotFoundError extends Error {
   constructor() {

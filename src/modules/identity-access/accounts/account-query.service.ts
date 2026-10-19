@@ -13,8 +13,10 @@ import {
   RoleGrantRecord,
 } from '../identity-access.types';
 import { employeeHasNotLeft } from '../policies/account-policy';
+import { AccountDirectoryService } from './account-directory.service';
 import { AccountNotFoundError } from './account.errors';
-import { AccountRepo } from './account.repo';
+import { ActionLinkService } from './action-link.service';
+import { RoleGrantService } from './role-grant.service';
 
 export interface AccountView {
   id: string;
@@ -51,7 +53,9 @@ const CANDIDATE_LIMIT = 20;
 @Injectable()
 export class AccountQueryService {
   constructor(
-    private readonly accounts: AccountRepo,
+    private readonly accounts: AccountDirectoryService,
+    private readonly grants: RoleGrantService,
+    private readonly links: ActionLinkService,
     private readonly organization: OrganizationService,
     private readonly notifications: NotificationsService,
   ) {}
@@ -98,7 +102,7 @@ export class AccountQueryService {
         employee,
       ]),
     );
-    const roles = await this.accounts.effectiveRolesFor(records.map((record) => record.id));
+    const roles = await this.grants.effectiveRolesFor(records.map((record) => record.id));
 
     return records.map((record) => {
       const employee = employees.get(record.employeeId);
@@ -120,8 +124,8 @@ export class AccountQueryService {
   private async toDetail(record: AccountRecord): Promise<AccountDetailView> {
     const [view] = await this.toViews([record]);
     const [roleHistory, token] = await Promise.all([
-      this.accounts.grantHistory(record.id),
-      this.accounts.latestToken(record.id),
+      this.grants.grantHistory(record.id),
+      this.links.latestToken(record.id),
     ]);
     let invitation: InvitationView | null = null;
     if (token) {

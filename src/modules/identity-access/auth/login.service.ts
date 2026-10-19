@@ -1,29 +1,24 @@
 import { Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { InvalidEmailError, normalizeEmail } from '../../../core/email';
-import { EnvironmentVariables } from '../../../infrastructure/config/env-schema';
-import { DbTx, TransactionRunner, toTransientError } from '../../../infrastructure/database/transaction-runner';
+import { TransactionRunner, toTransientError } from '../../../infrastructure/database/transaction-runner';
 import { OrganizationService } from '../../organization/organization.service';
-import { AccountRepo } from '../accounts/account.repo';
+import { AccountDirectoryService } from '../accounts/account-directory.service';
+import { CredentialService } from '../accounts/credential.service';
 import { AccountSnapshot, IssuedSession } from '../identity-access.types';
 import { employeeHasNotLeft } from '../policies/account-policy';
 import { InvalidCredentialsError } from './auth.errors';
 import { LoginThrottle } from './login-throttle.service';
-import { PasswordHasher } from './password-hasher.service';
-import { SessionRepo } from './session.repo';
-import { TokenService } from './token.service';
+import { SessionTokenService } from './session-token.service';
 
 @Injectable()
 export class LoginService {
   constructor(
-    private readonly accounts: AccountRepo,
-    private readonly sessions: SessionRepo,
+    private readonly accounts: AccountDirectoryService,
     private readonly organization: OrganizationService,
-    private readonly hasher: PasswordHasher,
-    private readonly tokens: TokenService,
+    private readonly credentials: CredentialService,
     private readonly throttle: LoginThrottle,
+    private readonly sessionTokens: SessionTokenService,
     private readonly runner: TransactionRunner,
-    private readonly config: ConfigService<EnvironmentVariables, true>,
   ) {}
 
   /**
@@ -41,12 +36,12 @@ export class LoginService {
   private async performLogin(email: string, password: string): Promise<IssuedSession> {
     const organization = await this.organization.getOrganization();
     if (!organization) {
-      await this.hasher.verifyAgainstDummy(password);
+      await this.credentials.verifyAgainstDummy(password);
       throw new InvalidCredentialsError();
     }
 
     const normalized = this.safeNormalize(email);
-    const keyHash = this.tokens.throttleKey(normalized);
+    const keyHash = this.throttle.keyFor(normalized);
 
     await this.throttle.assertNotBlocked(organization.id, keyHash);
 
@@ -83,8 +78,8 @@ export class LoginService {
         employeeHasNotLeft(employeeNow);
       if (!unchanged) return null;
 
-      const session = await this.openSession(tx, account.id);
-      await this.sessions.clearThrottle(tx, organization.id, keyHash);
+      const session = await this.sessionTokens.open(tx, account.id);
+      await this.throttle.clear(tx, organization.id, keyHash);
 
       return session;
     });
@@ -97,11 +92,11 @@ export class LoginService {
 
   private async verifyPassword(account: AccountSnapshot | null, password: string): Promise<string | null> {
     if (!account?.credentialHash) {
-      await this.hasher.verifyAgainstDummy(password);
+      await this.credentials.verifyAgainstDummy(password);
       return null;
     }
 
-    return (await this.hasher.verify(account.credentialHash, password)) ? account.credentialHash : null;
+    return (await this.credentials.verify(account.credentialHash, password)) ? account.credentialHash : null;
   }
 
   /** An unparseable email still goes through throttling and the dummy hash, under its raw form. */
@@ -112,38 +107,6 @@ export class LoginService {
       if (error instanceof InvalidEmailError) return `invalid:${email.trim().toLowerCase()}`;
       throw error;
     }
-  }
-
-  /** Creates a session with its first refresh token and signs the access token. Runs inside a transaction. */
-  private async openSession(tx: DbTx, appUserId: string): Promise<IssuedSession> {
-    const now = new Date();
-    const absoluteExpiresAt = new Date(
-      now.getTime() + this.config.get('AUTH_SESSION_ABSOLUTE_SECONDS', { infer: true }) * 1000,
-    );
-    const idleExpiresAt = this.minDate(
-      new Date(now.getTime() + this.config.get('AUTH_SESSION_IDLE_SECONDS', { infer: true }) * 1000),
-      absoluteExpiresAt,
-    );
-
-    const session = await this.sessions.createSession(tx, { appUserId, idleExpiresAt, absoluteExpiresAt });
-    const refresh = this.tokens.newRefreshToken();
-    await this.sessions.insertRefreshToken(tx, {
-      tokenHash: refresh.hash,
-      sessionId: session.id,
-      expiresAt: idleExpiresAt,
-    });
-    const access = await this.tokens.signAccessToken({ sub: appUserId, sid: session.id });
-
-    return {
-      accessToken: access.token,
-      accessTokenExpiresAt: access.expiresAt,
-      refreshToken: refresh.token,
-      refreshTokenExpiresAt: idleExpiresAt,
-    };
-  }
-
-  private minDate(a: Date, b: Date): Date {
-    return a <= b ? a : b;
   }
 
   /** Database trouble from the unlocked reads (outside the runner) becomes the same transient error. */

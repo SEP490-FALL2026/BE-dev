@@ -2,8 +2,10 @@ import { Logger } from '@nestjs/common';
 import { TestingModule, Test } from '@nestjs/testing';
 import { Client } from 'pg';
 import request from 'supertest';
-import { RecoveryRefusedError } from '../../src/modules/identity-access/recovery.errors';
-import { RecoveryContext, RecoveryResult, RecoveryService } from '../../src/modules/identity-access/recovery.service';
+import { HolderRecoveryService } from '../../src/modules/identity-access/recovery/holder-recovery.service';
+import { RecoveryRefusedError } from '../../src/modules/identity-access/recovery/recovery.errors';
+import { RecoveryContext, RecoveryResult } from '../../src/modules/identity-access/recovery/recovery.types';
+import { RoleTransferRecoveryService } from '../../src/modules/identity-access/recovery/role-transfer-recovery.service';
 import { PayloadCipher } from '../../src/modules/notifications/payload-cipher';
 import {
   ACCOUNT_PASSWORD,
@@ -24,12 +26,17 @@ import {
 
 const NEW_PASSWORD = 'a brand new passphrase 2026';
 
-/** Resolves once some backend is waiting for a lock — never guesses with a fixed delay. */
-async function waitForLockWait(observer: Client, timeoutMs = 8000): Promise<void> {
+/**
+ * Resolves once a backend of this database waits for a lock that the connection `holderPid` holds — never guesses with
+ * a fixed delay, and never takes another session's lock wait for this one (CP0-06).
+ */
+async function waitUntilBlockedBy(observer: Client, holderPid: number, timeoutMs = 8000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
     const { rows } = await observer.query<{ waiting: boolean }>(
-      'SELECT EXISTS (SELECT 1 FROM pg_locks WHERE NOT granted) AS waiting',
+      `SELECT EXISTS (SELECT 1 FROM pg_stat_activity
+                       WHERE datname = current_database() AND $1::int = ANY (pg_blocking_pids(pid))) AS waiting`,
+      [holderPid],
     );
     if (rows[0].waiting) return;
     if (Date.now() > deadline) throw new Error('No backend reached a lock wait in time.');
@@ -41,7 +48,9 @@ describe('recovering the Super Admin role outside the application (integration, 
   let ctx: HttpTestApp;
   let seed: SeededInstallation;
   let recoveryModule: TestingModule;
-  let recovery: RecoveryService;
+  /** The command's two entry services, as one object: the tests below call each mode by name. */
+  let recovery: Pick<HolderRecoveryService, 'resetCredentials' | 'unlock'> &
+    Pick<RoleTransferRecoveryService, 'transferRole'>;
   let admin: string;
   let it1: ApiAccount;
   let counter = 0;
@@ -66,7 +75,13 @@ describe('recovering the Super Admin role outside the application (integration, 
     const { RecoveryCliModule } = await import('../../src/recovery-cli.module');
     recoveryModule = await Test.createTestingModule({ imports: [RecoveryCliModule] }).compile();
     await recoveryModule.init();
-    recovery = recoveryModule.get(RecoveryService);
+    const holderRecovery = recoveryModule.get(HolderRecoveryService);
+    const roleTransfer = recoveryModule.get(RoleTransferRecoveryService);
+    recovery = {
+      resetCredentials: (context, input) => holderRecovery.resetCredentials(context, input),
+      unlock: (context, input) => holderRecovery.unlock(context, input),
+      transferRole: (context, input) => roleTransfer.transferRole(context, input),
+    };
   }, 120000);
 
   afterAll(async () => {
@@ -504,18 +519,48 @@ describe('recovering the Super Admin role outside the application (integration, 
         [holderId()],
       );
 
+    /** The tickets the running case opened; each case cleans up its own, so none depends on another's (CP0-07). */
+    const opened: string[] = [];
+    const openTicket = (): RecoveryContext => {
+      const ticket = context();
+      opened.push(ticket.ticketRef);
+
+      return ticket;
+    };
+    const waitingTickets = async () =>
+      (
+        await ctx.sql.query<{ ticket_ref: string }>(
+          `SELECT ticket_ref FROM recovery_tickets WHERE status IN ('PENDING', 'AWAITING_ACTIVATION') ORDER BY ticket_ref`,
+        )
+      ).rows.map((row) => row.ticket_ref);
+
+    beforeEach(async () => {
+      // Nothing left waiting by an earlier case: every case starts from the tickets it opens itself.
+      expect(await waitingTickets()).toEqual([]);
+    });
+
+    afterEach(async () => {
+      const refs = opened.splice(0);
+      await ctx.sql.query(
+        `UPDATE recovery_tickets SET status = 'SUPERSEDED', completed_at = NULL
+          WHERE ticket_ref = ANY ($1::text[]) AND status IN ('PENDING', 'AWAITING_ACTIVATION')`,
+        [refs],
+      );
+      expect(await waitingTickets()).toEqual([]);
+    });
+
     const insertTicket = (ticket: { organizationId: string; mode: string; status: string; targetAppUserId: string }) =>
       ctx.sql.query(
         `INSERT INTO recovery_tickets (id, organization_id, ticket_ref, mode, status, target_app_user_id, approver_ref,
                                        operator_ref, environment, completed_at)
          VALUES (gen_random_uuid(), $1, $2, $3::"RecoveryMode", $4::"RecoveryStatus", $5, 'cto@acme.vn', 'ops-1',
                  'SHARED', CASE WHEN $4 = 'COMPLETED' THEN now() END)`,
-        [ticket.organizationId, context().ticketRef, ticket.mode, ticket.status, ticket.targetAppUserId],
+        [ticket.organizationId, openTicket().ticketRef, ticket.mode, ticket.status, ticket.targetAppUserId],
       );
 
     it('answers like any other address and changes nothing: no link, no mail, the recovery link kept', async () => {
       await ageEarlierLinks();
-      const ticket = context();
+      const ticket = openTicket();
       await recovery.resetCredentials(ticket, { accountEmail: seed.superAdmin.email });
       const recoveryLink = await linkTokenOf(ticket.ticketRef);
       const before = await footprintOf(holderId());
@@ -554,7 +599,7 @@ describe('recovering the Super Admin role outside the application (integration, 
 
     it('still lets the recovery link set the password afterwards, as any reset link would (AC-4)', async () => {
       await ageEarlierLinks();
-      const ticket = context();
+      const ticket = openTicket();
       await recovery.resetCredentials(ticket, { accountEmail: seed.superAdmin.email });
       const recoveryLink = await linkTokenOf(ticket.ticketRef);
       await forgot(seed.superAdmin.email).expect(202);
@@ -574,6 +619,7 @@ describe('recovering the Super Admin role outside the application (integration, 
       await ageEarlierLinks();
       const holder = new Client({ connectionString: ctx.database.url });
       await holder.connect();
+      const holderPid = (await holder.query<{ pid: number }>('SELECT pg_backend_pid() AS pid')).rows[0].pid;
       try {
         const before = await footprintOf(holderId());
         // The recovery's own lock order: the employee for share, then the account, then the ticket.
@@ -584,11 +630,11 @@ describe('recovering the Super Admin role outside the application (integration, 
           `INSERT INTO recovery_tickets (id, organization_id, ticket_ref, mode, status, target_app_user_id, approver_ref,
                                          operator_ref, environment)
            VALUES (gen_random_uuid(), $1, $2, 'RESET_CREDENTIALS', 'PENDING', $3, 'cto@acme.vn', 'ops-1', 'SHARED')`,
-          [seed.organizationId, context().ticketRef, holderId()],
+          [seed.organizationId, openTicket().ticketRef, holderId()],
         );
 
         const pending = forgot(seed.superAdmin.email).then((response) => response);
-        await waitForLockWait(ctx.sql);
+        await waitUntilBlockedBy(ctx.sql, holderPid);
         await holder.query('COMMIT');
         const answer = await pending;
 
@@ -604,9 +650,45 @@ describe('recovering the Super Admin role outside the application (integration, 
       }
     });
 
+    it('also answers the same and changes nothing while a credential reset waits for activation', async () => {
+      // AWAITING_ACTIVATION is set only by a role transfer today; for a credential reset it still counts as waiting.
+      await insertTicket({
+        organizationId: seed.organizationId,
+        mode: 'RESET_CREDENTIALS',
+        status: 'AWAITING_ACTIVATION',
+        targetAppUserId: holderId(),
+      });
+      await ageEarlierLinks();
+      const before = await footprintOf(holderId());
+
+      const answer = await forgot(seed.superAdmin.email).expect(202);
+
+      expect(answer.body).toEqual(GENERIC_ANSWER);
+      expect(await footprintOf(holderId())).toEqual(before);
+    });
+
+    it('still blocks once the link of the waiting ticket has expired: the operator runs it again (AC-11)', async () => {
+      const ticket = openTicket();
+      await recovery.resetCredentials(ticket, { accountEmail: seed.superAdmin.email });
+      await ctx.sql.query(
+        `UPDATE account_action_tokens SET expires_at = now() - interval '1 minute'
+          WHERE recovery_ticket_id = (SELECT id FROM recovery_tickets WHERE ticket_ref = $1)`,
+        [ticket.ticketRef],
+      );
+      expect(await ticketRow(ticket.ticketRef)).toMatchObject({ status: 'PENDING' });
+      // After the setup, so the hourly limit cannot be what stops a link here.
+      await ageEarlierLinks();
+      const before = await footprintOf(holderId());
+
+      const answer = await forgot(seed.superAdmin.email).expect(202);
+
+      expect(answer.body).toEqual(GENERIC_ANSWER);
+      expect(await footprintOf(holderId())).toEqual(before);
+    });
+
     it('stops blocking once the ticket is completed, or superseded by one that completed', async () => {
-      const first = context();
-      const second = context();
+      const first = openTicket();
+      const second = openTicket();
       await recovery.resetCredentials(first, { accountEmail: seed.superAdmin.email });
       await recovery.resetCredentials(second, { accountEmail: seed.superAdmin.email });
       await redeem(await linkTokenOf(second.ticketRef)).expect(200);

@@ -156,9 +156,10 @@ mật khẩu, token hay hash. Ngoài ra không áp dụng: không migration, kh�
 - [x] Spec/plan/roadmap/rule phản ánh implementation cuối; không đổi contract nên không có thông báo FE.
 - [x] Legacy ledger chỉ co lại; không mục, allowlist hay export mới.
 - [x] Phần chưa kiểm chứng ghi rõ ở plan.
-- [ ] Owner review và commit/push.
+- [x] Commit/push: Owner commit/push `19cf3b1` lên `dev` 19/10/2026 (không PR).
+- [ ] Owner review.
 
 ## Changes and acceptance
 
 - 19/10/2026: tạo hạng mục, thiết kế `ready`; implement H5.0 → H5.4 và `verified` local (bằng chứng ở [plan](plan.md)).
-  Chưa commit, chưa Owner review, chưa nghiệm thu.
+  Owner commit/push `19cf3b1` lên `dev` cùng ngày (không PR); chưa Owner review, chưa nghiệm thu.

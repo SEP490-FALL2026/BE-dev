@@ -1,21 +1,36 @@
 import { Module } from '@nestjs/common';
 import { DatabaseModule } from '../../infrastructure/database/database.module';
 import { OrganizationModule } from '../organization/organization.module';
-import { AccountRepo } from './accounts/account.repo';
-import { SuccessorEligibility } from './accounts/successor-eligibility';
-import { ApprovalRoleRepo } from './approval-roles/approval-role.repo';
-import { PasswordHasher } from './auth/password-hasher.service';
-import { RecoveryRepo } from './recovery.repo';
+import { AccountDirectoryService } from './accounts/account-directory.service';
+import { ActionLinkService } from './accounts/action-link.service';
+import { ActionTokenRepo } from './accounts/action-token.repo';
+import { AppUserRepo } from './accounts/app-user.repo';
+import { CredentialRepo } from './accounts/credential.repo';
+import { CredentialService } from './accounts/credential.service';
+import { PasswordHasher } from './accounts/password-hasher.service';
+import { RoleGrantRepo } from './accounts/role-grant.repo';
+import { RoleGrantService } from './accounts/role-grant.service';
 import { IdentityAccessService } from './identity-access.service';
 
 /**
- * IdentityAccessService is the public facade installation and the worker use. The repos, the hasher and the
- * successor check are exported only so IdentityAccessModule and RecoveryModule, in the same folder and owned by
- * the same table owner, share one instance of each instead of declaring a second copy.
+ * IdentityAccessService is the public facade installation and the worker use. The account persistence is declared
+ * here once, because every graph needs it (API, worker, installation, recovery); the API and the recovery command reach
+ * it only through the account contracts exported below. No repository, hasher or helper is exported.
  */
 @Module({
   imports: [DatabaseModule, OrganizationModule],
-  providers: [AccountRepo, PasswordHasher, ApprovalRoleRepo, SuccessorEligibility, RecoveryRepo, IdentityAccessService],
-  exports: [IdentityAccessService, AccountRepo, PasswordHasher, ApprovalRoleRepo, SuccessorEligibility, RecoveryRepo],
+  providers: [
+    AppUserRepo,
+    CredentialRepo,
+    RoleGrantRepo,
+    ActionTokenRepo,
+    PasswordHasher,
+    AccountDirectoryService,
+    RoleGrantService,
+    ActionLinkService,
+    CredentialService,
+    IdentityAccessService,
+  ],
+  exports: [IdentityAccessService, AccountDirectoryService, RoleGrantService, ActionLinkService, CredentialService],
 })
 export class IdentityAccessFacadeModule {}

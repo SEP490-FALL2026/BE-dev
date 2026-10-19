@@ -361,8 +361,11 @@ describe('authentication over HTTP (integration, real PostgreSQL)', () => {
         .set('Authorization', `Bearer ${bodyOf(second).data.accessToken}`)
         .expect(401);
 
+      // The event of this session only, so a revoke elsewhere in the database neither satisfies nor breaks it (CP0-05).
       const audit = await ctx.sql.query(
-        `SELECT actor_kind, action, resource_type, after FROM audit_events WHERE action = 'SESSION.REVOKED'`,
+        `SELECT actor_kind, action, resource_type, after FROM audit_events
+          WHERE action = 'SESSION.REVOKED' AND resource_id = $1`,
+        [(await storedToken(oldToken)).session_id],
       );
       expect(audit.rows).toHaveLength(1);
       expect(audit.rows[0]).toMatchObject({

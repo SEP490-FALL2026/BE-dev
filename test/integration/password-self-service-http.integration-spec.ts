@@ -1,7 +1,7 @@
 import { Logger } from '@nestjs/common';
 import { createHash } from 'node:crypto';
 import { TransactionRunner } from '../../src/infrastructure/database/transaction-runner';
-import { PasswordHasher } from '../../src/modules/identity-access/auth/password-hasher.service';
+import { PasswordHasher } from '../../src/modules/identity-access/accounts/password-hasher.service';
 import request from 'supertest';
 import { PayloadCipher } from '../../src/modules/notifications/payload-cipher';
 import { bodyOf } from '../support/api-body';

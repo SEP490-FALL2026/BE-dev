@@ -1,7 +1,7 @@
 import { TokenVerificationUnavailableError } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { OrganizationService } from '../../organization/organization.service';
-import { ApprovalRoleRepo } from '../approval-roles/approval-role.repo';
-import { SessionRepo } from '../auth/session.repo';
+import { ApprovalRoleDirectoryService } from '../approval-roles/approval-role-directory.service';
+import { SessionDirectoryService } from '../auth/session-directory.service';
 import { TokenService } from '../auth/token.service';
 import { JwtAccessTokenVerifier } from './jwt-access-token.verifier';
 
@@ -10,10 +10,10 @@ const SID = 'a8b6c4d2-1f3e-4a5b-9c7d-0e2f4a6b8c10';
 
 function verifierFailingWith(error: Error): JwtAccessTokenVerifier {
   const tokens = { verifyAccessToken: () => Promise.resolve({ sub: SUB, sid: SID }) } as unknown as TokenService;
-  const sessions = { findPrincipalContext: () => Promise.reject(error) } as unknown as SessionRepo;
+  const sessions = { findPrincipalContext: () => Promise.reject(error) } as unknown as SessionDirectoryService;
   const organization = {} as OrganizationService;
 
-  return new JwtAccessTokenVerifier(tokens, sessions, organization, {} as ApprovalRoleRepo);
+  return new JwtAccessTokenVerifier(tokens, sessions, organization, {} as ApprovalRoleDirectoryService);
 }
 
 describe('JwtAccessTokenVerifier — database failures', () => {

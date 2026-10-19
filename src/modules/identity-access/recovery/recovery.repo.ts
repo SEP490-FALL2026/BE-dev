@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../../infrastructure/database/prisma.service';
-import { DbTx } from '../../infrastructure/database/transaction-runner';
+import { PrismaService } from '../../../infrastructure/database/prisma.service';
+import { DbTx } from '../../../infrastructure/database/transaction-runner';
 
 export type RecoveryModeName = 'RESET_CREDENTIALS' | 'UNLOCK' | 'TRANSFER_ROLE';
 export type RecoveryStatusName = 'PENDING' | 'AWAITING_ACTIVATION' | 'COMPLETED' | 'SUPERSEDED';
@@ -153,16 +153,6 @@ export class RecoveryRepo {
     const ticket = await tx.recoveryTicket.findUnique({ where: { id }, select: TICKET_SELECT });
 
     return ticket ? this.toRecord(ticket) : null;
-  }
-
-  /** Ends every session of the account: the operator's reset leaves the owner signed out everywhere (AC-9). */
-  async revokeSessions(tx: DbTx, appUserId: string, now: Date): Promise<number> {
-    const result = await tx.authSession.updateMany({
-      where: { appUserId, revokedAt: null },
-      data: { revokedAt: now, revokedReason: 'PASSWORD_RESET' },
-    });
-
-    return result.count;
   }
 
   private toRecord(row: {

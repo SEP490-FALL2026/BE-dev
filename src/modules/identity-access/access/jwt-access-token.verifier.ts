@@ -8,8 +8,8 @@ import {
 } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { OrganizationService } from '../../organization/organization.service';
 import { EmployeeRecord } from '../../organization/organization.types';
-import { ApprovalRoleRepo } from '../approval-roles/approval-role.repo';
-import { SessionRepo } from '../auth/session.repo';
+import { ApprovalRoleDirectoryService } from '../approval-roles/approval-role-directory.service';
+import { SessionDirectoryService } from '../auth/session-directory.service';
 import { TokenService } from '../auth/token.service';
 import { PrincipalContext } from '../identity-access.types';
 import { employeeHasNotLeft } from '../policies/account-policy';
@@ -24,9 +24,9 @@ import { resolveEffectiveRoles } from './effective-roles.policy';
 export class JwtAccessTokenVerifier implements AccessTokenVerifierPort {
   constructor(
     private readonly tokens: TokenService,
-    private readonly sessions: SessionRepo,
+    private readonly sessions: SessionDirectoryService,
     private readonly organization: OrganizationService,
-    private readonly approvalRoles: ApprovalRoleRepo,
+    private readonly approvalRoles: ApprovalRoleDirectoryService,
   ) {}
 
   async verify(token: string): Promise<AuthenticatedPrincipal> {

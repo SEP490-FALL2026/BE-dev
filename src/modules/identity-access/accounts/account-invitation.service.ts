@@ -1,19 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { InvalidEmailError, normalizeEmail } from '../../../core/email';
-import { DbTx, TransactionRunner } from '../../../infrastructure/database/transaction-runner';
+import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditService } from '../../audit/audit.service';
-import { NotificationsService } from '../../notifications/notifications.service';
 import { EmployeeNotFoundError } from '../../organization/organization.errors';
 import { OrganizationService } from '../../organization/organization.service';
-import { EmployeeRecord } from '../../organization/organization.types';
-import { PASSWORD_HASH_POLICY_VERSION, PasswordHasher } from '../auth/password-hasher.service';
-import { checkPasswordPolicy } from '../auth/password.policy';
-import { TokenService } from '../auth/token.service';
-import { PasswordPolicyError } from '../identity-access.errors';
 import { AppRole } from '../identity-access.types';
 import { employeeHasNotLeft } from '../policies/account-policy';
 import { translateAccountWriteError } from './account-constraints';
+import { AccountDirectoryService } from './account-directory.service';
 import { accountAuditEvent, isSelfChange, RequestedRole, validateRoleSet } from './account-administration.policy';
 import {
   AccountAlreadyActivatedError,
@@ -22,13 +17,13 @@ import {
   AccountNotFoundError,
   EmployeeTerminatedError,
   FinanceAlreadyAssignedError,
-  InvitationInvalidError,
   LoginEmailInvalidError,
   LoginEmailRequiredError,
   RoleRequestRefusedError,
   SelfChangeForbiddenError,
 } from './account.errors';
-import { AccountRepo } from './account.repo';
+import { InvitationMailService } from './invitation-mail.service';
+import { RoleGrantService } from './role-grant.service';
 
 export interface CreateAccountInput {
   employeeId: string;
@@ -37,19 +32,18 @@ export interface CreateAccountInput {
 }
 
 /**
- * Creating an account, inviting its owner and redeeming the invitation (slice 1b). Every method
- * that changes an account takes the AppUser row lock first and re-reads what it decides on (lock
- * protocol rules 1 and 2).
+ * Creating an account and inviting its owner, or inviting again (slice 1b). Every method that changes an account takes
+ * the AppUser row lock first and re-reads what it decides on (lock protocol rules 1 and 2). Redeeming the invitation is
+ * `InvitationRedemptionService`.
  */
 @Injectable()
 export class AccountInvitationService {
   constructor(
-    private readonly accounts: AccountRepo,
+    private readonly accounts: AccountDirectoryService,
+    private readonly grants: RoleGrantService,
     private readonly organization: OrganizationService,
     private readonly audit: AuditService,
-    private readonly notifications: NotificationsService,
-    private readonly hasher: PasswordHasher,
-    private readonly tokens: TokenService,
+    private readonly invitations: InvitationMailService,
     private readonly runner: TransactionRunner,
   ) {}
 
@@ -79,7 +73,7 @@ export class AccountInvitationService {
         if ((await this.accounts.findAccountIdByEmployee(tx, input.employeeId)) !== null) {
           throw new AccountAlreadyExistsError();
         }
-        if (roles.includes('FINANCE') && (await this.accounts.financeIsHeld(tx, organization.id))) {
+        if (roles.includes('FINANCE') && (await this.grants.financeIsHeld(tx, organization.id))) {
           throw new FinanceAlreadyAssignedError();
         }
 
@@ -95,7 +89,7 @@ export class AccountInvitationService {
           emailVerifiedAt: null,
         });
         for (const role of roles) {
-          await this.accounts.grantRole(tx, {
+          await this.grants.grantRole(tx, {
             organizationId: organization.id,
             appUserId: user.id,
             role,
@@ -116,7 +110,7 @@ export class AccountInvitationService {
             roles,
           }),
         );
-        await this.issueInvitation(tx, actor, organization.id, user.id, rawEmail.trim(), current, now);
+        await this.invitations.send(tx, actor, organization.id, user.id, rawEmail.trim(), current, now);
 
         return user.id;
       })
@@ -136,112 +130,17 @@ export class AccountInvitationService {
       const employee = await this.organization.getEmployee(account.employeeId, tx);
       if (!employeeHasNotLeft(employee)) throw new EmployeeTerminatedError();
 
-      const now = new Date();
       // Every usable token goes, including an expired one that still holds the place (spec base).
-      const usable = await this.accounts.findUsableTokens(tx, appUserId);
-      const hashes = usable.map((token) => token.tokenHash);
-      await this.accounts.revokeTokens(tx, hashes, 'SUPERSEDED', now);
-      await this.notifications.cancelPendingForTokens(tx, hashes);
-      await this.issueInvitation(tx, actor, account.organizationId, appUserId, account.loginEmail, employee, now);
+      await this.invitations.replace(
+        tx,
+        actor,
+        account.organizationId,
+        appUserId,
+        account.loginEmail,
+        employee,
+        new Date(),
+      );
     });
-  }
-
-  /**
-   * Redeems an invitation link: sets the account's first password and activates it. Every reason
-   * a link cannot be used gives the same InvitationInvalidError. The password length is checked
-   * before the token is looked at, so a weak password reveals nothing about the token.
-   */
-  async redeemInvitation(token: string, password: string): Promise<void> {
-    const lengthViolation = checkPasswordPolicy(password, '');
-    if (lengthViolation && lengthViolation !== 'EQUALS_LOGIN_EMAIL') throw new PasswordPolicyError(lengthViolation);
-
-    // Find the token first: a malformed or unknown token costs no Argon2 (R-09). The answer is the same
-    // generic error either way, and a 256-bit random token cannot be guessed from the timing.
-    if (!this.tokens.isWellFormedActionToken(token)) throw new InvitationInvalidError();
-    const tokenHash = this.tokens.hashActionToken(token);
-    const appUserId = await this.accounts.findActionTokenOwner(tokenHash);
-    if (!appUserId) throw new InvitationInvalidError();
-
-    // Hashing is the slow part and still happens before any lock (lock protocol rule 3).
-    const hash = await this.hasher.hash(password);
-
-    const outcome = await this.runner.run<'activated' | 'invalid' | PasswordPolicyError>(async (tx) => {
-      // AppUser first, then the token (spec: the order that cannot deadlock with lock/unlock).
-      if (!(await this.accounts.lockAppUser(tx, appUserId, 'UPDATE'))) return 'invalid';
-      const stored = await this.accounts.lockActionToken(tx, tokenHash);
-      const account = await this.accounts.findAccountRecord(appUserId, tx);
-      if (!stored || !account) return 'invalid';
-
-      const now = new Date();
-      const employee = await this.organization.getEmployee(account.employeeId, tx);
-      const usable =
-        stored.appUserId === appUserId &&
-        stored.purpose === 'INVITE' &&
-        stored.consumedAt === null &&
-        stored.revokedAt === null &&
-        stored.expiresAt > now &&
-        account.status === 'ACTIVE' &&
-        account.activationState === 'INVITED' &&
-        employeeHasNotLeft(employee);
-      if (!usable) return 'invalid';
-
-      const emailViolation = checkPasswordPolicy(password, account.loginEmail);
-      if (emailViolation) return new PasswordPolicyError(emailViolation);
-
-      await this.accounts.createCredential(tx, appUserId, hash, PASSWORD_HASH_POLICY_VERSION);
-      await this.accounts.markActivated(tx, appUserId, now);
-      await this.accounts.consumeToken(tx, tokenHash, now);
-      await this.audit.record(tx, {
-        organizationId: account.organizationId,
-        actorKind: 'USER',
-        actorAppUserId: appUserId,
-        actorRoles: [],
-        action: 'APP_USER.ACTIVATED',
-        resourceType: 'AppUser',
-        resourceId: appUserId,
-        before: { activationState: 'INVITED' },
-        after: { activationState: 'ACTIVATED', emailVerificationSource: 'INVITATION_REDEEMED' },
-        correlationId: appUserId,
-      });
-
-      return 'activated';
-    });
-
-    if (outcome instanceof PasswordPolicyError) throw outcome;
-    if (outcome !== 'activated') throw new InvitationInvalidError();
-  }
-
-  private async issueInvitation(
-    tx: DbTx,
-    actor: AuthenticatedPrincipal,
-    organizationId: string,
-    appUserId: string,
-    recipient: string,
-    employee: EmployeeRecord,
-    now: Date,
-  ): Promise<void> {
-    const issued = this.tokens.newInvitationToken(now);
-    await this.accounts.insertActionToken(tx, {
-      tokenHash: issued.hash,
-      appUserId,
-      purpose: 'INVITE',
-      expiresAt: issued.expiresAt,
-      createdBy: actor.appUserId,
-    });
-    await this.notifications.enqueueEmail(tx, {
-      organizationId,
-      recipient,
-      template: 'ACCOUNT_INVITATION',
-      locale: 'vi',
-      actionTokenHash: issued.hash,
-      payload: { token: issued.token, expiresAt: issued.expiresAt.toISOString(), fullName: employee.fullName },
-    });
-    await this.audit.record(
-      tx,
-      accountAuditEvent(actor, organizationId, 'APP_USER.INVITATION_SENT', appUserId, null, {
-        expiresAt: issued.expiresAt.toISOString(),
-      }),
-    );
   }
 
   private normalizeLoginEmail(value: string): string {

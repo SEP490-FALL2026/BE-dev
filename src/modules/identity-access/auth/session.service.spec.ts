@@ -4,9 +4,10 @@ import { createHash } from 'node:crypto';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import { AuditService } from '../../audit/audit.service';
 import { OrganizationService } from '../../organization/organization.service';
-import { AccountRepo } from '../accounts/account.repo';
+import { AccountDirectoryService } from '../accounts/account-directory.service';
 import { RefreshTokenSnapshot, SessionSnapshot } from '../identity-access.types';
 import { SessionInvalidError } from './auth.errors';
+import { SessionTokenService } from './session-token.service';
 import { SessionRepo } from './session.repo';
 import { SessionService } from './session.service';
 import { TokenService } from './token.service';
@@ -101,13 +102,12 @@ function setUp(world: World) {
     },
   };
   const service = new SessionService(
-    accounts as unknown as AccountRepo,
+    accounts as unknown as AccountDirectoryService,
     sessions as unknown as SessionRepo,
     organization as unknown as OrganizationService,
     audit as unknown as AuditService,
-    tokens,
+    new SessionTokenService(sessions as unknown as SessionRepo, tokens, config as never),
     runner as unknown as TransactionRunner,
-    config as never,
   );
 
   return { service, runner };

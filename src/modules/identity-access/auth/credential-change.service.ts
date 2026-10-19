@@ -4,11 +4,11 @@ import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { AuditService } from '../../audit/audit.service';
 import type { AuditEventInput } from '../../audit/audit.types';
 import { NotificationsService } from '../../notifications/notifications.service';
-import { AccountRepo } from '../accounts/account.repo';
+import { ActionLinkRevocation } from '../accounts/action-link-revocation.service';
+import { CredentialService } from '../accounts/credential.service';
 import { AccountSnapshot } from '../identity-access.types';
-import { PASSWORD_HASH_POLICY_VERSION } from './password-hasher.service';
+import { LoginThrottle } from './login-throttle.service';
 import { SessionRepo } from './session.repo';
-import { TokenService } from './token.service';
 
 export type CredentialChangeEvent = 'PASSWORD_RESET' | 'PASSWORD_CHANGED';
 
@@ -32,28 +32,23 @@ export interface CredentialChange {
 @Injectable()
 export class CredentialChangeService {
   constructor(
-    private readonly accounts: AccountRepo,
+    private readonly credentials: CredentialService,
+    private readonly revocation: ActionLinkRevocation,
     private readonly sessions: SessionRepo,
+    private readonly throttle: LoginThrottle,
     private readonly notifications: NotificationsService,
     private readonly audit: AuditService,
-    private readonly tokens: TokenService,
   ) {}
 
   async replace(tx: DbTx, change: CredentialChange): Promise<void> {
     const { account, event, now } = change;
 
-    await this.accounts.replaceCredential(tx, account.id, change.hash, PASSWORD_HASH_POLICY_VERSION, now);
+    await this.credentials.replaceCredential(tx, account.id, change.hash, now);
     // Every link still usable dies with the old password; a mail not yet sent is cancelled, not delivered (T-5).
-    const usable = (await this.accounts.findUsableTokens(tx, account.id)).map((token) => token.tokenHash);
-    await this.accounts.revokeTokens(tx, usable, 'CREDENTIAL_CHANGED', now);
-    await this.notifications.cancelPendingForTokens(tx, usable);
+    await this.revocation.revokeUsable(tx, account.id, 'CREDENTIAL_CHANGED', now);
     await this.sessions.revokeAllSessions(tx, account.id, event, now);
     // Getting the password back is getting the account back at once (T-3).
-    await this.sessions.clearThrottle(
-      tx,
-      account.organizationId,
-      this.tokens.throttleKey(normalizeEmail(account.loginEmail)),
-    );
+    await this.throttle.clear(tx, account.organizationId, this.throttle.keyFor(normalizeEmail(account.loginEmail)));
     await this.notifications.enqueueEmail(tx, {
       organizationId: account.organizationId,
       recipient: account.loginEmail,

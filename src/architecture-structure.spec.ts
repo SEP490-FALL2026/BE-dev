@@ -27,34 +27,11 @@ const MAX_DIRECTORY_DEPTH = 2;
 const SHARED_MODULE_FOLDERS = new Set(['dto', 'errors', 'mappers', 'policies']);
 
 const LEGACY = {
-  /** importer -> target, both relative to src/. Removed by H5 (identity-access capability boundaries). */
-  crossCapabilityImports: new Set([
-    'modules/identity-access/access/jwt-access-token.verifier.ts -> modules/identity-access/approval-roles/approval-role.repo.ts',
-    'modules/identity-access/access/jwt-access-token.verifier.ts -> modules/identity-access/auth/session.repo.ts',
-    'modules/identity-access/access/me.service.ts -> modules/identity-access/accounts/account.repo.ts',
-    'modules/identity-access/accounts/account-invitation.service.ts -> modules/identity-access/auth/password-hasher.service.ts',
-    'modules/identity-access/accounts/account-invitation.service.ts -> modules/identity-access/auth/password.policy.ts',
-    'modules/identity-access/accounts/account-status.service.ts -> modules/identity-access/auth/session.repo.ts',
-    'modules/identity-access/accounts/successor-eligibility.ts -> modules/identity-access/approval-roles/approval-role.repo.ts',
-    'modules/identity-access/approval-roles/approval-role.service.ts -> modules/identity-access/accounts/account.repo.ts',
-    'modules/identity-access/auth/credential-change.service.ts -> modules/identity-access/accounts/account.repo.ts',
-    'modules/identity-access/auth/login.service.ts -> modules/identity-access/accounts/account.repo.ts',
-    'modules/identity-access/auth/password-change.service.ts -> modules/identity-access/accounts/account.repo.ts',
-    'modules/identity-access/auth/password-reset.service.ts -> modules/identity-access/accounts/account.repo.ts',
-    'modules/identity-access/auth/session.service.ts -> modules/identity-access/accounts/account.repo.ts',
-    // A4-01 (GATE.1): the module root was not checked. H5.6 (E6) gives forgot-password a recovery-ticket service
-    // instead of the root repo (A4-20).
-    'modules/identity-access/auth/password-reset.service.ts -> modules/identity-access/recovery.repo.ts',
-    // A4-01 (GATE.1): the facade reaches into capability internals. H5.5 to H5.7 (capability surfaces, E5).
-    'modules/identity-access/identity-access.service.ts -> modules/identity-access/accounts/account.repo.ts',
-    'modules/identity-access/identity-access.service.ts -> modules/identity-access/auth/password-hasher.service.ts',
-    'modules/identity-access/identity-access.service.ts -> modules/identity-access/auth/password.policy.ts',
-    // A4-01 (GATE.1): the root recovery workflow reaches into accounts/auth. H5.7 (E5, E7: recovery/ folder).
-    'modules/identity-access/recovery.service.ts -> modules/identity-access/accounts/account.repo.ts',
-    'modules/identity-access/recovery.service.ts -> modules/identity-access/accounts/successor-eligibility.ts',
-    'modules/identity-access/recovery.service.ts -> modules/identity-access/auth/action-token.ts',
-    'modules/identity-access/recovery.service.ts -> modules/identity-access/auth/password-hasher.service.ts',
-  ]),
+  /**
+   * importer -> target, both relative to src/. Empty since identity-access Wave B (H5.5 to H5.7): capabilities reach
+   * one another only through services and types. Stays as a gate.
+   */
+  crossCapabilityImports: new Set<string>(),
   /** Controller importing another controller. Empty since H4.1 (shared project mapper); stays as a gate. */
   controllerImports: new Set<string>(),
   /** Error classes declared in an orchestration file (service/controller/repo). */
@@ -81,8 +58,6 @@ const LEGACY = {
   oversizedFiles: new Map<string, number>([
     ['infrastructure/config/env-schema.ts', 425], // H6
     ['modules/data-import/employee-import.service.ts', 545], // H8
-    ['modules/identity-access/accounts/account.repo.ts', 411], // H5
-    ['modules/identity-access/recovery.service.ts', 608], // H5
   ]),
   /** Module -> cap on controllers directly in the module root. H4. */
   rootControllers: new Map<string, number>(),

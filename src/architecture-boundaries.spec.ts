@@ -157,8 +157,8 @@ describe('architecture boundaries', () => {
 
     it('keeps repositories, the credential hasher and capability files private', () => {
       for (const target of [
-        join(identity, 'recovery.repo.ts'),
-        join(identity, 'auth', 'password-hasher.service.ts'),
+        join(identity, 'recovery', 'recovery.repo.ts'),
+        join(identity, 'accounts', 'password-hasher.service.ts'),
         join(identity, 'accounts', 'account-invitation.service.ts'),
         join(identity, 'auth', 'session.types.ts'),
       ]) {
@@ -167,9 +167,13 @@ describe('architecture boundaries', () => {
     });
 
     it('opens the listed CLI entry files to composition roots only', () => {
-      expect(privateModuleImport(sourceRoot, compositionRoot, join(identity, 'recovery.service.ts'))).toEqual([]);
-      expect(privateModuleImport(sourceRoot, otherModule, join(identity, 'recovery.service.ts'))).toHaveLength(1);
-      expect(privateModuleImport(sourceRoot, compositionRoot, join(identity, 'recovery.repo.ts'))).toHaveLength(1);
+      const entry = join(identity, 'recovery', 'holder-recovery.service.ts');
+
+      expect(privateModuleImport(sourceRoot, compositionRoot, entry)).toEqual([]);
+      expect(privateModuleImport(sourceRoot, otherModule, entry)).toHaveLength(1);
+      expect(
+        privateModuleImport(sourceRoot, compositionRoot, join(identity, 'recovery', 'recovery.repo.ts')),
+      ).toHaveLength(1);
     });
 
     it('gives the same answer for Windows and POSIX separators', () => {
@@ -296,9 +300,14 @@ function resolveRelativeImport(file: string, specifier: string): string {
  * kept at the module root (docs/rules/module-structure.md, Owner Q6). Not open to other business modules.
  */
 const CLI_ENTRY_FILES: ReadonlySet<string> = new Set([
-  'modules/identity-access/recovery.arguments.ts',
   'modules/identity-access/recovery.module.ts',
-  'modules/identity-access/recovery.service.ts',
+  // E7 (H5.7): the recovery implementation lives in recovery/; the command reaches exactly its two entry services,
+  // its arguments, errors and result types.
+  'modules/identity-access/recovery/holder-recovery.service.ts',
+  'modules/identity-access/recovery/recovery.arguments.ts',
+  'modules/identity-access/recovery/recovery.errors.ts',
+  'modules/identity-access/recovery/recovery.types.ts',
+  'modules/identity-access/recovery/role-transfer-recovery.service.ts',
   'modules/installation/hidden-prompt.ts',
   'modules/installation/installation.arguments.ts',
 ]);

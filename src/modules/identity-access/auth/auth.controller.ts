@@ -5,7 +5,7 @@ import { ApiErrorResponses } from '../../../infrastructure/http/decorators/api-e
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
 import { RawResponse } from '../../../infrastructure/http/decorators/raw-response.decorator';
 import { Public } from '../../../infrastructure/security/decorators/public.decorator';
-import { AccountInvitationService } from '../accounts/account-invitation.service';
+import { InvitationRedemptionService } from '../accounts/invitation-redemption.service';
 import { AccountActivatedResponseDto, RedeemInvitationBodyDto } from '../dto/account-management.dto';
 import {
   LoginBodyDto,
@@ -20,6 +20,7 @@ import { IssuedSession } from '../identity-access.types';
 import { toAccountApiException } from '../mappers/account.http-errors';
 import { toAuthApiException, toPasswordApiException, toPasswordResetApiException } from '../mappers/auth.http-errors';
 import { LoginService } from './login.service';
+import { PasswordResetRequestService } from './password-reset-request.service';
 import { PasswordResetService } from './password-reset.service';
 import { SessionService } from './session.service';
 
@@ -42,7 +43,8 @@ export class AuthController {
   constructor(
     private readonly logins: LoginService,
     private readonly sessions: SessionService,
-    private readonly invitations: AccountInvitationService,
+    private readonly invitations: InvitationRedemptionService,
+    private readonly passwordResetRequests: PasswordResetRequestService,
     private readonly passwordResets: PasswordResetService,
   ) {}
 
@@ -146,7 +148,7 @@ export class AuthController {
   )
   async requestPasswordReset(@Body() body: PasswordResetRequestBodyDto): Promise<{ requested: true }> {
     try {
-      await this.passwordResets.requestReset(body.email);
+      await this.passwordResetRequests.requestReset(body.email);
 
       return { requested: true };
     } catch (error) {

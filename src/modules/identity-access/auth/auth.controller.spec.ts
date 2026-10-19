@@ -1,7 +1,7 @@
 import { HttpStatus } from '@nestjs/common';
 import { TransientDatabaseError } from '../../../infrastructure/database/transaction-runner';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
-import { AccountInvitationService } from '../accounts/account-invitation.service';
+import { InvitationRedemptionService } from '../accounts/invitation-redemption.service';
 import { sessionTokenSchema } from '../dto/auth.dto';
 import { InvitationInvalidError } from '../accounts/account.errors';
 import { PasswordPolicyError } from '../identity-access.errors';
@@ -14,6 +14,7 @@ import {
   SessionInvalidError,
 } from './auth.errors';
 import { LoginService } from './login.service';
+import { PasswordResetRequestService } from './password-reset-request.service';
 import { PasswordResetService } from './password-reset.service';
 import { SessionService } from './session.service';
 
@@ -27,7 +28,8 @@ const issued: IssuedSession = {
 const controller = new AuthController(
   { login: () => Promise.resolve(issued) } as unknown as LoginService,
   { refresh: () => Promise.resolve(issued) } as unknown as SessionService,
-  {} as AccountInvitationService,
+  {} as InvitationRedemptionService,
+  {} as PasswordResetRequestService,
   {} as PasswordResetService,
 );
 
@@ -64,8 +66,9 @@ function failingWith(error: Error): AuthController {
   return new AuthController(
     { login: fail } as unknown as LoginService,
     { refresh: fail, logout: fail } as unknown as SessionService,
-    { redeemInvitation: fail } as unknown as AccountInvitationService,
-    { requestReset: fail, resetPassword: fail } as unknown as PasswordResetService,
+    { redeemInvitation: fail } as unknown as InvitationRedemptionService,
+    { requestReset: fail } as unknown as PasswordResetRequestService,
+    { resetPassword: fail } as unknown as PasswordResetService,
   );
 }
 

@@ -4,7 +4,6 @@ import { JwtService } from '@nestjs/jwt';
 import { createHash, createHmac, randomBytes } from 'node:crypto';
 import { EnvironmentVariables } from '../../../infrastructure/config/env-schema';
 import { InvalidAccessTokenError } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { hashActionToken, newActionToken } from './action-token';
 
 export interface AccessTokenClaims {
   /** AppUser id. */
@@ -13,7 +12,7 @@ export interface AccessTokenClaims {
   sid: string;
 }
 
-/** 32 random bytes in base64url: the shape of every opaque token this service issues (refresh and action tokens). */
+/** 32 random bytes in base64url: the shape of every refresh token this service issues. */
 const OPAQUE_TOKEN_SHAPE = /^[A-Za-z0-9_-]{43}$/;
 const UUID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -60,30 +59,6 @@ export class TokenService {
 
   hashRefreshToken(token: string): string {
     return createHash('sha256').update(token).digest('hex');
-  }
-
-  /**
-   * One-time token behind an emailed invitation link: 256 bits of randomness, only its SHA-256 is
-   * stored. It expires AUTH_INVITATION_TTL_SECONDS after `now`.
-   */
-  newInvitationToken(now: Date): { token: string; hash: string; expiresAt: Date } {
-    return newActionToken(now, this.config.get('AUTH_INVITATION_TTL_SECONDS', { infer: true }) * 1000);
-  }
-
-  /**
-   * One-time token behind an emailed password-reset link (T-1): the same 256 bits and SHA-256 as an
-   * invitation, but it expires AUTH_PASSWORD_RESET_TTL_SECONDS after `now`.
-   */
-  newPasswordResetToken(now: Date): { token: string; hash: string; expiresAt: Date } {
-    return newActionToken(now, this.config.get('AUTH_PASSWORD_RESET_TTL_SECONDS', { infer: true }) * 1000);
-  }
-
-  hashActionToken(token: string): string {
-    return hashActionToken(token);
-  }
-
-  isWellFormedActionToken(token: string): boolean {
-    return OPAQUE_TOKEN_SHAPE.test(token);
   }
 
   isWellFormedRefreshToken(token: string): boolean {

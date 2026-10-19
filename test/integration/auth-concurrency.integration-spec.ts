@@ -137,7 +137,7 @@ describe('lock protocol: authentication races (integration, real PostgreSQL)', (
 
   it('two simultaneous refreshes with one token: exactly one succeeds and the session is revoked', async () => {
     const email = 'race-twice@acme.vn';
-    await insertAccountFixture(ctx.app, seed, { code: 'E-R2', email, activated: true });
+    const { appUserId } = await insertAccountFixture(ctx.app, seed, { code: 'E-R2', email, activated: true });
     const session = await login(email).expect(200);
     const token = refreshToken(session);
 
@@ -155,10 +155,16 @@ describe('lock protocol: authentication races (integration, real PostgreSQL)', (
       .get('/api/v1/me')
       .set('Authorization', `Bearer ${bodyOf(winner).data.accessToken}`)
       .expect(401);
+    // Exactly one event, for this account's one session: a revoke from another test cannot satisfy it (CP0-05).
+    const sessions = await ctx.sql.query<{ id: string }>('SELECT id FROM auth_sessions WHERE app_user_id = $1', [
+      appUserId,
+    ]);
+    expect(sessions.rows).toHaveLength(1);
     const audit = await ctx.sql.query<{ n: number }>(
-      `SELECT count(*)::int AS n FROM audit_events WHERE action = 'SESSION.REVOKED'`,
+      `SELECT count(*)::int AS n FROM audit_events WHERE action = 'SESSION.REVOKED' AND resource_id = $1`,
+      [sessions.rows[0].id],
     );
-    expect(audit.rows[0].n).toBeGreaterThanOrEqual(1);
+    expect(audit.rows[0].n).toBe(1);
   });
 
   it('a mixed storm of login, refresh, logout and locking never deadlocks (no 503 / 40P01)', async () => {

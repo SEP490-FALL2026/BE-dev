@@ -48,11 +48,12 @@ src/
     operating-parameters/     # tham số vận hành (giá trị, lịch sử, ngày không làm việc) + API Super Admin
     data-import/              # import nhân sự CSV xem trước – xác nhận (employee_imports); gọi organization qua facade
     onboarding/               # checklist khởi tạo: tổng hợp đọc từ organization và identity-access, không sở hữu bảng
-    identity-access/          # facade, module, types, lỗi public ở gốc; dto/, mappers/, policies/ dùng chung (hai capability trở lên); recovery.* (RecoveryModule, chỉ nạp bởi lệnh khôi phục)
-      auth/                   # đăng nhập, refresh/logout, phiên + refresh token + throttle (session.repo), token, mật khẩu
-      accounts/               # truy vấn, tạo/mời/kích hoạt, khóa/vai, chuyển giao Super Admin; account.repo (AppUser, credential, vai, action token)
-      approval-roles/         # Người duyệt chi, người thay thế, approver dự phòng (approval_role_holders)
+    identity-access/          # gốc: module, facade module, facade, types, lỗi public, recovery.module (RecoveryModule, chỉ nạp bởi lệnh khôi phục); dto/, mappers/, policies/ dùng chung (hai capability trở lên)
+      auth/                   # đăng nhập, refresh/logout, phiên + refresh token + throttle (session.repo), đổi/đặt lại mật khẩu; SessionDirectoryService hiện thực port ACCOUNT_SESSIONS
+      accounts/               # truy vấn, tạo/mời/kích hoạt, khóa/vai, chuyển giao Super Admin; repo theo aggregate (AppUser, credential, RoleGrant, action token) sau contract AccountDirectory/RoleGrant/ActionLink/Credential service; hasher và chính sách mật khẩu
+      approval-roles/         # Người duyệt chi, người thay thế, approver dự phòng (approval_role_holders); ApprovalRoleDirectoryService hiện thực port APPROVAL_ROLE_HOLDINGS
       access/                 # /me và verifier access token cho guard
+      recovery/               # lệnh ops:recover (E7): entry HolderRecoveryService, RoleTransferRecoveryService, tham số, lỗi, type, recovery.repo
     notifications/            # EmailOutbox (mã hóa payload), dispatcher gửi thư; không import identity-access
     installation/             # use case khởi tạo; không sở hữu bảng; import IdentityAccessFacadeModule (không import IdentityAccessModule) và chỉ xác thực biến môi trường DB
     catalog/                  # source/test giữ lại, KHÔNG đăng ký vào AppModule, không phải mẫu; G3 quyết
@@ -169,17 +170,22 @@ mật khẩu nhập ở prompt ẩn, không nhận qua tham số hay biến môi
 
 CLI dùng `InstallationConfigurationModule` chỉ validate môi trường và DB; API/worker giữ config
 đầy đủ. `IdentityAccessFacadeModule` (DatabaseModule + OrganizationModule) cung cấp facade
-`IdentityAccessService` cùng `AccountRepo`/`PasswordHasher` dùng chung instance cho `IdentityAccessModule`;
-CLI và worker chỉ import module này nên không dựng controller, JWT hay workflow đăng nhập; CLI cũng không kéo
-SMTP/outbox. [Module graph test](src/module-graph.spec.ts) đọc metadata Nest thật: mỗi provider token chỉ khai
-báo ở một module trong graph API/worker/CLI và các graph không chứa module không dùng.
+`IdentityAccessService` cùng bốn contract của `accounts` (`AccountDirectoryService`, `RoleGrantService`,
+`ActionLinkService`, `CredentialService`) dùng chung instance cho `IdentityAccessModule` và `RecoveryModule`; repo
+AppUser/credential/RoleGrant/action token và `PasswordHasher` là provider riêng sau các contract đó. CLI và worker chỉ
+import module này nên không dựng controller, JWT hay workflow đăng nhập; CLI cũng không kéo SMTP/outbox.
+`RecoveryModule` (lệnh khôi phục) chỉ export hai entry `HolderRecoveryService`, `RoleTransferRecoveryService`; provider
+mà cả API và lệnh khôi phục cần nhưng facade không cần (ví dụ `SessionRepo`, `RecoveryRepo`, hai port `ACCOUNT_SESSIONS`,
+`APPROVAL_ROLE_HOLDINGS`) khai ở cả hai module theo E6, ghim bằng danh sách chính xác. [Module graph
+test](src/module-graph.spec.ts) đọc metadata Nest thật: mỗi provider token chỉ khai báo ở một module trong mỗi graph
+API/worker/CLI và các graph không chứa module không dùng.
 
 Lớp HTTP của `audit` và `organization` nằm ở module riêng (`AuditHttpModule`, `OrganizationHttpModule`) mà chỉ
 `AppModule` nạp: lệnh khởi tạo và worker import `AuditModule`/`OrganizationModule` chỉ để dùng facade, và module graph
 test cấm controller trong hai đồ thị đó. Repo ghi (`AuditRepo`) tách khỏi repo đọc (`AuditQueryRepo`). Trong
 `OrganizationModule`, `JobTitleRepo`, `EmployeeRepo`, `ImportLookupRepo`, `DepartmentHeadRepo` là provider riêng sau
 capability service mà chỉ facade dùng; ba repo `CostCenterRepo`, `DepartmentRepo`, `OrganizationRepo` vẫn export theo E4
-(ngoại lệ legacy có phạm vi, như `AccountRepo`; H4.7 giữ nguyên, xem lại ở G3) để `OrganizationHttpModule` cùng thư mục
+(ngoại lệ legacy có phạm vi; H4.7 giữ nguyên, xem lại ở G3) để `OrganizationHttpModule` cùng thư mục
 dùng chung một instance: `CostCenterService` inject `CostCenterRepo`; `DepartmentService`, `DepartmentQueryService`,
 `DepartmentHeadService` inject `DepartmentRepo`; `OrganizationRepo` không có consumer HTTP từ Wave 2, chỉ giữ export theo
 E4. Ánh xạ 503

@@ -1,15 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { EnvironmentVariables } from '../../../infrastructure/config/env-schema';
 import { TransactionRunner, toTransientError } from '../../../infrastructure/database/transaction-runner';
 import { AuditService } from '../../audit/audit.service';
 import { OrganizationService } from '../../organization/organization.service';
-import { AccountRepo } from '../accounts/account.repo';
+import { AccountDirectoryService } from '../accounts/account-directory.service';
 import { IssuedSession } from '../identity-access.types';
 import { employeeHasNotLeft } from '../policies/account-policy';
 import { SessionInvalidError } from './auth.errors';
+import { SessionTokenService } from './session-token.service';
 import { SessionRepo } from './session.repo';
-import { TokenService } from './token.service';
 
 /** Outcome carried out of a transaction that must commit even though the request fails. */
 type RefreshOutcome = { kind: 'issued'; session: IssuedSession } | { kind: 'invalid' } | { kind: 'replayed' };
@@ -20,13 +18,12 @@ export class SessionService {
   private readonly logger = new Logger(SessionService.name);
 
   constructor(
-    private readonly accounts: AccountRepo,
+    private readonly accounts: AccountDirectoryService,
     private readonly sessions: SessionRepo,
     private readonly organization: OrganizationService,
     private readonly audit: AuditService,
-    private readonly tokens: TokenService,
+    private readonly sessionTokens: SessionTokenService,
     private readonly runner: TransactionRunner,
-    private readonly config: ConfigService<EnvironmentVariables, true>,
   ) {}
 
   // --- refresh ----------------------------------------------------------------------
@@ -47,9 +44,9 @@ export class SessionService {
    * consumption, so an expired token is refused without being treated as replay.
    */
   private async authenticateAndRotate(refreshToken: string | undefined): Promise<IssuedSession> {
-    if (!refreshToken || !this.tokens.isWellFormedRefreshToken(refreshToken)) throw new SessionInvalidError();
+    const tokenHash = this.sessionTokens.hashPresented(refreshToken);
+    if (tokenHash === null) throw new SessionInvalidError();
 
-    const tokenHash = this.tokens.hashRefreshToken(refreshToken);
     const owner = await this.sessions.findRefreshTokenOwner(tokenHash);
     if (!owner) throw new SessionInvalidError();
 
@@ -86,29 +83,15 @@ export class SessionService {
         return { kind: 'replayed' };
       }
 
-      const next = this.tokens.newRefreshToken();
-      const idleExpiresAt = this.minDate(
-        new Date(now.getTime() + this.config.get('AUTH_SESSION_IDLE_SECONDS', { infer: true }) * 1000),
-        session.absoluteExpiresAt,
-      );
-      await this.sessions.consumeRefreshToken(tx, tokenHash, next.hash, now);
-      await this.sessions.insertRefreshToken(tx, {
-        tokenHash: next.hash,
-        sessionId: session.id,
-        expiresAt: idleExpiresAt,
-      });
-      await this.sessions.touchSession(tx, session.id, { lastRefreshedAt: now, idleExpiresAt });
-
-      const access = await this.tokens.signAccessToken({ sub: account.id, sid: session.id });
-
       return {
         kind: 'issued',
-        session: {
-          accessToken: access.token,
-          accessTokenExpiresAt: access.expiresAt,
-          refreshToken: next.token,
-          refreshTokenExpiresAt: idleExpiresAt,
-        },
+        session: await this.sessionTokens.rotate(tx, {
+          appUserId: account.id,
+          sessionId: session.id,
+          absoluteExpiresAt: session.absoluteExpiresAt,
+          tokenHash,
+          now,
+        }),
       };
     });
 
@@ -130,9 +113,10 @@ export class SessionService {
    */
   async logout(refreshToken: string | undefined): Promise<void> {
     try {
-      if (!refreshToken || !this.tokens.isWellFormedRefreshToken(refreshToken)) return;
+      const tokenHash = this.sessionTokens.hashPresented(refreshToken);
+      if (tokenHash === null) return;
 
-      const owner = await this.sessions.findRefreshTokenOwner(this.tokens.hashRefreshToken(refreshToken));
+      const owner = await this.sessions.findRefreshTokenOwner(tokenHash);
       if (!owner) return;
 
       await this.runner.run(async (tx) => {
@@ -153,10 +137,6 @@ export class SessionService {
     } catch (error) {
       throw this.asTransient(error);
     }
-  }
-
-  private minDate(a: Date, b: Date): Date {
-    return a <= b ? a : b;
   }
 
   /** Database trouble from the unlocked reads (outside the runner) becomes the same transient error. */

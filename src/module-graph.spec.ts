@@ -6,14 +6,18 @@ import { AppModule } from './app.module';
 import { MailTransport } from './infrastructure/mail/mail-transport';
 import { AuditController } from './modules/audit/audit.controller';
 import { AuditQueryRepo } from './modules/audit/audit-query.repo';
-import { AccountRepo } from './modules/identity-access/accounts/account.repo';
+import { ActionTokenRepo } from './modules/identity-access/accounts/action-token.repo';
+import { AppUserRepo } from './modules/identity-access/accounts/app-user.repo';
+import { CredentialRepo } from './modules/identity-access/accounts/credential.repo';
+import { RoleGrantRepo } from './modules/identity-access/accounts/role-grant.repo';
 import { AppUsersController } from './modules/identity-access/accounts/app-users.controller';
 import { MeController } from './modules/identity-access/access/me.controller';
 import { AuthController } from './modules/identity-access/auth/auth.controller';
-import { PasswordHasher } from './modules/identity-access/auth/password-hasher.service';
+import { PasswordHasher } from './modules/identity-access/accounts/password-hasher.service';
 import { SessionRepo } from './modules/identity-access/auth/session.repo';
 import { IdentityAccessService } from './modules/identity-access/identity-access.service';
 import { IdentityAccessModule } from './modules/identity-access/identity-access.module';
+import { RecoveryModule } from './modules/identity-access/recovery.module';
 import { InstallationModule } from './modules/installation/installation.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { PayloadCipher } from './modules/notifications/payload-cipher';
@@ -29,12 +33,20 @@ import { WorkerModule } from './worker.module';
 const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   'AuditModule: AuditService',
   'IdentityAccessFacadeModule: IdentityAccessService',
+  // H5.5 (identity-access Wave B): the account contracts the API and the recovery command reach the account persistence
+  // through; the persistence itself is declared once, here, because every graph needs it.
+  'IdentityAccessFacadeModule: AccountDirectoryService',
+  'IdentityAccessFacadeModule: ActionLinkService',
+  'IdentityAccessFacadeModule: CredentialService',
+  'IdentityAccessFacadeModule: RoleGrantService',
   'IdentityAccessModule: Symbol(ACCESS_TOKEN_VERIFIER)', // port of src/infrastructure/security
   'InstallationModule: InstallationService',
   'NotificationsModule: NotificationsService',
   'OperatingParametersModule: OperatingParametersService',
   'OrganizationModule: OrganizationService',
-  'RecoveryModule: RecoveryService', // entry of `pnpm ops:recover` (Q6)
+  // The two entry services of `pnpm ops:recover` (Q6; E7): the holder's own account, and the role transfer.
+  'RecoveryModule: HolderRecoveryService',
+  'RecoveryModule: RoleTransferRecoveryService',
 ]);
 
 /**
@@ -50,13 +62,6 @@ const LEGACY_PRIVATE_EXPORTS: ReadonlySet<string> = new Set([
   'OrganizationModule: CostCenterRepo',
   'OrganizationModule: DepartmentRepo',
   'OrganizationModule: OrganizationRepo',
-  // H5: IdentityAccessModule, the recovery module and the CLI share these instances today.
-  'IdentityAccessFacadeModule: AccountRepo',
-  'IdentityAccessFacadeModule: ApprovalRoleRepo',
-  'IdentityAccessFacadeModule: PasswordHasher',
-  'IdentityAccessFacadeModule: RecoveryRepo',
-  // A4-03 (GATE.1, E9 = A): a private token the name-suffix gate missed. H5.7 cleans the facade exports.
-  'IdentityAccessFacadeModule: SuccessorEligibility',
   // Owner 19/10/2026 (GATE.1, extends E9): non-facade exports the contract allowlist found.
   'DataImportModule: EmployeeImportService', // H8.3: data-import facade for onboarding (A4-10)
   'NotificationsModule: EmailDispatcher', // ROOT.1/DOC.1: decided with the email-dispatch.loop import edge (ADR-0012)
@@ -187,11 +192,28 @@ function businessModuleNames(): ReadonlySet<string> {
   return names;
 }
 
+/**
+ * E6 (H5.6): the providers the API and the recovery command both need but the facade does not. Each is declared once
+ * in IdentityAccessModule and once in RecoveryModule; the two never meet in one graph, and none is exported.
+ */
+const DECLARED_FOR_API_AND_RECOVERY = [
+  'ActionLinkRevocation',
+  'ApprovalRoleDirectoryService',
+  'ApprovalRoleRepo',
+  'RecoveryRepo',
+  'SessionDirectoryService',
+  'SessionRepo',
+  'SuccessorEligibility',
+  'Symbol(ACCOUNT_SESSIONS)',
+  'Symbol(APPROVAL_ROLE_HOLDINGS)',
+];
+
 describe('module graph', () => {
   const graphs: [string, Type<unknown>][] = [
     ['AppModule', AppModule],
     ['WorkerModule', WorkerModule],
     ['InstallationModule', InstallationModule],
+    ['RecoveryCliModule', RecoveryCliModule],
   ];
 
   it.each(graphs)('%s declares no provider token in two different modules', (_name, root) => {
@@ -210,18 +232,53 @@ describe('module graph', () => {
     expect(duplicated).toEqual([]);
   });
 
-  it('declares AccountRepo, PasswordHasher and IdentityAccessService once, and SessionRepo only in the API', () => {
+  it('declares the account repositories, PasswordHasher and IdentityAccessService once, and SessionRepo only in the API and the recovery command', () => {
     for (const [name, root] of graphs) {
       const graph = collectGraph(root);
 
-      expect({ name, accountRepo: declarationsOf(graph, AccountRepo).length }).toEqual({ name, accountRepo: 1 });
+      for (const repo of [AppUserRepo, CredentialRepo, RoleGrantRepo, ActionTokenRepo]) {
+        expect({ name, repo: repo.name, declarations: declarationsOf(graph, repo).length }).toEqual({
+          name,
+          repo: repo.name,
+          declarations: 1,
+        });
+      }
       expect({ name, hasher: declarationsOf(graph, PasswordHasher).length }).toEqual({ name, hasher: 1 });
       expect({ name, facade: declarationsOf(graph, IdentityAccessService).length }).toEqual({ name, facade: 1 });
       expect({ name, sessionRepo: declarationsOf(graph, SessionRepo).length }).toEqual({
         name,
-        sessionRepo: name === 'AppModule' ? 1 : 0,
+        sessionRepo: name === 'AppModule' || name === 'RecoveryCliModule' ? 1 : 0,
       });
     }
+  });
+
+  it('E6: declares exactly the providers shared with the recovery command once in the API and once in the command', () => {
+    const declaredIn = (graph: ModuleNode[], name: string) =>
+      graph.flatMap((node) =>
+        node.providers.filter((provider) => tokenName(tokenOf(provider)) === name).map(() => node.module.name),
+      );
+    const api = collectGraph(AppModule);
+    const recovery = collectGraph(RecoveryCliModule);
+    for (const name of DECLARED_FOR_API_AND_RECOVERY) {
+      expect({ name, api: declaredIn(api, name), recovery: declaredIn(recovery, name) }).toEqual({
+        name,
+        api: ['IdentityAccessModule'],
+        recovery: ['RecoveryModule'],
+      });
+    }
+
+    // No other provider is declared in both modules: the list above is the whole exception, not a pattern.
+    const providerNames = (module: Type<unknown>) => metadata(module, 'providers').map((p) => tokenName(tokenOf(p)));
+    const inBoth = providerNames(IdentityAccessModule).filter((name) => providerNames(RecoveryModule).includes(name));
+    expect(inBoth.sort()).toEqual([...DECLARED_FOR_API_AND_RECOVERY].sort());
+  });
+
+  it('keeps controllers, the identity-access API module and the JWT library out of the recovery command', () => {
+    const graph = collectGraph(RecoveryCliModule);
+
+    expect(controllersOf(graph)).toEqual([]);
+    expect(graph.map((node) => node.module)).not.toContain(IdentityAccessModule);
+    expect(moduleNames(graph)).not.toContain('JwtModule');
   });
 
   it('declares the mail transport and the payload cipher once in the worker and not at all in the installation command', () => {

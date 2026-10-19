@@ -20,8 +20,8 @@ Owner Q6/Q7 trong [báo cáo audit nền tảng 18/10/2026](../reviews/be-founda
   folder, tối đa **hai tầng thư mục** dưới root module (`<module>/<capability>/<dto|errors|mappers|policies>/file.ts`).
 - **Root module** chỉ giữ thứ thực sự công khai hoặc là điểm ghép: `<module>.module.ts`; `<module>-http.module.ts` khi lớp
   HTTP có vòng đời riêng; facade `<module>.service.ts`; `<module>.types.ts` (type public); `<module>.errors.ts` (lỗi mà
-  module khác thật sự phải bắt); entry point của capability có entry riêng (ví dụ `recovery.*` của lệnh `ops:recover`,
-  giữ ở root theo Q6). Không biến root thành nơi chứa mọi controller/service/repo.
+  module khác thật sự phải bắt); Nest module của capability có entry riêng (ví dụ `recovery.module.ts` của lệnh
+  `ops:recover`; hiện thực nằm trong `recovery/` theo E7). Không biến root thành nơi chứa mọi controller/service/repo.
 - **Root module không phải vùng public mặc định.** Trong cùng module, root là một phần như capability: file root không
   import file private của capability, capability không import file private ở root (ví dụ repo). Chỉ file Nest module
   (`*.module.ts`) được ghép mọi provider của module mình.
@@ -139,6 +139,14 @@ giữ ba repo export — ngoại lệ ledger duy nhất còn lại của `organi
 DTO, lỗi, mapper HTTP và policy của một capability nằm phẳng trong capability đó (ví dụ `auth/auth.errors.ts`,
 `access/me.dto.ts`, `approval-roles/approval-role.http-errors.ts`); `dto/`, `mappers/` (`auth.http-errors.ts`,
 `account.http-errors.ts`) và `policies/account-policy.ts` chỉ giữ nội dung có ít nhất hai capability dùng; không còn
-`errors/`. Root 10 file, 0 controller: module, facade module, facade, type, lỗi public (`PasswordPolicyError`) và
-`recovery.*` làm entry CLI (Q6). Wave B (H5.5 → H5.7) gỡ các cạnh `crossCapabilityImports` còn lại và chu trình auth ↔
-accounts theo E5–E7 của [audit H4.0](../reviews/be-full-src-architecture-audit-2026-10-19/README.md), không đổi contract.
+`errors/`.
+**Sau Identity Access Wave B (H5.5 → H5.7):** theo E5–E7 của
+[audit H4.0](../reviews/be-full-src-architecture-audit-2026-10-19/README.md), không đổi contract. Ledger
+`crossCapabilityImports` rỗng; không còn mục identity-access trong `LEGACY_PRIVATE_EXPORTS`. `accounts` sở hữu một repo
+mỗi aggregate (`app-user`, `credential`, `role-grant`, `action-token`) sau bốn contract service export bởi
+`IdentityAccessFacadeModule`; chu trình capability bị cắt bằng hai port khai trong `accounts/account.types.ts`
+(`ACCOUNT_SESSIONS` do `auth` hiện thực, `APPROVAL_ROLE_HOLDINGS` do `approval-roles` hiện thực, bind `useExisting`).
+Lệnh khôi phục ở `recovery/` (entry `HolderRecoveryService`, `RoleTransferRecoveryService`); root 6 file, 0 controller:
+module, facade module, facade, type, lỗi public và `recovery.module.ts`. Provider dùng cho cả API và lệnh khôi phục mà
+facade không cần khai ở cả `IdentityAccessModule` và `RecoveryModule` (E6), ghim bằng danh sách chính xác trong
+[module-graph.spec.ts](../../src/module-graph.spec.ts).

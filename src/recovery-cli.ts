@@ -5,9 +5,11 @@ import {
   RECOVERY_USAGE,
   RecoveryArgumentError,
   parseRecoveryArguments,
-} from './modules/identity-access/recovery.arguments';
-import { RecoveryRefusedError } from './modules/identity-access/recovery.errors';
-import { RecoveryResult, RecoveryService } from './modules/identity-access/recovery.service';
+} from './modules/identity-access/recovery/recovery.arguments';
+import { HolderRecoveryService } from './modules/identity-access/recovery/holder-recovery.service';
+import { RecoveryRefusedError } from './modules/identity-access/recovery/recovery.errors';
+import type { RecoveryResult } from './modules/identity-access/recovery/recovery.types';
+import { RoleTransferRecoveryService } from './modules/identity-access/recovery/role-transfer-recovery.service';
 
 /** Exit codes are part of the command's contract (see --help). */
 const EXIT = { done: 0, failed: 1, nothingToDo: 2 } as const;
@@ -66,18 +68,18 @@ async function main(): Promise<number> {
     // Loaded only now: the module graph validates the whole environment, which --help and argument errors must not need.
     const { RecoveryCliModule } = await import('./recovery-cli.module');
     app = await NestFactory.createApplicationContext(RecoveryCliModule, { logger: cliLogger, abortOnError: false });
-    const recovery = app.get(RecoveryService);
+    const holder = app.get(HolderRecoveryService);
 
     const { command } = parsed;
     const result =
       command.mode === 'reset-credentials'
-        ? await recovery.resetCredentials(command.context, {
+        ? await holder.resetCredentials(command.context, {
             accountEmail: command.accountEmail,
             ...(command.newLoginEmail ? { newLoginEmail: command.newLoginEmail } : {}),
           })
         : command.mode === 'unlock'
-          ? await recovery.unlock(command.context, { accountEmail: command.accountEmail })
-          : await recovery.transferRole(command.context, {
+          ? await holder.unlock(command.context, { accountEmail: command.accountEmail })
+          : await app.get(RoleTransferRecoveryService).transferRole(command.context, {
               successorEmployeeCode: command.successorEmployeeCode,
               ...(command.holderEmail ? { holderEmail: command.holderEmail } : {}),
             });

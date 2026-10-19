@@ -1,5 +1,5 @@
 import { parseArgs } from 'node:util';
-import type { RecoveryContext } from './recovery.service';
+import type { RecoveryContext } from './recovery.types';
 
 export class RecoveryArgumentError extends Error {
   constructor(message: string) {

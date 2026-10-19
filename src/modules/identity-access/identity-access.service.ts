@@ -2,10 +2,10 @@ import { Injectable } from '@nestjs/common';
 import { normalizeEmail } from '../../core/email';
 import { DbTx } from '../../infrastructure/database/transaction-runner';
 import { OrganizationService } from '../organization/organization.service';
-import { AccountRepo } from './accounts/account.repo';
-import { PASSWORD_HASH_POLICY_VERSION, PasswordHasher } from './auth/password-hasher.service';
-import { checkPasswordPolicy } from './auth/password.policy';
-import { PasswordPolicyError } from './identity-access.errors';
+import { AccountDirectoryService } from './accounts/account-directory.service';
+import { ActionLinkService } from './accounts/action-link.service';
+import { CredentialService } from './accounts/credential.service';
+import { RoleGrantService } from './accounts/role-grant.service';
 import { BootstrapSuperAdminInput, EmployeeAccountInspection } from './identity-access.types';
 import { employeeHasNotLeft, isActionLinkRedeemable } from './policies/account-policy';
 
@@ -13,8 +13,10 @@ import { employeeHasNotLeft, isActionLinkRedeemable } from './policies/account-p
 @Injectable()
 export class IdentityAccessService {
   constructor(
-    private readonly accounts: AccountRepo,
-    private readonly hasher: PasswordHasher,
+    private readonly accounts: AccountDirectoryService,
+    private readonly grants: RoleGrantService,
+    private readonly links: ActionLinkService,
+    private readonly credentials: CredentialService,
     private readonly organization: OrganizationService,
   ) {}
 
@@ -22,11 +24,8 @@ export class IdentityAccessService {
    * Checks the password policy and hashes the password. Call this BEFORE opening a transaction:
    * hashing is the slow part and must not hold database locks (lock protocol rule 3).
    */
-  async prepareCredential(password: string, loginEmail: string): Promise<{ hash: string; hashPolicyVersion: number }> {
-    const violation = checkPasswordPolicy(password, loginEmail);
-    if (violation) throw new PasswordPolicyError(violation);
-
-    return { hash: await this.hasher.hash(password), hashPolicyVersion: PASSWORD_HASH_POLICY_VERSION };
+  prepareCredential(password: string, loginEmail: string): Promise<{ hash: string; hashPolicyVersion: number }> {
+    return this.credentials.prepareCredential(password, loginEmail);
   }
 
   /**
@@ -45,8 +44,8 @@ export class IdentityAccessService {
       emailVerificationSource: 'BOOTSTRAP_ASSERTED',
       emailVerifiedAt: new Date(),
     });
-    await this.accounts.createCredential(tx, user.id, input.passwordHash, input.hashPolicyVersion);
-    await this.accounts.grantRole(tx, {
+    await this.credentials.createCredential(tx, user.id, input.passwordHash, input.hashPolicyVersion);
+    await this.grants.grantRole(tx, {
       organizationId: input.organizationId,
       appUserId: user.id,
       role: 'SUPER_ADMIN',
@@ -60,7 +59,7 @@ export class IdentityAccessService {
    * the dispatcher asks this before sending (T-10).
    */
   async isActionLinkUsable(tokenHash: string): Promise<boolean> {
-    const link = await this.accounts.findActionLink(tokenHash);
+    const link = await this.links.findActionLink(tokenHash);
     if (link === null || !isActionLinkRedeemable(link, new Date())) return false;
 
     // Redeeming refuses an employee who has left, so a link to one is dead and must not be mailed.
@@ -79,7 +78,7 @@ export class IdentityAccessService {
 
     await this.accounts.lockAppUser(tx, appUserId, 'SHARE');
     const account = await this.accounts.readAccount(tx, appUserId);
-    const roles = await this.accounts.effectiveRoles(appUserId, tx);
+    const roles = await this.grants.effectiveRoles(appUserId, tx);
 
     return {
       hasAccount: account !== null,
