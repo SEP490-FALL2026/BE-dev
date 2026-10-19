@@ -1,6 +1,6 @@
 import { HttpStatus } from '@nestjs/common';
-import { ApiException } from '../../infrastructure/http/errors/api.exception';
-import { TransientDatabaseError } from '../../infrastructure/database/transaction-runner';
+import { ApiException } from '../../../infrastructure/http/errors/api.exception';
+import { TransientDatabaseError } from '../../../infrastructure/database/transaction-runner';
 import {
   CostCenterCodeTakenError,
   CostCenterInUseError,
@@ -8,7 +8,7 @@ import {
   CostCenterNameInvalidError,
   CostCenterNameReservedError,
   CostCenterNotFoundError,
-} from './errors/cost-center.errors';
+} from '../errors/cost-center.errors';
 import {
   DepartmentCodeTakenError,
   DepartmentCostCenterError,
@@ -20,9 +20,7 @@ import {
   DepartmentOutOfScopeError,
   DepartmentUpdateEmptyError,
   HeadAssignmentError,
-  ProjectInvalidError,
-  ProjectNotFoundError,
-} from './errors/department.errors';
+} from '../errors/department.errors';
 import {
   EmployeeCodeTakenError,
   EmployeeRowInvalidError,
@@ -31,8 +29,9 @@ import {
   JobTitleNameTooLongError,
   JobTitleNotFoundError,
   OrganizationAlreadyExistsError,
-} from './errors/organization.errors';
-import { EmployeeNotFoundError } from './organization.errors';
+} from '../errors/organization.errors';
+import { ProjectInvalidError, ProjectNotFoundError } from '../project/project.errors';
+import { EmployeeNotFoundError } from '../organization.errors';
 import { toOrganizationApiException } from './organization.http-errors';
 
 /** The HTTP answer an error becomes: status and the body the global filter writes. */

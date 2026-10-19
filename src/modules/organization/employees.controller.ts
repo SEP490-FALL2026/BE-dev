@@ -11,7 +11,7 @@ import { CurrentPrincipal } from '../../infrastructure/security/models/current-p
 import type { AuthenticatedPrincipal } from '../../infrastructure/security/tokens/access-token-verifier.port';
 import { CreateEmployeeBodyDto, EmployeeResponseDto } from './dto/employee.dto';
 import { EmployeeManualService } from './employee-manual.service';
-import { toOrganizationApiException } from './organization.http-errors';
+import { toOrganizationApiException } from './mappers/organization.http-errors';
 
 /**
  * Entering people by hand (`US-02-02` AC-14). IT Admin only: the Super Admin does no business work (`SoD-1`).

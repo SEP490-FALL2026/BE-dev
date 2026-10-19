@@ -4,12 +4,12 @@ import {
   ApiErrorResponses,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
-} from '../../infrastructure/http/decorators/api-error-responses.decorator';
-import { ApiSuccessResponse } from '../../infrastructure/http/decorators/api-success-response.decorator';
-import { RequireRoles } from '../../infrastructure/security/decorators/access.decorators';
-import { CurrentPrincipal } from '../../infrastructure/security/models/current-principal';
-import type { AuthenticatedPrincipal } from '../../infrastructure/security/tokens/access-token-verifier.port';
-import { toProjectWire } from './mappers/project.mapper';
+} from '../../../infrastructure/http/decorators/api-error-responses.decorator';
+import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
+import { RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
+import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
+import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
+import { toProjectWire } from '../mappers/project.mapper';
 import {
   CreateProjectBodyDto,
   ListProjectsQueryDto,
@@ -17,8 +17,8 @@ import {
   ProjectListResponseDto,
   ProjectResponseDto,
   UpdateProjectBodyDto,
-} from './dto/department.dto';
-import { toOrganizationApiException } from './organization.http-errors';
+} from './project.dto';
+import { toOrganizationApiException } from '../mappers/organization.http-errors';
 import { ProjectService } from './project.service';
 
 const AUTH_ERRORS = [

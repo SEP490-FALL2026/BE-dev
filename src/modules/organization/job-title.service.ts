@@ -11,7 +11,7 @@ import {
   JobTitleNotFoundError,
 } from './errors/organization.errors';
 import { isJobTitleNameTooLong, normalizeJobTitleName } from './job-title-name';
-import { organizationAuditEvent } from './organization-audit';
+import { organizationAuditEvent } from './mappers/audit-event.mapper';
 import { OrganizationRepo } from './organization.repo';
 import { OrganizationService } from './organization.service';
 import { JobTitleRecord, JobTitleStatus } from './organization.types';

@@ -129,8 +129,8 @@ cũng qua review. Gate không chứng minh thiết kế đúng — review vẫn 
 
 ## Ví dụ đích (chưa di chuyển file)
 
-`organization` (hiện phẳng 26 file, 5 controller) đích theo capability `cost-center/`, `department/`, `project/`,
-`job-title/`, `employee/`; root giữ module, HTTP module, facade, type và lỗi public; `normalizeDisplayName` chuyển vào
-`src/core` (Q6). `identity-access` giữ `auth/`, `accounts/`, `approval-roles/`, `access/`; lỗi và DTO chuyển vào
-capability sở hữu; `recovery.*` ở root làm entry CLI. Bảng file → vị trí đích ở mục 4.4 của báo cáo audit; thực hiện ở
-lát H4/H5 của item handoff, mỗi capability một PR, không đổi contract.
+`organization` (sau H4.2: root 22 file, 4 controller; `project/` đã tách) đích theo capability `cost-center/`,
+`department/`, `project/`, `job-title/`, `employee/`; root giữ module, HTTP module, facade, type và lỗi public;
+`normalizeDisplayName` chuyển vào `src/core` (Q6). `identity-access` giữ `auth/`, `accounts/`, `approval-roles/`,
+`access/`; lỗi và DTO chuyển vào capability sở hữu; `recovery.*` ở root làm entry CLI. Bảng file → vị trí đích ở mục 4.4
+của báo cáo audit; thực hiện ở lát H4/H5 của item handoff, mỗi capability một PR, không đổi contract.

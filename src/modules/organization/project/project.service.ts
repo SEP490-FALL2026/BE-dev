@@ -1,13 +1,13 @@
 import { Injectable } from '@nestjs/common';
-import { normalizeDisplayName } from '../../core/display-name';
-import { TransactionRunner } from '../../infrastructure/database/transaction-runner';
-import type { AuthenticatedPrincipal } from '../../infrastructure/security/tokens/access-token-verifier.port';
-import { AuditService } from '../audit/audit.service';
-import { DepartmentRepo } from './department.repo';
-import { ProjectRecord, ProjectStatus } from './department.types';
-import { ProjectInvalidError, ProjectNotFoundError } from './errors/department.errors';
-import { organizationAuditEvent } from './organization-audit';
-import { OrganizationService } from './organization.service';
+import { normalizeDisplayName } from '../../../core/display-name';
+import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
+import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
+import { AuditService } from '../../audit/audit.service';
+import { organizationAuditEvent } from '../mappers/audit-event.mapper';
+import { OrganizationService } from '../organization.service';
+import { ProjectInvalidError, ProjectNotFoundError } from './project.errors';
+import { ProjectRepo } from './project.repo';
+import { ProjectRecord, ProjectStatus } from './project.types';
 
 export const PROJECT_NAME_MAX_LENGTH = 200;
 export const PROJECT_DESCRIPTION_MAX_LENGTH = 2000;
@@ -19,7 +19,7 @@ export const PROJECT_DESCRIPTION_MAX_LENGTH = 2000;
 @Injectable()
 export class ProjectService {
   constructor(
-    private readonly repo: DepartmentRepo,
+    private readonly repo: ProjectRepo,
     private readonly organization: OrganizationService,
     private readonly audit: AuditService,
     private readonly runner: TransactionRunner,
@@ -114,7 +114,7 @@ export class ProjectService {
     return (await this.repo.findProject(id)) as ProjectRecord;
   }
 
-  private async assertDepartmentsExist(tx: Parameters<DepartmentRepo['existingDepartmentIds']>[0], ids: string[]) {
+  private async assertDepartmentsExist(tx: Parameters<ProjectRepo['existingDepartmentIds']>[0], ids: string[]) {
     if (ids.length === 0) return;
     const existing = await this.repo.existingDepartmentIds(tx, ids);
     if (ids.some((id) => !existing.has(id))) throw new ProjectInvalidError('DEPARTMENT_NOT_FOUND');

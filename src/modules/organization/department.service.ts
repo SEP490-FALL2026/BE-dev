@@ -10,10 +10,11 @@ import { CostCenterRepo } from './cost-center.repo';
 import { DepartmentRepo } from './department.repo';
 import {
   DepartmentMemberRecord,
+  DepartmentProfileView,
   DepartmentRecord,
   DepartmentStatus,
+  DepartmentView,
   DepartmentWarning,
-  HeadPeriodRecord,
 } from './department.types';
 import {
   DepartmentCostCenterError,
@@ -26,9 +27,10 @@ import {
   DepartmentUpdateEmptyError,
   HeadAssignmentError,
 } from './errors/department.errors';
-import { organizationAuditEvent } from './organization-audit';
+import { organizationAuditEvent } from './mappers/audit-event.mapper';
 import { EmployeeNotFoundError } from './organization.errors';
 import { OrganizationService } from './organization.service';
+import { ProjectService } from './project/project.service';
 
 export const DEPARTMENT_NAME_MAX_LENGTH = 200;
 export const DEPARTMENT_FUNCTION_MAX_LENGTH = 1000;
@@ -46,19 +48,6 @@ const pageOf = <T>(items: T[], total: number, page: number, pageSize: number): P
   items,
   pagination: { page, pageSize, totalItems: total, totalPages: Math.ceil(total / pageSize) },
 });
-
-export interface DepartmentView extends DepartmentRecord {
-  head: { employeeId: string; employeeCode: string; fullName: string; since: BusinessDate } | null;
-  memberCount: number;
-  warnings: DepartmentWarning[];
-  /** Whether the IT Admin named still holds the role on a usable account. Meaningful only when `itAdmin` is set. */
-  itAdminUsable: boolean;
-}
-
-export interface DepartmentProfileView extends DepartmentView {
-  headHistory: HeadPeriodRecord[];
-  projects: Awaited<ReturnType<DepartmentRepo['listProjects']>>;
-}
 
 export interface DepartmentWarningItem {
   departmentId: string;
@@ -85,6 +74,7 @@ export class DepartmentService {
     private readonly repo: DepartmentRepo,
     private readonly costCenters: CostCenterRepo,
     private readonly organization: OrganizationService,
+    private readonly projects: ProjectService,
     private readonly identity: IdentityAccessService,
     private readonly audit: AuditService,
     private readonly runner: TransactionRunner,
@@ -120,7 +110,7 @@ export class DepartmentService {
     return {
       ...view,
       headHistory: await this.repo.headPeriods(undefined, id, HEAD_HISTORY_LIMIT),
-      projects: await this.repo.listProjects(id),
+      projects: await this.projects.list(id),
     };
   }
 

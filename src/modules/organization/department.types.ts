@@ -1,9 +1,9 @@
 import { BusinessDate } from '../../core/business-date';
 import { CostCenterStatus } from './cost-center.types';
 import { EmployeeStatus } from './organization.types';
+import { ProjectRecord } from './project/project.types';
 
 export type DepartmentStatus = 'ACTIVE' | 'INACTIVE';
-export type ProjectStatus = 'RUNNING' | 'FINISHED';
 
 /** Why a department needs attention (US-03-06 AC-9, AC-15). */
 export type DepartmentWarning = 'MISSING_HEAD' | 'MISSING_IT_ADMIN';
@@ -29,14 +29,17 @@ export interface HeadPeriodRecord {
   validTo: BusinessDate | null;
 }
 
-export interface ProjectRecord {
-  id: string;
-  name: string;
-  description: string | null;
-  status: ProjectStatus;
-  departments: { id: string; code: string; name: string }[];
-  createdAt: Date;
-  updatedAt: Date;
+export interface DepartmentView extends DepartmentRecord {
+  head: { employeeId: string; employeeCode: string; fullName: string; since: BusinessDate } | null;
+  memberCount: number;
+  warnings: DepartmentWarning[];
+  /** Whether the IT Admin named still holds the role on a usable account. Meaningful only when `itAdmin` is set. */
+  itAdminUsable: boolean;
+}
+
+export interface DepartmentProfileView extends DepartmentView {
+  headHistory: HeadPeriodRecord[];
+  projects: ProjectRecord[];
 }
 
 /** What a department head, or the IT Admin, may see of one person in the department. */

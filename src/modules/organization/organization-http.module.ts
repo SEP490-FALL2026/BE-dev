@@ -11,8 +11,9 @@ import { EmployeesController } from './employees.controller';
 import { JobTitleService } from './job-title.service';
 import { JobTitlesController } from './job-titles.controller';
 import { OrganizationModule } from './organization.module';
-import { ProjectService } from './project.service';
-import { ProjectsController } from './projects.controller';
+import { ProjectRepo } from './project/project.repo';
+import { ProjectService } from './project/project.service';
+import { ProjectsController } from './project/projects.controller';
 
 /**
  * The HTTP side of the organization module, mounted by the API only. It is a module of its own, not part of
@@ -28,6 +29,13 @@ import { ProjectsController } from './projects.controller';
     DepartmentsController,
     ProjectsController,
   ],
-  providers: [JobTitleService, EmployeeManualService, CostCenterService, DepartmentService, ProjectService],
+  providers: [
+    JobTitleService,
+    EmployeeManualService,
+    CostCenterService,
+    DepartmentService,
+    ProjectService,
+    ProjectRepo,
+  ],
 })
 export class OrganizationHttpModule {}

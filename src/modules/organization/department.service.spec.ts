@@ -9,6 +9,7 @@ import { DepartmentService } from './department.service';
 import { DepartmentItAdminInvalidError, HeadAssignmentError } from './errors/department.errors';
 import { EmployeeNotFoundError } from './organization.errors';
 import { OrganizationService } from './organization.service';
+import { ProjectService } from './project/project.service';
 
 /**
  * The employee look-up behind the IT Admin and head checks (H4.1, F-12): it goes through the organization facade,
@@ -46,6 +47,7 @@ describe('DepartmentService employee look-up', () => {
         { provide: DepartmentRepo, useValue: departments },
         { provide: CostCenterRepo, useValue: {} },
         { provide: OrganizationService, useValue: organization },
+        { provide: ProjectService, useValue: {} },
         { provide: IdentityAccessService, useValue: identity },
         { provide: AuditService, useValue: audit },
         { provide: TransactionRunner, useValue: runner },

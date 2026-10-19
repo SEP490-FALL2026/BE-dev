@@ -959,6 +959,173 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
     });
   });
 
+  /**
+   * H4.2 characterization: the `/v1/projects` contract and the projects on a profile, pinned on the code before the
+   * project capability moved out of the module root. The same tests run unchanged after the move.
+   */
+  describe('project contract kept by the H4.2 move', () => {
+    type ProjectWire = {
+      id: string;
+      name: string;
+      description: string | null;
+      status: string;
+      departments: { id: string; code: string; name: string }[];
+      createdAt: string;
+      updatedAt: string;
+    };
+    const PROJECT_KEYS = ['createdAt', 'departments', 'description', 'id', 'name', 'status', 'updatedAt'];
+    const ISO_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
+    const projectOf = (response: request.Response) => (response.body as { data: ProjectWire }).data;
+    const itemsOf = (response: request.Response) => (response.body as { data: { items: ProjectWire[] } }).data.items;
+    const createProject = async (body: object) =>
+      projectOf(await request(server()).post('/api/v1/projects').set(asIt()).send(body).expect(201));
+    const byCode = (a: { code: string }, b: { code: string }) => (a.code < b.code ? -1 : a.code > b.code ? 1 : 0);
+
+    const expectWire = (project: ProjectWire) => {
+      expect(Object.keys(project).sort()).toEqual(PROJECT_KEYS);
+      expect(project.createdAt).toMatch(ISO_INSTANT);
+      expect(project.updatedAt).toMatch(ISO_INSTANT);
+      for (const department of project.departments)
+        expect(Object.keys(department).sort()).toEqual(['code', 'id', 'name']);
+      expect(project.departments).toEqual([...project.departments].sort(byCode));
+    };
+
+    it('answers the exact wire, departments ordered by code, with the creation and its audit', async () => {
+      const first = await newDepartment();
+      const second = await newDepartment();
+      const project = await createProject({ name: unique('Wire'), departmentIds: [second.id, first.id] });
+
+      expectWire(project);
+      expect(project).toMatchObject({ description: null, status: 'RUNNING' });
+      expect(project.departments).toEqual(
+        [
+          { id: first.id, code: first.code, name: first.name },
+          { id: second.id, code: second.code, name: second.name },
+        ].sort(byCode),
+      );
+      expect(await auditOf(project.id)).toEqual([
+        {
+          action: 'PROJECT.CREATED',
+          before: null,
+          after: { name: project.name, status: 'RUNNING', departmentIds: [second.id, first.id] },
+        },
+      ]);
+    });
+
+    it('lists every project by name, then id, when no department is named', async () => {
+      const department = await newDepartment();
+      const prefix = unique('Order');
+      const later = await createProject({ name: `${prefix}-B`, departmentIds: [department.id] });
+      const earlier = await createProject({ name: `${prefix}-A`, departmentIds: [] });
+
+      const items = itemsOf(await request(server()).get('/api/v1/projects').set(asIt()).expect(200));
+      const ids = items.map((item) => item.id);
+
+      items.forEach(expectWire);
+      expect(ids).toContain(later.id);
+      expect(ids.indexOf(earlier.id)).toBeLessThan(ids.indexOf(later.id));
+      expect(items.find((item) => item.id === earlier.id)?.departments).toEqual([]);
+      expect(
+        itemsOf(
+          await request(server()).get(`/api/v1/projects?departmentId=${department.id}`).set(asIt()).expect(200),
+        ).map((item) => item.id),
+      ).toEqual([later.id]);
+    });
+
+    it('composes and trims the name, keeps line breaks in the description, and stores a blank description as none', async () => {
+      const department = await newDepartment();
+      const ideographicSpace = String.fromCharCode(0x3000);
+      const decomposed = 'Kế toán'.normalize('NFD');
+
+      const project = await createProject({
+        name: `${ideographicSpace}${decomposed}${ideographicSpace} ${ideographicSpace}plan `,
+        description: `  ${decomposed}\n  second line  `,
+        departmentIds: [department.id],
+      });
+      const blank = await createProject({ name: unique('Blank'), description: '   ', departmentIds: [] });
+
+      expect(project.name).toBe('Kế toán plan');
+      expect(project.description).toBe('Kế toán\n  second line');
+      expect(blank.description).toBeNull();
+    });
+
+    it('writes nothing and audits nothing when an update changes nothing', async () => {
+      const first = await newDepartment();
+      const second = await newDepartment();
+      const project = await createProject({
+        name: unique('Still'),
+        description: 'Same',
+        departmentIds: [first.id, second.id],
+      });
+
+      const unchanged = projectOf(
+        await request(server())
+          .patch(`/api/v1/projects/${project.id}`)
+          .set(asIt())
+          .send({
+            name: ` ${project.name} `,
+            description: 'Same',
+            status: 'RUNNING',
+            departmentIds: [second.id, first.id],
+          })
+          .expect(200),
+      );
+
+      expect(unchanged).toEqual(project);
+      expect(await auditOf(project.id)).toHaveLength(1);
+    });
+
+    it('records only what changed, and refuses a description that is too long or an unknown project', async () => {
+      const department = await newDepartment();
+      const project = await createProject({ name: unique('Change'), departmentIds: [department.id] });
+
+      const renamed = projectOf(
+        await request(server())
+          .patch(`/api/v1/projects/${project.id}`)
+          .set(asIt())
+          .send({ name: `${project.name} v2`, status: 'RUNNING' })
+          .expect(200),
+      );
+
+      expect(renamed.name).toBe(`${project.name} v2`);
+      expect(Date.parse(renamed.updatedAt)).toBeGreaterThanOrEqual(Date.parse(project.updatedAt));
+      expect((await auditOf(project.id)).at(-1)).toEqual({
+        action: 'PROJECT.UPDATED',
+        before: { name: project.name },
+        after: { name: `${project.name} v2` },
+      });
+      expect(
+        errorOf(
+          await request(server())
+            .patch(`/api/v1/projects/${project.id}`)
+            .set(asIt())
+            .send({ description: 'x'.repeat(2001) })
+            .expect(422),
+        ).code,
+      ).toBe('PROJECT.INVALID_DESCRIPTION');
+      expect(
+        errorOf(
+          await request(server())
+            .patch('/api/v1/projects/3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11')
+            .set(asIt())
+            .send({ name: 'x' })
+            .expect(404),
+        ).code,
+      ).toBe('PROJECT.NOT_FOUND');
+    });
+
+    it('shows the projects on a profile in the same wire as the project routes', async () => {
+      const department = await newDepartment();
+      const other = await newDepartment();
+      const project = await createProject({ name: unique('Profile'), departmentIds: [other.id, department.id] });
+
+      const profile = (await getDepartment(department.id)) as unknown as { projects: ProjectWire[] };
+
+      profile.projects.forEach(expectWire);
+      expect(profile.projects).toEqual([project]);
+    });
+  });
+
   describe('what the database keeps true by itself (INV-19, QĐ-66a)', () => {
     const insertPeriod = (departmentId: string, employeeId: string, from: string, to: string | null) =>
       ctx.sql.query(

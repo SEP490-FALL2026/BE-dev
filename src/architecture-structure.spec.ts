@@ -96,13 +96,12 @@ const LEGACY = {
     ['modules/data-import/employee-import.service.ts', 545], // H8
     ['modules/identity-access/accounts/account.repo.ts', 411], // H5
     ['modules/identity-access/recovery.service.ts', 608], // H5
-    ['modules/organization/department.repo.ts', 507], // H4
-    ['modules/organization/department.service.ts', 519], // H4
+    ['modules/organization/department.service.ts', 508], // H4
   ]),
   /** Module -> cap on controllers directly in the module root. H4. */
-  rootControllers: new Map<string, number>([['organization', 5]]),
+  rootControllers: new Map<string, number>([['organization', 4]]),
   /** Module -> cap on non-spec files directly in the module root. H4. */
-  rootFiles: new Map<string, number>([['organization', 26]]),
+  rootFiles: new Map<string, number>([['organization', 22]]),
 } as const;
 
 function listTypeScriptFiles(directory: string): string[] {

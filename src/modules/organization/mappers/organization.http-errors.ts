@@ -1,6 +1,6 @@
 import { HttpStatus } from '@nestjs/common';
-import { ApiException } from '../../infrastructure/http/errors/api.exception';
-import { toUnavailableApiException } from '../../infrastructure/http/errors/service-unavailable';
+import { ApiException } from '../../../infrastructure/http/errors/api.exception';
+import { toUnavailableApiException } from '../../../infrastructure/http/errors/service-unavailable';
 import {
   CostCenterCodeTakenError,
   CostCenterInUseError,
@@ -8,7 +8,7 @@ import {
   CostCenterNameInvalidError,
   CostCenterNameReservedError,
   CostCenterNotFoundError,
-} from './errors/cost-center.errors';
+} from '../errors/cost-center.errors';
 import {
   DepartmentCodeTakenError,
   DepartmentCostCenterError,
@@ -20,16 +20,15 @@ import {
   DepartmentOutOfScopeError,
   DepartmentUpdateEmptyError,
   HeadAssignmentError,
-  ProjectInvalidError,
-  ProjectNotFoundError,
-} from './errors/department.errors';
+} from '../errors/department.errors';
 import {
   EmployeeRowInvalidError,
   JobTitleNameRequiredError,
   JobTitleNameTakenError,
   JobTitleNameTooLongError,
   JobTitleNotFoundError,
-} from './errors/organization.errors';
+} from '../errors/organization.errors';
+import { ProjectInvalidError, ProjectNotFoundError } from '../project/project.errors';
 
 function refuse(status: HttpStatus, code: string, message: string, details?: Record<string, unknown>): ApiException {
   return new ApiException(status, { code, message, ...(details ? { details } : {}) });

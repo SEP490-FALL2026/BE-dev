@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { isBusinessDate } from '../../../core/business-date';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
 import { COST_CENTER_CODE_MAX_LENGTH, COST_CENTER_CODE_PATTERN } from '../cost-center-name';
+import { projectSchema } from '../project/project.dto';
 
 const businessDate = z.string().refine(isBusinessDate, { message: 'Must be a real date as YYYY-MM-DD.' });
 
@@ -44,16 +45,6 @@ const pagination = z.strictObject({
   pageSize: z.number().int().positive(),
   totalItems: z.number().int().nonnegative(),
   totalPages: z.number().int().nonnegative(),
-});
-
-const projectSchema = z.strictObject({
-  id: z.uuid(),
-  name: z.string(),
-  description: z.string().nullable(),
-  status: z.enum(['RUNNING', 'FINISHED']),
-  departments: z.array(z.strictObject({ id: z.uuid(), code: z.string(), name: z.string() })),
-  createdAt: z.iso.datetime(),
-  updatedAt: z.iso.datetime(),
 });
 
 const departmentSchema = z.strictObject({
@@ -120,23 +111,6 @@ const warningsSchema = z.strictObject({
   ),
 });
 
-export const createProjectBodySchema = z.strictObject({
-  name: z.string().max(1000),
-  description: z.string().max(5000).nullish(),
-  status: z.enum(['RUNNING', 'FINISHED']).optional(),
-  departmentIds: z.array(z.uuid()).max(100),
-});
-
-export const updateProjectBodySchema = z.strictObject({
-  name: z.string().max(1000).optional(),
-  description: z.string().max(5000).nullable().optional(),
-  status: z.enum(['RUNNING', 'FINISHED']).optional(),
-  departmentIds: z.array(z.uuid()).max(100).optional(),
-});
-
-export const listProjectsQuerySchema = z.strictObject({ departmentId: z.uuid().optional() });
-export const projectIdParamSchema = z.strictObject({ id: z.uuid() });
-
 export class CreateDepartmentBodyDto extends createZodDto(createDepartmentBodySchema) {}
 export class UpdateDepartmentBodyDto extends createZodDto(updateDepartmentBodySchema) {}
 export class ListDepartmentsQueryDto extends createZodDto(listDepartmentsQuerySchema) {}
@@ -148,12 +122,3 @@ export class DepartmentResponseDto extends createZodDto(successEnvelopeSchema(de
 export class DepartmentPageResponseDto extends createZodDto(successEnvelopeSchema(departmentPageSchema)) {}
 export class DepartmentMembersResponseDto extends createZodDto(successEnvelopeSchema(memberPageSchema)) {}
 export class DepartmentWarningsResponseDto extends createZodDto(successEnvelopeSchema(warningsSchema)) {}
-
-export class CreateProjectBodyDto extends createZodDto(createProjectBodySchema) {}
-export class UpdateProjectBodyDto extends createZodDto(updateProjectBodySchema) {}
-export class ListProjectsQueryDto extends createZodDto(listProjectsQuerySchema) {}
-export class ProjectIdParamDto extends createZodDto(projectIdParamSchema) {}
-export class ProjectResponseDto extends createZodDto(successEnvelopeSchema(projectSchema)) {}
-export class ProjectListResponseDto extends createZodDto(
-  successEnvelopeSchema(z.strictObject({ items: z.array(projectSchema) })),
-) {}

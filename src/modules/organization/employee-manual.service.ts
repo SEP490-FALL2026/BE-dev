@@ -6,7 +6,7 @@ import type { AuthenticatedPrincipal } from '../../infrastructure/security/token
 import { AuditService } from '../audit/audit.service';
 import { EmployeeCodeTakenError, EmployeeEmailTakenError, EmployeeRowInvalidError } from './errors/organization.errors';
 import { validateEmployeeRow } from './employee-row.validator';
-import { organizationAuditEvent } from './organization-audit';
+import { organizationAuditEvent } from './mappers/audit-event.mapper';
 import { OrganizationRepo } from './organization.repo';
 import { OrganizationService } from './organization.service';
 import { EmploymentType } from './organization.types';

@@ -21,7 +21,7 @@ import {
   ListCostCentersQueryDto,
   RenameCostCenterBodyDto,
 } from './dto/cost-center.dto';
-import { toOrganizationApiException } from './organization.http-errors';
+import { toOrganizationApiException } from './mappers/organization.http-errors';
 
 const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPONSE] as const;
 

@@ -9,7 +9,8 @@ import { ApiSuccessResponse } from '../../infrastructure/http/decorators/api-suc
 import { RequireRoles } from '../../infrastructure/security/decorators/access.decorators';
 import { CurrentPrincipal } from '../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../infrastructure/security/tokens/access-token-verifier.port';
-import { DepartmentProfileView, DepartmentService, DepartmentView } from './department.service';
+import { DepartmentService } from './department.service';
+import { DepartmentProfileView, DepartmentView } from './department.types';
 import {
   AssignHeadBodyDto,
   CreateDepartmentBodyDto,
@@ -24,7 +25,7 @@ import {
   VacateHeadBodyDto,
 } from './dto/department.dto';
 import { toProjectWire } from './mappers/project.mapper';
-import { toOrganizationApiException } from './organization.http-errors';
+import { toOrganizationApiException } from './mappers/organization.http-errors';
 
 const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPONSE] as const;
 

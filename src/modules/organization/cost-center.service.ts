@@ -13,7 +13,7 @@ import {
   CostCenterNameReservedError,
   CostCenterNotFoundError,
 } from './errors/cost-center.errors';
-import { organizationAuditEvent } from './organization-audit';
+import { organizationAuditEvent } from './mappers/audit-event.mapper';
 import { OrganizationService } from './organization.service';
 
 /** How many names of the people still in the department the refusal to retire a cost center lists. */

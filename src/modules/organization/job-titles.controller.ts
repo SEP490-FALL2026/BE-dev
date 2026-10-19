@@ -17,7 +17,7 @@ import {
   ListJobTitlesQueryDto,
 } from './dto/job-title.dto';
 import { JobTitleService } from './job-title.service';
-import { toOrganizationApiException } from './organization.http-errors';
+import { toOrganizationApiException } from './mappers/organization.http-errors';
 import { JobTitleRecord } from './organization.types';
 
 const COMMON_ERRORS = [
