@@ -6,32 +6,27 @@ import {
   AccountAlreadyActivatedError,
   AccountAlreadyExistsError,
   AccountLockedError,
-  AccountNoLongerUsableError,
   AccountNotFoundError,
-  CurrentPasswordInvalidError,
   EmployeeTerminatedError,
   FinanceAlreadyAssignedError,
   InvitationInvalidError,
   LoginEmailInvalidError,
   LoginEmailRequiredError,
   LoginEmailTakenError,
-  LoginTemporarilyBlockedError,
-  PasswordResetInvalidError,
   RoleAlreadyGrantedError,
   RoleCombinationForbiddenError,
   RoleNotGrantedError,
   RoleRequestRefusedError,
   SelfChangeForbiddenError,
   SuperAdminHolderNotLockableError,
-} from '../errors/identity-access.errors';
-import { PasswordPolicyError } from '../identity-access.errors';
+  SuperAdminTransferRefusedError,
+} from '../accounts/account.errors';
+
+// Shared by account administration (accounts/) and the invitation redeem route of the auth controller (auth/).
 
 function refuse(status: HttpStatus, code: string, message: string, details?: Record<string, unknown>): ApiException {
   return new ApiException(status, { code, message, ...(details ? { details } : {}) });
 }
-
-// The 503 mapping is shared with the audit module (it moved to infrastructure); kept here for existing importers.
-export { toUnavailableApiException };
 
 /**
  * Maps the errors of account management to their HTTP answers. Anything not listed is returned
@@ -86,26 +81,23 @@ export function toAccountApiException(error: unknown): unknown {
   if (error instanceof InvitationInvalidError) {
     return refuse(HttpStatus.BAD_REQUEST, 'AUTH.INVITATION_INVALID', 'The invitation link is not valid.');
   }
-  if (error instanceof LoginTemporarilyBlockedError) {
-    return refuse(HttpStatus.TOO_MANY_REQUESTS, 'AUTH.LOGIN_TEMPORARILY_BLOCKED', error.message, {
-      retryAfterSeconds: error.retryAfterSeconds,
-    });
-  }
-  // 422, not 401: the caller is signed in, and 401 is what tells a client the session ended.
-  if (error instanceof CurrentPasswordInvalidError) {
-    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'AUTH.CURRENT_PASSWORD_INVALID', error.message);
-  }
-  // The same answer the guard gives from the next request on.
-  if (error instanceof AccountNoLongerUsableError) {
-    return refuse(HttpStatus.UNAUTHORIZED, 'INVALID_ACCESS_TOKEN', 'The access token is invalid.');
-  }
-  if (error instanceof PasswordResetInvalidError) {
-    return refuse(HttpStatus.BAD_REQUEST, 'AUTH.PASSWORD_RESET_INVALID', 'The password reset link is not valid.');
-  }
-  if (error instanceof PasswordPolicyError) {
-    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'AUTH.PASSWORD_POLICY_VIOLATION', error.message, {
-      violation: error.violation,
-    });
-  }
   return toUnavailableApiException(error) ?? error;
+}
+
+/** The Super Admin transfer (`US-01-09`): its refusals first, then the account answers. */
+export function toSuperAdminTransferApiException(error: unknown): unknown {
+  if (error instanceof SuperAdminTransferRefusedError) {
+    if (error.problem === 'NOT_HOLDER') {
+      // The role moved while this request was waiting (US-01-09 AC-5): the same answer as a caller who never had it.
+      return new ApiException(HttpStatus.FORBIDDEN, {
+        code: 'AUTHORIZATION.FORBIDDEN',
+        message: 'You do not have permission to perform this action.',
+      });
+    }
+    const status = error.problem === 'SUCCESSOR_NOT_FOUND' ? HttpStatus.NOT_FOUND : HttpStatus.UNPROCESSABLE_ENTITY;
+
+    return new ApiException(status, { code: `SUPER_ADMIN_TRANSFER.${error.problem}`, message: error.message });
+  }
+
+  return toAccountApiException(error);
 }

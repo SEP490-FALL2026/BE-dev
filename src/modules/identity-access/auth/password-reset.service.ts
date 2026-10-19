@@ -7,14 +7,14 @@ import { DbTx, TransactionRunner, toTransientError } from '../../../infrastructu
 import { AuditService } from '../../audit/audit.service';
 import { NotificationsService } from '../../notifications/notifications.service';
 import { OrganizationService } from '../../organization/organization.service';
-import { canReceiveResetMail } from '../accounts/account-policy';
 import { AccountRepo } from '../accounts/account.repo';
-import { PasswordResetInvalidError } from '../errors/identity-access.errors';
 import { PasswordPolicyError } from '../identity-access.errors';
 import { ActionTokenSnapshot } from '../identity-access.types';
 import { RecoveryRepo } from '../recovery.repo';
+import { PasswordResetInvalidError } from './auth.errors';
 import { CredentialChangeService } from './credential-change.service';
 import { PasswordHasher } from './password-hasher.service';
+import { canReceiveResetMail } from './password-reset.policy';
 import { checkPasswordPolicy } from './password.policy';
 import { TokenService } from './token.service';
 

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EnvironmentVariables } from '../../../infrastructure/config/env-schema';
-import { LoginTemporarilyBlockedError } from '../errors/identity-access.errors';
+import { LoginTemporarilyBlockedError } from './auth.errors';
 import { SessionRepo } from './session.repo';
 
 /**

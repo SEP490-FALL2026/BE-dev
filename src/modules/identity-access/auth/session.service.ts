@@ -4,10 +4,10 @@ import { EnvironmentVariables } from '../../../infrastructure/config/env-schema'
 import { TransactionRunner, toTransientError } from '../../../infrastructure/database/transaction-runner';
 import { AuditService } from '../../audit/audit.service';
 import { OrganizationService } from '../../organization/organization.service';
-import { employeeHasNotLeft } from '../accounts/account-policy';
 import { AccountRepo } from '../accounts/account.repo';
-import { SessionInvalidError } from '../errors/identity-access.errors';
 import { IssuedSession } from '../identity-access.types';
+import { employeeHasNotLeft } from '../policies/account-policy';
+import { SessionInvalidError } from './auth.errors';
 import { SessionRepo } from './session.repo';
 import { TokenService } from './token.service';
 
@@ -123,8 +123,10 @@ export class SessionService {
   // --- logout -----------------------------------------------------------------------
 
   /**
-   * Revokes the session that owns the refresh token sent in the request body. Idempotent: an absent, malformed, unknown,
-   * already-revoked or expired token is a no-op. Only a database failure surfaces.
+   * Revokes the session that owns the refresh token sent in the request body. Idempotent: an absent, malformed or
+   * unknown token, or one whose session is already revoked or expired, is a no-op. The state of the token itself is not
+   * read: a spent or expired refresh token of a session that is still open ends that session. Only a database failure
+   * surfaces.
    */
   async logout(refreshToken: string | undefined): Promise<void> {
     try {

@@ -1,14 +1,11 @@
 import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
-import { TransientDatabaseError } from '../../../infrastructure/database/transaction-runner';
 import { ApiErrorResponses } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
 import { RawResponse } from '../../../infrastructure/http/decorators/raw-response.decorator';
-import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import { Public } from '../../../infrastructure/security/decorators/public.decorator';
 import { AccountInvitationService } from '../accounts/account-invitation.service';
-import { toAccountApiException } from '../accounts/account.http-errors';
 import { AccountActivatedResponseDto, RedeemInvitationBodyDto } from '../dto/account-management.dto';
 import {
   LoginBodyDto,
@@ -19,12 +16,9 @@ import {
   RefreshTokenBodyDto,
   SessionTokenResponseDto,
 } from '../dto/auth.dto';
-import {
-  InvalidCredentialsError,
-  LoginTemporarilyBlockedError,
-  SessionInvalidError,
-} from '../errors/identity-access.errors';
 import { IssuedSession } from '../identity-access.types';
+import { toAccountApiException } from '../mappers/account.http-errors';
+import { toAuthApiException, toPasswordApiException, toPasswordResetApiException } from '../mappers/auth.http-errors';
 import { LoginService } from './login.service';
 import { PasswordResetService } from './password-reset.service';
 import { SessionService } from './session.service';
@@ -41,13 +35,6 @@ const UNAVAILABLE = {
   status: HttpStatus.SERVICE_UNAVAILABLE,
   description: 'The database is temporarily unavailable. Retry shortly.',
 } as const;
-
-function unavailable(): ApiException {
-  return new ApiException(HttpStatus.SERVICE_UNAVAILABLE, {
-    code: 'AUTH.UNAVAILABLE',
-    message: 'Authentication is temporarily unavailable. Retry shortly.',
-  });
-}
 
 @ApiTags('auth')
 @Controller({ path: 'auth', version: '1' })
@@ -84,21 +71,7 @@ export class AuthController {
     try {
       return toSessionTokens(await this.logins.login(body.email, body.password));
     } catch (error) {
-      if (error instanceof InvalidCredentialsError) {
-        throw new ApiException(HttpStatus.UNAUTHORIZED, {
-          code: 'AUTH.INVALID_CREDENTIALS',
-          message: 'The email or password is not valid.',
-        });
-      }
-      if (error instanceof LoginTemporarilyBlockedError) {
-        throw new ApiException(HttpStatus.TOO_MANY_REQUESTS, {
-          code: 'AUTH.LOGIN_TEMPORARILY_BLOCKED',
-          message: 'Too many failed sign-in attempts. Try again later.',
-          details: { retryAfterSeconds: error.retryAfterSeconds },
-        });
-      }
-      if (error instanceof TransientDatabaseError) throw unavailable();
-      throw error;
+      throw toAuthApiException(error);
     }
   }
 
@@ -122,14 +95,7 @@ export class AuthController {
     try {
       return toSessionTokens(await this.sessions.refresh(body.refreshToken));
     } catch (error) {
-      if (error instanceof SessionInvalidError) {
-        throw new ApiException(HttpStatus.UNAUTHORIZED, {
-          code: 'AUTH.SESSION_INVALID',
-          message: 'The session is not valid. Sign in again.',
-        });
-      }
-      if (error instanceof TransientDatabaseError) throw unavailable();
-      throw error;
+      throw toAuthApiException(error);
     }
   }
 
@@ -153,8 +119,7 @@ export class AuthController {
       await this.sessions.logout(body.refreshToken);
     } catch (error) {
       // Not signed out for certain: the client keeps its token and retries.
-      if (error instanceof TransientDatabaseError) throw unavailable();
-      throw error;
+      throw toAuthApiException(error);
     }
   }
 
@@ -185,8 +150,7 @@ export class AuthController {
 
       return { requested: true };
     } catch (error) {
-      if (error instanceof TransientDatabaseError) throw unavailable();
-      throw error;
+      throw toAuthApiException(error);
     }
   }
 
@@ -225,8 +189,7 @@ export class AuthController {
       return { passwordReset: true };
     } catch (error) {
       // A public route: an outage is AUTH.UNAVAILABLE, like login and refresh.
-      if (error instanceof TransientDatabaseError) throw unavailable();
-      throw toAccountApiException(error);
+      throw toPasswordResetApiException(error);
     }
   }
 
@@ -258,7 +221,8 @@ export class AuthController {
 
       return { activated: true };
     } catch (error) {
-      throw toAccountApiException(error);
+      // The invitation's own answers, and the password policy's for the first password; an outage is 503.
+      throw toAccountApiException(toPasswordApiException(error));
     }
   }
 }

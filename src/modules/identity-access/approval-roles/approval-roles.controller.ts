@@ -9,8 +9,8 @@ import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-
 import { RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
 import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { ApprovalRoleParamDto, ApprovalRolesResponseDto, SetApprovalRoleBodyDto } from '../dto/approval-role.dto';
-import { toApprovalRoleApiException } from './approval-role.errors';
+import { ApprovalRoleParamDto, ApprovalRolesResponseDto, SetApprovalRoleBodyDto } from './approval-role.dto';
+import { toApprovalRoleApiException } from './approval-role.http-errors';
 import { ApprovalRoleService, ApprovalRoleView } from './approval-role.service';
 
 const COMMON_ERRORS = [

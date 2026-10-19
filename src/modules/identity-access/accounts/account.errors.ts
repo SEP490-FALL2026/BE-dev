@@ -1,29 +1,4 @@
-import { isCheckViolation, isUniqueViolation } from '../../../infrastructure/database/unique-violation';
-
-/** Same outcome for every reason a login fails (US-01-01 AC-10): the caller learns nothing. */
-export class InvalidCredentialsError extends Error {
-  constructor() {
-    super('The email or password is not valid.');
-    this.name = 'InvalidCredentialsError';
-  }
-}
-
-export class LoginTemporarilyBlockedError extends Error {
-  constructor(readonly retryAfterSeconds: number) {
-    super('Too many failed sign-in attempts. Try again later.');
-    this.name = 'LoginTemporarilyBlockedError';
-  }
-}
-
-/** The presented refresh token does not identify a usable session. */
-export class SessionInvalidError extends Error {
-  constructor() {
-    super('The session is not valid.');
-    this.name = 'SessionInvalidError';
-  }
-}
-
-// --- account management (slice 1b) --------------------------------------------------
+import type { SuccessorProblem } from './successor-eligibility';
 
 export class AccountNotFoundError extends Error {
   constructor() {
@@ -139,39 +114,12 @@ export class InvitationInvalidError extends Error {
   }
 }
 
-/** The password given as the current one is not the account's password (AC-5, AC-7). */
-export class CurrentPasswordInvalidError extends Error {
-  constructor() {
-    super('The current password is not correct.');
-    this.name = 'CurrentPasswordInvalidError';
-  }
-}
+export type SuperAdminTransferProblem = SuccessorProblem | 'NOT_HOLDER' | 'SUCCESSOR_IS_HOLDER';
 
-/** The account stopped being usable between the guard and the change (locked, or its employee left). */
-export class AccountNoLongerUsableError extends Error {
-  constructor() {
-    super('The account can no longer be used.');
-    this.name = 'AccountNoLongerUsableError';
+/** The transfer cannot happen; nothing was changed and nothing was recorded (US-01-09 AC-3, AC-5). */
+export class SuperAdminTransferRefusedError extends Error {
+  constructor(readonly problem: SuperAdminTransferProblem) {
+    super(`The Super Admin role cannot be transferred: ${problem}.`);
+    this.name = 'SuperAdminTransferRefusedError';
   }
-}
-
-/** One outcome for every reason a reset link cannot be used (unknown, used, replaced, expired, locked, left). */
-export class PasswordResetInvalidError extends Error {
-  constructor() {
-    super('The password reset link is not valid.');
-    this.name = 'PasswordResetInvalidError';
-  }
-}
-
-/** Maps a constraint that caught a race to the same business error the pre-checks give. */
-export function translateAccountWriteError(error: unknown): unknown {
-  if (isUniqueViolation(error, 'role_grants_one_finance')) return new FinanceAlreadyAssignedError();
-  if (isUniqueViolation(error, 'role_grants_one_effective_per_role')) return new RoleAlreadyGrantedError();
-  if (isUniqueViolation(error, 'app_users_employee_id_key')) return new AccountAlreadyExistsError();
-  if (isUniqueViolation(error, 'app_users_organization_id_normalized_login_email_key', 'normalized_login_email')) {
-    return new LoginEmailTakenError();
-  }
-  if (isCheckViolation(error)) return new RoleCombinationForbiddenError();
-
-  return error;
 }

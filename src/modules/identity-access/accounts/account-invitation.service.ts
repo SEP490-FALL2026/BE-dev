@@ -10,6 +10,11 @@ import { EmployeeRecord } from '../../organization/organization.types';
 import { PASSWORD_HASH_POLICY_VERSION, PasswordHasher } from '../auth/password-hasher.service';
 import { checkPasswordPolicy } from '../auth/password.policy';
 import { TokenService } from '../auth/token.service';
+import { PasswordPolicyError } from '../identity-access.errors';
+import { AppRole } from '../identity-access.types';
+import { employeeHasNotLeft } from '../policies/account-policy';
+import { translateAccountWriteError } from './account-constraints';
+import { accountAuditEvent, isSelfChange, RequestedRole, validateRoleSet } from './account-administration.policy';
 import {
   AccountAlreadyActivatedError,
   AccountAlreadyExistsError,
@@ -22,11 +27,7 @@ import {
   LoginEmailRequiredError,
   RoleRequestRefusedError,
   SelfChangeForbiddenError,
-  translateAccountWriteError,
-} from '../errors/identity-access.errors';
-import { PasswordPolicyError } from '../identity-access.errors';
-import { AppRole } from '../identity-access.types';
-import { accountAuditEvent, employeeHasNotLeft, isSelfChange, RequestedRole, validateRoleSet } from './account-policy';
+} from './account.errors';
 import { AccountRepo } from './account.repo';
 
 export interface CreateAccountInput {

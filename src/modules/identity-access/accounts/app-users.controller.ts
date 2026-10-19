@@ -12,7 +12,6 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { AccountInvitationService } from './account-invitation.service';
 import { AccountDetailView, AccountQueryService, AccountView } from './account-query.service';
 import { AccountStatusService } from './account-status.service';
-import { toAccountApiException } from './account.http-errors';
 import {
   AccountCandidatesQueryDto,
   AccountCandidatesResponseDto,
@@ -25,6 +24,7 @@ import {
   GrantRoleBodyDto,
   ListAppUsersQueryDto,
 } from '../dto/account-management.dto';
+import { toAccountApiException } from '../mappers/account.http-errors';
 
 const iso = (value: Date): string => value.toISOString();
 

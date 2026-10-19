@@ -29,37 +29,27 @@ const SHARED_MODULE_FOLDERS = new Set(['dto', 'errors', 'mappers', 'policies']);
 const LEGACY = {
   /** importer -> target, both relative to src/. Removed by H5 (identity-access capability boundaries). */
   crossCapabilityImports: new Set([
-    'modules/identity-access/access/jwt-access-token.verifier.ts -> modules/identity-access/accounts/account-policy.ts',
     'modules/identity-access/access/jwt-access-token.verifier.ts -> modules/identity-access/approval-roles/approval-role.repo.ts',
     'modules/identity-access/access/jwt-access-token.verifier.ts -> modules/identity-access/auth/session.repo.ts',
-    'modules/identity-access/access/me.controller.ts -> modules/identity-access/accounts/account.http-errors.ts',
     'modules/identity-access/access/me.service.ts -> modules/identity-access/accounts/account.repo.ts',
     'modules/identity-access/accounts/account-invitation.service.ts -> modules/identity-access/auth/password-hasher.service.ts',
     'modules/identity-access/accounts/account-invitation.service.ts -> modules/identity-access/auth/password.policy.ts',
     'modules/identity-access/accounts/account-status.service.ts -> modules/identity-access/auth/session.repo.ts',
     'modules/identity-access/accounts/successor-eligibility.ts -> modules/identity-access/approval-roles/approval-role.repo.ts',
-    'modules/identity-access/approval-roles/approval-role.service.ts -> modules/identity-access/accounts/account-policy.ts',
     'modules/identity-access/approval-roles/approval-role.service.ts -> modules/identity-access/accounts/account.repo.ts',
-    'modules/identity-access/auth/auth.controller.ts -> modules/identity-access/accounts/account.http-errors.ts',
     'modules/identity-access/auth/credential-change.service.ts -> modules/identity-access/accounts/account.repo.ts',
-    'modules/identity-access/auth/login.service.ts -> modules/identity-access/accounts/account-policy.ts',
     'modules/identity-access/auth/login.service.ts -> modules/identity-access/accounts/account.repo.ts',
-    'modules/identity-access/auth/password-change.service.ts -> modules/identity-access/accounts/account-policy.ts',
     'modules/identity-access/auth/password-change.service.ts -> modules/identity-access/accounts/account.repo.ts',
-    'modules/identity-access/auth/password-reset.service.ts -> modules/identity-access/accounts/account-policy.ts',
     'modules/identity-access/auth/password-reset.service.ts -> modules/identity-access/accounts/account.repo.ts',
-    'modules/identity-access/auth/session.service.ts -> modules/identity-access/accounts/account-policy.ts',
     'modules/identity-access/auth/session.service.ts -> modules/identity-access/accounts/account.repo.ts',
     // A4-01 (GATE.1): the module root was not checked. H5.6 (E6) gives forgot-password a recovery-ticket service
     // instead of the root repo (A4-20).
     'modules/identity-access/auth/password-reset.service.ts -> modules/identity-access/recovery.repo.ts',
-    // A4-01 (GATE.1): the facade reaches into capability internals. H5.2 (capability boundaries).
-    'modules/identity-access/identity-access.service.ts -> modules/identity-access/accounts/account-policy.ts',
+    // A4-01 (GATE.1): the facade reaches into capability internals. H5.5 to H5.7 (capability surfaces, E5).
     'modules/identity-access/identity-access.service.ts -> modules/identity-access/accounts/account.repo.ts',
     'modules/identity-access/identity-access.service.ts -> modules/identity-access/auth/password-hasher.service.ts',
     'modules/identity-access/identity-access.service.ts -> modules/identity-access/auth/password.policy.ts',
     // A4-01 (GATE.1): the root recovery workflow reaches into accounts/auth. H5.7 (E5, E7: recovery/ folder).
-    'modules/identity-access/recovery.service.ts -> modules/identity-access/accounts/account-policy.ts',
     'modules/identity-access/recovery.service.ts -> modules/identity-access/accounts/account.repo.ts',
     'modules/identity-access/recovery.service.ts -> modules/identity-access/accounts/successor-eligibility.ts',
     'modules/identity-access/recovery.service.ts -> modules/identity-access/auth/action-token.ts',
@@ -69,15 +59,12 @@ const LEGACY = {
   controllerImports: new Set<string>(),
   /** Error classes declared in an orchestration file (service/controller/repo). */
   errorClassesOutsideErrorFiles: new Set([
-    // H5: move to accounts/errors.
-    'modules/identity-access/accounts/super-admin-transfer.service.ts: SuperAdminTransferRefusedError',
     // H6: installation errors to installation.errors.ts.
     'modules/installation/installation.service.ts: InstallationInputError',
     'modules/installation/installation.service.ts: AlreadyInstalledError',
   ]),
   /** HTTP mapping (ApiException/HttpStatus) inside a business error file. */
   httpMappingInErrorFiles: new Set([
-    'modules/identity-access/approval-roles/approval-role.errors.ts', // H5
     'modules/data-import/employee-import.errors.ts', // H8
   ]),
   /** Errors matched by their class name string instead of instanceof. */

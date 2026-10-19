@@ -12,7 +12,7 @@ import {
   CreateAppUserInput,
   RoleGrantRecord,
 } from '../identity-access.types';
-import { ActionLinkState } from './account-policy';
+import { ActionLinkState } from '../policies/account-policy';
 
 type LockMode = 'SHARE' | 'UPDATE';
 

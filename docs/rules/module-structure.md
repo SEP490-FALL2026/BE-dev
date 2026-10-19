@@ -135,6 +135,10 @@ module, HTTP module, facade, type và lỗi public; `normalizeDisplayName` và `
 Organization); `dto/` và `mappers/` chỉ giữ nội dung ít nhất hai capability dùng. Repo Job Title, Employee, Department
 Head là provider riêng của `OrganizationModule` sau capability service mà chỉ facade dùng; use case HTTP gọi facade (E4
 giữ ba repo export — ngoại lệ ledger duy nhất còn lại của `organization`, xem lại ở G3).
-`identity-access` giữ `auth/`, `accounts/`, `approval-roles/`, `access/`; lỗi và DTO chuyển vào capability sở hữu;
-`recovery.*` ở root làm entry CLI. Bảng file → vị trí đích ở mục 4.4 của báo cáo audit; thực hiện theo các lát/wave H4
-và H5 của item handoff, không đổi contract.
+**Sau Identity Access Wave A (H5.0 → H5.4):** `identity-access` giữ `auth/`, `accounts/`, `approval-roles/`, `access/`;
+DTO, lỗi, mapper HTTP và policy của một capability nằm phẳng trong capability đó (ví dụ `auth/auth.errors.ts`,
+`access/me.dto.ts`, `approval-roles/approval-role.http-errors.ts`); `dto/`, `mappers/` (`auth.http-errors.ts`,
+`account.http-errors.ts`) và `policies/account-policy.ts` chỉ giữ nội dung có ít nhất hai capability dùng; không còn
+`errors/`. Root 10 file, 0 controller: module, facade module, facade, type, lỗi public (`PasswordPolicyError`) và
+`recovery.*` làm entry CLI (Q6). Wave B (H5.5 → H5.7) gỡ các cạnh `crossCapabilityImports` còn lại và chu trình auth ↔
+accounts theo E5–E7 của [audit H4.0](../reviews/be-full-src-architecture-audit-2026-10-19/README.md), không đổi contract.

@@ -2,12 +2,12 @@ import { Injectable } from '@nestjs/common';
 import { normalizeEmail } from '../../core/email';
 import { DbTx } from '../../infrastructure/database/transaction-runner';
 import { OrganizationService } from '../organization/organization.service';
-import { employeeHasNotLeft, isActionLinkRedeemable } from './accounts/account-policy';
 import { AccountRepo } from './accounts/account.repo';
 import { PASSWORD_HASH_POLICY_VERSION, PasswordHasher } from './auth/password-hasher.service';
 import { checkPasswordPolicy } from './auth/password.policy';
 import { PasswordPolicyError } from './identity-access.errors';
 import { BootstrapSuperAdminInput, EmployeeAccountInspection } from './identity-access.types';
+import { employeeHasNotLeft, isActionLinkRedeemable } from './policies/account-policy';
 
 /** Public facade of the identity-access module. */
 @Injectable()

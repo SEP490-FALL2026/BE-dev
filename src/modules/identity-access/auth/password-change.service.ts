@@ -3,13 +3,13 @@ import { normalizeEmail } from '../../../core/email';
 import { TransactionRunner, toTransientError } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { OrganizationService } from '../../organization/organization.service';
-import { canReceiveResetMail } from '../accounts/account-policy';
 import { AccountRepo } from '../accounts/account.repo';
-import { AccountNoLongerUsableError, CurrentPasswordInvalidError } from '../errors/identity-access.errors';
 import { PasswordPolicyError } from '../identity-access.errors';
+import { AccountNoLongerUsableError, CurrentPasswordInvalidError } from './auth.errors';
 import { CredentialChangeService } from './credential-change.service';
 import { LoginThrottle } from './login-throttle.service';
 import { PasswordHasher } from './password-hasher.service';
+import { canReceiveResetMail } from './password-reset.policy';
 import { checkPasswordPolicy } from './password.policy';
 import { TokenService } from './token.service';
 

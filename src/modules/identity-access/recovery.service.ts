@@ -9,10 +9,10 @@ import type { AuditEventInput, AuditValue } from '../audit/audit.types';
 import { NotificationsService } from '../notifications/notifications.service';
 import { OrganizationService } from '../organization/organization.service';
 import { AccountRepo } from './accounts/account.repo';
-import { employeeHasNotLeft } from './accounts/account-policy';
 import { SuccessorEligibility } from './accounts/successor-eligibility';
 import { newActionToken } from './auth/action-token';
 import { PASSWORD_HASH_POLICY_VERSION, PasswordHasher } from './auth/password-hasher.service';
+import { employeeHasNotLeft } from './policies/account-policy';
 import { RecoveryRefusedError } from './recovery.errors';
 import { RecoveryModeName, RecoveryRepo, TicketRecord } from './recovery.repo';
 

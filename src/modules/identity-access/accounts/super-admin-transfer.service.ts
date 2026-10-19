@@ -4,18 +4,9 @@ import { TransactionRunner, readSqlState } from '../../../infrastructure/databas
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditService } from '../../audit/audit.service';
 import { OrganizationService } from '../../organization/organization.service';
+import { SuperAdminTransferRefusedError } from './account.errors';
 import { AccountRepo } from './account.repo';
-import { SuccessorEligibility, SuccessorProblem } from './successor-eligibility';
-
-export type SuperAdminTransferProblem = SuccessorProblem | 'NOT_HOLDER' | 'SUCCESSOR_IS_HOLDER';
-
-/** The transfer cannot happen; nothing was changed and nothing was recorded (US-01-09 AC-3, AC-5). */
-export class SuperAdminTransferRefusedError extends Error {
-  constructor(readonly problem: SuperAdminTransferProblem) {
-    super(`The Super Admin role cannot be transferred: ${problem}.`);
-    this.name = 'SuperAdminTransferRefusedError';
-  }
-}
+import { SuccessorEligibility } from './successor-eligibility';
 
 export interface SuperAdminTransferResult {
   transferId: string;

@@ -6,30 +6,12 @@ import {
   UNAUTHENTICATED_RESPONSE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
-import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import { RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
 import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { SuperAdminTransferBodyDto, SuperAdminTransferResponseDto } from '../dto/super-admin-transfer.dto';
-import { toAccountApiException } from './account.http-errors';
-import { SuperAdminTransferRefusedError, SuperAdminTransferService } from './super-admin-transfer.service';
-
-function toTransferApiException(error: unknown): unknown {
-  if (error instanceof SuperAdminTransferRefusedError) {
-    if (error.problem === 'NOT_HOLDER') {
-      // The role moved while this request was waiting (US-01-09 AC-5): the same answer as a caller who never had it.
-      return new ApiException(HttpStatus.FORBIDDEN, {
-        code: 'AUTHORIZATION.FORBIDDEN',
-        message: 'You do not have permission to perform this action.',
-      });
-    }
-    const status = error.problem === 'SUCCESSOR_NOT_FOUND' ? HttpStatus.NOT_FOUND : HttpStatus.UNPROCESSABLE_ENTITY;
-
-    return new ApiException(status, { code: `SUPER_ADMIN_TRANSFER.${error.problem}`, message: error.message });
-  }
-
-  return toAccountApiException(error);
-}
+import { SuperAdminTransferBodyDto, SuperAdminTransferResponseDto } from './super-admin-transfer.dto';
+import { toSuperAdminTransferApiException } from '../mappers/account.http-errors';
+import { SuperAdminTransferService } from './super-admin-transfer.service';
 
 /**
  * Handing the Super Admin role to a successor (`US-01-09`). Only the holder may; it is the one way the role changes
@@ -69,7 +51,7 @@ export class SuperAdminTransfersController {
     try {
       return await this.transfers.transfer(actor, body.successorAppUserId);
     } catch (error) {
-      throw toTransferApiException(error);
+      throw toSuperAdminTransferApiException(error);
     }
   }
 }

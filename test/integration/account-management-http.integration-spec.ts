@@ -1,6 +1,6 @@
 import request from 'supertest';
 import { AccountStatusService } from '../../src/modules/identity-access/accounts/account-status.service';
-import { SuperAdminHolderNotLockableError } from '../../src/modules/identity-access/errors/identity-access.errors';
+import { SuperAdminHolderNotLockableError } from '../../src/modules/identity-access/accounts/account.errors';
 import { IdentityAccessService } from '../../src/modules/identity-access/identity-access.service';
 import { PayloadCipher } from '../../src/modules/notifications/payload-cipher';
 import { bodyOf } from '../support/api-body';

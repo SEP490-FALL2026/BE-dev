@@ -4,6 +4,16 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { AuditService } from '../../audit/audit.service';
 import { NotificationsService } from '../../notifications/notifications.service';
 import { SessionRepo } from '../auth/session.repo';
+import { AppRole } from '../identity-access.types';
+import { translateAccountWriteError } from './account-constraints';
+import {
+  accountAuditEvent,
+  checkRoleRequest,
+  forbidsCombination,
+  isSelfChange,
+  RequestedRole,
+  stopsLocking,
+} from './account-administration.policy';
 import {
   AccountNotFoundError,
   FinanceAlreadyAssignedError,
@@ -13,17 +23,7 @@ import {
   RoleRequestRefusedError,
   SelfChangeForbiddenError,
   SuperAdminHolderNotLockableError,
-  translateAccountWriteError,
-} from '../errors/identity-access.errors';
-import { AppRole } from '../identity-access.types';
-import {
-  accountAuditEvent,
-  checkRoleRequest,
-  forbidsCombination,
-  isSelfChange,
-  RequestedRole,
-  stopsLocking,
-} from './account-policy';
+} from './account.errors';
 import { AccountRepo } from './account.repo';
 
 /**

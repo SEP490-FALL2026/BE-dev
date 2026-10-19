@@ -6,13 +6,14 @@ import {
   UNAUTHENTICATED_RESPONSE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
+import { toUnavailableApiException } from '../../../infrastructure/http/errors/service-unavailable';
 import { AuthenticatedOnly } from '../../../infrastructure/security/decorators/access.decorators';
 import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { toAccountApiException, toUnavailableApiException } from '../accounts/account.http-errors';
 import { PasswordChangeService } from '../auth/password-change.service';
 import { ChangePasswordBodyDto, PasswordChangedResponseDto } from '../dto/auth.dto';
-import { MeResponseDto } from '../dto/me.dto';
+import { toPasswordApiException } from '../mappers/auth.http-errors';
+import { MeResponseDto } from './me.dto';
 import { MeService, MeView } from './me.service';
 
 @ApiTags('me')
@@ -74,7 +75,7 @@ export class MeController {
     try {
       await this.passwordChanges.changePassword(principal, body.currentPassword, body.newPassword);
     } catch (error) {
-      throw toAccountApiException(error);
+      throw toPasswordApiException(error);
     }
 
     return { passwordChanged: true };

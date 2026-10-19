@@ -4,7 +4,6 @@ import { NotificationsService } from '../../notifications/notifications.service'
 import { DeliveryState } from '../../notifications/notifications.types';
 import { OrganizationService } from '../../organization/organization.service';
 import { EmployeeCandidate } from '../../organization/organization.types';
-import { AccountNotFoundError } from '../errors/identity-access.errors';
 import {
   AccountListFilter,
   AccountRecord,
@@ -13,7 +12,8 @@ import {
   AppUserStatus,
   RoleGrantRecord,
 } from '../identity-access.types';
-import { employeeHasNotLeft } from './account-policy';
+import { employeeHasNotLeft } from '../policies/account-policy';
+import { AccountNotFoundError } from './account.errors';
 import { AccountRepo } from './account.repo';
 
 export interface AccountView {

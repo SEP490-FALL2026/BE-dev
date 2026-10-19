@@ -136,9 +136,10 @@ không thay đổi thì không ghi audit; audit payload và thứ tự giữ.
 - [x] Hạng mục refactor không có primary AC; characterization xanh trên code cũ và vẫn xanh sau sửa.
 - [x] Gate theo [CONTRIBUTING](../../../../CONTRIBUTING.md) chạy xanh trên cây cuối; e2e + OpenAPI vì chạm controller.
 - [x] Spec/plan/roadmap/rule phản ánh implementation cuối; không đổi contract nên không có thông báo FE.
-- [ ] Owner review và commit/push.
+- [x] Commit/push: Owner commit/push `ac3eb92` lên `dev` 19/10/2026 (không PR).
+- [ ] Owner review.
 
 ## Changes and acceptance
 
 - 19/10/2026: tạo hạng mục, thiết kế `ready`; implement H4.6 + H4.7 và `verified` local (bằng chứng ở [plan](plan.md)).
-  Chưa commit, chưa Owner review, chưa nghiệm thu.
+  Owner commit/push `ac3eb92` lên `dev` cùng ngày (không PR); chưa Owner review, chưa nghiệm thu.

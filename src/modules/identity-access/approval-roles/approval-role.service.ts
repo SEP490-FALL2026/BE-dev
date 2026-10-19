@@ -3,8 +3,8 @@ import { TransactionRunner, readSqlState } from '../../../infrastructure/databas
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditService } from '../../audit/audit.service';
 import { OrganizationService } from '../../organization/organization.service';
-import { employeeHasNotLeft } from '../accounts/account-policy';
 import { AccountRepo } from '../accounts/account.repo';
+import { employeeHasNotLeft } from '../policies/account-policy';
 import { ApprovalRoleHolderInvalidError, ApprovalRolePairingError } from './approval-role.errors';
 import { APPROVAL_ROLES, ApprovalRoleName, ApprovalRoleRepo } from './approval-role.repo';
 

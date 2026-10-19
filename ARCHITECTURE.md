@@ -48,7 +48,7 @@ src/
     operating-parameters/     # tham số vận hành (giá trị, lịch sử, ngày không làm việc) + API Super Admin
     data-import/              # import nhân sự CSV xem trước – xác nhận (employee_imports); gọi organization qua facade
     onboarding/               # checklist khởi tạo: tổng hợp đọc từ organization và identity-access, không sở hữu bảng
-    identity-access/          # facade, module, types ở gốc; dto/, errors/ dùng chung; recovery.* (RecoveryModule, chỉ nạp bởi lệnh khôi phục)
+    identity-access/          # facade, module, types, lỗi public ở gốc; dto/, mappers/, policies/ dùng chung (hai capability trở lên); recovery.* (RecoveryModule, chỉ nạp bởi lệnh khôi phục)
       auth/                   # đăng nhập, refresh/logout, phiên + refresh token + throttle (session.repo), token, mật khẩu
       accounts/               # truy vấn, tạo/mời/kích hoạt, khóa/vai, chuyển giao Super Admin; account.repo (AppUser, credential, vai, action token)
       approval-roles/         # Người duyệt chi, người thay thế, approver dự phòng (approval_role_holders)

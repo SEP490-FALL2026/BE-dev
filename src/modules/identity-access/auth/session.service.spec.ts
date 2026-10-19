@@ -5,8 +5,8 @@ import { TransactionRunner } from '../../../infrastructure/database/transaction-
 import { AuditService } from '../../audit/audit.service';
 import { OrganizationService } from '../../organization/organization.service';
 import { AccountRepo } from '../accounts/account.repo';
-import { SessionInvalidError } from '../errors/identity-access.errors';
 import { RefreshTokenSnapshot, SessionSnapshot } from '../identity-access.types';
+import { SessionInvalidError } from './auth.errors';
 import { SessionRepo } from './session.repo';
 import { SessionService } from './session.service';
 import { TokenService } from './token.service';
