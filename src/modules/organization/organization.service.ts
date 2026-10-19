@@ -1,8 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { BusinessDate, businessDateAt } from '../../core/business-date';
 import { DbTx } from '../../infrastructure/database/transaction-runner';
-import { DepartmentRepo } from './department.repo';
 import { CostCenterCatalogueService } from './cost-center/cost-center-catalogue.service';
+import { DepartmentDirectoryService } from './department/department-directory.service';
+import { DepartmentHeadRecord, HeadPeriodChanges, HeadPeriodRecord } from './department/department.types';
 import { EmployeeDirectoryService } from './employee/employee-directory.service';
 import { JobTitleCatalogueService } from './job-title/job-title-catalogue.service';
 import { JobTitleListFilter, JobTitleRecord, JobTitleStatus } from './job-title/job-title.types';
@@ -31,7 +32,7 @@ export class OrganizationService {
 
   constructor(
     private readonly repo: OrganizationRepo,
-    private readonly departments: DepartmentRepo,
+    private readonly departments: DepartmentDirectoryService,
     private readonly employees: EmployeeDirectoryService,
     private readonly costCenters: CostCenterCatalogueService,
     private readonly jobTitles: JobTitleCatalogueService,
@@ -64,6 +65,34 @@ export class OrganizationService {
     return this.departments.headedDepartment(employeeId, onDate ?? (await this.businessToday()));
   }
 
+  // --- the head periods of departments, for the department use cases (in their transaction) -------------
+
+  /** Who heads each of these departments on `onDate`; a department nobody heads is absent. */
+  getDepartmentHeads(departmentIds: string[], onDate: BusinessDate): Promise<Map<string, DepartmentHeadRecord>> {
+    return this.departments.headsOn(departmentIds, onDate);
+  }
+
+  /** Who headed the department, newest period first, at most `limit` periods. Pass `tx` to read in a transaction. */
+  getDepartmentHeadHistory(departmentId: string, limit: number, tx?: DbTx): Promise<HeadPeriodRecord[]> {
+    return this.departments.headHistory(tx, departmentId, limit);
+  }
+
+  /**
+   * Cancels the head periods that begin on or after `from` and ends the one in force then, the day before. The caller
+   * holds the department's `FOR UPDATE` lock.
+   */
+  endDepartmentHeadPeriodsFrom(tx: DbTx, departmentId: string, from: BusinessDate): Promise<HeadPeriodChanges> {
+    return this.departments.endHeadPeriodsFrom(tx, departmentId, from);
+  }
+
+  /** Opens a head period; throws HeadAssignmentError when the database refuses the person on those days (INV-19). */
+  startDepartmentHeadPeriod(
+    tx: DbTx,
+    input: { organizationId: string; departmentId: string; employeeId: string; validFrom: BusinessDate },
+  ): Promise<void> {
+    return this.departments.startHeadPeriod(tx, input);
+  }
+
   /** The installation's organization, or null before bootstrap. */
   getOrganization(tx?: DbTx): Promise<OrganizationRecord | null> {
     return this.repo.findOrganization(tx);
@@ -78,7 +107,7 @@ export class OrganizationService {
   }
 
   createDepartment(tx: DbTx, input: CreateDepartmentInput): Promise<{ id: string }> {
-    return this.repo.createDepartment(tx, input);
+    return this.departments.createForInstallation(tx, input);
   }
 
   createJobTitle(tx: DbTx, organizationId: string, name: string): Promise<{ id: string }> {
@@ -206,7 +235,7 @@ export class OrganizationService {
     organizationId: string,
     code: string,
   ): Promise<{ id: string; code: string; name: string; active: boolean; costCenterActive: boolean } | null> {
-    return this.repo.lockDepartmentByCode(tx, organizationId, code);
+    return this.departments.lockForEntry(tx, organizationId, code);
   }
 
   isEmployeeCodeTaken(tx: DbTx, organizationId: string, employeeCode: string): Promise<boolean> {
@@ -220,7 +249,7 @@ export class OrganizationService {
   /** Among these active departments, those nobody heads today: what the people import reports at its end (AC-1). */
   async departmentsWithoutHead(departmentIds: string[]): Promise<{ id: string; code: string; name: string }[]> {
     const wanted = new Set(departmentIds);
-    const without = await this.departments.activeDepartmentsWithoutHead(await this.businessToday());
+    const without = await this.departments.activeWithoutHead(await this.businessToday());
 
     return without.filter((department) => wanted.has(department.id));
   }
@@ -229,11 +258,11 @@ export class OrganizationService {
   async getOnboardingFacts(): Promise<OnboardingFacts> {
     const today = await this.businessToday();
     const [activeDepartments, activeEmployees, freeCostCenters, withoutHead, withItAdmin] = await Promise.all([
-      this.departments.countActiveDepartments(),
-      this.departments.countEmployees(),
+      this.departments.countActive(),
+      this.employees.countActive(),
       this.costCenters.countFreeUnits(),
-      this.departments.activeDepartmentsWithoutHead(today),
-      this.departments.activeDepartmentsWithItAdmin(),
+      this.departments.activeWithoutHead(today),
+      this.departments.activeWithItAdmin(),
     ]);
 
     return {

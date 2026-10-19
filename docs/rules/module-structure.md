@@ -130,10 +130,11 @@ cũng qua review. Gate không chứng minh thiết kế đúng — review vẫn 
 ## Ví dụ đích và trạng thái chuyển tiếp
 
 `organization` đích theo capability `cost-center/`, `department/`, `project/`, `job-title/`, `employee/`; root giữ
-module, HTTP module, facade, type và lỗi public; `normalizeDisplayName` ở `src/core` (Q6). **Chuyển tiếp sau Wave 2
-(H4.3b, H4.4, H4.5):** `project/`, `job-title/`, `employee/`, `cost-center/` đã tách; root còn 10 file, 1 controller —
-phần Department và `organization.repo.ts` chờ Wave 3 (H4.6, H4.7). Repo Job Title, Employee là provider riêng của
-`OrganizationModule` sau capability service mà chỉ facade dùng; use case HTTP gọi facade (E4 giữ ba repo export).
+module, HTTP module, facade, type và lỗi public; `normalizeDisplayName` và `Page<T>`/`pageOf` ở `src/core` (Q6).
+**Sau Wave 3 (H4.6, H4.7):** cả năm capability đã tách; root còn 6 file, 0 controller (`organization.repo.ts` chỉ còn
+Organization); `dto/` và `mappers/` chỉ giữ nội dung ít nhất hai capability dùng. Repo Job Title, Employee, Department
+Head là provider riêng của `OrganizationModule` sau capability service mà chỉ facade dùng; use case HTTP gọi facade (E4
+giữ ba repo export — ngoại lệ ledger duy nhất còn lại của `organization`, xem lại ở G3).
 `identity-access` giữ `auth/`, `accounts/`, `approval-roles/`, `access/`; lỗi và DTO chuyển vào capability sở hữu;
 `recovery.*` ở root làm entry CLI. Bảng file → vị trí đích ở mục 4.4 của báo cáo audit; thực hiện theo các lát/wave H4
 và H5 của item handoff, không đổi contract.

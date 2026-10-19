@@ -20,7 +20,7 @@ import {
   DepartmentOutOfScopeError,
   DepartmentUpdateEmptyError,
   HeadAssignmentError,
-} from '../errors/department.errors';
+} from '../department/department.errors';
 import { EmployeeRowInvalidError } from '../employee/employee.errors';
 import {
   JobTitleNameRequiredError,

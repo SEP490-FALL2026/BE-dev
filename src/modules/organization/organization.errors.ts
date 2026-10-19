@@ -21,3 +21,11 @@ export class EmployeeEmailTakenError extends Error {
     this.name = 'EmployeeEmailTakenError';
   }
 }
+
+/** Thrown by the facade when a second organization would be created: the installation has exactly one (I-8). */
+export class OrganizationAlreadyExistsError extends Error {
+  constructor() {
+    super('An organization already exists for this installation.');
+    this.name = 'OrganizationAlreadyExistsError';
+  }
+}

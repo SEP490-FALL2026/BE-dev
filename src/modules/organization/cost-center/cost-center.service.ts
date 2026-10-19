@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { Page, pageOf } from '../../../core/application/pagination';
 import { businessDateAt } from '../../../core/business-date';
 import { DbTx, TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
@@ -18,16 +19,6 @@ import { OrganizationService } from '../organization.service';
 
 /** How many names of the people still in the department the refusal to retire a cost center lists. */
 const IN_USE_LISTED_EMPLOYEES = 20;
-
-export interface Page<T> {
-  items: T[];
-  pagination: { page: number; pageSize: number; totalItems: number; totalPages: number };
-}
-
-const pageOf = <T>(items: T[], total: number, page: number, pageSize: number): Page<T> => ({
-  items,
-  pagination: { page, pageSize, totalItems: total, totalPages: Math.ceil(total / pageSize) },
-});
 
 /**
  * The Cost Center catalogue Finance maintains (`US-04-09`). Finance creates, renames and retires; IT Admin only

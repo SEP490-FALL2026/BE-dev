@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { Page, pageOf } from '../../../core/application/pagination';
 import { normalizeDisplayName } from '../../../core/display-name';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import { isUniqueViolation } from '../../../infrastructure/database/unique-violation';
@@ -14,11 +15,6 @@ import { isJobTitleNameTooLong, normalizeJobTitleName } from './job-title-name';
 import { organizationAuditEvent } from '../mappers/audit-event.mapper';
 import { OrganizationService } from '../organization.service';
 import { JobTitleRecord, JobTitleStatus } from './job-title.types';
-
-export interface JobTitlePage {
-  items: JobTitleRecord[];
-  pagination: { page: number; pageSize: number; totalItems: number; totalPages: number };
-}
 
 /**
  * The job title catalogue an IT Admin maintains (`US-02-07`). Every change takes the title's row lock first
@@ -37,7 +33,7 @@ export class JobTitleService {
     search?: string;
     page: number;
     pageSize: number;
-  }): Promise<JobTitlePage> {
+  }): Promise<Page<JobTitleRecord>> {
     const search = query.search ? normalizeJobTitleName(query.search) : '';
     const { items, total } = await this.organization.listJobTitles({
       ...(query.status ? { status: query.status } : {}),
@@ -46,15 +42,7 @@ export class JobTitleService {
       take: query.pageSize,
     });
 
-    return {
-      items,
-      pagination: {
-        page: query.page,
-        pageSize: query.pageSize,
-        totalItems: total,
-        totalPages: Math.ceil(total / query.pageSize),
-      },
-    };
+    return pageOf(items, total, query.page, query.pageSize);
   }
 
   /** Adds a title, `ACTIVE`. Throws JobTitleNameRequiredError, JobTitleNameTooLongError or JobTitleNameTakenError. */

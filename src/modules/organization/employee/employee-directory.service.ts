@@ -43,6 +43,10 @@ export class EmployeeDirectoryService {
     return this.repo.findEmployees(employeeIds);
   }
 
+  countActive(): Promise<number> {
+    return this.repo.countActive();
+  }
+
   searchActive(
     search: string | undefined,
     onDate: Date,

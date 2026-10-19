@@ -1,17 +1,7 @@
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
-
-/** The project resource. The department profile embeds the same resource, so it reuses this one definition. */
-export const projectSchema = z.strictObject({
-  id: z.uuid(),
-  name: z.string(),
-  description: z.string().nullable(),
-  status: z.enum(['RUNNING', 'FINISHED']),
-  departments: z.array(z.strictObject({ id: z.uuid(), code: z.string(), name: z.string() })),
-  createdAt: z.iso.datetime(),
-  updatedAt: z.iso.datetime(),
-});
+import { projectSchema } from '../dto/project-wire.dto';
 
 export const createProjectBodySchema = z.strictObject({
   name: z.string().max(1000),

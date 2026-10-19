@@ -4,13 +4,15 @@ import {
   ApiErrorResponses,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
-} from '../../infrastructure/http/decorators/api-error-responses.decorator';
-import { ApiSuccessResponse } from '../../infrastructure/http/decorators/api-success-response.decorator';
-import { RequireRoles } from '../../infrastructure/security/decorators/access.decorators';
-import { CurrentPrincipal } from '../../infrastructure/security/models/current-principal';
-import type { AuthenticatedPrincipal } from '../../infrastructure/security/tokens/access-token-verifier.port';
+} from '../../../infrastructure/http/decorators/api-error-responses.decorator';
+import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
+import { RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
+import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
+import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
+import { toOrganizationApiException } from '../mappers/organization.http-errors';
+import { DepartmentHeadService } from './department-head.service';
+import { DepartmentQueryService } from './department-query.service';
 import { DepartmentService } from './department.service';
-import { DepartmentProfileView, DepartmentView } from './department.types';
 import {
   AssignHeadBodyDto,
   CreateDepartmentBodyDto,
@@ -23,9 +25,8 @@ import {
   ListMembersQueryDto,
   UpdateDepartmentBodyDto,
   VacateHeadBodyDto,
-} from './dto/department.dto';
-import { toProjectWire } from './mappers/project.mapper';
-import { toOrganizationApiException } from './mappers/organization.http-errors';
+} from './department.dto';
+import { toDepartmentProfileWire, toDepartmentWire } from './department.mapper';
 
 const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPONSE] as const;
 
@@ -40,45 +41,24 @@ const VALIDATION_ERROR = {
 } as const;
 const NOT_FOUND = { status: HttpStatus.NOT_FOUND, description: 'The department does not exist.' } as const;
 
-function toWire(view: DepartmentView) {
-  return {
-    id: view.id,
-    code: view.code,
-    name: view.name,
-    function: view.functionDescription,
-    status: view.status,
-    costCenter: view.costCenter,
-    itAdmin: view.itAdmin
-      ? {
-          employeeId: view.itAdmin.employeeId,
-          employeeCode: view.itAdmin.employeeCode,
-          fullName: view.itAdmin.fullName,
-          usable: view.itAdminUsable,
-        }
-      : null,
-    head: view.head,
-    memberCount: view.memberCount,
-    warnings: view.warnings,
-    createdAt: view.createdAt.toISOString(),
-    updatedAt: view.updatedAt.toISOString(),
-    deactivatedAt: view.deactivatedAt ? view.deactivatedAt.toISOString() : null,
-  };
-}
-
-function toProfileWire(view: DepartmentProfileView) {
-  return { ...toWire(view), headHistory: view.headHistory, projects: view.projects.map(toProjectWire) };
-}
-
 /**
  * Department profiles (`US-03-06`). The IT Admin keeps them; a department head reads the one they head and the
  * list of its people (`US-01-02` AC-7); Finance, employees and the Super Admin change nothing here (AC-16). The
  * Super Admin sees the warnings only (`SoD-1`). There is no route that merges or splits departments (AC-20) or
- * deletes one: a department is retired.
+ * deletes one: a department is retired. Every change answers with the profile as it is after the change.
  */
 @ApiTags('departments')
 @Controller({ version: '1' })
 export class DepartmentsController {
-  constructor(private readonly departments: DepartmentService) {}
+  constructor(
+    private readonly queries: DepartmentQueryService,
+    private readonly departments: DepartmentService,
+    private readonly heads: DepartmentHeadService,
+  ) {}
+
+  private async profileAfter(actor: AuthenticatedPrincipal, id: string) {
+    return toDepartmentProfileWire(await this.queries.profile(actor, id));
+  }
 
   @Get('departments')
   @RequireRoles('IT_ADMIN')
@@ -90,9 +70,9 @@ export class DepartmentsController {
   @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, VALIDATION_ERROR)
   async list(@Query() query: ListDepartmentsQueryDto) {
     try {
-      const page = await this.departments.list(query);
+      const page = await this.queries.list(query);
 
-      return { items: page.items.map(toWire), pagination: page.pagination };
+      return { items: page.items.map(toDepartmentWire), pagination: page.pagination };
     } catch (error) {
       throw toOrganizationApiException(error);
     }
@@ -114,15 +94,15 @@ export class DepartmentsController {
   })
   async create(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: CreateDepartmentBodyDto) {
     try {
-      return toProfileWire(
-        await this.departments.create(actor, {
-          code: body.code,
-          name: body.name,
-          functionDescription: body.function,
-          costCenterId: body.costCenterId,
-          itAdminEmployeeId: body.itAdminEmployeeId,
-        }),
-      );
+      const id = await this.departments.create(actor, {
+        code: body.code,
+        name: body.name,
+        functionDescription: body.function,
+        costCenterId: body.costCenterId,
+        itAdminEmployeeId: body.itAdminEmployeeId,
+      });
+
+      return await this.profileAfter(actor, id);
     } catch (error) {
       throw toOrganizationApiException(error);
     }
@@ -143,7 +123,7 @@ export class DepartmentsController {
   })
   async get(@CurrentPrincipal() principal: AuthenticatedPrincipal, @Param() params: DepartmentIdParamDto) {
     try {
-      return toProfileWire(await this.departments.profile(principal, params.id));
+      return toDepartmentProfileWire(await this.queries.profile(principal, params.id));
     } catch (error) {
       throw toOrganizationApiException(error);
     }
@@ -163,13 +143,13 @@ export class DepartmentsController {
     @Body() body: UpdateDepartmentBodyDto,
   ) {
     try {
-      return toProfileWire(
-        await this.departments.update(actor, params.id, {
-          name: body.name,
-          functionDescription: body.function,
-          itAdminEmployeeId: body.itAdminEmployeeId,
-        }),
-      );
+      await this.departments.update(actor, params.id, {
+        name: body.name,
+        functionDescription: body.function,
+        itAdminEmployeeId: body.itAdminEmployeeId,
+      });
+
+      return await this.profileAfter(actor, params.id);
     } catch (error) {
       throw toOrganizationApiException(error);
     }
@@ -189,7 +169,9 @@ export class DepartmentsController {
   })
   async deactivate(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: DepartmentIdParamDto) {
     try {
-      return toProfileWire(await this.departments.deactivate(actor, params.id));
+      await this.departments.deactivate(actor, params.id);
+
+      return await this.profileAfter(actor, params.id);
     } catch (error) {
       throw toOrganizationApiException(error);
     }
@@ -210,7 +192,9 @@ export class DepartmentsController {
     @Body() body: AssignHeadBodyDto,
   ) {
     try {
-      return toProfileWire(await this.departments.assignHead(actor, params.id, body));
+      await this.heads.assign(actor, params.id, body);
+
+      return await this.profileAfter(actor, params.id);
     } catch (error) {
       throw toOrganizationApiException(error);
     }
@@ -231,7 +215,9 @@ export class DepartmentsController {
     @Body() body: VacateHeadBodyDto,
   ) {
     try {
-      return toProfileWire(await this.departments.vacateHead(actor, params.id, body));
+      await this.heads.vacate(actor, params.id, body);
+
+      return await this.profileAfter(actor, params.id);
     } catch (error) {
       throw toOrganizationApiException(error);
     }
@@ -255,7 +241,7 @@ export class DepartmentsController {
     @Query() query: ListMembersQueryDto,
   ) {
     try {
-      return await this.departments.members(principal, params.id, query);
+      return await this.queries.members(principal, params.id, query);
     } catch (error) {
       throw toOrganizationApiException(error);
     }
@@ -275,7 +261,7 @@ export class DepartmentsController {
   })
   async warnings() {
     try {
-      return { items: await this.departments.warnings() };
+      return { items: await this.queries.warnings() };
     } catch (error) {
       throw toOrganizationApiException(error);
     }

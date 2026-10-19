@@ -74,9 +74,9 @@ test/
 - Module dùng layout phẳng. Chỉ tạo dto/errors/mappers/policies/services khi có nhu cầu thật; module vượt 2 controller
   hoặc 12 file ở root nhóm theo capability (như `identity-access`), tối đa hai tầng thư mục. Folder capability không tự
   động là Nest module; điều kiện tạo Nest submodule, ownership capability, chỗ đặt lỗi và ngưỡng kích thước ở
-  [module structure](docs/rules/module-structure.md). `organization` đã nhóm theo capability trừ phần Department còn ở
-  root (chuyển tiếp); đích và trạng thái ở
-  [ví dụ đích](docs/rules/module-structure.md#ví-dụ-đích-và-trạng-thái-chuyển-tiếp).
+  [module structure](docs/rules/module-structure.md). `organization` đã nhóm theo capability (`cost-center/`,
+  `department/`, `employee/`, `job-title/`, `project/`), root chỉ còn module, HTTP module, facade, type và lỗi public;
+  chi tiết ở [ví dụ đích](docs/rules/module-structure.md#ví-dụ-đích-và-trạng-thái-chuyển-tiếp).
 - Gốc module **không** public mặc định. Module khác và composition root chỉ import **allowlist** bề mặt công khai ở gốc
   (`<module>.module.ts`, `*-http.module.ts`, `*-facade.module.ts`, facade `<module>.service.ts`, `*.types.ts`,
   `*.errors.ts`); composition root được thêm đúng các entry CLI đã liệt kê. File gốc khác, repo,
@@ -177,11 +177,12 @@ báo ở một module trong graph API/worker/CLI và các graph không chứa mo
 Lớp HTTP của `audit` và `organization` nằm ở module riêng (`AuditHttpModule`, `OrganizationHttpModule`) mà chỉ
 `AppModule` nạp: lệnh khởi tạo và worker import `AuditModule`/`OrganizationModule` chỉ để dùng facade, và module graph
 test cấm controller trong hai đồ thị đó. Repo ghi (`AuditRepo`) tách khỏi repo đọc (`AuditQueryRepo`). Trong
-`OrganizationModule`, `JobTitleRepo`, `EmployeeRepo`, `ImportLookupRepo` là provider riêng sau capability service mà chỉ
-facade dùng; ba repo `CostCenterRepo`, `DepartmentRepo`, `OrganizationRepo` vẫn export theo E4 (như `AccountRepo`, xem lại ở
-H4.7) để `OrganizationHttpModule` cùng thư mục dùng chung một instance: `CostCenterService` inject `CostCenterRepo`,
-`DepartmentService` inject `DepartmentRepo`; `OrganizationRepo` không còn consumer HTTP từ Wave 2, chỉ giữ export tới lượt
-review H4.7/E4. Ánh xạ 503
+`OrganizationModule`, `JobTitleRepo`, `EmployeeRepo`, `ImportLookupRepo`, `DepartmentHeadRepo` là provider riêng sau
+capability service mà chỉ facade dùng; ba repo `CostCenterRepo`, `DepartmentRepo`, `OrganizationRepo` vẫn export theo E4
+(ngoại lệ legacy có phạm vi, như `AccountRepo`; H4.7 giữ nguyên, xem lại ở G3) để `OrganizationHttpModule` cùng thư mục
+dùng chung một instance: `CostCenterService` inject `CostCenterRepo`; `DepartmentService`, `DepartmentQueryService`,
+`DepartmentHeadService` inject `DepartmentRepo`; `OrganizationRepo` không có consumer HTTP từ Wave 2, chỉ giữ export theo
+E4. Ánh xạ 503
 dùng chung nằm ở `infrastructure/http/errors/service-unavailable.ts` để module không import ruột của module khác.
 
 Catalog dùng unique slug ở PostgreSQL; phân trang sort name/id, transaction

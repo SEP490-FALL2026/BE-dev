@@ -32,6 +32,7 @@ triển khai ghi ở roadmap; bảng phủ G1/G2 dưới đây ghi trạng thái
 | [h4-3a-core-display-name](h4-3a-core-display-name/spec.md)                                       | Lát H4.3a: primitive `normalizeDisplayName` vào `src/core` (Q6), chuyển mọi consumer organization/data-import, gỡ đúng hai mục legacy ledger data-import → `organization/job-title-name.ts`; giữ byte chuẩn hóa, hành vi, DB và OpenAPI                          |
 | [h4-2-project-capability](h4-2-project-capability/spec.md)                                       | Lát H4.2: capability `project/` (controller, service, repo, types, errors, DTO) tách khỏi root/Department; `DepartmentService` đọc Project qua `ProjectService`; audit factory và HTTP error mapper vào `mappers/`; không đổi hành vi, contract hay OpenAPI      |
 | [h4-wave2-organization-capabilities](h4-wave2-organization-capabilities/spec.md)                 | Wave 2 (H4.3b + H4.4 + H4.5): capability `job-title/`, `employee/`, `cost-center/`; repo riêng sau capability service của `OrganizationModule`, facade ủy quyền (Owner làm rõ Prompt 16); root còn 10 file/1 controller; không đổi hành vi, contract hay OpenAPI |
+| [h4-wave3-department-and-root-contracts](h4-wave3-department-and-root-contracts/spec.md)         | Wave 3 (H4.6 + H4.7): capability `department/` (repo phòng, repo trưởng phòng, ba use case service), `OrganizationRepo` chỉ Organization, `Page<T>` core cho `organization`, E4 giữ ba export; root 6 file/0 controller; không đổi hành vi, contract hay OpenAPI |
 
 ## Bảng phủ G1 còn lại và G2 (15/10/2026)
 

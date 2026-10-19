@@ -44,7 +44,9 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
  * stale entry fails like a new export.
  */
 const LEGACY_PRIVATE_EXPORTS: ReadonlySet<string> = new Set([
-  // E4 = A: OrganizationHttpModule shares these three instances; reviewed at H4.7/G3.
+  // E4 = A (Owner, scoped legacy exception kept at H4.7, reviewed at G3): OrganizationHttpModule shares CostCenterRepo
+  // (CostCenterService) and DepartmentRepo (the three department use-case services); OrganizationRepo has no HTTP
+  // consumer since Wave 2 and stays exported only under E4. No other repo is exported.
   'OrganizationModule: CostCenterRepo',
   'OrganizationModule: DepartmentRepo',
   'OrganizationModule: OrganizationRepo',

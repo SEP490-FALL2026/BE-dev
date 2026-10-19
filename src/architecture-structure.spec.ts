@@ -96,7 +96,6 @@ const LEGACY = {
     ['modules/data-import/employee-import.service.ts', 545], // H8
     ['modules/identity-access/accounts/account.repo.ts', 411], // H5
     ['modules/identity-access/recovery.service.ts', 608], // H5
-    ['modules/organization/department.service.ts', 508], // H4
   ]),
   /** Module -> cap on controllers directly in the module root. H4. */
   rootControllers: new Map<string, number>(),

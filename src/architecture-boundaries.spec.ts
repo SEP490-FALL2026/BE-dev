@@ -125,7 +125,7 @@ describe('architecture boundaries', () => {
 
   describe('A4-02: the public surface of a module is an allowlist, not its whole root', () => {
     const identity = join(sourceRoot, 'modules', 'identity-access');
-    const otherModule = join(sourceRoot, 'modules', 'organization', 'department.service.ts');
+    const otherModule = join(sourceRoot, 'modules', 'organization', 'department', 'department.service.ts');
     const compositionRoot = join(sourceRoot, 'recovery-cli.ts');
 
     it('blocks an arbitrary file at the root of another module', () => {

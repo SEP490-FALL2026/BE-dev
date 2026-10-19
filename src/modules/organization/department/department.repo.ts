@@ -1,13 +1,13 @@
 import { Injectable } from '@nestjs/common';
-import { BusinessDate, fromDateColumn, toDateColumn } from '../../core/business-date';
-import { Prisma } from '../../generated/prisma/client';
-import { PrismaService } from '../../infrastructure/database/prisma.service';
-import { DbTx } from '../../infrastructure/database/transaction-runner';
-import { isUniqueViolation } from '../../infrastructure/database/unique-violation';
-import { DepartmentMemberRecord, DepartmentRecord, DepartmentStatus, HeadPeriodRecord } from './department.types';
-import { DepartmentCodeTakenError, DepartmentCostCenterError } from './errors/department.errors';
-import { CostCenterStatus } from './cost-center/cost-center.types';
-import { EmployeeStatus } from './organization.types';
+import { BusinessDate, fromDateColumn } from '../../../core/business-date';
+import { Prisma } from '../../../generated/prisma/client';
+import { PrismaService } from '../../../infrastructure/database/prisma.service';
+import { DbTx } from '../../../infrastructure/database/transaction-runner';
+import { isUniqueViolation } from '../../../infrastructure/database/unique-violation';
+import { CostCenterStatus } from '../cost-center/cost-center.types';
+import { CreateDepartmentInput, EmployeeStatus } from '../organization.types';
+import { DepartmentCodeTakenError, DepartmentCostCenterError } from './department.errors';
+import { DepartmentMemberRecord, DepartmentRecord, DepartmentStatus } from './department.types';
 
 interface DepartmentRow {
   id: string;
@@ -66,7 +66,10 @@ export interface DepartmentListFilter {
   take: number;
 }
 
-/** Departments and who heads them (US-03-06, US-01-11). */
+/**
+ * The one writer of `departments` (US-03-06, US-01-11), and the reads of who is placed in a department. Who heads a
+ * department is `DepartmentHeadRepo`.
+ */
 @Injectable()
 export class DepartmentRepo {
   constructor(private readonly prisma: PrismaService) {}
@@ -96,6 +99,11 @@ export class DepartmentRepo {
     }
   }
 
+  /** The installation's first department (`FR-9.8`): written as given, a database error is not translated. */
+  async createForInstallation(tx: DbTx, input: CreateDepartmentInput): Promise<{ id: string }> {
+    return tx.department.create({ data: input, select: { id: true } });
+  }
+
   /**
    * Takes the department's row lock (`FOR UPDATE` to change it or what hangs on it, `FOR SHARE` to rely on it),
    * then reads it in a separate statement. Null when it does not exist.
@@ -108,6 +116,37 @@ export class DepartmentRepo {
     if (rows.length === 0) return null;
 
     return this.findById(id, tx);
+  }
+
+  /**
+   * Takes the department's row lock (`FOR SHARE`: it must still exist, and its cost center must not change, until
+   * commit) and reads it. Null when there is no department with this code.
+   */
+  async lockByCode(
+    tx: DbTx,
+    organizationId: string,
+    code: string,
+  ): Promise<{ id: string; code: string; name: string; active: boolean; costCenterActive: boolean } | null> {
+    const rows = await tx.$queryRaw<
+      { id: string; code: string; name: string; cost_center_id: string; status: string }[]
+    >`
+      SELECT id, code, name, cost_center_id, status::text AS status FROM departments
+       WHERE organization_id = ${organizationId}::uuid AND code = ${code} FOR SHARE`;
+    const department = rows[0];
+    if (!department) return null;
+
+    // Read after the lock, in a statement of its own (lock protocol rule 7): a retirement of the cost center that
+    // committed while this waited for the department is seen here.
+    const centers = await tx.$queryRaw<{ status: string }[]>`
+      SELECT status::text AS status FROM cost_centers WHERE id = ${department.cost_center_id}::uuid`;
+
+    return {
+      id: department.id,
+      code: department.code,
+      name: department.name,
+      active: department.status === 'ACTIVE',
+      costCenterActive: centers[0]?.status === 'ACTIVE',
+    };
   }
 
   async findById(id: string, tx?: DbTx): Promise<DepartmentRecord | null> {
@@ -153,6 +192,42 @@ export class DepartmentRepo {
       },
       { isolationLevel: 'RepeatableRead' },
     );
+  }
+
+  /** Active departments that nobody heads on `onDate`, in code order. */
+  async activeDepartmentsWithoutHead(onDate: BusinessDate): Promise<{ id: string; code: string; name: string }[]> {
+    return this.prisma.$queryRaw<{ id: string; code: string; name: string }[]>`
+      SELECT d.id, d.code, d.name FROM departments d
+       WHERE d.status = 'ACTIVE'
+         AND NOT EXISTS (
+           SELECT 1 FROM department_head_periods h
+            WHERE h.department_id = d.id
+              AND h.valid_from <= ${onDate}::date AND (h.valid_to IS NULL OR h.valid_to > ${onDate}::date))
+       ORDER BY d.code, d.id`;
+  }
+
+  /** Active departments with the IT Admin in charge they name (or none), in code order. */
+  async activeDepartmentsWithItAdmin(): Promise<
+    { id: string; code: string; name: string; itAdminEmployeeId: string | null; itAdminStatus: EmployeeStatus | null }[]
+  > {
+    const rows = await this.prisma.$queryRaw<
+      { id: string; code: string; name: string; it_admin_employee_id: string | null; status: EmployeeStatus | null }[]
+    >`
+      SELECT d.id, d.code, d.name, d.it_admin_employee_id, e.status
+        FROM departments d LEFT JOIN employees e ON e.id = d.it_admin_employee_id
+       WHERE d.status = 'ACTIVE' ORDER BY d.code, d.id`;
+
+    return rows.map((row) => ({
+      id: row.id,
+      code: row.code,
+      name: row.name,
+      itAdminEmployeeId: row.it_admin_employee_id,
+      itAdminStatus: row.status,
+    }));
+  }
+
+  async countActiveDepartments(): Promise<number> {
+    return this.prisma.department.count({ where: { status: 'ACTIVE' } });
   }
 
   // --- members ------------------------------------------------------------------------
@@ -227,168 +302,5 @@ export class DepartmentRepo {
           validTo: row.valid_to ? fromDateColumn(row.valid_to) : null,
         }
       : null;
-  }
-
-  // --- heads --------------------------------------------------------------------------
-
-  /** Who heads each department on `onDate`, for the departments asked about. */
-  async currentHeads(
-    departmentIds: string[],
-    onDate: BusinessDate,
-  ): Promise<Map<string, { employeeId: string; employeeCode: string; fullName: string; since: BusinessDate }>> {
-    if (departmentIds.length === 0) return new Map();
-    const rows = await this.prisma.$queryRaw<
-      { department_id: string; employee_id: string; employee_code: string; full_name: string; valid_from: Date }[]
-    >`
-      SELECT h.department_id, e.id AS employee_id, e.employee_code, e.full_name, h.valid_from
-        FROM department_head_periods h JOIN employees e ON e.id = h.employee_id
-       WHERE h.department_id = ANY(${departmentIds}::uuid[])
-         AND h.valid_from <= ${onDate}::date AND (h.valid_to IS NULL OR h.valid_to > ${onDate}::date)`;
-
-    return new Map(
-      rows.map((row) => [
-        row.department_id,
-        {
-          employeeId: row.employee_id,
-          employeeCode: row.employee_code,
-          fullName: row.full_name,
-          since: fromDateColumn(row.valid_from),
-        },
-      ]),
-    );
-  }
-
-  /** The history of who headed the department, newest period first. */
-  async headPeriods(client: DbTx | undefined, departmentId: string, limit: number): Promise<HeadPeriodRecord[]> {
-    const rows = await (client ?? this.prisma).$queryRaw<
-      { employee_id: string; employee_code: string; full_name: string; valid_from: Date; valid_to: Date | null }[]
-    >`
-      SELECT e.id AS employee_id, e.employee_code, e.full_name, h.valid_from, h.valid_to
-        FROM department_head_periods h JOIN employees e ON e.id = h.employee_id
-       WHERE h.department_id = ${departmentId}::uuid
-       ORDER BY h.valid_from DESC, h.id LIMIT ${limit}`;
-
-    return rows.map((row) => ({
-      employeeId: row.employee_id,
-      employeeCode: row.employee_code,
-      fullName: row.full_name,
-      validFrom: fromDateColumn(row.valid_from),
-      validTo: row.valid_to ? fromDateColumn(row.valid_to) : null,
-    }));
-  }
-
-  /**
-   * Makes room for a new head from `from` (the caller holds the department's `FOR UPDATE` lock): a period that has
-   * not begun by then is cancelled, one in force on that day ends the day before it begins. Returns what was
-   * cancelled and what was ended, for the audit event.
-   */
-  async makeRoomForHead(
-    tx: DbTx,
-    departmentId: string,
-    from: BusinessDate,
-  ): Promise<{ cancelled: HeadPeriodRecord[]; ended: HeadPeriodRecord[] }> {
-    const cancelled = await tx.$queryRaw<
-      { employee_id: string; employee_code: string; full_name: string; valid_from: Date; valid_to: Date | null }[]
-    >`
-      WITH removed AS (
-        DELETE FROM department_head_periods
-         WHERE department_id = ${departmentId}::uuid AND valid_from >= ${from}::date
-        RETURNING employee_id, valid_from, valid_to)
-      SELECT e.id AS employee_id, e.employee_code, e.full_name, r.valid_from, r.valid_to
-        FROM removed r JOIN employees e ON e.id = r.employee_id`;
-    const ended = await tx.$queryRaw<
-      { employee_id: string; employee_code: string; full_name: string; valid_from: Date; valid_to: Date | null }[]
-    >`
-      WITH updated AS (
-        UPDATE department_head_periods SET valid_to = ${from}::date
-         WHERE department_id = ${departmentId}::uuid AND valid_from < ${from}::date
-           AND (valid_to IS NULL OR valid_to > ${from}::date)
-        RETURNING employee_id, valid_from, valid_to)
-      SELECT e.id AS employee_id, e.employee_code, e.full_name, u.valid_from, u.valid_to
-        FROM updated u JOIN employees e ON e.id = u.employee_id`;
-    const toRecord = (row: (typeof cancelled)[number]): HeadPeriodRecord => ({
-      employeeId: row.employee_id,
-      employeeCode: row.employee_code,
-      fullName: row.full_name,
-      validFrom: fromDateColumn(row.valid_from),
-      validTo: row.valid_to ? fromDateColumn(row.valid_to) : null,
-    });
-
-    return { cancelled: cancelled.map(toRecord), ended: ended.map(toRecord) };
-  }
-
-  async insertHeadPeriod(
-    tx: DbTx,
-    input: { organizationId: string; departmentId: string; employeeId: string; validFrom: BusinessDate },
-  ): Promise<void> {
-    await tx.departmentHeadPeriod.create({
-      data: {
-        organizationId: input.organizationId,
-        departmentId: input.departmentId,
-        employeeId: input.employeeId,
-        validFrom: toDateColumn(input.validFrom),
-      },
-    });
-  }
-
-  /** The department the employee heads on `onDate`, if any (an unlocked read, for the per-request role check). */
-  async headedDepartment(employeeId: string, onDate: BusinessDate): Promise<{ departmentId: string } | null> {
-    const rows = await this.prisma.$queryRaw<{ department_id: string }[]>`
-      SELECT h.department_id FROM department_head_periods h
-       WHERE h.employee_id = ${employeeId}::uuid
-         AND h.valid_from <= ${onDate}::date AND (h.valid_to IS NULL OR h.valid_to > ${onDate}::date)
-       LIMIT 1`;
-
-    return rows[0] ? { departmentId: rows[0].department_id } : null;
-  }
-
-  /** True when the employee heads a department now or has a head period that begins later. */
-  async hasHeadPeriodFrom(client: DbTx | undefined, employeeId: string, onDate: BusinessDate): Promise<boolean> {
-    const rows = await (client ?? this.prisma).$queryRaw<{ one: number }[]>`
-      SELECT 1 AS one FROM department_head_periods
-       WHERE employee_id = ${employeeId}::uuid AND (valid_to IS NULL OR valid_to > ${onDate}::date)
-       LIMIT 1`;
-
-    return rows.length > 0;
-  }
-
-  /** Active departments that nobody heads on `onDate`, in code order. */
-  async activeDepartmentsWithoutHead(onDate: BusinessDate): Promise<{ id: string; code: string; name: string }[]> {
-    return this.prisma.$queryRaw<{ id: string; code: string; name: string }[]>`
-      SELECT d.id, d.code, d.name FROM departments d
-       WHERE d.status = 'ACTIVE'
-         AND NOT EXISTS (
-           SELECT 1 FROM department_head_periods h
-            WHERE h.department_id = d.id
-              AND h.valid_from <= ${onDate}::date AND (h.valid_to IS NULL OR h.valid_to > ${onDate}::date))
-       ORDER BY d.code, d.id`;
-  }
-
-  /** Active departments with the IT Admin in charge they name (or none), in code order. */
-  async activeDepartmentsWithItAdmin(): Promise<
-    { id: string; code: string; name: string; itAdminEmployeeId: string | null; itAdminStatus: EmployeeStatus | null }[]
-  > {
-    const rows = await this.prisma.$queryRaw<
-      { id: string; code: string; name: string; it_admin_employee_id: string | null; status: EmployeeStatus | null }[]
-    >`
-      SELECT d.id, d.code, d.name, d.it_admin_employee_id, e.status
-        FROM departments d LEFT JOIN employees e ON e.id = d.it_admin_employee_id
-       WHERE d.status = 'ACTIVE' ORDER BY d.code, d.id`;
-
-    return rows.map((row) => ({
-      id: row.id,
-      code: row.code,
-      name: row.name,
-      itAdminEmployeeId: row.it_admin_employee_id,
-      itAdminStatus: row.status,
-    }));
-  }
-
-  async countActiveDepartments(): Promise<number> {
-    return this.prisma.department.count({ where: { status: 'ACTIVE' } });
-  }
-
-  async countEmployees(): Promise<number> {
-    return this.prisma.employee.count({ where: { status: 'ACTIVE' } });
   }
 }

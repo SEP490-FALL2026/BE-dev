@@ -115,4 +115,5 @@ mặc định); không mục mới, không allowlist/export mới; cap `departme
 ## Changes and acceptance
 
 - 19/10/2026: tạo hạng mục, thiết kế `ready`; Owner làm rõ Prompt 16 (phương án A) trong phiên; implement ba phase và
-  `verified` local (bằng chứng ở [plan](plan.md)). Chưa commit, chưa Owner review, chưa nghiệm thu.
+  `verified` local (bằng chứng ở [plan](plan.md)). Owner commit/push `e632dd6` lên `dev` cùng ngày (không PR); chưa
+  Owner review, chưa nghiệm thu.

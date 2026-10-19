@@ -1,20 +1,19 @@
 import { Test } from '@nestjs/testing';
-import { TransactionRunner } from '../../infrastructure/database/transaction-runner';
-import type { AuthenticatedPrincipal } from '../../infrastructure/security/tokens/access-token-verifier.port';
-import { AuditService } from '../audit/audit.service';
-import { IdentityAccessService } from '../identity-access/identity-access.service';
-import { CostCenterService } from './cost-center/cost-center.service';
+import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
+import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
+import { AuditService } from '../../audit/audit.service';
+import { IdentityAccessService } from '../../identity-access/identity-access.service';
+import { CostCenterService } from '../cost-center/cost-center.service';
+import { EmployeeNotFoundError } from '../organization.errors';
+import { OrganizationService } from '../organization.service';
+import { DepartmentItAdminInvalidError } from './department.errors';
 import { DepartmentRepo } from './department.repo';
 import { DepartmentService } from './department.service';
-import { DepartmentItAdminInvalidError, HeadAssignmentError } from './errors/department.errors';
-import { EmployeeNotFoundError } from './organization.errors';
-import { OrganizationService } from './organization.service';
-import { ProjectService } from './project/project.service';
 
 /**
- * The employee look-up behind the IT Admin and head checks (H4.1, F-12): it goes through the organization facade,
- * locks the employee `FOR SHARE` before reading it in the same transaction, turns only a missing employee into "none",
- * and lets every other error through. Driven through the public service methods with in-memory collaborators.
+ * The employee look-up behind the IT Admin check (H4.1, F-12): it goes through the organization facade, locks the
+ * employee `FOR SHARE` before reading it in the same transaction, turns only a missing employee into "none", and lets
+ * every other error through. Driven through the public service methods with in-memory collaborators.
  */
 describe('DepartmentService employee look-up', () => {
   const tx = { name: 'tx' };
@@ -47,7 +46,6 @@ describe('DepartmentService employee look-up', () => {
         { provide: DepartmentRepo, useValue: departments },
         { provide: CostCenterService, useValue: {} },
         { provide: OrganizationService, useValue: organization },
-        { provide: ProjectService, useValue: {} },
         { provide: IdentityAccessService, useValue: identity },
         { provide: AuditService, useValue: audit },
         { provide: TransactionRunner, useValue: runner },
@@ -95,7 +93,6 @@ describe('DepartmentService employee look-up', () => {
 
   it('locks a usable IT Admin for share, then reads it, in the same transaction, before saving the change', async () => {
     const departmentService = await service();
-    jest.spyOn(departmentService, 'profile').mockResolvedValue({} as Awaited<ReturnType<DepartmentService['profile']>>);
 
     await departmentService.update(actor, 'dep-1', { itAdminEmployeeId: 'emp-it' });
 
@@ -105,17 +102,5 @@ describe('DepartmentService employee look-up', () => {
       organization.getEmployee.mock.invocationCallOrder[0],
     );
     expect(departments.update).toHaveBeenCalledWith(tx, 'dep-1', { itAdminEmployeeId: 'emp-it' }, expect.any(Date));
-  });
-
-  it('answers EMPLOYEE_NOT_FOUND when the person named head is not an employee', async () => {
-    organization.lockEmployeeForShare.mockRejectedValue(new EmployeeNotFoundError('emp-missing'));
-    const departmentService = await service();
-
-    const refusal: unknown = await departmentService
-      .assignHead(actor, 'dep-1', { employeeId: 'emp-missing', effectiveFrom: '2026-10-19' })
-      .catch((error: unknown) => error);
-
-    expect(refusal).toBeInstanceOf(HeadAssignmentError);
-    expect((refusal as HeadAssignmentError).problem).toBe('EMPLOYEE_NOT_FOUND');
   });
 });

@@ -20,9 +20,8 @@ import {
   DepartmentOutOfScopeError,
   DepartmentUpdateEmptyError,
   HeadAssignmentError,
-} from '../errors/department.errors';
+} from '../department/department.errors';
 import { EmployeeRowInvalidError } from '../employee/employee.errors';
-import { OrganizationAlreadyExistsError } from '../errors/organization.errors';
 import {
   JobTitleNameRequiredError,
   JobTitleNameTakenError,
@@ -30,7 +29,7 @@ import {
   JobTitleNotFoundError,
 } from '../job-title/job-title.errors';
 import { ProjectInvalidError, ProjectNotFoundError } from '../project/project.errors';
-import { EmployeeCodeTakenError, EmployeeNotFoundError } from '../organization.errors';
+import { EmployeeCodeTakenError, EmployeeNotFoundError, OrganizationAlreadyExistsError } from '../organization.errors';
 import { toOrganizationApiException } from './organization.http-errors';
 
 /** The HTTP answer an error becomes: status and the body the global filter writes. */
