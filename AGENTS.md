@@ -10,7 +10,8 @@ Scope: this backend repository. Work from its root with the pnpm version in `pac
 - Current capability, in short: health, internal authentication and sessions (`/auth/*`, `/me`), Super Admin
   account administration and transfer, password self-service, the Audit Trail query, the organization and import
   foundation (Cost Centers, departments and heads, job titles, employees, approval roles, operating parameters,
-  onboarding step 1) and two out-of-HTTP commands (`pnpm ops:bootstrap`, `pnpm ops:recover`). Catalog is a structural
+  onboarding step 1) and out-of-HTTP commands (`pnpm ops:bootstrap`, `pnpm ops:recover`, read-only
+  `pnpm ops:inspect`, local-only `pnpm dev:seed`). Catalog is a structural
   sample and is not mounted; other US workflows are not implemented. A merged slice may cover a Story only partly, and
   nothing counts as reviewed or `accepted` unless the [roadmap](docs/roadmap.md) records it. Slice status, AC
   coverage, revisions and evidence: [roadmap](docs/roadmap.md); module map and technical limits:
@@ -30,6 +31,7 @@ Scope: this backend repository. Work from its root with the pnpm version in `pac
 | Add or update tests                          | [Test guide](test/README.md)                                                                                     |
 | Documentation or ADR                         | [Documentation rules](docs/rules/documentation.md)                                                               |
 | Split assigned work into items (spec/plan)   | [Work-item sizing](docs/rules/work-item-sizing.md)                                                               |
+| Add or change an out-of-HTTP command or seed | [Operational commands](docs/rules/operational-commands.md)                                                       |
 
 ## Repository constraints
 

@@ -44,4 +44,9 @@ export class RoleGrantService {
   findSuperAdminHolderId(tx: DbTx): Promise<string | null> {
     return this.grants.findSuperAdminHolderId(tx);
   }
+
+  /** How many effective grants each role has (roles with none are absent). */
+  countEffectiveGrantsByRole(tx: DbTx): Promise<Map<AppRole, number>> {
+    return this.grants.countEffectiveByRole(tx);
+  }
 }

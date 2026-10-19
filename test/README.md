@@ -139,6 +139,15 @@ fixture SQL không chứng minh workflow tạo tài khoản. Dùng `bodyOf(respo
   tối thiểu, không cần database: `--help` chạy khi chưa cấu hình gì, thiếu `DATABASE_URL` được báo thành một dòng trước
   prompt mật khẩu và không có stack, URL bị từ chối không in lại mật khẩu. Nó chứng minh mã thoát và đầu ra của tiến trình,
   không chỉ của service.
+- Mọi test khởi chạy lệnh thành tiến trình con qua `support/cli-process.ts` (`runCli`, `cliWorkingDirectory`,
+  `stopCliProcesses` trong `afterAll`): tiến trình và thư mục làm việc được ghi nhận trước khi dùng, bị dừng/xóa khi suite
+  kết thúc hoặc Jest thoát ([rule 8](../docs/rules/operational-commands.md)). `src/operational-commands.spec.ts` chặn import
+  `child_process` ở test khác. Không để assertion trong helper.
+- Lệnh vận hành H6.1/H6.2: `inspect.integration-spec.ts` (tiến trình thật qua các trạng thái chưa migrate/chưa cài/đã
+  cài/dở dang, fingerprint mọi bảng trước/sau, ghi thử qua đồ thị inspect bị PostgreSQL từ chối `25006`),
+  `dev-seed.integration-spec.ts` (trong tiến trình, generator mật khẩu cố định: rollback, audit, credential thật, vai,
+  chạy lại, conflict), `dev-seed-cli.integration-spec.ts` (ma trận chốt, lần tạo và lần chạy lại),
+  `installation-bootstrap-facts.integration-spec.ts` (characterization bản ghi cài đặt).
 - Test đua khóa (`auth-concurrency.integration-spec.ts`) giữ khóa dòng ở một kết nối `pg` riêng và chờ
   `pg_locks` báo có tiến trình đang chờ trước khi nhả khóa; không dùng `sleep` để ép thứ tự.
 - PostgreSQL phải chạy ở UTC **hoặc** để `PrismaService` ghim `TimeZone=UTC` (đã làm). Test

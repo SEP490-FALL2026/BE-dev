@@ -50,8 +50,12 @@ export class JobTitleRepo {
   }
 
   /** Unlocked: the title that has this normalized name, whatever its status, to name it in a conflict. */
-  async findJobTitleByNormalizedName(organizationId: string, normalizedName: string): Promise<JobTitleRecord | null> {
-    return this.prisma.jobTitle.findUnique({
+  async findJobTitleByNormalizedName(
+    organizationId: string,
+    normalizedName: string,
+    tx?: DbTx,
+  ): Promise<JobTitleRecord | null> {
+    return (tx ?? this.prisma).jobTitle.findUnique({
       where: { organizationId_normalizedName: { organizationId, normalizedName } },
       select: JOB_TITLE_SELECT,
     });

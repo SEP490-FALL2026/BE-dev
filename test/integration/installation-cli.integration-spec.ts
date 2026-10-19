@@ -1,7 +1,10 @@
-import { spawn } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import {
+  CLI_COLD_START_MS,
+  cliWorkingDirectory,
+  runCli,
+  stopCliProcesses,
+  type CliResult,
+} from '../support/cli-process';
 import { INSTALLATION_USAGE } from '../../src/modules/installation/installation.arguments';
 
 /**
@@ -14,11 +17,8 @@ import { INSTALLATION_USAGE } from '../../src/modules/installation/installation.
  *   (Without `abortOnError: false` Nest would print nothing and exit 1; the case would then fail on the message.)
  * - A rejected DATABASE_URL never echoes the password it contained.
  */
-const PROJECT_ROOT = resolve(__dirname, '..', '..');
-const CLI = join(PROJECT_ROOT, 'src', 'installation-cli.ts');
-const TS_NODE = require.resolve('ts-node/register/transpile-only');
 /** ts-node compiles the whole module graph on a cold cache. */
-const COLD_START_MS = 120000;
+const COLD_START_MS = CLI_COLD_START_MS;
 
 const REQUIRED_ARGUMENTS = [
   ...['--timezone', 'Asia/Ho_Chi_Minh', '--currency', 'VND'],
@@ -33,62 +33,24 @@ const REQUIRED_ARGUMENTS = [
   ...['--operator-reference', 'REVIEW-G0G1-20261014', '--environment', 'LOCAL_TEST'],
 ];
 
-interface CliResult {
-  code: number | null;
-  stdout: string;
-  stderr: string;
-}
-
 describe('installation command (integration, spawned process)', () => {
   let workingDirectory: string;
 
   beforeAll(() => {
     // An empty directory, so no .env file can be picked up from the working directory.
-    workingDirectory = mkdtempSync(join(tmpdir(), 'slm-installation-cli-'));
+    workingDirectory = cliWorkingDirectory('slm-installation-cli');
   });
 
   afterAll(() => {
-    rmSync(workingDirectory, { recursive: true, force: true });
+    stopCliProcesses();
   });
 
   /** Runs the command with a minimal environment and no stdin; the child is killed if it hangs. */
   const run = (args: string[], extraEnvironment: Record<string, string> = {}): Promise<CliResult> =>
-    new Promise((resolveRun, rejectRun) => {
-      const environment: Record<string, string> = {
-        NODE_ENV: 'production',
-        TS_NODE_TRANSPILE_ONLY: 'true',
-        // The working directory is empty, so ts-node must be told where the TypeScript project is.
-        TS_NODE_PROJECT: join(PROJECT_ROOT, 'tsconfig.json'),
-        ...extraEnvironment,
-      };
-      for (const name of ['PATH', 'SystemRoot', 'TEMP', 'TMP']) {
-        const value = process.env[name];
-        if (value !== undefined) environment[name] = value;
-      }
-
-      const child = spawn(process.execPath, ['-r', TS_NODE, CLI, ...args], {
-        cwd: workingDirectory,
-        env: environment,
-        stdio: ['ignore', 'pipe', 'pipe'],
-        windowsHide: true,
-      });
-      let stdout = '';
-      let stderr = '';
-      child.stdout.on('data', (chunk: Buffer) => void (stdout += chunk.toString('utf8')));
-      child.stderr.on('data', (chunk: Buffer) => void (stderr += chunk.toString('utf8')));
-
-      const killer = setTimeout(() => {
-        child.kill('SIGKILL');
-        rejectRun(new Error(`installation command did not finish in time\nstdout: ${stdout}\nstderr: ${stderr}`));
-      }, COLD_START_MS - 10000);
-      child.on('error', (error) => {
-        clearTimeout(killer);
-        rejectRun(error);
-      });
-      child.on('close', (code) => {
-        clearTimeout(killer);
-        resolveRun({ code, stdout, stderr });
-      });
+    runCli('installation-cli.ts', args, {
+      cwd: workingDirectory,
+      environment: { NODE_ENV: 'production', ...extraEnvironment },
+      timeoutMs: COLD_START_MS - 10000,
     });
 
   const stackLines = (text: string): string[] => text.split(/\r?\n/).filter((line) => /^\s+at /.test(line));

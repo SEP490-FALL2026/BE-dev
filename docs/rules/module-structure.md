@@ -171,6 +171,11 @@ duy nhất `accounts`, `approval-roles` hiện thực) ở `accounts/account.typ
 type, lỗi public, port dùng chung và `recovery.module.ts`. Provider dùng cho cả API và lệnh khôi phục mà
 facade không cần khai ở cả `IdentityAccessModule` và `RecoveryModule` (E6), ghim bằng danh sách chính xác trong
 [module-graph.spec.ts](../../src/module-graph.spec.ts).
+**Lệnh vận hành H6.1/H6.2 (E8 = A):** `installation` giữ root (cài đặt) và hai capability `inspect/` (`ops:inspect`) và
+`dev-seed/` (`dev:seed`), mỗi capability có Nest module riêng làm entry của lệnh (điều kiện "một entry point/graph khác"),
+không module `operations` chung. Hai hợp đồng hẹp của `identity-access` (`IdentityAccessInspectionService`,
+`LocalDemoAccountService`) ở `identity-access.service.ts`, khai trong hai `*-facade.module.ts` chỉ đồ thị lệnh nạp; quy tắc
+riêng của lệnh ở [operational commands](operational-commands.md).
 **Sau Data Import Wave (H8.1 → H8.3):** `data-import` giữ một capability `employee-import/` (controller, service điều
 phối, repo duy nhất của `employee_imports`/`employee_import_rows`, đọc file thuần, quy tắc dòng và so judgement, builder
 audit, type, DTO, lỗi và mapper HTTP `employee-import.http-errors.ts` cạnh nhau; không `dto/` một file, không Nest

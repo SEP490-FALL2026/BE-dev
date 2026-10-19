@@ -1,0 +1,102 @@
+import { spawn, type ChildProcess } from 'node:child_process';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
+
+/**
+ * The one way a test starts a command as a child process (docs/rules/operational-commands.md, rule 8). Each child and
+ * each working directory is recorded **before** it is used and removed in `stopCliProcesses()` (call it from
+ * `afterAll`); if Jest itself exits first, the exit hook below still kills what is left. Nothing here asserts: specs
+ * keep their own expectations.
+ */
+export const PROJECT_ROOT = resolve(__dirname, '..', '..');
+const TS_NODE = require.resolve('ts-node/register/transpile-only');
+/** ts-node compiles the whole module graph on a cold cache. */
+export const CLI_COLD_START_MS = 120000;
+
+export interface CliResult {
+  code: number | null;
+  stdout: string;
+  stderr: string;
+}
+
+const running = new Set<ChildProcess>();
+const directories = new Set<string>();
+
+process.once('exit', () => {
+  for (const child of running) child.kill('SIGKILL');
+  for (const directory of directories) rmSync(directory, { recursive: true, force: true });
+});
+
+/** An empty working directory, so no `.env` can be picked up; removed by `stopCliProcesses()`. */
+export function cliWorkingDirectory(prefix: string): string {
+  const directory = mkdtempSync(join(tmpdir(), `${prefix}-`));
+  directories.add(directory);
+  return directory;
+}
+
+/**
+ * Runs `src/<entry>` through ts-node with exactly `environment` plus the process basics (PATH, SystemRoot, TEMP,
+ * TMP) and no stdin. The child is killed after `timeoutMs`.
+ */
+export function runCli(
+  entry: string,
+  args: readonly string[],
+  options: { cwd: string; environment: Record<string, string>; timeoutMs?: number },
+): Promise<CliResult> {
+  const environment: Record<string, string> = {
+    TS_NODE_TRANSPILE_ONLY: 'true',
+    // The working directory is empty, so ts-node must be told where the TypeScript project is.
+    TS_NODE_PROJECT: join(PROJECT_ROOT, 'tsconfig.json'),
+    ...options.environment,
+  };
+  for (const name of ['PATH', 'SystemRoot', 'TEMP', 'TMP']) {
+    const value = process.env[name];
+    if (value !== undefined) environment[name] = value;
+  }
+
+  return new Promise((resolveRun, rejectRun) => {
+    const child = spawn(process.execPath, ['-r', TS_NODE, join(PROJECT_ROOT, 'src', entry), ...args], {
+      cwd: options.cwd,
+      env: environment,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      windowsHide: true,
+    });
+    running.add(child);
+    let stdout = '';
+    let stderr = '';
+    child.stdout?.on('data', (chunk: Buffer) => void (stdout += chunk.toString('utf8')));
+    child.stderr?.on('data', (chunk: Buffer) => void (stderr += chunk.toString('utf8')));
+
+    const killer = setTimeout(
+      () => {
+        child.kill('SIGKILL');
+        rejectRun(new Error(`${entry} did not finish in time\nstdout: ${stdout}\nstderr: ${stderr}`));
+      },
+      options.timeoutMs ?? CLI_COLD_START_MS - 10000,
+    );
+    child.on('error', (error) => {
+      clearTimeout(killer);
+      running.delete(child);
+      rejectRun(error);
+    });
+    child.on('close', (code) => {
+      clearTimeout(killer);
+      running.delete(child);
+      resolveRun({ code, stdout, stderr });
+    });
+  });
+}
+
+/** Kills every child still running and removes every working directory this file created. */
+export function stopCliProcesses(): void {
+  for (const child of running) child.kill('SIGKILL');
+  running.clear();
+  for (const directory of directories) rmSync(directory, { recursive: true, force: true });
+  directories.clear();
+}
+
+/** How many children are still running (a spec can assert 0 after its last case). */
+export function runningCliProcesses(): number {
+  return running.size;
+}

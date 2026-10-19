@@ -53,6 +53,7 @@ CI also runs HTTP E2E, isolated PostgreSQL integration, OpenAPI drift, Docker bu
 | Thêm endpoint                         | [Hướng dẫn viết code](docs/guides/kien-truc-backend-va-cach-viet-code.md), [API contract](docs/rules/api-contract.md) |
 | Persistence/nghiệp vụ                 | [Database và nghiệp vụ](docs/rules/database-business.md)                                                              |
 | Auth, upload hoặc job                 | [Security và jobs](docs/rules/security-jobs.md)                                                                       |
+| Lệnh vận hành ngoài HTTP, seed local  | [Lệnh vận hành](docs/rules/operational-commands.md)                                                                   |
 | Tài liệu hoặc quyết định              | [Quy ước tài liệu](docs/rules/documentation.md)                                                                       |
 | Tìm ADR hoặc thiết kế chưa triển khai | [Chỉ mục tài liệu](docs/README.md)                                                                                    |
 

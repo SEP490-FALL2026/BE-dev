@@ -310,6 +310,16 @@ const CLI_ENTRY_FILES: ReadonlySet<string> = new Set([
   'modules/identity-access/recovery/role-transfer-recovery.service.ts',
   'modules/installation/hidden-prompt.ts',
   'modules/installation/installation.arguments.ts',
+  // H6.1 (E8 = A): `pnpm ops:inspect` reaches its graph, its service, its arguments and its report.
+  'modules/installation/inspect/inspection-report.ts',
+  'modules/installation/inspect/inspection.arguments.ts',
+  'modules/installation/inspect/inspection.module.ts',
+  'modules/installation/inspect/inspection.service.ts',
+  // H6.2 (E8 = A): `pnpm dev:seed` reaches its graph, its service, its arguments and its report.
+  'modules/installation/dev-seed/dev-seed-report.ts',
+  'modules/installation/dev-seed/dev-seed.arguments.ts',
+  'modules/installation/dev-seed/dev-seed.module.ts',
+  'modules/installation/dev-seed/dev-seed.service.ts',
 ]);
 
 /**

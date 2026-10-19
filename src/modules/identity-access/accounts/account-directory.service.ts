@@ -1,6 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { AccountListFilter, AccountRecord, AccountSnapshot, CreateAppUserInput } from '../identity-access.types';
+import {
+  AccountListFilter,
+  AccountRecord,
+  AccountSnapshot,
+  ActivationState,
+  AppUserStatus,
+  CreateAppUserInput,
+} from '../identity-access.types';
 import { AppUserRepo } from './app-user.repo';
 
 /**
@@ -16,6 +23,13 @@ export class AccountDirectoryService {
   /** Unlocked lookup used before the transaction to decide what to verify. */
   findAccountByLoginEmail(organizationId: string, normalizedLoginEmail: string): Promise<AccountSnapshot | null> {
     return this.accounts.findAccountByLoginEmail(organizationId, normalizedLoginEmail);
+  }
+
+  /** How many accounts are in each status and activation state, in the caller's transaction. */
+  countAccountsByState(
+    tx: DbTx,
+  ): Promise<{ status: AppUserStatus; activationState: ActivationState; count: number }[]> {
+    return this.accounts.countByState(tx);
   }
 
   /** Unlocked read of one account by id, with its credential hash. */
@@ -72,8 +86,8 @@ export class AccountDirectoryService {
   }
 
   /** Among the employee ids given, those whose account is usable and holds an effective IT_ADMIN grant. */
-  findUsableItAdminEmployeeIds(employeeIds: readonly string[]): Promise<Set<string>> {
-    return this.accounts.findUsableItAdminEmployeeIds(employeeIds);
+  findUsableItAdminEmployeeIds(employeeIds: readonly string[], tx?: DbTx): Promise<Set<string>> {
+    return this.accounts.findUsableItAdminEmployeeIds(employeeIds, tx);
   }
 
   // --- account administration reads ---------------------------------------------------

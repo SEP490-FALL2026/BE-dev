@@ -7,10 +7,13 @@ architecture gate, không copy layout của một module cụ thể.
 **Đã có trong code:** lệnh khởi tạo `pnpm ops:bootstrap`, đăng nhập/làm mới/đăng xuất, `/me`, tạo tài khoản từ
 Employee, mời/kích hoạt, khóa/mở và gán/thu hồi vai, đổi/đặt lại mật khẩu, tra cứu Audit Trail, danh mục chức vụ/Cost
 Center, phòng và trưởng phòng (vai Manager suy ra), Người duyệt chi, tham số vận hành, import nhân sự CSV, checklist khởi
-tạo, chuyển giao Super Admin và lệnh khôi phục ngoài HTTP `pnpm ops:recover --help` (cần `pnpm build`).
+tạo, chuyển giao Super Admin, lệnh khôi phục ngoài HTTP `pnpm ops:recover --help`, lệnh kiểm trạng thái chỉ đọc
+`pnpm ops:inspect` và lệnh dữ liệu demo chỉ local `pnpm dev:seed -- --confirm-local` (các lệnh ngoài HTTP cần
+`pnpm build`; rule: [operational commands](docs/rules/operational-commands.md)).
 Catalog **không có route HTTP**: source, schema và test được giữ nhưng `CatalogModule` chưa mount, chưa có access
 declaration và không phải mẫu kiến trúc; G3 quyết giữ, thay hay loại. Health là public.
-Không có tài khoản demo: tạo Super Admin bằng lệnh khởi tạo trên database mới.
+Không có tài khoản mặc định trong repository: tạo Super Admin bằng lệnh khởi tạo trên database mới; tài khoản demo
+local (IT Admin, Finance, Employee) do `pnpm dev:seed` tạo với mật khẩu sinh ngẫu nhiên, in một lần.
 
 Có trong code không có nghĩa đã review hoặc nghiệm thu; một lát có thể mới phủ một phần Story. Trạng thái từng lát,
 revision/PR và kết quả kiểm chứng nằm ở [roadmap](docs/roadmap.md), bằng chứng ở
@@ -29,7 +32,10 @@ Cần Node.js 22 hoặc 24, pnpm 11.1.3, Docker Compose.
    `CORS_ORIGINS`). Đổi port PostgreSQL trong Compose thì cập nhật cả `DATABASE_URL`. **Development phải có secret riêng**
    (E3 = C, H6.3): bốn biến đánh dấu `@required-outside-test` (`AUTH_ACCESS_TOKEN_SECRET`, `AUTH_THROTTLE_PEPPER`,
    `OUTBOX_PAYLOAD_KEY`, `OUTBOX_PAYLOAD_KEY_ID`) không có giá trị mặc định ngoài `NODE_ENV=test`; tạo bằng lệnh trong
-   `.env.example` và đặt vào `.env`. Thiếu thì API, worker và `ops:recover` dừng với danh sách biến thiếu; giá trị công
+   `.env.example` và đặt vào `.env` (mỗi máy tự sinh, không chép từ máy khác; kiểm theo **tên**, không in giá trị:
+   `grep -cE '^(AUTH_ACCESS_TOKEN_SECRET|AUTH_THROTTLE_PEPPER|OUTBOX_PAYLOAD_KEY|OUTBOX_PAYLOAD_KEY_ID)=' .env` phải ra
+   `4`). Thiếu thì API, worker và `ops:recover` dừng với danh sách biến thiếu; `ops:inspect`, `ops:bootstrap` và
+   `dev:seed` chỉ cần cấu hình database nên vẫn chạy. Giá trị công
    khai trong repository (fallback của test, mặc định development cũ) bị từ chối ở development và production. Copy
    `.env.example` **chưa** đủ cho production: validator production còn từ chối thiếu biến `@production-required`. Biến đã bỏ (ví dụ `AUTH_COOKIE_SECURE`, bỏ khi refresh token chuyển sang body) bị bỏ
    qua âm thầm — tự xóa khỏi tệp env của bạn; không có lệnh nào đọc hay sửa tệp env chứa secret.
@@ -37,7 +43,14 @@ Cần Node.js 22 hoặc 24, pnpm 11.1.3, Docker Compose.
    profile: `docker compose --profile queue --profile storage up -d --wait` — dùng khi thử source hạ tầng chưa mount.
 4. Với **database mới**, chạy `pnpm db:migrate:deploy`, rồi `pnpm build` để sinh Prisma client và build CLI.
 5. Khởi tạo một lần bằng `pnpm ops:bootstrap --help`, điền tham số theo help và nhập mật khẩu ở terminal.
-6. Chạy `pnpm start:dev`; chạy worker ở terminal riêng nếu cần gửi thư mời.
+6. Kiểm bằng `pnpm ops:inspect` (chỉ đọc; `--json` cho máy đọc): thoát 0 khi đã cài và nhất quán, 2 khi chưa cài hoặc
+   dở dang, 1 khi lỗi. Chỉ in số liệu và email Super Admin đã che.
+7. Tùy chọn, dữ liệu demo local: `pnpm dev:seed -- --confirm-local` — chỉ khi `NODE_ENV` là `development`/`test` và host
+   database là `localhost`/`127.x.x.x`/`::1`; tạo một phòng, một chức vụ và ba tài khoản demo đã kích hoạt
+   (`IT_ADMIN`, `FINANCE`, `EMPLOYEE`, email `@demo.slm.test`), in mật khẩu mới **một lần**. Chạy lại không tạo trùng, không
+   đặt lại mật khẩu (thoát 2); dữ liệu khác fixture bị từ chối, không sửa (thoát 3). Vai Manager/Người duyệt chi là vai suy
+   ra, không seed: gán qua API như dữ liệu thật.
+8. Chạy `pnpm start:dev`; chạy worker ở terminal riêng nếu cần gửi thư mời.
 
 CLI khởi tạo chỉ xác thực `NODE_ENV` và cấu hình database; không yêu cầu secret JWT, SMTP hoặc khóa outbox của
 API/worker. API/worker vẫn dùng validation đầy đủ; không cần Redis hay object storage vì hai module đó chưa mount.

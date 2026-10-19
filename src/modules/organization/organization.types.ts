@@ -1,4 +1,6 @@
 import { BusinessDate } from '../../core/business-date';
+import { CostCenterKind, CostCenterStatus } from './cost-center/cost-center.types';
+import { DepartmentStatus } from './department/department.types';
 import { JobTitleStatus } from './job-title/job-title.types';
 
 export type EmploymentType = 'STAFF' | 'CONTRACTOR' | 'FREELANCER' | 'INTERN';
@@ -105,4 +107,28 @@ export interface OnboardingFacts {
     itAdminEmployeeId: string | null;
     itAdminStatus: 'ACTIVE' | 'TERMINATED' | null;
   }[];
+}
+
+/**
+ * The local seed fixture items as `pnpm dev:seed` compares them (P23-RV-01): every field the fixture fixes, the link
+ * between the cost center and its department, and the ids it writes against. Null when absent.
+ */
+export interface LocalSeedFixtureFacts {
+  costCenter: {
+    id: string;
+    code: string;
+    name: string;
+    kind: CostCenterKind;
+    status: CostCenterStatus;
+    departmentCode: string | null;
+  } | null;
+  department: {
+    id: string;
+    code: string;
+    name: string;
+    status: DepartmentStatus;
+    costCenterId: string;
+    costCenterCode: string;
+  } | null;
+  jobTitle: { id: string; name: string; normalizedName: string; status: JobTitleStatus } | null;
 }

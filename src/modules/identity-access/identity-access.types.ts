@@ -128,3 +128,38 @@ export interface EmployeeAccountInspection {
   /** The roles granted directly and still in force. */
   roles: AppRole[];
 }
+
+/** The approval roles a person can hold (US-01-03); who holds them stays inside the module. */
+export type ApprovalRoleKind = 'SPENDING_APPROVER' | 'CONFLICT_SUBSTITUTE' | 'FALLBACK_APPROVER';
+
+/** An account status and activation state as one key, for counts. */
+export type AccountStateKey = 'ACTIVE_ACTIVATED' | 'ACTIVE_INVITED' | 'LOCKED_ACTIVATED' | 'LOCKED_INVITED';
+
+/**
+ * The account side of an installation inspection (`ops:inspect`): counts only, plus the state and login email of the
+ * Super Admin account (the command masks the email before it prints it). No id, name, hash or token.
+ */
+export interface AccountInventory {
+  superAdmin: { holders: number; status: AppUserStatus; activationState: ActivationState; loginEmail: string } | null;
+  accountsByState: Record<AccountStateKey, number>;
+  directRoles: Record<AppRole, number>;
+  approvalRoles: Record<ApprovalRoleKind, number>;
+}
+
+/** The direct roles a local demo account may hold (`pnpm dev:seed`): never SUPER_ADMIN, never a derived role. */
+export type DemoAccountRole = 'IT_ADMIN' | 'FINANCE' | 'EMPLOYEE';
+
+/** Whether a demo account can be created, is already there as the fixture wants it, or conflicts with real data. */
+export type DemoAccountState =
+  | { state: 'absent' }
+  | { state: 'present' }
+  | { state: 'conflict'; reason: 'ACCOUNT_DIFFERS' | 'LOGIN_EMAIL_TAKEN' | 'FINANCE_HELD_ELSEWHERE' };
+
+export interface CreateDemoAccountInput {
+  organizationId: string;
+  employeeId: string;
+  loginEmail: string;
+  role: DemoAccountRole;
+  passwordHash: string;
+  hashPolicyVersion: number;
+}

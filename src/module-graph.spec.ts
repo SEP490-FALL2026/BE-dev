@@ -24,6 +24,11 @@ import { IdentityAccessService } from './modules/identity-access/identity-access
 import { IdentityAccessModule } from './modules/identity-access/identity-access.module';
 import { RecoveryModule } from './modules/identity-access/recovery.module';
 import { InstallationModule } from './modules/installation/installation.module';
+import { InspectionModule } from './modules/installation/inspect/inspection.module';
+import { DevSeedModule } from './modules/installation/dev-seed/dev-seed.module';
+import { IdentityAccessLocalSeedFacadeModule } from './modules/identity-access/identity-access-local-seed-facade.module';
+import { IdentityAccessInspectionFacadeModule } from './modules/identity-access/identity-access-inspection-facade.module';
+import { DATABASE_SESSION_OPTIONS } from './infrastructure/database/read-only-session.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { PayloadCipher } from './modules/notifications/payload-cipher';
 import { ObjectStorageModule } from './infrastructure/object-storage/object-storage.module';
@@ -48,8 +53,16 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   'IdentityAccessFacadeModule: ActionLinkService',
   'IdentityAccessFacadeModule: CredentialService',
   'IdentityAccessFacadeModule: RoleGrantService',
+  // H6.1: the read-only account contract of `ops:inspect`, declared only in the inspection graph.
+  'IdentityAccessInspectionFacadeModule: IdentityAccessInspectionService',
+  // H6.2: the local demo account contract of `dev:seed`, declared only in the seed graph.
+  'IdentityAccessLocalSeedFacadeModule: LocalDemoAccountService',
   'IdentityAccessModule: Symbol(ACCESS_TOKEN_VERIFIER)', // port of src/infrastructure/security
   'InstallationModule: InstallationService',
+  // H6.2: the entry service of `pnpm dev:seed`.
+  'DevSeedModule: DevSeedService',
+  // H6.1: the entry service of `pnpm ops:inspect`.
+  'InspectionModule: InstallationInspectionService',
   'NotificationsModule: NotificationsService',
   // ROOT.1: the delivery contract the worker's mail loop (composition root, ADR-0012) calls; EmailDispatcher stays private.
   'NotificationsModule: EmailDeliveryService',
@@ -246,6 +259,8 @@ describe('module graph', () => {
     ['WorkerModule', WorkerModule],
     ['InstallationModule', InstallationModule],
     ['RecoveryCliModule', RecoveryCliModule],
+    ['InspectionModule', InspectionModule],
+    ['DevSeedModule', DevSeedModule],
   ];
 
   it.each(graphs)('%s declares no provider token in two different modules', (_name, root) => {
@@ -393,7 +408,7 @@ describe('module graph', () => {
   it('exports only the public contract of a business module, except the legacy entries being removed', () => {
     const businessModules = businessModuleNames();
     const exported = new Set<string>();
-    for (const root of [AppModule, WorkerModule, InstallationModule, RecoveryCliModule]) {
+    for (const [, root] of graphs) {
       for (const node of collectGraph(root)) {
         if (!businessModules.has(node.module.name)) continue;
         for (const token of metadata(node.module, 'exports')) {
@@ -458,5 +473,110 @@ describe('module graph', () => {
 
     expect(graph.map((node) => node.module)).toContain(IdentityAccessModule);
     expect(controllersOf(graph)).toEqual(expect.arrayContaining([AuthController, MeController, AppUsersController]));
+  });
+});
+
+describe('operational command graphs (H6.1, docs/rules/operational-commands.md)', () => {
+  const apiAndWorker: [string, Type<unknown>][] = [
+    ['AppModule', AppModule],
+    ['WorkerModule', WorkerModule],
+  ];
+
+  it('rule 3: keeps the command graphs and their contracts out of the API and the worker', () => {
+    for (const [name, root] of apiAndWorker) {
+      const modules = collectGraph(root).map((node) => node.module);
+
+      expect({
+        name,
+        mounted: [
+          InspectionModule,
+          IdentityAccessInspectionFacadeModule,
+          DevSeedModule,
+          IdentityAccessLocalSeedFacadeModule,
+        ]
+          .filter((module) => modules.includes(module))
+          .map((module) => module.name),
+      }).toEqual({ name, mounted: [] });
+    }
+  });
+
+  it('rule 1: opens the sessions of the inspection graph read-only, and of no other graph', () => {
+    const graphs: [string, Type<unknown>, number][] = [
+      ['AppModule', AppModule, 0],
+      ['WorkerModule', WorkerModule, 0],
+      ['InstallationModule', InstallationModule, 0],
+      ['RecoveryCliModule', RecoveryCliModule, 0],
+      ['InspectionModule', InspectionModule, 1],
+      ['DevSeedModule', DevSeedModule, 0],
+    ];
+    for (const [name, root, expected] of graphs) {
+      expect({ name, readOnly: declarationsOf(collectGraph(root), DATABASE_SESSION_OPTIONS).length }).toEqual({
+        name,
+        readOnly: expected,
+      });
+    }
+  });
+
+  it('rule 1: loads only what the inspection reads: no controller, mail, queue, storage, JWT or API module', () => {
+    const graph = collectGraph(InspectionModule);
+    const modules = graph.map((node) => node.module);
+
+    expect(controllersOf(graph)).toEqual([]);
+    for (const forbidden of [NotificationsModule, IdentityAccessModule, RecoveryModule, QueueInfrastructureModule]) {
+      expect({ forbidden: forbidden.name, mounted: modules.includes(forbidden) }).toEqual({
+        forbidden: forbidden.name,
+        mounted: false,
+      });
+    }
+    expect(moduleNames(graph)).not.toContain('JwtModule');
+    expect(moduleNames(graph)).not.toContain('ConfigurationModule');
+    expect(moduleNames(graph)).toContain('InstallationConfigurationModule');
+    expect(declarationsOf(graph, MailTransport)).toHaveLength(0);
+  });
+});
+
+describe('the local seed graph (H6.2)', () => {
+  it('rule 3: declares the demo account contract in the seed graph only', () => {
+    const graphs: [string, Type<unknown>, number][] = [
+      ['AppModule', AppModule, 0],
+      ['WorkerModule', WorkerModule, 0],
+      ['InstallationModule', InstallationModule, 0],
+      ['RecoveryCliModule', RecoveryCliModule, 0],
+      ['InspectionModule', InspectionModule, 0],
+      ['DevSeedModule', DevSeedModule, 1],
+    ];
+    for (const [name, root, expected] of graphs) {
+      const modules = collectGraph(root).map((node) => node.module);
+      expect({
+        name,
+        seedContract: modules.filter((module) => module === IdentityAccessLocalSeedFacadeModule).length,
+      }).toEqual({
+        name,
+        seedContract: expected,
+      });
+    }
+  });
+
+  it('loads only what the seed writes through: no controller, mail, queue, JWT, API module or full configuration', () => {
+    const graph = collectGraph(DevSeedModule);
+    const modules = graph.map((node) => node.module);
+
+    expect(controllersOf(graph)).toEqual([]);
+    for (const forbidden of [
+      NotificationsModule,
+      IdentityAccessModule,
+      RecoveryModule,
+      QueueInfrastructureModule,
+      ObjectStorageModule,
+    ]) {
+      expect({ forbidden: forbidden.name, mounted: modules.includes(forbidden) }).toEqual({
+        forbidden: forbidden.name,
+        mounted: false,
+      });
+    }
+    expect(moduleNames(graph)).not.toContain('JwtModule');
+    expect(moduleNames(graph)).not.toContain('ConfigurationModule');
+    expect(moduleNames(graph)).toContain('InstallationConfigurationModule');
+    expect(declarationsOf(graph, MailTransport)).toHaveLength(0);
   });
 });

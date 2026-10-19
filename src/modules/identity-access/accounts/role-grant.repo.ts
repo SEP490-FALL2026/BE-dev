@@ -25,6 +25,17 @@ export class RoleGrantRepo {
     return row?.appUserId ?? null;
   }
 
+  /** How many effective (not revoked) grants each role has, whatever the account state (roles with none are absent). */
+  async countEffectiveByRole(tx: DbTx): Promise<Map<AppRole, number>> {
+    const groups = await tx.roleGrant.groupBy({
+      by: ['role'],
+      where: { revokedAt: null },
+      _count: { _all: true },
+    });
+
+    return new Map(groups.map((group) => [group.role, group._count._all]));
+  }
+
   async effectiveRoles(appUserId: string, tx?: DbTx): Promise<AppRole[]> {
     const rows = await (tx ?? this.prisma).roleGrant.findMany({
       where: { appUserId, revokedAt: null },

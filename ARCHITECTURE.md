@@ -31,13 +31,16 @@ src/
   worker.ts, worker.module.ts # worker application context
   installation-cli.ts         # lệnh khởi tạo một lần, ngoài HTTP (pnpm ops:bootstrap)
   recovery-cli.ts, recovery-cli.module.ts  # lệnh khôi phục Super Admin theo phiếu, ngoài HTTP (pnpm ops:recover)
+  inspect-cli.ts              # kiểm trạng thái cài đặt chỉ đọc (pnpm ops:inspect)
+  dev-seed-cli.ts             # dữ liệu demo chỉ local (pnpm dev:seed -- --confirm-local)
+  operational-commands.spec.ts  # gate của rule lệnh vận hành
   core/                       # thuần TypeScript: pagination, email, business-date
   infrastructure/
     cli/                      # helper chung của hai CLI: ghi lỗi, logger im lặng, nhận lỗi env bằng instanceof
     config/                   # env-schema.ts (hợp đồng validation công khai) ghép database-url/database-environment/secret-environment/environment-validation
     http/                     # pipe, envelope, serializer, filter
     security/                 # guard khai báo/xác thực/phân quyền, verifier port, rate limiting
-    database/                 # Prisma service, TransactionRunner
+    database/                 # Prisma service, TransactionRunner, ReadOnlyDatabaseSessionModule (phiên chỉ đọc của lệnh inspect)
     queue/                    # BullMQ connection + queue.config.ts (chưa mount)
     mail/                     # port MailTransport và SMTP adapter (nodemailer)
     object-storage/           # port, S3-compatible adapter + object-storage.config.ts (chưa mount)
@@ -58,6 +61,8 @@ src/
       recovery/               # lệnh ops:recover (E7): entry HolderRecoveryService, RoleTransferRecoveryService, tham số, lỗi, type, recovery.repo
     notifications/            # EmailOutbox (mã hóa payload), dispatcher gửi thư; không import identity-access
     installation/             # use case khởi tạo; không sở hữu bảng; import IdentityAccessFacadeModule (không import IdentityAccessModule) và chỉ xác thực biến môi trường DB
+      inspect/                # ops:inspect (E8 = A): InspectionModule, đọc _prisma_migrations, báo cáo, tham số
+      dev-seed/               # dev:seed (E8 = A): DevSeedModule, chốt local, fixture, kế hoạch, generator mật khẩu, báo cáo
     catalog/                  # source/test giữ lại, KHÔNG đăng ký vào AppModule, không phải mẫu; G3 quyết
 prisma/
   schema.prisma               # generator, datasource
@@ -220,9 +225,17 @@ Vòng lặp là orchestration có chủ đích ở composition root vì nối ha
 gửi thư qua hợp đồng công khai `EmailDeliveryService.dispatchDue` (trong `notifications.service.ts`, đăng ký ở
 `PUBLIC_CONTRACT_EXPORTS`), facade `IdentityAccessService.isActionLinkUsable` trả lời liên kết trong thư còn dùng được
 không. `EmailDispatcher`, repo, cipher và transport vẫn private (ROOT.1).
-Hai CLI (`installation-cli.ts`, `recovery-cli.ts`) dùng chung `infrastructure/cli/cli-runtime.ts` để ghi lỗi, tắt log
-Nest và nhận `EnvironmentValidationError` bằng `instanceof`; gate cấu trúc quét cả root và infrastructure để chặn so
-khớp lỗi theo `error.name`.
+Các CLI (`installation-cli.ts`, `recovery-cli.ts`, `inspect-cli.ts`, `dev-seed-cli.ts`) dùng chung
+`infrastructure/cli/cli-runtime.ts` để ghi lỗi, tắt log Nest và nhận `EnvironmentValidationError` bằng `instanceof`; gate
+cấu trúc quét cả root và infrastructure để chặn so khớp lỗi theo `error.name`.
+
+Lệnh vận hành theo [operational commands](docs/rules/operational-commands.md). `InspectionModule` (H6.1) chỉ xác thực
+biến DB, import `ReadOnlyDatabaseSessionModule` nên mọi phiên PostgreSQL mở `default_transaction_read_only=on`, và đọc
+qua `OrganizationService`, `AuditService.countByAction` và `IdentityAccessInspectionService`
+(`identity-access-inspection-facade.module.ts`, chỉ trong đồ thị này). `DevSeedModule` (H6.2) chỉ xác thực biến DB, kiểm
+ba chốt local trước transaction và ghi qua `OrganizationService`, `LocalDemoAccountService`
+(`identity-access-local-seed-facade.module.ts`, chỉ trong đồ thị này) và `AuditService`. Không đồ thị lệnh nào tới được từ
+`AppModule`/`WorkerModule` (`module-graph.spec.ts`, `operational-commands.spec.ts`).
 Storage adapter hỗ trợ endpoint S3-compatible; chưa có file ownership/API.
 Readiness chỉ chứng minh PostgreSQL có thể ping, không chứng minh schema/migration hoặc chức năng đăng nhập đã sẵn sàng.
 

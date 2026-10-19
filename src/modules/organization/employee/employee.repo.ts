@@ -145,8 +145,8 @@ export class EmployeeRepo {
   }
 
   /** How many employees have not left, for the onboarding checklist. */
-  async countActive(): Promise<number> {
-    return this.prisma.employee.count({ where: { status: 'ACTIVE' } });
+  async countActive(tx?: DbTx): Promise<number> {
+    return (tx ?? this.prisma).employee.count({ where: { status: 'ACTIVE' } });
   }
 
   async searchActiveEmployees(

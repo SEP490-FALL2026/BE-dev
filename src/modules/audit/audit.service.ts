@@ -32,4 +32,14 @@ export class AuditService {
     assertSafe(event.after ?? null, 'after');
     await this.repo.insert(tx, event);
   }
+
+  /**
+   * How many events each named action has in the trail, zero included, in the caller's transaction. Counts only: no
+   * payload, actor or resource leaves the module (the installation inspection, `ops:inspect`).
+   */
+  async countByAction(tx: DbTx, actions: readonly string[]): Promise<Map<string, number>> {
+    const found = await this.repo.countByAction(tx, actions);
+
+    return new Map(actions.map((action) => [action, found.get(action) ?? 0]));
+  }
 }

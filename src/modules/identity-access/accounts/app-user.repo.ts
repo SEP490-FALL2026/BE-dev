@@ -1,7 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { AccountListFilter, AccountRecord, AccountSnapshot, CreateAppUserInput } from '../identity-access.types';
+import {
+  AccountListFilter,
+  AccountRecord,
+  AccountSnapshot,
+  ActivationState,
+  AppUserStatus,
+  CreateAppUserInput,
+} from '../identity-access.types';
 
 type LockMode = 'SHARE' | 'UPDATE';
 
@@ -105,10 +112,25 @@ export class AppUserRepo {
     return rows.map((row) => row.employeeId);
   }
 
+  /** How many accounts are in each status and activation state (states with none are absent). */
+  async countByState(tx: DbTx): Promise<{ status: AppUserStatus; activationState: ActivationState; count: number }[]> {
+    const groups = await tx.appUser.groupBy({
+      by: ['status', 'activationState'],
+      _count: { _all: true },
+      orderBy: [{ status: 'asc' }, { activationState: 'asc' }],
+    });
+
+    return groups.map((group) => ({
+      status: group.status,
+      activationState: group.activationState,
+      count: group._count._all,
+    }));
+  }
+
   /** Among the employee ids given, those whose account is active and activated and holds an effective IT_ADMIN grant. */
-  async findUsableItAdminEmployeeIds(employeeIds: readonly string[]): Promise<Set<string>> {
+  async findUsableItAdminEmployeeIds(employeeIds: readonly string[], tx?: DbTx): Promise<Set<string>> {
     if (employeeIds.length === 0) return new Set();
-    const rows = await this.prisma.appUser.findMany({
+    const rows = await (tx ?? this.prisma).appUser.findMany({
       where: {
         employeeId: { in: [...employeeIds] },
         status: 'ACTIVE',

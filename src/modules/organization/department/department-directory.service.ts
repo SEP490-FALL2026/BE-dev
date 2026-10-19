@@ -6,7 +6,7 @@ import { CreateDepartmentInput, EmployeeStatus } from '../organization.types';
 import { HeadAssignmentError } from './department.errors';
 import { DepartmentHeadRepo } from './department-head.repo';
 import { DepartmentRepo } from './department.repo';
-import { DepartmentHeadRecord, HeadPeriodChanges, HeadPeriodRecord } from './department.types';
+import { DepartmentHeadRecord, DepartmentRecord, HeadPeriodChanges, HeadPeriodRecord } from './department.types';
 
 /**
  * The departments and their heads as `OrganizationModule` holds them: the owner of `DepartmentHeadRepo`, which no other
@@ -36,18 +36,24 @@ export class DepartmentDirectoryService {
     return this.departments.lockByCode(tx, organizationId, code);
   }
 
-  countActive(): Promise<number> {
-    return this.departments.countActiveDepartments();
+  findByCode(tx: DbTx, organizationId: string, code: string): Promise<DepartmentRecord | null> {
+    return this.departments.findByCode(tx, organizationId, code);
   }
 
-  activeWithoutHead(onDate: BusinessDate): Promise<{ id: string; code: string; name: string }[]> {
-    return this.departments.activeDepartmentsWithoutHead(onDate);
+  countActive(tx?: DbTx): Promise<number> {
+    return this.departments.countActiveDepartments(tx);
   }
 
-  activeWithItAdmin(): Promise<
+  activeWithoutHead(onDate: BusinessDate, tx?: DbTx): Promise<{ id: string; code: string; name: string }[]> {
+    return this.departments.activeDepartmentsWithoutHead(onDate, tx);
+  }
+
+  activeWithItAdmin(
+    tx?: DbTx,
+  ): Promise<
     { id: string; code: string; name: string; itAdminEmployeeId: string | null; itAdminStatus: EmployeeStatus | null }[]
   > {
-    return this.departments.activeDepartmentsWithItAdmin();
+    return this.departments.activeDepartmentsWithItAdmin(tx);
   }
 
   // --- heads --------------------------------------------------------------------------

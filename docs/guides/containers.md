@@ -58,8 +58,13 @@ settings, so `docker run --rm -it -e DATABASE_URL=... slm-api:foundation node di
 `--help` and argument errors do not touch the environment at all. Passing the full env file still works;
 unrelated variables are ignored. Exit code 1 does not prove that nothing was written: if the connection or the
 reply to `COMMIT` was lost, check the installation state before running it again (a rerun that exits 2 means the
-first run committed).
-It needs a terminal (`-it`) because the Super Admin password is typed at a hidden prompt; it refuses to
+first run committed). Check the state without writing anything:
+`docker run --rm -e DATABASE_URL=... slm-api:foundation node dist/inspect-cli.js` (`--json` for a machine; exit 0
+installed and consistent, 2 not installed or incomplete, 1 error). It reads the database settings only and opens every
+session read-only; it prints counts and the Super Admin email masked. `dev-seed-cli.js` is in the image too, but it
+refuses with exit 3 unless `NODE_ENV` is development or test and the database host is loopback: never point it at a
+shared database ([operational commands](../rules/operational-commands.md)).
+The installation command needs a terminal (`-it`) because the Super Admin password is typed at a hidden prompt; it refuses to
 read it from arguments, the environment or a pipe. The consolidated
 [G0/G1 review](../reviews/g0-g1-remediation-2026-10-15/README.md) records the Linux PTY verification
 through the remediation revision; manual interactive PowerShell verification is still pending.

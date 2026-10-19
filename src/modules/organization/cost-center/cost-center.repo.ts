@@ -87,6 +87,14 @@ export class CostCenterRepo {
     return this.findById(id, tx);
   }
 
+  /** The cost center with this code, with the department charged to it (the local seed fixture, P23-RV-01). */
+  async findByCode(tx: DbTx, organizationId: string, code: string): Promise<CostCenterRecord | null> {
+    const rows = await tx.$queryRaw<CostCenterRow[]>`
+      ${SELECT_WITH_DEPARTMENT} WHERE c.organization_id = ${organizationId}::uuid AND c.code = ${code}`;
+
+    return rows[0] ? toRecord(rows[0]) : null;
+  }
+
   async findById(id: string, tx?: DbTx): Promise<CostCenterRecord | null> {
     const rows = await (tx ?? this.prisma).$queryRaw<CostCenterRow[]>`
       ${SELECT_WITH_DEPARTMENT} WHERE c.id = ${id}::uuid`;
@@ -172,8 +180,8 @@ export class CostCenterRepo {
   }
 
   /** How many active UNIT cost centers no department is charged to yet: what the next department can take. */
-  async countFreeUnits(): Promise<number> {
-    const rows = await this.prisma.$queryRaw<{ total: number }[]>`
+  async countFreeUnits(tx?: DbTx): Promise<number> {
+    const rows = await (tx ?? this.prisma).$queryRaw<{ total: number }[]>`
       SELECT count(*)::int AS total FROM cost_centers c
        WHERE c.kind = 'UNIT' AND c.status = 'ACTIVE'
          AND NOT EXISTS (SELECT 1 FROM departments d WHERE d.cost_center_id = c.id)`;

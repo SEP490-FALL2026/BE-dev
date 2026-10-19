@@ -26,8 +26,8 @@ export class JobTitleCatalogueService {
     return this.repo.lockJobTitle(tx, jobTitleId, mode);
   }
 
-  findByNormalizedName(organizationId: string, normalizedName: string): Promise<JobTitleRecord | null> {
-    return this.repo.findJobTitleByNormalizedName(organizationId, normalizedName);
+  findByNormalizedName(organizationId: string, normalizedName: string, tx?: DbTx): Promise<JobTitleRecord | null> {
+    return this.repo.findJobTitleByNormalizedName(organizationId, normalizedName, tx);
   }
 
   rename(tx: DbTx, jobTitleId: string, name: string, now: Date): Promise<JobTitleRecord> {

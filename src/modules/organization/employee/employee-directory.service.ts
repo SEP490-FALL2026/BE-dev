@@ -43,8 +43,8 @@ export class EmployeeDirectoryService {
     return this.repo.findEmployees(employeeIds);
   }
 
-  countActive(): Promise<number> {
-    return this.repo.countActive();
+  countActive(tx?: DbTx): Promise<number> {
+    return this.repo.countActive(tx);
   }
 
   searchActive(

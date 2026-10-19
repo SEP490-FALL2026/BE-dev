@@ -17,6 +17,7 @@ import {
   EmployeeImportLookupData,
   EmployeeProfile,
   EmployeeRecord,
+  LocalSeedFixtureFacts,
   OnboardingFacts,
   OrganizationRecord,
 } from './organization.types';
@@ -38,10 +39,10 @@ export class OrganizationService {
     private readonly jobTitles: JobTitleCatalogueService,
   ) {}
 
-  /** Today in the organization's own calendar (`now` is a parameter for tests). */
-  async businessToday(now: Date = new Date()): Promise<BusinessDate> {
+  /** Today in the organization's own calendar (`now` is a parameter for tests; `tx` reads the zone in the caller's transaction). */
+  async businessToday(now: Date = new Date(), tx?: DbTx): Promise<BusinessDate> {
     if (this.timeZone === null) {
-      const organization = await this.repo.findOrganization();
+      const organization = await this.repo.findOrganization(tx);
       if (!organization) return businessDateAt(now, 'UTC');
       this.timeZone = organization.timeZone;
     }
@@ -254,16 +255,68 @@ export class OrganizationService {
     return without.filter((department) => wanted.has(department.id));
   }
 
-  /** The numbers and the gaps the onboarding checklist shows for the organization and its people (US-02-04 AC-1, AC-6). */
-  async getOnboardingFacts(): Promise<OnboardingFacts> {
-    const today = await this.businessToday();
-    const [activeDepartments, activeEmployees, freeCostCenters, withoutHead, withItAdmin] = await Promise.all([
-      this.departments.countActive(),
-      this.employees.countActive(),
-      this.costCenters.countFreeUnits(),
-      this.departments.activeWithoutHead(today),
-      this.departments.activeWithItAdmin(),
-    ]);
+  /**
+   * The three local seed fixture items by their stable keys, in the caller's transaction (`pnpm dev:seed`, P23-RV-01):
+   * the cost center with the department charged to it, the department with its cost center, and the job title with
+   * this normalized name. Each is null when absent.
+   */
+  async readLocalSeedFixture(
+    tx: DbTx,
+    keys: { organizationId: string; costCenterCode: string; departmentCode: string; normalizedJobTitleName: string },
+  ): Promise<LocalSeedFixtureFacts> {
+    const costCenter = await this.costCenters.findByCode(tx, keys.organizationId, keys.costCenterCode);
+    const department = await this.departments.findByCode(tx, keys.organizationId, keys.departmentCode);
+    const jobTitle = await this.jobTitles.findByNormalizedName(keys.organizationId, keys.normalizedJobTitleName, tx);
+
+    return {
+      costCenter: costCenter && {
+        id: costCenter.id,
+        code: costCenter.code,
+        name: costCenter.name,
+        kind: costCenter.kind,
+        status: costCenter.status,
+        departmentCode: costCenter.department?.code ?? null,
+      },
+      department: department && {
+        id: department.id,
+        code: department.code,
+        name: department.name,
+        status: department.status,
+        costCenterId: department.costCenter.id,
+        costCenterCode: department.costCenter.code,
+      },
+      jobTitle: jobTitle && {
+        id: jobTitle.id,
+        name: jobTitle.name,
+        // Found by this key, so it is the key itself.
+        normalizedName: keys.normalizedJobTitleName,
+        status: jobTitle.status,
+      },
+    };
+  }
+
+  /**
+   * The numbers and the gaps the onboarding checklist shows for the organization and its people (US-02-04 AC-1, AC-6).
+   * With `tx` every read runs in the caller's transaction, one after the other (the installation inspection, P23-RV-02);
+   * without it, as unlocked reads for the checklist.
+   */
+  async getOnboardingFacts(tx?: DbTx): Promise<OnboardingFacts> {
+    const today = await this.businessToday(new Date(), tx);
+    const [activeDepartments, activeEmployees, freeCostCenters, withoutHead, withItAdmin] = tx
+      ? [
+          await this.departments.countActive(tx),
+          await this.employees.countActive(tx),
+          await this.costCenters.countFreeUnits(tx),
+          await this.departments.activeWithoutHead(today, tx),
+          await this.departments.activeWithItAdmin(tx),
+        ]
+      : await Promise.all([
+          this.departments.countActive(),
+          this.employees.countActive(),
+          this.costCenters.countFreeUnits(),
+          this.departments.activeWithoutHead(today),
+          this.departments.activeWithItAdmin(),
+        ]);
 
     return {
       activeDepartments,

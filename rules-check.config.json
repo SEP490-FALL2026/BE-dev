@@ -28,6 +28,9 @@
       ["AGENTS.md", "CONTRIBUTING.md"],
       ["AGENTS.md", "ARCHITECTURE.md"],
       ["AGENTS.md", "docs/rules/README.md"],
+      ["AGENTS.md", "docs/rules/operational-commands.md"],
+      ["CONTRIBUTING.md", "docs/rules/operational-commands.md"],
+      ["docs/rules/README.md", "docs/rules/operational-commands.md"],
       ["CLAUDE.md", "AGENTS.md"],
       ["GEMINI.md", "AGENTS.md"],
       [".cursor/rules/database.mdc", "docs/rules/database-business.md"]

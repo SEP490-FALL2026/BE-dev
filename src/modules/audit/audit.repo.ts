@@ -24,4 +24,15 @@ export class AuditRepo {
       },
     });
   }
+
+  /** How many events each of these actions has; an action with none is absent from the map. */
+  async countByAction(tx: DbTx, actions: readonly string[]): Promise<Map<string, number>> {
+    const groups = await tx.auditEvent.groupBy({
+      by: ['action'],
+      where: { action: { in: [...actions] } },
+      _count: { _all: true },
+    });
+
+    return new Map(groups.map((group) => [group.action, group._count._all]));
+  }
 }

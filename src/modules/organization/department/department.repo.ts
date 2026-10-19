@@ -149,6 +149,14 @@ export class DepartmentRepo {
     };
   }
 
+  /** The department with this code, with its cost center (the local seed fixture, P23-RV-01). */
+  async findByCode(tx: DbTx, organizationId: string, code: string): Promise<DepartmentRecord | null> {
+    const rows = await tx.$queryRaw<DepartmentRow[]>`
+      ${SELECT_DEPARTMENT} WHERE d.organization_id = ${organizationId}::uuid AND d.code = ${code}`;
+
+    return rows[0] ? toRecord(rows[0]) : null;
+  }
+
   async findById(id: string, tx?: DbTx): Promise<DepartmentRecord | null> {
     const rows = await (tx ?? this.prisma).$queryRaw<DepartmentRow[]>`${SELECT_DEPARTMENT} WHERE d.id = ${id}::uuid`;
 
@@ -195,8 +203,11 @@ export class DepartmentRepo {
   }
 
   /** Active departments that nobody heads on `onDate`, in code order. */
-  async activeDepartmentsWithoutHead(onDate: BusinessDate): Promise<{ id: string; code: string; name: string }[]> {
-    return this.prisma.$queryRaw<{ id: string; code: string; name: string }[]>`
+  async activeDepartmentsWithoutHead(
+    onDate: BusinessDate,
+    tx?: DbTx,
+  ): Promise<{ id: string; code: string; name: string }[]> {
+    return (tx ?? this.prisma).$queryRaw<{ id: string; code: string; name: string }[]>`
       SELECT d.id, d.code, d.name FROM departments d
        WHERE d.status = 'ACTIVE'
          AND NOT EXISTS (
@@ -207,10 +218,12 @@ export class DepartmentRepo {
   }
 
   /** Active departments with the IT Admin in charge they name (or none), in code order. */
-  async activeDepartmentsWithItAdmin(): Promise<
+  async activeDepartmentsWithItAdmin(
+    tx?: DbTx,
+  ): Promise<
     { id: string; code: string; name: string; itAdminEmployeeId: string | null; itAdminStatus: EmployeeStatus | null }[]
   > {
-    const rows = await this.prisma.$queryRaw<
+    const rows = await (tx ?? this.prisma).$queryRaw<
       { id: string; code: string; name: string; it_admin_employee_id: string | null; status: EmployeeStatus | null }[]
     >`
       SELECT d.id, d.code, d.name, d.it_admin_employee_id, e.status
@@ -226,8 +239,8 @@ export class DepartmentRepo {
     }));
   }
 
-  async countActiveDepartments(): Promise<number> {
-    return this.prisma.department.count({ where: { status: 'ACTIVE' } });
+  async countActiveDepartments(tx?: DbTx): Promise<number> {
+    return (tx ?? this.prisma).department.count({ where: { status: 'ACTIVE' } });
   }
 
   // --- members ------------------------------------------------------------------------

@@ -16,6 +16,11 @@ export class ApprovalRoleDirectoryService implements ApprovalRoleHoldings {
     return this.holders.isSpendingApprover(employeeId);
   }
 
+  /** The approval roles somebody holds now, one entry per current holder (no employee leaves this method). */
+  async heldRoles(client: DbTx): Promise<ApprovalRoleName[]> {
+    return (await this.holders.currentHolders(client)).map((holder) => holder.role);
+  }
+
   /** The approval roles the employee holds now (for the checks that must refuse a Super Admin who holds one). */
   rolesHeldBy(client: DbTx | undefined, employeeId: string): Promise<ApprovalRoleName[]> {
     return this.holders.rolesHeldBy(client, employeeId);
