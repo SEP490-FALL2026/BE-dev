@@ -33,16 +33,16 @@ transaction, khóa, idempotency, OpenAPI — không đổi: characterization ghi
   onboarding đều đổi đường dẫn; Phase C đổi export của `DataImportModule`, consumer onboarding và `Page<T>` trên chính các
   file Phase B vừa dời. Tách thành nhiều commit sẽ để lại một cạnh private onboarding → service ở đường dẫn mới hoặc một
   mục ledger không còn đúng, tức ledger giả chỉ để build xanh.
-- Siblings: `beh1-employee-row-validation-alignment` — hạng mục hành vi dự kiến cho A4-11, **chưa tạo** trong lượt này;
-  nơi đó pin Story/AC hoặc quyết định Owner trước khi đổi hành vi.
+- Siblings: [`beh1-employee-row-validation-ownership`](../beh1-employee-row-validation-ownership/spec.md) — hạng mục cho A4-11 (Prompt 25, technical enabler): dùng chung đúng
+  quyết định điều kiện phòng/chức vụ, giữ nguyên D-1 → D-4.
 - Scope map: n/a — technical enabler ngoài nhóm G; không có Story/AC.
 
 ## Primary Story/AC
 
 | Story | AC                                | Coverage | Phần còn lại thuộc                                                                                                     |
 | ----- | --------------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------- |
-| —     | H8.1 (F-24 phần `data-import`)    | n/a      | gỡ chặn loại import thứ hai và `beh1-employee-row-validation-alignment` (tên dự kiến, chưa tạo)                        |
-| —     | H8.2 (oversized ledger, A4-12)    | n/a      | gỡ chặn `beh1-employee-row-validation-alignment`: classifier, re-judge và so judgement có owner duy nhất ở rows module |
+| —     | H8.1 (F-24 phần `data-import`)    | n/a      | gỡ chặn loại import thứ hai và `beh1-employee-row-validation-ownership`                                                |
+| —     | H8.2 (oversized ledger, A4-12)    | n/a      | gỡ chặn `beh1-employee-row-validation-ownership`: classifier, re-judge và so judgement có owner duy nhất ở rows module |
 | —     | H8.3 (A4-10, F-26 phần `Page<T>`) | n/a      | gỡ chặn mọi consumer liên module sau của import: chỉ qua facade `DataImportService` (chưa có hạng mục đặt tên)         |
 
 ## Supporting references
@@ -61,7 +61,8 @@ transaction, khóa, idempotency, OpenAPI — không đổi: characterization ghi
 
 - **BEH.1/A4-11:** dùng chung lý do dòng giữa form nhập tay (`organization/employee/employee-row.validator.ts`) và
   preview import. Lát này chỉ characterization hai đường (bảng D-1 → D-4 dưới) và giữ nguyên cả hai; không import
-  validator private của `organization`, không đưa validator nghiệp vụ vào `core`, không tạo facade giả. Finding vẫn mở.
+  validator private của `organization`, không đưa validator nghiệp vụ vào `core`, không tạo facade giả. Finding khép ở
+  [`beh1-employee-row-validation-ownership`](../beh1-employee-row-validation-ownership/spec.md) (Prompt 25).
 - Bất kỳ đổi route, `operationId`, request/response, status/code/message/details, row outcome/reason/difference, giá trị
   DB, schema/migration, transaction/lock/idempotency/audit.
 - H6/H7, ROOT.1, `CP0-09`/`CP0-10`, AUTH.1/AUTH.2/INF.1, G3–G10, nâng dependency, CI/deploy, refactor module khác.
@@ -149,6 +150,10 @@ Cùng fixture phòng/chức vụ/mã/email chạy qua `validateEmployeeRow` (nh�
 
 Hai đường **không** tương đương; lát này giữ cả hai byte/deep-equal với baseline. BEH.1 quyết align hay chấp nhận khác.
 
+**Kết quả BEH.1 (Prompt 25, [`beh1-employee-row-validation-ownership`](../beh1-employee-row-validation-ownership/spec.md)):** chấp nhận D-1 → D-4 (Docs không đòi giống nhau);
+dòng "giống" (lý do phòng/chức vụ, mã, thứ tự) nay do một policy `organization/employee-placement.policy.ts` quyết,
+hai đường là adapter. 13 ca của spec characterization giữ nguyên văn.
+
 ## Test matrix
 
 | AC / rủi ro                          | Tình huống (gồm từ chối, edge case)                                                                               | Cấp test                                                                                                                                        | Kết quả mong đợi                              | Bằng chứng sau implement                                                          |
@@ -191,3 +196,6 @@ rows, refresh, cancel, latest import) và `employee-import-confirm.spec.ts` (305
 `test/support/employee-import-service-harness.ts` (322 dòng; chỉ dựng fake, đồng hồ, dữ liệu mẫu). Thân 38 ca chép nguyên
 văn theo dải dòng, cùng 38 tên ca. Quy tắc và ví dụ ở [test guide](../../../../test/README.md#kích-thước-unit-spec-của-module)
 và [module structure](../../../rules/module-structure.md). Product code, integration/e2e và `openapi.json` byte-identical.
+
+20/10/2026 — A4-11 khép bởi [`beh1-employee-row-validation-ownership`](../beh1-employee-row-validation-ownership/spec.md) (Prompt 25): bảng D-1 → D-4 và spec
+characterization không đổi; chỉ quyết định điều kiện phòng/chức vụ chuyển vào policy dùng chung.

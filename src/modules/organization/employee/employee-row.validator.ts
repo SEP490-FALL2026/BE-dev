@@ -1,18 +1,17 @@
+import { PlacementReasonCode, PlacementSubject, placementReasons } from '../employee-placement.policy';
 import { JobTitleStatus } from '../job-title/job-title.types';
 
-export type EmployeeRowReasonCode =
-  | 'DEPARTMENT_REQUIRED'
-  | 'DEPARTMENT_NOT_FOUND'
-  | 'DEPARTMENT_INACTIVE'
-  | 'DEPARTMENT_COST_CENTER_INACTIVE'
-  | 'JOB_TITLE_REQUIRED'
-  | 'JOB_TITLE_NOT_FOUND'
-  | 'JOB_TITLE_INACTIVE'
-  | 'EMPLOYEE_CODE_TAKEN'
-  | 'WORK_EMAIL_TAKEN';
+/** The shared placement reasons (BEH.1), then the two keys the form checks against the people already there. */
+export type EmployeeRowReasonCode = PlacementReasonCode | 'EMPLOYEE_CODE_TAKEN' | 'WORK_EMAIL_TAKEN';
 
-/** The field of the row a reason is about, named as the form (and the import file column) names it. */
+/** The form field a reason is about (the import names a file column instead: H8 D-1). */
 export type EmployeeRowField = 'departmentCode' | 'jobTitleId' | 'employeeCode' | 'workEmail';
+
+/** Where the form shows a placement reason. */
+const FORM_FIELD: Record<PlacementSubject, EmployeeRowField> = {
+  DEPARTMENT: 'departmentCode',
+  JOB_TITLE: 'jobTitleId',
+};
 
 export interface EmployeeRowReason {
   field: EmployeeRowField;
@@ -33,27 +32,23 @@ const isBlank = (value: string | null | undefined): boolean =>
   value === undefined || value === null || value.trim() === '';
 
 /**
- * Why a row cannot become an employee (T-16): one list of reasons shared by the manual form and, later, by the
- * import preview, so the two never disagree about what is refused. It lists every reason at once, in a fixed
- * order, so one attempt shows everything to fix. It decides from what the caller looked up and nothing else.
+ * Why a row of the manual form cannot become an employee (T-16). Whether the department and the job title can take
+ * someone in is the placement policy the import preview shares (BEH.1); this adapter reads blank fields the form's
+ * way, shows each reason on its form field, then adds the taken code and email — after the placement reasons, and a
+ * taken code is a reason here, not an existing person to compare (H8 D-2, D-3). It lists every reason at once, in a
+ * fixed order, so one attempt shows everything to fix. It decides from what the caller looked up and nothing else.
  */
 export function validateEmployeeRow(
   row: { departmentCode?: string | null; jobTitleId?: string | null },
   lookup: EmployeeRowLookup,
 ): EmployeeRowReason[] {
-  const reasons: EmployeeRowReason[] = [];
-
-  if (isBlank(row.departmentCode)) reasons.push({ field: 'departmentCode', code: 'DEPARTMENT_REQUIRED' });
-  else if (!lookup.department) reasons.push({ field: 'departmentCode', code: 'DEPARTMENT_NOT_FOUND' });
-  else if (!lookup.department.active) reasons.push({ field: 'departmentCode', code: 'DEPARTMENT_INACTIVE' });
-  else if (!lookup.department.costCenterActive) {
-    // A retired cost center has no people (US-04-09 AC-3); a department charged to one cannot take anyone in.
-    reasons.push({ field: 'departmentCode', code: 'DEPARTMENT_COST_CENTER_INACTIVE' });
-  }
-
-  if (isBlank(row.jobTitleId)) reasons.push({ field: 'jobTitleId', code: 'JOB_TITLE_REQUIRED' });
-  else if (!lookup.jobTitle) reasons.push({ field: 'jobTitleId', code: 'JOB_TITLE_NOT_FOUND' });
-  else if (lookup.jobTitle.status === 'INACTIVE') reasons.push({ field: 'jobTitleId', code: 'JOB_TITLE_INACTIVE' });
+  const reasons: EmployeeRowReason[] = placementReasons({
+    department: { named: !isBlank(row.departmentCode), found: lookup.department },
+    jobTitle: {
+      named: !isBlank(row.jobTitleId),
+      found: lookup.jobTitle === null ? null : { active: lookup.jobTitle.status !== 'INACTIVE' },
+    },
+  }).map(({ subject, code }) => ({ field: FORM_FIELD[subject], code }));
 
   if (lookup.employeeCodeTaken) reasons.push({ field: 'employeeCode', code: 'EMPLOYEE_CODE_TAKEN' });
   if (lookup.workEmailTaken) reasons.push({ field: 'workEmail', code: 'WORK_EMAIL_TAKEN' });

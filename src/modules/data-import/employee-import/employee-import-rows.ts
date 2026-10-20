@@ -1,6 +1,7 @@
 import { isBusinessDate } from '../../../core/business-date';
 import { normalizeDisplayName } from '../../../core/display-name';
 import { InvalidEmailError, normalizeEmail } from '../../../core/email';
+import { PlacementSubject, placementReasons } from '../../organization/employee-placement.policy';
 import type { EmployeeImportLookupData } from '../../organization/organization.types';
 
 export const EMPLOYEE_COLUMNS = [
@@ -117,6 +118,12 @@ export interface EmployeeRowResult {
   parsed?: ParsedEmployeeRow;
 }
 
+/** Where the preview shows a placement reason (the manual form names a field instead: H8 D-1). */
+const FILE_COLUMN: Record<PlacementSubject, EmployeeColumn> = {
+  DEPARTMENT: 'department_code',
+  JOB_TITLE: 'job_title',
+};
+
 /** The cells of one row of the file, by the column they were read into. */
 export type EmployeeCells = Partial<Record<EmployeeColumn, string>>;
 
@@ -188,18 +195,18 @@ export class EmployeeRowClassifier {
       return this.compare(existing, { fullName, normalizedEmail, typeText, hireDate, departmentCode, jobTitleText });
     }
 
+    // Only a person to create is placed (H8 D-2); the placement reasons come after this file's own (D-3, D-4).
     const department = departmentCode === '' ? undefined : this.lookup.departments.get(departmentCode);
-    if (departmentCode === '') errors.push({ column: 'department_code', code: 'DEPARTMENT_REQUIRED' });
-    else if (!department) errors.push({ column: 'department_code', code: 'DEPARTMENT_NOT_FOUND' });
-    else if (!department.active) errors.push({ column: 'department_code', code: 'DEPARTMENT_INACTIVE' });
-    else if (!department.costCenterActive) {
-      errors.push({ column: 'department_code', code: 'DEPARTMENT_COST_CENTER_INACTIVE' });
-    }
-
     const jobTitle = jobTitleText === '' ? undefined : this.lookup.jobTitles.get(jobTitleKey(jobTitleText));
-    if (jobTitleText === '') errors.push({ column: 'job_title', code: 'JOB_TITLE_REQUIRED' });
-    else if (!jobTitle) errors.push({ column: 'job_title', code: 'JOB_TITLE_NOT_FOUND' });
-    else if (jobTitle.status === 'INACTIVE') errors.push({ column: 'job_title', code: 'JOB_TITLE_INACTIVE' });
+    for (const { subject, code } of placementReasons({
+      department: { named: departmentCode !== '', found: department ?? null },
+      jobTitle: {
+        named: jobTitleText !== '',
+        found: jobTitle === undefined ? null : { active: jobTitle.status !== 'INACTIVE' },
+      },
+    })) {
+      errors.push({ column: FILE_COLUMN[subject], code });
+    }
 
     if (errors.length > 0 || !department || !jobTitle) return { outcome: 'ERROR', errors };
 

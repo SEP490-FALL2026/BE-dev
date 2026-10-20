@@ -291,10 +291,14 @@ const PUBLIC_ROOT_CONTRACT_FILES: ReadonlySet<string> = new Set([
   'identity-access/local-demo-account.service.ts',
 ]);
 
+/** BEH.1: the exact shared policy files; the same list as in architecture-boundaries.spec.ts (checked by policy-ownership.spec.ts). */
+const PUBLIC_ROOT_POLICY_FILES: ReadonlySet<string> = new Set(['organization/employee-placement.policy.ts']);
+
 function isModuleRootPublicSurface(file: string): boolean {
   const [moduleName, fileName, ...rest] = moduleSegments(file);
   if (fileName === undefined || rest.length > 0) return false;
-  if (PUBLIC_ROOT_CONTRACT_FILES.has(`${moduleName}/${fileName}`)) return true;
+  const rootPath = `${moduleName}/${fileName}`;
+  if (PUBLIC_ROOT_CONTRACT_FILES.has(rootPath) || PUBLIC_ROOT_POLICY_FILES.has(rootPath)) return true;
 
   return (
     fileName === `${moduleName}.module.ts` ||

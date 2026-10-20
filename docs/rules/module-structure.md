@@ -92,6 +92,25 @@ re-export (`export ... from`). Gate đọc bằng parser TypeScript.
 - **Lách sai:** barrel hay `export { EmailDispatcher } from './email-dispatcher.service'` trong tệp công khai; allowlist chung
   cho mọi `*.service.ts` ở root; đăng ký một tệp không ai ngoài module dùng.
 
+**Validation dùng chung là dùng chung policy ngữ nghĩa (BEH.1).** Khi hai workflow cần cùng một quyết định nghiệp vụ, chỉ
+quyết định đó được dùng chung: một hàm thuần ở module sở hữu dữ liệu nghiệp vụ, nhận model tra cứu trung tính (không DTO
+HTTP, tên cột file, row Prisma hay repo) và trả **mã lý do ngữ nghĩa** theo thứ tự xác định, không `field`/`column`. Mỗi
+adapter (form, import, lệnh) tự ánh xạ lý do sang vị trí trình bày của mình và thêm lý do riêng của workflow (khóa đã có,
+trùng trong file, ô khác) theo thứ tự của nó. Tệp policy dùng liên module ở root module, đăng ký chính xác trong
+`PUBLIC_ROOT_POLICY_FILES` (cùng danh sách ở `architecture-boundaries.spec.ts`, `architecture-structure.spec.ts`), và
+[policy-ownership.spec.ts](../../src/policy-ownership.spec.ts) giữ consumer chính xác, tính thuần (không class, decorator
+hay import giá trị ngoài `src/core`) và việc mã lý do chỉ được viết trong policy (ngoại lệ là quyết định khác, liệt kê
+chính xác kèm lý do).
+
+- **Đúng:** `organization/employee-placement.policy.ts` trả `{ subject: 'DEPARTMENT', code: 'DEPARTMENT_INACTIVE' }`; form
+  nhập tay ánh xạ thành `field: departmentCode`, preview import thành `column: department_code`; import vẫn so người đã
+  có (`EXISTS_*`) trước khi gọi policy và giữ `EMPLOYEE_CODE_DUPLICATE_IN_FILE` của mình.
+- **Sai:** policy trả tên cột CSV hay `field` của form; ép form nhập tay dùng outcome import `EXISTS_DIFFERENT`; làm hai
+  đường giống nhau chỉ để dùng lại code khi Story không đòi.
+- **Lách sai:** chép cùng thang `if`/`switch` lý do vào hai adapter; import validator private của module khác
+  (`organization/employee/employee-row.validator.ts`) từ `data-import`; dồn mọi thứ vào `core/utils` hay
+  `shared/common`; mở mọi `*.policy.ts` bằng hậu tố.
+
 Nest module nghiệp vụ chỉ export **contract công khai**: facade, port nó hiện thực cho `infrastructure`, hoặc service của
 module entry CLI — danh sách cặp `Module: token` chính xác trong `PUBLIC_CONTRACT_EXPORTS` của
 [module-graph.spec.ts](../../src/module-graph.spec.ts). Token khác bị coi là private bất kể tên (ngoại lệ đang gỡ nằm
@@ -141,6 +160,7 @@ Ngoại lệ phải ghi lý do và người sở hữu remediation trong item. R
 | Import chéo capability (gồm root module) chỉ tới contract đăng ký chính xác, registry không thừa/thiếu, controller → controller, folder catch-all, lỗi trong service/controller/repo, lỗi trùng tên, HTTP mapping trong tệp lỗi và trong business service, so khớp `error.name` trong toàn `src`, raw SQL ngoài repo, kích thước file và unit spec của module (`H8-RV-01`), số file/controller ở root, độ sâu | [architecture-structure.spec.ts](../../src/architecture-structure.spec.ts)   |
 | Module nghiệp vụ chỉ export contract trong allowlist; provider không khai trùng                                                                                                                                                                                                                                                                                                                               | [module-graph.spec.ts](../../src/module-graph.spec.ts)                       |
 | `test/support/**/*.ts` ≤ 400 dòng, không đăng ký test/hook/assertion, không import thư viện test, không tên giống spec (TEST-HARDEN.1, đọc bằng parser TypeScript)                                                                                                                                                                                                                                            | [test-support-structure.spec.ts](../../src/test-support-structure.spec.ts)   |
+| Policy nghiệp vụ dùng chung có một chủ: mã lý do chỉ viết trong policy (ngoại lệ chính xác), policy thuần, consumer chính xác và có gọi, `PUBLIC_ROOT_POLICY_FILES` bằng nhau ở hai gate kiến trúc (BEH.1, đọc bằng parser TypeScript)                                                                                                                                                                        | [policy-ownership.spec.ts](../../src/policy-ownership.spec.ts)               |
 
 Vi phạm có sẵn khi một gate ra đời nằm trong ledger: `LEGACY` của `architecture-structure.spec.ts`,
 `LEGACY_PRIVATE_MODULE_IMPORTS` của `architecture-boundaries.spec.ts` và `LEGACY_PRIVATE_EXPORTS` của
@@ -198,5 +218,6 @@ audit, type, DTO, lỗi và mapper HTTP `employee-import.http-errors.ts` cạnh 
 submodule). Root 3 file non-spec: module, facade `DataImportService` (một method `latestEmployeeImport` cho
 onboarding) và `data-import.types.ts`; facade là export liên module duy nhất (`DataImportModule: DataImportService`);
 service capability là contract nội module đăng ký vì facade đọc qua nó. Không còn mục `data-import` trong ledger nào;
-`Page<T>` dùng bản core. Hai đường kiểm dòng (import và nhập tay) vẫn tách — hợp nhất là thay đổi hành vi riêng
-`beh1-employee-row-validation-alignment` (A4-11).
+`Page<T>` dùng bản core. Hai đường kiểm dòng (import và nhập tay) dùng chung đúng một quyết định — điều kiện phòng/chức
+vụ của `organization/employee-placement.policy.ts` — và giữ phần còn lại riêng (H8 D-1 → D-4,
+[`beh1-employee-row-validation-ownership`](../workspace/items/beh1-employee-row-validation-ownership/spec.md), A4-11).

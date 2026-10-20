@@ -6,11 +6,13 @@ import {
 import { EmployeeImportLookup, EmployeeRowClassifier, RowIssue } from './employee-import-rows';
 
 /*
- * BEH.1 / A4-11 characterization (H8 Phase 0). The import preview judges a row with its own rules
- * (`EmployeeRowClassifier`); manual entry uses the organization validator (`validateEmployeeRow`), which says it is
- * meant to be shared. This spec runs one fixture through both and records how they agree and differ TODAY. It does not
- * make them equal: aligning them can change codes, fields, order and stored previews, so it belongs to the behavior item
- * `beh1-employee-row-validation-alignment`. When that item changes either path, it updates this table on purpose.
+ * BEH.1 / A4-11 characterization (H8 Phase 0). The import preview (`EmployeeRowClassifier`) and manual entry
+ * (`validateEmployeeRow`) each judge a row; this spec runs one fixture through both and records where they agree and
+ * where they differ. Prompt 25 (`beh1-employee-row-validation-ownership`) made both paths adapters of one semantic
+ * placement policy (`organization/employee-placement.policy.ts`) — the agreeing department and job title reasons, codes
+ * and order — and deliberately kept H8 D-1 through D-4 (field against column, an existing person, the place of a taken
+ * email, import-only reasons). Making those equal would change codes, fields, order and stored previews; a change to
+ * either path updates this table on purpose.
  *
  * The test imports a private organization file on purpose (test/README: tests may reach private files to prove a
  * boundary); production code in data-import must not.

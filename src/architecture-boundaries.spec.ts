@@ -347,6 +347,15 @@ const PUBLIC_ROOT_CONTRACT_FILES: ReadonlySet<string> = new Set([
 ]);
 
 /**
+ * BEH.1: the root files that hold one pure business policy another module shares, listed exactly (no `*.policy.ts`
+ * rule). src/policy-ownership.spec.ts owns the consumers and the purity of each, and checks this list against its own.
+ */
+const PUBLIC_ROOT_POLICY_FILES: ReadonlySet<string> = new Set([
+  // Manual entry and the import preview (data-import) share whether a department and a job title can take a person in.
+  'organization/employee-placement.policy.ts',
+]);
+
+/**
  * The public surface of a business module, as path segments below src/modules: only these files directly in the
  * module root — the Nest modules, the facade service, public types and public errors. Anything else in the root, a
  * repo, the credential hasher and every subfolder file is private. Kept in step with `isModuleRootPublicSurface` of
@@ -355,7 +364,7 @@ const PUBLIC_ROOT_CONTRACT_FILES: ReadonlySet<string> = new Set([
 function isModulePublicSurface(parts: string[]): boolean {
   if (parts.length !== 2) return false;
   const [moduleName, fileName] = parts;
-  if (PUBLIC_ROOT_CONTRACT_FILES.has(parts.join('/'))) return true;
+  if (PUBLIC_ROOT_CONTRACT_FILES.has(parts.join('/')) || PUBLIC_ROOT_POLICY_FILES.has(parts.join('/'))) return true;
 
   return (
     fileName === `${moduleName}.module.ts` ||

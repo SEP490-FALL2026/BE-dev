@@ -33,18 +33,18 @@ PostgreSQL không còn cảnh báo deprecation; mỗi hợp đồng injectable c
 - Not smaller: tám finding đều nhỏ, độc lập về hành vi nhưng chung một cây làm việc và một full gate; tách thành tám
   hạng mục sẽ chạy tám lần full gate trên các thay đổi một-vài tệp, và hai phase (A, C) cùng đọc/ghi `openapi.json` phải
   tuần tự trong một lượt để diff OpenAPI duy nhất là AUTH.2.
-- Siblings: `beh1-employee-row-validation-alignment` (tên dự kiến, chưa tạo; Prompt 25).
+- Siblings: [`beh1-employee-row-validation-ownership`](../beh1-employee-row-validation-ownership/spec.md) (Prompt 25).
 - Scope map: n/a — technical enabler ngoài nhóm G; không có Story/AC.
 
 ## Primary Story/AC
 
-| Story | AC                                        | Coverage | Phần còn lại thuộc                                                                           |
-| ----- | ----------------------------------------- | -------- | -------------------------------------------------------------------------------------------- |
-| —     | Phase A: CP0-09, CP0-10, OPENAPI-EXPORT.1 | n/a      | gỡ chặn `beh1-employee-row-validation-alignment` (tên dự kiến): OpenAPI ổn định cho lát tiếp |
-| —     | Phase B: TEST-HARDEN.1                    | n/a      | gỡ chặn mọi lát G3 viết harness (`beh1-employee-row-validation-alignment`)                   |
-| —     | Phase C: AUTH.1 (F-18), AUTH.2 (F-31)     | n/a      | gỡ chặn client FE/Mobile tái sinh từ `openapi.json` (chưa có hạng mục đặt tên)               |
-| —     | Phase D: INF.1 (F-30)                     | n/a      | gỡ chặn nâng `pg` có kiểm soát sau này (chưa có hạng mục đặt tên)                            |
-| —     | Phase E: ROOT-HARDEN.1                    | n/a      | gỡ chặn mọi hợp đồng liên module mới (`beh1-employee-row-validation-alignment`)              |
+| Story | AC                                        | Coverage | Phần còn lại thuộc                                                              |
+| ----- | ----------------------------------------- | -------- | ------------------------------------------------------------------------------- |
+| —     | Phase A: CP0-09, CP0-10, OPENAPI-EXPORT.1 | n/a      | gỡ chặn `beh1-employee-row-validation-ownership`: OpenAPI ổn định cho lát tiếp  |
+| —     | Phase B: TEST-HARDEN.1                    | n/a      | gỡ chặn mọi lát G3 viết harness (`beh1-employee-row-validation-ownership`)      |
+| —     | Phase C: AUTH.1 (F-18), AUTH.2 (F-31)     | n/a      | gỡ chặn client FE/Mobile tái sinh từ `openapi.json` (chưa có hạng mục đặt tên)  |
+| —     | Phase D: INF.1 (F-30)                     | n/a      | gỡ chặn nâng `pg` có kiểm soát sau này (chưa có hạng mục đặt tên)               |
+| —     | Phase E: ROOT-HARDEN.1                    | n/a      | gỡ chặn mọi hợp đồng liên module mới (`beh1-employee-row-validation-ownership`) |
 
 ## Supporting references
 
