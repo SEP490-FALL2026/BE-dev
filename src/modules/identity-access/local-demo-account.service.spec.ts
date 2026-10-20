@@ -3,7 +3,7 @@ import { AccountDirectoryService } from './accounts/account-directory.service';
 import { CredentialService } from './accounts/credential.service';
 import { RoleGrantService } from './accounts/role-grant.service';
 import { DemoAccountRoleError } from './identity-access.errors';
-import { LocalDemoAccountService } from './identity-access.service';
+import { LocalDemoAccountService } from './local-demo-account.service';
 import { DemoAccountRole } from './identity-access.types';
 
 describe('LocalDemoAccountService', () => {

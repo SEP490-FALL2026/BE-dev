@@ -2,6 +2,7 @@ import { INestApplication } from '@nestjs/common';
 import { METHOD_METADATA } from '@nestjs/common/constants';
 import { ModulesContainer, Reflector } from '@nestjs/core';
 import request from 'supertest';
+import { z } from 'zod';
 import { App } from 'supertest/types';
 import { Test } from '@nestjs/testing';
 import { DECORATORS } from '@nestjs/swagger';
@@ -12,7 +13,6 @@ import {
   DEFAULT_SUCCESS_MESSAGE,
   SUCCESS_MESSAGE_METADATA,
 } from '../../src/infrastructure/http/decorators/api-success-response.decorator';
-import { isRedundantFormatPattern } from '../../src/infrastructure/http/openapi-presentation';
 import {
   IS_AUTHENTICATED_ONLY_METADATA,
   REQUIRED_ROLES_METADATA,
@@ -41,6 +41,22 @@ const BEARER_REQUIREMENT = [{ bearer: [] }];
 const INTERNAL_CODE = /\b(?:US|AC|FR|OQ|R|N|T)-\d|QĐ-|⟹/;
 
 /** Visits every object node of the document with its JSON pointer, so a failure names the exact place. */
+/**
+ * CP0-09: the exact patterns the schema generator (zod) emits next to `format: uuid` and `format: date-time`, written out
+ * as literals so the test does not ask the cleanup code what "redundant" means.
+ */
+const GENERATED_UUID_PATTERN =
+  '^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$';
+const GENERATED_DATE_TIME_PATTERN = String.raw`^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z))$`;
+const GENERATED_DATE_TIME_WITH_OFFSET_PATTERN = String.raw`^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$`;
+/** The business rules the document keeps: codes, message keys and identifiers (written out, not derived). */
+const BUSINESS_PATTERNS = [
+  '^[A-Z][A-Z0-9_]{0,99}$',
+  String.raw`^[A-Z][A-Z0-9_]*(\.[A-Z0-9_]+)+$`,
+  String.raw`^[A-Z][A-Z0-9_]*(\.[A-Z0-9_]+)*$`,
+  '^[A-Za-z0-9][A-Za-z0-9._-]*$',
+];
+
 function visit(node: unknown, at: string, onNode: (value: Record<string, unknown>, at: string) => void): void {
   if (Array.isArray(node)) {
     node.forEach((child, index) => visit(child, `${at}/${index}`, onNode));
@@ -254,18 +270,42 @@ describe('API inventory (e2e)', () => {
       expect(new Set(summaries).size).toBe(summaries.length);
     });
 
+    it('the schema generator still emits exactly these uuid and date-time patterns (an upgrade alarm)', () => {
+      // If zod changes them, this fails first: the cleanup and the expectations below must then be reviewed together.
+      for (const [schema, expected] of [
+        [z.uuid(), GENERATED_UUID_PATTERN],
+        [z.iso.datetime(), GENERATED_DATE_TIME_PATTERN],
+        [z.iso.datetime({ offset: true }), GENERATED_DATE_TIME_WITH_OFFSET_PATTERN],
+      ] as const) {
+        expect((z.toJSONSchema(schema) as { pattern: string }).pattern).toBe(expected);
+      }
+    });
+
     it('uses OpenAPI 3.0 keywords only and no pattern that just repeats a uuid or date-time format', () => {
+      // CP0-09: the expectation is independent of the cleanup code: literal generator patterns, counted directly.
       const problems: string[] = [];
+      const patterns = new Set<string>();
+      let formatted = 0;
       visit(document, '#', (node, at) => {
-        if ('const' in node) problems.push(`${at}: const`);
-        // Only the generator's own uuid/date-time regexes are forbidden; a custom pattern next to them may stay.
-        if (isRedundantFormatPattern(node.format, node.pattern))
-          problems.push(`${at}: generated pattern next to format ${String(node.format)}`);
+        if ('const' in node && typeof node.type === 'string') problems.push(`${at}: const`);
+        if (typeof node.pattern === 'string') patterns.add(node.pattern);
+        if (node.format === 'uuid' || node.format === 'date-time') {
+          formatted += 1;
+          if ('pattern' in node) problems.push(`${at}: pattern next to format ${String(node.format)}`);
+        }
       });
 
       expect(problems).toEqual([]);
-      // Business patterns stay: the success message key keeps its own regex.
-      expect(JSON.stringify(document.components?.schemas?.SessionTokenResponseDto)).toContain('"pattern"');
+      expect(formatted).toBeGreaterThan(0);
+      for (const generated of [
+        GENERATED_UUID_PATTERN,
+        GENERATED_DATE_TIME_PATTERN,
+        GENERATED_DATE_TIME_WITH_OFFSET_PATTERN,
+      ]) {
+        expect(patterns.has(generated)).toBe(false);
+      }
+      // Business patterns stay, exactly these.
+      expect([...patterns].sort()).toEqual([...BUSINESS_PATTERNS].sort());
     });
 
     it('shows credentials as short placeholders and never a token-like or secret-like example', () => {

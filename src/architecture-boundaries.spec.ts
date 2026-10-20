@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve, sep } from 'node:path';
+import * as ts from 'typescript';
 import { environmentConfigOptions, installationEnvironmentConfigOptions } from './infrastructure/config/env-config';
 import { validateEnvironment, validateInstallationEnvironment } from './infrastructure/config/env-schema';
 
@@ -333,6 +334,19 @@ const CLI_ENTRY_FILES: ReadonlySet<string> = new Set([
 const LEGACY_PRIVATE_MODULE_IMPORTS: ReadonlySet<string> = new Set<string>();
 
 /**
+ * ROOT-HARDEN.1: the root files that hold one public injectable contract besides the facade `<module>.service.ts`,
+ * listed exactly (no suffix or wildcard rule; a new one needs Owner/dev review and a real consumer outside the module).
+ */
+const PUBLIC_ROOT_CONTRACT_FILES: ReadonlySet<string> = new Set([
+  // The worker mail loop (email-dispatch.loop.ts) reads the delivery contract; the dispatcher stays private.
+  'notifications/email-delivery.service.ts',
+  // ops:inspect (installation/inspect) reads the account side of the inspection.
+  'identity-access/identity-access-inspection.service.ts',
+  // dev:seed (installation/dev-seed) writes the local demo accounts.
+  'identity-access/local-demo-account.service.ts',
+]);
+
+/**
  * The public surface of a business module, as path segments below src/modules: only these files directly in the
  * module root — the Nest modules, the facade service, public types and public errors. Anything else in the root, a
  * repo, the credential hasher and every subfolder file is private. Kept in step with `isModuleRootPublicSurface` of
@@ -341,6 +355,7 @@ const LEGACY_PRIVATE_MODULE_IMPORTS: ReadonlySet<string> = new Set<string>();
 function isModulePublicSurface(parts: string[]): boolean {
   if (parts.length !== 2) return false;
   const [moduleName, fileName] = parts;
+  if (PUBLIC_ROOT_CONTRACT_FILES.has(parts.join('/'))) return true;
 
   return (
     fileName === `${moduleName}.module.ts` ||
@@ -471,5 +486,129 @@ describe('installation command dependency boundary (R-13)', () => {
         importsInstallationConfiguration: false,
       });
     }
+  });
+});
+
+/**
+ * ROOT-HARDEN.1: one public injectable contract per file. Every non-spec source file under src/modules exports at most
+ * one `@Injectable` class (private helper classes, interfaces and functions stay allowed). Read with the TypeScript
+ * parser: a comment or a string naming a decorator does not count.
+ */
+function exportedInjectables(file: string, source: string): string[] {
+  const parsed = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+  return parsed.statements.filter(ts.isClassDeclaration).flatMap((declaration) => {
+    const exported = ts.getModifiers(declaration)?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword);
+    const injectable = (ts.getDecorators(declaration) ?? []).some((decorator) => {
+      const expression = ts.isCallExpression(decorator.expression)
+        ? decorator.expression.expression
+        : decorator.expression;
+      return ts.isIdentifier(expression) && expression.text === 'Injectable';
+    });
+    return exported && injectable && declaration.name ? [declaration.name.text] : [];
+  });
+}
+
+/** `export ... from '...'` declarations (re-exports, barrels) of a source file, by module specifier. */
+function reExports(file: string, source: string): string[] {
+  const parsed = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+  return parsed.statements
+    .filter(ts.isExportDeclaration)
+    .flatMap((declaration) =>
+      declaration.moduleSpecifier && ts.isStringLiteral(declaration.moduleSpecifier)
+        ? [declaration.moduleSpecifier.text]
+        : [],
+    );
+}
+
+describe('ROOT-HARDEN.1: public injectable contracts', () => {
+  const sourceRoot = join(process.cwd(), 'src');
+  const modulesRoot = join(sourceRoot, 'modules');
+  const toModulePath = (file: string) => relative(modulesRoot, file).split(sep).join('/');
+
+  it('exports at most one @Injectable class from each source file of a business module', () => {
+    const findings = listTypeScriptFiles(modulesRoot)
+      .map((file) => ({ file: toModulePath(file), injectables: exportedInjectables(file, readFileSync(file, 'utf8')) }))
+      .filter((finding) => finding.injectables.length > 1);
+
+    expect(findings).toEqual([]);
+  });
+
+  it('lists only public root contract files that exist, hold one injectable and have a consumer outside their module', () => {
+    // Generated code imports nothing of ours and uses specifiers this resolver does not follow.
+    const importers = listTypeScriptFiles(sourceRoot).filter((file) => !file.includes(`${sep}generated${sep}`));
+    const findings = [...PUBLIC_ROOT_CONTRACT_FILES].flatMap((entry) => {
+      const file = join(modulesRoot, ...entry.split('/'));
+      if (!existsSync(file)) return [`${entry}: missing`];
+      const problems: string[] = [];
+      if (exportedInjectables(file, readFileSync(file, 'utf8')).length !== 1)
+        problems.push(`${entry}: not one injectable`);
+      const owner = entry.split('/')[0];
+      const consumers = importers.filter((importer) => {
+        const path = relative(sourceRoot, importer).split(sep);
+        if (path[0] === 'modules' && path[1] === owner) return false;
+        return listRelativeSpecifiers(readFileSync(importer, 'utf8')).some(
+          (specifier) => resolveRelativeImport(importer, specifier) === file,
+        );
+      });
+      if (consumers.length === 0) problems.push(`${entry}: no consumer outside the module`);
+      return problems;
+    });
+
+    expect(findings).toEqual([]);
+  });
+
+  it('keeps the root public surface of architecture-structure.spec.ts in step with this exact registry', () => {
+    const structure = readFileSync(join(sourceRoot, 'architecture-structure.spec.ts'), 'utf8');
+    const block = /const PUBLIC_ROOT_CONTRACT_FILES[^=]*=\s*new Set\(\[([\s\S]*?)\]\)/.exec(structure)?.[1] ?? '';
+    const listed = [...block.matchAll(/'([^']+)'/g)].map((match) => match[1]).sort();
+
+    expect(listed).toEqual([...PUBLIC_ROOT_CONTRACT_FILES].sort());
+  });
+
+  it('re-exports nothing from a business module file: no barrel can hand a private class to another module', () => {
+    const findings = listTypeScriptFiles(modulesRoot)
+      .map((file) => ({ file: toModulePath(file), reExports: reExports(file, readFileSync(file, 'utf8')) }))
+      .filter((finding) => finding.reExports.length > 0);
+
+    expect(findings).toEqual([]);
+  });
+
+  it('opens exactly the registered root contract files, not every root *.service.ts', () => {
+    const otherModule = join(modulesRoot, 'organization', 'organization.service.ts');
+
+    expect(
+      privateModuleImport(sourceRoot, otherModule, join(modulesRoot, 'notifications', 'email-delivery.service.ts')),
+    ).toEqual([]);
+    for (const privateService of [
+      join(modulesRoot, 'notifications', 'email-dispatcher.service.ts'),
+      join(modulesRoot, 'identity-access', 'session-helper.service.ts'),
+    ]) {
+      expect(privateModuleImport(sourceRoot, otherModule, privateService)).toHaveLength(1);
+    }
+  });
+
+  describe('the check itself', () => {
+    it('counts exported @Injectable classes only, not private helpers, plain classes, comments or strings', () => {
+      const source = [
+        "import { Injectable } from '@nestjs/common';",
+        '// @Injectable() export class InComment {}',
+        "const text = '@Injectable() export class InString {}';",
+        '@Injectable()',
+        'export class PublicService {}',
+        '@Injectable()',
+        'class PrivateHelper {}',
+        'export class PlainValue {}',
+        'export interface Shape { value: number }',
+      ].join('\n');
+
+      expect(exportedInjectables('a.ts', source)).toEqual(['PublicService']);
+      expect(
+        reExports('c.ts', "export { A } from './a';\nexport * from './b';\nexport { local };\nconst local = 1;"),
+      ).toEqual(['./a', './b']);
+      expect(exportedInjectables('b.ts', `${source}\n@Injectable()\nexport class SecondService {}`)).toEqual([
+        'PublicService',
+        'SecondService',
+      ]);
+    });
   });
 });

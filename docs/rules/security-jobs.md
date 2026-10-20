@@ -34,6 +34,11 @@
   or `/me/password`; they are never accepted
   as arguments or environment variables, and never logged or stored in audit (`AuditService` rejects
   keys that look like secrets).
+- Transport limits only bound the body; the password policy (12–128) decides and names the reason. A new password
+  (reset, change, invitation) may carry up to 1024 characters, so 129–1024 answers `AUTH.PASSWORD_POLICY_VIOLATION`
+  and longer answers `VALIDATION_ERROR` (AUTH.2 / F-31); the login and current passwords stay at 256.
+- `Authorization: Bearer <token>`: the scheme is case-insensitive (`bearer`, `BEARER`, RFC 9110), the rest is exact — one
+  space and a token without whitespace (AUTH.1 / F-18).
 - Never trust client-supplied privileges. A signed JWT alone does not establish
   current account status or resource permission.
 - Distinguish invalid credentials from unavailable dependencies. Do not log secrets.

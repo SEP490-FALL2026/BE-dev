@@ -1,5 +1,5 @@
 import { EmailDispatcher } from './email-dispatcher.service';
-import { EmailDeliveryService } from './notifications.service';
+import { EmailDeliveryService } from './email-delivery.service';
 
 describe('EmailDeliveryService', () => {
   it('hands the due batch and the link check to the private dispatcher and returns its count', async () => {

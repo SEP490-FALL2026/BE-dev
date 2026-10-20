@@ -2,7 +2,7 @@ import { DbTx } from '../../infrastructure/database/transaction-runner';
 import { AccountDirectoryService } from './accounts/account-directory.service';
 import { RoleGrantService } from './accounts/role-grant.service';
 import { ApprovalRoleDirectoryService } from './approval-roles/approval-role-directory.service';
-import { IdentityAccessInspectionService } from './identity-access.service';
+import { IdentityAccessInspectionService } from './identity-access-inspection.service';
 
 describe('IdentityAccessInspectionService', () => {
   const tx = {} as DbTx;

@@ -1,6 +1,6 @@
 import { DbTx, TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import { AuditService } from '../../audit/audit.service';
-import { IdentityAccessInspectionService } from '../../identity-access/identity-access.service';
+import { IdentityAccessInspectionService } from '../../identity-access/identity-access-inspection.service';
 import { OrganizationService } from '../../organization/organization.service';
 import { BOOTSTRAP_ACTIONS } from './inspection-facts';
 import { InstallationInspectionService } from './inspection.service';

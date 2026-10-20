@@ -83,3 +83,104 @@ describe('toOpenApi30Presentation', () => {
     expect(JSON.stringify(input)).toBe(snapshot);
   });
 });
+
+/** CP0-10: `const` is a schema keyword; it is converted only on schema objects, never on names or values. */
+describe('toOpenApi30Presentation: `const` only where it is a schema keyword', () => {
+  const ENUM_FALSE = { type: 'boolean', enum: [false] };
+  const document = () => ({
+    openapi: '3.0.0',
+    paths: {
+      '/things/{kind}': {
+        get: {
+          parameters: [{ name: 'kind', in: 'path', schema: { type: 'string', const: 'a' } }],
+          responses: {
+            '200': {
+              description: 'ok',
+              headers: { 'X-Flag': { schema: { type: 'boolean', const: true } } },
+              content: {
+                'application/json': {
+                  schema: { $ref: '#/components/schemas/Thing' },
+                  // A response example is a value: its `const` key is data, not a keyword.
+                  example: { const: 'value', nested: { const: 1 } },
+                  examples: { one: { value: { const: 'x' } } },
+                },
+              },
+            },
+          },
+          'x-internal': { const: 'extension payload' },
+        },
+      },
+    },
+    components: {
+      schemas: {
+        Thing: {
+          type: 'object',
+          properties: {
+            // A property literally named `const`: its name stays, its own schema keyword converts.
+            const: { type: 'string', const: 'k' },
+            flag: { type: 'boolean', const: false },
+            list: { type: 'array', items: { type: 'boolean', const: false } },
+            tuple: { type: 'array', prefixItems: [{ type: 'boolean', const: false }] },
+            map: { type: 'object', additionalProperties: { type: 'boolean', const: false } },
+            either: { anyOf: [{ type: 'boolean', const: false }, { oneOf: [{ type: 'boolean', const: false }] }] },
+            both: { allOf: [{ type: 'object', properties: { inner: { type: 'boolean', const: false } } }] },
+            notThis: { not: { type: 'boolean', const: false } },
+            withDefault: { type: 'object', default: { const: 'kept' } },
+            withExample: { type: 'object', example: { const: 'kept' }, 'x-note': { const: 'kept' } },
+            withEnumValue: { type: 'object', enum: [{ const: 'kept' }] },
+          },
+        },
+      },
+    },
+  });
+
+  it('converts `const` on schemas: parameters, headers, components, and every subschema position', () => {
+    const result = toOpenApi30Presentation(document());
+    const operation = result.paths['/things/{kind}'].get;
+    const { properties } = result.components.schemas.Thing;
+
+    expect(operation.parameters[0].schema).toEqual({ type: 'string', enum: ['a'] });
+    expect(operation.responses['200'].headers['X-Flag'].schema).toEqual({ type: 'boolean', enum: [true] });
+    expect(properties.flag).toEqual(ENUM_FALSE);
+    expect(properties.list.items).toEqual(ENUM_FALSE);
+    expect(properties.tuple.prefixItems[0]).toEqual(ENUM_FALSE);
+    expect(properties.map.additionalProperties).toEqual(ENUM_FALSE);
+    expect(properties.either.anyOf[0]).toEqual(ENUM_FALSE);
+    expect((properties.either.anyOf[1] as { oneOf: unknown[] }).oneOf[0]).toEqual(ENUM_FALSE);
+    expect(properties.both.allOf[0].properties.inner).toEqual(ENUM_FALSE);
+    expect(properties.notThis.not).toEqual(ENUM_FALSE);
+  });
+
+  it('keeps a property named `const` as a property name', () => {
+    const { properties } = toOpenApi30Presentation(document()).components.schemas.Thing;
+
+    expect(Object.keys(properties)).toContain('const');
+    expect(properties.const).toEqual({ type: 'string', enum: ['k'] });
+    expect(Object.keys(properties)).not.toContain('enum');
+  });
+
+  it('never renames `const` inside an example, examples, default, an enum value or an extension', () => {
+    const result = toOpenApi30Presentation(document());
+    const media = result.paths['/things/{kind}'].get.responses['200'].content['application/json'];
+    const { properties } = result.components.schemas.Thing;
+
+    expect(media.example).toEqual({ const: 'value', nested: { const: 1 } });
+    expect(media.examples.one.value).toEqual({ const: 'x' });
+    expect(result.paths['/things/{kind}'].get['x-internal']).toEqual({ const: 'extension payload' });
+    expect(properties.withDefault.default).toEqual({ const: 'kept' });
+    expect(properties.withExample.example).toEqual({ const: 'kept' });
+    expect(properties.withExample['x-note']).toEqual({ const: 'kept' });
+    expect(properties.withEnumValue.enum).toEqual([{ const: 'kept' }]);
+  });
+
+  it('leaves its input untouched and gives the same result when applied twice', () => {
+    const input = document();
+    const snapshot = JSON.stringify(input);
+
+    const once = toOpenApi30Presentation(input);
+    const twice = toOpenApi30Presentation(once);
+
+    expect(JSON.stringify(input)).toBe(snapshot);
+    expect(twice).toEqual(once);
+  });
+});

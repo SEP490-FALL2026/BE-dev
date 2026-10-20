@@ -224,7 +224,9 @@ describe('password self-service over HTTP (integration, real PostgreSQL)', () =>
       expect(tokens).toHaveLength(3);
       expect(tokens.slice(0, 2).map((token) => token.revoked_reason)).toEqual(['SUPERSEDED', 'SUPERSEDED']);
       expect(tokens[2]).toMatchObject({ revoked_at: null, consumed_at: null, revoked_reason: null });
-      const states = await Promise.all(tokens.map((token) => mailFor(token.token_hash)));
+      // One pg client: queries go one at a time (INF.1 — pg 9 drops queueing on a busy client).
+      const states: Awaited<ReturnType<typeof mailFor>>[] = [];
+      for (const token of tokens) states.push(await mailFor(token.token_hash));
       expect(states.map((rows) => rows.map((row) => row.status))).toEqual([['CANCELLED'], ['CANCELLED'], ['PENDING']]);
     });
 
@@ -786,6 +788,22 @@ describe('password self-service over HTTP (integration, real PostgreSQL)', () =>
         const answer = await change(session.accessToken, SEED_PASSWORD, weak).expect(422);
         expect(bodyOf(answer).error.code).toBe('AUTH.PASSWORD_POLICY_VIOLATION');
       }
+
+      expect(await credentialOf(account.appUserId)).toEqual(before);
+      await request(server()).get('/api/v1/me').set('Authorization', `Bearer ${session.accessToken}`).expect(200);
+    });
+
+    it('AUTH.2: lets the policy name a too-long new password up to 1024 characters; beyond that the body is malformed', async () => {
+      const account = await newAccount();
+      const session = await signIn(account.email);
+      const before = await credentialOf(account.appUserId);
+
+      for (const length of [129, 257, 1024]) {
+        const answer = await change(session.accessToken, SEED_PASSWORD, 'x'.repeat(length)).expect(422);
+        expect({ length, code: bodyOf(answer).error.code }).toEqual({ length, code: 'AUTH.PASSWORD_POLICY_VIOLATION' });
+      }
+      const oversize = await change(session.accessToken, SEED_PASSWORD, 'x'.repeat(1025)).expect(422);
+      expect(bodyOf(oversize).error.code).toBe('VALIDATION_ERROR');
 
       expect(await credentialOf(account.appUserId)).toEqual(before);
       await request(server()).get('/api/v1/me').set('Authorization', `Bearer ${session.accessToken}`).expect(200);

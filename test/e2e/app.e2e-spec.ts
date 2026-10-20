@@ -353,6 +353,45 @@ describe('Application foundation (e2e)', () => {
     }
   });
 
+  it('AUTH.1: accepts the Bearer scheme in any case and hands the exact token to the verifier; refuses the rest', async () => {
+    const verify = jest.fn().mockResolvedValue(principalWithRoles());
+    const moduleFixture: TestingModule = await Test.createTestingModule({
+      imports: [AppModule],
+      controllers: [ProtectedProbeController],
+    })
+      .overrideProvider(ACCESS_TOKEN_VERIFIER)
+      .useValue({ verify })
+      .compile();
+    const caseApp: INestApplication<App> = moduleFixture.createNestApplication();
+    configureApplication(caseApp);
+    await caseApp.init();
+
+    try {
+      for (const header of ['Bearer Good.Token', 'bearer Good.Token', 'BEARER Good.Token', 'bEaReR Good.Token']) {
+        verify.mockClear();
+        await request(caseApp.getHttpServer()).get('/api/v1/protected-probe').set('authorization', header).expect(200);
+        expect({ header, tokens: verify.mock.calls.map(([token]: unknown[]) => token) }).toEqual({
+          header,
+          tokens: ['Good.Token'],
+        });
+      }
+      for (const header of ['Basic Good.Token', 'Bearer', 'Bearer  Good.Token', 'Bearer Good Token', 'Bearer\tGood']) {
+        verify.mockClear();
+        const response = await request(caseApp.getHttpServer())
+          .get('/api/v1/protected-probe')
+          .set('authorization', header)
+          .expect(401);
+        expect({ header, code: bodyOf(response).error.code, verified: verify.mock.calls.length }).toEqual({
+          header,
+          code: 'AUTHENTICATION_REQUIRED',
+          verified: 0,
+        });
+      }
+    } finally {
+      await caseApp.close();
+    }
+  });
+
   it('answers 503 without describing the infrastructure when the authentication service is unreachable', async () => {
     // The token here is fine. Only the authentication service is unreachable, so the caller must be
     // told to retry rather than to sign in again — and must learn nothing about why.

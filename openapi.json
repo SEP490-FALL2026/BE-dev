@@ -4393,7 +4393,7 @@
         "type": "object",
         "properties": {
           "currentPassword": { "type": "string", "minLength": 1, "maxLength": 256, "example": "<current-password>" },
-          "newPassword": { "type": "string", "minLength": 1, "maxLength": 256, "example": "<new-password>" }
+          "newPassword": { "type": "string", "minLength": 1, "maxLength": 1024, "example": "<new-password>" }
         },
         "required": ["currentPassword", "newPassword"],
         "additionalProperties": false

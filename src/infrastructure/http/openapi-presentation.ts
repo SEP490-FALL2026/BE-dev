@@ -25,15 +25,73 @@ export function isRedundantFormatPattern(format: unknown, pattern: unknown): boo
  * untouched. Returns a new document; the input is not modified.
  */
 export function toOpenApi30Presentation<T>(document: T): T {
-  return present(document) as T;
+  return walkDocument(document) as T;
 }
 
-function present(node: unknown): unknown {
-  if (Array.isArray(node)) return node.map(present);
-  if (node === null || typeof node !== 'object') return node;
+/** Keywords whose value is one subschema (or a boolean schema). */
+const SUBSCHEMA = new Set([
+  'items',
+  'additionalProperties',
+  'not',
+  'if',
+  'then',
+  'else',
+  'contains',
+  'propertyNames',
+  'unevaluatedItems',
+  'unevaluatedProperties',
+  'additionalItems',
+]);
+/** Keywords whose value is a list of subschemas. */
+const SUBSCHEMA_LIST = new Set(['allOf', 'anyOf', 'oneOf', 'prefixItems']);
+/** Keywords whose value maps names (never keywords) to subschemas. */
+const SUBSCHEMA_MAP = new Set(['properties', 'patternProperties', '$defs', 'definitions', 'dependentSchemas']);
+/** Keys of the document (outside schemas) whose value is data, copied as it is. */
+const DOCUMENT_VALUES = new Set(['example', 'examples', 'default', 'enum', 'const']);
+
+/** A deep copy, never interpreted: examples, defaults, enum values and extensions are data. */
+const copy = (value: unknown): unknown => structuredClone(value);
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  value !== null && typeof value === 'object' && !Array.isArray(value);
+
+/**
+ * The OpenAPI document outside schemas (CP0-10). It is walked to find the schemas: `components.schemas.*` and every
+ * `schema` (parameters, headers, media types). Examples and `x-*` extensions are copied as they are.
+ */
+function walkDocument(node: unknown, key?: string): unknown {
+  if (Array.isArray(node)) return node.map((item) => walkDocument(item));
+  if (!isRecord(node)) return node;
 
   const result: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(node)) result[key] = present(value);
+  for (const [name, value] of Object.entries(node)) {
+    if (DOCUMENT_VALUES.has(name) || name.startsWith('x-')) result[name] = copy(value);
+    else if (name === 'schema') result[name] = walkSchema(value);
+    else if (name === 'schemas' && key === 'components') result[name] = walkSchemaMap(value);
+    else result[name] = walkDocument(value, name);
+  }
+  return result;
+}
+
+function walkSchemaMap(node: unknown): unknown {
+  if (!isRecord(node)) return copy(node);
+  return Object.fromEntries(Object.entries(node).map(([name, schema]) => [name, walkSchema(schema)]));
+}
+
+/**
+ * One schema object: `const` becomes a single-value `enum` and a pattern that only repeats its format is dropped; its
+ * subschemas are walked as schemas; every other keyword's value (example, default, enum values, a `const` value,
+ * extensions, discriminator…) is copied as it is.
+ */
+function walkSchema(node: unknown): unknown {
+  if (!isRecord(node)) return copy(node);
+
+  const result: Record<string, unknown> = {};
+  for (const [name, value] of Object.entries(node)) {
+    if (SUBSCHEMA.has(name)) result[name] = walkSchema(value);
+    else if (SUBSCHEMA_LIST.has(name)) result[name] = Array.isArray(value) ? value.map(walkSchema) : copy(value);
+    else if (SUBSCHEMA_MAP.has(name)) result[name] = walkSchemaMap(value);
+    else result[name] = copy(value);
+  }
 
   if ('const' in result) {
     result.enum = [result.const];

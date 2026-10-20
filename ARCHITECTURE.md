@@ -222,7 +222,7 @@ WorkerModule chạy `EmailDispatchLoop` (`src/email-dispatch.loop.ts`): vòng th
 `OUTBOX_POLL_INTERVAL_MS` gửi thư trong EmailOutbox ([ADR-0012](docs/decisions/0012-account-email-delivery.md), vẫn
 **Proposed**) — không cần Redis cho việc này.
 Vòng lặp là orchestration có chủ đích ở composition root vì nối hai module không được import nhau: `notifications`
-gửi thư qua hợp đồng công khai `EmailDeliveryService.dispatchDue` (trong `notifications.service.ts`, đăng ký ở
+gửi thư qua hợp đồng công khai `EmailDeliveryService.dispatchDue` (tệp riêng `email-delivery.service.ts` từ ROOT-HARDEN.1, đăng ký ở
 `PUBLIC_CONTRACT_EXPORTS`), facade `IdentityAccessService.isActionLinkUsable` trả lời liên kết trong thư còn dùng được
 không. `EmailDispatcher`, repo, cipher và transport vẫn private (ROOT.1).
 Các CLI (`installation-cli.ts`, `recovery-cli.ts`, `inspect-cli.ts`, `dev-seed-cli.ts`) dùng chung

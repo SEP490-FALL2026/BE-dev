@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '../../../generated/prisma/client';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import { AuditService } from '../../audit/audit.service';
-import { IdentityAccessInspectionService } from '../../identity-access/identity-access.service';
+import { IdentityAccessInspectionService } from '../../identity-access/identity-access-inspection.service';
 import { OrganizationService } from '../../organization/organization.service';
 import { BOOTSTRAP_ACTIONS, bootstrapMismatches, maskEmail, problemsOf, summarizeMigrations } from './inspection-facts';
 import { InstallationInspection, MigrationReport } from './inspection.types';

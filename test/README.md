@@ -43,6 +43,20 @@ Developer viết tay cũng dùng cùng quy tắc.
 - **Lách sai:** đổi tên một ma trận test 1.000 dòng hoặc dời assertion sang script không đăng ký để né Jest/test
   discovery. Suite phải được tìm thấy qua lệnh unit test thông thường.
 
+### Tệp trong test/support (TEST-HARDEN.1)
+
+- Mỗi `test/support/**/*.ts` là fixture, builder, fake hoặc harness: tối đa **400 dòng vật lý**, không ledger, ngoại lệ
+  hay cap cao hơn; không đăng ký test và không assertion. Gate
+  [test-support-structure.spec.ts](../src/test-support-structure.spec.ts) đọc bằng parser TypeScript (không tìm chuỗi):
+  từ chối gọi hay tham chiếu tự do `describe`/`it`/`test`/`expect`/hook (kể cả `.only`/`.skip`/`.each`, `fit`/`xit`/…),
+  qua `globalThis`/`global` hay bí danh, import `@jest/globals`/`vitest`/`chai`/`assert`/`node:assert`/`node:test`, và tên
+  tệp giống spec hay khớp pattern runner.
+- **Đúng:** `request(app).post(...).expect(200)` (SuperTest), `/^[A-Z]+$/.test(code)`, method/property tên `it` hay `test`,
+  `jest.fn()` cho fake, tên trong chuỗi/chú thích; một harness có kiểu trả fake để spec tự `expect`.
+- **Sai:** `describe(...)`, `it(...)`, `expect(...)` hay `afterAll(...)` trong support; `import { expect } from '@jest/globals'`.
+- **Lách sai:** `const register = it`, `export const api = { it }`, `globalThis.describe(...)`, `global['it'](...)`, đặt tên
+  `helper.spec.ts` trong `support/`, hoặc dời assertion vào một hàm support rồi gọi từ spec.
+
 ### Import file private của src
 
 - Ưu tiên kiểm qua HTTP, facade hoặc contract công khai khi mục tiêu của test cho phép.

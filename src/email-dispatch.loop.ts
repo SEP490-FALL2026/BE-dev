@@ -2,7 +2,7 @@ import { Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from '@ne
 import { ConfigService } from '@nestjs/config';
 import { EnvironmentVariables } from './infrastructure/config/env-schema';
 import { IdentityAccessService } from './modules/identity-access/identity-access.service';
-import { EmailDeliveryService } from './modules/notifications/notifications.service';
+import { EmailDeliveryService } from './modules/notifications/email-delivery.service';
 
 /**
  * The worker's mail loop (ADR-0012): a database poll, not a queue job. It lives at the

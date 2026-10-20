@@ -5,7 +5,8 @@ import { DatabaseEnvironmentVariables } from '../../../infrastructure/config/env
 import { DbTx, TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import { isUniqueViolation } from '../../../infrastructure/database/unique-violation';
 import { AuditService } from '../../audit/audit.service';
-import { IdentityAccessService, LocalDemoAccountService } from '../../identity-access/identity-access.service';
+import { IdentityAccessService } from '../../identity-access/identity-access.service';
+import { LocalDemoAccountService } from '../../identity-access/local-demo-account.service';
 import { OrganizationService } from '../../organization/organization.service';
 import { DEMO_FIXTURE_KEYS, DEMO_PEOPLE_LOOKUP, buildSeedPlan, samePlan } from './dev-seed-plan';
 import { SeedStateChangedError } from './dev-seed.errors';

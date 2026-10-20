@@ -281,9 +281,20 @@ function moduleArea(file: string): { moduleName: string; area: string } {
  * Module-root files that are public: the Nest modules, the facade service, public types and public errors. Kept in
  * step with `isModulePublicSurface` of architecture-boundaries.spec.ts; the rest of the root is private.
  */
+/**
+ * ROOT-HARDEN.1: the exact root contract files besides `<module>.service.ts`; the same list as in
+ * architecture-boundaries.spec.ts, which checks that both stay equal.
+ */
+const PUBLIC_ROOT_CONTRACT_FILES: ReadonlySet<string> = new Set([
+  'notifications/email-delivery.service.ts',
+  'identity-access/identity-access-inspection.service.ts',
+  'identity-access/local-demo-account.service.ts',
+]);
+
 function isModuleRootPublicSurface(file: string): boolean {
   const [moduleName, fileName, ...rest] = moduleSegments(file);
   if (fileName === undefined || rest.length > 0) return false;
+  if (PUBLIC_ROOT_CONTRACT_FILES.has(`${moduleName}/${fileName}`)) return true;
 
   return (
     fileName === `${moduleName}.module.ts` ||

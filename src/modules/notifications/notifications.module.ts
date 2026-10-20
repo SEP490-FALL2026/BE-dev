@@ -5,7 +5,8 @@ import { DatabaseModule } from '../../infrastructure/database/database.module';
 import { MailTransport, SmtpMailTransport } from '../../infrastructure/mail/mail-transport';
 import { EmailDispatcher } from './email-dispatcher.service';
 import { NotificationsRepo } from './notifications.repo';
-import { EmailDeliveryService, NotificationsService } from './notifications.service';
+import { EmailDeliveryService } from './email-delivery.service';
+import { NotificationsService } from './notifications.service';
 import { PayloadCipher } from './payload-cipher';
 
 /** `id:base64` pairs separated by commas. */

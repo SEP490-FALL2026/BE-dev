@@ -37,13 +37,24 @@ export function cliWorkingDirectory(prefix: string): string {
 
 /**
  * Runs `src/<entry>` through ts-node with exactly `environment` plus the process basics (PATH, SystemRoot, TEMP,
- * TMP) and no stdin. The child is killed after `timeoutMs`.
+ * TMP; a basic named in `environment` takes that value) and no stdin. The child is killed after `timeoutMs`.
  */
-export function runCli(
-  entry: string,
-  args: readonly string[],
-  options: { cwd: string; environment: Record<string, string>; timeoutMs?: number },
-): Promise<CliResult> {
+export function runCli(entry: string, args: readonly string[], options: RunOptions): Promise<CliResult> {
+  return runTypeScript(join('src', entry), args, options);
+}
+
+/** Runs a repository script (a path from the project root, e.g. `scripts/dev/export-openapi.ts`) the same way. */
+export function runScript(path: string, args: readonly string[], options: RunOptions): Promise<CliResult> {
+  return runTypeScript(path, args, options);
+}
+
+interface RunOptions {
+  cwd: string;
+  environment: Record<string, string>;
+  timeoutMs?: number;
+}
+
+function runTypeScript(path: string, args: readonly string[], options: RunOptions): Promise<CliResult> {
   const environment: Record<string, string> = {
     TS_NODE_TRANSPILE_ONLY: 'true',
     // The working directory is empty, so ts-node must be told where the TypeScript project is.
@@ -52,11 +63,11 @@ export function runCli(
   };
   for (const name of ['PATH', 'SystemRoot', 'TEMP', 'TMP']) {
     const value = process.env[name];
-    if (value !== undefined) environment[name] = value;
+    if (value !== undefined && !(name in options.environment)) environment[name] = value;
   }
 
   return new Promise((resolveRun, rejectRun) => {
-    const child = spawn(process.execPath, ['-r', TS_NODE, join(PROJECT_ROOT, 'src', entry), ...args], {
+    const child = spawn(process.execPath, ['-r', TS_NODE, join(PROJECT_ROOT, path), ...args], {
       cwd: options.cwd,
       env: environment,
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -71,7 +82,7 @@ export function runCli(
     const killer = setTimeout(
       () => {
         child.kill('SIGKILL');
-        rejectRun(new Error(`${entry} did not finish in time\nstdout: ${stdout}\nstderr: ${stderr}`));
+        rejectRun(new Error(`${path} did not finish in time\nstdout: ${stdout}\nstderr: ${stderr}`));
       },
       options.timeoutMs ?? CLI_COLD_START_MS - 10000,
     );

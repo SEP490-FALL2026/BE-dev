@@ -78,6 +78,20 @@ entry CLI liệt kê trong `CLI_ENTRY_FILES` của [architecture-boundaries.spec
 module khác thì không. Mọi file root khác, file trong subfolder, repo và credential hasher là private; không truy cập
 bảng module khác.
 
+**Một hợp đồng injectable công khai mỗi tệp (ROOT-HARDEN.1).** Mỗi tệp nguồn non-spec dưới `src/modules/**` export tối
+đa **một** lớp `@Injectable` (lớp/interface/hàm helper private vẫn được). Một hợp đồng công khai thứ hai của module nằm ở
+tệp root riêng, đăng ký **chính xác** trong `PUBLIC_ROOT_CONTRACT_FILES` của
+[architecture-boundaries.spec.ts](../../src/architecture-boundaries.spec.ts) (cùng danh sách ở
+`architecture-structure.spec.ts`), có consumer thật ngoài module và token ở `PUBLIC_CONTRACT_EXPORTS`. Không tệp module nào
+re-export (`export ... from`). Gate đọc bằng parser TypeScript.
+
+- **Đúng:** `notifications/notifications.service.ts` chỉ chứa `NotificationsService`; `notifications/email-delivery.service.ts`
+  chứa `EmailDeliveryService` cho vòng gửi thư của worker; `identity-access-inspection.service.ts` và
+  `local-demo-account.service.ts` cho hai lệnh vận hành.
+- **Sai:** hai facade `@Injectable` công khai trong một `<module>.service.ts` để lọt qua quy tắc tên tệp.
+- **Lách sai:** barrel hay `export { EmailDispatcher } from './email-dispatcher.service'` trong tệp công khai; allowlist chung
+  cho mọi `*.service.ts` ở root; đăng ký một tệp không ai ngoài module dùng.
+
 Nest module nghiệp vụ chỉ export **contract công khai**: facade, port nó hiện thực cho `infrastructure`, hoặc service của
 module entry CLI — danh sách cặp `Module: token` chính xác trong `PUBLIC_CONTRACT_EXPORTS` của
 [module-graph.spec.ts](../../src/module-graph.spec.ts). Token khác bị coi là private bất kể tên (ngoại lệ đang gỡ nằm
@@ -103,16 +117,17 @@ trong ledger, xem dưới).
 
 Ngưỡng là **tín hiệu kiểm tra**, không phải lý do máy móc để chia nhỏ:
 
-| Tín hiệu                                    | Ngưỡng                              | Hành động                                                                                                                |
-| ------------------------------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| File non-spec trong `src/`                  | > 400 dòng (gate); > 700 dòng (cấm) | Tách trước khi thêm; file trong ledger không được vượt cap                                                               |
-| Unit spec trong `src/modules/**`            | > 400 dòng (gate, không ledger)     | Tách theo use case; harness chung ở `test/support/` ([test guide](../../test/README.md#kích-thước-unit-spec-của-module)) |
-| Controller ở root module                    | > 2 (gate)                          | Chia theo capability                                                                                                     |
-| File non-spec ở root module                 | > 12 (gate)                         | Chia theo capability                                                                                                     |
-| Độ sâu thư mục trong module                 | > 2 (gate)                          | Gộp lại hoặc tách capability                                                                                             |
-| Service nhận > 6 dependency                 | review                              | Xem service có điều phối quá nhiều capability không                                                                      |
-| Repo ghi > 1 aggregate hoặc nhiều nhóm bảng | review                              | Tách repo theo aggregate                                                                                                 |
-| Capability không có owner rõ ràng           | review                              | Ghi owner trong spec của item; tách folder hoặc bounded context                                                          |
+| Tín hiệu                                    | Ngưỡng                                                         | Hành động                                                                                                                |
+| ------------------------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| File non-spec trong `src/`                  | > 400 dòng (gate); > 700 dòng (cấm)                            | Tách trước khi thêm; file trong ledger không được vượt cap                                                               |
+| Unit spec trong `src/modules/**`            | > 400 dòng (gate, không ledger)                                | Tách theo use case; harness chung ở `test/support/` ([test guide](../../test/README.md#kích-thước-unit-spec-của-module)) |
+| Tệp `test/support/**/*.ts`                  | > 400 dòng, gọi/import test hay assertion (gate, không ledger) | Fixture/harness thuần; assertion ở spec ([test guide](../../test/README.md#tệp-trong-testsupport-test-harden1))          |
+| Controller ở root module                    | > 2 (gate)                                                     | Chia theo capability                                                                                                     |
+| File non-spec ở root module                 | > 12 (gate)                                                    | Chia theo capability                                                                                                     |
+| Độ sâu thư mục trong module                 | > 2 (gate)                                                     | Gộp lại hoặc tách capability                                                                                             |
+| Service nhận > 6 dependency                 | review                                                         | Xem service có điều phối quá nhiều capability không                                                                      |
+| Repo ghi > 1 aggregate hoặc nhiều nhóm bảng | review                                                         | Tách repo theo aggregate                                                                                                 |
+| Capability không có owner rõ ràng           | review                                                         | Ghi owner trong spec của item; tách folder hoặc bounded context                                                          |
 
 Ngoại lệ phải ghi lý do và người sở hữu remediation trong item. Refactor cấu trúc là thay đổi riêng, không gộp với thay
 đổi hành vi.
@@ -125,6 +140,7 @@ Ngoại lệ phải ghi lý do và người sở hữu remediation trong item. R
 | Liên module chỉ qua allowlist bề mặt công khai (+ entry CLI cho composition root); Prisma delegate và raw SQL chỉ trên bảng mình sở hữu                                                                                                                                                                                                                                                                       | [architecture-boundaries.spec.ts](../../src/architecture-boundaries.spec.ts) |
 | Import chéo capability (gồm root module) chỉ tới contract đăng ký chính xác, registry không thừa/thiếu, controller → controller, folder catch-all, lỗi trong service/controller/repo, lỗi trùng tên, HTTP mapping trong tệp lỗi và trong business service, so khớp `error.name` trong toàn `src`, raw SQL ngoài repo, kích thước file và unit spec của module (`H8-RV-01`), số file/controller ở root, độ sâu | [architecture-structure.spec.ts](../../src/architecture-structure.spec.ts)   |
 | Module nghiệp vụ chỉ export contract trong allowlist; provider không khai trùng                                                                                                                                                                                                                                                                                                                               | [module-graph.spec.ts](../../src/module-graph.spec.ts)                       |
+| `test/support/**/*.ts` ≤ 400 dòng, không đăng ký test/hook/assertion, không import thư viện test, không tên giống spec (TEST-HARDEN.1, đọc bằng parser TypeScript)                                                                                                                                                                                                                                            | [test-support-structure.spec.ts](../../src/test-support-structure.spec.ts)   |
 
 Vi phạm có sẵn khi một gate ra đời nằm trong ledger: `LEGACY` của `architecture-structure.spec.ts`,
 `LEGACY_PRIVATE_MODULE_IMPORTS` của `architecture-boundaries.spec.ts` và `LEGACY_PRIVATE_EXPORTS` của
@@ -174,7 +190,7 @@ facade không cần khai ở cả `IdentityAccessModule` và `RecoveryModule` (E
 **Lệnh vận hành H6.1/H6.2 (E8 = A):** `installation` giữ root (cài đặt) và hai capability `inspect/` (`ops:inspect`) và
 `dev-seed/` (`dev:seed`), mỗi capability có Nest module riêng làm entry của lệnh (điều kiện "một entry point/graph khác"),
 không module `operations` chung. Hai hợp đồng hẹp của `identity-access` (`IdentityAccessInspectionService`,
-`LocalDemoAccountService`) ở `identity-access.service.ts`, khai trong hai `*-facade.module.ts` chỉ đồ thị lệnh nạp; quy tắc
+`LocalDemoAccountService`) ở hai tệp root riêng `identity-access-inspection.service.ts`, `local-demo-account.service.ts` (ROOT-HARDEN.1), khai trong hai `*-facade.module.ts` chỉ đồ thị lệnh nạp; quy tắc
 riêng của lệnh ở [operational commands](operational-commands.md).
 **Sau Data Import Wave (H8.1 → H8.3):** `data-import` giữ một capability `employee-import/` (controller, service điều
 phối, repo duy nhất của `employee_imports`/`employee_import_rows`, đọc file thuần, quy tắc dòng và so judgement, builder

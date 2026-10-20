@@ -4,7 +4,9 @@
 - Phụ trách: AI theo giao việc Owner. Thiết kế ban đầu bởi: Owner (audit nền tảng Q5, audit H4.0 mục 9.4 + E8 = A;
   Prompt 23).
 - Owner review: chưa review. Peer review: tùy chọn.
-- Triển khai: `verified` (local 20/10/2026, cây làm việc chưa commit trên `188c9e0`). PR: chưa có.
+- Triển khai: `verified` (local 20/10/2026, cây làm việc chưa commit trên `188c9e0`, gồm mục 8).
+  Revision: commit `bf9db0d` trên `dev` = `origin/dev` (Owner commit/push trực tiếp, không PR); remote CI chưa có
+  bằng chứng. Docs `CI-CD/deployment.md` của lát này chưa commit ở repo Docs. PR: chưa có.
 
 ## Before coding
 

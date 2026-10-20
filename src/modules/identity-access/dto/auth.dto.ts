@@ -56,8 +56,8 @@ const passwordResetDoneSchema = z.strictObject({ passwordReset: z.literal(true) 
 
 export const changePasswordBodySchema = z.strictObject({
   currentPassword: z.string().min(1).max(256).meta({ example: '<current-password>' }),
-  // Only bounded here: the password policy answers with its own error code.
-  newPassword: z.string().min(1).max(256).meta({ example: '<new-password>' }),
+  // Only bounded here (AUTH.2 / F-31: the same 1024 as the reset): the password policy answers with its own error code.
+  newPassword: z.string().min(1).max(1024).meta({ example: '<new-password>' }),
 });
 
 const passwordChangedSchema = z.strictObject({ passwordChanged: z.literal(true) });
