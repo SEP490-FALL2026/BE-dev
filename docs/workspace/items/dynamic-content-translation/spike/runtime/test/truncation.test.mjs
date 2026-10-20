@@ -48,7 +48,14 @@ test('coordinator: truncated result -> UNAVAILABLE/truncated, text null, never c
 
 test('coordinator: a half-open probe that ends TRUNCATED releases the probe (no wedge)', async () => {
   const h = makeSup({ killGraceMs: 400 });
-  const coord = new Coordinator({ supervisor: h.sup, cache: new TranslationCache(), identity, timeoutMs: 2000, queueMax: 4, breakerOptions: { baseCooldownMs: 150 } });
+  const coord = new Coordinator({
+    supervisor: h.sup,
+    cache: new TranslationCache(),
+    identity,
+    timeoutMs: 2000,
+    queueMax: 4,
+    breakerOptions: { baseCooldownMs: 150 },
+  });
   const tr = (text) => coord.translate({ organizationId: 'o', scope: 's', source: 'vi', target: 'en', text });
   await tr('n=1 step=1 warm');
   h.sup.computeMaxMs = 100;

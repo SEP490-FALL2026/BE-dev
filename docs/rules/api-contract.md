@@ -10,7 +10,7 @@
 - Response DTO mô tả wire data; map Date/Decimal/BigInt trước khi trả, không lộ Prisma record.
 - `@ApiSuccessResponse` khai full envelope. Handler trả data; interceptor bọc
   `{ success: true, message, data }`, sau đó serializer validate.
-- Success `message` là key như `CATALOG.APPLICATION_CREATED`. FE không branch theo error message.
+- Success `message` là key như `AUDIT.EVENTS_LISTED`. FE không branch theo error message.
 - Stream/file/redirect/204 dùng `@RawResponse()` có contract/test phù hợp; không dùng để né DTO.
 
 ## Errors
@@ -48,5 +48,4 @@ Request-body validation errors are 422 `VALIDATION_ERROR`.
 Ví dụ hiện có, đã mount và khai báo quyền đúng: [audit controller](../../src/modules/audit/audit.controller.ts)
 (`GET /api/v1/audit-events`, `@RequireRoles('SUPER_ADMIN')` ở class, `operationId`, success/error response) cùng test
 [e2e](../../test/e2e/audit-events.e2e-spec.ts) và [integration](../../test/integration/audit-query-http.integration-spec.ts).
-Catalog **không** mount và không có access declaration — không dùng làm mẫu cho route mới.
 Cách thêm endpoint: [development guide](../guides/kien-truc-backend-va-cach-viet-code.md).

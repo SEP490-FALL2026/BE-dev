@@ -2,7 +2,7 @@
 
 `docker compose up -d --wait` starts local PostgreSQL only; that is all the API and the worker need. Redis and MinIO are
 optional and start only under their named profiles (`--profile queue`, `--profile storage`), for trying the queue and
-object-storage sources that are not mounted today (Owner decision E2 = A, H6.4). Ports bind to loopback.
+object storage the API mounts for contract files (the queue is not mounted, Owner decision E2 = A, H6.4). Ports bind to loopback.
 Check for port conflicts before starting; do not stop unrelated services.
 Create the configured MinIO bucket before using storage.
 
@@ -26,12 +26,13 @@ docker build --target migrate -t slm-migrate:foundation .
 ```
 
 The runtime defaults to production. Supply DATABASE_URL and HTTPS CORS_ORIGINS.
-Redis and object storage are not required: neither module is mounted in the API or the worker. A slice that mounts one
-gets its production validation back (REDIS_HOST/REDIS_PASSWORD, or an HTTPS OBJECT_STORAGE_ENDPOINT with
-credentials/bucket; the variables marked `@production-required-when-mounted` in `.env.example`).
+Redis is not required: the queue is not mounted. Object storage is mounted by the API (ADR-0014) and so needs an HTTPS
+OBJECT_STORAGE_ENDPOINT with OBJECT_STORAGE_BUCKET and the access key (the variables marked
+`@production-required-when-mounted` in `.env.example`); the worker and the commands do not read them.
 Authentication also requires AUTH_ACCESS_TOKEN_SECRET and AUTH_THROTTLE_PEPPER;
 invitation delivery requires HTTPS APP_PUBLIC_URL, OUTBOX_PAYLOAD_KEY (base64 of 32 bytes),
-OUTBOX_PAYLOAD_KEY_ID, SMTP_HOST, SMTP_FROM and SMTP_TLS=true, plus the provider's port/auth settings.
+OUTBOX_PAYLOAD_KEY_ID, LICENSE_KEY_VAULT_KEY (base64 of 32 bytes), LICENSE_KEY_VAULT_KEY_ID,
+LICENSE_KEY_FINGERPRINT_PEPPER, SMTP_HOST, SMTP_FROM and SMTP_TLS=true, plus the provider's port/auth settings.
 The [environment validator](../../src/infrastructure/config/env-schema.ts) owns the full constraints, and refuses in
 production (and in development) any of those four secrets whose value is public in the repository.
 The API and the worker validate all of these settings and refuse to start in production without them.

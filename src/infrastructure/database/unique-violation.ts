@@ -9,7 +9,14 @@ export function isUniqueViolation(error: unknown, ...needles: string[]): boolean
   return needles.some((needle) => haystack.includes(needle));
 }
 
-/** True when PostgreSQL rejected the statement with SQLSTATE 23514 (a CHECK or a trigger's own refusal). */
-export function isCheckViolation(error: unknown): boolean {
-  return readSqlState(error) === '23514';
+/**
+ * True when PostgreSQL rejected the statement with SQLSTATE 23514 (a CHECK or a trigger's own refusal); with `needles`,
+ * only when the error also names one of them (the constraint a trigger raised with).
+ */
+export function isCheckViolation(error: unknown, ...needles: string[]): boolean {
+  if (readSqlState(error) !== '23514') return false;
+  if (needles.length === 0) return true;
+  const haystack = JSON.stringify((error as Prisma.PrismaClientKnownRequestError).meta ?? {});
+
+  return needles.some((needle) => haystack.includes(needle));
 }

@@ -12,6 +12,9 @@ const OWN_SECRETS = {
   AUTH_THROTTLE_PEPPER: 'env-schema-spec-pepper-0123',
   OUTBOX_PAYLOAD_KEY: Buffer.alloc(32, 5).toString('base64'),
   OUTBOX_PAYLOAD_KEY_ID: 'spec-1',
+  LICENSE_KEY_VAULT_KEY: Buffer.alloc(32, 6).toString('base64'),
+  LICENSE_KEY_VAULT_KEY_ID: 'spec-vault-1',
+  LICENSE_KEY_FINGERPRINT_PEPPER: 'env-schema-spec-fingerprint-pepper-0123',
 };
 
 describe('validateEnvironment', () => {
@@ -29,6 +32,9 @@ describe('validateEnvironment', () => {
     APP_PUBLIC_URL: 'https://licenses.example.com',
     OUTBOX_PAYLOAD_KEY: Buffer.alloc(32, 7).toString('base64'),
     OUTBOX_PAYLOAD_KEY_ID: 'prod-1',
+    LICENSE_KEY_VAULT_KEY: Buffer.alloc(32, 8).toString('base64'),
+    LICENSE_KEY_VAULT_KEY_ID: 'prod-vault-1',
+    LICENSE_KEY_FINGERPRINT_PEPPER: 'production-fingerprint-pepper-0123',
     SMTP_HOST: 'smtp.example.com',
     SMTP_FROM: 'no-reply@licenses.example.com',
     SMTP_TLS: 'true',
@@ -216,6 +222,9 @@ describe('invitation email configuration', () => {
     APP_PUBLIC_URL: 'https://licenses.example.com',
     OUTBOX_PAYLOAD_KEY: Buffer.alloc(32, 7).toString('base64'),
     OUTBOX_PAYLOAD_KEY_ID: 'prod-1',
+    LICENSE_KEY_VAULT_KEY: Buffer.alloc(32, 8).toString('base64'),
+    LICENSE_KEY_VAULT_KEY_ID: 'prod-vault-1',
+    LICENSE_KEY_FINGERPRINT_PEPPER: 'production-fingerprint-pepper-0123',
     SMTP_HOST: 'smtp.example.com',
     SMTP_FROM: 'no-reply@licenses.example.com',
     SMTP_TLS: 'true',
@@ -269,18 +278,57 @@ describe('invitation email configuration', () => {
     );
   });
 
+  it('needs its own license key vault key, key id and fingerprint pepper outside test (QĐ-54b)', () => {
+    for (const key of ['LICENSE_KEY_VAULT_KEY', 'LICENSE_KEY_VAULT_KEY_ID', 'LICENSE_KEY_FINGERPRINT_PEPPER']) {
+      expect(() => validateEnvironment({ ...OWN_SECRETS, [key]: undefined })).toThrow(`"${key}" is required`);
+    }
+    expect(validateEnvironment(OWN_SECRETS)).toMatchObject({
+      LICENSE_KEY_VAULT_KEY_ID: 'spec-vault-1',
+      LICENSE_KEY_VAULT_PREVIOUS_KEYS: '',
+    });
+  });
+
+  it('rejects a vault key that is not 32 bytes, a pepper under 16 characters, and a key id of another shape', () => {
+    expect(() =>
+      validateEnvironment({ ...OWN_SECRETS, LICENSE_KEY_VAULT_KEY: Buffer.from('short').toString('base64') }),
+    ).toThrow('LICENSE_KEY_VAULT_KEY must be 32 bytes');
+    expect(() => validateEnvironment({ ...OWN_SECRETS, LICENSE_KEY_FINGERPRINT_PEPPER: 'short' })).toThrow(
+      'LICENSE_KEY_FINGERPRINT_PEPPER',
+    );
+    expect(() => validateEnvironment({ ...OWN_SECRETS, LICENSE_KEY_VAULT_KEY_ID: 'has space' })).toThrow(
+      'LICENSE_KEY_VAULT_KEY_ID',
+    );
+  });
+
+  it('rejects the public test vault key and pepper in production and development', () => {
+    const test = validateEnvironment({ NODE_ENV: 'test' });
+
+    expect(() => validateEnvironment({ ...productionBase, LICENSE_KEY_VAULT_KEY: test.LICENSE_KEY_VAULT_KEY })).toThrow(
+      'public in the repository for LICENSE_KEY_VAULT_KEY',
+    );
+    expect(() =>
+      validateEnvironment({ ...OWN_SECRETS, LICENSE_KEY_FINGERPRINT_PEPPER: test.LICENSE_KEY_FINGERPRINT_PEPPER }),
+    ).toThrow('public in the repository for LICENSE_KEY_FINGERPRINT_PEPPER');
+  });
+
   it('accepts a complete production mail setup', () => {
     expect(() => validateEnvironment(productionBase)).not.toThrow();
   });
 
-  it.each(['APP_PUBLIC_URL', 'OUTBOX_PAYLOAD_KEY', 'OUTBOX_PAYLOAD_KEY_ID', 'SMTP_HOST', 'SMTP_FROM'])(
-    'requires %s in production',
-    (key) => {
-      const rest = Object.fromEntries(Object.entries(productionBase).filter(([name]) => name !== key));
+  it.each([
+    'APP_PUBLIC_URL',
+    'OUTBOX_PAYLOAD_KEY',
+    'OUTBOX_PAYLOAD_KEY_ID',
+    'LICENSE_KEY_VAULT_KEY',
+    'LICENSE_KEY_VAULT_KEY_ID',
+    'LICENSE_KEY_FINGERPRINT_PEPPER',
+    'SMTP_HOST',
+    'SMTP_FROM',
+  ])('requires %s in production', (key) => {
+    const rest = Object.fromEntries(Object.entries(productionBase).filter(([name]) => name !== key));
 
-      expect(() => validateEnvironment(rest)).toThrow(key);
-    },
-  );
+    expect(() => validateEnvironment(rest)).toThrow(key);
+  });
 
   it('rejects the public test payload key in production', () => {
     const publicKey = validateEnvironment({ NODE_ENV: 'test' }).OUTBOX_PAYLOAD_KEY;
@@ -325,6 +373,9 @@ describe('installation environment (database keys only)', () => {
     APP_PUBLIC_URL: 'https://licenses.example.com',
     OUTBOX_PAYLOAD_KEY: Buffer.alloc(32, 7).toString('base64'),
     OUTBOX_PAYLOAD_KEY_ID: 'prod-1',
+    LICENSE_KEY_VAULT_KEY: Buffer.alloc(32, 8).toString('base64'),
+    LICENSE_KEY_VAULT_KEY_ID: 'prod-vault-1',
+    LICENSE_KEY_FINGERPRINT_PEPPER: 'production-fingerprint-pepper-0123',
     SMTP_HOST: 'smtp.example.com',
     SMTP_FROM: 'no-reply@licenses.example.com',
     SMTP_TLS: 'true',

@@ -1,4 +1,4 @@
-import { CsvError, parseCsvRows } from './csv';
+import { CsvError, parseCsvRows } from '../../../core/csv';
 import { EMPLOYEE_COLUMNS, EmployeeCells, mapEmployeeColumns } from './employee-import-rows';
 import {
   ImportFileInvalidError,

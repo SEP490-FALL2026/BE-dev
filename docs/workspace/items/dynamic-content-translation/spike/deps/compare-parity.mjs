@@ -25,7 +25,9 @@ for (const dir of ['vi-en', 'en-vi']) {
         [`${a.label}`]: ia.outputs[key],
         [`${b.label}`]: ib.outputs[key],
         identical: same,
-        sourceTokenIdsIdentical: JSON.stringify(key === 'noPrefix' ? ia.sourceTokenIdsNoPrefix : ia.sourceTokenIds) === JSON.stringify(key === 'noPrefix' ? ib.sourceTokenIdsNoPrefix : ib.sourceTokenIds),
+        sourceTokenIdsIdentical:
+          JSON.stringify(key === 'noPrefix' ? ia.sourceTokenIdsNoPrefix : ia.sourceTokenIds) ===
+          JSON.stringify(key === 'noPrefix' ? ib.sourceTokenIdsNoPrefix : ib.sourceTokenIds),
       });
     }
   });

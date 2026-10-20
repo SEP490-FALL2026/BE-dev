@@ -1,5 +1,6 @@
 import { HttpStatus } from '@nestjs/common';
 import { ApiException } from '../../infrastructure/http/errors/api.exception';
+import { toMoneyApiException } from '../../infrastructure/http/errors/money-errors';
 import { toUnavailableApiException } from '../../infrastructure/http/errors/service-unavailable';
 import {
   NonWorkingDateInPastError,
@@ -7,6 +8,7 @@ import {
   NonWorkingDateReasonInvalidError,
   NonWorkingDateTakenError,
   ParameterNotFoundError,
+  ReportingCurrencyLockedError,
   ParameterValueInvalidError,
 } from './operating-parameters.errors';
 
@@ -38,6 +40,13 @@ export function toOperatingParametersApiException(error: unknown): unknown {
   if (error instanceof NonWorkingDateNotFoundError) {
     return refuse(HttpStatus.NOT_FOUND, 'NON_WORKING_DATE.NOT_FOUND', error.message, { date: error.date });
   }
+
+  if (error instanceof ReportingCurrencyLockedError) {
+    return refuse(HttpStatus.CONFLICT, 'REPORTING_CURRENCY.LOCKED', error.message, { reason: error.reason });
+  }
+
+  const money = toMoneyApiException(error);
+  if (money !== error) return money;
 
   return toUnavailableApiException(error) ?? error;
 }

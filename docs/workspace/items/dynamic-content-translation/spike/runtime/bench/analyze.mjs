@@ -9,7 +9,8 @@ export function analyzeEvents(events, concurrency) {
   const violations = [];
   const slots = new Map(); // slot -> { alive:boolean, busyJob:number|null, killPending:boolean, exitSinceDispatch:boolean, running:number|null }
   const S = (id) => {
-    if (!slots.has(id)) slots.set(id, { alive: false, busyJob: null, killPending: false, exited: false, running: null });
+    if (!slots.has(id))
+      slots.set(id, { alive: false, busyJob: null, killPending: false, exited: false, running: null });
     return slots.get(id);
   };
   let live = 0;
@@ -32,13 +33,17 @@ export function analyzeEvents(events, concurrency) {
         break;
       case 'dispatch':
         dispatches++;
-        if (s.busyJob !== null) violations.push(`t=${e.t} dispatch job ${e.jobId} into busy slot ${e.slot} (job ${s.busyJob} not released)`);
+        if (s.busyJob !== null)
+          violations.push(`t=${e.t} dispatch job ${e.jobId} into busy slot ${e.slot} (job ${s.busyJob} not released)`);
         if (s.killPending) violations.push(`t=${e.t} dispatch into slot ${e.slot} while kill pending (no exit yet)`);
         s.busyJob = e.jobId;
         s.exited = false;
         break;
       case 'started':
-        if (s.running !== null && s.running !== e.jobId) violations.push(`t=${e.t} run intervals overlap in slot ${e.slot}: job ${e.jobId} started while ${s.running} running`);
+        if (s.running !== null && s.running !== e.jobId)
+          violations.push(
+            `t=${e.t} run intervals overlap in slot ${e.slot}: job ${e.jobId} started while ${s.running} running`,
+          );
         s.running = e.jobId;
         concurrentRuns++;
         maxConcurrentRuns = Math.max(maxConcurrentRuns, concurrentRuns);

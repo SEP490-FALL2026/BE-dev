@@ -33,6 +33,8 @@ export async function createHttpTestApp(
     appDatabaseUrl?: (directUrl: string) => Promise<string> | string;
     /** Extra environment for this application, such as shorter database timeouts. */
     env?: Record<string, string>;
+    /** Providers to replace with a stand-in, such as the gate of a module that does not exist yet. */
+    providerOverrides?: { token: unknown; useValue: unknown }[];
   } = {},
 ): Promise<HttpTestApp> {
   const database = await provisionDisposableDatabase();
@@ -47,10 +49,14 @@ export async function createHttpTestApp(
   // ConfigModule.forRoot validates process.env when AppModule is first imported, so the import
   // must happen after the variables above are set — a static import would read the real ones.
   const { AppModule } = await import('../../src/app.module');
-  const moduleRef = await Test.createTestingModule({
+  let builder = Test.createTestingModule({
     imports: [AppModule],
     controllers: options.extraControllers ?? [],
-  }).compile();
+  });
+  for (const override of options.providerOverrides ?? []) {
+    builder = builder.overrideProvider(override.token).useValue(override.useValue);
+  }
+  const moduleRef = await builder.compile();
   const app = moduleRef.createNestApplication<INestApplication<App>>();
   configureApplication(app, { mountDocs: false });
   await app.init();

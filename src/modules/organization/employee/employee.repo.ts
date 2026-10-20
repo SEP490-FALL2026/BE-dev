@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { fromDateColumn, toDateColumn } from '../../../core/business-date';
+import { fromDateColumn, toDateColumn, type BusinessDate } from '../../../core/business-date';
 import { normalizeEmail } from '../../../core/email';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
@@ -11,6 +11,29 @@ import {
   EmployeeProfile,
   EmployeeRecord,
 } from '../organization.types';
+
+/** The employee as the facade shows it. */
+function toEmployeeRecord(row: {
+  id: string;
+  organizationId: string;
+  employeeCode: string;
+  fullName: string;
+  workEmail: string | null;
+  employmentType: EmployeeRecord['employmentType'];
+  status: EmployeeRecord['status'];
+  hireDate: Date;
+}): EmployeeRecord {
+  return {
+    id: row.id,
+    organizationId: row.organizationId,
+    employeeCode: row.employeeCode,
+    fullName: row.fullName,
+    workEmail: row.workEmail,
+    employmentType: row.employmentType,
+    status: row.status,
+    hireDate: fromDateColumn(row.hireDate),
+  };
+}
 
 /** Escapes LIKE metacharacters so a search term matches literally (backslash is PostgreSQL's default escape). */
 function escapeLikePattern(term: string): string {
@@ -101,15 +124,7 @@ export class EmployeeRepo {
     const row = await (tx ?? this.prisma).employee.findUnique({ where: { id: employeeId } });
     if (!row) return null;
 
-    return {
-      id: row.id,
-      organizationId: row.organizationId,
-      employeeCode: row.employeeCode,
-      fullName: row.fullName,
-      workEmail: row.workEmail,
-      status: row.status,
-      hireDate: fromDateColumn(row.hireDate),
-    };
+    return toEmployeeRecord(row);
   }
 
   /** Unlocked read by the code of the employee, for the operator procedures that name people by code. */
@@ -117,15 +132,7 @@ export class EmployeeRepo {
     const row = await (tx ?? this.prisma).employee.findFirst({ where: { employeeCode } });
     if (!row) return null;
 
-    return {
-      id: row.id,
-      organizationId: row.organizationId,
-      employeeCode: row.employeeCode,
-      fullName: row.fullName,
-      workEmail: row.workEmail,
-      status: row.status,
-      hireDate: fromDateColumn(row.hireDate),
-    };
+    return toEmployeeRecord(row);
   }
 
   async findEmployees(employeeIds: string[]): Promise<EmployeeRecord[]> {
@@ -133,15 +140,40 @@ export class EmployeeRepo {
 
     const rows = await this.prisma.employee.findMany({ where: { id: { in: employeeIds } } });
 
-    return rows.map((row) => ({
-      id: row.id,
-      organizationId: row.organizationId,
-      employeeCode: row.employeeCode,
-      fullName: row.fullName,
-      workEmail: row.workEmail,
-      status: row.status,
-      hireDate: fromDateColumn(row.hireDate),
-    }));
+    return rows.map(toEmployeeRecord);
+  }
+
+  /** The department and the job title of the employee on `onDate`, by id; null when no placement holds that day. */
+  async placementIdsOn(
+    employeeId: string,
+    onDate: BusinessDate,
+  ): Promise<{ departmentId: string; jobTitleId: string } | null> {
+    const date = toDateColumn(onDate);
+    const row = await this.prisma.employeePlacement.findFirst({
+      where: { employeeId, validFrom: { lte: date }, OR: [{ validTo: null }, { validTo: { gt: date } }] },
+      select: { departmentId: true, jobTitleId: true },
+    });
+
+    return row;
+  }
+
+  /** The employees with these codes, as far as they exist; unlocked, for the import judgement that names people by code. */
+  async findEmployeesByCodes(employeeCodes: readonly string[], tx?: DbTx): Promise<EmployeeRecord[]> {
+    if (employeeCodes.length === 0) return [];
+    const rows = await (tx ?? this.prisma).employee.findMany({ where: { employeeCode: { in: [...employeeCodes] } } });
+
+    return rows.map(toEmployeeRecord);
+  }
+
+  /** The distinct, lower-case domains of the work emails of everyone the organization has ever employed. */
+  async workEmailDomains(tx?: DbTx): Promise<string[]> {
+    const rows = await (tx ?? this.prisma).$queryRaw<{ domain: string }[]>`
+      SELECT DISTINCT split_part(normalized_work_email, '@', 2) AS domain
+        FROM employees
+       WHERE normalized_work_email IS NOT NULL AND position('@' IN normalized_work_email) > 0
+       ORDER BY 1`;
+
+    return rows.map((row) => row.domain).filter((domain) => domain.length > 0);
   }
 
   /** How many employees have not left, for the onboarding checklist. */

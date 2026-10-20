@@ -19,7 +19,15 @@ function missing(input: Record<string, string>): string[] {
   return [];
 }
 
-const SECRETS = ['AUTH_ACCESS_TOKEN_SECRET', 'AUTH_THROTTLE_PEPPER', 'OUTBOX_PAYLOAD_KEY', 'OUTBOX_PAYLOAD_KEY_ID'];
+const SECRETS = [
+  'AUTH_ACCESS_TOKEN_SECRET',
+  'AUTH_THROTTLE_PEPPER',
+  'OUTBOX_PAYLOAD_KEY',
+  'OUTBOX_PAYLOAD_KEY_ID',
+  'LICENSE_KEY_VAULT_KEY',
+  'LICENSE_KEY_VAULT_KEY_ID',
+  'LICENSE_KEY_FINGERPRINT_PEPPER',
+];
 
 /** Made-up values for this spec: long enough, of the right shape, and not any public default. */
 const OWN_SECRETS = {
@@ -27,6 +35,9 @@ const OWN_SECRETS = {
   AUTH_THROTTLE_PEPPER: 'matrix-spec-pepper-0123',
   OUTBOX_PAYLOAD_KEY: Buffer.alloc(32, 3).toString('base64'),
   OUTBOX_PAYLOAD_KEY_ID: 'matrix-1',
+  LICENSE_KEY_VAULT_KEY: Buffer.alloc(32, 4).toString('base64'),
+  LICENSE_KEY_VAULT_KEY_ID: 'matrix-vault-1',
+  LICENSE_KEY_FINGERPRINT_PEPPER: 'matrix-spec-fingerprint-pepper-0123',
 };
 
 const PRODUCTION_ACTIVE = {
@@ -57,7 +68,7 @@ describe('environment matrix by NODE_ENV (H6.3 characterization)', () => {
     for (const key of SECRETS) expect(config[key as keyof typeof config]).toEqual(expect.any(String));
   });
 
-  it('development (E3 = C): has no secret fallback, so it must supply exactly the four secrets itself', () => {
+  it('development (E3 = C): has no secret fallback, so it must supply exactly the seven secrets itself', () => {
     expect(missing({ NODE_ENV: 'development' })).toEqual([...SECRETS].sort());
     expect(missing({})).toEqual([...SECRETS].sort());
     expect(() => validateEnvironment({ NODE_ENV: 'development', ...OWN_SECRETS })).not.toThrow();
@@ -74,8 +85,16 @@ describe('environment matrix by NODE_ENV (H6.3 characterization)', () => {
         OUTBOX_PAYLOAD_KEY: Buffer.alloc(32, 0x5a).toString('base64'),
       };
 
-      for (const key of ['AUTH_ACCESS_TOKEN_SECRET', 'AUTH_THROTTLE_PEPPER', 'OUTBOX_PAYLOAD_KEY'] as const) {
-        for (const value of [publicTest[key], retired[key]]) {
+      const publicValues = {
+        AUTH_ACCESS_TOKEN_SECRET: [publicTest.AUTH_ACCESS_TOKEN_SECRET, retired.AUTH_ACCESS_TOKEN_SECRET],
+        AUTH_THROTTLE_PEPPER: [publicTest.AUTH_THROTTLE_PEPPER, retired.AUTH_THROTTLE_PEPPER],
+        OUTBOX_PAYLOAD_KEY: [publicTest.OUTBOX_PAYLOAD_KEY, retired.OUTBOX_PAYLOAD_KEY],
+        LICENSE_KEY_VAULT_KEY: [publicTest.LICENSE_KEY_VAULT_KEY],
+        LICENSE_KEY_FINGERPRINT_PEPPER: [publicTest.LICENSE_KEY_FINGERPRINT_PEPPER],
+      };
+
+      for (const [key, values] of Object.entries(publicValues)) {
+        for (const value of values) {
           expect(() => validateEnvironment({ ...base, ...QUEUE_AND_STORAGE, [key]: value })).toThrow(
             `${nodeEnvironment} must not use a value that is public in the repository for ${key}`,
           );
@@ -84,13 +103,16 @@ describe('environment matrix by NODE_ENV (H6.3 characterization)', () => {
     },
   );
 
-  it('production: requires the database, auth, mail and outbox settings, and nothing of the queue or storage (E2 = A)', () => {
+  it('production: requires the database, auth, mail, outbox and license key vault settings, and nothing of the queue or storage (E2 = A)', () => {
     expect(missing({ NODE_ENV: 'production' })).toEqual(
       [
         'APP_PUBLIC_URL',
         'AUTH_ACCESS_TOKEN_SECRET',
         'AUTH_THROTTLE_PEPPER',
         'DATABASE_URL',
+        'LICENSE_KEY_FINGERPRINT_PEPPER',
+        'LICENSE_KEY_VAULT_KEY',
+        'LICENSE_KEY_VAULT_KEY_ID',
         'OUTBOX_PAYLOAD_KEY',
         'OUTBOX_PAYLOAD_KEY_ID',
         'SMTP_FROM',

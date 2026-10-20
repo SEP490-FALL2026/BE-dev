@@ -65,6 +65,14 @@ describe('operating parameter definitions (US-01-04)', () => {
     ).toEqual({ ok: false, reason: 'INCONSISTENT' });
   });
 
+  it('keeps the largest file between one and fifty megabytes, ten to begin with (US-04-04 AC-10)', () => {
+    expect(defaultValues().DOCUMENT_MAX_SIZE_MB).toBe(10);
+    expect(validateParameterValue('DOCUMENT_MAX_SIZE_MB', 25, defaultValues())).toEqual({ ok: true });
+    for (const value of [0, 51, 1.5, -1]) {
+      expect(validateParameterValue('DOCUMENT_MAX_SIZE_MB', value, defaultValues()).ok).toBe(false);
+    }
+  });
+
   it('knows its own keys and nothing else', () => {
     expect(definitionOf('APPROVAL_SLA_WORKING_DAYS')?.unit).toBe('working days');
     expect(definitionOf('TIME_ZONE')).toBeUndefined();

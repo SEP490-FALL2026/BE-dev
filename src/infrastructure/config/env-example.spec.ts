@@ -155,7 +155,15 @@ describe('.env.example', () => {
 
     expect(marked.sort()).toEqual(requiredNames('development').sort());
     expect(marked.sort()).toEqual(
-      ['AUTH_ACCESS_TOKEN_SECRET', 'AUTH_THROTTLE_PEPPER', 'OUTBOX_PAYLOAD_KEY', 'OUTBOX_PAYLOAD_KEY_ID'].sort(),
+      [
+        'AUTH_ACCESS_TOKEN_SECRET',
+        'AUTH_THROTTLE_PEPPER',
+        'OUTBOX_PAYLOAD_KEY',
+        'OUTBOX_PAYLOAD_KEY_ID',
+        'LICENSE_KEY_VAULT_KEY',
+        'LICENSE_KEY_VAULT_KEY_ID',
+        'LICENSE_KEY_FINGERPRINT_PEPPER',
+      ].sort(),
     );
   });
 });

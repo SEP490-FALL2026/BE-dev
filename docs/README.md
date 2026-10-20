@@ -29,6 +29,8 @@ trong docs/architecture. Các gói triển khai auth/US cũ đã được dọn 
 
 - [Xác thực nội bộ, phiên và quy ước persistence vùng danh tính](decisions/0011-internal-authentication-and-sessions.md) — Proposed; chờ dev review/Accepted.
 - [Gửi thư vòng đời tài khoản: outbox, thư viện SMTP, dispatcher](decisions/0012-account-email-delivery.md) — Proposed; chờ dev review/Accepted.
+- [Ba ngữ cảnh `catalog`, `finance`, `licensing` thay mẫu catalog cũ](decisions/0013-catalog-finance-licensing-contexts.md) — Proposed; chờ Owner review/Accepted.
+- [API mount lại kho đối tượng cho tệp của hợp đồng](decisions/0014-object-storage-mounted-for-contract-documents.md) — Proposed; chờ Owner review/Accepted.
 
 Trạng thái triển khai của các lát dùng hai ADR trên nằm ở [roadmap](roadmap.md). Số ADR bị khuyết không cần đánh lại.
 Định hướng tài khoản/mật khẩu + JWT hiện ghi ở ARCHITECTURE; spec/plan từng lát ở [workspace](workspace/README.md).

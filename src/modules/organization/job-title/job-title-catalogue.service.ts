@@ -26,6 +26,10 @@ export class JobTitleCatalogueService {
     return this.repo.lockJobTitle(tx, jobTitleId, mode);
   }
 
+  find(jobTitleId: string, tx?: DbTx): Promise<JobTitleRecord | null> {
+    return this.repo.findJobTitle(jobTitleId, tx);
+  }
+
   findByNormalizedName(organizationId: string, normalizedName: string, tx?: DbTx): Promise<JobTitleRecord | null> {
     return this.repo.findJobTitleByNormalizedName(organizationId, normalizedName, tx);
   }

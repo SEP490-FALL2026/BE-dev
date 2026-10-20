@@ -5,6 +5,7 @@ import { DbTx, TransactionRunner } from '../../../infrastructure/database/transa
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditService } from '../../audit/audit.service';
 import { EmployeeCodeTakenError, EmployeeEmailTakenError } from '../../organization/organization.errors';
+import { LicensingService } from '../../licensing/licensing.service';
 import { OrganizationService } from '../../organization/organization.service';
 import { importCancelledEvent, importConfirmedEvent, importUploadedEvent } from './employee-import-audit';
 import { EmployeeFileRow, readEmployeeFile } from './employee-import-file';
@@ -49,6 +50,7 @@ export class EmployeeImportService {
     private readonly organization: OrganizationService,
     private readonly audit: AuditService,
     private readonly runner: TransactionRunner,
+    private readonly licensing: LicensingService,
   ) {}
 
   /**
@@ -313,10 +315,30 @@ export class EmployeeImportService {
       existingDifferent: rows.filter((row) => row.outcome === 'EXISTS_DIFFERENT').length,
       newPeopleByDepartment: [...byDepartment].map(([departmentCode, count]) => ({ departmentCode, count })),
       departmentsWithoutHead: await this.withoutHead(lookup, [...byDepartment.keys()]),
+      reviewQueue: await this.reviewQueue(rows),
       duplicateOf: duplicate
         ? { importId: duplicate.id, fileName: duplicate.fileName, confirmedAt: duplicate.confirmedAt.toISOString() }
         : null,
     };
+  }
+
+  /** The people who hold a seat, still work here and are not in the file (`US-02-02` AC-4), by code, at most 200. */
+  private async reviewQueue(rows: readonly { cells: EmployeeCells }[]): Promise<ImportSummary['reviewQueue']> {
+    const inFile = new Set(rows.map((row) => clean(row.cells.employee_code)));
+    const holders = await this.licensing.openSeatHolders();
+    if (holders.length === 0) return { total: 0, items: [] };
+    const seats = new Map(holders.map((holder) => [holder.employeeId, holder.seats]));
+    const people = await this.organization.getEmployees([...seats.keys()]);
+    const queue = people
+      .filter((person) => person.status === 'ACTIVE' && !inFile.has(person.employeeCode))
+      .map((person) => ({
+        employeeCode: person.employeeCode,
+        fullName: person.fullName,
+        seats: seats.get(person.id) ?? 0,
+      }))
+      .sort((a, b) => a.employeeCode.localeCompare(b.employeeCode));
+
+    return { total: queue.length, items: queue.slice(0, 200) };
   }
 
   private async withoutHead(lookup: EmployeeImportLookup, departmentCodes: string[]) {
@@ -337,7 +359,11 @@ export class EmployeeImportService {
       status: record.status,
       previewVersion: record.previewVersion,
       ignoredColumns: record.ignoredColumns,
-      summary: record.summary as ImportSummary,
+      // A preview kept before the review queue existed has none.
+      summary: {
+        ...(record.summary as ImportSummary),
+        reviewQueue: (record.summary as Partial<ImportSummary>).reviewQueue ?? { total: 0, items: [] },
+      },
       result: (record.result ?? null) as ImportResult | null,
       createdAt: record.createdAt,
       expiresAt: record.expiresAt,

@@ -14,7 +14,9 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.dirname(here);
 const date = new Date().toISOString().slice(0, 10);
 const outIdx = process.argv.indexOf('--out');
-const outFile = path.resolve(outIdx > -1 ? process.argv[outIdx + 1] : path.join(root, 'results', `gate-analysis-${date}.json`));
+const outFile = path.resolve(
+  outIdx > -1 ? process.argv[outIdx + 1] : path.join(root, 'results', `gate-analysis-${date}.json`),
+);
 
 // A "damaged" placeholder is a missing id whose text survives in a broken form such as `x0>`, `<x0`, `[x0>`.
 const DAMAGED = /(?:<x\d+(?!\d|>))|(?:(?<!<)x\d+>)|(?:[\[(]x\d+[>\])])/;
@@ -26,7 +28,17 @@ const out = { date, note: 'segments of non-long fixture items, protected mode, b
 for (const direction of ['vi-en', 'en-vi']) {
   const model = await loadDirection({ direction, mod, modelsDir });
   const fx = JSON.parse(fs.readFileSync(path.join(root, 'fixtures', `${direction}.json`), 'utf8'));
-  const s = { segments: 0, sentToModel: 0, gateFail: 0, missing: 0, extra: 0, duplicated: 0, missingWithDamagedForm: 0, bySpanCount: {}, examples: [] };
+  const s = {
+    segments: 0,
+    sentToModel: 0,
+    gateFail: 0,
+    missing: 0,
+    extra: 0,
+    duplicated: 0,
+    missingWithDamagedForm: 0,
+    bySpanCount: {},
+    examples: [],
+  };
   for (const it of fx.items) {
     if (it.categories.includes('long')) continue;
     for (const seg of segmentText(it.source)) {

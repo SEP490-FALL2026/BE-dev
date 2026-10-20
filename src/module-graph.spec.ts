@@ -40,13 +40,21 @@ import { WorkerModule } from './worker.module';
 /**
  * What a business module may export (docs/rules/module-structure.md): its facade, a port it implements for
  * infrastructure, or the service of a CLI entry module. Every other exported token of a business module is private,
- * whatever its name (A4-03). Exact `Module: token` pairs; a module that is not mounted (catalog) is not listed.
+ * whatever its name (A4-03). Exact `Module: token` pairs; a module that is not mounted is not listed.
  */
 const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   'AuditModule: AuditService',
+  // G4 (ADR-0013): the catalog facade licensing reads the seat targets (subscription or internal plan) through.
+  'CatalogModule: CatalogService',
   // H8.3 (A4-10): the data-import facade; onboarding reads the latest people import through it.
   'DataImportModule: DataImportService',
+  // G3 (ADR-0013): the finance facade, money in and conversion snapshot out; the repos stay private.
+  'FinanceModule: FinanceService',
+  // The audited exchange-rate use case the finance HTTP module serves; the raw ledger is not exported.
+  'FinanceModule: ExchangeRateService',
   'IdentityAccessFacadeModule: IdentityAccessService',
+  // G4 (ADR-0013): the licensing facade the seat baseline import (data-import) reads and writes the assignments through.
+  'LicensingModule: LicensingService',
   // H5.5 (identity-access Wave B): the account contracts the API and the recovery command reach the account persistence
   // through; the persistence itself is declared once, here, because every graph needs it.
   'IdentityAccessFacadeModule: AccountDirectoryService',
@@ -446,7 +454,7 @@ describe('module graph', () => {
     }
   });
 
-  it('H6.4 (E2 = A): mounts neither the queue nor object storage in the API, the worker or either command', () => {
+  it('H6.4 (E2 = A, ADR-0014): mounts no queue anywhere, and object storage only in the API, for the files of contracts', () => {
     for (const [name, root] of graphs) {
       const modules = collectGraph(root).map((node) => node.module);
 
@@ -454,7 +462,7 @@ describe('module graph', () => {
         name,
         storage: modules.includes(ObjectStorageModule),
         queue: modules.includes(QueueInfrastructureModule),
-      }).toEqual({ name, storage: false, queue: false });
+      }).toEqual({ name, storage: name === 'AppModule', queue: false });
     }
   });
 

@@ -28,8 +28,7 @@
   database on every request; roles are never read from the token. Never use an always-accept verifier
   outside isolated tests.
 - Public routes need @Public(), an entry in the public allowlist of `test/e2e/api-inventory.e2e-spec.ts`
-  and anonymous HTTP tests. Catalog has no role/resource policy and is not mounted; add authorization
-  from the US before opening real business access.
+  and anonymous HTTP tests. Add authorization from the US before opening real business access.
 - Passwords enter through the installation prompt, `/auth/login`, `/auth/invitations/redeem`, `/auth/password-resets`
   or `/me/password`; they are never accepted
   as arguments or environment variables, and never logged or stored in audit (`AuditService` rejects

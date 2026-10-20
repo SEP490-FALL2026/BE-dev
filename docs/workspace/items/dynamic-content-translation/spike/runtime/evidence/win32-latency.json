@@ -158,9 +158,7 @@
         "note": "api",
         "apiRssMb": 51.9,
         "apiEldMaxMs": 36.5,
-        "workerRss": [
-          null
-        ]
+        "workerRss": [null]
       },
       {
         "direction": "en-vi",
@@ -306,9 +304,7 @@
         "note": "api",
         "apiRssMb": 52,
         "apiEldMaxMs": 33.78,
-        "workerRss": [
-          null
-        ]
+        "workerRss": [null]
       }
     ]
   }

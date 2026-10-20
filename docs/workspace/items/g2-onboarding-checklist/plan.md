@@ -14,10 +14,11 @@
 
 ## Kiểm chứng và bàn giao
 
-| Lệnh / kiểm tra AC           | Revision / môi trường             | Kết quả thực chạy                | Giới hạn / việc còn lại |
-| ---------------------------- | --------------------------------- | -------------------------------- | ----------------------- |
-| `pnpm test`, `pnpm test:e2e` | `e833092` + cây làm việc, Windows | PASS (xem "Cổng cuối" ở roadmap) | —                       |
-| `jest … onboarding-http`     | như trên, PostgreSQL 17 Docker    | 7 test PASS                      | Bước 2 → 5 chờ G3/G4/G7 |
+| Lệnh / kiểm tra AC                                                                                                                                                                                                                                                                 | Revision / môi trường                          | Kết quả thực chạy                | Giới hạn / việc còn lại                       |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- | -------------------------------- | --------------------------------------------- |
+| `pnpm test`, `pnpm test:e2e`                                                                                                                                                                                                                                                       | `e833092` + cây làm việc, Windows              | PASS (xem "Cổng cuối" ở roadmap) | —                                             |
+| `jest … onboarding-http`                                                                                                                                                                                                                                                           | như trên, PostgreSQL 17 Docker                 | 7 test PASS                      | Bước 2 → 5 chờ G3/G4/G7                       |
+| `onboarding.service.spec` (viết trước; đỏ 9/19 rồi xanh 19), `onboarding-http` (bước 2 → 4 theo dữ liệu, trạng thái rỗng, chốt khởi tạo; ba đột biến — bước 4 sẵn sàng khi chưa có thuê bao, trạng thái rỗng khi bộ lọc rỗng, bước 4 xong khi chưa chốt — làm đỏ ở unit hoặc HTTP) | 20/10/2026, cây làm việc, PostgreSQL 17 Docker | 11 test HTTP xanh                | AC-5 chờ `g3-standard-toolset`; bước 5 chờ G7 |
 
 - [x] AC trong scope có bằng chứng; spec/plan phản ánh implementation cuối.
 - [ ] Owner review trên revision cụ thể. Chỉ ghi `merged-dev`, `accepted`, `released` sau đúng sự kiện thật.

@@ -45,7 +45,11 @@ const FIXTURE_FILES = {
 
 function loadFixtureSet(set, direction) {
   const file = path.join(here, 'fixtures', FIXTURE_FILES[set](direction));
-  return { file: `fixtures/${path.basename(file)}`, sha256: sha256(file), data: JSON.parse(fs.readFileSync(file, 'utf8')) };
+  return {
+    file: `fixtures/${path.basename(file)}`,
+    sha256: sha256(file),
+    data: JSON.parse(fs.readFileSync(file, 'utf8')),
+  };
 }
 
 const round = (x, d = 2) => Math.round(x * 10 ** d) / 10 ** d;
@@ -82,11 +86,13 @@ async function runMode({ model, direction, mode, fixture, opts }) {
       samples.push(performance.now() - t0);
       for (const s of res.segments) if (s.status !== 'static' && Number.isFinite(s.ms)) segmentMs.push(round(s.ms, 1));
       if (r === 0) first = res;
-      else if (res.output !== first.output || res.status !== first.status || res.reason !== first.reason) stable = false;
+      else if (res.output !== first.output || res.status !== first.status || res.reason !== first.reason)
+        stable = false;
     }
     if (!stable) unstable.push(it.id);
     const medianMs = percentile(samples, 50);
-    if (medianMs > 10000 || results.length % 20 === 19) console.log(`  [progress] ${it.id} (${results.length + 1}/${items.length}) median ${Math.round(medianMs)} ms`);
+    if (medianMs > 10000 || results.length % 20 === 19)
+      console.log(`  [progress] ${it.id} (${results.length + 1}/${items.length}) median ${Math.round(medianMs)} ms`);
     const preserved = checkPreservation(first.output, it.protected);
     const meaning = checkMeaning(first.output, it);
     results.push({
@@ -157,11 +163,15 @@ async function main() {
   for (const direction of directions) {
     console.log(`[${direction}] loading model...`);
     const model = await loadDirection({ direction, mod, modelsDir });
-    console.log(`[${direction}] loaded in ${(model.loadMs / 1000).toFixed(2)} s (lang token id ${model.handle.langTokenId})`);
+    console.log(
+      `[${direction}] loaded in ${(model.loadMs / 1000).toFixed(2)} s (lang token id ${model.handle.langTokenId})`,
+    );
     for (const set of sets) {
       const fx = loadFixtureSet(set, direction);
       for (const mode of modes) {
-        console.log(`[${direction}/${set}/${mode}] running ${fx.data.items.length} items (warmup ${opts.warmup}, repetitions ${opts.repetitions})...`);
+        console.log(
+          `[${direction}/${set}/${mode}] running ${fx.data.items.length} items (warmup ${opts.warmup}, repetitions ${opts.repetitions})...`,
+        );
         const { items, unstable, wallSec } = await runMode({ model, direction, mode, fixture: fx.data, opts });
         const run = {
           date,
@@ -190,7 +200,9 @@ async function main() {
             langTokenId: model.handle.langTokenId,
             eosTokenId: model.handle.eosTokenId,
             decoderStartTokenId: model.handle.decoderStartTokenId,
-            files: manifest.files.filter((f) => f.model === MODEL_IDS[direction]).map(({ file, bytes, sha256 }) => ({ file, bytes, sha256 })),
+            files: manifest.files
+              .filter((f) => f.model === MODEL_IDS[direction])
+              .map(({ file, bytes, sha256 }) => ({ file, bytes, sha256 })),
           },
           loadMs: round(model.loadMs, 0),
           peakRssMb: round(process.resourceUsage().maxRSS / 1024, 0), // process-wide peak so far

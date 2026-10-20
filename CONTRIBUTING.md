@@ -7,7 +7,7 @@ Dành cho mọi contributor, có hoặc không dùng AI. Bắt đầu từ [READ
 
 1. Đọc yêu cầu/acceptance criteria của task, kiểm tra `git status` và test gần code cần sửa.
 2. Chọn một lát chức năng nhỏ; đặt file theo [module structure](docs/rules/module-structure.md) và architecture gate,
-   không copy layout của một module cụ thể (`catalog` chưa mount, không phải mẫu).
+   không copy layout của một module cụ thể.
 3. Sửa trong module sở hữu; thêm test hành vi, gồm trường hợp bị từ chối liên quan.
 4. Chạy kiểm tra theo bảng dưới và đọc diff cuối.
 5. Trong PR, mô tả hành vi thay đổi, bằng chứng đã chạy và phần chưa kiểm chứng.

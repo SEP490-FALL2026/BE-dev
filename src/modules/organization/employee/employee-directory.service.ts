@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import type { BusinessDate } from '../../../core/business-date';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import {
   CreateEmployeeWithPlacementInput,
@@ -41,6 +42,18 @@ export class EmployeeDirectoryService {
 
   findMany(employeeIds: string[]): Promise<EmployeeRecord[]> {
     return this.repo.findEmployees(employeeIds);
+  }
+
+  placementOn(employeeId: string, onDate: BusinessDate): Promise<{ departmentId: string; jobTitleId: string } | null> {
+    return this.repo.placementIdsOn(employeeId, onDate);
+  }
+
+  findManyByCodes(employeeCodes: readonly string[], tx?: DbTx): Promise<EmployeeRecord[]> {
+    return this.repo.findEmployeesByCodes(employeeCodes, tx);
+  }
+
+  workEmailDomains(tx?: DbTx): Promise<string[]> {
+    return this.repo.workEmailDomains(tx);
   }
 
   countActive(tx?: DbTx): Promise<number> {

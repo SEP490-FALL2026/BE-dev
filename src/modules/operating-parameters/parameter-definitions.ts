@@ -106,6 +106,14 @@ export const PARAMETER_DEFINITIONS: readonly ParameterDefinition[] = [
     source: 'FR-2.12, QĐ-63b, OQ-A-05',
   },
   {
+    key: 'DOCUMENT_MAX_SIZE_MB',
+    shape: { kind: 'int', min: 1, max: 50 },
+    default: 10,
+    unit: 'MB',
+    description: 'The largest file kept for a contract or a purchase document; a larger file is refused.',
+    source: 'US-04-04 AC-10',
+  },
+  {
     key: 'DETECTION_THRESHOLD_DAYS',
     shape: { kind: 'int-list', min: 1, max: 365, length: { min: 3, max: 3 }, order: 'ascending' },
     default: [30, 60, 90],

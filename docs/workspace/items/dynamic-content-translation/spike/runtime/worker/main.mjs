@@ -44,7 +44,13 @@ const intraThreads = Number(process.env.SPIKE_INTRA_THREADS ?? 1);
 const maxNewTokensOverride = process.env.SPIKE_MAX_NEW_TOKENS ? Number(process.env.SPIKE_MAX_NEW_TOKENS) : null;
 const modelsDir = path.resolve(process.env.SPIKE_MODELS_DIR ?? '');
 const lockPath = process.env.SPIKE_MODEL_LOCK ?? path.join(HERE, '..', 'model-lock.json');
-const SAFE_CODES = new Set(['INPUT_TOO_LONG', 'ADAPTER_RESULT_UNREADABLE', 'ADAPTER_ASSUMPTION_FAILED', 'CRITERION_NOT_INVOKED', 'BAD_MAX_NEW_TOKENS']);
+const SAFE_CODES = new Set([
+  'INPUT_TOO_LONG',
+  'ADAPTER_RESULT_UNREADABLE',
+  'ADAPTER_ASSUMPTION_FAILED',
+  'CRITERION_NOT_INVOKED',
+  'BAD_MAX_NEW_TOKENS',
+]);
 
 let tf = null;
 const handles = new Map(); // direction -> adapter handle
@@ -57,7 +63,8 @@ async function importLibrary() {
   if (depsDir) {
     const pkgDir = path.join(depsDir, 'node_modules', '@huggingface', 'transformers');
     const pkg = JSON.parse(fs.readFileSync(path.join(pkgDir, 'package.json'), 'utf8'));
-    const entry = pkg.exports?.['.']?.node?.import?.default ?? pkg.exports?.node?.import?.default ?? pkg.module ?? pkg.main;
+    const entry =
+      pkg.exports?.['.']?.node?.import?.default ?? pkg.exports?.node?.import?.default ?? pkg.module ?? pkg.main;
     tf = await import(pathToFileURL(path.resolve(pkgDir, entry)).href);
   } else {
     tf = await import('@huggingface/transformers');
@@ -117,7 +124,9 @@ async function onLoad({ direction }) {
     const msg = String(e?.message ?? '');
     const assumption = e?.code === 'ADAPTER_ASSUMPTION_FAILED';
     const permanent = assumption || e?.code === 'ENOENT' || /could not locate file|file not found|not found/i.test(msg);
-    process.stderr.write(`loadFailed ${direction} permanent=${permanent} name=${e?.name ?? 'Error'} code=${e?.code ?? ''}\n`);
+    process.stderr.write(
+      `loadFailed ${direction} permanent=${permanent} name=${e?.name ?? 'Error'} code=${e?.code ?? ''}\n`,
+    );
     send({ type: 'loadFailed', direction, permanent, ...(assumption ? { code: 'ADAPTER_ASSUMPTION_FAILED' } : {}) });
   }
 }

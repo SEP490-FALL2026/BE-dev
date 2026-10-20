@@ -17,7 +17,8 @@ const dropOrtWeb = flags.includes('--drop-onnxruntime-web');
 const scratch = process.env.SPIKE_SCRATCH || path.join(os.tmpdir(), 'translation-spike-deps');
 const proj = path.join(scratch, label);
 fs.mkdirSync(proj, { recursive: true });
-for (const f of ['package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml']) fs.copyFileSync(path.join(baseDir, f), path.join(proj, f));
+for (const f of ['package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml'])
+  fs.copyFileSync(path.join(baseDir, f), path.join(proj, f));
 
 const pkgPath = path.join(proj, 'package.json');
 const pkgText = fs.readFileSync(pkgPath, 'utf8');
@@ -36,11 +37,20 @@ if (dropOrtWeb) {
 const run = (args) => {
   const t = Date.now();
   const r = spawnSync('pnpm', args, { cwd: proj, shell: true, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
-  return { args: `pnpm ${args.join(' ')}`, exitCode: r.status, seconds: +((Date.now() - t) / 1000).toFixed(1), stdout: r.stdout || '', stderr: r.stderr || '' };
+  return {
+    args: `pnpm ${args.join(' ')}`,
+    exitCode: r.status,
+    seconds: +((Date.now() - t) / 1000).toFixed(1),
+    stdout: r.stdout || '',
+    stderr: r.stderr || '',
+  };
 };
 const pkgSet = (lockFile) => {
   const set = new Set();
-  for (const m of fs.readFileSync(lockFile, 'utf8').matchAll(/^  '?((?:@[^@/'\s]+\/)?[^@'\s]+)@([^':\s(]+)[^:]*'?:\s*(?:\{\})?$/gm)) set.add(`${m[1]}@${m[2]}`);
+  for (const m of fs
+    .readFileSync(lockFile, 'utf8')
+    .matchAll(/^  '?((?:@[^@/'\s]+\/)?[^@'\s]+)@([^':\s(]+)[^:]*'?:\s*(?:\{\})?$/gm))
+    set.add(`${m[1]}@${m[2]}`);
   return set;
 };
 const baseSet = pkgSet(path.join(baseDir, 'pnpm-lock.yaml'));
@@ -75,7 +85,12 @@ const evidence = {
     ? {
         exitCode: auditJson.exitCode,
         vulnerabilities: audit.metadata.vulnerabilities,
-        advisories: Object.values(audit.advisories || {}).map((a) => ({ ghsa: a.github_advisory_id, module: a.module_name, severity: a.severity, paths: a.findings.flatMap((f) => f.paths.slice(0, 2)) })),
+        advisories: Object.values(audit.advisories || {}).map((a) => ({
+          ghsa: a.github_advisory_id,
+          module: a.module_name,
+          severity: a.severity,
+          paths: a.findings.flatMap((f) => f.paths.slice(0, 2)),
+        })),
       }
     : null,
   lockfile: { sha256: createHash('sha256').update(lock).digest('hex'), bytes: lock.length },
@@ -85,4 +100,13 @@ const evidence = {
 };
 fs.mkdirSync(path.join(here, 'evidence'), { recursive: true });
 fs.writeFileSync(path.join(here, 'evidence', `${label}.json`), JSON.stringify(evidence, null, 2) + '\n');
-console.log(JSON.stringify({ label, gate: evidence.auditHighGateExitCode, vuln: evidence.audit?.vulnerabilities, added: added.length, removed: removed.length, why: evidence.pnpmWhySharp }));
+console.log(
+  JSON.stringify({
+    label,
+    gate: evidence.auditHighGateExitCode,
+    vuln: evidence.audit?.vulnerabilities,
+    added: added.length,
+    removed: removed.length,
+    why: evidence.pnpmWhySharp,
+  }),
+);

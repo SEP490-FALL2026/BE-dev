@@ -15,10 +15,11 @@
 
 ## Kiểm chứng và bàn giao
 
-| Lệnh / kiểm tra AC             | Revision / môi trường             | Kết quả thực chạy                                                                    | Giới hạn / việc còn lại    |
-| ------------------------------ | --------------------------------- | ------------------------------------------------------------------------------------ | -------------------------- |
-| `pnpm test`, `pnpm test:e2e`   | `e833092` + cây làm việc, Windows | PASS (xem "Cổng cuối" ở roadmap)                                                     | —                          |
-| `jest … employee-imports-http` | như trên, PostgreSQL 17 Docker    | 29 test PASS; đột biến bỏ kiểm lỗi thời + kiểm file trùng làm 3 test đỏ rồi hoàn lại | Xlsx, lưu tệp gốc, job dọn |
+| Lệnh / kiểm tra AC                                                                                                                                                                                     | Revision / môi trường                          | Kết quả thực chạy                                                                    | Giới hạn / việc còn lại    |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------- | ------------------------------------------------------------------------------------ | -------------------------- |
+| `pnpm test`, `pnpm test:e2e`                                                                                                                                                                           | `e833092` + cây làm việc, Windows              | PASS (xem "Cổng cuối" ở roadmap)                                                     | —                          |
+| `jest … employee-imports-http`                                                                                                                                                                         | như trên, PostgreSQL 17 Docker                 | 29 test PASS; đột biến bỏ kiểm lỗi thời + kiểm file trùng làm 3 test đỏ rồi hoàn lại | Xlsx, lưu tệp gốc, job dọn |
+| `employee-import-seats-http` (viết trước; đỏ 4/4 rồi xanh; ba đột biến — đưa cả người có trong tệp, cả người đã nghỉ vào hàng đợi — làm đỏ) và hai test mô tả hình dạng cũ cập nhật thêm `reviewQueue` | 20/10/2026, cây làm việc, PostgreSQL 17 Docker | 4 test xanh; `employee-imports-http` 38 test xanh                                    | `US-02-02` AC-4 đã làm     |
 
 - [x] AC trong scope có bằng chứng; spec/plan phản ánh implementation cuối.
 - [ ] Owner review trên revision cụ thể. Chỉ ghi `merged-dev`, `accepted`, `released` sau đúng sự kiện thật.

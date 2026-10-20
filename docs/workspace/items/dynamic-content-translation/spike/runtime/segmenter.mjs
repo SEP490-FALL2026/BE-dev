@@ -4,7 +4,10 @@
 export function splitSentences(text, { maxChars = 400 } = {}) {
   const trimmed = String(text).trim();
   if (!trimmed) return [];
-  const sentences = trimmed.split(/(?<=[.!?…])\s+|\n+/u).map((s) => s.trim()).filter(Boolean);
+  const sentences = trimmed
+    .split(/(?<=[.!?…])\s+|\n+/u)
+    .map((s) => s.trim())
+    .filter(Boolean);
   const out = [];
   for (const s of sentences) {
     if (s.length <= maxChars) {

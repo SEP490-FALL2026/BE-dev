@@ -7,8 +7,8 @@ import { S3CompatibleObjectStorageAdapter } from './s3-compatible-object-storage
 
 /**
  * S3-compatible storage, validated when the module is mounted (production requires the HTTPS endpoint, the bucket and
- * the credentials). Not mounted by the API or the worker while no Story stores files (E2 = A, H6.4); a G7/G9 slice that
- * stores files mounts it and gets the strict validation back with it.
+ * the credentials). Mounted by the API only, through the catalog, for the files of contracts (`US-04-04`, ADR-0014);
+ * the worker and the commands do not mount it. Mounting it brings the strict validation with it.
  */
 @Module({
   providers: [

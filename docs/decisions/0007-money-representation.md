@@ -19,6 +19,8 @@ This is a technical decision inside business rules already fixed by BRD `ADR-03`
 
 2026-10-03
 
+**Implementation annotation (20/10/2026, `g3-money-and-exchange-rates`):** `src/core/money` (parse/format, `ScaledRate`, `convertToReporting`, worked examples M1–M18 as unit tests), the tables `currencies` and `exchange_rates` (migration `20261020100000_finance_money_and_exchange_rates`) and the facade `FinanceService` (`parseMoney`, `snapshotMoney`) are implemented and `verified` locally. Money columns on subscriptions and the frozen snapshot stored with them are not yet: they arrive with `g3-subscription-purchase`. Accepted is still not Owner-reviewed implementation.
+
 **Implementation annotation after restore:** the status description of `currencies.minor_unit` above refers to the pre-restore S0 database/schema, not the current checked-out foundation schema. No live database was inspected in this documentation audit. WP-02/WP-05 and `core/money` are future work; prior acceptance does not establish current implementation. Inspect migration history before applying any new schema to an existing environment.
 
 ## Context

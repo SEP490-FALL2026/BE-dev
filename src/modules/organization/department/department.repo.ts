@@ -257,6 +257,25 @@ export class DepartmentRepo {
     return new Map(rows.map((row) => [row.department_id, row.total]));
   }
 
+  /** Holds the department `FOR SHARE` until the transaction ends (it must still exist and stay as read), then reads it. */
+  async lockShared(tx: DbTx, id: string): Promise<DepartmentRecord | null> {
+    const rows = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM departments WHERE id = ${id}::uuid FOR SHARE`;
+    if (rows.length === 0) return null;
+
+    return this.findById(id, tx);
+  }
+
+  /** Everyone placed in the department on `onDate`, by employee id; null when the department does not exist. */
+  async memberIdsOn(departmentId: string, onDate: BusinessDate): Promise<string[] | null> {
+    if (!(await this.findById(departmentId))) return null;
+    const rows = await this.prisma.$queryRaw<{ employee_id: string }[]>`
+      SELECT p.employee_id FROM employee_placements p
+       WHERE p.department_id = ${departmentId}::uuid
+         AND p.valid_from <= ${onDate}::date AND (p.valid_to IS NULL OR p.valid_to > ${onDate}::date)`;
+
+    return rows.map((row) => row.employee_id);
+  }
+
   /** The people placed in the department on `onDate`, in code order: one page and the total. */
   async members(
     client: DbTx | undefined,

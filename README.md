@@ -10,8 +10,8 @@ Center, phòng và trưởng phòng (vai Manager suy ra), Người duyệt chi, 
 tạo, chuyển giao Super Admin, lệnh khôi phục ngoài HTTP `pnpm ops:recover --help`, lệnh kiểm trạng thái chỉ đọc
 `pnpm ops:inspect` và lệnh dữ liệu demo chỉ local `pnpm dev:seed -- --confirm-local` (các lệnh ngoài HTTP cần
 `pnpm build`; rule: [operational commands](docs/rules/operational-commands.md)).
-Catalog **không có route HTTP**: source, schema và test được giữ nhưng `CatalogModule` chưa mount, chưa có access
-declaration và không phải mẫu kiến trúc; G3 quyết giữ, thay hay loại. Health là public.
+Danh mục phần mềm (nhóm G3) chưa có route HTTP: mẫu `catalog` cũ đã được gỡ ở `g3-catalog-foundation` và từng lát G3 thêm
+module thật theo [ADR-0013](docs/decisions/0013-catalog-finance-licensing-contexts.md). Health là public.
 Không có tài khoản mặc định trong repository: tạo Super Admin bằng lệnh khởi tạo trên database mới; tài khoản demo
 local (IT Admin, Finance, Employee) do `pnpm dev:seed` tạo với mật khẩu sinh ngẫu nhiên, in một lần.
 
@@ -30,11 +30,12 @@ Cần Node.js 22 hoặc 24, pnpm 11.1.3, Docker Compose.
    [env-schema.ts](src/infrastructure/config/env-schema.ts) và khớp [Compose](compose.yaml). Khi cần ghi đè, copy
    [.env.example](.env.example) thành `.env` (không commit), chỉ bỏ comment dòng cần đổi (ví dụ `DATABASE_URL`, `PORT`,
    `CORS_ORIGINS`). Đổi port PostgreSQL trong Compose thì cập nhật cả `DATABASE_URL`. **Development phải có secret riêng**
-   (E3 = C, H6.3): bốn biến đánh dấu `@required-outside-test` (`AUTH_ACCESS_TOKEN_SECRET`, `AUTH_THROTTLE_PEPPER`,
-   `OUTBOX_PAYLOAD_KEY`, `OUTBOX_PAYLOAD_KEY_ID`) không có giá trị mặc định ngoài `NODE_ENV=test`; tạo bằng lệnh trong
+   (E3 = C, H6.3): bảy biến đánh dấu `@required-outside-test` (`AUTH_ACCESS_TOKEN_SECRET`, `AUTH_THROTTLE_PEPPER`,
+   `OUTBOX_PAYLOAD_KEY`, `OUTBOX_PAYLOAD_KEY_ID`, `LICENSE_KEY_VAULT_KEY`, `LICENSE_KEY_VAULT_KEY_ID`,
+   `LICENSE_KEY_FINGERPRINT_PEPPER`) không có giá trị mặc định ngoài `NODE_ENV=test`; tạo bằng lệnh trong
    `.env.example` và đặt vào `.env` (mỗi máy tự sinh, không chép từ máy khác; kiểm theo **tên**, không in giá trị:
-   `grep -cE '^(AUTH_ACCESS_TOKEN_SECRET|AUTH_THROTTLE_PEPPER|OUTBOX_PAYLOAD_KEY|OUTBOX_PAYLOAD_KEY_ID)=' .env` phải ra
-   `4`). Thiếu thì API, worker và `ops:recover` dừng với danh sách biến thiếu; `ops:inspect`, `ops:bootstrap` và
+   `grep -cE '^(AUTH_ACCESS_TOKEN_SECRET|AUTH_THROTTLE_PEPPER|OUTBOX_PAYLOAD_KEY|OUTBOX_PAYLOAD_KEY_ID|LICENSE_KEY_VAULT_KEY|LICENSE_KEY_VAULT_KEY_ID|LICENSE_KEY_FINGERPRINT_PEPPER)=' .env`
+   phải ra `7`). Thiếu thì API, worker và `ops:recover` dừng với danh sách biến thiếu; `ops:inspect`, `ops:bootstrap` và
    `dev:seed` chỉ cần cấu hình database nên vẫn chạy. Giá trị công
    khai trong repository (fallback của test, mặc định development cũ) bị từ chối ở development và production. Copy
    `.env.example` **chưa** đủ cho production: validator production còn từ chối thiếu biến `@production-required`. Biến đã bỏ (ví dụ `AUTH_COOKIE_SECURE`, bỏ khi refresh token chuyển sang body) bị bỏ

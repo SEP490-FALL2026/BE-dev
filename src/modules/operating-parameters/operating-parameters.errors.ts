@@ -45,3 +45,13 @@ export class NonWorkingDateReasonInvalidError extends Error {
     this.name = 'NonWorkingDateReasonInvalidError';
   }
 }
+
+export type ReportingCurrencyLock = 'EXCHANGE_RATE' | 'CONVERTED_PRICE';
+
+/** A rate is recorded or a subscription has a converted price: the reporting currency is locked (US-01-04 AC-9). */
+export class ReportingCurrencyLockedError extends Error {
+  constructor(readonly reason: ReportingCurrencyLock) {
+    super('The reporting currency is locked: values were already recorded in it.');
+    this.name = 'ReportingCurrencyLockedError';
+  }
+}

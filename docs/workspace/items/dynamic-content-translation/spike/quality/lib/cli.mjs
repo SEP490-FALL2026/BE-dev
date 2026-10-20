@@ -51,13 +51,17 @@ export function parseArgs(argv) {
       o[key] = value;
     }
   }
-  if (!['vi-en', 'en-vi', 'both'].includes(o.direction)) throw new Error(`direction must be vi-en, en-vi or both (got "${o.direction}")`);
-  if (!['raw', 'protected', 'both'].includes(o.mode)) throw new Error(`mode must be raw, protected or both (got "${o.mode}")`);
-  if (!o.fixtures.split(',').every((s) => FIXTURE_SETS.includes(s))) throw new Error(`fixtures must be main, heldout or main,heldout (got "${o.fixtures}")`);
+  if (!['vi-en', 'en-vi', 'both'].includes(o.direction))
+    throw new Error(`direction must be vi-en, en-vi or both (got "${o.direction}")`);
+  if (!['raw', 'protected', 'both'].includes(o.mode))
+    throw new Error(`mode must be raw, protected or both (got "${o.mode}")`);
+  if (!o.fixtures.split(',').every((s) => FIXTURE_SETS.includes(s)))
+    throw new Error(`fixtures must be main, heldout or main,heldout (got "${o.fixtures}")`);
   if (o.warmup < 0) throw new Error('warmup must be >= 0');
   if (o.repetitions < 1) throw new Error('repetitions must be >= 1');
   if (o.maxSegmentTokens < 1) throw new Error('max-segment-tokens must be >= 1');
-  if (!['fixture', 'none'].includes(o.knownTerms)) throw new Error(`known-terms must be fixture or none (got "${o.knownTerms}")`);
+  if (!['fixture', 'none'].includes(o.knownTerms))
+    throw new Error(`known-terms must be fixture or none (got "${o.knownTerms}")`);
   if (o.limit !== null && o.limit < 1) throw new Error('limit must be >= 1');
   return o;
 }

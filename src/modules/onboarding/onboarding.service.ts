@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
+import { CatalogService } from '../catalog/catalog.service';
 import { DataImportService } from '../data-import/data-import.service';
 import { IdentityAccessService } from '../identity-access/identity-access.service';
+import { LicensingService } from '../licensing/licensing.service';
 import { OrganizationService } from '../organization/organization.service';
 
 export type StepStatus = 'DONE' | 'INCOMPLETE' | 'BLOCKED' | 'NOT_AVAILABLE';
@@ -24,23 +26,48 @@ export interface OrganizationStep {
   warnings: { code: 'MISSING_HEAD' | 'MISSING_IT_ADMIN'; departmentCode: string; departmentName: string }[];
 }
 
+/** A step after the first: judged from the catalog and the seats that exist, not from how they were entered. */
+export interface DataStep {
+  step: 2 | 3 | 4;
+  key: 'APPLICATIONS' | 'CONTRACTS_AND_SUBSCRIPTIONS' | 'SEAT_BASELINE';
+  status: 'DONE' | 'INCOMPLETE' | 'BLOCKED';
+  reasons: ('NO_APPLICATION' | 'NO_SUBSCRIPTION' | 'STEP_1_INCOMPLETE' | 'STEP_3_INCOMPLETE')[];
+  facts:
+    | { applications: number }
+    | { plans: number; subscriptions: number }
+    | { assignments: number; closed: boolean; closedAt: string | null };
+}
+
+/** A step whose data does not exist yet (the usage step): it says so and is never shown as done. */
 export interface LaterStep {
-  step: 2 | 3 | 4 | 5;
-  key: 'APPLICATIONS' | 'CONTRACTS_AND_SUBSCRIPTIONS' | 'SEAT_BASELINE' | 'USAGE';
-  status: 'BLOCKED' | 'NOT_AVAILABLE';
-  reasons: ('NOT_BUILT_YET' | 'STEP_1_INCOMPLETE' | 'STEP_3_NOT_AVAILABLE')[];
+  step: 5;
+  key: 'USAGE';
+  status: 'NOT_AVAILABLE';
+  reasons: 'NOT_BUILT_YET'[];
+}
+
+/** A step that is only suggested, never required: it says where it belongs and never stops another step. */
+export interface ChecklistSuggestion {
+  key: 'STANDARD_TOOLSET';
+  afterStep: 3;
+  story: 'US-04-10';
+  available: boolean;
+  configuredPairs: number;
+  blocksStep: false;
 }
 
 export interface OnboardingChecklist {
-  steps: [OrganizationStep, LaterStep, LaterStep, LaterStep, LaterStep];
+  steps: [OrganizationStep, DataStep, DataStep, DataStep, LaterStep];
+  suggestions: [ChecklistSuggestion];
 }
 
 /**
  * The onboarding checklist (`US-02-04`). Each step is judged from the data that exists, not from how it was entered.
  * Step 1 is done when there is a department and a person and the latest people file has no wrong row; a department
- * without a head or without an IT Admin in charge is a warning inside it and stops nothing (`QĐ-66d`). Steps 2 to 5
- * need the application catalogue, the subscriptions and the seats, which are not built yet, so they say so and step 4
- * says what it waits for; they join this checklist when those exist.
+ * without a head or without an IT Admin in charge is a warning inside it and stops nothing (`QĐ-66d`). Step 2 is done
+ * when the catalog holds an application, step 3 when it holds a subscription; step 4, the seat baseline, is blocked
+ * until steps 1 and 3 are done (`BR-01.1`), ready after, and done when the IT Admin closes it (`OI-10`). Step 5, the
+ * usage, is not built yet and says so. The standard toolset is only suggested after step 3 and blocks nothing (`QĐ-66d`).
  */
 @Injectable()
 export class OnboardingService {
@@ -48,12 +75,16 @@ export class OnboardingService {
     private readonly organization: OrganizationService,
     private readonly identity: IdentityAccessService,
     private readonly imports: DataImportService,
+    private readonly catalog: CatalogService,
+    private readonly licensing: LicensingService,
   ) {}
 
   async checklist(): Promise<OnboardingChecklist> {
-    const [facts, latest] = await Promise.all([
+    const [facts, latest, catalog, baseline] = await Promise.all([
       this.organization.getOnboardingFacts(),
       this.imports.latestEmployeeImport(),
+      this.catalog.getOnboardingFacts(),
+      this.licensing.getBaselineProgress(),
     ]);
     const usableItAdmins = await this.identity.findUsableItAdminEmployeeIds(
       facts.departmentsByItAdmin.flatMap((department) =>
@@ -98,26 +129,54 @@ export class OnboardingService {
           })),
       ],
     };
-    const notBuilt = (step: 2 | 3 | 5, key: LaterStep['key']): LaterStep => ({
-      step,
-      key,
-      status: 'NOT_AVAILABLE',
-      reasons: ['NOT_BUILT_YET'],
-    });
+    const second: DataStep = {
+      step: 2,
+      key: 'APPLICATIONS',
+      status: catalog.applications > 0 ? 'DONE' : 'INCOMPLETE',
+      reasons: catalog.applications > 0 ? [] : ['NO_APPLICATION'],
+      facts: { applications: catalog.applications },
+    };
+    const third: DataStep = {
+      step: 3,
+      key: 'CONTRACTS_AND_SUBSCRIPTIONS',
+      status: catalog.subscriptions > 0 ? 'DONE' : 'INCOMPLETE',
+      reasons: catalog.subscriptions > 0 ? [] : ['NO_SUBSCRIPTION'],
+      facts: { plans: catalog.plans, subscriptions: catalog.subscriptions },
+    };
+    // Seats need the people of step 1 and the subscriptions of step 3 (BR-01.1); closing is what completes the step.
+    const blockedBy: DataStep['reasons'] = [
+      ...(first.status === 'DONE' ? [] : (['STEP_1_INCOMPLETE'] as const)),
+      ...(third.status === 'DONE' ? [] : (['STEP_3_INCOMPLETE'] as const)),
+    ];
+    const fourth: DataStep = {
+      step: 4,
+      key: 'SEAT_BASELINE',
+      status: baseline.closed ? 'DONE' : blockedBy.length > 0 ? 'BLOCKED' : 'INCOMPLETE',
+      reasons: baseline.closed ? [] : blockedBy,
+      facts: {
+        assignments: baseline.assignments,
+        closed: baseline.closed,
+        closedAt: baseline.closedAt ? baseline.closedAt.toISOString() : null,
+      },
+    };
 
     return {
       steps: [
         first,
-        notBuilt(2, 'APPLICATIONS'),
-        notBuilt(3, 'CONTRACTS_AND_SUBSCRIPTIONS'),
+        second,
+        third,
+        fourth,
+        { step: 5, key: 'USAGE', status: 'NOT_AVAILABLE', reasons: ['NOT_BUILT_YET'] },
+      ],
+      suggestions: [
         {
-          step: 4,
-          key: 'SEAT_BASELINE',
-          status: 'BLOCKED',
-          // Seats need the subscriptions of step 3 (AC-2), and people before them.
-          reasons: [...(first.status === 'DONE' ? [] : (['STEP_1_INCOMPLETE'] as const)), 'STEP_3_NOT_AVAILABLE'],
+          key: 'STANDARD_TOOLSET',
+          afterStep: 3,
+          story: 'US-04-10',
+          available: third.status === 'DONE',
+          configuredPairs: catalog.standardToolsets,
+          blocksStep: false,
         },
-        notBuilt(5, 'USAGE'),
       ],
     };
   }

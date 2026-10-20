@@ -9,10 +9,12 @@ import { JobTitleCatalogueService } from './job-title/job-title-catalogue.servic
 import { JobTitleListFilter, JobTitleRecord, JobTitleStatus } from './job-title/job-title.types';
 import { OrganizationRepo } from './organization.repo';
 import {
+  CostCenterBrief,
   CreateCostCenterInput,
   CreateDepartmentInput,
   CreateEmployeeWithPlacementInput,
   CreateOrganizationInput,
+  DepartmentBrief,
   EmployeeCandidate,
   EmployeeImportLookupData,
   EmployeeProfile,
@@ -21,6 +23,9 @@ import {
   OnboardingFacts,
   OrganizationRecord,
 } from './organization.types';
+
+const toBrief = (record: { id: string; code: string; name: string; status: string } | null): DepartmentBrief | null =>
+  record && { id: record.id, code: record.code, name: record.name, active: record.status === 'ACTIVE' };
 
 /**
  * Public facade of the organization module. Other modules call these methods with their own
@@ -50,20 +55,52 @@ export class OrganizationService {
     return businessDateAt(now, this.timeZone);
   }
 
-  /**
-   * True when the employee heads a department today or has a head period that has not ended (including one
-   * that begins later): such a person can never hold the Super Admin role (FR-8.7, US-01-09 AC-3).
-   */
+  /** True when the employee heads a department or has a head period not yet ended: never a Super Admin (FR-8.7, AC-3). */
   async isDepartmentHead(employeeId: string, tx?: DbTx): Promise<boolean> {
     return this.departments.hasHeadPeriodFrom(tx, employeeId, await this.businessToday());
   }
 
-  /**
-   * The department this employee heads on `onDate` (default today), or null. An unlocked read: the per-request role
-   * check must not take locks. The head is a member of the department for the whole period (QĐ-66a).
-   */
+  /** The department this employee heads on `onDate` (default today), or null; unlocked, for the per-request role check. */
   async getHeadedDepartment(employeeId: string, onDate?: BusinessDate): Promise<{ departmentId: string } | null> {
     return this.departments.headedDepartment(employeeId, onDate ?? (await this.businessToday()));
+  }
+
+  /** The department with this id: its code, name and whether it is still active; null when there is none. */
+  async getDepartmentBrief(departmentId: string, tx?: DbTx): Promise<DepartmentBrief | null> {
+    return toBrief(await this.departments.find(departmentId, tx));
+  }
+
+  /** The same, held `FOR SHARE` until the caller transaction ends, so it cannot be made inactive between check and commit. */
+  async lockDepartmentShared(tx: DbTx, departmentId: string): Promise<DepartmentBrief | null> {
+    return toBrief(await this.departments.lockShared(tx, departmentId));
+  }
+
+  /** The department and the job title of the employee on `onDate` (default today), by id; null when they have none. */
+  async getEmployeePlacement(
+    employeeId: string,
+    onDate?: BusinessDate,
+  ): Promise<{ departmentId: string; jobTitleId: string } | null> {
+    return this.employees.placementOn(employeeId, onDate ?? (await this.businessToday()));
+  }
+
+  /** The department of the employee on `onDate` and its IT Admin, named only while still working (`US-01-11` AC-4, AC-8). */
+  async getItAdminInCharge(
+    employeeId: string,
+    onDate?: BusinessDate,
+  ): Promise<{ departmentId: string; itAdminEmployeeId: string | null } | null> {
+    const placement = await this.getEmployeePlacement(employeeId, onDate);
+
+    return (
+      placement && {
+        departmentId: placement.departmentId,
+        itAdminEmployeeId: await this.departments.itAdminInChargeOf(placement.departmentId),
+      }
+    );
+  }
+
+  /** Everyone placed in the department on `onDate` (default today), by employee id; null when it does not exist. */
+  async getDepartmentMemberIds(departmentId: string, onDate?: BusinessDate): Promise<string[] | null> {
+    return this.departments.memberIdsOn(departmentId, onDate ?? (await this.businessToday()));
   }
 
   // --- the head periods of departments, for the department use cases (in their transaction) -------------
@@ -78,10 +115,7 @@ export class OrganizationService {
     return this.departments.headHistory(tx, departmentId, limit);
   }
 
-  /**
-   * Cancels the head periods that begin on or after `from` and ends the one in force then, the day before. The caller
-   * holds the department's `FOR UPDATE` lock.
-   */
+  /** Cancels the head periods from `from` on and ends the one in force the day before; the caller holds the department lock. */
   endDepartmentHeadPeriodsFrom(tx: DbTx, departmentId: string, from: BusinessDate): Promise<HeadPeriodChanges> {
     return this.departments.endHeadPeriodsFrom(tx, departmentId, from);
   }
@@ -99,12 +133,32 @@ export class OrganizationService {
     return this.repo.findOrganization(tx);
   }
 
+  /** Changes the reporting currency; the database locks it once a rate or a converted price exists (AC-9, `55000`). */
+  setReportingCurrency(tx: DbTx, organizationId: string, currency: string): Promise<void> {
+    return this.repo.setReportingCurrency(tx, organizationId, currency);
+  }
+
   createOrganization(tx: DbTx, input: CreateOrganizationInput): Promise<OrganizationRecord> {
     return this.repo.createOrganization(tx, input);
   }
 
   createUnitCostCenter(tx: DbTx, input: CreateCostCenterInput): Promise<{ id: string }> {
     return this.costCenters.createUnitForInstallation(tx, input);
+  }
+
+  /** The Cost Centers with these codes as far as they exist, for the imports that name them by code. */
+  getCostCentersByCodes(codes: readonly string[], tx?: DbTx): Promise<CostCenterBrief[]> {
+    return this.costCenters.findBriefsByCodes(codes, tx);
+  }
+
+  /** The Cost Centers with these ids as far as they exist: code, name, kind and status (`ACTIVE` ones take new use). */
+  costCentersByIds(ids: readonly string[], tx?: DbTx): Promise<CostCenterBrief[]> {
+    return this.costCenters.findBriefs(ids, tx);
+  }
+
+  /** The same, each locked `FOR SHARE` until the caller's transaction ends, so none turns inactive before commit. */
+  lockCostCentersShared(tx: DbTx, ids: readonly string[]): Promise<CostCenterBrief[]> {
+    return this.costCenters.lockSharedBriefs(tx, ids);
   }
 
   createDepartment(tx: DbTx, input: CreateDepartmentInput): Promise<{ id: string }> {
@@ -135,6 +189,11 @@ export class OrganizationService {
   /** `FOR SHARE` when an entry relies on the title staying as it is until commit; null when it does not exist. */
   lockJobTitleForShare(tx: DbTx, jobTitleId: string): Promise<JobTitleRecord | null> {
     return this.jobTitles.lock(tx, jobTitleId, 'SHARE');
+  }
+
+  /** The job title with this id, or null. Pass `tx` to read in a transaction. */
+  getJobTitle(jobTitleId: string, tx?: DbTx): Promise<JobTitleRecord | null> {
+    return this.jobTitles.find(jobTitleId, tx);
   }
 
   /** Unlocked: the title that has this normalized name, whatever its status, to name it in a conflict. */
@@ -176,6 +235,16 @@ export class OrganizationService {
     return this.employees.findByCode(employeeCode, tx);
   }
 
+  /** Employees by code in one read, for the imports that name people by code. Unknown codes are simply absent. */
+  getEmployeesByCodes(employeeCodes: readonly string[], tx?: DbTx): Promise<EmployeeRecord[]> {
+    return this.employees.findManyByCodes(employeeCodes, tx);
+  }
+
+  /** The domains of the work emails of its people: all the organization can tell of its domains (`OQ-A-22`). */
+  getCompanyEmailDomains(tx?: DbTx): Promise<string[]> {
+    return this.employees.workEmailDomains(tx);
+  }
+
   /** Several employees in one read, for list views. Unknown ids are simply absent. */
   getEmployees(employeeIds: string[]): Promise<EmployeeRecord[]> {
     return this.employees.findMany(employeeIds);
@@ -199,10 +268,7 @@ export class OrganizationService {
     return this.employees.profile(employeeId, onDate);
   }
 
-  /**
-   * What a people file names, as the database knows it: the departments (by code), the job titles (by normalized
-   * name), the people (by code) and who owns each work email. Pass `tx` to read inside the confirming transaction.
-   */
+  /** What a people file names, as the database knows it: departments, job titles, people and work-email owners. */
   lookupForEmployeeImport(
     names: {
       departmentCodes: string[];
@@ -227,10 +293,7 @@ export class OrganizationService {
     return this.employees.recordingInstant(tx);
   }
 
-  /**
-   * `FOR SHARE` on the department a person is entered into (it must stay, with its cost center, until commit), then
-   * its state; null when no department has this code.
-   */
+  /** `FOR SHARE` on the department a person is entered into (it must stay until commit), then its state; null if none. */
   lockDepartmentForEntry(
     tx: DbTx,
     organizationId: string,
@@ -295,11 +358,7 @@ export class OrganizationService {
     };
   }
 
-  /**
-   * The numbers and the gaps the onboarding checklist shows for the organization and its people (US-02-04 AC-1, AC-6).
-   * With `tx` every read runs in the caller's transaction, one after the other (the installation inspection, P23-RV-02);
-   * without it, as unlocked reads for the checklist.
-   */
+  /** The numbers and gaps of the onboarding checklist (US-02-04 AC-1, AC-6); with `tx`, in order in that transaction. */
   async getOnboardingFacts(tx?: DbTx): Promise<OnboardingFacts> {
     const today = await this.businessToday(new Date(), tx);
     const [activeDepartments, activeEmployees, freeCostCenters, withoutHead, withItAdmin] = tx

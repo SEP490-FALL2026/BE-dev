@@ -48,11 +48,27 @@ export class TranslationCache {
   }
 
   stats() {
-    return { entries: this.#map.size, bytes: this.#bytes, hits: this.#hits, misses: this.#misses, evictions: this.#evictions };
+    return {
+      entries: this.#map.size,
+      bytes: this.#bytes,
+      hits: this.#hits,
+      misses: this.#misses,
+      evictions: this.#evictions,
+    };
   }
 
   /** `scope` is an opaque caller string, e.g. "request:<id>:businessJustification". */
-  makeKey({ organizationId, scope, engineId, modelDigest, glossaryVersion, placeholderPolicyVersion, source, target, text }) {
+  makeKey({
+    organizationId,
+    scope,
+    engineId,
+    modelDigest,
+    glossaryVersion,
+    placeholderPolicyVersion,
+    source,
+    target,
+    text,
+  }) {
     const material = JSON.stringify([
       KEY_VERSION,
       organizationId,

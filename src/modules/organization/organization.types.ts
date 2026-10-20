@@ -48,6 +48,7 @@ export interface EmployeeRecord {
   employeeCode: string;
   fullName: string;
   workEmail: string | null;
+  employmentType: EmploymentType;
   status: EmployeeStatus;
   hireDate: BusinessDate;
 }
@@ -131,4 +132,21 @@ export interface LocalSeedFixtureFacts {
     costCenterCode: string;
   } | null;
   jobTitle: { id: string; name: string; normalizedName: string; status: JobTitleStatus } | null;
+}
+
+/** What another module needs to know of a department to point at it: its code, name and whether it is still active. */
+export interface DepartmentBrief {
+  id: string;
+  code: string;
+  name: string;
+  active: boolean;
+}
+
+/** What another module needs to know of a Cost Center to point at it: its code, name, kind and whether it takes new use. */
+export interface CostCenterBrief {
+  id: string;
+  code: string;
+  name: string;
+  kind: CostCenterKind;
+  status: CostCenterStatus;
 }

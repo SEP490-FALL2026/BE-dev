@@ -94,7 +94,7 @@ try {
 Chờ pg_isready thành công trước khi chạy test. Dùng tên/port khác nếu đã có container.
 Không mount volume dữ liệu thật vào container test.
 
-Mỗi suite tạo slm_<random>_test với ownership marker riêng. Catalog suite áp dụng
+Mỗi suite tạo slm_<random>_test với ownership marker riêng. Mọi suite áp dụng
 migration đã commit. Cleanup chỉ drop đúng URL/name/runId; query parameters bị từ chối
 để tránh chuyển hướng target. afterAll phải đóng kết nối và dọn DB cả khi assertion lỗi:
 dừng relay, đóng ứng dụng/pool rồi mới `dropDisposableDatabase`. Sau một lượt chạy sạch không còn database

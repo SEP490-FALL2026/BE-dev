@@ -15,10 +15,11 @@
 
 ## Kiểm chứng và bàn giao
 
-| Lệnh / kiểm tra AC                 | Revision / môi trường             | Kết quả thực chạy                | Giới hạn / việc còn lại |
-| ---------------------------------- | --------------------------------- | -------------------------------- | ----------------------- |
-| `pnpm test`, `pnpm test:e2e`       | `e833092` + cây làm việc, Windows | PASS (xem "Cổng cuối" ở roadmap) | —                       |
-| `jest … operating-parameters-http` | như trên, PostgreSQL 17 Docker    | 19 test PASS                     | AC-1, 2, 4, 5, 8, 9     |
+| Lệnh / kiểm tra AC                                                                                                                                                                   | Revision / môi trường                          | Kết quả thực chạy                          | Giới hạn / việc còn lại                     |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------- | ------------------------------------------ | ------------------------------------------- |
+| `pnpm test`, `pnpm test:e2e`                                                                                                                                                         | `e833092` + cây làm việc, Windows              | PASS (xem "Cổng cuối" ở roadmap)           | —                                           |
+| `jest … operating-parameters-http`                                                                                                                                                   | như trên, PostgreSQL 17 Docker                 | 19 test PASS                               | AC-1, 2, 4, 5, 8, 9                         |
+| `reporting-currency-http`, `reporting-currency-rates-http` (viết trước route; ba đột biến — bỏ khóa theo giá quy đổi, bỏ khóa theo tỷ giá, nhận đồng tiền không hỗ trợ — đều làm đỏ) | 20/10/2026, cây làm việc, PostgreSQL 17 Docker | 7 test xanh; e2e `reporting-currency` xanh | AC-9 đã làm; AC-1, 2, 4, 5, 8 vẫn chờ G5/G7 |
 
 - [x] AC trong scope có bằng chứng; spec/plan phản ánh implementation cuối.
 - [ ] Owner review trên revision cụ thể. Chỉ ghi `merged-dev`, `accepted`, `released` sau đúng sự kiện thật.
