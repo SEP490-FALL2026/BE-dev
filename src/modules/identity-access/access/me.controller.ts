@@ -1,14 +1,19 @@
 import { Body, Controller, Get, HttpStatus, Post } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import { ApiErrorResponses } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
+import {
+  ApiErrorResponses,
+  GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
+  UNAUTHENTICATED_RESPONSE,
+} from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
+import { toUnavailableApiException } from '../../../infrastructure/http/errors/service-unavailable';
 import { AuthenticatedOnly } from '../../../infrastructure/security/decorators/access.decorators';
 import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { toAccountApiException, toUnavailableApiException } from '../accounts/account.http-errors';
 import { PasswordChangeService } from '../auth/password-change.service';
 import { ChangePasswordBodyDto, PasswordChangedResponseDto } from '../dto/auth.dto';
-import { MeResponseDto } from '../dto/me.dto';
+import { toPasswordApiException } from '../mappers/auth.http-errors';
+import { MeResponseDto } from './me.dto';
 import { MeService, MeView } from './me.service';
 
 @ApiTags('me')
@@ -21,19 +26,12 @@ export class MeController {
 
   @Get()
   @AuthenticatedOnly()
-  @ApiOperation({ operationId: 'meGet' })
+  @ApiOperation({ operationId: 'meGet', summary: 'Get the signed-in account' })
   @ApiSuccessResponse(MeResponseDto, {
     message: 'ME.RETRIEVED',
     description: 'The signed-in account, its employee record and its effective roles.',
   })
-  @ApiErrorResponses(
-    { status: HttpStatus.UNAUTHORIZED, description: 'Authentication is required or the token is no longer valid.' },
-    {
-      status: HttpStatus.SERVICE_UNAVAILABLE,
-      description:
-        'Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).',
-    },
-  )
+  @ApiErrorResponses(UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPONSE)
   async get(@CurrentPrincipal() principal: AuthenticatedPrincipal): Promise<MeView> {
     try {
       return await this.me.get(principal);
@@ -50,17 +48,13 @@ export class MeController {
    */
   @Post('password')
   @AuthenticatedOnly()
-  @ApiOperation({ operationId: 'meChangePassword' })
+  @ApiOperation({ operationId: 'meChangePassword', summary: 'Change my password' })
   @ApiSuccessResponse(PasswordChangedResponseDto, {
     message: 'AUTH.PASSWORD_CHANGED',
     description: 'The password was replaced and every session ended, this one included. Sign in again.',
   })
   @ApiErrorResponses(
-    {
-      status: HttpStatus.UNAUTHORIZED,
-      description:
-        'Authentication is required or the token is no longer valid (also: locked account, departed employee).',
-    },
+    UNAUTHENTICATED_RESPONSE,
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
@@ -68,13 +62,11 @@ export class MeController {
     },
     {
       status: HttpStatus.TOO_MANY_REQUESTS,
-      description: 'Too many wrong passwords for this email; see retryAfterSeconds (AUTH.LOGIN_TEMPORARILY_BLOCKED).',
-    },
-    {
-      status: HttpStatus.SERVICE_UNAVAILABLE,
       description:
-        'Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).',
+        'Too many wrong passwords for this email; see retryAfterSeconds (AUTH.LOGIN_TEMPORARILY_BLOCKED). ' +
+        'Too many requests to this route from this address also answer 429 (HTTP_TOO_MANY_REQUESTS).',
     },
+    GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   )
   async changePassword(
     @CurrentPrincipal() principal: AuthenticatedPrincipal,
@@ -83,7 +75,7 @@ export class MeController {
     try {
       await this.passwordChanges.changePassword(principal, body.currentPassword, body.newPassword);
     } catch (error) {
-      throw toAccountApiException(error);
+      throw toPasswordApiException(error);
     }
 
     return { passwordChanged: true };

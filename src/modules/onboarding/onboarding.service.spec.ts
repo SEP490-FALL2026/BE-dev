@@ -1,4 +1,5 @@
-import { EmployeeImportService } from '../data-import/employee-import.service';
+import { DataImportService } from '../data-import/data-import.service';
+import { LatestEmployeeImport } from '../data-import/data-import.types';
 import { IdentityAccessService } from '../identity-access/identity-access.service';
 import { OnboardingFacts } from '../organization/organization.types';
 import { OrganizationService } from '../organization/organization.service';
@@ -15,7 +16,7 @@ const facts = (overrides: Partial<OnboardingFacts> = {}): OnboardingFacts => ({
 
 function serviceWith(
   organizationFacts: OnboardingFacts,
-  latest: { id: string; status: 'PREVIEW' | 'COMPLETED' | 'CANCELLED'; errorRows: number; createdAt: Date } | null,
+  latest: LatestEmployeeImport | null,
   usableItAdmins: string[] = [],
 ): OnboardingService {
   return new OnboardingService(
@@ -23,7 +24,7 @@ function serviceWith(
     {
       findUsableItAdminEmployeeIds: () => Promise.resolve(new Set(usableItAdmins)),
     } as unknown as IdentityAccessService,
-    { latestImport: () => Promise.resolve(latest) } as unknown as EmployeeImportService,
+    { latestEmployeeImport: () => Promise.resolve(latest) } as unknown as DataImportService,
   );
 }
 
@@ -50,10 +51,7 @@ describe('onboarding checklist (US-02-04)', () => {
       ['NO_DEPARTMENT', 'NO_EMPLOYEE', 'IMPORT_HAS_ERRORS'],
     ],
   ])('has step 1 incomplete with %s, and says why', async (_name, over, latest, reasons) => {
-    const service = serviceWith(
-      facts(over),
-      latest ? { id: '3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11', createdAt: new Date(), ...latest } : null,
-    );
+    const service = serviceWith(facts(over), latest ? { id: '3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11', ...latest } : null);
 
     const { steps } = await service.checklist();
 
@@ -61,21 +59,19 @@ describe('onboarding checklist (US-02-04)', () => {
   });
 
   it('lets a file with no wrong rows finish the step once the wrong ones are fixed (AC-6)', async () => {
-    const wrong = await serviceWith(facts(), {
-      id: 'i1',
-      status: 'COMPLETED',
-      errorRows: 2,
-      createdAt: new Date(),
-    }).checklist();
-    const fixed = await serviceWith(facts(), {
-      id: 'i2',
-      status: 'COMPLETED',
-      errorRows: 0,
-      createdAt: new Date(),
-    }).checklist();
+    const wrong = await serviceWith(facts(), { id: 'i1', status: 'COMPLETED', errorRows: 2 }).checklist();
+    const fixed = await serviceWith(facts(), { id: 'i2', status: 'COMPLETED', errorRows: 0 }).checklist();
 
     expect(wrong.steps[0].status).toBe('INCOMPLETE');
     expect(fixed.steps[0].status).toBe('DONE');
+  });
+
+  it('shows the latest people file by its id, status and wrong rows only, and nothing when there is none', async () => {
+    const latest = await serviceWith(facts(), { id: 'i1', status: 'COMPLETED', errorRows: 2 }).checklist();
+    const none = await serviceWith(facts(), null).checklist();
+
+    expect(latest.steps[0].facts.latestImport).toEqual({ id: 'i1', status: 'COMPLETED', errorRows: 2 });
+    expect(none.steps[0].facts.latestImport).toBeNull();
   });
 
   it('shows the departments without a head or an IT Admin as warnings, and still counts the step as done (AC-6)', async () => {

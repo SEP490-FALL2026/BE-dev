@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { businessDateAt, toDateColumn } from '../../../core/business-date';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { OrganizationService } from '../../organization/organization.service';
-import { AccountRepo } from '../accounts/account.repo';
+import { AccountDirectoryService } from '../accounts/account-directory.service';
 
 export interface MeView {
   appUserId: string;
@@ -21,7 +21,7 @@ export interface MeView {
 @Injectable()
 export class MeService {
   constructor(
-    private readonly accounts: AccountRepo,
+    private readonly accounts: AccountDirectoryService,
     private readonly organization: OrganizationService,
   ) {}
 

@@ -10,12 +10,16 @@
             "description": "The API process is alive.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/HealthResponseDto" } } }
           },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "500": {
             "description": "The liveness check could not be completed.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           }
         },
-        "summary": "",
+        "summary": "Check that the process is running",
         "tags": ["health"]
       }
     },
@@ -28,6 +32,10 @@
             "description": "Every required dependency is reachable.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ReadinessResponseDto" } } }
           },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "500": {
             "description": "The readiness check could not be completed.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
@@ -37,7 +45,7 @@
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           }
         },
-        "summary": "",
+        "summary": "Check that the database is reachable",
         "tags": ["health"]
       }
     },
@@ -79,11 +87,7 @@
             "name": "actorAppUserId",
             "required": false,
             "in": "query",
-            "schema": {
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
-              "type": "string"
-            }
+            "schema": { "format": "uuid", "type": "string" }
           },
           {
             "name": "action",
@@ -95,21 +99,13 @@
             "name": "occurredFrom",
             "required": false,
             "in": "query",
-            "schema": {
-              "format": "date-time",
-              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
-              "type": "string"
-            }
+            "schema": { "format": "date-time", "type": "string" }
           },
           {
             "name": "occurredTo",
             "required": false,
             "in": "query",
-            "schema": {
-              "format": "date-time",
-              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
-              "type": "string"
-            }
+            "schema": { "format": "date-time", "type": "string" }
           }
         ],
         "responses": {
@@ -131,12 +127,17 @@
             "description": "The query is invalid (VALIDATION_ERROR).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "503": {
             "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           }
         },
-        "summary": "",
+        "security": [{ "bearer": [] }],
+        "summary": "Search the audit trail",
         "tags": ["audit"]
       }
     },
@@ -187,12 +188,17 @@
             "description": "The request is invalid (VALIDATION_ERROR), or the name is empty or too long.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "503": {
             "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           }
         },
-        "summary": "",
+        "security": [{ "bearer": [] }],
+        "summary": "List job titles",
         "tags": ["job-titles"]
       },
       "post": {
@@ -223,12 +229,17 @@
             "description": "The request is invalid (VALIDATION_ERROR), or the name is empty or too long.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "503": {
             "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           }
         },
-        "summary": "",
+        "security": [{ "bearer": [] }],
+        "summary": "Add a job title",
         "tags": ["job-titles"]
       }
     },
@@ -236,16 +247,7 @@
       "patch": {
         "operationId": "jobTitleRename",
         "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
-              "type": "string"
-            }
-          }
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
         ],
         "requestBody": {
           "required": true,
@@ -276,12 +278,17 @@
             "description": "The request is invalid (VALIDATION_ERROR), or the name is empty or too long.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "503": {
             "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           }
         },
-        "summary": "",
+        "security": [{ "bearer": [] }],
+        "summary": "Rename a job title",
         "tags": ["job-titles"]
       }
     },
@@ -289,20 +296,11 @@
       "post": {
         "operationId": "jobTitleDeactivate",
         "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
-              "type": "string"
-            }
-          }
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
         ],
         "responses": {
           "200": {
-            "description": "The title is inactive; nobody who holds it loses it. Already inactive ⟹ the same answer.",
+            "description": "The title is inactive; nobody who holds it loses it. If it is already inactive, the answer is the same.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/JobTitleResponseDto" } } }
           },
           "401": {
@@ -321,12 +319,17 @@
             "description": "The request is invalid (VALIDATION_ERROR), or the name is empty or too long.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "503": {
             "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           }
         },
-        "summary": "",
+        "security": [{ "bearer": [] }],
+        "summary": "Stop using a job title",
         "tags": ["job-titles"]
       }
     },
@@ -334,20 +337,11 @@
       "post": {
         "operationId": "jobTitleReactivate",
         "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
-              "type": "string"
-            }
-          }
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
         ],
         "responses": {
           "200": {
-            "description": "The title is active again. Already active ⟹ the same answer.",
+            "description": "The title is active again. If it is already active, the answer is the same.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/JobTitleResponseDto" } } }
           },
           "401": {
@@ -366,12 +360,17 @@
             "description": "The request is invalid (VALIDATION_ERROR), or the name is empty or too long.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "503": {
             "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           }
         },
-        "summary": "",
+        "security": [{ "bearer": [] }],
+        "summary": "Use a job title again",
         "tags": ["job-titles"]
       }
     },
@@ -400,12 +399,17 @@
             "description": "The body is malformed (VALIDATION_ERROR), or the row cannot become an employee (EMPLOYEE.ROW_INVALID; details.reasons lists every field and code).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "503": {
             "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           }
         },
-        "summary": "",
+        "security": [{ "bearer": [] }],
+        "summary": "Enter one employee by hand",
         "tags": ["employees"]
       }
     },
@@ -460,12 +464,21 @@
             "description": "Only Finance and the IT Admin read the Cost Center catalogue.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
+          "422": {
+            "description": "The query is invalid (VALIDATION_ERROR).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "503": {
             "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           }
         },
-        "summary": "",
+        "security": [{ "bearer": [] }],
+        "summary": "List cost centers",
         "tags": ["cost-centers"]
       },
       "post": {
@@ -485,7 +498,7 @@
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "403": {
-            "description": "Only Finance maintains the Cost Center catalogue (US-04-09 AC-2).",
+            "description": "Only Finance maintains the Cost Center catalogue.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "409": {
@@ -496,12 +509,17 @@
             "description": "The request is invalid (VALIDATION_ERROR), the kind is not UNIT or COMPANY (COST_CENTER.KIND_NOT_SUPPORTED), or the name is empty, too long (COST_CENTER.NAME_INVALID) or reserved (COST_CENTER.NAME_RESERVED).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "503": {
             "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           }
         },
-        "summary": "",
+        "security": [{ "bearer": [] }],
+        "summary": "Add a cost center",
         "tags": ["cost-centers"]
       }
     },
@@ -509,16 +527,7 @@
       "patch": {
         "operationId": "costCenterRename",
         "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
-              "type": "string"
-            }
-          }
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
         ],
         "requestBody": {
           "required": true,
@@ -534,7 +543,7 @@
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "403": {
-            "description": "Only Finance maintains the Cost Center catalogue (US-04-09 AC-2).",
+            "description": "Only Finance maintains the Cost Center catalogue.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "404": {
@@ -545,12 +554,17 @@
             "description": "The request is invalid (VALIDATION_ERROR), the kind is not UNIT or COMPANY (COST_CENTER.KIND_NOT_SUPPORTED), or the name is empty, too long (COST_CENTER.NAME_INVALID) or reserved (COST_CENTER.NAME_RESERVED).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "503": {
             "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           }
         },
-        "summary": "",
+        "security": [{ "bearer": [] }],
+        "summary": "Rename a cost center",
         "tags": ["cost-centers"]
       }
     },
@@ -558,20 +572,11 @@
       "post": {
         "operationId": "costCenterDeactivate",
         "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
-              "type": "string"
-            }
-          }
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
         ],
         "responses": {
           "200": {
-            "description": "The cost center is no longer in use. Already retired ⟹ the same answer.",
+            "description": "The cost center is no longer in use. If it is already retired, the answer is the same.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CostCenterResponseDto" } } }
           },
           "401": {
@@ -579,7 +584,7 @@
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "403": {
-            "description": "Only Finance maintains the Cost Center catalogue (US-04-09 AC-2).",
+            "description": "Only Finance maintains the Cost Center catalogue.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "404": {
@@ -594,12 +599,17 @@
             "description": "The request is invalid (VALIDATION_ERROR), the kind is not UNIT or COMPANY (COST_CENTER.KIND_NOT_SUPPORTED), or the name is empty, too long (COST_CENTER.NAME_INVALID) or reserved (COST_CENTER.NAME_RESERVED).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "503": {
             "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           }
         },
-        "summary": "",
+        "security": [{ "bearer": [] }],
+        "summary": "Retire a cost center",
         "tags": ["cost-centers"]
       }
     },
@@ -607,16 +617,7 @@
       "get": {
         "operationId": "costCenterEmployeeList",
         "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
-              "type": "string"
-            }
-          },
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } },
           {
             "name": "page",
             "required": false,
@@ -638,7 +639,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The people in the cost center today, reduced to code, name and that they are working: no email, contract, dates or manager (QĐ-41c).",
+            "description": "The people in the cost center today, reduced to code, name and that they are working: no email, contract, dates or manager.",
             "content": {
               "application/json": { "schema": { "$ref": "#/components/schemas/CostCenterEmployeesResponseDto" } }
             }
@@ -648,7 +649,7 @@
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "403": {
-            "description": "Only Finance maintains the Cost Center catalogue (US-04-09 AC-2).",
+            "description": "Only Finance maintains the Cost Center catalogue.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "404": {
@@ -659,12 +660,17 @@
             "description": "The request is invalid (VALIDATION_ERROR), the kind is not UNIT or COMPANY (COST_CENTER.KIND_NOT_SUPPORTED), or the name is empty, too long (COST_CENTER.NAME_INVALID) or reserved (COST_CENTER.NAME_RESERVED).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "503": {
             "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           }
         },
-        "summary": "",
+        "security": [{ "bearer": [] }],
+        "summary": "List the people in a cost center",
         "tags": ["cost-centers"]
       }
     },
@@ -710,11 +716,15 @@
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "403": {
-            "description": "Only an IT Admin changes department data (US-03-06 AC-16).",
+            "description": "Only an IT Admin changes department data.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
             "description": "The request is invalid (VALIDATION_ERROR) or a rule of the department refuses it; details name the reason.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "503": {
@@ -722,7 +732,8 @@
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           }
         },
-        "summary": "",
+        "security": [{ "bearer": [] }],
+        "summary": "List departments",
         "tags": ["departments"]
       },
       "post": {
@@ -742,7 +753,7 @@
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "403": {
-            "description": "Only an IT Admin changes department data (US-03-06 AC-16).",
+            "description": "Only an IT Admin changes department data.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "409": {
@@ -753,12 +764,17 @@
             "description": "The request is invalid (VALIDATION_ERROR) or a rule of the department refuses it; details name the reason.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "503": {
             "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           }
         },
-        "summary": "",
+        "security": [{ "bearer": [] }],
+        "summary": "Create a department",
         "tags": ["departments"]
       }
     },
@@ -766,16 +782,7 @@
       "get": {
         "operationId": "departmentGet",
         "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
-              "type": "string"
-            }
-          }
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
         ],
         "responses": {
           "200": {
@@ -798,27 +805,23 @@
             "description": "The request is invalid (VALIDATION_ERROR) or a rule of the department refuses it; details name the reason.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "503": {
             "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           }
         },
-        "summary": "",
+        "security": [{ "bearer": [] }],
+        "summary": "Get a department profile",
         "tags": ["departments"]
       },
       "patch": {
         "operationId": "departmentUpdate",
         "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
-              "type": "string"
-            }
-          }
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
         ],
         "requestBody": {
           "required": true,
@@ -834,7 +837,7 @@
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "403": {
-            "description": "Only an IT Admin changes department data (US-03-06 AC-16).",
+            "description": "Only an IT Admin changes department data.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "404": {
@@ -845,12 +848,17 @@
             "description": "The request is invalid (VALIDATION_ERROR) or a rule of the department refuses it; details name the reason.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "503": {
             "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           }
         },
-        "summary": "",
+        "security": [{ "bearer": [] }],
+        "summary": "Update a department profile",
         "tags": ["departments"]
       }
     },
@@ -858,20 +866,11 @@
       "post": {
         "operationId": "departmentDeactivate",
         "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
-              "type": "string"
-            }
-          }
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
         ],
         "responses": {
           "200": {
-            "description": "The department is retired: it takes no new member or head. Already retired ⟹ the same answer.",
+            "description": "The department is retired: it takes no new member or head. If it is already retired, the answer is the same.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DepartmentResponseDto" } } }
           },
           "401": {
@@ -879,7 +878,7 @@
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "403": {
-            "description": "Only an IT Admin changes department data (US-03-06 AC-16).",
+            "description": "Only an IT Admin changes department data.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "404": {
@@ -894,12 +893,17 @@
             "description": "The request is invalid (VALIDATION_ERROR) or a rule of the department refuses it; details name the reason.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "503": {
             "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           }
         },
-        "summary": "",
+        "security": [{ "bearer": [] }],
+        "summary": "Retire a department",
         "tags": ["departments"]
       }
     },
@@ -907,16 +911,7 @@
       "post": {
         "operationId": "departmentHeadAssign",
         "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
-              "type": "string"
-            }
-          }
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
         ],
         "requestBody": {
           "required": true,
@@ -932,7 +927,7 @@
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "403": {
-            "description": "Only an IT Admin changes department data (US-03-06 AC-16).",
+            "description": "Only an IT Admin changes department data.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "404": {
@@ -943,12 +938,17 @@
             "description": "The request is invalid (VALIDATION_ERROR) or a rule of the department refuses it; details name the reason.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "503": {
             "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           }
         },
-        "summary": "",
+        "security": [{ "bearer": [] }],
+        "summary": "Name the head of a department",
         "tags": ["departments"]
       }
     },
@@ -956,16 +956,7 @@
       "post": {
         "operationId": "departmentHeadVacate",
         "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
-              "type": "string"
-            }
-          }
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
         ],
         "requestBody": {
           "required": true,
@@ -973,7 +964,7 @@
         },
         "responses": {
           "200": {
-            "description": "Nobody heads the department from the date; it shows as missing a head. Nothing to end ⟹ no change.",
+            "description": "Nobody heads the department from the date; it shows as missing a head. If there is no head to end, nothing changes.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DepartmentResponseDto" } } }
           },
           "401": {
@@ -981,7 +972,7 @@
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "403": {
-            "description": "Only an IT Admin changes department data (US-03-06 AC-16).",
+            "description": "Only an IT Admin changes department data.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "404": {
@@ -992,12 +983,17 @@
             "description": "The request is invalid (VALIDATION_ERROR) or a rule of the department refuses it; details name the reason.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "503": {
             "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           }
         },
-        "summary": "",
+        "security": [{ "bearer": [] }],
+        "summary": "Leave a department without a head",
         "tags": ["departments"]
       }
     },
@@ -1005,16 +1001,7 @@
       "get": {
         "operationId": "departmentMemberList",
         "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
-              "type": "string"
-            }
-          },
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } },
           {
             "name": "page",
             "required": false,
@@ -1036,7 +1023,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The people in the department today: code, name, status, whether they have a work email, and since when. No email, contract or finance data (QĐ-41c).",
+            "description": "The people in the department today: code, name, status, whether they have a work email, and since when. No email, contract or finance data.",
             "content": {
               "application/json": { "schema": { "$ref": "#/components/schemas/DepartmentMembersResponseDto" } }
             }
@@ -1057,12 +1044,17 @@
             "description": "The request is invalid (VALIDATION_ERROR) or a rule of the department refuses it; details name the reason.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "503": {
             "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           }
         },
-        "summary": "",
+        "security": [{ "bearer": [] }],
+        "summary": "List the members of a department",
         "tags": ["departments"]
       }
     },
@@ -1085,12 +1077,17 @@
             "description": "Only the IT Admin and the Super Admin see department warnings.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "503": {
             "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           }
         },
-        "summary": "",
+        "security": [{ "bearer": [] }],
+        "summary": "List department warnings",
         "tags": ["departments"]
       }
     },
@@ -1098,16 +1095,7 @@
       "get": {
         "operationId": "projectList",
         "parameters": [
-          {
-            "name": "departmentId",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
-              "type": "string"
-            }
-          }
+          { "name": "departmentId", "required": false, "in": "query", "schema": { "format": "uuid", "type": "string" } }
         ],
         "responses": {
           "200": {
@@ -1126,12 +1114,17 @@
             "description": "The request is invalid (VALIDATION_ERROR) or the project is not valid (PROJECT.INVALID).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "503": {
             "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           }
         },
-        "summary": "",
+        "security": [{ "bearer": [] }],
+        "summary": "List projects",
         "tags": ["projects"]
       },
       "post": {
@@ -1158,12 +1151,17 @@
             "description": "The request is invalid (VALIDATION_ERROR) or the project is not valid (PROJECT.INVALID).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "503": {
             "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           }
         },
-        "summary": "",
+        "security": [{ "bearer": [] }],
+        "summary": "Add a project to a department profile",
         "tags": ["projects"]
       }
     },
@@ -1171,16 +1169,7 @@
       "patch": {
         "operationId": "projectUpdate",
         "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
-              "type": "string"
-            }
-          }
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
         ],
         "requestBody": {
           "required": true,
@@ -1207,12 +1196,17 @@
             "description": "The request is invalid (VALIDATION_ERROR) or the project is not valid (PROJECT.INVALID).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "503": {
             "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           }
         },
-        "summary": "",
+        "security": [{ "bearer": [] }],
+        "summary": "Update a project",
         "tags": ["projects"]
       }
     },
@@ -1230,7 +1224,11 @@
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "403": {
-            "description": "Only the Super Admin configures the operating parameters (AC-6).",
+            "description": "Only the Super Admin configures the operating parameters.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "503": {
@@ -1238,7 +1236,8 @@
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           }
         },
-        "summary": "",
+        "security": [{ "bearer": [] }],
+        "summary": "List operating parameters",
         "tags": ["operating-parameters"]
       }
     },
@@ -1267,7 +1266,7 @@
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "403": {
-            "description": "Only the Super Admin configures the operating parameters (AC-6).",
+            "description": "Only the Super Admin configures the operating parameters.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "404": {
@@ -1278,12 +1277,17 @@
             "description": "The request is invalid (VALIDATION_ERROR).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "503": {
             "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           }
         },
-        "summary": "",
+        "security": [{ "bearer": [] }],
+        "summary": "Set an operating parameter",
         "tags": ["operating-parameters"]
       }
     },
@@ -1310,7 +1314,7 @@
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "403": {
-            "description": "Only the Super Admin configures the operating parameters (AC-6).",
+            "description": "Only the Super Admin configures the operating parameters.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "404": {
@@ -1321,12 +1325,17 @@
             "description": "The request is invalid (VALIDATION_ERROR).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "503": {
             "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           }
         },
-        "summary": "",
+        "security": [{ "bearer": [] }],
+        "summary": "Show the history of an operating parameter",
         "tags": ["operating-parameters"]
       }
     },
@@ -1349,11 +1358,15 @@
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "403": {
-            "description": "Only the Super Admin configures the operating parameters (AC-6).",
+            "description": "Only the Super Admin configures the operating parameters.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
             "description": "The request is invalid (VALIDATION_ERROR).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "503": {
@@ -1361,7 +1374,8 @@
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           }
         },
-        "summary": "",
+        "security": [{ "bearer": [] }],
+        "summary": "List non-working dates",
         "tags": ["operating-parameters"]
       },
       "post": {
@@ -1383,7 +1397,7 @@
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "403": {
-            "description": "Only the Super Admin configures the operating parameters (AC-6).",
+            "description": "Only the Super Admin configures the operating parameters.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "409": {
@@ -1394,12 +1408,17 @@
             "description": "The request is invalid (VALIDATION_ERROR).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "503": {
             "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           }
         },
-        "summary": "",
+        "security": [{ "bearer": [] }],
+        "summary": "Add a non-working date",
         "tags": ["operating-parameters"]
       }
     },
@@ -1425,7 +1444,7 @@
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "403": {
-            "description": "Only the Super Admin configures the operating parameters (AC-6).",
+            "description": "Only the Super Admin configures the operating parameters.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "404": {
@@ -1436,12 +1455,17 @@
             "description": "The request is invalid (VALIDATION_ERROR).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "503": {
             "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           }
         },
-        "summary": "",
+        "security": [{ "bearer": [] }],
+        "summary": "Rename a non-working date",
         "tags": ["operating-parameters"]
       },
       "delete": {
@@ -1459,7 +1483,7 @@
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "403": {
-            "description": "Only the Super Admin configures the operating parameters (AC-6).",
+            "description": "Only the Super Admin configures the operating parameters.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "404": {
@@ -1470,12 +1494,17 @@
             "description": "The request is invalid (VALIDATION_ERROR).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "503": {
             "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           }
         },
-        "summary": "",
+        "security": [{ "bearer": [] }],
+        "summary": "Remove a non-working date",
         "tags": ["operating-parameters"]
       }
     },
@@ -1507,11 +1536,15 @@
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "403": {
-            "description": "Only an IT Admin imports people (US-02-02 AC-12).",
+            "description": "Only an IT Admin imports people.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
             "description": "The file cannot be used as a whole: missing, empty, not text, unreadable, too many rows, or lacking a required column such as the department or the job title (IMPORT.FILE_*).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "503": {
@@ -1519,7 +1552,8 @@
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           }
         },
-        "summary": "",
+        "security": [{ "bearer": [] }],
+        "summary": "Upload an employee file for preview",
         "tags": ["employee-imports"]
       }
     },
@@ -1527,16 +1561,7 @@
       "get": {
         "operationId": "employeeImportGet",
         "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
-              "type": "string"
-            }
-          }
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
         ],
         "responses": {
           "200": {
@@ -1550,11 +1575,19 @@
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "403": {
-            "description": "Only an IT Admin imports people (US-02-02 AC-12).",
+            "description": "Only an IT Admin imports people.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "404": {
             "description": "The import does not exist (IMPORT.NOT_FOUND).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "422": {
+            "description": "The identifier is not a UUID (VALIDATION_ERROR).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "503": {
@@ -1562,7 +1595,8 @@
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           }
         },
-        "summary": "",
+        "security": [{ "bearer": [] }],
+        "summary": "Get an employee import",
         "tags": ["employee-imports"]
       }
     },
@@ -1570,16 +1604,7 @@
       "get": {
         "operationId": "employeeImportRowList",
         "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
-              "type": "string"
-            }
-          },
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } },
           {
             "name": "outcome",
             "required": false,
@@ -1617,11 +1642,19 @@
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "403": {
-            "description": "Only an IT Admin imports people (US-02-02 AC-12).",
+            "description": "Only an IT Admin imports people.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "404": {
             "description": "The import does not exist (IMPORT.NOT_FOUND).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "422": {
+            "description": "The identifier is not a UUID, or the filter or paging query is invalid (VALIDATION_ERROR).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "503": {
@@ -1629,7 +1662,8 @@
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           }
         },
-        "summary": "",
+        "security": [{ "bearer": [] }],
+        "summary": "List the rows of an employee import",
         "tags": ["employee-imports"]
       }
     },
@@ -1637,16 +1671,7 @@
       "post": {
         "operationId": "employeeImportPreviewRefresh",
         "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
-              "type": "string"
-            }
-          }
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
         ],
         "responses": {
           "200": {
@@ -1660,7 +1685,7 @@
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "403": {
-            "description": "Only an IT Admin imports people (US-02-02 AC-12).",
+            "description": "Only an IT Admin imports people.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "404": {
@@ -1671,12 +1696,21 @@
             "description": "The import is no longer a preview (IMPORT.CANCELLED, IMPORT.NOT_PREVIEW).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
+          "422": {
+            "description": "The identifier is not a UUID (VALIDATION_ERROR).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "503": {
             "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           }
         },
-        "summary": "",
+        "security": [{ "bearer": [] }],
+        "summary": "Check an employee import again",
         "tags": ["employee-imports"]
       }
     },
@@ -1684,16 +1718,7 @@
       "post": {
         "operationId": "employeeImportConfirm",
         "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
-              "type": "string"
-            }
-          }
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
         ],
         "requestBody": {
           "required": true,
@@ -1711,7 +1736,7 @@
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "403": {
-            "description": "Only an IT Admin imports people (US-02-02 AC-12).",
+            "description": "Only an IT Admin imports people.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "404": {
@@ -1726,12 +1751,17 @@
             "description": "The request is invalid (VALIDATION_ERROR).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "503": {
             "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           }
         },
-        "summary": "",
+        "security": [{ "bearer": [] }],
+        "summary": "Confirm an employee import",
         "tags": ["employee-imports"]
       }
     },
@@ -1739,16 +1769,7 @@
       "post": {
         "operationId": "employeeImportCancel",
         "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
-              "type": "string"
-            }
-          }
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
         ],
         "responses": {
           "200": {
@@ -1762,7 +1783,7 @@
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "403": {
-            "description": "Only an IT Admin imports people (US-02-02 AC-12).",
+            "description": "Only an IT Admin imports people.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "404": {
@@ -1773,12 +1794,21 @@
             "description": "The import was already written (IMPORT.NOT_PREVIEW).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
+          "422": {
+            "description": "The identifier is not a UUID (VALIDATION_ERROR).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "503": {
             "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           }
         },
-        "summary": "",
+        "security": [{ "bearer": [] }],
+        "summary": "Cancel an employee import",
         "tags": ["employee-imports"]
       }
     },
@@ -1801,12 +1831,17 @@
             "description": "Only an IT Admin sees the onboarding checklist.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "503": {
             "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           }
         },
-        "summary": "",
+        "security": [{ "bearer": [] }],
+        "summary": "Get the onboarding checklist",
         "tags": ["onboarding"]
       }
     },
@@ -1832,7 +1867,7 @@
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "429": {
-            "description": "Too many failed attempts; see retryAfterSeconds.",
+            "description": "Too many failed sign-in attempts for this email; see retryAfterSeconds (AUTH.LOGIN_TEMPORARILY_BLOCKED). Too many requests to this route from this address also answer 429 (HTTP_TOO_MANY_REQUESTS).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "503": {
@@ -1840,7 +1875,7 @@
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           }
         },
-        "summary": "",
+        "summary": "Sign in with email and password",
         "tags": ["auth"]
       }
     },
@@ -1865,12 +1900,16 @@
             "description": "The body has no refresh token (VALIDATION_ERROR).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "503": {
             "description": "The database is temporarily unavailable. Retry shortly.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           }
         },
-        "summary": "",
+        "summary": "Exchange a refresh token for a new pair",
         "tags": ["auth"]
       }
     },
@@ -1888,12 +1927,16 @@
             "description": "The body has no refresh token (VALIDATION_ERROR).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "503": {
             "description": "The database is temporarily unavailable. Retry shortly.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           }
         },
-        "summary": "",
+        "summary": "Sign out the session of a refresh token",
         "tags": ["auth"]
       }
     },
@@ -1919,7 +1962,7 @@
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "429": {
-            "description": "Too many requests from this address.",
+            "description": "Too many requests from this address: this route allows 10 a minute (HTTP_TOO_MANY_REQUESTS).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "503": {
@@ -1927,7 +1970,7 @@
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           }
         },
-        "summary": "",
+        "summary": "Request a password reset email",
         "tags": ["auth"]
       }
     },
@@ -1953,7 +1996,7 @@
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "429": {
-            "description": "Too many requests from this address.",
+            "description": "Too many requests from this address: this route allows 10 a minute (HTTP_TOO_MANY_REQUESTS).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "503": {
@@ -1961,7 +2004,7 @@
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           }
         },
-        "summary": "",
+        "summary": "Set a new password with a reset token",
         "tags": ["auth"]
       }
     },
@@ -1988,12 +2031,16 @@
             "description": "The body is invalid or the password does not meet the policy.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "503": {
             "description": "The database is temporarily unavailable. Retry shortly.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           }
         },
-        "summary": "",
+        "summary": "Activate an account from an invitation",
         "tags": ["auth"]
       }
     },
@@ -2010,12 +2057,17 @@
             "description": "Authentication is required or the token is no longer valid.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "503": {
             "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           }
         },
-        "summary": "",
+        "security": [{ "bearer": [] }],
+        "summary": "Get the signed-in account",
         "tags": ["me"]
       }
     },
@@ -2035,7 +2087,7 @@
             }
           },
           "401": {
-            "description": "Authentication is required or the token is no longer valid (also: locked account, departed employee).",
+            "description": "Authentication is required or the token is no longer valid.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
@@ -2043,7 +2095,7 @@
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "429": {
-            "description": "Too many wrong passwords for this email; see retryAfterSeconds (AUTH.LOGIN_TEMPORARILY_BLOCKED).",
+            "description": "Too many wrong passwords for this email; see retryAfterSeconds (AUTH.LOGIN_TEMPORARILY_BLOCKED). Too many requests to this route from this address also answer 429 (HTTP_TOO_MANY_REQUESTS).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "503": {
@@ -2051,7 +2103,8 @@
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           }
         },
-        "summary": "",
+        "security": [{ "bearer": [] }],
+        "summary": "Change my password",
         "tags": ["me"]
       }
     },
@@ -2080,12 +2133,17 @@
             "description": "The query is invalid.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "503": {
-            "description": "The service is temporarily unavailable.",
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           }
         },
-        "summary": "",
+        "security": [{ "bearer": [] }],
+        "summary": "Find employees who can get an account",
         "tags": ["app-users"]
       }
     },
@@ -2122,12 +2180,17 @@
             "description": "The body is invalid or a requested role cannot be granted by hand.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "503": {
-            "description": "The service is temporarily unavailable.",
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           }
         },
-        "summary": "",
+        "security": [{ "bearer": [] }],
+        "summary": "Create an account for an employee",
         "tags": ["app-users"]
       },
       "get": {
@@ -2187,12 +2250,17 @@
             "description": "The query is invalid.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "503": {
-            "description": "The service is temporarily unavailable.",
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           }
         },
-        "summary": "",
+        "security": [{ "bearer": [] }],
+        "summary": "List accounts",
         "tags": ["app-users"]
       }
     },
@@ -2200,16 +2268,7 @@
       "get": {
         "operationId": "appUserGet",
         "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
-              "type": "string"
-            }
-          }
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
         ],
         "responses": {
           "200": {
@@ -2232,12 +2291,17 @@
             "description": "The identifier is not a UUID.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "503": {
-            "description": "The service is temporarily unavailable.",
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           }
         },
-        "summary": "",
+        "security": [{ "bearer": [] }],
+        "summary": "Get an account",
         "tags": ["app-users"]
       }
     },
@@ -2245,16 +2309,7 @@
       "post": {
         "operationId": "appUserResendInvitation",
         "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
-              "type": "string"
-            }
-          }
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
         ],
         "responses": {
           "202": {
@@ -2281,12 +2336,17 @@
             "description": "The identifier is not a UUID (VALIDATION_ERROR).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "503": {
-            "description": "The service is temporarily unavailable.",
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           }
         },
-        "summary": "",
+        "security": [{ "bearer": [] }],
+        "summary": "Send a new invitation",
         "tags": ["app-users"]
       }
     },
@@ -2294,17 +2354,12 @@
       "post": {
         "operationId": "appUserLock",
         "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
-              "type": "string"
-            }
-          }
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
         ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AccountStatusChangeBodyDto" } } }
+        },
         "responses": {
           "200": {
             "description": "The account is locked; its sessions and unused invitation are ended.",
@@ -2327,15 +2382,20 @@
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
-            "description": "The identifier is not a UUID (VALIDATION_ERROR).",
+            "description": "The identifier is not a UUID, or the reason is missing, blank, longer than 1000 characters or sent with other fields (VALIDATION_ERROR). Nothing changes.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "503": {
-            "description": "The service is temporarily unavailable.",
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           }
         },
-        "summary": "",
+        "security": [{ "bearer": [] }],
+        "summary": "Lock an account",
         "tags": ["app-users"]
       }
     },
@@ -2343,17 +2403,12 @@
       "post": {
         "operationId": "appUserUnlock",
         "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
-              "type": "string"
-            }
-          }
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
         ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AccountStatusChangeBodyDto" } } }
+        },
         "responses": {
           "200": {
             "description": "The account is active again.",
@@ -2376,15 +2431,20 @@
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
-            "description": "The identifier is not a UUID (VALIDATION_ERROR).",
+            "description": "The identifier is not a UUID, or the reason is missing, blank, longer than 1000 characters or sent with other fields (VALIDATION_ERROR). Nothing changes.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "503": {
-            "description": "The service is temporarily unavailable.",
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           }
         },
-        "summary": "",
+        "security": [{ "bearer": [] }],
+        "summary": "Unlock an account",
         "tags": ["app-users"]
       }
     },
@@ -2392,16 +2452,7 @@
       "post": {
         "operationId": "appUserGrantRole",
         "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
-              "type": "string"
-            }
-          }
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
         ],
         "requestBody": {
           "required": true,
@@ -2432,12 +2483,17 @@
             "description": "The role is derived or moves only by transfer.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "503": {
-            "description": "The service is temporarily unavailable.",
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           }
         },
-        "summary": "",
+        "security": [{ "bearer": [] }],
+        "summary": "Grant a role to an account",
         "tags": ["app-users"]
       }
     },
@@ -2445,16 +2501,7 @@
       "delete": {
         "operationId": "appUserRevokeRole",
         "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
-              "type": "string"
-            }
-          },
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } },
           {
             "name": "role",
             "required": true,
@@ -2490,12 +2537,17 @@
             "description": "The role is derived or moves only by transfer.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "503": {
-            "description": "The service is temporarily unavailable.",
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           }
         },
-        "summary": "",
+        "security": [{ "bearer": [] }],
+        "summary": "Revoke a role from an account",
         "tags": ["app-users"]
       }
     },
@@ -2513,7 +2565,11 @@
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "403": {
-            "description": "Only the Super Admin configures the approval roles (US-01-03 AC-4).",
+            "description": "Only the Super Admin configures the approval roles.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "503": {
@@ -2521,7 +2577,8 @@
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           }
         },
-        "summary": "",
+        "security": [{ "bearer": [] }],
+        "summary": "List the approval role holders",
         "tags": ["approval-roles"]
       }
     },
@@ -2550,7 +2607,7 @@
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "403": {
-            "description": "Only the Super Admin configures the approval roles (US-01-03 AC-4).",
+            "description": "Only the Super Admin configures the approval roles.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "404": {
@@ -2561,12 +2618,17 @@
             "description": "The request is invalid (VALIDATION_ERROR), the person has left or has no account that can sign in (APPROVAL_ROLE.EMPLOYEE_NOT_ACTIVE, APPROVAL_ROLE.NO_USABLE_ACCOUNT), holds the Super Admin role (APPROVAL_ROLE.SUPER_ADMIN_CANNOT_HOLD), or the substitute would be the spending approver (APPROVAL_ROLE.SUBSTITUTE_MUST_DIFFER).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "503": {
             "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           }
         },
-        "summary": "",
+        "security": [{ "bearer": [] }],
+        "summary": "Set the holder of an approval role",
         "tags": ["approval-roles"]
       }
     },
@@ -2601,12 +2663,17 @@
             "description": "The request is invalid (VALIDATION_ERROR) or the successor does not qualify: the caller themselves, a locked account, a person who is not working, an account not activated or with an unverified email, one holding the IT Admin or Finance role, an approval role, or heading a department.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "503": {
-            "description": "The service is temporarily unavailable.",
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           }
         },
-        "summary": "",
+        "security": [{ "bearer": [] }],
+        "summary": "Transfer the Super Admin role",
         "tags": ["super-admin-transfers"]
       }
     }
@@ -2641,7 +2708,7 @@
       "ErrorEnvelopeDto": {
         "type": "object",
         "properties": {
-          "success": { "type": "boolean", "const": false },
+          "success": { "type": "boolean", "enum": [false] },
           "error": {
             "type": "object",
             "properties": {
@@ -2697,23 +2764,10 @@
                 "items": {
                   "type": "object",
                   "properties": {
-                    "id": {
-                      "type": "string",
-                      "format": "uuid",
-                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                    },
-                    "occurredAt": {
-                      "type": "string",
-                      "format": "date-time",
-                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
-                    },
+                    "id": { "type": "string", "format": "uuid" },
+                    "occurredAt": { "type": "string", "format": "date-time" },
                     "actorKind": { "type": "string", "enum": ["USER", "SYSTEM", "OPERATOR"] },
-                    "actorAppUserId": {
-                      "type": "string",
-                      "format": "uuid",
-                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
-                      "nullable": true
-                    },
+                    "actorAppUserId": { "type": "string", "format": "uuid", "nullable": true },
                     "actorRoles": { "type": "array", "items": { "type": "string" } },
                     "action": { "type": "string" },
                     "resourceType": { "type": "string" },
@@ -2788,23 +2842,11 @@
                 "items": {
                   "type": "object",
                   "properties": {
-                    "id": {
-                      "type": "string",
-                      "format": "uuid",
-                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                    },
+                    "id": { "type": "string", "format": "uuid" },
                     "name": { "type": "string" },
                     "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE"] },
-                    "createdAt": {
-                      "type": "string",
-                      "format": "date-time",
-                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
-                    },
-                    "updatedAt": {
-                      "type": "string",
-                      "format": "date-time",
-                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
-                    }
+                    "createdAt": { "type": "string", "format": "date-time" },
+                    "updatedAt": { "type": "string", "format": "date-time" }
                   },
                   "required": ["id", "name", "status", "createdAt", "updatedAt"],
                   "additionalProperties": false
@@ -2849,23 +2891,11 @@
           "data": {
             "type": "object",
             "properties": {
-              "id": {
-                "type": "string",
-                "format": "uuid",
-                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-              },
+              "id": { "type": "string", "format": "uuid" },
               "name": { "type": "string" },
               "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE"] },
-              "createdAt": {
-                "type": "string",
-                "format": "date-time",
-                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
-              },
-              "updatedAt": {
-                "type": "string",
-                "format": "date-time",
-                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
-              }
+              "createdAt": { "type": "string", "format": "date-time" },
+              "updatedAt": { "type": "string", "format": "date-time" }
             },
             "required": ["id", "name", "status", "createdAt", "updatedAt"],
             "additionalProperties": false,
@@ -2897,11 +2927,7 @@
           "data": {
             "type": "object",
             "properties": {
-              "id": {
-                "type": "string",
-                "format": "uuid",
-                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-              },
+              "id": { "type": "string", "format": "uuid" },
               "employeeCode": { "type": "string" },
               "fullName": { "type": "string" },
               "workEmail": { "type": "string", "nullable": true },
@@ -2912,11 +2938,7 @@
               "department": {
                 "type": "object",
                 "properties": {
-                  "id": {
-                    "type": "string",
-                    "format": "uuid",
-                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                  },
+                  "id": { "type": "string", "format": "uuid" },
                   "code": { "type": "string" },
                   "name": { "type": "string" }
                 },
@@ -2925,14 +2947,7 @@
               },
               "jobTitle": {
                 "type": "object",
-                "properties": {
-                  "id": {
-                    "type": "string",
-                    "format": "uuid",
-                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                  },
-                  "name": { "type": "string" }
-                },
+                "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
                 "required": ["id", "name"],
                 "additionalProperties": false
               }
@@ -2969,11 +2984,7 @@
                 "items": {
                   "type": "object",
                   "properties": {
-                    "id": {
-                      "type": "string",
-                      "format": "uuid",
-                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                    },
+                    "id": { "type": "string", "format": "uuid" },
                     "code": { "type": "string" },
                     "name": { "type": "string" },
                     "kind": { "type": "string", "enum": ["UNIT", "COMPANY"] },
@@ -2981,11 +2992,7 @@
                     "department": {
                       "type": "object",
                       "properties": {
-                        "id": {
-                          "type": "string",
-                          "format": "uuid",
-                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                        },
+                        "id": { "type": "string", "format": "uuid" },
                         "code": { "type": "string" },
                         "name": { "type": "string" }
                       },
@@ -2993,22 +3000,9 @@
                       "additionalProperties": false,
                       "nullable": true
                     },
-                    "createdAt": {
-                      "type": "string",
-                      "format": "date-time",
-                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
-                    },
-                    "updatedAt": {
-                      "type": "string",
-                      "format": "date-time",
-                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
-                    },
-                    "deactivatedAt": {
-                      "type": "string",
-                      "format": "date-time",
-                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
-                      "nullable": true
-                    }
+                    "createdAt": { "type": "string", "format": "date-time" },
+                    "updatedAt": { "type": "string", "format": "date-time" },
+                    "deactivatedAt": { "type": "string", "format": "date-time", "nullable": true }
                   },
                   "required": [
                     "id",
@@ -3067,11 +3061,7 @@
           "data": {
             "type": "object",
             "properties": {
-              "id": {
-                "type": "string",
-                "format": "uuid",
-                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-              },
+              "id": { "type": "string", "format": "uuid" },
               "code": { "type": "string" },
               "name": { "type": "string" },
               "kind": { "type": "string", "enum": ["UNIT", "COMPANY"] },
@@ -3079,11 +3069,7 @@
               "department": {
                 "type": "object",
                 "properties": {
-                  "id": {
-                    "type": "string",
-                    "format": "uuid",
-                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                  },
+                  "id": { "type": "string", "format": "uuid" },
                   "code": { "type": "string" },
                   "name": { "type": "string" }
                 },
@@ -3091,22 +3077,9 @@
                 "additionalProperties": false,
                 "nullable": true
               },
-              "createdAt": {
-                "type": "string",
-                "format": "date-time",
-                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
-              },
-              "updatedAt": {
-                "type": "string",
-                "format": "date-time",
-                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
-              },
-              "deactivatedAt": {
-                "type": "string",
-                "format": "date-time",
-                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
-                "nullable": true
-              }
+              "createdAt": { "type": "string", "format": "date-time" },
+              "updatedAt": { "type": "string", "format": "date-time" },
+              "deactivatedAt": { "type": "string", "format": "date-time", "nullable": true }
             },
             "required": [
               "id",
@@ -3142,14 +3115,7 @@
             "properties": {
               "costCenter": {
                 "type": "object",
-                "properties": {
-                  "id": {
-                    "type": "string",
-                    "format": "uuid",
-                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                  },
-                  "code": { "type": "string" }
-                },
+                "properties": { "id": { "type": "string", "format": "uuid" }, "code": { "type": "string" } },
                 "required": ["id", "code"],
                 "additionalProperties": false
               },
@@ -3204,11 +3170,7 @@
                 "items": {
                   "type": "object",
                   "properties": {
-                    "id": {
-                      "type": "string",
-                      "format": "uuid",
-                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                    },
+                    "id": { "type": "string", "format": "uuid" },
                     "code": { "type": "string" },
                     "name": { "type": "string" },
                     "function": { "type": "string", "nullable": true },
@@ -3216,11 +3178,7 @@
                     "costCenter": {
                       "type": "object",
                       "properties": {
-                        "id": {
-                          "type": "string",
-                          "format": "uuid",
-                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                        },
+                        "id": { "type": "string", "format": "uuid" },
                         "code": { "type": "string" },
                         "name": { "type": "string" },
                         "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE"] }
@@ -3231,11 +3189,7 @@
                     "itAdmin": {
                       "type": "object",
                       "properties": {
-                        "employeeId": {
-                          "type": "string",
-                          "format": "uuid",
-                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                        },
+                        "employeeId": { "type": "string", "format": "uuid" },
                         "employeeCode": { "type": "string" },
                         "fullName": { "type": "string" },
                         "usable": { "type": "boolean" }
@@ -3247,11 +3201,7 @@
                     "head": {
                       "type": "object",
                       "properties": {
-                        "employeeId": {
-                          "type": "string",
-                          "format": "uuid",
-                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                        },
+                        "employeeId": { "type": "string", "format": "uuid" },
                         "employeeCode": { "type": "string" },
                         "fullName": { "type": "string" },
                         "since": { "type": "string" }
@@ -3265,22 +3215,9 @@
                       "type": "array",
                       "items": { "type": "string", "enum": ["MISSING_HEAD", "MISSING_IT_ADMIN"] }
                     },
-                    "createdAt": {
-                      "type": "string",
-                      "format": "date-time",
-                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
-                    },
-                    "updatedAt": {
-                      "type": "string",
-                      "format": "date-time",
-                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
-                    },
-                    "deactivatedAt": {
-                      "type": "string",
-                      "format": "date-time",
-                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
-                      "nullable": true
-                    }
+                    "createdAt": { "type": "string", "format": "date-time" },
+                    "updatedAt": { "type": "string", "format": "date-time" },
+                    "deactivatedAt": { "type": "string", "format": "date-time", "nullable": true }
                   },
                   "required": [
                     "id",
@@ -3331,17 +3268,8 @@
           "code": { "type": "string", "minLength": 1, "maxLength": 50, "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$" },
           "name": { "type": "string", "maxLength": 1000 },
           "function": { "type": "string", "maxLength": 5000, "nullable": true },
-          "costCenterId": {
-            "type": "string",
-            "format": "uuid",
-            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-          },
-          "itAdminEmployeeId": {
-            "type": "string",
-            "format": "uuid",
-            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
-            "nullable": true
-          }
+          "costCenterId": { "type": "string", "format": "uuid" },
+          "itAdminEmployeeId": { "type": "string", "format": "uuid", "nullable": true }
         },
         "required": ["code", "name", "costCenterId"],
         "additionalProperties": false
@@ -3354,11 +3282,7 @@
           "data": {
             "type": "object",
             "properties": {
-              "id": {
-                "type": "string",
-                "format": "uuid",
-                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-              },
+              "id": { "type": "string", "format": "uuid" },
               "code": { "type": "string" },
               "name": { "type": "string" },
               "function": { "type": "string", "nullable": true },
@@ -3366,11 +3290,7 @@
               "costCenter": {
                 "type": "object",
                 "properties": {
-                  "id": {
-                    "type": "string",
-                    "format": "uuid",
-                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                  },
+                  "id": { "type": "string", "format": "uuid" },
                   "code": { "type": "string" },
                   "name": { "type": "string" },
                   "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE"] }
@@ -3381,11 +3301,7 @@
               "itAdmin": {
                 "type": "object",
                 "properties": {
-                  "employeeId": {
-                    "type": "string",
-                    "format": "uuid",
-                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                  },
+                  "employeeId": { "type": "string", "format": "uuid" },
                   "employeeCode": { "type": "string" },
                   "fullName": { "type": "string" },
                   "usable": { "type": "boolean" }
@@ -3397,11 +3313,7 @@
               "head": {
                 "type": "object",
                 "properties": {
-                  "employeeId": {
-                    "type": "string",
-                    "format": "uuid",
-                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                  },
+                  "employeeId": { "type": "string", "format": "uuid" },
                   "employeeCode": { "type": "string" },
                   "fullName": { "type": "string" },
                   "since": { "type": "string" }
@@ -3415,32 +3327,15 @@
                 "type": "array",
                 "items": { "type": "string", "enum": ["MISSING_HEAD", "MISSING_IT_ADMIN"] }
               },
-              "createdAt": {
-                "type": "string",
-                "format": "date-time",
-                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
-              },
-              "updatedAt": {
-                "type": "string",
-                "format": "date-time",
-                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
-              },
-              "deactivatedAt": {
-                "type": "string",
-                "format": "date-time",
-                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
-                "nullable": true
-              },
+              "createdAt": { "type": "string", "format": "date-time" },
+              "updatedAt": { "type": "string", "format": "date-time" },
+              "deactivatedAt": { "type": "string", "format": "date-time", "nullable": true },
               "headHistory": {
                 "type": "array",
                 "items": {
                   "type": "object",
                   "properties": {
-                    "employeeId": {
-                      "type": "string",
-                      "format": "uuid",
-                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                    },
+                    "employeeId": { "type": "string", "format": "uuid" },
                     "employeeCode": { "type": "string" },
                     "fullName": { "type": "string" },
                     "validFrom": { "type": "string" },
@@ -3455,11 +3350,7 @@
                 "items": {
                   "type": "object",
                   "properties": {
-                    "id": {
-                      "type": "string",
-                      "format": "uuid",
-                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                    },
+                    "id": { "type": "string", "format": "uuid" },
                     "name": { "type": "string" },
                     "description": { "type": "string", "nullable": true },
                     "status": { "type": "string", "enum": ["RUNNING", "FINISHED"] },
@@ -3468,11 +3359,7 @@
                       "items": {
                         "type": "object",
                         "properties": {
-                          "id": {
-                            "type": "string",
-                            "format": "uuid",
-                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                          },
+                          "id": { "type": "string", "format": "uuid" },
                           "code": { "type": "string" },
                           "name": { "type": "string" }
                         },
@@ -3480,16 +3367,8 @@
                         "additionalProperties": false
                       }
                     },
-                    "createdAt": {
-                      "type": "string",
-                      "format": "date-time",
-                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
-                    },
-                    "updatedAt": {
-                      "type": "string",
-                      "format": "date-time",
-                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
-                    }
+                    "createdAt": { "type": "string", "format": "date-time" },
+                    "updatedAt": { "type": "string", "format": "date-time" }
                   },
                   "required": ["id", "name", "description", "status", "departments", "createdAt", "updatedAt"],
                   "additionalProperties": false
@@ -3525,25 +3404,13 @@
         "properties": {
           "name": { "type": "string", "maxLength": 1000 },
           "function": { "type": "string", "maxLength": 5000, "nullable": true },
-          "itAdminEmployeeId": {
-            "type": "string",
-            "format": "uuid",
-            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
-            "nullable": true
-          }
+          "itAdminEmployeeId": { "type": "string", "format": "uuid", "nullable": true }
         },
         "additionalProperties": false
       },
       "AssignHeadBodyDto": {
         "type": "object",
-        "properties": {
-          "employeeId": {
-            "type": "string",
-            "format": "uuid",
-            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-          },
-          "effectiveFrom": { "type": "string" }
-        },
+        "properties": { "employeeId": { "type": "string", "format": "uuid" }, "effectiveFrom": { "type": "string" } },
         "required": ["employeeId", "effectiveFrom"],
         "additionalProperties": false
       },
@@ -3614,11 +3481,7 @@
                 "items": {
                   "type": "object",
                   "properties": {
-                    "departmentId": {
-                      "type": "string",
-                      "format": "uuid",
-                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                    },
+                    "departmentId": { "type": "string", "format": "uuid" },
                     "code": { "type": "string" },
                     "name": { "type": "string" },
                     "warning": { "type": "string", "enum": ["MISSING_HEAD", "MISSING_IT_ADMIN"] }
@@ -3649,11 +3512,7 @@
                 "items": {
                   "type": "object",
                   "properties": {
-                    "id": {
-                      "type": "string",
-                      "format": "uuid",
-                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                    },
+                    "id": { "type": "string", "format": "uuid" },
                     "name": { "type": "string" },
                     "description": { "type": "string", "nullable": true },
                     "status": { "type": "string", "enum": ["RUNNING", "FINISHED"] },
@@ -3662,11 +3521,7 @@
                       "items": {
                         "type": "object",
                         "properties": {
-                          "id": {
-                            "type": "string",
-                            "format": "uuid",
-                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                          },
+                          "id": { "type": "string", "format": "uuid" },
                           "code": { "type": "string" },
                           "name": { "type": "string" }
                         },
@@ -3674,16 +3529,8 @@
                         "additionalProperties": false
                       }
                     },
-                    "createdAt": {
-                      "type": "string",
-                      "format": "date-time",
-                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
-                    },
-                    "updatedAt": {
-                      "type": "string",
-                      "format": "date-time",
-                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
-                    }
+                    "createdAt": { "type": "string", "format": "date-time" },
+                    "updatedAt": { "type": "string", "format": "date-time" }
                   },
                   "required": ["id", "name", "description", "status", "departments", "createdAt", "updatedAt"],
                   "additionalProperties": false
@@ -3704,15 +3551,7 @@
           "name": { "type": "string", "maxLength": 1000 },
           "description": { "type": "string", "maxLength": 5000, "nullable": true },
           "status": { "type": "string", "enum": ["RUNNING", "FINISHED"] },
-          "departmentIds": {
-            "maxItems": 100,
-            "type": "array",
-            "items": {
-              "type": "string",
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-            }
-          }
+          "departmentIds": { "maxItems": 100, "type": "array", "items": { "type": "string", "format": "uuid" } }
         },
         "required": ["name", "departmentIds"],
         "additionalProperties": false
@@ -3725,11 +3564,7 @@
           "data": {
             "type": "object",
             "properties": {
-              "id": {
-                "type": "string",
-                "format": "uuid",
-                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-              },
+              "id": { "type": "string", "format": "uuid" },
               "name": { "type": "string" },
               "description": { "type": "string", "nullable": true },
               "status": { "type": "string", "enum": ["RUNNING", "FINISHED"] },
@@ -3738,11 +3573,7 @@
                 "items": {
                   "type": "object",
                   "properties": {
-                    "id": {
-                      "type": "string",
-                      "format": "uuid",
-                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                    },
+                    "id": { "type": "string", "format": "uuid" },
                     "code": { "type": "string" },
                     "name": { "type": "string" }
                   },
@@ -3750,16 +3581,8 @@
                   "additionalProperties": false
                 }
               },
-              "createdAt": {
-                "type": "string",
-                "format": "date-time",
-                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
-              },
-              "updatedAt": {
-                "type": "string",
-                "format": "date-time",
-                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
-              }
+              "createdAt": { "type": "string", "format": "date-time" },
+              "updatedAt": { "type": "string", "format": "date-time" }
             },
             "required": ["id", "name", "description", "status", "departments", "createdAt", "updatedAt"],
             "additionalProperties": false,
@@ -3775,15 +3598,7 @@
           "name": { "type": "string", "maxLength": 1000 },
           "description": { "type": "string", "maxLength": 5000, "nullable": true },
           "status": { "type": "string", "enum": ["RUNNING", "FINISHED"] },
-          "departmentIds": {
-            "maxItems": 100,
-            "type": "array",
-            "items": {
-              "type": "string",
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-            }
-          }
+          "departmentIds": { "maxItems": 100, "type": "array", "items": { "type": "string", "format": "uuid" } }
         },
         "additionalProperties": false
       },
@@ -3819,12 +3634,7 @@
                     "unit": { "type": "string" },
                     "description": { "type": "string" },
                     "constraints": { "type": "object", "additionalProperties": {} },
-                    "changedAt": {
-                      "type": "string",
-                      "format": "date-time",
-                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
-                      "nullable": true
-                    }
+                    "changedAt": { "type": "string", "format": "date-time", "nullable": true }
                   },
                   "required": [
                     "key",
@@ -3881,12 +3691,7 @@
               "unit": { "type": "string" },
               "description": { "type": "string" },
               "constraints": { "type": "object", "additionalProperties": {} },
-              "changedAt": {
-                "type": "string",
-                "format": "date-time",
-                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
-                "nullable": true
-              }
+              "changedAt": { "type": "string", "format": "date-time", "nullable": true }
             },
             "required": ["key", "value", "default", "isDefault", "unit", "description", "constraints", "changedAt"],
             "additionalProperties": false,
@@ -3916,17 +3721,8 @@
                         { "type": "array", "items": { "type": "number" } }
                       ]
                     },
-                    "from": {
-                      "type": "string",
-                      "format": "date-time",
-                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
-                    },
-                    "until": {
-                      "type": "string",
-                      "format": "date-time",
-                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
-                      "nullable": true
-                    }
+                    "from": { "type": "string", "format": "date-time" },
+                    "until": { "type": "string", "format": "date-time", "nullable": true }
                   },
                   "required": ["value", "from", "until"],
                   "additionalProperties": false
@@ -4003,11 +3799,7 @@
           "data": {
             "type": "object",
             "properties": {
-              "id": {
-                "type": "string",
-                "format": "uuid",
-                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-              },
+              "id": { "type": "string", "format": "uuid" },
               "fileName": { "type": "string" },
               "status": { "type": "string", "enum": ["PREVIEW", "COMPLETED", "CANCELLED"] },
               "previewVersion": {
@@ -4049,17 +3841,9 @@
                   "duplicateOf": {
                     "type": "object",
                     "properties": {
-                      "importId": {
-                        "type": "string",
-                        "format": "uuid",
-                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                      },
+                      "importId": { "type": "string", "format": "uuid" },
                       "fileName": { "type": "string" },
-                      "confirmedAt": {
-                        "type": "string",
-                        "format": "date-time",
-                        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
-                      }
+                      "confirmedAt": { "type": "string", "format": "date-time" }
                     },
                     "required": ["importId", "fileName", "confirmedAt"],
                     "additionalProperties": false,
@@ -4118,28 +3902,10 @@
                 "additionalProperties": false,
                 "nullable": true
               },
-              "createdAt": {
-                "type": "string",
-                "format": "date-time",
-                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
-              },
-              "expiresAt": {
-                "type": "string",
-                "format": "date-time",
-                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
-              },
-              "confirmedAt": {
-                "type": "string",
-                "format": "date-time",
-                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
-                "nullable": true
-              },
-              "cancelledAt": {
-                "type": "string",
-                "format": "date-time",
-                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
-                "nullable": true
-              }
+              "createdAt": { "type": "string", "format": "date-time" },
+              "expiresAt": { "type": "string", "format": "date-time" },
+              "confirmedAt": { "type": "string", "format": "date-time", "nullable": true },
+              "cancelledAt": { "type": "string", "format": "date-time", "nullable": true }
             },
             "required": [
               "id",
@@ -4252,11 +4018,7 @@
               "import": {
                 "type": "object",
                 "properties": {
-                  "id": {
-                    "type": "string",
-                    "format": "uuid",
-                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                  },
+                  "id": { "type": "string", "format": "uuid" },
                   "fileName": { "type": "string" },
                   "status": { "type": "string", "enum": ["PREVIEW", "COMPLETED", "CANCELLED"] },
                   "previewVersion": {
@@ -4298,17 +4060,9 @@
                       "duplicateOf": {
                         "type": "object",
                         "properties": {
-                          "importId": {
-                            "type": "string",
-                            "format": "uuid",
-                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                          },
+                          "importId": { "type": "string", "format": "uuid" },
                           "fileName": { "type": "string" },
-                          "confirmedAt": {
-                            "type": "string",
-                            "format": "date-time",
-                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
-                          }
+                          "confirmedAt": { "type": "string", "format": "date-time" }
                         },
                         "required": ["importId", "fileName", "confirmedAt"],
                         "additionalProperties": false,
@@ -4367,28 +4121,10 @@
                     "additionalProperties": false,
                     "nullable": true
                   },
-                  "createdAt": {
-                    "type": "string",
-                    "format": "date-time",
-                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
-                  },
-                  "expiresAt": {
-                    "type": "string",
-                    "format": "date-time",
-                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
-                  },
-                  "confirmedAt": {
-                    "type": "string",
-                    "format": "date-time",
-                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
-                    "nullable": true
-                  },
-                  "cancelledAt": {
-                    "type": "string",
-                    "format": "date-time",
-                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
-                    "nullable": true
-                  }
+                  "createdAt": { "type": "string", "format": "date-time" },
+                  "expiresAt": { "type": "string", "format": "date-time" },
+                  "confirmedAt": { "type": "string", "format": "date-time", "nullable": true },
+                  "cancelledAt": { "type": "string", "format": "date-time", "nullable": true }
                 },
                 "required": [
                   "id",
@@ -4440,11 +4176,7 @@
                         "latestImport": {
                           "type": "object",
                           "properties": {
-                            "id": {
-                              "type": "string",
-                              "format": "uuid",
-                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                            },
+                            "id": { "type": "string", "format": "uuid" },
                             "status": { "type": "string", "enum": ["PREVIEW", "COMPLETED"] },
                             "errorRows": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
                           },
@@ -4491,8 +4223,8 @@
       "LoginBodyDto": {
         "type": "object",
         "properties": {
-          "email": { "type": "string", "maxLength": 254 },
-          "password": { "type": "string", "minLength": 1, "maxLength": 256 }
+          "email": { "type": "string", "maxLength": 254, "example": "user@example.com" },
+          "password": { "type": "string", "minLength": 1, "maxLength": 256, "example": "<password>" }
         },
         "required": ["email", "password"],
         "additionalProperties": false
@@ -4505,16 +4237,23 @@
           "data": {
             "type": "object",
             "properties": {
-              "accessToken": { "type": "string" },
+              "accessToken": { "type": "string", "example": "<access-token>" },
               "tokenType": { "type": "string", "enum": ["Bearer"] },
               "expiresAt": {
                 "type": "string",
                 "format": "date-time",
-                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                "description": "Expiry of the access token in this response.",
+                "example": "2026-01-01T00:10:00.000Z"
               },
-              "refreshToken": { "type": "string" }
+              "refreshToken": { "type": "string", "example": "<refresh-token>" },
+              "refreshExpiresAt": {
+                "type": "string",
+                "format": "date-time",
+                "description": "Expiry of the refresh token in this response: the session idle timeout, capped at the absolute session expiry. It can be earlier than expiresAt near the end of a session.",
+                "example": "2026-01-01T08:00:00.000Z"
+              }
             },
-            "required": ["accessToken", "tokenType", "expiresAt", "refreshToken"],
+            "required": ["accessToken", "tokenType", "expiresAt", "refreshToken", "refreshExpiresAt"],
             "additionalProperties": false,
             "nullable": true
           }
@@ -4524,7 +4263,9 @@
       },
       "RefreshTokenBodyDto": {
         "type": "object",
-        "properties": { "refreshToken": { "type": "string", "minLength": 1, "maxLength": 512 } },
+        "properties": {
+          "refreshToken": { "type": "string", "minLength": 1, "maxLength": 512, "example": "<refresh-token>" }
+        },
         "required": ["refreshToken"],
         "additionalProperties": false
       },
@@ -4553,8 +4294,8 @@
       "PasswordResetBodyDto": {
         "type": "object",
         "properties": {
-          "token": { "type": "string", "minLength": 1, "maxLength": 256 },
-          "newPassword": { "type": "string", "minLength": 1, "maxLength": 1024 }
+          "token": { "type": "string", "minLength": 1, "maxLength": 256, "example": "<reset-token>" },
+          "newPassword": { "type": "string", "minLength": 1, "maxLength": 1024, "example": "<new-password>" }
         },
         "required": ["token", "newPassword"],
         "additionalProperties": false
@@ -4578,8 +4319,8 @@
       "RedeemInvitationBodyDto": {
         "type": "object",
         "properties": {
-          "token": { "type": "string", "minLength": 1, "maxLength": 256 },
-          "password": { "type": "string", "minLength": 1, "maxLength": 1024 }
+          "token": { "type": "string", "minLength": 1, "maxLength": 256, "example": "<invitation-token>" },
+          "password": { "type": "string", "minLength": 1, "maxLength": 1024, "example": "<password>" }
         },
         "required": ["token", "password"],
         "additionalProperties": false
@@ -4608,20 +4349,12 @@
           "data": {
             "type": "object",
             "properties": {
-              "appUserId": {
-                "type": "string",
-                "format": "uuid",
-                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-              },
+              "appUserId": { "type": "string", "format": "uuid" },
               "loginEmail": { "type": "string" },
               "employee": {
                 "type": "object",
                 "properties": {
-                  "id": {
-                    "type": "string",
-                    "format": "uuid",
-                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                  },
+                  "id": { "type": "string", "format": "uuid" },
                   "employeeCode": { "type": "string" },
                   "fullName": { "type": "string" },
                   "department": {
@@ -4659,8 +4392,8 @@
       "ChangePasswordBodyDto": {
         "type": "object",
         "properties": {
-          "currentPassword": { "type": "string", "minLength": 1, "maxLength": 256 },
-          "newPassword": { "type": "string", "minLength": 1, "maxLength": 256 }
+          "currentPassword": { "type": "string", "minLength": 1, "maxLength": 256, "example": "<current-password>" },
+          "newPassword": { "type": "string", "minLength": 1, "maxLength": 1024, "example": "<new-password>" }
         },
         "required": ["currentPassword", "newPassword"],
         "additionalProperties": false
@@ -4694,11 +4427,7 @@
                 "items": {
                   "type": "object",
                   "properties": {
-                    "id": {
-                      "type": "string",
-                      "format": "uuid",
-                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                    },
+                    "id": { "type": "string", "format": "uuid" },
                     "employeeCode": { "type": "string" },
                     "fullName": { "type": "string" },
                     "workEmail": { "type": "string", "nullable": true },
@@ -4720,11 +4449,7 @@
       "CreateAppUserBodyDto": {
         "type": "object",
         "properties": {
-          "employeeId": {
-            "type": "string",
-            "format": "uuid",
-            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-          },
+          "employeeId": { "type": "string", "format": "uuid" },
           "loginEmail": { "type": "string", "maxLength": 254 },
           "roles": {
             "default": [],
@@ -4747,27 +4472,15 @@
           "data": {
             "type": "object",
             "properties": {
-              "id": {
-                "type": "string",
-                "format": "uuid",
-                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-              },
+              "id": { "type": "string", "format": "uuid" },
               "loginEmail": { "type": "string" },
               "status": { "type": "string", "enum": ["ACTIVE", "LOCKED"] },
               "activationState": { "type": "string", "enum": ["INVITED", "ACTIVATED"] },
-              "createdAt": {
-                "type": "string",
-                "format": "date-time",
-                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
-              },
+              "createdAt": { "type": "string", "format": "date-time" },
               "employee": {
                 "type": "object",
                 "properties": {
-                  "id": {
-                    "type": "string",
-                    "format": "uuid",
-                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                  },
+                  "id": { "type": "string", "format": "uuid" },
                   "employeeCode": { "type": "string" },
                   "fullName": { "type": "string" }
                 },
@@ -4785,17 +4498,8 @@
                   "type": "object",
                   "properties": {
                     "role": { "type": "string", "enum": ["SUPER_ADMIN", "IT_ADMIN", "FINANCE", "EMPLOYEE"] },
-                    "grantedAt": {
-                      "type": "string",
-                      "format": "date-time",
-                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
-                    },
-                    "revokedAt": {
-                      "type": "string",
-                      "format": "date-time",
-                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
-                      "nullable": true
-                    }
+                    "grantedAt": { "type": "string", "format": "date-time" },
+                    "revokedAt": { "type": "string", "format": "date-time", "nullable": true }
                   },
                   "required": ["role", "grantedAt", "revokedAt"],
                   "additionalProperties": false
@@ -4805,23 +4509,14 @@
                 "type": "object",
                 "properties": {
                   "usable": { "type": "boolean" },
-                  "expiresAt": {
-                    "type": "string",
-                    "format": "date-time",
-                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
-                  },
+                  "expiresAt": { "type": "string", "format": "date-time" },
                   "delivery": {
                     "type": "object",
                     "properties": {
                       "status": { "type": "string", "enum": ["PENDING", "SENDING", "SENT", "FAILED", "CANCELLED"] },
                       "attempts": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
                       "lastErrorCode": { "type": "string", "nullable": true },
-                      "sentAt": {
-                        "type": "string",
-                        "format": "date-time",
-                        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
-                        "nullable": true
-                      }
+                      "sentAt": { "type": "string", "format": "date-time", "nullable": true }
                     },
                     "required": ["status", "attempts", "lastErrorCode", "sentAt"],
                     "additionalProperties": false,
@@ -4864,27 +4559,15 @@
                 "items": {
                   "type": "object",
                   "properties": {
-                    "id": {
-                      "type": "string",
-                      "format": "uuid",
-                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                    },
+                    "id": { "type": "string", "format": "uuid" },
                     "loginEmail": { "type": "string" },
                     "status": { "type": "string", "enum": ["ACTIVE", "LOCKED"] },
                     "activationState": { "type": "string", "enum": ["INVITED", "ACTIVATED"] },
-                    "createdAt": {
-                      "type": "string",
-                      "format": "date-time",
-                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
-                    },
+                    "createdAt": { "type": "string", "format": "date-time" },
                     "employee": {
                       "type": "object",
                       "properties": {
-                        "id": {
-                          "type": "string",
-                          "format": "uuid",
-                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                        },
+                        "id": { "type": "string", "format": "uuid" },
                         "employeeCode": { "type": "string" },
                         "fullName": { "type": "string" }
                       },
@@ -4926,6 +4609,19 @@
         "required": ["success", "message", "data"],
         "additionalProperties": false
       },
+      "AccountStatusChangeBodyDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000,
+            "example": "<reason-or-authority-reference>"
+          }
+        },
+        "required": ["reason"],
+        "additionalProperties": false
+      },
       "GrantRoleBodyDto": {
         "type": "object",
         "properties": {
@@ -4957,18 +4653,10 @@
                     "holder": {
                       "type": "object",
                       "properties": {
-                        "employeeId": {
-                          "type": "string",
-                          "format": "uuid",
-                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                        },
+                        "employeeId": { "type": "string", "format": "uuid" },
                         "employeeCode": { "type": "string" },
                         "fullName": { "type": "string" },
-                        "since": {
-                          "type": "string",
-                          "format": "date-time",
-                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
-                        }
+                        "since": { "type": "string", "format": "date-time" }
                       },
                       "required": ["employeeId", "employeeCode", "fullName", "since"],
                       "additionalProperties": false,
@@ -4979,24 +4667,11 @@
                       "items": {
                         "type": "object",
                         "properties": {
-                          "employeeId": {
-                            "type": "string",
-                            "format": "uuid",
-                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                          },
+                          "employeeId": { "type": "string", "format": "uuid" },
                           "employeeCode": { "type": "string" },
                           "fullName": { "type": "string" },
-                          "from": {
-                            "type": "string",
-                            "format": "date-time",
-                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
-                          },
-                          "until": {
-                            "type": "string",
-                            "format": "date-time",
-                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
-                            "nullable": true
-                          }
+                          "from": { "type": "string", "format": "date-time" },
+                          "until": { "type": "string", "format": "date-time", "nullable": true }
                         },
                         "required": ["employeeId", "employeeCode", "fullName", "from", "until"],
                         "additionalProperties": false
@@ -5018,25 +4693,13 @@
       },
       "SetApprovalRoleBodyDto": {
         "type": "object",
-        "properties": {
-          "employeeId": {
-            "type": "string",
-            "format": "uuid",
-            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-          }
-        },
+        "properties": { "employeeId": { "type": "string", "format": "uuid" } },
         "required": ["employeeId"],
         "additionalProperties": false
       },
       "SuperAdminTransferBodyDto": {
         "type": "object",
-        "properties": {
-          "successorAppUserId": {
-            "type": "string",
-            "format": "uuid",
-            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-          }
-        },
+        "properties": { "successorAppUserId": { "type": "string", "format": "uuid" } },
         "required": ["successorAppUserId"],
         "additionalProperties": false
       },
@@ -5048,32 +4711,16 @@
           "data": {
             "type": "object",
             "properties": {
-              "transferId": {
-                "type": "string",
-                "format": "uuid",
-                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-              },
+              "transferId": { "type": "string", "format": "uuid" },
               "from": {
                 "type": "object",
-                "properties": {
-                  "appUserId": {
-                    "type": "string",
-                    "format": "uuid",
-                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                  }
-                },
+                "properties": { "appUserId": { "type": "string", "format": "uuid" } },
                 "required": ["appUserId"],
                 "additionalProperties": false
               },
               "to": {
                 "type": "object",
-                "properties": {
-                  "appUserId": {
-                    "type": "string",
-                    "format": "uuid",
-                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                  }
-                },
+                "properties": { "appUserId": { "type": "string", "format": "uuid" } },
                 "required": ["appUserId"],
                 "additionalProperties": false
               }

@@ -1,6 +1,10 @@
 import { Body, Controller, Delete, Get, HttpStatus, Param, Patch, Post, Put, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import { ApiErrorResponses } from '../../infrastructure/http/decorators/api-error-responses.decorator';
+import {
+  ApiErrorResponses,
+  GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
+  UNAUTHENTICATED_RESPONSE,
+} from '../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../infrastructure/http/decorators/api-success-response.decorator';
 import { RequireRoles } from '../../infrastructure/security/decorators/access.decorators';
 import { CurrentPrincipal } from '../../infrastructure/security/models/current-principal';
@@ -23,13 +27,9 @@ import { toOperatingParametersApiException } from './operating-parameters.http-e
 import { OperatingParametersService, ParameterView } from './operating-parameters.service';
 
 const AUTH_ERRORS = [
-  { status: HttpStatus.UNAUTHORIZED, description: 'Authentication is required or the token is no longer valid.' },
-  { status: HttpStatus.FORBIDDEN, description: 'Only the Super Admin configures the operating parameters (AC-6).' },
-  {
-    status: HttpStatus.SERVICE_UNAVAILABLE,
-    description:
-      'Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).',
-  },
+  UNAUTHENTICATED_RESPONSE,
+  { status: HttpStatus.FORBIDDEN, description: 'Only the Super Admin configures the operating parameters.' },
+  GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
 ] as const;
 const VALIDATION_ERROR = {
   status: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -64,7 +64,7 @@ export class OperatingParametersController {
 
   @Get('operating-parameters')
   @RequireRoles('SUPER_ADMIN')
-  @ApiOperation({ operationId: 'operatingParameterList' })
+  @ApiOperation({ operationId: 'operatingParameterList', summary: 'List operating parameters' })
   @ApiSuccessResponse(ParameterListResponseDto, {
     message: 'PARAMETER.LISTED',
     description: 'Every parameter with the value in force, its default, its unit and the domain a value must stay in.',
@@ -80,7 +80,7 @@ export class OperatingParametersController {
 
   @Put('operating-parameters/:key')
   @RequireRoles('SUPER_ADMIN')
-  @ApiOperation({ operationId: 'operatingParameterSet' })
+  @ApiOperation({ operationId: 'operatingParameterSet', summary: 'Set an operating parameter' })
   @ApiSuccessResponse(ParameterResponseDto, {
     message: 'PARAMETER.SET',
     description:
@@ -104,7 +104,7 @@ export class OperatingParametersController {
 
   @Get('operating-parameters/:key/history')
   @RequireRoles('SUPER_ADMIN')
-  @ApiOperation({ operationId: 'operatingParameterHistory' })
+  @ApiOperation({ operationId: 'operatingParameterHistory', summary: 'Show the history of an operating parameter' })
   @ApiSuccessResponse(ParameterHistoryResponseDto, {
     message: 'PARAMETER.HISTORY_LISTED',
     description: 'The values the parameter has had, newest first.',
@@ -129,7 +129,7 @@ export class OperatingParametersController {
 
   @Get('non-working-dates')
   @RequireRoles('SUPER_ADMIN')
-  @ApiOperation({ operationId: 'nonWorkingDateList' })
+  @ApiOperation({ operationId: 'nonWorkingDateList', summary: 'List non-working dates' })
   @ApiSuccessResponse(NonWorkingDateListResponseDto, {
     message: 'NON_WORKING_DATE.LISTED',
     description: 'The days nobody works, in date order, optionally between two dates.',
@@ -145,7 +145,7 @@ export class OperatingParametersController {
 
   @Post('non-working-dates')
   @RequireRoles('SUPER_ADMIN')
-  @ApiOperation({ operationId: 'nonWorkingDateAdd' })
+  @ApiOperation({ operationId: 'nonWorkingDateAdd', summary: 'Add a non-working date' })
   @ApiSuccessResponse(NonWorkingDateResponseDto, {
     status: HttpStatus.CREATED,
     message: 'NON_WORKING_DATE.ADDED',
@@ -165,7 +165,7 @@ export class OperatingParametersController {
 
   @Patch('non-working-dates/:date')
   @RequireRoles('SUPER_ADMIN')
-  @ApiOperation({ operationId: 'nonWorkingDateRename' })
+  @ApiOperation({ operationId: 'nonWorkingDateRename', summary: 'Rename a non-working date' })
   @ApiSuccessResponse(NonWorkingDateResponseDto, {
     message: 'NON_WORKING_DATE.RENAMED',
     description: 'The reason of a non-working date changes. A day before today is refused (NON_WORKING_DATE.IN_PAST).',
@@ -188,7 +188,7 @@ export class OperatingParametersController {
 
   @Delete('non-working-dates/:date')
   @RequireRoles('SUPER_ADMIN')
-  @ApiOperation({ operationId: 'nonWorkingDateRemove' })
+  @ApiOperation({ operationId: 'nonWorkingDateRemove', summary: 'Remove a non-working date' })
   @ApiSuccessResponse(NonWorkingDateResponseDto, {
     message: 'NON_WORKING_DATE.REMOVED',
     description: 'The day is a working day again. A day before today is refused (NON_WORKING_DATE.IN_PAST).',

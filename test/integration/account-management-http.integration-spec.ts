@@ -1,6 +1,6 @@
 import request from 'supertest';
 import { AccountStatusService } from '../../src/modules/identity-access/accounts/account-status.service';
-import { SuperAdminHolderNotLockableError } from '../../src/modules/identity-access/errors/identity-access.errors';
+import { SuperAdminHolderNotLockableError } from '../../src/modules/identity-access/accounts/account.errors';
 import { IdentityAccessService } from '../../src/modules/identity-access/identity-access.service';
 import { PayloadCipher } from '../../src/modules/notifications/payload-cipher';
 import { bodyOf } from '../support/api-body';
@@ -107,14 +107,15 @@ describe('account management over HTTP (integration, real PostgreSQL)', () => {
     await ctx.sql.query('DELETE FROM login_throttles');
   });
 
-  it.each(['invitations', 'lock', 'unlock'])(
-    'rejects an invalid account UUID on POST /app-users/:id/%s with 422 VALIDATION_ERROR',
-    async (action) => {
-      const response = await admin.post(`/api/v1/app-users/not-a-uuid/${action}`).expect(422);
+  it.each([
+    ['invitations', undefined],
+    ['lock', { reason: 'Only the identifier is wrong here' }],
+    ['unlock', { reason: 'Only the identifier is wrong here' }],
+  ])('rejects an invalid account UUID on POST /app-users/:id/%s with 422 VALIDATION_ERROR', async (action, body) => {
+    const response = await admin.post(`/api/v1/app-users/not-a-uuid/${action}`, body).expect(422);
 
-      expect(errorCode(response)).toBe('VALIDATION_ERROR');
-    },
-  );
+    expect(errorCode(response)).toBe('VALIDATION_ERROR');
+  });
 
   describe('candidates and creation (US-01-01 AC-1, AC-5, AC-8, AC-16)', () => {
     it('lists employees without an account, excluding the departed, and finds them by name or code', async () => {
@@ -356,7 +357,9 @@ describe('account management over HTTP (integration, real PostgreSQL)', () => {
       const lockedAccount = dataOf(
         await admin.post('/api/v1/app-users', { employeeId: locked.employeeId, roles: [] }).expect(201),
       );
-      await admin.post(`/api/v1/app-users/${lockedAccount.id}/lock`).expect(200);
+      await admin
+        .post(`/api/v1/app-users/${lockedAccount.id}/lock`, { reason: 'Locked so a resend must be refused' })
+        .expect(200);
 
       expect(errorCode(await admin.post(`/api/v1/app-users/${user.appUserId}/invitations`).expect(409))).toBe(
         'APP_USER.ALREADY_ACTIVATED',
@@ -394,7 +397,9 @@ describe('account management over HTTP (integration, real PostgreSQL)', () => {
       await request(server()).get('/api/v1/probe/it').set(as(token)).expect(200);
       const refreshToken = bodyOf(response).data.refreshToken;
 
-      const locked = await admin.post(`/api/v1/app-users/${user.appUserId}/lock`).expect(200);
+      const locked = await admin
+        .post(`/api/v1/app-users/${user.appUserId}/lock`, { reason: 'Contain the account during an incident review' })
+        .expect(200);
 
       expect(bodyOf(locked).message).toBe('APP_USER.LOCKED');
       await request(server()).get('/api/v1/probe/it').set(as(token)).expect(401);
@@ -409,22 +414,24 @@ describe('account management over HTTP (integration, real PostgreSQL)', () => {
 
     it('is idempotent: a second lock changes nothing and writes no second audit event', async () => {
       const user = await activatedAccount();
-      await admin.post(`/api/v1/app-users/${user.appUserId}/lock`).expect(200);
+      await admin.post(`/api/v1/app-users/${user.appUserId}/lock`, { reason: 'First lock of the account' }).expect(200);
 
-      await admin.post(`/api/v1/app-users/${user.appUserId}/lock`).expect(200);
+      await admin.post(`/api/v1/app-users/${user.appUserId}/lock`, { reason: 'Repeated lock request' }).expect(200);
 
       expect(await countAudit('APP_USER.LOCKED', user.appUserId)).toBe(1);
     });
 
     it('unlocking restores sign-in and the roles held, without bringing an old invitation back', async () => {
       const user = await activatedAccount(['IT_ADMIN']);
-      await admin.post(`/api/v1/app-users/${user.appUserId}/lock`).expect(200);
+      await admin.post(`/api/v1/app-users/${user.appUserId}/lock`, { reason: 'Contain the account' }).expect(200);
       await request(server())
         .post('/api/v1/auth/login')
         .send({ email: user.email, password: user.password })
         .expect(401);
 
-      const unlocked = await admin.post(`/api/v1/app-users/${user.appUserId}/unlock`).expect(200);
+      const unlocked = await admin
+        .post(`/api/v1/app-users/${user.appUserId}/unlock`, { reason: 'Verified with the department head' })
+        .expect(200);
 
       expect(bodyOf(unlocked).message).toBe('APP_USER.UNLOCKED');
       const { token } = await signIn(user.email, user.password);
@@ -439,8 +446,10 @@ describe('account management over HTTP (integration, real PostgreSQL)', () => {
       );
       const token = await invitationToken(account.id);
 
-      await admin.post(`/api/v1/app-users/${account.id}/lock`).expect(200);
-      await admin.post(`/api/v1/app-users/${account.id}/unlock`).expect(200);
+      await admin.post(`/api/v1/app-users/${account.id}/lock`, { reason: 'Contain the invited account' }).expect(200);
+      await admin
+        .post(`/api/v1/app-users/${account.id}/unlock`, { reason: 'Containment no longer needed' })
+        .expect(200);
 
       const redeem = await request(server())
         .post('/api/v1/auth/invitations/redeem')
@@ -458,7 +467,9 @@ describe('account management over HTTP (integration, real PostgreSQL)', () => {
       const self = seed.superAdmin.appUserId;
 
       for (const path of ['lock', 'unlock']) {
-        const response = await admin.post(`/api/v1/app-users/${self}/${path}`).expect(409);
+        const response = await admin
+          .post(`/api/v1/app-users/${self}/${path}`, { reason: 'A valid reason does not allow a self-change' })
+          .expect(409);
         expect(errorCode(response)).toBe('APP_USER.SELF_CHANGE_FORBIDDEN');
       }
       expect(
@@ -467,6 +478,118 @@ describe('account management over HTTP (integration, real PostgreSQL)', () => {
       expect(errorCode(await admin.delete(`/api/v1/app-users/${self}/role-grants/SUPER_ADMIN`).expect(409))).toBe(
         'APP_USER.SELF_CHANGE_FORBIDDEN',
       );
+    });
+  });
+
+  describe('the reason of a lock or an unlock (US-01-01 AC-6, AC-7, AC-20)', () => {
+    /** Every request body the contract refuses; each must leave the account and the Audit Trail as they were. */
+    const UNUSABLE_BODIES: [string, object | undefined][] = [
+      ['no body', undefined],
+      ['an empty object', {}],
+      ['a blank reason', { reason: '   ' }],
+      ['a null reason', { reason: null }],
+      ['a reason that is not a string', { reason: 42 }],
+      ['a reason over 1000 characters', { reason: 'x'.repeat(1001) }],
+      ['an unknown field next to the reason', { reason: 'Incident review', note: 'not part of the contract' }],
+    ];
+
+    const statusOf = async (appUserId: string) =>
+      (await ctx.sql.query<{ status: string }>('SELECT status FROM app_users WHERE id = $1', [appUserId])).rows[0]
+        .status;
+    const auditOf = async (action: string, appUserId: string) =>
+      (
+        await ctx.sql.query<{ actor_app_user_id: string; before: unknown; after: unknown }>(
+          `SELECT actor_app_user_id, before, after FROM audit_events
+            WHERE action = $1 AND resource_id = $2 ORDER BY occurred_at, id`,
+          [action, appUserId],
+        )
+      ).rows;
+    const answersTo = async (path: string) => {
+      const answers: [string, number, string | null][] = [];
+      for (const [label, body] of UNUSABLE_BODIES) {
+        const response = await admin.post(path, body);
+        answers.push([label, response.status, response.status === 422 ? errorCode(response) : null]);
+      }
+      return answers;
+    };
+    const allRefused = UNUSABLE_BODIES.map(([label]): [string, number, string] => [label, 422, 'VALIDATION_ERROR']);
+
+    it('refuses a lock without a usable reason with 422 and leaves the account and its session untouched', async () => {
+      const user = await activatedAccount(['IT_ADMIN']);
+      const { token } = await signIn(user.email, user.password);
+
+      expect(await answersTo(`/api/v1/app-users/${user.appUserId}/lock`)).toEqual(allRefused);
+
+      expect(await statusOf(user.appUserId)).toBe('ACTIVE');
+      expect(await countAudit('APP_USER.LOCKED', user.appUserId)).toBe(0);
+      await request(server()).get('/api/v1/probe/it').set(as(token)).expect(200);
+    });
+
+    it('refuses an unlock without a usable reason with 422 and keeps the account locked', async () => {
+      const user = await activatedAccount();
+      await admin.post(`/api/v1/app-users/${user.appUserId}/lock`, { reason: 'Contain the account' }).expect(200);
+
+      expect(await answersTo(`/api/v1/app-users/${user.appUserId}/unlock`)).toEqual(allRefused);
+
+      expect(await statusOf(user.appUserId)).toBe('LOCKED');
+      expect(await countAudit('APP_USER.UNLOCKED', user.appUserId)).toBe(0);
+    });
+
+    it('records the trimmed reason with the actor and the state before and after, up to 1000 characters', async () => {
+      const user = await activatedAccount();
+      const longestReason = 'r'.repeat(1000);
+
+      await admin
+        .post(`/api/v1/app-users/${user.appUserId}/lock`, {
+          reason: '  Sudden departure notice from the head, awaiting the HR letter  ',
+        })
+        .expect(200);
+      await admin.post(`/api/v1/app-users/${user.appUserId}/unlock`, { reason: ` ${longestReason} ` }).expect(200);
+
+      expect(await auditOf('APP_USER.LOCKED', user.appUserId)).toEqual([
+        {
+          actor_app_user_id: seed.superAdmin.appUserId,
+          before: { status: 'ACTIVE' },
+          after: {
+            status: 'LOCKED',
+            sessionsRevoked: 0,
+            invitationsRevoked: 0,
+            reason: 'Sudden departure notice from the head, awaiting the HR letter',
+          },
+        },
+      ]);
+      expect(await auditOf('APP_USER.UNLOCKED', user.appUserId)).toEqual([
+        {
+          actor_app_user_id: seed.superAdmin.appUserId,
+          before: { status: 'LOCKED' },
+          after: { status: 'ACTIVE', reason: longestReason },
+        },
+      ]);
+      const employee = await ctx.sql.query<{ status: string }>('SELECT status FROM employees WHERE id = $1', [
+        user.employeeId,
+      ]);
+      expect(employee.rows[0].status).toBe('ACTIVE');
+    });
+
+    it('still needs a valid reason when the account is already in the requested state, and writes no second event', async () => {
+      const user = await activatedAccount();
+      const lock = `/api/v1/app-users/${user.appUserId}/lock`;
+      const unlock = `/api/v1/app-users/${user.appUserId}/unlock`;
+      await admin.post(lock, { reason: 'First lock' }).expect(200);
+
+      expect(errorCode(await admin.post(lock).expect(422))).toBe('VALIDATION_ERROR');
+      expect(dataOf(await admin.post(lock, { reason: 'Repeated lock' }).expect(200)).status).toBe('LOCKED');
+      await admin.post(unlock, { reason: 'First unlock' }).expect(200);
+      expect(errorCode(await admin.post(unlock).expect(422))).toBe('VALIDATION_ERROR');
+      expect(dataOf(await admin.post(unlock, { reason: 'Repeated unlock' }).expect(200)).status).toBe('ACTIVE');
+
+      expect(await countAudit('APP_USER.LOCKED', user.appUserId)).toBe(1);
+      expect(await countAudit('APP_USER.UNLOCKED', user.appUserId)).toBe(1);
+      const stored = JSON.stringify([
+        ...(await auditOf('APP_USER.LOCKED', user.appUserId)),
+        ...(await auditOf('APP_USER.UNLOCKED', user.appUserId)),
+      ]);
+      expect(stored).not.toContain('Repeated');
     });
   });
 
@@ -536,7 +659,9 @@ describe('account management over HTTP (integration, real PostgreSQL)', () => {
       const whileInvited = await admin
         .post(`/api/v1/app-users/${other.id}/role-grants`, { role: 'FINANCE' })
         .expect(409);
-      await admin.post(`/api/v1/app-users/${invited.id}/lock`).expect(200);
+      await admin
+        .post(`/api/v1/app-users/${invited.id}/lock`, { reason: 'A locked Finance holder keeps the place' })
+        .expect(200);
       const whileLocked = await admin
         .post(`/api/v1/app-users/${other.id}/role-grants`, { role: 'FINANCE' })
         .expect(409);
@@ -587,7 +712,11 @@ describe('account management over HTTP (integration, real PostgreSQL)', () => {
         .expect(403);
       await request(server()).get('/api/v1/app-users').set(as(token)).expect(403);
       await request(server()).get('/api/v1/account-candidates').set(as(token)).expect(403);
-      await request(server()).post(`/api/v1/app-users/${itAdmin.appUserId}/lock`).set(as(token)).expect(403);
+      await request(server())
+        .post(`/api/v1/app-users/${itAdmin.appUserId}/lock`)
+        .set(as(token))
+        .send({ reason: 'A valid reason does not grant the role' })
+        .expect(403);
 
       expect(errorCode(created)).toBe('AUTHORIZATION.FORBIDDEN');
       expect((await ctx.sql.query('SELECT count(*)::int AS n FROM app_users')).rows).toEqual(before.rows);
@@ -629,6 +758,32 @@ describe('account management over HTTP (integration, real PostgreSQL)', () => {
     });
   });
 
+  describe('success messages (H2b)', () => {
+    it('answers the account list and detail with their own message, data unchanged', async () => {
+      const account = dataOf(
+        await admin.post('/api/v1/app-users', { employeeId: (await newEmployee()).employeeId, roles: [] }).expect(201),
+      );
+
+      const listed = await admin.get('/api/v1/app-users?pageSize=100').expect(200);
+      const detail = await admin.get(`/api/v1/app-users/${account.id}`).expect(200);
+
+      expect(bodyOf(listed)).toMatchObject({ success: true, message: 'APP_USER.LISTED' });
+      expect(dataOf<{ items: AccountView[] }>(listed).items.map((item) => item.id)).toContain(account.id);
+      expect(bodyOf(detail)).toMatchObject({ success: true, message: 'APP_USER.RETRIEVED' });
+      expect(dataOf(detail).id).toBe(account.id);
+    });
+
+    it('answers readiness with its own message when PostgreSQL is reachable', async () => {
+      const response = await request(server()).get('/api/v1/health/ready').expect(200);
+
+      expect(response.body).toEqual({
+        success: true,
+        message: 'HEALTH.READINESS_CHECKED',
+        data: { status: 'ready', checks: [{ name: 'database', status: 'up' }] },
+      });
+    });
+  });
+
   // R-08: through HTTP the caller is the holder, so the self-change rule answers first and the
   // holder protection is never reached. Only a call from another account (a later transfer or
   // recovery flow) exercises it, so it is pinned here at the service.
@@ -646,9 +801,11 @@ describe('account management over HTTP (integration, real PostgreSQL)', () => {
       };
       const lockedBefore = await countAudit('APP_USER.LOCKED', seed.superAdmin.appUserId);
 
-      await expect(ctx.app.get(AccountStatusService).lock(actor, seed.superAdmin.appUserId)).rejects.toBeInstanceOf(
-        SuperAdminHolderNotLockableError,
-      );
+      await expect(
+        ctx.app
+          .get(AccountStatusService)
+          .lock(actor, seed.superAdmin.appUserId, 'A reason does not unlock the holder protection'),
+      ).rejects.toBeInstanceOf(SuperAdminHolderNotLockableError);
 
       const { rows } = await ctx.sql.query<{ status: string }>('SELECT status FROM app_users WHERE id = $1', [
         seed.superAdmin.appUserId,

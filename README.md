@@ -1,38 +1,59 @@
 # Software License Management — Backend
 
-Foundation để triển khai User Story bằng NestJS 11, TypeScript, PostgreSQL/Prisma,
-Redis/BullMQ và S3-compatible storage. Giữ catalog làm module mẫu.
+Foundation để triển khai User Story bằng NestJS 11, TypeScript và PostgreSQL/Prisma. Source hạ tầng Redis/BullMQ và
+S3-compatible storage được giữ nhưng chưa mount vào API/worker (E2 = A, H6.4). Module mới đặt file theo [module structure](docs/rules/module-structure.md) và
+architecture gate, không copy layout của một module cụ thể.
 
-**Đã merge G0, lát 1a/1b và gói remediation (chưa được dev review/nghiệm thu):** lệnh khởi tạo `pnpm ops:bootstrap`,
-đăng nhập/làm mới/đăng xuất, `/me`, tạo tài khoản từ Employee, mời/kích hoạt, khóa/mở và gán/thu hồi vai.
-Có 16 operation HTTP gồm health; xem [roadmap](docs/roadmap.md) và
-[báo cáo review G0/G1](docs/reviews/g0-g1-remediation-2026-10-15/README.md).
-Cây làm việc hiện tại (chưa commit, `verified` local, chưa review) còn có: đổi/đặt lại mật khẩu (1c), tra cứu Audit Trail,
-danh mục chức vụ/Cost Center, phòng và trưởng phòng (vai Manager suy ra), Người duyệt chi, tham số vận hành, import nhân sự CSV,
-checklist khởi tạo, chuyển giao Super Admin và lệnh khôi phục ngoài HTTP `pnpm ops:recover --help` (cần `pnpm build`).
-Route catalog **không còn trên HTTP** (module vẫn là mẫu cấu trúc). Health là public.
-Không có tài khoản demo: tạo Super Admin bằng lệnh khởi tạo trên database mới.
+**Đã có trong code:** lệnh khởi tạo `pnpm ops:bootstrap`, đăng nhập/làm mới/đăng xuất, `/me`, tạo tài khoản từ
+Employee, mời/kích hoạt, khóa/mở và gán/thu hồi vai, đổi/đặt lại mật khẩu, tra cứu Audit Trail, danh mục chức vụ/Cost
+Center, phòng và trưởng phòng (vai Manager suy ra), Người duyệt chi, tham số vận hành, import nhân sự CSV, checklist khởi
+tạo, chuyển giao Super Admin, lệnh khôi phục ngoài HTTP `pnpm ops:recover --help`, lệnh kiểm trạng thái chỉ đọc
+`pnpm ops:inspect` và lệnh dữ liệu demo chỉ local `pnpm dev:seed -- --confirm-local` (các lệnh ngoài HTTP cần
+`pnpm build`; rule: [operational commands](docs/rules/operational-commands.md)).
+Catalog **không có route HTTP**: source, schema và test được giữ nhưng `CatalogModule` chưa mount, chưa có access
+declaration và không phải mẫu kiến trúc; G3 quyết giữ, thay hay loại. Health là public.
+Không có tài khoản mặc định trong repository: tạo Super Admin bằng lệnh khởi tạo trên database mới; tài khoản demo
+local (IT Admin, Finance, Employee) do `pnpm dev:seed` tạo với mật khẩu sinh ngẫu nhiên, in một lần.
 
-Bản sửa remediation tại `a0cf5f1` đã vào `origin/dev` qua PR #7 và #8; kết quả kiểm chứng và giới hạn
-nằm trong [báo cáo review G0/G1](docs/reviews/g0-g1-remediation-2026-10-15/README.md).
-Chưa được dev review/nghiệm thu; ADR-0011/0012 vẫn Proposed.
+Có trong code không có nghĩa đã review hoặc nghiệm thu; một lát có thể mới phủ một phần Story. Trạng thái từng lát,
+revision/PR và kết quả kiểm chứng nằm ở [roadmap](docs/roadmap.md), bằng chứng ở
+[audit nền tảng](docs/reviews/be-foundation-audit-2026-10-18/README.md) và
+[review G0/G1](docs/reviews/g0-g1-remediation-2026-10-15/README.md). Danh sách operation HTTP: `openapi.json`. Trạng
+thái ADR: [chỉ mục tài liệu](docs/README.md).
 
 ## Chạy local
 
 Cần Node.js 22 hoặc 24, pnpm 11.1.3, Docker Compose.
 
 1. Chạy `pnpm install --frozen-lockfile`.
-2. Kiểm tra port/credentials local. Repo hiện không có `.env.example`; mặc định development nằm ở
-   [env-schema.ts](src/infrastructure/config/env-schema.ts) và khớp [Compose](compose.yaml).
-   Khi cần ghi đè, tạo `.env` local không commit (ví dụ `DATABASE_URL`, `PORT`, `CORS_ORIGINS`).
-   Đổi port PostgreSQL trong Compose thì cập nhật cả `DATABASE_URL`.
-3. Chạy `docker compose up -d --wait` để khởi động PostgreSQL, Redis, MinIO.
+2. Kiểm tra port/credentials local. Mặc định development nằm ở
+   [env-schema.ts](src/infrastructure/config/env-schema.ts) và khớp [Compose](compose.yaml). Khi cần ghi đè, copy
+   [.env.example](.env.example) thành `.env` (không commit), chỉ bỏ comment dòng cần đổi (ví dụ `DATABASE_URL`, `PORT`,
+   `CORS_ORIGINS`). Đổi port PostgreSQL trong Compose thì cập nhật cả `DATABASE_URL`. **Development phải có secret riêng**
+   (E3 = C, H6.3): bốn biến đánh dấu `@required-outside-test` (`AUTH_ACCESS_TOKEN_SECRET`, `AUTH_THROTTLE_PEPPER`,
+   `OUTBOX_PAYLOAD_KEY`, `OUTBOX_PAYLOAD_KEY_ID`) không có giá trị mặc định ngoài `NODE_ENV=test`; tạo bằng lệnh trong
+   `.env.example` và đặt vào `.env` (mỗi máy tự sinh, không chép từ máy khác; kiểm theo **tên**, không in giá trị:
+   `grep -cE '^(AUTH_ACCESS_TOKEN_SECRET|AUTH_THROTTLE_PEPPER|OUTBOX_PAYLOAD_KEY|OUTBOX_PAYLOAD_KEY_ID)=' .env` phải ra
+   `4`). Thiếu thì API, worker và `ops:recover` dừng với danh sách biến thiếu; `ops:inspect`, `ops:bootstrap` và
+   `dev:seed` chỉ cần cấu hình database nên vẫn chạy. Giá trị công
+   khai trong repository (fallback của test, mặc định development cũ) bị từ chối ở development và production. Copy
+   `.env.example` **chưa** đủ cho production: validator production còn từ chối thiếu biến `@production-required`. Biến đã bỏ (ví dụ `AUTH_COOKIE_SECURE`, bỏ khi refresh token chuyển sang body) bị bỏ
+   qua âm thầm — tự xóa khỏi tệp env của bạn; không có lệnh nào đọc hay sửa tệp env chứa secret.
+3. Chạy `docker compose up -d --wait` để khởi động PostgreSQL (đủ cho API và worker). Redis và MinIO chỉ chạy khi gọi
+   profile: `docker compose --profile queue --profile storage up -d --wait` — dùng khi thử source hạ tầng chưa mount.
 4. Với **database mới**, chạy `pnpm db:migrate:deploy`, rồi `pnpm build` để sinh Prisma client và build CLI.
 5. Khởi tạo một lần bằng `pnpm ops:bootstrap --help`, điền tham số theo help và nhập mật khẩu ở terminal.
-6. Chạy `pnpm start:dev`; chạy worker ở terminal riêng nếu cần gửi thư mời.
+6. Kiểm bằng `pnpm ops:inspect` (chỉ đọc; `--json` cho máy đọc): thoát 0 khi đã cài và nhất quán, 2 khi chưa cài hoặc
+   dở dang, 1 khi lỗi. Chỉ in số liệu và email Super Admin đã che.
+7. Tùy chọn, dữ liệu demo local: `pnpm dev:seed -- --confirm-local` — chỉ khi `NODE_ENV` là `development`/`test` và host
+   database là `localhost`/`127.x.x.x`/`::1`; tạo một phòng, một chức vụ và ba tài khoản demo đã kích hoạt
+   (`IT_ADMIN`, `FINANCE`, `EMPLOYEE`, email `@demo.slm.test`), in mật khẩu mới **một lần**. Chạy lại không tạo trùng, không
+   đặt lại mật khẩu (thoát 2); dữ liệu khác fixture bị từ chối, không sửa (thoát 3). Vai Manager/Người duyệt chi là vai suy
+   ra, không seed: gán qua API như dữ liệu thật.
+8. Chạy `pnpm start:dev`; chạy worker ở terminal riêng nếu cần gửi thư mời.
 
-CLI khởi tạo chỉ xác thực `NODE_ENV` và cấu hình database; không yêu cầu secret JWT, SMTP,
-Redis/storage hoặc khóa outbox của API/worker (R-13). API/worker vẫn dùng validation đầy đủ.
+CLI khởi tạo chỉ xác thực `NODE_ENV` và cấu hình database; không yêu cầu secret JWT, SMTP hoặc khóa outbox của
+API/worker. API/worker vẫn dùng validation đầy đủ; không cần Redis hay object storage vì hai module đó chưa mount.
 Nếu mất phản hồi khi COMMIT, mã thoát lỗi không chứng minh chưa ghi gì: kiểm trạng thái cài đặt
 trước khi chạy lại; không tự retry thao tác ghi.
 
@@ -44,15 +65,15 @@ Mật khẩu/token vẫn được che trước khi xuất log.
 Migration baseline chỉ phục vụ DB mới. Không chạy reset hoặc áp baseline lên DB cũ
 có migration/schema khác; tạo DB mới hoặc lập migration chuyển đổi riêng.
 
-| Địa chỉ mặc định                          | Mục đích                                                                    |
-| ----------------------------------------- | --------------------------------------------------------------------------- |
-| http://localhost:3000/api/v1/health/live  | Process đang chạy                                                           |
-| http://localhost:3000/api/v1/health/ready | Kiểm tra kết nối PostgreSQL                                                 |
-| http://localhost:3000/api/docs            | Swagger khi SWAGGER_ENABLED=true                                            |
-| http://localhost:9001                     | MinIO console; tạo bucket theo OBJECT_STORAGE_BUCKET trước khi dùng storage |
+| Địa chỉ mặc định                          | Mục đích                                                                       |
+| ----------------------------------------- | ------------------------------------------------------------------------------ |
+| http://localhost:3000/api/v1/health/live  | Process đang chạy                                                              |
+| http://localhost:3000/api/v1/health/ready | Kiểm tra kết nối PostgreSQL                                                    |
+| http://localhost:3000/api/docs            | Swagger khi SWAGGER_ENABLED=true                                               |
+| http://localhost:9001                     | MinIO console (chỉ với `--profile storage`); bucket theo OBJECT_STORAGE_BUCKET |
 
 Worker: `pnpm start:worker` chạy `EmailDispatchLoop`, thăm dò outbox PostgreSQL và gửi thư qua SMTP.
-Gửi thư không dùng BullMQ/Redis; BullMQ mới có cấu hình, chưa có queue/processor được đăng ký.
+Gửi thư không dùng BullMQ/Redis; worker không mount queue, chưa có queue/processor nào được đăng ký.
 Compose chưa cung cấp SMTP sink: cấu hình `SMTP_HOST`, `SMTP_PORT`, `SMTP_FROM` và các biến SMTP
 trong `env-schema.ts` cho dịch vụ thư local (mặc định `localhost:1025`, `SMTP_TLS=false`).
 `SMTP_TLS` chỉ điều khiển `requireTLS` (`true` = bắt buộc STARTTLS); TLS ngay khi kết nối chỉ do
@@ -65,7 +86,7 @@ thư luôn được gửi plaintext.
 
 `pnpm check` chạy gate không cần dịch vụ ngoài; `pnpm test:e2e` kiểm tra HTTP
 với boundary thay thế. Integration test cần PostgreSQL riêng: xem [test guide](test/README.md).
-`pnpm check` sinh Prisma client trước lint nên chạy được trực tiếp trên checkout sạch (R-01).
+`pnpm check` sinh Prisma client trước lint nên chạy được trực tiếp trên checkout sạch.
 
 Pool database do ứng dụng sở hữu: query hết `DB_QUERY_TIMEOUT_MS` làm kết nối bị loại khỏi pool,
 không được tái sử dụng transaction còn dở. `DB_IDLE_IN_TRANSACTION_TIMEOUT_MS` là backstop phía

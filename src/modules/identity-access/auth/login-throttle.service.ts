@@ -1,8 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EnvironmentVariables } from '../../../infrastructure/config/env-schema';
-import { LoginTemporarilyBlockedError } from '../errors/identity-access.errors';
+import { DbTx } from '../../../infrastructure/database/transaction-runner';
+import { LoginTemporarilyBlockedError } from './auth.errors';
 import { SessionRepo } from './session.repo';
+import { TokenService } from './token.service';
 
 /**
  * The failed-attempt counter behind sign-in and behind changing a password (T-6): one counter per
@@ -13,8 +15,14 @@ import { SessionRepo } from './session.repo';
 export class LoginThrottle {
   constructor(
     private readonly sessions: SessionRepo,
+    private readonly tokens: TokenService,
     private readonly config: ConfigService<EnvironmentVariables, true>,
   ) {}
+
+  /** The counter's key for a normalized email: an HMAC, so an unknown email is throttled without being stored. */
+  keyFor(normalizedEmail: string): string {
+    return this.tokens.throttleKey(normalizedEmail);
+  }
 
   /** Throws LoginTemporarilyBlockedError while this email is blocked. */
   async assertNotBlocked(organizationId: string, emailKeyHash: string): Promise<void> {
@@ -42,5 +50,10 @@ export class LoginThrottle {
       maxFailures: this.config.get('AUTH_LOGIN_MAX_FAILURES', { infer: true }),
       blockedUntil: new Date(now.getTime() + blockMs),
     });
+  }
+
+  /** A clean slate after a sign-in that worked or a password that was replaced (T-3), in the caller's transaction. */
+  async clear(tx: DbTx, organizationId: string, emailKeyHash: string): Promise<void> {
+    await this.sessions.clearThrottle(tx, organizationId, emailKeyHash);
   }
 }

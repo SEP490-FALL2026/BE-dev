@@ -21,6 +21,8 @@
     "start:worker:prod": "node dist/worker",
     "ops:bootstrap": "node dist/installation-cli",
     "ops:recover": "node dist/recovery-cli",
+    "ops:inspect": "node dist/inspect-cli",
+    "dev:seed": "node dist/dev-seed-cli",
     "lint": "eslint \"{src,test,scripts}/**/*.ts\"",
     "lint:fix": "eslint \"{src,test,scripts}/**/*.ts\" --fix",
     "prisma:format": "prisma format",

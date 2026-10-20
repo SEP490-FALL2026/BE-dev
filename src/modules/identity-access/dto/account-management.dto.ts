@@ -25,6 +25,11 @@ export const createAppUserBodySchema = z.strictObject({
 
 export const grantRoleBodySchema = z.strictObject({ role: requestedRoleSchema });
 
+/** Lock and unlock both require one reason or authority reference; it is stored trimmed in the Audit Trail. */
+export const accountStatusChangeBodySchema = z.strictObject({
+  reason: z.string().trim().min(1).max(1000).meta({ example: '<reason-or-authority-reference>' }),
+});
+
 export const appUserIdParamSchema = z.strictObject({ id: z.uuid() });
 export const appUserRoleParamSchema = z.strictObject({ id: z.uuid(), role: requestedRoleSchema });
 
@@ -39,9 +44,9 @@ export const listAppUsersQuerySchema = z.strictObject({
 export const accountCandidatesQuerySchema = z.strictObject({ search: z.string().trim().max(100).optional() });
 
 export const redeemInvitationBodySchema = z.strictObject({
-  token: z.string().min(1).max(256),
+  token: z.string().min(1).max(256).meta({ example: '<invitation-token>' }),
   // Only bounded here: the password policy answers with its own error code and must run before the token is examined.
-  password: z.string().min(1).max(1024),
+  password: z.string().min(1).max(1024).meta({ example: '<password>' }),
 });
 
 const accountSchema = z.strictObject({
@@ -100,6 +105,7 @@ const activatedSchema = z.strictObject({ activated: z.literal(true) });
 
 export class CreateAppUserBodyDto extends createZodDto(createAppUserBodySchema) {}
 export class GrantRoleBodyDto extends createZodDto(grantRoleBodySchema) {}
+export class AccountStatusChangeBodyDto extends createZodDto(accountStatusChangeBodySchema) {}
 export class AppUserIdParamDto extends createZodDto(appUserIdParamSchema) {}
 export class AppUserRoleParamDto extends createZodDto(appUserRoleParamSchema) {}
 export class ListAppUsersQueryDto extends createZodDto(listAppUsersQuerySchema) {}

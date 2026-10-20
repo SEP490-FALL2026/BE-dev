@@ -1,6 +1,10 @@
 import { Controller, Get, HttpStatus, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import { ApiErrorResponses } from '../../infrastructure/http/decorators/api-error-responses.decorator';
+import {
+  ApiErrorResponses,
+  GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
+  UNAUTHENTICATED_RESPONSE,
+} from '../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../infrastructure/http/decorators/api-success-response.decorator';
 import { toUnavailableApiException } from '../../infrastructure/http/errors/service-unavailable';
 import { RequireRoles } from '../../infrastructure/security/decorators/access.decorators';
@@ -15,21 +19,17 @@ export class AuditController {
   constructor(private readonly queries: AuditQueryService) {}
 
   @Get()
-  @ApiOperation({ operationId: 'auditEventList' })
+  @ApiOperation({ operationId: 'auditEventList', summary: 'Search the audit trail' })
   @ApiSuccessResponse(AuditEventPageResponseDto, {
     message: 'AUDIT.EVENTS_LISTED',
     description:
       'A page of the Audit Trail, newest first, optionally narrowed by resource, actor, action and time window [occurredFrom, occurredTo).',
   })
   @ApiErrorResponses(
-    { status: HttpStatus.UNAUTHORIZED, description: 'Authentication is required or the token is no longer valid.' },
+    UNAUTHENTICATED_RESPONSE,
     { status: HttpStatus.FORBIDDEN, description: 'Only the Super Admin may read the Audit Trail.' },
     { status: HttpStatus.UNPROCESSABLE_ENTITY, description: 'The query is invalid (VALIDATION_ERROR).' },
-    {
-      status: HttpStatus.SERVICE_UNAVAILABLE,
-      description:
-        'Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).',
-    },
+    GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   )
   async list(@Query() query: ListAuditEventsQueryDto) {
     try {

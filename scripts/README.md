@@ -3,17 +3,18 @@
 Thư mục root scripts/ chứa công cụ hỗ trợ dev/CI; không chứa business service.
 Scripts không tự chạy khi API nhận request. package.json khai lệnh gọi chúng.
 
-| File                                | Lệnh                                             | Trách nhiệm                                                                                                          |
-| ----------------------------------- | ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------- |
-| check-rules.mjs                     | pnpm rules:check                                 | Kiểm tra link và quan hệ instruction trong rules-check.config.json                                                   |
-| check-rules.test.mjs                | pnpm rules:test                                  | Regression cho checker                                                                                               |
-| dev/export-openapi.ts               | pnpm openapi:export                              | Tạo Nest app không listen, sinh openapi.json rồi đóng app                                                            |
-| dev/download-translation-models.mjs | node scripts/dev/download-translation-models.mjs | Tải public model artifact cho translation research vào OFFLINE_TRANSLATION_MODELS_DIR (mặc định .models/translation) |
-| verify/runners.mjs                  | Đọc bởi discovery                                | Registry runner, suffix, thư mục                                                                                     |
-| verify/check-script-order.test.mjs  | pnpm test:scripts                                | Regression: `check` generate Prisma client trước lint; CI path filter                                                |
-| verify/test-layout.mjs              | Đọc bởi discovery                                | Logic phát hiện layout sai                                                                                           |
-| verify/test-layout.test.mjs         | pnpm test:scripts                                | Regression layout                                                                                                    |
-| verify/verify-test-discovery.mjs    | pnpm test:discovery                              | Đối chiếu file trên disk với Jest --listTests                                                                        |
+| File                                | Lệnh                                             | Trách nhiệm                                                                                                                                                                                  |
+| ----------------------------------- | ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| check-rules.mjs                     | pnpm rules:check                                 | Kiểm tra link và quan hệ instruction trong rules-check.config.json; kiểm cấu trúc work item (mục bắt buộc, pin, trạng thái, primary Story, trường task, đăng ký) trừ danh sách `legacy`      |
+| check-rules.test.mjs                | pnpm rules:test                                  | Regression cho checker                                                                                                                                                                       |
+| dev/export-openapi.ts               | pnpm openapi:export                              | Tạo Nest app không listen trong môi trường chỉ cho export (`dev/export-environment.ts`: secret E3 sinh trong bộ nhớ, không đọc `.env`, không đặt `NODE_ENV`), sinh openapi.json rồi đóng app |
+| dev/download-translation-models.mjs | node scripts/dev/download-translation-models.mjs | Tải public model artifact cho translation research vào OFFLINE_TRANSLATION_MODELS_DIR (mặc định .models/translation)                                                                         |
+| verify/runners.mjs                  | Đọc bởi discovery                                | Registry runner, suffix, thư mục                                                                                                                                                             |
+| verify/check-script-order.test.mjs  | pnpm test:scripts                                | Regression: `check` generate Prisma client trước lint; CI path filter                                                                                                                        |
+| verify/pg-deprecation.test.mjs      | pnpm test:scripts                                | INF.1: spec adapter PostgreSQL chạy với `--throw-deprecation`, 0 cảnh báo deprecation của pg                                                                                                 |
+| verify/test-layout.mjs              | Đọc bởi discovery                                | Logic phát hiện layout sai                                                                                                                                                                   |
+| verify/test-layout.test.mjs         | pnpm test:scripts                                | Regression layout                                                                                                                                                                            |
+| verify/verify-test-discovery.mjs    | pnpm test:discovery                              | Đối chiếu file trên disk với Jest --listTests                                                                                                                                                |
 
 ## Translation research
 

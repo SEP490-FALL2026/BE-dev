@@ -6,6 +6,8 @@ import helmet from 'helmet';
 import { cleanupOpenApiDoc } from 'nestjs-zod';
 import { parseCorsOrigins } from './infrastructure/config/cors';
 import { EnvironmentVariables } from './infrastructure/config/env-schema';
+import { toOpenApi30Presentation } from './infrastructure/http/openapi-presentation';
+import { withGlobalRateLimitResponse } from './infrastructure/http/openapi-rate-limit';
 
 interface ConfigurableHttpInstance {
   set: (setting: string, value: unknown) => void;
@@ -56,7 +58,11 @@ export function createOpenApiDocument(app: INestApplication): OpenAPIObject {
     .addBearerAuth()
     .build();
 
-  return cleanupOpenApiDoc(SwaggerModule.createDocument(app, swaggerConfig), {
-    version: '3.0',
-  });
+  return withGlobalRateLimitResponse(
+    toOpenApi30Presentation(
+      cleanupOpenApiDoc(SwaggerModule.createDocument(app, swaggerConfig), {
+        version: '3.0',
+      }),
+    ),
+  );
 }

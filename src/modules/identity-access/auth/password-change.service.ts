@@ -3,26 +3,23 @@ import { normalizeEmail } from '../../../core/email';
 import { TransactionRunner, toTransientError } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { OrganizationService } from '../../organization/organization.service';
-import { canReceiveResetMail } from '../accounts/account-policy';
-import { AccountRepo } from '../accounts/account.repo';
-import { AccountNoLongerUsableError, CurrentPasswordInvalidError } from '../errors/identity-access.errors';
+import { AccountDirectoryService } from '../accounts/account-directory.service';
+import { CredentialService } from '../accounts/credential.service';
 import { PasswordPolicyError } from '../identity-access.errors';
+import { AccountNoLongerUsableError, CurrentPasswordInvalidError } from './auth.errors';
 import { CredentialChangeService } from './credential-change.service';
 import { LoginThrottle } from './login-throttle.service';
-import { PasswordHasher } from './password-hasher.service';
-import { checkPasswordPolicy } from './password.policy';
-import { TokenService } from './token.service';
+import { canReceiveResetMail } from './password-reset.policy';
 
 /** Changing one's own password while signed in (slice 1c, `US-01-10` AC-5). */
 @Injectable()
 export class PasswordChangeService {
   constructor(
-    private readonly accounts: AccountRepo,
+    private readonly accounts: AccountDirectoryService,
     private readonly organization: OrganizationService,
-    private readonly credentials: CredentialChangeService,
+    private readonly changes: CredentialChangeService,
     private readonly throttle: LoginThrottle,
-    private readonly hasher: PasswordHasher,
-    private readonly tokens: TokenService,
+    private readonly credentials: CredentialService,
     private readonly runner: TransactionRunner,
   ) {}
 
@@ -48,7 +45,7 @@ export class PasswordChangeService {
     const account = await this.accounts.findAccountById(principal.appUserId);
     // The guard just resolved this account; losing it now is a state change, answered as the guard would.
     if (!account) throw new AccountNoLongerUsableError();
-    const keyHash = this.tokens.throttleKey(normalizeEmail(account.loginEmail));
+    const keyHash = this.throttle.keyFor(normalizeEmail(account.loginEmail));
     await this.throttle.assertNotBlocked(account.organizationId, keyHash);
 
     // Everything CPU-heavy happens before the transaction (lock protocol rule 3).
@@ -58,9 +55,9 @@ export class PasswordChangeService {
       await this.throttle.recordFailure(account.organizationId, keyHash);
       throw new CurrentPasswordInvalidError();
     }
-    const violation = checkPasswordPolicy(newPassword, account.loginEmail);
+    const violation = this.credentials.checkPasswordPolicy(newPassword, account.loginEmail);
     if (violation) throw new PasswordPolicyError(violation);
-    const hash = await this.hasher.hash(newPassword);
+    const hash = await this.credentials.hash(newPassword);
 
     await this.runner.run(async (tx) => {
       if (!(await this.accounts.lockAppUser(tx, account.id, 'UPDATE'))) throw new AccountNoLongerUsableError();
@@ -70,7 +67,7 @@ export class PasswordChangeService {
       // Another change or reset won the lock first: what was verified is no longer the current password.
       if (current.credentialHash !== verifiedHash) throw new CurrentPasswordInvalidError();
 
-      await this.credentials.replace(tx, {
+      await this.changes.replace(tx, {
         account: current,
         hash,
         event: 'PASSWORD_CHANGED',
@@ -89,10 +86,10 @@ export class PasswordChangeService {
   /** The stored hash when `password` matches it, otherwise null. Burns equal CPU when there is no credential. */
   private async verifyCurrent(storedHash: string | null, password: string): Promise<string | null> {
     if (!storedHash) {
-      await this.hasher.verifyAgainstDummy(password);
+      await this.credentials.verifyAgainstDummy(password);
       return null;
     }
 
-    return (await this.hasher.verify(storedHash, password)) ? storedHash : null;
+    return (await this.credentials.verify(storedHash, password)) ? storedHash : null;
   }
 }

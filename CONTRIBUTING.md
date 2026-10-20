@@ -6,7 +6,8 @@ Dành cho mọi contributor, có hoặc không dùng AI. Bắt đầu từ [READ
 ## Một thay đổi thông thường
 
 1. Đọc yêu cầu/acceptance criteria của task, kiểm tra `git status` và test gần code cần sửa.
-2. Chọn một lát chức năng nhỏ; dùng `src/modules/catalog` làm mẫu về vị trí file.
+2. Chọn một lát chức năng nhỏ; đặt file theo [module structure](docs/rules/module-structure.md) và architecture gate,
+   không copy layout của một module cụ thể (`catalog` chưa mount, không phải mẫu).
 3. Sửa trong module sở hữu; thêm test hành vi, gồm trường hợp bị từ chối liên quan.
 4. Chạy kiểm tra theo bảng dưới và đọc diff cuối.
 5. Trong PR, mô tả hành vi thay đổi, bằng chứng đã chạy và phần chưa kiểm chứng.
@@ -14,6 +15,11 @@ Dành cho mọi contributor, có hoặc không dùng AI. Bắt đầu từ [READ
 Bug fix cần test tái hiện lỗi ở boundary phù hợp. Refactor giữ public contract;
 không gộp tính năng hoặc nâng dependency không liên quan. Sửa tài liệu cần kiểm tra
 nội dung, link và format; không cần test giả cho một câu văn.
+
+Đặt file, capability folder và lỗi theo [module structure](docs/rules/module-structure.md); `pnpm check` chạy gate cấu trúc
+(`src/architecture-structure.spec.ts`) với legacy ledger chỉ được co lại. Hạng mục mới là một outcome kiểm chứng độc lập,
+chia theo Story chứ không theo nhóm G ([work-item sizing](docs/rules/work-item-sizing.md)), dùng
+[mẫu](docs/workspace/_template/README.md); `pnpm rules:check` kiểm cấu trúc và mục `Sizing decision` của nó.
 
 Task nhỏ không đổi nghiệp vụ/contract dùng issue/PR. Tính năng US hoặc thay đổi nhiều bước dùng [quy trình chung](docs/workspace/README.md) và [roadmap](docs/roadmap.md): giao người phụ trách → thiết kế spec/plan/test → implement và kiểm chứng → tích hợp `dev` → Owner review cuối trước `main`/production. Người phụ trách có thể tự thiết kế và code; Owner cũng có thể chuẩn bị thiết kế rồi bàn giao. Peer review của dev khác là tùy chọn, không phải gate bắt buộc. Không bắt một AI hoặc gói skill cụ thể; nếu công cụ hỗ trợ skill/subagent thì áp dụng theo quy tắc trong workspace. Quyết định kiến trúc lâu dài dùng ADR.
 
@@ -38,8 +44,7 @@ validate schema, unit + architecture test, script test, test discovery và build
 E2E, integration, OpenAPI export và dependency audit chạy riêng theo tác động.
 CI also runs HTTP E2E, isolated PostgreSQL integration, OpenAPI drift, Docker build and dependency audit.
 
-`pnpm check` sinh Prisma client trước lint nên chạy được trực tiếp trên checkout sạch (R-01,
-xem [review G0/G1](docs/reviews/g0-g1-remediation-2026-10-15/README.md)).
+`pnpm check` sinh Prisma client trước lint nên chạy được trực tiếp trên checkout sạch.
 
 ## Chọn tài liệu theo tác vụ
 
@@ -48,6 +53,7 @@ xem [review G0/G1](docs/reviews/g0-g1-remediation-2026-10-15/README.md)).
 | Thêm endpoint                         | [Hướng dẫn viết code](docs/guides/kien-truc-backend-va-cach-viet-code.md), [API contract](docs/rules/api-contract.md) |
 | Persistence/nghiệp vụ                 | [Database và nghiệp vụ](docs/rules/database-business.md)                                                              |
 | Auth, upload hoặc job                 | [Security và jobs](docs/rules/security-jobs.md)                                                                       |
+| Lệnh vận hành ngoài HTTP, seed local  | [Lệnh vận hành](docs/rules/operational-commands.md)                                                                   |
 | Tài liệu hoặc quyết định              | [Quy ước tài liệu](docs/rules/documentation.md)                                                                       |
 | Tìm ADR hoặc thiết kế chưa triển khai | [Chỉ mục tài liệu](docs/README.md)                                                                                    |
 
@@ -67,5 +73,7 @@ Khi hai nguồn khác nhau, ghi rõ khoảng cách, không mặc định kế ho
   (ví dụ giá trị kỹ thuật của `US-01-10`). Khi đó ghi người review, link và revision; chưa có thì ghi `pending` và
   hạng mục chưa được `accepted`.
 - Cập nhật hướng dẫn/runbook khi lệnh, cấu hình, workflow, vận hành hoặc boundary thay đổi.
+- Ghi tiến độ, revision/PR và kết quả kiểm tra vào roadmap, plan hoặc review, không vào `AGENTS.md`/`ARCHITECTURE.md`;
+  tài liệu nào sở hữu nội dung nào: [trách nhiệm tài liệu](docs/rules/documentation.md#trách-nhiệm-từng-loại-tài-liệu).
 - Báo lệnh thực chạy, kết quả và giới hạn; mock không chứng minh hạ tầng thật.
 - Không commit secrets/dữ liệu thật. Không tự push, deploy hoặc thao tác dữ liệu dùng chung khi chưa được giao.

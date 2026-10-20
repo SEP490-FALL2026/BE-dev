@@ -196,7 +196,11 @@ describe('the approval roles over HTTP (integration, real PostgreSQL)', () => {
         activated: false,
       });
       const locked = await person();
-      await request(server()).post(`/api/v1/app-users/${locked.appUserId}/lock`).set(asAdmin()).expect(200);
+      await request(server())
+        .post(`/api/v1/app-users/${locked.appUserId}/lock`)
+        .set(asAdmin())
+        .send({ reason: 'A locked account cannot hold an approval role' })
+        .expect(200);
       const before = await currentRows();
 
       const cases: [string, string, string][] = [

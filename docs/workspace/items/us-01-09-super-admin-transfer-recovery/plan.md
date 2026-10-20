@@ -3,7 +3,8 @@
 - [Spec](spec.md); revision đầu vào: Docs `3341ea0`, BE `e833092` (nhánh `Bao_Dev`, cây làm việc chưa commit).
 - Phụ trách: AI theo giao việc Owner (16/10/2026). Thiết kế ban đầu bởi: AI theo giao việc Owner.
 - Owner review: chưa review. Peer review: tùy chọn.
-- Triển khai: **verified** (local, 16/10/2026). PR: chưa có. Remote CI chưa chạy.
+- Triển khai: **verified** (local, 16/10/2026). Sau đó commit `4ead859`, vào `dev` qua PR #11 (`eae212a`) — `merged-dev`, chưa review/nghiệm thu; gate trên HEAD `186ad5f` chạy xanh ở [audit 18/10](../../../reviews/be-foundation-audit-2026-10-18/README.md). Remote CI chưa chạy.
+- _18/10/2026:_ `US-01-10` AC-10 (quên mật khẩu khi đang khôi phục) không do lát này chứng minh; [H3c](../h3c-forgot-password-during-recovery/plan.md#verification-and-handoff) thêm 5 ca vào suite `super-admin-recovery` (nay 31 test), sửa `password-reset.service.ts` + `recovery.repo.ts`, `verified` local, chưa commit. Bảng dưới (26 test) là bằng chứng của lát gốc, giữ làm lịch sử.
 
 ## Các bước nhỏ
 

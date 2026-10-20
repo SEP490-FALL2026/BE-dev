@@ -4,6 +4,7 @@ import { DatabaseModule } from '../../infrastructure/database/database.module';
 import { AuditModule } from '../audit/audit.module';
 import { IdentityAccessFacadeModule } from '../identity-access/identity-access-facade.module';
 import { OrganizationModule } from '../organization/organization.module';
+import { InstallationRepo } from './installation.repo';
 import { InstallationService } from './installation.service';
 
 /** No controllers and no tables of its own: it orchestrates the other modules from the command line. */
@@ -15,7 +16,7 @@ import { InstallationService } from './installation.service';
     IdentityAccessFacadeModule,
     AuditModule,
   ],
-  providers: [InstallationService],
+  providers: [InstallationRepo, InstallationService],
   exports: [InstallationService],
 })
 export class InstallationModule {}

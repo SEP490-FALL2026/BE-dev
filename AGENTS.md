@@ -7,42 +7,49 @@ Scope: this backend repository. Work from its root with the pnpm version in `pac
 - Read [CONTRIBUTING.md](CONTRIBUTING.md) for workflow and verification commands.
 - Read [ARCHITECTURE.md](ARCHITECTURE.md) before changing module boundaries.
 - Check the branch, working diff and relevant source/tests; preserve existing changes.
-- Current runtime: health, `/auth/*`, `/me` plus infrastructure; first-run installation is a CLI
-  (`pnpm ops:bootstrap`). Super Admin account administration (create, invite, activate, lock, role
-  grants) is implemented as slice 1b and verified locally at `d60d306`; final acceptance is pending.
-  Slice 1c adds forgot/reset password (`POST /auth/password-reset-requests`, `/auth/password-resets`) and
-  change password (`POST /me/password`), the Super Admin's Audit Trail query (`GET /audit-events`), and the IT
-  Admin's job title catalogue and manual employee entry (`/job-titles`, `POST /employees`); all are verified
-  locally, not yet reviewed or accepted. G1/G2 are complete in the working tree (also uncommitted, verified
-  locally, not reviewed): Cost Center catalogue, department profile with head periods and the derived Manager
-  role, spending-approver roles, operating parameters, CSV employee import (preview then confirm), the
-  onboarding checklist (step 1), Super Admin transfer (`POST /super-admin-transfers`) and the out-of-HTTP
-  recovery command (`pnpm ops:recover --help`). What each slice leaves to G3–G6 is listed in its spec.
-  Catalog is a structural sample and is not mounted.
-  All other US workflows are not implemented.
+- Current capability, in short: health, internal authentication and sessions (`/auth/*`, `/me`), Super Admin
+  account administration and transfer, password self-service, the Audit Trail query, the organization and import
+  foundation (Cost Centers, departments and heads, job titles, employees, approval roles, operating parameters,
+  onboarding step 1) and out-of-HTTP commands (`pnpm ops:bootstrap`, `pnpm ops:recover`, read-only
+  `pnpm ops:inspect`, local-only `pnpm dev:seed`). Catalog is a structural
+  sample and is not mounted; other US workflows are not implemented. A merged slice may cover a Story only partly, and
+  nothing counts as reviewed or `accepted` unless the [roadmap](docs/roadmap.md) records it. Slice status, AC
+  coverage, revisions and evidence: [roadmap](docs/roadmap.md); module map and technical limits:
+  [ARCHITECTURE.md](ARCHITECTURE.md); latest baseline check:
+  [foundation audit](docs/reviews/be-foundation-audit-2026-10-18/README.md); planned remediation and refactors:
+  [foundation remediation handoff](docs/workspace/items/foundation-remediation-handoff-2026-10-18/spec.md).
 
 ## Read only what the task needs
 
 | Task                                         | Reference                                                                                                        |
 | -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
 | Add an endpoint                              | [Development guide](docs/guides/kien-truc-backend-va-cach-viet-code.md), [API rules](docs/rules/api-contract.md) |
+| Add/move a file, capability folder or error  | [Module structure rules](docs/rules/module-structure.md)                                                         |
 | Model, query, transaction, business behavior | [Database rules](docs/rules/database-business.md)                                                                |
 | Authentication, files, jobs                  | [Security rules](docs/rules/security-jobs.md)                                                                    |
 | Add or change a script                       | [Script guide](scripts/README.md)                                                                                |
 | Add or update tests                          | [Test guide](test/README.md)                                                                                     |
 | Documentation or ADR                         | [Documentation rules](docs/rules/documentation.md)                                                               |
+| Split assigned work into items (spec/plan)   | [Work-item sizing](docs/rules/work-item-sizing.md)                                                               |
+| Add or change an out-of-HTTP command or seed | [Operational commands](docs/rules/operational-commands.md)                                                       |
 
 ## Repository constraints
 
-- Default to flat feature modules. A module with several distinct capabilities may group files by capability,
-  with at most two directory levels, as documented in `ARCHITECTURE.md`. Controllers map HTTP; services
-  coordinate; `*.repo.ts` owns persistence.
+- Default to flat feature modules; group by capability once a module root passes 2 controllers or 12 files, with
+  at most two directory levels. A capability folder is not automatically a Nest module. Controllers map HTTP;
+  services coordinate; `*.repo.ts` owns persistence; business errors live with their capability, never in a global
+  errors folder. Details and the enforced gates: [module structure](docs/rules/module-structure.md).
 - Cross-module calls use exported facades/contracts; never import another module's private files or query its tables.
 - Keep framework-free primitives in `src/core`; technical adapters in `src/infrastructure`.
 - Generated `src/generated/`, `dist/` and `openapi.json` change through their generators.
 - Do not load every ADR, design document or external repository by default.
   Obtain the relevant requirement before inventing missing business behavior.
-- For US design and implementation handoff, follow [shared planning](docs/workspace/README.md).
+- For US design and implementation handoff, follow [shared planning](docs/workspace/README.md). A roadmap group `G`
+  is never a spec/plan boundary: size each item by Story and outcome per
+  [work-item sizing](docs/rules/work-item-sizing.md).
+- One canonical source per fact: progress, commits/PRs and test results go to the roadmap, item plan or review, not
+  into this file or ARCHITECTURE.md. Which document owns what:
+  [documentation responsibilities](docs/rules/documentation.md#trách-nhiệm-từng-loại-tài-liệu).
 - Use pinned BRD/US revisions and the current spec/plan. The assignee owns design, implementation,
   tests and plan maintenance; peer review is optional, except where a pinned requirement, decision or spec
   explicitly requires it (for example the US-01-10 technical values) — then it is a recorded gate before

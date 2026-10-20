@@ -3,8 +3,9 @@ import { TransactionRunner, readSqlState } from '../../../infrastructure/databas
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditService } from '../../audit/audit.service';
 import { OrganizationService } from '../../organization/organization.service';
-import { employeeHasNotLeft } from '../accounts/account-policy';
-import { AccountRepo } from '../accounts/account.repo';
+import { AccountDirectoryService } from '../accounts/account-directory.service';
+import { RoleGrantService } from '../accounts/role-grant.service';
+import { employeeHasNotLeft } from '../policies/account-policy';
 import { ApprovalRoleHolderInvalidError, ApprovalRolePairingError } from './approval-role.errors';
 import { APPROVAL_ROLES, ApprovalRoleName, ApprovalRoleRepo } from './approval-role.repo';
 
@@ -27,7 +28,8 @@ export interface ApprovalRoleView {
 export class ApprovalRoleService {
   constructor(
     private readonly repo: ApprovalRoleRepo,
-    private readonly accounts: AccountRepo,
+    private readonly accounts: AccountDirectoryService,
+    private readonly grants: RoleGrantService,
     private readonly organization: OrganizationService,
     private readonly audit: AuditService,
     private readonly runner: TransactionRunner,
@@ -89,7 +91,7 @@ export class ApprovalRoleService {
       if (!account || account.status !== 'ACTIVE' || account.activationState !== 'ACTIVATED') {
         throw new ApprovalRoleHolderInvalidError('NO_USABLE_ACCOUNT');
       }
-      if ((await this.accounts.effectiveRoles(appUserId, tx)).includes('SUPER_ADMIN')) {
+      if ((await this.grants.effectiveRoles(appUserId, tx)).includes('SUPER_ADMIN')) {
         throw new ApprovalRoleHolderInvalidError('SUPER_ADMIN_CANNOT_HOLD');
       }
 

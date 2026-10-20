@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { EmployeeImportService } from '../data-import/employee-import.service';
+import { DataImportService } from '../data-import/data-import.service';
 import { IdentityAccessService } from '../identity-access/identity-access.service';
 import { OrganizationService } from '../organization/organization.service';
 
@@ -47,11 +47,14 @@ export class OnboardingService {
   constructor(
     private readonly organization: OrganizationService,
     private readonly identity: IdentityAccessService,
-    private readonly imports: EmployeeImportService,
+    private readonly imports: DataImportService,
   ) {}
 
   async checklist(): Promise<OnboardingChecklist> {
-    const [facts, latest] = await Promise.all([this.organization.getOnboardingFacts(), this.imports.latestImport()]);
+    const [facts, latest] = await Promise.all([
+      this.organization.getOnboardingFacts(),
+      this.imports.latestEmployeeImport(),
+    ]);
     const usableItAdmins = await this.identity.findUsableItAdminEmployeeIds(
       facts.departmentsByItAdmin.flatMap((department) =>
         department.itAdminEmployeeId ? [department.itAdminEmployeeId] : [],
@@ -72,10 +75,7 @@ export class OnboardingService {
         activeDepartments: facts.activeDepartments,
         activeEmployees: facts.activeEmployees,
         freeCostCenters: facts.freeCostCenters,
-        latestImport:
-          latest && latest.status !== 'CANCELLED'
-            ? { id: latest.id, status: latest.status, errorRows: latest.errorRows }
-            : null,
+        latestImport: latest ? { id: latest.id, status: latest.status, errorRows: latest.errorRows } : null,
       },
       createDepartmentBlockedBy: facts.freeCostCenters === 0 ? 'NO_FREE_COST_CENTER' : null,
       warnings: [

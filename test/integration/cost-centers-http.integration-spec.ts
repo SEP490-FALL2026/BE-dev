@@ -302,6 +302,11 @@ describe('the Cost Center catalogue over HTTP (integration, real PostgreSQL)', (
         'COST_CENTER.CREATED',
         'COST_CENTER.DEACTIVATED',
       ]);
+      expect((await auditActions(costCenter.id))[1]).toEqual({
+        action: 'COST_CENTER.DEACTIVATED',
+        before: { status: 'ACTIVE' },
+        after: { status: 'INACTIVE' },
+      });
     });
 
     it('retires one whose department has nobody left, and keeps the department (split and merge, AC-10, AC-11)', async () => {
@@ -496,6 +501,17 @@ describe('the Cost Center catalogue over HTTP (integration, real PostgreSQL)', (
       ).rows[0].n;
       expect(deadlocksAfter).toBe(deadlocksBefore);
     });
+  });
+
+  // The OpenAPI document declares this 422 (H2b); these cases prove the runtime answers it before it is documented.
+  it.each([
+    ['an unknown status', 'status=RETIRED'],
+    ['a page size above the limit', 'pageSize=101'],
+    ['an unknown query field', 'colour=blue'],
+  ])('answers 422 VALIDATION_ERROR to a list query with %s', async (_label, query) => {
+    const response = await request(server()).get(`/api/v1/cost-centers?${query}`).set(asFinance()).expect(422);
+
+    expect(errorOf(response).code).toBe('VALIDATION_ERROR');
   });
 
   it('leaves every employee with exactly the placements the invariant I-2 asks for', async () => {

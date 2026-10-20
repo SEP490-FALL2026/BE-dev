@@ -1,0 +1,102 @@
+name: slm-production
+
+services:
+  # ----------------------------------------------------------------------------
+  # 1. DATABASE: PostgreSQL 17
+  # ----------------------------------------------------------------------------
+  postgres:
+    image: postgres:17-alpine
+    container_name: slm-postgres
+    restart: unless-stopped
+    command:
+      - "postgres"
+      - "-c"
+      - "timezone=UTC"
+      - "-c"
+      - "shared_buffers=128MB"
+      - "-c"
+      - "work_mem=8MB"
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-software_license_management}
+      POSTGRES_USER: ${POSTGRES_USER:-app}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-app} -d ${POSTGRES_DB:-software_license_management}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - slm-network
+
+  # ----------------------------------------------------------------------------
+  # 2. BACKEND API: NestJS Core
+  # ----------------------------------------------------------------------------
+  api:
+    image: ${API_IMAGE:-ghcr.io/baophipham/slm-api:latest}
+    container_name: slm-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: ${PORT:-3000}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-app}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-software_license_management}
+    expose:
+      - "${PORT:-3000}"
+    networks:
+      - slm-network
+
+  # ----------------------------------------------------------------------------
+  # 3. BACKGROUND WORKER: gửi email outbox (thăm dò PostgreSQL, không dùng Redis/BullMQ — ADR-0012, E2 = A)
+  # ----------------------------------------------------------------------------
+  worker:
+    image: ${API_IMAGE:-ghcr.io/baophipham/slm-api:latest}
+    container_name: slm-worker
+    restart: unless-stopped
+    command: ["node", "dist/worker.js"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-app}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-software_license_management}
+    networks:
+      - slm-network
+
+  # ----------------------------------------------------------------------------
+  # 4. REVERSE PROXY & AUTOMATIC HTTPS: Caddy Web Server
+  # ----------------------------------------------------------------------------
+  caddy:
+    image: caddy:2-alpine
+    container_name: slm-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:-:80}
+      PORT: ${PORT:-3000}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - api
+    networks:
+      - slm-network
+
+volumes:
+  postgres-data:
+  caddy-data:
+  caddy-config:
+
+networks:
+  slm-network:
+    driver: bridge

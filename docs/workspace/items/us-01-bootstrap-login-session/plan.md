@@ -3,6 +3,7 @@
 - [Spec](spec.md); revision thiết kế: Docs `0e0bb83` (`S-2026-10-12b`).
 - Phụ trách: BE Dev A. Thiết kế ban đầu bởi: Owner. Owner review: chưa review cuối. Peer review: review toàn bộ code/spec tùy chọn; review giá trị kỹ thuật `US-01-10` **bắt buộc theo nguồn — `pending`**, chặn `accepted`.
 - Triển khai: `verified` local tại `d60d306` (PR #4 `64073c4`, remediation PR #7/#8 `a0cf5f1`, Task 1B); refactor ở `ab0c43a`. Chưa `accepted`. Xem [báo cáo G0/G1](../../../reviews/g0-g1-remediation-2026-10-15/README.md).
+- Sửa đổi sau triển khai (18/10/2026): `1336bd5` (PR #12) chuyển refresh token từ cookie sang body và bỏ `cookie-parser`, `AUTH_COOKIE_SECURE`. Phần cookie ở bước 1 và bước 6 dưới đây là **lịch sử, superseded**; hợp đồng hiện hành ở [spec — HTTP API](spec.md#http-api). Gate của HEAD `186ad5f` (gồm `1336bd5`) đã chạy xanh trong [báo cáo audit 18/10](../../../reviews/be-foundation-audit-2026-10-18/README.md#11-lệnh-kết-quả-phần-chưa-kiểm-chứng); dev review ADR-0011 vẫn `pending`.
 
 ## Trước khi code
 

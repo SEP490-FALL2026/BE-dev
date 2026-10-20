@@ -1,6 +1,10 @@
-import type { INestApplicationContext, LoggerService } from '@nestjs/common';
+import type { INestApplicationContext } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
-import { EnvironmentValidationError } from './infrastructure/config/env-schema';
+import {
+  isEnvironmentValidationError,
+  quietCliLogger,
+  writeCliFailure as fail,
+} from './infrastructure/cli/cli-runtime';
 import { PasswordPolicyError } from './modules/identity-access/identity-access.errors';
 import { NoTerminalError, PromptCancelledError, readHiddenLine } from './modules/installation/hidden-prompt';
 import {
@@ -8,39 +12,11 @@ import {
   InstallationArgumentError,
   parseInstallationArguments,
 } from './modules/installation/installation.arguments';
-import {
-  AlreadyInstalledError,
-  InstallationInputError,
-  InstallationService,
-} from './modules/installation/installation.service';
+import { AlreadyInstalledError, InstallationInputError } from './modules/installation/installation.errors';
+import { InstallationService } from './modules/installation/installation.service';
 
 /** Exit codes are part of the command's contract (see --help). */
 const EXIT = { installed: 0, failed: 1, alreadyInstalled: 2, cancelled: 130 } as const;
-
-function fail(message: string): number {
-  process.stderr.write(`${message}\n`);
-  return EXIT.failed;
-}
-
-/**
- * Warnings only. The errors Nest would log carry stacks (possibly with connection details), and
- * main() reports every failure itself, by message or by error name.
- */
-const cliLogger: LoggerService = {
-  log: () => undefined,
-  error: () => undefined,
-  warn: (message: unknown) => {
-    process.stderr.write(`warning: ${typeof message === 'string' ? message : 'unexpected warning'}\n`);
-  },
-};
-
-/** The error can come from a second copy of the module graph, so the name is checked as well as the class. */
-function isEnvironmentValidationError(error: unknown): error is Error {
-  return (
-    error instanceof EnvironmentValidationError ||
-    (error instanceof Error && error.name === 'EnvironmentValidationError')
-  );
-}
 
 async function main(): Promise<number> {
   let parsed;
@@ -65,7 +41,7 @@ async function main(): Promise<number> {
     // Nest print a stack and exit, and the logger below drops Nest's own error output for the same reason.
     const { InstallationModule } = await import('./modules/installation/installation.module');
     app = await NestFactory.createApplicationContext(InstallationModule, {
-      logger: cliLogger,
+      logger: quietCliLogger,
       abortOnError: false,
     });
 

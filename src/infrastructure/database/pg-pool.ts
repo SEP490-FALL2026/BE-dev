@@ -45,11 +45,12 @@ export class RetireOnTimeoutClient extends Client {
   private retired = false;
 
   constructor(config?: string | ClientConfig) {
-    super(config);
+    // Refused before pg sees the configuration (INF.1 / F-30): pg itself warns that a custom Promise is deprecated, and
+    // pipelined queries survive end() until they drain while a custom Promise breaks the .then below.
     const options = (typeof config === 'object' ? config : undefined) as
       { pipeline?: unknown; Promise?: unknown } | undefined;
-    // Pipelined queries survive end() until they drain, and a custom Promise breaks the .then below.
     if (options?.pipeline || options?.Promise) throw new UnsupportedQueryFormError();
+    super(config);
 
     const query = super.query.bind(this) as (...args: unknown[]) => unknown;
     // An own property wraps the accepted forms (see the class doc) and refuses the rest.

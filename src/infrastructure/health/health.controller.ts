@@ -31,8 +31,9 @@ export class HealthController {
   ) {}
 
   @Get('live')
-  @ApiOperation({ operationId: 'healthGetLiveness' })
+  @ApiOperation({ operationId: 'healthGetLiveness', summary: 'Check that the process is running' })
   @ApiSuccessResponse(HealthResponseDto, {
+    message: 'HEALTH.LIVENESS_CHECKED',
     description: 'The API process is alive.',
   })
   @ApiErrorResponses({
@@ -45,8 +46,9 @@ export class HealthController {
   }
 
   @Get('ready')
-  @ApiOperation({ operationId: 'healthGetReadiness' })
+  @ApiOperation({ operationId: 'healthGetReadiness', summary: 'Check that the database is reachable' })
   @ApiSuccessResponse(ReadinessResponseDto, {
+    message: 'HEALTH.READINESS_CHECKED',
     description: 'Every required dependency is reachable.',
   })
   @ApiErrorResponses(

@@ -13,7 +13,10 @@ export interface ApiBody {
     /** Login and refresh: the opaque, single-use token for `/auth/refresh` and `/auth/logout`. */
     refreshToken: string;
     tokenType: string;
+    /** Login and refresh: expiry of the access token. */
     expiresAt: string;
+    /** Login and refresh: stored expiry of the refresh token returned in the same response. */
+    refreshExpiresAt: string;
     appUserId: string;
     loginEmail: string;
     /** Account detail: the latest invitation, or null when there is none. */

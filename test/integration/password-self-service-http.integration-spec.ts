@@ -1,7 +1,7 @@
 import { Logger } from '@nestjs/common';
 import { createHash } from 'node:crypto';
 import { TransactionRunner } from '../../src/infrastructure/database/transaction-runner';
-import { PasswordHasher } from '../../src/modules/identity-access/auth/password-hasher.service';
+import { PasswordHasher } from '../../src/modules/identity-access/accounts/password-hasher.service';
 import request from 'supertest';
 import { PayloadCipher } from '../../src/modules/notifications/payload-cipher';
 import { bodyOf } from '../support/api-body';
@@ -224,7 +224,9 @@ describe('password self-service over HTTP (integration, real PostgreSQL)', () =>
       expect(tokens).toHaveLength(3);
       expect(tokens.slice(0, 2).map((token) => token.revoked_reason)).toEqual(['SUPERSEDED', 'SUPERSEDED']);
       expect(tokens[2]).toMatchObject({ revoked_at: null, consumed_at: null, revoked_reason: null });
-      const states = await Promise.all(tokens.map((token) => mailFor(token.token_hash)));
+      // One pg client: queries go one at a time (INF.1 — pg 9 drops queueing on a busy client).
+      const states: Awaited<ReturnType<typeof mailFor>>[] = [];
+      for (const token of tokens) states.push(await mailFor(token.token_hash));
       expect(states.map((rows) => rows.map((row) => row.status))).toEqual([['CANCELLED'], ['CANCELLED'], ['PENDING']]);
     });
 
@@ -236,6 +238,7 @@ describe('password self-service over HTTP (integration, real PostgreSQL)', () =>
 
       const refused = await forgot('nobody@acme.vn', address).expect(429);
       expect(bodyOf(refused).success).toBe(false);
+      expect(bodyOf(refused).error.code).toBe('HTTP_TOO_MANY_REQUESTS');
       // Another address is not affected.
       await forgot('nobody@acme.vn', freshAddress()).expect(202);
     });
@@ -475,11 +478,13 @@ describe('password self-service over HTTP (integration, real PostgreSQL)', () =>
       await request(server())
         .post(`/api/v1/app-users/${account.appUserId}/lock`)
         .set('Authorization', `Bearer ${token}`)
+        .send({ reason: 'Locking revokes the reset link' })
         .expect(200);
       expect(bodyOf(await reset(link).expect(400)).error.code).toBe('AUTH.PASSWORD_RESET_INVALID');
       await request(server())
         .post(`/api/v1/app-users/${account.appUserId}/unlock`)
         .set('Authorization', `Bearer ${token}`)
+        .send({ reason: 'Unlocking must not revive the old link' })
         .expect(200);
 
       expect(bodyOf(await reset(link).expect(400)).error.code).toBe('AUTH.PASSWORD_RESET_INVALID');
@@ -788,6 +793,22 @@ describe('password self-service over HTTP (integration, real PostgreSQL)', () =>
       await request(server()).get('/api/v1/me').set('Authorization', `Bearer ${session.accessToken}`).expect(200);
     });
 
+    it('AUTH.2: lets the policy name a too-long new password up to 1024 characters; beyond that the body is malformed', async () => {
+      const account = await newAccount();
+      const session = await signIn(account.email);
+      const before = await credentialOf(account.appUserId);
+
+      for (const length of [129, 257, 1024]) {
+        const answer = await change(session.accessToken, SEED_PASSWORD, 'x'.repeat(length)).expect(422);
+        expect({ length, code: bodyOf(answer).error.code }).toEqual({ length, code: 'AUTH.PASSWORD_POLICY_VIOLATION' });
+      }
+      const oversize = await change(session.accessToken, SEED_PASSWORD, 'x'.repeat(1025)).expect(422);
+      expect(bodyOf(oversize).error.code).toBe('VALIDATION_ERROR');
+
+      expect(await credentialOf(account.appUserId)).toEqual(before);
+      await request(server()).get('/api/v1/me').set('Authorization', `Bearer ${session.accessToken}`).expect(200);
+    });
+
     it('requires a token, and rejects a malformed body with 422', async () => {
       await request(server()).post('/api/v1/me/password').send({ currentPassword: 'a', newPassword: 'b' }).expect(401);
       const account = await newAccount();
@@ -818,6 +839,7 @@ describe('password self-service over HTTP (integration, real PostgreSQL)', () =>
       await request(server())
         .post(`/api/v1/app-users/${locked.appUserId}/lock`)
         .set('Authorization', `Bearer ${admin.accessToken}`)
+        .send({ reason: 'A locked account must not change its password' })
         .expect(200);
       // Fixture only: the offboarding flow that terminates an employee belongs to G6.
       await ctx.sql.query(`UPDATE employees SET status = 'TERMINATED' WHERE id = $1`, [left.employeeId]);

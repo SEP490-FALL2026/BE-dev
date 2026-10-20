@@ -3,11 +3,8 @@ import { INestApplicationContext } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { TransactionRunner } from '../../src/infrastructure/database/transaction-runner';
 import { AuditService } from '../../src/modules/audit/audit.service';
-import {
-  AlreadyInstalledError,
-  InstallationInputError,
-  InstallationService,
-} from '../../src/modules/installation/installation.service';
+import { AlreadyInstalledError, InstallationInputError } from '../../src/modules/installation/installation.errors';
+import { InstallationService } from '../../src/modules/installation/installation.service';
 import { PasswordPolicyError } from '../../src/modules/identity-access/identity-access.errors';
 import {
   DisposableDatabase,

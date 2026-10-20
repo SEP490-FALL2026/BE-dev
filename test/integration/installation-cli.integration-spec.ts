@@ -1,7 +1,11 @@
-import { spawn } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import {
+  CLI_COLD_START_MS,
+  cliWorkingDirectory,
+  runCli,
+  stopCliProcesses,
+  type CliResult,
+} from '../support/cli-process';
+import { INSTALLATION_USAGE } from '../../src/modules/installation/installation.arguments';
 
 /**
  * R-13: the installation command is an operator tool, so what matters is what an operator sees. These cases
@@ -13,11 +17,8 @@ import { join, resolve } from 'node:path';
  *   (Without `abortOnError: false` Nest would print nothing and exit 1; the case would then fail on the message.)
  * - A rejected DATABASE_URL never echoes the password it contained.
  */
-const PROJECT_ROOT = resolve(__dirname, '..', '..');
-const CLI = join(PROJECT_ROOT, 'src', 'installation-cli.ts');
-const TS_NODE = require.resolve('ts-node/register/transpile-only');
 /** ts-node compiles the whole module graph on a cold cache. */
-const COLD_START_MS = 120000;
+const COLD_START_MS = CLI_COLD_START_MS;
 
 const REQUIRED_ARGUMENTS = [
   ...['--timezone', 'Asia/Ho_Chi_Minh', '--currency', 'VND'],
@@ -32,62 +33,24 @@ const REQUIRED_ARGUMENTS = [
   ...['--operator-reference', 'REVIEW-G0G1-20261014', '--environment', 'LOCAL_TEST'],
 ];
 
-interface CliResult {
-  code: number | null;
-  stdout: string;
-  stderr: string;
-}
-
 describe('installation command (integration, spawned process)', () => {
   let workingDirectory: string;
 
   beforeAll(() => {
     // An empty directory, so no .env file can be picked up from the working directory.
-    workingDirectory = mkdtempSync(join(tmpdir(), 'slm-installation-cli-'));
+    workingDirectory = cliWorkingDirectory('slm-installation-cli');
   });
 
   afterAll(() => {
-    rmSync(workingDirectory, { recursive: true, force: true });
+    stopCliProcesses();
   });
 
   /** Runs the command with a minimal environment and no stdin; the child is killed if it hangs. */
   const run = (args: string[], extraEnvironment: Record<string, string> = {}): Promise<CliResult> =>
-    new Promise((resolveRun, rejectRun) => {
-      const environment: Record<string, string> = {
-        NODE_ENV: 'production',
-        TS_NODE_TRANSPILE_ONLY: 'true',
-        // The working directory is empty, so ts-node must be told where the TypeScript project is.
-        TS_NODE_PROJECT: join(PROJECT_ROOT, 'tsconfig.json'),
-        ...extraEnvironment,
-      };
-      for (const name of ['PATH', 'SystemRoot', 'TEMP', 'TMP']) {
-        const value = process.env[name];
-        if (value !== undefined) environment[name] = value;
-      }
-
-      const child = spawn(process.execPath, ['-r', TS_NODE, CLI, ...args], {
-        cwd: workingDirectory,
-        env: environment,
-        stdio: ['ignore', 'pipe', 'pipe'],
-        windowsHide: true,
-      });
-      let stdout = '';
-      let stderr = '';
-      child.stdout.on('data', (chunk: Buffer) => void (stdout += chunk.toString('utf8')));
-      child.stderr.on('data', (chunk: Buffer) => void (stderr += chunk.toString('utf8')));
-
-      const killer = setTimeout(() => {
-        child.kill('SIGKILL');
-        rejectRun(new Error(`installation command did not finish in time\nstdout: ${stdout}\nstderr: ${stderr}`));
-      }, COLD_START_MS - 10000);
-      child.on('error', (error) => {
-        clearTimeout(killer);
-        rejectRun(error);
-      });
-      child.on('close', (code) => {
-        clearTimeout(killer);
-        resolveRun({ code, stdout, stderr });
-      });
+    runCli('installation-cli.ts', args, {
+      cwd: workingDirectory,
+      environment: { NODE_ENV: 'production', ...extraEnvironment },
+      timeoutMs: COLD_START_MS - 10000,
     });
 
   const stackLines = (text: string): string[] => text.split(/\r?\n/).filter((line) => /^\s+at /.test(line));
@@ -115,6 +78,36 @@ describe('installation command (integration, spawned process)', () => {
       expect(stackLines(result.stderr)).toEqual([]);
       // Validation happens before the prompt: the operator is never asked for a password first.
       expect(result.stdout).not.toContain('Password');
+    },
+    COLD_START_MS,
+  );
+
+  it(
+    'prints exactly the usage for --help, and exactly the reason plus the usage for an unknown option (H6.3/ROOT.1 parity)',
+    async () => {
+      const help = await run(['--help']);
+      const unknown = await run(['--bogus']);
+
+      expect(help).toEqual({ code: 0, stdout: `${INSTALLATION_USAGE}\n`, stderr: '' });
+      expect(unknown).toEqual({ code: 1, stdout: '', stderr: `Unknown option '--bogus'\n\n${INSTALLATION_USAGE}\n` });
+    },
+    COLD_START_MS * 2,
+  );
+
+  it(
+    'reaches the password prompt in development with only a database URL: it never needs the API secrets (E3)',
+    async () => {
+      const result = await run(REQUIRED_ARGUMENTS, {
+        NODE_ENV: 'development',
+        DATABASE_URL: 'postgresql://user:s3cr3t-pw@127.0.0.1:1/x',
+      });
+
+      expect(result).toEqual({
+        code: 1,
+        stdout: 'You are creating the Super Admin account. Choose its password now.\n',
+        stderr:
+          'A password can only be entered at an interactive terminal; it is never taken from arguments, the environment or a pipe.\n',
+      });
     },
     COLD_START_MS,
   );

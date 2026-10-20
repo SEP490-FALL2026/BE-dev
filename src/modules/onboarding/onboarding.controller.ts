@@ -2,7 +2,11 @@ import { Controller, Get, HttpStatus } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
-import { ApiErrorResponses } from '../../infrastructure/http/decorators/api-error-responses.decorator';
+import {
+  ApiErrorResponses,
+  GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
+  UNAUTHENTICATED_RESPONSE,
+} from '../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../infrastructure/http/decorators/api-success-response.decorator';
 import { successEnvelopeSchema } from '../../infrastructure/http/dto/success-envelope.dto';
 import { toUnavailableApiException } from '../../infrastructure/http/errors/service-unavailable';
@@ -56,20 +60,16 @@ export class OnboardingController {
 
   @Get()
   @RequireRoles('IT_ADMIN')
-  @ApiOperation({ operationId: 'onboardingChecklistGet' })
+  @ApiOperation({ operationId: 'onboardingChecklistGet', summary: 'Get the onboarding checklist' })
   @ApiSuccessResponse(OnboardingChecklistResponseDto, {
     message: 'ONBOARDING.CHECKLIST_FETCHED',
     description:
       'The five steps and where each stands, judged from the data that exists. Step 1 says what is missing and which departments lack a head or an IT Admin; steps 2 to 5 are not built yet and say so.',
   })
   @ApiErrorResponses(
-    { status: HttpStatus.UNAUTHORIZED, description: 'Authentication is required or the token is no longer valid.' },
+    UNAUTHENTICATED_RESPONSE,
     { status: HttpStatus.FORBIDDEN, description: 'Only an IT Admin sees the onboarding checklist.' },
-    {
-      status: HttpStatus.SERVICE_UNAVAILABLE,
-      description:
-        'Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).',
-    },
+    GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   )
   async get() {
     try {

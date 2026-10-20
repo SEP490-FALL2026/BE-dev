@@ -4,25 +4,9 @@ import { TransactionRunner } from '../../infrastructure/database/transaction-run
 import { AuditService } from '../audit/audit.service';
 import { IdentityAccessService } from '../identity-access/identity-access.service';
 import { OrganizationService } from '../organization/organization.service';
+import { AlreadyInstalledError, InstallationInputError } from './installation.errors';
 import { InstallationInput, installationInputSchema } from './installation.input';
-
-/** Fixed key so two installers, anywhere, queue on the same lock. */
-const INSTALLATION_ADVISORY_LOCK_KEY = 6_173_204_001;
-
-export class InstallationInputError extends Error {
-  constructor(readonly issues: string[]) {
-    super(`The installation input is not valid:\n - ${issues.join('\n - ')}`);
-    this.name = 'InstallationInputError';
-  }
-}
-
-/** The installation already has an organization. Nothing was changed. */
-export class AlreadyInstalledError extends Error {
-  constructor() {
-    super('This installation already has an organization; nothing was changed.');
-    this.name = 'AlreadyInstalledError';
-  }
-}
+import { InstallationRepo } from './installation.repo';
 
 export interface InstallationResult {
   organizationId: string;
@@ -46,6 +30,7 @@ export class InstallationService {
     private readonly organization: OrganizationService,
     private readonly identity: IdentityAccessService,
     private readonly audit: AuditService,
+    private readonly repo: InstallationRepo,
   ) {}
 
   async install(rawInput: unknown, password: string): Promise<InstallationResult> {
@@ -63,7 +48,7 @@ export class InstallationService {
     const correlationId = randomUUID();
 
     return this.runner.run(async (tx) => {
-      await tx.$executeRaw`SELECT pg_advisory_xact_lock(${INSTALLATION_ADVISORY_LOCK_KEY}::bigint)`;
+      await this.repo.lockInstallation(tx);
       // Read after the lock: a concurrent installer that finished first is visible now.
       if (await this.organization.getOrganization(tx)) throw new AlreadyInstalledError();
 

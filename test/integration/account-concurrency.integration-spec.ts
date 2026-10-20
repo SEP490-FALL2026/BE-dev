@@ -108,6 +108,7 @@ describe('lock protocol: account administration races (integration, real Postgre
     request(server())
       .post(`/api/v1/app-users/${appUserId}/lock`)
       .set(asAdmin())
+      .send({ reason: 'Lock racing the invitation redeem' })
       .then((r) => r);
 
   it('redeem racing a lock: never an activated account with a usable link, never a server error', async () => {

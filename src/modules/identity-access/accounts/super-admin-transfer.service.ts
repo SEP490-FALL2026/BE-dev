@@ -4,18 +4,10 @@ import { TransactionRunner, readSqlState } from '../../../infrastructure/databas
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditService } from '../../audit/audit.service';
 import { OrganizationService } from '../../organization/organization.service';
-import { AccountRepo } from './account.repo';
-import { SuccessorEligibility, SuccessorProblem } from './successor-eligibility';
-
-export type SuperAdminTransferProblem = SuccessorProblem | 'NOT_HOLDER' | 'SUCCESSOR_IS_HOLDER';
-
-/** The transfer cannot happen; nothing was changed and nothing was recorded (US-01-09 AC-3, AC-5). */
-export class SuperAdminTransferRefusedError extends Error {
-  constructor(readonly problem: SuperAdminTransferProblem) {
-    super(`The Super Admin role cannot be transferred: ${problem}.`);
-    this.name = 'SuperAdminTransferRefusedError';
-  }
-}
+import { AccountDirectoryService } from './account-directory.service';
+import { SuperAdminTransferRefusedError } from './account.errors';
+import { RoleGrantService } from './role-grant.service';
+import { SuccessorEligibility } from './successor-eligibility.service';
 
 export interface SuperAdminTransferResult {
   transferId: string;
@@ -31,7 +23,8 @@ export interface SuperAdminTransferResult {
 @Injectable()
 export class SuperAdminTransferService {
   constructor(
-    private readonly accounts: AccountRepo,
+    private readonly accounts: AccountDirectoryService,
+    private readonly grants: RoleGrantService,
     private readonly eligibility: SuccessorEligibility,
     private readonly organization: OrganizationService,
     private readonly audit: AuditService,
@@ -55,15 +48,15 @@ export class SuperAdminTransferService {
       await this.accounts.lockAppUser(tx, first, 'UPDATE');
       await this.accounts.lockAppUser(tx, second, 'UPDATE');
 
-      const holderRoles = await this.accounts.effectiveRoles(actor.appUserId, tx);
+      const holderRoles = await this.grants.effectiveRoles(actor.appUserId, tx);
       if (!holderRoles.includes('SUPER_ADMIN')) throw new SuperAdminTransferRefusedError('NOT_HOLDER');
 
       const problem = await this.eligibility.check(tx, successorAppUserId);
       if (problem) throw new SuperAdminTransferRefusedError(problem);
-      const successorRoles = await this.accounts.effectiveRoles(successorAppUserId, tx);
+      const successorRoles = await this.grants.effectiveRoles(successorAppUserId, tx);
 
       const now = new Date();
-      const revoked = await this.accounts.revokeRole(tx, {
+      const revoked = await this.grants.revokeRole(tx, {
         appUserId: actor.appUserId,
         role: 'SUPER_ADMIN',
         revokedBy: actor.appUserId,
@@ -71,7 +64,7 @@ export class SuperAdminTransferService {
       });
       if (!revoked) throw new SuperAdminTransferRefusedError('NOT_HOLDER');
       try {
-        await this.accounts.grantRole(tx, {
+        await this.grants.grantRole(tx, {
           organizationId: organization.id,
           appUserId: successorAppUserId,
           role: 'SUPER_ADMIN',

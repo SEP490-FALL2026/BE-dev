@@ -5,6 +5,7 @@ import { DatabaseModule } from '../../infrastructure/database/database.module';
 import { MailTransport, SmtpMailTransport } from '../../infrastructure/mail/mail-transport';
 import { EmailDispatcher } from './email-dispatcher.service';
 import { NotificationsRepo } from './notifications.repo';
+import { EmailDeliveryService } from './email-delivery.service';
 import { NotificationsService } from './notifications.service';
 import { PayloadCipher } from './payload-cipher';
 
@@ -27,6 +28,7 @@ function parsePreviousKeys(value: string): Record<string, string> {
   providers: [
     NotificationsRepo,
     NotificationsService,
+    EmailDeliveryService,
     EmailDispatcher,
     { provide: MailTransport, useClass: SmtpMailTransport },
     {
@@ -42,6 +44,7 @@ function parsePreviousKeys(value: string): Record<string, string> {
         }),
     },
   ],
-  exports: [NotificationsService, EmailDispatcher],
+  // The facade for the business modules and the delivery contract for the worker loop; the dispatcher stays private.
+  exports: [NotificationsService, EmailDeliveryService],
 })
 export class NotificationsModule {}

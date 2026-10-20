@@ -92,13 +92,13 @@ describe('RetireOnTimeoutClient', () => {
       expect(events).toEqual(['end', 'hook', 'caller']);
     });
 
-    it('retires once when two queued queries both time out, and each caller gets its own error', async () => {
+    // INF.1 / F-30: one query at a time, as the Prisma adapter sends them; pg deprecates queueing a second query on a
+    // client that is still running one, and nothing in production does.
+    it('retires once when two queries in turn both time out, and each caller gets its own error', async () => {
       const { client, end } = build();
 
-      const [a, b] = await Promise.all([
-        (call(client, 'SELECT 1') as Promise<unknown>).catch((e: unknown) => e),
-        (call(client, 'SELECT 2') as Promise<unknown>).catch((e: unknown) => e),
-      ]);
+      const a = await (call(client, 'SELECT 1') as Promise<unknown>).catch((e: unknown) => e);
+      const b = await (call(client, 'SELECT 2') as Promise<unknown>).catch((e: unknown) => e);
 
       expect((a as Error).message).toBe(TIMEOUT);
       expect((b as Error).message).toBe(TIMEOUT);
@@ -148,11 +148,15 @@ describe('RetireOnTimeoutClient', () => {
       const { client } = build();
       const config = { text: 'SELECT 1' };
 
-      const first = new Promise<unknown>((resolve) => call(client, config, undefined, (e: unknown) => resolve(e)));
-      const second = new Promise<unknown>((resolve) => call(client, config, undefined, (e: unknown) => resolve(e)));
+      const first = await new Promise<unknown>((resolve) =>
+        call(client, config, undefined, (e: unknown) => resolve(e)),
+      );
+      const second = await new Promise<unknown>((resolve) =>
+        call(client, config, undefined, (e: unknown) => resolve(e)),
+      );
 
-      expect(((await first) as Error).message).toBe(TIMEOUT);
-      expect(((await second) as Error).message).toBe(TIMEOUT);
+      expect((first as Error).message).toBe(TIMEOUT);
+      expect((second as Error).message).toBe(TIMEOUT);
       expect(config).toEqual({ text: 'SELECT 1' });
     });
 

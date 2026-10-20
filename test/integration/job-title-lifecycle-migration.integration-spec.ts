@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { Client } from 'pg';
-import { normalizeJobTitleName } from '../../src/modules/organization/job-title-name';
+import { normalizeJobTitleName } from '../../src/modules/organization/job-title/job-title-name';
 import {
   DisposableDatabase,
   dropDisposableDatabase,

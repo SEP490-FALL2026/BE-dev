@@ -1,0 +1,322 @@
+import type { DbTx, TransactionRunner } from '../../src/infrastructure/database/transaction-runner';
+import type { AuthenticatedPrincipal } from '../../src/infrastructure/security/tokens/access-token-verifier.port';
+import type { AuditService } from '../../src/modules/audit/audit.service';
+import type { OrganizationService } from '../../src/modules/organization/organization.service';
+import type { EmployeeImportLookupData } from '../../src/modules/organization/organization.types';
+import type {
+  EmployeeImportRepo,
+  ImportRecord,
+  StoredRow,
+} from '../../src/modules/data-import/employee-import/employee-import.repo';
+import { EmployeeImportService } from '../../src/modules/data-import/employee-import/employee-import.service';
+
+/*
+ * The shared harness of the people import use-case specs (H8 Phase 0 characterization, split by use case in Prompt 21A):
+ * what the service asks of its collaborators, in which transaction and in which order, and what it writes and records.
+ * The collaborators are in-memory stand-ins at the boundary (repository, organization facade, audit, transaction
+ * runner); the row rules and the CSV reader are real. Only construction lives here; the assertions stay in the specs
+ * `src/modules/data-import/employee-import/employee-import-{upload,preview-lifecycle,confirm}.spec.ts`.
+ */
+
+/** The fixed clock of every case: the specs install it with `jest.useFakeTimers(FAKE_CLOCK)`. */
+export const NOW = new Date('2026-10-19T03:00:00.000Z');
+export const FAKE_CLOCK: Parameters<typeof jest.useFakeTimers>[0] = {
+  now: NOW,
+  doNotFake: ['nextTick', 'setImmediate', 'queueMicrotask'],
+};
+export const TODAY = '2026-10-19';
+export const ACTOR: AuthenticatedPrincipal = {
+  subject: 'u-it',
+  appUserId: 'u-it',
+  sessionId: 'session-1',
+  employeeId: 'e-it',
+  directRoles: ['IT_ADMIN'],
+  derivedRoles: [],
+  roles: ['IT_ADMIN'],
+};
+
+export interface Department {
+  id: string;
+  code: string;
+  name: string;
+  active: boolean;
+  costCenterActive: boolean;
+  headed: boolean;
+}
+
+export interface Directory {
+  departments: Department[];
+  jobTitles: EmployeeImportLookupData['jobTitles'];
+  employees: EmployeeImportLookupData['employees'];
+}
+
+export function directory(): Directory {
+  return {
+    departments: [
+      { id: 'd-ops', code: 'P-OPS', name: 'Operations', active: true, costCenterActive: true, headed: true },
+      { id: 'd-des', code: 'P-DES', name: 'Design', active: true, costCenterActive: true, headed: false },
+    ],
+    jobTitles: [
+      { id: 'j-adm', name: 'Administrator', normalizedName: 'administrator', status: 'ACTIVE' },
+      { id: 'j-des', name: 'Designer', normalizedName: 'designer', status: 'ACTIVE' },
+    ],
+    employees: [
+      {
+        id: 'e-1',
+        employeeCode: 'E-001',
+        fullName: 'An Nguyen',
+        workEmail: 'an@acme.vn',
+        employmentType: 'STAFF',
+        hireDate: '2026-01-05',
+        departmentCode: 'P-OPS',
+        jobTitleName: 'Administrator',
+      },
+      {
+        id: 'e-2',
+        employeeCode: 'E-002',
+        fullName: 'Hoa Vo',
+        workEmail: 'hoa@acme.vn',
+        employmentType: 'STAFF',
+        hireDate: '2026-02-01',
+        departmentCode: 'P-OPS',
+        jobTitleName: 'Administrator',
+      },
+    ],
+  };
+}
+
+/** Line 2 and 3 are new people, 4 is a person already there and the same, 5 differs, 6 is wrong in three columns. */
+export const FILE = [
+  'employee_code,full_name,work_email,employment_type,hire_date,department_code,job_title,notes',
+  'N-1,Binh Tran,Binh@Acme.vn,STAFF,2026-10-01,P-OPS,Administrator,first',
+  'N-2,Chi Le,,intern,2026-10-02,P-DES,  designer ,',
+  'E-001,An Nguyen,an@acme.vn,STAFF,2026-01-05,P-OPS,Administrator,',
+  'E-002,Hoa Vo Thi,hoa@acme.vn,STAFF,2026-02-01,P-OPS,Administrator,',
+  'N-3,Dung Pham,dung@acme.vn,STAFF,not-a-date,P-NOPE,Unknown,',
+].join('\n');
+
+export function harness(start: Directory = directory()) {
+  const dir = start;
+  const calls: string[] = [];
+  const TX = { name: 'the transaction' } as unknown as DbTx;
+  const where = (tx: unknown) => (tx === undefined ? '' : tx === TX ? 'tx' : 'OTHER');
+  const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
+  const imports = new Map<string, ImportRecord>();
+  const storedRows = new Map<string, StoredRow[]>();
+  const created: unknown[] = [];
+  const audits: unknown[] = [];
+  const lookups: unknown[] = [];
+  const locks: unknown[] = [];
+  let sequence = 0;
+  let organization: { id: string } | null = { id: 'org-1' };
+  let failCreate: ((code: string) => Error | undefined) | undefined;
+  let beforeLock: ((record: ImportRecord) => void) | undefined;
+  const revive = (record: ImportRecord): ImportRecord => ({
+    ...clone(record),
+    createdAt: record.createdAt,
+    expiresAt: record.expiresAt,
+    confirmedAt: record.confirmedAt,
+    cancelledAt: record.cancelledAt,
+  });
+
+  const repo = {
+    create(tx: DbTx, input: Parameters<EmployeeImportRepo['create']>[1]) {
+      calls.push(`repo.create(${where(tx)})`);
+      sequence += 1;
+      const id = `import-${sequence}`;
+      imports.set(id, {
+        id,
+        organizationId: input.organizationId,
+        uploadedBy: input.uploadedBy,
+        fileName: input.fileName,
+        contentHash: input.contentHash,
+        status: 'PREVIEW',
+        previewVersion: 1,
+        ignoredColumns: [...input.ignoredColumns],
+        summary: clone(input.summary),
+        result: null,
+        confirmKey: null,
+        createdAt: new Date(NOW),
+        expiresAt: input.expiresAt,
+        confirmedAt: null,
+        cancelledAt: null,
+      });
+      storedRows.set(id, clone(input.rows));
+      return Promise.resolve(id);
+    },
+    find(id: string, tx?: DbTx) {
+      calls.push(`repo.find(${where(tx)})`);
+      const record = imports.get(id);
+      return Promise.resolve(record ? revive(record) : null);
+    },
+    lock(tx: DbTx, id: string) {
+      calls.push(`repo.lock(${where(tx)})`);
+      const record = imports.get(id);
+      if (record && beforeLock) beforeLock(record);
+      return Promise.resolve(record ? revive(record) : null);
+    },
+    rows(tx: DbTx | undefined, id: string) {
+      calls.push(`repo.rows(${where(tx)})`);
+      return Promise.resolve(clone(storedRows.get(id) ?? []));
+    },
+    page(id: string, filter: { outcome?: string; skip: number; take: number }) {
+      calls.push(`repo.page(${JSON.stringify(filter)})`);
+      const all = (storedRows.get(id) ?? []).filter((row) => !filter.outcome || row.outcome === filter.outcome);
+      return Promise.resolve({ items: clone(all.slice(filter.skip, filter.skip + filter.take)), total: all.length });
+    },
+    replacePreview(tx: DbTx, id: string, input: { rows: StoredRow[]; summary: unknown; expiresAt: Date }) {
+      calls.push(`repo.replacePreview(${where(tx)})`);
+      const record = imports.get(id) as ImportRecord;
+      record.previewVersion += 1;
+      record.summary = clone(input.summary);
+      record.expiresAt = input.expiresAt;
+      storedRows.set(id, clone(input.rows));
+      return Promise.resolve(record.previewVersion);
+    },
+    markCompleted(tx: DbTx, id: string, input: { result: unknown; confirmKey: string; now: Date }) {
+      calls.push(`repo.markCompleted(${where(tx)})`);
+      const record = imports.get(id) as ImportRecord;
+      Object.assign(record, {
+        status: 'COMPLETED',
+        result: clone(input.result),
+        confirmKey: input.confirmKey,
+        confirmedAt: input.now,
+      });
+      return Promise.resolve();
+    },
+    markCancelled(tx: DbTx, id: string, now: Date) {
+      calls.push(`repo.markCancelled(${where(tx)}, ${now.toISOString()})`);
+      Object.assign(imports.get(id) as ImportRecord, { status: 'CANCELLED', cancelledAt: now });
+      return Promise.resolve();
+    },
+    findLatestKept(organizationId: string) {
+      calls.push(`repo.findLatestKept(${organizationId})`);
+      return Promise.resolve({ id: 'import-9', status: 'PREVIEW' as const, errorRows: 3, createdAt: NOW });
+    },
+    findCompletedWithContent(organizationId: string, contentHash: string, client?: DbTx) {
+      calls.push(`repo.findCompletedWithContent(${where(client)})`);
+      const done = [...imports.values()]
+        .filter((record) => record.organizationId === organizationId && record.contentHash === contentHash)
+        .filter((record) => record.status === 'COMPLETED' && record.confirmedAt !== null);
+      const latest = done.at(-1);
+      return Promise.resolve(
+        latest ? { id: latest.id, fileName: latest.fileName, confirmedAt: latest.confirmedAt as Date } : null,
+      );
+    },
+  };
+
+  const org = {
+    getOrganization() {
+      calls.push('org.getOrganization');
+      return Promise.resolve(organization);
+    },
+    lookupForEmployeeImport(names: Parameters<OrganizationService['lookupForEmployeeImport']>[0], tx?: DbTx) {
+      calls.push(`org.lookupForEmployeeImport(${where(tx)})`);
+      lookups.push(clone(names));
+      const data: EmployeeImportLookupData = {
+        departments: dir.departments
+          .filter((department) => names.departmentCodes.includes(department.code))
+          .map(({ id, code, active, costCenterActive }) => ({ id, code, active, costCenterActive })),
+        jobTitles: dir.jobTitles.filter((title) => names.normalizedJobTitleNames.includes(title.normalizedName)),
+        employees: dir.employees.filter((employee) => names.employeeCodes.includes(employee.employeeCode)),
+        emailOwners: dir.employees
+          .filter((employee) => employee.workEmail && names.normalizedEmails.includes(employee.workEmail))
+          .map((employee) => ({ normalizedEmail: employee.workEmail as string, employeeCode: employee.employeeCode })),
+      };
+      return Promise.resolve(data);
+    },
+    lockForEmployeeImport(tx: DbTx, departmentIds: string[], jobTitleIds: string[]) {
+      calls.push(`org.lockForEmployeeImport(${where(tx)})`);
+      locks.push({ departmentIds, jobTitleIds });
+      return Promise.resolve();
+    },
+    businessToday() {
+      calls.push('org.businessToday');
+      return Promise.resolve(TODAY);
+    },
+    createEmployeeWithPlacement(tx: DbTx, input: { employeeCode: string }) {
+      calls.push(`org.createEmployeeWithPlacement(${where(tx)}, ${input.employeeCode})`);
+      const failure = failCreate?.(input.employeeCode);
+      if (failure) return Promise.reject(failure);
+      created.push(input);
+      return Promise.resolve({ id: `new-${input.employeeCode}` });
+    },
+    departmentsWithoutHead(ids: string[]) {
+      calls.push(`org.departmentsWithoutHead(${ids.join(',')})`);
+      return Promise.resolve(
+        dir.departments
+          .filter((department) => ids.includes(department.id) && !department.headed)
+          .map(({ id, code, name }) => ({ id, code, name })),
+      );
+    },
+  };
+
+  const audit = {
+    record(tx: DbTx, event: unknown) {
+      calls.push(`audit.record(${where(tx)})`);
+      audits.push(clone(event));
+      return Promise.resolve();
+    },
+  };
+
+  const runner = {
+    async run<T>(work: (tx: DbTx) => Promise<T>): Promise<T> {
+      calls.push('BEGIN');
+      try {
+        const result = await work(TX);
+        calls.push('COMMIT');
+        return result;
+      } catch (error) {
+        calls.push('ROLLBACK');
+        throw error;
+      }
+    },
+  };
+
+  const service = new EmployeeImportService(
+    repo as unknown as EmployeeImportRepo,
+    org as unknown as OrganizationService,
+    audit as unknown as AuditService,
+    runner as unknown as TransactionRunner,
+  );
+
+  return {
+    service,
+    dir,
+    calls,
+    imports,
+    storedRows,
+    created,
+    audits,
+    lookups,
+    locks,
+    reset() {
+      calls.length = 0;
+      created.length = 0;
+      audits.length = 0;
+      lookups.length = 0;
+      locks.length = 0;
+    },
+    withoutOrganization() {
+      organization = null;
+    },
+    failCreateWith(fail: (code: string) => Error | undefined) {
+      failCreate = fail;
+    },
+    onLock(change: (record: ImportRecord) => void) {
+      beforeLock = change;
+    },
+  };
+}
+
+export type ImportHarness = ReturnType<typeof harness>;
+
+export const upload = (h: ImportHarness, text: string | Buffer, fileName = 'people.csv') =>
+  h.service.upload(ACTOR, { fileName, bytes: typeof text === 'string' ? Buffer.from(text, 'utf8') : text });
+
+export const confirmBody = (overrides: Partial<{ previewVersion: number; idempotencyKey: string }> = {}) => ({
+  previewVersion: 1,
+  idempotencyKey: 'key-00000001',
+  acknowledgeDuplicateFile: false,
+  ...overrides,
+});

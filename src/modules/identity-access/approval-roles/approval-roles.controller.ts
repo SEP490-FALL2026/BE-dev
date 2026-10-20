@@ -1,22 +1,22 @@
 import { Body, Controller, Get, HttpStatus, Param, Put } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import { ApiErrorResponses } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
+import {
+  ApiErrorResponses,
+  GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
+  UNAUTHENTICATED_RESPONSE,
+} from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
 import { RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
 import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { ApprovalRoleParamDto, ApprovalRolesResponseDto, SetApprovalRoleBodyDto } from '../dto/approval-role.dto';
-import { toApprovalRoleApiException } from './approval-role.errors';
+import { ApprovalRoleParamDto, ApprovalRolesResponseDto, SetApprovalRoleBodyDto } from './approval-role.dto';
+import { toApprovalRoleApiException } from './approval-role.http-errors';
 import { ApprovalRoleService, ApprovalRoleView } from './approval-role.service';
 
 const COMMON_ERRORS = [
-  { status: HttpStatus.UNAUTHORIZED, description: 'Authentication is required or the token is no longer valid.' },
-  { status: HttpStatus.FORBIDDEN, description: 'Only the Super Admin configures the approval roles (US-01-03 AC-4).' },
-  {
-    status: HttpStatus.SERVICE_UNAVAILABLE,
-    description:
-      'Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).',
-  },
+  UNAUTHENTICATED_RESPONSE,
+  { status: HttpStatus.FORBIDDEN, description: 'Only the Super Admin configures the approval roles.' },
+  GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
 ] as const;
 
 function toWire(views: ApprovalRoleView[]) {
@@ -47,7 +47,7 @@ export class ApprovalRolesController {
 
   @Get()
   @RequireRoles('SUPER_ADMIN')
-  @ApiOperation({ operationId: 'approvalRoleList' })
+  @ApiOperation({ operationId: 'approvalRoleList', summary: 'List the approval role holders' })
   @ApiSuccessResponse(ApprovalRolesResponseDto, {
     message: 'APPROVAL_ROLE.LISTED',
     description: 'The three approval roles, who holds each now (or nobody) and who held it before.',
@@ -63,7 +63,7 @@ export class ApprovalRolesController {
 
   @Put(':role')
   @RequireRoles('SUPER_ADMIN')
-  @ApiOperation({ operationId: 'approvalRoleSet' })
+  @ApiOperation({ operationId: 'approvalRoleSet', summary: 'Set the holder of an approval role' })
   @ApiSuccessResponse(ApprovalRolesResponseDto, {
     message: 'APPROVAL_ROLE.SET',
     description:

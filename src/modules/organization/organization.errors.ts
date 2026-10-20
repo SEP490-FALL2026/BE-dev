@@ -6,5 +6,26 @@ export class EmployeeNotFoundError extends Error {
   }
 }
 
-// Thrown by the facade when a person's code or work email is already taken; callers outside the module catch them here.
-export { EmployeeCodeTakenError, EmployeeEmailTakenError } from './errors/organization.errors';
+/** Thrown by the facade when a person's code is already taken; callers outside the module catch it. */
+export class EmployeeCodeTakenError extends Error {
+  constructor(readonly employeeCode: string) {
+    super(`Employee code already exists: ${employeeCode}`);
+    this.name = 'EmployeeCodeTakenError';
+  }
+}
+
+/** Thrown by the facade when a person's work email is already taken. */
+export class EmployeeEmailTakenError extends Error {
+  constructor() {
+    super('The work email is already used by another employee.');
+    this.name = 'EmployeeEmailTakenError';
+  }
+}
+
+/** Thrown by the facade when a second organization would be created: the installation has exactly one (I-8). */
+export class OrganizationAlreadyExistsError extends Error {
+  constructor() {
+    super('An organization already exists for this installation.');
+    this.name = 'OrganizationAlreadyExistsError';
+  }
+}

@@ -3,6 +3,7 @@
 - Phụ trách: chưa phân công; reviewer: chưa phân công (một dev khác, ngang quyền).
 - Thiết kế: **draft**, cập nhật sau [review spike và finalization](../../../reviews/dynamic-content-translation-2026-10-15/README.md). Review: chưa có dev review. Kết quả review của AI không thay xác nhận của dev.
 - Loại hạng mục: technical enabler gắn lát G5. **Chưa** đưa module, `env-schema`, migration hay route dịch vào product.
+- **Stale — trùng số — chờ thẩm quyền (18/10/2026):** mã đề xuất "`QĐ-74`" và `QĐ-74a`–`i` trong hạng mục này là đề xuất cũ, **chưa** từng vào sổ quyết định. Sổ Docs nay dùng `QĐ-74` cho phương pháp thu thập usage (16/10/2026). Đọc mọi chỗ ghi `QĐ-74` ở đây là _đề xuất dịch EN↔VI chưa có số_; không cấp số mới, không coi là Accepted; evidence giữ nguyên. **E-2 = B, Owner 18/10/2026:** giữ `draft`, không giao implement, không cấp số mới trong repo BE; hạng mục bị chặn implement tới khi một quyết định Docs có thẩm quyền cấp số hợp lệ và giải quyết quan hệ với `QĐ-69`/`QĐ-78`. Research và evidence giữ nguyên ([remediation](../baseline-impact-and-remediation-2026-10-17/spec.md)).
 - Nguồn:
   - Docs working tree, chưa pin snapshot: BRD v3.39 (6.4, 7.7.2 dòng 5, 7.7.5), US `US-05-02`, `US-05-04` (cờ ngoài bộ chuẩn ở AC-7).
   - BE ADR-0001, ADR-0002, ADR-0004, [API contract](../../../rules/api-contract.md).

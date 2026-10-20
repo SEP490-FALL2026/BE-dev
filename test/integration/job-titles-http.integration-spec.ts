@@ -307,6 +307,11 @@ describe('job title catalogue over HTTP (integration, real PostgreSQL)', () => {
         'JOB_TITLE.REACTIVATED',
       ]);
       expect(events[1]).toMatchObject({ before: { status: 'ACTIVE' }, after: { status: 'INACTIVE' } });
+      expect(events[2]).toMatchObject({
+        actor_app_user_id: it1.appUserId,
+        before: { status: 'INACTIVE' },
+        after: { status: 'ACTIVE' },
+      });
       expect((await rowOf(title.id)).version).toBe(3);
     });
 

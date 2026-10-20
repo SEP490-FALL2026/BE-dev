@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve, sep } from 'node:path';
+import * as ts from 'typescript';
 import { environmentConfigOptions, installationEnvironmentConfigOptions } from './infrastructure/config/env-config';
 import { validateEnvironment, validateInstallationEnvironment } from './infrastructure/config/env-schema';
 
@@ -75,7 +76,8 @@ describe('architecture boundaries', () => {
   const sourceRoot = join(process.cwd(), 'src');
 
   it('keeps core framework-free', () => {
-    const forbidden = ['@nestjs/', '@prisma/', '@aws-sdk/', 'bullmq', '/infrastructure/'];
+    // `/modules/` added 18/10/2026 (docs/rules/module-structure.md): core is pure TypeScript and knows no business module.
+    const forbidden = ['@nestjs/', '@prisma/', '@aws-sdk/', 'bullmq', '/infrastructure/', '/modules/'];
 
     for (const file of listTypeScriptFiles(join(sourceRoot, 'core'))) {
       const source = readFileSync(file, 'utf8').replaceAll('\\', '/');
@@ -89,18 +91,11 @@ describe('architecture boundaries', () => {
     }
   });
 
-  it('prevents imports of another business module private layers', () => {
-    const modulesRoot = join(sourceRoot, 'modules');
+  it('prevents imports of another business module private files', () => {
+    const findings = privateModuleImportFindings(sourceRoot, listTypeScriptFiles(join(sourceRoot, 'modules')));
+    const ledger = [...LEGACY_PRIVATE_MODULE_IMPORTS].filter((entry) => entry.startsWith('modules/'));
 
-    for (const file of listTypeScriptFiles(modulesRoot)) {
-      const violations = listResolvedRelativeImports(file).flatMap((target) =>
-        privateModuleImport(sourceRoot, file, target),
-      );
-      expect({ file: relative(sourceRoot, file), violations }).toEqual({
-        file: relative(sourceRoot, file),
-        violations: [],
-      });
-    }
+    expect(againstLedger(findings, ledger)).toEqual({ newViolations: [], staleLedgerEntries: [] });
   });
 
   it('holds the composition roots (API, worker, CLI entry files) to the same public module contract', () => {
@@ -109,15 +104,14 @@ describe('architecture boundaries', () => {
       .filter((path) => statSync(path).isFile() && path.endsWith('.ts') && !path.endsWith('.spec.ts'));
     expect(rootFiles).toContain(join(sourceRoot, 'installation-cli.ts'));
 
-    for (const file of rootFiles) {
-      const violations = listResolvedRelativeImports(file).flatMap((target) =>
-        privateModuleImport(sourceRoot, file, target),
-      );
-      expect({ file: relative(sourceRoot, file), violations }).toEqual({
-        file: relative(sourceRoot, file),
-        violations: [],
-      });
-    }
+    const findings = privateModuleImportFindings(sourceRoot, rootFiles);
+    const ledger = [...LEGACY_PRIVATE_MODULE_IMPORTS].filter((entry) => !entry.startsWith('modules/'));
+
+    expect(againstLedger(findings, ledger)).toEqual({ newViolations: [], staleLedgerEntries: [] });
+  });
+
+  it('reports the ledger differences in both directions', () => {
+    expect(againstLedger(['a', 'b'], ['b', 'c'])).toEqual({ newViolations: ['a'], staleLedgerEntries: ['c'] });
   });
 
   it('reports an import of a module subfolder such as identity-access/errors as private', () => {
@@ -128,6 +122,71 @@ describe('architecture boundaries', () => {
     expect(privateModuleImport(sourceRoot, cli, join(identity, 'auth', 'password-hasher.service.ts'))).toHaveLength(1);
     expect(privateModuleImport(sourceRoot, cli, join(identity, 'identity-access.errors.ts'))).toEqual([]);
     expect(privateModuleImport(sourceRoot, cli, join(identity, 'identity-access.service.ts'))).toEqual([]);
+  });
+
+  describe('A4-02: the public surface of a module is an allowlist, not its whole root', () => {
+    const identity = join(sourceRoot, 'modules', 'identity-access');
+    const otherModule = join(sourceRoot, 'modules', 'organization', 'department', 'department.service.ts');
+    const compositionRoot = join(sourceRoot, 'recovery-cli.ts');
+
+    it('blocks an arbitrary file at the root of another module', () => {
+      expect(privateModuleImport(sourceRoot, otherModule, join(identity, 'session-helper.ts'))).toHaveLength(1);
+      expect(
+        privateModuleImport(
+          sourceRoot,
+          otherModule,
+          join(sourceRoot, 'modules', 'data-import', 'employee-import', 'employee-import.service.ts'),
+        ),
+      ).toHaveLength(1);
+    });
+
+    it('allows each public pattern: module, HTTP and facade modules, facade service, types and public errors', () => {
+      for (const file of [
+        'identity-access.module.ts',
+        'identity-access-http.module.ts',
+        'identity-access-facade.module.ts',
+        'identity-access.service.ts',
+        'session.types.ts',
+        'identity-access.errors.ts',
+      ]) {
+        expect({ file, violations: privateModuleImport(sourceRoot, otherModule, join(identity, file)) }).toEqual({
+          file,
+          violations: [],
+        });
+      }
+    });
+
+    it('keeps repositories, the credential hasher and capability files private', () => {
+      for (const target of [
+        join(identity, 'recovery', 'recovery.repo.ts'),
+        join(identity, 'accounts', 'password-hasher.service.ts'),
+        join(identity, 'accounts', 'account-invitation.service.ts'),
+        join(identity, 'auth', 'session.types.ts'),
+      ]) {
+        expect(privateModuleImport(sourceRoot, otherModule, target)).toHaveLength(1);
+      }
+    });
+
+    it('opens the listed CLI entry files to composition roots only', () => {
+      const entry = join(identity, 'recovery', 'holder-recovery.service.ts');
+
+      expect(privateModuleImport(sourceRoot, compositionRoot, entry)).toEqual([]);
+      expect(privateModuleImport(sourceRoot, otherModule, entry)).toHaveLength(1);
+      expect(
+        privateModuleImport(sourceRoot, compositionRoot, join(identity, 'recovery', 'recovery.repo.ts')),
+      ).toHaveLength(1);
+    });
+
+    it('gives the same answer for Windows and POSIX separators', () => {
+      const posix = (path: string) => path.split(sep).join('/');
+
+      expect(privateModuleImport(sourceRoot, posix(otherModule), posix(join(identity, 'session-helper.ts')))).toEqual(
+        privateModuleImport(sourceRoot, otherModule, join(identity, 'session-helper.ts')),
+      );
+      expect(
+        privateModuleImport(sourceRoot, posix(otherModule), posix(join(identity, 'identity-access.service.ts'))),
+      ).toEqual([]);
+    });
   });
 
   it('keeps business modules flat instead of recreating application layers', () => {
@@ -238,10 +297,89 @@ function resolveRelativeImport(file: string, specifier: string): string {
 }
 
 /**
+ * Module files a composition root (a file directly in src/) may import besides the public surface: the CLI entry files
+ * kept at the module root (docs/rules/module-structure.md, Owner Q6). Not open to other business modules.
+ */
+const CLI_ENTRY_FILES: ReadonlySet<string> = new Set([
+  'modules/identity-access/recovery.module.ts',
+  // E7 (H5.7): the recovery implementation lives in recovery/; the command reaches exactly its two entry services,
+  // its arguments, errors and result types.
+  'modules/identity-access/recovery/holder-recovery.service.ts',
+  'modules/identity-access/recovery/recovery.arguments.ts',
+  'modules/identity-access/recovery/recovery.errors.ts',
+  'modules/identity-access/recovery/recovery.types.ts',
+  'modules/identity-access/recovery/role-transfer-recovery.service.ts',
+  'modules/installation/hidden-prompt.ts',
+  'modules/installation/installation.arguments.ts',
+  // H6.1 (E8 = A): `pnpm ops:inspect` reaches its graph, its service, its arguments and its report.
+  'modules/installation/inspect/inspection-report.ts',
+  'modules/installation/inspect/inspection.arguments.ts',
+  'modules/installation/inspect/inspection.module.ts',
+  'modules/installation/inspect/inspection.service.ts',
+  // H6.2 (E8 = A): `pnpm dev:seed` reaches its graph, its service, its arguments and its report.
+  'modules/installation/dev-seed/dev-seed-report.ts',
+  'modules/installation/dev-seed/dev-seed.arguments.ts',
+  'modules/installation/dev-seed/dev-seed.module.ts',
+  'modules/installation/dev-seed/dev-seed.service.ts',
+]);
+
+/**
+ * Cross-module imports of a non-public file that existed when GATE.1 (19/10/2026, Owner decision E9 = A) replaced "any
+ * root file is public" with the allowlist (A4-02 of docs/reviews/be-full-src-architecture-audit-2026-10-19). Each
+ * entry names the slice of that report that removes it. Entries are only removed; a stale entry fails like a new
+ * violation, and adding one needs Owner/dev review.
+ */
+// Empty since ROOT.1. H8.3 removed the onboarding -> employee-import.service.ts entry (A4-10); ROOT.1 removed
+// email-dispatch.loop.ts -> modules/notifications/email-dispatcher.service.ts (the loop reads EmailDeliveryService).
+const LEGACY_PRIVATE_MODULE_IMPORTS: ReadonlySet<string> = new Set<string>();
+
+/**
+ * ROOT-HARDEN.1: the root files that hold one public injectable contract besides the facade `<module>.service.ts`,
+ * listed exactly (no suffix or wildcard rule; a new one needs Owner/dev review and a real consumer outside the module).
+ */
+const PUBLIC_ROOT_CONTRACT_FILES: ReadonlySet<string> = new Set([
+  // The worker mail loop (email-dispatch.loop.ts) reads the delivery contract; the dispatcher stays private.
+  'notifications/email-delivery.service.ts',
+  // ops:inspect (installation/inspect) reads the account side of the inspection.
+  'identity-access/identity-access-inspection.service.ts',
+  // dev:seed (installation/dev-seed) writes the local demo accounts.
+  'identity-access/local-demo-account.service.ts',
+]);
+
+/**
+ * BEH.1: the root files that hold one pure business policy another module shares, listed exactly (no `*.policy.ts`
+ * rule). src/policy-ownership.spec.ts owns the consumers and the purity of each, and checks this list against its own.
+ */
+const PUBLIC_ROOT_POLICY_FILES: ReadonlySet<string> = new Set([
+  // Manual entry and the import preview (data-import) share whether a department and a job title can take a person in.
+  'organization/employee-placement.policy.ts',
+]);
+
+/**
+ * The public surface of a business module, as path segments below src/modules: only these files directly in the
+ * module root — the Nest modules, the facade service, public types and public errors. Anything else in the root, a
+ * repo, the credential hasher and every subfolder file is private. Kept in step with `isModuleRootPublicSurface` of
+ * architecture-structure.spec.ts.
+ */
+function isModulePublicSurface(parts: string[]): boolean {
+  if (parts.length !== 2) return false;
+  const [moduleName, fileName] = parts;
+  if (PUBLIC_ROOT_CONTRACT_FILES.has(parts.join('/')) || PUBLIC_ROOT_POLICY_FILES.has(parts.join('/'))) return true;
+
+  return (
+    fileName === `${moduleName}.module.ts` ||
+    fileName.endsWith('-http.module.ts') ||
+    fileName.endsWith('-facade.module.ts') ||
+    fileName === `${moduleName}.service.ts` ||
+    fileName.endsWith('.types.ts') ||
+    fileName.endsWith('.errors.ts')
+  );
+}
+
+/**
  * Resolved from the real import graph, not from folder names: code outside a business module (another
- * module or a composition root in src/) may import only a file directly in that module's root (facade
- * service, module, types, public errors), never a subfolder file, a repo or the credential hasher.
- * Returns a description of the violation, or nothing.
+ * module or a composition root in src/) may import only the module's public surface (allowlist above);
+ * a composition root may also import the listed CLI entry files. Returns the private target, or nothing.
  */
 function privateModuleImport(sourceRoot: string, importer: string, target: string): string[] {
   const modulesRoot = join(sourceRoot, 'modules');
@@ -250,9 +388,33 @@ function privateModuleImport(sourceRoot: string, importer: string, target: strin
   const importerParts = relative(modulesRoot, importer).split(sep);
   if (importerParts[0] !== '..' && importerParts[0] === parts[0]) return [];
 
-  const isPublic = parts.length === 2 && !target.endsWith('.repo.ts') && !target.endsWith('password-hasher.service.ts');
+  const targetPath = relative(sourceRoot, target).split(sep).join('/');
+  const isCompositionRoot = relative(sourceRoot, importer).split(sep).length === 1;
+  const isPublic = isModulePublicSurface(parts) || (isCompositionRoot && CLI_ENTRY_FILES.has(targetPath));
 
-  return isPublic ? [] : [relative(sourceRoot, target).split(sep).join('/')];
+  return isPublic ? [] : [targetPath];
+}
+
+/** `importer -> target` for every private cross-module import made by `files`, paths relative to src/. */
+function privateModuleImportFindings(sourceRoot: string, files: string[]): string[] {
+  return files.flatMap((file) =>
+    listResolvedRelativeImports(file).flatMap((target) =>
+      privateModuleImport(sourceRoot, file, target).map(
+        (privateTarget) => `${relative(sourceRoot, file).split(sep).join('/')} -> ${privateTarget}`,
+      ),
+    ),
+  );
+}
+
+/** New findings and stale ledger entries, so a failure names exactly what to fix. */
+function againstLedger(findings: string[], ledger: Iterable<string>) {
+  const found = new Set(findings);
+  const legacy = new Set(ledger);
+
+  return {
+    newViolations: [...found].filter((finding) => !legacy.has(finding)).sort(),
+    staleLedgerEntries: [...legacy].filter((entry) => !found.has(entry)).sort(),
+  };
 }
 
 function listResolvedRelativeImports(file: string): string[] {
@@ -333,5 +495,129 @@ describe('installation command dependency boundary (R-13)', () => {
         importsInstallationConfiguration: false,
       });
     }
+  });
+});
+
+/**
+ * ROOT-HARDEN.1: one public injectable contract per file. Every non-spec source file under src/modules exports at most
+ * one `@Injectable` class (private helper classes, interfaces and functions stay allowed). Read with the TypeScript
+ * parser: a comment or a string naming a decorator does not count.
+ */
+function exportedInjectables(file: string, source: string): string[] {
+  const parsed = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+  return parsed.statements.filter(ts.isClassDeclaration).flatMap((declaration) => {
+    const exported = ts.getModifiers(declaration)?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword);
+    const injectable = (ts.getDecorators(declaration) ?? []).some((decorator) => {
+      const expression = ts.isCallExpression(decorator.expression)
+        ? decorator.expression.expression
+        : decorator.expression;
+      return ts.isIdentifier(expression) && expression.text === 'Injectable';
+    });
+    return exported && injectable && declaration.name ? [declaration.name.text] : [];
+  });
+}
+
+/** `export ... from '...'` declarations (re-exports, barrels) of a source file, by module specifier. */
+function reExports(file: string, source: string): string[] {
+  const parsed = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+  return parsed.statements
+    .filter(ts.isExportDeclaration)
+    .flatMap((declaration) =>
+      declaration.moduleSpecifier && ts.isStringLiteral(declaration.moduleSpecifier)
+        ? [declaration.moduleSpecifier.text]
+        : [],
+    );
+}
+
+describe('ROOT-HARDEN.1: public injectable contracts', () => {
+  const sourceRoot = join(process.cwd(), 'src');
+  const modulesRoot = join(sourceRoot, 'modules');
+  const toModulePath = (file: string) => relative(modulesRoot, file).split(sep).join('/');
+
+  it('exports at most one @Injectable class from each source file of a business module', () => {
+    const findings = listTypeScriptFiles(modulesRoot)
+      .map((file) => ({ file: toModulePath(file), injectables: exportedInjectables(file, readFileSync(file, 'utf8')) }))
+      .filter((finding) => finding.injectables.length > 1);
+
+    expect(findings).toEqual([]);
+  });
+
+  it('lists only public root contract files that exist, hold one injectable and have a consumer outside their module', () => {
+    // Generated code imports nothing of ours and uses specifiers this resolver does not follow.
+    const importers = listTypeScriptFiles(sourceRoot).filter((file) => !file.includes(`${sep}generated${sep}`));
+    const findings = [...PUBLIC_ROOT_CONTRACT_FILES].flatMap((entry) => {
+      const file = join(modulesRoot, ...entry.split('/'));
+      if (!existsSync(file)) return [`${entry}: missing`];
+      const problems: string[] = [];
+      if (exportedInjectables(file, readFileSync(file, 'utf8')).length !== 1)
+        problems.push(`${entry}: not one injectable`);
+      const owner = entry.split('/')[0];
+      const consumers = importers.filter((importer) => {
+        const path = relative(sourceRoot, importer).split(sep);
+        if (path[0] === 'modules' && path[1] === owner) return false;
+        return listRelativeSpecifiers(readFileSync(importer, 'utf8')).some(
+          (specifier) => resolveRelativeImport(importer, specifier) === file,
+        );
+      });
+      if (consumers.length === 0) problems.push(`${entry}: no consumer outside the module`);
+      return problems;
+    });
+
+    expect(findings).toEqual([]);
+  });
+
+  it('keeps the root public surface of architecture-structure.spec.ts in step with this exact registry', () => {
+    const structure = readFileSync(join(sourceRoot, 'architecture-structure.spec.ts'), 'utf8');
+    const block = /const PUBLIC_ROOT_CONTRACT_FILES[^=]*=\s*new Set\(\[([\s\S]*?)\]\)/.exec(structure)?.[1] ?? '';
+    const listed = [...block.matchAll(/'([^']+)'/g)].map((match) => match[1]).sort();
+
+    expect(listed).toEqual([...PUBLIC_ROOT_CONTRACT_FILES].sort());
+  });
+
+  it('re-exports nothing from a business module file: no barrel can hand a private class to another module', () => {
+    const findings = listTypeScriptFiles(modulesRoot)
+      .map((file) => ({ file: toModulePath(file), reExports: reExports(file, readFileSync(file, 'utf8')) }))
+      .filter((finding) => finding.reExports.length > 0);
+
+    expect(findings).toEqual([]);
+  });
+
+  it('opens exactly the registered root contract files, not every root *.service.ts', () => {
+    const otherModule = join(modulesRoot, 'organization', 'organization.service.ts');
+
+    expect(
+      privateModuleImport(sourceRoot, otherModule, join(modulesRoot, 'notifications', 'email-delivery.service.ts')),
+    ).toEqual([]);
+    for (const privateService of [
+      join(modulesRoot, 'notifications', 'email-dispatcher.service.ts'),
+      join(modulesRoot, 'identity-access', 'session-helper.service.ts'),
+    ]) {
+      expect(privateModuleImport(sourceRoot, otherModule, privateService)).toHaveLength(1);
+    }
+  });
+
+  describe('the check itself', () => {
+    it('counts exported @Injectable classes only, not private helpers, plain classes, comments or strings', () => {
+      const source = [
+        "import { Injectable } from '@nestjs/common';",
+        '// @Injectable() export class InComment {}',
+        "const text = '@Injectable() export class InString {}';",
+        '@Injectable()',
+        'export class PublicService {}',
+        '@Injectable()',
+        'class PrivateHelper {}',
+        'export class PlainValue {}',
+        'export interface Shape { value: number }',
+      ].join('\n');
+
+      expect(exportedInjectables('a.ts', source)).toEqual(['PublicService']);
+      expect(
+        reExports('c.ts', "export { A } from './a';\nexport * from './b';\nexport { local };\nconst local = 1;"),
+      ).toEqual(['./a', './b']);
+      expect(exportedInjectables('b.ts', `${source}\n@Injectable()\nexport class SecondService {}`)).toEqual([
+        'PublicService',
+        'SecondService',
+      ]);
+    });
   });
 });

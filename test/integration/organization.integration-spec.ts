@@ -1,15 +1,23 @@
 import { Client } from 'pg';
 import { PrismaService } from '../../src/infrastructure/database/prisma.service';
 import { TransactionRunner } from '../../src/infrastructure/database/transaction-runner';
+import { CostCenterCatalogueService } from '../../src/modules/organization/cost-center/cost-center-catalogue.service';
+import { CostCenterRepo } from '../../src/modules/organization/cost-center/cost-center.repo';
+import { DepartmentDirectoryService } from '../../src/modules/organization/department/department-directory.service';
+import { DepartmentHeadRepo } from '../../src/modules/organization/department/department-head.repo';
+import { DepartmentRepo } from '../../src/modules/organization/department/department.repo';
+import { EmployeeDirectoryService } from '../../src/modules/organization/employee/employee-directory.service';
+import { EmployeeRepo } from '../../src/modules/organization/employee/employee.repo';
+import { ImportLookupRepo } from '../../src/modules/organization/employee/import-lookup.repo';
+import { JobTitleCatalogueService } from '../../src/modules/organization/job-title/job-title-catalogue.service';
+import { JobTitleRepo } from '../../src/modules/organization/job-title/job-title.repo';
+import { OrganizationRepo } from '../../src/modules/organization/organization.repo';
 import {
   EmployeeCodeTakenError,
   EmployeeEmailTakenError,
+  EmployeeNotFoundError,
   OrganizationAlreadyExistsError,
-} from '../../src/modules/organization/errors/organization.errors';
-import { CostCenterRepo } from '../../src/modules/organization/cost-center.repo';
-import { DepartmentRepo } from '../../src/modules/organization/department.repo';
-import { ImportLookupRepo } from '../../src/modules/organization/import-lookup.repo';
-import { OrganizationRepo } from '../../src/modules/organization/organization.repo';
+} from '../../src/modules/organization/organization.errors';
 import { OrganizationService } from '../../src/modules/organization/organization.service';
 import {
   DisposableDatabase,
@@ -39,9 +47,10 @@ describe('organization foundation (integration)', () => {
     runner = new TransactionRunner(prisma, config);
     organization = new OrganizationService(
       new OrganizationRepo(prisma),
-      new DepartmentRepo(prisma),
-      new ImportLookupRepo(prisma),
-      new CostCenterRepo(prisma),
+      new DepartmentDirectoryService(new DepartmentRepo(prisma), new DepartmentHeadRepo(prisma)),
+      new EmployeeDirectoryService(new EmployeeRepo(prisma), new ImportLookupRepo(prisma)),
+      new CostCenterCatalogueService(new CostCenterRepo(prisma)),
+      new JobTitleCatalogueService(new JobTitleRepo(prisma)),
     );
     sql = new Client({ connectionString: database.url });
     await sql.connect();
@@ -211,5 +220,169 @@ describe('organization foundation (integration)', () => {
     await expect(
       runner.run((tx) => organization.lockEmployeeForShare(tx, '4f24d10d-63ad-49b1-a7a1-c988765990ae')),
     ).rejects.toThrow(/not found/i);
+  });
+
+  // Wave 2 characterization: what the facade answers, pinned before its job title, employee and cost center work moved
+  // to capability services. The facade calls stay the same; only who answers them behind it changes.
+  it('reports a missing employee with the public EmployeeNotFoundError, for both lock modes', async () => {
+    const missing = '0b4d7a5c-2f1e-4c3b-9a8d-7e6f5a4b3c2d';
+    const locks = [
+      (tx: Parameters<typeof organization.lockEmployeeForShare>[0]) => organization.lockEmployeeForShare(tx, missing),
+      (tx: Parameters<typeof organization.lockEmployeeForUpdate>[0]) => organization.lockEmployeeForUpdate(tx, missing),
+    ];
+    for (const lock of locks) {
+      const failure = await runner.run((tx) => lock(tx)).catch((error: unknown) => error);
+      expect(failure).toBeInstanceOf(EmployeeNotFoundError);
+      expect(failure).toMatchObject({ employeeId: missing });
+    }
+  });
+
+  it('reads several employees at once, leaving out ids it does not know', async () => {
+    const first = await hire('E-MANY1', null);
+    const second = await hire('E-MANY2', null);
+
+    await expect(organization.getEmployees([])).resolves.toEqual([]);
+    const found = await organization.getEmployees([second.id, '6e1f2a3b-4c5d-4e6f-8a7b-9c0d1e2f3a4b', first.id]);
+    expect(found.map((employee) => employee.employeeCode).sort()).toEqual(['E-MANY1', 'E-MANY2']);
+    expect(Object.keys(found[0]).sort()).toEqual([
+      'employeeCode',
+      'fullName',
+      'hireDate',
+      'id',
+      'organizationId',
+      'status',
+      'workEmail',
+    ]);
+  });
+
+  it('creates the installation cost center as a UNIT, and counts as free only active UNITs no department has', async () => {
+    const free = async () => (await organization.getOnboardingFacts()).freeCostCenters;
+    const before = await free();
+
+    const unit = await runner.run((tx) =>
+      organization.createUnitCostCenter(tx, { organizationId, code: 'CC-FREE', name: 'Free unit' }),
+    );
+    expect((await sql.query('SELECT kind, status FROM cost_centers WHERE id = $1', [unit.id])).rows).toEqual([
+      { kind: 'UNIT', status: 'ACTIVE' },
+    ]);
+    expect(await free()).toBe(before + 1);
+
+    await sql.query(`UPDATE cost_centers SET kind = 'COMPANY' WHERE id = $1`, [unit.id]);
+    expect(await free()).toBe(before);
+    await sql.query(
+      `UPDATE cost_centers SET kind = 'UNIT', status = 'INACTIVE', deactivated_at = now() WHERE id = $1`,
+      [unit.id],
+    );
+    expect(await free()).toBe(before);
+  });
+
+  // Wave 3 characterization: the department and head answers of the facade, pinned before the department capability left
+  // the module root. Other modules (identity-access, installation, data-import, onboarding) depend on exactly these.
+  describe('department facade kept by the Wave 3 move', () => {
+    const insertHeadPeriod = (employeeId: string, from: string, to: string | null) =>
+      sql.query(
+        `INSERT INTO department_head_periods (id, organization_id, department_id, employee_id, valid_from, valid_to)
+         VALUES (gen_random_uuid(), $1, $2, $3, $4, $5)`,
+        [organizationId, departmentId, employeeId, from, to],
+      );
+    const newDepartment = async (code: string, name: string) => {
+      const costCenter = await runner.run((tx) =>
+        organization.createUnitCostCenter(tx, { organizationId, code: `CC-${code}`, name: `Unit ${code}` }),
+      );
+
+      return runner.run((tx) =>
+        organization.createDepartment(tx, { organizationId, code, name, costCenterId: costCenter.id }),
+      );
+    };
+
+    it('tells who heads a department, on a date and from today on, including a period that begins later', async () => {
+      const past = await hire('E-HD1', null);
+      const current = await hire('E-HD2', null);
+      const later = await hire('E-HD3', null);
+      const never = await hire('E-HD4', null);
+      await insertHeadPeriod(past.id, '2026-02-01', '2026-03-01');
+      await insertHeadPeriod(current.id, '2026-03-01', '2099-01-01');
+      await insertHeadPeriod(later.id, '2099-01-01', null);
+
+      expect(await organization.isDepartmentHead(past.id)).toBe(false);
+      expect(await organization.isDepartmentHead(current.id)).toBe(true);
+      expect(await organization.isDepartmentHead(later.id)).toBe(true);
+      expect(await runner.run((tx) => organization.isDepartmentHead(never.id, tx))).toBe(false);
+      expect(await organization.getHeadedDepartment(past.id, '2026-02-15')).toEqual({ departmentId });
+      expect(await organization.getHeadedDepartment(past.id, '2026-03-01')).toBeNull();
+      expect(await organization.getHeadedDepartment(current.id)).toEqual({ departmentId });
+      expect(await organization.getHeadedDepartment(later.id)).toBeNull();
+    });
+
+    it('creates the installation department as given, and locks a department by code for an entry', async () => {
+      const created = await newDepartment('P-NOHEAD', 'No head');
+      const retired = await newDepartment('P-RETIRED', 'Retired');
+      await sql.query(`UPDATE departments SET status = 'INACTIVE', deactivated_at = now() WHERE id = $1`, [retired.id]);
+
+      expect(
+        (
+          await sql.query(
+            `SELECT d.code, d.name, d.status, d.function_description, d.it_admin_employee_id, c.code AS cost_center
+               FROM departments d JOIN cost_centers c ON c.id = d.cost_center_id WHERE d.id = $1`,
+            [created.id],
+          )
+        ).rows,
+      ).toEqual([
+        {
+          code: 'P-NOHEAD',
+          name: 'No head',
+          status: 'ACTIVE',
+          function_description: null,
+          it_admin_employee_id: null,
+          cost_center: 'CC-P-NOHEAD',
+        },
+      ]);
+      const lock = (code: string) => runner.run((tx) => organization.lockDepartmentForEntry(tx, organizationId, code));
+      await expect(lock('P-NOHEAD')).resolves.toEqual({
+        id: created.id,
+        code: 'P-NOHEAD',
+        name: 'No head',
+        active: true,
+        costCenterActive: true,
+      });
+      await expect(lock('P-RETIRED')).resolves.toEqual({
+        id: retired.id,
+        code: 'P-RETIRED',
+        name: 'Retired',
+        active: false,
+        costCenterActive: true,
+      });
+      await expect(lock('P-NONE')).resolves.toBeNull();
+    });
+
+    it('reports the active departments nobody heads today, for the import and the onboarding checklist', async () => {
+      const withoutHead = (await sql.query<{ id: string }>(`SELECT id FROM departments WHERE code = 'P-NOHEAD'`))
+        .rows[0].id;
+      const retired = (await sql.query<{ id: string }>(`SELECT id FROM departments WHERE code = 'P-RETIRED'`)).rows[0]
+        .id;
+
+      await expect(
+        organization.departmentsWithoutHead([
+          departmentId,
+          withoutHead,
+          retired,
+          '5a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d',
+        ]),
+      ).resolves.toEqual([{ id: withoutHead, code: 'P-NOHEAD', name: 'No head' }]);
+
+      const facts = await organization.getOnboardingFacts();
+      const count = async (query: string) => (await sql.query<{ n: number }>(query)).rows[0].n;
+      expect(facts.activeDepartments).toBe(
+        await count(`SELECT count(*)::int AS n FROM departments WHERE status = 'ACTIVE'`),
+      );
+      expect(facts.activeEmployees).toBe(
+        await count(`SELECT count(*)::int AS n FROM employees WHERE status = 'ACTIVE'`),
+      );
+      expect(facts.departmentsWithoutHead).toEqual([{ code: 'P-NOHEAD', name: 'No head' }]);
+      expect(facts.departmentsByItAdmin).toEqual([
+        { code: 'P-ENG', name: 'Engineering', itAdminEmployeeId: null, itAdminStatus: null },
+        { code: 'P-NOHEAD', name: 'No head', itAdminEmployeeId: null, itAdminStatus: null },
+      ]);
+    });
   });
 });

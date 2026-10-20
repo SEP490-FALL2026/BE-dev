@@ -1,5 +1,8 @@
 name: software-license-management
 
+# Local development. "docker compose up -d --wait" starts PostgreSQL only: the API and the worker need nothing else
+# today. Redis (profile "queue") and MinIO (profile "storage") are optional, for a G7/G9 slice that mounts the queue or
+# object storage again (Owner decision E2 = A): "docker compose --profile queue --profile storage up -d --wait".
 services:
   postgres:
     image: postgres:17-alpine
@@ -18,6 +21,7 @@ services:
       retries: 10
 
   redis:
+    profiles: ['queue']
     image: redis:8-alpine
     ports:
       - '127.0.0.1:${REDIS_PORT:-6379}:6379'
@@ -31,6 +35,7 @@ services:
       retries: 10
 
   minio:
+    profiles: ['storage']
     build: ./infra/minio
     image: slm-minio:2025-10-15
     command: server /data --console-address ':9001'

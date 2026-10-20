@@ -3,7 +3,7 @@
 - [Spec](spec.md); revision đầu vào: Docs `3341ea0`, BE `e833092` (nhánh `Bao_Dev`, cây làm việc chưa commit).
 - Phụ trách: AI theo giao việc Owner (16/10/2026). Thiết kế ban đầu bởi: AI theo giao việc Owner.
 - Owner review: chưa review. Peer review: tùy chọn.
-- Triển khai: **verified** (local, 16/10/2026). PR: chưa có. Remote CI chưa chạy.
+- Triển khai: **verified** (local, 16/10/2026). Sau đó commit `4ead859`, vào `dev` qua PR #11 (`eae212a`) — `merged-dev`, chưa review/nghiệm thu; gate trên HEAD `186ad5f` chạy xanh ở [audit 18/10](../../../reviews/be-foundation-audit-2026-10-18/README.md). Remote CI chưa chạy.
 
 ## Trước khi code
 
@@ -32,3 +32,5 @@ Chạy từ gốc BE; DB dev Docker `localhost:5433`, DB integration Docker `127
 - [x] AC trong scope có bằng chứng.
 - [x] Spec/plan phản ánh implementation cuối.
 - [ ] Owner review trên revision cụ thể. Chỉ ghi `merged-dev`, `accepted`, `released` sau đúng sự kiện thật.
+
+_18/10/2026:_ [H3a](../h3a-r1-department-in-use-details/plan.md) bỏ `details.sharedAccounts` khỏi 409 `DEPARTMENT.IN_USE` (R-1, `QĐ-75`); bằng chứng mới ở plan H3a, bảng trên là lịch sử.

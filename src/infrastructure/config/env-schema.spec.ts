@@ -6,6 +6,14 @@ import {
 } from './env-schema';
 import { installationEnvironmentConfigOptions } from './env-config';
 
+/** Development has no secret fallback since E3 = C: a developer supplies these from `.env`. Made up for this spec. */
+const OWN_SECRETS = {
+  AUTH_ACCESS_TOKEN_SECRET: 'env-schema-spec-access-token-secret-0123456789',
+  AUTH_THROTTLE_PEPPER: 'env-schema-spec-pepper-0123',
+  OUTBOX_PAYLOAD_KEY: Buffer.alloc(32, 5).toString('base64'),
+  OUTBOX_PAYLOAD_KEY_ID: 'spec-1',
+};
+
 describe('validateEnvironment', () => {
   const productionInfrastructure = {
     CORS_ORIGINS: 'https://licenses.example.com',
@@ -27,7 +35,7 @@ describe('validateEnvironment', () => {
   };
 
   it('applies safe development defaults', () => {
-    const config = validateEnvironment({});
+    const config = validateEnvironment(OWN_SECRETS);
 
     expect(config).toMatchObject({
       NODE_ENV: 'development',
@@ -38,7 +46,7 @@ describe('validateEnvironment', () => {
   });
 
   it('defaults the database timeouts to lock 3 s < statement 5 s < transaction 10 s', () => {
-    expect(validateEnvironment({})).toMatchObject({
+    expect(validateEnvironment(OWN_SECRETS)).toMatchObject({
       DB_LOCK_TIMEOUT_MS: 3000,
       DB_STATEMENT_TIMEOUT_MS: 5000,
       DB_TRANSACTION_TIMEOUT_MS: 10000,
@@ -47,25 +55,25 @@ describe('validateEnvironment', () => {
   });
 
   it('defaults the client-side limits so PostgreSQL reports a slow statement before the driver gives up', () => {
-    expect(validateEnvironment({})).toMatchObject({
+    expect(validateEnvironment(OWN_SECRETS)).toMatchObject({
       DB_CONNECT_TIMEOUT_MS: 3000,
       DB_QUERY_TIMEOUT_MS: 8000,
     });
   });
 
   it('rejects a driver query limit that would cut off a statement PostgreSQL is still allowed to run', () => {
-    expect(() => validateEnvironment({ DB_QUERY_TIMEOUT_MS: '5000', DB_STATEMENT_TIMEOUT_MS: '5000' })).toThrow(
-      'DB_QUERY_TIMEOUT_MS',
-    );
+    expect(() =>
+      validateEnvironment({ ...OWN_SECRETS, DB_QUERY_TIMEOUT_MS: '5000', DB_STATEMENT_TIMEOUT_MS: '5000' }),
+    ).toThrow('DB_QUERY_TIMEOUT_MS');
   });
 
   it('rejects database timeouts that let Prisma close a transaction before PostgreSQL stops the statement', () => {
-    expect(() => validateEnvironment({ DB_STATEMENT_TIMEOUT_MS: '9000', DB_TRANSACTION_TIMEOUT_MS: '9000' })).toThrow(
-      'DB_STATEMENT_TIMEOUT_MS',
-    );
-    expect(() => validateEnvironment({ DB_LOCK_TIMEOUT_MS: '6000', DB_STATEMENT_TIMEOUT_MS: '5000' })).toThrow(
-      'DB_LOCK_TIMEOUT_MS',
-    );
+    expect(() =>
+      validateEnvironment({ ...OWN_SECRETS, DB_STATEMENT_TIMEOUT_MS: '9000', DB_TRANSACTION_TIMEOUT_MS: '9000' }),
+    ).toThrow('DB_STATEMENT_TIMEOUT_MS');
+    expect(() =>
+      validateEnvironment({ ...OWN_SECRETS, DB_LOCK_TIMEOUT_MS: '6000', DB_STATEMENT_TIMEOUT_MS: '5000' }),
+    ).toThrow('DB_LOCK_TIMEOUT_MS');
   });
 
   it('requires explicit auth secrets in production and rejects the development defaults', () => {
@@ -78,17 +86,17 @@ describe('validateEnvironment', () => {
         ...productionInfrastructure,
         AUTH_ACCESS_TOKEN_SECRET: 'development-only-access-token-secret-not-for-production',
       }),
-    ).toThrow('development auth secrets');
+    ).toThrow('public in the repository for AUTH_ACCESS_TOKEN_SECRET');
   });
 
   it('rejects an idle session limit longer than the absolute limit', () => {
     expect(() =>
-      validateEnvironment({ AUTH_SESSION_IDLE_SECONDS: '9000', AUTH_SESSION_ABSOLUTE_SECONDS: '3600' }),
+      validateEnvironment({ ...OWN_SECRETS, AUTH_SESSION_IDLE_SECONDS: '9000', AUTH_SESSION_ABSOLUTE_SECONDS: '3600' }),
     ).toThrow('AUTH_SESSION_IDLE_SECONDS');
   });
 
   it('rejects an invalid port', () => {
-    expect(() => validateEnvironment({ PORT: 'not-a-port' })).toThrow('Environment validation failed');
+    expect(() => validateEnvironment({ ...OWN_SECRETS, PORT: 'not-a-port' })).toThrow('PORT');
   });
 
   it('disables Swagger by default in production', () => {
@@ -100,41 +108,24 @@ describe('validateEnvironment', () => {
     expect(() => validateEnvironment({ NODE_ENV: 'production' })).toThrow('DATABASE_URL');
   });
 
-  it('requires object-storage credentials in production', () => {
+  it('neither requires nor reads the queue or object storage settings: the API and worker mount neither (E2 = A)', () => {
+    const {
+      OBJECT_STORAGE_ENDPOINT: _endpoint,
+      OBJECT_STORAGE_BUCKET: _bucket,
+      OBJECT_STORAGE_ACCESS_KEY_ID: _accessKey,
+      OBJECT_STORAGE_SECRET_ACCESS_KEY: _secretKey,
+      REDIS_HOST: _host,
+      REDIS_PASSWORD: _password,
+      ...active
+    } = productionInfrastructure;
+    void [_endpoint, _bucket, _accessKey, _secretKey, _host, _password];
+
+    const config = validateEnvironment({ NODE_ENV: 'production', ...active });
+
+    expect(Object.keys(config).filter((key) => /^(REDIS|OBJECT_STORAGE)_/.test(key))).toEqual([]);
     expect(() =>
-      validateEnvironment({ NODE_ENV: 'production', DATABASE_URL: productionInfrastructure.DATABASE_URL }),
-    ).toThrow('OBJECT_STORAGE');
-  });
-
-  it('requires the Redis host in production', () => {
-    const { REDIS_HOST: redisHost, ...withoutRedis } = productionInfrastructure;
-    void redisHost;
-    expect(() => validateEnvironment({ NODE_ENV: 'production', ...withoutRedis })).toThrow('REDIS_HOST');
-  });
-
-  it('throws in production when no Redis password is configured', () => {
-    const { REDIS_PASSWORD: _, ...withoutPassword } = productionInfrastructure;
-    void _;
-    expect(() => validateEnvironment({ NODE_ENV: 'production', ...withoutPassword })).toThrow('REDIS_PASSWORD');
-  });
-
-  it('accepts password via REDIS_PASSWORD env var in production', () => {
-    const config = validateEnvironment({
-      NODE_ENV: 'production',
-      ...productionInfrastructure,
-      REDIS_PASSWORD: 'secret-redis-password',
-    });
-    expect(config.REDIS_PASSWORD).toBe('secret-redis-password');
-  });
-
-  it('works without password in development', () => {
-    const config = validateEnvironment({});
-    expect(config.REDIS_PASSWORD).toBe('');
-  });
-
-  it('works without password in test', () => {
-    const config = validateEnvironment({ NODE_ENV: 'test' });
-    expect(config.REDIS_PASSWORD).toBe('');
+      validateEnvironment({ NODE_ENV: 'production', ...active, OBJECT_STORAGE_ENDPOINT: 'http://storage.example.com' }),
+    ).not.toThrow();
   });
 
   it.each([
@@ -149,25 +140,15 @@ describe('validateEnvironment', () => {
     ).toThrow('CORS_ORIGINS');
   });
 
-  it('requires HTTPS object storage in production', () => {
-    expect(() =>
-      validateEnvironment({
-        NODE_ENV: 'production',
-        ...productionInfrastructure,
-        OBJECT_STORAGE_ENDPOINT: 'http://storage.example.com',
-      }),
-    ).toThrow('OBJECT_STORAGE_ENDPOINT');
-  });
-
   it('applies rate-limit defaults', () => {
-    expect(validateEnvironment({})).toMatchObject({
+    expect(validateEnvironment(OWN_SECRETS)).toMatchObject({
       RATE_LIMIT_TTL_MS: 60_000,
       RATE_LIMIT_LIMIT: 120,
     });
   });
 
   it('rejects a rate limit below one request', () => {
-    expect(() => validateEnvironment({ RATE_LIMIT_LIMIT: '0' })).toThrow('Environment validation failed');
+    expect(() => validateEnvironment({ ...OWN_SECRETS, RATE_LIMIT_LIMIT: '0' })).toThrow('RATE_LIMIT_LIMIT');
   });
 });
 
@@ -199,7 +180,7 @@ describe('DATABASE_URL resolution through validateEnvironment', () => {
   // resolved at one consumer instead, the Prisma CLI and any integration harness would
   // still read the development database while the application read the test one.
   it('hands every consumer the test database when NODE_ENV is test', () => {
-    const development = validateEnvironment({}).DATABASE_URL;
+    const development = validateEnvironment(OWN_SECRETS).DATABASE_URL;
     const test = validateEnvironment({ NODE_ENV: 'test' }).DATABASE_URL;
 
     expect(test).not.toBe(development);
@@ -213,9 +194,9 @@ describe('DATABASE_URL resolution through validateEnvironment', () => {
   });
 
   it('rejects TEST_DATABASE_URL outside the test environment', () => {
-    expect(() => validateEnvironment({ TEST_DATABASE_URL: 'postgresql://app:app@localhost:5432/x' })).toThrow(
-      'TEST_DATABASE_URL',
-    );
+    expect(() =>
+      validateEnvironment({ ...OWN_SECRETS, TEST_DATABASE_URL: 'postgresql://app:app@localhost:5432/x' }),
+    ).toThrow('TEST_DATABASE_URL');
   });
 });
 
@@ -241,7 +222,7 @@ describe('invitation email configuration', () => {
   };
 
   it('defaults the invitation lifetime to 72 hours and polls the outbox every 3 seconds', () => {
-    expect(validateEnvironment({})).toMatchObject({
+    expect(validateEnvironment(OWN_SECRETS)).toMatchObject({
       AUTH_INVITATION_TTL_SECONDS: 259_200,
       OUTBOX_POLL_INTERVAL_MS: 3_000,
     });
@@ -249,7 +230,7 @@ describe('invitation email configuration', () => {
 
   describe('password reset settings (T-1, T-2)', () => {
     it('defaults the reset link to 30 minutes and three requests per hour', () => {
-      expect(validateEnvironment({})).toMatchObject({
+      expect(validateEnvironment(OWN_SECRETS)).toMatchObject({
         AUTH_PASSWORD_RESET_TTL_SECONDS: 1_800,
         AUTH_PASSWORD_RESET_MAX_PER_HOUR: 3,
       });
@@ -257,7 +238,11 @@ describe('invitation email configuration', () => {
 
     it('reads both from the environment', () => {
       expect(
-        validateEnvironment({ AUTH_PASSWORD_RESET_TTL_SECONDS: '600', AUTH_PASSWORD_RESET_MAX_PER_HOUR: '5' }),
+        validateEnvironment({
+          ...OWN_SECRETS,
+          AUTH_PASSWORD_RESET_TTL_SECONDS: '600',
+          AUTH_PASSWORD_RESET_MAX_PER_HOUR: '5',
+        }),
       ).toMatchObject({ AUTH_PASSWORD_RESET_TTL_SECONDS: 600, AUTH_PASSWORD_RESET_MAX_PER_HOUR: 5 });
     });
 
@@ -268,15 +253,20 @@ describe('invitation email configuration', () => {
       ['an unbounded number of requests per hour', { AUTH_PASSWORD_RESET_MAX_PER_HOUR: '101' }],
       ['a fractional limit', { AUTH_PASSWORD_RESET_MAX_PER_HOUR: '2.5' }],
     ])('rejects %s', (_name, env) => {
-      expect(() => validateEnvironment(env)).toThrow(/AUTH_PASSWORD_RESET/);
+      expect(() => validateEnvironment({ ...OWN_SECRETS, ...env })).toThrow(/AUTH_PASSWORD_RESET/);
     });
   });
 
-  it('runs in development without any mail or outbox setting', () => {
-    const config = validateEnvironment({});
+  it('runs in development without any mail setting, but with its own outbox key and key id (E3 = C)', () => {
+    const config = validateEnvironment(OWN_SECRETS);
 
-    expect(config.OUTBOX_PAYLOAD_KEY_ID).toBe('development');
-    expect(Buffer.from(config.OUTBOX_PAYLOAD_KEY, 'base64')).toHaveLength(32);
+    expect(config).toMatchObject({ OUTBOX_PAYLOAD_KEY_ID: 'spec-1', SMTP_HOST: 'localhost', SMTP_TLS: false });
+    expect(() => validateEnvironment({ ...OWN_SECRETS, OUTBOX_PAYLOAD_KEY: undefined })).toThrow(
+      '"OUTBOX_PAYLOAD_KEY" is required',
+    );
+    expect(() => validateEnvironment({ ...OWN_SECRETS, OUTBOX_PAYLOAD_KEY_ID: undefined })).toThrow(
+      '"OUTBOX_PAYLOAD_KEY_ID" is required',
+    );
   });
 
   it('accepts a complete production mail setup', () => {
@@ -292,16 +282,18 @@ describe('invitation email configuration', () => {
     },
   );
 
-  it('rejects the development payload key in production', () => {
-    const development = validateEnvironment({}).OUTBOX_PAYLOAD_KEY;
+  it('rejects the public test payload key in production', () => {
+    const publicKey = validateEnvironment({ NODE_ENV: 'test' }).OUTBOX_PAYLOAD_KEY;
 
-    expect(() => validateEnvironment({ ...productionBase, OUTBOX_PAYLOAD_KEY: development })).toThrow('development');
+    expect(() => validateEnvironment({ ...productionBase, OUTBOX_PAYLOAD_KEY: publicKey })).toThrow(
+      'public in the repository for OUTBOX_PAYLOAD_KEY',
+    );
   });
 
   it('rejects a payload key that is not 32 bytes of base64', () => {
-    expect(() => validateEnvironment({ OUTBOX_PAYLOAD_KEY: Buffer.from('short').toString('base64') })).toThrow(
-      '32 bytes',
-    );
+    expect(() =>
+      validateEnvironment({ ...OWN_SECRETS, OUTBOX_PAYLOAD_KEY: Buffer.from('short').toString('base64') }),
+    ).toThrow('32 bytes');
   });
 
   it('requires an HTTPS public URL in production', () => {
@@ -420,28 +412,25 @@ describe('installation environment (database keys only)', () => {
       message = (error as Error).message;
     }
 
-    for (const key of [
-      'AUTH_ACCESS_TOKEN_SECRET',
-      'OUTBOX_PAYLOAD_KEY',
-      'SMTP_HOST',
-      'REDIS_HOST',
-      'OBJECT_STORAGE_ENDPOINT',
-    ]) {
+    for (const key of ['AUTH_ACCESS_TOKEN_SECRET', 'AUTH_THROTTLE_PEPPER', 'OUTBOX_PAYLOAD_KEY', 'SMTP_HOST']) {
       expect(message).toContain(key);
     }
+    expect(message).not.toMatch(/REDIS_|OBJECT_STORAGE_/);
   });
 
   it('throws a typed EnvironmentValidationError from both validators', () => {
     expect(() => validateInstallationEnvironment({ NODE_ENV: 'production' })).toThrow(EnvironmentValidationError);
     expect(() => validateEnvironment({ NODE_ENV: 'production' })).toThrow(EnvironmentValidationError);
-    expect(() => validateEnvironment({ DB_LOCK_TIMEOUT_MS: '6000' })).toThrow(EnvironmentValidationError);
+    expect(() => validateEnvironment({ ...OWN_SECRETS, DB_LOCK_TIMEOUT_MS: '6000' })).toThrow(
+      EnvironmentValidationError,
+    );
     expect(new EnvironmentValidationError('x')).toMatchObject({ name: 'EnvironmentValidationError' });
     expect(new EnvironmentValidationError('x')).toBeInstanceOf(Error);
   });
 
   describe.each([
     ['validateInstallationEnvironment', validateInstallationEnvironment],
-    ['validateEnvironment', validateEnvironment],
+    ['validateEnvironment', (input: Record<string, unknown>) => validateEnvironment({ ...OWN_SECRETS, ...input })],
   ] as const)('idle-in-transaction default through %s', (_name, validate) => {
     it('keeps 20 s with the default transaction timeout', () => {
       expect(validate({}).DB_IDLE_IN_TRANSACTION_TIMEOUT_MS).toBe(20000);

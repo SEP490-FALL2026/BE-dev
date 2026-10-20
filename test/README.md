@@ -29,6 +29,42 @@ Developer viết tay cũng dùng cùng quy tắc.
   Inventory chỉ bảo đảm danh sách operation, không chứng minh coverage mọi nhánh.
 - Chạy pnpm test:discovery để phát hiện test sai tên/vị trí hoặc runner bỏ sót.
 
+### Kích thước unit spec của module
+
+- Mỗi unit spec trong `src/modules/**` (`*.spec.ts`) tối đa **400 dòng vật lý**, đếm như gate kích thước source; gate
+  `H8-RV-01` của [architecture-structure.spec.ts](../src/architecture-structure.spec.ts) báo đúng đường dẫn và số dòng,
+  không có ledger, ngoại lệ hay cap cao hơn. Gate không áp cho spec gate ở `src/` gốc hay suite trong `test/**`.
+- Vượt ngưỡng thì tách theo **use case hoặc chuyển trạng thái quan sát được**, không theo tầng kỹ thuật. Fixture/harness
+  dùng chung đặt ở `test/support/` (có kiểu, tất định, chỉ dựng đối tượng); assertion và mạch use case ở lại spec sở
+  hữu. `support/` không chứa spec.
+- **Đúng:** `employee-import-upload.spec.ts`, `employee-import-preview-lifecycle.spec.ts` và
+  `employee-import-confirm.spec.ts` dùng chung harness có kiểu `test/support/employee-import-service-harness.ts`.
+- **Sai:** một `employee-import.service.spec.ts` chứa mọi route/use case chỉ vì chúng gọi cùng một service.
+- **Lách sai:** đổi tên một ma trận test 1.000 dòng hoặc dời assertion sang script không đăng ký để né Jest/test
+  discovery. Suite phải được tìm thấy qua lệnh unit test thông thường.
+
+### Tệp trong test/support (TEST-HARDEN.1)
+
+- Mỗi `test/support/**/*.ts` là fixture, builder, fake hoặc harness: tối đa **400 dòng vật lý**, không ledger, ngoại lệ
+  hay cap cao hơn; không đăng ký test và không assertion. Gate
+  [test-support-structure.spec.ts](../src/test-support-structure.spec.ts) đọc bằng parser TypeScript (không tìm chuỗi):
+  từ chối gọi hay tham chiếu tự do `describe`/`it`/`test`/`expect`/hook (kể cả `.only`/`.skip`/`.each`, `fit`/`xit`/…),
+  qua `globalThis`/`global` hay bí danh, import `@jest/globals`/`vitest`/`chai`/`assert`/`node:assert`/`node:test`, và tên
+  tệp giống spec hay khớp pattern runner.
+- **Đúng:** `request(app).post(...).expect(200)` (SuperTest), `/^[A-Z]+$/.test(code)`, method/property tên `it` hay `test`,
+  `jest.fn()` cho fake, tên trong chuỗi/chú thích; một harness có kiểu trả fake để spec tự `expect`.
+- **Sai:** `describe(...)`, `it(...)`, `expect(...)` hay `afterAll(...)` trong support; `import { expect } from '@jest/globals'`.
+- **Lách sai:** `const register = it`, `export const api = { it }`, `globalThis.describe(...)`, `global['it'](...)`, đặt tên
+  `helper.spec.ts` trong `support/`, hoặc dời assertion vào một hàm support rồi gọi từ spec.
+
+### Import file private của src
+
+- Ưu tiên kiểm qua HTTP, facade hoặc contract công khai khi mục tiêu của test cho phép.
+- Unit/integration test được import repo, token hay type private khi cần chứng minh boundary nội bộ (ràng buộc, khóa
+  dòng, provider DI). Import đó phụ thuộc layout: lát move/refactor phải cập nhật nó trong cùng thay đổi.
+- Architecture gate có chủ đích không quét `test/**`. Điều đó không biến file private thành contract công khai; code
+  trong `src` vẫn theo [module structure](../docs/rules/module-structure.md).
+
 ## PostgreSQL dùng riêng cho test
 
 Tất cả integration suite dùng support/disposable-database.ts. Cấu hình
@@ -117,6 +153,15 @@ fixture SQL không chứng minh workflow tạo tài khoản. Dùng `bodyOf(respo
   tối thiểu, không cần database: `--help` chạy khi chưa cấu hình gì, thiếu `DATABASE_URL` được báo thành một dòng trước
   prompt mật khẩu và không có stack, URL bị từ chối không in lại mật khẩu. Nó chứng minh mã thoát và đầu ra của tiến trình,
   không chỉ của service.
+- Mọi test khởi chạy lệnh thành tiến trình con qua `support/cli-process.ts` (`runCli`, `cliWorkingDirectory`,
+  `stopCliProcesses` trong `afterAll`): tiến trình và thư mục làm việc được ghi nhận trước khi dùng, bị dừng/xóa khi suite
+  kết thúc hoặc Jest thoát ([rule 8](../docs/rules/operational-commands.md)). `src/operational-commands.spec.ts` chặn import
+  `child_process` ở test khác. Không để assertion trong helper.
+- Lệnh vận hành H6.1/H6.2: `inspect.integration-spec.ts` (tiến trình thật qua các trạng thái chưa migrate/chưa cài/đã
+  cài/dở dang, fingerprint mọi bảng trước/sau, ghi thử qua đồ thị inspect bị PostgreSQL từ chối `25006`),
+  `dev-seed.integration-spec.ts` (trong tiến trình, generator mật khẩu cố định: rollback, audit, credential thật, vai,
+  chạy lại, conflict), `dev-seed-cli.integration-spec.ts` (ma trận chốt, lần tạo và lần chạy lại),
+  `installation-bootstrap-facts.integration-spec.ts` (characterization bản ghi cài đặt).
 - Test đua khóa (`auth-concurrency.integration-spec.ts`) giữ khóa dòng ở một kết nối `pg` riêng và chờ
   `pg_locks` báo có tiến trình đang chờ trước khi nhả khóa; không dùng `sleep` để ép thứ tự.
 - PostgreSQL phải chạy ở UTC **hoặc** để `PrismaService` ghim `TimeZone=UTC` (đã làm). Test

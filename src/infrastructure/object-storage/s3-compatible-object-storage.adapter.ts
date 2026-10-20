@@ -6,9 +6,8 @@ import {
   S3Client,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { Injectable, OnModuleDestroy } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { EnvironmentVariables } from '../config/env-schema';
+import { OnModuleDestroy } from '@nestjs/common';
+import type { ObjectStorageEnvironmentVariables } from './object-storage.config';
 import {
   CreateDownloadUrlInput,
   CreateUploadUrlInput,
@@ -16,26 +15,20 @@ import {
   StoredObjectMetadata,
 } from './object-storage.port';
 
-@Injectable()
+/** Built by ObjectStorageModule from settings it has already validated. */
 export class S3CompatibleObjectStorageAdapter implements ObjectStoragePort, OnModuleDestroy {
   private readonly bucket: string;
   private readonly client: S3Client;
 
-  constructor(config: ConfigService<EnvironmentVariables, true>) {
-    this.bucket = config.get('OBJECT_STORAGE_BUCKET', { infer: true });
+  constructor(settings: ObjectStorageEnvironmentVariables) {
+    this.bucket = settings.OBJECT_STORAGE_BUCKET;
     this.client = new S3Client({
-      endpoint: config.get('OBJECT_STORAGE_ENDPOINT', { infer: true }),
-      region: config.get('OBJECT_STORAGE_REGION', { infer: true }),
-      forcePathStyle: config.get('OBJECT_STORAGE_FORCE_PATH_STYLE', {
-        infer: true,
-      }),
+      endpoint: settings.OBJECT_STORAGE_ENDPOINT,
+      region: settings.OBJECT_STORAGE_REGION,
+      forcePathStyle: settings.OBJECT_STORAGE_FORCE_PATH_STYLE,
       credentials: {
-        accessKeyId: config.get('OBJECT_STORAGE_ACCESS_KEY_ID', {
-          infer: true,
-        }),
-        secretAccessKey: config.get('OBJECT_STORAGE_SECRET_ACCESS_KEY', {
-          infer: true,
-        }),
+        accessKeyId: settings.OBJECT_STORAGE_ACCESS_KEY_ID,
+        secretAccessKey: settings.OBJECT_STORAGE_SECRET_ACCESS_KEY,
       },
     });
   }
