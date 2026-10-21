@@ -55,6 +55,8 @@ const BUSINESS_PATTERNS = [
   String.raw`^[A-Z][A-Z0-9_]*(\.[A-Z0-9_]+)+$`,
   String.raw`^[A-Z][A-Z0-9_]*(\.[A-Z0-9_]+)*$`,
   '^[A-Za-z0-9][A-Za-z0-9._-]*$',
+  // An ISO 4217 currency code (finance).
+  '^[A-Z]{3}$',
 ];
 
 function visit(node: unknown, at: string, onNode: (value: Record<string, unknown>, at: string) => void): void {
@@ -352,12 +354,17 @@ describe('API inventory (e2e)', () => {
     /** Operations that read no path, query or body input, so no request can fail validation. */
     const WITHOUT_VALIDATION = [
       'approvalRoleList',
+      'currencyList',
       'departmentWarningList',
       'healthGetLiveness',
       'healthGetReadiness',
       'meGet',
       'onboardingChecklistGet',
       'operatingParameterList',
+      'reportingCurrencyGet',
+      'seatBaselineClose',
+      'seatBaselineGet',
+      'standardToolsetMine',
     ];
     const NEW_422 = [
       'costCenterList',
@@ -420,7 +427,7 @@ describe('API inventory (e2e)', () => {
         })
         .map((operation) => operation.key);
 
-      expect(operations).toHaveLength(60);
+      expect(operations).toHaveLength(143);
       expect(missing).toEqual([]);
     });
 
@@ -457,7 +464,7 @@ describe('API inventory (e2e)', () => {
     });
   });
 
-  it('the catalog sample is not mounted on HTTP', async () => {
+  it('the removed catalog sample serves no route', async () => {
     for (const path of [
       '/api/v1/catalog-applications',
       '/api/v1/catalog-applications/4f24d10d-63ad-49b1-a7a1-c988765990ae',

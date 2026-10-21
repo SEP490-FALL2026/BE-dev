@@ -8,6 +8,7 @@ import {
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { OnModuleDestroy } from '@nestjs/common';
 import type { ObjectStorageEnvironmentVariables } from './object-storage.config';
+import { ObjectStorageUnavailableError } from './object-storage.errors';
 import {
   CreateDownloadUrlInput,
   CreateUploadUrlInput,
@@ -38,25 +39,29 @@ export class S3CompatibleObjectStorageAdapter implements ObjectStoragePort, OnMo
   }
 
   createUploadUrl(input: CreateUploadUrlInput): Promise<string> {
-    return getSignedUrl(
-      this.client,
-      new PutObjectCommand({
-        Bucket: this.bucket,
-        Key: input.key,
-        ContentType: input.contentType,
-      }),
-      { expiresIn: input.expiresInSeconds },
+    return this.guarded(() =>
+      getSignedUrl(
+        this.client,
+        new PutObjectCommand({
+          Bucket: this.bucket,
+          Key: input.key,
+          ContentType: input.contentType,
+        }),
+        { expiresIn: input.expiresInSeconds },
+      ),
     );
   }
 
   createDownloadUrl(input: CreateDownloadUrlInput): Promise<string> {
-    return getSignedUrl(this.client, new GetObjectCommand({ Bucket: this.bucket, Key: input.key }), {
-      expiresIn: input.expiresInSeconds,
-    });
+    return this.guarded(() =>
+      getSignedUrl(this.client, new GetObjectCommand({ Bucket: this.bucket, Key: input.key }), {
+        expiresIn: input.expiresInSeconds,
+      }),
+    );
   }
 
   async head(key: string): Promise<StoredObjectMetadata> {
-    const result = await this.client.send(new HeadObjectCommand({ Bucket: this.bucket, Key: key }));
+    const result = await this.guarded(() => this.client.send(new HeadObjectCommand({ Bucket: this.bucket, Key: key })));
 
     return {
       contentLength: result.ContentLength,
@@ -65,7 +70,35 @@ export class S3CompatibleObjectStorageAdapter implements ObjectStoragePort, OnMo
     };
   }
 
-  async delete(key: string): Promise<void> {
-    await this.client.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: key }));
+  async readPrefix(key: string, length: number): Promise<Uint8Array> {
+    const result = await this.guarded(() =>
+      this.client.send(new GetObjectCommand({ Bucket: this.bucket, Key: key, Range: `bytes=0-${length - 1}` })),
+    );
+
+    return this.guarded(async () => (result.Body ? await result.Body.transformToByteArray() : new Uint8Array()));
   }
+
+  async delete(key: string): Promise<void> {
+    await this.guarded(() => this.client.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: key })));
+  }
+
+  /**
+   * An answer of "there is no such object" passes through unchanged for the caller to read; anything else that goes wrong
+   * with the storage (the network, a timeout, a refusal of the service) is an outage the caller cannot fix.
+   */
+  private async guarded<T>(call: () => Promise<T>): Promise<T> {
+    try {
+      return await call();
+    } catch (error) {
+      if (isNoSuchObject(error)) throw error;
+      throw new ObjectStorageUnavailableError({ cause: error });
+    }
+  }
+}
+
+function isNoSuchObject(error: unknown): boolean {
+  const name = (error as { name?: string } | null)?.name;
+  const status = (error as { $metadata?: { httpStatusCode?: number } } | null)?.$metadata?.httpStatusCode;
+
+  return name === 'NotFound' || name === 'NoSuchKey' || status === 404;
 }

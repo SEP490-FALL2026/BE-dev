@@ -66,6 +66,25 @@ export class DepartmentDirectoryService {
     return this.heads.headPeriods(client, departmentId, limit);
   }
 
+  find(id: string, tx?: DbTx): Promise<DepartmentRecord | null> {
+    return this.departments.findById(id, tx);
+  }
+
+  /** The IT Admin in charge of the department while still working; null when there is none or they have left. */
+  async itAdminInChargeOf(id: string): Promise<string | null> {
+    const itAdmin = (await this.departments.findById(id))?.itAdmin;
+
+    return itAdmin?.employeeStatus === 'ACTIVE' ? itAdmin.employeeId : null;
+  }
+
+  lockShared(tx: DbTx, id: string): Promise<DepartmentRecord | null> {
+    return this.departments.lockShared(tx, id);
+  }
+
+  memberIdsOn(departmentId: string, onDate: BusinessDate): Promise<string[] | null> {
+    return this.departments.memberIdsOn(departmentId, onDate);
+  }
+
   headedDepartment(employeeId: string, onDate: BusinessDate): Promise<{ departmentId: string } | null> {
     return this.heads.headedDepartment(employeeId, onDate);
   }

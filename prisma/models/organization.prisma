@@ -44,11 +44,30 @@ model Organization {
   bootstrapCompletedAt DateTime? @map("bootstrap_completed_at") @db.Timestamptz(3)
   createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
 
-  costCenters CostCenter[]
-  departments Department[]
-  jobTitles   JobTitle[]
-  employees   Employee[]
-  projects    Project[]
+  costCenters                        CostCenter[]
+  departments                        Department[]
+  jobTitles                          JobTitle[]
+  employees                          Employee[]
+  projects                           Project[]
+  // Owned by finance: the rates entered for the reporting currency.
+  exchangeRates                      ExchangeRate[]
+  vendorProposals                    VendorDictionaryProposal[]
+  vendors                            Vendor[]
+  functionalGroups                   FunctionalGroup[]
+  applications                       Application[]
+  plans                              Plan[]
+  vendorTaxProfiles                  VendorTaxProfile[]
+  subscriptions                      Subscription[]
+  subscriptionCostAllocations        SubscriptionCostAllocation[]
+  seatBaselineImports                SeatBaselineImport[]
+  licenseAssignments                 LicenseAssignment[]
+  provisioningTasks                  ProvisioningTask[]
+  applicationRetirementConfirmations ApplicationRetirementConfirmation[]
+  contracts                          Contract[]
+  documentAttachments                DocumentAttachment[]
+  licenseKeys                        LicenseKey[]
+  seatBaselineState                  SeatBaselineState?
+  standardToolsets                   StandardToolset[]
 
   @@map("organizations")
 }
@@ -64,8 +83,10 @@ model CostCenter {
   updatedAt      DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
   deactivatedAt  DateTime?        @map("deactivated_at") @db.Timestamptz(3)
 
-  organization Organization @relation(fields: [organizationId], references: [id])
-  department   Department?
+  organization                    Organization                     @relation(fields: [organizationId], references: [id])
+  department                      Department?
+  subscriptionCostAllocationLines SubscriptionCostAllocationLine[]
+  licenseAssignments              LicenseAssignment[]
 
   @@unique([organizationId, code])
   @@map("cost_centers")
@@ -85,12 +106,13 @@ model Department {
   updatedAt           DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
   deactivatedAt       DateTime?        @map("deactivated_at") @db.Timestamptz(3)
 
-  organization Organization           @relation(fields: [organizationId], references: [id])
-  costCenter   CostCenter             @relation(fields: [costCenterId], references: [id])
-  itAdmin      Employee?              @relation("DepartmentItAdmin", fields: [itAdminEmployeeId], references: [id], onDelete: Restrict)
-  placements   EmployeePlacement[]
-  headPeriods  DepartmentHeadPeriod[]
-  projects     ProjectDepartment[]
+  organization     Organization           @relation(fields: [organizationId], references: [id])
+  costCenter       CostCenter             @relation(fields: [costCenterId], references: [id])
+  itAdmin          Employee?              @relation("DepartmentItAdmin", fields: [itAdminEmployeeId], references: [id], onDelete: Restrict)
+  placements       EmployeePlacement[]
+  headPeriods      DepartmentHeadPeriod[]
+  projects         ProjectDepartment[]
+  standardToolsets StandardToolset[]
 
   @@unique([organizationId, code])
   @@index([itAdminEmployeeId])
@@ -156,8 +178,9 @@ model JobTitle {
   createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt      DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  organization Organization        @relation(fields: [organizationId], references: [id])
-  placements   EmployeePlacement[]
+  organization     Organization        @relation(fields: [organizationId], references: [id])
+  placements       EmployeePlacement[]
+  standardToolsets StandardToolset[]
 
   @@unique([organizationId, normalizedName])
   @@map("job_titles")
@@ -176,12 +199,21 @@ model Employee {
   createdAt           DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt           DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  organization  Organization           @relation(fields: [organizationId], references: [id])
-  placements    EmployeePlacement[]
-  appUser       AppUser?
-  itAdminOf     Department[]           @relation("DepartmentItAdmin")
-  headPeriods   DepartmentHeadPeriod[]
-  approvalRoles ApprovalRoleHolder[]
+  organization                 Organization                        @relation(fields: [organizationId], references: [id])
+  placements                   EmployeePlacement[]
+  appUser                      AppUser?
+  itAdminOf                    Department[]                        @relation("DepartmentItAdmin")
+  headPeriods                  DepartmentHeadPeriod[]
+  approvalRoles                ApprovalRoleHolder[]
+  ownedApplications            Application[]
+  workspacePrimaryOwnerOf      PlanWorkspaceProfile[]              @relation("WorkspacePrimaryOwner")
+  workspaceEmergencyHolderOf   PlanWorkspaceProfile[]              @relation("WorkspaceEmergencyHolder")
+  workspaceMemberships         PlanWorkspaceAdmin[]                @relation("WorkspaceMember")
+  planTermOpinions             PlanTermOpinion[]
+  applicationBusinessOwners    ApplicationBusinessOwner[]
+  licenseAssignments           LicenseAssignment[]
+  provisioningTasksInCharge    ProvisioningTask[]                  @relation("TaskDefaultResponsible")
+  retirementConfirmationsGiven ApplicationRetirementConfirmation[] @relation("RetirementConfirmingOwner")
 
   @@unique([organizationId, employeeCode])
   @@unique([organizationId, normalizedWorkEmail])

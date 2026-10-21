@@ -11,6 +11,11 @@ export interface ImportSummary {
   newPeopleByDepartment: { departmentCode: string; count: number }[];
   /** Departments those people join that nobody heads yet (US-02-02 AC-1). */
   departmentsWithoutHead: { code: string; name: string }[];
+  /**
+   * People who hold a seat and are not in the file: nothing changes for them, an import never marks anyone as gone
+   * (US-02-02 AC-4); they are the queue to review. `items` is cut at 200, `total` is not.
+   */
+  reviewQueue: { total: number; items: { employeeCode: string; fullName: string; seats: number }[] };
   /** The same file, imported before (US-02-01 AC-4). */
   duplicateOf: { importId: string; fileName: string; confirmedAt: string } | null;
 }

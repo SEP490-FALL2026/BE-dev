@@ -9,7 +9,8 @@ import { sleep, waitFor } from './helpers.mjs';
 import { analyzeEvents } from '../bench/analyze.mjs';
 
 const ok = () => wellBehaved(new FakeChild());
-const withTimeout = (p, ms, what) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('never settled: ' + what)), ms))]);
+const withTimeout = (p, ms, what) =>
+  Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('never settled: ' + what)), ms))]);
 
 test('V-3 sync throw from spawnFn: job settles FAILED/SPAWN_FAILED once, slot released, failure counted, queue proceeds, shutdown completes', async () => {
   const h = makeFakeSup((i) => {
@@ -25,7 +26,10 @@ test('V-3 sync throw from spawnFn: job settles FAILED/SPAWN_FAILED once, slot re
   assert.equal(o1.reason, 'SPAWN_FAILED');
   assert.equal(o1.complete, false);
   assert.ok(!JSON.stringify(o1).includes('EAGAIN'), 'raw error text never leaks into the outcome');
-  assert.deepEqual(failures.map((f) => f.kind), ['spawnFailed']);
+  assert.deepEqual(
+    failures.map((f) => f.kind),
+    ['spawnFailed'],
+  );
   const o2 = await withTimeout(j2.settled, 2000, 'job2 (queue proceeds)');
   assert.equal(o2.state, 'DONE');
   assert.equal(h.ofType('settled', (e) => e.jobId === j1.id).length, 1, 'settled exactly once');
@@ -62,7 +66,10 @@ test('V-3 async spawn failure: error with no pid and NO exit event ever -> slot 
   const o1 = await withTimeout(j1.settled, 1000, 'job1');
   assert.equal(o1.reason, 'SPAWN_FAILED');
   assert.equal(h.sup.liveWorkers === 0 || h.sup.liveWorkers === 1, true);
-  assert.deepEqual(failures.map((f) => f.kind), ['spawnFailed']);
+  assert.deepEqual(
+    failures.map((f) => f.kind),
+    ['spawnFailed'],
+  );
   const o2 = await withTimeout(j2.settled, 2000, 'job2');
   assert.equal(o2.state, 'DONE');
   assert.equal(h.ofType('settled', (e) => e.jobId === j1.id).length, 1);
@@ -138,7 +145,10 @@ test('V-3 error on a LIVE child (IPC error): slot NOT released at error; killed 
   const o1 = await withTimeout(j1.settled, 1000, 'job1');
   assert.equal(o1.state, 'FAILED');
   assert.equal(o1.reason, 'CHILD_ERROR');
-  assert.deepEqual(failures.map((f) => f.kind), ['crash']);
+  assert.deepEqual(
+    failures.map((f) => f.kind),
+    ['crash'],
+  );
   const o2 = await withTimeout(j2.settled, 2000, 'job2');
   assert.equal(o2.state, 'DONE');
   assert.ok(h.ofType('spawn')[1].t >= h.ofType('exit')[0].t, 'respawn after exit');

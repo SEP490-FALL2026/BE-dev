@@ -4,7 +4,7 @@ import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { isUniqueViolation } from '../../../infrastructure/database/unique-violation';
 import { CostCenterCodeTakenError } from './cost-center.errors';
-import { CreateCostCenterInput } from '../organization.types';
+import { CostCenterBrief, CreateCostCenterInput } from '../organization.types';
 import { CostCenterKind, CostCenterRecord, CostCenterStatus } from './cost-center.types';
 
 interface CostCenterRow {
@@ -100,6 +100,38 @@ export class CostCenterRepo {
       ${SELECT_WITH_DEPARTMENT} WHERE c.id = ${id}::uuid`;
 
     return rows[0] ? toRecord(rows[0]) : null;
+  }
+
+  /** The Cost Centers with these ids, as far as they exist, without their department. */
+  async findBriefs(ids: readonly string[], tx?: DbTx): Promise<CostCenterBrief[]> {
+    if (ids.length === 0) return [];
+
+    return (tx ?? this.prisma).costCenter.findMany({
+      where: { id: { in: [...ids] } },
+      select: { id: true, code: true, name: true, kind: true, status: true },
+    });
+  }
+
+  /** The Cost Centers with these codes, as far as they exist, without their department. */
+  async findBriefsByCodes(codes: readonly string[], tx?: DbTx): Promise<CostCenterBrief[]> {
+    if (codes.length === 0) return [];
+
+    return (tx ?? this.prisma).costCenter.findMany({
+      where: { code: { in: [...codes] } },
+      select: { id: true, code: true, name: true, kind: true, status: true },
+    });
+  }
+
+  /**
+   * Takes `FOR SHARE` on the Cost Centers with these ids, in the order of the ids so two writers never wait on each
+   * other in a circle, then reads them in a separate statement: a Cost Center cannot be made inactive until the
+   * transaction ends. Those that do not exist are absent from the answer.
+   */
+  async lockSharedBriefs(tx: DbTx, ids: readonly string[]): Promise<CostCenterBrief[]> {
+    if (ids.length === 0) return [];
+    await tx.$queryRaw`SELECT id FROM cost_centers WHERE id = ANY(${[...ids]}::uuid[]) ORDER BY id FOR SHARE`;
+
+    return this.findBriefs(ids, tx);
   }
 
   async rename(tx: DbTx, id: string, name: string, now: Date): Promise<void> {

@@ -2,7 +2,12 @@
 import os from 'node:os';
 import { POLARITY_CATEGORIES } from './metrics.mjs';
 
-const HOME_PATTERNS = [/[A-Za-z]:\\Users\\[^\\"\s]+/g, /[A-Za-z]:\/Users\/[^/"\s]+/g, /\/home\/[^/"\s]+/g, /\/Users\/[^/"\s]+/g];
+const HOME_PATTERNS = [
+  /[A-Za-z]:\\Users\\[^\\"\s]+/g,
+  /[A-Za-z]:\/Users\/[^/"\s]+/g,
+  /\/home\/[^/"\s]+/g,
+  /\/Users\/[^/"\s]+/g,
+];
 
 function scrubString(s) {
   let out = s;
@@ -46,7 +51,8 @@ export function worstErrors(runs, fixtures, n = 10) {
       const what = [];
       if (silentMeaning) {
         if (it.meaning.failedContain?.length) what.push(`missing: ${it.meaning.failedContain.join('; ')}`);
-        if (it.meaning.failedNotContain?.length) what.push(`forbidden present: ${it.meaning.failedNotContain.join('; ')}`);
+        if (it.meaning.failedNotContain?.length)
+          what.push(`forbidden present: ${it.meaning.failedNotContain.join('; ')}`);
       }
       if (presFail) what.push(`protected term altered: ${it.preserved.missing.join('; ')}`);
       const score =
@@ -71,7 +77,8 @@ export function worstErrors(runs, fixtures, n = 10) {
   return rows.slice(0, n);
 }
 
-const fmt = (v, d = 1) => (v === null || v === undefined || Number.isNaN(v) ? 'n/a' : typeof v === 'number' ? v.toFixed(d) : String(v));
+const fmt = (v, d = 1) =>
+  v === null || v === undefined || Number.isNaN(v) ? 'n/a' : typeof v === 'number' ? v.toFixed(d) : String(v);
 const cut = (s, n) => {
   const one = String(s).replace(/\s+/g, ' ').replace(/\|/g, '\\|');
   return one.length > n ? `${one.slice(0, n - 1)}…` : one;
@@ -81,9 +88,16 @@ export function renderSummary({ runs, fixtures }) {
   const out = [];
   const date = runs[0]?.date ?? '';
   out.push('# Translation quality spike: summary', '');
-  out.push(`Run date: ${date}. Synthetic fixtures; references are AI drafts (not human gold); one machine. See README.md for definitions and caveats.`, '');
+  out.push(
+    `Run date: ${date}. Synthetic fixtures; references are AI drafts (not human gold); one machine. See README.md for definitions and caveats.`,
+    '',
+  );
   const env = runs[0]?.environment;
-  if (env) out.push(`Environment: ${env.os}, ${env.cpuModel} (${env.cpuCount} logical CPUs, ${env.totalMemGb} GB RAM), Node ${env.node}, @huggingface/transformers ${env.transformers}.`, '');
+  if (env)
+    out.push(
+      `Environment: ${env.os}, ${env.cpuModel} (${env.cpuCount} logical CPUs, ${env.totalMemGb} GB RAM), Node ${env.node}, @huggingface/transformers ${env.transformers}.`,
+      '',
+    );
 
   for (const direction of ['vi-en', 'en-vi']) {
     const dRuns = runs.filter((r) => r.direction === direction);
@@ -97,10 +111,13 @@ export function renderSummary({ runs, fixtures }) {
     row('Corpus chrF', (r) => fmt(r.aggregate.corpusChrF));
     row('Items with all protected terms preserved (%)', (r) => fmt(r.aggregate.preservedPct));
     row('Meaning checks passed (%)', (r) => fmt(r.aggregate.meaningPassPct));
-    for (const c of POLARITY_CATEGORIES) row(`${c} checks passed (%)`, (r) => `${fmt(r.aggregate.polarity[c].pct)} (n=${r.aggregate.polarity[c].n})`);
+    for (const c of POLARITY_CATEGORIES)
+      row(`${c} checks passed (%)`, (r) => `${fmt(r.aggregate.polarity[c].pct)} (n=${r.aggregate.polarity[c].n})`);
     row('Segments fallen back to original (%)', (r) => fmt(r.aggregate.fallbackSegmentPct));
     row('Silent meaning failures (items)', (r) => String(r.aggregate.silentMeaningFailures));
-    row('Silent polarity failures (items)', (r) => String(POLARITY_CATEGORIES.reduce((a, c) => a + r.aggregate.polarity[c].silentFailures, 0)));
+    row('Silent polarity failures (items)', (r) =>
+      String(POLARITY_CATEGORIES.reduce((a, c) => a + r.aggregate.polarity[c].silentFailures, 0)),
+    );
     row('Latency p50 per item (ms)', (r) => fmt(r.aggregate.latency.p50, 0));
     row('Latency p95 per item (ms)', (r) => fmt(r.aggregate.latency.p95, 0));
     row('Model load time (s)', (r) => fmt(r.loadMs / 1000, 2));
@@ -108,9 +125,16 @@ export function renderSummary({ runs, fixtures }) {
     out.push('');
     for (const m of modes) {
       const r = get(m);
-      out.push(`### ${direction} ${m}: per category`, '', '| Category | Items | chrF | Protected preserved % | Meaning passed % | Fallback seg % |', '|---|---:|---:|---:|---:|---:|');
+      out.push(
+        `### ${direction} ${m}: per category`,
+        '',
+        '| Category | Items | chrF | Protected preserved % | Meaning passed % | Fallback seg % |',
+        '|---|---:|---:|---:|---:|---:|',
+      );
       for (const [cat, s] of Object.entries(r.aggregate.perCategory)) {
-        out.push(`| ${cat} | ${s.items} | ${fmt(s.corpusChrF)} | ${fmt(s.preservedPct)} | ${fmt(s.meaningPassPct)} | ${fmt(s.fallbackSegmentPct)} |`);
+        out.push(
+          `| ${cat} | ${s.items} | ${fmt(s.corpusChrF)} | ${fmt(s.preservedPct)} | ${fmt(s.meaningPassPct)} | ${fmt(s.fallbackSegmentPct)} |`,
+        );
       }
       out.push('');
     }
@@ -118,13 +142,36 @@ export function renderSummary({ runs, fixtures }) {
 
   const table = (rows) => {
     if (rows.length === 0) return ['None.', ''];
-    const t = ['| # | Direction / mode | Item | Category | Failure | Source | Output |', '|---:|---|---|---|---|---|---|'];
-    rows.forEach((w, i) => t.push(`| ${i + 1} | ${w.direction} ${w.mode} | ${w.id} | ${w.category} | ${cut(w.what, 100)} | ${cut(w.source, 110)} | ${cut(w.output, 130)} |`));
+    const t = [
+      '| # | Direction / mode | Item | Category | Failure | Source | Output |',
+      '|---:|---|---|---|---|---|---|',
+    ];
+    rows.forEach((w, i) =>
+      t.push(
+        `| ${i + 1} | ${w.direction} ${w.mode} | ${w.id} | ${w.category} | ${cut(w.what, 100)} | ${cut(w.source, 110)} | ${cut(w.output, 130)} |`,
+      ),
+    );
     return [...t, ''];
   };
   out.push('## Worst observed errors, protected mode (automatic ranking; silent = not caught by fallback)', '');
-  out.push(...table(worstErrors(runs.filter((r) => r.mode === 'protected'), fixtures, 10)));
+  out.push(
+    ...table(
+      worstErrors(
+        runs.filter((r) => r.mode === 'protected'),
+        fixtures,
+        10,
+      ),
+    ),
+  );
   out.push('## Worst observed errors, raw mode (top 10)', '');
-  out.push(...table(worstErrors(runs.filter((r) => r.mode === 'raw'), fixtures, 10)));
+  out.push(
+    ...table(
+      worstErrors(
+        runs.filter((r) => r.mode === 'raw'),
+        fixtures,
+        10,
+      ),
+    ),
+  );
   return out.join('\n');
 }

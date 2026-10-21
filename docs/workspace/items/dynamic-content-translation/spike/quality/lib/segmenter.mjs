@@ -6,9 +6,37 @@
 // Lower-case, without the final dot. Abbreviations never end a sentence.
 export const ABBREVIATIONS = new Set([
   // Vietnamese
-  'ts', 'ths', 'pgs', 'gs', 'bs', 'ks', 'tp', 'q', 'p', 'tr', 'v.v', 'đ',
+  'ts',
+  'ths',
+  'pgs',
+  'gs',
+  'bs',
+  'ks',
+  'tp',
+  'q',
+  'p',
+  'tr',
+  'v.v',
+  'đ',
   // English
-  'mr', 'mrs', 'ms', 'dr', 'prof', 'vs', 'e.g', 'i.e', 'etc', 'inc', 'ltd', 'co', 'approx', 'st', 'jr', 'sr', 'fig', 'cf',
+  'mr',
+  'mrs',
+  'ms',
+  'dr',
+  'prof',
+  'vs',
+  'e.g',
+  'i.e',
+  'etc',
+  'inc',
+  'ltd',
+  'co',
+  'approx',
+  'st',
+  'jr',
+  'sr',
+  'fig',
+  'cf',
 ]);
 
 const BOUNDARY = /([.!?…]+["')\]”’]*)([ \t]+)/gu;
@@ -20,7 +48,10 @@ function isAbbreviation(textBeforeAndIncludingPunct) {
   // strip leading opening punctuation and the trailing run of terminators/closers
   const token = m[1].replace(/^["'“‘(\[]+/u, '');
   if (!/\.["')\]”’]*$/u.test(token) || /[!?…]/u.test(token.slice(-3))) return false;
-  const bare = token.replace(/["')\]”’]*$/u, '').replace(/\.$/u, '').toLowerCase();
+  const bare = token
+    .replace(/["')\]”’]*$/u, '')
+    .replace(/\.$/u, '')
+    .toLowerCase();
   return ABBREVIATIONS.has(bare);
 }
 
@@ -78,9 +109,34 @@ export function joinSegments(segments) {
 // as the limit allows. If a single clause is still over the limit the segment cannot be translated safely: TOO_LONG.
 const CONJUNCTIONS = [
   // Vietnamese
-  'và', 'nhưng', 'vì', 'nên', 'hoặc', 'còn', 'nếu', 'tuy', 'mặc dù', 'trong khi', 'để', 'do đó', 'vì vậy',
+  'và',
+  'nhưng',
+  'vì',
+  'nên',
+  'hoặc',
+  'còn',
+  'nếu',
+  'tuy',
+  'mặc dù',
+  'trong khi',
+  'để',
+  'do đó',
+  'vì vậy',
   // English
-  'and', 'but', 'because', 'so', 'or', 'while', 'although', 'though', 'which', 'where', 'when', 'if', 'since', 'unless',
+  'and',
+  'but',
+  'because',
+  'so',
+  'or',
+  'while',
+  'although',
+  'though',
+  'which',
+  'where',
+  'when',
+  'if',
+  'since',
+  'unless',
 ];
 const CONJ_ALT = CONJUNCTIONS.map((c) => c.replace(/ /gu, '\\s+')).join('|');
 const CUT_RE = new RegExp(`([;,])(\\s+)|(\\s+)(?=(?:${CONJ_ALT})(?![\\p{L}\\p{N}_]))`, 'giu');

@@ -27,6 +27,12 @@ const summarySchema = z.strictObject({
   existingDifferent: z.number().int().nonnegative(),
   newPeopleByDepartment: z.array(departmentCount),
   departmentsWithoutHead: z.array(departmentRef),
+  reviewQueue: z.strictObject({
+    total: z.number().int().nonnegative(),
+    items: z.array(
+      z.strictObject({ employeeCode: z.string(), fullName: z.string(), seats: z.number().int().positive() }),
+    ),
+  }),
   duplicateOf: z.strictObject({ importId: z.uuid(), fileName: z.string(), confirmedAt: z.iso.datetime() }).nullable(),
 });
 

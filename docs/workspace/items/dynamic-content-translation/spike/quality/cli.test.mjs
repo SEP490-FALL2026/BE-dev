@@ -18,8 +18,40 @@ test('defaults', () => {
 });
 
 test('parses every option', () => {
-  const o = parseArgs(['--direction', 'vi-en', '--mode', 'protected', '--fixtures', 'heldout', '--tag', '4.3.1', '--warmup', '0', '--repetitions', '1', '--out', 'x.json', '--max-segment-tokens', '96', '--limit', '5', '--known-terms', 'none']);
-  assert.deepEqual(o, { direction: 'vi-en', mode: 'protected', fixtures: 'heldout', tag: '4.3.1', warmup: 0, repetitions: 1, out: 'x.json', maxSegmentTokens: 96, limit: 5, knownTerms: 'none' });
+  const o = parseArgs([
+    '--direction',
+    'vi-en',
+    '--mode',
+    'protected',
+    '--fixtures',
+    'heldout',
+    '--tag',
+    '4.3.1',
+    '--warmup',
+    '0',
+    '--repetitions',
+    '1',
+    '--out',
+    'x.json',
+    '--max-segment-tokens',
+    '96',
+    '--limit',
+    '5',
+    '--known-terms',
+    'none',
+  ]);
+  assert.deepEqual(o, {
+    direction: 'vi-en',
+    mode: 'protected',
+    fixtures: 'heldout',
+    tag: '4.3.1',
+    warmup: 0,
+    repetitions: 1,
+    out: 'x.json',
+    maxSegmentTokens: 96,
+    limit: 5,
+    knownTerms: 'none',
+  });
 });
 
 test('also accepts --key=value', () => {

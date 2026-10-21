@@ -1,0 +1,185 @@
+enum AssignmentKind {
+  PERSONAL
+  SERVICE
+}
+
+enum AssignmentSource {
+  BASELINE
+  HANDOVER
+  REQUEST
+}
+
+enum AssignmentDateBasis {
+  ACTUAL
+  RECORDED
+}
+
+// One seat held by one person on one subscription (or one internal plan, which has no subscription), over the
+// half-open period [validFrom, validUntil): validUntil null is open. Seats are never materialized (ADR-02): a free seat is
+// the number bought minus the assignments occupying a day. The database holds the invariants: INV-01 (seats taken never
+// exceed seats bought), INV-02 (no overlap of one person on one subscription), INV-07 (time-limited staff have an
+// expected end date), and a closed baseline takes no baseline row. Nothing is deleted; only when it ends and when it is
+// expected to end may change.
+model LicenseAssignment {
+  id                          String              @id @default(uuid()) @db.Uuid
+  organizationId              String              @map("organization_id") @db.Uuid
+  kind                        AssignmentKind
+  source                      AssignmentSource
+  planId                      String              @map("plan_id") @db.Uuid
+  subscriptionId              String?             @map("subscription_id") @db.Uuid
+  // The person who holds the seat, or who answers for a service account.
+  employeeId                  String              @map("employee_id") @db.Uuid
+  accountIdentifier           String              @map("account_identifier")
+  normalizedAccountIdentifier String              @map("normalized_account_identifier")
+  reason                      String?
+  costCenterId                String?             @map("cost_center_id") @db.Uuid
+  validFrom                   DateTime            @map("valid_from") @db.Date
+  validFromBasis              AssignmentDateBasis @map("valid_from_basis")
+  validUntil                  DateTime?           @map("valid_until") @db.Date
+  expectedEndDate             DateTime?           @map("expected_end_date") @db.Date
+  // Set once when the grant it was made for is closed as failed: the period is then empty, so no seat is taken.
+  failedAt                    DateTime?           @map("failed_at") @db.Timestamptz(3)
+  predecessorId               String?             @map("predecessor_id") @db.Uuid
+  baselineImportId            String?             @map("baseline_import_id") @db.Uuid
+  // A value, not a foreign key: the history outlives the account (as the audit trail does).
+  createdByAppUserId          String              @map("created_by_app_user_id") @db.Uuid
+  createdAt                   DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  organization      Organization        @relation(fields: [organizationId], references: [id])
+  plan              Plan                @relation(fields: [planId], references: [id])
+  subscription      Subscription?       @relation(fields: [subscriptionId], references: [id], onDelete: Restrict)
+  employee          Employee            @relation(fields: [employeeId], references: [id])
+  costCenter        CostCenter?         @relation(fields: [costCenterId], references: [id], onDelete: Restrict)
+  predecessor       LicenseAssignment?  @relation("AssignmentChain", fields: [predecessorId], references: [id], onDelete: Restrict)
+  successors        LicenseAssignment[] @relation("AssignmentChain")
+  baselineImport    SeatBaselineImport? @relation(fields: [baselineImportId], references: [id], onDelete: Restrict)
+  provisioningTasks ProvisioningTask[]
+
+  @@index([subscriptionId])
+  @@index([planId])
+  @@index([employeeId])
+  @@index([baselineImportId])
+  @@map("license_assignments")
+}
+
+// Whether the seat baseline (step 4 of the installation) is closed. One row per organization, made when first needed;
+// a confirmation of a baseline import holds it FOR SHARE and closing holds it FOR UPDATE, so they meet one after the
+// other. Closing never reopens.
+model SeatBaselineState {
+  organizationId    String    @id @map("organization_id") @db.Uuid
+  closedAt          DateTime? @map("closed_at") @db.Timestamptz(3)
+  closedByAppUserId String?   @map("closed_by_app_user_id") @db.Uuid
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@map("seat_baseline_states")
+}
+
+enum ProvisioningTaskKind {
+  GRANT
+  REVOKE
+}
+
+enum ProvisioningChannel {
+  MANUAL
+  CONNECTOR
+}
+
+enum ProvisioningTaskStatus {
+  QUEUED
+  RETRY_SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+  CLOSED_FAILED
+}
+
+enum ProvisioningFailureKind {
+  TRANSIENT
+  PERMANENT
+  AUTHENTICATION
+  QUOTA_EXCEEDED
+  NOT_DONE
+}
+
+// One piece of work the IT team does to make a decision real: today the grant of a seat (US-07-01), by hand or through a
+// connector, in one queue. The assignment is the decision and holds the seat from the day it is made, so a seat stays
+// taken while the task is queued, in progress or failed (BR-10.4). A manual task completes only with a person's evidence;
+// nothing here moves with time. The request is a value, not a foreign key: requests belong to a later module.
+model ProvisioningTask {
+  id                           String                   @id @default(uuid()) @db.Uuid
+  organizationId               String                   @map("organization_id") @db.Uuid
+  assignmentId                 String                   @map("assignment_id") @db.Uuid
+  kind                         ProvisioningTaskKind
+  channel                      ProvisioningChannel
+  status                       ProvisioningTaskStatus   @default(QUEUED)
+  requestId                    String                   @map("request_id") @db.Uuid
+  // The IT Admin in charge of the department of the beneficiary when the task was made; null when there was none.
+  defaultResponsibleEmployeeId String?                  @map("default_responsible_employee_id") @db.Uuid
+  // Accounts are values, not foreign keys: the history outlives the account (as the audit trail does).
+  claimedByAppUserId           String?                  @map("claimed_by_app_user_id") @db.Uuid
+  claimedAt                    DateTime?                @map("claimed_at") @db.Timestamptz(3)
+  completedByAppUserId         String?                  @map("completed_by_app_user_id") @db.Uuid
+  completedAt                  DateTime?                @map("completed_at") @db.Timestamptz(3)
+  evidence                     String?
+  failedByAppUserId            String?                  @map("failed_by_app_user_id") @db.Uuid
+  failedAt                     DateTime?                @map("failed_at") @db.Timestamptz(3)
+  failureReason                String?                  @map("failure_reason")
+  failureKind                  ProvisioningFailureKind? @map("failure_kind")
+  // Tries made (the first and the retries); the last error is technical detail for the IT team, never for the user.
+  attempts                     Int                      @default(0)
+  // The most tries the task gets (the first and the retries `PROVISIONING_RETRY_COUNT` allowed when it was made): fixed
+  // then, so a parameter changed later reaches only the tasks made after it (US-01-04 AC-13).
+  maxAttempts                  Int                      @map("max_attempts")
+  lastError                    String?                  @map("last_error")
+  nextRetryAt                  DateTime?                @map("next_retry_at") @db.Timestamptz(3)
+  closedByAppUserId            String?                  @map("closed_by_app_user_id") @db.Uuid
+  closedAt                     DateTime?                @map("closed_at") @db.Timestamptz(3)
+  closeReason                  String?                  @map("close_reason")
+  handedOffByAppUserId         String?                  @map("handed_off_by_app_user_id") @db.Uuid
+  handedOffAt                  DateTime?                @map("handed_off_at") @db.Timestamptz(3)
+  handOffEvidence              String?                  @map("hand_off_evidence")
+  createdByAppUserId           String                   @map("created_by_app_user_id") @db.Uuid
+  createdAt                    DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt                    DateTime                 @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization       Organization      @relation(fields: [organizationId], references: [id])
+  assignment         LicenseAssignment @relation(fields: [assignmentId], references: [id], onDelete: Restrict)
+  defaultResponsible Employee?         @relation("TaskDefaultResponsible", fields: [defaultResponsibleEmployeeId], references: [id], onDelete: Restrict)
+
+  @@unique([assignmentId, kind])
+  @@index([status, createdAt])
+  @@index([defaultResponsibleEmployeeId])
+  @@map("provisioning_tasks")
+}
+
+enum LicenseKeyStatus {
+  IN_STORE
+  ASSIGNED
+  RETIRED
+}
+
+// A license key of a K4 purchase, kept only as ciphertext (QĐ-54b, US-04-12). The fingerprint is the HMAC of the key with a
+// stable secret: it finds a key that was imported twice and tells nothing of the key. The key never leaves in the clear
+// but by a reveal, which writes an audit event in the same transaction. Keys are never deleted; the vault holds them for
+// good and only their status moves (assigning and retiring belong to the device-dependent work).
+model LicenseKey {
+  id                  String           @id @default(uuid()) @db.Uuid
+  organizationId      String           @map("organization_id") @db.Uuid
+  subscriptionId      String           @map("subscription_id") @db.Uuid
+  fingerprint         String
+  masked              String
+  ciphertext          Bytes
+  cipherKeyId         String           @map("cipher_key_id")
+  status              LicenseKeyStatus @default(IN_STORE)
+  // The importing account is a value, not a foreign key: the history outlives the account (as the audit trail does).
+  importedByAppUserId String           @map("imported_by_app_user_id") @db.Uuid
+  importedAt          DateTime         @default(now()) @map("imported_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, fingerprint])
+  @@index([subscriptionId, status])
+  @@map("license_keys")
+}

@@ -14,7 +14,9 @@ import { longItem } from '../fixtures/src/helpers.mjs';
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const date = new Date().toISOString().slice(0, 10);
 const outIdx = process.argv.indexOf('--out');
-const outFile = path.resolve(outIdx > -1 ? process.argv[outIdx + 1] : path.join(root, 'results', `length-probe-${date}.json`));
+const outFile = path.resolve(
+  outIdx > -1 ? process.argv[outIdx + 1] : path.join(root, 'results', `length-probe-${date}.json`),
+);
 
 function maxRepeat4gram(text) {
   const w = text.toLowerCase().split(/\s+/).filter(Boolean);
@@ -28,7 +30,11 @@ function maxRepeat4gram(text) {
 
 const { depsDir, modelsDir } = resolveDirs();
 const { mod } = await loadTransformers(depsDir);
-const out = { date, note: 'raw translation of one sentence built from the first N clauses; batch size 1', directions: {} };
+const out = {
+  date,
+  note: 'raw translation of one sentence built from the first N clauses; batch size 1',
+  directions: {},
+};
 for (const direction of ['vi-en', 'en-vi']) {
   const lang = direction.split('-')[0];
   const model = await loadDirection({ direction, mod, modelsDir });

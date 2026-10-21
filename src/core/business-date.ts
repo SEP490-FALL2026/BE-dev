@@ -40,3 +40,11 @@ export function toDateColumn(date: BusinessDate): Date {
 export function fromDateColumn(value: Date): BusinessDate {
   return value.toISOString().slice(0, 10);
 }
+
+/** The calendar date `days` after `date` (before it when negative): whole days of the calendar, no time zone involved. */
+export function addDays(date: BusinessDate, days: number): BusinessDate {
+  const shifted = new Date(`${date}T00:00:00.000Z`);
+  shifted.setUTCDate(shifted.getUTCDate() + days);
+
+  return shifted.toISOString().slice(0, 10);
+}

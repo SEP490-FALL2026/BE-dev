@@ -2,7 +2,7 @@
 
 `docker compose up -d --wait` starts local PostgreSQL only; that is all the API and the worker need. Redis and MinIO are
 optional and start only under their named profiles (`--profile queue`, `--profile storage`), for trying the queue and
-object-storage sources that are not mounted today (Owner decision E2 = A, H6.4). Ports bind to loopback.
+object storage the API mounts for contract files (the queue is not mounted, Owner decision E2 = A, H6.4). Ports bind to loopback.
 Check for port conflicts before starting; do not stop unrelated services.
 Create the configured MinIO bucket before using storage.
 
@@ -26,19 +26,28 @@ docker build --target migrate -t slm-migrate:foundation .
 ```
 
 The runtime defaults to production. Supply DATABASE_URL and HTTPS CORS_ORIGINS.
-Redis and object storage are not required: neither module is mounted in the API or the worker. A slice that mounts one
-gets its production validation back (REDIS_HOST/REDIS_PASSWORD, or an HTTPS OBJECT_STORAGE_ENDPOINT with
-credentials/bucket; the variables marked `@production-required-when-mounted` in `.env.example`).
+Redis is not required: the queue is not mounted. Object storage is mounted by the API (ADR-0014) and so needs an HTTPS
+OBJECT_STORAGE_ENDPOINT with OBJECT_STORAGE_BUCKET and the access key (the variables marked
+`@production-required-when-mounted` in `.env.example`); the worker and the commands do not read them. The endpoint is
+the one the browser uploads to and the one signed links open: its host is written into every link, so it must be
+reachable from the user's browser over HTTPS (not a container-internal name), the bucket must already exist, and the
+bucket must allow the browser's `PUT` from the application's origin (CORS). Links live 15 minutes to upload and 5
+minutes to view (ADR-0014).
 Authentication also requires AUTH_ACCESS_TOKEN_SECRET and AUTH_THROTTLE_PEPPER;
-invitation delivery requires HTTPS APP_PUBLIC_URL, OUTBOX_PAYLOAD_KEY (base64 of 32 bytes),
-OUTBOX_PAYLOAD_KEY_ID, SMTP_HOST, SMTP_FROM and SMTP_TLS=true, plus the provider's port/auth settings.
+invitation delivery requires HTTPS APP_PUBLIC_URL, OUTBOX_PAYLOAD_KEY (base64 of 32 bytes), OUTBOX_PAYLOAD_KEY_ID,
+SMTP_HOST, SMTP_FROM and SMTP_TLS=true, plus the provider's port/auth settings.
+The license key vault requires LICENSE_KEY_VAULT_KEY (base64 of 32 bytes, never the same as OUTBOX_PAYLOAD_KEY),
+LICENSE_KEY_VAULT_KEY_ID and LICENSE_KEY_FINGERPRINT_PEPPER; LICENSE_KEY_VAULT_PREVIOUS_KEYS (`id:base64` pairs) keeps
+the keys of a rotation and is held to the same rules as the current key. How to rotate and what to back up:
+[license key vault](license-key-vault.md).
 The [environment validator](../../src/infrastructure/config/env-schema.ts) owns the full constraints, and refuses in
-production (and in development) any of those four secrets whose value is public in the repository.
+production (and in development) any secret value that is public in the repository (the five secrets above and a
+previous vault key).
 The API and the worker validate all of these settings and refuse to start in production without them.
 The runtime image also carries `src/infrastructure/config/database-url.ts`, the one `DATABASE_URL` rule that both the
 validator and `prisma.config.ts` read, so `prisma` commands in the image resolve the same URL.
 The installation command validates only the database settings and NODE_ENV (see below).
-Use container-reachable hostnames: localhost means the container itself.
+Use container-reachable hostnames: localhost means the container itself (the object storage endpoint is the exception: it must reach the browser).
 
 Create untracked environment files appropriate to the target environment:
 

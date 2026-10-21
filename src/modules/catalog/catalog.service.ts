@@ -1,79 +1,53 @@
-import { HttpStatus, Injectable } from '@nestjs/common';
-import { normalizePageSize } from '../../core/application/pagination';
-import { ApiException } from '../../infrastructure/http/errors/api.exception';
-import { CATALOG_ERROR_CODES } from './catalog.constants';
-import { CatalogRepo } from './catalog.repo';
-import { CatalogApplicationPage, CatalogApplicationStatus, CatalogApplicationWire } from './catalog.types';
-import { ApplicationSlugTakenError } from './errors/catalog.errors';
-import { toCatalogApplicationWire } from './mappers/catalog-application.mapper';
-
-interface ListApplicationsInput {
-  page: number;
-  pageSize: number;
-  status?: CatalogApplicationStatus;
-}
-
-interface CreateApplicationInput {
-  slug: string;
-  name: string;
-  vendor: string;
-}
+import { Injectable } from '@nestjs/common';
+import { DbTx } from '../../infrastructure/database/transaction-runner';
+import type {
+  CatalogOnboardingFacts,
+  PlanSummary,
+  SeatOccupancyReader,
+  SeatTarget,
+  SeatTargetRef,
+} from './catalog.types';
+import { SeatOccupancyRegistry } from './subscription/seat-occupancy.registry';
+import { OnboardingFactsService } from './subscription/onboarding-facts.service';
+import { SeatTargetService } from './subscription/seat-target.service';
 
 /**
- * Public contract of the catalog module. Other modules call this class and nothing else;
- * `CatalogRepo` stays private so no caller can reach the tables directly.
+ * The catalog facade other modules call (ADR-0013: `licensing → catalog`). It exposes what the assignments of seats
+ * need to know about a subscription or an internal plan and nothing of how the catalog keeps it.
  */
 @Injectable()
 export class CatalogService {
-  constructor(private readonly repo: CatalogRepo) {}
+  constructor(
+    private readonly seatTargets: SeatTargetService,
+    private readonly onboarding: OnboardingFactsService,
+    private readonly occupancy: SeatOccupancyRegistry,
+  ) {}
 
-  async listApplications(input: ListApplicationsInput): Promise<CatalogApplicationPage> {
-    const pageSize = normalizePageSize(input.pageSize);
-    const { rows, totalItems } = await this.repo.findPage({
-      page: input.page,
-      pageSize,
-      status: input.status,
-    });
-
-    return {
-      items: rows.map(toCatalogApplicationWire),
-      pagination: {
-        page: input.page,
-        pageSize,
-        totalItems,
-        totalPages: Math.ceil(totalItems / pageSize),
-      },
-    };
+  /** `licensing` registers how the catalog reads the seats it holds, when its module starts (ADR-0013 item 4). */
+  registerSeatOccupancy(reader: SeatOccupancyReader): void {
+    this.occupancy.register(reader);
   }
 
-  async getApplication(id: string): Promise<CatalogApplicationWire> {
-    const record = await this.repo.findById(id);
-
-    if (record === null) {
-      throw new ApiException(HttpStatus.NOT_FOUND, {
-        code: CATALOG_ERROR_CODES.applicationNotFound,
-        message: 'The catalog application was not found.',
-      });
-    }
-
-    return toCatalogApplicationWire(record);
+  /** The plans with these ids by name, with their application, as far as they exist. */
+  getPlanSummaries(ids: readonly string[]): Promise<PlanSummary[]> {
+    return this.onboarding.planSummaries(ids);
   }
 
-  async createApplication(input: CreateApplicationInput): Promise<CatalogApplicationWire> {
-    try {
-      return toCatalogApplicationWire(await this.repo.create(input));
-    } catch (error) {
-      // Translate only the error we understand. Anything else is a real failure and must
-      // keep bubbling to the exception filter as a 500.
-      if (error instanceof ApplicationSlugTakenError) {
-        throw new ApiException(HttpStatus.CONFLICT, {
-          code: CATALOG_ERROR_CODES.applicationSlugTaken,
-          message: 'A catalog application with this slug already exists.',
-          details: { slug: error.slug },
-        });
-      }
+  /** How many applications, plans and subscriptions exist, for the onboarding checklist. */
+  getOnboardingFacts(): Promise<CatalogOnboardingFacts> {
+    return this.onboarding.read();
+  }
 
-      throw error;
-    }
+  /** The seat target without a lock, or null when the subscription or the plan does not exist. */
+  findSeatTarget(ref: SeatTargetRef, tx?: DbTx): Promise<SeatTarget | null> {
+    return this.seatTargets.find(ref, tx);
+  }
+
+  /**
+   * The seat target, locked until the caller's transaction ends: the subscription `FOR UPDATE`, so writers of its seats
+   * queue and a change of its quantity waits; an internal plan `FOR SHARE`. Null when it does not exist.
+   */
+  lockSeatTarget(tx: DbTx, ref: SeatTargetRef): Promise<SeatTarget | null> {
+    return this.seatTargets.lock(tx, ref);
   }
 }

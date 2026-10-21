@@ -12,12 +12,12 @@
 
 Phòng ban cần một Cost Center `Unit` do **Finance** tạo trước (`FR-3.17`, `US-04-09` AC-8). Lát này cho Finance duy trì danh mục Cost Center và cho IT Admin **đọc** nó để chọn mã còn trống khi tạo phòng.
 
-| Trong lát                                                                                                | Ngoài lát (nơi làm)                                                                                                                             |
-| -------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `US-04-09` AC-1, AC-2 (tạo, IT không tạo được), AC-3 (ngừng dùng khi còn người), AC-4 (hai loại)         | AC-7, AC-8, AC-9 vế **tạo phòng** (chọn, 1–1, đổi tên/trưởng phòng) — `g2-department-profile`                                                   |
-| AC-5 vế Cost Center: mã đã ngừng dùng không gắn được cho phòng (ràng buộc CSDL)                          | AC-10, AC-11 vế **tạo phòng mới / điều chuyển từng người** — G2 phòng ban, G6 (`US-03-01`); lát này chỉ cho phép ngừng dùng khi phòng hết người |
-| AC-6 Finance xem nhân viên trong phạm vi Cost Center ở dạng rút gọn                                      | Ngân sách theo Cost Center (`US-06-09`), phân bổ gói dùng chung (`US-04-08`), dòng _Chưa phân bổ_ (`US-12-12`)                                  |
-| Chặn nhập nhân viên vào phòng có Cost Center đã ngừng dùng (lý do mới `DEPARTMENT_COST_CENTER_INACTIVE`) | Điều kiện ngừng dùng Cost Center `Company` đang dùng cho tài khoản dùng chung (G4, `OQ-B-18`)                                                   |
+| Trong lát                                                                                                | Ngoài lát (nơi làm)                                                                                                                                  |
+| -------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `US-04-09` AC-1, AC-2 (tạo, IT không tạo được), AC-3 (ngừng dùng khi còn người), AC-4 (hai loại)         | AC-7, AC-8, AC-9 vế **tạo phòng** (chọn, 1–1, đổi tên/trưởng phòng) — `g2-department-profile`                                                        |
+| AC-5 vế Cost Center: mã đã ngừng dùng không gắn được cho phòng (ràng buộc CSDL)                          | AC-10, AC-11 vế **tạo phòng mới / điều chuyển từng người** — G2 phòng ban, G6 (`US-03-01`); lát này chỉ cho phép ngừng dùng khi phòng hết người      |
+| AC-6 Finance xem nhân viên trong phạm vi Cost Center ở dạng rút gọn                                      | Ngân sách theo Cost Center (`US-06-09`), phân bổ gói dùng chung (`US-04-08`), dòng _Chưa phân bổ_ (`US-12-12`)                                       |
+| Chặn nhập nhân viên vào phòng có Cost Center đã ngừng dùng (lý do mới `DEPARTMENT_COST_CENTER_INACTIVE`) | Điều kiện ngừng dùng Cost Center `Company` đang được Assignment tài khoản dịch vụ dùng (G4): **câu hỏi mở**, `OQ-B-18`, xem _Thay đổi và nghiệm thu_ |
 
 ## Làm rõ yêu cầu
 
@@ -87,3 +87,5 @@ Audit cùng giao dịch: `COST_CENTER.CREATED` (`after` code, tên, loại, tr�
 ## Thay đổi và nghiệm thu
 
 16/10/2026: thiết kế và triển khai trong cùng phiên theo giao việc của Owner (tự thiết kế, tự làm). Quyết định cần Owner xác nhận khi review: mã bất biến và không có thao tác mở lại; "còn người" = còn nhân viên hiệu lực hôm nay; AC-6 liệt kê chỉ người đang làm việc. Chưa review, chưa nghiệm thu.
+
+21/10/2026 (đợt hoàn tất G2–G4, [audit](../../../reviews/g2-g4-completion-2026-10-21/README.md), câu hỏi Q1 cho Owner): dòng ở bảng _Trong lát/Ngoài lát_ về Cost Center `Company` được ghi lại cho đúng hiện trạng. Từ khi `g4-seat-baseline-import` có, Assignment tài khoản dịch vụ mang `cost_center_id` của một Cost Center `Company` đang dùng; nhưng việc ngừng dùng ở lát này chỉ kiểm nhân viên hiệu lực của phòng gắn Cost Center `Unit`, **không** kiểm Assignment tài khoản dịch vụ. Có chặn ngừng dùng Cost Center `Company` đang được Assignment tài khoản dịch vụ dùng hay không **vẫn là câu hỏi mở** (`OQ-B-18` còn mở; `US-04-09` không có AC cho việc này) và chờ Owner quyết; lát này không tự đặt quy tắc. Hành vi và test của lát không đổi; Owner review: chưa review.

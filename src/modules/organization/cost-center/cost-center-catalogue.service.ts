@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { CreateCostCenterInput } from '../organization.types';
+import { CostCenterBrief, CreateCostCenterInput } from '../organization.types';
 import { CostCenterRepo } from './cost-center.repo';
 import { CostCenterRecord } from './cost-center.types';
 
@@ -19,6 +19,18 @@ export class CostCenterCatalogueService {
 
   findByCode(tx: DbTx, organizationId: string, code: string): Promise<CostCenterRecord | null> {
     return this.repo.findByCode(tx, organizationId, code);
+  }
+
+  findBriefs(ids: readonly string[], tx?: DbTx): Promise<CostCenterBrief[]> {
+    return this.repo.findBriefs(ids, tx);
+  }
+
+  findBriefsByCodes(codes: readonly string[], tx?: DbTx): Promise<CostCenterBrief[]> {
+    return this.repo.findBriefsByCodes(codes, tx);
+  }
+
+  lockSharedBriefs(tx: DbTx, ids: readonly string[]): Promise<CostCenterBrief[]> {
+    return this.repo.lockSharedBriefs(tx, ids);
   }
 
   countFreeUnits(tx?: DbTx): Promise<number> {

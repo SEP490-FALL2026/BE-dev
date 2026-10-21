@@ -1,6 +1,7 @@
 import type { DbTx, TransactionRunner } from '../../src/infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../src/infrastructure/security/tokens/access-token-verifier.port';
 import type { AuditService } from '../../src/modules/audit/audit.service';
+import type { LicensingService } from '../../src/modules/licensing/licensing.service';
 import type { OrganizationService } from '../../src/modules/organization/organization.service';
 import type { EmployeeImportLookupData } from '../../src/modules/organization/organization.types';
 import type {
@@ -278,6 +279,7 @@ export function harness(start: Directory = directory()) {
     org as unknown as OrganizationService,
     audit as unknown as AuditService,
     runner as unknown as TransactionRunner,
+    { openSeatHolders: () => Promise.resolve([]) } as unknown as LicensingService,
   );
 
   return {

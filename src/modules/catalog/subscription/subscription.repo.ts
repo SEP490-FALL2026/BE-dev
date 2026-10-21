@@ -1,0 +1,220 @@
+import { Injectable } from '@nestjs/common';
+import { fromDateColumn, toDateColumn, type BusinessDate } from '../../../core/business-date';
+import { formatRate, parseRate } from '../../../core/money/rate';
+import { Prisma } from '../../../generated/prisma/client';
+import { PrismaService } from '../../../infrastructure/database/prisma.service';
+import { DbTx } from '../../../infrastructure/database/transaction-runner';
+import type {
+  NewSubscription,
+  PriceSnapshotRecord,
+  SubscriptionKind,
+  SubscriptionListFilter,
+  SubscriptionRecord,
+  SubscriptionState,
+  UnitPriceRecord,
+} from './subscription.types';
+
+const WITH_PLAN = { plan: { include: { application: { include: { vendor: true } } } } } as const;
+type Row = Prisma.SubscriptionGetPayload<{ include: typeof WITH_PLAN }>;
+
+const date = (value: Date | null) => (value ? fromDateColumn(value) : null);
+const column = (value: string | null) => (value ? toDateColumn(value) : null);
+
+function toRecord(row: Row): SubscriptionRecord {
+  const unitPrice: UnitPriceRecord | null =
+    row.unitPriceMinor !== null && row.unitPriceCurrency !== null && row.priceRecordedOn !== null
+      ? {
+          amountMinor: row.unitPriceMinor,
+          currency: row.unitPriceCurrency,
+          recordedOn: fromDateColumn(row.priceRecordedOn),
+        }
+      : null;
+  const priceSnapshot: PriceSnapshotRecord | null =
+    row.priceRate !== null &&
+    row.priceRateDate !== null &&
+    row.priceRateSource !== null &&
+    row.priceReportingMinor !== null &&
+    row.priceReportingCurrency !== null
+      ? {
+          rate: parseRate(row.priceRate.toFixed(10)),
+          rateDate: fromDateColumn(row.priceRateDate),
+          rateSource: row.priceRateSource,
+          reportingMinor: row.priceReportingMinor,
+          reportingCurrency: row.priceReportingCurrency,
+          exchangeRateId: row.priceExchangeRateId,
+        }
+      : null;
+  const { application } = row.plan;
+  if (!application.vendor) throw new Error('A subscription belongs to an application with a vendor');
+
+  return {
+    id: row.id,
+    planId: row.planId,
+    planName: row.plan.name,
+    planPricingModel: row.plan.pricingModel,
+    applicationId: application.id,
+    applicationName: application.name,
+    applicationKind: application.kind,
+    vendor: { id: application.vendor.id, name: application.vendor.name },
+    kind: row.kind,
+    status: row.status,
+    purchasedQuantity: row.purchasedQuantity,
+    unitPrice,
+    priceSnapshot,
+    billingCycle: row.billingCycle,
+    startDate: date(row.startDate),
+    endDate: date(row.endDate),
+    renewalDate: date(row.renewalDate),
+    noticeDeadline: date(row.noticeDeadline),
+    noticePeriodDays: row.noticePeriodDays,
+    autoRenew: row.autoRenew,
+    allowsMidTermReduction: row.allowsMidTermReduction,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+}
+
+/** The columns a state writes: the same set for a new subscription and for every change, so a write never leaves a stale one. */
+function columnsOf(state: SubscriptionState) {
+  return {
+    status: state.status,
+    purchasedQuantity: state.purchasedQuantity,
+    unitPriceMinor: state.unitPrice?.amountMinor ?? null,
+    unitPriceCurrency: state.unitPrice?.currency ?? null,
+    priceRecordedOn: state.unitPrice ? toDateColumn(state.unitPrice.recordedOn) : null,
+    priceRate: state.priceSnapshot ? formatRate(state.priceSnapshot.rate) : null,
+    priceRateDate: state.priceSnapshot ? toDateColumn(state.priceSnapshot.rateDate) : null,
+    priceRateSource: state.priceSnapshot?.rateSource ?? null,
+    priceReportingMinor: state.priceSnapshot?.reportingMinor ?? null,
+    priceReportingCurrency: state.priceSnapshot?.reportingCurrency ?? null,
+    priceExchangeRateId: state.priceSnapshot?.exchangeRateId ?? null,
+    billingCycle: state.billingCycle,
+    startDate: column(state.startDate),
+    endDate: column(state.endDate),
+    renewalDate: column(state.renewalDate),
+    noticeDeadline: column(state.noticeDeadline),
+    noticePeriodDays: state.noticePeriodDays,
+    autoRenew: state.autoRenew,
+    allowsMidTermReduction: state.allowsMidTermReduction,
+  };
+}
+
+/** The one writer of `subscriptions` (US-04-03): the subscriptions and perpetual purchases of the plans. */
+@Injectable()
+export class SubscriptionRepo {
+  constructor(private readonly prisma: PrismaService) {}
+
+  async insert(tx: DbTx, input: NewSubscription): Promise<SubscriptionRecord> {
+    const { organizationId, planId, kind, ...state } = input;
+    const row = await tx.subscription.create({
+      data: { organizationId, planId, kind, ...columnsOf(state) },
+      include: WITH_PLAN,
+    });
+
+    return toRecord(row);
+  }
+
+  async count(): Promise<number> {
+    return this.prisma.subscription.count();
+  }
+
+  /** The subscription, locked for the rest of the transaction, or null. */
+  async lock(tx: DbTx, id: string): Promise<SubscriptionRecord | null> {
+    const locked = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM subscriptions WHERE id = ${id}::uuid FOR UPDATE`;
+    if (locked.length === 0) return null;
+
+    return this.find(id, tx);
+  }
+
+  /** The subscriptions and perpetual purchases of these plans: only what a rule about their term needs. */
+  async findOfPlans(
+    planIds: readonly string[],
+    tx?: DbTx,
+  ): Promise<{ subscriptionId: string; planId: string; kind: SubscriptionKind; endDate: BusinessDate | null }[]> {
+    if (planIds.length === 0) return [];
+    const rows = await (tx ?? this.prisma).subscription.findMany({
+      where: { planId: { in: [...planIds] } },
+      select: { id: true, planId: true, kind: true, endDate: true },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    });
+
+    return rows.map((row) => ({
+      subscriptionId: row.id,
+      planId: row.planId,
+      kind: row.kind,
+      endDate: row.endDate ? fromDateColumn(row.endDate) : null,
+    }));
+  }
+
+  async find(id: string, tx?: DbTx): Promise<SubscriptionRecord | null> {
+    const row = await (tx ?? this.prisma).subscription.findUnique({ where: { id }, include: WITH_PLAN });
+
+    return row ? toRecord(row) : null;
+  }
+
+  /** Writes the whole mutable state; the plan and the kind never change. */
+  async update(tx: DbTx, id: string, state: SubscriptionState): Promise<SubscriptionRecord> {
+    const row = await tx.subscription.update({ where: { id }, data: columnsOf(state), include: WITH_PLAN });
+
+    return toRecord(row);
+  }
+
+  /** Every active term subscription, optionally of one plan, oldest first: what the notice and the alerts are drawn from. */
+  async listActiveTerms(planId?: string): Promise<SubscriptionRecord[]> {
+    const rows = await this.prisma.subscription.findMany({
+      where: { status: 'ACTIVE', kind: 'TERM', ...(planId ? { planId } : {}) },
+      include: WITH_PLAN,
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    });
+
+    return rows.map(toRecord);
+  }
+
+  /** One page by application, plan then creation, and the total for the same filter, from one snapshot. */
+  async list(filter: SubscriptionListFilter): Promise<{ items: SubscriptionRecord[]; total: number }> {
+    const conditions: Prisma.SubscriptionWhereInput[] = [
+      ...(filter.applicationId ? [{ plan: { applicationId: filter.applicationId } }] : []),
+      ...(filter.planId ? [{ planId: filter.planId }] : []),
+      ...(filter.status ? [{ status: filter.status }] : []),
+      ...(filter.kind ? [{ kind: filter.kind }] : []),
+      // The rule that derives the NO_ALERT_ANCHOR warning, as a filter: a term subscription with no declared deadline,
+      // no notice period that a renewal or end date can be counted from, and either auto renewal or no end date.
+      ...(filter.withoutAlertAnchor
+        ? [
+            { kind: 'TERM' as const },
+            { noticeDeadline: null },
+            {
+              NOT: {
+                AND: [
+                  { noticePeriodDays: { not: null } },
+                  { OR: [{ renewalDate: { not: null } }, { endDate: { not: null } }] },
+                ],
+              },
+            },
+            { OR: [{ autoRenew: true }, { endDate: null }] },
+          ]
+        : []),
+    ];
+    const where: Prisma.SubscriptionWhereInput = { AND: conditions };
+
+    return this.prisma.$transaction(
+      async (tx) => {
+        const rows = await tx.subscription.findMany({
+          where,
+          include: WITH_PLAN,
+          orderBy: [
+            { plan: { application: { normalizedName: 'asc' } } },
+            { plan: { normalizedName: 'asc' } },
+            { createdAt: 'asc' },
+            { id: 'asc' },
+          ],
+          skip: filter.skip,
+          take: filter.take,
+        });
+
+        return { items: rows.map(toRecord), total: await tx.subscription.count({ where }) };
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
+    );
+  }
+}
