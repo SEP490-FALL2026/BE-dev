@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto';
+import { Client } from 'pg';
 import request from 'supertest';
+import { waitForLockWaiters } from '../support/lock-wait';
 import { ProvisioningHarness } from '../support/provisioning-harness';
 
 const h = new ProvisioningHarness();
@@ -55,11 +57,11 @@ describe('the retirement of an application over HTTP (integration, real PostgreS
     employeeId: string,
     planId: string,
     subscriptionId: string | null,
-    options: { from?: string; until?: string | null; failed?: boolean } = {},
+    options: { from?: string; until?: string | null; failed?: boolean; db?: Pick<Client, 'query'> } = {},
   ) => {
     const id = randomUUID();
     const from = options.from ?? '2026-10-01';
-    await h.ctx.sql.query(
+    await (options.db ?? h.ctx.sql).query(
       `INSERT INTO license_assignments (id, organization_id, kind, source, plan_id, subscription_id, employee_id,
          account_identifier, normalized_account_identifier, valid_from, valid_from_basis, valid_until, failed_at,
          created_by_app_user_id)
@@ -329,6 +331,65 @@ describe('the retirement of an application over HTTP (integration, real PostgreS
     expect(h.codeOf(baseline)).toBe('SEAT_TARGET.APPLICATION_RETIRED');
   });
 
+  it('a baseline file previewed before the retirement cannot be confirmed after it, and writes nothing', async () => {
+    const planId = await h.plan('K5');
+    const applicationId = await applicationOf(planId);
+    const preview = h.dataOf<{ id: string; previewVersion: number }>(
+      await h.upload({ planId }, h.file([{ employee_code: 'E-R4', account_identifier: 'e-r4@acme.vn' }])).expect(201),
+    );
+    await confirm(applicationId, { businessOwnerEmployeeId: owner, note: 'đồng ý' }).expect(201);
+    await retire(applicationId).expect(200);
+
+    const refused = await h.confirm(preview.id, preview.previewVersion).expect(409);
+
+    expect(h.codeOf(refused)).toBe('SEAT_TARGET.APPLICATION_RETIRED');
+    const held = await h.ctx.sql.query<{ n: string }>(
+      `SELECT count(*) AS n FROM license_assignments WHERE plan_id = $1`,
+      [planId],
+    );
+    expect(Number(held.rows[0].n)).toBe(0);
+  });
+
+  it('a retirement waits for a grant that is being made, and then finds the seat it holds', async () => {
+    const planId = await h.plan('K5');
+    const applicationId = await applicationOf(planId);
+    await confirm(applicationId, { businessOwnerEmployeeId: owner, note: 'đồng ý' }).expect(201);
+    const holder = new Client({ connectionString: h.ctx.database.url });
+    await holder.connect();
+    try {
+      // The grant in flight: it holds the plan and has written its assignment, which is not committed yet.
+      await holder.query('BEGIN');
+      await holder.query('SELECT id FROM plans WHERE id = $1 FOR SHARE', [planId]);
+      await insertAssignment(people[3], planId, null, { db: holder });
+
+      const pending = retire(applicationId).then((response) => response);
+      await waitForLockWaiters(h.ctx.sql, 1);
+      await holder.query('COMMIT');
+      const refused = await pending;
+
+      expect(refused.status).toBe(409);
+      expect(h.codeOf(refused)).toBe('APPLICATION.RETIREMENT_BLOCKED');
+      expect(await statusOf(applicationId)).toBe('APPROVED');
+    } finally {
+      await holder.query('ROLLBACK').catch(() => undefined);
+      await holder.end();
+    }
+  });
+
+  it('shows an application that is retired as retired, with the day, and nothing left to decide', async () => {
+    const { applicationId } = await cleanApplication();
+    await confirm(applicationId, { businessOwnerEmployeeId: owner, note: 'đồng ý' }).expect(201);
+    await retire(applicationId).expect(200);
+
+    const { retirement: view } = h.dataOf<{
+      retirement: { status: string; retiredAt: string | null; canRetire: boolean };
+    }>(await retirement(applicationId).expect(200));
+
+    expect(view.status).toBe('RETIRED');
+    expect(view.retiredAt).not.toBeNull();
+    expect(view.canRetire).toBe(false);
+  });
+
   it('a grant and a retirement at the same moment never leave a retired application with a seat held under it', async () => {
     const planId = await h.plan('K5');
     const applicationId = await applicationOf(planId);
@@ -345,6 +406,39 @@ describe('the retirement of an application over HTTP (integration, real PostgreS
     );
     expect(Number(held.rows[0].n) > 0 && (await statusOf(applicationId)) === 'RETIRED').toBe(false);
     expect([granted.status, retired.status]).not.toEqual([201, 200]);
+  });
+
+  it('INV-06: a confirmation waits for a departure that is being recorded, and then finds the owner gone', async () => {
+    const { applicationId } = await cleanApplication();
+    const leaving = await h.person('E-OWNER-LEAVING');
+    await h.ctx.sql.query(`UPDATE applications SET business_owner_employee_id = $2 WHERE id = $1`, [
+      applicationId,
+      leaving,
+    ]);
+    const holder = new Client({ connectionString: h.ctx.database.url });
+    await holder.connect();
+    try {
+      await holder.query('BEGIN');
+      await holder.query(`UPDATE employees SET status = 'TERMINATED' WHERE id = $1`, [leaving]);
+
+      const pending = confirm(applicationId, { businessOwnerEmployeeId: leaving, note: 'đồng ý' }).then(
+        (response) => response,
+      );
+      await waitForLockWaiters(h.ctx.sql, 1);
+      await holder.query('COMMIT');
+      const refused = await pending;
+
+      expect(refused.status).toBe(422);
+      expect(h.codeOf(refused)).toBe('APPLICATION.RETIREMENT_NOT_BUSINESS_OWNER');
+      const kept = await h.ctx.sql.query(
+        `SELECT 1 FROM application_retirement_confirmations WHERE application_id = $1`,
+        [applicationId],
+      );
+      expect(kept.rowCount).toBe(0);
+    } finally {
+      await holder.query('ROLLBACK').catch(() => undefined);
+      await holder.end();
+    }
   });
 
   it('is for the IT Admin to record and retire; Finance only looks; an employee and the Super Admin do neither', async () => {

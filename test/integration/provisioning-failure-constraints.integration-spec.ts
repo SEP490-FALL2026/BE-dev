@@ -64,8 +64,8 @@ describe('failed provisioning tasks and failed assignments (integration, Postgre
   const newTask = async (channel: 'MANUAL' | 'CONNECTOR' = 'CONNECTOR', assignmentId?: string): Promise<string> => {
     const id = randomUUID();
     await sql.query(
-      `INSERT INTO provisioning_tasks (id, organization_id, assignment_id, kind, channel, request_id, created_by_app_user_id)
-       VALUES ($1, $2, $3, 'GRANT', $4::"ProvisioningChannel", $5, $6)`,
+      `INSERT INTO provisioning_tasks (id, organization_id, assignment_id, kind, channel, request_id, max_attempts, created_by_app_user_id)
+       VALUES ($1, $2, $3, 'GRANT', $4::"ProvisioningChannel", $5, 4, $6)`,
       [id, organizationId, assignmentId ?? (await newAssignment()), channel, randomUUID(), person()],
     );
 
@@ -209,7 +209,7 @@ describe('failed provisioning tasks and failed assignments (integration, Postgre
       expect(await close(`closed_by_app_user_id = '${person()}', closed_at = now(), close_reason = 'xong'`)).toBeNull();
     });
 
-    it('cannot be closed when it never failed', async () => {
+    it('cannot be closed when it never failed: a queued task is not on the line to being closed', async () => {
       const id = await newTask();
 
       expect(
@@ -218,7 +218,7 @@ describe('failed provisioning tasks and failed assignments (integration, Postgre
           `status = 'CLOSED_FAILED', closed_by_app_user_id = $2, closed_at = now(), close_reason = 'x'`,
           [person()],
         ),
-      ).toBe('23514');
+      ).toBe('55000');
     });
 
     it('never changes again, and is never deleted', async () => {
@@ -324,6 +324,80 @@ describe('failed provisioning tasks and failed assignments (integration, Postgre
       await expect(newAssignment({ plan: paidPlanId, subscriptionId, employeeId: employee })).resolves.toEqual(
         expect.any(String),
       );
+    });
+  });
+
+  describe('the lines a task may follow, whoever writes it (the state machine of the task)', () => {
+    const NO_FAILURE = `failed_by_app_user_id = NULL, failed_at = NULL, failure_reason = NULL, failure_kind = NULL`;
+    const COMPLETE = `status = 'COMPLETED', completed_by_app_user_id = $2, completed_at = now(), evidence = 'done'`;
+    const CLOSE = `status = 'CLOSED_FAILED', closed_by_app_user_id = $2, closed_at = now(), close_reason = 'given up'`;
+    const FAILURE = `failed_at = now(), failure_reason = 'refused', failure_kind = 'PERMANENT'`;
+    const taken = async (): Promise<string> => {
+      const id = await newTask('MANUAL');
+      await update(id, `status = 'IN_PROGRESS', claimed_by_app_user_id = $2, claimed_at = now()`, [person()]);
+
+      return id;
+    };
+    const waiting = async (): Promise<string> => {
+      const id = await newTask('CONNECTOR');
+      await update(
+        id,
+        `status = 'RETRY_SCHEDULED', failure_kind = 'TRANSIENT', attempts = 1, last_error = 'timeout', next_retry_at = now()`,
+      );
+
+      return id;
+    };
+
+    it.each([
+      [
+        'a queued task cannot be completed without being taken',
+        async () => newTask('MANUAL'),
+        `${COMPLETE}, claimed_by_app_user_id = $2, claimed_at = now()`,
+      ],
+      [
+        'a failed task cannot be completed: a decision comes first',
+        async () => failedTask('MANUAL'),
+        `${COMPLETE}, ${NO_FAILURE}`,
+      ],
+      [
+        'a queued task cannot be closed as failed: it never failed',
+        async () => newTask('CONNECTOR'),
+        `${CLOSE}, ${FAILURE}`,
+      ],
+      ['a task in progress cannot be closed as failed: it must fail first', taken, `${CLOSE}, ${FAILURE}`],
+      [
+        'a task in progress cannot be put back in the queue',
+        taken,
+        `status = 'QUEUED', claimed_by_app_user_id = NULL, claimed_at = NULL`,
+      ],
+      [
+        'a task waiting for its retry cannot be taken by hand',
+        waiting,
+        `status = 'IN_PROGRESS', claimed_at = now(), failure_kind = NULL, next_retry_at = NULL`,
+      ],
+    ])('refuses it: %s', async (_label, prepare, set) => {
+      const id = await prepare();
+
+      expect(await update(id, set, set.includes('$2') ? [person()] : [])).toBe('55000');
+    });
+
+    it('lets a task follow every line the application takes: taken, completed, failed, retried, handed off, closed', async () => {
+      const claimed = await taken();
+      expect(await update(claimed, `${COMPLETE}`, [person()])).toBeNull();
+
+      const failed = await failedTask('MANUAL');
+      expect(
+        await update(
+          failed,
+          `status = 'QUEUED', channel = 'MANUAL', claimed_by_app_user_id = NULL, claimed_at = NULL, ${NO_FAILURE}`,
+        ),
+      ).toBeNull();
+
+      const connector = await failedTask('CONNECTOR');
+      expect(await update(connector, `${CLOSE}`, [person()])).toBeNull();
+
+      const retrying = await waiting();
+      expect(await update(retrying, `status = 'FAILED', ${FAILURE}, next_retry_at = NULL`)).toBeNull();
     });
   });
 });

@@ -66,7 +66,8 @@ describe('the tools a department uses (US-03-06 AC-13, AC-17, integration, real 
           fullName: `Person ${code}`,
           workEmail: `${code.toLowerCase()}@acme.vn`,
           employmentType: 'STAFF',
-          hireDate: '2026-10-01',
+          // Long before any seat of the baseline: a seat never starts before the person does.
+          hireDate: '2024-06-01',
           departmentCode,
           jobTitleId: h.seed.jobTitleId,
         })

@@ -7,7 +7,9 @@ export type { ExistingAssignment };
 /** Fixtures of the seat baseline row judgement: a company with people of every kind and Cost Centers of both. */
 export const TODAY = '2026-10-01';
 
-const staff = { id: 'e-staff', status: 'ACTIVE', employmentType: 'STAFF' } as const;
+/** Everyone started long before `TODAY`, so no row is early unless a test says so. */
+const HIRED = '2020-01-01';
+const staff = { id: 'e-staff', status: 'ACTIVE', employmentType: 'STAFF', hireDate: HIRED } as const;
 export const facts = (over: Partial<SeatFacts> = {}): SeatFacts => ({
   target: { kind: 'SUBSCRIPTION', purchasedQuantity: 100 },
   recordedOn: TODAY,
@@ -17,10 +19,10 @@ export const facts = (over: Partial<SeatFacts> = {}): SeatFacts => ({
     ['E3', { ...staff, id: 'e3' }],
     ['E4', { ...staff, id: 'e4' }],
     ['E5', { ...staff, id: 'e5' }],
-    ['LEFT', { id: 'e-left', status: 'TERMINATED', employmentType: 'STAFF' }],
-    ['T1', { id: 'e-intern', status: 'ACTIVE', employmentType: 'INTERN' }],
-    ['T2', { id: 'e-contractor', status: 'ACTIVE', employmentType: 'CONTRACTOR' }],
-    ['T3', { id: 'e-freelancer', status: 'ACTIVE', employmentType: 'FREELANCER' }],
+    ['LEFT', { id: 'e-left', status: 'TERMINATED', employmentType: 'STAFF', hireDate: HIRED }],
+    ['T1', { id: 'e-intern', status: 'ACTIVE', employmentType: 'INTERN', hireDate: HIRED }],
+    ['T2', { id: 'e-contractor', status: 'ACTIVE', employmentType: 'CONTRACTOR', hireDate: HIRED }],
+    ['T3', { id: 'e-freelancer', status: 'ACTIVE', employmentType: 'FREELANCER', hireDate: HIRED }],
   ]),
   costCenters: new Map([
     ['CC-CORP', { id: 'cc-corp', kind: 'COMPANY', status: 'ACTIVE' }],

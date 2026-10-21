@@ -7,10 +7,12 @@ import { AuditService } from '../../audit/audit.service';
 import { CatalogService } from '../../catalog/catalog.service';
 import type { SeatTarget } from '../../catalog/catalog.types';
 import { OrganizationService } from '../../organization/organization.service';
+import { OperatingParametersService } from '../../operating-parameters/operating-parameters.service';
 import { AssignmentService } from '../assignment/assignment.service';
 import {
   GrantRequestRefusedError,
   ProvisioningBeneficiaryDepartedError,
+  ProvisioningBeneficiaryNotStartedError,
   ProvisioningSubscriptionError,
   ProvisioningTaskNotFoundError,
   SeatQuantityUnknownError,
@@ -31,6 +33,7 @@ import {
   cleanFailureReason,
   nextStatus,
 } from './provisioning.policy';
+import { maxAttempts as maxAttemptsFor } from './failure.policy';
 import { ProvisioningTaskFrame } from './provisioning-task-frame.service';
 import { ProvisioningTaskRepo } from './provisioning-task.repo';
 import { ProvisioningTaskViewService, type TaskView } from './provisioning-task-view.service';
@@ -52,6 +55,7 @@ export class ProvisioningService {
     private readonly assignments: AssignmentService,
     private readonly catalog: CatalogService,
     private readonly organization: OrganizationService,
+    private readonly parameters: OperatingParametersService,
     private readonly audit: AuditService,
     private readonly runner: TransactionRunner,
     @Inject(GRANT_REQUEST_GATE) private readonly gate: GrantRequestGate,
@@ -61,7 +65,8 @@ export class ProvisioningService {
    * Grants the seat of a request: the assignment (source REQUEST, from today) and a manual task in the queue of the IT
    * Admin in charge of the beneficiary's department. Throws GrantRequestRefusedError, SeatTargetNotFoundError,
    * ProvisioningTypeNotSupportedError, ProvisioningSubscriptionError, SeatQuantityUnknownError, EmployeeNotFoundError,
-   * ProvisioningBeneficiaryDepartedError, ProvisioningPersonalAccountError and AssignmentConflictError.
+   * ProvisioningBeneficiaryDepartedError, ProvisioningBeneficiaryNotStartedError, ProvisioningPersonalAccountError and
+   * AssignmentConflictError.
    */
   async grant(
     actor: AuthenticatedPrincipal,
@@ -78,12 +83,16 @@ export class ProvisioningService {
     const organization = await this.requireOrganization();
     const today = await this.organization.businessToday();
     const inCharge = await this.organization.getItAdminInCharge(answer.employeeId, today);
+    // The most tries are fixed here: a parameter changed later reaches only the tasks made after it (US-01-04 AC-13).
+    const maxAttempts = maxAttemptsFor(Number(await this.parameters.getValue('PROVISIONING_RETRY_COUNT')));
 
     const record = await this.runner.run(async (tx) => {
       const target = await this.lockTarget(tx, plan, input.subscriptionId);
       await this.organization.lockEmployeeForShare(tx, answer.employeeId);
       const employee = await this.organization.getEmployee(answer.employeeId, tx);
       if (!employee || employee.status !== 'ACTIVE') throw new ProvisioningBeneficiaryDepartedError(input.requestId);
+      if (employee.hireDate > today)
+        throw new ProvisioningBeneficiaryNotStartedError(input.requestId, employee.hireDate);
       const accountIdentifier = chooseAccount({
         workEmail: employee.workEmail,
         requested: input.accountIdentifier,
@@ -106,6 +115,7 @@ export class ProvisioningService {
         requestId: input.requestId,
         defaultResponsibleEmployeeId: inCharge?.itAdminEmployeeId ?? null,
         createdByAppUserId: actor.appUserId,
+        maxAttempts,
       });
       await this.audit.record(
         tx,

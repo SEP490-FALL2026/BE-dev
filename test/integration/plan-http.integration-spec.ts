@@ -282,7 +282,9 @@ describe('plans and workspace profiles over HTTP (integration, real PostgreSQL)'
 
     it('refuses an application that does not exist or is retired', async () => {
       const retired = await application();
-      await ctx.sql.query(`UPDATE applications SET catalog_status = 'RETIRED' WHERE id = $1`, [retired]);
+      await ctx.sql.query(`UPDATE applications SET catalog_status = 'RETIRED', retired_at = now() WHERE id = $1`, [
+        retired,
+      ]);
 
       expect(codeOf(await createPlan(k2(randomUUID())).expect(422))).toBe('PLAN.APPLICATION_NOT_FOUND');
       expect(codeOf(await createPlan(k2(retired)).expect(422))).toBe('PLAN.APPLICATION_RETIRED');

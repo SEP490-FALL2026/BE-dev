@@ -117,7 +117,12 @@ describe('license keys (integration, PostgreSQL constraints)', () => {
 
   it('stores a sealed key of a purchase in the store, with the masked tail and the key id of its cipher', async () => {
     const { id, code } = await insertKey();
-    const row = (await sql.query(`SELECT status, masked, cipher_key_id FROM license_keys WHERE id = $1`, [id])).rows[0];
+    const row = (
+      await sql.query<{ status: string; masked: string; cipher_key_id: string }>(
+        `SELECT status, masked, cipher_key_id FROM license_keys WHERE id = $1`,
+        [id],
+      )
+    ).rows[0];
 
     expect(code).toBeNull();
     expect(row).toEqual({ status: 'IN_STORE', masked: '••••1234', cipher_key_id: 'k1' });

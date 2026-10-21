@@ -17,6 +17,7 @@ import {
   assertPurposeAvailable,
   assertUploadMatches,
   cleanContractName,
+  contentMatchesType,
   mayOpen,
 } from './contract.policy';
 
@@ -203,5 +204,33 @@ describe('the name of a contract', () => {
     expect(cleanContractName('  Hợp đồng Figma 2026  ')).toBe('Hợp đồng Figma 2026');
     expect(() => cleanContractName('   ')).toThrow(ContractNameRequiredError);
     expect(() => cleanContractName('')).toThrow(ContractNameRequiredError);
+  });
+});
+
+describe('what the first bytes of a file must say (US-04-04 AC-10)', () => {
+  const bytes = (...values: number[]) => Uint8Array.from(values);
+  const ascii = (text: string) => Uint8Array.from(Buffer.from(text, 'latin1'));
+
+  it.each([
+    ['application/pdf', ascii('%PDF-1.7')],
+    ['image/png', bytes(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00)],
+    ['image/jpeg', bytes(0xff, 0xd8, 0xff, 0xe0, 0x00)],
+  ])('accepts the signature of %s', (type, prefix) => {
+    expect(contentMatchesType(type, prefix)).toBe(true);
+  });
+
+  it.each([
+    ['application/pdf', ascii('MZ an executable')],
+    ['application/pdf', bytes(0xff, 0xd8, 0xff, 0xe0)],
+    ['image/png', ascii('%PDF-1.7')],
+    ['image/jpeg', bytes(0x89, 0x50, 0x4e, 0x47)],
+    ['application/pdf', new Uint8Array()],
+    ['application/x-msdownload', ascii('MZ')],
+  ])('refuses bytes that are not those of %s', (type, prefix) => {
+    expect(contentMatchesType(type, prefix)).toBe(false);
+  });
+
+  it('refuses a prefix that stops inside the signature', () => {
+    expect(contentMatchesType('application/pdf', ascii('%PD'))).toBe(false);
   });
 });

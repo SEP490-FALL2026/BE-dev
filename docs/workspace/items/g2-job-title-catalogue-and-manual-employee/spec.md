@@ -103,6 +103,10 @@ Lỗi CSDL tạm thời, deadlock, timeout: quy tắc 6 của G0 (rollback, 503,
   `employees.created_at` theo `organizations.time_zone`". Spec G0 (mục I-2) cập nhật cùng thay đổi này.
 - Quyền từ ngày vào (`QĐ-66ak`): lát này chỉ lưu `hireDate`; quy tắc "không quyền/Assignment trước ngày vào" do G4/G5 thực
   thi trên `hireDate`. AC-15 ở lát này chứng minh: không tài khoản/vai/lời mời và placement từ ngày ghi.
+  **Cập nhật 21/10/2026:** vế "không Assignment trước ngày vào" của G4 nay đã làm xong ở import hiện trạng seat
+  (`EFFECTIVE_BEFORE_HIRE`, `g4-seat-baseline-import`) và ở lệnh cấp (`409 PROVISIONING.BENEFICIARY_NOT_STARTED`,
+  `g4-provisioning-queue-manual`); phần còn lại của quy tắc cho quyền/vai do G5 thi hành chưa có ở đây. Lát này không đổi
+  hành vi.
 
 ### Bảo mật và PII
 
@@ -141,3 +145,5 @@ R-10, sửa I-2 R-11; bỏ điều kiện "chờ remediation merge" và "dev kh�
 chuyển `ready`. Chưa implement, chưa nghiệm thu.
 
 16/10/2026: implement xong năm bước của plan, kiểm chứng local (chi tiết và các quyết định khi triển khai ở [plan](plan.md)). Khác spec: lớp HTTP ở `OrganizationHttpModule` riêng; bộ khoảng trắng T-12 viết tường minh vì `\s` của PostgreSQL không đủ; `departmentCode`/`jobTitleId` tùy chọn ở DTO để thành lý do T-16; thêm mã `JOB_TITLE.NAME_TOO_LONG`. Chưa review, chưa nghiệm thu.
+
+21/10/2026 (đợt hoàn tất G2–G4, [audit](../../../reviews/g2-g4-completion-2026-10-21/README.md)): chỉ đính chính văn bản — đuôi `US-02-02` AC-15 (không Assignment hiệu lực trước ngày vào làm) mà mục _Quyền từ ngày vào_ ghi là chờ G4/G5 nay đã làm cho import hiện trạng seat và lệnh cấp (quyết định D1 của AI, chờ Owner). Hành vi và test của lát này không đổi; Owner review: chưa review.

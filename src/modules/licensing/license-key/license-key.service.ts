@@ -103,7 +103,7 @@ export class LicenseKeyService {
           {
             subscriptionId: input.subscriptionId,
             imported: kept,
-            rejected: 0,
+            rejected: lines.length,
           },
         ),
       );

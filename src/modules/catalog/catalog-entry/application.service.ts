@@ -322,7 +322,7 @@ export class ApplicationService {
     }
   }
 
-  /** Locks the employee `FOR SHARE` so a departure cannot slip in, then requires them to be still working (`INV-06`). */
+  /** The plan changes worth recommending to the owner today, read not decided: three people on K1 plans suggest K2. */
   private async recommendationsOf(applicationId: string): Promise<K2Recommendation[]> {
     const k1Plans = (await this.plans.plansOfApplication(applicationId))
       .filter((plan) => plan.provisioningType === 'K1')
@@ -334,6 +334,7 @@ export class ApplicationService {
     return recommendation ? [recommendation] : [];
   }
 
+  /** Locks the employee `FOR SHARE` so a departure cannot slip in, then requires them to be still working (`INV-06`). */
   private async requireWorkingOwner(tx: DbTx, employeeId: string): Promise<void> {
     try {
       await this.organization.lockEmployeeForShare(tx, employeeId);

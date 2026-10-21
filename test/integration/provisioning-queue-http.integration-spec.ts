@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import request from 'supertest';
 import { ApiAccount } from '../support/api-accounts';
 import { ProvisioningHarness, type TaskWire } from '../support/provisioning-harness';
 
@@ -252,6 +253,37 @@ describe('the queue of provisioning tasks over HTTP (integration, real PostgreSQ
 
     const later = await fresh(e8);
     expect(later.task).toMatchObject({ defaultResponsibleEmployeeId: null, inGeneralQueue: true });
+  });
+
+  it('US-01-11 AC-7: a change of the IT Admin in charge of a department reaches the tasks made after it, and leaves the earlier ones with who was in charge', async () => {
+    const owner = await h.person('E-A5');
+    const ownerAccount = await h.account('E-A5', owner, ['IT_ADMIN']);
+    const next = await h.person('E-A6');
+    const nextAccount = await h.account('E-A6', next, ['IT_ADMIN']);
+    const department = await h.department('P-SWAP', owner);
+    const before = await h.member('P-SWAP', 'E-9', designer);
+    const after = await h.member('P-SWAP', 'E-10', designer);
+    const { task: earlier } = await fresh(before);
+    expect(earlier.defaultResponsibleEmployeeId).toBe(owner);
+
+    await request(h.server())
+      .patch(`/api/v1/departments/${department.id}`)
+      .set(h.as(h.it1))
+      .send({ itAdminEmployeeId: next })
+      .expect(200);
+    const { task: later } = await fresh(after);
+
+    expect(later.defaultResponsibleEmployeeId).toBe(next);
+    expect((await task(earlier.id)).defaultResponsibleEmployeeId).toBe(owner);
+    expect(
+      h
+        .dataOf<{ items: TaskWire[] }>(await h.list({ scope: 'MINE', pageSize: 100 }, a3).expect(200))
+        .items.map((item) => item.id),
+    ).not.toContain(later.id);
+    // Two more IT Admins would change who is "the only one who can act" in the cases that follow: they leave the stage.
+    await h.ctx.sql.query(`UPDATE app_users SET status = 'LOCKED' WHERE id = ANY($1::uuid[])`, [
+      [ownerAccount.appUserId, nextAccount.appUserId],
+    ]);
   });
 
   it('two IT Admins completing one task at once: one completes it, the other is told it is not in progress', async () => {

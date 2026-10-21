@@ -52,7 +52,7 @@ export interface SeatFacts {
   target: { kind: 'SUBSCRIPTION' | 'PLAN'; purchasedQuantity: number | null };
   recordedOn: BusinessDate;
   /** By employee code. */
-  employees: ReadonlyMap<string, { id: string; status: string; employmentType: string }>;
+  employees: ReadonlyMap<string, { id: string; status: string; employmentType: string; hireDate: BusinessDate }>;
   /** By Cost Center code. */
   costCenters: ReadonlyMap<string, { id: string; kind: string; status: string }>;
   companyDomains: readonly string[];
@@ -83,7 +83,9 @@ export function lookupNamesOf(rows: readonly { cells: SeatCells }[]): {
 export function maskSecretCells(cells: SeatCells): SeatCells {
   const identifier = cells.account_identifier;
 
-  return identifier !== undefined && looksLikeSecret(identifier) ? { ...cells, account_identifier: MASK } : cells;
+  return identifier !== undefined && !hasInvalidCharacters(identifier) && looksLikeSecret(identifier)
+    ? { ...cells, account_identifier: MASK }
+    : cells;
 }
 
 const periodOf = (assignment: ExistingAssignment): SeatPeriod => ({
@@ -116,6 +118,8 @@ function judgeAlone(cells: SeatCells, facts: SeatFacts): { errors: SeatRowErrorC
 
   const identifier = cell(cells, 'account_identifier');
   if (identifier === '') errors.push('ACCOUNT_IDENTIFIER_MISSING');
+  // A stored row holds the mask where a token was: it is judged again as the token it replaced, so the preview stands.
+  else if (identifier === MASK) errors.push('ACCOUNT_IDENTIFIER_LOOKS_LIKE_SECRET');
   else if (hasInvalidCharacters(identifier)) errors.push('ACCOUNT_IDENTIFIER_INVALID');
   else if (looksLikeSecret(identifier)) errors.push('ACCOUNT_IDENTIFIER_LOOKS_LIKE_SECRET');
   else if (kind !== null && (kind === 'PERSONAL' || identifier.includes('@'))) {
@@ -128,6 +132,15 @@ function judgeAlone(cells: SeatCells, facts: SeatFacts): { errors: SeatRowErrorC
     if (!isBusinessDate(grantedOn)) errors.push('GRANTED_ON_INVALID');
     else if (grantedOn > facts.recordedOn) errors.push('GRANTED_ON_IN_FUTURE');
     else effectiveFrom = grantedOn;
+  }
+  // A seat never starts before the person does (US-02-02 AC-15); a date already refused is not judged a second time.
+  if (
+    employee &&
+    !errors.includes('GRANTED_ON_INVALID') &&
+    !errors.includes('GRANTED_ON_IN_FUTURE') &&
+    effectiveFrom < employee.hireDate
+  ) {
+    errors.push('EFFECTIVE_BEFORE_HIRE');
   }
 
   const endText = cell(cells, 'expected_end_date');

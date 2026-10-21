@@ -231,7 +231,12 @@ export class SeatBaselineImportService {
       employees: new Map(
         employees.map((employee) => [
           employee.employeeCode,
-          { id: employee.id, status: employee.status, employmentType: employee.employmentType },
+          {
+            id: employee.id,
+            status: employee.status,
+            employmentType: employee.employmentType,
+            hireDate: employee.hireDate,
+          },
         ]),
       ),
       costCenters: new Map(

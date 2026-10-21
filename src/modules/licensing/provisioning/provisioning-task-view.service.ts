@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
 import { CatalogService } from '../../catalog/catalog.service';
-import { OperatingParametersService } from '../../operating-parameters/operating-parameters.service';
 import { OrganizationService } from '../../organization/organization.service';
 import type {
   ProvisioningChannel,
@@ -12,7 +11,7 @@ import type {
   TaskDoneWhen,
   TaskStep,
 } from '../licensing.types';
-import { availableDecisions, maxAttempts } from './failure.policy';
+import { availableDecisions } from './failure.policy';
 import { doneWhenFor, inGeneralQueue, stepsFor } from './provisioning.policy';
 import type { ProvisioningTaskRecord } from './provisioning-task.repo';
 
@@ -74,7 +73,6 @@ export class ProvisioningTaskViewService {
   constructor(
     private readonly catalog: CatalogService,
     private readonly organization: OrganizationService,
-    private readonly parameters: OperatingParametersService,
   ) {}
 
   async views(records: readonly ProvisioningTaskRecord[]): Promise<TaskView[]> {
@@ -95,7 +93,6 @@ export class ProvisioningTaskViewService {
         plan ? [[plan.planId, plan] as const] : [],
       ),
     );
-    const limit = maxAttempts(Number(await this.parameters.getValue('PROVISIONING_RETRY_COUNT')));
     const now = Date.now();
 
     return records.map((task) => {
@@ -145,7 +142,7 @@ export class ProvisioningTaskViewService {
         failureReason: task.failureReason,
         failureKind: task.failureKind,
         attempts: task.attempts,
-        maxAttempts: limit,
+        maxAttempts: task.maxAttempts,
         nextRetryAt: task.nextRetryAt,
         lastError: task.lastError,
         availableDecisions: availableDecisions(task.status, task.channel),

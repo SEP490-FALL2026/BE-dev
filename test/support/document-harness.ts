@@ -62,7 +62,10 @@ export class DocumentHarness extends ProvisioningHarness {
   }
 
   /** What the client does after the upload link: the object arrives under the key the system chose for the file. */
-  async putObject(id: string, stored: { contentLength: number; contentType: string }): Promise<string> {
+  async putObject(
+    id: string,
+    stored: { contentLength: number; contentType: string; content?: Uint8Array },
+  ): Promise<string> {
     const key = await this.keyOf(id);
     this.storage.put(key, stored);
 

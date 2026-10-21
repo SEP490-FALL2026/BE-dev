@@ -28,6 +28,8 @@ export interface ProvisioningTaskRecord {
   failureReason: string | null;
   failureKind: ProvisioningFailureKind | null;
   attempts: number;
+  /** The most tries the task gets, fixed when it was made (US-01-04 AC-13). */
+  maxAttempts: number;
   lastError: string | null;
   nextRetryAt: Date | null;
   closedByAppUserId: string | null;
@@ -63,6 +65,7 @@ const toRecord = (row: Row): ProvisioningTaskRecord => ({
   failureReason: row.failureReason,
   failureKind: row.failureKind,
   attempts: row.attempts,
+  maxAttempts: row.maxAttempts,
   lastError: row.lastError,
   nextRetryAt: row.nextRetryAt,
   closedByAppUserId: row.closedByAppUserId,
@@ -116,6 +119,8 @@ export class ProvisioningTaskRepo {
       requestId: string;
       defaultResponsibleEmployeeId: string | null;
       createdByAppUserId: string;
+      /** The tries the task gets, from the retries the configuration allows now. */
+      maxAttempts: number;
     },
   ): Promise<ProvisioningTaskRecord> {
     const row = await tx.provisioningTask.create({

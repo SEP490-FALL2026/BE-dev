@@ -21,6 +21,8 @@ import {
   assertMayChoosePurpose,
   assertPurposeAvailable,
   assertUploadMatches,
+  contentMatchesType,
+  SIGNATURE_PREFIX_BYTES,
   mayOpen,
   type DocumentPurpose,
 } from './contract.policy';
@@ -125,6 +127,10 @@ export class DocumentService {
     let matches = true;
     try {
       assertUploadMatches(current, stored);
+      // What it says it is, by its size and type, is not enough: the content must begin like the type it declares.
+      if (!contentMatchesType(current.contentType, await this.prefixOf(current.objectKey))) {
+        throw new DocumentUploadMismatchError();
+      }
     } catch (error) {
       if (!(error instanceof DocumentUploadMismatchError)) throw error;
       matches = false;
@@ -252,6 +258,16 @@ export class DocumentService {
     }
   }
 
+  /** The first bytes of the object, enough to read its signature; an object that is not there has none. */
+  private async prefixOf(key: string): Promise<Uint8Array> {
+    try {
+      return await this.storage.readPrefix(key, SIGNATURE_PREFIX_BYTES);
+    } catch (error) {
+      if (isNotFound(error)) return new Uint8Array();
+      throw error;
+    }
+  }
+
   private async requireOrganization() {
     const organization = await this.organization.getOrganization();
     if (!organization) throw new Error('A document was kept before installation');
@@ -263,5 +279,5 @@ export class DocumentService {
 function isNotFound(error: unknown): boolean {
   const candidate = error as { name?: string; $metadata?: { httpStatusCode?: number } };
 
-  return candidate.name === 'NotFound' || candidate.$metadata?.httpStatusCode === 404;
+  return candidate.name === 'NotFound' || candidate.name === 'NoSuchKey' || candidate.$metadata?.httpStatusCode === 404;
 }

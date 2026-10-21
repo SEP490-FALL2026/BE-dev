@@ -114,7 +114,7 @@ describe('validateEnvironment', () => {
     expect(() => validateEnvironment({ NODE_ENV: 'production' })).toThrow('DATABASE_URL');
   });
 
-  it('neither requires nor reads the queue or object storage settings: the API and worker mount neither (E2 = A)', () => {
+  it('neither requires nor reads the queue or object storage settings: the module that mounts them (the API, for the storage, ADR-0014) validates its own', () => {
     const {
       OBJECT_STORAGE_ENDPOINT: _endpoint,
       OBJECT_STORAGE_BUCKET: _bucket,
@@ -309,6 +309,46 @@ describe('invitation email configuration', () => {
     expect(() =>
       validateEnvironment({ ...OWN_SECRETS, LICENSE_KEY_FINGERPRINT_PEPPER: test.LICENSE_KEY_FINGERPRINT_PEPPER }),
     ).toThrow('public in the repository for LICENSE_KEY_FINGERPRINT_PEPPER');
+  });
+
+  it('refuses a vault key that is also the outbox key: one key seals one thing (QĐ-54b)', () => {
+    expect(() =>
+      validateEnvironment({ ...OWN_SECRETS, LICENSE_KEY_VAULT_KEY: OWN_SECRETS.OUTBOX_PAYLOAD_KEY }),
+    ).toThrow('LICENSE_KEY_VAULT_KEY must differ from OUTBOX_PAYLOAD_KEY');
+  });
+
+  describe('the vault keys kept to open what was sealed before a rotation', () => {
+    const key = (fill: number) => Buffer.alloc(32, fill).toString('base64');
+    const withPrevious = (value: string) => ({ ...OWN_SECRETS, LICENSE_KEY_VAULT_PREVIOUS_KEYS: value });
+
+    it('accepts id:base64 pairs of 32 bytes, with spaces around them, and nothing at all', () => {
+      expect(validateEnvironment(withPrevious('')).LICENSE_KEY_VAULT_PREVIOUS_KEYS).toBe('');
+      expect(() => validateEnvironment(withPrevious(`old-1:${key(1)}, old-2:${key(2)} `))).not.toThrow();
+    });
+
+    it.each([
+      ['a pair with no key', 'old-1', 'must hold id:base64 pairs'],
+      ['a pair with no id', `:${key(1)}`, 'must hold id:base64 pairs'],
+      [
+        'a key that is not 32 bytes',
+        `old-1:${Buffer.from('short').toString('base64')}`,
+        'keys of 32 bytes encoded as base64',
+      ],
+      ['an id of another shape', `has space:${key(1)}`, 'an id of letters, digits, dot, dash and underscore'],
+      ['the id of the current key', `spec-vault-1:${key(1)}`, 'must not repeat LICENSE_KEY_VAULT_KEY_ID'],
+      ['the same id twice', `old-1:${key(1)},old-1:${key(2)}`, 'must not repeat an id'],
+      ['the current key under another id', `old-1:${key(6)}`, 'must differ from LICENSE_KEY_VAULT_KEY'],
+    ])('refuses %s', (_label, value, message) => {
+      expect(() => validateEnvironment(withPrevious(value))).toThrow(message);
+    });
+
+    it('refuses the public test vault key outside test, as it would be a way back to every sealed key', () => {
+      const test = validateEnvironment({ NODE_ENV: 'test' });
+
+      expect(() => validateEnvironment(withPrevious(`old-1:${test.LICENSE_KEY_VAULT_KEY}`))).toThrow(
+        'public in the repository for LICENSE_KEY_VAULT_PREVIOUS_KEYS',
+      );
+    });
   });
 
   it('accepts a complete production mail setup', () => {

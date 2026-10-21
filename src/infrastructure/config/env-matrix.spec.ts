@@ -121,7 +121,7 @@ describe('environment matrix by NODE_ENV (H6.3 characterization)', () => {
     );
   });
 
-  it('production: boots on the active settings alone, without Redis or object storage keys (E2 = A)', () => {
+  it('production: the validator boots on the active settings alone, without Redis or object storage keys (the storage module checks its own, ADR-0014)', () => {
     const config = validateEnvironment(PRODUCTION_ACTIVE);
 
     expect(Object.keys(config).filter((key) => /^(REDIS|OBJECT_STORAGE)_/.test(key))).toEqual([]);

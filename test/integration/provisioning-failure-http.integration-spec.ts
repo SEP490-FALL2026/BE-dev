@@ -155,6 +155,28 @@ describe('what a failed try of the connector leads to, over HTTP (integration, r
     }
   });
 
+  it('US-01-04 AC-13: the most tries are fixed when the task is made, and a later change reaches only the tasks made after it', async () => {
+    const early = await connectorTask(e5, 5);
+    await h.setParameter('PROVISIONING_RETRY_COUNT', 1).expect(200);
+    try {
+      const late = await connectorTask(e7, 5);
+
+      expect(await task(early.id)).toMatchObject({ maxAttempts: 4 });
+      expect(await task(late.id)).toMatchObject({ maxAttempts: 2 });
+      // The task made before the change still gets its three retries; the one made after gets one.
+      for (const attempts of [1, 2, 3]) {
+        expect(await h.recordFailure(early.id, 'TRANSIENT')).toMatchObject({ status: 'RETRY_SCHEDULED', attempts });
+      }
+      expect(await h.recordFailure(early.id, 'TRANSIENT')).toMatchObject({ status: 'FAILED', attempts: 4 });
+      expect((await h.recordFailure(late.id, 'TRANSIENT')).status).toBe('RETRY_SCHEDULED');
+      expect(await h.recordFailure(late.id, 'TRANSIENT')).toMatchObject({ status: 'FAILED', attempts: 2 });
+      expect(await task(early.id)).toMatchObject({ maxAttempts: 4, attempts: 4 });
+      expect(await task(late.id)).toMatchObject({ maxAttempts: 2, attempts: 2 });
+    } finally {
+      await h.setParameter('PROVISIONING_RETRY_COUNT', 3).expect(200);
+    }
+  });
+
   it('is the entry of the connector only: a task by hand, a task that does not exist and a task that is over are refused', async () => {
     const subscriptionId = await h.subscription(5, 'K2');
     const byHand = await h.granted(e7, await h.planOf(subscriptionId), { subscriptionId });

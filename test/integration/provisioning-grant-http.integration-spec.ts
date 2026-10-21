@@ -48,7 +48,7 @@ describe('the grant of a seat over HTTP (integration, real PostgreSQL)', () => {
     const { subscriptionId, planId } = await k2(1);
     const response = await h.grant({ requestId: h.gate.grantable(e5, planId), subscriptionId }).expect(201);
     const { task, warnings } = h.dataOf<{
-      task: ReturnType<typeof h.dataOf> & Record<string, unknown>;
+      task: Record<string, unknown>;
       warnings: string[];
     }>(response);
 
@@ -285,6 +285,28 @@ describe('the grant of a seat over HTTP (integration, real PostgreSQL)', () => {
     expect(await tasksOf(subscriptionId)).toBe(0);
   });
 
+  it('US-02-02 AC-15: does not grant to someone who starts after today, and writes nothing', async () => {
+    const { subscriptionId, planId } = await k2();
+    const newcomer = await h.member('P-DES', 'E-NEW', designer);
+    const startsOn = (
+      await h.ctx.sql.query<{ day: string }>(
+        `UPDATE employees SET hire_date = $2::date + 3 WHERE id = $1 RETURNING to_char(hire_date, 'YYYY-MM-DD') AS day`,
+        [newcomer, h.today()],
+      )
+    ).rows[0].day;
+    const requestId = h.gate.grantable(newcomer, planId);
+
+    const refused = await h.grant({ requestId, subscriptionId }).expect(409);
+
+    expect(h.codeOf(refused)).toBe('PROVISIONING.BENEFICIARY_NOT_STARTED');
+    expect(h.detailsOf(refused)).toEqual({ requestId, startsOn });
+    expect(await assignmentsOf(newcomer)).toBe(0);
+    expect(await tasksOf(subscriptionId)).toBe(0);
+
+    await h.ctx.sql.query(`UPDATE employees SET hire_date = $2::date WHERE id = $1`, [newcomer, h.today()]);
+    await h.grant({ requestId, subscriptionId }).expect(201);
+  });
+
   it('AC-3, AC-16 (US-07-01): the way the gate answers is the way the grant refuses, and nothing is written', async () => {
     const { subscriptionId, planId } = await k2();
     const before = await count(`SELECT count(*) AS n FROM license_assignments`);
@@ -346,13 +368,30 @@ describe('the grant of a seat over HTTP (integration, real PostgreSQL)', () => {
     expect(await tasksOf(subscriptionId)).toBe(0);
   });
 
-  it('AC-13 (US-07-01): once the baseline is closed an assignment with no request is refused, and one of a request still works', async () => {
+  it('AC-13 (US-07-01): once the baseline is closed an assignment with no request is refused by the API and by the database, and one of a request still works', async () => {
     const { subscriptionId, planId } = await k2();
+    const baselineRow = { employee_code: 'E-5', account_identifier: 'e-5@acme.vn' };
+    expect(h.dataOf<{ id: string }>(await h.upload({ subscriptionId }, h.file([baselineRow])).expect(201)).id).toEqual(
+      expect.any(String),
+    );
     await request(h.server()).post('/api/v1/seat-baseline/close').set(h.as(h.it1)).expect(200);
+    const held = await assignmentsOf(e5);
 
-    const withoutRequest = await h.grant({ subscriptionId }).expect(422);
-    expect(h.codeOf(withoutRequest)).toBe('VALIDATION_ERROR');
+    expect(h.codeOf(await h.grant({ subscriptionId }).expect(422))).toBe('VALIDATION_ERROR');
+    expect(h.codeOf(await h.upload({ subscriptionId }, h.file([baselineRow])).expect(409))).toBe(
+      'SEAT_BASELINE.CLOSED',
+    );
+    // Not even a writer that skips the API can add a seat with no request: the database refuses the row.
+    await expect(
+      h.ctx.sql.query(
+        `INSERT INTO license_assignments (id, organization_id, kind, source, plan_id, subscription_id, employee_id,
+           account_identifier, normalized_account_identifier, valid_from, valid_from_basis, created_by_app_user_id)
+         VALUES (gen_random_uuid(), $1, 'PERSONAL', 'BASELINE', $2, $3, $4, 'late@acme.vn', 'late@acme.vn', $5, 'RECORDED', $6)`,
+        [h.seed.organizationId, planId, subscriptionId, e5, h.today(), randomUUID()],
+      ),
+    ).rejects.toMatchObject({ code: '55000' });
     expect(await tasksOf(subscriptionId)).toBe(0);
+    expect(await assignmentsOf(e5)).toBe(held);
 
     const task = await h.granted(e5, planId, { subscriptionId });
     expect(task.status).toBe('QUEUED');

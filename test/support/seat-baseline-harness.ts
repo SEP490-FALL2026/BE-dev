@@ -109,6 +109,9 @@ export class SeatHarness {
       code,
       email: `${code.toLowerCase()}@acme.vn`,
     });
+    // People of a baseline held their seats before the system knew them: they joined long ago, so a grant date in
+    // the past is right unless a test moves the hire date itself.
+    await this.ctx.sql.query(`UPDATE employees SET hire_date = '2020-01-01' WHERE id = $1`, [employeeId]);
     if (employmentType !== 'STAFF') {
       await this.ctx.sql.query(`UPDATE employees SET employment_type = $2::"EmploymentType" WHERE id = $1`, [
         employeeId,

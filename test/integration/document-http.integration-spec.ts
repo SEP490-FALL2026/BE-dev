@@ -122,6 +122,25 @@ describe('the contracts and the files kept for them over HTTP (integration, real
     expect(h.codeOf(await h.linkDocument(document.id, it3).expect(403))).toBe('AUTHORIZATION.FORBIDDEN');
   });
 
+  it('US-04-04 AC-6: a role lost before the file is attached takes the right to attach it, and the file waits', async () => {
+    const contract = await h.contract();
+    const leaver = await h.account('E-IT-LEAVER', await h.person('E-IT-LEAVER'), ['IT_ADMIN']);
+    const document = await h.uploaded(leaver);
+
+    await h.revokeItAdmin(leaver);
+
+    expect(h.codeOf(await h.attachDocument(document.id, { contractId: contract }, leaver).expect(403))).toBe(
+      'AUTHORIZATION.FORBIDDEN',
+    );
+    expect(
+      (
+        await h.ctx.sql.query<{ status: string }>(`SELECT status FROM document_attachments WHERE id = $1`, [
+          document.id,
+        ])
+      ).rows[0].status,
+    ).toBe('PENDING_ATTACH');
+  });
+
   it('US-04-04 AC-6: the uploader is the signed-in person whatever the body says, and a purpose is chosen by its roles only', async () => {
     const before = await h.documentCount();
 
@@ -232,6 +251,61 @@ describe('the contracts and the files kept for them over HTTP (integration, real
       'DOCUMENT.CREATED',
       'DOCUMENT.QUARANTINED',
     ]);
+  });
+
+  it('US-04-04 AC-10: a file whose bytes are not those of its declared type is deleted and quarantined, even with the right name, type and size', async () => {
+    const executable = wire(await declare().expect(201));
+    const key = await h.putObject(executable.id, {
+      contentLength: PDF.sizeBytes,
+      contentType: PDF.contentType,
+      content: Uint8Array.from(Buffer.from('MZ  this is a program, not a PDF', 'latin1')),
+    });
+
+    expect(h.codeOf(await h.completeDocument(executable.id).expect(422))).toBe('DOCUMENT.UPLOAD_MISMATCH');
+
+    expect(h.storage.deleted).toContain(key);
+    expect(
+      (
+        await h.ctx.sql.query<{ status: string }>(`SELECT status FROM document_attachments WHERE id = $1`, [
+          executable.id,
+        ])
+      ).rows[0].status,
+    ).toBe('QUARANTINED');
+    expect(h.codeOf(await h.getDocument(executable.id).expect(404))).toBe('DOCUMENT.NOT_FOUND');
+  });
+
+  it('answers 503 when the storage cannot answer, and leaves the file as it was so the same call works again', async () => {
+    const document = wire(await declare().expect(201));
+    await h.putObject(document.id, { contentLength: PDF.sizeBytes, contentType: PDF.contentType });
+    const statusOf = async () =>
+      (
+        await h.ctx.sql.query<{ status: string }>(`SELECT status FROM document_attachments WHERE id = $1`, [
+          document.id,
+        ])
+      ).rows[0].status;
+
+    for (const call of ['head', 'readPrefix'] as const) {
+      h.storage.unavailable.add(call);
+      try {
+        const down = await h.completeDocument(document.id).expect(503);
+        expect(h.codeOf(down)).toBe('SERVICE_UNAVAILABLE');
+        expect(await statusOf()).toBe('AWAITING_UPLOAD');
+      } finally {
+        h.storage.unavailable.delete(call);
+      }
+    }
+    await h.completeDocument(document.id).expect(200);
+    expect(await statusOf()).toBe('PENDING_ATTACH');
+
+    const contract = await h.contract();
+    await h.attachDocument(document.id, { contractId: contract }).expect(200);
+    h.storage.unavailable.add('createDownloadUrl');
+    try {
+      expect(h.codeOf(await h.linkDocument(document.id).expect(503))).toBe('SERVICE_UNAVAILABLE');
+    } finally {
+      h.storage.unavailable.delete('createDownloadUrl');
+    }
+    await h.linkDocument(document.id).expect(200);
   });
 
   it('keeps the order of the steps: a file is completed once, only by its uploader, and cannot be attached or opened before', async () => {

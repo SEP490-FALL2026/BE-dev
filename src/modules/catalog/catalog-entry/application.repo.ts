@@ -116,6 +116,23 @@ export class ApplicationRepo {
     return toRecord(row);
   }
 
+  /** Retires the application: the one writer of its retirement columns. A retired application never comes back (the database refuses it). */
+  async markRetired(
+    tx: DbTx,
+    applicationId: string,
+    input: { appUserId: string; confirmationId: string; now: Date },
+  ): Promise<void> {
+    await tx.application.update({
+      where: { id: applicationId },
+      data: {
+        catalogStatus: 'RETIRED',
+        retiredAt: input.now,
+        retiredByAppUserId: input.appUserId,
+        retirementConfirmationId: input.confirmationId,
+      },
+    });
+  }
+
   /**
    * The application as another capability may rely on it: locked `FOR SHARE` for the rest of the transaction, so it
    * cannot be retired under the caller. Null when it does not exist.

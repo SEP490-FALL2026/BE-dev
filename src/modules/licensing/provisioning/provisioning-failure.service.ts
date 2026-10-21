@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import { AuditService } from '../../audit/audit.service';
-import { OperatingParametersService } from '../../operating-parameters/operating-parameters.service';
 import { OrganizationService } from '../../organization/organization.service';
 import {
   ProvisioningTaskNotConnectorError,
@@ -31,7 +30,6 @@ export class ProvisioningFailureService {
   constructor(
     private readonly repo: ProvisioningTaskRepo,
     private readonly organization: OrganizationService,
-    private readonly parameters: OperatingParametersService,
     private readonly audit: AuditService,
     private readonly runner: TransactionRunner,
   ) {}
@@ -49,7 +47,6 @@ export class ProvisioningFailureService {
   }): Promise<FailureRecorded> {
     const organization = await this.organization.getOrganization();
     if (!organization) throw new Error('A failure was recorded before installation');
-    const retryCount = Number(await this.parameters.getValue('PROVISIONING_RETRY_COUNT'));
     const now = input.now ?? new Date();
     const detail = input.detail.trim() || input.kind;
 
@@ -62,7 +59,8 @@ export class ProvisioningFailureService {
       }
 
       const attempts = task.attempts + 1;
-      const outcome = classifyFailure({ kind: input.kind, attempts, retryCount });
+      // The retries are those the task was made with, not those the configuration allows today (US-01-04 AC-13).
+      const outcome = classifyFailure({ kind: input.kind, attempts, retryCount: task.maxAttempts - 1 });
       const nextRetryAt =
         outcome.status === 'RETRY_SCHEDULED' ? new Date(now.getTime() + outcome.delayMinutes * 60_000) : null;
       await this.repo.markFailureRecorded(

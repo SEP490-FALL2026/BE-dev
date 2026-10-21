@@ -103,7 +103,7 @@ describe('.env.example', () => {
     expect(schema.filter((name) => NOT_MOUNTED.has(name))).toEqual([]);
   });
 
-  it('marks exactly what object storage and the queue require in production once a module is mounted (E2 = A)', () => {
+  it('marks exactly what object storage and the queue require in production once their module is mounted (ADR-0014, E2 = A)', () => {
     const required = (validate: () => unknown): string[] => {
       try {
         validate();

@@ -3,7 +3,7 @@
 - [Spec](spec.md); revision đầu vào: Docs `9416fe0`, BE `57b1e1c` (cây làm việc chưa commit, nhánh `Bao_dev_be`).
 - Phụ trách: AI theo giao việc Owner. Thiết kế ban đầu bởi: AI theo giao việc Owner.
 - Owner review: chưa review. Peer review: tùy chọn.
-- Triển khai: `in-progress`. PR: chưa có.
+- Triển khai: `verified` (local, 21/10/2026, cây làm việc chưa commit trên `5f3b2b3`, nhánh `Bao_dev_be`). PR: chưa có. Chưa commit, chưa `merged-dev`.
 
 ## Before coding
 
@@ -15,12 +15,16 @@ Mỗi task theo TDD: viết test đỏ, xem nó đỏ đúng lý do, viết mã 
 
 ### Task 1: dữ liệu `contracts` và `document_attachments`
 
+- Trạng thái: xong; migration và `document-constraints.integration-spec.ts` xanh trong `pnpm test:integration`. Chưa chạy lại `prisma migrate diff` trong lượt cập nhật tài liệu này.
+
 - Files: `prisma/models/catalog.prisma`, quan hệ ngược ở `organization.prisma`, migration `20261020250000_catalog_contracts_and_documents`, `src/architecture-boundaries.spec.ts`, `test/integration/document-constraints.integration-spec.ts`.
 - Depends on: `g3-subscription-purchase`.
 - Acceptance: CHECK trạng thái ⟺ chủ, mục đích gắn được vào hợp đồng, `object_key` duy nhất, kích thước dương, tên hợp đồng không rỗng, trigger không xóa, `READY` bất biến, cột khai báo không đổi.
 - Verify: constraints đỏ trước migration, xanh sau; `prisma migrate diff` không khác biệt.
 
 ### Task 2: chính sách thuần và tham số kích thước
+
+- Trạng thái: xong; `pnpm check` xanh. Lượt rà soát 21/10/2026 thêm `contentMatchesType` (chữ ký PDF, PNG, JPEG) vào `contract.policy.ts`.
 
 - Files: `src/modules/catalog/contract/contract.policy.ts`, `contract.policy.spec.ts`, `contract.errors.ts`, `src/modules/operating-parameters/parameter-definitions.ts` (`DOCUMENT_MAX_SIZE_MB`) và spec của nó.
 - Depends on: Task 1.
@@ -29,6 +33,8 @@ Mỗi task theo TDD: viết test đỏ, xem nó đỏ đúng lý do, viết mã 
 
 ### Task 3: mount kho đối tượng và cấu hình
 
+- Trạng thái: xong; `pnpm check` và `pnpm test:integration` xanh. Lượt rà soát thêm `readPrefix(key, length)` vào `ObjectStoragePort`, `ObjectStorageUnavailableError` (503) và đính chính ADR-0014. Các tài liệu khác của Task (`ARCHITECTURE.md`, `docs/guides/containers.md`, `.env.example`) do người tích hợp cập nhật hoặc kiểm ở bước cuối.
+
 - Files: `catalog.module.ts` (import `ObjectStorageModule`), `src/infrastructure/object-storage/object-storage.module.ts` (cập nhật chú thích mount), `test/support/http-test-app.ts` (đã có ghi đè nhà cung cấp), `test/support/fake-object-storage.ts` (kho giả), `ARCHITECTURE.md`, `docs/guides/containers.md`, `.env.example`.
 - Depends on: Task 2.
 - Acceptance: API khởi động với kho mount; production vẫn đòi endpoint HTTPS, bucket và khóa truy cập; tài liệu không còn nói kho chưa mount.
@@ -36,12 +42,16 @@ Mỗi task theo TDD: viết test đỏ, xem nó đỏ đúng lý do, viết mã 
 
 ### Task 4: repo, service, route
 
-- Files: `contract.repo.ts`, `contract.service.ts`, `contracts.controller.ts`, `document.repo.ts`, `document.service.ts`, `documents.controller.ts`, `contract.dto.ts`, `document.dto.ts`, `contract.http-errors.ts`, `catalog.module.ts`, `test/support/api-coverage-manifest.ts` (+7), `test/e2e/api-inventory.e2e-spec.ts` (133 → 140), `test/e2e/document.e2e-spec.ts`, `test/integration/document-http.integration-spec.ts`.
+- Trạng thái: xong; e2e và integration xanh. Lượt rà soát: `complete` kiểm byte đầu và quarantine khi không khớp; lỗi kho ⟹ 503; thêm test ‘a role lost before the file is attached takes the right to attach it’. Các đột biến liệt kê ở Verify không được chạy lại ở lượt 21/10/2026, nên không có bằng chứng mới về chúng.
+
+- Files: `contract.repo.ts`, `contract.service.ts`, `contracts.controller.ts`, `document.repo.ts`, `document.service.ts`, `documents.controller.ts`, `contract.dto.ts`, `document.dto.ts`, `contract.http-errors.ts`, `catalog.module.ts`, `test/support/api-coverage-manifest.ts` (+7), `test/e2e/api-inventory.e2e-spec.ts` (143 operation toàn API, trong đó bảy của hạng mục), `test/e2e/document.e2e-spec.ts`, `test/integration/document-http.integration-spec.ts`.
 - Depends on: Task 3.
 - Acceptance: bảy operation đúng bảng HTTP; mọi AC trong ma trận; không URL ký nào ở CSDL, Audit Trail hay log.
 - Verify: e2e + integration; đột biến (bỏ kiểm đuôi tệp, bỏ kiểm kích thước, cho vai khác chọn mục đích, tệp chưa gắn thấy bởi người khác, lưu URL, bỏ kiểm khớp ở bước hoàn tất, cho gắn hai lần, quên kiểm vai lúc mở, thời hạn liên kết sai) làm đỏ.
 
 ### Task 5: tài liệu và gate cuối
+
+- Trạng thái: tài liệu của hạng mục (spec, plan, ADR-0014) đã khớp mã; `openapi:export`, `rules:check`, drift check migration, roadmap, `AGENTS.md`, `ARCHITECTURE.md` do người tích hợp chạy hoặc cập nhật ở bước cuối, chưa nằm trong bảng bên dưới.
 
 - Files: `openapi.json` (sinh), `ARCHITECTURE.md`, `AGENTS.md`, `docs/roadmap.md`, `docs/workspace/items/README.md`, plan/spec này, `g3-downstream-finance-integration` (điểm nối: hóa đơn, Người duyệt chi mở tệp), `g4-device-dependent-features` (bản ký).
 - Depends on: Task 4.
@@ -50,11 +60,17 @@ Mỗi task theo TDD: viết test đỏ, xem nó đỏ đúng lý do, viết mã 
 
 ## Verification and handoff
 
-| Lệnh / kiểm tra AC | Revision / môi trường | Kết quả thực chạy | Giới hạn / việc còn lại |
-| ------------------ | --------------------- | ----------------- | ----------------------- |
-| —                  | —                     | chưa chạy         | đang triển khai         |
+Môi trường: Windows, Node 24.0.2, pnpm 11.1.3, PostgreSQL 17 trong Docker `127.0.0.1:55432` cho integration. Chạy local ngày 21/10/2026 trên cây làm việc chưa commit trên `5f3b2b3` (nhánh `Bao_dev_be`).
 
-- [ ] AC trong scope có bằng chứng; lỗi đã xử lý hoặc ghi blocker.
-- [ ] Spec/plan/test design phản ánh đúng implementation cuối.
-- [ ] Diff cuối đã tự review; tài liệu vận hành bị ảnh hưởng đã cập nhật; phần chưa kiểm chứng ghi rõ.
+| Lệnh / kiểm tra AC      | Revision / môi trường                                                               | Kết quả thực chạy                                  | Giới hạn / việc còn lại                                                                                                                                                                                              |
+| ----------------------- | ----------------------------------------------------------------------------------- | -------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm check`            | `5f3b2b3` + cây làm việc chưa commit, 21/10/2026, Windows, Node 24.0.2, pnpm 11.1.3 | exit 0; unit và kiểm cấu trúc 138 suite, 2006 test | Gồm unit của hạng mục (`contract.policy.spec.ts`, `s3-compatible-object-storage.adapter.spec.ts`, `service-unavailable.spec.ts`, `object-storage.config.spec.ts`); không phải CI từ xa                               |
+| `pnpm test:e2e`         | như trên                                                                            | 32 suite, 811 test xanh                            | Gồm `document.e2e-spec.ts` và `api-inventory.e2e-spec.ts` (143 operation); không có cơ sở dữ liệu                                                                                                                    |
+| `pnpm test:integration` | như trên, PostgreSQL 17 Docker `127.0.0.1:55432`                                    | 97 suite, 1307 test xanh                           | Gồm `document-http.integration-spec.ts` và `document-constraints.integration-spec.ts`; dùng kho giả trong bộ nhớ nên kho S3 thật, chữ ký thật và việc kho từ chối liên kết quá hạn chưa kiểm chứng; chưa có CI từ xa |
+
+Chưa có trong bảng: `pnpm openapi:export`, `pnpm rules:check`, `prisma migrate diff` (người tích hợp chạy). Giới hạn đã biết của hạng mục (không có route liệt kê tệp của hợp đồng, không dọn tệp không hoàn tất, liên kết tải lên dùng lại được 15 phút, không quét mã độc, liên kết tải xuống không đặt `Content-Disposition`, AC-9 mới có đích Contract) nằm ở mục _Thay đổi và nghiệm thu_ của [spec](spec.md).
+
+- [x] AC trong scope có bằng chứng; lỗi đã xử lý hoặc ghi blocker. AC-1→AC-3, AC-6, AC-10 có test ở bảng _Test matrix_ của spec; AC-9 chỉ cho đích Contract, vế còn lại ghi cho `g3-downstream-finance-integration`.
+- [x] Spec/plan/test design phản ánh đúng implementation cuối.
+- [x] Diff cuối đã tự review; tài liệu vận hành bị ảnh hưởng đã cập nhật; phần chưa kiểm chứng ghi rõ.
 - [ ] Giao Owner review trên revision cụ thể; cập nhật roadmap/PR. Chỉ ghi `merged-dev`, `accepted`, `released` sau đúng sự kiện thật.

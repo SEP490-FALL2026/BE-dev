@@ -78,6 +78,11 @@ export class ApplicationRetirementService {
       const application = await this.applications.lock(tx, applicationId);
       if (!application) throw new ApplicationNotFoundError();
       if (application.status === 'RETIRED') throw new ApplicationAlreadyRetiredError();
+      // The owner must still be working when the confirmation is kept (INV-06): a departure being recorded is waited for.
+      // Only the current owner can confirm, so only that employee (who exists) is locked; anyone else is refused below.
+      if (input.businessOwnerEmployeeId === application.businessOwnerEmployeeId) {
+        await this.organization.lockEmployeeForShare(tx, input.businessOwnerEmployeeId);
+      }
       const owner = await this.organization.getEmployee(input.businessOwnerEmployeeId, tx);
       assertConfirmable({
         currentOwnerEmployeeId: application.businessOwnerEmployeeId,
@@ -161,7 +166,7 @@ export class ApplicationRetirementService {
       });
       if (!confirmation) return;
 
-      await this.retirements.markRetired(tx, applicationId, {
+      await this.applications.markRetired(tx, applicationId, {
         appUserId: actor.appUserId,
         confirmationId: confirmation.id,
         now,

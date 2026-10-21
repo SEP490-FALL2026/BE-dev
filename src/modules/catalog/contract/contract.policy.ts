@@ -89,6 +89,28 @@ export function assertUploadMatches(
   }
 }
 
+/** How the first bytes of each type the system keeps begin: a PDF, a PNG and a JPEG say what they are. */
+const SIGNATURES: Readonly<Record<string, readonly number[]>> = {
+  'application/pdf': [0x25, 0x50, 0x44, 0x46, 0x2d],
+  'image/png': [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a],
+  'image/jpeg': [0xff, 0xd8, 0xff],
+};
+
+/** How many bytes from the start of an object are enough to tell what it is. */
+export const SIGNATURE_PREFIX_BYTES = Math.max(...Object.values(SIGNATURES).map((signature) => signature.length));
+
+/**
+ * Whether the first bytes of an object are those of the type it was declared to be (`US-04-04` AC-10): a name or a type
+ * that says PDF is not enough, the content must begin like one. A type the system does not keep has no signature.
+ */
+export function contentMatchesType(contentType: string, prefix: Uint8Array): boolean {
+  const signature = SIGNATURES[contentType];
+
+  return (
+    signature !== undefined && prefix.length >= signature.length && signature.every((byte, at) => prefix[at] === byte)
+  );
+}
+
 export type OpenDecision = 'OPEN' | 'HIDDEN' | 'FORBIDDEN';
 
 /**

@@ -304,6 +304,27 @@ describe('the seat baseline import over HTTP (integration, real PostgreSQL)', ()
       expect(events.rows).toEqual([]);
     });
 
+    it('confirms the valid rows of a file that holds a token, and leaves the token row an error (AC-9)', async () => {
+      const subscriptionId = await h.subscription(10);
+      const corp = await h.costCenter('COMPANY');
+      await h.person('TOK1');
+      await h.person('TOK2');
+
+      const preview = await h.preview({ subscriptionId }, [
+        row('TOK1'),
+        bot('TOK2', 'ghp_confirmtoken123', { cost_center_code: corp.code }),
+      ]);
+      const confirmed = h.dataOf<{ import: ImportWire }>(await h.confirm(preview.id, 1).expect(200)).import;
+
+      expect(preview.summary).toMatchObject({ valid: 1, errors: 1 });
+      expect(confirmed.result).toMatchObject({ created: 1, errors: 1 });
+      const identifiers = await h.ctx.sql.query(
+        `SELECT account_identifier FROM license_assignments WHERE baseline_import_id = $1`,
+        [preview.id],
+      );
+      expect(identifiers.rows).toEqual([{ account_identifier: 'tok1@acme.vn' }]);
+    });
+
     it('refuses a personal account that is not on a company domain, and takes one that is (AC-13)', async () => {
       const subscriptionId = await h.subscription(10);
       await h.person('DOM1');
@@ -446,6 +467,29 @@ describe('the seat baseline import over HTTP (integration, real PostgreSQL)', ()
       const preview = await h.preview({ subscriptionId }, [row('NOBODY9'), row('LEFT1')]);
 
       expect(preview.summary.byCode).toEqual({ EMPLOYEE_NOT_FOUND: 1, EMPLOYEE_NOT_ACTIVE: 1 });
+    });
+
+    it('US-02-02 AC-15: refuses a seat that would start before the person does, and keeps no seat for the row', async () => {
+      const subscriptionId = await h.subscription(5);
+      const later = await h.person('HIRE-LATER');
+      const earlier = await h.person('HIRE-EARLIER');
+      await h.ctx.sql.query(`UPDATE employees SET hire_date = current_date + 400 WHERE id = $1`, [later]);
+      await h.ctx.sql.query(`UPDATE employees SET hire_date = $2::date WHERE id = $1`, [earlier, '2026-06-15']);
+
+      const preview = await h.preview({ subscriptionId }, [
+        row('HIRE-LATER'),
+        row('HIRE-EARLIER', { granted_on: '2026-06-14' }),
+        row('HIRE-EARLIER', { granted_on: '2026-06-15' }),
+      ]);
+
+      expect(preview.summary.byCode).toEqual({ EFFECTIVE_BEFORE_HIRE: 2 });
+      expect(preview.summary.valid).toBe(1);
+      const rows = await rowsOf(preview.id);
+      expect(rows.map((item) => item.errors.map((error) => error.code))).toEqual([
+        ['EFFECTIVE_BEFORE_HIRE'],
+        ['EFFECTIVE_BEFORE_HIRE'],
+        [],
+      ]);
     });
   });
 

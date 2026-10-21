@@ -56,8 +56,8 @@ describe('provisioning tasks (integration, PostgreSQL constraints)', () => {
     const code = await sqlState(
       sql,
       `INSERT INTO provisioning_tasks (id, organization_id, assignment_id, kind, channel, request_id,
-         default_responsible_employee_id, created_by_app_user_id)
-       VALUES ($1, $2, $3, 'GRANT', $4::"ProvisioningChannel", $5, $6, $7)`,
+         default_responsible_employee_id, max_attempts, created_by_app_user_id)
+       VALUES ($1, $2, $3, 'GRANT', $4::"ProvisioningChannel", $5, $6, 4, $7)`,
       [
         id,
         organizationId,
@@ -129,14 +129,36 @@ describe('provisioning tasks (integration, PostgreSQL constraints)', () => {
     expect((await newTask({ assignmentId })).code).toBe('23505');
   });
 
+  it('fixes the most tries when the task is made, from one to eleven, and never changes them (US-01-04 AC-13)', async () => {
+    const insert = async (maxAttempts: number) =>
+      sqlState(
+        sql,
+        `INSERT INTO provisioning_tasks (id, organization_id, assignment_id, kind, channel, request_id, max_attempts, created_by_app_user_id)
+         VALUES (gen_random_uuid(), $1, $2, 'GRANT', 'MANUAL', $3, $4, $5)`,
+        [organizationId, await newAssignment(), randomUUID(), maxAttempts, person()],
+      );
+
+    expect(await insert(0)).toBe('23514');
+    expect(await insert(12)).toBe('23514');
+    expect(await insert(1)).toBeNull();
+    expect(await insert(11)).toBeNull();
+
+    const { id } = await newTask();
+    expect(await sqlState(sql, `UPDATE provisioning_tasks SET max_attempts = 5 WHERE id = $1`, [id])).toBe('55000');
+    expect(
+      (await sql.query<{ max_attempts: number }>(`SELECT max_attempts FROM provisioning_tasks WHERE id = $1`, [id]))
+        .rows[0].max_attempts,
+    ).toBe(4);
+  });
+
   it('refuses an assignment or a person in charge that does not exist, and a task with no request', async () => {
     expect((await newTask({ assignmentId: randomUUID() })).code).toBe('23503');
     expect((await newTask({ responsible: randomUUID() })).code).toBe('23503');
     expect(
       await sqlState(
         sql,
-        `INSERT INTO provisioning_tasks (organization_id, assignment_id, kind, channel, request_id, created_by_app_user_id)
-         VALUES ($1, $2, 'GRANT', 'MANUAL', NULL, $3)`,
+        `INSERT INTO provisioning_tasks (id, organization_id, assignment_id, kind, channel, request_id, max_attempts, created_by_app_user_id)
+         VALUES (gen_random_uuid(), $1, $2, 'GRANT', 'MANUAL', NULL, 4, $3)`,
         [organizationId, await newAssignment(), person()],
       ),
     ).toBe('23502');

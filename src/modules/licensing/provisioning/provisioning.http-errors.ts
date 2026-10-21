@@ -5,6 +5,7 @@ import {
   GrantRequestRefusedError,
   ProvisioningAnotherItAdminNeededError,
   ProvisioningBeneficiaryDepartedError,
+  ProvisioningBeneficiaryNotStartedError,
   ProvisioningEvidenceRequiredError,
   ProvisioningPersonalAccountError,
   ProvisioningReasonRequiredError,
@@ -59,6 +60,12 @@ export function toProvisioningApiException(error: unknown): unknown {
     return refuse(CONFLICT, 'PROVISIONING.BENEFICIARY_DEPARTED', error.message, {
       requestId: error.requestId,
       nextStep: 'CANCEL_REQUEST',
+    });
+  }
+  if (error instanceof ProvisioningBeneficiaryNotStartedError) {
+    return refuse(CONFLICT, 'PROVISIONING.BENEFICIARY_NOT_STARTED', error.message, {
+      requestId: error.requestId,
+      startsOn: error.startsOn,
     });
   }
   if (error instanceof ProvisioningTaskNotFoundError) {

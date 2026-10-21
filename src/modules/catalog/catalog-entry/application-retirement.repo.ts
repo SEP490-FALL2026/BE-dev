@@ -19,8 +19,9 @@ export interface RetirementState {
 }
 
 /**
- * The writer of `application_retirement_confirmations` and of the retirement columns of `applications`. A confirmation is
- * written once and never changed; an application is retired once and never brought back (the database refuses both).
+ * The writer of `application_retirement_confirmations`, and a reader of the retirement columns of `applications` (which
+ * `ApplicationRepo` writes). A confirmation is written once and never changed; the database refuses both a change and a
+ * return of a retired application.
  */
 @Injectable()
 export class ApplicationRetirementRepo {
@@ -51,22 +52,6 @@ export class ApplicationRetirementRepo {
     return (tx ?? this.prisma).application.findUnique({
       where: { id: applicationId },
       select: { retiredAt: true, retiredByAppUserId: true, retirementConfirmationId: true },
-    });
-  }
-
-  async markRetired(
-    tx: DbTx,
-    applicationId: string,
-    input: { appUserId: string; confirmationId: string; now: Date },
-  ): Promise<void> {
-    await tx.application.update({
-      where: { id: applicationId },
-      data: {
-        catalogStatus: 'RETIRED',
-        retiredAt: input.now,
-        retiredByAppUserId: input.appUserId,
-        retirementConfirmationId: input.confirmationId,
-      },
     });
   }
 }

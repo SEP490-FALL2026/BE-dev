@@ -50,8 +50,9 @@
 
 ## Storage and jobs
 
-- Storage/BullMQ adapters exist but are not mounted in any graph (E2 = A); file APIs and BullMQ processors do not.
-  A slice that mounts one restores its production validation (Redis password, HTTPS storage endpoint).
+- Only the API mounts the object storage (ADR-0014, contract files, signed links); the queue is mounted in no graph
+  (E2 = A) and has no processors. A slice that mounts either restores its production validation (Redis password,
+  HTTPS storage endpoint). A storage that cannot answer is a 503, never a 500 and never a successful write.
   `EmailDispatchLoop` in the separate worker polls PostgreSQL `EmailOutbox` and sends via SMTP
   outside the business transaction (ADR-0012, Proposed). Delivery is at-least-once.
 - Business modules call ObjectStoragePort rather than vendor SDKs.

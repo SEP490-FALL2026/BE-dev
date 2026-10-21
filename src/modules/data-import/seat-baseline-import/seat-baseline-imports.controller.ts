@@ -117,12 +117,12 @@ export class SeatBaselineImportsController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The baseline is closed (SEAT_BASELINE.CLOSED) or the subscription has no quantity (SEAT_BASELINE.QUANTITY_UNKNOWN).',
+        'The baseline is closed (SEAT_BASELINE.CLOSED), the subscription has no quantity (SEAT_BASELINE.QUANTITY_UNKNOWN) or the application is retired (SEAT_TARGET.APPLICATION_RETIRED).',
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The request is invalid (VALIDATION_ERROR), the target is not one subscription or one internal plan (SEAT_BASELINE.TARGET_INVALID), its plan takes no baseline yet (SEAT_BASELINE.PLAN_NOT_SUPPORTED), or the file cannot be used as a whole (SEAT_BASELINE_IMPORT.FILE_*).',
+        'The request is invalid (VALIDATION_ERROR), the target is not one subscription or one internal plan (SEAT_BASELINE.TARGET_INVALID), its plan takes no baseline yet (SEAT_BASELINE.PLAN_NOT_SUPPORTED), the subscription is still a draft (SEAT_TARGET.SUBSCRIPTION_DRAFT, details.missing lists what it lacks), or the file cannot be used as a whole (SEAT_BASELINE_IMPORT.FILE_*).',
     },
   )
   async upload(
@@ -196,9 +196,13 @@ export class SeatBaselineImportsController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The baseline is closed (SEAT_BASELINE.CLOSED), the preview is outdated or stale (SEAT_BASELINE_IMPORT.PREVIEW_OUTDATED, PREVIEW_STALE), or the import was cancelled, expired or already written under another key (CANCELLED, EXPIRED, ALREADY_CONFIRMED).',
+        'The baseline is closed (SEAT_BASELINE.CLOSED), the application was retired since the preview (SEAT_TARGET.APPLICATION_RETIRED), the preview is outdated or stale (SEAT_BASELINE_IMPORT.PREVIEW_OUTDATED, PREVIEW_STALE), or the import was cancelled, expired or already written under another key (CANCELLED, EXPIRED, ALREADY_CONFIRMED).',
     },
-    { status: HttpStatus.UNPROCESSABLE_ENTITY, description: 'The request is invalid (VALIDATION_ERROR).' },
+    {
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      description:
+        'The request is invalid (VALIDATION_ERROR) or the subscription is a draft (SEAT_TARGET.SUBSCRIPTION_DRAFT).',
+    },
   )
   async confirm(
     @CurrentPrincipal() actor: AuthenticatedPrincipal,

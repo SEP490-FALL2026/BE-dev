@@ -182,23 +182,55 @@ describe('standard toolsets (integration, PostgreSQL constraints)', () => {
     expect(stored.rows).toEqual([{ plan_id: figma }]);
   });
 
-  it('lets the head move to the next version and refuses a version below zero', async () => {
+  it('lets the head move to the next version, which is already recorded, and refuses a version below zero', async () => {
     const pair = await newPair();
     await head(pair.department, pair.jobTitle);
+    await version(pair.department, pair.jobTitle, 1);
+    const move = (to: number) =>
+      sqlState(
+        sql,
+        `UPDATE standard_toolsets SET current_version = $3 WHERE department_id = $1 AND job_title_id = $2`,
+        [pair.department, pair.jobTitle, to],
+      );
 
-    expect(
-      await sqlState(
+    expect(await move(1)).toBeNull();
+    expect(await move(-1)).toBe('55000');
+  });
+
+  it('records a version only as the next one of its pair, and its items only while it is being written (history stays whole)', async () => {
+    const pair = await newPair();
+    await head(pair.department, pair.jobTitle);
+    const move = (to: number) =>
+      sqlState(
         sql,
-        `UPDATE standard_toolsets SET current_version = 1 WHERE department_id = $1 AND job_title_id = $2`,
-        [pair.department, pair.jobTitle],
-      ),
-    ).toBeNull();
-    expect(
-      await sqlState(
-        sql,
-        `UPDATE standard_toolsets SET current_version = -1 WHERE department_id = $1 AND job_title_id = $2`,
-        [pair.department, pair.jobTitle],
-      ),
-    ).toBe('23514');
+        `UPDATE standard_toolsets SET current_version = $3 WHERE department_id = $1 AND job_title_id = $2`,
+        [pair.department, pair.jobTitle, to],
+      );
+
+    // The first version is written, its items with it, and then the head moves to it.
+    const first = await version(pair.department, pair.jobTitle, 1);
+    expect(first.state).toBeNull();
+    expect(await item(first.id, figma)).toBeNull();
+    expect((await version(pair.department, pair.jobTitle, 3)).state).toBe('55000');
+    expect(await move(1)).toBeNull();
+
+    // The version is recorded: nothing is added to it any more, and no version is written out of turn.
+    expect(await item(first.id, miro)).toBe('55000');
+    expect((await version(pair.department, pair.jobTitle, 3)).state).toBe('55000');
+    expect((await version(pair.department, pair.jobTitle, 1)).state).toBe('55000');
+    const second = await version(pair.department, pair.jobTitle, 2);
+    expect(second.state).toBeNull();
+    expect(await item(second.id, miro)).toBeNull();
+
+    // The head moves up by one, to a version that exists; never back, never past it.
+    expect(await move(3)).toBe('55000');
+    expect(await move(0)).toBe('55000');
+    expect(await move(2)).toBeNull();
+    expect(await move(4)).toBe('55000');
+    const stored = await sql.query<{ plan_id: string }>(
+      `SELECT plan_id FROM standard_toolset_items WHERE version_id = $1`,
+      [first.id],
+    );
+    expect(stored.rows).toEqual([{ plan_id: figma }]);
   });
 });

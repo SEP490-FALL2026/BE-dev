@@ -158,6 +158,17 @@ export class ProvisioningBeneficiaryDepartedError extends Error {
   }
 }
 
+/** The beneficiary has not started yet: no seat is granted before the day they join (`US-02-02` AC-15). */
+export class ProvisioningBeneficiaryNotStartedError extends Error {
+  constructor(
+    readonly requestId: string,
+    readonly startsOn: string,
+  ) {
+    super('The beneficiary has not started yet.');
+    this.name = 'ProvisioningBeneficiaryNotStartedError';
+  }
+}
+
 export class ProvisioningTaskNotFoundError extends Error {
   constructor() {
     super('The provisioning task does not exist.');

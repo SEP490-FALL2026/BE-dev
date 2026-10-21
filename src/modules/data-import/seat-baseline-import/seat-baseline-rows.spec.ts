@@ -180,3 +180,34 @@ describe('judgeSeatRows: dates and time-limited staff (AC-4, AC-8, INV-07)', () 
     ).toEqual(['EXPECTED_END_INVALID']);
   });
 });
+
+describe('judgeSeatRows: nobody holds a seat before the day they start (US-02-02 AC-15)', () => {
+  const newcomer = (hireDate: string) =>
+    new Map([['NEW', { id: 'e-new', status: 'ACTIVE', employmentType: 'STAFF', hireDate }]]);
+  const row = { employee_code: 'NEW', account_identifier: 'new@congty.vn' };
+
+  it('refuses a person who starts after today when the row names no grant date, as the seat would start today', () => {
+    expect(codesOf(judgeOne(row, { employees: newcomer('2026-10-05') }))).toEqual(['EFFECTIVE_BEFORE_HIRE']);
+  });
+
+  it('refuses a grant date before the day the person started', () => {
+    expect(codesOf(judgeOne({ ...row, granted_on: '2026-02-01' }, { employees: newcomer('2026-03-01') }))).toEqual([
+      'EFFECTIVE_BEFORE_HIRE',
+    ]);
+  });
+
+  it('accepts the day the person started, and any day after it', () => {
+    expect(judgeOne({ ...row, granted_on: '2026-03-01' }, { employees: newcomer('2026-03-01') }).outcome).toBe('VALID');
+    expect(judgeOne({ ...row, granted_on: '2026-03-02' }, { employees: newcomer('2026-03-01') }).outcome).toBe('VALID');
+    expect(judgeOne(row, { employees: newcomer(TODAY) }).outcome).toBe('VALID');
+  });
+
+  it('does not add this error to a grant date that is already refused as invalid or in the future', () => {
+    expect(codesOf(judgeOne({ ...row, granted_on: 'soon' }, { employees: newcomer('2026-10-05') }))).toEqual([
+      'GRANTED_ON_INVALID',
+    ]);
+    expect(codesOf(judgeOne({ ...row, granted_on: '2026-10-03' }, { employees: newcomer('2026-10-05') }))).toEqual([
+      'GRANTED_ON_IN_FUTURE',
+    ]);
+  });
+});

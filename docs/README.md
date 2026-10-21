@@ -7,7 +7,7 @@ không phải bộ chức năng đã hoàn thành.
 | Thư mục    | Mục đích                                                                  |
 | ---------- | ------------------------------------------------------------------------- |
 | rules/     | Quy tắc ngắn phải tuân thủ theo phần code thay đổi                        |
-| guides/    | Cách thực hiện: thêm endpoint, dùng AI, chạy container                    |
+| guides/    | Cách thực hiện: thêm endpoint, dùng AI, chạy container, vận hành kho khóa |
 | decisions/ | Vì sao chọn một hướng kỹ thuật; ghi rõ accepted khác implemented          |
 | examples/  | Dữ liệu mẫu/template tham khảo, không phải runtime hay acceptance đã pass |
 | reviews/   | Kết quả review và phạm vi đã kiểm chứng                                   |

@@ -20,8 +20,10 @@ mount `ObjectStorageModule` hay `QueueInfrastructureModule` khi chưa có Story 
    `OBJECT_STORAGE_ENDPOINT` HTTPS, `OBJECT_STORAGE_BUCKET`, `OBJECT_STORAGE_ACCESS_KEY_ID`,
    `OBJECT_STORAGE_SECRET_ACCESS_KEY`; ngoài production có giá trị mặc định cho MinIO cục bộ. `env-schema.ts` vẫn không đọc
    các biến này, nên worker và các lệnh không cần chúng.
-3. Hệ thống không nhận byte của tệp: cổng chỉ ký liên kết tải lên và tải xuống, kiểm tra tệp đã lưu (`head`) và xóa. Liên
-   kết mở tệp sống 300 giây, không lưu ở CSDL, Audit Trail hay log.
+3. Hệ thống không nhận byte của tệp: cổng chỉ ký liên kết tải lên và tải xuống, kiểm tra tệp đã lưu (`head` cho cỡ và
+   loại khai báo, `readPrefix` đọc vài byte đầu để chắc tệp bắt đầu đúng như loại PDF/PNG/JPEG đã khai) và xóa. Liên kết
+   mở tệp sống 300 giây, không lưu ở CSDL, Audit Trail hay log. Kho không trả lời được (mạng, quá hạn, từ chối của dịch
+   vụ) là `ObjectStorageUnavailableError` và API trả 503; "không có đối tượng" đi qua nguyên vẹn để service đọc.
 4. Test không dùng kho thật: cổng được thay bằng kho trong bộ nhớ (`test/support/fake-object-storage.ts`); việc kho S3
    thật từ chối liên kết quá hạn và việc ký liên kết với cấu hình thật chưa được kiểm chứng ở môi trường phát triển này.
 
@@ -31,7 +33,9 @@ mount `ObjectStorageModule` hay `QueueInfrastructureModule` khi chưa có Story 
   mount hàng đợi".
 - Deploy production của API phải đặt bốn biến kho (xem `.env.example`, `docs/guides/containers.md`) hoặc khởi động thất bại;
   đây là thay đổi vận hành cần báo trước khi triển khai.
-- Tệp không có đường xóa trong lát này; vòng đời xóa, quét mã độc và lưu 24 tháng của sao kê thuộc các lát sau.
+- Tệp không có đường xóa trong lát này; vòng đời xóa, quét mã độc và lưu 24 tháng của sao kê thuộc các lát sau. Còn mở
+  (hỏi Owner): liên kết tải lên dùng lại được trong 15 phút nên một tệp đã xác minh có thể bị thay trước khi gắn; chưa có
+  dọn tệp chờ tải lên hay chờ gắn mà không bao giờ hoàn tất.
 
 ## Phương án đã cân nhắc
 

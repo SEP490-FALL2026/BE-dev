@@ -34,11 +34,14 @@ const NOT_FOUND = {
   status: HttpStatus.NOT_FOUND,
   description: 'The subscription does not exist (SUBSCRIPTION.NOT_FOUND).',
 } as const;
+const INVALID_UPDATE_NOTE =
+  ' An update that would put the seats bought under the seats taken is refused with SUBSCRIPTION.QUANTITY_BELOW_OCCUPIED (details.occupied, details.requested).';
 const INVALID = {
   status: HttpStatus.UNPROCESSABLE_ENTITY,
   description:
     'The request is invalid (VALIDATION_ERROR) or a rule refuses it: SUBSCRIPTION.PLAN_NOT_FOUND, PLAN_HAS_NO_SUBSCRIPTION, PERPETUAL_NEEDS_LICENSED_APPLICATION, PERPETUAL_HAS_NO_TERM, DATES_INVALID or UPDATE_EMPTY; the price is refused with MONEY_SCALE_EXCEEDED, MONEY_OUT_OF_RANGE or CURRENCY_NOT_SUPPORTED.',
 } as const;
+const INVALID_UPDATE = { ...INVALID, description: INVALID.description + INVALID_UPDATE_NOTE } as const;
 
 const toWire = (view: SubscriptionView) => ({
   ...view,
@@ -126,7 +129,7 @@ export class SubscriptionsController {
     description:
       'The subscription as it is after the change; a new unit price is converted again at the rate of today; a change of nothing is answered the same and not audited. The plan and the kind cannot change.',
   })
-  @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, INVALID, NOT_FOUND)
+  @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, INVALID_UPDATE, NOT_FOUND)
   async update(
     @CurrentPrincipal() actor: AuthenticatedPrincipal,
     @Param() params: SubscriptionIdParamDto,

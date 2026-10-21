@@ -1,7 +1,7 @@
 # Software License Management — Backend
 
 Foundation để triển khai User Story bằng NestJS 11, TypeScript và PostgreSQL/Prisma. Source hạ tầng Redis/BullMQ và
-S3-compatible storage được giữ nhưng chưa mount vào API/worker (E2 = A, H6.4). Module mới đặt file theo [module structure](docs/rules/module-structure.md) và
+Kho đối tượng S3-compatible do API mount cho tệp của hợp đồng (ADR-0014); worker không mount nó và BullMQ chưa mount (E2 = A, H6.4). Module mới đặt file theo [module structure](docs/rules/module-structure.md) và
 architecture gate, không copy layout của một module cụ thể.
 
 **Đã có trong code:** lệnh khởi tạo `pnpm ops:bootstrap`, đăng nhập/làm mới/đăng xuất, `/me`, tạo tài khoản từ
@@ -41,7 +41,7 @@ Cần Node.js 22 hoặc 24, pnpm 11.1.3, Docker Compose.
    `.env.example` **chưa** đủ cho production: validator production còn từ chối thiếu biến `@production-required`. Biến đã bỏ (ví dụ `AUTH_COOKIE_SECURE`, bỏ khi refresh token chuyển sang body) bị bỏ
    qua âm thầm — tự xóa khỏi tệp env của bạn; không có lệnh nào đọc hay sửa tệp env chứa secret.
 3. Chạy `docker compose up -d --wait` để khởi động PostgreSQL (đủ cho API và worker). Redis và MinIO chỉ chạy khi gọi
-   profile: `docker compose --profile queue --profile storage up -d --wait` — dùng khi thử source hạ tầng chưa mount.
+   profile: `docker compose --profile queue --profile storage up -d --wait` — MinIO (`storage`) dùng khi chạy tệp hợp đồng ở local, Redis (`queue`) chỉ cho source hạ tầng chưa mount.
 4. Với **database mới**, chạy `pnpm db:migrate:deploy`, rồi `pnpm build` để sinh Prisma client và build CLI.
 5. Khởi tạo một lần bằng `pnpm ops:bootstrap --help`, điền tham số theo help và nhập mật khẩu ở terminal.
 6. Kiểm bằng `pnpm ops:inspect` (chỉ đọc; `--json` cho máy đọc): thoát 0 khi đã cài và nhất quán, 2 khi chưa cài hoặc
@@ -54,7 +54,7 @@ Cần Node.js 22 hoặc 24, pnpm 11.1.3, Docker Compose.
 8. Chạy `pnpm start:dev`; chạy worker ở terminal riêng nếu cần gửi thư mời.
 
 CLI khởi tạo chỉ xác thực `NODE_ENV` và cấu hình database; không yêu cầu secret JWT, SMTP hoặc khóa outbox của
-API/worker. API/worker vẫn dùng validation đầy đủ; không cần Redis hay object storage vì hai module đó chưa mount.
+API/worker. API/worker vẫn dùng validation đầy đủ; không cần Redis vì hàng đợi chưa mount, còn object storage chỉ API cần (HTTPS endpoint, bucket, khóa truy cập khi chạy production).
 Nếu mất phản hồi khi COMMIT, mã thoát lỗi không chứng minh chưa ghi gì: kiểm trạng thái cài đặt
 trước khi chạy lại; không tự retry thao tác ghi.
 

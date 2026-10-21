@@ -197,15 +197,41 @@ describe('standard toolsets over HTTP (integration, real PostgreSQL)', () => {
     expect(await count('standard_toolset_versions')).toBe(before);
   });
 
-  it('AC-4: grants and revokes nothing: no assignment, and no other table of seats, changes', async () => {
-    const assignments = await count('license_assignments');
-    const imports = await count('seat_baseline_imports');
+  it('AC-4: grants and revokes nothing: a seat held stays held, and no assignment, task or import is made or changed', async () => {
+    const subscriptionId = await h.subscription(5);
+    const planId = (
+      await h.ctx.sql.query<{ plan_id: string }>(`SELECT plan_id FROM subscriptions WHERE id = $1`, [subscriptionId])
+    ).rows[0].plan_id;
+    const holder = await member(design.code, 'E-SEAT-HOLDER', senior);
+    const assignmentId = randomUUID();
+    await h.ctx.sql.query(
+      `INSERT INTO license_assignments (id, organization_id, kind, source, plan_id, subscription_id, employee_id,
+         account_identifier, normalized_account_identifier, valid_from, valid_from_basis, created_by_app_user_id)
+       VALUES ($1, $2, 'PERSONAL', 'REQUEST', $3, $4, $5, 'e-seat-holder@acme.vn', 'e-seat-holder@acme.vn',
+         '2026-10-01', 'ACTUAL', $6)`,
+      [assignmentId, h.seed.organizationId, planId, subscriptionId, holder, randomUUID()],
+    );
+    const held = () =>
+      h.ctx.sql.query<{ row: Record<string, unknown> }>(
+        `SELECT to_jsonb(a) AS row FROM license_assignments a WHERE id = $1`,
+        [assignmentId],
+      );
+    const before = {
+      assignments: await count('license_assignments'),
+      tasks: await count('provisioning_tasks'),
+      imports: await count('seat_baseline_imports'),
+      row: (await held()).rows[0].row,
+    };
 
-    await set(senior === designer ? design.id : design.id, senior, [figma], 'bộ chuẩn Senior Designer');
+    // The seat held is in the toolset, then taken out of it, and nobody is given or loses anything by it.
+    await set(design.id, senior, [planId, figma], 'bộ chuẩn Senior Designer');
+    await set(design.id, senior, [figma], 'bỏ khỏi bộ chuẩn');
     await set(design.id, senior, [], 'bỏ hết');
 
-    expect(await count('license_assignments')).toBe(assignments);
-    expect(await count('seat_baseline_imports')).toBe(imports);
+    expect(await count('license_assignments')).toBe(before.assignments);
+    expect(await count('provisioning_tasks')).toBe(before.tasks);
+    expect(await count('seat_baseline_imports')).toBe(before.imports);
+    expect((await held()).rows[0].row).toEqual(before.row);
   });
 
   it('AC-9: refuses a plan that is not in the catalog, a plan twice and more than fifty, naming what is wrong', async () => {
@@ -321,6 +347,57 @@ describe('standard toolsets over HTTP (integration, real PostgreSQL)', () => {
     expect(mine.department.id).toBe(design.id);
     expect(mine.jobTitle.id).toBe(designer);
     expect(mine.toolset?.plans.length).toBeGreaterThan(0);
+  });
+
+  describe('what an employee reads of their own toolset (US-04-10 AC-12)', () => {
+    const mineOf = async (who: ApiAccount) =>
+      h.dataOf<{
+        department: { id: string } | null;
+        jobTitle: { id: string; name: string } | null;
+        toolset: ToolsetWire | null;
+      }>(await request(h.server()).get('/api/v1/standard-toolsets/mine').set(h.as(who)).expect(200));
+
+    it('still shows the toolset to someone whose job title is no longer in use', async () => {
+      const retiring = await jobTitle('Retiring Title');
+      await set(design.id, retiring, [miro], 'bộ chuẩn của chức vụ sắp ngừng');
+      const holder = await account('E-RETIRING', await member(design.code, 'E-RETIRING', retiring));
+      await request(h.server()).post(`/api/v1/job-titles/${retiring}/deactivate`).set(h.as(h.it1)).expect(200);
+
+      const mine = await mineOf(holder);
+
+      expect(mine.jobTitle?.id).toBe(retiring);
+      expect(mine.toolset?.plans.map((entry) => entry.planId)).toEqual([miro]);
+    });
+
+    it('shows the new name when the job title is renamed, with the same toolset and the same version', async () => {
+      const original = await jobTitle('Desginer Typo');
+      await set(design.id, original, [figma], 'bộ chuẩn');
+      const holder = await account('E-RENAMED', await member(design.code, 'E-RENAMED', original));
+      const versions = await count('standard_toolset_versions');
+
+      await request(h.server())
+        .patch(`/api/v1/job-titles/${original}`)
+        .set(h.as(h.it1))
+        .send({ name: 'Designer Fixed' })
+        .expect(200);
+      const mine = await mineOf(holder);
+
+      expect(mine.jobTitle).toEqual({ id: original, name: 'Designer Fixed' });
+      expect(mine.toolset?.version).toBe(1);
+      expect(await count('standard_toolset_versions')).toBe(versions);
+    });
+
+    it('answers a toolset of null for a pair that has none, and nothing for someone with no department', async () => {
+      const bare = await jobTitle('Title Without Toolset');
+      const withoutToolset = await account('E-BARE', await member(design.code, 'E-BARE', bare));
+      const strayId = await h.person('E-NOPLACE');
+      const noPlacement = await account('E-NOPLACE', strayId);
+      // Someone the system holds with no department today (the fixture put them in one: take it away).
+      await h.ctx.sql.query(`DELETE FROM employee_placements WHERE employee_id = $1`, [strayId]);
+
+      expect(await mineOf(withoutToolset)).toMatchObject({ toolset: null, jobTitle: { id: bare } });
+      expect(await mineOf(noPlacement)).toEqual({ department: null, jobTitle: null, toolset: null });
+    });
   });
 
   it('answers a pair with no toolset as null, not as a missing page, and the history to the IT Admin only', async () => {

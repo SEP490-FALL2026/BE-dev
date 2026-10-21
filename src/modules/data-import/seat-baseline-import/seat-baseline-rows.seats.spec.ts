@@ -123,7 +123,7 @@ describe('judgeSeatRows: the seats bought (AC-2, AC-12, INV-01)', () => {
     new Map(
       Array.from({ length: count }, (_, index) => [
         `P${index}`,
-        { id: `p${index}`, status: 'ACTIVE', employmentType: 'STAFF' } as const,
+        { id: `p${index}`, status: 'ACTIVE', employmentType: 'STAFF', hireDate: '2020-01-01' } as const,
       ]),
     );
 
@@ -218,6 +218,29 @@ describe('maskSecretCells (AC-9: a secret is never kept)', () => {
       employee_code: 'E2',
       account_identifier: 'ci-bot',
     });
+  });
+
+  it('judges a stored row again as the token it replaced, so a preview with a token still confirms (AC-9)', () => {
+    const cells = {
+      employee_code: 'E2',
+      account_identifier: 'ghp_abc123',
+      kind: 'service',
+      reason: 'CI',
+      cost_center_code: 'CC-CORP',
+    };
+    const preview = judgeOne(cells);
+    const confirmed = judgeOne(maskSecretCells(cells));
+
+    expect(codesOf(preview)).toEqual(['ACCOUNT_IDENTIFIER_LOOKS_LIKE_SECRET']);
+    expect(codesOf(confirmed)).toEqual(['ACCOUNT_IDENTIFIER_LOOKS_LIKE_SECRET']);
+    expect(sameJudgement(preview, confirmed)).toBe(true);
+  });
+
+  it('keeps an identifier with a space as it is: its error is the characters, not a token', () => {
+    const cells = { employee_code: 'E2', account_identifier: 'ghp abc 123' };
+
+    expect(maskSecretCells(cells)).toEqual(cells);
+    expect(codesOf(judgeOne(cells))).toEqual(['ACCOUNT_IDENTIFIER_INVALID']);
   });
 });
 

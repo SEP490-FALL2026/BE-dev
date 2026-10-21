@@ -203,11 +203,11 @@ describe('what an IT Admin decides about a failed task, over HTTP (integration, 
 
   it('US-07-04 AC-11: closing a failed revocation closes the task and leaves the assignment in force, the seat taken', async () => {
     const granted = await failed('PERMANENT', { quantity: 2 });
+    // A revocation is queued for the connector, and the connector reports that the provider refused: the way G6/G7 will do it.
     await h.ctx.sql.query(
-      `INSERT INTO provisioning_tasks (id, organization_id, assignment_id, kind, channel, status, request_id,
-         failed_at, failure_reason, failure_kind, attempts, created_by_app_user_id)
-       VALUES (gen_random_uuid(), $1, $2, 'REVOKE', 'CONNECTOR', 'FAILED', $3, now(),
-         'provider refused to remove the user', 'PERMANENT', 1, $4)`,
+      `INSERT INTO provisioning_tasks (id, organization_id, assignment_id, kind, channel, request_id, max_attempts,
+         created_by_app_user_id)
+       VALUES (gen_random_uuid(), $1, $2, 'REVOKE', 'CONNECTOR', $3, 4, $4)`,
       [h.seed.organizationId, granted.assignmentId, randomUUID(), randomUUID()],
     );
     const revoke = (
@@ -216,6 +216,9 @@ describe('what an IT Admin decides about a failed task, over HTTP (integration, 
         [granted.assignmentId],
       )
     ).rows[0].id;
+    expect((await h.recordFailure(revoke, 'PERMANENT', 'provider refused to remove the user')).status).toBe('FAILED');
+    // While it waits for a decision the seat stays in force and taken.
+    expect(await assignment(granted.assignmentId)).toMatchObject({ valid_until: null, failed_at: null });
     const before = await h.freeSeats(granted.subscriptionId);
 
     const closed = wire(await h.closeFailed(revoke, { reason: 'sẽ gỡ tay sau khi nhà cung cấp sửa' }).expect(200));
@@ -232,13 +235,12 @@ describe('what an IT Admin decides about a failed task, over HTTP (integration, 
   it('decides on a failed task only: every other state answers that it is not failed, and nothing changes', async () => {
     const queued = await failed();
     await h.retry(queued.id).expect(200);
-    const scheduled = await failed();
-    await h.ctx.sql.query(
-      `UPDATE provisioning_tasks SET status = 'RETRY_SCHEDULED', failure_kind = 'TRANSIENT', attempts = 1,
-         last_error = 'slow', next_retry_at = now() + interval '5 minutes', failed_at = NULL, failure_reason = NULL
-       WHERE id = $1`,
-      [scheduled.id],
-    );
+    // A task waiting for its next try, reached the way the connector reaches it: a temporary failure with retries left.
+    const subscriptionId = await h.subscription(5, 'K2');
+    const made = await h.granted(e7, await h.planOf(subscriptionId), { subscriptionId });
+    await h.makeConnector(made.id);
+    expect((await h.recordFailure(made.id, 'TRANSIENT')).status).toBe('RETRY_SCHEDULED');
+    const scheduled = { id: made.id };
     const closed = await failed();
     await h.closeFailed(closed.id, { reason: 'xong' }).expect(200);
     const done = await failed('PERMANENT', { connector: false });
@@ -299,6 +301,39 @@ describe('what an IT Admin decides about a failed task, over HTTP (integration, 
     expect(h.codeOf(await h.retry(own.id, a1).expect(403))).toBe('PROVISIONING.ANOTHER_IT_ADMIN_NEEDED');
     expect((await task(own.id)).status).toBe('FAILED');
     expect(wire(await h.retry(own.id).expect(200)).status).toBe('QUEUED');
+  });
+
+  it('QĐ-77m: when no other IT Admin can act, the one who is the beneficiary decides, and each decision is marked as made by oneself', async () => {
+    const own = async () => {
+      const subscriptionId = await h.subscription(5, 'K2');
+      const made = await h.granted(a1Employee, await h.planOf(subscriptionId), { subscriptionId });
+      await h.makeConnector(made.id);
+      await h.recordFailure(made.id, 'PERMANENT');
+
+      return made.id;
+    };
+    const toRetry = await own();
+    const toHandOff = await own();
+    const toClose = await own();
+
+    // The other IT Admin is locked: nobody else can decide, so the refusal gives way and the audit says so.
+    await h.ctx.sql.query(`UPDATE app_users SET status = 'LOCKED' WHERE id = $1`, [h.it1.appUserId]);
+    try {
+      expect(wire(await h.retry(toRetry, a1).expect(200)).status).toBe('QUEUED');
+      expect(wire(await h.handOff(toHandOff, { evidence: 'đã thử tay' }, a1).expect(200)).status).toBe('QUEUED');
+      expect(wire(await h.closeFailed(toClose, { reason: 'bỏ' }, a1).expect(200)).status).toBe('CLOSED_FAILED');
+    } finally {
+      await h.ctx.sql.query(`UPDATE app_users SET status = 'ACTIVE' WHERE id = $1`, [h.it1.appUserId]);
+    }
+
+    for (const [id, action] of [
+      [toRetry, 'PROVISIONING_TASK.RETRY_REQUESTED'],
+      [toHandOff, 'PROVISIONING_TASK.HANDED_OFF'],
+      [toClose, 'PROVISIONING_TASK.CLOSED_FAILED'],
+    ] as const) {
+      const events = await h.auditEvents('ProvisioningTask', id);
+      expect(events.at(-1)).toMatchObject({ action, actor_app_user_id: a1.appUserId, after: { selfExecuted: true } });
+    }
   });
 
   it('two IT Admins closing one failed task at once: one closes it, the other is told it is not failed, the assignment fails once', async () => {

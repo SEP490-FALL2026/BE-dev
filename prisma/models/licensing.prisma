@@ -128,6 +128,9 @@ model ProvisioningTask {
   failureKind                  ProvisioningFailureKind? @map("failure_kind")
   // Tries made (the first and the retries); the last error is technical detail for the IT team, never for the user.
   attempts                     Int                      @default(0)
+  // The most tries the task gets (the first and the retries `PROVISIONING_RETRY_COUNT` allowed when it was made): fixed
+  // then, so a parameter changed later reaches only the tasks made after it (US-01-04 AC-13).
+  maxAttempts                  Int                      @map("max_attempts")
   lastError                    String?                  @map("last_error")
   nextRetryAt                  DateTime?                @map("next_retry_at") @db.Timestamptz(3)
   closedByAppUserId            String?                  @map("closed_by_app_user_id") @db.Uuid

@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto';
+import { Client } from 'pg';
 import request from 'supertest';
+import { waitForLockWaiters } from '../support/lock-wait';
 import { ProvisioningHarness } from '../support/provisioning-harness';
 
 const h = new ProvisioningHarness();
@@ -20,11 +22,11 @@ describe('the guards of the seats of a subscription over HTTP (integration, real
     employeeId: string,
     planId: string,
     subscriptionId: string | null,
-    options: { from?: string; until?: string | null; failed?: boolean } = {},
+    options: { from?: string; until?: string | null; failed?: boolean; db?: Pick<Client, 'query'> } = {},
   ): Promise<string> => {
     const id = randomUUID();
     const from = options.from ?? '2026-10-01';
-    await h.ctx.sql.query(
+    await (options.db ?? h.ctx.sql).query(
       `INSERT INTO license_assignments (id, organization_id, kind, source, plan_id, subscription_id, employee_id,
          account_identifier, normalized_account_identifier, valid_from, valid_from_basis, valid_until, failed_at,
          created_by_app_user_id)
@@ -142,6 +144,33 @@ describe('the guards of the seats of a subscription over HTTP (integration, real
     expect(answers.map((answer) => answer.status).sort()).not.toEqual([201, 200]);
   });
 
+  it('US-04-03 AC-5: a cut of the seats waits for a grant that is being made, and then counts it', async () => {
+    const subscriptionId = await h.subscription(2, 'K2');
+    const planId = await h.planOf(subscriptionId);
+    await insertAssignment(people[0], planId, subscriptionId);
+    const holder = new Client({ connectionString: h.ctx.database.url });
+    await holder.connect();
+    try {
+      // The grant in flight: it holds the subscription and has written its assignment, which is not committed yet.
+      await holder.query('BEGIN');
+      await holder.query('SELECT id FROM subscriptions WHERE id = $1 FOR UPDATE', [subscriptionId]);
+      await insertAssignment(people[1], planId, subscriptionId, { db: holder });
+
+      const pending = patch(subscriptionId, { purchasedQuantity: 1 }).then((response) => response);
+      await waitForLockWaiters(h.ctx.sql, 1);
+      await holder.query('COMMIT');
+      const refused = await pending;
+
+      expect(refused.status).toBe(422);
+      expect(h.codeOf(refused)).toBe('SUBSCRIPTION.QUANTITY_BELOW_OCCUPIED');
+      expect(h.detailsOf(refused)).toEqual({ occupied: 2, requested: 1 });
+      expect(await quantityOf(subscriptionId)).toBe(2);
+    } finally {
+      await holder.query('ROLLBACK').catch(() => undefined);
+      await holder.end();
+    }
+  });
+
   it('US-04-03 AC-6: a draft takes no seat, from a request or from a baseline file, and says what it lacks', async () => {
     const draft = await h.draftSubscription('K2');
     const planId = await h.planOf(draft);
@@ -160,7 +189,7 @@ describe('the guards of the seats of a subscription over HTTP (integration, real
       [draft],
     );
     expect(Number(written.rows[0].n)).toBe(0);
-    expect((await h.dataOf<{ items: unknown[] }>(await h.list().expect(200))).items).toBeDefined();
+    expect(h.dataOf<{ items: unknown[] }>(await h.list().expect(200)).items).toBeDefined();
   });
 
   it('takes a seat as soon as the draft is complete, and a plan with no subscription is never a draft', async () => {

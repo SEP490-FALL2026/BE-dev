@@ -182,12 +182,12 @@ describe('the vault of license keys over HTTP (integration, real PostgreSQL)', (
   it('US-04-12 AC-2: leaves no key, fingerprint or secret in the audit trail of an import', async () => {
     const subscriptionId = await h.subscription(5, 'K4');
     const [secret] = keys(1, 'AUD');
-    await imported(subscriptionId, [secret]);
+    await imported(subscriptionId, [secret, 'short', secret]);
 
     const events = await h.auditOf('Subscription', subscriptionId);
     const event = events.find((e) => e.action === 'LICENSE_KEY.IMPORTED');
 
-    expect(event?.after).toEqual({ subscriptionId, imported: 1, rejected: 0 });
+    expect(event?.after).toEqual({ subscriptionId, imported: 1, rejected: 2 });
     expect(JSON.stringify(events)).not.toContain(secret);
   });
 
