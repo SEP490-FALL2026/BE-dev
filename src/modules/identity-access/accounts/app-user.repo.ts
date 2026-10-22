@@ -143,6 +143,19 @@ export class AppUserRepo {
     return new Set(rows.map((row) => row.employeeId));
   }
 
+  /** How many IT Admins other than this employee can act: an active, activated account with the role, of someone still working. */
+  countUsableItAdminsExcept(employeeId: string, tx?: DbTx): Promise<number> {
+    return (tx ?? this.prisma).appUser.count({
+      where: {
+        employeeId: { not: employeeId },
+        status: 'ACTIVE',
+        activationState: 'ACTIVATED',
+        employee: { status: 'ACTIVE' },
+        roleGrants: { some: { role: 'IT_ADMIN', revokedAt: null } },
+      },
+    });
+  }
+
   /** How the login email of the account was verified; null when it never was (an account not yet activated). */
   async readEmailVerificationSource(tx: DbTx, appUserId: string): Promise<string | null> {
     const row = await tx.appUser.findUnique({ where: { id: appUserId }, select: { emailVerificationSource: true } });

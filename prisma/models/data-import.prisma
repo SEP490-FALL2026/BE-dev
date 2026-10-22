@@ -49,3 +49,62 @@ model EmployeeImportRow {
   @@index([importId, outcome])
   @@map("employee_import_rows")
 }
+
+enum SeatBaselineImportStatus {
+  PREVIEW
+  COMPLETED
+  CANCELLED
+}
+
+// One upload of a seat baseline file for one subscription (or one internal plan) and what became of it (US-02-05). Like
+// a people import, the file is read once into rows and nothing in the licensing tables changes until the person
+// confirms the preview, and then it changes exactly once.
+model SeatBaselineImport {
+  id             String                   @id @default(uuid()) @db.Uuid
+  organizationId String                   @map("organization_id") @db.Uuid
+  uploadedBy     String                   @map("uploaded_by") @db.Uuid
+  fileName       String                   @map("file_name")
+  // SHA-256 of the bytes that were uploaded.
+  contentHash    String                   @map("content_hash")
+  // The target: a subscription of a paid plan, or an internal plan with no subscription (then subscriptionId is null).
+  planId         String                   @map("plan_id") @db.Uuid
+  subscriptionId String?                  @map("subscription_id") @db.Uuid
+  status         SeatBaselineImportStatus @default(PREVIEW)
+  // Raised every time the preview is computed again; a confirmation names the version it was shown.
+  previewVersion Int                      @default(1) @map("preview_version")
+  ignoredColumns String[]                 @map("ignored_columns")
+  summary        Json
+  result         Json?
+  // The idempotency key of the confirmation that wrote, so the same request again gets the same answer.
+  confirmKey     String?                  @map("confirm_key")
+  createdAt      DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
+  expiresAt      DateTime                 @map("expires_at") @db.Timestamptz(3)
+  confirmedAt    DateTime?                @map("confirmed_at") @db.Timestamptz(3)
+  cancelledAt    DateTime?                @map("cancelled_at") @db.Timestamptz(3)
+
+  organization Organization            @relation(fields: [organizationId], references: [id])
+  plan         Plan                    @relation(fields: [planId], references: [id])
+  subscription Subscription?           @relation(fields: [subscriptionId], references: [id], onDelete: Restrict)
+  rows         SeatBaselineImportRow[]
+  assignments  LicenseAssignment[]
+
+  @@index([organizationId, createdAt(sort: Desc)])
+  @@map("seat_baseline_imports")
+}
+
+// One data row of the file: what it said (cells, as read; a secret-looking identifier is masked) and what the preview
+// made of it.
+model SeatBaselineImportRow {
+  importId   String @map("import_id") @db.Uuid
+  // The line of the file where the row begins; the header is line 1.
+  lineNumber Int    @map("line_number")
+  cells      Json
+  outcome    String
+  errors     Json
+
+  import SeatBaselineImport @relation(fields: [importId], references: [id], onDelete: Cascade)
+
+  @@id([importId, lineNumber])
+  @@index([importId, outcome])
+  @@map("seat_baseline_import_rows")
+}

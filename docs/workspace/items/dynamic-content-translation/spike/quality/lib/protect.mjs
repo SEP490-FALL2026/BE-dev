@@ -11,8 +11,18 @@ const WORD_CHAR = /[\p{L}\p{N}]/u;
 const PRIO = { collision: 0, url: 1, email: 1, code: 2, known: 3, date: 4, number: 5, glossary: 6 };
 
 const MONTHS_EN = [
-  ['January', 'Jan'], ['February', 'Feb'], ['March', 'Mar'], ['April', 'Apr'], ['May', 'May'], ['June', 'Jun'],
-  ['July', 'Jul'], ['August', 'Aug'], ['September', 'Sep', 'Sept'], ['October', 'Oct'], ['November', 'Nov'], ['December', 'Dec'],
+  ['January', 'Jan'],
+  ['February', 'Feb'],
+  ['March', 'Mar'],
+  ['April', 'Apr'],
+  ['May', 'May'],
+  ['June', 'Jun'],
+  ['July', 'Jul'],
+  ['August', 'Aug'],
+  ['September', 'Sep', 'Sept'],
+  ['October', 'Oct'],
+  ['November', 'Nov'],
+  ['December', 'Dec'],
 ];
 const MONTH_ALT = MONTHS_EN.flatMap((m) => m).join('|');
 
@@ -32,10 +42,16 @@ const RE = {
     new RegExp(`(?<![\\p{L}\\p{N}./,-])\\d{4}-${MONTH}-${DAY}(?![\\p{N}])`, 'gu'),
     new RegExp(`(?<![\\p{L}\\p{N}./,-])${DAY}/${MONTH}(?![\\p{N}/])`, 'gu'),
   ],
-  dateVi: new RegExp(`(?<![\\p{L}\\p{N}])(?:ngày\\s+)?(${DAY})\\s+tháng\\s+(${MONTH})(?:\\s+năm\\s+(\\d{4}))?${NA}`, 'giu'),
+  dateVi: new RegExp(
+    `(?<![\\p{L}\\p{N}])(?:ngày\\s+)?(${DAY})\\s+tháng\\s+(${MONTH})(?:\\s+năm\\s+(\\d{4}))?${NA}`,
+    'giu',
+  ),
   // The optional dot after an abbreviated month is only consumed when a day follows ("Nov. 15"),
   // so a sentence-final period ("by 3 Feb.") stays outside the span.
-  dateEn1: new RegExp(`${NB}(${MONTH_ALT})(?:\\.(?=\\s+\\d))?\\s+(${DAY})(?:st|nd|rd|th)?(?:,?\\s+(\\d{4}))?${NA}`, 'gu'),
+  dateEn1: new RegExp(
+    `${NB}(${MONTH_ALT})(?:\\.(?=\\s+\\d))?\\s+(${DAY})(?:st|nd|rd|th)?(?:,?\\s+(\\d{4}))?${NA}`,
+    'gu',
+  ),
   dateEn2: new RegExp(`${NB}(${DAY})(?:st|nd|rd|th)?\\s+(?:of\\s+)?(${MONTH_ALT})(?:,?\\s+(\\d{4}))?${NA}`, 'gu'),
   number: new RegExp(
     '(?<![\\p{L}\\p{N}.,])(?:[$€£₫]\\s?)?\\d+(?:[.,]\\d+)*' +
@@ -104,7 +120,9 @@ function collect(text, direction, { knownTerms, glossaryRules, protectNumbers })
 function selectSpans(cands, length) {
   const taken = new Uint8Array(length);
   const chosen = [];
-  const ordered = [...cands].sort((a, b) => a.prio - b.prio || b.end - b.start - (a.end - a.start) || a.start - b.start);
+  const ordered = [...cands].sort(
+    (a, b) => a.prio - b.prio || b.end - b.start - (a.end - a.start) || a.start - b.start,
+  );
   for (const c of ordered) {
     let free = true;
     for (let i = c.start; i < c.end; i++) {
@@ -140,7 +158,8 @@ export function protectSegment(text, opts) {
 }
 
 const AUX_BEFORE = /(?:^|[^\p{L}])(?:be|is|are|was|were|been|being|get|gets|got|has|have|had)\s+$/iu;
-const DET_BEFORE = /(?:^|[^\p{L}])(?:the|a|an|of|for|its|their|your|our|this|that|upon|any|no|each|every|before|after)\s+$/iu;
+const DET_BEFORE =
+  /(?:^|[^\p{L}])(?:the|a|an|of|for|its|their|your|our|this|that|upon|any|no|each|every|before|after)\s+$/iu;
 
 function capitalise(s) {
   return s.charAt(0).toUpperCase() + s.slice(1);

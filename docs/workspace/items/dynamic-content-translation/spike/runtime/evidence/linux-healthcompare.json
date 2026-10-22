@@ -20,10 +20,7 @@
     "worker": {
       "cold": {
         "ms": 10106,
-        "statuses": [
-          "OK",
-          "OK"
-        ],
+        "statuses": ["OK", "OK"],
         "health": {
           "n": 200,
           "min": 1.1,
@@ -95,10 +92,7 @@
     "inproc": {
       "cold": {
         "ms": 7913,
-        "statuses": [
-          "OK",
-          "OK"
-        ],
+        "statuses": ["OK", "OK"],
         "health": {
           "n": 156,
           "min": 1.2,

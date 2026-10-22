@@ -103,7 +103,7 @@ describe('.env.example', () => {
     expect(schema.filter((name) => NOT_MOUNTED.has(name))).toEqual([]);
   });
 
-  it('marks exactly what object storage and the queue require in production once a module is mounted (E2 = A)', () => {
+  it('marks exactly what object storage and the queue require in production once their module is mounted (ADR-0014, E2 = A)', () => {
     const required = (validate: () => unknown): string[] => {
       try {
         validate();
@@ -155,7 +155,15 @@ describe('.env.example', () => {
 
     expect(marked.sort()).toEqual(requiredNames('development').sort());
     expect(marked.sort()).toEqual(
-      ['AUTH_ACCESS_TOKEN_SECRET', 'AUTH_THROTTLE_PEPPER', 'OUTBOX_PAYLOAD_KEY', 'OUTBOX_PAYLOAD_KEY_ID'].sort(),
+      [
+        'AUTH_ACCESS_TOKEN_SECRET',
+        'AUTH_THROTTLE_PEPPER',
+        'OUTBOX_PAYLOAD_KEY',
+        'OUTBOX_PAYLOAD_KEY_ID',
+        'LICENSE_KEY_VAULT_KEY',
+        'LICENSE_KEY_VAULT_KEY_ID',
+        'LICENSE_KEY_FINGERPRINT_PEPPER',
+      ].sort(),
     );
   });
 });

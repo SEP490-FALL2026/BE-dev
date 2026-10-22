@@ -1352,41 +1352,45 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
       const department = await newDepartment();
       const first = await enter(department.code);
       const second = await enter(department.code);
-      await insertPeriod(department.id, first.employeeId, '2026-11-01', '2026-12-01');
+      // Days are relative to today: a member's placement starts today, so a fixed calendar date goes stale.
+      const start = addDays(today(), 10);
+      const end = addDays(today(), 40);
+      await insertPeriod(department.id, first.employeeId, start, end);
 
-      await expect(insertPeriod(department.id, second.employeeId, '2026-11-15', null)).rejects.toMatchObject({
+      await expect(insertPeriod(department.id, second.employeeId, addDays(today(), 25), null)).rejects.toMatchObject({
         code: '23P01',
       });
-      await expect(insertPeriod(department.id, second.employeeId, '2026-12-01', null)).resolves.toBeDefined();
+      await expect(insertPeriod(department.id, second.employeeId, end, null)).resolves.toBeDefined();
     });
 
     it('lets a person head only one department on any day: the member rule and the exclusion both refuse overlap', async () => {
       const first = await newDepartment();
       const second = await newDepartment();
       const person = await enter(first.code);
+      const transfer = addDays(today(), 40);
       // The same person is a member of the second department from a later day (a transfer), by SQL.
-      await ctx.sql.query(
-        `UPDATE employee_placements SET valid_to = '2026-12-01' WHERE employee_id = $1 AND valid_to IS NULL`,
-        [person.employeeId],
-      );
+      await ctx.sql.query(`UPDATE employee_placements SET valid_to = $2 WHERE employee_id = $1 AND valid_to IS NULL`, [
+        person.employeeId,
+        transfer,
+      ]);
       await ctx.sql.query(
         `INSERT INTO employee_placements (id, organization_id, employee_id, department_id, job_title_id, valid_from)
-         VALUES (gen_random_uuid(), $1, $2, $3, $4, '2026-12-01')`,
-        [seed.organizationId, person.employeeId, second.id, seed.jobTitleId],
+         VALUES (gen_random_uuid(), $1, $2, $3, $4, $5)`,
+        [seed.organizationId, person.employeeId, second.id, seed.jobTitleId, transfer],
       );
-      await insertPeriod(first.id, person.employeeId, '2026-10-20', '2026-12-01');
+      await insertPeriod(first.id, person.employeeId, today(), transfer);
 
       // Heading the second department before the transfer is refused: not a member yet (a second guard, the
       // exclusion on the person, would refuse it too if the placements ever overlapped).
-      const refusal: unknown = await insertPeriod(second.id, person.employeeId, '2026-11-20', null).catch(
+      const refusal: unknown = await insertPeriod(second.id, person.employeeId, addDays(today(), 30), null).catch(
         (error: unknown) => error,
       );
       expect(['23514', '23P01']).toContain((refusal as { code?: string }).code);
-      await expect(insertPeriod(second.id, person.employeeId, '2026-12-01', null)).resolves.toBeDefined();
+      await expect(insertPeriod(second.id, person.employeeId, transfer, null)).resolves.toBeDefined();
       await ctx.sql.query('DELETE FROM department_head_periods WHERE employee_id = $1', [person.employeeId]);
       await ctx.sql.query('DELETE FROM employee_placements WHERE employee_id = $1 AND valid_from = $2', [
         person.employeeId,
-        '2026-12-01',
+        transfer,
       ]);
       await ctx.sql.query('UPDATE employee_placements SET valid_to = NULL WHERE employee_id = $1', [person.employeeId]);
     });
@@ -1395,19 +1399,21 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
       const department = await newDepartment();
       const elsewhere = await enter('P-OPS');
       const member = await enter(department.code);
+      const periodStart = addDays(today(), 10);
+      const placementEnd = addDays(today(), 20);
 
-      await expect(insertPeriod(department.id, elsewhere.employeeId, '2026-11-01', null)).rejects.toMatchObject({
+      await expect(insertPeriod(department.id, elsewhere.employeeId, periodStart, null)).rejects.toMatchObject({
         code: '23514',
       });
       // A closed placement that ends before the period does.
-      await ctx.sql.query(
-        `UPDATE employee_placements SET valid_to = '2026-11-10' WHERE employee_id = $1 AND valid_to IS NULL`,
-        [member.employeeId],
-      );
-      await expect(insertPeriod(department.id, member.employeeId, '2026-11-01', null)).rejects.toMatchObject({
+      await ctx.sql.query(`UPDATE employee_placements SET valid_to = $2 WHERE employee_id = $1 AND valid_to IS NULL`, [
+        member.employeeId,
+        placementEnd,
+      ]);
+      await expect(insertPeriod(department.id, member.employeeId, periodStart, null)).rejects.toMatchObject({
         code: '23514',
       });
-      await expect(insertPeriod(department.id, member.employeeId, '2026-10-20', '2026-11-10')).resolves.toBeDefined();
+      await expect(insertPeriod(department.id, member.employeeId, today(), placementEnd)).resolves.toBeDefined();
       await ctx.sql.query('DELETE FROM department_head_periods WHERE employee_id = $1', [member.employeeId]);
       await ctx.sql.query('UPDATE employee_placements SET valid_to = NULL WHERE employee_id = $1', [member.employeeId]);
     });
@@ -1416,7 +1422,9 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
       const department = await newDepartment();
       const member = await enter(department.code);
 
-      await expect(insertPeriod(department.id, member.employeeId, '2026-11-01', '2026-11-01')).rejects.toMatchObject({
+      const day = addDays(today(), 10);
+
+      await expect(insertPeriod(department.id, member.employeeId, day, day)).rejects.toMatchObject({
         code: '23514',
       });
     });

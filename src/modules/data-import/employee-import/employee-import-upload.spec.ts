@@ -56,6 +56,7 @@ describe('EmployeeImportService: upload (H8 Phase 0 characterization)', () => {
           { departmentCode: 'P-DES', count: 1 },
         ],
         departmentsWithoutHead: [{ code: 'P-DES', name: 'Design' }],
+        reviewQueue: { total: 0, items: [] },
         duplicateOf: null,
       };
       const record = h.imports.get(view.id) as ImportRecord;

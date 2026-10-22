@@ -21,7 +21,12 @@ test('permanent loadFailed code is surfaced in the outcome and the event; hostil
 
 test('coordinator exposes the code in stats and trips the breaker to PERMANENT', async () => {
   const h = makeSup({}, () => ({ FAKE_LOAD_FAIL: 'permanent', FAKE_LOAD_CODE: 'MODEL_LOCK_MISMATCH' }));
-  const coord = new Coordinator({ supervisor: h.sup, cache: new TranslationCache(), identity: { engineId: 'f', modelDigest: 'd', glossaryVersion: 'g', placeholderPolicyVersion: 'p' }, timeoutMs: 2000 });
+  const coord = new Coordinator({
+    supervisor: h.sup,
+    cache: new TranslationCache(),
+    identity: { engineId: 'f', modelDigest: 'd', glossaryVersion: 'g', placeholderPolicyVersion: 'p' },
+    timeoutMs: 2000,
+  });
   const r = await coord.translate({ organizationId: 'o', scope: 's', storedSource: 'vi', target: 'en', text: 'x' });
   assert.equal(r.status, 'UNAVAILABLE');
   assert.equal(r.stats.code, 'MODEL_LOCK_MISMATCH');

@@ -84,7 +84,12 @@ const steps = [];
 function step(name, args) {
   const t = Date.now();
   const r = run(pnpm, args);
-  steps.push({ step: name, command: `${pnpm} ${args.join(' ')}`, exitCode: r.code, seconds: +((Date.now() - t) / 1000).toFixed(1) });
+  steps.push({
+    step: name,
+    command: `${pnpm} ${args.join(' ')}`,
+    exitCode: r.code,
+    seconds: +((Date.now() - t) / 1000).toFixed(1),
+  });
   if (r.code !== 0 && !name.startsWith('audit')) {
     console.error(scrub(r.stdout + r.stderr));
     throw new Error(`step ${name} failed`);
@@ -130,7 +135,17 @@ const lockPath = path.join(proj, 'pnpm-lock.yaml');
 const lockBuf = fs.readFileSync(lockPath);
 const lockText = lockBuf.toString('utf8');
 const resolved = {};
-for (const name of ['@huggingface/transformers', '@huggingface/jinja', '@huggingface/tokenizers', 'sharp', 'onnxruntime-node', 'onnxruntime-web', 'onnxruntime-common', 'protobufjs', 'sprintf-js']) {
+for (const name of [
+  '@huggingface/transformers',
+  '@huggingface/jinja',
+  '@huggingface/tokenizers',
+  'sharp',
+  'onnxruntime-node',
+  'onnxruntime-web',
+  'onnxruntime-common',
+  'protobufjs',
+  'sprintf-js',
+]) {
   const esc = name.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
   const re = new RegExp(`^  '?${esc}@([^':\\s]+)'?:`, 'gm');
   resolved[name] = [...lockText.matchAll(re)].map((m) => m[1]);
@@ -140,16 +155,29 @@ const imgPlatforms = [...lockText.matchAll(/^  '?(@img\/sharp-[^@']+)@([^':\s]+)
 // ---- CJS / ESM loadability (clean process each, cwd = scratch project)
 function nodeEval(code) {
   const r = run('node', ['-e', JSON.stringify(code)]);
-  return { exitCode: r.code, stdout: scrub(r.stdout).trim().slice(0, 300), stderr: scrub(r.stderr).trim().split('\n').slice(0, 6).join('\n').slice(0, 800) };
+  return {
+    exitCode: r.code,
+    stdout: scrub(r.stdout).trim().slice(0, 300),
+    stderr: scrub(r.stderr).trim().split('\n').slice(0, 6).join('\n').slice(0, 800),
+  };
 }
 const loadChecks = {
   node: process.version,
   cjsRequire: nodeEval("const m=require('@huggingface/transformers');console.log(typeof m.pipeline,typeof m.env)"),
-  esmDynamicImportFromCjs: nodeEval("import('@huggingface/transformers').then(m=>console.log(typeof m.pipeline,typeof m.env))"),
+  esmDynamicImportFromCjs: nodeEval(
+    "import('@huggingface/transformers').then(m=>console.log(typeof m.pipeline,typeof m.env))",
+  ),
   esmStaticImport: (() => {
-    fs.writeFileSync(path.join(proj, 'esm-check.mjs'), "import * as m from '@huggingface/transformers';console.log(typeof m.pipeline,typeof m.env);\n");
+    fs.writeFileSync(
+      path.join(proj, 'esm-check.mjs'),
+      "import * as m from '@huggingface/transformers';console.log(typeof m.pipeline,typeof m.env);\n",
+    );
     const r = run('node', ['esm-check.mjs']);
-    return { exitCode: r.code, stdout: r.stdout.trim().slice(0, 300), stderr: scrub(r.stderr).trim().split('\n').slice(0, 6).join('\n').slice(0, 800) };
+    return {
+      exitCode: r.code,
+      stdout: r.stdout.trim().slice(0, 300),
+      stderr: scrub(r.stderr).trim().split('\n').slice(0, 6).join('\n').slice(0, 800),
+    };
   })(),
 };
 

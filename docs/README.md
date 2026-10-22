@@ -7,7 +7,7 @@ không phải bộ chức năng đã hoàn thành.
 | Thư mục    | Mục đích                                                                  |
 | ---------- | ------------------------------------------------------------------------- |
 | rules/     | Quy tắc ngắn phải tuân thủ theo phần code thay đổi                        |
-| guides/    | Cách thực hiện: thêm endpoint, dùng AI, chạy container                    |
+| guides/    | Cách thực hiện: thêm endpoint, dùng AI, chạy container, vận hành kho khóa |
 | decisions/ | Vì sao chọn một hướng kỹ thuật; ghi rõ accepted khác implemented          |
 | examples/  | Dữ liệu mẫu/template tham khảo, không phải runtime hay acceptance đã pass |
 | reviews/   | Kết quả review và phạm vi đã kiểm chứng                                   |
@@ -29,6 +29,8 @@ trong docs/architecture. Các gói triển khai auth/US cũ đã được dọn 
 
 - [Xác thực nội bộ, phiên và quy ước persistence vùng danh tính](decisions/0011-internal-authentication-and-sessions.md) — Proposed; chờ dev review/Accepted.
 - [Gửi thư vòng đời tài khoản: outbox, thư viện SMTP, dispatcher](decisions/0012-account-email-delivery.md) — Proposed; chờ dev review/Accepted.
+- [Ba ngữ cảnh `catalog`, `finance`, `licensing` thay mẫu catalog cũ](decisions/0013-catalog-finance-licensing-contexts.md) — Proposed; chờ Owner review/Accepted.
+- [API mount lại kho đối tượng cho tệp của hợp đồng](decisions/0014-object-storage-mounted-for-contract-documents.md) — Proposed; chờ Owner review/Accepted.
 
 Trạng thái triển khai của các lát dùng hai ADR trên nằm ở [roadmap](roadmap.md). Số ADR bị khuyết không cần đánh lại.
 Định hướng tài khoản/mật khẩu + JWT hiện ghi ở ARCHITECTURE; spec/plan từng lát ở [workspace](workspace/README.md).

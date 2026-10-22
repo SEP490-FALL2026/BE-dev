@@ -246,6 +246,7 @@ describe('organization foundation (integration)', () => {
     expect(found.map((employee) => employee.employeeCode).sort()).toEqual(['E-MANY1', 'E-MANY2']);
     expect(Object.keys(found[0]).sort()).toEqual([
       'employeeCode',
+      'employmentType',
       'fullName',
       'hireDate',
       'id',

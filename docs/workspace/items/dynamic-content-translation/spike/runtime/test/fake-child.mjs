@@ -68,7 +68,16 @@ export function wellBehaved(child) {
     setImmediate(() => {
       if (!child.alive) return;
       if (msg.type === 'load') child.reply({ type: 'loaded', direction: msg.direction, ms: 1 });
-      else if (msg.type === 'run') child.reply({ type: 'done', jobId: msg.jobId, outputs: msg.segments.map((s) => 'T:' + s), complete: true, deadlineHit: false, cancelled: false, stats: { runMs: 1 } });
+      else if (msg.type === 'run')
+        child.reply({
+          type: 'done',
+          jobId: msg.jobId,
+          outputs: msg.segments.map((s) => 'T:' + s),
+          complete: true,
+          deadlineHit: false,
+          cancelled: false,
+          stats: { runMs: 1 },
+        });
       else if (msg.type === 'shutdown') child.die(0, null);
     });
   };
@@ -102,5 +111,14 @@ export function makeFakeSup(script, opts = {}) {
     ...opts,
   });
   sup.on('event', (e) => events.push(e));
-  return { sup, children, events, ofType: (t, p = () => true) => events.filter((e) => e.type === t && p(e)), aliveCount, get maxAlive() { return Math.max(maxAlive, aliveCount()); } };
+  return {
+    sup,
+    children,
+    events,
+    ofType: (t, p = () => true) => events.filter((e) => e.type === t && p(e)),
+    aliveCount,
+    get maxAlive() {
+      return Math.max(maxAlive, aliveCount());
+    },
+  };
 }

@@ -8,7 +8,17 @@ const WORKER = path.join(path.dirname(fileURLToPath(import.meta.url)), 'main.mjs
 
 // execPath / workerPath / cwd exist so spawn FAILURES can be provoked (bench `spawnfail`): a missing execPath or cwd makes
 // fork() emit an async 'error' with pid undefined; a missing workerPath starts node, which exits 1 (an ordinary crash).
-export function makeSpawn({ depsDir, modelsDir, intraThreads = 1, maxOldSpaceMb = 256, lockPath = null, maxNewTokensOverride = null, workerPath = WORKER, execPath = undefined, cwd = undefined }) {
+export function makeSpawn({
+  depsDir,
+  modelsDir,
+  intraThreads = 1,
+  maxOldSpaceMb = 256,
+  lockPath = null,
+  maxNewTokensOverride = null,
+  workerPath = WORKER,
+  execPath = undefined,
+  cwd = undefined,
+}) {
   return function spawnWorker() {
     const env = {
       SPIKE_MODELS_DIR: modelsDir,

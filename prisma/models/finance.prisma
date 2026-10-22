@@ -1,0 +1,135 @@
+enum ExchangeRateSource {
+  MANUAL
+}
+
+// Reference data: the currencies the system can price in, with their minor digits (ADR-0007). Seeded by migration.
+model Currency {
+  code      String @id @db.Char(3)
+  name      String
+  minorUnit Int    @map("minor_unit") @db.SmallInt
+
+  rates         ExchangeRate[]
+  subscriptions Subscription[] @relation("SubscriptionPriceCurrency")
+
+  @@map("currencies")
+}
+
+// One manually entered rate per currency and day: units of the organization's reporting currency for one unit of
+// `currency`. Never edited or deleted (US-04-05); a snapshot taken from it is frozen elsewhere.
+model ExchangeRate {
+  id             String             @id @default(uuid()) @db.Uuid
+  organizationId String             @map("organization_id") @db.Uuid
+  currency       String             @db.Char(3)
+  rateDate       DateTime           @map("rate_date") @db.Date
+  rate           Decimal            @db.Decimal(20, 10)
+  source         ExchangeRateSource @default(MANUAL)
+  createdAt      DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  organization  Organization   @relation(fields: [organizationId], references: [id])
+  currencyRef   Currency       @relation(fields: [currency], references: [code])
+  subscriptions Subscription[]
+
+  @@unique([organizationId, currency, rateDate])
+  @@map("exchange_rates")
+}
+
+enum TaxGroup {
+  T1
+  T2
+  T3
+}
+
+// The head of the tax profile of a vendor of the organization (US-12-09): which version is current. The only row of the
+// profile that is ever changed; the versions it points at never are. The vendor is a catalog table, so this is a database
+// foreign key only: the finance code does not read the vendor.
+model VendorTaxProfile {
+  vendorId       String   @id @map("vendor_id") @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  currentVersion Int      @default(0) @map("current_version")
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization              @relation(fields: [organizationId], references: [id])
+  vendor       Vendor                    @relation(fields: [vendorId], references: [id])
+  versions     VendorTaxProfileVersion[]
+
+  @@map("vendor_tax_profiles")
+}
+
+// One declaration of the profile: the group and the tax lines Finance entered, by whom and when. Immutable.
+model VendorTaxProfileVersion {
+  id                  String   @id @default(uuid()) @db.Uuid
+  vendorId            String   @map("vendor_id") @db.Uuid
+  version             Int
+  taxGroup            TaxGroup @map("tax_group")
+  declaredByAppUserId String   @map("declared_by_app_user_id") @db.Uuid
+  declaredAt          DateTime @default(now()) @map("declared_at") @db.Timestamptz(3)
+
+  profile VendorTaxProfile       @relation(fields: [vendorId], references: [vendorId])
+  lines   VendorTaxProfileLine[]
+
+  @@unique([vendorId, version])
+  @@map("vendor_tax_profile_versions")
+}
+
+// One tax of a version: its name, its estimated rate in hundredths of a percent, and the default deductible flag.
+model VendorTaxProfileLine {
+  versionId         String  @map("version_id") @db.Uuid
+  position          Int     @db.SmallInt
+  taxType           String  @map("tax_type")
+  normalizedTaxType String  @map("normalized_tax_type")
+  rateBp            Int     @map("rate_bp")
+  deductible        Boolean
+
+  version VendorTaxProfileVersion @relation(fields: [versionId], references: [id])
+
+  @@id([versionId, position])
+  @@unique([versionId, normalizedTaxType])
+  @@map("vendor_tax_profile_lines")
+}
+
+// The cost allocation of a subscription whose plan is not billed per seat (US-04-08, INV-03): Finance spreads the cost
+// over Cost Centers in ratios that add up to exactly 100%. This is the head: the only row that moves, naming the
+// current version. The subscription is a catalog table and the Cost Center an organization table: foreign keys only.
+model SubscriptionCostAllocation {
+  subscriptionId String   @id @map("subscription_id") @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  currentVersion Int      @default(0) @map("current_version")
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization                        @relation(fields: [organizationId], references: [id])
+  subscription Subscription                        @relation(fields: [subscriptionId], references: [id])
+  versions     SubscriptionCostAllocationVersion[]
+
+  @@map("subscription_cost_allocations")
+}
+
+// One declaration of the allocation, by whom and when. Immutable; its lines add up to 10 000 when it commits.
+model SubscriptionCostAllocationVersion {
+  id                  String   @id @default(uuid()) @db.Uuid
+  subscriptionId      String   @map("subscription_id") @db.Uuid
+  version             Int
+  declaredByAppUserId String   @map("declared_by_app_user_id") @db.Uuid
+  declaredAt          DateTime @default(now()) @map("declared_at") @db.Timestamptz(3)
+
+  allocation SubscriptionCostAllocation       @relation(fields: [subscriptionId], references: [subscriptionId])
+  lines      SubscriptionCostAllocationLine[]
+
+  @@unique([subscriptionId, version])
+  @@map("subscription_cost_allocation_versions")
+}
+
+// One Cost Center of a version and its share in hundredths of a percent (6000 is 60%): whole numbers, no float.
+model SubscriptionCostAllocationLine {
+  versionId    String @map("version_id") @db.Uuid
+  position     Int    @db.SmallInt
+  costCenterId String @map("cost_center_id") @db.Uuid
+  ratioBp      Int    @map("ratio_bp")
+
+  version    SubscriptionCostAllocationVersion @relation(fields: [versionId], references: [id])
+  costCenter CostCenter                        @relation(fields: [costCenterId], references: [id])
+
+  @@id([versionId, position])
+  @@unique([versionId, costCenterId])
+  @@index([costCenterId])
+  @@map("subscription_cost_allocation_lines")
+}

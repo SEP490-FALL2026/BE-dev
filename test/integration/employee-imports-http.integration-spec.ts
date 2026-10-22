@@ -215,6 +215,7 @@ describe('importing people from a file over HTTP (integration, real PostgreSQL)'
           existingDifferent: 0,
           newPeopleByDepartment: [{ departmentCode: department, count: 6 }],
           departmentsWithoutHead: [{ code: department }],
+          reviewQueue: { total: 0, items: [] },
           duplicateOf: null,
         },
       });
@@ -860,6 +861,7 @@ describe('importing people from a file over HTTP (integration, real PostgreSQL)'
         existingDifferent: 0,
         newPeopleByDepartment: [{ departmentCode: department, count: 1 }],
         departmentsWithoutHead: [{ code: department, name: `Department ${department}` }],
+        reviewQueue: { total: 0, items: [] },
         duplicateOf: null,
       };
 

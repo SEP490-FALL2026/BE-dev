@@ -65,7 +65,15 @@ export async function translateText(text, opts) {
   } = opts;
 
   if (isEmptySource(text)) {
-    return { output: text, status: 'NOT_NEEDED', reason: 'SOURCE_EMPTY', counts: { total: 0, translated: 0, fallback: 0 }, segments: [], modelCalls: 0, finishReasons: {} };
+    return {
+      output: text,
+      status: 'NOT_NEEDED',
+      reason: 'SOURCE_EMPTY',
+      counts: { total: 0, translated: 0, fallback: 0 },
+      segments: [],
+      modelCalls: 0,
+      finishReasons: {},
+    };
   }
   if (typeof text !== 'string') throw new TypeError('source must be a string, null or undefined');
 
@@ -82,13 +90,27 @@ export async function translateText(text, opts) {
     const prot = protectSegment(part.text, { direction, knownTerms, glossary, protectNumbers });
     const split = splitToLimit(prot.text, countTokens, maxSegmentTokens);
     if (!split.ok) {
-      return finish(text, parts.length, failure(text, 'TOO_LONG', { detail: { segment: part.text.slice(0, 80) } }), [], 0, {});
+      return finish(
+        text,
+        parts.length,
+        failure(text, 'TOO_LONG', { detail: { segment: part.text.slice(0, 80) } }),
+        [],
+        0,
+        {},
+      );
     }
     split.pieces.forEach((piece, i) => {
       const spans = spansIn(piece.text, prot.spans);
       const sep = i === split.pieces.length - 1 ? part.sep : piece.sep;
       if (isPlaceholderOnly(piece.text)) {
-        plan.push({ source: part.text, protectedText: piece.text, spans, sep, kind: 'static', output: restoreSegment(piece.text, spans, { direction }) });
+        plan.push({
+          source: part.text,
+          protectedText: piece.text,
+          spans,
+          sep,
+          kind: 'static',
+          output: restoreSegment(piece.text, spans, { direction }),
+        });
       } else {
         plan.push({ source: piece.text, protectedText: piece.text, spans, sep, kind: 'model' });
       }
@@ -112,15 +134,35 @@ export async function translateText(text, opts) {
       res = await translateSegment(item.protectedText);
     } catch (e) {
       segments.push({ protectedText: item.protectedText, status: 'error', ms: nowMs() - t0 });
-      return finish(text, plan.length, failure(text, 'ERROR', { detail: { code: e?.code ?? e?.name ?? 'Error' } }), segments, modelCalls, finishReasons);
+      return finish(
+        text,
+        plan.length,
+        failure(text, 'ERROR', { detail: { code: e?.code ?? e?.name ?? 'Error' } }),
+        segments,
+        modelCalls,
+        finishReasons,
+      );
     }
     const ms = nowMs() - t0;
     const reason = res?.finishReason ?? 'unknown';
     finishReasons[reason] = (finishReasons[reason] ?? 0) + 1;
-    const rec = { protectedText: item.protectedText, finishReason: reason, inputTokens: res?.inputTokens, generatedTokens: res?.generatedTokens, ms };
+    const rec = {
+      protectedText: item.protectedText,
+      finishReason: reason,
+      inputTokens: res?.inputTokens,
+      generatedTokens: res?.generatedTokens,
+      ms,
+    };
     if (typeof res?.text !== 'string') {
       segments.push({ ...rec, status: 'error' });
-      return finish(text, plan.length, failure(text, 'ERROR', { detail: { code: 'NO_TEXT' } }), segments, modelCalls, finishReasons);
+      return finish(
+        text,
+        plan.length,
+        failure(text, 'ERROR', { detail: { code: 'NO_TEXT' } }),
+        segments,
+        modelCalls,
+        finishReasons,
+      );
     }
     if (!protectedMode) {
       segments.push({ ...rec, status: 'ok', output: res.text });
@@ -130,17 +172,42 @@ export async function translateText(text, opts) {
     if (reason !== 'eos') {
       segments.push({ ...rec, status: 'failed' });
       const code = reason === 'max_new_tokens' ? 'MAX_NEW_TOKENS' : 'NOT_EOS';
-      return finish(text, plan.length, failure(text, code, { detail: { finishReason: reason } }), segments, modelCalls, finishReasons);
+      return finish(
+        text,
+        plan.length,
+        failure(text, code, { detail: { finishReason: reason } }),
+        segments,
+        modelCalls,
+        finishReasons,
+      );
     }
     const gate = checkPlaceholders(res.text, item.spans);
     if (!gate.ok) {
       segments.push({ ...rec, status: 'failed', gate });
-      return finish(text, plan.length, failure(text, 'PLACEHOLDER_GATE', { detail: { gate } }), segments, modelCalls, finishReasons);
+      return finish(
+        text,
+        plan.length,
+        failure(text, 'PLACEHOLDER_GATE', { detail: { gate } }),
+        segments,
+        modelCalls,
+        finishReasons,
+      );
     }
-    const pol = checkPolarity(gateSource(item.protectedText, item.spans), gateOutput(res.text, item.spans, direction), direction);
+    const pol = checkPolarity(
+      gateSource(item.protectedText, item.spans),
+      gateOutput(res.text, item.spans, direction),
+      direction,
+    );
     if (!pol.ok) {
       segments.push({ ...rec, status: 'failed', polarity: { required: pol.required, missing: pol.missing } });
-      return finish(text, plan.length, failure(text, 'QUALITY_GATE', { detail: { polarity: { required: pol.required, missing: pol.missing } } }), segments, modelCalls, finishReasons);
+      return finish(
+        text,
+        plan.length,
+        failure(text, 'QUALITY_GATE', { detail: { polarity: { required: pol.required, missing: pol.missing } } }),
+        segments,
+        modelCalls,
+        finishReasons,
+      );
     }
     const out = restoreSegment(res.text, item.spans, { direction });
     segments.push({ ...rec, status: 'ok', output: out });

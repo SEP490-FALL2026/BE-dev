@@ -105,6 +105,92 @@ const INTRA_MODULE_CONTRACTS: ReadonlyMap<string, string> = new Map([
     'modules/identity-access/recovery/recovery-ticket.service.ts',
     'waiting recovery tickets that block a password reset request (H3c)',
   ],
+  // catalog (G3, ADR-0013): the application capability reaches the dictionary, the vendors and the functional groups
+  // through these contracts; the name and host helpers are pure text functions every capability shares.
+  [
+    'modules/catalog/vendor-dictionary/vendor-matcher.ts',
+    'pure name and host normalisation (searchKey, normalizeHost) shared by every catalog capability',
+  ],
+  [
+    'modules/catalog/vendor-dictionary/vendor-dictionary-lookup.service.ts',
+    'the dictionary line and its group read by the application declaration',
+  ],
+  [
+    'modules/catalog/vendor-dictionary/vendor-proposal-intake.service.ts',
+    'proposal to the dictionary raised by an application declaration outside it',
+  ],
+  ['modules/catalog/vendor/vendor-directory.service.ts', 'vendors found or made by the application declaration'],
+  [
+    'modules/catalog/catalog-entry/application-lookup.service.ts',
+    'application locked for the plans declared under it, so it cannot be retired meanwhile',
+  ],
+  [
+    'modules/catalog/subscription/subscription-notice.service.ts',
+    'milestones of the active term subscriptions, read by the review of the terms of a plan',
+  ],
+  [
+    'modules/catalog/plan/plan-lookup.service.ts',
+    'plan facts and lock read by the subscriptions and the terms hanging off it, so its kind cannot change meanwhile',
+  ],
+  [
+    'modules/catalog/functional-group/functional-group-lookup.service.ts',
+    'active functional group chosen by the application declaration',
+  ],
+  // finance (G3, ADR-0013): the facade reads the two capabilities through these services; the shared mapper maps the
+  // exchange-rate errors for the exchange-rate and currency routes.
+  [
+    'modules/finance/currency/currency.service.ts',
+    'currency table read by the finance facade for parsing and conversion',
+  ],
+  [
+    'modules/catalog/subscription/onboarding-facts.service.ts',
+    'counts of applications, plans and subscriptions read through the catalog facade catalog.service.ts for the onboarding checklist',
+  ],
+  [
+    'modules/catalog/standard-toolset/standard-toolset.service.ts',
+    'count of the department and job title pairs that have a standard toolset, read through standard-toolset.service.ts for the onboarding checklist',
+  ],
+  [
+    'modules/catalog/subscription/subscription-lookup.service.ts',
+    'term and end of the subscriptions of some plans, read by the retirement of an application',
+  ],
+  [
+    'modules/catalog/subscription/seat-guard.policy.ts',
+    'the K2 recommendation and its threshold, read by the application read from the same seat guards as the subscription',
+  ],
+  [
+    'modules/catalog/subscription/seat-occupancy.registry.ts',
+    'where licensing hands the catalog its reader of occupied seats (ADR-0013 item 4): the facade registers it, the subscription and the application read it',
+  ],
+  [
+    'modules/catalog/subscription/seat-target.service.ts',
+    'seat target (subscription or internal plan, its seats bought) read through the catalog facade catalog.service.ts',
+  ],
+  [
+    'modules/licensing/assignment/assignment.service.ts',
+    'seat targets, facts and the writing of baseline assignments, reached through the licensing facade licensing.service.ts',
+  ],
+  [
+    'modules/licensing/provisioning/provisioning-failure.service.ts',
+    'the entry the connector calls when a try failed, reached through the licensing facade licensing.service.ts',
+  ],
+  [
+    'modules/licensing/seat-baseline/seat-baseline.service.ts',
+    'whether the baseline is closed and the shared lock a confirmation holds, reached through the licensing facade',
+  ],
+  ['modules/finance/tax-profile/tax-profile.service.ts', 'tax estimate of a vendor read through the finance facade'],
+  [
+    'modules/finance/cost-allocation/cost-allocation.service.ts',
+    'cost allocation of a subscription declared and read through the finance facade',
+  ],
+  [
+    'modules/finance/exchange-rate/exchange-rate-ledger.service.ts',
+    'recorded exchange rates read by the finance facade; written only through the audited ExchangeRateService',
+  ],
+  [
+    'modules/finance/exchange-rate/exchange-rate.errors.ts',
+    'exchange-rate errors thrown through the facade and mapped by the shared mappers/finance.http-errors.ts',
+  ],
   // organization (Waves 2 and 3: the facade and the department use cases reach the other capabilities here; GATE2-02:
   // the shared mappers/organization.http-errors.ts maps the errors of all five capabilities for their routes).
   [
@@ -166,8 +252,8 @@ const LEGACY = {
   /** Errors matched by their class name string instead of instanceof. Empty since ROOT.1 (A4-04): both CLIs read
    * `infrastructure/cli/cli-runtime.ts`, which uses instanceof. */
   errorMatchedByName: new Set<string>(),
-  /** HTTP mapping (ApiException/HttpStatus) inside a business service. A4-05 (GATE.1); G3 decides catalog (E1 = A). */
-  httpMappingInServices: new Set(['modules/catalog/catalog.service.ts']),
+  /** HTTP mapping (ApiException/HttpStatus) inside a business service. A4-05 (GATE.1). Empty since the catalog sample was removed (g3-catalog-foundation); stays as a gate. */
+  httpMappingInServices: new Set<string>(),
   /** Raw SQL in a business file that is not a repository. Empty since H6.3 (installation lock in its repo). */
   rawSqlOutsideRepositories: new Set<string>(),
   /** File -> line cap. A listed file must not grow past its cap. */

@@ -90,6 +90,11 @@ export class AccountDirectoryService {
     return this.accounts.findUsableItAdminEmployeeIds(employeeIds, tx);
   }
 
+  /** How many IT Admins other than this employee can act, for the rule that an IT Admin does not serve themselves. */
+  countUsableItAdminsExcept(employeeId: string, tx?: DbTx): Promise<number> {
+    return this.accounts.countUsableItAdminsExcept(employeeId, tx);
+  }
+
   // --- account administration reads ---------------------------------------------------
 
   findAccountRecord(appUserId: string, tx?: DbTx): Promise<AccountRecord | null> {

@@ -1,17 +1,506 @@
-enum CatalogApplicationStatus {
-  ACTIVE
-  INACTIVE
-  UNDER_REVIEW
+enum VendorProposalStatus {
+  PENDING
+  ACCEPTED
+  DISMISSED
 }
 
-model CatalogApplication {
-  id        String                   @id @default(uuid()) @db.Uuid
-  slug      String                   @unique
-  name      String
-  vendor    String
-  status    CatalogApplicationStatus @default(ACTIVE)
-  createdAt DateTime                 @default(now())
-  updatedAt DateTime                 @updatedAt
+// The shared vendor dictionary (US-04-07): reference data kept by the IT Admin, with no organization of its own.
+model VendorGroup {
+  id             String   @id @default(uuid()) @db.Uuid
+  name           String
+  normalizedName String   @unique @map("normalized_name")
+  // Brand domains: a fallback that offers every service line of the group.
+  brandDomains   String[] @default([]) @map("brand_domains")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  @@map("catalog_applications")
+  serviceLines VendorServiceLine[]
+  vendors      Vendor[]
+
+  @@map("vendor_groups")
+}
+
+// One separately billed service of a vendor (Microsoft 365 is not Azure). Domains cover subdomains; patterns are literal
+// fragments of a bank description.
+model VendorServiceLine {
+  id             String   @id @default(uuid()) @db.Uuid
+  groupId        String   @map("group_id") @db.Uuid
+  name           String
+  normalizedName String   @map("normalized_name")
+  domains        String[] @default([])
+  patterns       String[] @default([])
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  group        VendorGroup                @relation(fields: [groupId], references: [id])
+  proposals    VendorDictionaryProposal[]
+  applications Application[]
+
+  @@unique([groupId, normalizedName])
+  @@map("vendor_service_lines")
+}
+
+// A proposal to add a vendor that an application declaration did not find in the dictionary.
+model VendorDictionaryProposal {
+  id                  String               @id @default(uuid()) @db.Uuid
+  organizationId      String               @map("organization_id") @db.Uuid
+  proposedName        String               @map("proposed_name")
+  normalizedName      String               @map("normalized_name")
+  status              VendorProposalStatus @default(PENDING)
+  resolvedLineId      String?              @map("resolved_line_id") @db.Uuid
+  proposedDomains     String[]             @default([]) @map("proposed_domains")
+  sourceApplicationId String?              @map("source_application_id") @db.Uuid
+  createdAt           DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
+  resolvedAt          DateTime?            @map("resolved_at") @db.Timestamptz(3)
+
+  organization      Organization       @relation(fields: [organizationId], references: [id])
+  resolvedLine      VendorServiceLine? @relation(fields: [resolvedLineId], references: [id], onDelete: Restrict)
+  sourceApplication Application?       @relation(fields: [sourceApplicationId], references: [id], onDelete: Restrict)
+
+  @@index([status, createdAt])
+  @@index([sourceApplicationId])
+  @@map("vendor_dictionary_proposals")
+}
+
+enum ApplicationKind {
+  SAAS
+  LICENSED
+  INTERNAL
+}
+
+enum DataSensitivity {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum FunctionalGroupStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum CatalogStatus {
+  APPROVED
+  RETIRED
+}
+
+// A vendor of this organization. Created by an application declaration, either from a dictionary group or by name.
+model Vendor {
+  id                String   @id @default(uuid()) @db.Uuid
+  organizationId    String   @map("organization_id") @db.Uuid
+  name              String
+  normalizedName    String   @map("normalized_name")
+  dictionaryGroupId String?  @map("dictionary_group_id") @db.Uuid
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization    Organization      @relation(fields: [organizationId], references: [id])
+  dictionaryGroup VendorGroup?      @relation(fields: [dictionaryGroupId], references: [id], onDelete: Restrict)
+  applications    Application[]
+  taxProfile      VendorTaxProfile?
+
+  @@unique([organizationId, normalizedName])
+  @@unique([organizationId, dictionaryGroupId])
+  @@map("vendors")
+}
+
+// The list the IT Admin keeps for classifying applications by what they do (BR-06.9).
+model FunctionalGroup {
+  id             String                @id @default(uuid()) @db.Uuid
+  organizationId String                @map("organization_id") @db.Uuid
+  name           String
+  normalizedName String                @map("normalized_name")
+  status         FunctionalGroupStatus @default(ACTIVE)
+  createdAt      DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime              @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization  @relation(fields: [organizationId], references: [id])
+  applications Application[]
+
+  @@unique([organizationId, normalizedName])
+  @@map("functional_groups")
+}
+
+// An application of the catalog (US-04-01). The partial unique indexes on the name and the CHECKs live in the migration.
+model Application {
+  id                          String          @id @default(uuid()) @db.Uuid
+  organizationId              String          @map("organization_id") @db.Uuid
+  kind                        ApplicationKind
+  vendorId                    String?         @map("vendor_id") @db.Uuid
+  name                        String
+  normalizedName              String          @map("normalized_name")
+  dictionaryLineId            String?         @map("dictionary_line_id") @db.Uuid
+  functionalGroupId           String?         @map("functional_group_id") @db.Uuid
+  businessOwnerEmployeeId     String          @map("business_owner_employee_id") @db.Uuid
+  dataSensitivity             DataSensitivity @map("data_sensitivity")
+  commPersonToPersonMessaging Boolean         @map("comm_person_to_person_messaging")
+  commCallsOrMeetings         Boolean         @map("comm_calls_or_meetings")
+  commMailbox                 Boolean         @map("comm_mailbox")
+  isCommunicationService      Boolean         @map("is_communication_service")
+  communicationNote           String?         @map("communication_note")
+  domains                     String[]        @default([])
+  catalogStatus               CatalogStatus   @default(APPROVED) @map("catalog_status")
+  // Set together, once, when the Business Owner has confirmed and nothing holds the application; never undone.
+  retiredAt                   DateTime?       @map("retired_at") @db.Timestamptz(3)
+  retiredByAppUserId          String?         @map("retired_by_app_user_id") @db.Uuid
+  retirementConfirmationId    String?         @map("retirement_confirmation_id") @db.Uuid
+  createdAt                   DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt                   DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization              Organization                        @relation(fields: [organizationId], references: [id])
+  vendor                    Vendor?                             @relation(fields: [vendorId], references: [id], onDelete: Restrict)
+  dictionaryLine            VendorServiceLine?                  @relation(fields: [dictionaryLineId], references: [id], onDelete: Restrict)
+  functionalGroup           FunctionalGroup?                    @relation(fields: [functionalGroupId], references: [id], onDelete: Restrict)
+  businessOwner             Employee                            @relation(fields: [businessOwnerEmployeeId], references: [id])
+  proposals                 VendorDictionaryProposal[]
+  plans                     Plan[]
+  applicationBusinessOwners ApplicationBusinessOwner[]
+  retirementConfirmation    ApplicationRetirementConfirmation?  @relation("ApplicationRetiredOn", fields: [retirementConfirmationId], references: [id], onDelete: Restrict)
+  retirementConfirmations   ApplicationRetirementConfirmation[] @relation("ApplicationConfirmed")
+
+  @@unique([organizationId, dictionaryLineId])
+  @@index([functionalGroupId])
+  @@map("applications")
+}
+
+enum ProvisioningType {
+  K1
+  K2
+  K3
+  K4
+  K5
+}
+
+enum PricingModel {
+  PER_SEAT
+  FLAT_RATE
+  CONCURRENT
+  CONSUMPTION
+  PER_HOST
+}
+
+enum ControlLevel {
+  FULL
+  PARTIAL
+  UNCONTROLLABLE
+}
+
+enum SharingPolicy {
+  ALLOWED
+  NOT_ALLOWED
+}
+
+enum WorkspaceRole {
+  OWNER
+  ADMIN
+}
+
+// A plan of an application (US-04-02): how it is priced, provisioned and controlled. The CHECKs and the triggers that
+// tie the kind to the application live in the migration.
+model Plan {
+  id                String           @id @default(uuid()) @db.Uuid
+  organizationId    String           @map("organization_id") @db.Uuid
+  applicationId     String           @map("application_id") @db.Uuid
+  name              String
+  normalizedName    String           @map("normalized_name")
+  provisioningType  ProvisioningType @map("provisioning_type")
+  pricingModel      PricingModel?    @map("pricing_model")
+  controlLevel      ControlLevel?    @map("control_level")
+  revocationNote    String?          @map("revocation_note")
+  dataLossOnRemoval Boolean          @default(false) @map("data_loss_on_removal")
+  sharingPolicy     SharingPolicy?   @map("sharing_policy")
+  createdAt         DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization         Organization          @relation(fields: [organizationId], references: [id])
+  application          Application           @relation(fields: [applicationId], references: [id])
+  workspaceProfile     PlanWorkspaceProfile?
+  subscriptions        Subscription[]
+  terms                PlanTerms?
+  termOpinions         PlanTermOpinion[]
+  seatBaselineImports  SeatBaselineImport[]
+  licenseAssignments   LicenseAssignment[]
+  standardToolsetItems StandardToolsetItem[]
+
+  @@unique([organizationId, applicationId, normalizedName])
+  @@index([applicationId])
+  @@map("plans")
+}
+
+// The workspace of a K2 plan (QĐ-77d): who owns and administers it, and the emergency account. No secret is stored.
+model PlanWorkspaceProfile {
+  planId                    String    @id @map("plan_id") @db.Uuid
+  primaryOwnerEmployeeId    String    @map("primary_owner_employee_id") @db.Uuid
+  ownerLimit                Int?      @map("owner_limit")
+  adminLimit                Int?      @map("admin_limit")
+  ownerTransferProcedure    String?   @map("owner_transfer_procedure")
+  emergencyIdentity         String?   @map("emergency_identity")
+  emergencyOccupiesSeat     Boolean?  @map("emergency_occupies_seat")
+  emergencyHolderEmployeeId String?   @map("emergency_holder_employee_id") @db.Uuid
+  emergencyLastReviewedOn   DateTime? @map("emergency_last_reviewed_on") @db.Date
+  createdAt                 DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt                 DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  plan            Plan                 @relation(fields: [planId], references: [id])
+  primaryOwner    Employee             @relation("WorkspacePrimaryOwner", fields: [primaryOwnerEmployeeId], references: [id])
+  emergencyHolder Employee?            @relation("WorkspaceEmergencyHolder", fields: [emergencyHolderEmployeeId], references: [id], onDelete: Restrict)
+  members         PlanWorkspaceAdmin[]
+
+  @@map("plan_workspace_profiles")
+}
+
+model PlanWorkspaceAdmin {
+  planId     String        @map("plan_id") @db.Uuid
+  employeeId String        @map("employee_id") @db.Uuid
+  role       WorkspaceRole
+
+  profile  PlanWorkspaceProfile @relation(fields: [planId], references: [planId], onDelete: Cascade)
+  employee Employee             @relation("WorkspaceMember", fields: [employeeId], references: [id])
+
+  @@id([planId, employeeId])
+  @@map("plan_workspace_admins")
+}
+
+enum SubscriptionKind {
+  TERM
+  PERPETUAL
+}
+
+enum SubscriptionStatus {
+  DRAFT
+  ACTIVE
+}
+
+enum BillingCycle {
+  MONTHLY
+  QUARTERLY
+  ANNUAL
+  OTHER
+}
+
+enum PriceRateSource {
+  MANUAL
+  SAME_CURRENCY
+}
+
+// A subscription for a term, or a perpetual purchase, of a plan (US-04-03). The unit price keeps its conversion snapshot
+// (ADR-0007), frozen when the price is recorded. The CHECKs and the triggers live in the migration.
+model Subscription {
+  id                     String             @id @default(uuid()) @db.Uuid
+  organizationId         String             @map("organization_id") @db.Uuid
+  planId                 String             @map("plan_id") @db.Uuid
+  kind                   SubscriptionKind
+  status                 SubscriptionStatus @default(DRAFT)
+  purchasedQuantity      Int?               @map("purchased_quantity")
+  unitPriceMinor         BigInt?            @map("unit_price_minor")
+  unitPriceCurrency      String?            @map("unit_price_currency") @db.Char(3)
+  priceRecordedOn        DateTime?          @map("price_recorded_on") @db.Date
+  priceRate              Decimal?           @map("price_rate") @db.Decimal(20, 10)
+  priceRateDate          DateTime?          @map("price_rate_date") @db.Date
+  priceRateSource        PriceRateSource?   @map("price_rate_source")
+  priceReportingMinor    BigInt?            @map("price_reporting_minor")
+  priceReportingCurrency String?            @map("price_reporting_currency") @db.Char(3)
+  priceExchangeRateId    String?            @map("price_exchange_rate_id") @db.Uuid
+  billingCycle           BillingCycle?      @map("billing_cycle")
+  startDate              DateTime?          @map("start_date") @db.Date
+  endDate                DateTime?          @map("end_date") @db.Date
+  renewalDate            DateTime?          @map("renewal_date") @db.Date
+  noticeDeadline         DateTime?          @map("notice_deadline") @db.Date
+  noticePeriodDays       Int?               @map("notice_period_days")
+  autoRenew              Boolean            @default(false) @map("auto_renew")
+  allowsMidTermReduction Boolean            @default(false) @map("allows_mid_term_reduction")
+  createdAt              DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt              DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization        Organization                @relation(fields: [organizationId], references: [id])
+  plan                Plan                        @relation(fields: [planId], references: [id])
+  priceCurrency       Currency?                   @relation("SubscriptionPriceCurrency", fields: [unitPriceCurrency], references: [code], onDelete: Restrict)
+  exchangeRate        ExchangeRate?               @relation(fields: [priceExchangeRateId], references: [id], onDelete: Restrict)
+  costAllocation      SubscriptionCostAllocation?
+  seatBaselineImports SeatBaselineImport[]
+  licenseAssignments  LicenseAssignment[]
+  licenseKeys         LicenseKey[]
+
+  @@index([planId])
+  @@map("subscriptions")
+}
+
+// What IT read in the terms of a plan (US-04-11): a link, the date of the last review and the points of the checklist, as
+// text. Nothing here is a legal conclusion. The sharing policy (point 1) is a column of the plan, entered once.
+model PlanTerms {
+  planId                 String    @id @map("plan_id") @db.Uuid
+  termsUrl               String?   @map("terms_url")
+  lastReviewedOn         DateTime? @map("last_reviewed_on") @db.Date
+  aiTrainingNote         String?   @map("ai_training_note")
+  storageLocationNote    String?   @map("storage_location_note")
+  installLimitMaxDevices Int?      @map("install_limit_max_devices")
+  installLimitNote       String?   @map("install_limit_note")
+  commercialUseNote      String?   @map("commercial_use_note")
+  cancellationRefundNote String?   @map("cancellation_refund_note")
+  createdAt              DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt              DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  plan Plan @relation(fields: [planId], references: [id])
+
+  @@map("plan_terms")
+}
+
+// An opinion the Business Owner gave on the terms, recorded by the IT Admin. Added to, never changed.
+model PlanTermOpinion {
+  id                      String   @id @default(uuid()) @db.Uuid
+  planId                  String   @map("plan_id") @db.Uuid
+  businessOwnerEmployeeId String   @map("business_owner_employee_id") @db.Uuid
+  opinion                 String
+  recordedByAppUserId     String   @map("recorded_by_app_user_id") @db.Uuid
+  recordedAt              DateTime @default(now()) @map("recorded_at") @db.Timestamptz(3)
+
+  plan          Plan     @relation(fields: [planId], references: [id])
+  businessOwner Employee @relation(fields: [businessOwnerEmployeeId], references: [id])
+
+  @@index([planId, recordedAt])
+  @@map("plan_term_opinions")
+}
+
+// The periods an application had a Business Owner (US-04-06): the person, from when to when, and who made the change.
+// One period is open per application; a closed period is never changed. Whether the person has left is read from the
+// organization when the application is read, never stored.
+model ApplicationBusinessOwner {
+  id                  String    @id @default(uuid()) @db.Uuid
+  applicationId       String    @map("application_id") @db.Uuid
+  employeeId          String    @map("employee_id") @db.Uuid
+  assignedAt          DateTime  @default(now()) @map("assigned_at") @db.Timestamptz(3)
+  assignedByAppUserId String?   @map("assigned_by_app_user_id") @db.Uuid
+  endedAt             DateTime? @map("ended_at") @db.Timestamptz(3)
+
+  application Application @relation(fields: [applicationId], references: [id])
+  employee    Employee    @relation(fields: [employeeId], references: [id])
+
+  @@index([applicationId, assignedAt])
+  @@map("application_business_owners")
+}
+
+// The standard toolset of a pair (department, job title): the plans IT keeps as the usual tools of that kind of work
+// (US-04-10). This is the head, the only row that moves: it names the current version of the pair. A department and a
+// job title are organization tables: foreign keys only.
+model StandardToolset {
+  departmentId   String   @map("department_id") @db.Uuid
+  jobTitleId     String   @map("job_title_id") @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  currentVersion Int      @default(0) @map("current_version")
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization             @relation(fields: [organizationId], references: [id])
+  department   Department               @relation(fields: [departmentId], references: [id])
+  jobTitle     JobTitle                 @relation(fields: [jobTitleId], references: [id])
+  versions     StandardToolsetVersion[]
+
+  @@id([departmentId, jobTitleId])
+  @@map("standard_toolsets")
+}
+
+// One setting of the toolset, by whom, why and when. Immutable: a change is a new version.
+model StandardToolsetVersion {
+  id                 String   @id @default(uuid()) @db.Uuid
+  departmentId       String   @map("department_id") @db.Uuid
+  jobTitleId         String   @map("job_title_id") @db.Uuid
+  version            Int
+  reason             String
+  // A value, not a foreign key: the history outlives the account (as the audit trail does).
+  changedByAppUserId String   @map("changed_by_app_user_id") @db.Uuid
+  changedAt          DateTime @default(now()) @map("changed_at") @db.Timestamptz(3)
+
+  toolset StandardToolset       @relation(fields: [departmentId, jobTitleId], references: [departmentId, jobTitleId])
+  items   StandardToolsetItem[]
+
+  @@unique([departmentId, jobTitleId, version])
+  @@map("standard_toolset_versions")
+}
+
+// One plan of a version.
+model StandardToolsetItem {
+  versionId String @map("version_id") @db.Uuid
+  planId    String @map("plan_id") @db.Uuid
+
+  version StandardToolsetVersion @relation(fields: [versionId], references: [id])
+  plan    Plan                   @relation(fields: [planId], references: [id])
+
+  @@id([versionId, planId])
+  @@index([planId])
+  @@map("standard_toolset_items")
+}
+
+// What the Business Owner confirmed before an application was retired: who, what they said, who recorded it and when.
+// Written once, never changed or deleted; a retired application names the confirmation it was retired on.
+model ApplicationRetirementConfirmation {
+  id                      String   @id @default(uuid()) @db.Uuid
+  organizationId          String   @map("organization_id") @db.Uuid
+  applicationId           String   @map("application_id") @db.Uuid
+  businessOwnerEmployeeId String   @map("business_owner_employee_id") @db.Uuid
+  note                    String
+  // A value, not a foreign key: the record outlives the account (as the audit trail does).
+  recordedByAppUserId     String   @map("recorded_by_app_user_id") @db.Uuid
+  recordedAt              DateTime @default(now()) @map("recorded_at") @db.Timestamptz(3)
+
+  organization        Organization  @relation(fields: [organizationId], references: [id])
+  application         Application   @relation("ApplicationConfirmed", fields: [applicationId], references: [id], onDelete: Restrict)
+  businessOwner       Employee      @relation("RetirementConfirmingOwner", fields: [businessOwnerEmployeeId], references: [id], onDelete: Restrict)
+  retiredApplications Application[] @relation("ApplicationRetiredOn")
+
+  @@index([applicationId, recordedAt])
+  @@map("application_retirement_confirmations")
+}
+
+enum DocumentPurpose {
+  CONTRACT_ATTACHMENT
+  PURCHASE_DOCUMENT
+  TAX_PAYMENT_PROOF
+  SIGNATURE_RECORD
+  IMPORT_SOURCE
+  COST_STATEMENT
+}
+
+enum DocumentStatus {
+  AWAITING_UPLOAD
+  PENDING_ATTACH
+  READY
+  QUARANTINED
+}
+
+// A contract, for now only a name (the Story of the contract itself is not written, OQ-B-17). Never changed or deleted.
+model Contract {
+  id                 String   @id @default(uuid()) @db.Uuid
+  organizationId     String   @map("organization_id") @db.Uuid
+  name               String
+  // A value, not a foreign key: the record outlives the account (as the audit trail does).
+  createdByAppUserId String   @map("created_by_app_user_id") @db.Uuid
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  organization Organization         @relation(fields: [organizationId], references: [id])
+  documents    DocumentAttachment[]
+
+  @@map("contracts")
+}
+
+// A private file kept for a contract. The bytes are in the object storage; this row says where and what they are. It
+// moves one way (awaiting upload, uploaded and waiting for its owner, attached, or quarantined) and has at most one owner.
+model DocumentAttachment {
+  id                  String          @id @default(uuid()) @db.Uuid
+  organizationId      String          @map("organization_id") @db.Uuid
+  purpose             DocumentPurpose
+  status              DocumentStatus  @default(AWAITING_UPLOAD)
+  fileName            String          @map("file_name")
+  contentType         String          @map("content_type")
+  sizeBytes           Int             @map("size_bytes")
+  objectKey           String          @unique @map("object_key")
+  uploadedByAppUserId String          @map("uploaded_by_app_user_id") @db.Uuid
+  contractId          String?         @map("contract_id") @db.Uuid
+  attachedAt          DateTime?       @map("attached_at") @db.Timestamptz(3)
+  createdAt           DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  contract     Contract?    @relation(fields: [contractId], references: [id], onDelete: Restrict)
+
+  @@index([contractId])
+  @@index([uploadedByAppUserId, status])
+  @@map("document_attachments")
 }

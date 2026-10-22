@@ -1,14 +1,21 @@
 import { HttpStatus } from '@nestjs/common';
 import { TransientDatabaseError, toTransientError } from '../../database/transaction-runner';
+import { ObjectStorageUnavailableError } from '../../object-storage/object-storage.errors';
 import { ApiException } from './api.exception';
 
 /**
- * 503 for a database that could not answer: a transaction's TransientDatabaseError, or the driver's
- * own error from a read outside TransactionRunner. Anything else is not an outage (undefined), so a
- * defect is reported as an internal error instead of being hidden behind a retry.
+ * 503 for a dependency that could not answer: a database (a transaction's TransientDatabaseError, or the driver's
+ * own error from a read outside TransactionRunner) or the object storage. Anything else is not an outage (undefined),
+ * so a defect is reported as an internal error instead of being hidden behind a retry.
  */
 export function toUnavailableApiException(error: unknown): ApiException | undefined {
-  if (!(error instanceof TransientDatabaseError) && !toTransientError(error)) return undefined;
+  if (
+    !(error instanceof TransientDatabaseError) &&
+    !(error instanceof ObjectStorageUnavailableError) &&
+    !toTransientError(error)
+  ) {
+    return undefined;
+  }
 
   return new ApiException(HttpStatus.SERVICE_UNAVAILABLE, {
     code: 'SERVICE_UNAVAILABLE',

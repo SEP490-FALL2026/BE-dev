@@ -11,9 +11,7 @@ Ghi input, output, actor/quyền và lỗi cần trả. Chọn module sở hữu
 2 controller hoặc 12 file ở root thì đặt file vào capability folder (xem rule). Chỉ tạo `policies/`, `mappers/`,
 `errors/` khi có nội dung cần tách.
 
-Catalog có list/get/create nhưng **không được đăng ký vào `AppModule`** (404 trên HTTP) và không có access declaration:
-nó chỉ còn là mẫu cấu trúc cũ, **không** dùng làm mẫu cho route mới. Mọi route mới phải khai báo đúng một trong
-`@Public()`, `@AuthenticatedOnly()`, `@RequireRoles(...)`.
+Mọi route mới phải khai báo đúng một trong `@Public()`, `@AuthenticatedOnly()`, `@RequireRoles(...)`.
 
 ## 2. Lần theo một endpoint đang có
 
@@ -72,6 +70,6 @@ hoặc acceptance ID của kế hoạch historical cho mọi endpoint foundation
 - `@Public()` chỉ bỏ authentication. Nó không phải cách sửa test thiếu token.
 - `@Param('id')` primitive không khai Zod schema; dùng Param DTO như `AppUserIdParamDto` (`identity-access/dto/account-management.dto.ts`).
 - Client/DTO được generate không sửa bằng tay.
-- Một transaction mặc định không đảm bảo page/count cùng snapshot;
-  catalog đang có finding này, xem [review](../reviews/backend-baseline-review.md).
+- Một transaction mặc định không đảm bảo page/count cùng snapshot; danh sách phân trang đọc trong một giao dịch
+  `RepeatableRead` (xem `audit-query.repo.ts`).
 - Accepted ADR là lựa chọn thiết kế; kiểm source trước khi gọi một facade/helper.

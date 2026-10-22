@@ -54,7 +54,10 @@ test('cooperative compute deadline: worker stops itself; job ABANDONED/DEADLINE;
   assert.equal(o.deadlineHit, true);
   assert.equal(o.complete, false);
   assert.equal(o.outputs, undefined, 'incomplete outputs are never exposed');
-  assert.deepEqual(failures.map((f) => f.kind), ['deadline']);
+  assert.deepEqual(
+    failures.map((f) => f.kind),
+    ['deadline'],
+  );
   assert.equal(h.ofType('killSent').length, 0);
   assert.equal(h.ofType('spawn').length, 1);
   await h.sup.shutdown();
@@ -134,7 +137,10 @@ test('external SIGKILL mid-run: job FAILED/CRASHED fast, failure(crash), slot re
   assert.equal(o1.state, 'FAILED');
   assert.equal(o1.reason, 'CRASHED');
   assert.ok(settleMs < 500, `settled in ${settleMs} ms`);
-  assert.deepEqual(failures.map((f) => f.kind), ['crash']);
+  assert.deepEqual(
+    failures.map((f) => f.kind),
+    ['crash'],
+  );
   const exit = first(h, 'exit');
   const rel = first(h, 'release', (e) => e.jobId === j1.id);
   assert.equal(rel.by, 'exit');
@@ -207,7 +213,18 @@ test('kill timer is cleared on normal completion (no kill long after the job fin
 test('live workers never exceed concurrency under a mix of crash / kill / hang / cancel (events AND OS pids)', async () => {
   const h = makeSup({ concurrency: 2, computeMaxMs: 120, killGraceMs: 60 });
   const stop = sampleLive(h, 3);
-  const specs = ['ok1', 'crash', 'hang', 'n=300 step=10 ignoreCancel ignoreDeadline stuck', 'ok2', 'n=200 step=10 slow', 'crash', 'ok3', 'hang', 'ok4'];
+  const specs = [
+    'ok1',
+    'crash',
+    'hang',
+    'n=300 step=10 ignoreCancel ignoreDeadline stuck',
+    'ok2',
+    'n=200 step=10 slow',
+    'crash',
+    'ok3',
+    'hang',
+    'ok4',
+  ];
   const jobs = specs.map((s) => h.sup.enqueue({ direction: 'vi-en', segments: [s] }));
   setTimeout(() => h.sup.cancel(jobs[5]), 40);
   await Promise.all(jobs.map((j) => j.settled));
@@ -231,7 +248,8 @@ test('live workers never exceed concurrency under a mix of crash / kill / hang /
     l.push(e.type);
     bySlot.set(e.slot, l);
   }
-  for (const l of bySlot.values()) for (let i = 0; i < l.length; i++) assert.equal(l[i], i % 2 === 0 ? 'spawn' : 'exit');
+  for (const l of bySlot.values())
+    for (let i = 0; i < l.length; i++) assert.equal(l[i], i % 2 === 0 ? 'spawn' : 'exit');
   await h.sup.shutdown();
 });
 
@@ -245,7 +263,9 @@ test('shutdown sequence: queued -> SHUTDOWN, running cancelled and awaited, then
   assert.ok(Date.now() - t0 < 1500);
   assert.equal((await j2.settled).reason, 'SHUTDOWN');
   assert.equal((await j1.settled).reason, 'CANCELLED');
-  const order = h.events.map((e) => e.type).filter((t) => ['shutdownStart', 'cancelSent', 'done', 'shutdownSent', 'exit'].includes(t));
+  const order = h.events
+    .map((e) => e.type)
+    .filter((t) => ['shutdownStart', 'cancelSent', 'done', 'shutdownSent', 'exit'].includes(t));
   assert.deepEqual(order, ['shutdownStart', 'cancelSent', 'done', 'shutdownSent', 'exit']);
   assert.equal(h.ofType('exit')[0].code, 0);
   assert.equal(h.ofType('killSent').length, 0);
@@ -272,7 +292,10 @@ test('shutdown with idle workers sends shutdown immediately and they exit 0', as
   const h = makeSup({ concurrency: 2 });
   await Promise.all([0, 1].map((i) => h.sup.enqueue({ direction: 'vi-en', segments: ['n=5 step=20 j' + i] }).settled));
   await h.sup.shutdown();
-  assert.deepEqual(h.ofType('exit').map((e) => e.code), [0, 0]);
+  assert.deepEqual(
+    h.ofType('exit').map((e) => e.code),
+    [0, 0],
+  );
 });
 
 test('deadlineCancel:false: no cancel is sent at the compute deadline; the worker enforces it itself (worker-reported deadlineHit)', async () => {

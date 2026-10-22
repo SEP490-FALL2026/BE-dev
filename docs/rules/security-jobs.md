@@ -28,8 +28,7 @@
   database on every request; roles are never read from the token. Never use an always-accept verifier
   outside isolated tests.
 - Public routes need @Public(), an entry in the public allowlist of `test/e2e/api-inventory.e2e-spec.ts`
-  and anonymous HTTP tests. Catalog has no role/resource policy and is not mounted; add authorization
-  from the US before opening real business access.
+  and anonymous HTTP tests. Add authorization from the US before opening real business access.
 - Passwords enter through the installation prompt, `/auth/login`, `/auth/invitations/redeem`, `/auth/password-resets`
   or `/me/password`; they are never accepted
   as arguments or environment variables, and never logged or stored in audit (`AuditService` rejects
@@ -51,8 +50,9 @@
 
 ## Storage and jobs
 
-- Storage/BullMQ adapters exist but are not mounted in any graph (E2 = A); file APIs and BullMQ processors do not.
-  A slice that mounts one restores its production validation (Redis password, HTTPS storage endpoint).
+- Only the API mounts the object storage (ADR-0014, contract files, signed links); the queue is mounted in no graph
+  (E2 = A) and has no processors. A slice that mounts either restores its production validation (Redis password,
+  HTTPS storage endpoint). A storage that cannot answer is a 503, never a 500 and never a successful write.
   `EmailDispatchLoop` in the separate worker polls PostgreSQL `EmailOutbox` and sends via SMTP
   outside the business transaction (ADR-0012, Proposed). Delivery is at-least-once.
 - Business modules call ObjectStoragePort rather than vendor SDKs.

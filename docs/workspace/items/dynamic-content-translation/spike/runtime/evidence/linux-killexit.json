@@ -23,9 +23,7 @@
       "TIMEOUT/deadline": 1
     },
     "killsSent": 11,
-    "killReasons": [
-      "unresponsive"
-    ],
+    "killReasons": ["unresponsive"],
     "killToExitMs": {
       "n": 11,
       "min": 31.1,

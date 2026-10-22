@@ -20,7 +20,13 @@ const fakeModel = (table = {}, calls = []) => ({
   countTokens: (t) => t.length,
 });
 
-const base = (model, extra = {}) => ({ direction: 'vi-en', mode: 'protected', maxSegmentTokens: 100, ...model, ...extra });
+const base = (model, extra = {}) => ({
+  direction: 'vi-en',
+  mode: 'protected',
+  maxSegmentTokens: 100,
+  ...model,
+  ...extra,
+});
 
 test('translates per sentence, keeps the original separators, restores spans; one model call per segment', async () => {
   const calls = [];
@@ -31,7 +37,10 @@ test('translates per sentence, keeps the original separators, restores spans; on
     },
     calls,
   );
-  const r = await translateText('Yêu cầu REQ-2026-0042 đã được duyệt. Cảm ơn Trần An!', base(model, { knownTerms: ['Trần An'] }));
+  const r = await translateText(
+    'Yêu cầu REQ-2026-0042 đã được duyệt. Cảm ơn Trần An!',
+    base(model, { knownTerms: ['Trần An'] }),
+  );
   assert.equal(r.output, 'Request REQ-2026-0042 has been approved. Thanks Trần An!');
   assert.deepEqual(r.counts, { total: 2, translated: 2, fallback: 0 });
   assert.equal(r.status, 'TRANSLATED');
@@ -101,7 +110,13 @@ test('long sentence is split at clause boundaries (placeholders intact across pi
       );
     },
   };
-  const r = await translateText(src, { direction: 'vi-en', mode: 'protected', maxSegmentTokens: 7, knownTerms: ['Trần An', 'Figma', 'Lê Hoa'], ...m2 });
+  const r = await translateText(src, {
+    direction: 'vi-en',
+    mode: 'protected',
+    maxSegmentTokens: 7,
+    knownTerms: ['Trần An', 'Figma', 'Lê Hoa'],
+    ...m2,
+  });
   assert.equal(r.status, 'TRANSLATED', JSON.stringify(r.detail));
   assert.equal(r.output, 'Trần An needs Figma, budget is 4200 USD; Lê Hoa confirms.');
   assert.ok(calls.length >= 2, `split into pieces: ${JSON.stringify(calls)}`);
@@ -121,7 +136,10 @@ test('a piece that still exceeds the limit after clause splitting makes the whol
 
 test('token guard counts the protected text (placeholders shorten the segment)', async () => {
   const model = fakeModel({ 'Cần <x0> ngay.': 'Need <x0> now.' });
-  const r = await translateText('Cần Một-Cái-Tên-Rất-Dài-Của-Phần-Mềm ngay.', base(model, { maxSegmentTokens: 20, knownTerms: ['Một-Cái-Tên-Rất-Dài-Của-Phần-Mềm'] }));
+  const r = await translateText(
+    'Cần Một-Cái-Tên-Rất-Dài-Của-Phần-Mềm ngay.',
+    base(model, { maxSegmentTokens: 20, knownTerms: ['Một-Cái-Tên-Rất-Dài-Của-Phần-Mềm'] }),
+  );
   assert.equal(r.output, 'Need Một-Cái-Tên-Rất-Dài-Của-Phần-Mềm now.');
 });
 
@@ -159,7 +177,10 @@ test('textual dates stay verbatim (no localisation)', async () => {
 test('raw mode: no protection, no placeholder gate, no polarity gate, no length guard; a non-eos finish is only recorded', async () => {
   const calls = [];
   const model = fakeModel({ 'Yêu cầu bị từ chối.': seg('The request was approved.', 'max_new_tokens') }, calls);
-  const r = await translateText('Gửi Figma cho Lê Hoa. Yêu cầu bị từ chối.', base(model, { mode: 'raw', maxSegmentTokens: 3 }));
+  const r = await translateText(
+    'Gửi Figma cho Lê Hoa. Yêu cầu bị từ chối.',
+    base(model, { mode: 'raw', maxSegmentTokens: 3 }),
+  );
   assert.deepEqual(calls, ['Gửi Figma cho Lê Hoa.', 'Yêu cầu bị từ chối.']);
   assert.equal(r.output, 'GỬI FIGMA CHO LÊ HOA. The request was approved.');
   assert.equal(r.status, 'TRANSLATED');
@@ -168,7 +189,12 @@ test('raw mode: no protection, no placeholder gate, no polarity gate, no length 
 });
 
 test('raw mode: a model error still returns the exact original with NOT_TRANSLATED / ERROR', async () => {
-  const boom = { countTokens: () => 1, translateSegment: async () => { throw new Error('boom'); } };
+  const boom = {
+    countTokens: () => 1,
+    translateSegment: async () => {
+      throw new Error('boom');
+    },
+  };
   const r = await translateText('Một. Hai.', base(boom, { mode: 'raw' }));
   assert.equal(r.output, 'Một. Hai.');
   assert.equal(r.reason, 'ERROR');
@@ -213,7 +239,10 @@ test('polarity gate: a flipped decision falls back with QUALITY_GATE and the exa
 });
 
 test('polarity gate: valid synonyms pass; protected spans are not scanned for cues', async () => {
-  const ok = await translateText('Ban giám đốc tán thành kế hoạch.', base(fakeModel({ 'Ban giám đốc tán thành kế hoạch.': 'The board endorsed the plan.' })));
+  const ok = await translateText(
+    'Ban giám đốc tán thành kế hoạch.',
+    base(fakeModel({ 'Ban giám đốc tán thành kế hoạch.': 'The board endorsed the plan.' })),
+  );
   assert.equal(ok.status, 'TRANSLATED');
   // an e-mail address that contains "approvers" must neither require nor satisfy the approve class
   const model = fakeModel({ 'Gửi tới <x0>.': 'Send to <x0>.' });
@@ -231,7 +260,11 @@ test('polarity gate: glossary terms carry their cue through the placeholder', as
   assert.equal(r.output, 'Need to revoke the account.');
   assert.equal(r.status, 'TRANSLATED');
   const lost = fakeModel({ 'Cần <x0> tài khoản.': 'Need <x0> the account.' });
-  assert.equal((await translateText('Cần thu hồi tài khoản.', base(lost))).status, 'TRANSLATED', 'placeholder present => restored cue present');
+  assert.equal(
+    (await translateText('Cần thu hồi tài khoản.', base(lost))).status,
+    'TRANSLATED',
+    'placeholder present => restored cue present',
+  );
 });
 
 test('empty / whitespace / null sources are returned exactly as given with NOT_NEEDED / SOURCE_EMPTY and no model call', async () => {
@@ -255,7 +288,11 @@ test('glossary terms are restored with the target-language term', async () => {
 test('status is only ever TRANSLATED, NOT_TRANSLATED or NOT_NEEDED', async () => {
   const seen = new Set();
   const bad = { countTokens: () => 1, translateSegment: async () => seg('<x0> <x0>') };
-  for (const [src, model] of [['Một. Hai.', fakeModel()], ['Có Figma. Hai.', bad], ['', fakeModel()]]) {
+  for (const [src, model] of [
+    ['Một. Hai.', fakeModel()],
+    ['Có Figma. Hai.', bad],
+    ['', fakeModel()],
+  ]) {
     seen.add((await translateText(src, base(model, { knownTerms: ['Figma'] }))).status);
   }
   for (const s of seen) assert.ok(['TRANSLATED', 'NOT_TRANSLATED', 'NOT_NEEDED'].includes(s), s);

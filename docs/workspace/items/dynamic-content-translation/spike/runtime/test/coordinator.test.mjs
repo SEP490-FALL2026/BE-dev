@@ -10,7 +10,14 @@ function makeCoord({ sup: supOpts = {}, coord: coordOpts = {}, env } = {}) {
   const h = makeSup(supOpts, env);
   const cache = new TranslationCache();
   const coord = new Coordinator({ supervisor: h.sup, cache, identity, timeoutMs: 2000, queueMax: 4, ...coordOpts });
-  const req = (text, o = {}) => ({ organizationId: 'org1', scope: 'request:1:justification', source: 'vi', target: 'en', text, ...o });
+  const req = (text, o = {}) => ({
+    organizationId: 'org1',
+    scope: 'request:1:justification',
+    source: 'vi',
+    target: 'en',
+    text,
+    ...o,
+  });
   const tr = (text, o) => coord.translate(req(text, o));
   const warmUp = async () => {
     const r = await tr('n=1 step=1 warm');
@@ -250,7 +257,10 @@ test('inflight size never exceeds queueMax + concurrency; excess is BUSY', async
 });
 
 test('circuit opens after 3 failures (deadline hits): immediate UNAVAILABLE, then a single half-open probe', async () => {
-  const c = makeCoord({ sup: { killGraceMs: 400 }, coord: { breakerOptions: { baseCooldownMs: 250, maxCooldownMs: 1000 } } });
+  const c = makeCoord({
+    sup: { killGraceMs: 400 },
+    coord: { breakerOptions: { baseCooldownMs: 250, maxCooldownMs: 1000 } },
+  });
   await c.warmUp();
   c.sup.computeMaxMs = 120;
   for (let i = 0; i < 3; i++) assert.equal((await c.tr(`n=500 step=20 slow${i}`)).status, 'TIMEOUT');
@@ -341,5 +351,6 @@ test('shutdown: queued waiters UNAVAILABLE, running cancelled, new calls UNAVAIL
 
 test('coordinator exposes no cache read/list/delete API', () => {
   const c = makeCoord();
-  for (const m of ['getCached', 'cacheGet', 'peek', 'list', 'keys', 'delete', 'evict', 'clear']) assert.equal(typeof c.coord[m], 'undefined', m);
+  for (const m of ['getCached', 'cacheGet', 'peek', 'list', 'keys', 'delete', 'evict', 'clear'])
+    assert.equal(typeof c.coord[m], 'undefined', m);
 });

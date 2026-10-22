@@ -45,6 +45,8 @@ export interface EnvironmentVariables extends DatabaseEnvironmentVariables, Secr
   /** `id:base64` pairs separated by commas: keys that may still seal pending rows after a rotation. */
   OUTBOX_PAYLOAD_PREVIOUS_KEYS: string;
   OUTBOX_POLL_INTERVAL_MS: number;
+  /** `id:base64` pairs separated by commas: vault keys that may still open license keys sealed before a rotation. */
+  LICENSE_KEY_VAULT_PREVIOUS_KEYS: string;
   SMTP_HOST: string;
   SMTP_PORT: number;
   SMTP_USER: string;
@@ -90,6 +92,10 @@ const environmentSchema = Joi.object({
   OUTBOX_PAYLOAD_KEY_ID: secretKeys.OUTBOX_PAYLOAD_KEY_ID,
   OUTBOX_PAYLOAD_PREVIOUS_KEYS: Joi.string().allow('').default(''),
   OUTBOX_POLL_INTERVAL_MS: Joi.number().integer().min(500).max(60_000).default(3_000),
+  LICENSE_KEY_VAULT_KEY: secretKeys.LICENSE_KEY_VAULT_KEY,
+  LICENSE_KEY_VAULT_KEY_ID: secretKeys.LICENSE_KEY_VAULT_KEY_ID,
+  LICENSE_KEY_FINGERPRINT_PEPPER: secretKeys.LICENSE_KEY_FINGERPRINT_PEPPER,
+  LICENSE_KEY_VAULT_PREVIOUS_KEYS: Joi.string().allow('').default(''),
   SMTP_HOST: Joi.string().when('NODE_ENV', {
     is: 'production',
     then: Joi.required(),

@@ -29,13 +29,23 @@ test('a clean single-slot history has no violations', () => {
 
 test('dispatch into a busy slot is a violation', () => {
   t = 0;
-  const r = analyzeEvents([ev('spawn', { slot: 0, pid: 1 }), ev('dispatch', { slot: 0, jobId: 1 }), ev('dispatch', { slot: 0, jobId: 2 })], 1);
+  const r = analyzeEvents(
+    [ev('spawn', { slot: 0, pid: 1 }), ev('dispatch', { slot: 0, jobId: 1 }), ev('dispatch', { slot: 0, jobId: 2 })],
+    1,
+  );
   assert.ok(r.violations.some((v) => /dispatch.*busy/.test(v)));
 });
 
 test('release by exit without a preceding exit event is a violation', () => {
   t = 0;
-  const r = analyzeEvents([ev('spawn', { slot: 0, pid: 1 }), ev('dispatch', { slot: 0, jobId: 1 }), ev('release', { slot: 0, jobId: 1, by: 'exit' })], 1);
+  const r = analyzeEvents(
+    [
+      ev('spawn', { slot: 0, pid: 1 }),
+      ev('dispatch', { slot: 0, jobId: 1 }),
+      ev('release', { slot: 0, jobId: 1, by: 'exit' }),
+    ],
+    1,
+  );
   assert.ok(r.violations.some((v) => /release by exit/.test(v)));
 });
 
@@ -49,7 +59,15 @@ test('spawn before the previous process of the slot exited is a violation; live 
 
 test('killSent must be followed by exit before the slot is reused', () => {
   t = 0;
-  const r = analyzeEvents([ev('spawn', { slot: 0, pid: 1 }), ev('dispatch', { slot: 0, jobId: 1 }), ev('killSent', { slot: 0, pid: 1 }), ev('release', { slot: 0, jobId: 1, by: 'done' })], 1);
+  const r = analyzeEvents(
+    [
+      ev('spawn', { slot: 0, pid: 1 }),
+      ev('dispatch', { slot: 0, jobId: 1 }),
+      ev('killSent', { slot: 0, pid: 1 }),
+      ev('release', { slot: 0, jobId: 1, by: 'done' }),
+    ],
+    1,
+  );
   assert.ok(r.violations.length > 0);
 });
 
@@ -73,7 +91,10 @@ test('run intervals (started..done) of different jobs never overlap per slot; co
   assert.deepEqual(ok.violations, []);
   assert.equal(ok.maxConcurrentRuns, 2);
   t = 0;
-  const bad = analyzeEvents([ev('spawn', { slot: 0, pid: 1 }), ev('started', { slot: 0, jobId: 1 }), ev('started', { slot: 0, jobId: 2 })], 1);
+  const bad = analyzeEvents(
+    [ev('spawn', { slot: 0, pid: 1 }), ev('started', { slot: 0, jobId: 1 }), ev('started', { slot: 0, jobId: 2 })],
+    1,
+  );
   assert.ok(bad.violations.some((v) => /overlap/.test(v)));
 });
 

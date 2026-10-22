@@ -5,8 +5,11 @@ import { DatabaseModule } from './infrastructure/database/database.module';
 import { SecurityModule } from './infrastructure/security/security.module';
 import { AuditHttpModule } from './modules/audit/audit-http.module';
 import { AuditModule } from './modules/audit/audit.module';
+import { CatalogModule } from './modules/catalog/catalog.module';
+import { FinanceHttpModule } from './modules/finance/finance-http.module';
 import { DataImportModule } from './modules/data-import/data-import.module';
 import { IdentityAccessModule } from './modules/identity-access/identity-access.module';
+import { LicensingModule } from './modules/licensing/licensing.module';
 import { OnboardingModule } from './modules/onboarding/onboarding.module';
 import { OperatingParametersHttpModule } from './modules/operating-parameters/operating-parameters-http.module';
 import { OrganizationHttpModule } from './modules/organization/organization-http.module';
@@ -27,10 +30,11 @@ import { HttpInfrastructureModule } from './infrastructure/http/http-infrastruct
     OrganizationHttpModule,
     OperatingParametersHttpModule,
     DataImportModule,
+    FinanceHttpModule,
+    CatalogModule,
+    LicensingModule,
     OnboardingModule,
     IdentityAccessModule,
-    // The catalog module stays in the tree as the reference structure but is not mounted: it has
-    // no per-role rules yet, and the first real account would otherwise be able to call it.
     SecurityModule.register({ verifierModule: IdentityAccessModule }),
   ],
 })

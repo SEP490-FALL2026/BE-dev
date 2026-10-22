@@ -1,220 +1,220 @@
 {
- "date": "2026-10-14",
- "note": "Supplementary single-repetition runs; per-item outputs dropped to keep results small. Re-create with the commands in README.md.",
- "runs": {
-  "batchSize8_viEn_protected": {
-   "direction": "vi-en",
-   "mode": "protected",
-   "options": {
-    "warmup": 1,
-    "repetitions": 1,
-    "maxTokens": 512,
-    "batchSize": 8,
-    "limit": null
-   },
-   "loadMs": 1966,
-   "peakRssMb": 686,
-   "aggregate": {
-    "items": 84,
-    "corpusChrF": 36.62,
-    "preservedPct": 100,
-    "meaningPassPct": 70.97,
-    "fallbackSegmentPct": 24.18,
-    "silentMeaningFailures": 6,
-    "polarity": {
-     "negation": {
-      "n": 19,
-      "pass": 14,
-      "pct": 73.68,
-      "silentFailures": 1
-     },
-     "approve": {
-      "n": 9,
-      "pass": 5,
-      "pct": 55.56,
-      "silentFailures": 3
-     },
-     "reject": {
-      "n": 10,
-      "pass": 8,
-      "pct": 80,
-      "silentFailures": 1
-     },
-     "revoke": {
-      "n": 10,
-      "pass": 5,
-      "pct": 50,
-      "silentFailures": 0
-     }
+  "date": "2026-10-14",
+  "note": "Supplementary single-repetition runs; per-item outputs dropped to keep results small. Re-create with the commands in README.md.",
+  "runs": {
+    "batchSize8_viEn_protected": {
+      "direction": "vi-en",
+      "mode": "protected",
+      "options": {
+        "warmup": 1,
+        "repetitions": 1,
+        "maxTokens": 512,
+        "batchSize": 8,
+        "limit": null
+      },
+      "loadMs": 1966,
+      "peakRssMb": 686,
+      "aggregate": {
+        "items": 84,
+        "corpusChrF": 36.62,
+        "preservedPct": 100,
+        "meaningPassPct": 70.97,
+        "fallbackSegmentPct": 24.18,
+        "silentMeaningFailures": 6,
+        "polarity": {
+          "negation": {
+            "n": 19,
+            "pass": 14,
+            "pct": 73.68,
+            "silentFailures": 1
+          },
+          "approve": {
+            "n": 9,
+            "pass": 5,
+            "pct": 55.56,
+            "silentFailures": 3
+          },
+          "reject": {
+            "n": 10,
+            "pass": 8,
+            "pct": 80,
+            "silentFailures": 1
+          },
+          "revoke": {
+            "n": 10,
+            "pass": 5,
+            "pct": 50,
+            "silentFailures": 0
+          }
+        },
+        "latency": {
+          "p50": 792.5,
+          "p95": 1831.5,
+          "max": 20323.2
+        }
+      },
+      "itemsWithDifferentOutputThanBatchSize1": [
+        {
+          "id": "vi-078",
+          "batch1Tail": "he group only 2 seat is not enough. Request additional level 3 seat to the end 31/03/2027.",
+          "batch8Tail": " group only 2 seat is not enough.!! Additional level 3 seat> - Over to the end 31/03/2027."
+        },
+        {
+          "id": "vi-079",
+          "batch1Tail": "ith Slack. Please use the current Slack. If you still need to send back the price request.",
+          "batch8Tail": "se use the current Slack.!!! If you still need to send back a price-substantiated request."
+        }
+      ]
     },
-    "latency": {
-     "p50": 792.5,
-     "p95": 1831.5,
-     "max": 20323.2
-    }
-   },
-   "itemsWithDifferentOutputThanBatchSize1": [
-    {
-     "id": "vi-078",
-     "batch1Tail": "he group only 2 seat is not enough. Request additional level 3 seat to the end 31/03/2027.",
-     "batch8Tail": " group only 2 seat is not enough.!! Additional level 3 seat> - Over to the end 31/03/2027."
+    "regexOnly_vien_protected": {
+      "direction": "vi-en",
+      "mode": "protected",
+      "options": {
+        "warmup": 1,
+        "repetitions": 1,
+        "maxTokens": 512,
+        "batchSize": 1,
+        "limit": null,
+        "knownTerms": "none"
+      },
+      "loadMs": 2589,
+      "peakRssMb": 649,
+      "aggregate": {
+        "items": 84,
+        "corpusChrF": 35.48,
+        "preservedPct": 74.29,
+        "meaningPassPct": 72.58,
+        "fallbackSegmentPct": 18.68,
+        "silentMeaningFailures": 7,
+        "polarity": {
+          "negation": {
+            "n": 19,
+            "pass": 14,
+            "pct": 73.68,
+            "silentFailures": 2
+          },
+          "approve": {
+            "n": 9,
+            "pass": 5,
+            "pct": 55.56,
+            "silentFailures": 3
+          },
+          "reject": {
+            "n": 10,
+            "pass": 8,
+            "pct": 80,
+            "silentFailures": 2
+          },
+          "revoke": {
+            "n": 10,
+            "pass": 5,
+            "pct": 50,
+            "silentFailures": 0
+          }
+        },
+        "latency": {
+          "p50": 717.9,
+          "p95": 2138.1,
+          "max": 10418.9
+        }
+      },
+      "termsNotProtectedByRegexAlone": [
+        "Adobe Photoshop",
+        "AutoCAD",
+        "Bùi Gia Huy",
+        "Công ty TNHH Sao Mai Demo",
+        "DevOps",
+        "Hoàng Ngọc Lan",
+        "Lê Hoàng Nam",
+        "MATLAB",
+        "Nguyễn Văn An",
+        "Ngô Phương Thảo",
+        "Phạm Quỳnh Anh",
+        "Trần Thị Bích",
+        "Visual Studio Code",
+        "Võ Thanh Hà",
+        "Đặng Minh Khoa",
+        "Đỗ Thế Vinh"
+      ]
     },
-    {
-     "id": "vi-079",
-     "batch1Tail": "ith Slack. Please use the current Slack. If you still need to send back the price request.",
-     "batch8Tail": "se use the current Slack.!!! If you still need to send back a price-substantiated request."
+    "regexOnly_envi_protected": {
+      "direction": "en-vi",
+      "mode": "protected",
+      "options": {
+        "warmup": 1,
+        "repetitions": 1,
+        "maxTokens": 512,
+        "batchSize": 1,
+        "limit": null,
+        "knownTerms": "none"
+      },
+      "loadMs": 1683,
+      "peakRssMb": 658,
+      "aggregate": {
+        "items": 84,
+        "corpusChrF": 37.98,
+        "preservedPct": 63.24,
+        "meaningPassPct": 81.67,
+        "fallbackSegmentPct": 14.29,
+        "silentMeaningFailures": 3,
+        "polarity": {
+          "negation": {
+            "n": 17,
+            "pass": 16,
+            "pct": 94.12,
+            "silentFailures": 1
+          },
+          "approve": {
+            "n": 9,
+            "pass": 7,
+            "pct": 77.78,
+            "silentFailures": 2
+          },
+          "reject": {
+            "n": 9,
+            "pass": 9,
+            "pct": 100,
+            "silentFailures": 0
+          },
+          "revoke": {
+            "n": 9,
+            "pass": 5,
+            "pct": 55.56,
+            "silentFailures": 0
+          }
+        },
+        "latency": {
+          "p50": 730.9,
+          "p95": 2415.6,
+          "max": 10476.6
+        }
+      },
+      "termsNotProtectedByRegexAlone": [
+        "Adobe Photoshop",
+        "Adobe XD",
+        "AutoCAD",
+        "Bùi Gia Huy",
+        "Confluence",
+        "Docker Desktop",
+        "Figma",
+        "GitHub Actions",
+        "JetBrains IntelliJ IDEA",
+        "Jira",
+        "MATLAB",
+        "Microsoft Power BI",
+        "Microsoft Teams",
+        "Nguyễn Văn An",
+        "Ngô Phương Thảo",
+        "Notion",
+        "Phạm Quỳnh Anh",
+        "Postman",
+        "Tableau",
+        "Trần Thị Bích",
+        "Visual Studio Code",
+        "nên em xin exception từ trưởng phòng",
+        "Đặng Minh Khoa",
+        "Đỗ Thế Vinh"
+      ]
     }
-   ]
-  },
-  "regexOnly_vien_protected": {
-   "direction": "vi-en",
-   "mode": "protected",
-   "options": {
-    "warmup": 1,
-    "repetitions": 1,
-    "maxTokens": 512,
-    "batchSize": 1,
-    "limit": null,
-    "knownTerms": "none"
-   },
-   "loadMs": 2589,
-   "peakRssMb": 649,
-   "aggregate": {
-    "items": 84,
-    "corpusChrF": 35.48,
-    "preservedPct": 74.29,
-    "meaningPassPct": 72.58,
-    "fallbackSegmentPct": 18.68,
-    "silentMeaningFailures": 7,
-    "polarity": {
-     "negation": {
-      "n": 19,
-      "pass": 14,
-      "pct": 73.68,
-      "silentFailures": 2
-     },
-     "approve": {
-      "n": 9,
-      "pass": 5,
-      "pct": 55.56,
-      "silentFailures": 3
-     },
-     "reject": {
-      "n": 10,
-      "pass": 8,
-      "pct": 80,
-      "silentFailures": 2
-     },
-     "revoke": {
-      "n": 10,
-      "pass": 5,
-      "pct": 50,
-      "silentFailures": 0
-     }
-    },
-    "latency": {
-     "p50": 717.9,
-     "p95": 2138.1,
-     "max": 10418.9
-    }
-   },
-   "termsNotProtectedByRegexAlone": [
-    "Adobe Photoshop",
-    "AutoCAD",
-    "Bùi Gia Huy",
-    "Công ty TNHH Sao Mai Demo",
-    "DevOps",
-    "Hoàng Ngọc Lan",
-    "Lê Hoàng Nam",
-    "MATLAB",
-    "Nguyễn Văn An",
-    "Ngô Phương Thảo",
-    "Phạm Quỳnh Anh",
-    "Trần Thị Bích",
-    "Visual Studio Code",
-    "Võ Thanh Hà",
-    "Đặng Minh Khoa",
-    "Đỗ Thế Vinh"
-   ]
-  },
-  "regexOnly_envi_protected": {
-   "direction": "en-vi",
-   "mode": "protected",
-   "options": {
-    "warmup": 1,
-    "repetitions": 1,
-    "maxTokens": 512,
-    "batchSize": 1,
-    "limit": null,
-    "knownTerms": "none"
-   },
-   "loadMs": 1683,
-   "peakRssMb": 658,
-   "aggregate": {
-    "items": 84,
-    "corpusChrF": 37.98,
-    "preservedPct": 63.24,
-    "meaningPassPct": 81.67,
-    "fallbackSegmentPct": 14.29,
-    "silentMeaningFailures": 3,
-    "polarity": {
-     "negation": {
-      "n": 17,
-      "pass": 16,
-      "pct": 94.12,
-      "silentFailures": 1
-     },
-     "approve": {
-      "n": 9,
-      "pass": 7,
-      "pct": 77.78,
-      "silentFailures": 2
-     },
-     "reject": {
-      "n": 9,
-      "pass": 9,
-      "pct": 100,
-      "silentFailures": 0
-     },
-     "revoke": {
-      "n": 9,
-      "pass": 5,
-      "pct": 55.56,
-      "silentFailures": 0
-     }
-    },
-    "latency": {
-     "p50": 730.9,
-     "p95": 2415.6,
-     "max": 10476.6
-    }
-   },
-   "termsNotProtectedByRegexAlone": [
-    "Adobe Photoshop",
-    "Adobe XD",
-    "AutoCAD",
-    "Bùi Gia Huy",
-    "Confluence",
-    "Docker Desktop",
-    "Figma",
-    "GitHub Actions",
-    "JetBrains IntelliJ IDEA",
-    "Jira",
-    "MATLAB",
-    "Microsoft Power BI",
-    "Microsoft Teams",
-    "Nguyễn Văn An",
-    "Ngô Phương Thảo",
-    "Notion",
-    "Phạm Quỳnh Anh",
-    "Postman",
-    "Tableau",
-    "Trần Thị Bích",
-    "Visual Studio Code",
-    "nên em xin exception từ trưởng phòng",
-    "Đặng Minh Khoa",
-    "Đỗ Thế Vinh"
-   ]
   }
- }
 }

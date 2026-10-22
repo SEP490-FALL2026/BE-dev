@@ -91,4 +91,9 @@ export class IdentityAccessService {
   findUsableItAdminEmployeeIds(employeeIds: readonly string[]): Promise<Set<string>> {
     return this.accounts.findUsableItAdminEmployeeIds(employeeIds);
   }
+
+  /** How many IT Admins other than this employee can act (an unlocked read, `QĐ-77m`). */
+  countUsableItAdminsExcept(employeeId: string): Promise<number> {
+    return this.accounts.countUsableItAdminsExcept(employeeId);
+  }
 }

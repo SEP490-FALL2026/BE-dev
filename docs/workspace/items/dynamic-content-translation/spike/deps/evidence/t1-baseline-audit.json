@@ -45,9 +45,7 @@
           "findings": [
             {
               "version": "0.34.5",
-              "paths": [
-                ".>@huggingface/transformers>sharp"
-              ]
+              "paths": [".>@huggingface/transformers>sharp"]
             }
           ]
         },
@@ -61,9 +59,7 @@
           "findings": [
             {
               "version": "0.34.5",
-              "paths": [
-                ".>@huggingface/transformers>sharp"
-              ]
+              "paths": [".>@huggingface/transformers>sharp"]
             }
           ]
         },
@@ -77,9 +73,7 @@
           "findings": [
             {
               "version": "1.1.3",
-              "paths": [
-                ".>@huggingface/transformers>onnxruntime-node>global-agent>roarr>sprintf-js"
-              ]
+              "paths": [".>@huggingface/transformers>onnxruntime-node>global-agent>roarr>sprintf-js"]
             }
           ]
         },
@@ -93,9 +87,7 @@
           "findings": [
             {
               "version": "0.34.5",
-              "paths": [
-                ".>@huggingface/transformers>sharp"
-              ]
+              "paths": [".>@huggingface/transformers>sharp"]
             }
           ]
         }

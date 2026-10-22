@@ -109,7 +109,8 @@ test('splitToLimit: splits before vi and en conjunctions (the conjunction starts
   assert.equal(rv.ok, true);
   assert.equal(rejoin(rv.pieces), vi);
   assert.ok(rv.pieces.some((p) => p.text.startsWith('và ')) || rv.pieces.some((p) => p.text.startsWith('nhưng ')));
-  const en = 'The team compared both tools and found the first one more suitable but the price is much higher because of the extra seats';
+  const en =
+    'The team compared both tools and found the first one more suitable but the price is much higher because of the extra seats';
   const re = piecesOf(en, 12);
   assert.equal(re.ok, true);
   assert.equal(rejoin(re.pieces), en);

@@ -82,11 +82,7 @@
         },
         "nrThrottledDelta": 0,
         "throttledMsDelta": 0,
-        "loadavg": [
-          1.37,
-          0.71,
-          0.4
-        ],
+        "loadavg": [1.37, 0.71, 0.4],
         "apiEldMaxMsDuringTrial": 10.89,
         "apiEldP99MsDuringTrial": 10.89,
         "apiExitEventEpochMs": 1792006241978,
@@ -116,11 +112,7 @@
         },
         "nrThrottledDelta": 0,
         "throttledMsDelta": 0,
-        "loadavg": [
-          1.34,
-          0.71,
-          0.4
-        ],
+        "loadavg": [1.34, 0.71, 0.4],
         "apiEldMaxMsDuringTrial": 10.22,
         "apiEldP99MsDuringTrial": 10.22,
         "apiExitEventEpochMs": 1792006246865,
@@ -150,11 +142,7 @@
         },
         "nrThrottledDelta": 0,
         "throttledMsDelta": 0,
-        "loadavg": [
-          1.31,
-          0.72,
-          0.41
-        ],
+        "loadavg": [1.31, 0.72, 0.41],
         "apiEldMaxMsDuringTrial": 10.2,
         "apiEldP99MsDuringTrial": 10.2,
         "apiExitEventEpochMs": 1792006251108,
@@ -184,11 +172,7 @@
         },
         "nrThrottledDelta": 0,
         "throttledMsDelta": 0,
-        "loadavg": [
-          1.31,
-          0.72,
-          0.41
-        ],
+        "loadavg": [1.31, 0.72, 0.41],
         "apiEldMaxMsDuringTrial": 10.26,
         "apiEldP99MsDuringTrial": 10.26,
         "apiExitEventEpochMs": 1792006255659,
@@ -218,11 +202,7 @@
         },
         "nrThrottledDelta": 0,
         "throttledMsDelta": 0,
-        "loadavg": [
-          1.21,
-          0.7,
-          0.41
-        ],
+        "loadavg": [1.21, 0.7, 0.41],
         "apiEldMaxMsDuringTrial": 10.66,
         "apiEldP99MsDuringTrial": 10.66,
         "apiExitEventEpochMs": 1792006260155,
@@ -252,11 +232,7 @@
         },
         "nrThrottledDelta": 0,
         "throttledMsDelta": 0,
-        "loadavg": [
-          1.27,
-          0.73,
-          0.41
-        ],
+        "loadavg": [1.27, 0.73, 0.41],
         "apiEldMaxMsDuringTrial": 10.23,
         "apiEldP99MsDuringTrial": 10.23,
         "apiExitEventEpochMs": 1792006264452,
@@ -286,11 +262,7 @@
         },
         "nrThrottledDelta": 0,
         "throttledMsDelta": 0,
-        "loadavg": [
-          1.25,
-          0.73,
-          0.42
-        ],
+        "loadavg": [1.25, 0.73, 0.42],
         "apiEldMaxMsDuringTrial": 10.16,
         "apiEldP99MsDuringTrial": 10.16,
         "apiExitEventEpochMs": 1792006268346,
@@ -320,11 +292,7 @@
         },
         "nrThrottledDelta": 0,
         "throttledMsDelta": 0,
-        "loadavg": [
-          1.23,
-          0.74,
-          0.42
-        ],
+        "loadavg": [1.23, 0.74, 0.42],
         "apiEldMaxMsDuringTrial": 10.18,
         "apiEldP99MsDuringTrial": 10.18,
         "apiExitEventEpochMs": 1792006272638,
@@ -354,11 +322,7 @@
         },
         "nrThrottledDelta": 1,
         "throttledMsDelta": 637,
-        "loadavg": [
-          1.21,
-          0.74,
-          0.42
-        ],
+        "loadavg": [1.21, 0.74, 0.42],
         "apiEldMaxMsDuringTrial": 10.19,
         "apiEldP99MsDuringTrial": 10.19,
         "apiExitEventEpochMs": 1792006277544,
@@ -388,11 +352,7 @@
         },
         "nrThrottledDelta": 0,
         "throttledMsDelta": 0,
-        "loadavg": [
-          1.59,
-          0.83,
-          0.45
-        ],
+        "loadavg": [1.59, 0.83, 0.45],
         "apiEldMaxMsDuringTrial": 10.17,
         "apiEldP99MsDuringTrial": 10.17,
         "apiExitEventEpochMs": 1792006282558,
