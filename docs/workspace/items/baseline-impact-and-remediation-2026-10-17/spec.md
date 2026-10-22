@@ -8,6 +8,7 @@
 - Trạng thái nguồn: phần `QĐ-78` → `QĐ-80` **chưa** có commit Docs nên **chưa tái lập được từ remote**; hash ở [sources](../../sources.md) chỉ chứng minh đúng tệp đã đọc. Hai lát code R-1, R-2 chỉ dựa trên nội dung đã có ở `73e7379` nên pin được bằng commit đó.
 - Logical ERD: **hoãn** tới lượt thiết kế của từng nhóm G (`CERD5-01` ở Docs). Spec này không lập Logical/Physical cho G3–G10.
 - [Kế hoạch](plan.md).
+- _Thay một phần 22/10/2026:_ phần `Company` của `M-01` (tài khoản dịch vụ ở `Company`, không chặn ngừng phòng, không thêm `serviceAccounts`), `M-07`, `M-09` và câu _`US-02-02` không đổi_ của `M-57` bị baseline Docs `72e1480` (`QĐ-82i`, `QĐ-86`) thay. Tác động `QĐ-82` → `QĐ-86` ở [business-baseline-impact-2026-10-22](../business-baseline-impact-2026-10-22/spec.md); hạng mục này giữ làm lịch sử.
 
 ## Vấn đề và phạm vi
 

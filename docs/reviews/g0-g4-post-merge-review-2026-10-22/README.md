@@ -1,0 +1,406 @@
+# Review hậu merge G0→G4 và contract collection/detail (22/10/2026)
+
+- Phụ trách: AI theo giao việc Owner (Prompt 08 của `business-review-sync-2026-10-21`). Owner review: chưa review. Peer
+  review: chưa có. Review này **không** phải nghiệm thu Story và không ghi lát nào `accepted`/`released`.
+- Nền: BE `dev` @ `69f4891` (merge local của `94e70ce` với `origin/dev` `4e7097f`), ahead `origin/dev` 2, behind 0; cây làm
+  việc có 37 path tài liệu của Prompt 07 chưa commit (bảo toàn, hash ở [manifest](file-manifest.md)). Docs `72e1480` (sổ tới
+  `QĐ-86`, BRD v3.53, Phạm vi v1.34, User Stories v0.15: 157 mã, 147 đang dùng, 1 549 AC), sạch.
+- Môi trường: Windows 11, Node 24.0.1, pnpm 11.1.3, PostgreSQL 17 (`postgres:17-alpine`) trong container dùng riêng tên
+  chính xác, role thường `LOGIN NOSUPERUSER CREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS`; container đã xóa.
+- Đầu vào không có thẩm quyền: [báo cáo của tác giả PR #14](../g2-g4-completion-2026-10-21/README.md) (giữ nguyên) và báo cáo
+  Prompt 07 ([ma trận](../../workspace/items/business-baseline-impact-2026-10-22/spec.md#ma-trận-tác-động-ae)).
+- Cách làm: đọc diff thật `9a7164a..69f4891`, code/SQL/test ở HEAD; năm lượt đọc độc lập (collection/detail × 2, migration/
+  transaction/kiến trúc, bảo mật, truy vết Story/AC → test) rồi **tự kiểm lại** từng defect nêu dưới ở file:line; chạy gate
+  trên cây sản phẩm không đổi.
+
+## 1. Tóm tắt theo mức độ
+
+Không có finding Critical. Không có lỗ phân quyền, IDOR, SQL injection, secret trong config hay dependency mới.
+
+**High — code đã merge trái baseline nghiệp vụ hiện hành** (đã có chủ từ Prompt 07, xác minh lại ở HEAD):
+
+| Mã        | Điều sai                                                                                              | Chủ                                 |
+| --------- | ----------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| `BBI-D01` | `POST /employees` và 6 route `/employee-imports*` chỉ `IT_ADMIN`, không căn cứ HR (`QĐ-82i`)          | `g2-employee-intake-by-super-admin` |
+| `BBI-D04` | tạo được Cost Center `COMPANY`; OpenAPI còn `COMPANY` ở 16 chỗ (`QĐ-86b`)                             | `g2-g4-unit-only-cost-attribution`  |
+| `BBI-D05` | dòng tài khoản dịch vụ của import hiện trạng **bắt buộc** `COMPANY` (`seat-baseline-rows.ts:169`)     | `g2-g4-unit-only-cost-attribution`  |
+| `BBI-D06` | đổi người chịu trách nhiệm tài khoản dịch vụ nhận người ngoài phòng sở hữu (`QĐ-86c`)                 | `g2-g4-unit-only-cost-attribution`  |
+| `BBI-D08` | phân bổ chi phí nhận dòng Cost Center `COMPANY`                                                       | `g2-g4-unit-only-cost-attribution`  |
+| `BBI-D09` | `DeclareApplicationBodyDto.kind` còn `FREE_EXTERNAL` trong request/OpenAPI, chỉ từ chối sau khi parse | `g3-catalog-kind-contract-cleanup`  |
+
+`BBI-D02`, `BBI-D03`, `BBI-D07`, `BBI-D10` (bảo trì trường chính thức, `BUDGET_PERIOD_KIND`, ngừng phòng không xét tài
+khoản dịch vụ, công cụ theo phòng người giữ) cũng giữ nguyên chủ Prompt 07.
+
+**Nhóm E — Owner quyết** (carry-over 1, [mục 7](#7-nghiệp-vụ-hiện-hành-qđ-82--qđ-86-và-carry-over)): `BBI-E01` — năm của đề
+xuất ngân sách (`QĐ-82a` _năm tài chính sau_ ↔ `FR-5.15`(1)/`US-06-10` AC-9 _mọi năm chưa kết thúc_). Chặn thiết kế ngân sách
+G5 (`BBI-C01`); **không** ghi Prompt 07 có 0 E.
+
+**Medium:**
+
+| Mã        | Finding                                                                                                                                                              | Chủ                                          |
+| --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| `SEC-01`  | liên kết tải lên hợp đồng ký không gồm `Content-Type`/`Content-Length`, sống 900 s, dùng lại được sau `complete` ⟹ thay được tệp đã xác minh; tải về hiển thị inline | `contract-document-upload-integrity`         |
+| `SEC-02`  | xem khóa bản quyền không có hạn mức theo tài khoản (throttler 120/phút theo IP, trong bộ nhớ) ⟹ token IT Admin lộ rút được toàn bộ kho                               | `secret-and-upload-hardening`                |
+| `DB-01`   | khóa đổi tiền tệ báo cáo (`QĐ-42c`) là write skew: trigger đọc `organizations` không khóa; đổi tiền tệ và ghi tỷ giá/ảnh chụp đồng thời cùng commit được             | `finance-reporting-currency-integrity`       |
+| `DB-02`   | tiền tệ báo cáo ngoài 11 mã seed ⟹ mọi lần ghi giá 500 (`ReportingCurrencyNotSupportedError` không có ánh xạ HTTP; lệnh khởi tạo nhận mọi `^[A-Z]{3}$`)              | `finance-reporting-currency-integrity`       |
+| `DB-03`   | gắn nhà cung cấp vào nhóm từ điển là lost update (`UPDATE` theo `id` không điều kiện) phá `LR-10`; không có audit riêng                                              | `catalog-licensing-write-integrity`          |
+| `DB-04`   | production dùng cùng role (owner/superuser) cho migrate và runtime (`docker-compose.prod.yml:21,48,69`) ⟹ mọi trigger bất biến bỏ qua được; có từ trước PR #14       | H7 (đã hoãn) — không lập hạng mục mới        |
+| `DB-05`   | không down migration, không sao lưu trước `migrate deploy` (`deploy.yml:110-122`); `ALTER TYPE … ADD VALUE` không hoàn tác được                                      | `delivery-gate-hardening`                    |
+| `GATE-01` | `pnpm test:e2e` đỏ 1/811 trên checkout Windows: `openapi.json` CRLF ở cây làm việc (không `.gitattributes`), test so byte                                            | `delivery-gate-hardening`                    |
+| `GATE-02` | `pnpm test:integration` đầy đủ đỏ 1/1307: timeout 30 s ở `employee-imports-http` (suite 521 s); chạy riêng 38/38 trong 10 s                                          | `delivery-gate-hardening`                    |
+| `LD-01`   | `subscriptionList` đọc hồ sơ thuế từng dòng tuần tự (≈ 300 câu lệnh/trang 100) và include đủ cột gói/ứng dụng/nhà cung cấp                                           | `catalog-subscription-read-model`            |
+| `LD-02`   | `planWarningList` quét mọi thuê bao `TERM` kèm quan hệ rồi phân trang bằng `slice`                                                                                   | `catalog-subscription-read-model`            |
+| `LD-04`   | `applicationList` trả schema detail-lite (domains, ghi chú liên lạc, `dictionaryServiceLineId`) và include đủ cột                                                    | `catalog-application-plan-read-contracts`    |
+| `LD-06`   | mảng detail không biên: chặn ngừng dùng (mọi seat của mọi gói), ý kiến điều khoản, lịch sử Business Owner, ứng dụng tương tự                                         | `catalog-application-plan-read-contracts`    |
+| `LD-07`   | `standardToolsetList`/`History` N+1 (tới ≈ 400 câu lệnh/trang), thứ tự theo UUID, không tên                                                                          | `catalog-standard-toolset-read-batching`     |
+| `LD-08`   | `provisioningTaskList` dùng chung `taskSchema` (bằng chứng, lỗi, bước, lý do dài) với detail; đọc gói từng gói                                                       | `licensing-provisioning-task-read-contracts` |
+| `LD-09`   | `departmentToolsInUse` đọc mọi Assignment của mọi thành viên rồi phân trang trong bộ nhớ                                                                             | `licensing-assignment-read-contracts`        |
+| `LD-10`   | `licenseAssignmentList` chỉ trả id; IT Admin không đọc được tên người/Cost Center (không `GET /employees`, `/app-users` chỉ Super Admin)                             | `licensing-assignment-read-contracts`        |
+
+**Low/Info:** `SEC-03` → `SEC-09`, `DB-06` → `DB-17`, `LD-03`, `LD-05`, `LD-11` → `LD-14`, `EV-01` (18 AC không có test gắn
+nhãn) — chi tiết ở mục 3–6. Chủ: hạng mục ghi ở từng dòng.
+
+## 2. Nền, Git và quyền sở hữu diff
+
+```text
+*   69f4891 (local dev)  merge 94e70ce + origin/dev            — remerge diff rỗng (không sửa tay khi merge)
+|\
+| *   4e7097f (origin/dev) Merge PR #14 Bao_dev_be → dev        — remerge diff rỗng
+| |\
+| | * 459cb6f complete G2, G3, G4        (95 tệp: +2 414 / −775)
+| | * 5f3b2b3 G2, G3, G4 processing      (591 tệp: +94 848 / −7 499)
+| | * 57b1e1c Merge PR #13 dev → branch  — cây giống hệt 9a7164a
+* | 94e70ce feat: update roadmap         (2 tệp: báo cáo kiểm thử API tay 20/10 + một link)
+|/
+* 9a7164a BEH.1 (Prompt 25, CI xanh)
+```
+
+- Delta `9a7164a..4e7097f`: **607** path — `src` 289, `prisma` 29 (24 migration + 5 model), `test` 82, `docs` 199,
+  root 8 (`README.md`, `AGENTS.md`, `ARCHITECTURE.md`, `CONTRIBUTING.md`, `.env.example`, `compose.yaml`, `openapi.json`,
+  `scripts/dev/export-environment.ts`). `9a7164a..HEAD`: 608 (+ `docs/reviews/be-api-manual-verification-2026-10-20`).
+- **Churn không liên quan:** 133 / 199 path `docs` là spike dịch `dynamic-content-translation/spike/**` chỉ đổi định dạng
+  (57 JSON parse bằng nhau, 68 bằng nhau khi bỏ khoảng trắng, 8 chỉ khác xuống dòng/ngoặc/dấu phẩy/kiểu nháy của Prettier).
+- `openapi.json` là artifact sinh: 60 → **143** operation, 159 schema; export lại trùng byte với blob ở HEAD.
+- Không có tệp nào bị Owner/merge local sửa sau nhánh dev ngoài `94e70ce`; không migration nào viết lại migration trước.
+- Ánh xạ từng migration, module, route, test → hạng mục: [file-manifest](file-manifest.md).
+
+## 3. Disposition G0→G4 và bằng chứng Story/AC
+
+`verified-implemented` = AC claim có test gắn nhãn (Story + AC trong tiêu đề/describe, hoặc AC trong tệp chỉ test một Story)
+**và** test đó xanh trên cây cuối (mục 6). Không dùng `accepted`/`released`.
+
+| Disposition                  | Số hạng mục | Hạng mục                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| ---------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `verified-implemented`       | 19          | `us-01-password-self-service`, `us-01-audit-trail-query`, `us-01-09-super-admin-transfer-recovery`, `h3a-r1-department-in-use-details`, `h3b-r2-lock-unlock-reason`, `h3c-forgot-password-during-recovery`, `g2-approval-roles`, `g2-onboarding-checklist` (bước 1→4), `g3-catalog-foundation`, `g3-vendor-dictionary`, `g3-plan-declaration`, `g3-vendor-tax-profile`, `g3-subscription-purchase`, `g3-vendor-terms-checklist`, `g3-license-key-vault`, `g3-business-owner-replacement`, `g3-subscription-seat-guards`, `g3-catalog-retire`, `g3-standard-toolset` |
+| `implemented-unverified`     | 5           | `foundation-org-identity-boundary` (`US-01-06` AC-3 chỉ suy ra), `us-01-bootstrap-login-session` (`US-01-06` AC-1, AC-3), `us-01-account-invitation-activation` (`US-01-01` AC-9), `h1-auth-session-refresh-expiry` (plan nêu `login.service.spec.ts` không tồn tại), `g3-money-and-exchange-rates` (`US-04-05` AC-6 chỉ gắn nhãn M1–M18; `DB-01`, `DB-02`)                                                                                                                                                                                                         |
+| `partial`                    | 1           | `g3-contract-documents` — vế _không có tệp nào được lưu_ của `US-04-04` AC-10 không giữ ở kho và tệp đã xác minh thay được (`SEC-01`, `DB-13`)                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `incorrect-current-baseline` | 8           | `g2-job-title-catalogue-and-manual-employee` (D01), `g2-cost-center-catalogue` (D04), `g2-department-profile` (D04, D07), `g2-operating-parameters` (D03), `g2-employee-import-preview-confirm` (D01), `g3-catalog-entry` (D09), `g3-shared-cost-allocation` (D08), `g4-seat-baseline-import` (D05, D06; `SEC-03`)                                                                                                                                                                                                                                                  |
+| `stub`                       | 2           | `g4-provisioning-queue-manual`, `g4-provisioning-failure-handling` — logic và test có, nhưng `GRANT_REQUEST_GATE` = `RefusingGrantRequestGate` (`licensing.module.ts:91`) nên ở production không tạo được tác vụ nào; mọi test thay bằng `FakeGrantGate`                                                                                                                                                                                                                                                                                                            |
+| `blocked`                    | 4           | `g3-downstream-finance-integration`, `g4-device-dependent-features`, `g4-request-and-transfer-integration`, `g4-notification-delivery` — không model, route hay migration riêng                                                                                                                                                                                                                                                                                                                                                                                     |
+| `unmounted`                  | 0           | (module `queue-infrastructure` không mount có chủ đích — E2 = A; không phải hạng mục G0→G4)                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `not-started`                | 0           | (trong tập đã giao; 6 hạng mục forward của Prompt 07 và 12 hạng mục của review này là `not-started`/`blocked` riêng)                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+
+Tổng 39 hạng mục G0→G4. **G2/G3/G4 không hoàn tất như một nhóm**: G2 có 5/7 lát trái baseline, G4 không có đường cấp thật.
+Enabler nền tảng không claim Story (`g0-g1-remediation-after-rereview`, H2a, H2b, H4.1 → Wave 3, H5 Wave A/B, GOV.1/GATE.2,
+H8, Operations Foundation, Installation & Local Data, BEH.1): `verified-implemented` theo gate cuối (unit + kiến trúc +
+integration xanh); `final-foundation-hardening`: `implemented-unverified` trên checkout này vì test export OpenAPI của
+OPENAPI-EXPORT.1 đỏ do xuống dòng (`GATE-01`, không phải lệch nội dung).
+
+### Bằng chứng Story/AC → route → schema → test (rút gọn)
+
+| Hạng mục                              | AC claim (gắn nhãn / claim)             | Route (mount)                                                          | Migration/model                                  | Test chính                                                         |
+| ------------------------------------- | --------------------------------------- | ---------------------------------------------------------------------- | ------------------------------------------------ | ------------------------------------------------------------------ |
+| `us-01-account-invitation-activation` | 21/22 (`US-01-01` AC-9 suy ra)          | `/app-users*`, `/account-candidates`, `/auth/invitations/redeem`       | `20261012140000_account_invitation`              | `account-management-http`, `role-grant-constraints`                |
+| `g2-department-profile`               | 23/28                                   | `/departments*`, `/department-warnings`, `/projects`, `…/tools-in-use` | `20261016160000_department_profile`              | `departments-http`, `department-tools-http`                        |
+| `g2-employee-import-preview-confirm`  | 20/27 (+2 nhãn mơ hồ)                   | `/employee-imports*` (6)                                               | `20261016200000_employee_import`                 | `employee-imports-http`, e2e `employee-imports`                    |
+| `g3-catalog-entry`                    | 10/11 (`US-04-01` AC-11 suy ra từ AC-4) | `/applications*`, `/functional-groups*`                                | `20261020120000_catalog_applications`            | `application-http` (còn ca AC-12 đã bỏ), `application.policy.spec` |
+| `g3-subscription-purchase`            | 14/14 (một nhãn sai Story ở `:379`)     | `/subscriptions*`                                                      | `20261020150000_catalog_subscriptions`           | `subscription-http`, `subscription-constraints`                    |
+| `g3-contract-documents`               | 6/6                                     | `/contracts*`, `/documents*`                                           | `20261020250000_catalog_contracts_and_documents` | `contract-documents-http`, adapter unit                            |
+| `g3-license-key-vault`                | 8/8                                     | `/license-keys*`                                                       | `20261020260000_licensing_license_keys`          | `license-key-http`, e2e `license-key`                              |
+| `g4-seat-baseline-import`             | 14/15 (`US-07-01` AC-14 suy ra)         | `/seat-baseline-imports*`, `/seat-baseline*`, `/license-assignments*`  | `20261020190000`, `20261020190100`               | `seat-baseline-import-http`, `seat-baseline-rows.spec`             |
+| `g4-provisioning-queue-manual`        | 20/20 (với `FakeGrantGate`)             | `/provisioning-tasks*` (6)                                             | `20261020220000`, `20261021120000`               | `provisioning-grant-http`, `provisioning-queue-http`               |
+| `g4-provisioning-failure-handling`    | 11/12 (`US-07-04` AC-13 suy ra)         | `…/retry`, `…/hand-off`, `…/close-failed`                              | `20261020230000`, `…230100`, `20261021100000`    | `provisioning-failure-http`                                        |
+
+Các hạng mục còn lại có mọi AC claim gắn nhãn. **`EV-01` (Low):** 18 AC claim không có test gắn nhãn (`US-01-06` AC-1, AC-3;
+`US-01-01` AC-9; `US-01-02` AC-5, AC-6; `US-04-09` AC-7, AC-8, AC-9; `US-02-01` AC-7; `US-02-02` AC-9, AC-11; `US-02-03` AC-6;
+`US-02-07` AC-12; `US-04-05` AC-6; `US-04-01` AC-11; `US-07-01` AC-14; `US-07-04` AC-13; nhãn mơ hồ `US-02-02` AC-8, AC-13) —
+hầu hết có test suy ra; `US-01-02` AC-5 không tìm thấy test. Tên test cũ trong plan: H1 `login.service.spec.ts`,
+`g4-provisioning-queue-manual` `provisioning-http`. Test còn ghim hành vi đã bị thay: `US-04-01` AC-12 (`FREE_EXTERNAL`),
+`COMPANY` (`cost-centers-http`, `cost-allocation-http:180-187`), actor IT Admin nhập hồ sơ, `BUDGET_PERIOD_KIND`. Chủ: người
+phụ trách từng hạng mục khi sửa (gắn nhãn khi chạm test), các hạng mục forward của Prompt 07 cho test ghim hành vi cũ.
+
+## 4. Collection và detail (`API-LIST-DETAIL.1`)
+
+61 operation `GET` / 143. Chung cho mọi route: một tổ chức mỗi cài đặt (chỉ mục duy nhất trên hằng số) nên thiếu lọc
+`organizationId` không phải lỗ tenant; route phân trang mặc định 20 (import 50), tối đa 100 (dòng import nhân sự 200), trả
+`totalItems/totalPages`; hầu hết đếm + trang trong một transaction `RepeatableRead` với khóa phụ `id`; không phát hiện
+`authorization-leak`. Kết luận dùng đúng từ vựng của Prompt 08; _defect_ trỏ mục ở bảng cuối.
+
+| #   | `operationId`                       | Quyền                               | Biên · thứ tự                             | Item danh sách so với detail / query                                                               | Kết luận                    | Defect  |
+| --- | ----------------------------------- | ----------------------------------- | ----------------------------------------- | -------------------------------------------------------------------------------------------------- | --------------------------- | ------- |
+| 1   | `healthGetLiveness`                 | public                              | singleton                                 | —                                                                                                  | correct-summary             | —       |
+| 2   | `healthGetReadiness`                | public                              | singleton                                 | —                                                                                                  | correct-summary             | —       |
+| 3   | `auditEventList`                    | SUPER_ADMIN                         | ≤100 · `occurredAt desc, id`, RR          | item có `before`/`after` đầy đủ (spec chọn); không detail; payload audit không cap                 | needs-owner-decision        | `LD-13` |
+| 4   | `jobTitleList`                      | IT_ADMIN                            | ≤100 · `normalized_name, id`, RR          | item = resource; không cần detail                                                                  | correct-summary             | —       |
+| 5   | `costCenterList`                    | FINANCE, IT_ADMIN                   | ≤100 · `code, id`, RR                     | item = resource + phòng; lọc `kind=COMPANY` (D04)                                                  | correct-summary             | —       |
+| 6   | `costCenterEmployeeList`            | FINANCE                             | ≤100 · `employee_code, id`                | trang và đếm là hai câu lệnh ngoài transaction                                                     | correct-summary             | `LD-11` |
+| 7   | `departmentList`                    | IT_ADMIN                            | ≤100 · `code, id`, RR                     | item có `function` ≤1000 (spec chọn)                                                               | needs-owner-decision        | `LD-13` |
+| 8   | `departmentGet`                     | IT_ADMIN, MANAGER (phòng mình)      | singleton                                 | `headHistory` ≤50; `projects` không biên                                                           | unbounded                   | `LD-12` |
+| 9   | `departmentMemberList`              | IT_ADMIN, MANAGER                   | ≤100 · `employee_code, id`                | đọc `work_email` để thành boolean; đếm ngoài snapshot                                              | correct-summary             | `LD-11` |
+| 10  | `departmentWarningList`             | IT_ADMIN, SUPER_ADMIN               | ≤ 2 × số phòng                            | 4 trường                                                                                           | bounded-reference-exception | —       |
+| 11  | `projectList`                       | IT_ADMIN                            | **không phân trang, không biên**          | resource đủ (mô tả ≤2000, ≤100 phòng); không detail                                                | unbounded                   | `LD-12` |
+| 12  | `operatingParameterList`            | SUPER_ADMIN                         | tập định nghĩa cố định                    | —                                                                                                  | correct-summary             | —       |
+| 13  | `operatingParameterHistory`         | SUPER_ADMIN                         | 20 mới nhất (spec)                        | không cờ `hasMore`                                                                                 | bounded-reference-exception | `LD-14` |
+| 14  | `nonWorkingDateList`                | SUPER_ADMIN                         | khoảng `from/to`                          | ≈ 15 dòng/năm                                                                                      | bounded-reference-exception | —       |
+| 15  | `reportingCurrencyGet`              | SUPER_ADMIN                         | singleton                                 | —                                                                                                  | correct-summary             | —       |
+| 16  | `employeeImportGet`                 | IT_ADMIN                            | singleton; hàng đợi xem xét ≤200          | —                                                                                                  | correct-summary             | —       |
+| 17  | `employeeImportRowList`             | IT_ADMIN                            | ≤200 · `lineNumber` (PK), RR              | `cells` chỉ cột đã ánh xạ (mục đích của preview)                                                   | correct-summary             | —       |
+| 18  | `seatBaselineImportGet`             | IT_ADMIN                            | singleton                                 | —                                                                                                  | correct-summary             | —       |
+| 19  | `seatBaselineImportRows`            | IT_ADMIN                            | ≤100 · `lineNumber`, RR                   | khác tên `line` của import nhân sự (ghi nhận, không sửa)                                           | correct-summary             | —       |
+| 20  | `licenseAssignmentList`             | IT_ADMIN                            | ≤100 · `validFrom, id`, RR                | chỉ id; không `select`; `reason` không cap                                                         | underfetch                  | `LD-10` |
+| 21  | `subscriptionSeatUsage`             | IT_ADMIN                            | singleton                                 | —                                                                                                  | correct-summary             | —       |
+| 22  | `departmentToolsInUse`              | IT_ADMIN, MANAGER                   | ≤100 nhưng **phân trang trong bộ nhớ**    | đọc mọi thành viên × Assignment rồi `slice`                                                        | unbounded                   | `LD-09` |
+| 23  | `seatBaselineGet`                   | IT_ADMIN                            | singleton                                 | —                                                                                                  | correct-summary             | —       |
+| 24  | `provisioningTaskList`              | IT_ADMIN                            | ≤100 · `createdAt, id`, RR                | **cùng `taskSchema` với detail** (bằng chứng ≤2000 ×2, lỗi, bước); đọc gói từng gói                | overfetch                   | `LD-08` |
+| 25  | `provisioningTaskGet`               | IT_ADMIN                            | singleton                                 | detail                                                                                             | correct-summary             | —       |
+| 26  | `licenseKeyList`                    | IT_ADMIN                            | ≤100 · `importedAt, id`                   | `select` chỉ mặt nạ; đếm + trang qua `Promise.all` ngoài transaction; khóa đầy đủ chỉ qua `reveal` | correct-summary             | `LD-11` |
+| 27  | `vendorGroupList`                   | IT_ADMIN                            | ≤100 · `name, id`, RR                     | nhóm nhúng mọi dòng dịch vụ (không cap số dòng); biên theo giả định `T-D2`                         | bounded-reference-exception | `LD-13` |
+| 28  | `vendorSuggestionList`              | IT_ADMIN                            | không phân trang                          | đọc cả từ điển mỗi lần; 4 trường                                                                   | bounded-reference-exception | —       |
+| 29  | `vendorProposalList`                | IT_ADMIN                            | ≤100 · `createdAt, id`                    | bỏ `proposedDomains`, `sourceApplicationId`; không detail                                          | underfetch                  | `LD-13` |
+| 30  | `applicationList`                   | IT_ADMIN, FINANCE                   | ≤100 · `normalizedName, id`, RR           | item = `applicationSchema` (domains ≤20 × 1000, ghi chú 1000); include đủ cột vendor/group         | overfetch                   | `LD-04` |
+| 31  | `applicationGet`                    | IT_ADMIN, FINANCE                   | singleton                                 | `similarApplications` không `take`                                                                 | unbounded                   | `LD-06` |
+| 32  | `functionalGroupList`               | IT_ADMIN, FINANCE                   | ≤100                                      | id, tên, trạng thái                                                                                | correct-summary             | —       |
+| 33  | `planList`                          | IT_ADMIN, FINANCE                   | ≤100 · ứng dụng, gói, id                  | item = `planSchema` có `revocationNote` ≤2000; detail chỉ thêm hồ sơ workspace                     | overfetch                   | `LD-05` |
+| 34  | `planGet`                           | IT_ADMIN, FINANCE                   | singleton                                 | thành viên workspace ≤100                                                                          | correct-summary             | —       |
+| 35  | `vendorList`                        | IT_ADMIN, FINANCE                   | ≤100                                      | 5 trường; lọc thuế đọc id ngoài snapshot                                                           | correct-summary             | —       |
+| 36  | `vendorTaxProfileGet`               | IT_ADMIN, FINANCE                   | singleton, ≤20 dòng                       | —                                                                                                  | correct-summary             | —       |
+| 37  | `vendorTaxProfileHistory`           | IT_ADMIN, FINANCE                   | ≤100                                      | item = phiên bản đủ dòng (≤20)                                                                     | bounded-reference-exception | —       |
+| 38  | `vendorTaxEstimate`                 | IT_ADMIN, FINANCE                   | tính toán                                 | —                                                                                                  | correct-summary             | —       |
+| 39  | `subscriptionList`                  | IT_ADMIN, FINANCE                   | ≤100                                      | **cùng `subscriptionSchema`** với detail (spec chọn); thuế đọc từng dòng; include đủ cột           | overfetch                   | `LD-01` |
+| 40  | `subscriptionGet`                   | IT_ADMIN, FINANCE                   | singleton                                 | —                                                                                                  | correct-summary             | —       |
+| 41  | `subscriptionCostAllocationGet`     | FINANCE, IT_ADMIN                   | singleton, ≤20 dòng                       | —                                                                                                  | correct-summary             | —       |
+| 42  | `subscriptionCostAllocationHistory` | FINANCE, IT_ADMIN                   | ≤100                                      | Cost Center đọc từng phiên bản (N+1)                                                               | bounded-reference-exception | `LD-03` |
+| 43  | `planTermsGet`                      | IT_ADMIN, FINANCE                   | singleton                                 | `opinions` không biên (≤2000 ký tự mỗi ý kiến)                                                     | unbounded                   | `LD-06` |
+| 44  | `planWarningList`                   | IT_ADMIN                            | ≤100 nhưng **quét toàn bộ rồi `slice`**   | item 10 trường; query đọc mọi thuê bao `TERM` kèm quan hệ                                          | unbounded                   | `LD-02` |
+| 45  | `businessOwnerWarningList`          | IT_ADMIN                            | ≤100                                      | đọc mọi owner trước trang                                                                          | correct-summary             | —       |
+| 46  | `applicationBusinessOwnerHistory`   | IT_ADMIN, FINANCE                   | **không phân trang**                      | giai đoạn chỉ thêm                                                                                 | unbounded                   | `LD-06` |
+| 47  | `applicationRetirementGet`          | IT_ADMIN, FINANCE                   | singleton                                 | `blockers.assignments` = mọi seat của mọi gói; `confirmations` không biên                          | unbounded                   | `LD-06` |
+| 48  | `contractGet`                       | IT_ADMIN, FINANCE                   | singleton                                 | **không có collection nào** cho hợp đồng/tệp (`Q5`)                                                | needs-owner-decision        | `LD-13` |
+| 49  | `documentGet`                       | IT_ADMIN, FINANCE (+ người tải lên) | singleton                                 | không lộ `objectKey`; tệp ẩn ⟹ 404                                                                 | correct-summary             | —       |
+| 50  | `standardToolsetList`               | IT_ADMIN, MANAGER (phòng mình)      | ≤100 · UUID phòng, UUID chức vụ           | gói nhúng ≤50; N+1 phiên bản + gói; không tên                                                      | bounded-reference-exception | `LD-07` |
+| 51  | `standardToolsetMine`               | đã xác thực (của mình)              | singleton                                 | —                                                                                                  | correct-summary             | —       |
+| 52  | `standardToolsetGet`                | IT_ADMIN, MANAGER                   | singleton                                 | 404 trước kiểm phạm vi (Info `SEC-08`)                                                             | correct-summary             | —       |
+| 53  | `standardToolsetHistory`            | IT_ADMIN                            | ≤100                                      | gói đọc từng phiên bản                                                                             | bounded-reference-exception | `LD-07` |
+| 54  | `exchangeRateList`                  | FINANCE, IT_ADMIN                   | ≤100 · `rate_date desc, currency, id`, RR | 7 trường                                                                                           | correct-summary             | —       |
+| 55  | `currencyList`                      | FINANCE, IT_ADMIN                   | 11 mã seed, không route ghi               | —                                                                                                  | bounded-reference-exception | —       |
+| 56  | `onboardingChecklistGet`            | IT_ADMIN                            | singleton                                 | —                                                                                                  | correct-summary             | —       |
+| 57  | `meGet`                             | đã xác thực                         | singleton                                 | —                                                                                                  | correct-summary             | —       |
+| 58  | `accountCandidatesList`             | SUPER_ADMIN                         | ≤20 (picker)                              | đọc mọi `employeeId` có tài khoản mỗi lần                                                          | bounded-reference-exception | —       |
+| 59  | `appUserList`                       | SUPER_ADMIN                         | ≤100 · `createdAt desc, id`, RR           | summary; detail = `extend` (không trôi)                                                            | correct-summary             | —       |
+| 60  | `appUserGet`                        | SUPER_ADMIN                         | singleton                                 | `roleHistory` không biên                                                                           | unbounded                   | `LD-14` |
+| 61  | `approvalRoleList`                  | SUPER_ADMIN                         | 3 vai, lịch sử ≤20                        | không cờ `hasMore`                                                                                 | bounded-reference-exception | `LD-14` |
+
+Đếm kết luận (tổng 61): `correct-summary` 31 · `bounded-reference-exception` 12 · `unbounded` 9 · `overfetch` 4 · `underfetch` 2 ·
+`needs-owner-decision` 2 · `missing-detail` 1 · `authorization-leak` 0. Mọi defect đã được tự kiểm ở file:line nêu dưới.
+
+| Defect  | Mức    | Bằng chứng                                                                                                                 | Chủ                                                                           |
+| ------- | ------ | -------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `LD-01` | Medium | `subscription-view.service.ts:38-56` (`await estimateTax` trong vòng lặp); `subscription.repo.ts:17`                       | `catalog-subscription-read-model`                                             |
+| `LD-02` | Medium | `plan-terms.service.ts:194-198` (`all.slice`); `subscription.repo.ts:163-171`                                              | `catalog-subscription-read-model`                                             |
+| `LD-03` | Low    | `cost-allocation.service.ts:49,117-121`                                                                                    | `catalog-subscription-read-model`                                             |
+| `LD-04` | Medium | `application.dto.ts:61-88,112`; `application.repo.ts:15,244`                                                               | `catalog-application-plan-read-contracts`                                     |
+| `LD-05` | Low    | `plan.dto.ts:96,116`                                                                                                       | `catalog-application-plan-read-contracts`                                     |
+| `LD-06` | Medium | `application-retirement.service.ts:206-233`; `plan-terms.repo.ts:75-80`; `application.repo.ts:171-176,216-224`             | `catalog-application-plan-read-contracts`                                     |
+| `LD-07` | Medium | `standard-toolset.repo.ts:152-165` (`Promise.all` từng head); `standard-toolset.service.ts:143,161`                        | `catalog-standard-toolset-read-batching`                                      |
+| `LD-08` | Medium | `provisioning.dto.ts:114-122`; `provisioning-task-view.service.ts:91-95`; `provisioning-failure.service.ts:51,66-71`       | `licensing-provisioning-task-read-contracts`                                  |
+| `LD-09` | Medium | `department-tools.service.ts:54-118`; `assignment.repo.ts:197-210`                                                         | `licensing-assignment-read-contracts`                                         |
+| `LD-10` | Medium | `assignment.dto.ts:34-53`; `assignment.repo.ts:230-236`                                                                    | `licensing-assignment-read-contracts`                                         |
+| `LD-11` | Low    | `license-key.repo.ts:66-75`; `department.repo.ts:280-305`; `cost-center.repo.ts:187-213`                                   | `licensing-assignment-read-contracts`, `organization-identity-read-contracts` |
+| `LD-12` | Low    | `project.repo.ts:70-78`; `department-query.service.ts:61-62`                                                               | `organization-identity-read-contracts`                                        |
+| `LD-13` | Owner  | bảy điểm _Cần Owner quyết_: hợp đồng, đề xuất từ điển, trường thuê bao, payload audit, định danh người, `function`, `T-D2` | `api-list-detail-contract-remediation`                                        |
+| `LD-14` | Low    | `role-grant.repo.ts:61-67`; lịch sử 20/20/50 không `hasMore`                                                               | `organization-identity-read-contracts`                                        |
+
+Quy tắc chuẩn đề xuất (Good / Bad / Bad workaround), inventory gate với registry ngoại lệ chính xác và harness đếm query —
+không áp dụng trong review này — ở [api-list-detail-contract-remediation](../../workspace/items/api-list-detail-contract-remediation/spec.md).
+
+## 5. Bảo mật, migration, transaction và audit
+
+**Đã kiểm và đúng:** mọi route mới khai đúng một decorator truy cập, không `@Public` mới; phạm vi trưởng phòng/nhân viên đúng
+spec; ghi chỉ Finance (hồ sơ thuế, phân bổ, tỷ giá) và chỉ IT Admin (licensing) đúng; kho khóa AES-256-GCM, IV ngẫu nhiên 12
+byte, AAD gắn id dòng + id khóa, reveal và audit cùng transaction, `no-store`; tài liệu: khóa đối tượng sinh ở server, kiểm byte
+đầu, liên kết tải về 300 s không lưu; lỗi 422 không lặp lại đầu vào, 500 chung; mọi `$queryRaw` có tham số; CSV import ≤2 MB,
+≤1000 dòng; `termsUrl` không bao giờ được fetch; 24 migration chỉ thêm (trừ drop bảng mẫu chưa từng mount), cột NOT NULL có
+default/backfill, giá trị enum tách migration riêng; giao thức khóa seat nhất quán (thuê bao `FOR UPDATE` → gói `FOR SHARE` →
+nhân viên/Cost Center theo id); xác nhận import hiện trạng idempotent; audit ghi trong cùng transaction nghiệp vụ;
+`finance` không import `catalog`/`licensing`; `package.json`/`pnpm-lock.yaml` không đổi trong delta.
+
+| Mã       | Mức    | Finding (đã tự kiểm ở file:line)                                                                                                                                                                                                 | Chủ                                                                   |
+| -------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| `SEC-01` | Medium | presign PUT chỉ `Bucket/Key/ContentType` (`s3-compatible-object-storage.adapter.ts:41-53`; presigner không ký `content-type`), 900 s (`document.service.ts:32`), dùng lại sau `complete`; GET không `ResponseContentDisposition` | `contract-document-upload-integrity`                                  |
+| `SEC-02` | Medium | `POST /license-keys/{id}/reveal` chỉ throttler toàn cục theo IP trong bộ nhớ (`license-keys.controller.ts:98-119`)                                                                                                               | `secret-and-upload-hardening`                                         |
+| `SEC-03` | Low    | `maskSecretCells` bỏ che khi ô có ký tự lạ (`seat-baseline-rows.ts:83-88`) trong khi kiểm dòng dùng ô đã trim ⟹ token thô được lưu                                                                                               | `secret-and-upload-hardening`                                         |
+| `SEC-04` | Low    | production nhận `minioadmin` (`object-storage.config.ts:29-38`)                                                                                                                                                                  | `secret-and-upload-hardening`                                         |
+| `SEC-05` | Low    | so khóa theo chuỗi base64, bỏ sót cặp khóa trước đây (`secret-environment.ts:114-140`)                                                                                                                                           | `secret-and-upload-hardening`                                         |
+| `SEC-06` | Low    | multipart chỉ giới hạn `fileSize`, `files` (`seat-baseline-imports.controller.ts:91`, `employee-imports.controller.ts:78`)                                                                                                       | `secret-and-upload-hardening`                                         |
+| `SEC-07` | Low    | liên kết ký sẵn trả không `Cache-Control: no-store` (`documents.controller.ts:63-96,176-193`)                                                                                                                                    | `contract-document-upload-integrity`                                  |
+| `SEC-08` | Info   | 404 trước 403 cho trưởng phòng dò id (UUID — tác động không đáng kể); không hành động                                                                                                                                            | —                                                                     |
+| `SEC-09` | Low    | nghi vấn: `S3Client` không đặt `requestChecksumCalculation: 'WHEN_REQUIRED'` — có thể làm hỏng PUT từ trình duyệt; chưa kiểm kho thật                                                                                            | `contract-document-upload-integrity`                                  |
+| `DB-01`  | Medium | write skew tiền tệ báo cáo (migration `20261020100000:58-73`, `…100500:16-30`, `…200000:6-24`; `finance.service.ts:68-73`)                                                                                                       | `finance-reporting-currency-integrity`                                |
+| `DB-02`  | Medium | `installation.input.ts:47`; `finance.service.ts:74`; không ánh xạ HTTP ⟹ 500                                                                                                                                                     | `finance-reporting-currency-integrity`                                |
+| `DB-03`  | Medium | `vendor.repo.ts:111-113` cập nhật theo `id` không điều kiện; trigger chỉ chạy khi ghi `applications`                                                                                                                             | `catalog-licensing-write-integrity`                                   |
+| `DB-04`  | Medium | một role cho migrate và runtime production                                                                                                                                                                                       | H7                                                                    |
+| `DB-05`  | Medium | không sao lưu/rollback trước `migrate deploy`                                                                                                                                                                                    | `delivery-gate-hardening`                                             |
+| `DB-06`  | Low    | cấp không idempotent theo Request, cổng kiểm ngoài transaction (`provisioning.service.ts:75-87`) — tiềm ẩn (cổng từ chối mọi Request)                                                                                            | `g4-request-and-transfer-integration`                                 |
+| `DB-07`  | Low    | đổi mô hình giá/kiểu cấp khi còn thuê bao/khóa/phân bổ (`plan.service.ts:155-208`)                                                                                                                                               | `catalog-licensing-write-integrity`                                   |
+| `DB-08`  | Low    | `INV-01` chỉ đúng dưới READ COMMITTED; giảm số lượng chỉ kiểm ở ứng dụng                                                                                                                                                         | `catalog-licensing-write-integrity`                                   |
+| `DB-09`  | Low    | đọc kiểm qua kết nối pool khác khi đang giữ khóa (`application-retirement.service.ts:206-216`, `seat-occupancy.reader.ts:30-44`)                                                                                                 | `catalog-licensing-write-integrity`                                   |
+| `DB-10`  | Low    | phân bổ kiểm mô hình giá rồi mở transaction khác (`subscription-allocation.service.ts:52-59`)                                                                                                                                    | `catalog-licensing-write-integrity`                                   |
+| `DB-11`  | Low    | thiếu sự kiện audit riêng: nhận nhóm từ điển, đề xuất phát sinh khi khai ứng dụng                                                                                                                                                | `catalog-licensing-write-integrity`                                   |
+| `DB-12`  | —      | trùng `LD-01`                                                                                                                                                                                                                    | `catalog-subscription-read-model`                                     |
+| `DB-13`  | Low    | tài liệu `AWAITING_UPLOAD` không được dọn; `complete` trước khi PUT tới ⟹ cách ly vĩnh viễn                                                                                                                                      | `contract-document-upload-integrity`                                  |
+| `DB-14`  | Low    | đầu phiên bản hồ sơ thuế/phân bổ không có trigger chỉ-tiến (chỉ bộ chuẩn có — `20261021110000`)                                                                                                                                  | `catalog-licensing-write-integrity`                                   |
+| `DB-15`  | Low    | tên migration giờ 24–26 (`20261020240000/250000/260000`) — thứ tự vẫn tất định; drop bảng mẫu không có guard rỗng                                                                                                                | `delivery-gate-hardening`                                             |
+| `DB-16`  | Low    | CI không chạy `prisma migrate diff --exit-code`                                                                                                                                                                                  | `delivery-gate-hardening`                                             |
+| `DB-17`  | Low    | ADR-0005 status ghi _chưa cần ràng buộc ngoài Prisma_; ADR-0013 còn Proposed; chú thích `catalog.module.ts:65-70` cũ; `subscription.service.ts` đúng 400 dòng; 5 service > 6 phụ thuộc; `requireOrganization()` lặp ~15 lần      | `delivery-gate-hardening` (tài liệu); phần cấu trúc là backlog review |
+
+**Tương thích CSDL:** _xuôi_ — mọi migration áp lên CSDL G1/G2 có dữ liệu mà không cần backfill thủ công; _ngược_ — rollback
+ứng dụng về `9a7164a` chạy được trên schema mới (code cũ không chạm bảng mới; ngoại lệ: trigger
+`organizations_reporting_currency_locked` mới áp cả cho code cũ); rollback CSDL phải làm tay (xóa 23 bảng, ~25 hàm/trigger,
+enum mới; khôi phục `organizations_reject_reporting_currency_change`; tạo lại `catalog_applications`; xóa 24 dòng
+`_prisma_migrations`) ⟹ quy ước _roll-forward hoặc khôi phục từ bản sao lưu_ (`DB-05`).
+
+## 6. Lệnh và kết quả trên cây cuối
+
+Cây sản phẩm không đổi trong suốt lượt (SHA-256 của 847 tệp theo dõi không phải tài liệu trùng trước/sau; `git ls-files -s`
+trùng; không stage). Integration dùng container `slm-p08-review-db-20261022` (cổng `127.0.0.1:56432`); lần thử đầu ở cổng
+55438 không mở được vì nằm trong dải cổng Windows loại trừ 55387–55486 — không chạy gì trên CSDL khác.
+
+| Lệnh                                                                                   | Kết quả                                                                                                                                                                                                                                                                        |
+| -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `pnpm check`                                                                           | exit 0 (249 s): rules 173 tệp/1 425 link/0 lỗi; rules test 38/38; format; Prisma validate/generate; lint; typecheck; unit 138 suite/2 006 test; script 20/20; discovery; build                                                                                                 |
+| `pnpm test:e2e`                                                                        | **exit 1**: 31/32 suite, 810/811 test. Đỏ: `openapi-export.e2e-spec.ts` _writes the committed document…_ — kỳ vọng/nhận 13 567 dòng khác toàn bộ do CRLF (`GATE-01`)                                                                                                           |
+| `pnpm test:integration` (đầy đủ, `TEST_DATABASE_ADMIN_URL` role thường)                | **exit 1**: 96/97 suite, 1 306/1 307 test (1 325 s). Đỏ: `employee-imports-http:587` _gives the same answer to the same confirmation sent again…_ — `Exceeded timeout of 30000 ms`; suite 521 s (`GATE-02`). Không còn CSDL `slm_*_test` sau lượt                              |
+| `pnpm test:integration -- employee-imports-http` (container mới, riêng)                | exit 0: 38/38 trong 10 s — không tái hiện khi chạy riêng                                                                                                                                                                                                                       |
+| `prisma migrate deploy` trên CSDL mới `slm_p08_migrate_fresh`                          | exit 0: 40 migration áp, 58 bảng                                                                                                                                                                                                                                               |
+| `prisma migrate diff --from-config-datasource --to-schema prisma --exit-code`          | exit 0: _No difference detected_                                                                                                                                                                                                                                               |
+| `ts-node scripts/dev/export-openapi.ts <scratch>` (= `pnpm openapi:export` ra tệp tạm) | exit 0; trùng byte với `git show HEAD:openapi.json`; 143 operation, 159 schema; tệp làm việc khác chỉ ở CRLF (13 567 dòng)                                                                                                                                                     |
+| `pnpm test:discovery`                                                                  | exit 0: unit 138, e2e 32, integration 97 tệp                                                                                                                                                                                                                                   |
+| `pnpm rules:check`, `pnpm rules:format`, `git diff --check` trên cây tài liệu cuối     | exit 0: rules 197 tệp/1 553 link/0 lỗi (gồm link/anchor của 12 hạng mục mới và scope map); format sạch; `git diff --check` sạch; tệp mới không khoảng trắng cuối dòng/tab; link/anchor của review này, ADR-0007 và `docs/README.md` kiểm riêng bằng slugger của checker: 0 lỗi |
+
+So với báo cáo tác giả (cùng ngày 21/10, trên `5f3b2b3` + cây chưa commit): unit 2 006 và discovery khớp; e2e 811 và
+integration 1 307 khớp số test nhưng lượt này có hai đỏ nêu trên; báo cáo tác giả cũng ghi một lượt integration đỏ ngắt quãng.
+Remote CI của `4e7097f`/`69f4891`: **UNVERIFIED** (chưa có run được kiểm).
+
+## 7. Nghiệp vụ hiện hành (`QĐ-82` → `QĐ-86`) và carry-over
+
+Kiểm lại độc lập tại HEAD (không dựa vào ma trận Prompt 07): Super Admin/IT Admin nhập hồ sơ (`employees.controller.ts:22`,
+`employee-imports.controller.ts:77-208` — chỉ `IT_ADMIN`; D01); Cost Center chỉ `Unit` (enum `CostCenterKind`, 16 chỗ
+OpenAPI; D04, D05, D08); `FREE_EXTERNAL` còn trong **request schema và OpenAPI** (`DeclareApplicationBodyDto.kind`; D09 — bỏ
+khỏi contract, không chỉ từ chối sau parse); **một** Finance đại diện (`role_grants_one_finance`, không có hàng đợi nhiều
+Finance — A01 đúng); tài khoản dịch vụ và quy Cost Center theo `QĐ-86` (D05, D06, D10; Request chưa có — cổng stub).
+
+**Q1 → Q8 và D1 → D4 của báo cáo PR #14** (không mục nào là quyết định Owner):
+
+| Mục | Phân loại                                                                                                                                                                                                        |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Q1  | hết đối tượng — `QĐ-86b` (Owner): `Company` không phải Cost Center; sửa ở `g2-g4-unit-only-cost-attribution`                                                                                                     |
+| Q2  | `QĐ-77m` (Owner) áp khi **thực thi** tác vụ của chính IT Admin — code áp khi nhận/hoàn tất/báo lỗi (`provisioning.policy.ts:145`); vế lúc cấp chờ cổng G5 (`g4-request-and-transfer-integration`) — không phải E |
+| Q3  | cổng G5 phải bảo đảm một lần cấp mỗi Request (`DB-06`) — thiết kế G5, không phải E                                                                                                                               |
+| Q4  | `OQ-D-02` (b)(c) **còn mở** ở Docs với ghi chú _hỏi khi tới G4_; G4 đã giao mà chưa hỏi ⟹ quyết định Owner còn cần trước khi nghiệm thu kênh thủ công (mục 9)                                                    |
+| Q5  | không có AC ⟹ câu hỏi sản phẩm; đưa vào `LD-13` (danh sách hợp đồng) và `DB-13` (dọn tệp)                                                                                                                        |
+| Q6  | khớp `US-07-04` AC-7, AC-8: thử lại tự động dừng ở `maxAttempts`; chỉ quyết định _thử lại_ của IT Admin đặt `attempts` = 0 (`provisioning-decision.service.ts:35`) — không vòng vô hạn tự động                   |
+| Q7  | `OQ-B-09` (không-chặn) còn mở ở Docs — quyết định Owner, không phát sinh từ `QĐ-82` → `QĐ-86`                                                                                                                    |
+| Q8  | công cụ re-seal là phạm vi mới (vận hành) — backlog, không phải E                                                                                                                                                |
+| D1  | khớp `US-02-02` AC-15 (không quyền/Assignment trước ngày vào) + kiểm dòng của import: từ chối dòng không tự dời ngày — hệ quả của AC, Owner có thể đổi                                                           |
+| D2  | đúng nguyên văn `US-01-04` AC-13 (tham số áp cho tác vụ _tạo sau đó_)                                                                                                                                            |
+| D3  | biện pháp kỹ thuật cho `US-04-04` AC-10 (byte đầu PDF/PNG/JPEG); không phải nghiệp vụ; rủi ro từ chối PDF có dữ liệu trước `%PDF-` (Low)                                                                         |
+| D4  | kỹ thuật theo `database-business.md` (bất biến ở CSDL); không cần Owner                                                                                                                                          |
+
+**Carry-over của review độc lập Prompt 07:**
+
+1. **`QĐ-82a` ↔ `FR-5.15`/`US-06-10` — E thật (`BBI-E01`).** Chuỗi nguồn tại `72e1480`: `QĐ-82a` (Owner, `FIN-01` A): trưởng
+   phòng nộp đề xuất _cho năm tài chính sau_. Không `QĐ-*` sau nào viết lại vế này: `QĐ-82l`(3)(4) chỉ định nghĩa _kỳ không còn
+   mở_ = năm đã kết thúc; `QĐ-82m` `INF-04` = A chỉ cấm năm **đã kết thúc** nhận phiên bản; `QĐ-82n` B(ii) cho _lập phiên bản
+   đầu của năm_ khi `NO_ACTIVE_BUDGET`; `QĐ-85c`(2) cho trưởng phòng mới lập đề xuất — đều chỉ **ngầm** cần đề xuất năm đang chạy.
+   `FR-5.15`(1) ghi _cho một năm tài chính_ và `US-06-10` AC-9 ghi _năm chưa kết thúc, kể cả năm đang chạy_, cả hai dẫn
+   `QĐ-82a`/`INF-04`. Gói quyết định ở [business-baseline-impact-2026-10-22](../../workspace/items/business-baseline-impact-2026-10-22/spec.md#nhóm-e--mâu-thuẫn-cần-owner-quyết).
+   G5 thiết kế ngân sách (`BBI-C01`) **không** `ready` tới khi Owner quyết.
+2. **ADR-0007 — đã xử lý.** Xác minh `src/core/money` (`money.ts`, `convert.ts`, `rate.ts`, `tax-estimate.ts`), bảng
+   `currencies`/`exchange_rates`, cột giá + ảnh chụp của `subscriptions` (`20261020150000`), facade `FinanceService`; ví dụ M1–M18
+   có test (unit `convert/money/rate.spec`, integration M2/M16 `finance-money-facade`, M17 = `US-04-05` AC-7 ở
+   `subscription-http`); M13 hiện là 422 `VALIDATION_ERROR` của schema + CHECK, không có mã `MONEY_INCOMPLETE`; `tax-estimate.ts:69`
+   dùng `Number()` trên phần nguyên có biên của tỷ lệ phần trăm (không mất chính xác; lệch chữ của ADR §3 — Low, ghi ở ADR).
+   Đã thêm annotation trạng thái implement vào ADR (không sửa quyết định/lịch sử) và sửa dòng chỉ mục ở `docs/README.md`.
+3. **Tracker — đã đối chiếu.** `BE-WORKSTREAM-TRACKER.md` ghi Prompt 07 `verified-local`, chờ Owner review/commit — đúng cây làm
+   việc; cập nhật hàng Prompt 08 và mốc tiếp theo, không ghi acceptance.
+4. **Ba quyết định thiết kế của Prompt 07 — giữ nguyên, chưa chọn:** (a) cách xử lý dữ liệu Cost Center `COMPANY` đã ghi
+   (A đề xuất: kiểm kê, từ chối khi không ánh xạ được, bỏ giá trị enum; B: giữ chỉ đọc) — chặn `g2-g4-unit-only-cost-attribution`;
+   (b) miền hợp lệ của thời hạn chờ trình duyệt chi (mặc định 2 ngày làm việc, đề xuất 1–30) — chặn
+   `g2-fiscal-year-operating-parameters`; (c) Employee intake có được giao trước hộp thông báo của AC-17 không ((a) đề xuất: làm,
+   Audit Trail là dấu vết tạm, không lên `main` trước khi AC-17 có lời giải; (b) kéo hộp thông báo tối thiểu lên trước; (c) giữ
+   lại) — chặn `g2-employee-intake-by-super-admin`.
+
+## 8. Gói remediation theo thứ tự phụ thuộc
+
+Không implement trong review này. Mỗi gói chỉ `ready` sau Owner review spec/plan của chính nó.
+
+| Thứ tự | Gói                                                                                                                                                                                                                                                       | Finding                                              | Phụ thuộc / điều kiện                                                               |
+| ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| 0      | Owner quyết (mục 9)                                                                                                                                                                                                                                       | `BBI-E01`, 3 điểm Prompt 07, `OQ-D-02`, `LD-13`      | —                                                                                   |
+| 1      | [delivery-gate-hardening](../../workspace/items/delivery-gate-hardening/spec.md)                                                                                                                                                                          | `GATE-01`, `GATE-02`, `DB-05`, `DB-15` → `DB-17`     | Owner đồng ý `.gitattributes`                                                       |
+| 2      | [api-list-detail-contract-remediation](../../workspace/items/api-list-detail-contract-remediation/spec.md)                                                                                                                                                | `LD-R1` → `LD-R3`                                    | gói 1 (nếu gate đọc `openapi.json`)                                                 |
+| 3      | [finance-reporting-currency-integrity](../../workspace/items/finance-reporting-currency-integrity/spec.md)                                                                                                                                                | `DB-01`, `DB-02`                                     | migration mới đầu tiên; gói 1 (drift CI)                                            |
+| 4      | [contract-document-upload-integrity](../../workspace/items/contract-document-upload-integrity/spec.md)                                                                                                                                                    | `SEC-01`, `SEC-07`, `SEC-09`, `DB-13`                | Owner chọn A/B bất biến; kho S3/MinIO thật                                          |
+| 5      | [secret-and-upload-hardening](../../workspace/items/secret-and-upload-hardening/spec.md)                                                                                                                                                                  | `SEC-02` → `SEC-06`                                  | Owner chọn hạn mức xem khóa                                                         |
+| 6      | [catalog-licensing-write-integrity](../../workspace/items/catalog-licensing-write-integrity/spec.md)                                                                                                                                                      | `DB-03`, `DB-07` → `DB-11`, `DB-14`                  | gói 1                                                                               |
+| 7      | `g3-catalog-kind-contract-cleanup` → [catalog-application-plan-read-contracts](../../workspace/items/catalog-application-plan-read-contracts/spec.md)                                                                                                     | `BBI-D09`; `LD-04` → `LD-06`                         | cùng route `/applications` — một đợt tái sinh client FE; gói 2                      |
+| 8      | `g2-g4-unit-only-cost-attribution` → [licensing-assignment-read-contracts](../../workspace/items/licensing-assignment-read-contracts/spec.md), [organization-identity-read-contracts](../../workspace/items/organization-identity-read-contracts/spec.md) | `BBI-D04` → `D08`, `D10`; `LD-09` → `LD-12`, `LD-14` | Owner chọn A/B `COMPANY`; gói 2; cùng route `/cost-centers`, `/license-assignments` |
+| 9      | [catalog-subscription-read-model](../../workspace/items/catalog-subscription-read-model/spec.md)                                                                                                                                                          | `LD-01` → `LD-03`                                    | gói 2; sau gói 8 (enum phân bổ)                                                     |
+| 10     | [licensing-provisioning-task-read-contracts](../../workspace/items/licensing-provisioning-task-read-contracts/spec.md), [catalog-standard-toolset-read-batching](../../workspace/items/catalog-standard-toolset-read-batching/spec.md)                    | `LD-08`; `LD-07`                                     | gói 2; Owner chọn định danh người (`LD-13` điểm 5)                                  |
+| 11     | `g2-fiscal-year-operating-parameters` → `g2-employee-intake-by-super-admin` → `g2-employee-official-field-maintenance`                                                                                                                                    | `BBI-D03`, `D01`, `D02`                              | Owner (b), (c) của mục 7.4; `GATE-02` trước intake                                  |
+| —      | `g2-downstream-integration`, bốn khung G3/G4                                                                                                                                                                                                              | phần chờ G5–G8                                       | `blocked`                                                                           |
+| —      | H7 (`DB-04`)                                                                                                                                                                                                                                              | vai PostgreSQL                                       | hoãn tới trước staging/production                                                   |
+
+Prompt 26 (`OPENAPI-EXAMPLE.1`) chạy sau các gói đổi contract (2, 7–10) và mọi finding Medium được Owner chấp nhận đã
+checkpoint; Prompt 27 sau Prompt 26. G5 thiết kế ngân sách chờ `BBI-E01`.
+
+## 9. Chưa kiểm chứng và quyết định Owner còn cần
+
+**Chưa kiểm chứng:** remote CI của `4e7097f`/`69f4891`; kho S3/MinIO thật (test dùng kho trong bộ nhớ — ADR-0014); nguyên nhân
+gốc `GATE-02` (chỉ biết không tái hiện khi chạy riêng); hiệu năng thời gian (cố ý không đo — chỉ đếm câu lệnh/kích thước bằng
+đọc code); vai PostgreSQL production (H7); `pnpm audit` (không chạy trong lượt này); hành vi trên môi trường dùng chung (không
+chạm); số lần N+1 là ước lượng từ code, chưa đo bằng harness (harness là `LD-R3`).
+
+**Quyết định Owner còn cần:**
+
+1. `BBI-E01` — năm của đề xuất ngân sách (gói ở spec Prompt 07, khuyến nghị A).
+2. Ba điểm thiết kế Prompt 07 (mục 7.4).
+3. `OQ-D-02` (b)(c) — bằng chứng kênh thủ công bắt buộc cho mọi kiểu cấp hay chỉ `K5`; đính lúc chuyển hay lúc hoàn tất —
+   trước khi nghiệm thu `g4-provisioning-queue-manual`/`-failure-handling`.
+4. `OQ-B-09` — gói của ứng dụng đã ngừng trong bộ chuẩn.
+5. Bảy điểm `LD-13`: hợp đồng, đề xuất từ điển, trường danh sách thuê bao, payload audit, định danh người trên thẻ, giữ
+   `function` ở danh sách phòng và giới hạn `T-D2` của từ điển.
+6. `.gitattributes` (`delivery-gate-hardening`), phương án bất biến tệp (`contract-document-upload-integrity`), hạn mức xem khóa
+   (`secret-and-upload-hardening`).
+7. ADR-0013, ADR-0014 vẫn Proposed — Owner review/Accepted khi chấp nhận kiến trúc đã merge.
+
+## 10. Review độc lập sau Prompt 08 (22/10/2026)
+
+Lượt review phía Owner đối chiếu báo cáo với cây thật và giữ nguyên kết luận chính. Bằng chứng chạy lại: Docs build
+157 Story/147 active/1.549 AC xanh; `pnpm rules:check` 197 tệp/1.553 link/0 lỗi; `rules:format` và `git diff --check`
+sạch; OpenAPI có 143 operation/159 schema; focused `openapi-export.e2e-spec.ts` tái hiện đúng lỗi LF/CRLF. Các finding
+nghiệp vụ mức High về actor Employee, Cost Center `COMPANY` và `FREE_EXTERNAL` cũng được đối chiếu trực tiếp với code.
+
+Các chỉnh lý bắt buộc đã nhập vào chính gói tài liệu này, không đổi product/test/OpenAPI:
+
+- `contractGet` có detail nên kết luận đúng là `needs-owner-decision`, không phải `missing-detail`;
+- `LD-13` có **bảy** quyết định, bổ sung rõ trường `function` của danh sách Department và business maximum `T-D2`;
+- hạn mức reveal khóa phải dùng bộ đếm PostgreSQL nguyên tử trong cùng transaction; đếm AuditEvent rồi mới ghi có race ở
+  slot cuối và không được dùng;
+- phép ký upload hiện tại được kiểm thực nghiệm có `X-Amz-SignedHeaders=host`; spec phải có test adapter chứng minh type và
+  size thật sự nằm trong điều kiện ký;
+- lựa chọn EOL được thu hẹp thành `openapi.json text eol=lf`; test giữ so byte chính xác, không strip `\r`, không
+  renormalize toàn repo.
+
+Kết luận: Prompt 07/08 đủ làm checkpoint tài liệu sau Owner review. Gói triển khai kế tiếp là Remediation Wave 0, gộp
+`delivery-gate-hardening` và guardrail `api-list-detail-contract-remediation`; chỉ chạy từ baseline đã commit/push, sạch.

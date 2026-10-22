@@ -5,6 +5,16 @@
 - Thiết kế: `blocked`. Owner review: chưa review.
 - Nguồn: Docs `9416fe0` (BRD v3.46, US v0.15 — Story/AC ở bảng Primary Story/AC), BE `57b1e1c`.
 - Nhóm roadmap: G3 và G4 — chỉ là planning container, không phải phạm vi của hạng mục này (xem `## Sizing decision`).
+- _Tác động 22/10/2026 (baseline Docs `72e1480`):_ khung này giữ thêm `US-07-04` AC-15 (`QĐ-83a`). Hướng dẫn _nhánh mua
+  thêm khi hết hạn mức_ và dẫn `US-05-05`, `US-05-07` dưới đây **lỗi thời**: hai Story đó `RETIRED` (`QĐ-82m` C), không có
+  nhánh seat trống chi phí 0, hết hạn mức không chèn bước duyệt chi; cam kết chỉ giải phóng phần chưa chi (`QĐ-83a`,
+  `QĐ-84g`); hợp đồng `GRANT_REQUEST_GATE` cần phòng, Cost Center `Unit`, số tiền/lịch và _một lần cấp mỗi Request_
+  (`QĐ-86a`, câu Q3 của PR #14). Thiết kế lại khi gỡ blocker theo dòng C04, C06, C09 của
+  [ma trận](../business-baseline-impact-2026-10-22/spec.md#ma-trận-tác-động-ae).
+- _Review hậu merge 22/10/2026 (Prompt 08):_ khi gỡ blocker, cổng G5 phải kiểm Request **trong** transaction cấp có khóa
+  và bảo đảm một lần cấp mỗi Request (`DB-06` của
+  [review](../../../reviews/g0-g4-post-merge-review-2026-10-22/README.md#5-bảo-mật-migration-transaction-và-audit); câu Q3
+  của PR #14); vế _thực thi tác vụ cho chính IT Admin lúc cấp_ của `QĐ-77m` (Q2) cũng ở đây.
 - [Kế hoạch](plan.md).
 
 ## Business outcome
@@ -28,7 +38,7 @@ Hoàn tất các AC của G3/G4 cần Request hoặc sự kiện điều chuyể
 | -------- | ------------------------ | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | US-04-10 | AC-5, AC-6, AC-11        | partial  | AC-1→AC-4, AC-7→AC-10, AC-12: `g3-standard-toolset`; AC-1, AC-3: `g4-notification-delivery`                                                                |
 | US-07-01 | AC-1, AC-3, AC-15, AC-16 | partial  | AC-1, AC-2, AC-4→AC-9, AC-11→AC-13, AC-15, AC-17: `g4-provisioning-queue-manual`; AC-14: `g4-seat-baseline-import`; AC-10: `g4-device-dependent-features`  |
-| US-07-04 | AC-4, AC-6, AC-12        | partial  | AC-1→AC-3, AC-6→AC-14: `g4-provisioning-failure-handling`; AC-3, AC-6, AC-12, AC-13: `g4-notification-delivery`; AC-5: `g3-downstream-finance-integration` |
+| US-07-04 | AC-4, AC-6, AC-12, AC-15 | partial  | AC-1→AC-3, AC-6→AC-14: `g4-provisioning-failure-handling`; AC-3, AC-6, AC-12, AC-13: `g4-notification-delivery`; AC-5: `g3-downstream-finance-integration` |
 
 ## Supporting references
 

@@ -15,6 +15,7 @@
 - Thiết kế kế thừa: [G0](../foundation-org-identity-boundary/spec.md) (module `organization`, facade
   `createEmployeeWithPlacement`, giao thức khóa, I-2), R-10/R-11 ở [sources](../../sources.md) (mục _Delta sau baseline: `QĐ-68`_),
   quy ước route quản trị của lát 1b. [Kế hoạch](plan.md).
+- _Tác động 22/10/2026 (baseline Docs `72e1480`, `QĐ-82i`):_ nhập tay nhân viên **mới** do **Super Admin** kèm căn cứ HR (`US-02-02` AC-14, AC-16, AC-18); danh mục chức vụ vẫn do IT Admin (`US-02-07`, AC-7 và AC-12 chỉ đổi actor nhập hồ sơ). Actor `IT_ADMIN` của `POST /employees` trong spec này là hành vi đã giao trên nguồn cũ — sửa forward ở [g2-employee-intake-by-super-admin](../g2-employee-intake-by-super-admin/spec.md); [ma trận](../business-baseline-impact-2026-10-22/spec.md#ma-trận-tác-động-ae).
 
 ## Vấn đề và phạm vi
 

@@ -13,7 +13,7 @@
 
 Mỗi lát: đọc AGENTS.md, CONTRIBUTING.md, [module structure](../../../rules/module-structure.md), rule chuyên đề, mục
 tương ứng của [báo cáo audit](../../../reviews/be-foundation-audit-2026-10-18/README.md) và spec gốc bị sửa. Đối chiếu HEAD
-`dev` thật (không dùng `eae212a`), pin Docs commit đang dùng (hiện `9416fe0`). Hạng mục mới theo mẫu và phải qua
+`dev` thật (không dùng `eae212a`), pin Docs commit đang dùng (hiện `72e1480` theo [sources](../../sources.md) từ 22/10/2026; trước đó `9416fe0`). Hạng mục mới theo mẫu và phải qua
 `pnpm rules:check` (không thêm vào danh sách legacy).
 
 ## Tasks

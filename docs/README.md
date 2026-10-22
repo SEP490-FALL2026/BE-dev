@@ -23,7 +23,8 @@ trong docs/architecture. Các gói triển khai auth/US cũ đã được dọn 
 - [Flat feature layout](decisions/0003-flat-feature-module-layout.md).
 - [Error contract và request ID](decisions/0004-error-contract-availability-and-request-id-trust.md).
 - [Constraint ngoài Prisma](decisions/0005-database-constraints-outside-prisma.md).
-- [Money](decisions/0007-money-representation.md): quyết định thiết kế, chưa implement.
+- [Money](decisions/0007-money-representation.md): Accepted; implement ở `src/core/money` từ lát `g3-money-and-exchange-rates`
+  (PR #14) — annotation trạng thái 22/10/2026 trong ADR; chưa Owner review implementation.
 
 ## Quyết định đề xuất (chưa Accepted)
 
@@ -49,6 +50,16 @@ Trạng thái triển khai của các lát dùng hai ADR trên nằm ở [roadma
 - [Audit kiến trúc toàn bộ `src` H4.0, 19/10/2026](reviews/be-full-src-architecture-audit-2026-10-19/README.md): inventory, finding `A4-01` → `A4-23`, backlog lát nhỏ và quyết định kỹ thuật E1–E9 của Owner; không phải phê duyệt của dev.
 - [Review checkpoint CP-0A, 19/10/2026](reviews/cp0-h1-h3c-checkpoint-review-2026-10-19/README.md): gate và review trước checkpoint `5aac33f`, manifest đường dẫn, finding `CP0-01` → `CP0-10`; không phải phê duyệt của dev.
 - [Kiểm kê chức năng BE và runbook kiểm thử API 20/10/2026](reviews/be-api-manual-verification-2026-10-20/README.md): trạng thái G/US, checklist 60 operation, seed account/role, lệnh vận hành và thứ tự test tay trên HEAD `9a7164a`; không phải nghiệm thu Story.
+
+## Review G2–G4
+
+- [Hoàn tất G2–G4: kiểm kê, quyết định và kế hoạch, 21/10/2026](reviews/g2-g4-completion-2026-10-21/README.md): báo cáo
+  của tác giả PR #14 trên Docs `9416fe0`; claim, D1–D4 và Q1–Q8 được đối chiếu với baseline Docs `72e1480` ở
+  [business-baseline-impact-2026-10-22](workspace/items/business-baseline-impact-2026-10-22/spec.md#đối-chiếu-pr-14-và-trạng-thái-hiện-hành-theo-baseline-mới);
+  không phải nghiệm thu Story, D1–D4/Q1–Q8 không phải quyết định Owner.
+- [Review hậu merge G0→G4 và contract collection/detail, 22/10/2026](reviews/g0-g4-post-merge-review-2026-10-22/README.md):
+  disposition từng lát trên baseline Docs `72e1480`, gate trên cây cuối, ma trận 61 `GET`, finding bảo mật/migration/
+  transaction và gói remediation; không phải nghiệm thu Story.
 
 ## Review dịch EN–VI
 

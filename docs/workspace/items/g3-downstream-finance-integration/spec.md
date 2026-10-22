@@ -5,6 +5,10 @@
 - Thiết kế: `blocked`. Owner review: chưa review.
 - Nguồn: Docs `9416fe0` (BRD v3.46, US v0.15 — Story/AC ở bảng Primary Story/AC), BE `57b1e1c`.
 - Nhóm roadmap: G3 và G4 — chỉ là planning container, không phải phạm vi của hạng mục này (xem `## Sizing decision`).
+- _Tác động 22/10/2026 (baseline Docs `72e1480`):_ khoản cam kết nay tối đa một mỗi (Request, năm tài chính) (`QĐ-84b`,
+  `INV-16`), Finance không ghi nhận sau duyệt (`QĐ-82m` B), mọi chi phí quy về Cost Center `Unit` (`QĐ-86`). Khi gỡ blocker,
+  thiết kế lại các AC của khung theo dòng C01, C02, C05, C14 của
+  [ma trận](../business-baseline-impact-2026-10-22/spec.md#ma-trận-tác-động-ae).
 - [Kế hoạch](plan.md).
 
 ## Business outcome

@@ -5,6 +5,11 @@
 - Thiết kế: `ready`. Owner review: chưa review.
 - Nguồn: Docs `9416fe0` (BRD v3.46, US v0.15 — Story/AC ở bảng Primary Story/AC), BE `57b1e1c`.
 - Nhóm roadmap: G4 — chỉ là planning container, không phải phạm vi của hạng mục này (xem `## Sizing decision`).
+- _Tác động 22/10/2026 (baseline Docs `72e1480`, `QĐ-82m` C, `QĐ-83a`, `QĐ-84g`):_ `US-07-04` AC-4 viết lại — hết hạn mức
+  ở nhà cung cấp **không** chèn bước duyệt chi, IT Admin mua thêm trong phạm vi đã duyệt; AC-6, AC-12 chỉ giải phóng phần
+  cam kết **chưa** phát sinh chi; AC-15 mới (đóng thất bại sau khi đã chi). Các câu dưới về _nhánh mua thêm_ và _giải phóng
+  khoản cam kết_ là hướng dẫn cũ cho phần chờ G5 (`g4-request-and-transfer-integration`); hành vi tác vụ đã giao không đổi
+  — [ma trận](../business-baseline-impact-2026-10-22/spec.md#ma-trận-tác-động-ae).
 - [Kế hoạch](plan.md).
 
 ## Business outcome
@@ -24,9 +29,9 @@ Tác vụ lỗi được phân loại; lỗi vĩnh viễn hoặc hết lượt t
 
 ## Primary Story/AC
 
-| Story    | AC                    | Coverage | Phần còn lại thuộc                                                                                                                                        |
-| -------- | --------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| US-07-04 | AC-1→AC-3, AC-6→AC-14 | partial  | AC-3, AC-6, AC-12, AC-13: `g4-notification-delivery`; AC-4, AC-6, AC-12: `g4-request-and-transfer-integration`; AC-5: `g3-downstream-finance-integration` |
+| Story    | AC                    | Coverage | Phần còn lại thuộc                                                                                                                                               |
+| -------- | --------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| US-07-04 | AC-1→AC-3, AC-6→AC-14 | partial  | AC-3, AC-6, AC-12, AC-13: `g4-notification-delivery`; AC-4, AC-6, AC-12, AC-15: `g4-request-and-transfer-integration`; AC-5: `g3-downstream-finance-integration` |
 
 Phần `partial`, nói rõ vế đã làm và vế còn lại:
 
