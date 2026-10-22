@@ -13,6 +13,7 @@ on:
       - '.dockerignore'
       - 'infra/**'
       - 'openapi.json'
+      - '.gitattributes'
       - 'package.json'
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
@@ -46,6 +47,7 @@ on:
       - '.dockerignore'
       - 'infra/**'
       - 'openapi.json'
+      - '.gitattributes'
       - 'package.json'
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
@@ -136,6 +138,18 @@ jobs:
           END;
           $$;
           SQL
+
+      # DB-16: deploy every committed migration into an empty CI database, then fail when the Prisma schema
+      # describes anything the migrations do not create (a schema change committed without its migration).
+      - name: Check Prisma schema against committed migrations
+        env:
+          PGPASSWORD: ci-integration-only
+          NODE_ENV: development
+          DATABASE_URL: postgresql://ci_integration:ci-integration-only@127.0.0.1:5432/slm_ci_migration_drift
+        run: |
+          docker exec -i -e PGPASSWORD "${{ job.services.postgres.id }}" psql -X -h 127.0.0.1 -U ci_integration -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE slm_ci_migration_drift;'
+          pnpm exec prisma migrate deploy
+          pnpm exec prisma migrate diff --from-config-datasource --to-schema prisma --exit-code
 
       - name: Run isolated PostgreSQL integration tests
         run: pnpm test:integration

@@ -34,14 +34,30 @@ describe('OpenAPI export (spawned process)', () => {
       const result = await runScript('scripts/dev/export-openapi.ts', [output], { cwd, environment: {} });
 
       expect(result).toEqual({ code: 0, stdout: '', stderr: '' });
-      const exported = readFileSync(output, 'utf8');
-      expect(exported).toBe(readFileSync(join(PROJECT_ROOT, 'openapi.json'), 'utf8'));
+      // GATE-01: exact bytes, no line-ending normalization. A CRLF checkout of openapi.json is a wrong artifact, not
+      // an equivalent one; `.gitattributes` pins the file to LF so every checkout holds the exporter's bytes.
+      const exportedBytes = readFileSync(output);
+      const committedBytes = readFileSync(join(PROJECT_ROOT, 'openapi.json'));
+      expect(exportedBytes.includes(0x0d)).toBe(false);
+      expect(committedBytes.includes(0x0d)).toBe(false);
+      expect(exportedBytes.equals(committedBytes)).toBe(true);
+      const exported = exportedBytes.toString('utf8');
       expect(exported).not.toContain('leaked');
       expect(exported).not.toContain('decoy-value');
       expect(exported).not.toMatch(/export-[0-9a-f]{8}/);
     },
     CLI_COLD_START_MS,
   );
+
+  it('pins only openapi.json to LF in the repository attributes (GATE-EOL=A)', () => {
+    const rules = readFileSync(join(PROJECT_ROOT, '.gitattributes'), 'utf8')
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line !== '' && !line.startsWith('#'));
+
+    // Exactly one narrow rule: no repository-wide `* text=auto eol=lf`, no renormalization of unrelated files.
+    expect(rules).toEqual(['openapi.json text eol=lf']);
+  });
 
   it(
     'fails with its own one-line message and leaves no temporary folder when the API graph cannot start',

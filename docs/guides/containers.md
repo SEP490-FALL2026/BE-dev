@@ -83,6 +83,46 @@ file has no Redis service. A host that ran an earlier deploy keeps its `slm-redi
 an orphan; the deploy does not pass `--remove-orphans`) and its volume: remove them by hand when no longer wanted. Compose has no SMTP sink;
 configure a reachable SMTP service separately. SMTP TLS/provider delivery remains unverified.
 
+## Backup before production migrations
+
+`DB-05`, added 22/10/2026 by `delivery-gate-hardening`. The deploy workflow (`.github/workflows/deploy.yml`, step 3.5)
+dumps the production database **before** `prisma migrate deploy`:
+
+- waits for PostgreSQL (`pg_isready`, 60 s), then runs `pg_dump --format=custom --no-owner --no-privileges` inside the
+  `postgres` container over its local socket with that container's own `POSTGRES_USER`/`POSTGRES_DB`; no credential is
+  passed on a command line or printed;
+- writes `<APP_DIR>/backups/postgres/slm-pre-migrate-<UTC yyyyMMddTHHmmssZ>-<short sha>.dump` (directory `0700`,
+  `umask 077`) through a `.partial` file, and keeps it only when it is non-empty and `pg_restore --list` reads it;
+- stops the deploy (exit 1, partial file removed) when `pg_dump` fails, when the dump is empty or unreadable, or when
+  PostgreSQL is not ready — no migration runs and the running containers are not recreated.
+
+There are no down migrations. After a failed or wrong migration, either **roll forward** with a new reviewed migration
+or **restore** the dump taken just before it. A restore is a manual, approved operation: stop `api` and `worker`, restore
+into a new empty database (for example
+`docker compose -f docker-compose.prod.yml exec -T postgres sh -c 'createdb -U "$POSTGRES_USER" slm_restore && pg_restore -U "$POSTGRES_USER" -d slm_restore --no-owner --exit-on-error' < <dump>`),
+check `_prisma_migrations` and the data, then point `DATABASE_URL` at it or swap the databases, and start the image that
+matches that schema. Never restore over the live database in place.
+
+Retention (manual, bounded): the workflow never deletes a backup. `scripts/ops/postgres-backup-retention.sh` keeps the
+10 newest `slm-pre-migrate-<stamp>-<sha>.dump` files **and** every file younger than 30 days (age from the UTC stamp in
+the name) and deletes only older ones beyond those 10. It is a **dry run unless `--apply`**, refuses (exit 2) any
+directory that is not an absolute `…/backups/postgres` path, and never touches another name, a symlink or a `.partial`
+file. Run it from a checkout over SSH; `tr -d '\r'` keeps a Windows (CRLF) checkout runnable on the Linux host:
+
+```bash
+tr -d '\r' < scripts/ops/postgres-backup-retention.sh | ssh <vps> 'bash -s -- --dir /opt/slm/backend/backups/postgres'
+# read the list, then the same command with --apply appended
+```
+
+A dump contains personal data; copy it off the host only to storage with the same access controls as the database.
+
+Verification: the backup block was exercised locally on 22/10/2026 against a disposable PostgreSQL 17 container (success,
+`pg_dump` failure and unreadable-dump cases; the success dump restored with 40 migrations and 58 tables). The retention
+script has tests (`pnpm test:scripts`) and was run on a Linux container through stdin as above. Neither has run on the
+VPS or in a real deploy.
+
+## Local smoke test
+
 For a local container smoke test, explicitly set NODE_ENV=development, database and
 service hostnames and your own development secrets (no public default exists outside NODE_ENV=test);
 do not expose development credentials to a shared environment.

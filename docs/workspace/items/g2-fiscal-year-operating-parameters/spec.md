@@ -3,26 +3,32 @@
 - Phụ trách: chưa phân công.
 - Thiết kế ban đầu bởi: AI theo giao việc Owner (Prompt 07, 22/10/2026).
 - Thiết kế: `draft`. Owner review: chưa review — cần Owner xác nhận miền giá trị của thời hạn chờ trình (mặc định 2 ngày
-  làm việc đã có ở nguồn).
+  làm việc đã có ở nguồn); hợp đồng có biên của `GET /non-working-dates` (`LD-15`, gán ở Prompt 09A ngày 23/10/2026) chưa
+  chọn.
 - Nguồn: Docs `72e1480` (BRD v3.53 `FR-8.2`, `FR-5.1`; `QĐ-82c`, `QĐ-82e`, `QĐ-82l`(23), `QĐ-82m` `INF-13`; `US-01-04`
   AC-7, AC-8, AC-14), BE `69f4891`.
 - Nhóm roadmap: G2 — chỉ là planning container, không phải phạm vi (xem `## Sizing decision`).
-- Finding: `BBI-D03` của [business-baseline-impact-2026-10-22](../business-baseline-impact-2026-10-22/spec.md).
+- Finding: `BBI-D03` của [business-baseline-impact-2026-10-22](../business-baseline-impact-2026-10-22/spec.md); `LD-15`
+  (vế `nonWorkingDateList`) của
+  [review hậu merge](../../../reviews/g0-g4-post-merge-review-2026-10-22/README.md#4-collection-và-detail-api-list-detail1) —
+  finding kỹ thuật đi cùng capability, không phải AC.
 - [Kế hoạch](plan.md).
 
 ## Business outcome
 
 Sau lát này, Super Admin thấy và đặt được _tháng bắt đầu năm tài chính_ (mặc định tháng 1) và _thời hạn chờ trình duyệt
 chi_ (mặc định 2 ngày làm việc); không còn tham số _loại kỳ ngân sách_ và không có tham số ngưỡng giá trị cao — kiểm bằng
-`GET`/`PUT` tham số và Audit Trail.
+`GET`/`PUT` tham số và Audit Trail. Đi kèm (`LD-15`): danh sách ngày nghỉ có biên cho toàn response.
 
 ## Sizing decision
 
 - Container: G2 (nhóm giao việc, không phải ranh giới hạng mục).
 - Mode: `single-story`.
-- Outcome and owner: danh mục tham số khớp `FR-8.2`; capability `operating-parameters`.
+- Outcome and owner: danh mục tham số khớp `FR-8.2`; capability `operating-parameters` (cùng capability giữ biên danh sách
+  ngày nghỉ của `LD-15`).
 - Boundaries: định nghĩa tham số trong `parameter-definitions.ts`; bảng `parameter_values` không đổi lược đồ; HTTP
-  tham số hiện hành; chỉ Super Admin.
+  tham số hiện hành; chỉ Super Admin. `GET /non-working-dates` chỉ đổi phần biên của danh sách (`LD-15`); thêm/sửa/xóa
+  ngày nghỉ không đổi.
 - Not larger: khóa đổi tháng bắt đầu khi đã có phiên bản ngân sách và tham số phiếu báo lỗi cần G5/phiếu báo lỗi — ở khung
   `g2-downstream-integration`.
 - Not smaller: ba AC cùng một danh mục tham số và một test matrix.
@@ -41,6 +47,9 @@ Vế sở hữu: AC-7 trọn AC; AC-8 vế _không có tham số loại kỳ th�
 
 `FR-8.2` (danh sách tham số), `FR-5.1` (kỳ ngân sách là năm tài chính), `QĐ-82l`(23) (đặt một lần, không đổi khi đã có
 phiên bản), `OI-11b` (bị `QĐ-82e` thay); lát gốc [g2-operating-parameters](../g2-operating-parameters/spec.md).
+`LD-15` (vế `nonWorkingDateList`, gỡ mục `nonWorkingDateList#unbounded` khỏi registry của
+`api-list-detail-contract-remediation`): `US-01-04` AC-10 (ngày nghỉ, lát gốc), [rule collection/detail](../../../rules/api-contract.md#collection-và-detail-api-list-detail1)
+điều 3 — một dòng mỗi ngày không phải biên của response khi khoảng năm tùy chọn.
 
 ## Explicit out of scope
 
@@ -50,14 +59,18 @@ lỗi (`US-01-04` AC-15, `US-07-10`, `US-07-11`); dùng thời hạn chờ trìn
 ## Dependencies and blockers
 
 Không blocker kỹ thuật. Owner review spec. G5 phải thêm khóa của AC-8 **trước** khi cho tạo phiên bản ngân sách đầu tiên
-(ghi ở `g2-downstream-integration`).
+(ghi ở `g2-downstream-integration`). Vế `LD-15`: chọn hợp đồng có biên của danh sách ngày nghỉ và Owner duyệt trước khi
+code.
 
 ## Ownership: module, data, API
 
 `src/modules/operating-parameters/parameter-definitions.ts` (+ spec), `operating-parameters.service.ts` (không đổi hành
 vi đọc: khóa không còn định nghĩa bị bỏ qua khi đọc), test `operating-parameters-http.integration-spec.ts`. Không
 migration (giá trị cũ của `BUDGET_PERIOD_KIND` trong `parameter_values` không còn được đọc và giữ làm lịch sử). OpenAPI
-không liệt kê khóa — diff dự kiến rỗng; kiểm lại khi export.
+không liệt kê khóa — diff dự kiến rỗng; kiểm lại khi export. Vế `LD-15`: `operating-parameters.controller.ts`,
+`dto/operating-parameters.dto.ts` (`listNonWorkingDatesQuerySchema`), `non-working-dates.service.ts`,
+`operating-parameters.repo.ts` (`listNonWorkingDates`), `src/api-collection-contract.spec.ts` (gỡ mục); OpenAPI đổi nếu
+query hay response đổi.
 
 ## Behavior and design
 
@@ -68,17 +81,23 @@ không liệt kê khóa — diff dự kiến rỗng; kiểm lại khi export.
   nhận, như cách `OQ-A-05` cho các tham số khác).
 - Không có tham số ngưỡng giá trị cao hay tỷ lệ 50 % (`QĐ-82c`) — có test khẳng định.
 - Mọi thay đổi ghi Audit Trail trước/sau như hiện hành. Transaction, concurrency: như hiện hành.
-- Tương thích: client đọc `BUDGET_PERIOD_KIND` phải bỏ; báo FE.
+- **Danh sách ngày nghỉ có biên (`LD-15`, vế `nonWorkingDateList`):** khóa duy nhất cho một dòng mỗi ngày, nhưng `from` và
+  `to` tùy chọn và không phân trang — gọi không khoảng trả mọi năm đã ghi, nên response không có biên. Gỡ mục registry khi có
+  **một** trong: phân trang thật (`pageSize` có `maximum`, thứ tự tất định), trần cứng của **toàn response**, hoặc bắt buộc cả
+  `from` lẫn `to` kèm khoảng tối đa chứng minh được. Hợp đồng nào **chưa chọn** — người phụ trách đề xuất, Owner duyệt.
+- Tương thích: client đọc `BUDGET_PERIOD_KIND` phải bỏ; báo FE. Nếu danh sách ngày nghỉ bắt buộc khoảng hoặc phân trang thì
+  đổi wire (FE).
 
 ## Test matrix
 
-| AC / rủi ro      | Tình huống (gồm từ chối, edge case)           | Cấp test           | Kết quả mong đợi                                              | Bằng chứng sau implement |
-| ---------------- | --------------------------------------------- | ------------------ | ------------------------------------------------------------- | ------------------------ |
-| `US-01-04` AC-7  | hệ thống mới: danh sách mặc định              | unit + integration | SLA 2, N 5, tháng bắt đầu 1, chờ trình 2, rà soát 5, giữ gỡ 1 | chưa chạy                |
-| `US-01-04` AC-8  | tìm/đặt `BUDGET_PERIOD_KIND`; đặt tháng 13, 0 | integration        | không có khóa loại kỳ; ngoài miền ⟹ 422                       | chưa chạy                |
-| `US-01-04` AC-14 | tìm tham số ngưỡng giá trị cao                | integration        | không có                                                      | chưa chạy                |
-| hồi quy          | giá trị `BUDGET_PERIOD_KIND` đã lưu từ trước  | integration        | không trả, không lỗi                                          | chưa chạy                |
-| quyền            | IT Admin, Finance đặt tham số                 | integration        | 403 như AC-6                                                  | chưa chạy                |
+| AC / rủi ro      | Tình huống (gồm từ chối, edge case)                                          | Cấp test           | Kết quả mong đợi                                                                   | Bằng chứng sau implement |
+| ---------------- | ---------------------------------------------------------------------------- | ------------------ | ---------------------------------------------------------------------------------- | ------------------------ |
+| `US-01-04` AC-7  | hệ thống mới: danh sách mặc định                                             | unit + integration | SLA 2, N 5, tháng bắt đầu 1, chờ trình 2, rà soát 5, giữ gỡ 1                      | chưa chạy                |
+| `US-01-04` AC-8  | tìm/đặt `BUDGET_PERIOD_KIND`; đặt tháng 13, 0                                | integration        | không có khóa loại kỳ; ngoài miền ⟹ 422                                            | chưa chạy                |
+| `US-01-04` AC-14 | tìm tham số ngưỡng giá trị cao                                               | integration        | không có                                                                           | chưa chạy                |
+| hồi quy          | giá trị `BUDGET_PERIOD_KIND` đã lưu từ trước                                 | integration        | không trả, không lỗi                                                               | chưa chạy                |
+| quyền            | IT Admin, Finance đặt tham số                                                | integration        | 403 như AC-6                                                                       | chưa chạy                |
+| `LD-15`          | ngày nghỉ ghi trải nhiều năm, gọi không khoảng hoặc khoảng vượt biên đã chọn | integration        | response không vượt biên đã chọn; mục `nonWorkingDateList#unbounded` gỡ, gate xanh | chưa chạy                |
 
 ## Definition of Done
 
@@ -91,3 +110,6 @@ không liệt kê khóa — diff dự kiến rỗng; kiểm lại khi export.
 ## Changes and acceptance
 
 22/10/2026: lập theo Prompt 07. Chưa code, chưa review, chưa nghiệm thu.
+
+23/10/2026 (Prompt 09A): nhận vế `nonWorkingDateList` của `LD-15` theo Owner review `LD-R2-RV-01` (mục registry chuyển
+`bounded` → `unbounded`). Chưa chọn hợp đồng, chưa code.

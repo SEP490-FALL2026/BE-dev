@@ -7,7 +7,8 @@
 
 ## Before coding
 
-Đối chiếu spec với BE revision lúc bắt đầu; xác nhận miền giá trị thời hạn chờ trình với Owner.
+Đối chiếu spec với BE revision lúc bắt đầu; xác nhận miền giá trị thời hạn chờ trình với Owner; ghi hợp đồng có biên đã
+được Owner duyệt cho danh sách ngày nghỉ (`LD-15`).
 
 ## Tasks
 
@@ -19,6 +20,16 @@
 - Acceptance: `US-01-04` AC-7, vế không có loại kỳ của AC-8, AC-14.
 - Verify: test đổi trước để đỏ trên code cũ; `pnpm check`; `pnpm test:integration` suite tham số; `pnpm openapi:export`
   (mong không diff).
+
+### Task 2: danh sách ngày nghỉ có biên toàn response
+
+- Files: `operating-parameters.controller.ts`, `dto/operating-parameters.dto.ts`, `non-working-dates.service.ts`,
+  `operating-parameters.repo.ts`, `test/integration/operating-parameters-http.integration-spec.ts`,
+  `src/api-collection-contract.spec.ts` (gỡ mục `nonWorkingDateList#unbounded`), `openapi.json` (sinh) nếu đổi wire.
+- Depends on: hợp đồng đã được Owner duyệt (phân trang thật, trần cứng của toàn response, hoặc bắt buộc cả hai đầu khoảng
+  kèm khoảng tối đa — chưa chọn).
+- Acceptance: `LD-15` (vế `nonWorkingDateList`).
+- Verify: test đỏ trước với ngày nghỉ trải nhiều năm; gate collection xanh sau khi gỡ mục; `pnpm openapi:export` review diff.
 
 ### Checkpoint
 

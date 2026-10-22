@@ -2,8 +2,11 @@
 
 - Phụ trách: chưa phân công (đề xuất: người giữ gate kiến trúc/OpenAPI).
 - Thiết kế ban đầu bởi: AI theo giao việc Owner (Prompt 08, 22/10/2026).
-- Thiết kế: `draft`. Owner review: chưa review — cần Owner xem bảy điểm _Cần Owner quyết_ ở cuối mục _Behavior and
-  design_ trước khi các hạng mục capability chuyển `ready`.
+- Thiết kế: `draft`. Owner review: Owner review kết quả Prompt 09 (23/10/2026) mở `LD-R2-RV-01` — hai mục `bounded` không có
+  biên toàn response — sửa ở Prompt 09A; review tiếp mở `LD-R2-RV-02` (mảng lồng chưa kiểm đệ quy) và `LD-R2-RV-03`
+  (maximum chưa đối chiếu nguồn) — sửa ở Prompt 09B, cùng checkpoint; chưa có Owner review cuối. Owner giao triển khai `LD-R1` → `LD-R3`
+  qua Prompt 09 (22/10/2026) — giao việc, không phải review; bảy điểm _Cần Owner quyết_ ở cuối mục _Behavior and design_
+  **vẫn mở** và vẫn chặn các hạng mục capability tương ứng.
 - Nguồn: Docs `72e1480` (BRD v3.53, US v0.15), BE `69f4891`; bằng chứng ở
   [review hậu merge G0–G4](../../../reviews/g0-g4-post-merge-review-2026-10-22/README.md#4-collection-và-detail-api-list-detail1).
 - Nhóm roadmap: xuyên module — hạng mục này là `technical-enabler` (xem `## Sizing decision`).
@@ -34,11 +37,12 @@ và gate đỏ khi một collection mới vi phạm — kiểm bằng `pnpm chec
 
 ## Primary Story/AC
 
-| Story | AC      | Coverage | Phần còn lại thuộc                                                                             |
-| ----- | ------- | -------- | ---------------------------------------------------------------------------------------------- |
-| —     | `LD-R1` | n/a      | gỡ chặn `catalog-application-plan-read-contracts`, `catalog-subscription-read-model`           |
-| —     | `LD-R2` | n/a      | gỡ chặn `catalog-standard-toolset-read-batching`, `licensing-provisioning-task-read-contracts` |
-| —     | `LD-R3` | n/a      | gỡ chặn `licensing-assignment-read-contracts`, `organization-identity-read-contracts`          |
+| Story | AC      | Coverage | Phần còn lại thuộc                                                                                |
+| ----- | ------- | -------- | ------------------------------------------------------------------------------------------------- |
+| —     | `LD-R1` | n/a      | gỡ chặn `catalog-application-plan-read-contracts`, `catalog-subscription-read-model`              |
+| —     | `LD-R2` | n/a      | gỡ chặn `catalog-standard-toolset-read-batching`, `licensing-provisioning-task-read-contracts`    |
+| —     | `LD-R3` | n/a      | gỡ chặn `licensing-assignment-read-contracts`, `organization-identity-read-contracts`             |
+| —     | `LD-16` | n/a      | vế `onboardingChecklistGet#steps.warnings` giữ ở đây tới khi Owner chọn gói chủ (mục _Mảng lồng_) |
 
 `LD-R1` = rule trong `docs/rules/api-contract.md`; `LD-R2` = inventory gate + registry ngoại lệ chính xác; `LD-R3` =
 harness đặc tả projection và số query của repository danh sách.
@@ -46,7 +50,8 @@ harness đặc tả projection và số query của repository danh sách.
 ## Supporting references
 
 - Review: [mục 4](../../../reviews/g0-g4-post-merge-review-2026-10-22/README.md#4-collection-và-detail-api-list-detail1) —
-  ma trận đủ 61 `GET`, defect `LD-01` → `LD-14`.
+  ma trận đủ 61 `GET`, defect `LD-01` → `LD-14`; `LD-15` (hai mục `bounded` sai) thêm từ Owner review Prompt 09; `LD-16`
+  (mảng lồng không biên chưa có finding) thêm ở Prompt 09B.
 - Rule hiện có: [API contract](../../../rules/api-contract.md) (không có quy tắc collection),
   [database và nghiệp vụ](../../../rules/database-business.md) (đếm + trang cùng snapshot, thứ tự có khóa phụ).
 - Gate cùng họ: `test/e2e/api-inventory.e2e-spec.ts`, `src/architecture-structure.spec.ts` (ledger chỉ được co lại).
@@ -64,13 +69,16 @@ spec; các điểm _Cần Owner quyết_ chặn riêng hạng mục capability t
 
 ## Ownership: module, data, API
 
-- `docs/rules/api-contract.md` (mục _Collection và detail_ mới).
-- Gate mới `src/api-collection-contract.spec.ts` (unit, chạy trong `pnpm check`) đọc tài liệu OpenAPI dựng trong bộ nhớ
-  như `test/e2e/api-inventory.e2e-spec.ts` hoặc đọc `openapi.json` đã commit (chọn khi `ready`; đọc artifact thì phải chuẩn
-  hóa xuống dòng — xem `delivery-gate-hardening`), cùng registry `src/api-collection-contract.registry.ts`.
-- Harness `test/support/query-count.ts`: đếm câu lệnh qua event `query` của Prisma client dựng riêng cho test, hoặc qua
-  `pg_stat_statements` của database dùng riêng; không đổi `PrismaService` sản phẩm.
-- Không đổi route, DTO, Prisma schema hay migration.
+- `docs/rules/api-contract.md` — mục [Collection và detail](../../../rules/api-contract.md#collection-và-detail-api-list-detail1)
+  là nguồn chuẩn của quy tắc (bản trong spec này là thiết kế gốc); `docs/workspace/_template/spec.md` một đoạn nhắc.
+- Gate `src/api-collection-contract.spec.ts` (unit, chạy trong `pnpm check`) đọc `openapi.json` đã commit — an toàn vì
+  `GATE-01` của `delivery-gate-hardening` ghim artifact về LF và test export so đúng byte với bản sinh từ controller.
+  **Lệch kế hoạch có chủ đích:** registry nằm **trong** tệp gate (như `LEGACY` của `architecture-structure.spec.ts`), không ở
+  `src/api-collection-contract.registry.ts`: một `.ts` không phải spec trong `src/` sẽ được build vào `dist`.
+- Harness `test/support/query-count.ts` đọc lưu lượng qua `PgRelay.observe` (relay sẵn có, thêm theo dõi **mỗi lần thực thi**:
+  Query hoặc Execute của portal đã Bind, không đọc giá trị bind); không đổi `PrismaService`, không thêm dependency, không cần
+  `pg_stat_statements`. Mẫu: `test/integration/query-count-harness.integration-spec.ts`.
+- Không đổi route, DTO, Prisma schema, migration hay query sản phẩm.
 
 ## Behavior and design
 
@@ -134,13 +142,20 @@ export const applicationListItemSchema = applicationSchema; // bí danh che vi�
 
 - Nguồn sự thật: mọi operation `GET` của tài liệu OpenAPI dựng từ controller. Một operation là _collection_ khi schema
   `data` có `items: array` hoặc là mảng ở gốc; gate không đoán theo tên method.
-- Mỗi collection phải: (a) có `pageSize` với `maximum` **hoặc** một mục registry `bounded` có `businessMaximum` + nguồn
-  (AC/FR/CHECK); (b) item schema không trùng cấu trúc với schema của một operation detail cùng resource, **hoặc** một mục
+- Mỗi collection phải: (a) có `pageSize` với `maximum` **hoặc** một mục registry `bounded` có `businessMaximum` — `maxItems`
+  số nguyên dương của toàn response + nguồn (AC/FR/hằng số/CHECK); biên theo cha/năm/nhóm không đủ (`LD-15`); (b) item schema không trùng cấu trúc với schema của một operation detail cùng resource, **hoặc** một mục
   registry `detail-reuse` ghi đúng `operationId`, lý do, chủ, điều kiện gỡ; (c) có tên schema riêng trong code (component
   `…SummaryDto`/`…ListItemDto` hoặc mục registry).
 - Registry khởi đầu = đúng các vi phạm còn sau review (bảng dưới); mỗi mục mang tên hạng mục capability gỡ nó. Gate đỏ khi
   thêm collection mới vi phạm, khi một mục registry không còn khớp operation (đã sửa mà quên gỡ), hoặc khi mục thiếu
-  trường. Registry chỉ được co lại (như legacy ledger kiến trúc).
+  trường. Registry chỉ được co lại (như legacy ledger kiến trúc). `detail-reuse.maxItems` phải bằng đúng `pageSize.maximum`
+  của operation (`LD-R2-RV-03`, Prompt 09B).
+- **Mảng lồng (Prompt 09B, `LD-R2-RV-02`):** gate đi đệ quy mọi mảng dưới `data` của mọi `GET` — item của collection, phần
+  còn lại của `data`, detail, object, union, map, item của mảng khác; `$ref` có chặn vòng lặp — và đối chiếu với registry
+  chính xác `NESTED_ARRAYS` khóa `operationId#path` (thay `RESOURCE_ARRAYS` nông và phân loại `nested-bound`). Mỗi mảng
+  đúng một mục: `bounded` (`maxItems` + nguồn chính xác, bằng `maxItems` của schema nếu có), `unbounded` (finding + chủ),
+  `owner-decision` (`LD-13`). `INITIAL_NESTED_ARRAYS` đóng băng khóa **kèm phân loại**: thêm khóa hay đổi phân loại cần
+  quyết định Owner.
 - Gate DTO không phát hiện nạp thừa ở query; vì vậy mỗi hạng mục capability thêm test đặc tả bằng harness `LD-R3`.
 
 ### Harness projection/số query (`LD-R3`)
@@ -152,6 +167,38 @@ export const applicationListItemSchema = applicationSchema; // bí danh che vi�
   (3) kích thước body ≤ biên khai trong spec. Không công bố ngưỡng thời gian.
 
 ### Registry khởi đầu (vi phạm còn sau review, mỗi mục một chủ)
+
+Bảng thiết kế gốc (Prompt 08) giữ nguyên dưới đây để truy vết. **Registry thật** (Prompt 09) là `COLLECTION_EXCEPTIONS` trong
+gate: sau Prompt 09A **35 mục** trên 28 operation (`detail-reuse` 4 · `detail-projection` 2 · `unbounded` 5 · `bounded` 5 ·
+`nested-bound` 1 · `query` 11 · `owner-decision` 7); **sau Prompt 09B 34 mục trên 27 operation** — mục
+`vendorTaxProfileHistory#nested-bound` chuyển thành `vendorTaxProfileHistory#lines` của `NESTED_ARRAYS` (67 mục, mục
+_Mảng lồng_ dưới). Khác bảng gốc, đều do inventory chính xác phát hiện trên `openapi.json` hoặc do Owner review:
+
+- **Prompt 09A (`LD-R2-RV-01` → `LD-15`):** `departmentWarningList` và `nonWorkingDateList` sửa từ `bounded` sang `unbounded`.
+  Tối đa hai cảnh báo **mỗi phòng đang hoạt động** không chặn response vì số phòng không có trần; một dòng mỗi ngày (khóa duy
+  nhất) không chặn response vì `from`/`to` tùy chọn — gọi không khoảng trả mọi năm đã ghi. Chủ gỡ: lần lượt
+  `organization-identity-read-contracts` và `g2-fiscal-year-operating-parameters`; gỡ khi có phân trang thật hoặc trần cứng
+  của toàn response (với ngày nghỉ, bắt buộc cả hai đầu khoảng kèm khoảng tối đa chứng minh được cũng hợp lệ). Hợp đồng nào
+  chưa chọn, chưa hiện thực. Cùng lượt, `businessMaximum` đổi từ câu chữ `limit` sang `maxItems` (số nguyên dương) +
+  `source`; gate từ chối 0, số âm, số lẻ, `NaN`, vô hạn, chuỗi, thiếu giá trị và nguồn rỗng. Đây là hai thay đổi khóa duy nhất
+  của `INITIAL_EXCEPTION_KEYS`, do Owner cho phép.
+
+- **Thêm** `applicationBusinessOwnerHistory` (`unbounded`, `LD-06`) và `operatingParameterList` (`bounded`, 15 định nghĩa) —
+  không phân trang nhưng bảng gốc không ghi.
+- `standardToolsetList`/`History` có thêm mục `detail-reuse` (item trùng hình `standardToolsetGet.toolset`), ngoài `query`.
+- `vendorGroupList` và `vendorSuggestionList` **không** ghi `bounded`: biên `T-D2` chỉ là giả định (điểm 7) ⟹
+  `owner-decision` và `unbounded`.
+- Bảy quyết định `LD-13` có mục trên operation tương ứng (điểm 1 — danh sách hợp đồng — chưa có operation nên không có mục);
+  Prompt 09 ghi `vendorTaxProfileHistory` là `nested-bound` (`lines` ≤ 20) — từ 09B là mục của `NESTED_ARRAYS`.
+- Prompt 09: ngoài registry, gate có hai danh sách chính xác: `NON_ENVELOPE_COLLECTIONS` (`vendorSuggestionList` →
+  `candidates`) và `RESOURCE_ARRAYS` (13 operation không phải collection, 22 mảng ở đỉnh `data`). _Đính chính 09B:_
+  `RESOURCE_ARRAYS` chỉ thấy mảng nông và phân loại `nested-bound` chỉ có một mục, nên mảng lồng mới hay sâu hơn qua được
+  gate (`LD-R2-RV-02`); cả hai được thay bằng inventory đệ quy + `NESTED_ARRAYS`. `NON_ENVELOPE_COLLECTIONS` giữ nguyên.
+
+Giới hạn: gate không thấy query (N+1, phân trang trong bộ nhớ, đếm ngoài snapshot) — các mục `query` chỉ được gỡ khi hạng mục chủ
+chứng minh bằng harness. OpenAPI hiện không khai `maxItems` cho mảng lồng nào, nên biên của 56 mục `bounded` nằm ở nguồn ngoài
+schema (hằng số, validation, ràng buộc CSDL, cách code dựng mảng) — gate không đọc nguồn đó; điều kiện xem lại của mỗi mục
+kích hoạt ở thay đổi đầu tiên của nguồn (`LD-R2-RV-03`).
 
 | `operationId`                       | Vi phạm                                                        | Chủ gỡ                                       |
 | ----------------------------------- | -------------------------------------------------------------- | -------------------------------------------- |
@@ -171,12 +218,66 @@ export const applicationListItemSchema = applicationSchema; // bí danh che vi�
 | `costCenterEmployeeList`            | đếm + trang ngoài một snapshot                                 | `organization-identity-read-contracts`       |
 
 Ngoại lệ `bounded` có chủ thật (không gỡ, ghi lý do và điều kiện xem lại): `currencyList` (11 mã seed, không route ghi —
-chủ `g3-money-and-exchange-rates`); `departmentWarningList` (≤ 2 × số phòng đang hoạt động — `g2-department-profile`);
-`approvalRoleList` (3 vai, lịch sử ≤ 20 — `g2-approval-roles`); `operatingParameterHistory` (20 mới nhất theo spec —
-`g2-operating-parameters`); `nonWorkingDateList` (khoảng ngày — `g2-operating-parameters`); `accountCandidatesList`
+chủ `g3-money-and-exchange-rates`); ~~`departmentWarningList` (≤ 2 × số phòng đang hoạt động — `g2-department-profile`)~~ —
+sai, nay `unbounded` (`LD-15`); `approvalRoleList` (3 vai, lịch sử ≤ 20 — `g2-approval-roles`); `operatingParameterHistory`
+(20 mới nhất theo spec — `g2-operating-parameters`); ~~`nonWorkingDateList` (khoảng ngày — `g2-operating-parameters`)~~ —
+sai, nay `unbounded` (`LD-15`); `accountCandidatesList`
 (picker ≤ 20 — `us-01-account-invitation-activation`); `vendorGroupList` (từ điển dùng chung, biên theo giả định `T-D2`,
 cần Owner xác nhận — `g3-vendor-dictionary`); `vendorSuggestionList` (gợi ý theo tên — `g3-vendor-dictionary`);
 `vendorTaxProfileHistory` (phân trang, item là phiên bản đủ dòng ≤ 20 — `g3-vendor-tax-profile`).
+
+### Mảng lồng (Prompt 09B, `LD-R2-RV-02`, `LD-R2-RV-03`)
+
+Inventory đệ quy trên `openapi.json` (`6508c953…`, 61 `GET`: 37 collection, 24 khác) có **104 mảng**: **37 mảng collection**
+cấp trên cùng (`data`, `data.items` hoặc `data.candidates`) và **67 mảng lồng** — 25 trong item collection (22 trực tiếp, 3
+sâu hơn), 1 trong phần còn lại của `data` collection (`departmentToolsInUse#data.summary`), 41 trong detail. Kiểm bằng một
+script độc lập với gate: không thiếu, không thừa khóa nào. `NESTED_ARRAYS` có 67 mục: `bounded` 56 · `unbounded` 10 ·
+`owner-decision` 1. Nguồn từng biên (hằng số, validation, ràng buộc CSDL, cách code dựng mảng) đã đọc tận nơi; không biên
+nào lấy từ cỡ dữ liệu dự kiến, fixture, tính duy nhất theo cha/ngày hay query không có giới hạn cứng.
+
+Mục không `bounded` (11):
+
+| Khóa                                                         | Phân loại        | Finding | Chủ                                       |
+| ------------------------------------------------------------ | ---------------- | ------- | ----------------------------------------- |
+| `departmentGet#projects`                                     | `unbounded`      | `LD-12` | `organization-identity-read-contracts`    |
+| `appUserGet#roleHistory`                                     | `unbounded`      | `LD-14` | `organization-identity-read-contracts`    |
+| `applicationGet#similarApplications`                         | `unbounded`      | `LD-06` | `catalog-application-plan-read-contracts` |
+| `planTermsGet#opinions`                                      | `unbounded`      | `LD-06` | `catalog-application-plan-read-contracts` |
+| `applicationRetirementGet#retirement.confirmations`          | `unbounded`      | `LD-06` | `catalog-application-plan-read-contracts` |
+| `applicationRetirementGet#retirement.blockers.assignments`   | `unbounded`      | `LD-06` | `catalog-application-plan-read-contracts` |
+| `applicationRetirementGet#retirement.blockers.subscriptions` | `unbounded`      | `LD-06` | `catalog-application-plan-read-contracts` |
+| `departmentToolsInUse#data.summary`                          | `unbounded`      | `LD-09` | `licensing-assignment-read-contracts`     |
+| `planTermsGet#warnings`                                      | `unbounded`      | `LD-16` | `catalog-subscription-read-model`         |
+| `onboardingChecklistGet#steps.warnings`                      | `unbounded`      | `LD-16` | `api-list-detail-contract-remediation`    |
+| `vendorGroupList#serviceLines`                               | `owner-decision` | `LD-13` | `api-list-detail-contract-remediation`    |
+
+**`LD-16`** — mảng lồng không biên mà chưa finding nào phủ, hai vế:
+
+1. `planTermsGet#warnings` — một cảnh báo `TERMS_REVIEW_DUE` cho mỗi thuê bao đang chạy của gói (`warningsFor` trong
+   `plan-terms.service.ts`); số thuê bao của một gói không có trần. Chủ: `catalog-subscription-read-model` (đã giữ phần cảnh
+   báo điều khoản của `catalog/plan-terms` — `warningsFor` chung với `planWarningList`, `LD-02`).
+2. `onboardingChecklistGet#steps.warnings` — bước 1 liệt kê `MISSING_HEAD`, `MISSING_IT_ADMIN` cho mỗi phòng đang hoạt
+   động; số phòng không có trần (cùng bản chất với `departmentWarningList`, `LD-15`). Không gói remediation hiện có nào sở
+   hữu module `onboarding` một cách trung thực, nên vế này **giữ ở hạng mục này**. Ánh xạ gói tương lai cần Owner chốt: gói
+   nhận phải đi cùng hợp đồng biên của cảnh báo phòng mà `organization-identity-read-contracts` chọn cho `LD-15`, và sửa
+   `modules/onboarding` (lát gốc `g2-onboarding-checklist`) — hoặc mở rộng phạm vi `organization-identity-read-contracts`,
+   hoặc một gói remediation riêng cho onboarding. Không gộp vào hạng mục Story `g2-onboarding-checklist`.
+
+Hợp đồng của cả hai vế (biên chứng minh được hay dạng phân trang) **chưa chọn, chưa hiện thực**.
+
+Mục `bounded` theo chủ nguồn: `g2-employee-import-preview-confirm` 8, `g3-subscription-purchase` 6, `g2-department-profile` 5,
+`us-01-bootstrap-login-session` 4, `g3-standard-toolset` 4, `g3-vendor-tax-profile` 4, `g3-vendor-dictionary` 3,
+`g2-operating-parameters` 3, `g3-catalog-entry` 3, `g2-onboarding-checklist` 3, `g4-provisioning-queue-manual` 2,
+`g4-provisioning-failure-handling` 2, `g4-seat-baseline-import` 2, `g3-shared-cost-allocation` 2,
+`us-01-account-invitation-activation` 2, `us-01-audit-trail-query` 1, `g3-plan-declaration` 1, `g2-approval-roles` 1 — danh
+sách đủ, nguồn và điều kiện xem lại nằm trong `NESTED_ARRAYS`. Hai mục `bounded` còn mang `LD-14` (thiếu `hasMore`, không
+phải thiếu biên): `departmentGet#headHistory` (50), `approvalRoleList#history` (20).
+
+**Đối chiếu biên (`LD-R2-RV-03`):** `detail-reuse.maxItems` của bốn mục bằng `pageSize.maximum` 100 (gate so); điều kiện xem
+lại của `currencyList` (mọi thêm/bớt mã, route ghi, đổi tập seed), `operatingParameterList` (mọi thêm/bớt định nghĩa, đổi
+`parameter-definitions.ts`), `approvalRoleList` (`APPROVAL_ROLES`), `operatingParameterHistory` (`HISTORY_LIMIT`),
+`accountCandidatesList` (`CANDIDATE_LIMIT`) và mọi mục `NESTED_ARRAYS` nêu đúng hằng số, enum, validation hay tập dữ liệu
+nguồn.
 
 ### Cần Owner quyết (chặn hạng mục capability tương ứng, không chặn hạng mục này)
 
@@ -197,25 +298,46 @@ cần Owner xác nhận — `g3-vendor-dictionary`); `vendorSuggestionList` (g�
 
 ## Test matrix
 
-| AC / rủi ro     | Tình huống (gồm từ chối, edge case)                                                 | Cấp test    | Kết quả mong đợi                         | Bằng chứng sau implement |
-| --------------- | ----------------------------------------------------------------------------------- | ----------- | ---------------------------------------- | ------------------------ |
-| `LD-R2`         | collection mới dùng schema của detail, không có mục registry                        | unit        | gate đỏ, nêu `operationId` và schema     | chưa chạy                |
-| `LD-R2`         | collection không có `pageSize.maximum` và không có mục `bounded`                    | unit        | gate đỏ                                  | chưa chạy                |
-| `LD-R2`         | mục registry còn sau khi hạng mục capability đã sửa operation                       | unit        | gate đỏ: mục thừa phải gỡ                | chưa chạy                |
-| `LD-R2`         | mục registry dùng glob/hậu tố hoặc thiếu chủ/lý do/điều kiện gỡ                     | unit        | gate đỏ                                  | chưa chạy                |
-| `LD-R2` hồi quy | 61 `GET` hiện có với registry khởi đầu                                              | unit        | xanh                                     | chưa chạy                |
-| `LD-R3`         | harness đếm câu lệnh của một list mẫu trên database riêng; không ghi giá trị bind   | integration | đếm đúng, văn bản SQL không chứa tham số | chưa chạy                |
-| `LD-R1`         | rule có Good/Bad/Bad workaround; link từ `api-contract.md`, `pnpm rules:check` xanh | tài liệu    | xanh                                     | chưa chạy                |
+| AC / rủi ro       | Tình huống (gồm từ chối, edge case)                                                                                                                              | Cấp test    | Kết quả mong đợi                                             | Bằng chứng sau implement                                                                  |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- | ------------------------------------------------------------ | ----------------------------------------------------------------------------------------- |
+| `LD-R2`           | collection mới dùng schema của detail, không có mục registry                                                                                                     | unit        | gate đỏ, nêu `operationId` và schema                         | fixture + đột biến M2 thật (xem plan); stub đỏ 7/7 trước                                  |
+| `LD-R2`           | collection không có `pageSize.maximum` và không có mục `bounded`                                                                                                 | unit        | gate đỏ                                                      | fixture + đột biến M1 thật                                                                |
+| `LD-R2`           | mục registry còn sau khi hạng mục capability đã sửa operation                                                                                                    | unit        | gate đỏ: mục thừa phải gỡ                                    | fixture + đột biến M3 thật (`openapi.json`)                                               |
+| `LD-R2`           | mục registry dùng glob/hậu tố hoặc thiếu chủ/lý do/điều kiện gỡ                                                                                                  | unit        | gate đỏ                                                      | fixture + đột biến M4 thật                                                                |
+| `LD-R2`           | registry thêm mục ngoài danh sách khởi đầu; danh sách trốn dưới tên khác                                                                                         | unit        | gate đỏ                                                      | đột biến M5, M6 thật                                                                      |
+| `LD-R2` hồi quy   | 61 `GET` hiện có với registry khởi đầu                                                                                                                           | unit        | xanh                                                         | 11/11; sau 09A 14/14                                                                      |
+| `LD-R2` / `LD-15` | mục `bounded`/`detail-reuse`/`nested-bound` có `maxItems` 0, âm, lẻ, `NaN`, vô hạn, chuỗi, thiếu, chỉ câu chữ hoặc nguồn rỗng                                    | unit        | gate đỏ                                                      | 09A: đỏ trước (gate không đọc được số), xanh sau; đột biến M10–M13                        |
+| `LD-15` hồi quy   | hai mục khai lại `bounded` bằng biên mỗi phòng / mỗi năm (câu chữ Prompt 09 hoặc số 2/366)                                                                       | unit        | gate đỏ: thiếu `maxItems` hoặc khóa ngoài danh sách khởi đầu | 09A: đỏ trước, xanh sau; đột biến M7–M9                                                   |
+| `LD-R2-RV-02`     | mảng chưa đăng ký trong item collection, trong phần còn lại của `data`, sâu hai tầng object trong detail, trong item của mảng khác; union, map, `$ref` vòng lặp  | unit        | gate đỏ: `…: array not in NESTED_ARRAYS`                     | 09B: đỏ trước (gate không thấy), xanh sau; đột biến O1–O3 trên `openapi.json` thật, G6–G7 |
+| `LD-R2-RV-02`     | mục `NESTED_ARRAYS` stale; khóa dạng pattern; thiếu chủ/lý do; `unbounded` thiếu finding hay có maximum; `owner-decision` thiếu `LD-13`; `maxItems` không hợp lệ | unit        | gate đỏ                                                      | 09B: đỏ trước, xanh sau; đột biến G1, G5                                                  |
+| `LD-R2-RV-02`     | khóa ngoài `INITIAL_NESTED_ARRAYS` hoặc đổi phân loại (vd. `planTermsGet#warnings` thành `bounded`)                                                              | unit        | gate đỏ ở test _only ever shrinks_                           | 09B: đỏ trước (khóa chỉ so tên), xanh sau; đột biến G3, G4                                |
+| `LD-R2-RV-03`     | `detail-reuse.maxItems` khác `pageSize.maximum`; `maxItems` khác `maxItems` của schema                                                                           | unit        | gate đỏ, nêu cả hai số                                       | 09B: đỏ trước, xanh sau; đột biến G2, O4, G8, G9                                          |
+| `LD-R3`           | harness đếm câu lệnh của một list mẫu trên database riêng; không ghi giá trị bind                                                                                | integration | đếm đúng, văn bản SQL không chứa tham số                     | `exchangeRateList`: 12 câu lệnh cho 5 và 60 tỷ giá, không bind                            |
+| `LD-R3`           | per-row query cố ý trong fixture; statement prepare chạy lại                                                                                                     | integration | harness thấy fan-out và đếm lần chạy lại                     | đột biến H1, H2 thật                                                                      |
+| `LD-R1`           | rule có Good/Bad/Bad workaround; link từ `api-contract.md`, `pnpm rules:check` xanh                                                                              | tài liệu    | xanh                                                         | xanh                                                                                      |
 
 ## Definition of Done
 
-- [ ] Mọi primary AC `full` có test đỏ-trước/xanh-sau ở cấp phù hợp; AC `partial` ghi đúng vế đã làm — áp cho `LD-R1`
+- [x] Mọi primary AC `full` có test đỏ-trước/xanh-sau ở cấp phù hợp; AC `partial` ghi đúng vế đã làm — áp cho `LD-R1`
       → `LD-R3` (enabler không claim Story).
-- [ ] Gate theo [CONTRIBUTING](../../../../CONTRIBUTING.md) chạy xanh trên revision cuối; HTTP không đổi.
-- [ ] Spec/plan/roadmap phản ánh implementation cuối; registry khởi đầu khớp bảng trên.
-- [ ] Không tăng legacy ledger kiến trúc; registry mới chỉ được co lại.
-- [ ] Tài liệu vận hành/runbook bị ảnh hưởng đã cập nhật; phần chưa kiểm chứng ghi rõ.
+- [x] Gate theo [CONTRIBUTING](../../../../CONTRIBUTING.md) chạy xanh trên revision cuối; HTTP không đổi — local; remote CI
+      `UNVERIFIED`.
+- [x] Spec/plan/roadmap phản ánh implementation cuối; registry khởi đầu khớp inventory (khác bảng gốc ghi ở trên).
+- [x] Không tăng legacy ledger kiến trúc; registry mới chỉ được co lại.
+- [x] Tài liệu vận hành/runbook bị ảnh hưởng đã cập nhật; phần chưa kiểm chứng ghi rõ.
 
 ## Changes and acceptance
 
 22/10/2026: lập theo Prompt 08 từ audit collection/detail của review hậu merge. Chưa code, chưa review, chưa nghiệm thu.
+
+22/10/2026 (Prompt 09, Remediation Wave 0 — Phase B): `LD-R1` → `LD-R3` triển khai và kiểm chứng cục bộ; không đổi HTTP,
+DTO hay query. Bảy quyết định `LD-13` vẫn mở; không hạng mục capability nào bắt đầu. Chưa có Owner review hay remote CI.
+
+23/10/2026 (Prompt 09A, sửa trong cùng checkpoint): Owner review mở `LD-R2-RV-01`; `LD-15` ghi hai mục `unbounded` có chủ,
+`businessMaximum.maxItems` bắt buộc là số nguyên dương, rule có ví dụ Bad. Chỉ đổi gate và tài liệu; runtime, OpenAPI không
+đổi. Chưa có Owner review cuối hay remote CI.
+
+23/10/2026 (Prompt 09B, sửa cuối trong cùng checkpoint): review mở `LD-R2-RV-02`, `LD-R2-RV-03`. Inventory đệ quy 104 mảng
+(37 collection + 67 lồng), `NESTED_ARRAYS` 67 mục đóng băng kèm phân loại thay `RESOURCE_ARRAYS` và `nested-bound`;
+`detail-reuse.maxItems` = `pageSize.maximum`; `maxItems` = `maxItems` của schema khi có; điều kiện xem lại theo nguồn;
+`LD-16` hai vế. Chỉ đổi gate và tài liệu; runtime, OpenAPI không đổi. Chưa có Owner review cuối hay remote CI.

@@ -21,6 +21,7 @@ interface TeardownDiagnostics {
   }[];
   diagnosticsSqlState?: string | null;
   closeSqlStates?: (string | null)[];
+  plainDropSqlState?: string | null;
 }
 
 export class DisposableDatabaseError extends Error {
@@ -245,6 +246,18 @@ export async function dropDisposableDatabase(database: DisposableDatabase): Prom
     await client.query('DROP DATABASE ' + quote(name) + ' WITH (FORCE)');
   } catch (error) {
     const diagnostics = await teardownDiagnostics(client, name, error);
+    // GATE-02: FORCE answers 42501 to an ordinary role when a process it may not signal is in the database: an
+    // autovacuum worker, whose backend_type that role cannot even read. Only then one plain DROP DATABASE follows: it
+    // signals autovacuum workers itself, terminates nothing else and fails (55006) while a real session holds the
+    // database. No other failure is retried.
+    if (diagnostics.sqlState === '42501') {
+      try {
+        await client.query('DROP DATABASE ' + quote(name));
+        return;
+      } catch (plainError) {
+        diagnostics.plainDropSqlState = sqlState(plainError);
+      }
+    }
     failure = new DisposableDatabaseError(
       'Cannot drop disposable database. Safe teardown diagnostics: ' + JSON.stringify(diagnostics),
       diagnostics.sqlState,

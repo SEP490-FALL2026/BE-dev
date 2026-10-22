@@ -8,7 +8,8 @@
 ## Before coding
 
 `g2-g4-unit-only-cost-attribution` đã merge (route `/cost-centers`); harness của `api-list-detail-contract-remediation`
-đã có; ghi quyết định Owner về `description` dự án. Đối chiếu spec với BE revision lúc bắt đầu.
+đã có; ghi quyết định Owner về `description` dự án và hợp đồng có biên đã chọn cho cảnh báo phòng (`LD-15`). Đối chiếu spec
+với BE revision lúc bắt đầu.
 
 ## Tasks
 
@@ -34,6 +35,14 @@
 - Depends on: none.
 - Acceptance: `LD-14`.
 - Verify: integration; OpenAPI chỉ thêm trường.
+
+### Task 4: cảnh báo phòng có biên toàn response
+
+- Files: `department-query.service.ts`, `departments.controller.ts`, `department.dto.ts`, integration cảnh báo phòng,
+  `src/api-collection-contract.spec.ts` (gỡ mục `departmentWarningList#unbounded`), `openapi.json` (sinh) nếu đổi wire.
+- Depends on: hợp đồng đã được Owner duyệt (phân trang thật hoặc trần cứng của toàn response — chưa chọn).
+- Acceptance: `LD-15` (vế `departmentWarningList`).
+- Verify: test đỏ trước khi số phòng vượt biên; harness; gate collection xanh sau khi gỡ mục; `pnpm openapi:export` review diff.
 
 ### Checkpoint
 

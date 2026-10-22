@@ -116,6 +116,45 @@ jobs:
             echo "📦 Khởi động database & reverse proxy nếu chưa chạy..."
             docker compose -f docker-compose.prod.yml up -d postgres caddy
 
+            # 3.5. DB-05: sao lưu trước migration. Không có down migration: khôi phục = roll-forward hoặc pg_restore bản
+            # sao lưu này (docs/guides/containers.md). pg_dump hoặc kiểm đọc lỗi ⟹ dừng deploy trước `migrate deploy`.
+            # Lệnh chạy trong container postgres qua socket cục bộ với biến của chính container; không in thông tin
+            # đăng nhập. Thư mục cố định, chỉ chủ sở hữu đọc được; workflow không xóa bản sao lưu nào (dọn có giới hạn:
+            # scripts/ops/postgres-backup-retention.sh, dry run trước, chạy tay).
+            echo "⏳ Chờ PostgreSQL sẵn sàng..."
+            READY=0
+            for attempt in $(seq 1 30); do
+              if docker compose -f docker-compose.prod.yml exec -T postgres sh -c 'pg_isready -q -U "$POSTGRES_USER" -d "$POSTGRES_DB"'; then
+                READY=1
+                break
+              fi
+              sleep 2
+            done
+            if [ "$READY" -ne 1 ]; then
+              echo "❌ LỖI: PostgreSQL không sẵn sàng; dừng deploy trước khi sao lưu và migrate."
+              exit 1
+            fi
+
+            BACKUP_DIR="$APP_DIR/backups/postgres"
+            umask 077
+            mkdir -p "$BACKUP_DIR"
+            chmod 700 "$BACKUP_DIR"
+            BACKUP_FILE="$BACKUP_DIR/slm-pre-migrate-$(date -u +%Y%m%dT%H%M%SZ)-${{ needs.build-and-push.outputs.tag }}.dump"
+
+            echo "💾 Sao lưu CSDL trước migration: $BACKUP_FILE"
+            if ! docker compose -f docker-compose.prod.yml exec -T postgres sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" --format=custom --no-owner --no-privileges' > "$BACKUP_FILE.partial"; then
+              rm -f "$BACKUP_FILE.partial"
+              echo "❌ LỖI: pg_dump thất bại; dừng deploy, chưa chạy migration."
+              exit 1
+            fi
+            if [ ! -s "$BACKUP_FILE.partial" ] || ! docker compose -f docker-compose.prod.yml exec -T postgres pg_restore --list > /dev/null < "$BACKUP_FILE.partial"; then
+              rm -f "$BACKUP_FILE.partial"
+              echo "❌ LỖI: bản sao lưu rỗng hoặc pg_restore --list không đọc được; dừng deploy, chưa chạy migration."
+              exit 1
+            fi
+            mv "$BACKUP_FILE.partial" "$BACKUP_FILE"
+            echo "✅ Bản sao lưu đọc được ($(wc -c < "$BACKUP_FILE") byte). Số bản sao lưu hiện có: $(ls -1 "$BACKUP_DIR"/slm-pre-migrate-*.dump | wc -l)"
+
             echo "🔄 Chạy Prisma Migration cập nhật Database..."
             docker compose -f docker-compose.prod.yml run --rm --no-deps api node node_modules/prisma/build/index.js migrate deploy
 

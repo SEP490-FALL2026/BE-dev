@@ -3,6 +3,12 @@
 Status: Accepted technical principle. No such custom constraints are currently
 needed by the catalog baseline.
 
+> _Implementation annotation (22/10/2026, `delivery-gate-hardening`, `DB-17`):_ the second sentence of the status is
+> superseded. Reviewed SQL outside Prisma now exists in committed migrations (text search of `prisma/migrations` at
+> `0198456`: 5 `EXCLUDE USING` constraints, 42 `CREATE TRIGGER` and 2 `CREATE CONSTRAINT TRIGGER` statements, 85 `CHECK (`
+> clauses). The CI workflow now also runs a schema-to-migrations drift check (added in the same item; no remote run
+> verified yet). The principle above is unchanged.
+
 Use Prisma schema for supported columns, relations and unique constraints.
 When a User Story requires a constraint Prisma cannot express, create a migration
 with --create-only, add reviewed SQL with explicit object names, and apply it to

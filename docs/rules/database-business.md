@@ -12,6 +12,17 @@
   production `db push` thay migration.
 - Constraint Prisma không biểu diễn được viết SQL rõ ràng theo
   [ADR-0005](../decisions/0005-database-constraints-outside-prisma.md).
+- **Tên migration (`DB-15`):** `YYYYMMDDHHMMSS_<snake_case>` với thời điểm hợp lệ (giờ `00`–`23`, phút/giây `00`–`59`) và
+  lớn hơn migration cuối đã merge, để thứ tự áp dụng là thứ tự đọc. Ba migration đã merge `20261020240000`,
+  `20261020250000`, `20261020260000` mang giờ 24–26: thứ tự vẫn tất định (so chuỗi) nên **giữ nguyên tên** — đổi tên một
+  migration đã áp làm `_prisma_migrations` lệch với thư mục. Không đổi tên hay sửa migration đã merge.
+- **Drift (`DB-16`):** CI áp mọi migration vào CSDL rỗng rồi chạy
+  `prisma migrate diff --from-config-datasource --to-schema prisma --exit-code`; sửa `prisma/models` mà thiếu migration
+  làm bước này đỏ.
+- **Không có down migration (`DB-05`):** sửa lỗi sau khi đã áp là **roll-forward** (migration mới sửa tiếp) hoặc
+  **khôi phục** từ bản sao lưu deploy tạo trước `migrate deploy` (quy trình ở
+  [containers](../guides/containers.md#backup-before-production-migrations)). Migration không hoàn tác được — ví dụ
+  `ALTER TYPE … ADD VALUE`, xóa cột/bảng có dữ liệu — ghi rõ trong spec của hạng mục trước khi merge.
 
 ## Transaction và hành vi
 
