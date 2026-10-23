@@ -9,6 +9,8 @@ export interface EnsuredVendor {
   vendor: VendorRecord;
   /** True when this call made the vendor, so the caller records that in the audit trail. */
   created: boolean;
+  /** True when this call gave a vendor of the same name its dictionary group, so the caller records that too (DB-11). */
+  adopted: boolean;
 }
 
 /**
@@ -32,7 +34,7 @@ export class VendorDirectoryService {
   ): Promise<EnsuredVendor> {
     const normalizedName = searchKey(group.name);
     const held = await this.vendors.findByDictionaryGroup(tx, organizationId, group.id);
-    if (held) return { vendor: held, created: false };
+    if (held) return { vendor: held, created: false, adopted: false };
 
     const inserted = await this.vendors.insertIfAbsent(tx, {
       organizationId,
@@ -40,14 +42,14 @@ export class VendorDirectoryService {
       normalizedName,
       dictionaryGroupId: group.id,
     });
-    if (inserted) return { vendor: inserted, created: true };
+    if (inserted) return { vendor: inserted, created: true, adopted: false };
 
     const raced = await this.vendors.findByDictionaryGroup(tx, organizationId, group.id);
-    if (raced) return { vendor: raced, created: false };
+    if (raced) return { vendor: raced, created: false, adopted: false };
     const sameName = await this.vendors.findByNormalizedName(tx, organizationId, normalizedName);
     if (sameName?.dictionaryGroupId === null) {
       const adopted = await this.vendors.setDictionaryGroup(tx, sameName.id, group.id);
-      if (adopted) return { vendor: adopted, created: false };
+      if (adopted) return { vendor: adopted.vendor, created: false, adopted: adopted.adopted };
     }
 
     throw new Error('A vendor of the same name belongs to another dictionary group');
@@ -57,7 +59,7 @@ export class VendorDirectoryService {
   async ensureByName(tx: DbTx, organizationId: string, name: string): Promise<EnsuredVendor> {
     const normalizedName = searchKey(name);
     const found = await this.vendors.findByNormalizedName(tx, organizationId, normalizedName);
-    if (found) return { vendor: found, created: false };
+    if (found) return { vendor: found, created: false, adopted: false };
 
     const inserted = await this.vendors.insertIfAbsent(tx, {
       organizationId,
@@ -65,16 +67,23 @@ export class VendorDirectoryService {
       normalizedName,
       dictionaryGroupId: null,
     });
-    if (inserted) return { vendor: inserted, created: true };
+    if (inserted) return { vendor: inserted, created: true, adopted: false };
 
     const raced = await this.vendors.findByNormalizedName(tx, organizationId, normalizedName);
     if (!raced) throw new Error('The vendor could neither be made nor found');
 
-    return { vendor: raced, created: false };
+    return { vendor: raced, created: false, adopted: false };
   }
 
-  /** Gives a vendor with no dictionary group the group of a line; null when another vendor already holds that group. */
-  adoptDictionaryGroup(tx: DbTx, vendorId: string, groupId: string): Promise<VendorRecord | null> {
+  /**
+   * Gives a vendor with no dictionary group the group of a line, once (DB-03): `adopted` is true only for the call that
+   * made the link, which then records it. Null when the vendor holds another group, or another vendor holds that group.
+   */
+  adoptDictionaryGroup(
+    tx: DbTx,
+    vendorId: string,
+    groupId: string,
+  ): Promise<{ vendor: VendorRecord; adopted: boolean } | null> {
     return this.vendors.setDictionaryGroup(tx, vendorId, groupId);
   }
 }

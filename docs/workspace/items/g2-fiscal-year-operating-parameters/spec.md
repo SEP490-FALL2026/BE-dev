@@ -90,21 +90,21 @@ query hay response đổi.
 
 ## Test matrix
 
-| AC / rủi ro      | Tình huống (gồm từ chối, edge case)                                          | Cấp test           | Kết quả mong đợi                                                                   | Bằng chứng sau implement |
-| ---------------- | ---------------------------------------------------------------------------- | ------------------ | ---------------------------------------------------------------------------------- | ------------------------ |
-| `US-01-04` AC-7  | hệ thống mới: danh sách mặc định                                             | unit + integration | SLA 2, N 5, tháng bắt đầu 1, chờ trình 2, rà soát 5, giữ gỡ 1                      | chưa chạy                |
-| `US-01-04` AC-8  | tìm/đặt `BUDGET_PERIOD_KIND`; đặt tháng 13, 0                                | integration        | không có khóa loại kỳ; ngoài miền ⟹ 422                                            | chưa chạy                |
-| `US-01-04` AC-14 | tìm tham số ngưỡng giá trị cao                                               | integration        | không có                                                                           | chưa chạy                |
-| hồi quy          | giá trị `BUDGET_PERIOD_KIND` đã lưu từ trước                                 | integration        | không trả, không lỗi                                                               | chưa chạy                |
-| quyền            | IT Admin, Finance đặt tham số                                                | integration        | 403 như AC-6                                                                       | chưa chạy                |
-| `LD-15`          | ngày nghỉ ghi trải nhiều năm, gọi không khoảng hoặc khoảng vượt biên đã chọn | integration        | response không vượt biên đã chọn; mục `nonWorkingDateList#unbounded` gỡ, gate xanh | chưa chạy                |
+| AC / rủi ro      | Tình huống (gồm từ chối, edge case)                                          | Cấp test           | Kết quả mong đợi                                                                   | Bằng chứng sau implement                                         |
+| ---------------- | ---------------------------------------------------------------------------- | ------------------ | ---------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| `US-01-04` AC-7  | hệ thống mới: danh sách mặc định                                             | unit + integration | SLA 2, N 5, tháng bắt đầu 1, chờ trình 2, rà soát 5, giữ gỡ 1                      | xanh — `parameter-definitions.spec`, `operating-parameters-http` |
+| `US-01-04` AC-8  | tìm/đặt `BUDGET_PERIOD_KIND`; đặt tháng 13, 0                                | integration        | không có khóa loại kỳ; ngoài miền ⟹ 422                                            | xanh — `parameter-definitions.spec`, `operating-parameters-http` |
+| `US-01-04` AC-14 | tìm tham số ngưỡng giá trị cao                                               | integration        | không có                                                                           | xanh — `parameter-definitions.spec`, `operating-parameters-http` |
+| hồi quy          | giá trị `BUDGET_PERIOD_KIND` đã lưu từ trước                                 | integration        | không trả, không lỗi                                                               | xanh — `parameter-definitions.spec`, `operating-parameters-http` |
+| quyền            | IT Admin, Finance đặt tham số                                                | integration        | 403 như AC-6                                                                       | xanh — `parameter-definitions.spec`, `operating-parameters-http` |
+| `LD-15`          | ngày nghỉ ghi trải nhiều năm, gọi không khoảng hoặc khoảng vượt biên đã chọn | integration        | response không vượt biên đã chọn; mục `nonWorkingDateList#unbounded` gỡ, gate xanh | xanh — `parameter-definitions.spec`, `operating-parameters-http` |
 
 ## Definition of Done
 
 - [ ] Mọi primary AC `full` có test đỏ-trước/xanh-sau ở cấp phù hợp; AC `partial` ghi đúng vế đã làm.
-- [ ] Gate theo [CONTRIBUTING](../../../../CONTRIBUTING.md) chạy xanh trên revision cuối; HTTP đổi thì e2e + OpenAPI.
-- [ ] Spec/plan/roadmap phản ánh implementation cuối; contract đổi đã ghi và báo consumer FE.
-- [ ] Không tăng legacy ledger kiến trúc; nếu gỡ được mục nào thì xóa mục đó.
+- [x] Gate theo [CONTRIBUTING](../../../../CONTRIBUTING.md) chạy xanh trên revision cuối; HTTP đổi thì e2e + OpenAPI.
+- [x] Spec/plan/roadmap phản ánh implementation cuối; contract đổi đã ghi và báo consumer FE.
+- [x] Không tăng legacy ledger kiến trúc; nếu gỡ được mục nào thì xóa mục đó.
 - [ ] Tài liệu vận hành/runbook bị ảnh hưởng đã cập nhật; phần chưa kiểm chứng ghi rõ.
 
 ## Changes and acceptance
@@ -113,3 +113,5 @@ query hay response đổi.
 
 23/10/2026 (Prompt 09A): nhận vế `nonWorkingDateList` của `LD-15` theo Owner review `LD-R2-RV-01` (mục registry chuyển
 `bounded` → `unbounded`). Chưa chọn hợp đồng, chưa code.
+
+23/10/2026 (Prompt 10 — xử lý tồn đọng G0→G4): `BBI-D03` + `LD-15`: bỏ `BUDGET_PERIOD_KIND`; thêm `FISCAL_YEAR_START_MONTH` (1–12, mặc định 1) và `SPEND_SUBMISSION_WAIT_WORKING_DAYS` (1–30, mặc định 2); giá trị cũ của khóa đã bỏ không còn được đọc. `GET /non-working-dates` phân trang (đổi wire). Áp dụng **mặc định do spec khuyến nghị**, không phải quyết định của Owner: Owner chưa review; nếu Owner chọn khác thì đổi ở đây. Miền 1–30 của thời hạn chờ trình là đề xuất của spec. Kiểm chứng: `parameter-definitions.spec`, `operating-parameters-http` — xanh trên cây làm việc chưa commit, nhánh `Bao_dev_be`, nền `dev` `19be620`, 23/10/2026. Gate toàn cây trên cùng cây: `pnpm lint`, `tsc --noEmit`, `pnpm test` (unit 2.074 (141 suite)), `pnpm test:e2e` (839 (32 suite)), `pnpm test:integration` (112 suite, 1.429 test, gồm 4 test kho S3 thật trên LocalStack), `prisma migrate deploy` trên CSDL mới + `migrate diff --exit-code` (không lệch), `pnpm openapi:export`. Giới hạn: Khóa đổi tháng bắt đầu khi đã có phiên bản ngân sách thuộc `g2-downstream-integration` (cần G5): giữ `blocked`. Chưa commit khi viết dòng này, chưa remote CI, chưa Owner review, chưa nghiệm thu: không có gì là `accepted`; đỏ-trước của từng test không được ghi lại.

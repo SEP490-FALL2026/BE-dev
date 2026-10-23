@@ -3,7 +3,6 @@ import { normalizeHost } from '../vendor-dictionary/vendor-matcher';
 import {
   ApplicationDomainInvalidError,
   ApplicationInternalHasNoVendorError,
-  ApplicationKindNotManagedError,
   ApplicationNameInvalidError,
   ApplicationNoteInvalidError,
   ApplicationTooManyDomainsError,
@@ -27,6 +26,9 @@ export interface CommunicationAnswers {
 export function isCommunicationService(answers: CommunicationAnswers): boolean {
   return answers.personToPersonMessaging || answers.callsOrMeetings || answers.mailbox;
 }
+
+/** The most similar applications a detail names; the total says how many there are (`LD-06`). */
+export const SIMILAR_APPLICATION_LIMIT = 20;
 
 /** A communication service is not collected for usage by default (BR-06.2); otherwise nothing is decided here. */
 export function usageCollectionDefault(communicationService: boolean): 'NOT_COLLECTED' | null {
@@ -70,16 +72,14 @@ export function cleanNote(raw: string | null | undefined): string | null {
 export type VendorSource = { type: 'NONE' } | { type: 'DICTIONARY'; lineId: string } | { type: 'NAME'; name: string };
 
 /**
- * Where the vendor of a new application comes from. The free external software is refused first (`QĐ-49a`); an
- * internal application has no vendor; any other names its vendor either through a dictionary service line (the vendor is
+ * Where the vendor of a new application comes from. An internal application has no vendor; any other names its vendor either through a dictionary service line (the vendor is
  * the line's group) or by typing a name for software outside the dictionary — exactly one of the two.
  */
 export function vendorSourceOf(input: {
-  kind: 'SAAS' | 'LICENSED' | 'INTERNAL' | 'FREE_EXTERNAL';
+  kind: 'SAAS' | 'LICENSED' | 'INTERNAL';
   vendorName?: string;
   dictionaryServiceLineId?: string;
 }): VendorSource {
-  if (input.kind === 'FREE_EXTERNAL') throw new ApplicationKindNotManagedError();
   const named = input.vendorName !== undefined;
   const lined = input.dictionaryServiceLineId !== undefined;
 

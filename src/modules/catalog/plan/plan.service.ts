@@ -13,6 +13,8 @@ import {
   PlanNameTakenError,
   PlanNotFoundError,
   PlanProvisioningTypeMismatchError,
+  PlanChangeBlock,
+  PlanInUseBlocksChangeError,
   PlanTermsBlockTypeChangeError,
   PlanUpdateEmptyError,
   PlanWorkspaceProfileBlocksTypeChangeError,
@@ -24,6 +26,7 @@ import type {
   ControlLevel,
   PlanChanges,
   PlanRecord,
+  PlanSummaryRecord,
   PricingModel,
   ProvisioningType,
   SharingPolicy,
@@ -83,7 +86,7 @@ export class PlanService {
     provisioningType?: ProvisioningType;
     page: number;
     pageSize: number;
-  }): Promise<Page<PlanRecord>> {
+  }): Promise<Page<PlanSummaryRecord>> {
     const { items, total } = await this.plans.list({
       ...(query.applicationId ? { applicationId: query.applicationId } : {}),
       ...(query.provisioningType ? { provisioningType: query.provisioningType } : {}),
@@ -203,6 +206,8 @@ export class PlanService {
   private mapWriteError(error: unknown): unknown {
     if (isUniqueViolation(error, 'normalized_name')) return new PlanNameTakenError();
     if (isCheckViolation(error, 'keeps a numeric install limit')) return new PlanTermsBlockTypeChangeError();
+    const blocked = changeBlockOf(error);
+    if (blocked) return new PlanInUseBlocksChangeError(blocked);
     if (isCheckViolation(error)) return new PlanProvisioningTypeMismatchError();
 
     return error;
@@ -214,4 +219,18 @@ export class PlanService {
 
     return organization.id;
   }
+}
+
+const CHANGE_BLOCKS: readonly PlanChangeBlock[] = [
+  'ACTIVE_SUBSCRIPTION_WITHOUT_QUANTITY',
+  'LICENSE_KEYS',
+  'SUBSCRIPTIONS',
+];
+
+/** The reason the plan trigger gave (`plan_change_blocked: REASON`), or null for any other refusal. */
+function changeBlockOf(error: unknown): PlanChangeBlock | null {
+  if (!isCheckViolation(error, 'plan_change_blocked:')) return null;
+  const haystack = JSON.stringify((error as { meta?: unknown }).meta ?? {});
+
+  return CHANGE_BLOCKS.find((reason) => haystack.includes(`plan_change_blocked: ${reason}`)) ?? null;
 }

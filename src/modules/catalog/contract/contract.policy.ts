@@ -17,7 +17,7 @@ export type DocumentPurpose =
   | 'SIGNATURE_RECORD'
   | 'IMPORT_SOURCE'
   | 'COST_STATEMENT';
-export type DocumentStatus = 'AWAITING_UPLOAD' | 'PENDING_ATTACH' | 'READY' | 'QUARANTINED';
+export type DocumentStatus = 'AWAITING_UPLOAD' | 'PENDING_ATTACH' | 'READY' | 'QUARANTINED' | 'EXPIRED';
 
 /** How long a link that opens a file lives (`US-04-04` AC-1, AC-2); it is never stored and a new request makes a new one. */
 export const LINK_TTL_SECONDS = 300;
@@ -116,8 +116,8 @@ export type OpenDecision = 'OPEN' | 'HIDDEN' | 'FORBIDDEN';
 /**
  * Whether a person opens a file, by what the file is and the roles they hold now (`US-04-04` AC-1, AC-3, AC-6). Anyone
  * but the IT Admin and Finance is refused whatever the file is. A file not yet attached is the uploader's alone and is
- * "not there" for everyone else; a file that is attached opens for the IT Admin and Finance; a file that is not uploaded or
- * that was quarantined is for nobody. The role is the one held now, so a role taken away takes the right with it.
+ * "not there" for everyone else; a file that is attached opens for the IT Admin and Finance; a file that is not uploaded, that was
+ * quarantined or whose upload never came is for nobody. The role is the one held now, so a role taken away takes the right with it.
  */
 export function mayOpen(input: {
   status: DocumentStatus;

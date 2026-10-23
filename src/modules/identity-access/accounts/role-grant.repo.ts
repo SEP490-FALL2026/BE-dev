@@ -58,10 +58,12 @@ export class RoleGrantRepo {
     return byUser;
   }
 
-  async grantHistory(appUserId: string): Promise<RoleGrantRecord[]> {
+  /** The newest `limit` grants of the account, newest first. */
+  async grantHistory(appUserId: string, limit: number): Promise<RoleGrantRecord[]> {
     return this.prisma.roleGrant.findMany({
       where: { appUserId },
-      orderBy: [{ grantedAt: 'asc' }, { id: 'asc' }],
+      orderBy: [{ grantedAt: 'desc' }, { id: 'desc' }],
+      take: limit,
       select: { role: true, grantedAt: true, revokedAt: true },
     });
   }

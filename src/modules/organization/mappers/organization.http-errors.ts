@@ -21,7 +21,12 @@ import {
   DepartmentUpdateEmptyError,
   HeadAssignmentError,
 } from '../department/department.errors';
-import { EmployeeRowInvalidError } from '../employee/employee.errors';
+import {
+  EmployeeAnotherItAdminNeededError,
+  EmployeeRowInvalidError,
+  EmployeeUpdateEmptyError,
+} from '../employee/employee.errors';
+import { EmployeeNotFoundError } from '../organization.errors';
 import {
   JobTitleNameRequiredError,
   JobTitleNameTakenError,
@@ -44,6 +49,13 @@ export function toOrganizationApiException(error: unknown): unknown {
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'EMPLOYEE.ROW_INVALID', error.message, {
       reasons: error.reasons,
     });
+  }
+  if (error instanceof EmployeeNotFoundError) return refuse(HttpStatus.NOT_FOUND, 'EMPLOYEE.NOT_FOUND', error.message);
+  if (error instanceof EmployeeUpdateEmptyError) {
+    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'EMPLOYEE.UPDATE_EMPTY', error.message);
+  }
+  if (error instanceof EmployeeAnotherItAdminNeededError) {
+    return refuse(HttpStatus.FORBIDDEN, 'EMPLOYEE.ANOTHER_IT_ADMIN_NEEDED', error.message);
   }
   if (error instanceof JobTitleNotFoundError) return refuse(HttpStatus.NOT_FOUND, 'JOB_TITLE.NOT_FOUND', error.message);
   if (error instanceof JobTitleNameRequiredError) {
@@ -114,6 +126,8 @@ export function toOrganizationApiException(error: unknown): unknown {
     return refuse(HttpStatus.CONFLICT, 'DEPARTMENT.IN_USE', error.message, {
       members: error.members,
       totalMembers: error.totalMembers,
+      serviceAccounts: error.serviceAccounts,
+      totalServiceAccounts: error.totalServiceAccounts,
       openWork: [],
     });
   }

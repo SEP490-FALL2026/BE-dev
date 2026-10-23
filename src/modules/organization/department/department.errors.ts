@@ -44,13 +44,16 @@ export class DepartmentUpdateEmptyError extends Error {
   }
 }
 
-/** Still has people, so it cannot be retired (US-03-06 AC-19). The other groups arrive with the slices that own them. */
+/** Still has people or service accounts, so it cannot be retired (US-03-06 AC-19). Open work arrives with its slice. */
 export class DepartmentInUseError extends Error {
   constructor(
     readonly members: { employeeCode: string; fullName: string }[],
     readonly totalMembers: number,
+    /** The first of the service accounts the department owns, still open (`QĐ-86c`); the total counts them all. */
+    readonly serviceAccounts: { assignmentId: string; accountIdentifier: string }[] = [],
+    readonly totalServiceAccounts: number = 0,
   ) {
-    super('The department still has members.');
+    super('The department still has members or service accounts.');
     this.name = 'DepartmentInUseError';
   }
 }

@@ -4,6 +4,7 @@ import { Client } from 'pg';
 import { ApiAccount, adminToken, createActivatedAccount } from '../support/api-accounts';
 import { HttpTestApp, SeededInstallation, createHttpTestApp, seedInstallation } from '../support/http-test-app';
 import { findPlacementCoverageViolations } from '../support/placement-coverage';
+import { HR_BASIS } from '../support/hr-basis';
 
 interface ImportWire {
   id: string;
@@ -69,17 +70,24 @@ describe('importing people from a file over HTTP (integration, real PostgreSQL)'
   let ctx: HttpTestApp;
   let seed: SeededInstallation;
   let admin: string;
+  let adminAppUserId: string;
   let it1: ApiAccount;
   let finance: ApiAccount;
   let counter = 0;
   const server = () => ctx.app.getHttpServer();
   const as = (account: ApiAccount) => ({ Authorization: `Bearer ${account.accessToken}` });
   const asIt = () => as(it1);
+  const asSuper = () => ({ Authorization: `Bearer ${admin}` });
 
   beforeAll(async () => {
     ctx = await createHttpTestApp();
     seed = await seedInstallation(ctx.app);
     admin = await adminToken(ctx, seed);
+    adminAppUserId = (
+      await ctx.sql.query<{ id: string }>(
+        `SELECT u.id FROM app_users u JOIN role_grants g ON g.app_user_id = u.id AND g.role = 'SUPER_ADMIN' AND g.revoked_at IS NULL`,
+      )
+    ).rows[0].id;
     it1 = await createActivatedAccount(ctx, seed, { code: 'E-IT1', email: 'it1@acme.vn', roles: ['IT_ADMIN'], admin });
     finance = await createActivatedAccount(ctx, seed, {
       code: 'E-FIN',
@@ -152,19 +160,23 @@ describe('importing people from a file over HTTP (integration, real PostgreSQL)'
   };
   const csv = (rows: string[], header = HEADER) => `${header}\n${rows.join('\n')}\n`;
 
-  const upload = (content: string, fileName = 'people.csv', headers = asIt()) =>
+  const upload = (content: string, fileName = 'people.csv', headers = asSuper()) =>
     request(server()).post('/api/v1/employee-imports').set(headers).attach('file', Buffer.from(content), fileName);
   const confirm = (
     id: string,
-    body: { previewVersion: number; idempotencyKey: string; acknowledgeDuplicateFile?: boolean },
-    headers = asIt(),
-  ) => request(server()).post(`/api/v1/employee-imports/${id}/confirmations`).set(headers).send(body);
+    body: { previewVersion: number; idempotencyKey: string; acknowledgeDuplicateFile?: boolean; hrBasis?: unknown },
+    headers = asSuper(),
+  ) =>
+    request(server())
+      .post(`/api/v1/employee-imports/${id}/confirmations`)
+      .set(headers)
+      .send({ hrBasis: HR_BASIS, ...body });
   const rowsOf = async (id: string, outcome?: string): Promise<RowWire[]> =>
     (
       (
         await request(server())
           .get(`/api/v1/employee-imports/${id}/rows?pageSize=200${outcome ? `&outcome=${outcome}` : ''}`)
-          .set(asIt())
+          .set(asSuper())
           .expect(200)
       ).body as { data: { items: RowWire[] } }
     ).data.items;
@@ -179,8 +191,9 @@ describe('importing people from a file over HTTP (integration, real PostgreSQL)'
       const [existingCode] = existing.split(',');
       await request(server())
         .post('/api/v1/employees')
-        .set(asIt())
+        .set(asSuper())
         .send({
+          hrBasis: HR_BASIS,
           employeeCode: existingCode,
           fullName: existing.split(',')[1],
           workEmail: existing.split(',')[2],
@@ -280,14 +293,14 @@ describe('importing people from a file over HTTP (integration, real PostgreSQL)'
     });
 
     it('refuses a file with no file, one that is empty, one with only a header, and one that is not text', async () => {
-      expect(errorOf(await request(server()).post('/api/v1/employee-imports').set(asIt()).expect(422)).code).toBe(
+      expect(errorOf(await request(server()).post('/api/v1/employee-imports').set(asSuper()).expect(422)).code).toBe(
         'IMPORT.FILE_REQUIRED',
       );
       expect(errorOf(await upload('').expect(422)).code).toBe('IMPORT.FILE_EMPTY');
       expect(errorOf(await upload(`${HEADER}\n`).expect(422)).code).toBe('IMPORT.FILE_EMPTY');
       const binary = await request(server())
         .post('/api/v1/employee-imports')
-        .set(asIt())
+        .set(asSuper())
         .attach('file', Buffer.from([0x50, 0x4b, 0x03, 0x04, 0x00, 0x00]), 'people.xlsx')
         .expect(422);
       expect(errorOf(binary).code).toBe('IMPORT.FILE_NOT_TEXT');
@@ -381,7 +394,10 @@ describe('importing people from a file over HTTP (integration, real PostgreSQL)'
       // Adding the title to the catalogue makes the same file work: the preview is judged again.
       await newTitle('Desginer');
       const refreshed = importOf(
-        await request(server()).post(`/api/v1/employee-imports/${data.id}/preview-refreshes`).set(asIt()).expect(200),
+        await request(server())
+          .post(`/api/v1/employee-imports/${data.id}/preview-refreshes`)
+          .set(asSuper())
+          .expect(200),
       );
       expect(refreshed.previewVersion).toBe(2);
       expect(refreshed.summary.valid).toBe(2);
@@ -440,8 +456,9 @@ describe('importing people from a file over HTTP (integration, real PostgreSQL)'
       const code = unique('EI-OLD-');
       await request(server())
         .post('/api/v1/employees')
-        .set(asIt())
+        .set(asSuper())
         .send({
+          hrBasis: HR_BASIS,
           employeeCode: code,
           fullName: 'Nguyen Van A',
           workEmail: `${code.toLowerCase()}@acme.vn`,
@@ -498,8 +515,9 @@ describe('importing people from a file over HTTP (integration, real PostgreSQL)'
       const code = unique('EI-RET-');
       await request(server())
         .post('/api/v1/employees')
-        .set(asIt())
+        .set(asSuper())
         .send({
+          hrBasis: HR_BASIS,
           employeeCode: code,
           fullName: 'Retired Title Person',
           employmentType: 'STAFF',
@@ -611,9 +629,9 @@ describe('importing people from a file over HTTP (integration, real PostgreSQL)'
 
       const first = await request(server())
         .post(`/api/v1/employee-imports/${uploaded.id}/cancellations`)
-        .set(asIt())
+        .set(asSuper())
         .expect(200);
-      await request(server()).post(`/api/v1/employee-imports/${uploaded.id}/cancellations`).set(asIt()).expect(200);
+      await request(server()).post(`/api/v1/employee-imports/${uploaded.id}/cancellations`).set(asSuper()).expect(200);
       const confirmed = await confirm(uploaded.id, { previewVersion: 1, idempotencyKey: unique('key-0000') }).expect(
         409,
       );
@@ -643,10 +661,10 @@ describe('importing people from a file over HTTP (integration, real PostgreSQL)'
     it('is 404 for an import that does not exist, on every route', async () => {
       const missing = '3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11';
 
-      await request(server()).get(`/api/v1/employee-imports/${missing}`).set(asIt()).expect(404);
-      await request(server()).get(`/api/v1/employee-imports/${missing}/rows`).set(asIt()).expect(404);
-      await request(server()).post(`/api/v1/employee-imports/${missing}/preview-refreshes`).set(asIt()).expect(404);
-      await request(server()).post(`/api/v1/employee-imports/${missing}/cancellations`).set(asIt()).expect(404);
+      await request(server()).get(`/api/v1/employee-imports/${missing}`).set(asSuper()).expect(404);
+      await request(server()).get(`/api/v1/employee-imports/${missing}/rows`).set(asSuper()).expect(404);
+      await request(server()).post(`/api/v1/employee-imports/${missing}/preview-refreshes`).set(asSuper()).expect(404);
+      await request(server()).post(`/api/v1/employee-imports/${missing}/cancellations`).set(asSuper()).expect(404);
       await confirm(missing, { previewVersion: 1, idempotencyKey: 'a-key-of-8' }).expect(404);
     });
   });
@@ -683,8 +701,9 @@ describe('importing people from a file over HTTP (integration, real PostgreSQL)'
       const uploaded = importOf(await upload(csv([personRow({ employee_code: taken }), personRow()])).expect(201));
       await request(server())
         .post('/api/v1/employees')
-        .set(asIt())
+        .set(asSuper())
         .send({
+          hrBasis: HR_BASIS,
           employeeCode: taken,
           fullName: 'Entered by hand first',
           employmentType: 'STAFF',
@@ -702,7 +721,7 @@ describe('importing people from a file over HTTP (integration, real PostgreSQL)'
       const refreshed = importOf(
         await request(server())
           .post(`/api/v1/employee-imports/${uploaded.id}/preview-refreshes`)
-          .set(asIt())
+          .set(asSuper())
           .expect(200),
       );
       expect(refreshed).toMatchObject({ previewVersion: 2, summary: { valid: 1, existingDifferent: 1 } });
@@ -826,10 +845,10 @@ describe('importing people from a file over HTTP (integration, real PostgreSQL)'
           appUserId,
         ])
       ).rows.map((row) => row.id);
-    const asIt1 = (action: string, resourceId: string, before: unknown, after: unknown) => ({
+    const bySuperAdmin = (action: string, resourceId: string, before: unknown, after: unknown) => ({
       actor_kind: 'USER',
-      actor_app_user_id: it1.appUserId,
-      actor_roles: ['IT_ADMIN'],
+      actor_app_user_id: adminAppUserId,
+      actor_roles: ['SUPER_ADMIN'],
       action,
       resource_type: 'EmployeeImport',
       resource_id: resourceId,
@@ -886,12 +905,12 @@ describe('importing people from a file over HTTP (integration, real PostgreSQL)'
       const expiresAt = Date.parse((importOf(uploaded) as unknown as { expiresAt: string }).expiresAt);
       expect(Math.abs(expiresAt - createdAt - 24 * 60 * 60 * 1000)).toBeLessThan(10_000);
 
-      const viewed = await request(server()).get(`/api/v1/employee-imports/${id}`).set(asIt()).expect(200);
+      const viewed = await request(server()).get(`/api/v1/employee-imports/${id}`).set(asSuper()).expect(200);
       expect(viewed.body).toEqual({ success: true, message: 'EMPLOYEE_IMPORT.FETCHED', data: importOf(uploaded) });
 
       const page = await request(server())
         .get(`/api/v1/employee-imports/${id}/rows?page=2&pageSize=1`)
-        .set(asIt())
+        .set(asSuper())
         .expect(200);
       expect(page.body).toEqual({
         success: true,
@@ -927,7 +946,7 @@ describe('importing people from a file over HTTP (integration, real PostgreSQL)'
 
       const refreshed = await request(server())
         .post(`/api/v1/employee-imports/${id}/preview-refreshes`)
-        .set(asIt())
+        .set(asSuper())
         .expect(200);
       expect(refreshed.body).toEqual({
         success: true,
@@ -964,21 +983,29 @@ describe('importing people from a file over HTTP (integration, real PostgreSQL)'
 
       const audit = await auditOf(id);
       expect(audit).toEqual([
-        asIt1('EMPLOYEE_IMPORT.UPLOADED', id, null, {
+        bySuperAdmin('EMPLOYEE_IMPORT.UPLOADED', id, null, {
           fileName: 'wire.csv',
           fileDigest: createHash('sha256').update(Buffer.from(content)).digest('hex'),
           rows: 2,
           valid: 1,
           errors: 1,
         }),
-        asIt1(
+        bySuperAdmin(
           'EMPLOYEE_IMPORT.CONFIRMED',
           id,
           { status: 'PREVIEW', previewVersion: 2 },
-          { status: 'COMPLETED', created: 1, existingSame: 0, existingDifferent: 0, errors: 1, repeatedFile: false },
+          {
+            status: 'COMPLETED',
+            created: 1,
+            existingSame: 0,
+            existingDifferent: 0,
+            errors: 1,
+            repeatedFile: false,
+            hrBasis: HR_BASIS,
+          },
         ),
       ]);
-      const sessions = await sessionsOf(it1.appUserId);
+      const sessions = await sessionsOf(adminAppUserId);
       for (const event of audit) expect(sessions).toContain(event.correlation_id);
       const recorded = JSON.stringify(audit);
       for (const raw of [valid.full_name, valid.work_email, wrong.full_name, 'notes']) {
@@ -992,11 +1019,11 @@ describe('importing people from a file over HTTP (integration, real PostgreSQL)'
 
       const first = await request(server())
         .post(`/api/v1/employee-imports/${id}/cancellations`)
-        .set(asIt())
+        .set(asSuper())
         .expect(200);
       const second = await request(server())
         .post(`/api/v1/employee-imports/${id}/cancellations`)
-        .set(asIt())
+        .set(asSuper())
         .expect(200);
 
       expect(first.body).toEqual({
@@ -1011,7 +1038,7 @@ describe('importing people from a file over HTTP (integration, real PostgreSQL)'
         ['EMPLOYEE_IMPORT.CANCELLED', { status: 'PREVIEW' }, { status: 'CANCELLED' }],
       ]);
       expect((await auditOf(id))[1]).toEqual(
-        asIt1('EMPLOYEE_IMPORT.CANCELLED', id, { status: 'PREVIEW' }, { status: 'CANCELLED' }),
+        bySuperAdmin('EMPLOYEE_IMPORT.CANCELLED', id, { status: 'PREVIEW' }, { status: 'CANCELLED' }),
       );
     });
 
@@ -1019,7 +1046,7 @@ describe('importing people from a file over HTTP (integration, real PostgreSQL)'
       const missing = '3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11';
       const id = importOf(await upload(people(await newDepartment()).content).expect(201)).id;
 
-      const notFound = await request(server()).get(`/api/v1/employee-imports/${missing}`).set(asIt()).expect(404);
+      const notFound = await request(server()).get(`/api/v1/employee-imports/${missing}`).set(asSuper()).expect(404);
       const outdated = await confirm(id, { previewVersion: 5, idempotencyKey: unique('key-wire-') }).expect(409);
       const missingColumns = await upload('employee_code,full_name\nX,Y\n').expect(422);
 
@@ -1079,8 +1106,93 @@ describe('importing people from a file over HTTP (integration, real PostgreSQL)'
     });
   });
 
+  describe('the HR basis and the record of the Super Admin (US-02-02 AC-16, AC-18)', () => {
+    it.each([
+      ['no HR basis', undefined],
+      ['no type', { ...HR_BASIS, type: undefined }],
+      ['no reference', { ...HR_BASIS, reference: '' }],
+      ['no issuer', { ...HR_BASIS, issuer: undefined }],
+      ['no date of issue', { ...HR_BASIS, issuedOn: undefined }],
+    ])('writes nothing and says what is missing when the confirmation has %s', async (_name, hrBasis) => {
+      const department = await newDepartment();
+      const uploaded = importOf(await upload(csv([personRow({ department_code: department })])).expect(201));
+      const people = await count('employees');
+
+      const refused = await confirm(
+        uploaded.id,
+        { previewVersion: 1, idempotencyKey: unique('key-0000'), hrBasis },
+        asSuper(),
+      ).expect(422);
+
+      expect(errorOf(refused).code).toBe('VALIDATION_ERROR');
+      expect(JSON.stringify(refused.body)).toMatch(/hrBasis|type|reference|issuer|issuedOn/);
+      expect(await count('employees')).toBe(people);
+      expect(
+        importOf(await request(server()).get(`/api/v1/employee-imports/${uploaded.id}`).set(asSuper()).expect(200))
+          .status,
+      ).toBe('PREVIEW');
+    });
+
+    it('puts the HR basis in the Audit Trail of every person created, with the code, the department and the title and no name or email', async () => {
+      const department = await newDepartment();
+      const rows = [personRow({ department_code: department }), personRow({ department_code: department })];
+      const uploaded = importOf(await upload(csv(rows)).expect(201));
+      await confirm(uploaded.id, { previewVersion: 1, idempotencyKey: unique('key-0000') }).expect(200);
+
+      const events = await ctx.sql.query<{
+        actor_roles: string[];
+        resource_id: string;
+        after: Record<string, unknown>;
+      }>(
+        `SELECT a.actor_roles, a.resource_id, a.after
+           FROM audit_events a JOIN employees e ON e.id::text = a.resource_id
+           JOIN employee_placements p ON p.employee_id = e.id JOIN departments d ON d.id = p.department_id
+          WHERE a.action = 'EMPLOYEE.CREATED' AND d.code = $1 ORDER BY e.employee_code`,
+        [department],
+      );
+
+      expect(events.rows).toHaveLength(2);
+      for (const event of events.rows) {
+        expect(event.actor_roles).toEqual(['SUPER_ADMIN']);
+        expect(event.after).toEqual({
+          employeeCode: expect.any(String) as unknown,
+          department,
+          jobTitle: 'Administrator',
+          importId: uploaded.id,
+          hrBasis: HR_BASIS,
+        });
+      }
+    });
+
+    it('refuses a row with the code or the work email of the Super Admin who imports, even when it would only be a person already there', async () => {
+      const own = (
+        await ctx.sql.query<{ code: string; email: string }>(
+          `SELECT e.employee_code AS code, e.work_email AS email FROM employees e JOIN app_users u ON u.employee_id = e.id
+             JOIN role_grants g ON g.app_user_id = u.id AND g.role = 'SUPER_ADMIN' AND g.revoked_at IS NULL`,
+        )
+      ).rows[0];
+      const department = await newDepartment();
+
+      const uploaded = importOf(
+        await upload(
+          csv([
+            personRow({ department_code: department }),
+            personRow({ employee_code: own.code, department_code: department }),
+            personRow({ work_email: own.email.toUpperCase(), department_code: department }),
+          ]),
+        ).expect(201),
+      );
+
+      expect(uploaded.summary).toMatchObject({ totalRows: 3, valid: 1, errors: 2 });
+      expect((await rowsOf(uploaded.id, 'ERROR')).map((row) => row.errors)).toEqual([
+        [{ column: 'employee_code', code: 'OWN_RECORD' }],
+        [{ column: 'work_email', code: 'OWN_RECORD' }],
+      ]);
+    });
+  });
+
   describe('who may import (US-02-02 AC-12)', () => {
-    it('refuses Finance, a department head, an employee and the Super Admin, and changes nothing', async () => {
+    it('refuses the IT Admin, Finance, a department head and an employee, and changes nothing (QĐ-82i)', async () => {
       const head = await createActivatedAccount(ctx, seed, {
         code: unique('E-HEAD'),
         email: `${unique('head')}@acme.vn`,
@@ -1101,7 +1213,7 @@ describe('importing people from a file over HTTP (integration, real PostgreSQL)'
       const imports = await count('employee_imports');
       const people = await count('employees');
 
-      for (const headers of [as(finance), as(head), as(employee), { Authorization: `Bearer ${admin}` }]) {
+      for (const headers of [asIt(), as(finance), as(head), as(employee)]) {
         await upload(csv([personRow()]), 'people.csv', headers).expect(403);
       }
 
@@ -1119,7 +1231,7 @@ describe('importing people from a file over HTTP (integration, real PostgreSQL)'
     ['POST', '/api/v1/employee-imports/not-a-uuid/cancellations'],
   ])('answers 422 VALIDATION_ERROR to %s %s', async (method, path) => {
     const call = method === 'GET' ? request(server()).get(path) : request(server()).post(path).send({});
-    const response = await call.set(asIt()).expect(422);
+    const response = await call.set(asSuper()).expect(422);
 
     expect(errorOf(response).code).toBe('VALIDATION_ERROR');
   });

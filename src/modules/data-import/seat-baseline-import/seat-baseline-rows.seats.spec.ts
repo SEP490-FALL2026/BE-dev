@@ -51,7 +51,7 @@ describe('judgeSeatRows: overlap and the same identifier (AC-3, AC-9, INV-02)', 
       account_identifier: identifier,
       kind: 'service',
       reason: 'CI',
-      cost_center_code: 'CC-CORP',
+      cost_center_code: 'CC-DES',
     });
     const results = judgeSeatRows(
       [
@@ -71,7 +71,7 @@ describe('judgeSeatRows: overlap and the same identifier (AC-3, AC-9, INV-02)', 
       account_identifier: identifier,
       kind: 'service',
       reason: 'CI',
-      cost_center_code: 'CC-CORP',
+      cost_center_code: 'CC-DES',
     });
     const inFile = judgeSeatRows([row(2, bot('E2', 'ci-bot')), row(3, bot('E3', ' CI-Bot '))], facts());
     const kept: ExistingAssignment[] = [
@@ -106,7 +106,7 @@ describe('judgeSeatRows: overlap and the same identifier (AC-3, AC-9, INV-02)', 
           account_identifier: 'ci-bot',
           kind: 'service',
           reason: 'CI',
-          cost_center_code: 'CC-CORP',
+          cost_center_code: 'CC-DES',
         },
         { existing: kept },
       ).outcome,
@@ -226,7 +226,7 @@ describe('maskSecretCells (AC-9: a secret is never kept)', () => {
       account_identifier: 'ghp_abc123',
       kind: 'service',
       reason: 'CI',
-      cost_center_code: 'CC-CORP',
+      cost_center_code: 'CC-DES',
     };
     const preview = judgeOne(cells);
     const confirmed = judgeOne(maskSecretCells(cells));
@@ -236,11 +236,39 @@ describe('maskSecretCells (AC-9: a secret is never kept)', () => {
     expect(sameJudgement(preview, confirmed)).toBe(true);
   });
 
-  it('keeps an identifier with a space as it is: its error is the characters, not a token', () => {
+  it('masks an identifier that is not a name at all, as invalid: a secret of a shape nobody knows looks like that (SEC-03)', () => {
     const cells = { employee_code: 'E2', account_identifier: 'ghp abc 123' };
 
-    expect(maskSecretCells(cells)).toEqual(cells);
+    const kept = maskSecretCells(cells);
+
+    expect(kept).toEqual({ employee_code: 'E2', account_identifier: '[masked: invalid]' });
     expect(codesOf(judgeOne(cells))).toEqual(['ACCOUNT_IDENTIFIER_INVALID']);
+    expect(sameJudgement(judgeOne(cells), judgeOne(kept))).toBe(true);
+  });
+
+  it.each([
+    ['a space in front', ' ghp_abc123 '],
+    ['a zero-width space inside', 'ghp_abc​123'],
+    ['a zero-width joiner after the prefix', 'ghp_\u200dabc123'],
+    ['a byte order mark in front', '\ufeffghp_abc123'],
+    ['full-width letters', 'ｇｈｐ_abc123'],
+    ['a space inside the shape', 'github_pat_ abc123def456'],
+    ['tabs and a newline', 'ghp_\tabc\n123'],
+  ])('masks a token however it is dressed: %s, as the token it is (SEC-03)', (_name, identifier) => {
+    const cells = { employee_code: 'E2', account_identifier: identifier };
+
+    const kept = maskSecretCells(cells);
+
+    expect(kept.account_identifier).toBe('[masked]');
+    expect(JSON.stringify(kept)).not.toMatch(/abc|123/);
+    expect(codesOf(judgeOne(cells))).toEqual(['ACCOUNT_IDENTIFIER_LOOKS_LIKE_SECRET']);
+    expect(codesOf(judgeOne(kept))).toEqual(['ACCOUNT_IDENTIFIER_LOOKS_LIKE_SECRET']);
+  });
+
+  it('keeps an ordinary account as it is', () => {
+    const cells = { employee_code: 'E2', account_identifier: 'ci-bot' };
+
+    expect(maskSecretCells(cells)).toEqual(cells);
   });
 });
 

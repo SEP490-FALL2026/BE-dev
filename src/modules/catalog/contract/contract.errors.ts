@@ -76,6 +76,22 @@ export class DocumentNotAwaitingUploadError extends Error {
   }
 }
 
+/** The upload has not reached the storage yet: the link is still good, so this is not a refusal of the file (`DB-13`). */
+export class DocumentUploadPendingError extends Error {
+  constructor() {
+    super('The file has not reached the storage yet. Put it there with the link and say so again.');
+    this.name = 'DocumentUploadPendingError';
+  }
+}
+
+/** Nobody uploaded the file in time and it was given up: declare it again (`DB-13`). */
+export class DocumentUploadExpiredError extends Error {
+  constructor() {
+    super('The upload of this document never came and it was given up. Declare the file again.');
+    this.name = 'DocumentUploadExpiredError';
+  }
+}
+
 export class DocumentAlreadyAttachedError extends Error {
   constructor() {
     super('The document has an owner already.');

@@ -44,7 +44,7 @@ const documentSchema = z.strictObject({
     'IMPORT_SOURCE',
     'COST_STATEMENT',
   ]),
-  status: z.enum(['AWAITING_UPLOAD', 'PENDING_ATTACH', 'READY', 'QUARANTINED']),
+  status: z.enum(['AWAITING_UPLOAD', 'PENDING_ATTACH', 'READY', 'QUARANTINED', 'EXPIRED']),
   fileName: z.string(),
   contentType: z.string(),
   sizeBytes: z.number().int().positive(),

@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { cutHistory } from '../../../core/application/pagination';
 import { businessDateAt, toDateColumn } from '../../../core/business-date';
 import { NotificationsService } from '../../notifications/notifications.service';
 import { DeliveryState } from '../../notifications/notifications.types';
@@ -38,6 +39,8 @@ export interface InvitationView {
 
 export interface AccountDetailView extends AccountView {
   roleHistory: RoleGrantRecord[];
+  /** The account has older grants than the {@link ROLE_HISTORY_LIMIT} shown. */
+  roleHistoryHasMore: boolean;
   invitation: InvitationView | null;
 }
 
@@ -50,6 +53,9 @@ export interface AccountPage {
 const CANDIDATE_LIMIT = 20;
 
 /** Reads for account administration (slice 1b): candidates, the account list and one account. */
+/** How many grants of one account the detail shows, the newest; older ones are reported by `roleHistoryHasMore`. */
+export const ROLE_HISTORY_LIMIT = 50;
+
 @Injectable()
 export class AccountQueryService {
   constructor(
@@ -124,7 +130,7 @@ export class AccountQueryService {
   private async toDetail(record: AccountRecord): Promise<AccountDetailView> {
     const [view] = await this.toViews([record]);
     const [roleHistory, token] = await Promise.all([
-      this.grants.grantHistory(record.id),
+      this.grants.grantHistory(record.id, ROLE_HISTORY_LIMIT + 1),
       this.links.latestToken(record.id),
     ]);
     let invitation: InvitationView | null = null;
@@ -141,6 +147,8 @@ export class AccountQueryService {
       };
     }
 
-    return { ...view, roleHistory, invitation };
+    const cut = cutHistory(roleHistory, ROLE_HISTORY_LIMIT);
+
+    return { ...view, roleHistory: cut.items.reverse(), roleHistoryHasMore: cut.hasMore, invitation };
   }
 }

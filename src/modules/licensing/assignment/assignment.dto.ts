@@ -41,6 +41,7 @@ const assignmentSchema = z.strictObject({
   accountIdentifier: z.string(),
   reason: z.string().nullable(),
   costCenterId: z.uuid().nullable(),
+  owningDepartmentId: z.uuid().nullable(),
   effectiveFrom: z.string(),
   effectiveFromBasis: z.enum(['ACTUAL', 'RECORDED']),
   grantedOn: z.string().nullable(),
@@ -50,6 +51,11 @@ const assignmentSchema = z.strictObject({
   predecessorId: z.uuid().nullable(),
   failedAt: z.iso.datetime().nullable(),
   createdAt: z.iso.datetime(),
+});
+const assignmentSummarySchema = assignmentSchema.extend({
+  employee: z.strictObject({ employeeId: z.uuid(), employeeCode: z.string(), fullName: z.string() }),
+  plan: z.strictObject({ planId: z.uuid(), planName: z.string(), applicationName: z.string() }),
+  costCenter: z.strictObject({ id: z.uuid(), code: z.string(), name: z.string() }).nullable(),
 });
 const pagination = z.strictObject({
   page: z.number().int().positive(),
@@ -63,7 +69,7 @@ export class ListAssignmentsQueryDto extends createZodDto(listAssignmentsQuerySc
 export class AssignmentIdParamDto extends createZodDto(assignmentIdParamSchema) {}
 export class SubscriptionSeatsParamDto extends createZodDto(subscriptionIdParamSchema) {}
 export class AssignmentPageResponseDto extends createZodDto(
-  successEnvelopeSchema(z.strictObject({ items: z.array(assignmentSchema), pagination })),
+  successEnvelopeSchema(z.strictObject({ items: z.array(assignmentSummarySchema), pagination })),
 ) {}
 export class ResponsibleChangeResponseDto extends createZodDto(
   successEnvelopeSchema(z.strictObject({ ended: assignmentSchema, created: assignmentSchema })),

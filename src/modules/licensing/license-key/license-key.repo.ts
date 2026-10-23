@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { LicenseKeyStatus } from '../../../generated/prisma/client';
+import { Prisma, type LicenseKeyStatus } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
 
@@ -56,25 +56,29 @@ export class LicenseKeyRepo {
     });
   }
 
+  /** One page, the total for the filter and the keys still usable, all from one snapshot (`LD-11`): a key imported meanwhile is in none or in all. */
   async page(input: {
     subscriptionId: string;
     status?: LicenseKeyStatus;
     skip: number;
     take: number;
-  }): Promise<{ items: LicenseKeyListed[]; total: number }> {
+  }): Promise<{ items: LicenseKeyListed[]; total: number; usable: number }> {
     const where = { subscriptionId: input.subscriptionId, ...(input.status ? { status: input.status } : {}) };
-    const [rows, total] = await Promise.all([
-      this.prisma.licenseKey.findMany({
-        where,
-        orderBy: [{ importedAt: 'asc' }, { id: 'asc' }],
-        skip: input.skip,
-        take: input.take,
-        select: { id: true, subscriptionId: true, masked: true, status: true, importedAt: true },
-      }),
-      this.prisma.licenseKey.count({ where }),
-    ]);
 
-    return { items: rows, total };
+    return this.prisma.$transaction(
+      async (tx) => ({
+        items: await tx.licenseKey.findMany({
+          where,
+          orderBy: [{ importedAt: 'asc' }, { id: 'asc' }],
+          skip: input.skip,
+          take: input.take,
+          select: { id: true, subscriptionId: true, masked: true, status: true, importedAt: true },
+        }),
+        total: await tx.licenseKey.count({ where }),
+        usable: await this.countUsable(input.subscriptionId, tx),
+      }),
+      { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
+    );
   }
 
   async findSealed(tx: DbTx, id: string): Promise<LicenseKeySealed | null> {

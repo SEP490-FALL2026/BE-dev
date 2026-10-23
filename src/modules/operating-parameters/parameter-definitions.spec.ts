@@ -6,13 +6,24 @@ describe('operating parameter definitions (US-01-04)', () => {
 
     expect(defaults.APPROVAL_SLA_WORKING_DAYS).toBe(2);
     expect(defaults.ACTIVITY_WINDOW_MINUTES).toBe(5);
-    expect(defaults.BUDGET_PERIOD_KIND).toBe('QUARTER');
+    expect(defaults.FISCAL_YEAR_START_MONTH).toBe(1);
+    expect(defaults.SPEND_SUBMISSION_WAIT_WORKING_DAYS).toBe(2);
     expect(defaults.TRANSFER_REVIEW_WORKING_DAYS).toBe(5);
     expect(defaults.ABRUPT_DEPARTURE_HOLD_WORKING_DAYS).toBe(1);
     expect(defaults.DETECTION_THRESHOLD_DAYS).toEqual([30, 60, 90]);
     expect(defaults.RENEWAL_ALERT_DAYS_BEFORE_DEADLINE).toEqual([15, 7]);
     expect(defaults.RULE_SCHEDULE_G1_G2).toBe('DAILY');
     expect(defaults.RULE_SCHEDULE_G3_G4).toBe('WEEKLY');
+  });
+
+  it('has no budget period kind and no high-value threshold: the budget period is the fiscal year (AC-8, AC-14)', () => {
+    const keys = PARAMETER_DEFINITIONS.map((definition) => definition.key);
+
+    expect(definitionOf('BUDGET_PERIOD_KIND')).toBeUndefined();
+    expect(keys.filter((key) => /BUDGET_PERIOD|HIGH_VALUE|THRESHOLD_PERCENT/.test(key))).toEqual([
+      'FORECAST_ERROR_THRESHOLD_PERCENT',
+    ]);
+    expect(keys).toEqual(expect.arrayContaining(['FISCAL_YEAR_START_MONTH', 'SPEND_SUBMISSION_WAIT_WORKING_DAYS']));
   });
 
   it('gives every parameter a key, a unit, a description and a default that is itself valid', () => {
@@ -41,7 +52,10 @@ describe('operating parameter definitions (US-01-04)', () => {
     ['a fraction', 'APPROVAL_SLA_WORKING_DAYS', 2.5],
     ['zero days', 'APPROVAL_SLA_WORKING_DAYS', 0],
     ['no value', 'APPROVAL_SLA_WORKING_DAYS', null],
-    ['an unknown period kind', 'BUDGET_PERIOD_KIND', 'WEEK'],
+    ['a month that does not exist', 'FISCAL_YEAR_START_MONTH', 13],
+    ['month zero', 'FISCAL_YEAR_START_MONTH', 0],
+    ['no waiting days', 'SPEND_SUBMISSION_WAIT_WORKING_DAYS', 0],
+    ['more than thirty waiting days', 'SPEND_SUBMISSION_WAIT_WORKING_DAYS', 31],
     ['thresholds out of order', 'DETECTION_THRESHOLD_DAYS', [60, 30, 90]],
     ['thresholds with a repeat', 'DETECTION_THRESHOLD_DAYS', [30, 30, 90]],
     ['two thresholds instead of three', 'DETECTION_THRESHOLD_DAYS', [30, 60]],

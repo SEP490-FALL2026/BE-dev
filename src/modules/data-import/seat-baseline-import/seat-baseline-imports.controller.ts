@@ -37,6 +37,8 @@ import type { SeatImportView } from './seat-baseline-import.types';
 
 /** The largest file the route reads: a seat file of 1 000 rows is far smaller. */
 const MAX_FILE_BYTES = 2 * 1024 * 1024;
+/** One file and nothing else of any size: a form of 50 fields, or a field of a megabyte, is refused before it is read (`SEC-06`). */
+const UPLOAD_LIMITS = { fileSize: MAX_FILE_BYTES, files: 1, fields: 2, fieldSize: 64, parts: 3 };
 
 /** The part of a multipart upload this controller uses; multer own type is not a dependency of the project. */
 interface UploadedBinary {
@@ -88,7 +90,7 @@ export class SeatBaselineImportsController {
 
   @Post()
   @RequireRoles('IT_ADMIN')
-  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_FILE_BYTES, files: 1 } }))
+  @UseInterceptors(FileInterceptor('file', { limits: UPLOAD_LIMITS }))
   @ApiOperation({ operationId: 'seatBaselineImportUpload', summary: 'Upload a seat baseline file for preview' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({

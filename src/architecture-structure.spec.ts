@@ -208,6 +208,10 @@ const INTRA_MODULE_CONTRACTS: ReadonlyMap<string, string> = new Map([
   ],
   ['modules/organization/department/department-directory.service.ts', 'department head periods behind the facade'],
   [
+    'modules/organization/department/service-account-registry.ts',
+    'registry where licensing hands in the reader of the service accounts a department owns (QĐ-86c), read by the facade',
+  ],
+  [
     'modules/organization/department/department.errors.ts',
     'department errors mapped by the shared mappers/organization.http-errors.ts',
   ],

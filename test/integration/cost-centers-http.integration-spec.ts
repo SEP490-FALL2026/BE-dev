@@ -3,6 +3,7 @@ import { Client } from 'pg';
 import { ApiAccount, adminToken, createActivatedAccount } from '../support/api-accounts';
 import { HttpTestApp, SeededInstallation, createHttpTestApp, seedInstallation } from '../support/http-test-app';
 import { findPlacementCoverageViolations } from '../support/placement-coverage';
+import { HR_BASIS } from '../support/hr-basis';
 
 interface CostCenterWire {
   id: string;
@@ -29,11 +30,14 @@ describe('the Cost Center catalogue over HTTP (integration, real PostgreSQL)', (
   const server = () => ctx.app.getHttpServer();
   const asFinance = () => ({ Authorization: `Bearer ${finance.accessToken}` });
   const asIt = () => ({ Authorization: `Bearer ${it1.accessToken}` });
+  let superAdmin: string;
+  const asSuperAdmin = () => ({ Authorization: `Bearer ${superAdmin}` });
 
   beforeAll(async () => {
     ctx = await createHttpTestApp();
     seed = await seedInstallation(ctx.app);
     const admin = await adminToken(ctx, seed);
+    superAdmin = admin;
     finance = await createActivatedAccount(ctx, seed, {
       code: 'E-FIN',
       email: 'fin@acme.vn',
@@ -109,10 +113,13 @@ describe('the Cost Center catalogue over HTTP (integration, real PostgreSQL)', (
       expect(actor.rows[0].actor_roles).toEqual(['FINANCE']);
     });
 
-    it('lets Finance create a COMPANY cost center too', async () => {
-      const response = await create({ code: unique('CORP'), name: 'Whole company', kind: 'COMPANY' }).expect(201);
+    it('refuses a COMPANY cost center: the Company is the root of the organization, not a Cost Center (QĐ-86a)', async () => {
+      const code = unique('CORP');
 
-      expect(dataOf(response)).toMatchObject({ kind: 'COMPANY', status: 'ACTIVE' });
+      const response = await create({ code, name: 'Whole company', kind: 'COMPANY' }).expect(422);
+
+      expect(errorOf(response).code).toBe('COST_CENTER.KIND_NOT_SUPPORTED');
+      expect((await ctx.sql.query('SELECT 1 FROM cost_centers WHERE code = $1', [code])).rows).toHaveLength(0);
     });
 
     it('turns the IT Admin away from creating one: 403, nothing created', async () => {
@@ -191,10 +198,7 @@ describe('the Cost Center catalogue over HTTP (integration, real PostgreSQL)', (
       expect(items.every((item) => item.status === 'INACTIVE')).toBe(true);
       expect(items.map((item) => item.code)).toContain(retired.code);
 
-      const company = await request(server()).get('/api/v1/cost-centers?kind=COMPANY').set(asFinance()).expect(200);
-      expect(
-        (company.body as { data: { items: CostCenterWire[] } }).data.items.every((item) => item.kind === 'COMPANY'),
-      ).toBe(true);
+      await request(server()).get('/api/v1/cost-centers?kind=COMPANY').set(asFinance()).expect(422);
       const codes = (
         (await request(server()).get('/api/v1/cost-centers?pageSize=100').set(asFinance()).expect(200)).body as {
           data: { items: CostCenterWire[] };
@@ -350,8 +354,9 @@ describe('the Cost Center catalogue over HTTP (integration, real PostgreSQL)', (
 
       const response = await request(server())
         .post('/api/v1/employees')
-        .set(asIt())
+        .set(asSuperAdmin())
         .send({
+          hrBasis: HR_BASIS,
           employeeCode: unique('E-GONE'),
           fullName: 'Late Joiner',
           employmentType: 'STAFF',
@@ -397,7 +402,7 @@ describe('the Cost Center catalogue over HTTP (integration, real PostgreSQL)', (
     });
 
     it('is empty for a cost center with no department, and refused to everyone but Finance', async () => {
-      const company = dataOf(await create({ code: unique('CORP'), name: 'Company wide', kind: 'COMPANY' }).expect(201));
+      const company = await createUnit(unique('CC-FREE'));
 
       const response = await request(server())
         .get(`/api/v1/cost-centers/${company.id}/employees`)
@@ -463,8 +468,9 @@ describe('the Cost Center catalogue over HTTP (integration, real PostgreSQL)', (
         const retiring = deactivate(costCenter.id).then((r) => r);
         const entering = request(server())
           .post('/api/v1/employees')
-          .set(asIt())
+          .set(asSuperAdmin())
           .send({
+            hrBasis: HR_BASIS,
             employeeCode,
             fullName: 'Racing Person',
             employmentType: 'STAFF',

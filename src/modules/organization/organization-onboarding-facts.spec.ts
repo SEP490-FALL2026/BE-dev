@@ -4,6 +4,7 @@ import { DepartmentDirectoryService } from './department/department-directory.se
 import { EmployeeDirectoryService } from './employee/employee-directory.service';
 import { JobTitleCatalogueService } from './job-title/job-title-catalogue.service';
 import { OrganizationRepo } from './organization.repo';
+import { DepartmentServiceAccountRegistry } from './department/service-account-registry';
 import { OrganizationService } from './organization.service';
 
 /** P23-RV-02: with a transaction, every read behind the onboarding facts runs in it; without one, none is passed. */
@@ -32,6 +33,7 @@ describe('OrganizationService.getOnboardingFacts', () => {
       employees as unknown as EmployeeDirectoryService,
       costCenters as unknown as CostCenterCatalogueService,
       {} as JobTitleCatalogueService,
+      new DepartmentServiceAccountRegistry(),
     );
     return { service, calls };
   }

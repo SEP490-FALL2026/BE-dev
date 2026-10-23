@@ -131,6 +131,8 @@ describe('vendor tax profiles (integration, PostgreSQL constraints)', () => {
     expect(await line(versionId, 1, 'GTGT', 1000)).toBeNull();
     expect(await line(versionId, 2, 'gtgt', 500)).toBe('23505');
     expect(await line(versionId, 1, 'TNDN', 500)).toBe('23505');
+    // A version is the next one of its head (DB-14): the head moves to 1 before version 2 is written.
+    await sql.query(`UPDATE vendor_tax_profiles SET current_version = 1 WHERE vendor_id = $1`, [owner]);
     const other = await version(owner, 2);
     expect(await line(other, 1, 'GTGT', 1000)).toBeNull();
   });

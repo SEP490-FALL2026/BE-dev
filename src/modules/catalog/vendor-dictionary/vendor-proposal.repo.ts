@@ -42,7 +42,8 @@ export class VendorProposalRepo {
 
   /**
    * Raises a proposal from an application declaration unless the organization already has an open one for the same
-   * name (the partial unique index decides, so two declarations at once raise one). True when this call made it.
+   * name (the partial unique index decides, so two declarations at once raise one). The id of the proposal this call made, or
+   * null when one was already open.
    */
   async raise(
     tx: DbTx,
@@ -53,7 +54,7 @@ export class VendorProposalRepo {
       domains: string[];
       sourceApplicationId: string;
     },
-  ): Promise<boolean> {
+  ): Promise<string | null> {
     const rows = await tx.$queryRaw<{ id: string }[]>`
       INSERT INTO vendor_dictionary_proposals
         (id, organization_id, proposed_name, normalized_name, proposed_domains, source_application_id)
@@ -62,7 +63,7 @@ export class VendorProposalRepo {
       ON CONFLICT (organization_id, normalized_name) WHERE status = 'PENDING' DO NOTHING
       RETURNING id`;
 
-    return rows.length > 0;
+    return rows.length > 0 ? rows[0].id : null;
   }
 
   /** The proposal, locked until the transaction ends, so two resolutions of it cannot both see it pending. */

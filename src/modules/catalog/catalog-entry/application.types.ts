@@ -26,6 +26,20 @@ export interface ApplicationRecord {
   updatedAt: Date;
 }
 
+/** What a row of the application list shows (`LD-04`): no domains, no communication note, no dictionary line. */
+export interface ApplicationSummaryRecord {
+  id: string;
+  name: string;
+  kind: ApplicationKind;
+  vendor: { id: string; name: string } | null;
+  dataSensitivity: DataSensitivity;
+  businessOwnerEmployeeId: string;
+  isCommunicationService: boolean;
+  functionalGroup: { id: string; name: string } | null;
+  status: CatalogStatus;
+  updatedAt: Date;
+}
+
 export interface BusinessOwnerView {
   employeeId: string;
   employeeCode: string;
@@ -37,6 +51,11 @@ export interface BusinessOwnerView {
 export interface ApplicationView extends ApplicationRecord {
   businessOwner: BusinessOwnerView;
   /** The Business Owner has left and has not been replaced (`INV-06`: the previous one is kept until then). */
+  businessOwnerReplacementRequired: boolean;
+}
+
+export interface ApplicationSummaryView extends ApplicationSummaryRecord {
+  businessOwner: BusinessOwnerView;
   businessOwnerReplacementRequired: boolean;
 }
 

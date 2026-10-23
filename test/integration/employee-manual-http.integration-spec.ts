@@ -14,6 +14,7 @@ import {
   loginAs,
 } from '../support/api-accounts';
 import { HttpTestApp, SeededInstallation, createHttpTestApp, seedInstallation } from '../support/http-test-app';
+import { HR_BASIS } from '../support/hr-basis';
 import { findPlacementCoverageViolations } from '../support/placement-coverage';
 
 interface Reason {
@@ -40,9 +41,11 @@ describe('manual employee entry over HTTP (integration, real PostgreSQL)', () =>
   let it1: ApiAccount;
   let finance: ApiAccount;
   let admin: string;
+  let adminAccount: { appUserId: string; employeeId: string; employeeCode: string; email: string };
   let counter = 0;
   const server = () => ctx.app.getHttpServer();
   const asIt = () => ({ Authorization: `Bearer ${it1.accessToken}` });
+  const asSuperAdmin = () => ({ Authorization: `Bearer ${admin}` });
 
   beforeAll(async () => {
     ctx = await createHttpTestApp();
@@ -55,6 +58,13 @@ describe('manual employee entry over HTTP (integration, real PostgreSQL)', () =>
       roles: ['FINANCE'],
       admin,
     });
+    adminAccount = (
+      await ctx.sql.query<{ appUserId: string; employeeId: string; employeeCode: string; email: string }>(
+        `SELECT u.id AS "appUserId", e.id AS "employeeId", e.employee_code AS "employeeCode", e.work_email AS email
+           FROM app_users u JOIN employees e ON e.id = u.employee_id
+           JOIN role_grants g ON g.app_user_id = u.id AND g.role = 'SUPER_ADMIN' AND g.revoked_at IS NULL`,
+      )
+    ).rows[0];
   }, 120000);
 
   afterAll(async () => {
@@ -72,11 +82,12 @@ describe('manual employee entry over HTTP (integration, real PostgreSQL)', () =>
       hireDate: '2026-10-01',
       departmentCode: 'P-OPS',
       jobTitleId: seed.jobTitleId,
+      hrBasis: HR_BASIS,
       ...overrides,
     };
   };
 
-  const enter = (body: object, headers: Record<string, string> = asIt()) =>
+  const enter = (body: object, headers: Record<string, string> = asSuperAdmin()) =>
     request(server()).post('/api/v1/employees').set(headers).send(body);
 
   const reasonsOf = (response: request.Response): Reason[] =>
@@ -168,8 +179,8 @@ describe('manual employee entry over HTTP (integration, real PostgreSQL)', () =>
       expect(audit.rows).toHaveLength(1);
       expect(audit.rows[0]).toMatchObject({
         actor_kind: 'USER',
-        actor_app_user_id: it1.appUserId,
-        actor_roles: ['IT_ADMIN'],
+        actor_app_user_id: adminAccount.appUserId,
+        actor_roles: ['SUPER_ADMIN'],
         before: null,
         after: {
           employeeCode: 'E-NOMAIL',
@@ -177,6 +188,7 @@ describe('manual employee entry over HTTP (integration, real PostgreSQL)', () =>
           hireDate: '2026-10-01',
           department: 'P-OPS',
           jobTitle: 'Administrator',
+          hrBasis: HR_BASIS,
         },
       });
     });
@@ -201,6 +213,7 @@ describe('manual employee entry over HTTP (integration, real PostgreSQL)', () =>
             department: data.department.code,
             jobTitle: data.jobTitle.name,
             memberSince: data.memberSince,
+            hrBasis: HR_BASIS,
           },
         },
       ]);
@@ -292,6 +305,33 @@ describe('manual employee entry over HTTP (integration, real PostgreSQL)', () =>
       expect(after.cost_centers).toBe(before.cost_centers);
     });
 
+    it('refuses to enter the record of the Super Admin who is entering: their code, their email, however written (AC-18)', async () => {
+      const before = await sideTables();
+
+      const byCode = await enter(row({ employeeCode: adminAccount.employeeCode })).expect(422);
+      const byEmail = await enter(row({ workEmail: ` ${adminAccount.email.toUpperCase()} ` })).expect(422);
+
+      expect(reasonsOf(byCode)).toEqual([{ field: 'employeeCode', code: 'OWN_RECORD' }]);
+      expect(reasonsOf(byEmail)).toEqual([{ field: 'workEmail', code: 'OWN_RECORD' }]);
+      expect(await sideTables()).toEqual(before);
+    });
+
+    it.each([
+      ['no HR basis at all', undefined, 'hrBasis'],
+      ['an HR basis without its type', { ...HR_BASIS, type: undefined }, 'type'],
+      ['an HR basis without its reference', { ...HR_BASIS, reference: '  ' }, 'reference'],
+      ['an HR basis without its issuer', { ...HR_BASIS, issuer: undefined }, 'issuer'],
+      ['an HR basis without a real date', { ...HR_BASIS, issuedOn: '2026-02-30' }, 'issuedOn'],
+    ])('refuses %s, naming what is missing, and writes nothing (AC-16)', async (_name, hrBasis, field) => {
+      const people = (await ctx.sql.query<{ n: number }>('SELECT count(*)::int AS n FROM employees')).rows[0];
+
+      const response = await enter(row({ hrBasis })).expect(422);
+
+      expect(errorCodeOf(response)).toBe('VALIDATION_ERROR');
+      expect(JSON.stringify(response.body)).toContain(field);
+      expect((await ctx.sql.query('SELECT count(*)::int AS n FROM employees')).rows[0]).toEqual(people);
+    });
+
     it.each([
       ['a work email that is not an email', { workEmail: 'not an email' }],
       ['a hire date that is not a date', { hireDate: '2026-02-30' }],
@@ -304,13 +344,13 @@ describe('manual employee entry over HTTP (integration, real PostgreSQL)', () =>
 
   describe('when the person becomes a member of the department (US-02-02 AC-15, T-14)', () => {
     const actor = (): AuthenticatedPrincipal => ({
-      subject: it1.appUserId,
-      appUserId: it1.appUserId,
+      subject: adminAccount.appUserId,
+      appUserId: adminAccount.appUserId,
       sessionId: 'clock-test-session',
-      employeeId: it1.employeeId,
-      directRoles: ['IT_ADMIN'],
+      employeeId: adminAccount.employeeId,
+      directRoles: ['SUPER_ADMIN'],
       derivedRoles: [],
-      roles: ['IT_ADMIN'],
+      roles: ['SUPER_ADMIN'],
     });
     const service = () => ctx.app.get(EmployeeManualService, { strict: false });
     const placementOf = async (employeeId: string) =>
@@ -381,9 +421,9 @@ describe('manual employee entry over HTTP (integration, real PostgreSQL)', () =>
 
   describe('who may enter people', () => {
     it.each([
-      ['the Super Admin', () => ({ Authorization: `Bearer ${admin}` })],
+      ['the IT Admin', () => asIt()],
       ['the finance officer', () => ({ Authorization: `Bearer ${finance.accessToken}` })],
-    ])('refuses %s with 403 and writes nothing', async (_name, headers) => {
+    ])('refuses %s with 403 and writes nothing (AC-14, QĐ-82i)', async (_name, headers) => {
       const before = await sideTables();
       const people = (await ctx.sql.query<{ n: number }>('SELECT count(*)::int AS n FROM employees')).rows[0];
 
@@ -395,7 +435,7 @@ describe('manual employee entry over HTTP (integration, real PostgreSQL)', () =>
   });
 
   describe('the first Finance officer (QĐ-67c, QĐ-73b)', () => {
-    it('is entered by hand by an IT Admin, given an account and the FINANCE role by the Super Admin, and signs in', async () => {
+    it('is entered by hand by the Super Admin on an HR basis, given an account and the FINANCE role by them, and signs in', async () => {
       // An installation holds one Finance officer (QĐ-52d). The one this suite made to prove a refusal steps down.
       await request(server())
         .delete(`/api/v1/app-users/${finance.appUserId}/role-grants/FINANCE`)

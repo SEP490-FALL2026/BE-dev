@@ -24,7 +24,7 @@ import {
 import { toProvisioningApiException } from './provisioning.http-errors';
 import { ProvisioningDecisionService } from './provisioning-decision.service';
 import { ProvisioningService } from './provisioning.service';
-import type { TaskView } from './provisioning-task-view.service';
+import type { TaskSummaryView, TaskView } from './provisioning-task-view.service';
 
 const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPONSE] as const;
 const IT_ONLY = {
@@ -36,15 +36,31 @@ const NOT_FOUND = {
   description: 'The task does not exist (PROVISIONING_TASK.NOT_FOUND).',
 } as const;
 
-const toWire = (view: TaskView) => ({
+const toSummaryWire = (view: TaskSummaryView) => ({
   ...view,
   createdAt: view.createdAt.toISOString(),
   claimedAt: view.claimedAt?.toISOString() ?? null,
   completedAt: view.completedAt?.toISOString() ?? null,
   failedAt: view.failedAt?.toISOString() ?? null,
   nextRetryAt: view.nextRetryAt?.toISOString() ?? null,
-  handedOffAt: view.handedOffAt?.toISOString() ?? null,
   closedAt: view.closedAt?.toISOString() ?? null,
+});
+
+const toWire = (view: TaskView) => ({ ...toSummaryWire(view), ...detailOf(view) });
+
+const detailOf = (view: TaskView) => ({
+  steps: view.steps,
+  doneWhen: view.doneWhen,
+  completedBy: view.completedBy,
+  evidence: view.evidence,
+  failedBy: view.failedBy,
+  failureReason: view.failureReason,
+  lastError: view.lastError,
+  handedOffBy: view.handedOffBy,
+  handedOffAt: view.handedOffAt?.toISOString() ?? null,
+  handOffEvidence: view.handOffEvidence,
+  closedBy: view.closedBy,
+  closeReason: view.closeReason,
 });
 
 /**
@@ -114,7 +130,7 @@ export class ProvisioningTasksController {
     try {
       const page = await this.provisioning.list(actor, query);
 
-      return { items: page.items.map(toWire), pagination: page.pagination };
+      return { items: page.items.map(toSummaryWire), pagination: page.pagination };
     } catch (error) {
       throw toProvisioningApiException(error);
     }

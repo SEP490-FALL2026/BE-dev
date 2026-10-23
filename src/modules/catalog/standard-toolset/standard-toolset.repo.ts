@@ -149,20 +149,24 @@ export class StandardToolsetRepo {
           skip: filter.skip,
           take: filter.take,
         });
-        const rows = await Promise.all(
-          heads.map((head) =>
-            tx.standardToolsetVersion.findUniqueOrThrow({
-              where: {
-                departmentId_jobTitleId_version: {
-                  departmentId: head.departmentId,
-                  jobTitleId: head.jobTitleId,
-                  version: head.currentVersion,
-                },
-              },
-              include: WITH_ITEMS,
-            }),
-          ),
-        );
+        // One read for the current version of every pair of the page (`LD-07`), put back in the order of the heads.
+        const versions = await tx.standardToolsetVersion.findMany({
+          where: {
+            OR: heads.map((head) => ({
+              departmentId: head.departmentId,
+              jobTitleId: head.jobTitleId,
+              version: head.currentVersion,
+            })),
+          },
+          include: WITH_ITEMS,
+        });
+        const byPair = new Map(versions.map((row) => [`${row.departmentId}|${row.jobTitleId}`, row]));
+        const rows = heads.map((head) => {
+          const row = byPair.get(`${head.departmentId}|${head.jobTitleId}`);
+          if (!row) throw new Error('The current version of a standard toolset is missing');
+
+          return row;
+        });
 
         return { items: rows.map(toVersion), total: await tx.standardToolset.count({ where }) };
       },

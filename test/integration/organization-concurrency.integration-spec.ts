@@ -5,6 +5,7 @@ import { HttpTestApp, SeededInstallation, createHttpTestApp, seedInstallation } 
 import { TransactionRunner } from '../../src/infrastructure/database/transaction-runner';
 import { OrganizationService } from '../../src/modules/organization/organization.service';
 import { findPlacementCoverageViolations } from '../support/placement-coverage';
+import { HR_BASIS } from '../support/hr-basis';
 
 const ROUNDS = 6;
 
@@ -29,11 +30,13 @@ describe('lock protocol: job titles and manual entry races (integration, real Po
   let counter = 0;
   const server = () => ctx.app.getHttpServer();
   const asIt = () => ({ Authorization: `Bearer ${it1.accessToken}` });
+  let superAdmin: string;
 
   beforeAll(async () => {
     ctx = await createHttpTestApp();
     seed = await seedInstallation(ctx.app);
     const admin = await adminToken(ctx, seed);
+    superAdmin = admin;
     it1 = await createActivatedAccount(ctx, seed, { code: 'E-IT1', email: 'it1@acme.vn', roles: ['IT_ADMIN'], admin });
     holder = new Client({ connectionString: ctx.database.url });
     await holder.connect();
@@ -72,11 +75,16 @@ describe('lock protocol: job titles and manual entry races (integration, real Po
       hireDate: '2026-10-01',
       departmentCode: 'P-OPS',
       jobTitleId: seed.jobTitleId,
+      hrBasis: HR_BASIS,
       ...overrides,
     };
   };
 
-  const enter = (body: object) => request(server()).post('/api/v1/employees').set(asIt()).send(body);
+  const enter = (body: object) =>
+    request(server())
+      .post('/api/v1/employees')
+      .set({ Authorization: `Bearer ${superAdmin}` })
+      .send(body);
 
   const deadlocks = async (): Promise<number> =>
     (

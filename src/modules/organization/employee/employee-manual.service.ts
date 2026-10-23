@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { BusinessDate, businessDateAt } from '../../../core/business-date';
 import { InvalidEmailError, normalizeEmail } from '../../../core/email';
+import type { HrBasis } from '../../../core/hr-basis';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditService } from '../../audit/audit.service';
@@ -22,6 +23,8 @@ export interface ManualEmployeeInput {
   hireDate: BusinessDate;
   departmentCode?: string | null;
   jobTitleId?: string | null;
+  /** The HR document the record is entered on (`US-02-02` AC-16). */
+  hrBasis: HrBasis;
 }
 
 export interface ManualEmployeeView {
@@ -39,9 +42,9 @@ export interface ManualEmployeeView {
 }
 
 /**
- * Entering one person by hand (`US-02-02` AC-14, `QĐ-67d`): the Employee and its single placement, in one
- * transaction, and nothing else. It creates no account, role, invitation or mail; giving the person a login
- * is the Super Admin's separate step.
+ * Entering one person by hand (`US-02-02` AC-14, `QĐ-67d`, `QĐ-82i`): the Employee and its single placement, in one
+ * transaction, on the HR document the caller cites, and nothing else. It creates no account, role, invitation or
+ * mail; giving the person a login is a separate step. Whoever enters is never the person entered (AC-18).
  */
 @Injectable()
 export class EmployeeManualService {
@@ -79,6 +82,11 @@ export class EmployeeManualService {
             : null;
         const workEmail = input.workEmail?.trim() || null;
         const normalizedEmail = workEmail === null ? null : this.normalize(workEmail);
+        // Nobody enters their own record (`US-02-02` AC-18): the one place the Super Admin's record is read.
+        const own = await this.organization.getEmployee(actor.employeeId, tx);
+        const ownCode = own !== null && own.employeeCode === input.employeeCode;
+        const ownEmail =
+          own?.workEmail != null && normalizedEmail !== null && this.normalize(own.workEmail) === normalizedEmail;
 
         const reasons = validateEmployeeRow(
           { departmentCode, jobTitleId },
@@ -89,6 +97,8 @@ export class EmployeeManualService {
             workEmailTaken:
               normalizedEmail !== null &&
               (await this.organization.isWorkEmailTaken(tx, organization.id, normalizedEmail)),
+            ownCode,
+            ownEmail,
           },
         );
         if (reasons.length > 0 || !department || !jobTitle) throw new EmployeeRowInvalidError(reasons);
@@ -115,6 +125,7 @@ export class EmployeeManualService {
             department: department.code,
             jobTitle: jobTitle.name,
             memberSince,
+            hrBasis: { ...input.hrBasis },
           }),
         );
 

@@ -30,6 +30,10 @@ export class JobTitleCatalogueService {
     return this.repo.findJobTitle(jobTitleId, tx);
   }
 
+  findMany(jobTitleIds: readonly string[], tx?: DbTx): Promise<JobTitleRecord[]> {
+    return this.repo.findJobTitles(jobTitleIds, tx);
+  }
+
   findByNormalizedName(organizationId: string, normalizedName: string, tx?: DbTx): Promise<JobTitleRecord | null> {
     return this.repo.findJobTitleByNormalizedName(organizationId, normalizedName, tx);
   }

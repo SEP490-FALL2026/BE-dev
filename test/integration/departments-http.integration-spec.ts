@@ -9,6 +9,7 @@ import {
   seedInstallation,
 } from '../support/http-test-app';
 import { findPlacementCoverageViolations } from '../support/placement-coverage';
+import { HR_BASIS } from '../support/hr-basis';
 
 interface DepartmentWire {
   id: string;
@@ -131,9 +132,10 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
       hireDate: '2026-10-01',
       departmentCode,
       jobTitleId: seed.jobTitleId,
+      hrBasis: HR_BASIS,
       ...overrides,
     };
-    const response = await request(server()).post('/api/v1/employees').set(asIt()).send(body).expect(201);
+    const response = await request(server()).post('/api/v1/employees').set(asAdmin()).send(body).expect(201);
 
     return { employeeId: (response.body as { data: { id: string } }).data.id, code, email: body.workEmail };
   };
@@ -206,7 +208,9 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
         memberCount: 0,
         warnings: ['MISSING_HEAD'],
         headHistory: [],
+        headHistoryHasMore: false,
         projects: [],
+        projectTotal: 0,
       });
       expect(await auditOf(dataOf(response).id)).toEqual([
         {
@@ -232,14 +236,12 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
 
     it('turns back the cost centers that cannot be used, each with its own reason, and creates nothing (AC-2)', async () => {
       const before = await rowCount('departments');
-      const company = await createCostCenter('COMPANY');
       const retired = await createCostCenter();
       await request(server()).post(`/api/v1/cost-centers/${retired.id}/deactivate`).set(asFinance()).expect(200);
       const inUse = (await ctx.sql.query<{ id: string }>(`SELECT id FROM cost_centers WHERE code = 'CC-1'`)).rows[0];
 
       const cases: [string, string, number, string][] = [
         ['one that does not exist', '3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11', 422, 'DEPARTMENT.COST_CENTER_NOT_FOUND'],
-        ['one that is a COMPANY cost center', company.id, 422, 'DEPARTMENT.COST_CENTER_NOT_UNIT'],
         ['one that is retired', retired.id, 422, 'DEPARTMENT.COST_CENTER_INACTIVE'],
         ['one that already has a department', inUse.id, 409, 'DEPARTMENT.COST_CENTER_TAKEN'],
       ];
@@ -462,15 +464,23 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
       const error = (response.body as { error: { code: string; message: string; details: Record<string, unknown> } })
         .error;
       expect(error.code).toBe('DEPARTMENT.IN_USE');
-      expect(error.message).toBe('The department still has members.');
-      // Two groups only (US-03-06 AC-19): members and open work. Shared accounts are out of scope since QĐ-75, so the
-      // key is absent — not empty, not null.
-      expect(Object.keys(error.details).sort()).toEqual(['members', 'openWork', 'totalMembers']);
+      expect(error.message).toBe('The department still has members or service accounts.');
+      // Members, the service accounts the department owns (QĐ-86c) and open work (US-03-06 AC-19). Shared accounts are out
+      // of scope since QĐ-75, so that key is absent — not empty, not null.
+      expect(Object.keys(error.details).sort()).toEqual([
+        'members',
+        'openWork',
+        'serviceAccounts',
+        'totalMembers',
+        'totalServiceAccounts',
+      ]);
       expect(Object.hasOwn(error.details, 'sharedAccounts')).toBe(false);
       expect(response.text).not.toContain('sharedAccounts');
       expect(error.details).toEqual({
         totalMembers: 1,
         members: [{ employeeCode: member.code, fullName: expect.any(String) as unknown }],
+        totalServiceAccounts: 0,
+        serviceAccounts: [],
         openWork: [],
       });
       expect((await getDepartment(department.id)).status).toBe('ACTIVE');
@@ -497,8 +507,9 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
       ]);
       const entry = await request(server())
         .post('/api/v1/employees')
-        .set(asIt())
+        .set(asAdmin())
         .send({
+          hrBasis: HR_BASIS,
           employeeCode: unique('E-LATE'),
           fullName: 'Late Joiner',
           employmentType: 'STAFF',
@@ -1012,7 +1023,7 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
       ]);
     });
 
-    it('lists every project by name, then id, when no department is named', async () => {
+    it('lists a page of projects by name, then id, without the description, when no department is named', async () => {
       const department = await newDepartment();
       const prefix = unique('Order');
       const later = await createProject({ name: `${prefix}-B`, departmentIds: [department.id] });
@@ -1021,7 +1032,10 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
       const items = itemsOf(await request(server()).get('/api/v1/projects').set(asIt()).expect(200));
       const ids = items.map((item) => item.id);
 
-      items.forEach(expectWire);
+      for (const item of items) {
+        expect(Object.keys(item).sort()).toEqual(['departments', 'id', 'name', 'status', 'updatedAt']);
+        expect(item.updatedAt).toMatch(ISO_INSTANT);
+      }
       expect(ids).toContain(later.id);
       expect(ids.indexOf(earlier.id)).toBeLessThan(ids.indexOf(later.id));
       expect(items.find((item) => item.id === earlier.id)?.departments).toEqual([]);
@@ -1148,7 +1162,7 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
       'updatedAt',
       'warnings',
     ];
-    const PROFILE_KEYS = [...LIST_KEYS, 'headHistory', 'projects'].sort();
+    const PROFILE_KEYS = [...LIST_KEYS, 'headHistory', 'headHistoryHasMore', 'projects', 'projectTotal'].sort();
     const vacate = (departmentId: string, effectiveFrom: string) =>
       request(server()).post(`/api/v1/departments/${departmentId}/head-vacancies`).set(asIt()).send({ effectiveFrom });
 
@@ -1184,7 +1198,9 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
         updatedAt: profile.createdAt,
         deactivatedAt: null,
         headHistory: [],
+        headHistoryHasMore: false,
         projects: [],
+        projectTotal: 0,
       });
     });
 

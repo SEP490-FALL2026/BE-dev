@@ -24,18 +24,29 @@ const parameterSchema = z.strictObject({
 const parameterListSchema = z.strictObject({ items: z.array(parameterSchema) });
 const parameterHistorySchema = z.strictObject({
   items: z.array(z.strictObject({ value: parameterValue, from: z.iso.datetime(), until: z.iso.datetime().nullable() })),
+  hasMore: z.boolean(),
 });
 
 export const listNonWorkingDatesQuerySchema = z.strictObject({
   from: businessDate.optional(),
   to: businessDate.optional(),
+  page: z.coerce.number().int().positive().default(1),
+  pageSize: z.coerce.number().int().positive().max(100).default(20),
 });
 export const nonWorkingDateParamSchema = z.strictObject({ date: businessDate });
 export const addNonWorkingDateBodySchema = z.strictObject({ date: businessDate, reason: z.string().max(1000) });
 export const renameNonWorkingDateBodySchema = z.strictObject({ reason: z.string().max(1000) });
 
 const nonWorkingDateSchema = z.strictObject({ date: z.string(), reason: z.string() });
-const nonWorkingDateListSchema = z.strictObject({ items: z.array(nonWorkingDateSchema) });
+const nonWorkingDateListSchema = z.strictObject({
+  items: z.array(nonWorkingDateSchema),
+  pagination: z.strictObject({
+    page: z.number().int().positive(),
+    pageSize: z.number().int().positive(),
+    totalItems: z.number().int().nonnegative(),
+    totalPages: z.number().int().nonnegative(),
+  }),
+});
 
 export class ParameterKeyParamDto extends createZodDto(parameterKeyParamSchema) {}
 export class SetParameterBodyDto extends createZodDto(setParameterBodySchema) {}

@@ -123,16 +123,31 @@ export class SeatHarness {
     return employeeId;
   }
 
-  /** Many employees in one statement: `${prefix}0` … `${prefix}${count - 1}`, all staff with an acme.vn email. */
+  /** Many employees in one statement: `${prefix}0` … `${prefix}${count - 1}`, all staff with an acme.vn email, placed in the seed department. */
   async crowd(prefix: string, count: number): Promise<void> {
     await this.ctx.sql.query(
-      `INSERT INTO employees (id, organization_id, employee_code, full_name, work_email, normalized_work_email,
-         employment_type, hire_date, updated_at)
-       SELECT gen_random_uuid(), $1, $2 || n, $2 || n, lower($2) || n || '@acme.vn', lower($2) || n || '@acme.vn',
-              'STAFF', '2026-01-05', now()
-         FROM generate_series(0, $3::int - 1) AS n`,
-      [this.seed.organizationId, prefix, count],
+      `WITH made AS (
+         INSERT INTO employees (id, organization_id, employee_code, full_name, work_email, normalized_work_email,
+           employment_type, hire_date, updated_at)
+         SELECT gen_random_uuid(), $1, $2 || n, $2 || n, lower($2) || n || '@acme.vn', lower($2) || n || '@acme.vn',
+                'STAFF', '2026-01-05', now()
+           FROM generate_series(0, $3::int - 1) AS n
+         RETURNING id, organization_id
+       )
+       INSERT INTO employee_placements (id, organization_id, employee_id, department_id, job_title_id, valid_from)
+       SELECT gen_random_uuid(), organization_id, id, $4, $5, '2026-01-05' FROM made`,
+      [this.seed.organizationId, prefix, count, this.seed.departmentId, this.seed.jobTitleId],
     );
+  }
+
+  /** The Unit the seed department is charged to: where the service accounts of its people are charged (`QĐ-86c`). */
+  async ownUnit(): Promise<{ id: string; departmentId: string }> {
+    const { rows } = await this.ctx.sql.query<{ id: string }>(
+      `SELECT cost_center_id AS id FROM departments WHERE id = $1`,
+      [this.seed.departmentId],
+    );
+
+    return { id: rows[0].id, departmentId: this.seed.departmentId };
   }
 
   private async application(kind: 'SAAS' | 'LICENSED' | 'INTERNAL') {
@@ -206,7 +221,7 @@ export class SeatHarness {
     ).id;
   }
 
-  async costCenter(kind: 'UNIT' | 'COMPANY' = 'COMPANY'): Promise<{ id: string; code: string }> {
+  async costCenter(kind: 'UNIT' = 'UNIT'): Promise<{ id: string; code: string }> {
     const code = `CC-${(this.counter += 1)}-${randomUUID().slice(0, 4)}`.toUpperCase();
 
     return this.dataOf<{ id: string; code: string }>(

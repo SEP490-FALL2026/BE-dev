@@ -10,7 +10,6 @@ import {
   ApplicationDomainInvalidError,
   ApplicationFunctionalGroupInvalidError,
   ApplicationInternalHasNoVendorError,
-  ApplicationKindNotManagedError,
   ApplicationNameInvalidError,
   ApplicationNameTakenError,
   ApplicationNotFoundError,
@@ -44,7 +43,9 @@ export function toApplicationApiException(error: unknown): unknown {
   if (error instanceof ApplicationRetirementBlockedError) {
     return refuse(HttpStatus.CONFLICT, 'APPLICATION.RETIREMENT_BLOCKED', error.message, {
       assignments: error.assignments,
+      assignmentTotal: error.assignmentTotal,
       subscriptions: error.subscriptions,
+      subscriptionTotal: error.subscriptionTotal,
     });
   }
   if (error instanceof ApplicationRetirementNeedsConfirmationError) {
@@ -61,9 +62,6 @@ export function toApplicationApiException(error: unknown): unknown {
   }
   if (error instanceof ApplicationDictionaryLineTakenError) {
     return refuse(HttpStatus.CONFLICT, 'APPLICATION.DICTIONARY_LINE_TAKEN', error.message);
-  }
-  if (error instanceof ApplicationKindNotManagedError) {
-    return refuse(UNPROCESSABLE, 'APPLICATION.KIND_NOT_MANAGED', error.message);
   }
   if (error instanceof ApplicationNameInvalidError) {
     return refuse(UNPROCESSABLE, 'APPLICATION.NAME_INVALID', error.message);

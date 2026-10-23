@@ -7,6 +7,7 @@ import {
   RateMalformedError,
   RateOutOfRangeError,
   RateScaleExceededError,
+  ReportingCurrencyNotSupportedError,
 } from '../../../core/money/money.errors';
 import { ApiException } from './api.exception';
 import { toMoneyApiException } from './money-errors';
@@ -30,6 +31,16 @@ describe('toMoneyApiException', () => {
     [new RateOutOfRangeError(), 'RATE_OUT_OF_RANGE'],
   ])('answers %p with 422 and a stable code', (error, code) => {
     expect(answerOf(error)).toEqual({ status: HttpStatus.UNPROCESSABLE_ENTITY, code });
+  });
+
+  it('answers a reporting currency outside the currency table with 409, naming it, never a 500 (DB-02)', () => {
+    const mapped = toMoneyApiException(new ReportingCurrencyNotSupportedError('MYR')) as ApiException;
+
+    expect(answerOf(new ReportingCurrencyNotSupportedError('MYR'))).toEqual({
+      status: HttpStatus.CONFLICT,
+      code: 'REPORTING_CURRENCY_NOT_SUPPORTED',
+    });
+    expect((mapped.getResponse() as { details: unknown }).details).toEqual({ currency: 'MYR' });
   });
 
   it('names the allowed decimals when the scale is exceeded, and the currency when it is unsupported', () => {

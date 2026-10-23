@@ -77,6 +77,12 @@ describe('subscription cost allocations (integration, PostgreSQL constraints)', 
 
     return { state, versionId };
   };
+  /** Moves the head up to a version that is written (the order a writer keeps, DB-14); the SQLSTATE if refused. */
+  const advance = (subscriptionId: string, version: number): Promise<string | null> =>
+    sqlState(sql, `UPDATE subscription_cost_allocations SET current_version = $2 WHERE subscription_id = $1`, [
+      subscriptionId,
+      version,
+    ]);
   const split = (...ratios: number[]) =>
     ratios.map((ratioBp, index) => ({ costCenterId: costCenters[index], ratioBp }));
 
@@ -118,7 +124,7 @@ describe('subscription cost allocations (integration, PostgreSQL constraints)', 
     for (const [code, kind] of [
       ['CC-A', 'UNIT'],
       ['CC-B', 'UNIT'],
-      ['CC-C', 'COMPANY'],
+      ['CC-C', 'UNIT'],
     ]) {
       const id = randomUUID();
       await sql.query(
@@ -152,7 +158,9 @@ describe('subscription cost allocations (integration, PostgreSQL constraints)', 
     await head(subscriptionId);
 
     expect((await record(subscriptionId, 1, split(6000, 4000))).state).toBeNull();
+    await advance(subscriptionId, 1);
     expect((await record(subscriptionId, 2, split(3333, 3333, 3334))).state).toBeNull();
+    await advance(subscriptionId, 2);
     expect((await record(subscriptionId, 3, split(10000))).state).toBeNull();
   });
 
@@ -223,6 +231,7 @@ describe('subscription cost allocations (integration, PostgreSQL constraints)', 
       ).state,
     ).toBe('23505');
     expect((await record(subscriptionId, 1, split(6000, 4000))).state).toBeNull();
+    await advance(subscriptionId, 1);
     expect((await record(subscriptionId, 2, split(6000, 4000))).state).toBeNull();
   });
 
@@ -257,16 +266,20 @@ describe('subscription cost allocations (integration, PostgreSQL constraints)', 
     const subscriptionId = await newSubscription();
     await head(subscriptionId);
 
+    // The head moves up by one, to a version that exists (DB-14): not to one that is not written yet, and never back.
     expect(
       await sqlState(sql, `UPDATE subscription_cost_allocations SET current_version = 1 WHERE subscription_id = $1`, [
         subscriptionId,
       ]),
-    ).toBeNull();
+    ).toBe('55000');
+    expect((await record(subscriptionId, 1, split(10000))).state).toBeNull();
+    expect(await advance(subscriptionId, 1)).toBeNull();
+    // The forward-only trigger answers before the CHECK on the range does.
     expect(
       await sqlState(sql, `UPDATE subscription_cost_allocations SET current_version = -1 WHERE subscription_id = $1`, [
         subscriptionId,
       ]),
-    ).toBe('23514');
+    ).toBe('55000');
 
     const columns = await sql.query<{ column_name: string }>(
       `SELECT column_name FROM information_schema.columns

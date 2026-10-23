@@ -2,14 +2,13 @@ import { Injectable } from '@nestjs/common';
 import { isBusinessDate, type BusinessDate } from '../../core/business-date';
 import { convertToReporting } from '../../core/money/convert';
 import { parseDecimalAmount, type Money } from '../../core/money/money';
-import { CurrencyNotSupportedError } from '../../core/money/money.errors';
+import { CurrencyNotSupportedError, ReportingCurrencyNotSupportedError } from '../../core/money/money.errors';
 import { RATE_DECIMALS, type ScaledRate } from '../../core/money/rate';
 import { DbTx } from '../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../infrastructure/security/tokens/access-token-verifier.port';
 import { OrganizationService } from '../organization/organization.service';
 import { CostAllocationService } from './cost-allocation/cost-allocation.service';
 import { CurrencyService } from './currency/currency.service';
-import { ReportingCurrencyNotSupportedError } from './exchange-rate/exchange-rate.errors';
 import { ExchangeRateLedgerService } from './exchange-rate/exchange-rate-ledger.service';
 import type {
   AllocationLineInput,
@@ -65,7 +64,8 @@ export class FinanceService {
    */
   async snapshotMoney(tx: DbTx, money: Money, rateDate: BusinessDate): Promise<SnapshotResult> {
     if (!isBusinessDate(rateDate)) throw new RangeError('The rate date is not a business date');
-    const organization = await this.organization.getOrganization(tx);
+    // Held shared until the caller commits: the reporting currency read here is still the one when the snapshot is stored.
+    const organization = await this.organization.getOrganizationShared(tx);
     if (!organization) throw new Error('Money was converted before installation');
 
     const from = await this.currencies.find(money.currency, tx);
@@ -110,6 +110,11 @@ export class FinanceService {
    */
   estimateTax(vendorId: string, netMinor: bigint, tx?: DbTx): Promise<TaxEstimateResult> {
     return this.taxProfiles.estimate(vendorId, netMinor, tx);
+  }
+
+  /** `estimateTax` for many prices in one read of the profiles of their vendors, in the order given (`LD-01`). */
+  estimateTaxMany(items: readonly { vendorId: string; netMinor: bigint }[], tx?: DbTx): Promise<TaxEstimateResult[]> {
+    return this.taxProfiles.estimateMany(items, tx);
   }
 
   /**
@@ -167,8 +172,9 @@ export class FinanceService {
     actor: AuthenticatedPrincipal,
     subscriptionId: string,
     input: { lines: AllocationLineInput[] },
+    tx?: DbTx,
   ): Promise<{ allocation: CostAllocationView; changed: boolean }> {
-    return this.costAllocations.declare(actor, subscriptionId, input);
+    return this.costAllocations.declare(actor, subscriptionId, input, tx);
   }
 
   costAllocationHistory(

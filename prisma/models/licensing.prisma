@@ -33,6 +33,8 @@ model LicenseAssignment {
   normalizedAccountIdentifier String              @map("normalized_account_identifier")
   reason                      String?
   costCenterId                String?             @map("cost_center_id") @db.Uuid
+  // The department that owns a service account (QĐ-86c); null for a personal seat.
+  owningDepartmentId          String?             @map("owning_department_id") @db.Uuid
   validFrom                   DateTime            @map("valid_from") @db.Date
   validFromBasis              AssignmentDateBasis @map("valid_from_basis")
   validUntil                  DateTime?           @map("valid_until") @db.Date
@@ -50,6 +52,7 @@ model LicenseAssignment {
   subscription      Subscription?       @relation(fields: [subscriptionId], references: [id], onDelete: Restrict)
   employee          Employee            @relation(fields: [employeeId], references: [id])
   costCenter        CostCenter?         @relation(fields: [costCenterId], references: [id], onDelete: Restrict)
+  owningDepartment  Department?         @relation("AssignmentOwningDepartment", fields: [owningDepartmentId], references: [id], onDelete: Restrict)
   predecessor       LicenseAssignment?  @relation("AssignmentChain", fields: [predecessorId], references: [id], onDelete: Restrict)
   successors        LicenseAssignment[] @relation("AssignmentChain")
   baselineImport    SeatBaselineImport? @relation(fields: [baselineImportId], references: [id], onDelete: Restrict)
@@ -59,6 +62,7 @@ model LicenseAssignment {
   @@index([planId])
   @@index([employeeId])
   @@index([baselineImportId])
+  @@index([owningDepartmentId])
   @@map("license_assignments")
 }
 
@@ -151,6 +155,18 @@ model ProvisioningTask {
   @@index([status, createdAt])
   @@index([defaultResponsibleEmployeeId])
   @@map("provisioning_tasks")
+}
+
+// How many license keys an account has opened in a minute and in a day (SEC-02): one row per account and window, raised
+// by one atomic statement that refuses at the limit, so a leaked token cannot empty the vault and a restart forgets nothing.
+model LicenseKeyRevealWindow {
+  appUserId   String   @map("app_user_id") @db.Uuid
+  windowKind  String   @map("window_kind")
+  windowStart DateTime @map("window_start") @db.Timestamptz(3)
+  count       Int
+
+  @@id([appUserId, windowKind, windowStart])
+  @@map("license_key_reveal_windows")
 }
 
 enum LicenseKeyStatus {

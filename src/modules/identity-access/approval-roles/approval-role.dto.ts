@@ -15,6 +15,7 @@ const approvalRolesSchema = z.strictObject({
       role: approvalRole,
       holder: person.extend({ since: z.iso.datetime() }).nullable(),
       history: z.array(person.extend({ from: z.iso.datetime(), until: z.iso.datetime().nullable() })),
+      historyHasMore: z.boolean(),
     }),
   ),
 });

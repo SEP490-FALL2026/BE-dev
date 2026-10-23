@@ -1,7 +1,7 @@
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
-import { RETIREMENT_NOTE_MAX_LENGTH } from './application-retirement.policy';
+import { RETIREMENT_LIST_LIMIT, RETIREMENT_NOTE_MAX_LENGTH } from './application-retirement.policy';
 
 /**
  * Only the shape and a generous bound are checked here. Whether the person is the Business Owner of today and still
@@ -37,8 +37,13 @@ const blockingSubscriptionSchema = z.strictObject({
   endDate: z.string().nullable(),
 });
 const blockersSchema = z.strictObject({
-  assignments: z.array(blockingAssignmentSchema),
-  subscriptions: z.array(blockingSubscriptionSchema),
+  assignments: z.array(blockingAssignmentSchema).max(RETIREMENT_LIST_LIMIT),
+  assignmentTotal: z.number().int().nonnegative(),
+  assignmentsByPlan: z
+    .array(z.strictObject({ planId: z.uuid(), planName: z.string(), count: z.number().int().positive() }))
+    .max(RETIREMENT_LIST_LIMIT),
+  subscriptions: z.array(blockingSubscriptionSchema).max(RETIREMENT_LIST_LIMIT),
+  subscriptionTotal: z.number().int().nonnegative(),
 });
 
 export class ConfirmRetirementBodyDto extends createZodDto(confirmRetirementBodySchema) {}
@@ -52,7 +57,8 @@ export class RetirementResponseDto extends createZodDto(
       retirement: z.strictObject({
         status: z.enum(['APPROVED', 'RETIRED']),
         retiredAt: z.iso.datetime().nullable(),
-        confirmations: z.array(confirmationSchema),
+        confirmations: z.array(confirmationSchema).max(RETIREMENT_LIST_LIMIT),
+        confirmationTotal: z.number().int().nonnegative(),
         confirmed: z.boolean(),
         blockers: blockersSchema,
         canRetire: z.boolean(),

@@ -40,10 +40,33 @@ export class ApplicationRetirementRepo {
     return tx.applicationRetirementConfirmation.create({ data: input });
   }
 
-  /** The confirmations of an application, the newest first. */
-  async confirmations(applicationId: string, tx?: DbTx): Promise<RetirementConfirmationRecord[]> {
-    return (tx ?? this.prisma).applicationRetirementConfirmation.findMany({
-      where: { applicationId },
+  /** The newest `take` confirmations of an application, and how many there are in all. */
+  async confirmations(
+    applicationId: string,
+    take: number,
+    tx?: DbTx,
+  ): Promise<{ items: RetirementConfirmationRecord[]; total: number }> {
+    const db = tx ?? this.prisma;
+    const [items, total] = await Promise.all([
+      db.applicationRetirementConfirmation.findMany({
+        where: { applicationId },
+        orderBy: [{ recordedAt: 'desc' }, { id: 'desc' }],
+        take,
+      }),
+      db.applicationRetirementConfirmation.count({ where: { applicationId } }),
+    ]);
+
+    return { items, total };
+  }
+
+  /** The newest confirmation recorded by this employee as Business Owner, or null: the only one the decision reads. */
+  async latestBy(
+    applicationId: string,
+    businessOwnerEmployeeId: string,
+    tx?: DbTx,
+  ): Promise<RetirementConfirmationRecord | null> {
+    return (tx ?? this.prisma).applicationRetirementConfirmation.findFirst({
+      where: { applicationId, businessOwnerEmployeeId },
       orderBy: [{ recordedAt: 'desc' }, { id: 'desc' }],
     });
   }

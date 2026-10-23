@@ -43,6 +43,11 @@ export class CatalogService {
     return this.seatTargets.find(ref, tx);
   }
 
+  /** The seat targets of many plans in one read, without a lock; a plan that does not exist is absent. */
+  findPlanSeatTargets(planIds: readonly string[], tx?: DbTx): Promise<SeatTarget[]> {
+    return this.seatTargets.findPlans(planIds, tx);
+  }
+
   /**
    * The seat target, locked until the caller's transaction ends: the subscription `FOR UPDATE`, so writers of its seats
    * queue and a change of its quantity waits; an internal plan `FOR SHARE`. Null when it does not exist.

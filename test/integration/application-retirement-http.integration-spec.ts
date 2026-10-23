@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { Client } from 'pg';
 import request from 'supertest';
+import { PlanRepo } from '../../src/modules/catalog/plan/plan.repo';
+import { AssignmentRepo } from '../../src/modules/licensing/assignment/assignment.repo';
 import { waitForLockWaiters } from '../support/lock-wait';
 import { ProvisioningHarness } from '../support/provisioning-harness';
 
@@ -168,6 +170,23 @@ describe('the retirement of an application over HTTP (integration, real PostgreS
     });
   });
 
+  it('DB-09: the last look at what holds the application is taken in the transaction that holds the locks', async () => {
+    const { applicationId } = await cleanApplication();
+    await confirm(applicationId, { businessOwnerEmployeeId: owner, note: 'đồng ý' }).expect(201);
+    const holdings = jest.spyOn(h.ctx.app.get(AssignmentRepo, { strict: false }), 'holdingOfPlans');
+    const plans = jest.spyOn(h.ctx.app.get(PlanRepo, { strict: false }), 'findOfApplication');
+    try {
+      await retire(applicationId).expect(200);
+
+      // The earlier look, before the locks, has no transaction; the last one is made under them and passes it.
+      expect(holdings.mock.calls.at(-1)?.[2]).toBeDefined();
+      expect(plans.mock.calls.at(-1)?.[1]).toBeDefined();
+    } finally {
+      holdings.mockRestore();
+      plans.mockRestore();
+    }
+  });
+
   it('does not count the confirmation of someone who is no longer the Business Owner', async () => {
     const { applicationId } = await cleanApplication();
     await confirm(applicationId, { businessOwnerEmployeeId: owner, note: 'đồng ý' }).expect(201);
@@ -288,7 +307,13 @@ describe('the retirement of an application over HTTP (integration, real PostgreS
     const view = h.dataOf<{ retirement: { blockers: Blockers; canRetire: boolean } }>(
       await retirement(applicationId).expect(200),
     );
-    expect(view.retirement.blockers).toEqual({ assignments: [], subscriptions: [] });
+    expect(view.retirement.blockers).toEqual({
+      assignments: [],
+      assignmentTotal: 0,
+      assignmentsByPlan: [],
+      subscriptions: [],
+      subscriptionTotal: 0,
+    });
 
     const today = await subscribe(planId, { endDate: h.today() });
     const openEnded = await subscribe(planId, {});

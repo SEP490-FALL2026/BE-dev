@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { Page, pageOf } from '../../../core/application/pagination';
 import { normalizeDisplayName } from '../../../core/display-name';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
@@ -7,7 +8,7 @@ import { organizationAuditEvent } from '../mappers/audit-event.mapper';
 import { OrganizationService } from '../organization.service';
 import { ProjectInvalidError, ProjectNotFoundError } from './project.errors';
 import { ProjectRepo } from './project.repo';
-import { ProjectRecord, ProjectStatus } from './project.types';
+import { PROFILE_PROJECT_LIMIT, ProjectRecord, ProjectStatus, ProjectSummaryRecord } from './project.types';
 
 export const PROJECT_NAME_MAX_LENGTH = 200;
 export const PROJECT_DESCRIPTION_MAX_LENGTH = 2000;
@@ -25,8 +26,28 @@ export class ProjectService {
     private readonly runner: TransactionRunner,
   ) {}
 
-  list(departmentId?: string): Promise<ProjectRecord[]> {
-    return this.repo.listProjects(departmentId);
+  /** One page of projects by name, the description left to `get` (`LD-12`). */
+  async list(query: { departmentId?: string; page: number; pageSize: number }): Promise<Page<ProjectSummaryRecord>> {
+    const { items, total } = await this.repo.page(
+      query.departmentId,
+      (query.page - 1) * query.pageSize,
+      query.pageSize,
+    );
+
+    return pageOf(items, total, query.page, query.pageSize);
+  }
+
+  /** One project in full. Throws ProjectNotFoundError. */
+  async get(id: string): Promise<ProjectRecord> {
+    const project = await this.repo.findProject(id);
+    if (!project) throw new ProjectNotFoundError();
+
+    return project;
+  }
+
+  /** The projects a department profile shows: the first {@link PROFILE_PROJECT_LIMIT} in full and how many there are. */
+  forProfile(departmentId: string): Promise<{ items: ProjectRecord[]; total: number }> {
+    return this.repo.forDepartment(departmentId, PROFILE_PROJECT_LIMIT);
   }
 
   async create(

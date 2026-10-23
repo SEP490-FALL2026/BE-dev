@@ -5,7 +5,8 @@ import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-
 /**
  * Only the shape and a generous bound are checked here. Whether a name is empty or too long, a domain is a host, a
  * list holds more than twenty domains or the note is over 1000 characters is judged by the policy and answers with its
- * own `APPLICATION.*` code. The kind `FREE_EXTERNAL` is accepted here on purpose: it is refused as a business rule.
+ * own `APPLICATION.*` code. There are three managed kinds and no other (`QĐ-82n`): a value outside them is the schema's
+ * `VALIDATION_ERROR`, never a business rule of its own.
  */
 const text = z.string().max(1000);
 const textList = z.array(z.string().max(1000)).max(100);
@@ -15,7 +16,7 @@ const kind = z.enum(['SAAS', 'LICENSED', 'INTERNAL']);
 
 export const declareApplicationBodySchema = z.strictObject({
   name: text,
-  kind: z.enum(['SAAS', 'LICENSED', 'INTERNAL', 'FREE_EXTERNAL']),
+  kind,
   vendorName: text.optional(),
   dictionaryServiceLineId: z.uuid().optional(),
   domains: textList.optional(),
@@ -58,14 +59,14 @@ export const listApplicationsQuerySchema = z.strictObject({
 });
 export const applicationIdParamSchema = z.strictObject({ id: z.uuid() });
 
-const applicationSchema = z.strictObject({
+/** A row of the list (`LD-04`); the detail is this and the rest, so the shared fields cannot drift apart. */
+const applicationSummarySchema = z.strictObject({
   id: z.uuid(),
   name: z.string(),
   kind,
   vendor: z.strictObject({ id: z.uuid(), name: z.string() }).nullable(),
-  dictionaryServiceLineId: z.uuid().nullable(),
-  domains: z.array(z.string()),
   dataSensitivity: sensitivity,
+  isCommunicationService: z.boolean(),
   businessOwner: z.strictObject({
     employeeId: z.uuid(),
     employeeCode: z.string(),
@@ -73,6 +74,14 @@ const applicationSchema = z.strictObject({
     status: z.enum(['ACTIVE', 'TERMINATED']),
   }),
   businessOwnerReplacementRequired: z.boolean(),
+  usageCollectionDefault: z.literal('NOT_COLLECTED').nullable(),
+  functionalGroup: z.strictObject({ id: z.uuid(), name: z.string() }).nullable(),
+  status: z.enum(['APPROVED', 'RETIRED']),
+  updatedAt: z.iso.datetime(),
+});
+const applicationSchema = applicationSummarySchema.extend({
+  dictionaryServiceLineId: z.uuid().nullable(),
+  domains: z.array(z.string()),
   communication: z.strictObject({
     personToPersonMessaging: z.boolean(),
     callsOrMeetings: z.boolean(),
@@ -80,16 +89,13 @@ const applicationSchema = z.strictObject({
     isCommunicationService: z.boolean(),
     note: z.string().nullable(),
   }),
-  usageCollectionDefault: z.literal('NOT_COLLECTED').nullable(),
-  functionalGroup: z.strictObject({ id: z.uuid(), name: z.string() }).nullable(),
-  status: z.enum(['APPROVED', 'RETIRED']),
   createdAt: z.iso.datetime(),
-  updatedAt: z.iso.datetime(),
 });
 
 const createdApplicationSchema = applicationSchema.extend({ proposedToDictionary: z.boolean() });
 const applicationDetailSchema = applicationSchema.extend({
-  similarApplications: z.array(z.strictObject({ id: z.uuid(), name: z.string() })),
+  similarApplications: z.array(z.strictObject({ id: z.uuid(), name: z.string() })).max(20),
+  similarTotal: z.number().int().nonnegative(),
   recommendations: z.array(
     z.strictObject({
       code: z.enum(['CONSIDER_K2']),
@@ -109,7 +115,7 @@ export class ApplicationDetailResponseDto extends createZodDto(successEnvelopeSc
 export class ApplicationPageResponseDto extends createZodDto(
   successEnvelopeSchema(
     z.strictObject({
-      items: z.array(applicationSchema),
+      items: z.array(applicationSummarySchema),
       pagination: z.strictObject({
         page: z.number().int().positive(),
         pageSize: z.number().int().positive(),

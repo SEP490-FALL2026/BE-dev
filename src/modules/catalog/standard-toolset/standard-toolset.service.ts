@@ -21,6 +21,9 @@ import { StandardToolsetRepo, type ToolsetVersion } from './standard-toolset.rep
 export interface ToolsetView {
   departmentId: string;
   jobTitleId: string;
+  /** The names of the pair, so a list needs no second read to be shown (`LD-07`). */
+  department: { id: string; code: string; name: string } | null;
+  jobTitle: { id: string; name: string } | null;
   version: number;
   plans: PlanSummary[];
   reason: string;
@@ -140,7 +143,7 @@ export class StandardToolsetService {
       query.pageSize,
     );
 
-    return pageOf(await Promise.all(items.map((item) => this.show(item))), total, query.page, query.pageSize);
+    return pageOf(await this.showMany(items), total, query.page, query.pageSize);
   }
 
   /** The pairs that have a toolset. A department head names, and only gets, their own department. */
@@ -158,7 +161,7 @@ export class StandardToolsetService {
       take: query.pageSize,
     });
 
-    return pageOf(await Promise.all(items.map((item) => this.show(item))), total, query.page, query.pageSize);
+    return pageOf(await this.showMany(items), total, query.page, query.pageSize);
   }
 
   /** The toolset of the department and job title the employee has today; the placement and the toolset are null when none. */
@@ -200,19 +203,46 @@ export class StandardToolsetService {
   }
 
   private async show(version: ToolsetVersion): Promise<ToolsetView> {
-    const summaries = new Map((await this.plans.summaries(version.planIds)).map((plan) => [plan.planId, plan]));
+    return (await this.showMany([version]))[0];
+  }
 
-    return {
-      departmentId: version.departmentId,
-      jobTitleId: version.jobTitleId,
-      version: version.version,
-      plans: version.planIds
-        .flatMap((id) => summaries.get(id) ?? [])
-        .sort((a, b) => a.planName.localeCompare(b.planName)),
-      reason: version.reason,
-      changedBy: version.changedByAppUserId,
-      changedAt: version.changedAt,
-    };
+  /** The views of many versions with one read of their plans and one read each of their departments and job titles. */
+  private async showMany(versions: readonly ToolsetVersion[]): Promise<ToolsetView[]> {
+    const summaries = new Map(
+      (await this.plans.summaries([...new Set(versions.flatMap((version) => version.planIds))])).map((plan) => [
+        plan.planId,
+        plan,
+      ]),
+    );
+    const departments = new Map(
+      (await this.organization.getDepartmentBriefs([...new Set(versions.map((version) => version.departmentId))])).map(
+        (department) => [department.id, department],
+      ),
+    );
+    const jobTitles = new Map(
+      (await this.organization.getJobTitles([...new Set(versions.map((version) => version.jobTitleId))])).map(
+        (jobTitle) => [jobTitle.id, jobTitle],
+      ),
+    );
+
+    return versions.map((version) => {
+      const department = departments.get(version.departmentId);
+      const jobTitle = jobTitles.get(version.jobTitleId);
+
+      return {
+        departmentId: version.departmentId,
+        jobTitleId: version.jobTitleId,
+        department: department ? { id: department.id, code: department.code, name: department.name } : null,
+        jobTitle: jobTitle ? { id: jobTitle.id, name: jobTitle.name } : null,
+        version: version.version,
+        plans: version.planIds
+          .flatMap((id) => summaries.get(id) ?? [])
+          .sort((a, b) => a.planName.localeCompare(b.planName)),
+        reason: version.reason,
+        changedBy: version.changedByAppUserId,
+        changedAt: version.changedAt,
+      };
+    });
   }
 
   private async requireOrganization() {

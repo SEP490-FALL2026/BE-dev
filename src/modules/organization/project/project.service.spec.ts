@@ -39,7 +39,8 @@ describe('ProjectService', () => {
 
   let calls: string[];
   const repo = {
-    listProjects: jest.fn(),
+    page: jest.fn(),
+    forDepartment: jest.fn(),
     insertProject: jest.fn(),
     lockProject: jest.fn(),
     findProject: jest.fn(),
@@ -108,13 +109,31 @@ describe('ProjectService', () => {
     });
   });
 
-  it('lists through the repository, for every project or for one department', async () => {
-    repo.listProjects.mockResolvedValue([stored]);
+  it('lists a page through the repository, for every project or for one department, and cuts the profile at 20', async () => {
+    const summary = { id: stored.id, name: stored.name, status: stored.status, departments: [], updatedAt: new Date() };
+    repo.page.mockResolvedValue({ items: [summary], total: 41 });
+    repo.forDepartment.mockResolvedValue({ items: [stored], total: 30 });
     const projects = await service();
 
-    await expect(projects.list()).resolves.toEqual([stored]);
-    await expect(projects.list('dep-a')).resolves.toEqual([stored]);
-    expect(repo.listProjects.mock.calls).toEqual([[undefined], ['dep-a']]);
+    await expect(projects.list({ page: 2, pageSize: 20 })).resolves.toEqual({
+      items: [summary],
+      pagination: { page: 2, pageSize: 20, totalItems: 41, totalPages: 3 },
+    });
+    await projects.list({ departmentId: 'dep-a', page: 1, pageSize: 50 });
+    await expect(projects.forProfile('dep-a')).resolves.toEqual({ items: [stored], total: 30 });
+    expect(repo.page.mock.calls).toEqual([
+      [undefined, 20, 20],
+      ['dep-a', 0, 50],
+    ]);
+    expect(repo.forDepartment).toHaveBeenCalledWith('dep-a', 20);
+  });
+
+  it('reads one project in full, and says when it does not exist', async () => {
+    const projects = await service();
+
+    await expect(projects.get('project-new')).resolves.toBe(stored);
+    repo.findProject.mockResolvedValueOnce(null);
+    await expect(projects.get('missing')).rejects.toBeInstanceOf(ProjectNotFoundError);
   });
 
   it('creates with the departments once each, RUNNING by default, checked and audited in one transaction', async () => {

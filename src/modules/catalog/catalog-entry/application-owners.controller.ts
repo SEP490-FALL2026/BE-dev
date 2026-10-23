@@ -60,6 +60,7 @@ class OwnerHistoryResponseDto extends createZodDto(
           endedAt: z.iso.datetime().nullable(),
         }),
       ),
+      pagination,
     }),
   ),
 ) {}
@@ -107,24 +108,28 @@ export class ApplicationOwnersController {
   @ApiSuccessResponse(OwnerHistoryResponseDto, {
     message: 'APPLICATION.BUSINESS_OWNERS_LISTED',
     description:
-      'The periods of the Business Owner, the latest first: the person, from when to when, and who made the change.',
+      'A page of the periods of the Business Owner, the latest first: the person, from when to when, and who made the change.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
     { status: HttpStatus.FORBIDDEN, description: 'Only the IT Admin and Finance read the history.' },
     { status: HttpStatus.NOT_FOUND, description: 'The application does not exist (APPLICATION.NOT_FOUND).' },
-    { status: HttpStatus.UNPROCESSABLE_ENTITY, description: 'The id is not a UUID (VALIDATION_ERROR).' },
+    {
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      description: 'The id is not a UUID or the query is invalid (VALIDATION_ERROR).',
+    },
   )
-  async history(@Param() params: ApplicationIdParamDto) {
+  async history(@Param() params: ApplicationIdParamDto, @Query() query: OwnerWarningsQueryDto) {
     try {
-      const periods = await this.owners.history(params.id);
+      const page = await this.owners.history(params.id, query);
 
       return {
-        items: periods.map((period) => ({
+        items: page.items.map((period) => ({
           ...period,
           assignedAt: period.assignedAt.toISOString(),
           endedAt: period.endedAt ? period.endedAt.toISOString() : null,
         })),
+        pagination: page.pagination,
       };
     } catch (error) {
       throw toApplicationApiException(error);

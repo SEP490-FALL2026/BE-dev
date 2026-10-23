@@ -35,7 +35,7 @@ const NOT_FOUND = { status: HttpStatus.NOT_FOUND, description: 'The cost center 
 const VALIDATION_ERROR = {
   status: HttpStatus.UNPROCESSABLE_ENTITY,
   description:
-    'The request is invalid (VALIDATION_ERROR), the kind is not UNIT or COMPANY (COST_CENTER.KIND_NOT_SUPPORTED), or the name is empty, too long (COST_CENTER.NAME_INVALID) or reserved (COST_CENTER.NAME_RESERVED).',
+    'The request is invalid (VALIDATION_ERROR), the kind is not UNIT (COST_CENTER.KIND_NOT_SUPPORTED), or the name is empty, too long (COST_CENTER.NAME_INVALID) or reserved (COST_CENTER.NAME_RESERVED).',
 } as const;
 
 function toWire(record: CostCenterRecord) {

@@ -30,6 +30,7 @@ describe('judgeSeatRows: one valid personal row', () => {
       accountIdentifier: 'E1@Congty.vn',
       reason: null,
       costCenterId: null,
+      owningDepartmentId: null,
       effectiveFrom: TODAY,
       effectiveFromBasis: 'RECORDED',
       expectedEndDate: null,
@@ -66,7 +67,7 @@ describe('judgeSeatRows: the person and the account', () => {
           kind: 'service',
           account_identifier: 'ghp_abc123',
           reason: 'CI',
-          cost_center_code: 'CC-CORP',
+          cost_center_code: 'CC-DES',
         }),
       ),
     ).toEqual(['ACCOUNT_IDENTIFIER_LOOKS_LIKE_SECRET']);
@@ -99,10 +100,9 @@ describe('judgeSeatRows: a service account (AC-7)', () => {
     account_identifier: 'ci-bot',
     kind: 'service',
     reason: 'CI pipeline',
-    cost_center_code: 'CC-CORP',
   };
 
-  it('is valid with a reason and a Company Cost Center, whose identifier need not be an email', () => {
+  it('is valid with a reason alone: owned by the department of the person, charged to its Unit (QĐ-86c)', () => {
     const result = judgeOne(bot);
 
     expect(result.outcome).toBe('VALID');
@@ -110,16 +110,22 @@ describe('judgeSeatRows: a service account (AC-7)', () => {
       kind: 'SERVICE',
       employeeId: 'e2',
       reason: 'CI pipeline',
-      costCenterId: 'cc-corp',
+      costCenterId: 'cc-des',
+      owningDepartmentId: 'd-des',
     });
+    expect(judgeOne({ ...bot, cost_center_code: 'CC-DES' }).parsed).toMatchObject({ costCenterId: 'cc-des' });
   });
 
-  it('asks for a reason and a Cost Center, and for a Cost Center that exists, is in use and is a Company one', () => {
+  it('asks for a reason, and refuses a Cost Center that does not exist, one that is not the owning Unit, and a Company code', () => {
     expect(codesOf(judgeOne({ ...bot, reason: '' }))).toEqual(['REASON_REQUIRED']);
-    expect(codesOf(judgeOne({ ...bot, cost_center_code: '' }))).toEqual(['COST_CENTER_REQUIRED']);
     expect(codesOf(judgeOne({ ...bot, cost_center_code: 'CC-NONE' }))).toEqual(['COST_CENTER_NOT_FOUND']);
-    expect(codesOf(judgeOne({ ...bot, cost_center_code: 'CC-OLD' }))).toEqual(['COST_CENTER_INACTIVE']);
-    expect(codesOf(judgeOne({ ...bot, cost_center_code: 'CC-A' }))).toEqual(['COST_CENTER_NOT_COMPANY']);
+    expect(codesOf(judgeOne({ ...bot, cost_center_code: 'CC-CORP' }))).toEqual(['COST_CENTER_NOT_FOUND']);
+    expect(codesOf(judgeOne({ ...bot, cost_center_code: 'CC-A' }))).toEqual(['COST_CENTER_NOT_OWNING_UNIT']);
+  });
+
+  it('refuses a service account whose owning Unit is not in use, and one whose person is in no department', () => {
+    expect(codesOf(judgeOne({ ...bot, employee_code: 'E6' }))).toEqual(['COST_CENTER_INACTIVE']);
+    expect(codesOf(judgeOne({ ...bot, employee_code: 'E7' }))).toEqual(['OWNING_DEPARTMENT_NOT_FOUND']);
   });
 
   it('still asks an email identifier to be on a company domain', () => {
@@ -129,7 +135,7 @@ describe('judgeSeatRows: a service account (AC-7)', () => {
 
   it('does not take a Cost Center on a personal row: a personal seat is charged by the department of the holder', () => {
     expect(
-      codesOf(judgeOne({ employee_code: 'E1', account_identifier: 'e1@congty.vn', cost_center_code: 'CC-CORP' })),
+      codesOf(judgeOne({ employee_code: 'E1', account_identifier: 'e1@congty.vn', cost_center_code: 'CC-DES' })),
     ).toEqual(['COST_CENTER_NOT_ALLOWED']);
   });
 });

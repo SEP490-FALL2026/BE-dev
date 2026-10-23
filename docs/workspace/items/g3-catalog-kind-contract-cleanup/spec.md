@@ -65,21 +65,23 @@ contract theo hướng dẫn của Prompt 08.
 
 ## Test matrix
 
-| AC / rủi ro | Tình huống (gồm từ chối, edge case)                  | Cấp test    | Kết quả mong đợi                                        | Bằng chứng sau implement |
-| ----------- | ---------------------------------------------------- | ----------- | ------------------------------------------------------- | ------------------------ |
-| `BBI-D09`   | `POST /applications` với `kind: FREE_EXTERNAL`       | integration | 422 `VALIDATION_ERROR`, không bản ghi, không audit      | chưa chạy                |
-| `BBI-D09`   | ba loại hợp lệ vẫn khai báo được (hồi quy AC-1→AC-7) | integration | như trước                                               | chưa chạy                |
-| `BBI-D09`   | policy không còn nhánh miễn phí                      | unit        | `vendorSourceOf` chỉ nhận ba loại                       | chưa chạy                |
-| contract    | OpenAPI `DeclareApplicationBodyDto.kind`             | e2e OpenAPI | enum ba giá trị; mô tả lỗi không còn `KIND_NOT_MANAGED` | chưa chạy                |
+| AC / rủi ro | Tình huống (gồm từ chối, edge case)                  | Cấp test    | Kết quả mong đợi                                        | Bằng chứng sau implement                                                                  |
+| ----------- | ---------------------------------------------------- | ----------- | ------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `BBI-D09`   | `POST /applications` với `kind: FREE_EXTERNAL`       | integration | 422 `VALIDATION_ERROR`, không bản ghi, không audit      | xanh — `application-http`/`catalog-*` integration và unit đã đổi (422 `VALIDATION_ERROR`) |
+| `BBI-D09`   | ba loại hợp lệ vẫn khai báo được (hồi quy AC-1→AC-7) | integration | như trước                                               | xanh — `application-http`/`catalog-*` integration và unit đã đổi (422 `VALIDATION_ERROR`) |
+| `BBI-D09`   | policy không còn nhánh miễn phí                      | unit        | `vendorSourceOf` chỉ nhận ba loại                       | xanh — `application-http`/`catalog-*` integration và unit đã đổi (422 `VALIDATION_ERROR`) |
+| contract    | OpenAPI `DeclareApplicationBodyDto.kind`             | e2e OpenAPI | enum ba giá trị; mô tả lỗi không còn `KIND_NOT_MANAGED` | xanh — `application-http`/`catalog-*` integration và unit đã đổi (422 `VALIDATION_ERROR`) |
 
 ## Definition of Done
 
 - [ ] Mọi primary AC `full` có test đỏ-trước/xanh-sau ở cấp phù hợp; AC `partial` ghi đúng vế đã làm — áp cho `BBI-D09`.
-- [ ] Gate theo [CONTRIBUTING](../../../../CONTRIBUTING.md) chạy xanh trên revision cuối; HTTP đổi thì e2e + OpenAPI.
-- [ ] Spec/plan/roadmap phản ánh implementation cuối; contract đổi đã ghi và báo consumer FE.
-- [ ] Không tăng legacy ledger kiến trúc; nếu gỡ được mục nào thì xóa mục đó.
+- [x] Gate theo [CONTRIBUTING](../../../../CONTRIBUTING.md) chạy xanh trên revision cuối; HTTP đổi thì e2e + OpenAPI.
+- [x] Spec/plan/roadmap phản ánh implementation cuối; contract đổi đã ghi và báo consumer FE.
+- [x] Không tăng legacy ledger kiến trúc; nếu gỡ được mục nào thì xóa mục đó.
 - [ ] Tài liệu vận hành/runbook bị ảnh hưởng đã cập nhật; phần chưa kiểm chứng ghi rõ.
 
 ## Changes and acceptance
 
 22/10/2026: lập theo Prompt 07. Chưa code, chưa review, chưa nghiệm thu.
+
+23/10/2026 (Prompt 10 — xử lý tồn đọng G0→G4): `BBI-D09`: `FREE_EXTERNAL` bỏ khỏi DTO, policy, service, lỗi `ApplicationKindNotManagedError`, mapper và tài liệu controller; ứng dụng loại này nay là 422 `VALIDATION_ERROR`. FE phải tái sinh client. Kiểm chứng: `application-http`/`catalog-*` integration và unit đã đổi (422 `VALIDATION_ERROR`) — xanh trên cây làm việc chưa commit, nhánh `Bao_dev_be`, nền `dev` `19be620`, 23/10/2026. Gate toàn cây trên cùng cây: `pnpm lint`, `tsc --noEmit`, `pnpm test` (unit 2.074 (141 suite)), `pnpm test:e2e` (839 (32 suite)), `pnpm test:integration` (112 suite, 1.429 test, gồm 4 test kho S3 thật trên LocalStack), `prisma migrate deploy` trên CSDL mới + `migrate diff --exit-code` (không lệch), `pnpm openapi:export`. Giới hạn: Không có migration (cột enum vốn không còn giá trị `FREE_EXTERNAL`). Chưa commit khi viết dòng này, chưa remote CI, chưa Owner review, chưa nghiệm thu: không có gì là `accepted`; đỏ-trước của từng test không được ghi lại.

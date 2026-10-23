@@ -88,7 +88,7 @@ export class ApplicationRetirementController {
   @ApiSuccessResponse(RetirementResponseDto, {
     message: 'APPLICATION.RETIREMENT_FETCHED',
     description:
-      'The confirmations recorded, whether the Business Owner of today has confirmed, the assignments and the running term subscriptions that would stop the retirement, and whether it would go through now.',
+      'The newest 50 confirmations recorded and how many there are, whether the Business Owner of today has confirmed, the first 50 assignments and running term subscriptions that would stop the retirement with their totals and the number of assignments per plan, and whether it would go through now.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
@@ -127,7 +127,7 @@ export class ApplicationRetirementController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The application is retired already (APPLICATION.ALREADY_RETIRED), or assignments or running term subscriptions hold it (APPLICATION.RETIREMENT_BLOCKED, details.assignments and details.subscriptions list them).',
+        'The application is retired already (APPLICATION.ALREADY_RETIRED), or assignments or running term subscriptions hold it (APPLICATION.RETIREMENT_BLOCKED, details.assignments and details.subscriptions list the first 50 of them, details.assignmentTotal and details.subscriptionTotal count them all).',
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,

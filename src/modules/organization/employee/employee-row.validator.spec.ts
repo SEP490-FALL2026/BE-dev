@@ -72,6 +72,29 @@ describe('validateEmployeeRow (T-16)', () => {
     });
   });
 
+  describe('the record of the person entering (US-02-02 AC-18)', () => {
+    const row = { departmentCode: 'P-OPS', jobTitleId: 'j1' };
+
+    it('refuses their own code and their own email as their own record, instead of as taken', () => {
+      expect(
+        validateEmployeeRow(row, {
+          ...clean,
+          employeeCodeTaken: true,
+          workEmailTaken: true,
+          ownCode: true,
+          ownEmail: true,
+        }),
+      ).toEqual([
+        { field: 'employeeCode', code: 'OWN_RECORD' },
+        { field: 'workEmail', code: 'OWN_RECORD' },
+      ]);
+    });
+
+    it('says nothing when the code and the email are of somebody else and free', () => {
+      expect(validateEmployeeRow(row, { ...clean, ownCode: false, ownEmail: false })).toEqual([]);
+    });
+  });
+
   describe('the form adapter of the placement policy (BEH.1)', () => {
     it.each<[string, Partial<EmployeeRowLookup>, { departmentCode: string; jobTitleId: string }, object]>([
       [

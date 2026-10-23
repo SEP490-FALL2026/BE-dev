@@ -224,6 +224,12 @@ export class SeatBaselineImportService {
     const employees = await this.organization.getEmployeesByCodes(names.employeeCodes, tx);
     const costCenters = await this.organization.getCostCentersByCodes(names.costCenterCodes, tx);
     const companyDomains = await this.organization.getCompanyEmailDomains(tx);
+    // The department of each person on the day of the import and its Unit: a service account is owned and charged there.
+    const units = await this.organization.getOwningUnits(
+      employees.map((employee) => employee.id),
+      base.recordedOn,
+      tx,
+    );
 
     return {
       target: { kind: base.target.kind, purchasedQuantity: base.target.purchasedQuantity },
@@ -236,6 +242,7 @@ export class SeatBaselineImportService {
             status: employee.status,
             employmentType: employee.employmentType,
             hireDate: employee.hireDate,
+            owningUnit: units.get(employee.id) ?? null,
           },
         ]),
       ),
@@ -256,8 +263,12 @@ export class SeatBaselineImportService {
     const names = lookupNamesOf(stored);
     const employeeIds = names.employeeCodes.flatMap((code) => before.employees.get(code)?.id ?? []).sort();
     for (const employeeId of employeeIds) await this.organization.lockEmployeeForShare(tx, employeeId);
-    const costCenterIds = names.costCenterCodes.flatMap((code) => before.costCenters.get(code)?.id ?? []);
-    await this.organization.lockCostCentersShared(tx, costCenterIds);
+    // The Cost Centers the rows name and the Unit of each person's department, held so none is retired meanwhile.
+    const costCenterIds = [
+      ...names.costCenterCodes.flatMap((code) => before.costCenters.get(code)?.id ?? []),
+      ...[...before.employees.values()].flatMap((employee) => employee.owningUnit?.costCenter.id ?? []),
+    ];
+    await this.organization.lockCostCentersShared(tx, [...new Set(costCenterIds)]);
 
     return this.factsFor(stored, base, tx);
   }

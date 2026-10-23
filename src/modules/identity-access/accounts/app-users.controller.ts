@@ -40,6 +40,7 @@ function toDetailWire(view: AccountDetailView) {
       grantedAt: iso(entry.grantedAt),
       revokedAt: entry.revokedAt ? iso(entry.revokedAt) : null,
     })),
+    roleHistoryHasMore: view.roleHistoryHasMore,
     invitation: view.invitation
       ? {
           usable: view.invitation.usable,

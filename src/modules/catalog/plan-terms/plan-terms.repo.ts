@@ -71,11 +71,19 @@ export class PlanTermsRepo {
     return tx.planTermOpinion.create({ data: input });
   }
 
-  /** The opinions on a plan, newest first. */
-  listOpinions(planId: string): Promise<OpinionRecord[]> {
-    return this.prisma.planTermOpinion.findMany({
-      where: { planId },
-      orderBy: [{ recordedAt: 'desc' }, { id: 'desc' }],
-    });
+  /** One page of the opinions on a plan, newest first, and the total, from one snapshot. */
+  listOpinions(planId: string, skip: number, take: number): Promise<{ items: OpinionRecord[]; total: number }> {
+    return this.prisma.$transaction(
+      async (tx) => ({
+        items: await tx.planTermOpinion.findMany({
+          where: { planId },
+          orderBy: [{ recordedAt: 'desc' }, { id: 'desc' }],
+          skip,
+          take,
+        }),
+        total: await tx.planTermOpinion.count({ where: { planId } }),
+      }),
+      { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
+    );
   }
 }

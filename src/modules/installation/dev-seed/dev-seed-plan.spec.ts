@@ -61,7 +61,7 @@ describe('buildSeedPlan: Cost Center, Department and Job Title by stable key', (
 
   it.each([
     ['another name', { name: 'Demo Cost Center' }, 'COST_CENTER_NAME_DIFFERS'],
-    ['a COMPANY kind', { kind: 'COMPANY' as const }, 'COST_CENTER_NOT_UNIT'],
+    ['a COMPANY kind (no longer a possible kind)', { kind: 'COMPANY' as unknown as 'UNIT' }, 'COST_CENTER_NOT_UNIT'],
     ['an inactive state', { status: 'INACTIVE' as const }, 'COST_CENTER_INACTIVE'],
   ])('refuses a DEMO-CC with %s', (_case, change, reason) => {
     expect(items({ ...exact, costCenter: { ...costCenter, ...change } })[0]).toBe(`COST_CENTER conflict ${reason}`);

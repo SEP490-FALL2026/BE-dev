@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { ApiAccount, createActivatedAccount } from '../support/api-accounts';
 import { SeatHarness } from '../support/seat-baseline-harness';
+import { HR_BASIS } from '../support/hr-basis';
 
 const h = new SeatHarness();
 
@@ -70,8 +71,9 @@ describe('standard toolsets over HTTP (integration, real PostgreSQL)', () => {
     h.dataOf<{ id: string }>(
       await request(h.server())
         .post('/api/v1/employees')
-        .set(h.as(h.it1))
+        .set({ Authorization: `Bearer ${h.admin}` })
         .send({
+          hrBasis: HR_BASIS,
           employeeCode: code,
           fullName: `Person ${code}`,
           workEmail: `${code.toLowerCase()}@acme.vn`,

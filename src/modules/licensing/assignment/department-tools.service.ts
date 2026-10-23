@@ -31,8 +31,8 @@ export interface ToolsSummaryLine {
 }
 
 /**
- * The tools a department uses (`US-03-06` AC-13): an aggregate read of the seats its people hold today, never a list that
- * is typed in or edited. The IT Admin reads any department; a department head reads the one they head (AC-17, `SoD-2`).
+ * The tools a department uses (`US-03-06` AC-13): an aggregate read of the seats its people hold today and the service
+ * accounts it owns, never a list that is typed in or edited; one page by start date, with the counts of all (`LD-09`). The IT Admin reads any department; a department head reads the one they head (AC-17, `SoD-2`).
  * The account identifier of a seat is not shown here: a head sees which tool each person has, not how they sign in.
  * Licence keys (K4) join the list when the key vault exists.
  */
@@ -55,11 +55,19 @@ export class DepartmentToolsService {
     if (!memberIds) throw new ToolsDepartmentNotFoundError();
     await this.assertMayRead(principal, departmentId, today);
 
-    const assignments = await this.repo.openOf(memberIds, today);
+    const start = (query.page - 1) * query.pageSize;
+    const {
+      items: assignments,
+      total,
+      byPlan,
+    } = await this.repo.toolsOfDepartment({ memberIds, departmentId }, today, start, query.pageSize);
+    // Only the plans of the seats and the people of this page are named: the summary counts, the page names.
     const plans = new Map(
-      (await this.catalog.getPlanSummaries([...new Set(assignments.map((assignment) => assignment.planId))])).map(
-        (plan) => [plan.planId, plan],
-      ),
+      (
+        await this.catalog.getPlanSummaries([
+          ...new Set([...assignments.map((a) => a.planId), ...byPlan.map((p) => p.planId)]),
+        ])
+      ).map((plan) => [plan.planId, plan]),
     );
     const people = new Map(
       (await this.organization.getEmployees([...new Set(assignments.map((assignment) => assignment.employeeId))])).map(
@@ -67,56 +75,45 @@ export class DepartmentToolsService {
       ),
     );
 
-    const items = assignments
-      .flatMap((assignment): ToolInUse[] => {
-        const plan = plans.get(assignment.planId);
-        const person = people.get(assignment.employeeId);
-        if (!plan || !person) return [];
+    const items = assignments.flatMap((assignment): ToolInUse[] => {
+      const plan = plans.get(assignment.planId);
+      const person = people.get(assignment.employeeId);
+      if (!plan || !person) return [];
 
-        return [
-          {
-            assignmentId: assignment.id,
-            employeeCode: person.employeeCode,
-            fullName: person.fullName,
-            holderStatus: person.status,
-            kind: assignment.kind,
-            source: assignment.source,
-            application: { id: plan.applicationId, name: plan.applicationName },
-            plan: { id: plan.planId, name: plan.planName },
-            effectiveFrom: assignment.effectiveFrom,
-            effectiveFromLabel: effectiveFromLabel(assignment.effectiveFromBasis, assignment.effectiveFrom),
-          },
-        ];
+      return [
+        {
+          assignmentId: assignment.id,
+          employeeCode: person.employeeCode,
+          fullName: person.fullName,
+          holderStatus: person.status,
+          kind: assignment.kind,
+          source: assignment.source,
+          application: { id: plan.applicationId, name: plan.applicationName },
+          plan: { id: plan.planId, name: plan.planName },
+          effectiveFrom: assignment.effectiveFrom,
+          effectiveFromLabel: effectiveFromLabel(assignment.effectiveFromBasis, assignment.effectiveFrom),
+        },
+      ];
+    });
+    const summary = byPlan
+      .flatMap((group): ToolsSummaryLine[] => {
+        const plan = plans.get(group.planId);
+
+        return plan
+          ? [
+              {
+                applicationId: plan.applicationId,
+                applicationName: plan.applicationName,
+                planId: plan.planId,
+                planName: plan.planName,
+                seats: group.count,
+              },
+            ]
+          : [];
       })
-      .sort(
-        (a, b) =>
-          a.employeeCode.localeCompare(b.employeeCode) ||
-          a.application.name.localeCompare(b.application.name) ||
-          a.assignmentId.localeCompare(b.assignmentId),
-      );
+      .sort((a, b) => a.applicationName.localeCompare(b.applicationName) || a.planName.localeCompare(b.planName));
 
-    const lines = new Map<string, ToolsSummaryLine>();
-    for (const item of items) {
-      const line = lines.get(item.plan.id) ?? {
-        applicationId: item.application.id,
-        applicationName: item.application.name,
-        planId: item.plan.id,
-        planName: item.plan.name,
-        seats: 0,
-      };
-      line.seats += 1;
-      lines.set(item.plan.id, line);
-    }
-    const summary = [...lines.values()].sort(
-      (a, b) => a.applicationName.localeCompare(b.applicationName) || a.planName.localeCompare(b.planName),
-    );
-    const start = (query.page - 1) * query.pageSize;
-
-    return {
-      asOf: today,
-      summary,
-      page: pageOf(items.slice(start, start + query.pageSize), items.length, query.page, query.pageSize),
-    };
+    return { asOf: today, summary, page: pageOf(items, total, query.page, query.pageSize) };
   }
 
   /** The IT Admin sees any department; a department head sees only the one they head today. */

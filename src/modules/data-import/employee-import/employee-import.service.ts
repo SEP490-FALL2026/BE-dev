@@ -1,13 +1,21 @@
 import { Injectable } from '@nestjs/common';
 import { createHash } from 'node:crypto';
 import { Page, pageOf } from '../../../core/application/pagination';
+import type { HrBasis } from '../../../core/hr-basis';
 import { DbTx, TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditService } from '../../audit/audit.service';
 import { EmployeeCodeTakenError, EmployeeEmailTakenError } from '../../organization/organization.errors';
 import { LicensingService } from '../../licensing/licensing.service';
 import { OrganizationService } from '../../organization/organization.service';
-import { importCancelledEvent, importConfirmedEvent, importUploadedEvent } from './employee-import-audit';
+import {
+  importCancelledEvent,
+  importConfirmedEvent,
+  importEmployeeCreatedEvent,
+  importUploadedEvent,
+} from './employee-import-audit';
+import { reviewQueueOf } from './employee-import-review-queue';
+import { OwnRecord, readOwnRecord } from './employee-import-own-record';
 import { EmployeeFileRow, readEmployeeFile } from './employee-import-file';
 import {
   EmployeeCells,
@@ -67,7 +75,7 @@ export class EmployeeImportService {
     const organization = await this.requireOrganization();
     const { rows, ignored } = readEmployeeFile(file.bytes);
     const contentHash = createHash('sha256').update(file.bytes).digest('hex');
-    const evaluated = await this.evaluate(rows);
+    const evaluated = await this.evaluate(rows, await this.ownRecord(actor));
     const duplicate = await this.repo.findCompletedWithContent(organization.id, contentHash);
     const summary = await this.summarize(evaluated, duplicate);
     const fileName = file.fileName.slice(0, 255);
@@ -119,7 +127,7 @@ export class EmployeeImportService {
    * Judges the same rows again against the data as it is now, under a higher preview version; the older version
    * can no longer be confirmed (`US-02-01` AC-10). The file is not uploaded again.
    */
-  async refresh(id: string): Promise<ImportView> {
+  async refresh(actor: AuthenticatedPrincipal, id: string): Promise<ImportView> {
     const organization = await this.requireOrganization();
     const stored = await this.repo.find(id);
     if (!stored) throw new ImportNotFoundError();
@@ -128,6 +136,7 @@ export class EmployeeImportService {
 
     const evaluated = await this.evaluate(
       (await this.repo.rows(undefined, id)).map((row) => ({ lineNumber: row.lineNumber, cells: row.cells })),
+      await this.ownRecord(actor),
     );
     const duplicate = await this.repo.findCompletedWithContent(organization.id, stored.contentHash);
     const summary = await this.summarize(evaluated, duplicate);
@@ -175,7 +184,7 @@ export class EmployeeImportService {
   async confirm(
     actor: AuthenticatedPrincipal,
     id: string,
-    input: { previewVersion: number; idempotencyKey: string; acknowledgeDuplicateFile: boolean },
+    input: { previewVersion: number; idempotencyKey: string; acknowledgeDuplicateFile: boolean; hrBasis: HrBasis },
   ): Promise<{ import: ImportView; replayed: boolean }> {
     const organization = await this.requireOrganization();
     let replayed = false;
@@ -205,8 +214,12 @@ export class EmployeeImportService {
         });
       }
 
-      const { fresh, before } = await this.judgeAgainUnderLocks(tx, id);
-      const createdByDepartment = await this.writeValidRows(tx, organization.id, fresh);
+      const { fresh, before } = await this.judgeAgainUnderLocks(tx, id, await this.ownRecord(actor, tx));
+      const createdByDepartment = await this.writeValidRows(tx, organization.id, fresh, {
+        actor,
+        importId: id,
+        hrBasis: input.hrBasis,
+      });
 
       const result: ImportResult = {
         created: [...createdByDepartment.values()].reduce((sum, count) => sum + count, 0),
@@ -223,6 +236,7 @@ export class EmployeeImportService {
           previewVersion: current.previewVersion,
           result,
           repeatedFile: duplicate !== null,
+          hrBasis: input.hrBasis,
         }),
       );
     });
@@ -234,13 +248,13 @@ export class EmployeeImportService {
    * Locks what the valid rows of the stored preview rely on, then judges every row again on what the locks protect.
    * Throws the lines whose judgement changed: the preview is stale.
    */
-  private async judgeAgainUnderLocks(tx: DbTx, id: string) {
+  private async judgeAgainUnderLocks(tx: DbTx, id: string, own: OwnRecord) {
     const stored = await this.repo.rows(tx, id);
     const cells = stored.map((row) => ({ lineNumber: row.lineNumber, cells: row.cells }));
-    const before = await this.lookup(cells, tx);
+    const before = await this.lookup(cells, own, tx);
     const wanted = idsUsedByValidRows(stored, before);
     await this.organization.lockForEmployeeImport(tx, wanted.departmentIds, wanted.jobTitleIds);
-    const fresh = judgeEmployeeRows(cells, await this.lookup(cells, tx));
+    const fresh = judgeEmployeeRows(cells, await this.lookup(cells, own, tx));
     const changed = fresh.filter((row, index) => !sameJudgement(row, stored[index])).map((row) => row.lineNumber);
     if (changed.length > 0) throw new ImportPreviewStaleError(changed);
 
@@ -248,13 +262,18 @@ export class EmployeeImportService {
   }
 
   /** Creates the people of the valid rows, members from today, and counts them by department code in file order. */
-  private async writeValidRows(tx: DbTx, organizationId: string, fresh: JudgedRow[]): Promise<Map<string, number>> {
+  private async writeValidRows(
+    tx: DbTx,
+    organizationId: string,
+    fresh: JudgedRow[],
+    on: { actor: AuthenticatedPrincipal; importId: string; hrBasis: HrBasis },
+  ): Promise<Map<string, number>> {
     const today = await this.organization.businessToday();
     const createdByDepartment = new Map<string, number>();
     for (const row of fresh) {
       if (row.outcome !== 'VALID' || !row.parsed) continue;
       try {
-        await this.organization.createEmployeeWithPlacement(tx, {
+        const { id: employeeId } = await this.organization.createEmployeeWithPlacement(tx, {
           organizationId,
           employeeCode: row.parsed.employeeCode,
           fullName: row.parsed.fullName,
@@ -265,6 +284,16 @@ export class EmployeeImportService {
           departmentId: row.parsed.departmentId,
           jobTitleId: row.parsed.jobTitleId,
         });
+        await this.audit.record(
+          tx,
+          importEmployeeCreatedEvent(organizationId, on.actor, employeeId, {
+            importId: on.importId,
+            employeeCode: row.parsed.employeeCode,
+            department: row.parsed.departmentCode,
+            jobTitle: row.parsed.jobTitleName,
+            hrBasis: on.hrBasis,
+          }),
+        );
       } catch (error) {
         // Someone entered the same code or email between the judgement and the write: the preview is stale.
         if (error instanceof EmployeeCodeTakenError || error instanceof EmployeeEmailTakenError) {
@@ -280,13 +309,21 @@ export class EmployeeImportService {
 
   // --- helpers ------------------------------------------------------------------------
 
-  private async lookup(rows: readonly { cells: EmployeeCells }[], tx?: DbTx): Promise<EmployeeImportLookup> {
-    return toEmployeeImportLookup(await this.organization.lookupForEmployeeImport(lookupNamesOf(rows), tx));
+  private async lookup(
+    rows: readonly { cells: EmployeeCells }[],
+    own: OwnRecord = null,
+    tx?: DbTx,
+  ): Promise<EmployeeImportLookup> {
+    return { ...toEmployeeImportLookup(await this.organization.lookupForEmployeeImport(lookupNamesOf(rows), tx)), own };
+  }
+
+  private ownRecord(actor: AuthenticatedPrincipal, tx?: DbTx): Promise<OwnRecord> {
+    return readOwnRecord(this.organization, actor.employeeId, tx);
   }
 
   /** Every row judged against the data as it is now, kept as the preview stores it. */
-  private async evaluate(rows: EmployeeFileRow[]): Promise<StoredRow[]> {
-    return judgeEmployeeRows(rows, await this.lookup(rows)).map((row) => ({
+  private async evaluate(rows: EmployeeFileRow[], own: OwnRecord): Promise<StoredRow[]> {
+    return judgeEmployeeRows(rows, await this.lookup(rows, own)).map((row) => ({
       lineNumber: row.lineNumber,
       cells: row.cells,
       outcome: row.outcome,
@@ -315,30 +352,11 @@ export class EmployeeImportService {
       existingDifferent: rows.filter((row) => row.outcome === 'EXISTS_DIFFERENT').length,
       newPeopleByDepartment: [...byDepartment].map(([departmentCode, count]) => ({ departmentCode, count })),
       departmentsWithoutHead: await this.withoutHead(lookup, [...byDepartment.keys()]),
-      reviewQueue: await this.reviewQueue(rows),
+      reviewQueue: await reviewQueueOf(this.licensing, this.organization, rows),
       duplicateOf: duplicate
         ? { importId: duplicate.id, fileName: duplicate.fileName, confirmedAt: duplicate.confirmedAt.toISOString() }
         : null,
     };
-  }
-
-  /** The people who hold a seat, still work here and are not in the file (`US-02-02` AC-4), by code, at most 200. */
-  private async reviewQueue(rows: readonly { cells: EmployeeCells }[]): Promise<ImportSummary['reviewQueue']> {
-    const inFile = new Set(rows.map((row) => clean(row.cells.employee_code)));
-    const holders = await this.licensing.openSeatHolders();
-    if (holders.length === 0) return { total: 0, items: [] };
-    const seats = new Map(holders.map((holder) => [holder.employeeId, holder.seats]));
-    const people = await this.organization.getEmployees([...seats.keys()]);
-    const queue = people
-      .filter((person) => person.status === 'ACTIVE' && !inFile.has(person.employeeCode))
-      .map((person) => ({
-        employeeCode: person.employeeCode,
-        fullName: person.fullName,
-        seats: seats.get(person.id) ?? 0,
-      }))
-      .sort((a, b) => a.employeeCode.localeCompare(b.employeeCode));
-
-    return { total: queue.length, items: queue.slice(0, 200) };
   }
 
   private async withoutHead(lookup: EmployeeImportLookup, departmentCodes: string[]) {

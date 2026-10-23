@@ -9,6 +9,7 @@ import {
 } from '../../src/modules/licensing/licensing.types';
 import { ApiAccount, createActivatedAccount } from './api-accounts';
 import { SeatHarness } from './seat-baseline-harness';
+import { HR_BASIS } from './hr-basis';
 
 /** What the module of requests will answer, as the test decides: the request by id, and what it may be granted for. */
 export class FakeGrantGate implements GrantRequestGate {
@@ -118,8 +119,9 @@ export class ProvisioningHarness extends SeatHarness {
     return this.dataOf<{ id: string }>(
       await request(this.server())
         .post('/api/v1/employees')
-        .set(this.as(this.it1))
+        .set({ Authorization: `Bearer ${this.admin}` })
         .send({
+          hrBasis: HR_BASIS,
           employeeCode: code,
           fullName: `Person ${code}`,
           workEmail: `${code.toLowerCase()}@acme.vn`,

@@ -36,13 +36,13 @@ const TIME_LIMITED = new Set(['CONTRACTOR', 'FREELANCER', 'INTERN']);
 /**
  * The rules of passing a service account to another responsible person (`AC-10`, `QĐ-43a`), in a fixed order: it is a
  * service account and still open; the day it takes effect is after the day the account began and not in the past; the
- * person is found, still working and not the one already responsible; the expected end date, which time-limited staff
+ * person is found, still working, not the one already responsible and in the department that owns the account; the expected end date, which time-limited staff
  * must have (`INV-07`), is not before the day the change takes effect. Throws the matching error from `licensing.errors`.
  */
 export function assertResponsibleChange(
   current: AssignmentRecord,
   change: { employeeId: string; effectiveFrom: BusinessDate; expectedEndDate: BusinessDate | null },
-  holder: { status: string; employmentType: string } | null,
+  holder: { status: string; employmentType: string; departmentId: string | null } | null,
   today: BusinessDate,
 ): void {
   if (current.kind !== 'SERVICE') throw new AssignmentNotServiceAccountError();
@@ -53,6 +53,10 @@ export function assertResponsibleChange(
   if (!holder) throw new AssignmentResponsibleInvalidError('NOT_FOUND');
   if (holder.status !== 'ACTIVE') throw new AssignmentResponsibleInvalidError('NOT_ACTIVE');
   if (change.employeeId === current.employeeId) throw new AssignmentResponsibleInvalidError('SAME_PERSON');
+  // A service account stays in the department that owns it (`QĐ-86c`); moving it to another is a G6 decision.
+  if (holder.departmentId !== current.owningDepartmentId) {
+    throw new AssignmentResponsibleInvalidError('OUTSIDE_OWNING_DEPARTMENT');
+  }
 
   if (change.expectedEndDate !== null && change.expectedEndDate < change.effectiveFrom) {
     throw new AssignmentEffectiveDateInvalidError('EXPECTED_END_BEFORE_START');

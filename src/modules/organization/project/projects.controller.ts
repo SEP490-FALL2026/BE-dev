@@ -9,7 +9,7 @@ import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-
 import { RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
 import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { toProjectWire } from '../mappers/project.mapper';
+import { toProjectSummaryWire, toProjectWire } from '../mappers/project.mapper';
 import {
   CreateProjectBodyDto,
   ListProjectsQueryDto,
@@ -48,12 +48,34 @@ export class ProjectsController {
   @ApiOperation({ operationId: 'projectList', summary: 'List projects' })
   @ApiSuccessResponse(ProjectListResponseDto, {
     message: 'PROJECT.LISTED',
-    description: 'The projects, optionally those a department takes part in.',
+    description:
+      'A page of projects by name, optionally those a department takes part in. The description is read with GET /projects/{id}.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, VALIDATION_ERROR)
   async list(@Query() query: ListProjectsQueryDto) {
     try {
-      return { items: (await this.projects.list(query.departmentId)).map(toProjectWire) };
+      const page = await this.projects.list(query);
+
+      return { items: page.items.map(toProjectSummaryWire), pagination: page.pagination };
+    } catch (error) {
+      throw toOrganizationApiException(error);
+    }
+  }
+
+  @Get(':id')
+  @RequireRoles('IT_ADMIN')
+  @ApiOperation({ operationId: 'projectGet', summary: 'Read one project' })
+  @ApiSuccessResponse(ProjectResponseDto, {
+    message: 'PROJECT.FETCHED',
+    description: 'The project in full, with its description and the departments that take part.',
+  })
+  @ApiErrorResponses(...AUTH_ERRORS, VALIDATION_ERROR, {
+    status: HttpStatus.NOT_FOUND,
+    description: 'The project does not exist (PROJECT.NOT_FOUND).',
+  })
+  async get(@Param() params: ProjectIdParamDto) {
+    try {
+      return toProjectWire(await this.projects.get(params.id));
     } catch (error) {
       throw toOrganizationApiException(error);
     }

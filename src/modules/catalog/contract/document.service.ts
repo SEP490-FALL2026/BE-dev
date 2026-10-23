@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import { ObjectKeyFactory } from '../../../infrastructure/object-storage/object-key.factory';
+import { ObjectStorageUnavailableError } from '../../../infrastructure/object-storage/object-storage.errors';
 import { OBJECT_STORAGE, type ObjectStoragePort } from '../../../infrastructure/object-storage/object-storage.port';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditService } from '../../audit/audit.service';
@@ -12,7 +13,9 @@ import {
   DocumentAccessForbiddenError,
   DocumentNotAwaitingUploadError,
   DocumentNotFoundError,
+  DocumentUploadExpiredError,
   DocumentUploadMismatchError,
+  DocumentUploadPendingError,
 } from './contract.errors';
 import {
   LINK_TTL_SECONDS,
@@ -29,7 +32,10 @@ import {
 import { ContractRepo } from './contract.repo';
 import { DocumentRepo, type DocumentRecord } from './document.repo';
 
-const UPLOAD_LINK_SECONDS = 900;
+/** The upload link lives two minutes (`SEC-01`): long enough to put a file, too short to be kept for later. */
+const UPLOAD_LINK_SECONDS = 120;
+/** A file declared and not uploaded this long is given up (`DB-13`). */
+export const UPLOAD_ABANDONED_AFTER_MS = 24 * 60 * 60 * 1000;
 const MB = 1024 * 1024;
 
 export interface UploadInstructions {
@@ -45,6 +51,10 @@ export interface UploadInstructions {
  * looks at what was stored before it keeps the file. A file belongs to the person who uploaded it until they attach it to
  * a contract, then to the IT Admin and Finance. A link that opens a file is made when it is asked for, lives five
  * minutes, and is stored nowhere. The role is the one held at the moment of each request.
+ *
+ * What the person uploads goes to a key the upload link can still write to, so it is never what is kept: once the stored
+ * object is judged, those very bytes are copied to a key of their own that no link reaches, and the link is of no use to
+ * replace them (`SEC-01`). A file whose upload never came is not refused, only waiting; after a day it is given up (`DB-13`).
  */
 @Injectable()
 export class DocumentService {
@@ -73,7 +83,7 @@ export class DocumentService {
     const maxBytes = Number(await this.parameters.getValue('DOCUMENT_MAX_SIZE_MB')) * MB;
     assertFileAllowed({ ...input, maxBytes });
     const organization = await this.requireOrganization();
-    const objectKey = this.keys.create('documents');
+    const objectKey = this.keys.create('pending-documents');
 
     const document = await this.runner.run(async (tx) => {
       const created = await this.documents.insert(tx, {
@@ -100,6 +110,7 @@ export class DocumentService {
     const url = await this.storage.createUploadUrl({
       key: objectKey,
       contentType: input.contentType,
+      contentLength: input.sizeBytes,
       expiresInSeconds: UPLOAD_LINK_SECONDS,
     });
 
@@ -108,59 +119,115 @@ export class DocumentService {
       upload: {
         url,
         method: 'PUT',
-        headers: { 'Content-Type': input.contentType },
+        headers: { 'Content-Type': input.contentType, 'Content-Length': String(input.sizeBytes) },
         expiresAt: new Date(Date.now() + UPLOAD_LINK_SECONDS * 1000),
       },
     };
   }
 
   /**
-   * Looks at what the storage holds for the file: if it is what was declared the file is uploaded and waits for its
-   * owner, if not the object is deleted and the file is quarantined. Throws DocumentNotFoundError (not yours),
-   * DocumentNotAwaitingUploadError and DocumentUploadMismatchError.
+   * Looks at what the storage holds for the file: if it is what was declared, those bytes are copied to the key the file
+   * is kept under and the file waits for its owner; if not, the object is deleted and the file is quarantined. An object
+   * that has not arrived is not a refusal: the file keeps waiting. Throws DocumentNotFoundError (not yours),
+   * DocumentNotAwaitingUploadError, DocumentUploadPendingError, DocumentUploadExpiredError and DocumentUploadMismatchError.
    */
   async complete(actor: AuthenticatedPrincipal, id: string): Promise<DocumentRecord> {
     const organization = await this.requireOrganization();
     const current = await this.ownedBy(actor, id);
     if (current.status !== 'AWAITING_UPLOAD') throw new DocumentNotAwaitingUploadError();
+    if (Date.now() - current.createdAt.getTime() > UPLOAD_ABANDONED_AFTER_MS) {
+      await this.expire(current.id, current.objectKey, actor);
+      throw new DocumentUploadExpiredError();
+    }
     const stored = await this.stored(current.objectKey);
-    let matches = true;
+    if (stored.etag === undefined) throw new DocumentUploadPendingError();
+    let finalKey: string | null = null;
     try {
       assertUploadMatches(current, stored);
       // What it says it is, by its size and type, is not enough: the content must begin like the type it declares.
-      if (!contentMatchesType(current.contentType, await this.prefixOf(current.objectKey))) {
+      if (!contentMatchesType(current.contentType, await this.prefixOf(current.objectKey, stored.etag))) {
         throw new DocumentUploadMismatchError();
       }
+      // The bytes that were looked at are the ones kept: copied only if they are still those, to a key no link reaches.
+      finalKey = this.keys.create('documents');
+      await this.copyKept(current.objectKey, finalKey, stored.etag);
     } catch (error) {
       if (!(error instanceof DocumentUploadMismatchError)) throw error;
-      matches = false;
+      finalKey = null;
     }
-    if (!matches) await this.storage.delete(current.objectKey);
+    // The upload link is no more use once the object is judged, whatever the answer; a failed delete leaves the object to the lifecycle of the bucket.
+    await this.discard(current.objectKey);
 
     const result = await this.runner.run(async (tx) => {
       const locked = await this.documents.lock(tx, id);
       if (!locked) throw new DocumentNotFoundError();
       if (locked.status !== 'AWAITING_UPLOAD') throw new DocumentNotAwaitingUploadError();
-      if (matches) await this.documents.markUploaded(tx, id);
+      if (finalKey !== null) await this.documents.markUploaded(tx, id, finalKey);
       else await this.documents.markQuarantined(tx, id);
       await this.audit.record(
         tx,
         catalogAuditEvent(
           actor,
           organization.id,
-          matches ? 'DOCUMENT.UPLOADED' : 'DOCUMENT.QUARANTINED',
+          finalKey !== null ? 'DOCUMENT.UPLOADED' : 'DOCUMENT.QUARANTINED',
           'DocumentAttachment',
           id,
           { status: 'AWAITING_UPLOAD' },
-          { status: matches ? 'PENDING_ATTACH' : 'QUARANTINED' },
+          { status: finalKey !== null ? 'PENDING_ATTACH' : 'QUARANTINED' },
         ),
       );
 
       return (await this.documents.find(id, tx)) ?? locked;
     });
-    if (!matches) throw new DocumentUploadMismatchError();
+    if (finalKey === null) throw new DocumentUploadMismatchError();
 
     return result;
+  }
+
+  /**
+   * Gives up the files whose upload never came: each becomes EXPIRED, with an event in the audit trail, and its object, if
+   * one arrived after all, is deleted. Run by the API on a timer; safe to run often and from several instances. Returns
+   * how many were given up.
+   */
+  async expireAbandoned(now: Date = new Date(), limit = 100): Promise<number> {
+    const abandoned = await this.documents.findAbandoned(new Date(now.getTime() - UPLOAD_ABANDONED_AFTER_MS), limit);
+    let expired = 0;
+    for (const file of abandoned) {
+      if (await this.expire(file.id, file.objectKey)) expired += 1;
+    }
+
+    return expired;
+  }
+
+  /** One file given up, if it is still awaiting its upload when the row is locked; the object goes after the commit. */
+  private async expire(id: string, objectKey: string, actor?: AuthenticatedPrincipal): Promise<boolean> {
+    const organization = await this.requireOrganization();
+    const done = await this.runner.run(async (tx) => {
+      const locked = await this.documents.lock(tx, id);
+      if (!locked || locked.status !== 'AWAITING_UPLOAD') return false;
+      await this.documents.markExpired(tx, id);
+      await this.audit.record(tx, {
+        ...(actor
+          ? catalogAuditEvent(actor, organization.id, 'DOCUMENT.EXPIRED', 'DocumentAttachment', id, null, null)
+          : {
+              organizationId: organization.id,
+              actorKind: 'SYSTEM',
+              actorAppUserId: null,
+              actorRoles: [],
+              action: 'DOCUMENT.EXPIRED',
+              resourceType: 'DocumentAttachment',
+              resourceId: id,
+              correlationId: `document-expiry-${id}`,
+            }),
+        before: { status: 'AWAITING_UPLOAD' },
+        after: { status: 'EXPIRED' },
+      });
+
+      return true;
+    });
+    if (done) await this.discard(objectKey);
+
+    return done;
   }
 
   /**
@@ -210,7 +277,13 @@ export class DocumentService {
     const organization = await this.requireOrganization();
     const document = await this.visibleTo(actor, id);
     const expiresAt = new Date(Date.now() + LINK_TTL_SECONDS * 1000);
-    const url = await this.storage.createDownloadUrl({ key: document.objectKey, expiresInSeconds: LINK_TTL_SECONDS });
+    const url = await this.storage.createDownloadUrl({
+      // A file that was kept opens from the copy that was looked at, never from the key an upload link can still write to.
+      key: document.finalObjectKey ?? document.objectKey,
+      fileName: document.fileName,
+      contentType: document.contentType,
+      expiresInSeconds: LINK_TTL_SECONDS,
+    });
     await this.runner.run((tx) =>
       this.audit.record(
         tx,
@@ -247,24 +320,46 @@ export class DocumentService {
   }
 
   /** What the storage holds under the key; an object that is not there reports nothing, so it never matches. */
-  private async stored(key: string): Promise<{ contentLength: number | undefined; contentType: string | undefined }> {
+  private async stored(
+    key: string,
+  ): Promise<{ contentLength: number | undefined; contentType: string | undefined; etag: string | undefined }> {
     try {
       const metadata = await this.storage.head(key);
 
-      return { contentLength: metadata.contentLength, contentType: metadata.contentType };
+      return { contentLength: metadata.contentLength, contentType: metadata.contentType, etag: metadata.etag };
     } catch (error) {
-      if (isNotFound(error)) return { contentLength: undefined, contentType: undefined };
+      if (isNotFound(error)) return { contentLength: undefined, contentType: undefined, etag: undefined };
       throw error;
     }
   }
 
   /** The first bytes of the object, enough to read its signature; an object that is not there has none. */
-  private async prefixOf(key: string): Promise<Uint8Array> {
+  private async prefixOf(key: string, etag: string): Promise<Uint8Array> {
     try {
-      return await this.storage.readPrefix(key, SIGNATURE_PREFIX_BYTES);
+      return await this.storage.readPrefix(key, SIGNATURE_PREFIX_BYTES, etag);
     } catch (error) {
-      if (isNotFound(error)) return new Uint8Array();
+      // An object that is gone, or put again since it was looked at, is not the file that was judged.
+      if (isNotFound(error) || isChanged(error)) return new Uint8Array();
       throw error;
+    }
+  }
+
+  /** The copy of the bytes that were looked at; if they changed meanwhile, they are not what was judged. */
+  private async copyKept(fromKey: string, toKey: string, etag: string): Promise<void> {
+    try {
+      await this.storage.copyIfMatch(fromKey, toKey, etag);
+    } catch (error) {
+      if (isNotFound(error) || isChanged(error)) throw new DocumentUploadMismatchError();
+      throw error;
+    }
+  }
+
+  /** Deletes an object nobody can use any more; one that is not there, or cannot be deleted now, is left to the bucket's lifecycle. */
+  private async discard(key: string): Promise<void> {
+    try {
+      await this.storage.delete(key);
+    } catch (error) {
+      if (!(error instanceof ObjectStorageUnavailableError) && !isNotFound(error)) throw error;
     }
   }
 
@@ -274,6 +369,12 @@ export class DocumentService {
 
     return organization;
   }
+}
+
+function isChanged(error: unknown): boolean {
+  const candidate = error as { name?: string; $metadata?: { httpStatusCode?: number } };
+
+  return candidate.name === 'PreconditionFailed' || candidate.$metadata?.httpStatusCode === 412;
 }
 
 function isNotFound(error: unknown): boolean {

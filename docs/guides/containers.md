@@ -4,7 +4,9 @@
 optional and start only under their named profiles (`--profile queue`, `--profile storage`), for trying the queue and
 object storage the API mounts for contract files (the queue is not mounted, Owner decision E2 = A, H6.4). Ports bind to loopback.
 Check for port conflicts before starting; do not stop unrelated services.
-Create the configured MinIO bucket before using storage.
+Create the configured MinIO bucket before using storage. The API refuses the public default credentials of MinIO
+(`minioadmin`) in every environment but `NODE_ENV=test` (SEC-04): set your own `MINIO_ROOT_USER`/`MINIO_ROOT_PASSWORD`
+and the same values as `OBJECT_STORAGE_ACCESS_KEY_ID`/`OBJECT_STORAGE_SECRET_ACCESS_KEY` (different from each other).
 
 MinIO builds locally from the pinned official release because the old prebuilt image
 cannot be pulled. The first build downloads Go dependencies and can take several minutes.
@@ -31,18 +33,21 @@ OBJECT_STORAGE_ENDPOINT with OBJECT_STORAGE_BUCKET and the access key (the varia
 `@production-required-when-mounted` in `.env.example`); the worker and the commands do not read them. The endpoint is
 the one the browser uploads to and the one signed links open: its host is written into every link, so it must be
 reachable from the user's browser over HTTPS (not a container-internal name), the bucket must already exist, and the
-bucket must allow the browser's `PUT` from the application's origin (CORS). Links live 15 minutes to upload and 5
-minutes to view (ADR-0014).
+bucket must allow the browser's `PUT` from the application's origin (CORS, with the `Content-Type` header: the upload link signs
+the declared type and size, ADR-0014). Links live 2 minutes to upload and 5 minutes to view. Add a lifecycle rule that
+expires the objects under `pending-documents/` after 2 days (what an upload that was never completed leaves behind);
+objects under `documents/` are the kept files and are never expired by the bucket.
 Authentication also requires AUTH_ACCESS_TOKEN_SECRET and AUTH_THROTTLE_PEPPER;
 invitation delivery requires HTTPS APP_PUBLIC_URL, OUTBOX_PAYLOAD_KEY (base64 of 32 bytes), OUTBOX_PAYLOAD_KEY_ID,
 SMTP_HOST, SMTP_FROM and SMTP_TLS=true, plus the provider's port/auth settings.
-The license key vault requires LICENSE_KEY_VAULT_KEY (base64 of 32 bytes, never the same as OUTBOX_PAYLOAD_KEY),
+The license key vault requires LICENSE_KEY_VAULT_KEY (base64 of 32 bytes, never the same bytes as OUTBOX_PAYLOAD_KEY or
+any previous key of either purpose, however written; standard padded base64 only, SEC-05),
 LICENSE_KEY_VAULT_KEY_ID and LICENSE_KEY_FINGERPRINT_PEPPER; LICENSE_KEY_VAULT_PREVIOUS_KEYS (`id:base64` pairs) keeps
 the keys of a rotation and is held to the same rules as the current key. How to rotate and what to back up:
 [license key vault](license-key-vault.md).
 The [environment validator](../../src/infrastructure/config/env-schema.ts) owns the full constraints, and refuses in
-production (and in development) any secret value that is public in the repository (the five secrets above and a
-previous vault key).
+production (and in development) any secret value that is public in the repository (the five secrets above, a
+previous vault key and the storage credentials).
 The API and the worker validate all of these settings and refuse to start in production without them.
 The runtime image also carries `src/infrastructure/config/database-url.ts`, the one `DATABASE_URL` rule that both the
 validator and `prisma.config.ts` read, so `prisma` commands in the image resolve the same URL.

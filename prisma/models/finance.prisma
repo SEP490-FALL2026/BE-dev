@@ -10,6 +10,7 @@ model Currency {
 
   rates         ExchangeRate[]
   subscriptions Subscription[] @relation("SubscriptionPriceCurrency")
+  organizations Organization[] @relation("OrganizationReportingCurrency")
 
   @@map("currencies")
 }

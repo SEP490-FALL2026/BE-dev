@@ -28,6 +28,11 @@ export interface ParameterDefinition {
  * installation starts with (AC-7). The domains are the ones the stories give; where a story leaves the number
  * to the technical design (`OQ-A-05`) the default here is that design's choice and is meant to be changed.
  *
+ * The budget period is the fiscal year (`FR-5.1`, `QĐ-82e`), so there is no parameter for its kind and none for a
+ * high-value threshold or a 50 % rate (`QĐ-82c`). The two choices that remain are when the fiscal year begins and how
+ * long a request may wait to be submitted; the lock on the month once a budget version exists belongs to the budget
+ * (G5), which does not exist yet.
+ *
  * Not here on purpose: the time zone (set once at installation, `QĐ-47d`), and the reporting currency, which lock
  * once rates or priced subscriptions exist (AC-9) — it joins when the slice that holds those exists. The same goes
  * for the notice text of the device collector (AC-2) and the per-application detection thresholds (AC-1, AC-5).
@@ -50,12 +55,20 @@ export const PARAMETER_DEFINITIONS: readonly ParameterDefinition[] = [
     source: 'BR-45.5, OI-14b',
   },
   {
-    key: 'BUDGET_PERIOD_KIND',
-    shape: { kind: 'enum', options: ['MONTH', 'QUARTER', 'YEAR'] },
-    default: 'QUARTER',
-    unit: 'period',
-    description: 'The kind of budget period used for the whole organization.',
-    source: 'BR-36.8, OI-11b',
+    key: 'FISCAL_YEAR_START_MONTH',
+    shape: { kind: 'int', min: 1, max: 12 },
+    default: 1,
+    unit: 'month of the year',
+    description: 'The month the fiscal year, which is the budget period of the whole organization, begins.',
+    source: 'FR-8.2, FR-5.1, QĐ-82c',
+  },
+  {
+    key: 'SPEND_SUBMISSION_WAIT_WORKING_DAYS',
+    shape: { kind: 'int', min: 1, max: 30 },
+    default: 2,
+    unit: 'working days',
+    description: 'How long a spending request may wait to be submitted for approval before it is reminded.',
+    source: 'FR-8.2, QĐ-82e',
   },
   {
     key: 'TRANSFER_REVIEW_WORKING_DAYS',

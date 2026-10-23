@@ -26,15 +26,16 @@ export const objectStorageKeys = {
     then: Joi.required(),
     otherwise: Joi.string().default('software-license-files'),
   }),
+  // The public default of MinIO is for the test runs only: any other environment supplies its own credentials (SEC-04).
   OBJECT_STORAGE_ACCESS_KEY_ID: Joi.string().when('NODE_ENV', {
-    is: 'production',
-    then: Joi.required(),
-    otherwise: Joi.string().default('minioadmin'),
+    is: 'test',
+    then: Joi.string().default('minioadmin'),
+    otherwise: Joi.required(),
   }),
   OBJECT_STORAGE_SECRET_ACCESS_KEY: Joi.string().when('NODE_ENV', {
-    is: 'production',
-    then: Joi.required(),
-    otherwise: Joi.string().default('minioadmin'),
+    is: 'test',
+    then: Joi.string().default('minioadmin'),
+    otherwise: Joi.required(),
   }),
   OBJECT_STORAGE_FORCE_PATH_STYLE: Joi.boolean().default(true),
 };
@@ -43,10 +44,27 @@ export const OBJECT_STORAGE_ENVIRONMENT_KEYS = Object.keys(
   objectStorageKeys,
 ) as (keyof ObjectStorageEnvironmentVariables)[];
 
+/** The credentials every MinIO starts with: public, so no environment but the tests may use them. */
+const PUBLIC_STORAGE_CREDENTIAL = 'minioadmin';
+
 export function assertProductionObjectStorage(result: ObjectStorageEnvironmentVariables & { NODE_ENV: string }): void {
   if (result.NODE_ENV === 'production' && !isHttpsUrl(result.OBJECT_STORAGE_ENDPOINT)) {
     throw new EnvironmentValidationError(
       'Environment validation failed: OBJECT_STORAGE_ENDPOINT must use HTTPS in production',
+    );
+  }
+  if (result.NODE_ENV === 'test') return;
+  const keyId = result.OBJECT_STORAGE_ACCESS_KEY_ID;
+  const secret = result.OBJECT_STORAGE_SECRET_ACCESS_KEY;
+  // Which setting, never its value (SEC-04).
+  if (keyId === PUBLIC_STORAGE_CREDENTIAL || secret === PUBLIC_STORAGE_CREDENTIAL) {
+    throw new EnvironmentValidationError(
+      `Environment validation failed: ${result.NODE_ENV} must not use the public default credentials of the object storage for OBJECT_STORAGE_ACCESS_KEY_ID and OBJECT_STORAGE_SECRET_ACCESS_KEY; create your own`,
+    );
+  }
+  if (keyId === secret) {
+    throw new EnvironmentValidationError(
+      'Environment validation failed: OBJECT_STORAGE_SECRET_ACCESS_KEY must differ from OBJECT_STORAGE_ACCESS_KEY_ID',
     );
   }
 }

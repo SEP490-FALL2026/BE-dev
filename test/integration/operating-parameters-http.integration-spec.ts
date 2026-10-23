@@ -97,7 +97,10 @@ describe('the operating parameters and the non-working dates over HTTP (integrat
 
       expect(parameters.get('APPROVAL_SLA_WORKING_DAYS')).toMatchObject({ value: 2, isDefault: true, changedAt: null });
       expect(parameters.get('ACTIVITY_WINDOW_MINUTES')?.value).toBe(5);
-      expect(parameters.get('BUDGET_PERIOD_KIND')?.value).toBe('QUARTER');
+      expect(parameters.get('FISCAL_YEAR_START_MONTH')?.value).toBe(1);
+      expect(parameters.get('SPEND_SUBMISSION_WAIT_WORKING_DAYS')?.value).toBe(2);
+      expect(parameters.has('BUDGET_PERIOD_KIND')).toBe(false);
+      expect([...parameters.keys()].filter((key) => /HIGH_VALUE/.test(key))).toEqual([]);
       expect(parameters.get('TRANSFER_REVIEW_WORKING_DAYS')?.value).toBe(5);
       expect(parameters.get('ABRUPT_DEPARTURE_HOLD_WORKING_DAYS')?.value).toBe(1);
       expect(parameters.get('DETECTION_THRESHOLD_DAYS')?.value).toEqual([30, 60, 90]);
@@ -168,7 +171,9 @@ describe('the operating parameters and the non-working dates over HTTP (integrat
     it.each([
       ['a number sent as text', 'APPROVAL_SLA_WORKING_DAYS', '3', 'WRONG_TYPE'],
       ['zero days', 'APPROVAL_SLA_WORKING_DAYS', 0, 'OUT_OF_RANGE'],
-      ['a period kind that does not exist', 'BUDGET_PERIOD_KIND', 'WEEK', 'OUT_OF_RANGE'],
+      ['a month that does not exist', 'FISCAL_YEAR_START_MONTH', 13, 'OUT_OF_RANGE'],
+      ['month zero', 'FISCAL_YEAR_START_MONTH', 0, 'OUT_OF_RANGE'],
+      ['no days to wait', 'SPEND_SUBMISSION_WAIT_WORKING_DAYS', 0, 'OUT_OF_RANGE'],
       ['thresholds that do not rise', 'DETECTION_THRESHOLD_DAYS', [90, 60, 30], 'OUT_OF_RANGE'],
     ])('refuses %s and leaves the value as it was', async (_name, key, value, problem) => {
       const before = (await list()).get(key);
@@ -201,8 +206,21 @@ describe('the operating parameters and the non-working dates over HTTP (integrat
       });
     });
 
+    it('does not return, and does not fail on, a budget period kind stored before it was removed (AC-8)', async () => {
+      await ctx.sql.query(
+        `INSERT INTO parameter_values (id, organization_id, key, value, valid_from)
+         VALUES (gen_random_uuid(), $1, 'BUDGET_PERIOD_KIND', '"MONTH"'::jsonb, now())`,
+        [seed.organizationId],
+      );
+
+      const parameters = await list();
+
+      expect(parameters.has('BUDGET_PERIOD_KIND')).toBe(false);
+      expect(parameters.size).toBe(16);
+    });
+
     it('is 404 for a parameter that does not exist, the time zone included (AC-11)', async () => {
-      for (const key of ['NO_SUCH_PARAMETER', 'TIME_ZONE', 'REPORTING_CURRENCY']) {
+      for (const key of ['NO_SUCH_PARAMETER', 'TIME_ZONE', 'REPORTING_CURRENCY', 'BUDGET_PERIOD_KIND']) {
         expect(errorOf(await setParameter(key, 'x').expect(404)).code).toBe('PARAMETER.NOT_FOUND');
       }
       await request(server()).get('/api/v1/operating-parameters/NO_SUCH_PARAMETER/history').set(asAdmin()).expect(404);
@@ -340,6 +358,26 @@ describe('the operating parameters and the non-working dates over HTTP (integrat
             .expect(404),
         ).code,
       ).toBe('NON_WORKING_DATE.NOT_FOUND');
+    });
+
+    it('pages the list by date with the total of the range, whatever the range (LD-15)', async () => {
+      const start = addDays(today(), 200);
+      for (let offset = 0; offset < 5; offset += 1) await addDate(addDays(start, offset), `Page ${offset}`).expect(201);
+
+      const second = await request(server())
+        .get(`/api/v1/non-working-dates?from=${start}&to=${addDays(start, 4)}&pageSize=2&page=2`)
+        .set(asAdmin())
+        .expect(200);
+      const everything = await request(server())
+        .get('/api/v1/non-working-dates?pageSize=100')
+        .set(asAdmin())
+        .expect(200);
+
+      const data = (second.body as { data: { items: { date: string }[]; pagination: unknown } }).data;
+      expect(data.items.map((item) => item.date)).toEqual([addDays(start, 2), addDays(start, 3)]);
+      expect(data.pagination).toEqual({ page: 2, pageSize: 2, totalItems: 5, totalPages: 3 });
+      expect((everything.body as { data: { items: unknown[] } }).data.items.length).toBeLessThanOrEqual(100);
+      await request(server()).get('/api/v1/non-working-dates?pageSize=101').set(asAdmin()).expect(422);
     });
 
     it('lists in date order and refuses everyone but the Super Admin', async () => {

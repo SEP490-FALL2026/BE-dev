@@ -22,7 +22,7 @@ const lineSchema = z.strictObject({
   costCenterId: z.uuid(),
   costCenterCode: z.string(),
   costCenterName: z.string(),
-  costCenterKind: z.enum(['UNIT', 'COMPANY']),
+  costCenterKind: z.enum(['UNIT']),
   ratioPercent: z.string(),
 });
 const allocationSchema = z.strictObject({

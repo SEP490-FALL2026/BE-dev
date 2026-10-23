@@ -118,7 +118,7 @@ describe('toAllocationView', () => {
   const declaredAt = new Date('2026-10-20T03:00:00.000Z');
   const centers = new Map([
     [A, { id: A, code: 'CC-A', name: 'Design', kind: 'UNIT' as const, status: 'ACTIVE' as const }],
-    [B, { id: B, code: 'CC-B', name: 'Company', kind: 'COMPANY' as const, status: 'ACTIVE' as const }],
+    [B, { id: B, code: 'CC-B', name: 'Finance', kind: 'UNIT' as const, status: 'ACTIVE' as const }],
   ]);
 
   it('shows the shares as percentages with the code, name and kind of each Cost Center, and the total', () => {
@@ -149,8 +149,8 @@ describe('toAllocationView', () => {
         {
           costCenterId: B,
           costCenterCode: 'CC-B',
-          costCenterName: 'Company',
-          costCenterKind: 'COMPANY',
+          costCenterName: 'Finance',
+          costCenterKind: 'UNIT',
           ratioPercent: '39.5',
         },
       ],

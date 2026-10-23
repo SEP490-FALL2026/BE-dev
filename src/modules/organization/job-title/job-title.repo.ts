@@ -16,6 +16,22 @@ const JOB_TITLE_SELECT = {
 } as const;
 
 /** The one writer of `job_titles`: the installation's first title and the catalogue, under one name rule (T-12). */
+const toJobTitleRecord = (row: {
+  id: string;
+  name: string;
+  status: JobTitleRecord['status'];
+  version: number;
+  createdAt: Date;
+  updatedAt: Date;
+}): JobTitleRecord => ({
+  id: row.id,
+  name: row.name,
+  status: row.status,
+  version: row.version,
+  createdAt: row.createdAt,
+  updatedAt: row.updatedAt,
+});
+
 @Injectable()
 export class JobTitleRepo {
   constructor(private readonly prisma: PrismaService) {}
@@ -54,16 +70,15 @@ export class JobTitleRepo {
   async findJobTitle(jobTitleId: string, tx?: DbTx): Promise<JobTitleRecord | null> {
     const row = await (tx ?? this.prisma).jobTitle.findUnique({ where: { id: jobTitleId } });
 
-    return row
-      ? {
-          id: row.id,
-          name: row.name,
-          status: row.status,
-          version: row.version,
-          createdAt: row.createdAt,
-          updatedAt: row.updatedAt,
-        }
-      : null;
+    return row ? toJobTitleRecord(row) : null;
+  }
+
+  /** The job titles with these ids in one read; an id that does not exist is absent. */
+  async findJobTitles(jobTitleIds: readonly string[], tx?: DbTx): Promise<JobTitleRecord[]> {
+    if (jobTitleIds.length === 0) return [];
+    const rows = await (tx ?? this.prisma).jobTitle.findMany({ where: { id: { in: [...jobTitleIds] } } });
+
+    return rows.map(toJobTitleRecord);
   }
 
   async findJobTitleByNormalizedName(

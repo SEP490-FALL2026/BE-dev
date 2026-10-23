@@ -1,7 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { ProjectRecord, ProjectStatus } from './project.types';
+import { Prisma } from '../../../generated/prisma/client';
+import { ProjectRecord, ProjectStatus, ProjectSummaryRecord } from './project.types';
+
+const DEPARTMENT_REF = { id: true, code: true, name: true } as const;
+const sortedDepartments = (links: { department: { id: string; code: string; name: string } }[]) =>
+  links.map((link) => link.department).sort((a, b) => (a.code < b.code ? -1 : a.code > b.code ? 1 : 0));
 
 /**
  * Projects described on department profiles and the departments that take part (`US-03-06` AC-14). It also checks
@@ -67,14 +72,62 @@ export class ProjectRepo {
     }
   }
 
-  async listProjects(departmentId: string | undefined, client?: DbTx): Promise<ProjectRecord[]> {
-    const rows = await (client ?? this.prisma).project.findMany({
-      where: departmentId ? { departments: { some: { departmentId } } } : {},
-      include: { departments: { include: { department: { select: { id: true, code: true, name: true } } } } },
-      orderBy: [{ name: 'asc' }, { id: 'asc' }],
-    });
+  /** One page of projects by name then id, and the total for the same filter, from one snapshot (`LD-12`). */
+  async page(
+    departmentId: string | undefined,
+    skip: number,
+    take: number,
+  ): Promise<{ items: ProjectSummaryRecord[]; total: number }> {
+    const where = departmentId ? { departments: { some: { departmentId } } } : {};
 
-    return rows.map((row) => this.toProject(row));
+    return this.prisma.$transaction(
+      async (tx) => {
+        const rows = await tx.project.findMany({
+          where,
+          select: {
+            id: true,
+            name: true,
+            status: true,
+            updatedAt: true,
+            departments: { select: { department: { select: DEPARTMENT_REF } } },
+          },
+          orderBy: [{ name: 'asc' }, { id: 'asc' }],
+          skip,
+          take,
+        });
+
+        return {
+          items: rows.map((row) => ({
+            id: row.id,
+            name: row.name,
+            status: row.status,
+            updatedAt: row.updatedAt,
+            departments: sortedDepartments(row.departments),
+          })),
+          total: await tx.project.count({ where }),
+        };
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
+    );
+  }
+
+  /** The first `take` projects a department takes part in, in full, and how many there are, from one snapshot. */
+  async forDepartment(departmentId: string, take: number): Promise<{ items: ProjectRecord[]; total: number }> {
+    const where = { departments: { some: { departmentId } } };
+
+    return this.prisma.$transaction(
+      async (tx) => {
+        const rows = await tx.project.findMany({
+          where,
+          include: { departments: { include: { department: { select: DEPARTMENT_REF } } } },
+          orderBy: [{ name: 'asc' }, { id: 'asc' }],
+          take,
+        });
+
+        return { items: rows.map((row) => this.toProject(row)), total: await tx.project.count({ where }) };
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
+    );
   }
 
   async existingDepartmentIds(tx: DbTx, ids: string[]): Promise<Set<string>> {
@@ -97,9 +150,7 @@ export class ProjectRepo {
       name: row.name,
       description: row.description,
       status: row.status,
-      departments: row.departments
-        .map((link) => link.department)
-        .sort((a, b) => (a.code < b.code ? -1 : a.code > b.code ? 1 : 0)),
+      departments: sortedDepartments(row.departments),
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
     };

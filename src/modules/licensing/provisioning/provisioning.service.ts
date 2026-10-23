@@ -36,7 +36,7 @@ import {
 import { maxAttempts as maxAttemptsFor } from './failure.policy';
 import { ProvisioningTaskFrame } from './provisioning-task-frame.service';
 import { ProvisioningTaskRepo } from './provisioning-task.repo';
-import { ProvisioningTaskViewService, type TaskView } from './provisioning-task-view.service';
+import { ProvisioningTaskViewService, type TaskSummaryView, type TaskView } from './provisioning-task-view.service';
 
 export type TaskScope = 'ALL' | 'MINE' | 'GENERAL';
 
@@ -146,7 +146,7 @@ export class ProvisioningService {
       page: number;
       pageSize: number;
     },
-  ): Promise<Page<TaskView>> {
+  ): Promise<Page<TaskSummaryView>> {
     const { items, total } = await this.repo.page({
       ...(query.channel ? { channel: query.channel } : {}),
       ...(query.status ? { status: query.status } : {}),
@@ -156,7 +156,7 @@ export class ProvisioningService {
       take: query.pageSize,
     });
 
-    return pageOf(await this.views.views(items), total, query.page, query.pageSize);
+    return pageOf(await this.views.summaries(items), total, query.page, query.pageSize);
   }
 
   /** One task as a card. Throws ProvisioningTaskNotFoundError. */

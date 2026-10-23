@@ -27,14 +27,3 @@ export class ExchangeRateDateTooOldError extends Error {
     this.name = 'ExchangeRateDateTooOldError';
   }
 }
-
-/**
- * The organization's reporting currency is not one the system has a minor-unit table for. A configuration defect, not
- * a caller mistake: it is not mapped to a 4xx answer.
- */
-export class ReportingCurrencyNotSupportedError extends Error {
-  constructor(readonly currency: string) {
-    super(`The reporting currency ${currency} is not in the currency table.`);
-    this.name = 'ReportingCurrencyNotSupportedError';
-  }
-}

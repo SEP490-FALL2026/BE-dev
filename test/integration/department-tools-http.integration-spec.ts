@@ -1,6 +1,7 @@
 import request from 'supertest';
 import { ApiAccount, createActivatedAccount } from '../support/api-accounts';
 import { SeatHarness } from '../support/seat-baseline-harness';
+import { HR_BASIS } from '../support/hr-basis';
 
 const h = new SeatHarness();
 
@@ -60,8 +61,9 @@ describe('the tools a department uses (US-03-06 AC-13, AC-17, integration, real 
     h.dataOf<{ id: string }>(
       await request(h.server())
         .post('/api/v1/employees')
-        .set(h.as(h.it1))
+        .set({ Authorization: `Bearer ${h.admin}` })
         .send({
+          hrBasis: HR_BASIS,
           employeeCode: code,
           fullName: `Person ${code}`,
           workEmail: `${code.toLowerCase()}@acme.vn`,
@@ -102,7 +104,6 @@ describe('the tools a department uses (US-03-06 AC-13, AC-17, integration, real 
 
     figmaSubscription = await h.subscription(10, 'K2');
     const githubSubscription = await h.subscription(10, 'K1');
-    const corp = await h.costCenter('COMPANY');
     const person = (code: string) => ({ employee_code: code, account_identifier: `${code.toLowerCase()}@acme.vn` });
     await h.written({ subscriptionId: figmaSubscription }, [
       person('D1'),
@@ -113,7 +114,7 @@ describe('the tools a department uses (US-03-06 AC-13, AC-17, integration, real 
     ]);
     await h.written({ subscriptionId: githubSubscription }, [
       person('D4'),
-      { employee_code: 'D5', account_identifier: 'ci-bot', kind: 'service', reason: 'CI', cost_center_code: corp.code },
+      { employee_code: 'D5', account_identifier: 'ci-bot', kind: 'service', reason: 'CI' },
     ]);
   }, 240000);
 

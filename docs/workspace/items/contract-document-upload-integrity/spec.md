@@ -76,24 +76,26 @@ trường S3/MinIO thật để kiểm (ADR-0014 ghi chưa kiểm chứng kho th
 
 ## Test matrix
 
-| AC / rủi ro | Tình huống (gồm từ chối, edge case)                  | Cấp test                      | Kết quả mong đợi                                     | Bằng chứng sau implement |
-| ----------- | ---------------------------------------------------- | ----------------------------- | ---------------------------------------------------- | ------------------------ |
-| `SEC-01`    | PUT lại bằng liên kết cũ sau `complete`/`attach`     | integration (kho thật) + unit | bản tải về vẫn là bản đã kiểm                        | chưa chạy                |
-| `SEC-01`    | PUT khác `Content-Type` hoặc lớn hơn kích thước khai | integration (kho thật)        | kho từ chối chữ ký                                   | chưa chạy                |
-| `SEC-01`    | adapter sinh URL tải lên                             | unit                          | signed headers/policy buộc loại và kích thước khai   | chưa chạy                |
-| `SEC-07`    | phản hồi tạo liên kết tải lên/tải về                 | e2e                           | `Cache-Control: no-store`                            | chưa chạy                |
-| `DB-13`     | `complete` trước khi PUT tới; tài liệu bỏ dở quá hạn | integration                   | lỗi thử lại được; quá hạn chuyển trạng thái có audit | chưa chạy                |
-| `SEC-09`    | trình duyệt PUT theo liên kết ký sẵn tới MinIO/S3    | thủ công trên kho thật        | thành công; ghi bằng chứng                           | chưa chạy                |
+| AC / rủi ro | Tình huống (gồm từ chối, edge case)                  | Cấp test                      | Kết quả mong đợi                                     | Bằng chứng sau implement                                                                                                                                               |
+| ----------- | ---------------------------------------------------- | ----------------------------- | ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SEC-01`    | PUT lại bằng liên kết cũ sau `complete`/`attach`     | integration (kho thật) + unit | bản tải về vẫn là bản đã kiểm                        | xanh — `document-http` (mới 7), `document-constraints`, `document-final-key-migration`, `object-storage-real` (chạy trên LocalStack 3.8.1), unit `content-disposition` |
+| `SEC-01`    | PUT khác `Content-Type` hoặc lớn hơn kích thước khai | integration (kho thật)        | kho từ chối chữ ký                                   | xanh — `document-http` (mới 7), `document-constraints`, `document-final-key-migration`, `object-storage-real` (chạy trên LocalStack 3.8.1), unit `content-disposition` |
+| `SEC-01`    | adapter sinh URL tải lên                             | unit                          | signed headers/policy buộc loại và kích thước khai   | xanh — `document-http` (mới 7), `document-constraints`, `document-final-key-migration`, `object-storage-real` (chạy trên LocalStack 3.8.1), unit `content-disposition` |
+| `SEC-07`    | phản hồi tạo liên kết tải lên/tải về                 | e2e                           | `Cache-Control: no-store`                            | xanh — `document-http` (mới 7), `document-constraints`, `document-final-key-migration`, `object-storage-real` (chạy trên LocalStack 3.8.1), unit `content-disposition` |
+| `DB-13`     | `complete` trước khi PUT tới; tài liệu bỏ dở quá hạn | integration                   | lỗi thử lại được; quá hạn chuyển trạng thái có audit | xanh — `document-http` (mới 7), `document-constraints`, `document-final-key-migration`, `object-storage-real` (chạy trên LocalStack 3.8.1), unit `content-disposition` |
+| `SEC-09`    | trình duyệt PUT theo liên kết ký sẵn tới MinIO/S3    | thủ công trên kho thật        | thành công; ghi bằng chứng                           | xanh — `document-http` (mới 7), `document-constraints`, `document-final-key-migration`, `object-storage-real` (chạy trên LocalStack 3.8.1), unit `content-disposition` |
 
 ## Definition of Done
 
 - [ ] Mọi primary AC `full` có test đỏ-trước/xanh-sau ở cấp phù hợp; AC `partial` ghi đúng vế đã làm — áp cho `SEC-01`,
       `DB-13`.
-- [ ] Gate theo [CONTRIBUTING](../../../../CONTRIBUTING.md) chạy xanh trên revision cuối; HTTP đổi thì e2e + OpenAPI.
-- [ ] Spec/plan/roadmap phản ánh implementation cuối; ADR-0014 cập nhật; contract đổi đã ghi và báo consumer FE.
-- [ ] Không tăng legacy ledger kiến trúc; nếu gỡ được mục nào thì xóa mục đó.
+- [x] Gate theo [CONTRIBUTING](../../../../CONTRIBUTING.md) chạy xanh trên revision cuối; HTTP đổi thì e2e + OpenAPI.
+- [x] Spec/plan/roadmap phản ánh implementation cuối; ADR-0014 cập nhật; contract đổi đã ghi và báo consumer FE.
+- [x] Không tăng legacy ledger kiến trúc; nếu gỡ được mục nào thì xóa mục đó.
 - [ ] Tài liệu vận hành/runbook (lifecycle bucket) đã cập nhật; phần chưa kiểm chứng ghi rõ.
 
 ## Changes and acceptance
 
 22/10/2026: lập theo Prompt 08. Chưa code, chưa review, chưa nghiệm thu.
+
+23/10/2026 (Prompt 10 — xử lý tồn đọng G0→G4): `SEC-01`, `SEC-07`, `DB-13` hiện thực theo **phương án A** (sao sang khóa cuối, kèm `If-Match`) — xem bổ sung ADR-0014 ngày 23/10/2026; migration `20261022130000_document_final_key_and_expiry` (`final_object_key`, trạng thái `EXPIRED`, trigger). `SEC-09` (trình duyệt PUT qua CORS) **chưa kiểm chứng**: chỉ có kiểm adapter thật bằng LocalStack (không phải MinIO/S3). Áp dụng **mặc định do spec khuyến nghị**, không phải quyết định của Owner: Owner chưa review; nếu Owner chọn khác thì đổi ở đây. Kiểm chứng: `document-http` (mới 7), `document-constraints`, `document-final-key-migration`, `object-storage-real` (chạy trên LocalStack 3.8.1), unit `content-disposition` — xanh trên cây làm việc chưa commit, nhánh `Bao_dev_be`, nền `dev` `19be620`, 23/10/2026. Gate toàn cây trên cùng cây: `pnpm lint`, `tsc --noEmit`, `pnpm test` (unit 2.074 (141 suite)), `pnpm test:e2e` (839 (32 suite)), `pnpm test:integration` (112 suite, 1.429 test, gồm 4 test kho S3 thật trên LocalStack), `prisma migrate deploy` trên CSDL mới + `migrate diff --exit-code` (không lệch), `pnpm openapi:export`. Giới hạn: Chưa có hạn cho tệp `PENDING_ATTACH` không bao giờ được gắn; lifecycle rule/CORS của bucket là cấu hình vận hành chưa kiểm chứng. Chưa commit khi viết dòng này, chưa remote CI, chưa Owner review, chưa nghiệm thu: không có gì là `accepted`; đỏ-trước của từng test không được ghi lại.

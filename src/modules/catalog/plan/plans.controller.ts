@@ -23,7 +23,7 @@ import {
 import { toPlanApiException } from './plan.http-errors';
 import { seatTrackingOf } from './plan.policy';
 import { PlanService } from './plan.service';
-import type { PlanRecord, WorkspaceProfileView } from './plan.types';
+import type { PlanRecord, PlanSummaryRecord, WorkspaceProfileView } from './plan.types';
 import { PlanWorkspaceService } from './plan-workspace.service';
 
 const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPONSE] as const;
@@ -37,11 +37,11 @@ const INVALID = {
 const NAME_TAKEN = {
   status: HttpStatus.CONFLICT,
   description:
-    'The application already has a plan of this name (PLAN.NAME_TAKEN) or the plan still has a workspace profile or a numeric install limit the new kind cannot keep (PLAN.WORKSPACE_PROFILE_BLOCKS_TYPE_CHANGE, PLAN.TERMS_BLOCK_TYPE_CHANGE).',
+    'The application already has a plan of this name (PLAN.NAME_TAKEN) or the plan still has a workspace profile or a numeric install limit the new kind cannot keep (PLAN.WORKSPACE_PROFILE_BLOCKS_TYPE_CHANGE, PLAN.TERMS_BLOCK_TYPE_CHANGE), or a subscription or license key of the plan would no longer fit the new pricing model or kind (PLAN.IN_USE_BLOCKS_CHANGE, `details.reason`: ACTIVE_SUBSCRIPTION_WITHOUT_QUANTITY, LICENSE_KEYS or SUBSCRIPTIONS).',
 } as const;
 const NOT_FOUND = { status: HttpStatus.NOT_FOUND, description: 'The plan does not exist (PLAN.NOT_FOUND).' } as const;
 
-function toPlanWire(plan: PlanRecord) {
+function toPlanSummaryWire(plan: PlanSummaryRecord) {
   return {
     id: plan.id,
     applicationId: plan.applicationId,
@@ -50,13 +50,16 @@ function toPlanWire(plan: PlanRecord) {
     provisioningType: plan.provisioningType,
     pricingModel: plan.pricingModel,
     controlLevel: plan.controlLevel,
-    revocationNote: plan.revocationNote,
     dataLossOnRemoval: plan.dataLossOnRemoval,
     sharingPolicy: plan.sharingPolicy,
     seatTracking: seatTrackingOf(plan.pricingModel),
     createdAt: plan.createdAt.toISOString(),
     updatedAt: plan.updatedAt.toISOString(),
   };
+}
+
+function toPlanWire(plan: PlanRecord) {
+  return { ...toPlanSummaryWire(plan), revocationNote: plan.revocationNote };
 }
 
 function toProfileWire(profile: WorkspaceProfileView) {
@@ -91,7 +94,7 @@ export class PlansController {
     try {
       const page = await this.plans.list(query);
 
-      return { items: page.items.map(toPlanWire), pagination: page.pagination };
+      return { items: page.items.map(toPlanSummaryWire), pagination: page.pagination };
     } catch (error) {
       throw toPlanApiException(error);
     }

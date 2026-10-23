@@ -26,15 +26,24 @@ export const FAKE_CLOCK: Parameters<typeof jest.useFakeTimers>[0] = {
   doNotFake: ['nextTick', 'setImmediate', 'queueMicrotask'],
 };
 export const TODAY = '2026-10-19';
+/** The Super Admin: the only role that enters new employee records (`QĐ-82i`), with the HR basis of the entry. */
 export const ACTOR: AuthenticatedPrincipal = {
-  subject: 'u-it',
-  appUserId: 'u-it',
+  subject: 'u-sa',
+  appUserId: 'u-sa',
   sessionId: 'session-1',
-  employeeId: 'e-it',
-  directRoles: ['IT_ADMIN'],
+  employeeId: 'e-sa',
+  directRoles: ['SUPER_ADMIN'],
   derivedRoles: [],
-  roles: ['IT_ADMIN'],
+  roles: ['SUPER_ADMIN'],
 };
+export const OWN_EMPLOYEE_CODE = 'E-SA';
+export const OWN_WORK_EMAIL = 'Sa+admin@Acme.vn';
+export const HR_BASIS = {
+  type: 'LABOR_CONTRACT',
+  reference: 'HD-2026-001',
+  issuer: 'HR Department',
+  issuedOn: '2026-10-01',
+} as const;
 
 export interface Department {
   id: string;
@@ -226,6 +235,14 @@ export function harness(start: Directory = directory()) {
       };
       return Promise.resolve(data);
     },
+    getEmployee(employeeId: string, tx?: DbTx) {
+      calls.push(`org.getEmployee(${where(tx)})`);
+      return Promise.resolve(
+        employeeId === ACTOR.employeeId
+          ? { id: employeeId, employeeCode: OWN_EMPLOYEE_CODE, workEmail: OWN_WORK_EMAIL }
+          : null,
+      );
+    },
     lockForEmployeeImport(tx: DbTx, departmentIds: string[], jobTitleIds: string[]) {
       calls.push(`org.lockForEmployeeImport(${where(tx)})`);
       locks.push({ departmentIds, jobTitleIds });
@@ -316,9 +333,12 @@ export type ImportHarness = ReturnType<typeof harness>;
 export const upload = (h: ImportHarness, text: string | Buffer, fileName = 'people.csv') =>
   h.service.upload(ACTOR, { fileName, bytes: typeof text === 'string' ? Buffer.from(text, 'utf8') : text });
 
-export const confirmBody = (overrides: Partial<{ previewVersion: number; idempotencyKey: string }> = {}) => ({
+export const confirmBody = (
+  overrides: Partial<{ previewVersion: number; idempotencyKey: string; hrBasis: typeof HR_BASIS }> = {},
+) => ({
   previewVersion: 1,
   idempotencyKey: 'key-00000001',
   acknowledgeDuplicateFile: false,
+  hrBasis: HR_BASIS,
   ...overrides,
 });

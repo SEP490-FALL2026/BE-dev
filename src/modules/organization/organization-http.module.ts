@@ -8,6 +8,8 @@ import { DepartmentHeadService } from './department/department-head.service';
 import { DepartmentQueryService } from './department/department-query.service';
 import { DepartmentService } from './department/department.service';
 import { DepartmentsController } from './department/departments.controller';
+import { EmployeeMaintenanceController } from './employee/employee-maintenance.controller';
+import { EmployeeMaintenanceService } from './employee/employee-maintenance.service';
 import { EmployeeManualService } from './employee/employee-manual.service';
 import { EmployeesController } from './employee/employees.controller';
 import { JobTitleService } from './job-title/job-title.service';
@@ -27,6 +29,7 @@ import { ProjectsController } from './project/projects.controller';
   controllers: [
     JobTitlesController,
     EmployeesController,
+    EmployeeMaintenanceController,
     CostCentersController,
     DepartmentsController,
     ProjectsController,
@@ -34,6 +37,7 @@ import { ProjectsController } from './project/projects.controller';
   providers: [
     JobTitleService,
     EmployeeManualService,
+    EmployeeMaintenanceService,
     CostCenterService,
     DepartmentQueryService,
     DepartmentService,

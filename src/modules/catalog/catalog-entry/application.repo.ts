@@ -8,6 +8,7 @@ import type {
   ApplicationKind,
   ApplicationListFilter,
   ApplicationRecord,
+  ApplicationSummaryRecord,
   CatalogStatus,
   NewApplication,
 } from './application.types';
@@ -167,12 +168,20 @@ export class ApplicationRepo {
     });
   }
 
-  /** The Business Owner periods of an application, the latest first. */
-  listOwnerPeriods(applicationId: string) {
-    return this.prisma.applicationBusinessOwner.findMany({
-      where: { applicationId },
-      orderBy: [{ assignedAt: 'desc' }, { id: 'desc' }],
-    });
+  /** One page of the Business Owner periods of an application, the latest first, and the total, from one snapshot. */
+  listOwnerPeriods(applicationId: string, skip: number, take: number) {
+    return this.prisma.$transaction(
+      async (tx) => ({
+        items: await tx.applicationBusinessOwner.findMany({
+          where: { applicationId },
+          orderBy: [{ assignedAt: 'desc' }, { id: 'desc' }],
+          skip,
+          take,
+        }),
+        total: await tx.applicationBusinessOwner.count({ where: { applicationId } }),
+      }),
+      { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
+    );
   }
 
   /** The distinct Business Owners of all applications now: whose status decides which applications need a new one. */
@@ -212,19 +221,37 @@ export class ApplicationRepo {
     );
   }
 
-  /** The other approved applications of a functional group, by name: the similar tools. */
-  async similarTo(group: string, excludingId: string): Promise<{ id: string; name: string }[]> {
-    const rows = await this.prisma.application.findMany({
-      where: { functionalGroupId: group, id: { not: excludingId }, catalogStatus: 'APPROVED' },
-      select: { id: true, name: true },
-      orderBy: [{ normalizedName: 'asc' }, { id: 'asc' }],
-    });
+  /** The first `take` other approved applications of a functional group, by name: the similar tools, and how many there are. */
+  async similarTo(
+    group: string,
+    excludingId: string,
+    take: number,
+  ): Promise<{ items: { id: string; name: string }[]; total: number }> {
+    const where: Prisma.ApplicationWhereInput = {
+      functionalGroupId: group,
+      id: { not: excludingId },
+      catalogStatus: 'APPROVED',
+    };
 
-    return rows;
+    return this.prisma.$transaction(
+      async (tx) => ({
+        items: await tx.application.findMany({
+          where,
+          select: { id: true, name: true },
+          orderBy: [{ normalizedName: 'asc' }, { id: 'asc' }],
+          take,
+        }),
+        total: await tx.application.count({ where }),
+      }),
+      { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
+    );
   }
 
-  /** One page by name and the total for the same filter, from one snapshot. */
-  async list(filter: ApplicationListFilter): Promise<{ items: ApplicationRecord[]; total: number }> {
+  /**
+   * One page of summaries by name and the total for the same filter, from one snapshot. Only the columns of the list are
+   * selected (`LD-04`): the domains and the communication note are a detail's.
+   */
+  async listSummaries(filter: ApplicationListFilter): Promise<{ items: ApplicationSummaryRecord[]; total: number }> {
     const key = filter.search ? searchKey(filter.search) : '';
     const where: Prisma.ApplicationWhereInput = {
       ...(key
@@ -241,13 +268,38 @@ export class ApplicationRepo {
       async (tx) => {
         const rows = await tx.application.findMany({
           where,
-          include: WITH_RELATIONS,
+          select: {
+            id: true,
+            name: true,
+            kind: true,
+            catalogStatus: true,
+            dataSensitivity: true,
+            isCommunicationService: true,
+            businessOwnerEmployeeId: true,
+            updatedAt: true,
+            vendor: { select: { id: true, name: true } },
+            functionalGroup: { select: { id: true, name: true } },
+          },
           orderBy: [{ normalizedName: 'asc' }, { id: 'asc' }],
           skip: filter.skip,
           take: filter.take,
         });
 
-        return { items: rows.map(toRecord), total: await tx.application.count({ where }) };
+        return {
+          items: rows.map((row) => ({
+            id: row.id,
+            name: row.name,
+            kind: row.kind,
+            vendor: row.vendor,
+            dataSensitivity: row.dataSensitivity,
+            businessOwnerEmployeeId: row.businessOwnerEmployeeId,
+            isCommunicationService: row.isCommunicationService,
+            functionalGroup: row.functionalGroup,
+            status: row.catalogStatus,
+            updatedAt: row.updatedAt,
+          })),
+          total: await tx.application.count({ where }),
+        };
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
     );

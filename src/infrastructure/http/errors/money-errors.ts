@@ -7,6 +7,7 @@ import {
   RateMalformedError,
   RateOutOfRangeError,
   RateScaleExceededError,
+  ReportingCurrencyNotSupportedError,
 } from '../../../core/money/money.errors';
 import { ApiException } from './api.exception';
 
@@ -28,6 +29,13 @@ export function toMoneyApiException(error: unknown): unknown {
   if (error instanceof MoneyOutOfRangeError) return unprocessable('MONEY_OUT_OF_RANGE', error.message);
   if (error instanceof CurrencyNotSupportedError) {
     return unprocessable('CURRENCY_NOT_SUPPORTED', error.message, { currency: error.currency });
+  }
+  if (error instanceof ReportingCurrencyNotSupportedError) {
+    return new ApiException(HttpStatus.CONFLICT, {
+      code: 'REPORTING_CURRENCY_NOT_SUPPORTED',
+      message: error.message,
+      details: { currency: error.currency },
+    });
   }
   if (error instanceof RateScaleExceededError) return unprocessable('RATE_SCALE_EXCEEDED', error.message);
   if (error instanceof RateOutOfRangeError) return unprocessable('RATE_OUT_OF_RANGE', error.message);

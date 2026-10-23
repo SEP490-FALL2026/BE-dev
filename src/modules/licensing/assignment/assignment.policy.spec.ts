@@ -17,7 +17,8 @@ const bot: AssignmentRecord = {
   employeeId: 'e2',
   accountIdentifier: 'ci-bot',
   reason: 'CI pipeline',
-  costCenterId: 'cc-corp',
+  costCenterId: 'cc-des',
+  owningDepartmentId: 'd-des',
   effectiveFrom: '2026-10-01',
   effectiveFromBasis: 'ACTUAL',
   validUntil: null,
@@ -26,7 +27,7 @@ const bot: AssignmentRecord = {
   failedAt: null,
   createdAt: new Date('2026-10-01T00:00:00.000Z'),
 };
-const staff = { status: 'ACTIVE', employmentType: 'STAFF' } as const;
+const staff = { status: 'ACTIVE', employmentType: 'STAFF', departmentId: 'd-des' } as const;
 
 describe('effectiveFromLabel (AC-8, QĐ-43b: a recorded start is never shown as a grant date)', () => {
   it('says the real grant date is not known when the start is only the day of recording', () => {
@@ -90,15 +91,28 @@ describe('assertResponsibleChange (AC-10)', () => {
   it('refuses a person that is not found, one who has left, and the person already responsible', () => {
     expect(() => assertResponsibleChange(bot, change, null, today)).toThrow(AssignmentResponsibleInvalidError);
     expect(() =>
-      assertResponsibleChange(bot, change, { status: 'TERMINATED', employmentType: 'STAFF' }, today),
+      assertResponsibleChange(
+        bot,
+        change,
+        { status: 'TERMINATED', employmentType: 'STAFF', departmentId: 'd-des' },
+        today,
+      ),
     ).toThrow(AssignmentResponsibleInvalidError);
     expect(() => assertResponsibleChange(bot, { ...change, employeeId: 'e2' }, staff, today)).toThrow(
       AssignmentResponsibleInvalidError,
     );
   });
 
+  it('refuses a person of another department, or of none: a service account stays in the department that owns it (QĐ-86c)', () => {
+    for (const departmentId of ['d-other', null]) {
+      expect(() => assertResponsibleChange(bot, change, { ...staff, departmentId }, today)).toThrow(
+        expect.objectContaining({ problem: 'OUTSIDE_OWNING_DEPARTMENT' }) as Error,
+      );
+    }
+  });
+
   it('asks time-limited staff for an expected end date no earlier than the day the change takes effect (INV-07)', () => {
-    const intern = { status: 'ACTIVE', employmentType: 'INTERN' } as const;
+    const intern = { status: 'ACTIVE', employmentType: 'INTERN', departmentId: 'd-des' } as const;
 
     expect(() => assertResponsibleChange(bot, change, intern, today)).toThrow(AssignmentExpectedEndRequiredError);
     expect(() => assertResponsibleChange(bot, { ...change, expectedEndDate: '2026-10-14' }, intern, today)).toThrow(

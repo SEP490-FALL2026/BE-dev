@@ -51,10 +51,51 @@ describe('object storage configuration (validated when ObjectStorageModule is mo
     expect(() => validateObjectStorageEnvironment(PRODUCTION)).not.toThrow();
   });
 
-  it('defaults to the local MinIO outside production', () => {
-    expect(validateObjectStorageEnvironment({ NODE_ENV: 'development' })).toMatchObject({
+  it('defaults to the local MinIO in the test runs only', () => {
+    expect(validateObjectStorageEnvironment({ NODE_ENV: 'test' })).toMatchObject({
       OBJECT_STORAGE_ENDPOINT: 'http://localhost:9000',
+      OBJECT_STORAGE_ACCESS_KEY_ID: 'minioadmin',
       OBJECT_STORAGE_FORCE_PATH_STYLE: true,
+    });
+    expect(() => validateObjectStorageEnvironment({ NODE_ENV: 'development' })).toThrow(
+      '"OBJECT_STORAGE_ACCESS_KEY_ID" is required',
+    );
+  });
+
+  describe('the credentials of a real environment (SEC-04)', () => {
+    const own = {
+      OBJECT_STORAGE_ACCESS_KEY_ID: 'storage-spec-access',
+      OBJECT_STORAGE_SECRET_ACCESS_KEY: 'storage-spec-secret',
+    };
+
+    it.each(['development', 'production'])(
+      'refuses the public default of MinIO in %s, naming the settings and no value',
+      (env) => {
+        const base = { ...PRODUCTION, NODE_ENV: env, OBJECT_STORAGE_ENDPOINT: 'https://storage.example.com' };
+
+        for (const bad of [
+          { ...own, OBJECT_STORAGE_ACCESS_KEY_ID: 'minioadmin' },
+          { ...own, OBJECT_STORAGE_SECRET_ACCESS_KEY: 'minioadmin' },
+          { OBJECT_STORAGE_ACCESS_KEY_ID: 'minioadmin', OBJECT_STORAGE_SECRET_ACCESS_KEY: 'minioadmin' },
+        ]) {
+          const attempt = () => validateObjectStorageEnvironment({ ...base, ...bad });
+
+          expect(attempt).toThrow('public default credentials of the object storage');
+          expect(attempt).toThrow('OBJECT_STORAGE_ACCESS_KEY_ID and OBJECT_STORAGE_SECRET_ACCESS_KEY');
+          expect(attempt).not.toThrow('minioadmin');
+        }
+      },
+    );
+
+    it('refuses an access key that is the secret key, and takes made-up credentials', () => {
+      expect(() =>
+        validateObjectStorageEnvironment({
+          ...PRODUCTION,
+          OBJECT_STORAGE_ACCESS_KEY_ID: 'same-value',
+          OBJECT_STORAGE_SECRET_ACCESS_KEY: 'same-value',
+        }),
+      ).toThrow('OBJECT_STORAGE_SECRET_ACCESS_KEY must differ from OBJECT_STORAGE_ACCESS_KEY_ID');
+      expect(() => validateObjectStorageEnvironment({ ...PRODUCTION, ...own })).not.toThrow();
     });
   });
 

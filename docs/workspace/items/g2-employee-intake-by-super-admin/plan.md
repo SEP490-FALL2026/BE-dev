@@ -3,7 +3,7 @@
 - [Spec](spec.md); revision đầu vào: Docs `72e1480`, BE `69f4891`.
 - Phụ trách: chưa phân công. Thiết kế ban đầu bởi: AI theo giao việc Owner.
 - Owner review: chưa review. Peer review: tùy chọn.
-- Triển khai: `not-started`. PR: chưa có.
+- Triển khai: `verified` local (23/10/2026, cây làm việc chưa commit, nhánh `Bao_dev_be`, nền `dev` `19be620`, 23/10/2026). PR: chưa có — chưa commit lúc ghi dòng này.
 
 ## Before coding
 
@@ -38,12 +38,13 @@ Gate xanh; ghi chú FE (vai và body đổi); cập nhật roadmap/scope map; Ow
 
 ## Verification and handoff
 
-| Lệnh / kiểm tra AC | Revision / môi trường | Kết quả thực chạy | Giới hạn / việc còn lại  |
-| ------------------ | --------------------- | ----------------- | ------------------------ |
-| —                  | —                     | chưa chạy         | hạng mục chưa triển khai |
+| Lệnh / kiểm tra AC                                                                                                                                                                                                                                                                                                                 | Revision / môi trường                                                         | Kết quả thực chạy     | Giới hạn / việc còn lại                                                                                                                                                                                                                                              |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm exec jest --config test/config/jest.integration.cjs` các suite: `employee-manual-http`, `employee-imports-http`, `employee-import-seats-http`, `onboarding-http`, e2e `employees`, `employee-imports`                                                                                                                        | cây làm việc chưa commit, nhánh `Bao_dev_be`, nền `dev` `19be620`, 23/10/2026 | xanh                  | AC-17 (báo IT Admin phụ trách và trưởng phòng) chờ `g4-notification-delivery`: Audit Trail là dấu vết tạm; **không đưa revision lên `main`/production trước khi AC-17 có lời giải** (plan). Checklist khởi tạo vẫn chỉ IT Admin xem. FE/Mobile phải đổi vai và body. |
+| Gate toàn cây trên cùng cây: `pnpm lint`, `tsc --noEmit`, `pnpm test` (unit 2.074 (141 suite)), `pnpm test:e2e` (839 (32 suite)), `pnpm test:integration` (112 suite, 1.429 test, gồm 4 test kho S3 thật trên LocalStack), `prisma migrate deploy` trên CSDL mới + `migrate diff --exit-code` (không lệch), `pnpm openapi:export`. | cùng cây                                                                      | xem kết quả trong câu | Remote CI chưa chạy; chưa Owner review.                                                                                                                                                                                                                              |
 
-- [ ] AC trong scope có bằng chứng; lỗi đã xử lý hoặc ghi blocker.
-- [ ] Spec/plan/test design phản ánh đúng implementation cuối; peer review nếu có đã xử lý hoặc ghi disposition.
-- [ ] Diff cuối đã tự review; tài liệu vận hành/runbook bị ảnh hưởng đã cập nhật; phần chưa kiểm chứng ghi rõ.
+- [x] AC trong scope có bằng chứng; lỗi đã xử lý hoặc ghi blocker (xem giới hạn ở bảng trên).
+- [x] Spec/plan/test design phản ánh đúng implementation cuối; peer review: chưa có (tùy chọn).
+- [x] Diff cuối đã tự review; tài liệu vận hành/runbook bị ảnh hưởng đã cập nhật; phần chưa kiểm chứng ghi rõ.
 - [ ] Giao Owner review trên revision cụ thể; cập nhật roadmap/PR. Chỉ ghi `merged-dev`, `accepted`, `released` sau
       đúng sự kiện thật.

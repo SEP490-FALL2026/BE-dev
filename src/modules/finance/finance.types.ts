@@ -85,7 +85,7 @@ export interface AllocationLineView {
   costCenterId: string;
   costCenterCode: string;
   costCenterName: string;
-  costCenterKind: 'UNIT' | 'COMPANY';
+  costCenterKind: 'UNIT';
   ratioPercent: string;
 }
 /** An allocation as it is answered: shares as percentages with their Cost Centers, the total, who declared it and when. */

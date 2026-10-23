@@ -14,11 +14,14 @@ import { ApplicationRetirementRepo } from './catalog-entry/application-retiremen
 import { ApplicationRetirementService } from './catalog-entry/application-retirement.service';
 import { ApplicationOwnersController } from './catalog-entry/application-owners.controller';
 import { ApplicationRepo } from './catalog-entry/application.repo';
+import { ApplicationListService } from './catalog-entry/application-list.service';
 import { ApplicationService } from './catalog-entry/application.service';
+import { ApplicationVendorLinkService } from './catalog-entry/application-vendor-link.service';
 import { ApplicationsController } from './catalog-entry/applications.controller';
 import { ContractRepo } from './contract/contract.repo';
 import { ContractService } from './contract/contract.service';
 import { ContractsController } from './contract/contracts.controller';
+import { DocumentExpirySweeper } from './contract/document-expiry.sweeper';
 import { DocumentRepo } from './contract/document.repo';
 import { DocumentService } from './contract/document.service';
 import { DocumentsController } from './contract/documents.controller';
@@ -107,6 +110,8 @@ import { VendorRepo } from './vendor/vendor.repo';
     FunctionalGroupRepo,
     FunctionalGroupLookupService,
     ApplicationService,
+    ApplicationListService,
+    ApplicationVendorLinkService,
     ApplicationRepo,
     ApplicationLookupService,
     PlanService,
@@ -127,6 +132,7 @@ import { VendorRepo } from './vendor/vendor.repo';
     ContractService,
     DocumentRepo,
     DocumentService,
+    DocumentExpirySweeper,
     SubscriptionLookupService,
     ApplicationRetirementRepo,
     ApplicationRetirementService,

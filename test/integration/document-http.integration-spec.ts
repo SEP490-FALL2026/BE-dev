@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { ApiAccount } from '../support/api-accounts';
+import { DocumentService } from '../../src/modules/catalog/contract/document.service';
 import { DocumentHarness, PDF, type DocumentWire } from '../support/document-harness';
 
 const h = new DocumentHarness();
@@ -50,8 +51,16 @@ describe('the contracts and the files kept for them over HTTP (integration, real
     const upload = (await declare().expect(201)).body as {
       data: { upload: { url: string; method: string; headers: object } };
     };
-    expect(upload.data.upload).toMatchObject({ method: 'PUT', headers: { 'Content-Type': 'application/pdf' } });
-    expect(h.storage.uploadLinks.at(-1)).toMatchObject({ contentType: 'application/pdf', expiresInSeconds: 900 });
+    expect(upload.data.upload).toMatchObject({
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/pdf', 'Content-Length': String(PDF.sizeBytes) },
+    });
+    // The type and the size are signed into a link that lives two minutes (SEC-01).
+    expect(h.storage.uploadLinks.at(-1)).toMatchObject({
+      contentType: 'application/pdf',
+      contentLength: PDF.sizeBytes,
+      expiresInSeconds: 120,
+    });
 
     await h.putObject(declared.id, { contentLength: PDF.sizeBytes, contentType: PDF.contentType });
     expect(wire(await h.completeDocument(declared.id).expect(200)).status).toBe('PENDING_ATTACH');
@@ -64,7 +73,15 @@ describe('the contracts and the files kept for them over HTTP (integration, real
     const link = linkOf(await h.linkDocument(declared.id, h.finance).expect(200));
 
     const issued = h.storage.downloadLinks.at(-1);
-    expect(issued).toMatchObject({ url: link.url, expiresInSeconds: 300, key: await h.keyOf(declared.id) });
+    // The link opens the copy that was looked at, as a download with the name and the type that were declared.
+    expect(issued).toMatchObject({
+      url: link.url,
+      expiresInSeconds: 300,
+      key: await h.finalKeyOf(declared.id),
+      fileName: PDF.fileName,
+      contentType: PDF.contentType,
+    });
+    expect(issued?.key).not.toBe(await h.keyOf(declared.id));
     expect(new Date(link.expiresAt).getTime() - before.getTime()).toBeGreaterThan(290_000);
     expect(new Date(link.expiresAt).getTime() - before.getTime()).toBeLessThan(310_000);
   });
@@ -226,11 +243,10 @@ describe('the contracts and the files kept for them over HTTP (integration, real
     const contract = await h.contract();
     const wrongSize = wire(await declare().expect(201));
     const wrongType = wire(await declare().expect(201));
-    const neverSent = wire(await declare().expect(201));
     const sizeKey = await h.putObject(wrongSize.id, { contentLength: PDF.sizeBytes - 1, contentType: PDF.contentType });
     await h.putObject(wrongType.id, { contentLength: PDF.sizeBytes, contentType: 'application/x-msdownload' });
 
-    for (const document of [wrongSize, wrongType, neverSent]) {
+    for (const document of [wrongSize, wrongType]) {
       expect(h.codeOf(await h.completeDocument(document.id).expect(422))).toBe('DOCUMENT.UPLOAD_MISMATCH');
       expect(h.codeOf(await h.getDocument(document.id).expect(404))).toBe('DOCUMENT.NOT_FOUND');
       expect(h.codeOf(await h.linkDocument(document.id).expect(404))).toBe('DOCUMENT.NOT_FOUND');
@@ -374,5 +390,123 @@ describe('the contracts and the files kept for them over HTTP (integration, real
     expect(h.codeOf(await h.getContract(randomUUID()).expect(404))).toBe('CONTRACT.NOT_FOUND');
     await request(h.server()).delete(`/api/v1/contracts/${id}`).set(h.as(h.it1)).expect(404);
     await request(h.server()).patch(`/api/v1/contracts/${id}`).set(h.as(h.it1)).send({ name: 'x' }).expect(404);
+  });
+  describe('the integrity of a file that was looked at (SEC-01, SEC-07, DB-13)', () => {
+    it('keeps the bytes that were looked at under a key of their own, and the old upload link is of no use to replace them', async () => {
+      const document = await h.uploaded();
+      const tempKey = await h.keyOf(document.id);
+      const finalKey = await h.finalKeyOf(document.id);
+      const looked = h.storage.objects.get(finalKey as string);
+
+      // The temporary object is gone, and what a client puts there again with the old link is not what the file is.
+      expect(finalKey).not.toBeNull();
+      expect(finalKey).not.toBe(tempKey);
+      expect(h.storage.objects.has(tempKey)).toBe(false);
+      h.storage.put(tempKey, { contentLength: 1, contentType: 'text/html', content: Uint8Array.of(60, 33) });
+
+      const contract = await h.contract();
+      await h.attachDocument(document.id, { contractId: contract }).expect(200);
+      const link = linkOf(await h.linkDocument(document.id, h.finance).expect(200));
+      expect(h.storage.open(link.url)).toBe(h.storage.objects.get(finalKey as string));
+      expect(h.storage.open(link.url)).toMatchObject({ contentType: PDF.contentType, contentLength: PDF.sizeBytes });
+      expect(h.storage.open(link.url).etag).toBe(looked?.etag);
+      expect(h.storage.copied).toContainEqual({ from: tempKey, to: finalKey });
+    });
+
+    it('refuses an object that was put again between the look and the copy: nothing is kept, the file is quarantined', async () => {
+      const declared = wire(await declare().expect(201));
+      const tempKey = await h.putObject(declared.id, { contentLength: PDF.sizeBytes, contentType: PDF.contentType });
+      h.storage.beforeCopy = (key) =>
+        h.storage.put(key, {
+          contentLength: PDF.sizeBytes,
+          contentType: PDF.contentType,
+          content: Uint8Array.of(77, 90, 144),
+        });
+      try {
+        expect(h.codeOf(await h.completeDocument(declared.id).expect(422))).toBe('DOCUMENT.UPLOAD_MISMATCH');
+      } finally {
+        h.storage.beforeCopy = undefined;
+      }
+
+      expect(await h.statusOf(declared.id)).toBe('QUARANTINED');
+      expect(await h.finalKeyOf(declared.id)).toBeNull();
+      expect(h.storage.copied.some((copy) => copy.from === tempKey)).toBe(false);
+      expect(h.storage.objects.has(tempKey)).toBe(false);
+    });
+
+    it('says the upload is pending, and not a refusal, when it has not reached the storage: the file keeps waiting and can be completed after', async () => {
+      const declared = wire(await declare().expect(201));
+
+      expect(h.codeOf(await h.completeDocument(declared.id).expect(409))).toBe('DOCUMENT.UPLOAD_PENDING');
+      expect(await h.statusOf(declared.id)).toBe('AWAITING_UPLOAD');
+      expect(h.storage.deleted).not.toContain(await h.keyOf(declared.id));
+
+      await h.putObject(declared.id, { contentLength: PDF.sizeBytes, contentType: PDF.contentType });
+      expect(wire(await h.completeDocument(declared.id).expect(200)).status).toBe('PENDING_ATTACH');
+    });
+
+    it('answers the declaration and the link with Cache-Control: no-store', async () => {
+      const declared = await declare().expect(201);
+      const document = await h.uploaded();
+      await h.attachDocument(document.id, { contractId: await h.contract() }).expect(200);
+      const linked = await h.linkDocument(document.id).expect(200);
+
+      expect(declared.headers['cache-control']).toBe('no-store');
+      expect(linked.headers['cache-control']).toBe('no-store');
+    });
+
+    it('gives up a file whose upload never came: expired, with an event in the audit trail, its object deleted, and not completable', async () => {
+      const abandoned = wire(await declare().expect(201));
+      const recent = wire(await declare().expect(201));
+      const key = await h.putObject(abandoned.id, { contentLength: PDF.sizeBytes, contentType: PDF.contentType });
+      const service = h.ctx.app.get(DocumentService, { strict: false });
+
+      // Two days on: the one declared long ago is given up, nothing newer than a day is.
+      const expired = await service.expireAbandoned(new Date(Date.now() + 2 * 24 * 60 * 60 * 1000));
+      expect(expired).toBeGreaterThanOrEqual(2);
+      expect(await h.statusOf(abandoned.id)).toBe('EXPIRED');
+      expect(h.storage.objects.has(key)).toBe(false);
+      expect((await h.auditEvents('DocumentAttachment', abandoned.id)).map((event) => event.action)).toEqual([
+        'DOCUMENT.CREATED',
+        'DOCUMENT.EXPIRED',
+      ]);
+      expect(await service.expireAbandoned(new Date(Date.now() + 2 * 24 * 60 * 60 * 1000))).toBe(0);
+      expect(h.codeOf(await h.completeDocument(abandoned.id).expect(409))).toBe('DOCUMENT.NOT_AWAITING_UPLOAD');
+      expect(h.codeOf(await h.getDocument(abandoned.id).expect(404))).toBe('DOCUMENT.NOT_FOUND');
+      expect(await h.statusOf(recent.id)).toBe('EXPIRED');
+    });
+
+    it('does not give up a file declared less than a day ago', async () => {
+      const fresh = wire(await declare().expect(201));
+      const service = h.ctx.app.get(DocumentService, { strict: false });
+
+      await service.expireAbandoned(new Date());
+
+      expect(await h.statusOf(fresh.id)).toBe('AWAITING_UPLOAD');
+    });
+
+    it('gives up a file that is completed after a day, and says so', async () => {
+      const late = wire(await declare().expect(201));
+      const spy = jest.spyOn(Date, 'now').mockReturnValue(Date.now() + 2 * 24 * 60 * 60 * 1000);
+      try {
+        const actor = {
+          subject: h.it1.appUserId,
+          appUserId: h.it1.appUserId,
+          sessionId: 'late',
+          employeeId: h.it1.employeeId,
+          directRoles: ['IT_ADMIN'],
+          derivedRoles: [],
+          roles: ['IT_ADMIN'],
+        };
+
+        await expect(h.ctx.app.get(DocumentService, { strict: false }).complete(actor, late.id)).rejects.toMatchObject({
+          name: 'DocumentUploadExpiredError',
+        });
+      } finally {
+        spy.mockRestore();
+      }
+
+      expect(await h.statusOf(late.id)).toBe('EXPIRED');
+    });
   });
 });

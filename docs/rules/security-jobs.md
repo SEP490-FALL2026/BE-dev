@@ -56,6 +56,15 @@
   `EmailDispatchLoop` in the separate worker polls PostgreSQL `EmailOutbox` and sends via SMTP
   outside the business transaction (ADR-0012, Proposed). Delivery is at-least-once.
 - Business modules call ObjectStoragePort rather than vendor SDKs.
+- A signed upload link signs the declared `Content-Type` and `Content-Length` and lives two minutes; what was looked at is
+  copied once to a key no upload link reaches before it is kept (ADR-0014). A download link is an `attachment` with the
+  declared type, and a response that carries a link is `Cache-Control: no-store`.
+- Opening a secret is counted per account in PostgreSQL (`license_key_reveal_windows`: 10 a minute, 200 a day), in the
+  transaction that opens it and audits it; a refusal is 429 `HTTP_TOO_MANY_REQUESTS` and leaves the count as it was.
+- A token in a file is masked before anything is stored, in the form with its spaces and invisible characters taken out;
+  what is not a name at all is masked as invalid. The upload of an import takes one file and two small fields.
+- Encryption keys are standard padded base64 of 32 bytes, and no two keys of either purpose, current or previous, are the
+  same bytes. Only `NODE_ENV=test` may use a public secret or the public MinIO credentials.
 - Check permissions before issuing short-lived signed URLs; objects remain private.
 - Filenames, MIME, bytes, CSV/XLSX cells and queue payloads are untrusted input.
 - Imports need limits, ownership/purpose checks and idempotency defined by the US.

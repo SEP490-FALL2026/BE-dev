@@ -103,56 +103,6 @@ const NON_ENVELOPE_COLLECTIONS: Readonly<Record<string, string>> = {
 
 const COLLECTION_EXCEPTIONS: readonly CollectionException[] = [
   {
-    operationId: 'provisioningTaskList',
-    classification: 'detail-reuse',
-    findings: ['LD-08'],
-    owner: 'licensing-provisioning-task-read-contracts',
-    detailOperationId: 'provisioningTaskGet',
-    businessMaximum: { maxItems: 100, source: 'pageSize maximum of the operation' },
-    rationale:
-      'The queue item is the full task of provisioningTaskGet: evidence, errors, steps and long reasons on every row.',
-    removeWhen:
-      'A task summary schema replaces the task schema in the list. Review maxItems when the pageSize maximum changes (the gate compares them).',
-    itemProperties: [
-      'accountIdentifier',
-      'assignmentId',
-      'attempts',
-      'availableDecisions',
-      'beneficiary',
-      'channel',
-      'claimedAt',
-      'claimedBy',
-      'closeReason',
-      'closedAt',
-      'closedBy',
-      'completedAt',
-      'completedBy',
-      'createdAt',
-      'defaultResponsibleEmployeeId',
-      'doneWhen',
-      'elapsedSeconds',
-      'evidence',
-      'failedAt',
-      'failedBy',
-      'failureKind',
-      'failureReason',
-      'handOffEvidence',
-      'handedOffAt',
-      'handedOffBy',
-      'id',
-      'inGeneralQueue',
-      'kind',
-      'lastError',
-      'maxAttempts',
-      'nextRetryAt',
-      'plan',
-      'requestId',
-      'status',
-      'steps',
-      'subscriptionId',
-    ],
-  },
-  {
     operationId: 'subscriptionList',
     classification: 'detail-reuse',
     findings: ['LD-01'],
@@ -206,7 +156,17 @@ const COLLECTION_EXCEPTIONS: readonly CollectionException[] = [
     rationale: 'A list row is the current toolset version, the resource standardToolsetGet returns.',
     removeWhen:
       'A toolset summary schema ships, or the item records a decision that keeps this bounded reuse. Review maxItems when the pageSize maximum changes (the gate compares them).',
-    itemProperties: ['changedAt', 'changedBy', 'departmentId', 'jobTitleId', 'plans', 'reason', 'version'],
+    itemProperties: [
+      'changedAt',
+      'changedBy',
+      'department',
+      'departmentId',
+      'jobTitle',
+      'jobTitleId',
+      'plans',
+      'reason',
+      'version',
+    ],
   },
   {
     operationId: 'standardToolsetHistory',
@@ -222,99 +182,17 @@ const COLLECTION_EXCEPTIONS: readonly CollectionException[] = [
     rationale: 'A history row is a full toolset version, the shape standardToolsetGet returns.',
     removeWhen:
       'A version summary schema ships, or the item records a decision that keeps this bounded reuse. Review maxItems when the pageSize maximum changes (the gate compares them).',
-    itemProperties: ['changedAt', 'changedBy', 'departmentId', 'jobTitleId', 'plans', 'reason', 'version'],
-  },
-  {
-    operationId: 'applicationList',
-    classification: 'detail-projection',
-    findings: ['LD-04'],
-    owner: 'catalog-application-plan-read-contracts',
-    projectedFields: ['communication', 'dictionaryServiceLineId', 'domains'],
-    rationale:
-      'The list item is the detail-lite application schema: domains (up to 20 x 1000 characters), the communication note and the dictionary link on every row.',
-    removeWhen: 'An application summary schema without these fields ships with a direct select.',
     itemProperties: [
-      'businessOwner',
-      'businessOwnerReplacementRequired',
-      'communication',
-      'createdAt',
-      'dataSensitivity',
-      'dictionaryServiceLineId',
-      'domains',
-      'functionalGroup',
-      'id',
-      'kind',
-      'name',
-      'status',
-      'updatedAt',
-      'usageCollectionDefault',
-      'vendor',
+      'changedAt',
+      'changedBy',
+      'department',
+      'departmentId',
+      'jobTitle',
+      'jobTitleId',
+      'plans',
+      'reason',
+      'version',
     ],
-  },
-  {
-    operationId: 'planList',
-    classification: 'detail-projection',
-    findings: ['LD-05'],
-    owner: 'catalog-application-plan-read-contracts',
-    projectedFields: ['revocationNote'],
-    rationale:
-      'The list item is the plan schema with its revocation note (up to 2000 characters); the detail only adds the workspace profile.',
-    removeWhen: 'A plan summary schema without the note ships.',
-    itemProperties: [
-      'applicationId',
-      'applicationName',
-      'controlLevel',
-      'createdAt',
-      'dataLossOnRemoval',
-      'id',
-      'name',
-      'pricingModel',
-      'provisioningType',
-      'revocationNote',
-      'seatTracking',
-      'sharingPolicy',
-      'updatedAt',
-    ],
-  },
-  {
-    operationId: 'projectList',
-    classification: 'unbounded',
-    findings: ['LD-12'],
-    owner: 'organization-identity-read-contracts',
-    rationale: 'Every project with its full description and departments; no paging and no business maximum.',
-    removeWhen: 'The list is paginated with a pageSize maximum.',
-    itemProperties: ['createdAt', 'departments', 'description', 'id', 'name', 'status', 'updatedAt'],
-  },
-  {
-    operationId: 'applicationBusinessOwnerHistory',
-    classification: 'unbounded',
-    findings: ['LD-06'],
-    owner: 'catalog-application-plan-read-contracts',
-    rationale: 'Business Owner periods only grow; the history is returned whole.',
-    removeWhen: 'The history is paginated or capped by a recorded business maximum.',
-    itemProperties: ['assignedAt', 'assignedBy', 'employee', 'endedAt'],
-  },
-  {
-    operationId: 'departmentWarningList',
-    classification: 'unbounded',
-    findings: ['LD-15'],
-    owner: 'organization-identity-read-contracts',
-    rationale:
-      'No paging; at most two warning kinds (MISSING_HEAD, MISSING_IT_ADMIN) per active department, but the number of active departments has no hard maximum, so neither has the response.',
-    removeWhen:
-      'The list is paginated with a pageSize maximum, or an AC/FR, code constant or database constraint caps the complete response.',
-    itemProperties: ['code', 'departmentId', 'name', 'warning'],
-  },
-  {
-    operationId: 'nonWorkingDateList',
-    classification: 'unbounded',
-    findings: ['LD-15'],
-    owner: 'g2-fiscal-year-operating-parameters',
-    rationale:
-      'No paging; the unique key allows one row per calendar date, but from and to are optional, so a call without them returns every recorded year and the response has no maximum.',
-    removeWhen:
-      'The list is paginated with a pageSize maximum, or the complete response gets a hard maximum (for example both from and to required with a proven maximum range).',
-    itemProperties: ['date', 'reason'],
   },
   {
     operationId: 'currencyList',
@@ -341,16 +219,15 @@ const COLLECTION_EXCEPTIONS: readonly CollectionException[] = [
         'APPROVAL_ROLES in approval-role.repo.ts (the history of each role: NESTED_ARRAYS approvalRoleList#history)',
     },
     rationale: 'The fixed set of configured approval roles.',
-    removeWhen:
-      'Review when APPROVAL_ROLES changes; the missing hasMore flag (LD-14) is fixed by organization-identity-read-contracts.',
-    itemProperties: ['history', 'holder', 'role'],
+    removeWhen: 'Review when APPROVAL_ROLES changes.',
+    itemProperties: ['history', 'historyHasMore', 'holder', 'role'],
   },
   {
     operationId: 'operatingParameterList',
     classification: 'bounded',
     findings: [],
     owner: 'g2-operating-parameters',
-    businessMaximum: { maxItems: 15, source: 'definitions in parameter-definitions.ts' },
+    businessMaximum: { maxItems: 16, source: 'definitions in parameter-definitions.ts' },
     rationale: 'The fixed set of parameter definitions with their current values.',
     removeWhen: 'Review on any definition added or removed, or any change of parameter-definitions.ts.',
     itemProperties: ['changedAt', 'constraints', 'default', 'description', 'isDefault', 'key', 'unit', 'value'],
@@ -364,9 +241,8 @@ const COLLECTION_EXCEPTIONS: readonly CollectionException[] = [
       maxItems: 20,
       source: 'HISTORY_LIMIT in operating-parameters.service.ts (spec g2-operating-parameters)',
     },
-    rationale: 'The newest versions of one parameter.',
-    removeWhen:
-      'Review when HISTORY_LIMIT changes; the missing hasMore flag (LD-14) is fixed by organization-identity-read-contracts.',
+    rationale: 'The newest versions of one parameter; hasMore says there are older ones (LD-14).',
+    removeWhen: 'Review when HISTORY_LIMIT changes.',
     itemProperties: ['from', 'until', 'value'],
   },
   {
@@ -378,214 +254,6 @@ const COLLECTION_EXCEPTIONS: readonly CollectionException[] = [
     rationale: 'A picker that searches by name and returns the first matches.',
     removeWhen: 'Review when CANDIDATE_LIMIT changes or the picker needs paging.',
     itemProperties: ['department', 'employeeCode', 'fullName', 'id', 'workEmail'],
-  },
-  {
-    operationId: 'subscriptionList',
-    classification: 'query',
-    findings: ['LD-01'],
-    owner: 'catalog-subscription-read-model',
-    rationale:
-      'The tax profile is read row by row (about 300 statements for a page of 100); plan, application and vendor are included with every column.',
-    removeWhen: 'A query-count test shows a constant number of statements and a direct select.',
-    itemProperties: [
-      'alerts',
-      'allowsMidTermReduction',
-      'applicationId',
-      'applicationName',
-      'autoRenew',
-      'billingCycle',
-      'createdAt',
-      'endDate',
-      'id',
-      'kind',
-      'missing',
-      'missingFinancialData',
-      'noticeDeadline',
-      'noticePeriodDays',
-      'planId',
-      'planName',
-      'priceSnapshot',
-      'purchasedQuantity',
-      'renewalDate',
-      'startDate',
-      'status',
-      'taxEstimate',
-      'taxProfile',
-      'unitPrice',
-      'updatedAt',
-      'vendor',
-      'warnings',
-    ],
-  },
-  {
-    operationId: 'planWarningList',
-    classification: 'query',
-    findings: ['LD-02'],
-    owner: 'catalog-subscription-read-model',
-    rationale: 'Every TERM subscription is read with its relations, then the page is cut with slice.',
-    removeWhen: 'Paging moves into the query, proven by a query-count test.',
-    itemProperties: [
-      'applicationId',
-      'applicationName',
-      'baseDate',
-      'code',
-      'lastReviewedOn',
-      'noticeDeadline',
-      'planId',
-      'planName',
-      'reviewFrom',
-      'subscriptionId',
-    ],
-  },
-  {
-    operationId: 'subscriptionCostAllocationHistory',
-    classification: 'query',
-    findings: ['LD-03'],
-    owner: 'catalog-subscription-read-model',
-    rationale: 'Cost Centers are read once per version.',
-    removeWhen: 'One batched read per page, proven by a query-count test.',
-    itemProperties: ['declaredAt', 'declaredBy', 'lines', 'totalPercent', 'version'],
-  },
-  {
-    operationId: 'standardToolsetList',
-    classification: 'query',
-    findings: ['LD-07'],
-    owner: 'catalog-standard-toolset-read-batching',
-    rationale:
-      'Versions and plans are read per head (up to about 400 statements per page) and rows are ordered by UUID.',
-    removeWhen: 'Batched reads and a stable business order, proven by a query-count test.',
-    itemProperties: ['changedAt', 'changedBy', 'departmentId', 'jobTitleId', 'plans', 'reason', 'version'],
-  },
-  {
-    operationId: 'standardToolsetHistory',
-    classification: 'query',
-    findings: ['LD-07'],
-    owner: 'catalog-standard-toolset-read-batching',
-    rationale: 'Plans are read once per version.',
-    removeWhen: 'One batched read per page, proven by a query-count test.',
-    itemProperties: ['changedAt', 'changedBy', 'departmentId', 'jobTitleId', 'plans', 'reason', 'version'],
-  },
-  {
-    operationId: 'provisioningTaskList',
-    classification: 'query',
-    findings: ['LD-08'],
-    owner: 'licensing-provisioning-task-read-contracts',
-    rationale: 'The plan is read once per task.',
-    removeWhen: 'One batched read per page, proven by a query-count test.',
-    itemProperties: [
-      'accountIdentifier',
-      'assignmentId',
-      'attempts',
-      'availableDecisions',
-      'beneficiary',
-      'channel',
-      'claimedAt',
-      'claimedBy',
-      'closeReason',
-      'closedAt',
-      'closedBy',
-      'completedAt',
-      'completedBy',
-      'createdAt',
-      'defaultResponsibleEmployeeId',
-      'doneWhen',
-      'elapsedSeconds',
-      'evidence',
-      'failedAt',
-      'failedBy',
-      'failureKind',
-      'failureReason',
-      'handOffEvidence',
-      'handedOffAt',
-      'handedOffBy',
-      'id',
-      'inGeneralQueue',
-      'kind',
-      'lastError',
-      'maxAttempts',
-      'nextRetryAt',
-      'plan',
-      'requestId',
-      'status',
-      'steps',
-      'subscriptionId',
-    ],
-  },
-  {
-    operationId: 'departmentToolsInUse',
-    classification: 'query',
-    findings: ['LD-09'],
-    owner: 'licensing-assignment-read-contracts',
-    rationale: 'Every assignment of every member is read, then the page is cut in memory.',
-    removeWhen: 'Paging moves into the query, proven by a query-count test.',
-    itemProperties: [
-      'application',
-      'assignmentId',
-      'effectiveFrom',
-      'effectiveFromLabel',
-      'employeeCode',
-      'fullName',
-      'holderStatus',
-      'kind',
-      'plan',
-      'source',
-    ],
-  },
-  {
-    operationId: 'licenseAssignmentList',
-    classification: 'query',
-    findings: ['LD-10'],
-    owner: 'licensing-assignment-read-contracts',
-    rationale:
-      'The query has no select and the item carries only ids, so an IT Admin cannot show the person or Cost Center.',
-    removeWhen: 'A direct select of the summary fields ships (fields per Owner decision 5 of LD-13).',
-    itemProperties: [
-      'accountIdentifier',
-      'costCenterId',
-      'createdAt',
-      'effectiveFrom',
-      'effectiveFromBasis',
-      'effectiveFromLabel',
-      'employeeId',
-      'expectedEndDate',
-      'failedAt',
-      'grantedOn',
-      'id',
-      'kind',
-      'planId',
-      'predecessorId',
-      'reason',
-      'source',
-      'subscriptionId',
-      'validUntil',
-    ],
-  },
-  {
-    operationId: 'licenseKeyList',
-    classification: 'query',
-    findings: ['LD-11'],
-    owner: 'licensing-assignment-read-contracts',
-    rationale: 'The count and the page run in parallel outside one snapshot.',
-    removeWhen: 'Count and page share one RepeatableRead transaction.',
-    itemProperties: ['id', 'importedAt', 'masked', 'status', 'subscriptionId'],
-  },
-  {
-    operationId: 'departmentMemberList',
-    classification: 'query',
-    findings: ['LD-11'],
-    owner: 'organization-identity-read-contracts',
-    rationale: 'The count and the page are two statements outside one snapshot.',
-    removeWhen: 'Count and page share one RepeatableRead transaction.',
-    itemProperties: ['employeeCode', 'fullName', 'hasWorkEmail', 'memberSince', 'status'],
-  },
-  {
-    operationId: 'costCenterEmployeeList',
-    classification: 'query',
-    findings: ['LD-11'],
-    owner: 'organization-identity-read-contracts',
-    rationale: 'The count and the page are two statements outside one snapshot.',
-    removeWhen: 'Count and page share one RepeatableRead transaction.',
-    itemProperties: ['employeeCode', 'fullName', 'status'],
   },
   {
     operationId: 'vendorProposalList',
@@ -657,80 +325,6 @@ const COLLECTION_EXCEPTIONS: readonly CollectionException[] = [
     ],
   },
   {
-    operationId: 'provisioningTaskList',
-    classification: 'owner-decision',
-    findings: ['LD-13'],
-    owner: 'licensing-provisioning-task-read-contracts',
-    rationale: 'Decision 5: which identity fields of the beneficiary, default owner and claimant a task card shows.',
-    removeWhen: 'The Owner decides and the chosen contract ships.',
-    itemProperties: [
-      'accountIdentifier',
-      'assignmentId',
-      'attempts',
-      'availableDecisions',
-      'beneficiary',
-      'channel',
-      'claimedAt',
-      'claimedBy',
-      'closeReason',
-      'closedAt',
-      'closedBy',
-      'completedAt',
-      'completedBy',
-      'createdAt',
-      'defaultResponsibleEmployeeId',
-      'doneWhen',
-      'elapsedSeconds',
-      'evidence',
-      'failedAt',
-      'failedBy',
-      'failureKind',
-      'failureReason',
-      'handOffEvidence',
-      'handedOffAt',
-      'handedOffBy',
-      'id',
-      'inGeneralQueue',
-      'kind',
-      'lastError',
-      'maxAttempts',
-      'nextRetryAt',
-      'plan',
-      'requestId',
-      'status',
-      'steps',
-      'subscriptionId',
-    ],
-  },
-  {
-    operationId: 'licenseAssignmentList',
-    classification: 'owner-decision',
-    findings: ['LD-13'],
-    owner: 'licensing-assignment-read-contracts',
-    rationale: 'Decision 5: which identity fields of the holder an assignment row shows.',
-    removeWhen: 'The Owner decides and the chosen contract ships.',
-    itemProperties: [
-      'accountIdentifier',
-      'costCenterId',
-      'createdAt',
-      'effectiveFrom',
-      'effectiveFromBasis',
-      'effectiveFromLabel',
-      'employeeId',
-      'expectedEndDate',
-      'failedAt',
-      'grantedOn',
-      'id',
-      'kind',
-      'planId',
-      'predecessorId',
-      'reason',
-      'source',
-      'subscriptionId',
-      'validUntil',
-    ],
-  },
-  {
     operationId: 'departmentList',
     classification: 'owner-decision',
     findings: ['LD-13'],
@@ -784,37 +378,17 @@ const COLLECTION_EXCEPTIONS: readonly CollectionException[] = [
  * NESTED_ARRAYS, which now holds every nested array.
  */
 const INITIAL_EXCEPTION_KEYS: readonly string[] = [
-  'provisioningTaskList#detail-reuse',
   'subscriptionList#detail-reuse',
   'standardToolsetList#detail-reuse',
   'standardToolsetHistory#detail-reuse',
-  'applicationList#detail-projection',
-  'planList#detail-projection',
-  'projectList#unbounded',
-  'applicationBusinessOwnerHistory#unbounded',
-  'departmentWarningList#unbounded',
-  'nonWorkingDateList#unbounded',
   'currencyList#bounded',
   'approvalRoleList#bounded',
   'operatingParameterList#bounded',
   'operatingParameterHistory#bounded',
   'accountCandidatesList#bounded',
-  'subscriptionList#query',
-  'planWarningList#query',
-  'subscriptionCostAllocationHistory#query',
-  'standardToolsetList#query',
-  'standardToolsetHistory#query',
-  'provisioningTaskList#query',
-  'departmentToolsInUse#query',
-  'licenseAssignmentList#query',
-  'licenseKeyList#query',
-  'departmentMemberList#query',
-  'costCenterEmployeeList#query',
   'vendorProposalList#owner-decision',
   'subscriptionList#owner-decision',
   'auditEventList#owner-decision',
-  'provisioningTaskList#owner-decision',
-  'licenseAssignmentList#owner-decision',
   'departmentList#owner-decision',
   'vendorGroupList#owner-decision',
   'vendorSuggestionList#unbounded',
@@ -885,18 +459,33 @@ const NESTED_ARRAYS: readonly NestedArrayEntry[] = [
       maxItems: 50,
       source: 'DEPARTMENT_HEAD_HISTORY_LIMIT in department.types.ts (LIMIT of headPeriods in department-head.repo.ts)',
     },
-    rationale: 'The newest head periods; the cut has no hasMore flag (LD-14).',
-    removeWhen:
-      'Review when DEPARTMENT_HEAD_HISTORY_LIMIT changes; the hasMore flag (LD-14) is organization-identity-read-contracts.',
+    rationale: 'The newest head periods; headHistoryHasMore says there are older ones (LD-14).',
+    removeWhen: 'Review when DEPARTMENT_HEAD_HISTORY_LIMIT changes.',
   },
   {
     key: 'departmentGet#projects',
-    classification: 'unbounded',
+    classification: 'bounded',
     findings: ['LD-12'],
     owner: 'organization-identity-read-contracts',
-    rationale: 'Every project the department takes part in is embedded, with no limit.',
-    removeWhen:
-      'The profile embeds a proved number of projects, or the projects become a paginated subresource (LD-12).',
+    businessMaximum: {
+      maxItems: 20,
+      source:
+        'PROFILE_PROJECT_LIMIT in project.types.ts (take of ProjectRepo.forDepartment); projectTotal counts them all',
+    },
+    rationale: 'The first projects the department takes part in; the rest are read from the paginated project list.',
+    removeWhen: 'Review when PROFILE_PROJECT_LIMIT changes.',
+  },
+  {
+    key: 'projectGet#departments',
+    classification: 'bounded',
+    findings: [],
+    owner: 'organization-identity-read-contracts',
+    businessMaximum: {
+      maxItems: 100,
+      source: 'departmentIds .max(100) in project.dto.ts on create and update; ProjectRepo replaces the set',
+    },
+    rationale: 'The departments one project names (the detail route GET /projects/{id}, added with LD-12).',
+    removeWhen: 'Review when the departmentIds limit or the project write path changes.',
   },
   {
     key: 'departmentGet#projects.departments',
@@ -1082,15 +671,6 @@ const NESTED_ARRAYS: readonly NestedArrayEntry[] = [
     removeWhen: 'Review when SeatRowErrorCode or a row check changes.',
   },
   {
-    key: 'provisioningTaskList#steps',
-    classification: 'bounded',
-    findings: [],
-    owner: 'g4-provisioning-queue-manual',
-    businessMaximum: { maxItems: 3, source: 'stepsFor in provisioning.policy.ts (K4 has the most: 3)' },
-    rationale: 'The steps of one task card.',
-    removeWhen: 'Review when stepsFor changes.',
-  },
-  {
     key: 'provisioningTaskList#availableDecisions',
     classification: 'bounded',
     findings: [],
@@ -1163,19 +743,6 @@ const NESTED_ARRAYS: readonly NestedArrayEntry[] = [
     removeWhen: 'Review when MAX_VALUES or a dictionary write path changes.',
   },
   {
-    key: 'applicationList#domains',
-    classification: 'bounded',
-    findings: [],
-    owner: 'g3-catalog-entry',
-    businessMaximum: {
-      maxItems: 20,
-      source: 'MAX_DOMAINS in application.policy.ts (cleanApplicationDomains on create and update)',
-    },
-    rationale:
-      'The domains of one application; that they are on the list at all is LD-04 (applicationList#detail-projection).',
-    removeWhen: 'Review when MAX_DOMAINS or an application write path changes.',
-  },
-  {
     key: 'applicationGet#domains',
     classification: 'bounded',
     findings: [],
@@ -1189,11 +756,16 @@ const NESTED_ARRAYS: readonly NestedArrayEntry[] = [
   },
   {
     key: 'applicationGet#similarApplications',
-    classification: 'unbounded',
+    classification: 'bounded',
     findings: ['LD-06'],
     owner: 'catalog-application-plan-read-contracts',
-    rationale: 'Every other approved application of the functional group, read without take.',
-    removeWhen: 'The list has a proved maximum or becomes a paginated subresource (LD-06).',
+    businessMaximum: {
+      maxItems: 20,
+      source:
+        'SIMILAR_APPLICATION_LIMIT in application.policy.ts (similarTo takes that many; similarTotal counts the rest)',
+    },
+    rationale: 'The first similar approved applications of the functional group.',
+    removeWhen: 'Review when SIMILAR_APPLICATION_LIMIT changes.',
   },
   {
     key: 'applicationGet#recommendations',
@@ -1367,46 +939,65 @@ const NESTED_ARRAYS: readonly NestedArrayEntry[] = [
   },
   {
     key: 'planTermsGet#opinions',
-    classification: 'unbounded',
+    classification: 'bounded',
     findings: ['LD-06'],
     owner: 'catalog-application-plan-read-contracts',
-    rationale: 'Every opinion on the plan terms, newest first, with no limit (listOpinions).',
-    removeWhen: 'The opinions have a proved maximum or become a paginated subresource (LD-06).',
+    businessMaximum: {
+      maxItems: 50,
+      source:
+        'OPINIONS_IN_VIEW in plan-terms.service.ts (the newest; opinionTotal counts all, GET /plans/{id}/term-opinions pages them)',
+    },
+    rationale: 'The newest opinions on the plan terms.',
+    removeWhen: 'Review when OPINIONS_IN_VIEW changes.',
   },
   {
     key: 'planTermsGet#warnings',
-    classification: 'unbounded',
+    classification: 'bounded',
     findings: ['LD-16'],
     owner: 'catalog-subscription-read-model',
-    rationale:
-      'One TERMS_REVIEW_DUE warning per active subscription of the plan (warningsFor in plan-terms.service.ts); the subscriptions of a plan have no cap.',
-    removeWhen:
-      'The warnings of one plan get a proved maximum or a paginated form; the contract is not chosen here (LD-16).',
+    businessMaximum: {
+      maxItems: 50,
+      source:
+        'WARNINGS_IN_VIEW in plan-terms.service.ts (the earliest; warningTotal counts all, planWarningList pages them)',
+    },
+    rationale: 'The earliest review alerts of one plan.',
+    removeWhen: 'Review when WARNINGS_IN_VIEW changes.',
   },
-  {
-    key: 'applicationRetirementGet#retirement.confirmations',
-    classification: 'unbounded',
+  ...(
+    [
+      [
+        'confirmations',
+        'retirement.confirmations',
+        'The newest Business Owner confirmations; confirmationTotal counts all.',
+      ],
+      [
+        'assignments',
+        'retirement.blockers.assignments',
+        'The first open seats holding the application; assignmentTotal counts all.',
+      ],
+      [
+        'assignmentsByPlan',
+        'retirement.blockers.assignmentsByPlan',
+        'The plans holding the most seats; the rest are in assignmentTotal.',
+      ],
+      [
+        'subscriptions',
+        'retirement.blockers.subscriptions',
+        'The first running subscriptions; subscriptionTotal counts all.',
+      ],
+    ] as const
+  ).map(([, path, rationale]): NestedArrayEntry => ({
+    key: `applicationRetirementGet#${path}`,
+    classification: 'bounded',
     findings: ['LD-06'],
     owner: 'catalog-application-plan-read-contracts',
-    rationale: 'Every Business Owner confirmation of the retirement, with no limit.',
-    removeWhen: 'The confirmations have a proved maximum or become a paginated subresource (LD-06).',
-  },
-  {
-    key: 'applicationRetirementGet#retirement.blockers.assignments',
-    classification: 'unbounded',
-    findings: ['LD-06'],
-    owner: 'catalog-application-plan-read-contracts',
-    rationale: 'Every open seat of every plan of the application (blockersOf in application-retirement.service.ts).',
-    removeWhen: 'The blockers return a proved maximum with a total, or a paginated subresource (LD-06).',
-  },
-  {
-    key: 'applicationRetirementGet#retirement.blockers.subscriptions',
-    classification: 'unbounded',
-    findings: ['LD-06'],
-    owner: 'catalog-application-plan-read-contracts',
-    rationale: 'Every running subscription of every plan of the application (blockersOf).',
-    removeWhen: 'The blockers return a proved maximum with a total, or a paginated subresource (LD-06).',
-  },
+    businessMaximum: {
+      maxItems: 50,
+      source: 'RETIREMENT_LIST_LIMIT in application-retirement.policy.ts (blockersOf and confirmations take that many)',
+    },
+    rationale,
+    removeWhen: 'Review when RETIREMENT_LIST_LIMIT changes.',
+  })),
   {
     key: 'standardToolsetList#plans',
     classification: 'bounded',
@@ -1538,11 +1129,16 @@ const NESTED_ARRAYS: readonly NestedArrayEntry[] = [
   },
   {
     key: 'appUserGet#roleHistory',
-    classification: 'unbounded',
+    classification: 'bounded',
     findings: ['LD-14'],
     owner: 'organization-identity-read-contracts',
-    rationale: 'Every grant of the account ever made (grantHistory reads without take).',
-    removeWhen: 'The history has a proved maximum with hasMore, or becomes a paginated subresource (LD-14).',
+    businessMaximum: {
+      maxItems: 50,
+      source:
+        'ROLE_HISTORY_LIMIT in account-query.service.ts (take of RoleGrantRepo.grantHistory); roleHistoryHasMore says there are older grants',
+    },
+    rationale: 'The newest grants of the account, with roleHistoryHasMore.',
+    removeWhen: 'Review when ROLE_HISTORY_LIMIT changes.',
   },
   {
     key: 'approvalRoleList#history',
@@ -1553,8 +1149,8 @@ const NESTED_ARRAYS: readonly NestedArrayEntry[] = [
       maxItems: 20,
       source: 'HISTORY_LIMIT in approval-role.service.ts (take of ApprovalRoleRepo.history)',
     },
-    rationale: 'The newest holders of one approval role; the cut has no hasMore flag (LD-14).',
-    removeWhen: 'Review when HISTORY_LIMIT changes; the hasMore flag (LD-14) is organization-identity-read-contracts.',
+    rationale: 'The newest holders of one approval role; historyHasMore says there are older ones (LD-14).',
+    removeWhen: 'Review when HISTORY_LIMIT changes.',
   },
   {
     key: 'departmentToolsInUse#data.summary',
@@ -1562,8 +1158,8 @@ const NESTED_ARRAYS: readonly NestedArrayEntry[] = [
     findings: ['LD-09'],
     owner: 'licensing-assignment-read-contracts',
     rationale:
-      'One line per plan over every seat the department holds, computed from all its assignments before the page is cut.',
-    removeWhen: 'The summary is read in SQL with a proved maximum or paginated (LD-09).',
+      'One line per plan the department holds seats of, counted in SQL by one groupBy of the same snapshot as the page (LD-09 fixed the cost, not the number of plans).',
+    removeWhen: 'The summary is capped with a total or paginated.',
   },
 ];
 
@@ -1577,9 +1173,11 @@ const INITIAL_NESTED_ARRAYS: Readonly<Record<string, NestedClassification>> = {
   'departmentList#warnings': 'bounded',
   'departmentGet#warnings': 'bounded',
   'departmentGet#headHistory': 'bounded',
-  'departmentGet#projects': 'unbounded',
+  'departmentGet#projects': 'bounded',
   'departmentGet#projects.departments': 'bounded',
   'projectList#departments': 'bounded',
+  // Added with the detail route GET /projects/{id} that the spec of organization-identity-read-contracts names (LD-12).
+  'projectGet#departments': 'bounded',
   'operatingParameterList#value': 'bounded',
   'operatingParameterList#default': 'bounded',
   'operatingParameterHistory#value': 'bounded',
@@ -1593,7 +1191,6 @@ const INITIAL_NESTED_ARRAYS: Readonly<Record<string, NestedClassification>> = {
   'employeeImportRowList#differences': 'bounded',
   'seatBaselineImportGet#ignoredColumns': 'bounded',
   'seatBaselineImportRows#errors': 'bounded',
-  'provisioningTaskList#steps': 'bounded',
   'provisioningTaskList#availableDecisions': 'bounded',
   'provisioningTaskGet#task.steps': 'bounded',
   'provisioningTaskGet#task.availableDecisions': 'bounded',
@@ -1601,9 +1198,8 @@ const INITIAL_NESTED_ARRAYS: Readonly<Record<string, NestedClassification>> = {
   'vendorGroupList#serviceLines': 'owner-decision',
   'vendorGroupList#serviceLines.domains': 'bounded',
   'vendorGroupList#serviceLines.patterns': 'bounded',
-  'applicationList#domains': 'bounded',
   'applicationGet#domains': 'bounded',
-  'applicationGet#similarApplications': 'unbounded',
+  'applicationGet#similarApplications': 'bounded',
   'applicationGet#recommendations': 'bounded',
   'planGet#workspaceProfile.members': 'bounded',
   'vendorTaxProfileGet#profile.lines': 'bounded',
@@ -1618,11 +1214,12 @@ const INITIAL_NESTED_ARRAYS: Readonly<Record<string, NestedClassification>> = {
   'subscriptionGet#warnings': 'bounded',
   'subscriptionCostAllocationGet#allocation.lines': 'bounded',
   'subscriptionCostAllocationHistory#lines': 'bounded',
-  'planTermsGet#opinions': 'unbounded',
-  'planTermsGet#warnings': 'unbounded',
-  'applicationRetirementGet#retirement.confirmations': 'unbounded',
-  'applicationRetirementGet#retirement.blockers.assignments': 'unbounded',
-  'applicationRetirementGet#retirement.blockers.subscriptions': 'unbounded',
+  'planTermsGet#opinions': 'bounded',
+  'planTermsGet#warnings': 'bounded',
+  'applicationRetirementGet#retirement.confirmations': 'bounded',
+  'applicationRetirementGet#retirement.blockers.assignments': 'bounded',
+  'applicationRetirementGet#retirement.blockers.assignmentsByPlan': 'bounded',
+  'applicationRetirementGet#retirement.blockers.subscriptions': 'bounded',
   'standardToolsetList#plans': 'bounded',
   'standardToolsetMine#toolset.plans': 'bounded',
   'standardToolsetGet#toolset.plans': 'bounded',
@@ -1636,7 +1233,7 @@ const INITIAL_NESTED_ARRAYS: Readonly<Record<string, NestedClassification>> = {
   'meGet#roles.effective': 'bounded',
   'appUserList#roles': 'bounded',
   'appUserGet#roles': 'bounded',
-  'appUserGet#roleHistory': 'unbounded',
+  'appUserGet#roleHistory': 'bounded',
   'approvalRoleList#history': 'bounded',
   'departmentToolsInUse#data.summary': 'unbounded',
 };
@@ -2095,7 +1692,6 @@ const INVALID_MAXIMA: Record<string, object> = {
 const REVIEW_NAMED_ARRAYS = [
   'approvalRoleList#history',
   'standardToolsetList#plans',
-  'applicationList#domains',
   'vendorGroupList#serviceLines',
   'departmentGet#projects.departments',
   'employeeImportGet#summary.reviewQueue.items',
@@ -2127,57 +1723,13 @@ describe('collection and detail contract gate (API-LIST-DETAIL.1, LD-R2)', () =>
     expect(keysOutsideInitialSet(COLLECTION_EXCEPTIONS)).toEqual([]);
   });
 
-  it('records the unpaged department warnings and non-working dates as unbounded, never bounded (LD-15)', () => {
+  it('has no LD-15 exception left: the department warnings and the non-working dates are pages (LD-15)', () => {
     const keys = COLLECTION_EXCEPTIONS.map((exception) => `${exception.operationId}#${exception.classification}`);
-    const corrected = COLLECTION_EXCEPTIONS.filter((exception) => exception.findings.includes('LD-15'));
 
-    expect(keys).toEqual(expect.arrayContaining(['departmentWarningList#unbounded', 'nonWorkingDateList#unbounded']));
-    expect(keys).not.toContain('departmentWarningList#bounded');
-    expect(keys).not.toContain('nonWorkingDateList#bounded');
-    expect(corrected.map((exception) => `${exception.operationId} -> ${exception.owner}`).sort()).toEqual([
-      'departmentWarningList -> organization-identity-read-contracts',
-      'nonWorkingDateList -> g2-fiscal-year-operating-parameters',
-    ]);
-  });
-
-  it('cannot make either LD-15 operation bounded again with a count per department or per year', () => {
-    const asBounded = (operationId: string, maximum: object): CollectionException[] =>
-      COLLECTION_EXCEPTIONS.map((exception) =>
-        exception.operationId === operationId && ['bounded', 'unbounded'].includes(exception.classification)
-          ? {
-              ...exception,
-              classification: 'bounded' as const,
-              findings: [],
-              businessMaximum: maximum as BusinessMaximum,
-            }
-          : exception,
-      );
-    // The Prompt 09 claims, word for word.
-    const perDepartment = {
-      limit: '2 per active department (MISSING_HEAD, MISSING_IT_ADMIN)',
-      source: 'warning enum of department.dto.ts',
-    };
-    const perYear = {
-      limit: 'one row per calendar date: at most 366 per year of the requested range',
-      source: 'unique index non_working_dates_organization_id_date_key',
-    };
-    const refused = (key: string) => [
-      `${key}: needs a business maximum: maxItems as a positive integer item count, with its source`,
-    ];
-
-    expect(
-      evaluate(document, { ...realRegistries, exceptions: asBounded('departmentWarningList', perDepartment) }),
-    ).toEqual(refused('departmentWarningList#bounded'));
-    expect(evaluate(document, { ...realRegistries, exceptions: asBounded('nonWorkingDateList', perYear) })).toEqual(
-      refused('nonWorkingDateList#bounded'),
-    );
-    // Written as a number, the per-parent count is still not a maximum of the response: the key needs the Owner.
-    expect(
-      keysOutsideInitialSet(asBounded('departmentWarningList', { maxItems: 2, source: perDepartment.source })),
-    ).toEqual(['departmentWarningList#bounded']);
-    expect(keysOutsideInitialSet(asBounded('nonWorkingDateList', { maxItems: 366, source: perYear.source }))).toEqual([
-      'nonWorkingDateList#bounded',
-    ]);
+    expect(COLLECTION_EXCEPTIONS.filter((exception) => exception.findings.includes('LD-15'))).toEqual([]);
+    for (const operationId of ['departmentWarningList', 'nonWorkingDateList']) {
+      expect(keys.filter((key) => key.startsWith(`${operationId}#`))).toEqual([]);
+    }
   });
 
   it('keeps the operations of the LD-13 Owner decisions recorded, so no contract is chosen by this gate', () => {
@@ -2186,8 +1738,6 @@ describe('collection and detail contract gate (API-LIST-DETAIL.1, LD-R2)', () =>
     expect(decisions.map((exception) => exception.operationId).sort()).toEqual([
       'auditEventList',
       'departmentList',
-      'licenseAssignmentList',
-      'provisioningTaskList',
       'subscriptionList',
       'vendorGroupList',
       'vendorProposalList',
@@ -2203,7 +1753,7 @@ describe('collection and detail contract gate (API-LIST-DETAIL.1, LD-R2)', () =>
 
   it('only ever shrinks the nested-array inventory recorded on 23/10/2026, classification included', () => {
     const reclassified = NESTED_ARRAYS.map((entry) =>
-      entry.key === 'planTermsGet#warnings'
+      entry.key === 'onboardingChecklistGet#steps.warnings'
         ? { ...entry, classification: 'bounded' as const, businessMaximum: { maxItems: 20, source: 'a guess' } }
         : entry,
     );
@@ -2213,17 +1763,20 @@ describe('collection and detail contract gate (API-LIST-DETAIL.1, LD-R2)', () =>
     expect(nestedEntriesOutsideInitialSet([...NESTED_ARRAYS, nestedEntry('jobTitleList#aliases')])).toEqual([
       'jobTitleList#aliases (bounded)',
     ]);
-    expect(nestedEntriesOutsideInitialSet(reclassified)).toEqual(['planTermsGet#warnings (bounded)']);
+    expect(nestedEntriesOutsideInitialSet(reclassified)).toEqual(['onboardingChecklistGet#steps.warnings (bounded)']);
   });
 
-  it('records the unbounded nested arrays no earlier finding covers as LD-16, each with an existing owner', () => {
+  it('records the nested arrays no earlier finding covers as LD-16, each with an existing owner; the plan one is bounded since 23/10/2026', () => {
     const subcases = NESTED_ARRAYS.filter((entry) => entry.findings.includes('LD-16'));
 
     expect(subcases.map((entry) => `${entry.key} -> ${entry.owner}`).sort()).toEqual([
       'onboardingChecklistGet#steps.warnings -> api-list-detail-contract-remediation',
       'planTermsGet#warnings -> catalog-subscription-read-model',
     ]);
-    expect(subcases.every((entry) => entry.classification === 'unbounded')).toBe(true);
+    expect(subcases.map((entry) => `${entry.key} ${entry.classification}`).sort()).toEqual([
+      'onboardingChecklistGet#steps.warnings unbounded',
+      'planTermsGet#warnings bounded',
+    ]);
   });
 
   describe('on fixture documents (each case is one way the rule is broken)', () => {

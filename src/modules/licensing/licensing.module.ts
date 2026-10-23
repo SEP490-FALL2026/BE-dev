@@ -9,6 +9,8 @@ import { OperatingParametersModule } from '../operating-parameters/operating-par
 import { OrganizationModule } from '../organization/organization.module';
 import { AssignmentRepo } from './assignment/assignment.repo';
 import { AssignmentSeatOccupancy } from './assignment/seat-occupancy.reader';
+import { AssignmentServiceAccountReader } from './assignment/service-account-reader';
+import { AssignmentListService } from './assignment/assignment-list.service';
 import { AssignmentService } from './assignment/assignment.service';
 import { AssignmentsController } from './assignment/assignments.controller';
 import { DepartmentToolsController } from './assignment/department-tools.controller';
@@ -16,6 +18,7 @@ import { DepartmentToolsService } from './assignment/department-tools.service';
 import { SubscriptionSeatsController } from './assignment/subscription-seats.controller';
 import { LicenseKeyCipher, parsePreviousVaultKeys } from './license-key/license-key-cipher';
 import { LicenseKeyRepo } from './license-key/license-key.repo';
+import { LicenseKeyRevealQuotaRepo } from './license-key/license-key-reveal-quota.repo';
 import { LicenseKeyService } from './license-key/license-key.service';
 import { LicenseKeysController } from './license-key/license-keys.controller';
 import { GRANT_REQUEST_GATE } from './licensing.types';
@@ -59,7 +62,9 @@ import { SeatBaselineService } from './seat-baseline/seat-baseline.service';
   providers: [
     AssignmentRepo,
     AssignmentSeatOccupancy,
+    AssignmentServiceAccountReader,
     AssignmentService,
+    AssignmentListService,
     DepartmentToolsService,
     SeatBaselineRepo,
     SeatBaselineService,
@@ -70,6 +75,7 @@ import { SeatBaselineService } from './seat-baseline/seat-baseline.service';
     ProvisioningDecisionService,
     ProvisioningFailureService,
     LicenseKeyRepo,
+    LicenseKeyRevealQuotaRepo,
     LicenseKeyService,
     {
       provide: LicenseKeyCipher,

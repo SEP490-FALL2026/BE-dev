@@ -1,13 +1,18 @@
 import { randomUUID } from 'node:crypto';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { Page, pageOf } from '../../../core/application/pagination';
 import type { LicenseKeyStatus } from '../../../generated/prisma/client';
-import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
+import { DbTx, TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditService } from '../../audit/audit.service';
 import { CatalogService } from '../../catalog/catalog.service';
 import { OrganizationService } from '../../organization/organization.service';
-import { LicenseKeyNotFoundError, LicenseKeyPlanNotK4Error, SeatTargetNotFoundError } from '../licensing.errors';
+import {
+  LicenseKeyNotFoundError,
+  LicenseKeyPlanNotK4Error,
+  LicenseKeyRevealLimitError,
+  SeatTargetNotFoundError,
+} from '../licensing.errors';
 import { licensingAuditEvent } from '../mappers/licensing-audit-event';
 import { LicenseKeyCipher } from './license-key-cipher';
 import {
@@ -18,6 +23,7 @@ import {
   type BatchErrorCode,
   type CapacityWarning,
 } from './license-key.policy';
+import { LicenseKeyRevealQuotaRepo } from './license-key-reveal-quota.repo';
 import { LicenseKeyRepo, type LicenseKeyListed } from './license-key.repo';
 
 export interface VaultSummary {
@@ -41,8 +47,11 @@ export interface ImportResult {
  */
 @Injectable()
 export class LicenseKeyService {
+  private readonly logger = new Logger(LicenseKeyService.name);
+
   constructor(
     private readonly repo: LicenseKeyRepo,
+    private readonly quota: LicenseKeyRevealQuotaRepo,
     private readonly cipher: LicenseKeyCipher,
     private readonly catalog: CatalogService,
     private readonly organization: OrganizationService,
@@ -126,13 +135,12 @@ export class LicenseKeyService {
     pageSize: number;
   }): Promise<Page<LicenseKeyListed> & { summary: VaultSummary }> {
     const target = await this.requireSubscription(input.subscriptionId);
-    const { items, total } = await this.repo.page({
+    const { items, total, usable } = await this.repo.page({
       subscriptionId: input.subscriptionId,
       ...(input.status ? { status: input.status } : {}),
       skip: (input.page - 1) * input.pageSize,
       take: input.pageSize,
     });
-    const usable = await this.repo.countUsable(input.subscriptionId);
 
     return {
       ...pageOf(items, total, input.page, input.pageSize),
@@ -152,6 +160,7 @@ export class LicenseKeyService {
     return this.runner.run(async (tx) => {
       const sealed = await this.repo.findSealed(tx, id);
       if (!sealed) throw new LicenseKeyNotFoundError();
+      await this.takeSlot(tx, actor);
       const value = this.cipher.decrypt(sealed.id, sealed.cipherKeyId, sealed.ciphertext);
       await this.audit.record(
         tx,
@@ -165,6 +174,23 @@ export class LicenseKeyService {
 
       return { id: sealed.id, value };
     });
+  }
+
+  /**
+   * One slot of the minute and one of the day of the account (`SEC-02`), taken in the transaction that opens the key and
+   * writes its event: a refusal rolls both back, so a refused request costs the account nothing and two requests for the
+   * last slot cannot both pass.
+   */
+  private async takeSlot(tx: DbTx, actor: AuthenticatedPrincipal): Promise<void> {
+    const now = new Date();
+    for (const window of ['MINUTE', 'DAY'] as const) {
+      if (!(await this.quota.take(tx, actor.appUserId, window, now))) {
+        // For the operator, never for the caller: which account tried, not which key.
+        this.logger.warn(`License key reveal limit reached for account ${actor.appUserId} (${window})`);
+        throw new LicenseKeyRevealLimitError(window);
+      }
+    }
+    await this.quota.forgetOlderThan(tx, new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000));
   }
 
   private summary(purchased: number | null, usableKeys: number): VaultSummary {

@@ -1,10 +1,3 @@
-export class ApplicationKindNotManagedError extends Error {
-  constructor() {
-    super('This kind of software is not a managed object: free external software is not added to the catalog.');
-    this.name = 'ApplicationKindNotManagedError';
-  }
-}
-
 export class ApplicationNameInvalidError extends Error {
   constructor() {
     super('An application name must be 1 to 200 characters.');
@@ -147,9 +140,12 @@ export interface RetirementBlockingSubscription {
 
 /** An assignment or a subscription still holds the application, so it is not retired and nothing is revoked for it. */
 export class ApplicationRetirementBlockedError extends Error {
+  /** `assignments` and `subscriptions` are the first of what holds the application; the totals count them all. */
   constructor(
     readonly assignments: RetirementBlockingAssignment[],
     readonly subscriptions: RetirementBlockingSubscription[],
+    readonly assignmentTotal: number = assignments.length,
+    readonly subscriptionTotal: number = subscriptions.length,
   ) {
     super('Assignments or subscriptions still hold the application.');
     this.name = 'ApplicationRetirementBlockedError';

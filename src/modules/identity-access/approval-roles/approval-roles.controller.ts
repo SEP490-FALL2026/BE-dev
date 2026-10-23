@@ -24,6 +24,7 @@ function toWire(views: ApprovalRoleView[]) {
     items: views.map((view) => ({
       role: view.role,
       holder: view.holder ? { ...view.holder, since: view.holder.since.toISOString() } : null,
+      historyHasMore: view.historyHasMore,
       history: view.history.map((entry) => ({
         employeeId: entry.employeeId,
         employeeCode: entry.employeeCode,

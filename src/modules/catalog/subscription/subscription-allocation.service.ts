@@ -1,9 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { Page } from '../../../core/application/pagination';
+import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { FinanceService } from '../../finance/finance.service';
 import type { AllocationLineInput, CostAllocationView } from '../../finance/finance.types';
-import { SubscriptionNotFoundError } from './subscription.errors';
+import { PlanLookupService } from '../plan/plan-lookup.service';
+import { SubscriptionNotFoundError, SubscriptionPlanNotFoundError } from './subscription.errors';
 import { SubscriptionRepo } from './subscription.repo';
 import {
   allocationApplicability,
@@ -26,7 +28,9 @@ export interface SubscriptionAllocationView {
 export class SubscriptionAllocationService {
   constructor(
     private readonly subscriptions: SubscriptionRepo,
+    private readonly plans: PlanLookupService,
     private readonly finance: FinanceService,
+    private readonly runner: TransactionRunner,
   ) {}
 
   /** Throws SubscriptionNotFoundError. A subscription with no allocation is `MISSING`, not an error. */
@@ -45,16 +49,22 @@ export class SubscriptionAllocationService {
   /**
    * Throws SubscriptionNotFoundError, SubscriptionCostAllocationNotApplicableError (a per-seat plan, or a pricing
    * model not declared) and the allocation errors of finance. An allocation equal to the current one is `changed: false`.
+   * The plan is held `FOR SHARE` and the pricing model read after that, in the transaction that writes the allocation,
+   * so a change of the pricing model cannot slip in between the check and the write (DB-10).
    */
   async declare(
     actor: AuthenticatedPrincipal,
     subscriptionId: string,
     input: { lines: AllocationLineInput[] },
   ): Promise<{ allocation: CostAllocationView; changed: boolean }> {
-    const subscription = await this.require(subscriptionId);
-    assertAllocatable(subscription.planPricingModel);
+    return this.runner.run(async (tx) => {
+      const found = await this.require(subscriptionId, tx);
+      if (!(await this.plans.lockShared(tx, found.planId))) throw new SubscriptionPlanNotFoundError();
+      const subscription = await this.require(subscriptionId, tx);
+      assertAllocatable(subscription.planPricingModel);
 
-    return this.finance.declareCostAllocation(actor, subscriptionId, input);
+      return this.finance.declareCostAllocation(actor, subscriptionId, input, tx);
+    });
   }
 
   async history(subscriptionId: string, query: { page: number; pageSize: number }): Promise<Page<CostAllocationView>> {
@@ -63,8 +73,8 @@ export class SubscriptionAllocationService {
     return this.finance.costAllocationHistory(subscriptionId, query);
   }
 
-  private async require(subscriptionId: string) {
-    const subscription = await this.subscriptions.find(subscriptionId);
+  private async require(subscriptionId: string, tx?: DbTx) {
+    const subscription = await this.subscriptions.find(subscriptionId, tx);
     if (!subscription) throw new SubscriptionNotFoundError();
 
     return subscription;

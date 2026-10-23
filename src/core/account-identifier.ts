@@ -46,11 +46,19 @@ const SECRET_SHAPES: readonly RegExp[] = [
   /^AIza[0-9A-Za-z_-]{30,}$/,
 ];
 
-/** True when the identifier has the shape of a token or a key a vendor issues: it is a secret, not an account name. */
-export function looksLikeSecret(identifier: string): boolean {
-  const trimmed = identifier.trim();
+/** The characters a name has none of: space, control, and the invisible ones that can hide inside a token. */
+// eslint-disable-next-line no-control-regex
+const SPACE_OR_INVISIBLE = /[\s\u0000-\u001f\u007f\u200b-\u200f\u2028\u2029\ufeff]/gu;
 
-  return SECRET_SHAPES.some((shape) => shape.test(trimmed));
+/**
+ * True when the identifier has the shape of a token or a key a vendor issues: it is a secret, not an account name. It is
+ * judged as it is written and with its spaces, invisible characters and compatibility forms taken out, so a token with a
+ * space in front or a zero-width character in the middle is still one (`SEC-03`).
+ */
+export function looksLikeSecret(identifier: string): boolean {
+  const stripped = identifier.normalize('NFKC').replace(SPACE_OR_INVISIBLE, '');
+
+  return SECRET_SHAPES.some((shape) => shape.test(identifier.trim()) || shape.test(stripped));
 }
 
 /** The lower-case domain of something that looks like one email address, or null. */

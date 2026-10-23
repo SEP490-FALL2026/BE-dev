@@ -392,11 +392,11 @@
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "403": {
-            "description": "Only an IT Admin may enter people.",
+            "description": "Only the Super Admin may enter people.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
-            "description": "The body is malformed (VALIDATION_ERROR), or the row cannot become an employee (EMPLOYEE.ROW_INVALID; details.reasons lists every field and code).",
+            "description": "The body is malformed or lacks a part of the HR basis (VALIDATION_ERROR), or the row cannot become an employee (EMPLOYEE.ROW_INVALID; details.reasons lists every field and code, among them OWN_RECORD for the Super Admin's own code or email).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "429": {
@@ -413,6 +413,53 @@
         "tags": ["employees"]
       }
     },
+    "/api/v1/employees/{id}": {
+      "patch": {
+        "operationId": "employeeUpdateOfficialFields",
+        "parameters": [
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UpdateEmployeeBodyDto" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "The name, work email, kind of staff or a hire date still to come were changed on the HR basis given; the Audit Trail keeps the values before and after and the basis. The login email, the department, the title and the status are untouched.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/MaintainedEmployeeResponseDto" } }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "403": {
+            "description": "Only an IT Admin corrects these fields; the record of an IT Admin goes to another IT Admin when one can act (EMPLOYEE.ANOTHER_IT_ADMIN_NEEDED).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "404": {
+            "description": "The employee does not exist (EMPLOYEE.NOT_FOUND).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "422": {
+            "description": "The body is malformed, names a field that is not an official one or lacks a part of the HR basis (VALIDATION_ERROR), names nothing to change (EMPLOYEE.UPDATE_EMPTY), or a value is refused (EMPLOYEE.ROW_INVALID: WORK_EMAIL_TAKEN, HIRE_DATE_LOCKED, HIRE_DATE_IN_PAST).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Correct the official fields of an employee",
+        "tags": ["employees"]
+      }
+    },
     "/api/v1/cost-centers": {
       "get": {
         "operationId": "costCenterList",
@@ -423,12 +470,7 @@
             "in": "query",
             "schema": { "type": "string", "enum": ["ACTIVE", "INACTIVE"] }
           },
-          {
-            "name": "kind",
-            "required": false,
-            "in": "query",
-            "schema": { "type": "string", "enum": ["UNIT", "COMPANY"] }
-          },
+          { "name": "kind", "required": false, "in": "query", "schema": { "type": "string", "enum": ["UNIT"] } },
           { "name": "search", "required": false, "in": "query", "schema": { "maxLength": 100, "type": "string" } },
           {
             "name": "page",
@@ -506,7 +548,7 @@
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
-            "description": "The request is invalid (VALIDATION_ERROR), the kind is not UNIT or COMPANY (COST_CENTER.KIND_NOT_SUPPORTED), or the name is empty, too long (COST_CENTER.NAME_INVALID) or reserved (COST_CENTER.NAME_RESERVED).",
+            "description": "The request is invalid (VALIDATION_ERROR), the kind is not UNIT (COST_CENTER.KIND_NOT_SUPPORTED), or the name is empty, too long (COST_CENTER.NAME_INVALID) or reserved (COST_CENTER.NAME_RESERVED).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "429": {
@@ -551,7 +593,7 @@
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
-            "description": "The request is invalid (VALIDATION_ERROR), the kind is not UNIT or COMPANY (COST_CENTER.KIND_NOT_SUPPORTED), or the name is empty, too long (COST_CENTER.NAME_INVALID) or reserved (COST_CENTER.NAME_RESERVED).",
+            "description": "The request is invalid (VALIDATION_ERROR), the kind is not UNIT (COST_CENTER.KIND_NOT_SUPPORTED), or the name is empty, too long (COST_CENTER.NAME_INVALID) or reserved (COST_CENTER.NAME_RESERVED).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "429": {
@@ -596,7 +638,7 @@
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
-            "description": "The request is invalid (VALIDATION_ERROR), the kind is not UNIT or COMPANY (COST_CENTER.KIND_NOT_SUPPORTED), or the name is empty, too long (COST_CENTER.NAME_INVALID) or reserved (COST_CENTER.NAME_RESERVED).",
+            "description": "The request is invalid (VALIDATION_ERROR), the kind is not UNIT (COST_CENTER.KIND_NOT_SUPPORTED), or the name is empty, too long (COST_CENTER.NAME_INVALID) or reserved (COST_CENTER.NAME_RESERVED).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "429": {
@@ -657,7 +699,7 @@
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
-            "description": "The request is invalid (VALIDATION_ERROR), the kind is not UNIT or COMPANY (COST_CENTER.KIND_NOT_SUPPORTED), or the name is empty, too long (COST_CENTER.NAME_INVALID) or reserved (COST_CENTER.NAME_RESERVED).",
+            "description": "The request is invalid (VALIDATION_ERROR), the kind is not UNIT (COST_CENTER.KIND_NOT_SUPPORTED), or the name is empty, too long (COST_CENTER.NAME_INVALID) or reserved (COST_CENTER.NAME_RESERVED).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "429": {
@@ -886,7 +928,7 @@
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "409": {
-            "description": "It still has members (DEPARTMENT.IN_USE; details lists them).",
+            "description": "It still has members or owns service accounts (DEPARTMENT.IN_USE; details lists them).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
@@ -1061,10 +1103,29 @@
     "/api/v1/department-warnings": {
       "get": {
         "operationId": "departmentWarningList",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 9007199254740991,
+              "exclusiveMinimum": true,
+              "default": 1,
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": { "maximum": 100, "exclusiveMinimum": true, "default": 20, "type": "integer", "minimum": 0 }
+          }
+        ],
         "responses": {
           "200": {
-            "description": "The active departments that miss a head or a usable IT Admin in charge. The Super Admin sees these and nothing else of the departments.",
+            "description": "A page of the active departments that miss a head or a usable IT Admin in charge, by department code then warning. The Super Admin sees these and nothing else of the departments.",
             "content": {
               "application/json": { "schema": { "$ref": "#/components/schemas/DepartmentWarningsResponseDto" } }
             }
@@ -1095,11 +1156,34 @@
       "get": {
         "operationId": "projectList",
         "parameters": [
-          { "name": "departmentId", "required": false, "in": "query", "schema": { "format": "uuid", "type": "string" } }
+          {
+            "name": "departmentId",
+            "required": false,
+            "in": "query",
+            "schema": { "format": "uuid", "type": "string" }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 9007199254740991,
+              "exclusiveMinimum": true,
+              "default": 1,
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": { "maximum": 100, "exclusiveMinimum": true, "default": 20, "type": "integer", "minimum": 0 }
+          }
         ],
         "responses": {
           "200": {
-            "description": "The projects, optionally those a department takes part in.",
+            "description": "A page of projects by name, optionally those a department takes part in. The description is read with GET /projects/{id}.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ProjectListResponseDto" } } }
           },
           "401": {
@@ -1166,6 +1250,45 @@
       }
     },
     "/api/v1/projects/{id}": {
+      "get": {
+        "operationId": "projectGet",
+        "parameters": [
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "The project in full, with its description and the departments that take part.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ProjectResponseDto" } } }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "403": {
+            "description": "Only an IT Admin keeps the projects described on department profiles.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "404": {
+            "description": "The project does not exist (PROJECT.NOT_FOUND).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "422": {
+            "description": "The request is invalid (VALIDATION_ERROR) or the project is not valid (PROJECT.INVALID).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Read one project",
+        "tags": ["projects"]
+      },
       "patch": {
         "operationId": "projectUpdate",
         "parameters": [
@@ -1344,11 +1467,29 @@
         "operationId": "nonWorkingDateList",
         "parameters": [
           { "name": "from", "required": false, "in": "query", "schema": { "type": "string" } },
-          { "name": "to", "required": false, "in": "query", "schema": { "type": "string" } }
+          { "name": "to", "required": false, "in": "query", "schema": { "type": "string" } },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 9007199254740991,
+              "exclusiveMinimum": true,
+              "default": 1,
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": { "maximum": 100, "exclusiveMinimum": true, "default": 20, "type": "integer", "minimum": 0 }
+          }
         ],
         "responses": {
           "200": {
-            "description": "The days nobody works, in date order, optionally between two dates.",
+            "description": "A page of the days nobody works, in date order, optionally between two dates.",
             "content": {
               "application/json": { "schema": { "$ref": "#/components/schemas/NonWorkingDateListResponseDto" } }
             }
@@ -1614,7 +1755,7 @@
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "403": {
-            "description": "Only an IT Admin imports people.",
+            "description": "Only the Super Admin imports people.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
@@ -1653,7 +1794,7 @@
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "403": {
-            "description": "Only an IT Admin imports people.",
+            "description": "Only the Super Admin imports people.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "404": {
@@ -1720,7 +1861,7 @@
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "403": {
-            "description": "Only an IT Admin imports people.",
+            "description": "Only the Super Admin imports people.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "404": {
@@ -1763,7 +1904,7 @@
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "403": {
-            "description": "Only an IT Admin imports people.",
+            "description": "Only the Super Admin imports people.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "404": {
@@ -1804,7 +1945,7 @@
         },
         "responses": {
           "200": {
-            "description": "The people the preview promised are created, once. The same confirmation sent again (same idempotency key) returns the first answer with replayed set.",
+            "description": "The people the preview promised are created, once, on the HR basis given; each carries it in the Audit Trail. The same confirmation sent again (same idempotency key) returns the first answer with replayed set.",
             "content": {
               "application/json": { "schema": { "$ref": "#/components/schemas/EmployeeImportConfirmationResponseDto" } }
             }
@@ -1814,7 +1955,7 @@
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "403": {
-            "description": "Only an IT Admin imports people.",
+            "description": "Only the Super Admin imports people.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "404": {
@@ -1826,7 +1967,7 @@
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
-            "description": "The request is invalid (VALIDATION_ERROR).",
+            "description": "The request is invalid or lacks a part of the HR basis (VALIDATION_ERROR).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "429": {
@@ -1861,7 +2002,7 @@
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "403": {
-            "description": "Only an IT Admin imports people.",
+            "description": "Only the Super Admin imports people.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "404": {
@@ -2198,7 +2339,7 @@
         ],
         "responses": {
           "200": {
-            "description": "A page of assignments by start date. source tells a baseline assignment from one that came from a request or from a change of the person responsible; a start that is only the day of recording has no grantedOn and carries a label.",
+            "description": "A page of assignments by start date, each with the person, the plan and the Cost Center it names. source tells a baseline assignment from one that came from a request or from a change of the person responsible; a start that is only the day of recording has no grantedOn and carries a label.",
             "content": {
               "application/json": { "schema": { "$ref": "#/components/schemas/AssignmentPageResponseDto" } }
             }
@@ -3034,7 +3175,7 @@
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "429": {
-            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "description": "The account has opened as many keys as it may in this minute (10) or this day (200): HTTP_TOO_MANY_REQUESTS. Nothing was opened and nothing was counted.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "503": {
@@ -3595,7 +3736,7 @@
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
-            "description": "The request is invalid (VALIDATION_ERROR) or a rule refuses it: APPLICATION.KIND_NOT_MANAGED, NAME_INVALID, VENDOR_NAME_INVALID, DOMAIN_INVALID, TOO_MANY_DOMAINS, NOTE_INVALID, VENDOR_REQUIRED, VENDOR_SOURCE_AMBIGUOUS, INTERNAL_HAS_NO_VENDOR, BUSINESS_OWNER_INVALID, FUNCTIONAL_GROUP_INVALID, DICTIONARY_LINE_NOT_FOUND, DICTIONARY_LINE_MISMATCH or UPDATE_EMPTY.",
+            "description": "The request is invalid (VALIDATION_ERROR) or a rule refuses it: NAME_INVALID, VENDOR_NAME_INVALID, DOMAIN_INVALID, TOO_MANY_DOMAINS, NOTE_INVALID, VENDOR_REQUIRED, VENDOR_SOURCE_AMBIGUOUS, INTERNAL_HAS_NO_VENDOR, BUSINESS_OWNER_INVALID, FUNCTIONAL_GROUP_INVALID, DICTIONARY_LINE_NOT_FOUND, DICTIONARY_LINE_MISMATCH or UPDATE_EMPTY.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "429": {
@@ -3620,7 +3761,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The application and, in similarApplications, the other approved applications of its functional group; recommendations says, without blocking anything, when a K2 plan is worth considering (three different people on K1 plans).",
+            "description": "The application and, in similarApplications, the first 20 other approved applications of its functional group and, in similarTotal, how many there are; recommendations says, without blocking anything, when a K2 plan is worth considering (three different people on K1 plans).",
             "content": {
               "application/json": { "schema": { "$ref": "#/components/schemas/ApplicationDetailResponseDto" } }
             }
@@ -3685,7 +3826,7 @@
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
-            "description": "The request is invalid (VALIDATION_ERROR) or a rule refuses it: APPLICATION.KIND_NOT_MANAGED, NAME_INVALID, VENDOR_NAME_INVALID, DOMAIN_INVALID, TOO_MANY_DOMAINS, NOTE_INVALID, VENDOR_REQUIRED, VENDOR_SOURCE_AMBIGUOUS, INTERNAL_HAS_NO_VENDOR, BUSINESS_OWNER_INVALID, FUNCTIONAL_GROUP_INVALID, DICTIONARY_LINE_NOT_FOUND, DICTIONARY_LINE_MISMATCH or UPDATE_EMPTY.",
+            "description": "The request is invalid (VALIDATION_ERROR) or a rule refuses it: NAME_INVALID, VENDOR_NAME_INVALID, DOMAIN_INVALID, TOO_MANY_DOMAINS, NOTE_INVALID, VENDOR_REQUIRED, VENDOR_SOURCE_AMBIGUOUS, INTERNAL_HAS_NO_VENDOR, BUSINESS_OWNER_INVALID, FUNCTIONAL_GROUP_INVALID, DICTIONARY_LINE_NOT_FOUND, DICTIONARY_LINE_MISMATCH or UPDATE_EMPTY.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "429": {
@@ -3948,7 +4089,7 @@
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "409": {
-            "description": "The application already has a plan of this name (PLAN.NAME_TAKEN) or the plan still has a workspace profile or a numeric install limit the new kind cannot keep (PLAN.WORKSPACE_PROFILE_BLOCKS_TYPE_CHANGE, PLAN.TERMS_BLOCK_TYPE_CHANGE).",
+            "description": "The application already has a plan of this name (PLAN.NAME_TAKEN) or the plan still has a workspace profile or a numeric install limit the new kind cannot keep (PLAN.WORKSPACE_PROFILE_BLOCKS_TYPE_CHANGE, PLAN.TERMS_BLOCK_TYPE_CHANGE), or a subscription or license key of the plan would no longer fit the new pricing model or kind (PLAN.IN_USE_BLOCKS_CHANGE, `details.reason`: ACTIVE_SUBSCRIPTION_WITHOUT_QUANTITY, LICENSE_KEYS or SUBSCRIPTIONS).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
@@ -4036,7 +4177,7 @@
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "409": {
-            "description": "The application already has a plan of this name (PLAN.NAME_TAKEN) or the plan still has a workspace profile or a numeric install limit the new kind cannot keep (PLAN.WORKSPACE_PROFILE_BLOCKS_TYPE_CHANGE, PLAN.TERMS_BLOCK_TYPE_CHANGE).",
+            "description": "The application already has a plan of this name (PLAN.NAME_TAKEN) or the plan still has a workspace profile or a numeric install limit the new kind cannot keep (PLAN.WORKSPACE_PROFILE_BLOCKS_TYPE_CHANGE, PLAN.TERMS_BLOCK_TYPE_CHANGE), or a subscription or license key of the plan would no longer fit the new pricing model or kind (PLAN.IN_USE_BLOCKS_CHANGE, `details.reason`: ACTIVE_SUBSCRIPTION_WITHOUT_QUANTITY, LICENSE_KEYS or SUBSCRIPTIONS).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
@@ -4843,6 +4984,63 @@
       }
     },
     "/api/v1/plans/{id}/term-opinions": {
+      "get": {
+        "operationId": "planTermOpinionList",
+        "parameters": [
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 9007199254740991,
+              "exclusiveMinimum": true,
+              "default": 1,
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": { "maximum": 100, "exclusiveMinimum": true, "default": 20, "type": "integer", "minimum": 0 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of the opinions of the Business Owner on the terms of the plan, the newest first.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/OpinionPageResponseDto" } } }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "403": {
+            "description": "Only the IT Admin and Finance read the opinions.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "404": {
+            "description": "The plan does not exist (PLAN.NOT_FOUND).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "422": {
+            "description": "The id is not a UUID or the query is invalid (VALIDATION_ERROR).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "List the opinions on the terms of a plan",
+        "tags": ["plan-terms"]
+      },
       "post": {
         "operationId": "planTermOpinionRecord",
         "parameters": [
@@ -5003,11 +5201,29 @@
       "get": {
         "operationId": "applicationBusinessOwnerHistory",
         "parameters": [
-          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 9007199254740991,
+              "exclusiveMinimum": true,
+              "default": 1,
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": { "maximum": 100, "exclusiveMinimum": true, "default": 20, "type": "integer", "minimum": 0 }
+          }
         ],
         "responses": {
           "200": {
-            "description": "The periods of the Business Owner, the latest first: the person, from when to when, and who made the change.",
+            "description": "A page of the periods of the Business Owner, the latest first: the person, from when to when, and who made the change.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/OwnerHistoryResponseDto" } } }
           },
           "401": {
@@ -5023,7 +5239,7 @@
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
-            "description": "The id is not a UUID (VALIDATION_ERROR).",
+            "description": "The id is not a UUID or the query is invalid (VALIDATION_ERROR).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "429": {
@@ -5099,7 +5315,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The confirmations recorded, whether the Business Owner of today has confirmed, the assignments and the running term subscriptions that would stop the retirement, and whether it would go through now.",
+            "description": "The newest 50 confirmations recorded and how many there are, whether the Business Owner of today has confirmed, the first 50 assignments and running term subscriptions that would stop the retirement with their totals and the number of assignments per plan, and whether it would go through now.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RetirementResponseDto" } } }
           },
           "401": {
@@ -5156,7 +5372,7 @@
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "409": {
-            "description": "The application is retired already (APPLICATION.ALREADY_RETIRED), or assignments or running term subscriptions hold it (APPLICATION.RETIREMENT_BLOCKED, details.assignments and details.subscriptions list them).",
+            "description": "The application is retired already (APPLICATION.ALREADY_RETIRED), or assignments or running term subscriptions hold it (APPLICATION.RETIREMENT_BLOCKED, details.assignments and details.subscriptions list the first 50 of them, details.assignmentTotal and details.subscriptionTotal count them all).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
@@ -5267,7 +5483,7 @@
         },
         "responses": {
           "201": {
-            "description": "The file is declared as awaiting its upload, with the link to put it in the storage. The uploader is the signed-in person; the body cannot say otherwise.",
+            "description": "The file is declared as awaiting its upload, with the link to put it in the storage: it lives two minutes and takes only a file of the declared type and size. The response is never cached. The uploader is the signed-in person; the body cannot say otherwise.",
             "content": {
               "application/json": { "schema": { "$ref": "#/components/schemas/CreateDocumentResponseDto" } }
             }
@@ -5326,7 +5542,7 @@
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "409": {
-            "description": "The upload is done already (DOCUMENT.NOT_AWAITING_UPLOAD).",
+            "description": "The upload is done already (DOCUMENT.NOT_AWAITING_UPLOAD), has not reached the storage yet and can be said again (DOCUMENT.UPLOAD_PENDING), or never came in a day and was given up (DOCUMENT.UPLOAD_EXPIRED).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
@@ -5445,7 +5661,7 @@
         ],
         "responses": {
           "200": {
-            "description": "A link valid for five minutes, kept nowhere: every request is one more link and one more event of the audit trail, which does not hold the link.",
+            "description": "A link valid for five minutes, kept nowhere: it opens the file as a download under its own name and type, and the response is never cached. Every request is one more link and one more event of the audit trail, which does not hold the link.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DocumentLinkResponseDto" } } }
           },
           "401": {
@@ -6949,9 +7165,20 @@
           "employmentType": { "type": "string", "enum": ["STAFF", "CONTRACTOR", "FREELANCER", "INTERN"] },
           "hireDate": { "type": "string" },
           "departmentCode": { "type": "string", "maxLength": 50, "nullable": true },
-          "jobTitleId": { "type": "string", "maxLength": 64, "nullable": true }
+          "jobTitleId": { "type": "string", "maxLength": 64, "nullable": true },
+          "hrBasis": {
+            "type": "object",
+            "properties": {
+              "type": { "type": "string", "minLength": 1, "maxLength": 100 },
+              "reference": { "type": "string", "minLength": 1, "maxLength": 200 },
+              "issuer": { "type": "string", "minLength": 1, "maxLength": 200 },
+              "issuedOn": { "type": "string" }
+            },
+            "required": ["type", "reference", "issuer", "issuedOn"],
+            "additionalProperties": false
+          }
         },
-        "required": ["employeeCode", "fullName", "employmentType", "hireDate"],
+        "required": ["employeeCode", "fullName", "employmentType", "hireDate", "hrBasis"],
         "additionalProperties": false
       },
       "EmployeeResponseDto": {
@@ -7006,6 +7233,52 @@
         "required": ["success", "message", "data"],
         "additionalProperties": false
       },
+      "UpdateEmployeeBodyDto": {
+        "type": "object",
+        "properties": {
+          "fullName": { "type": "string", "minLength": 1, "maxLength": 200 },
+          "workEmail": { "type": "string", "maxLength": 254, "nullable": true },
+          "employmentType": { "type": "string", "enum": ["STAFF", "CONTRACTOR", "FREELANCER", "INTERN"] },
+          "hireDate": { "type": "string" },
+          "hrBasis": {
+            "type": "object",
+            "properties": {
+              "type": { "type": "string", "minLength": 1, "maxLength": 100 },
+              "reference": { "type": "string", "minLength": 1, "maxLength": 200 },
+              "issuer": { "type": "string", "minLength": 1, "maxLength": 200 },
+              "issuedOn": { "type": "string" }
+            },
+            "required": ["type", "reference", "issuer", "issuedOn"],
+            "additionalProperties": false
+          }
+        },
+        "required": ["hrBasis"],
+        "additionalProperties": false
+      },
+      "MaintainedEmployeeResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string", "format": "uuid" },
+              "employeeCode": { "type": "string" },
+              "fullName": { "type": "string" },
+              "workEmail": { "type": "string", "nullable": true },
+              "employmentType": { "type": "string", "enum": ["STAFF", "CONTRACTOR", "FREELANCER", "INTERN"] },
+              "hireDate": { "type": "string" },
+              "status": { "type": "string", "enum": ["ACTIVE", "TERMINATED"] }
+            },
+            "required": ["id", "employeeCode", "fullName", "workEmail", "employmentType", "hireDate", "status"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
       "CostCenterPageResponseDto": {
         "type": "object",
         "properties": {
@@ -7022,7 +7295,7 @@
                     "id": { "type": "string", "format": "uuid" },
                     "code": { "type": "string" },
                     "name": { "type": "string" },
-                    "kind": { "type": "string", "enum": ["UNIT", "COMPANY"] },
+                    "kind": { "type": "string", "enum": ["UNIT"] },
                     "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE"] },
                     "department": {
                       "type": "object",
@@ -7099,7 +7372,7 @@
               "id": { "type": "string", "format": "uuid" },
               "code": { "type": "string" },
               "name": { "type": "string" },
-              "kind": { "type": "string", "enum": ["UNIT", "COMPANY"] },
+              "kind": { "type": "string", "enum": ["UNIT"] },
               "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE"] },
               "department": {
                 "type": "object",
@@ -7380,6 +7653,7 @@
                   "additionalProperties": false
                 }
               },
+              "headHistoryHasMore": { "type": "boolean" },
               "projects": {
                 "type": "array",
                 "items": {
@@ -7408,7 +7682,8 @@
                   "required": ["id", "name", "description", "status", "departments", "createdAt", "updatedAt"],
                   "additionalProperties": false
                 }
-              }
+              },
+              "projectTotal": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
             },
             "required": [
               "id",
@@ -7425,7 +7700,9 @@
               "updatedAt",
               "deactivatedAt",
               "headHistory",
-              "projects"
+              "headHistoryHasMore",
+              "projects",
+              "projectTotal"
             ],
             "additionalProperties": false,
             "nullable": true
@@ -7524,9 +7801,25 @@
                   "required": ["departmentId", "code", "name", "warning"],
                   "additionalProperties": false
                 }
+              },
+              "pagination": {
+                "type": "object",
+                "properties": {
+                  "page": { "type": "integer", "exclusiveMinimum": true, "maximum": 9007199254740991, "minimum": 0 },
+                  "pageSize": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  },
+                  "totalItems": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "totalPages": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                },
+                "required": ["page", "pageSize", "totalItems", "totalPages"],
+                "additionalProperties": false
               }
             },
-            "required": ["items"],
+            "required": ["items", "pagination"],
             "additionalProperties": false,
             "nullable": true
           }
@@ -7549,7 +7842,6 @@
                   "properties": {
                     "id": { "type": "string", "format": "uuid" },
                     "name": { "type": "string" },
-                    "description": { "type": "string", "nullable": true },
                     "status": { "type": "string", "enum": ["RUNNING", "FINISHED"] },
                     "departments": {
                       "type": "array",
@@ -7564,31 +7856,35 @@
                         "additionalProperties": false
                       }
                     },
-                    "createdAt": { "type": "string", "format": "date-time" },
                     "updatedAt": { "type": "string", "format": "date-time" }
                   },
-                  "required": ["id", "name", "description", "status", "departments", "createdAt", "updatedAt"],
+                  "required": ["id", "name", "status", "departments", "updatedAt"],
                   "additionalProperties": false
                 }
+              },
+              "pagination": {
+                "type": "object",
+                "properties": {
+                  "page": { "type": "integer", "exclusiveMinimum": true, "maximum": 9007199254740991, "minimum": 0 },
+                  "pageSize": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  },
+                  "totalItems": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "totalPages": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                },
+                "required": ["page", "pageSize", "totalItems", "totalPages"],
+                "additionalProperties": false
               }
             },
-            "required": ["items"],
+            "required": ["items", "pagination"],
             "additionalProperties": false,
             "nullable": true
           }
         },
         "required": ["success", "message", "data"],
-        "additionalProperties": false
-      },
-      "CreateProjectBodyDto": {
-        "type": "object",
-        "properties": {
-          "name": { "type": "string", "maxLength": 1000 },
-          "description": { "type": "string", "maxLength": 5000, "nullable": true },
-          "status": { "type": "string", "enum": ["RUNNING", "FINISHED"] },
-          "departmentIds": { "maxItems": 100, "type": "array", "items": { "type": "string", "format": "uuid" } }
-        },
-        "required": ["name", "departmentIds"],
         "additionalProperties": false
       },
       "ProjectResponseDto": {
@@ -7625,6 +7921,17 @@
           }
         },
         "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "CreateProjectBodyDto": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "maxLength": 1000 },
+          "description": { "type": "string", "maxLength": 5000, "nullable": true },
+          "status": { "type": "string", "enum": ["RUNNING", "FINISHED"] },
+          "departmentIds": { "maxItems": 100, "type": "array", "items": { "type": "string", "format": "uuid" } }
+        },
+        "required": ["name", "departmentIds"],
         "additionalProperties": false
       },
       "UpdateProjectBodyDto": {
@@ -7762,9 +8069,10 @@
                   "required": ["value", "from", "until"],
                   "additionalProperties": false
                 }
-              }
+              },
+              "hasMore": { "type": "boolean" }
             },
-            "required": ["items"],
+            "required": ["items", "hasMore"],
             "additionalProperties": false,
             "nullable": true
           }
@@ -7788,9 +8096,25 @@
                   "required": ["date", "reason"],
                   "additionalProperties": false
                 }
+              },
+              "pagination": {
+                "type": "object",
+                "properties": {
+                  "page": { "type": "integer", "exclusiveMinimum": true, "maximum": 9007199254740991, "minimum": 0 },
+                  "pageSize": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  },
+                  "totalItems": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "totalPages": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                },
+                "required": ["page", "pageSize", "totalItems", "totalPages"],
+                "additionalProperties": false
               }
             },
-            "required": ["items"],
+            "required": ["items", "pagination"],
             "additionalProperties": false,
             "nullable": true
           }
@@ -8101,9 +8425,20 @@
         "properties": {
           "previewVersion": { "type": "integer", "exclusiveMinimum": true, "maximum": 9007199254740991, "minimum": 0 },
           "idempotencyKey": { "type": "string", "minLength": 8, "maxLength": 100 },
-          "acknowledgeDuplicateFile": { "default": false, "type": "boolean" }
+          "acknowledgeDuplicateFile": { "default": false, "type": "boolean" },
+          "hrBasis": {
+            "type": "object",
+            "properties": {
+              "type": { "type": "string", "minLength": 1, "maxLength": 100 },
+              "reference": { "type": "string", "minLength": 1, "maxLength": 200 },
+              "issuer": { "type": "string", "minLength": 1, "maxLength": 200 },
+              "issuedOn": { "type": "string" }
+            },
+            "required": ["type", "reference", "issuer", "issuedOn"],
+            "additionalProperties": false
+          }
         },
-        "required": ["previewVersion", "idempotencyKey"],
+        "required": ["previewVersion", "idempotencyKey", "hrBasis"],
         "additionalProperties": false
       },
       "EmployeeImportConfirmationResponseDto": {
@@ -8601,6 +8936,7 @@
                     "accountIdentifier": { "type": "string" },
                     "reason": { "type": "string", "nullable": true },
                     "costCenterId": { "type": "string", "format": "uuid", "nullable": true },
+                    "owningDepartmentId": { "type": "string", "format": "uuid", "nullable": true },
                     "effectiveFrom": { "type": "string" },
                     "effectiveFromBasis": { "type": "string", "enum": ["ACTUAL", "RECORDED"] },
                     "grantedOn": { "type": "string", "nullable": true },
@@ -8609,7 +8945,38 @@
                     "expectedEndDate": { "type": "string", "nullable": true },
                     "predecessorId": { "type": "string", "format": "uuid", "nullable": true },
                     "failedAt": { "type": "string", "format": "date-time", "nullable": true },
-                    "createdAt": { "type": "string", "format": "date-time" }
+                    "createdAt": { "type": "string", "format": "date-time" },
+                    "employee": {
+                      "type": "object",
+                      "properties": {
+                        "employeeId": { "type": "string", "format": "uuid" },
+                        "employeeCode": { "type": "string" },
+                        "fullName": { "type": "string" }
+                      },
+                      "required": ["employeeId", "employeeCode", "fullName"],
+                      "additionalProperties": false
+                    },
+                    "plan": {
+                      "type": "object",
+                      "properties": {
+                        "planId": { "type": "string", "format": "uuid" },
+                        "planName": { "type": "string" },
+                        "applicationName": { "type": "string" }
+                      },
+                      "required": ["planId", "planName", "applicationName"],
+                      "additionalProperties": false
+                    },
+                    "costCenter": {
+                      "type": "object",
+                      "properties": {
+                        "id": { "type": "string", "format": "uuid" },
+                        "code": { "type": "string" },
+                        "name": { "type": "string" }
+                      },
+                      "required": ["id", "code", "name"],
+                      "additionalProperties": false,
+                      "nullable": true
+                    }
                   },
                   "required": [
                     "id",
@@ -8621,6 +8988,7 @@
                     "accountIdentifier",
                     "reason",
                     "costCenterId",
+                    "owningDepartmentId",
                     "effectiveFrom",
                     "effectiveFromBasis",
                     "grantedOn",
@@ -8629,7 +8997,10 @@
                     "expectedEndDate",
                     "predecessorId",
                     "failedAt",
-                    "createdAt"
+                    "createdAt",
+                    "employee",
+                    "plan",
+                    "costCenter"
                   ],
                   "additionalProperties": false
                 }
@@ -8689,6 +9060,7 @@
                   "accountIdentifier": { "type": "string" },
                   "reason": { "type": "string", "nullable": true },
                   "costCenterId": { "type": "string", "format": "uuid", "nullable": true },
+                  "owningDepartmentId": { "type": "string", "format": "uuid", "nullable": true },
                   "effectiveFrom": { "type": "string" },
                   "effectiveFromBasis": { "type": "string", "enum": ["ACTUAL", "RECORDED"] },
                   "grantedOn": { "type": "string", "nullable": true },
@@ -8709,6 +9081,7 @@
                   "accountIdentifier",
                   "reason",
                   "costCenterId",
+                  "owningDepartmentId",
                   "effectiveFrom",
                   "effectiveFromBasis",
                   "grantedOn",
@@ -8733,6 +9106,7 @@
                   "accountIdentifier": { "type": "string" },
                   "reason": { "type": "string", "nullable": true },
                   "costCenterId": { "type": "string", "format": "uuid", "nullable": true },
+                  "owningDepartmentId": { "type": "string", "format": "uuid", "nullable": true },
                   "effectiveFrom": { "type": "string" },
                   "effectiveFromBasis": { "type": "string", "enum": ["ACTUAL", "RECORDED"] },
                   "grantedOn": { "type": "string", "nullable": true },
@@ -8753,6 +9127,7 @@
                   "accountIdentifier",
                   "reason",
                   "costCenterId",
+                  "owningDepartmentId",
                   "effectiveFrom",
                   "effectiveFromBasis",
                   "grantedOn",
@@ -8983,6 +9358,32 @@
                   },
                   "subscriptionId": { "type": "string", "format": "uuid", "nullable": true },
                   "accountIdentifier": { "type": "string" },
+                  "defaultResponsibleEmployeeId": { "type": "string", "format": "uuid", "nullable": true },
+                  "inGeneralQueue": { "type": "boolean" },
+                  "createdAt": { "type": "string", "format": "date-time" },
+                  "claimedBy": { "type": "string", "format": "uuid", "nullable": true },
+                  "claimedAt": { "type": "string", "format": "date-time", "nullable": true },
+                  "completedAt": { "type": "string", "format": "date-time", "nullable": true },
+                  "failedAt": { "type": "string", "format": "date-time", "nullable": true },
+                  "failureKind": {
+                    "type": "string",
+                    "enum": ["TRANSIENT", "PERMANENT", "AUTHENTICATION", "QUOTA_EXCEEDED", "NOT_DONE", null],
+                    "nullable": true
+                  },
+                  "attempts": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "maxAttempts": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  },
+                  "nextRetryAt": { "type": "string", "format": "date-time", "nullable": true },
+                  "availableDecisions": {
+                    "type": "array",
+                    "items": { "type": "string", "enum": ["RETRY", "HAND_OFF", "CLOSE_FAILED"] }
+                  },
+                  "closedAt": { "type": "string", "format": "date-time", "nullable": true },
+                  "elapsedSeconds": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
                   "steps": {
                     "type": "array",
                     "items": {
@@ -9017,42 +9418,16 @@
                     ],
                     "nullable": true
                   },
-                  "defaultResponsibleEmployeeId": { "type": "string", "format": "uuid", "nullable": true },
-                  "inGeneralQueue": { "type": "boolean" },
-                  "createdAt": { "type": "string", "format": "date-time" },
-                  "claimedBy": { "type": "string", "format": "uuid", "nullable": true },
-                  "claimedAt": { "type": "string", "format": "date-time", "nullable": true },
                   "completedBy": { "type": "string", "format": "uuid", "nullable": true },
-                  "completedAt": { "type": "string", "format": "date-time", "nullable": true },
                   "evidence": { "type": "string", "nullable": true },
                   "failedBy": { "type": "string", "format": "uuid", "nullable": true },
-                  "failedAt": { "type": "string", "format": "date-time", "nullable": true },
                   "failureReason": { "type": "string", "nullable": true },
-                  "failureKind": {
-                    "type": "string",
-                    "enum": ["TRANSIENT", "PERMANENT", "AUTHENTICATION", "QUOTA_EXCEEDED", "NOT_DONE", null],
-                    "nullable": true
-                  },
-                  "attempts": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
-                  "maxAttempts": {
-                    "type": "integer",
-                    "exclusiveMinimum": true,
-                    "maximum": 9007199254740991,
-                    "minimum": 0
-                  },
-                  "nextRetryAt": { "type": "string", "format": "date-time", "nullable": true },
                   "lastError": { "type": "string", "nullable": true },
-                  "availableDecisions": {
-                    "type": "array",
-                    "items": { "type": "string", "enum": ["RETRY", "HAND_OFF", "CLOSE_FAILED"] }
-                  },
                   "handedOffBy": { "type": "string", "format": "uuid", "nullable": true },
                   "handedOffAt": { "type": "string", "format": "date-time", "nullable": true },
                   "handOffEvidence": { "type": "string", "nullable": true },
                   "closedBy": { "type": "string", "format": "uuid", "nullable": true },
-                  "closedAt": { "type": "string", "format": "date-time", "nullable": true },
-                  "closeReason": { "type": "string", "nullable": true },
-                  "elapsedSeconds": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                  "closeReason": { "type": "string", "nullable": true }
                 },
                 "required": [
                   "id",
@@ -9065,32 +9440,32 @@
                   "plan",
                   "subscriptionId",
                   "accountIdentifier",
-                  "steps",
-                  "doneWhen",
                   "defaultResponsibleEmployeeId",
                   "inGeneralQueue",
                   "createdAt",
                   "claimedBy",
                   "claimedAt",
-                  "completedBy",
                   "completedAt",
-                  "evidence",
-                  "failedBy",
                   "failedAt",
-                  "failureReason",
                   "failureKind",
                   "attempts",
                   "maxAttempts",
                   "nextRetryAt",
-                  "lastError",
                   "availableDecisions",
+                  "closedAt",
+                  "elapsedSeconds",
+                  "steps",
+                  "doneWhen",
+                  "completedBy",
+                  "evidence",
+                  "failedBy",
+                  "failureReason",
+                  "lastError",
                   "handedOffBy",
                   "handedOffAt",
                   "handOffEvidence",
                   "closedBy",
-                  "closedAt",
-                  "closeReason",
-                  "elapsedSeconds"
+                  "closeReason"
                 ],
                 "additionalProperties": false
               },
@@ -9152,51 +9527,13 @@
                     },
                     "subscriptionId": { "type": "string", "format": "uuid", "nullable": true },
                     "accountIdentifier": { "type": "string" },
-                    "steps": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "code": {
-                            "type": "string",
-                            "enum": [
-                              "BUY_ON_COMPANY_ACCOUNT",
-                              "ADD_TO_WORKSPACE",
-                              "GRANT_IN_INTERNAL_SOFTWARE",
-                              "OPEN_KEY_STORE",
-                              "ASSIGN_KEY_WITH_COMPANY_DEVICE",
-                              "CONFIRM_WITH_EVIDENCE"
-                            ]
-                          },
-                          "accountIdentifier": { "type": "string" },
-                          "adminIdentity": { "type": "string", "enum": ["ACTING_IT_ADMIN"] }
-                        },
-                        "required": ["code"],
-                        "additionalProperties": false
-                      }
-                    },
-                    "doneWhen": {
-                      "type": "string",
-                      "enum": [
-                        "PURCHASE_CONFIRMED",
-                        "MEMBER_ACTIVE",
-                        "KEY_ASSIGNED_WITH_DEVICE",
-                        "CONFIRMED_WITH_EVIDENCE",
-                        null
-                      ],
-                      "nullable": true
-                    },
                     "defaultResponsibleEmployeeId": { "type": "string", "format": "uuid", "nullable": true },
                     "inGeneralQueue": { "type": "boolean" },
                     "createdAt": { "type": "string", "format": "date-time" },
                     "claimedBy": { "type": "string", "format": "uuid", "nullable": true },
                     "claimedAt": { "type": "string", "format": "date-time", "nullable": true },
-                    "completedBy": { "type": "string", "format": "uuid", "nullable": true },
                     "completedAt": { "type": "string", "format": "date-time", "nullable": true },
-                    "evidence": { "type": "string", "nullable": true },
-                    "failedBy": { "type": "string", "format": "uuid", "nullable": true },
                     "failedAt": { "type": "string", "format": "date-time", "nullable": true },
-                    "failureReason": { "type": "string", "nullable": true },
                     "failureKind": {
                       "type": "string",
                       "enum": ["TRANSIENT", "PERMANENT", "AUTHENTICATION", "QUOTA_EXCEEDED", "NOT_DONE", null],
@@ -9210,17 +9547,11 @@
                       "minimum": 0
                     },
                     "nextRetryAt": { "type": "string", "format": "date-time", "nullable": true },
-                    "lastError": { "type": "string", "nullable": true },
                     "availableDecisions": {
                       "type": "array",
                       "items": { "type": "string", "enum": ["RETRY", "HAND_OFF", "CLOSE_FAILED"] }
                     },
-                    "handedOffBy": { "type": "string", "format": "uuid", "nullable": true },
-                    "handedOffAt": { "type": "string", "format": "date-time", "nullable": true },
-                    "handOffEvidence": { "type": "string", "nullable": true },
-                    "closedBy": { "type": "string", "format": "uuid", "nullable": true },
                     "closedAt": { "type": "string", "format": "date-time", "nullable": true },
-                    "closeReason": { "type": "string", "nullable": true },
                     "elapsedSeconds": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
                   },
                   "required": [
@@ -9234,31 +9565,19 @@
                     "plan",
                     "subscriptionId",
                     "accountIdentifier",
-                    "steps",
-                    "doneWhen",
                     "defaultResponsibleEmployeeId",
                     "inGeneralQueue",
                     "createdAt",
                     "claimedBy",
                     "claimedAt",
-                    "completedBy",
                     "completedAt",
-                    "evidence",
-                    "failedBy",
                     "failedAt",
-                    "failureReason",
                     "failureKind",
                     "attempts",
                     "maxAttempts",
                     "nextRetryAt",
-                    "lastError",
                     "availableDecisions",
-                    "handedOffBy",
-                    "handedOffAt",
-                    "handOffEvidence",
-                    "closedBy",
                     "closedAt",
-                    "closeReason",
                     "elapsedSeconds"
                   ],
                   "additionalProperties": false
@@ -9335,6 +9654,32 @@
                   },
                   "subscriptionId": { "type": "string", "format": "uuid", "nullable": true },
                   "accountIdentifier": { "type": "string" },
+                  "defaultResponsibleEmployeeId": { "type": "string", "format": "uuid", "nullable": true },
+                  "inGeneralQueue": { "type": "boolean" },
+                  "createdAt": { "type": "string", "format": "date-time" },
+                  "claimedBy": { "type": "string", "format": "uuid", "nullable": true },
+                  "claimedAt": { "type": "string", "format": "date-time", "nullable": true },
+                  "completedAt": { "type": "string", "format": "date-time", "nullable": true },
+                  "failedAt": { "type": "string", "format": "date-time", "nullable": true },
+                  "failureKind": {
+                    "type": "string",
+                    "enum": ["TRANSIENT", "PERMANENT", "AUTHENTICATION", "QUOTA_EXCEEDED", "NOT_DONE", null],
+                    "nullable": true
+                  },
+                  "attempts": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "maxAttempts": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  },
+                  "nextRetryAt": { "type": "string", "format": "date-time", "nullable": true },
+                  "availableDecisions": {
+                    "type": "array",
+                    "items": { "type": "string", "enum": ["RETRY", "HAND_OFF", "CLOSE_FAILED"] }
+                  },
+                  "closedAt": { "type": "string", "format": "date-time", "nullable": true },
+                  "elapsedSeconds": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
                   "steps": {
                     "type": "array",
                     "items": {
@@ -9369,42 +9714,16 @@
                     ],
                     "nullable": true
                   },
-                  "defaultResponsibleEmployeeId": { "type": "string", "format": "uuid", "nullable": true },
-                  "inGeneralQueue": { "type": "boolean" },
-                  "createdAt": { "type": "string", "format": "date-time" },
-                  "claimedBy": { "type": "string", "format": "uuid", "nullable": true },
-                  "claimedAt": { "type": "string", "format": "date-time", "nullable": true },
                   "completedBy": { "type": "string", "format": "uuid", "nullable": true },
-                  "completedAt": { "type": "string", "format": "date-time", "nullable": true },
                   "evidence": { "type": "string", "nullable": true },
                   "failedBy": { "type": "string", "format": "uuid", "nullable": true },
-                  "failedAt": { "type": "string", "format": "date-time", "nullable": true },
                   "failureReason": { "type": "string", "nullable": true },
-                  "failureKind": {
-                    "type": "string",
-                    "enum": ["TRANSIENT", "PERMANENT", "AUTHENTICATION", "QUOTA_EXCEEDED", "NOT_DONE", null],
-                    "nullable": true
-                  },
-                  "attempts": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
-                  "maxAttempts": {
-                    "type": "integer",
-                    "exclusiveMinimum": true,
-                    "maximum": 9007199254740991,
-                    "minimum": 0
-                  },
-                  "nextRetryAt": { "type": "string", "format": "date-time", "nullable": true },
                   "lastError": { "type": "string", "nullable": true },
-                  "availableDecisions": {
-                    "type": "array",
-                    "items": { "type": "string", "enum": ["RETRY", "HAND_OFF", "CLOSE_FAILED"] }
-                  },
                   "handedOffBy": { "type": "string", "format": "uuid", "nullable": true },
                   "handedOffAt": { "type": "string", "format": "date-time", "nullable": true },
                   "handOffEvidence": { "type": "string", "nullable": true },
                   "closedBy": { "type": "string", "format": "uuid", "nullable": true },
-                  "closedAt": { "type": "string", "format": "date-time", "nullable": true },
-                  "closeReason": { "type": "string", "nullable": true },
-                  "elapsedSeconds": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                  "closeReason": { "type": "string", "nullable": true }
                 },
                 "required": [
                   "id",
@@ -9417,32 +9736,32 @@
                   "plan",
                   "subscriptionId",
                   "accountIdentifier",
-                  "steps",
-                  "doneWhen",
                   "defaultResponsibleEmployeeId",
                   "inGeneralQueue",
                   "createdAt",
                   "claimedBy",
                   "claimedAt",
-                  "completedBy",
                   "completedAt",
-                  "evidence",
-                  "failedBy",
                   "failedAt",
-                  "failureReason",
                   "failureKind",
                   "attempts",
                   "maxAttempts",
                   "nextRetryAt",
-                  "lastError",
                   "availableDecisions",
+                  "closedAt",
+                  "elapsedSeconds",
+                  "steps",
+                  "doneWhen",
+                  "completedBy",
+                  "evidence",
+                  "failedBy",
+                  "failureReason",
+                  "lastError",
                   "handedOffBy",
                   "handedOffAt",
                   "handOffEvidence",
                   "closedBy",
-                  "closedAt",
-                  "closeReason",
-                  "elapsedSeconds"
+                  "closeReason"
                 ],
                 "additionalProperties": false
               }
@@ -9945,9 +10264,8 @@
                       "additionalProperties": false,
                       "nullable": true
                     },
-                    "dictionaryServiceLineId": { "type": "string", "format": "uuid", "nullable": true },
-                    "domains": { "type": "array", "items": { "type": "string" } },
                     "dataSensitivity": { "type": "string", "enum": ["LOW", "MEDIUM", "HIGH"] },
+                    "isCommunicationService": { "type": "boolean" },
                     "businessOwner": {
                       "type": "object",
                       "properties": {
@@ -9960,24 +10278,6 @@
                       "additionalProperties": false
                     },
                     "businessOwnerReplacementRequired": { "type": "boolean" },
-                    "communication": {
-                      "type": "object",
-                      "properties": {
-                        "personToPersonMessaging": { "type": "boolean" },
-                        "callsOrMeetings": { "type": "boolean" },
-                        "mailbox": { "type": "boolean" },
-                        "isCommunicationService": { "type": "boolean" },
-                        "note": { "type": "string", "nullable": true }
-                      },
-                      "required": [
-                        "personToPersonMessaging",
-                        "callsOrMeetings",
-                        "mailbox",
-                        "isCommunicationService",
-                        "note"
-                      ],
-                      "additionalProperties": false
-                    },
                     "usageCollectionDefault": { "type": "string", "nullable": true, "enum": ["NOT_COLLECTED"] },
                     "functionalGroup": {
                       "type": "object",
@@ -9987,7 +10287,6 @@
                       "nullable": true
                     },
                     "status": { "type": "string", "enum": ["APPROVED", "RETIRED"] },
-                    "createdAt": { "type": "string", "format": "date-time" },
                     "updatedAt": { "type": "string", "format": "date-time" }
                   },
                   "required": [
@@ -9995,16 +10294,13 @@
                     "name",
                     "kind",
                     "vendor",
-                    "dictionaryServiceLineId",
-                    "domains",
                     "dataSensitivity",
+                    "isCommunicationService",
                     "businessOwner",
                     "businessOwnerReplacementRequired",
-                    "communication",
                     "usageCollectionDefault",
                     "functionalGroup",
                     "status",
-                    "createdAt",
                     "updatedAt"
                   ],
                   "additionalProperties": false
@@ -10057,7 +10353,7 @@
         "type": "object",
         "properties": {
           "name": { "type": "string", "maxLength": 1000 },
-          "kind": { "type": "string", "enum": ["SAAS", "LICENSED", "INTERNAL", "FREE_EXTERNAL"] },
+          "kind": { "type": "string", "enum": ["SAAS", "LICENSED", "INTERNAL"] },
           "vendorName": { "type": "string", "maxLength": 1000 },
           "dictionaryServiceLineId": { "type": "string", "format": "uuid" },
           "domains": { "maxItems": 100, "type": "array", "items": { "type": "string", "maxLength": 1000 } },
@@ -10097,9 +10393,8 @@
                 "additionalProperties": false,
                 "nullable": true
               },
-              "dictionaryServiceLineId": { "type": "string", "format": "uuid", "nullable": true },
-              "domains": { "type": "array", "items": { "type": "string" } },
               "dataSensitivity": { "type": "string", "enum": ["LOW", "MEDIUM", "HIGH"] },
+              "isCommunicationService": { "type": "boolean" },
               "businessOwner": {
                 "type": "object",
                 "properties": {
@@ -10112,6 +10407,18 @@
                 "additionalProperties": false
               },
               "businessOwnerReplacementRequired": { "type": "boolean" },
+              "usageCollectionDefault": { "type": "string", "nullable": true, "enum": ["NOT_COLLECTED"] },
+              "functionalGroup": {
+                "type": "object",
+                "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
+                "required": ["id", "name"],
+                "additionalProperties": false,
+                "nullable": true
+              },
+              "status": { "type": "string", "enum": ["APPROVED", "RETIRED"] },
+              "updatedAt": { "type": "string", "format": "date-time" },
+              "dictionaryServiceLineId": { "type": "string", "format": "uuid", "nullable": true },
+              "domains": { "type": "array", "items": { "type": "string" } },
               "communication": {
                 "type": "object",
                 "properties": {
@@ -10124,17 +10431,7 @@
                 "required": ["personToPersonMessaging", "callsOrMeetings", "mailbox", "isCommunicationService", "note"],
                 "additionalProperties": false
               },
-              "usageCollectionDefault": { "type": "string", "nullable": true, "enum": ["NOT_COLLECTED"] },
-              "functionalGroup": {
-                "type": "object",
-                "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
-                "required": ["id", "name"],
-                "additionalProperties": false,
-                "nullable": true
-              },
-              "status": { "type": "string", "enum": ["APPROVED", "RETIRED"] },
               "createdAt": { "type": "string", "format": "date-time" },
-              "updatedAt": { "type": "string", "format": "date-time" },
               "proposedToDictionary": { "type": "boolean" }
             },
             "required": [
@@ -10142,17 +10439,18 @@
               "name",
               "kind",
               "vendor",
-              "dictionaryServiceLineId",
-              "domains",
               "dataSensitivity",
+              "isCommunicationService",
               "businessOwner",
               "businessOwnerReplacementRequired",
-              "communication",
               "usageCollectionDefault",
               "functionalGroup",
               "status",
-              "createdAt",
               "updatedAt",
+              "dictionaryServiceLineId",
+              "domains",
+              "communication",
+              "createdAt",
               "proposedToDictionary"
             ],
             "additionalProperties": false,
@@ -10180,9 +10478,8 @@
                 "additionalProperties": false,
                 "nullable": true
               },
-              "dictionaryServiceLineId": { "type": "string", "format": "uuid", "nullable": true },
-              "domains": { "type": "array", "items": { "type": "string" } },
               "dataSensitivity": { "type": "string", "enum": ["LOW", "MEDIUM", "HIGH"] },
+              "isCommunicationService": { "type": "boolean" },
               "businessOwner": {
                 "type": "object",
                 "properties": {
@@ -10195,6 +10492,18 @@
                 "additionalProperties": false
               },
               "businessOwnerReplacementRequired": { "type": "boolean" },
+              "usageCollectionDefault": { "type": "string", "nullable": true, "enum": ["NOT_COLLECTED"] },
+              "functionalGroup": {
+                "type": "object",
+                "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
+                "required": ["id", "name"],
+                "additionalProperties": false,
+                "nullable": true
+              },
+              "status": { "type": "string", "enum": ["APPROVED", "RETIRED"] },
+              "updatedAt": { "type": "string", "format": "date-time" },
+              "dictionaryServiceLineId": { "type": "string", "format": "uuid", "nullable": true },
+              "domains": { "type": "array", "items": { "type": "string" } },
               "communication": {
                 "type": "object",
                 "properties": {
@@ -10207,18 +10516,9 @@
                 "required": ["personToPersonMessaging", "callsOrMeetings", "mailbox", "isCommunicationService", "note"],
                 "additionalProperties": false
               },
-              "usageCollectionDefault": { "type": "string", "nullable": true, "enum": ["NOT_COLLECTED"] },
-              "functionalGroup": {
-                "type": "object",
-                "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
-                "required": ["id", "name"],
-                "additionalProperties": false,
-                "nullable": true
-              },
-              "status": { "type": "string", "enum": ["APPROVED", "RETIRED"] },
               "createdAt": { "type": "string", "format": "date-time" },
-              "updatedAt": { "type": "string", "format": "date-time" },
               "similarApplications": {
+                "maxItems": 20,
                 "type": "array",
                 "items": {
                   "type": "object",
@@ -10227,6 +10527,7 @@
                   "additionalProperties": false
                 }
               },
+              "similarTotal": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
               "recommendations": {
                 "type": "array",
                 "items": {
@@ -10251,18 +10552,20 @@
               "name",
               "kind",
               "vendor",
-              "dictionaryServiceLineId",
-              "domains",
               "dataSensitivity",
+              "isCommunicationService",
               "businessOwner",
               "businessOwnerReplacementRequired",
-              "communication",
               "usageCollectionDefault",
               "functionalGroup",
               "status",
-              "createdAt",
               "updatedAt",
+              "dictionaryServiceLineId",
+              "domains",
+              "communication",
+              "createdAt",
               "similarApplications",
+              "similarTotal",
               "recommendations"
             ],
             "additionalProperties": false,
@@ -10312,9 +10615,8 @@
                 "additionalProperties": false,
                 "nullable": true
               },
-              "dictionaryServiceLineId": { "type": "string", "format": "uuid", "nullable": true },
-              "domains": { "type": "array", "items": { "type": "string" } },
               "dataSensitivity": { "type": "string", "enum": ["LOW", "MEDIUM", "HIGH"] },
+              "isCommunicationService": { "type": "boolean" },
               "businessOwner": {
                 "type": "object",
                 "properties": {
@@ -10327,6 +10629,18 @@
                 "additionalProperties": false
               },
               "businessOwnerReplacementRequired": { "type": "boolean" },
+              "usageCollectionDefault": { "type": "string", "nullable": true, "enum": ["NOT_COLLECTED"] },
+              "functionalGroup": {
+                "type": "object",
+                "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
+                "required": ["id", "name"],
+                "additionalProperties": false,
+                "nullable": true
+              },
+              "status": { "type": "string", "enum": ["APPROVED", "RETIRED"] },
+              "updatedAt": { "type": "string", "format": "date-time" },
+              "dictionaryServiceLineId": { "type": "string", "format": "uuid", "nullable": true },
+              "domains": { "type": "array", "items": { "type": "string" } },
               "communication": {
                 "type": "object",
                 "properties": {
@@ -10339,34 +10653,25 @@
                 "required": ["personToPersonMessaging", "callsOrMeetings", "mailbox", "isCommunicationService", "note"],
                 "additionalProperties": false
               },
-              "usageCollectionDefault": { "type": "string", "nullable": true, "enum": ["NOT_COLLECTED"] },
-              "functionalGroup": {
-                "type": "object",
-                "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
-                "required": ["id", "name"],
-                "additionalProperties": false,
-                "nullable": true
-              },
-              "status": { "type": "string", "enum": ["APPROVED", "RETIRED"] },
-              "createdAt": { "type": "string", "format": "date-time" },
-              "updatedAt": { "type": "string", "format": "date-time" }
+              "createdAt": { "type": "string", "format": "date-time" }
             },
             "required": [
               "id",
               "name",
               "kind",
               "vendor",
-              "dictionaryServiceLineId",
-              "domains",
               "dataSensitivity",
+              "isCommunicationService",
               "businessOwner",
               "businessOwnerReplacementRequired",
-              "communication",
               "usageCollectionDefault",
               "functionalGroup",
               "status",
-              "createdAt",
-              "updatedAt"
+              "updatedAt",
+              "dictionaryServiceLineId",
+              "domains",
+              "communication",
+              "createdAt"
             ],
             "additionalProperties": false,
             "nullable": true
@@ -10487,7 +10792,6 @@
                       "enum": ["FULL", "PARTIAL", "UNCONTROLLABLE", null],
                       "nullable": true
                     },
-                    "revocationNote": { "type": "string", "nullable": true },
                     "dataLossOnRemoval": { "type": "boolean" },
                     "sharingPolicy": { "type": "string", "enum": ["ALLOWED", "NOT_ALLOWED", null], "nullable": true },
                     "seatTracking": { "type": "string", "enum": ["APPLICABLE", "NOT_APPLICABLE"] },
@@ -10502,7 +10806,6 @@
                     "provisioningType",
                     "pricingModel",
                     "controlLevel",
-                    "revocationNote",
                     "dataLossOnRemoval",
                     "sharingPolicy",
                     "seatTracking",
@@ -10578,12 +10881,12 @@
                 "enum": ["FULL", "PARTIAL", "UNCONTROLLABLE", null],
                 "nullable": true
               },
-              "revocationNote": { "type": "string", "nullable": true },
               "dataLossOnRemoval": { "type": "boolean" },
               "sharingPolicy": { "type": "string", "enum": ["ALLOWED", "NOT_ALLOWED", null], "nullable": true },
               "seatTracking": { "type": "string", "enum": ["APPLICABLE", "NOT_APPLICABLE"] },
               "createdAt": { "type": "string", "format": "date-time" },
-              "updatedAt": { "type": "string", "format": "date-time" }
+              "updatedAt": { "type": "string", "format": "date-time" },
+              "revocationNote": { "type": "string", "nullable": true }
             },
             "required": [
               "id",
@@ -10593,12 +10896,12 @@
               "provisioningType",
               "pricingModel",
               "controlLevel",
-              "revocationNote",
               "dataLossOnRemoval",
               "sharingPolicy",
               "seatTracking",
               "createdAt",
-              "updatedAt"
+              "updatedAt",
+              "revocationNote"
             ],
             "additionalProperties": false,
             "nullable": true
@@ -10630,12 +10933,12 @@
                 "enum": ["FULL", "PARTIAL", "UNCONTROLLABLE", null],
                 "nullable": true
               },
-              "revocationNote": { "type": "string", "nullable": true },
               "dataLossOnRemoval": { "type": "boolean" },
               "sharingPolicy": { "type": "string", "enum": ["ALLOWED", "NOT_ALLOWED", null], "nullable": true },
               "seatTracking": { "type": "string", "enum": ["APPLICABLE", "NOT_APPLICABLE"] },
               "createdAt": { "type": "string", "format": "date-time" },
               "updatedAt": { "type": "string", "format": "date-time" },
+              "revocationNote": { "type": "string", "nullable": true },
               "workspaceProfile": {
                 "type": "object",
                 "properties": {
@@ -10720,12 +11023,12 @@
               "provisioningType",
               "pricingModel",
               "controlLevel",
-              "revocationNote",
               "dataLossOnRemoval",
               "sharingPolicy",
               "seatTracking",
               "createdAt",
               "updatedAt",
+              "revocationNote",
               "workspaceProfile"
             ],
             "additionalProperties": false,
@@ -11637,7 +11940,7 @@
                         "costCenterId": { "type": "string", "format": "uuid" },
                         "costCenterCode": { "type": "string" },
                         "costCenterName": { "type": "string" },
-                        "costCenterKind": { "type": "string", "enum": ["UNIT", "COMPANY"] },
+                        "costCenterKind": { "type": "string", "enum": ["UNIT"] },
                         "ratioPercent": { "type": "string" }
                       },
                       "required": [
@@ -11707,7 +12010,7 @@
                         "costCenterId": { "type": "string", "format": "uuid" },
                         "costCenterCode": { "type": "string" },
                         "costCenterName": { "type": "string" },
-                        "costCenterKind": { "type": "string", "enum": ["UNIT", "COMPANY"] },
+                        "costCenterKind": { "type": "string", "enum": ["UNIT"] },
                         "ratioPercent": { "type": "string" }
                       },
                       "required": [
@@ -11764,7 +12067,7 @@
                           "costCenterId": { "type": "string", "format": "uuid" },
                           "costCenterCode": { "type": "string" },
                           "costCenterName": { "type": "string" },
-                          "costCenterKind": { "type": "string", "enum": ["UNIT", "COMPANY"] },
+                          "costCenterKind": { "type": "string", "enum": ["UNIT"] },
                           "ratioPercent": { "type": "string" }
                         },
                         "required": [
@@ -11860,6 +12163,7 @@
                 "nullable": true
               },
               "opinions": {
+                "maxItems": 50,
                 "type": "array",
                 "items": {
                   "type": "object",
@@ -11883,7 +12187,9 @@
                   "additionalProperties": false
                 }
               },
+              "opinionTotal": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
               "warnings": {
+                "maxItems": 50,
                 "type": "array",
                 "items": {
                   "type": "object",
@@ -11921,9 +12227,19 @@
                   ],
                   "additionalProperties": false
                 }
-              }
+              },
+              "warningTotal": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
             },
-            "required": ["planId", "applicable", "sharingPolicy", "terms", "opinions", "warnings"],
+            "required": [
+              "planId",
+              "applicable",
+              "sharingPolicy",
+              "terms",
+              "opinions",
+              "opinionTotal",
+              "warnings",
+              "warningTotal"
+            ],
             "additionalProperties": false,
             "nullable": true
           }
@@ -12000,6 +12316,63 @@
               "changed": { "type": "boolean" }
             },
             "required": ["terms", "changed"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "OpinionPageResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": { "type": "string", "format": "uuid" },
+                    "businessOwner": {
+                      "type": "object",
+                      "properties": {
+                        "employeeId": { "type": "string", "format": "uuid" },
+                        "employeeCode": { "type": "string" },
+                        "fullName": { "type": "string" }
+                      },
+                      "required": ["employeeId", "employeeCode", "fullName"],
+                      "additionalProperties": false
+                    },
+                    "opinion": { "type": "string" },
+                    "recordedBy": { "type": "string", "format": "uuid" },
+                    "recordedAt": { "type": "string", "format": "date-time" }
+                  },
+                  "required": ["id", "businessOwner", "opinion", "recordedBy", "recordedAt"],
+                  "additionalProperties": false
+                }
+              },
+              "pagination": {
+                "type": "object",
+                "properties": {
+                  "page": { "type": "integer", "exclusiveMinimum": true, "maximum": 9007199254740991, "minimum": 0 },
+                  "pageSize": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  },
+                  "totalItems": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "totalPages": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                },
+                "required": ["page", "pageSize", "totalItems", "totalPages"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["items", "pagination"],
             "additionalProperties": false,
             "nullable": true
           }
@@ -12205,9 +12578,25 @@
                   "required": ["employee", "assignedAt", "assignedBy", "endedAt"],
                   "additionalProperties": false
                 }
+              },
+              "pagination": {
+                "type": "object",
+                "properties": {
+                  "page": { "type": "integer", "exclusiveMinimum": true, "maximum": 9007199254740991, "minimum": 0 },
+                  "pageSize": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  },
+                  "totalItems": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "totalPages": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                },
+                "required": ["page", "pageSize", "totalItems", "totalPages"],
+                "additionalProperties": false
               }
             },
-            "required": ["items"],
+            "required": ["items", "pagination"],
             "additionalProperties": false,
             "nullable": true
           }
@@ -12268,6 +12657,7 @@
                   "status": { "type": "string", "enum": ["APPROVED", "RETIRED"] },
                   "retiredAt": { "type": "string", "format": "date-time", "nullable": true },
                   "confirmations": {
+                    "maxItems": 50,
                     "type": "array",
                     "items": {
                       "type": "object",
@@ -12290,11 +12680,13 @@
                       "additionalProperties": false
                     }
                   },
+                  "confirmationTotal": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
                   "confirmed": { "type": "boolean" },
                   "blockers": {
                     "type": "object",
                     "properties": {
                       "assignments": {
+                        "maxItems": 50,
                         "type": "array",
                         "items": {
                           "type": "object",
@@ -12319,7 +12711,28 @@
                           "additionalProperties": false
                         }
                       },
+                      "assignmentTotal": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                      "assignmentsByPlan": {
+                        "maxItems": 50,
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "planId": { "type": "string", "format": "uuid" },
+                            "planName": { "type": "string" },
+                            "count": {
+                              "type": "integer",
+                              "exclusiveMinimum": true,
+                              "maximum": 9007199254740991,
+                              "minimum": 0
+                            }
+                          },
+                          "required": ["planId", "planName", "count"],
+                          "additionalProperties": false
+                        }
+                      },
                       "subscriptions": {
+                        "maxItems": 50,
                         "type": "array",
                         "items": {
                           "type": "object",
@@ -12332,14 +12745,29 @@
                           "required": ["subscriptionId", "planId", "planName", "endDate"],
                           "additionalProperties": false
                         }
-                      }
+                      },
+                      "subscriptionTotal": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
                     },
-                    "required": ["assignments", "subscriptions"],
+                    "required": [
+                      "assignments",
+                      "assignmentTotal",
+                      "assignmentsByPlan",
+                      "subscriptions",
+                      "subscriptionTotal"
+                    ],
                     "additionalProperties": false
                   },
                   "canRetire": { "type": "boolean" }
                 },
-                "required": ["status", "retiredAt", "confirmations", "confirmed", "blockers", "canRetire"],
+                "required": [
+                  "status",
+                  "retiredAt",
+                  "confirmations",
+                  "confirmationTotal",
+                  "confirmed",
+                  "blockers",
+                  "canRetire"
+                ],
                 "additionalProperties": false
               }
             },
@@ -12447,7 +12875,10 @@
                       "COST_STATEMENT"
                     ]
                   },
-                  "status": { "type": "string", "enum": ["AWAITING_UPLOAD", "PENDING_ATTACH", "READY", "QUARANTINED"] },
+                  "status": {
+                    "type": "string",
+                    "enum": ["AWAITING_UPLOAD", "PENDING_ATTACH", "READY", "QUARANTINED", "EXPIRED"]
+                  },
                   "fileName": { "type": "string" },
                   "contentType": { "type": "string" },
                   "sizeBytes": {
@@ -12518,7 +12949,10 @@
                       "COST_STATEMENT"
                     ]
                   },
-                  "status": { "type": "string", "enum": ["AWAITING_UPLOAD", "PENDING_ATTACH", "READY", "QUARANTINED"] },
+                  "status": {
+                    "type": "string",
+                    "enum": ["AWAITING_UPLOAD", "PENDING_ATTACH", "READY", "QUARANTINED", "EXPIRED"]
+                  },
                   "fileName": { "type": "string" },
                   "contentType": { "type": "string" },
                   "sizeBytes": {
@@ -12592,6 +13026,24 @@
                   "properties": {
                     "departmentId": { "type": "string", "format": "uuid" },
                     "jobTitleId": { "type": "string", "format": "uuid" },
+                    "department": {
+                      "type": "object",
+                      "properties": {
+                        "id": { "type": "string", "format": "uuid" },
+                        "code": { "type": "string" },
+                        "name": { "type": "string" }
+                      },
+                      "required": ["id", "code", "name"],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "jobTitle": {
+                      "type": "object",
+                      "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
+                      "required": ["id", "name"],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
                     "version": {
                       "type": "integer",
                       "exclusiveMinimum": true,
@@ -12616,7 +13068,17 @@
                     "changedBy": { "type": "string", "format": "uuid" },
                     "changedAt": { "type": "string", "format": "date-time" }
                   },
-                  "required": ["departmentId", "jobTitleId", "version", "plans", "reason", "changedBy", "changedAt"],
+                  "required": [
+                    "departmentId",
+                    "jobTitleId",
+                    "department",
+                    "jobTitle",
+                    "version",
+                    "plans",
+                    "reason",
+                    "changedBy",
+                    "changedAt"
+                  ],
                   "additionalProperties": false
                 }
               },
@@ -12676,6 +13138,24 @@
                 "properties": {
                   "departmentId": { "type": "string", "format": "uuid" },
                   "jobTitleId": { "type": "string", "format": "uuid" },
+                  "department": {
+                    "type": "object",
+                    "properties": {
+                      "id": { "type": "string", "format": "uuid" },
+                      "code": { "type": "string" },
+                      "name": { "type": "string" }
+                    },
+                    "required": ["id", "code", "name"],
+                    "additionalProperties": false,
+                    "nullable": true
+                  },
+                  "jobTitle": {
+                    "type": "object",
+                    "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
+                    "required": ["id", "name"],
+                    "additionalProperties": false,
+                    "nullable": true
+                  },
                   "version": { "type": "integer", "exclusiveMinimum": true, "maximum": 9007199254740991, "minimum": 0 },
                   "plans": {
                     "type": "array",
@@ -12695,7 +13175,17 @@
                   "changedBy": { "type": "string", "format": "uuid" },
                   "changedAt": { "type": "string", "format": "date-time" }
                 },
-                "required": ["departmentId", "jobTitleId", "version", "plans", "reason", "changedBy", "changedAt"],
+                "required": [
+                  "departmentId",
+                  "jobTitleId",
+                  "department",
+                  "jobTitle",
+                  "version",
+                  "plans",
+                  "reason",
+                  "changedBy",
+                  "changedAt"
+                ],
                 "additionalProperties": false,
                 "nullable": true
               }
@@ -12721,6 +13211,24 @@
                 "properties": {
                   "departmentId": { "type": "string", "format": "uuid" },
                   "jobTitleId": { "type": "string", "format": "uuid" },
+                  "department": {
+                    "type": "object",
+                    "properties": {
+                      "id": { "type": "string", "format": "uuid" },
+                      "code": { "type": "string" },
+                      "name": { "type": "string" }
+                    },
+                    "required": ["id", "code", "name"],
+                    "additionalProperties": false,
+                    "nullable": true
+                  },
+                  "jobTitle": {
+                    "type": "object",
+                    "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
+                    "required": ["id", "name"],
+                    "additionalProperties": false,
+                    "nullable": true
+                  },
                   "version": { "type": "integer", "exclusiveMinimum": true, "maximum": 9007199254740991, "minimum": 0 },
                   "plans": {
                     "type": "array",
@@ -12740,7 +13248,17 @@
                   "changedBy": { "type": "string", "format": "uuid" },
                   "changedAt": { "type": "string", "format": "date-time" }
                 },
-                "required": ["departmentId", "jobTitleId", "version", "plans", "reason", "changedBy", "changedAt"],
+                "required": [
+                  "departmentId",
+                  "jobTitleId",
+                  "department",
+                  "jobTitle",
+                  "version",
+                  "plans",
+                  "reason",
+                  "changedBy",
+                  "changedAt"
+                ],
                 "additionalProperties": false,
                 "nullable": true
               }
@@ -12775,6 +13293,24 @@
                 "properties": {
                   "departmentId": { "type": "string", "format": "uuid" },
                   "jobTitleId": { "type": "string", "format": "uuid" },
+                  "department": {
+                    "type": "object",
+                    "properties": {
+                      "id": { "type": "string", "format": "uuid" },
+                      "code": { "type": "string" },
+                      "name": { "type": "string" }
+                    },
+                    "required": ["id", "code", "name"],
+                    "additionalProperties": false,
+                    "nullable": true
+                  },
+                  "jobTitle": {
+                    "type": "object",
+                    "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
+                    "required": ["id", "name"],
+                    "additionalProperties": false,
+                    "nullable": true
+                  },
                   "version": { "type": "integer", "exclusiveMinimum": true, "maximum": 9007199254740991, "minimum": 0 },
                   "plans": {
                     "type": "array",
@@ -12794,7 +13330,17 @@
                   "changedBy": { "type": "string", "format": "uuid" },
                   "changedAt": { "type": "string", "format": "date-time" }
                 },
-                "required": ["departmentId", "jobTitleId", "version", "plans", "reason", "changedBy", "changedAt"],
+                "required": [
+                  "departmentId",
+                  "jobTitleId",
+                  "department",
+                  "jobTitle",
+                  "version",
+                  "plans",
+                  "reason",
+                  "changedBy",
+                  "changedAt"
+                ],
                 "additionalProperties": false
               },
               "changed": { "type": "boolean" }
@@ -13334,6 +13880,7 @@
                   "additionalProperties": false
                 }
               },
+              "roleHistoryHasMore": { "type": "boolean" },
               "invitation": {
                 "type": "object",
                 "properties": {
@@ -13366,6 +13913,7 @@
               "employee",
               "roles",
               "roleHistory",
+              "roleHistoryHasMore",
               "invitation"
             ],
             "additionalProperties": false,
@@ -13505,9 +14053,10 @@
                         "required": ["employeeId", "employeeCode", "fullName", "from", "until"],
                         "additionalProperties": false
                       }
-                    }
+                    },
+                    "historyHasMore": { "type": "boolean" }
                   },
-                  "required": ["role", "holder", "history"],
+                  "required": ["role", "holder", "history", "historyHasMore"],
                   "additionalProperties": false
                 }
               }

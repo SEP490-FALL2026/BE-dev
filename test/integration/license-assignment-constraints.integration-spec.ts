@@ -29,6 +29,8 @@ interface AssignmentInput {
   identifier?: string;
   reason?: string | null;
   costCenterId?: string | null;
+  /** Left out, a service account is owned by the department of `unitCenter` (QĐ-86c); a personal seat has none. */
+  owningDepartmentId?: string | null;
   validFrom?: string;
   basis?: 'ACTUAL' | 'RECORDED';
   validUntil?: string | null;
@@ -52,7 +54,7 @@ describe('license assignments (integration, PostgreSQL constraints)', () => {
   let otherPlan: string;
   let internalPlan: string;
   let unitCenter: string;
-  let companyCenter: string;
+  let department: string;
   let counter = 0;
 
   const newSubscription = async (planId: string, quantity: number | null): Promise<string> => {
@@ -102,10 +104,10 @@ describe('license assignments (integration, PostgreSQL constraints)', () => {
     sqlState(
       client,
       `INSERT INTO license_assignments (id, organization_id, kind, source, plan_id, subscription_id, employee_id,
-         account_identifier, normalized_account_identifier, reason, cost_center_id, valid_from, valid_from_basis,
-         valid_until, expected_end_date, predecessor_id, baseline_import_id, created_by_app_user_id)
-       VALUES ($1, $2, $3::"AssignmentKind", $4::"AssignmentSource", $5, $6, $7, $8, $9, $10, $11, $12,
-         $13::"AssignmentDateBasis", $14, $15, $16, $17, $18)`,
+         account_identifier, normalized_account_identifier, reason, cost_center_id, owning_department_id, valid_from,
+         valid_from_basis, valid_until, expected_end_date, predecessor_id, baseline_import_id, created_by_app_user_id)
+       VALUES ($1, $2, $3::"AssignmentKind", $4::"AssignmentSource", $5, $6, $7, $8, $9, $10, $11, $12, $13,
+         $14::"AssignmentDateBasis", $15, $16, $17, $18, $19)`,
       [
         input.id ?? randomUUID(),
         organizationId,
@@ -118,6 +120,11 @@ describe('license assignments (integration, PostgreSQL constraints)', () => {
         (input.identifier ?? `user${counter}@congty.vn`).trim().toLowerCase(),
         input.reason === undefined ? null : input.reason,
         input.costCenterId === undefined ? null : input.costCenterId,
+        input.owningDepartmentId !== undefined
+          ? input.owningDepartmentId
+          : input.kind === 'SERVICE'
+            ? department
+            : null,
         input.validFrom ?? '2026-10-01',
         input.basis ?? 'RECORDED',
         input.validUntil === undefined ? null : input.validUntil,
@@ -149,18 +156,17 @@ describe('license assignments (integration, PostgreSQL constraints)', () => {
     flatPlan = await newPlan('SAAS', 'K2', 'FLAT_RATE');
     otherPlan = await newPlan('SAAS', 'K2', 'PER_SEAT');
     internalPlan = await newPlan('INTERNAL', 'K5', null);
-    for (const [code, kind] of [
-      ['CC-UNIT', 'UNIT'],
-      ['CC-CORP', 'COMPANY'],
-    ]) {
-      const id = randomUUID();
-      await sql.query(
-        `INSERT INTO cost_centers (id, organization_id, code, name, kind) VALUES ($1, $2, $3, $3, $4::"CostCenterKind")`,
-        [id, organizationId, code, kind],
-      );
-      if (kind === 'UNIT') unitCenter = id;
-      else companyCenter = id;
-    }
+    unitCenter = randomUUID();
+    await sql.query(
+      `INSERT INTO cost_centers (id, organization_id, code, name, kind) VALUES ($1, $2, 'CC-UNIT', 'CC-UNIT', 'UNIT')`,
+      [unitCenter, organizationId],
+    );
+    department = randomUUID();
+    await sql.query(
+      `INSERT INTO departments (id, organization_id, code, name, cost_center_id, updated_at)
+       VALUES ($1, $2, 'P-OPS', 'Operations', $3, now())`,
+      [department, organizationId, unitCenter],
+    );
     importId = randomUUID();
     await sql.query(
       `INSERT INTO seat_baseline_imports (id, organization_id, uploaded_by, file_name, content_hash, plan_id, status,
@@ -182,7 +188,7 @@ describe('license assignments (integration, PostgreSQL constraints)', () => {
     expect(await insert({ planId: internalPlan, subscriptionId: null })).toBeNull();
   });
 
-  it('keeps a service account for a reason and a Company-style Cost Center, and a personal seat with none', async () => {
+  it('keeps a service account for a reason, its owning department and the Unit of that department, and a personal seat with none', async () => {
     const subscriptionId = await fresh();
 
     expect(
@@ -190,7 +196,7 @@ describe('license assignments (integration, PostgreSQL constraints)', () => {
         kind: 'SERVICE',
         identifier: 'ci-bot',
         reason: 'CI pipeline',
-        costCenterId: companyCenter,
+        costCenterId: unitCenter,
       }),
     ).toBeNull();
     expect(
@@ -198,7 +204,7 @@ describe('license assignments (integration, PostgreSQL constraints)', () => {
         kind: 'SERVICE',
         identifier: 'bot-a',
         reason: null,
-        costCenterId: companyCenter,
+        costCenterId: unitCenter,
       }),
     ).toBe('23514');
     expect(
@@ -209,12 +215,57 @@ describe('license assignments (integration, PostgreSQL constraints)', () => {
         kind: 'SERVICE',
         identifier: 'bot-c',
         reason: '  ',
-        costCenterId: companyCenter,
+        costCenterId: unitCenter,
       }),
     ).toBe('23514');
     expect(await personal(subscriptionId, { kind: 'PERSONAL', employeeId: other, costCenterId: unitCenter })).toBe(
       '23514',
     );
+  });
+
+  it('owns a service account by a department and charges it to that department Unit, and a personal seat by none (QĐ-86c)', async () => {
+    const subscriptionId = await fresh();
+    const otherUnit = randomUUID();
+    await sql.query(
+      `INSERT INTO cost_centers (id, organization_id, code, name, kind) VALUES ($1, $2, 'CC-OTHER', 'CC-OTHER', 'UNIT')`,
+      [otherUnit, organizationId],
+    );
+    const retired = randomUUID();
+    const retiredUnit = randomUUID();
+    await sql.query(
+      `INSERT INTO cost_centers (id, organization_id, code, name, kind) VALUES ($1, $2, 'CC-OLD', 'CC-OLD', 'UNIT')`,
+      [retiredUnit, organizationId],
+    );
+    await sql.query(
+      `INSERT INTO departments (id, organization_id, code, name, cost_center_id, status, deactivated_at, updated_at)
+       VALUES ($1, $2, 'P-OLD', 'Old', $3, 'INACTIVE', now(), now())`,
+      [retired, organizationId, retiredUnit],
+    );
+    const service = { kind: 'SERVICE', reason: 'CI' } as const;
+
+    expect(
+      await personal(subscriptionId, {
+        ...service,
+        identifier: 'no-owner',
+        costCenterId: unitCenter,
+        owningDepartmentId: null,
+      }),
+    ).toBe('23514');
+    expect(
+      await personal(subscriptionId, { kind: 'PERSONAL', employeeId: other, owningDepartmentId: department }),
+    ).toBe('23514');
+    expect(await personal(subscriptionId, { ...service, identifier: 'wrong-unit', costCenterId: otherUnit })).toBe(
+      '23514',
+    );
+    expect(
+      await personal(subscriptionId, {
+        ...service,
+        identifier: 'old-dept',
+        costCenterId: retiredUnit,
+        owningDepartmentId: retired,
+      }),
+    ).toBe('23514');
+    expect(await personal(subscriptionId, { ...service, identifier: 'right', costCenterId: unitCenter })).toBeNull();
   });
 
   it('keeps the period in order and the expected end no earlier than the start', async () => {
@@ -285,7 +336,7 @@ describe('license assignments (integration, PostgreSQL constraints)', () => {
           employeeId: staff,
           identifier: 'ci-bot',
           reason: 'CI',
-          costCenterId: companyCenter,
+          costCenterId: unitCenter,
         }),
       ).toBeNull();
       expect(
@@ -294,7 +345,7 @@ describe('license assignments (integration, PostgreSQL constraints)', () => {
           employeeId: staff,
           identifier: 'release-bot',
           reason: 'Releases',
-          costCenterId: companyCenter,
+          costCenterId: unitCenter,
         }),
       ).toBeNull();
     });
@@ -318,7 +369,7 @@ describe('license assignments (integration, PostgreSQL constraints)', () => {
           identifier: 'ci-bot',
           kind: 'SERVICE',
           reason: 'CI',
-          costCenterId: companyCenter,
+          costCenterId: unitCenter,
         }),
       ).toBeNull();
       expect(
@@ -327,14 +378,14 @@ describe('license assignments (integration, PostgreSQL constraints)', () => {
           identifier: ' CI-Bot ',
           kind: 'SERVICE',
           reason: 'CI',
-          costCenterId: companyCenter,
+          costCenterId: unitCenter,
         }),
       ).toBe('23P01');
     });
 
     it('lets the identifier be used again once the earlier period has ended (a change of the responsible person)', async () => {
       const subscriptionId = await fresh(10);
-      const service = { kind: 'SERVICE', reason: 'CI', costCenterId: companyCenter, identifier: 'ci-bot' } as const;
+      const service = { kind: 'SERVICE', reason: 'CI', costCenterId: unitCenter, identifier: 'ci-bot' } as const;
 
       expect(
         await personal(subscriptionId, {
@@ -409,7 +460,7 @@ describe('license assignments (integration, PostgreSQL constraints)', () => {
 
     it('lets a handover keep the count at every day: the old seat ends the day the new one begins', async () => {
       const subscriptionId = await fresh(1);
-      const service = { kind: 'SERVICE', reason: 'CI', costCenterId: companyCenter, identifier: 'ci-bot' } as const;
+      const service = { kind: 'SERVICE', reason: 'CI', costCenterId: unitCenter, identifier: 'ci-bot' } as const;
       const first = randomUUID();
       await personal(subscriptionId, { ...service, employeeId: staff, validFrom: '2026-10-01', id: first });
 

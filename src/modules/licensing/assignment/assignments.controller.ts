@@ -18,6 +18,7 @@ import {
   ResponsibleChangeBodyDto,
   ResponsibleChangeResponseDto,
 } from './assignment.dto';
+import { AssignmentListService } from './assignment-list.service';
 import { AssignmentService } from './assignment.service';
 
 const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPONSE] as const;
@@ -40,7 +41,10 @@ const toWire = (view: AssignmentView) => ({
 @ApiTags('license-assignments')
 @Controller({ path: 'license-assignments', version: '1' })
 export class AssignmentsController {
-  constructor(private readonly assignments: AssignmentService) {}
+  constructor(
+    private readonly assignments: AssignmentService,
+    private readonly assignmentList: AssignmentListService,
+  ) {}
 
   @Get()
   @RequireRoles('IT_ADMIN')
@@ -48,7 +52,7 @@ export class AssignmentsController {
   @ApiSuccessResponse(AssignmentPageResponseDto, {
     message: 'LICENSE_ASSIGNMENT.LISTED',
     description:
-      'A page of assignments by start date. source tells a baseline assignment from one that came from a request or from a change of the person responsible; a start that is only the day of recording has no grantedOn and carries a label.',
+      'A page of assignments by start date, each with the person, the plan and the Cost Center it names. source tells a baseline assignment from one that came from a request or from a change of the person responsible; a start that is only the day of recording has no grantedOn and carries a label.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -56,7 +60,7 @@ export class AssignmentsController {
   })
   async list(@Query() query: ListAssignmentsQueryDto) {
     try {
-      const page = await this.assignments.list(query);
+      const page = await this.assignmentList.list(query);
 
       return { items: page.items.map(toWire), pagination: page.pagination };
     } catch (error) {

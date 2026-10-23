@@ -49,7 +49,8 @@ const stepSchema = z.strictObject({
   accountIdentifier: z.string().optional(),
   adminIdentity: z.enum(['ACTING_IT_ADMIN']).optional(),
 });
-const taskSchema = z.strictObject({
+/** A row of the list (`LD-08`): the task without its steps, evidence and errors; the detail is this and those. */
+const taskSummarySchema = z.strictObject({
   id: z.uuid(),
   kind: z.enum(['GRANT', 'REVOKE']),
   channel: z.enum(['MANUAL', 'CONNECTOR']),
@@ -68,34 +69,36 @@ const taskSchema = z.strictObject({
     .nullable(),
   subscriptionId: z.uuid().nullable(),
   accountIdentifier: z.string(),
-  steps: z.array(stepSchema),
-  doneWhen: z
-    .enum(['PURCHASE_CONFIRMED', 'MEMBER_ACTIVE', 'KEY_ASSIGNED_WITH_DEVICE', 'CONFIRMED_WITH_EVIDENCE'])
-    .nullable(),
   defaultResponsibleEmployeeId: z.uuid().nullable(),
   inGeneralQueue: z.boolean(),
   createdAt: z.iso.datetime(),
   claimedBy: z.uuid().nullable(),
   claimedAt: z.iso.datetime().nullable(),
-  completedBy: z.uuid().nullable(),
   completedAt: z.iso.datetime().nullable(),
-  evidence: z.string().nullable(),
-  failedBy: z.uuid().nullable(),
   failedAt: z.iso.datetime().nullable(),
-  failureReason: z.string().nullable(),
   failureKind: z.enum(['TRANSIENT', 'PERMANENT', 'AUTHENTICATION', 'QUOTA_EXCEEDED', 'NOT_DONE']).nullable(),
   attempts: z.number().int().nonnegative(),
   maxAttempts: z.number().int().positive(),
   nextRetryAt: z.iso.datetime().nullable(),
-  lastError: z.string().nullable(),
   availableDecisions: z.array(z.enum(['RETRY', 'HAND_OFF', 'CLOSE_FAILED'])),
+  closedAt: z.iso.datetime().nullable(),
+  elapsedSeconds: z.number().int().nonnegative(),
+});
+const taskSchema = taskSummarySchema.extend({
+  steps: z.array(stepSchema),
+  doneWhen: z
+    .enum(['PURCHASE_CONFIRMED', 'MEMBER_ACTIVE', 'KEY_ASSIGNED_WITH_DEVICE', 'CONFIRMED_WITH_EVIDENCE'])
+    .nullable(),
+  completedBy: z.uuid().nullable(),
+  evidence: z.string().nullable(),
+  failedBy: z.uuid().nullable(),
+  failureReason: z.string().nullable(),
+  lastError: z.string().nullable(),
   handedOffBy: z.uuid().nullable(),
   handedOffAt: z.iso.datetime().nullable(),
   handOffEvidence: z.string().nullable(),
   closedBy: z.uuid().nullable(),
-  closedAt: z.iso.datetime().nullable(),
   closeReason: z.string().nullable(),
-  elapsedSeconds: z.number().int().nonnegative(),
 });
 const pagination = z.strictObject({
   page: z.number().int().positive(),
@@ -118,5 +121,5 @@ export class GrantResponseDto extends createZodDto(
   ),
 ) {}
 export class TaskPageResponseDto extends createZodDto(
-  successEnvelopeSchema(z.strictObject({ items: z.array(taskSchema), pagination })),
+  successEnvelopeSchema(z.strictObject({ items: z.array(taskSummarySchema), pagination })),
 ) {}

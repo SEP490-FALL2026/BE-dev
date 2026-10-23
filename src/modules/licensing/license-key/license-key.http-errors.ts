@@ -1,6 +1,6 @@
 import { HttpStatus } from '@nestjs/common';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
-import { LicenseKeyNotFoundError, LicenseKeyPlanNotK4Error } from '../licensing.errors';
+import { LicenseKeyNotFoundError, LicenseKeyPlanNotK4Error, LicenseKeyRevealLimitError } from '../licensing.errors';
 import { toLicensingApiException } from '../mappers/licensing.http-errors';
 
 const refuse = (status: HttpStatus, code: string, message: string, details?: Record<string, unknown>): ApiException =>
@@ -16,6 +16,10 @@ export function toLicenseKeyApiException(error: unknown): unknown {
 
   if (error instanceof LicenseKeyNotFoundError) {
     return refuse(HttpStatus.NOT_FOUND, 'LICENSE_KEY.NOT_FOUND', error.message);
+  }
+  if (error instanceof LicenseKeyRevealLimitError) {
+    // The same code the global rate limit answers with: to a client it is one kind of refusal.
+    return refuse(HttpStatus.TOO_MANY_REQUESTS, 'HTTP_TOO_MANY_REQUESTS', error.message);
   }
   if (error instanceof LicenseKeyPlanNotK4Error) {
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'LICENSE_KEY.PLAN_NOT_K4', error.message, {

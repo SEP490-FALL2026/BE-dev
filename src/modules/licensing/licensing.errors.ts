@@ -74,7 +74,7 @@ export class AssignmentNotServiceAccountError extends Error {
   }
 }
 
-export type ResponsibleProblem = 'NOT_FOUND' | 'NOT_ACTIVE' | 'SAME_PERSON';
+export type ResponsibleProblem = 'NOT_FOUND' | 'NOT_ACTIVE' | 'SAME_PERSON' | 'OUTSIDE_OWNING_DEPARTMENT';
 
 export class AssignmentResponsibleInvalidError extends Error {
   constructor(readonly problem: ResponsibleProblem) {
@@ -261,5 +261,13 @@ export class LicenseKeyPlanNotK4Error extends Error {
   constructor(readonly provisioningType: string) {
     super(`Only a purchase of a K4 plan keeps license keys; this plan is ${provisioningType}.`);
     this.name = 'LicenseKeyPlanNotK4Error';
+  }
+}
+
+/** The account has opened as many keys as it may in this minute or this day (`SEC-02`); nothing was opened. */
+export class LicenseKeyRevealLimitError extends Error {
+  constructor(readonly window: 'MINUTE' | 'DAY') {
+    super('Too many license keys were opened by this account. Try again later.');
+    this.name = 'LicenseKeyRevealLimitError';
   }
 }

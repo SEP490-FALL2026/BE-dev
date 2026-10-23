@@ -90,9 +90,9 @@ describe('the approval roles over HTTP (integration, real PostgreSQL)', () => {
       const response = await request(server()).get('/api/v1/approval-roles').set(asAdmin()).expect(200);
 
       expect(viewOf(response)).toEqual([
-        { role: 'SPENDING_APPROVER', holder: null, history: [] },
-        { role: 'CONFLICT_SUBSTITUTE', holder: null, history: [] },
-        { role: 'FALLBACK_APPROVER', holder: null, history: [] },
+        { role: 'SPENDING_APPROVER', holder: null, history: [], historyHasMore: false },
+        { role: 'CONFLICT_SUBSTITUTE', holder: null, history: [], historyHasMore: false },
+        { role: 'FALLBACK_APPROVER', holder: null, history: [], historyHasMore: false },
       ]);
     });
 

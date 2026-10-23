@@ -52,3 +52,15 @@ export class CurrencyNotSupportedError extends Error {
     this.name = 'CurrencyNotSupportedError';
   }
 }
+
+/**
+ * The organization's reporting currency is not one the system has a minor-unit table for. A foreign key keeps it out of
+ * a current installation (DB-02); an older one that predates it answers a conflict with the installation's own state
+ * rather than a caller mistake, and never a 500.
+ */
+export class ReportingCurrencyNotSupportedError extends Error {
+  constructor(readonly currency: string) {
+    super(`The reporting currency ${currency} is not in the currency table.`);
+    this.name = 'ReportingCurrencyNotSupportedError';
+  }
+}
