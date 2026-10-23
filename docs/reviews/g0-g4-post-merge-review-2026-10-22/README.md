@@ -455,7 +455,7 @@ Giao việc: sửa mọi finding và remediation G0–G4 còn mở trong roadmap
 G5–G10, liệt kê phần không làm được (Story/AC, nguyên nhân, G chặn) mà không tạo stub, rà mọi API list/detail, giữ OpenAPI,
 migration, transaction, audit và contract lỗi khớp mã, chạy toàn bộ kiểm thử và cập nhật tài liệu bằng kết quả thật.
 
-**Nền:** nhánh `Bao_dev_be`; `dev` = `origin/dev` = `19be620` (không có gì mới để kéo). Mọi thay đổi nằm trên cây làm việc, kiểm chứng
+**Nền:** nhánh `Bao_dev_be`; `dev` = `origin/dev` = `19be620` (không có gì mới để kéo). Mọi thay đổi nằm trong commit `4cc9a47` trên `Bao_dev_be`, kiểm chứng
 **local** trên PostgreSQL dùng một lần; remote CI, review của Owner và peer review **chưa có**; không có gì `accepted`.
 
 **Quyết định Owner chưa có được áp bằng mặc định của spec** (không phải Owner chọn; đổi được): `BBI-D03` miền thời hạn chờ trình 1–30;
