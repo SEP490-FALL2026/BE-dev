@@ -3,6 +3,7 @@ import { bodyOf } from '../support/api-body';
 import { ApiAccount, adminToken, createActivatedAccount } from '../support/api-accounts';
 import { HttpTestApp, SeededInstallation, createHttpTestApp, seedInstallation } from '../support/http-test-app';
 import { PgRelay } from '../support/pg-relay';
+import { HR_BASIS } from '../support/hr-basis';
 
 const QUERY_TIMEOUT_MS = 2000;
 const SLACK_MS = 1500;
@@ -18,6 +19,7 @@ describe('job titles and manual entry when the database stops answering mid-tran
   let it1: ApiAccount;
   const server = () => ctx.app.getHttpServer();
   const asIt = () => ({ Authorization: `Bearer ${it1.accessToken}` });
+  let superAdmin: string;
 
   beforeAll(async () => {
     ctx = await createHttpTestApp({
@@ -36,6 +38,7 @@ describe('job titles and manual entry when the database stops answering mid-tran
     });
     seed = await seedInstallation(ctx.app);
     const admin = await adminToken(ctx, seed);
+    superAdmin = admin;
     it1 = await createActivatedAccount(ctx, seed, { code: 'E-IT1', email: 'it1@acme.vn', roles: ['IT_ADMIN'], admin });
   }, 120000);
 
@@ -73,15 +76,19 @@ describe('job titles and manual entry when the database stops answering mid-tran
 
     relay.holdWhen(/INSERT INTO "public"\."employee_placements"/);
     const started = Date.now();
-    const stalled = await request(server()).post('/api/v1/employees').set(asIt()).send({
-      employeeCode: 'E-STALL',
-      fullName: 'Stalled Person',
-      workEmail: 'stalled@acme.vn',
-      employmentType: 'STAFF',
-      hireDate: '2026-10-01',
-      departmentCode: 'P-OPS',
-      jobTitleId: seed.jobTitleId,
-    });
+    const stalled = await request(server())
+      .post('/api/v1/employees')
+      .set({ Authorization: `Bearer ${superAdmin}` })
+      .send({
+        hrBasis: HR_BASIS,
+        employeeCode: 'E-STALL',
+        fullName: 'Stalled Person',
+        workEmail: 'stalled@acme.vn',
+        employmentType: 'STAFF',
+        hireDate: '2026-10-01',
+        departmentCode: 'P-OPS',
+        jobTitleId: seed.jobTitleId,
+      });
     const elapsed = Date.now() - started;
     expect(relay.holding).toBe(true);
     relay.releaseHeld();

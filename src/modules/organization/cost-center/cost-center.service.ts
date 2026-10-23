@@ -162,7 +162,7 @@ export class CostCenterService {
 
   /**
    * Who is in the cost center's scope today, as little as Finance may see (AC-6, `QĐ-41c`): the code, the name and
-   * that the person is working. A `COMPANY` cost center has no department and so no people.
+   * that the person is working. A cost center whose department is gone has no people.
    */
   async employees(
     id: string,
@@ -194,7 +194,7 @@ export class CostCenterService {
   }
 
   private requireKind(kind: string): CostCenterKind {
-    if (kind !== 'UNIT' && kind !== 'COMPANY') throw new CostCenterKindNotSupportedError();
+    if (kind !== 'UNIT') throw new CostCenterKindNotSupportedError();
 
     return kind;
   }

@@ -109,6 +109,11 @@ export class LicenseKeysController {
     IT_ONLY,
     { status: HttpStatus.NOT_FOUND, description: 'The key does not exist (LICENSE_KEY.NOT_FOUND).' },
     { status: HttpStatus.UNPROCESSABLE_ENTITY, description: 'The id is invalid (VALIDATION_ERROR).' },
+    {
+      status: HttpStatus.TOO_MANY_REQUESTS,
+      description:
+        'The account has opened as many keys as it may in this minute (10) or this day (200): HTTP_TOO_MANY_REQUESTS. Nothing was opened and nothing was counted.',
+    },
   )
   async reveal(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: KeyIdParamDto) {
     try {

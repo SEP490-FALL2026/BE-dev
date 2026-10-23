@@ -12,10 +12,10 @@ export class CostCenterCodeTakenError extends Error {
   }
 }
 
-/** The kind is not one of the two the catalogue holds (US-04-09 AC-4: no project kind, no placeholder). */
+/** The kind is not the one the catalogue holds (US-04-09 AC-4, `QĐ-86b`: no Company, no project kind, no placeholder). */
 export class CostCenterKindNotSupportedError extends Error {
   constructor() {
-    super('A cost center is of kind UNIT or COMPANY, nothing else.');
+    super('A cost center is of kind UNIT, nothing else: the Company is not a cost center.');
     this.name = 'CostCenterKindNotSupportedError';
   }
 }

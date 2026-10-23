@@ -87,17 +87,17 @@ lưu tệp gốc của import (giới hạn sẵn có).
 
 ## Test matrix
 
-| AC / rủi ro           | Tình huống (gồm từ chối, edge case)                                    | Cấp test           | Kết quả mong đợi                                         | Bằng chứng sau implement |
-| --------------------- | ---------------------------------------------------------------------- | ------------------ | -------------------------------------------------------- | ------------------------ |
-| `US-02-02` AC-1, AC-9 | Super Admin xác nhận import hợp lệ kèm căn cứ                          | integration        | nhân viên tạo, không tài khoản, căn cứ trong Audit Trail | chưa chạy                |
-| `US-02-02` AC-12      | IT Admin, Manager, Finance tải file nhân sự                            | integration + e2e  | 403, không bản ghi                                       | chưa chạy                |
-| `US-02-02` AC-13      | chức vụ viết sai / đã ngừng dưới actor Super Admin                     | integration        | lỗi dòng như hiện hành                                   | chưa chạy                |
-| `US-02-02` AC-14      | Super Admin nhập tay kèm căn cứ; IT Admin, Finance nhập tay            | integration        | một nhân viên; vai khác 403                              | chưa chạy                |
-| `US-02-02` AC-15      | ngày vào tương lai dưới actor Super Admin                              | integration        | thành viên phòng ngay, không quyền trước ngày vào        | chưa chạy                |
-| `US-02-02` AC-16      | import/nhập tay thiếu từng trường căn cứ                               | unit + integration | 422 nêu trường, không ghi                                | chưa chạy                |
-| `US-02-02` AC-18      | Super Admin nhập dòng mã/email của chính mình                          | integration        | từ chối                                                  | chưa chạy                |
-| `US-02-03` AC-1       | file 50 dòng, dòng 17 thiếu phòng, 18 thiếu chức vụ, actor Super Admin | integration        | 2 lỗi đúng cột, 48 hợp lệ                                | chưa chạy                |
-| `US-01-05` AC-14      | Super Admin tạo phòng, Cost Center, chức vụ, ghi sự kiện nhân sự       | integration        | 403 (hồi quy)                                            | chưa chạy                |
+| AC / rủi ro           | Tình huống (gồm từ chối, edge case)                                    | Cấp test           | Kết quả mong đợi                                         | Bằng chứng sau implement                                                                                                                     |
+| --------------------- | ---------------------------------------------------------------------- | ------------------ | -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `US-02-02` AC-1, AC-9 | Super Admin xác nhận import hợp lệ kèm căn cứ                          | integration        | nhân viên tạo, không tài khoản, căn cứ trong Audit Trail | xanh — `employee-manual-http`, `employee-imports-http`, `employee-import-seats-http`, `onboarding-http`, e2e `employees`, `employee-imports` |
+| `US-02-02` AC-12      | IT Admin, Manager, Finance tải file nhân sự                            | integration + e2e  | 403, không bản ghi                                       | xanh — `employee-manual-http`, `employee-imports-http`, `employee-import-seats-http`, `onboarding-http`, e2e `employees`, `employee-imports` |
+| `US-02-02` AC-13      | chức vụ viết sai / đã ngừng dưới actor Super Admin                     | integration        | lỗi dòng như hiện hành                                   | xanh — `employee-manual-http`, `employee-imports-http`, `employee-import-seats-http`, `onboarding-http`, e2e `employees`, `employee-imports` |
+| `US-02-02` AC-14      | Super Admin nhập tay kèm căn cứ; IT Admin, Finance nhập tay            | integration        | một nhân viên; vai khác 403                              | xanh — `employee-manual-http`, `employee-imports-http`, `employee-import-seats-http`, `onboarding-http`, e2e `employees`, `employee-imports` |
+| `US-02-02` AC-15      | ngày vào tương lai dưới actor Super Admin                              | integration        | thành viên phòng ngay, không quyền trước ngày vào        | xanh — `employee-manual-http`, `employee-imports-http`, `employee-import-seats-http`, `onboarding-http`, e2e `employees`, `employee-imports` |
+| `US-02-02` AC-16      | import/nhập tay thiếu từng trường căn cứ                               | unit + integration | 422 nêu trường, không ghi                                | xanh — `employee-manual-http`, `employee-imports-http`, `employee-import-seats-http`, `onboarding-http`, e2e `employees`, `employee-imports` |
+| `US-02-02` AC-18      | Super Admin nhập dòng mã/email của chính mình                          | integration        | từ chối                                                  | xanh — `employee-manual-http`, `employee-imports-http`, `employee-import-seats-http`, `onboarding-http`, e2e `employees`, `employee-imports` |
+| `US-02-03` AC-1       | file 50 dòng, dòng 17 thiếu phòng, 18 thiếu chức vụ, actor Super Admin | integration        | 2 lỗi đúng cột, 48 hợp lệ                                | xanh — `employee-manual-http`, `employee-imports-http`, `employee-import-seats-http`, `onboarding-http`, e2e `employees`, `employee-imports` |
+| `US-01-05` AC-14      | Super Admin tạo phòng, Cost Center, chức vụ, ghi sự kiện nhân sự       | integration        | 403 (hồi quy)                                            | xanh — `employee-manual-http`, `employee-imports-http`, `employee-import-seats-http`, `onboarding-http`, e2e `employees`, `employee-imports` |
 
 Test đang ghim actor IT Admin phải đổi cùng lát: `employee-manual-http`, `employee-imports-http`,
 `employee-import-seats-http`, `onboarding-http`, e2e `employees`, `employee-imports`, `test/support/api-coverage-manifest.ts`.
@@ -105,11 +105,13 @@ Test đang ghim actor IT Admin phải đổi cùng lát: `employee-manual-http`,
 ## Definition of Done
 
 - [ ] Mọi primary AC `full` có test đỏ-trước/xanh-sau ở cấp phù hợp; AC `partial` ghi đúng vế đã làm.
-- [ ] Gate theo [CONTRIBUTING](../../../../CONTRIBUTING.md) chạy xanh trên revision cuối; HTTP đổi thì e2e + OpenAPI.
-- [ ] Spec/plan/roadmap phản ánh implementation cuối; contract đổi đã ghi và báo consumer FE.
-- [ ] Không tăng legacy ledger kiến trúc; nếu gỡ được mục nào thì xóa mục đó.
+- [x] Gate theo [CONTRIBUTING](../../../../CONTRIBUTING.md) chạy xanh trên revision cuối; HTTP đổi thì e2e + OpenAPI.
+- [x] Spec/plan/roadmap phản ánh implementation cuối; contract đổi đã ghi và báo consumer FE.
+- [x] Không tăng legacy ledger kiến trúc; nếu gỡ được mục nào thì xóa mục đó.
 - [ ] Tài liệu vận hành/runbook bị ảnh hưởng đã cập nhật; phần chưa kiểm chứng ghi rõ.
 
 ## Changes and acceptance
 
 22/10/2026: lập theo Prompt 07. Chưa code, chưa review, chưa nghiệm thu.
+
+23/10/2026 (Prompt 10 — xử lý tồn đọng G0→G4): `BBI-D01` hiện thực theo lựa chọn (a) của plan: `POST /employees` và sáu route `/employee-imports*` chỉ `SUPER_ADMIN`; căn cứ HR bắt buộc `{type, reference, issuer, issuedOn}` (chỉ số tham chiếu, không tệp) ở nhập tay và ở xác nhận import, ghi vào Audit Trail của lần xác nhận và **mỗi** `Employee` mới (`EMPLOYEE.CREATED`); dòng/biểu mẫu mang mã hoặc email của chính Super Admin bị từ chối (`OWN_RECORD`). Áp dụng **mặc định do spec khuyến nghị**, không phải quyết định của Owner: Owner chưa review; nếu Owner chọn khác thì đổi ở đây. Kiểm chứng: `employee-manual-http`, `employee-imports-http`, `employee-import-seats-http`, `onboarding-http`, e2e `employees`, `employee-imports` — xanh trên cây làm việc chưa commit, nhánh `Bao_dev_be`, nền `dev` `19be620`, 23/10/2026. Gate toàn cây trên cùng cây: `pnpm lint`, `tsc --noEmit`, `pnpm test` (unit 2.074 (141 suite)), `pnpm test:e2e` (839 (32 suite)), `pnpm test:integration` (112 suite, 1.429 test, gồm 4 test kho S3 thật trên LocalStack), `prisma migrate deploy` trên CSDL mới + `migrate diff --exit-code` (không lệch), `pnpm openapi:export`. Giới hạn: AC-17 (báo IT Admin phụ trách và trưởng phòng) chờ `g4-notification-delivery`: Audit Trail là dấu vết tạm; **không đưa revision lên `main`/production trước khi AC-17 có lời giải** (plan). Checklist khởi tạo vẫn chỉ IT Admin xem. FE/Mobile phải đổi vai và body. Chưa commit khi viết dòng này, chưa remote CI, chưa Owner review, chưa nghiệm thu: không có gì là `accepted`; đỏ-trước của từng test không được ghi lại.

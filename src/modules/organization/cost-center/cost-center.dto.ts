@@ -17,7 +17,7 @@ export const renameCostCenterBodySchema = z.strictObject({ name: z.string().max(
 
 export const listCostCentersQuerySchema = z.strictObject({
   status: z.enum(['ACTIVE', 'INACTIVE']).optional(),
-  kind: z.enum(['UNIT', 'COMPANY']).optional(),
+  kind: z.enum(['UNIT']).optional(),
   search: z.string().max(100).optional(),
   page: z.coerce.number().int().positive().default(1),
   pageSize: z.coerce.number().int().positive().max(100).default(20),
@@ -41,7 +41,7 @@ const costCenterSchema = z.strictObject({
   id: z.uuid(),
   code: z.string(),
   name: z.string(),
-  kind: z.enum(['UNIT', 'COMPANY']),
+  kind: z.enum(['UNIT']),
   status: z.enum(['ACTIVE', 'INACTIVE']),
   department: z.strictObject({ id: z.uuid(), code: z.string(), name: z.string() }).nullable(),
   createdAt: z.iso.datetime(),

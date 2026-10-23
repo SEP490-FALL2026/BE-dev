@@ -46,58 +46,75 @@ export class CostAllocationService {
   async history(subscriptionId: string, query: { page: number; pageSize: number }): Promise<Page<CostAllocationView>> {
     const { items, total } = await this.repo.history(subscriptionId, (query.page - 1) * query.pageSize, query.pageSize);
 
-    return pageOf(await Promise.all(items.map((item) => this.show(item))), total, query.page, query.pageSize);
+    const centers = new Map(
+      (
+        await this.organization.costCentersByIds([
+          ...new Set(items.flatMap((item) => item.lines.map((line) => line.costCenterId))),
+        ])
+      ).map((center) => [center.id, center]),
+    );
+
+    return pageOf(
+      items.map((item) => toAllocationView(item, centers)),
+      total,
+      query.page,
+      query.pageSize,
+    );
   }
 
   /**
    * Declares the allocation of a subscription. Throws the line errors of `cleanAllocationLines`,
    * CostAllocationCostCenterRefusedError and CostAllocationSubscriptionNotFoundError. An allocation equal to the
-   * current one records nothing and answers `changed: false`.
+   * current one records nothing and answers `changed: false`. Given the caller's `tx`, it writes in that transaction, so
+   * what the caller checked under its locks (the pricing model of the plan) still holds when the allocation commits.
    */
   async declare(
     actor: AuthenticatedPrincipal,
     subscriptionId: string,
     input: { lines: AllocationLineInput[] },
+    tx?: DbTx,
   ): Promise<{ allocation: CostAllocationView; changed: boolean }> {
     const lines = cleanAllocationLines(input.lines);
-    const organization = await this.organization.getOrganization();
+    const organization = await this.organization.getOrganization(tx);
     if (!organization) throw new Error('A cost allocation was declared before installation');
 
-    try {
-      return await this.runner.run(async (tx) => {
-        await this.repo.ensureHead(tx, subscriptionId, organization.id);
-        const currentVersion = await this.repo.lockCurrentVersion(tx, subscriptionId);
-        const current = currentVersion > 0 ? await this.repo.readVersion(subscriptionId, currentVersion, tx) : null;
-        if (current && sameAllocation(current.lines, lines)) {
-          return { allocation: await this.show(current, tx), changed: false };
-        }
-        await this.requireUsableCostCenters(
-          tx,
-          lines.map((line) => line.costCenterId),
-        );
+    const write = async (inner: DbTx) => {
+      await this.repo.ensureHead(inner, subscriptionId, organization.id);
+      const currentVersion = await this.repo.lockCurrentVersion(inner, subscriptionId);
+      const current = currentVersion > 0 ? await this.repo.readVersion(subscriptionId, currentVersion, inner) : null;
+      if (current && sameAllocation(current.lines, lines)) {
+        return { allocation: await this.show(current, inner), changed: false };
+      }
+      await this.requireUsableCostCenters(
+        inner,
+        lines.map((line) => line.costCenterId),
+      );
 
-        const created = await this.repo.insertVersion(tx, {
-          subscriptionId,
-          version: currentVersion + 1,
-          lines,
-          declaredByAppUserId: actor.appUserId,
-        });
-        await this.repo.setCurrentVersion(tx, subscriptionId, created.version);
-        await this.audit.record(
-          tx,
-          financeAuditEvent(
-            actor,
-            organization.id,
-            'COST_ALLOCATION.DECLARED',
-            'SubscriptionCostAllocation',
-            subscriptionId,
-            current ? snapshot(current) : null,
-            snapshot(created),
-          ),
-        );
-
-        return { allocation: await this.show(created, tx), changed: true };
+      const created = await this.repo.insertVersion(inner, {
+        subscriptionId,
+        version: currentVersion + 1,
+        lines,
+        declaredByAppUserId: actor.appUserId,
       });
+      await this.repo.setCurrentVersion(inner, subscriptionId, created.version);
+      await this.audit.record(
+        inner,
+        financeAuditEvent(
+          actor,
+          organization.id,
+          'COST_ALLOCATION.DECLARED',
+          'SubscriptionCostAllocation',
+          subscriptionId,
+          current ? snapshot(current) : null,
+          snapshot(created),
+        ),
+      );
+
+      return { allocation: await this.show(created, inner), changed: true };
+    };
+
+    try {
+      return await (tx ? write(tx) : this.runner.run(write));
     } catch (error) {
       if (readSqlState(error) === '23503') throw new CostAllocationSubscriptionNotFoundError();
       throw error;

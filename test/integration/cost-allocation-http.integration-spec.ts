@@ -81,10 +81,7 @@ describe('subscription cost allocations over HTTP (integration, real PostgreSQL)
     ).rows;
 
   /** A Cost Center made the way Finance makes one. */
-  const costCenter = async (
-    kind: 'UNIT' | 'COMPANY' = 'UNIT',
-    code = unique('CC'),
-  ): Promise<{ id: string; code: string }> =>
+  const costCenter = async (kind: 'UNIT' = 'UNIT', code = unique('CC')): Promise<{ id: string; code: string }> =>
     dataOf<{ id: string; code: string }>(
       await request(server())
         .post('/api/v1/cost-centers')
@@ -174,20 +171,20 @@ describe('subscription cost allocations over HTTP (integration, real PostgreSQL)
       expect((await declared(id, [share(a.id, '100')])).version).toBe(1);
     });
 
-    it('takes a Company Cost Center, a single line of 100%, and a split in hundredths that adds up to 100%', async () => {
+    it('takes a single line of 100% and a split in hundredths that adds up to 100%', async () => {
       const id = await subscription();
       const unit = await costCenter('UNIT');
-      const company = await costCenter('COMPANY');
+      const second = await costCenter('UNIT');
       const third = await costCenter('UNIT');
 
       expect(
-        (await declared(id, [share(unit.id, '70'), share(company.id, '30')])).lines
+        (await declared(id, [share(unit.id, '70'), share(second.id, '30')])).lines
           .map((line) => line.costCenterKind)
           .sort(),
-      ).toEqual(['COMPANY', 'UNIT']);
-      expect((await declared(id, [share(company.id, '100')])).lines).toHaveLength(1);
+      ).toEqual(['UNIT', 'UNIT']);
+      expect((await declared(id, [share(second.id, '100')])).lines).toHaveLength(1);
       expect(
-        (await declared(id, [share(unit.id, '33.33'), share(company.id, '33.33'), share(third.id, '33.34')]))
+        (await declared(id, [share(unit.id, '33.33'), share(second.id, '33.33'), share(third.id, '33.34')]))
           .totalPercent,
       ).toBe('100');
     });

@@ -85,22 +85,22 @@ hoặc `currentTaxProfiles(vendorIds)`), `tax-profile.repo.ts`, `cost-allocation
 
 ## Test matrix
 
-| AC / rủi ro | Tình huống (gồm từ chối, edge case)                                               | Cấp test              | Kết quả mong đợi                                                                   | Bằng chứng sau implement |
-| ----------- | --------------------------------------------------------------------------------- | --------------------- | ---------------------------------------------------------------------------------- | ------------------------ |
-| `LD-01`     | 100 thuê bao có giá của 40 nhà cung cấp, 10 nhà cung cấp chưa khai hồ sơ thuế     | integration + harness | số câu lệnh hằng số; ước tính bằng kết quả từng dòng cũ                            | chưa chạy                |
-| `LD-01`     | hồ sơ thuế đổi giữa hai lần đọc                                                   | integration           | `taxProfile.group` và `taxEstimate` cùng phiên bản                                 | chưa chạy                |
-| `LD-02`     | 500 thuê bao `TERM`, 7 đến hạn; trang 2 kích thước 5                              | integration + harness | đúng 2 dòng, thứ tự ổn định; SQL không đọc thuê bao ngoài cửa sổ                   | chưa chạy                |
-| `LD-03`     | 30 phiên bản phân bổ, 5 Cost Center                                               | integration + harness | một lần đọc Cost Center                                                            | chưa chạy                |
-| `LD-16`     | một gói có số thuê bao `TERM` đến hạn rà soát lớn hơn biên đã chọn                | integration           | `GET /plans/{id}/terms` không vượt biên; mục `planTermsGet#warnings` gỡ, gate xanh | chưa chạy                |
-| hồi quy     | `subscription-http`, `plan-terms-http`, `cost-allocation-http` giữ nguyên kết quả | integration           | xanh                                                                               | chưa chạy                |
+| AC / rủi ro | Tình huống (gồm từ chối, edge case)                                               | Cấp test              | Kết quả mong đợi                                                                   | Bằng chứng sau implement                 |
+| ----------- | --------------------------------------------------------------------------------- | --------------------- | ---------------------------------------------------------------------------------- | ---------------------------------------- |
+| `LD-01`     | 100 thuê bao có giá của 40 nhà cung cấp, 10 nhà cung cấp chưa khai hồ sơ thuế     | integration + harness | số câu lệnh hằng số; ước tính bằng kết quả từng dòng cũ                            | xanh — `catalog-subscription-read-model` |
+| `LD-01`     | hồ sơ thuế đổi giữa hai lần đọc                                                   | integration           | `taxProfile.group` và `taxEstimate` cùng phiên bản                                 | xanh — `catalog-subscription-read-model` |
+| `LD-02`     | 500 thuê bao `TERM`, 7 đến hạn; trang 2 kích thước 5                              | integration + harness | đúng 2 dòng, thứ tự ổn định; SQL không đọc thuê bao ngoài cửa sổ                   | xanh — `catalog-subscription-read-model` |
+| `LD-03`     | 30 phiên bản phân bổ, 5 Cost Center                                               | integration + harness | một lần đọc Cost Center                                                            | xanh — `catalog-subscription-read-model` |
+| `LD-16`     | một gói có số thuê bao `TERM` đến hạn rà soát lớn hơn biên đã chọn                | integration           | `GET /plans/{id}/terms` không vượt biên; mục `planTermsGet#warnings` gỡ, gate xanh | xanh — `catalog-subscription-read-model` |
+| hồi quy     | `subscription-http`, `plan-terms-http`, `cost-allocation-http` giữ nguyên kết quả | integration           | xanh                                                                               | xanh — `catalog-subscription-read-model` |
 
 ## Definition of Done
 
 - [ ] Mọi primary AC `full` có test đỏ-trước/xanh-sau ở cấp phù hợp; AC `partial` ghi đúng vế đã làm — áp cho `LD-01`
       → `LD-03`, `LD-16`.
-- [ ] Gate theo [CONTRIBUTING](../../../../CONTRIBUTING.md) chạy xanh trên revision cuối; HTTP đổi thì e2e + OpenAPI.
-- [ ] Spec/plan/roadmap phản ánh implementation cuối; contract đổi (nếu có) đã ghi và báo consumer FE.
-- [ ] Không tăng legacy ledger kiến trúc; ba mục registry đã gỡ.
+- [x] Gate theo [CONTRIBUTING](../../../../CONTRIBUTING.md) chạy xanh trên revision cuối; HTTP đổi thì e2e + OpenAPI.
+- [x] Spec/plan/roadmap phản ánh implementation cuối; contract đổi (nếu có) đã ghi và báo consumer FE.
+- [x] Không tăng legacy ledger kiến trúc; ba mục registry đã gỡ.
 - [ ] Tài liệu vận hành/runbook bị ảnh hưởng đã cập nhật; phần chưa kiểm chứng ghi rõ.
 
 ## Changes and acceptance
@@ -109,3 +109,5 @@ hoặc `currentTaxProfiles(vendorIds)`), `tax-profile.repo.ts`, `cost-allocation
 
 23/10/2026 (Prompt 09B): nhận vế `planTermsGet#warnings` của `LD-16` (mảng lồng không biên trong `NESTED_ARRAYS` của
 `api-list-detail-contract-remediation`). Chưa chọn hợp đồng, chưa code.
+
+23/10/2026 (Prompt 10 — xử lý tồn đọng G0→G4): `LD-01`→`LD-03`, `LD-16`: ước tính thuế đọc theo lô (`readCurrentMany`/`estimateMany`), `select` hẹp cho danh sách thuê bao, cảnh báo gói đọc bằng cửa sổ SQL (`listTermsWithMilestoneBetween`), lịch sử phân bổ đọc Cost Center theo lô; `warnings` của điều khoản cắt 50 + `warningTotal`. Số câu lệnh không đổi theo kích thước trang (đếm bằng harness). Kiểm chứng: `catalog-subscription-read-model` — xanh trên cây làm việc chưa commit, nhánh `Bao_dev_be`, nền `dev` `19be620`, 23/10/2026. Gate toàn cây trên cùng cây: `pnpm lint`, `tsc --noEmit`, `pnpm test` (unit 2.074 (141 suite)), `pnpm test:e2e` (839 (32 suite)), `pnpm test:integration` (112 suite, 1.429 test, gồm 4 test kho S3 thật trên LocalStack), `prisma migrate deploy` trên CSDL mới + `migrate diff --exit-code` (không lệch), `pnpm openapi:export`. Giới hạn: Quyết định Owner `LD-13` điểm 3 chưa có: danh sách vẫn giữ `taxEstimate`, `priceSnapshot`, `alerts` theo spec `g3-subscription-purchase`. Chưa commit khi viết dòng này, chưa remote CI, chưa Owner review, chưa nghiệm thu: không có gì là `accepted`; đỏ-trước của từng test không được ghi lại.

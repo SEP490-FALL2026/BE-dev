@@ -16,6 +16,8 @@ export interface AssignmentRecord {
   accountIdentifier: string;
   reason: string | null;
   costCenterId: string | null;
+  /** The department that owns a service account (`QĐ-86c`); null for a personal seat. */
+  owningDepartmentId: string | null;
   effectiveFrom: BusinessDate;
   effectiveFromBasis: AssignmentDateBasis;
   validUntil: BusinessDate | null;
@@ -32,6 +34,13 @@ export interface AssignmentView extends AssignmentRecord {
   effectiveFromLabel: string | null;
 }
 
+/** An assignment of a list, with who holds it, which plan it is of and which Cost Center it is charged to (`LD-10`). */
+export interface AssignmentSummaryView extends AssignmentView {
+  employee: { employeeId: string; employeeCode: string; fullName: string };
+  plan: { planId: string; planName: string; applicationName: string };
+  costCenter: { id: string; code: string; name: string } | null;
+}
+
 /** What the baseline import asks to be written for one valid row. */
 export interface NewBaselineAssignment {
   kind: AssignmentKind;
@@ -39,6 +48,7 @@ export interface NewBaselineAssignment {
   accountIdentifier: string;
   reason: string | null;
   costCenterId: string | null;
+  owningDepartmentId: string | null;
   effectiveFrom: BusinessDate;
   effectiveFromBasis: AssignmentDateBasis;
   expectedEndDate: BusinessDate | null;

@@ -69,12 +69,13 @@ describe('EmployeeImportService: view, rows, refresh, cancel and latest import (
       jest.setSystemTime(new Date(NOW.getTime() + 60_000));
       h.dir.departments[1].active = false;
 
-      const view = await h.service.refresh(id);
+      const view = await h.service.refresh(ACTOR, id);
 
       expect(h.calls).toEqual([
         'org.getOrganization',
         'repo.find()',
         'repo.rows()',
+        'org.getEmployee()',
         'org.lookupForEmployeeImport()',
         'repo.findCompletedWithContent()',
         'org.lookupForEmployeeImport()',
@@ -105,7 +106,7 @@ describe('EmployeeImportService: view, rows, refresh, cancel and latest import (
       (h.imports.get(id) as ImportRecord).status = status;
       h.reset();
 
-      const error = await h.service.refresh(id).catch((thrown: unknown) => thrown);
+      const error = await h.service.refresh(ACTOR, id).catch((thrown: unknown) => thrown);
 
       expect(error).toBeInstanceOf(ImportStateError);
       expect(error).toMatchObject({ problem });
@@ -120,14 +121,14 @@ describe('EmployeeImportService: view, rows, refresh, cancel and latest import (
         record.status = 'CANCELLED';
       });
 
-      await expect(h.service.refresh(id)).rejects.toMatchObject({ problem: 'CANCELLED' });
+      await expect(h.service.refresh(ACTOR, id)).rejects.toMatchObject({ problem: 'CANCELLED' });
       expect(h.calls.slice(-3)).toEqual(['BEGIN', 'repo.lock(tx)', 'ROLLBACK']);
     });
 
     it('is not found when there is no such import', async () => {
       const h = harness();
 
-      await expect(h.service.refresh('nope')).rejects.toBeInstanceOf(ImportNotFoundError);
+      await expect(h.service.refresh(ACTOR, 'nope')).rejects.toBeInstanceOf(ImportNotFoundError);
     });
   });
 
@@ -153,8 +154,8 @@ describe('EmployeeImportService: view, rows, refresh, cancel and latest import (
         {
           organizationId: 'org-1',
           actorKind: 'USER',
-          actorAppUserId: 'u-it',
-          actorRoles: ['IT_ADMIN'],
+          actorAppUserId: 'u-sa',
+          actorRoles: ['SUPER_ADMIN'],
           action: 'EMPLOYEE_IMPORT.CANCELLED',
           resourceType: 'EmployeeImport',
           resourceId: id,

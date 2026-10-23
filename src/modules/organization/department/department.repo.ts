@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { BusinessDate, fromDateColumn } from '../../../core/business-date';
+import { BusinessDate, fromDateColumn, toDateColumn } from '../../../core/business-date';
 import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
@@ -157,6 +157,34 @@ export class DepartmentRepo {
     return rows[0] ? toRecord(rows[0]) : null;
   }
 
+  /** The department each of these employees was placed in on `onDate`, in one read. */
+  async placementsOn(
+    employeeIds: readonly string[],
+    onDate: BusinessDate,
+    tx?: DbTx,
+  ): Promise<{ employeeId: string; departmentId: string }[]> {
+    if (employeeIds.length === 0) return [];
+    const date = toDateColumn(onDate);
+
+    return (tx ?? this.prisma).employeePlacement.findMany({
+      where: {
+        employeeId: { in: [...employeeIds] },
+        validFrom: { lte: date },
+        OR: [{ validTo: null }, { validTo: { gt: date } }],
+      },
+      select: { employeeId: true, departmentId: true },
+    });
+  }
+
+  /** The departments with these ids in one read; an id that does not exist is absent. */
+  async findByIds(ids: readonly string[], tx?: DbTx): Promise<DepartmentRecord[]> {
+    if (ids.length === 0) return [];
+    const rows = await (tx ?? this.prisma).$queryRaw<DepartmentRow[]>`
+      ${SELECT_DEPARTMENT} WHERE d.id = ANY(${[...ids]}::uuid[])`;
+
+    return rows.map(toRecord);
+  }
+
   async findById(id: string, tx?: DbTx): Promise<DepartmentRecord | null> {
     const rows = await (tx ?? this.prisma).$queryRaw<DepartmentRow[]>`${SELECT_DEPARTMENT} WHERE d.id = ${id}::uuid`;
 
@@ -276,24 +304,39 @@ export class DepartmentRepo {
     return rows.map((row) => row.employee_id);
   }
 
-  /** The people placed in the department on `onDate`, in code order: one page and the total. */
+  /**
+   * The people placed in the department on `onDate`, in code order: one page and the total, read in one snapshot when the
+   * caller has no transaction of its own (`LD-11`). The email is never read, only whether there is one.
+   */
   async members(
     client: DbTx | undefined,
     departmentId: string,
     onDate: BusinessDate,
     options: { skip: number; take: number },
   ): Promise<{ items: DepartmentMemberRecord[]; total: number }> {
-    const db = client ?? this.prisma;
+    if (client) return this.readMembers(client, departmentId, onDate, options);
+
+    return this.prisma.$transaction((tx) => this.readMembers(tx, departmentId, onDate, options), {
+      isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead,
+    });
+  }
+
+  private async readMembers(
+    db: DbTx,
+    departmentId: string,
+    onDate: BusinessDate,
+    options: { skip: number; take: number },
+  ): Promise<{ items: DepartmentMemberRecord[]; total: number }> {
     const rows = await db.$queryRaw<
       {
         employee_code: string;
         full_name: string;
         status: EmployeeStatus;
-        work_email: string | null;
+        has_work_email: boolean;
         valid_from: Date;
       }[]
     >`
-      SELECT e.employee_code, e.full_name, e.status, e.work_email, p.valid_from
+      SELECT e.employee_code, e.full_name, e.status, (e.work_email IS NOT NULL) AS has_work_email, p.valid_from
         FROM employee_placements p JOIN employees e ON e.id = p.employee_id
        WHERE p.department_id = ${departmentId}::uuid
          AND p.valid_from <= ${onDate}::date AND (p.valid_to IS NULL OR p.valid_to > ${onDate}::date)
@@ -308,7 +351,7 @@ export class DepartmentRepo {
         employeeCode: row.employee_code,
         fullName: row.full_name,
         status: row.status,
-        hasWorkEmail: row.work_email !== null,
+        hasWorkEmail: row.has_work_email,
         memberSince: fromDateColumn(row.valid_from),
       })),
       total: counted[0].total,

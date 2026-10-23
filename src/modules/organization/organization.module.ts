@@ -5,6 +5,7 @@ import { CostCenterRepo } from './cost-center/cost-center.repo';
 import { DepartmentDirectoryService } from './department/department-directory.service';
 import { DepartmentHeadRepo } from './department/department-head.repo';
 import { DepartmentRepo } from './department/department.repo';
+import { DepartmentServiceAccountRegistry } from './department/service-account-registry';
 import { EmployeeDirectoryService } from './employee/employee-directory.service';
 import { EmployeeRepo } from './employee/employee.repo';
 import { ImportLookupRepo } from './employee/import-lookup.repo';
@@ -23,6 +24,7 @@ import { OrganizationService } from './organization.service';
     DepartmentRepo,
     DepartmentHeadRepo,
     DepartmentDirectoryService,
+    DepartmentServiceAccountRegistry,
     ImportLookupRepo,
     EmployeeDirectoryService,
     EmployeeRepo,

@@ -31,7 +31,6 @@ describe('a closed seat baseline over HTTP (integration, real PostgreSQL)', () =
   it('is open at the start: the baseline can be imported, and a service account is kept for later', async () => {
     expect(await state()).toEqual({ closed: false, closedAt: null });
     subscriptionId = await h.subscription(10);
-    const corp = await h.costCenter('COMPANY');
     await h.person('OPEN1');
     await h.person('OPEN2');
 
@@ -42,7 +41,6 @@ describe('a closed seat baseline over HTTP (integration, real PostgreSQL)', () =
         account_identifier: 'open-bot',
         kind: 'service',
         reason: 'CI pipeline',
-        cost_center_code: corp.code,
       },
     ]);
 

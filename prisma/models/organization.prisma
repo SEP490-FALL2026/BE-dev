@@ -1,6 +1,6 @@
+// The Company is the root of the organization, not a Cost Center (QĐ-86b): there is one kind.
 enum CostCenterKind {
   UNIT
-  COMPANY
 }
 
 enum CostCenterStatus {
@@ -40,10 +40,12 @@ model Organization {
   id                   String    @id @default(uuid()) @db.Uuid
   name                 String
   timeZone             String    @map("time_zone")
-  reportingCurrency    String    @map("reporting_currency")
+  reportingCurrency    String    @map("reporting_currency") @db.Char(3)
   bootstrapCompletedAt DateTime? @map("bootstrap_completed_at") @db.Timestamptz(3)
   createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
 
+  // The currency must be one finance knows (DB-02); the lock and its concurrency rule are triggers (migration 20261022100000).
+  reportingCurrencyRecord            Currency                            @relation("OrganizationReportingCurrency", fields: [reportingCurrency], references: [code])
   costCenters                        CostCenter[]
   departments                        Department[]
   jobTitles                          JobTitle[]
@@ -106,13 +108,15 @@ model Department {
   updatedAt           DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
   deactivatedAt       DateTime?        @map("deactivated_at") @db.Timestamptz(3)
 
-  organization     Organization           @relation(fields: [organizationId], references: [id])
-  costCenter       CostCenter             @relation(fields: [costCenterId], references: [id])
-  itAdmin          Employee?              @relation("DepartmentItAdmin", fields: [itAdminEmployeeId], references: [id], onDelete: Restrict)
-  placements       EmployeePlacement[]
-  headPeriods      DepartmentHeadPeriod[]
-  projects         ProjectDepartment[]
-  standardToolsets StandardToolset[]
+  organization            Organization           @relation(fields: [organizationId], references: [id])
+  costCenter              CostCenter             @relation(fields: [costCenterId], references: [id])
+  itAdmin                 Employee?              @relation("DepartmentItAdmin", fields: [itAdminEmployeeId], references: [id], onDelete: Restrict)
+  placements              EmployeePlacement[]
+  headPeriods             DepartmentHeadPeriod[]
+  projects                ProjectDepartment[]
+  standardToolsets        StandardToolset[]
+  // The service accounts the department owns (QĐ-86c); the migration keeps each charged to this department's Cost Center.
+  ownedServiceAssignments LicenseAssignment[]    @relation("AssignmentOwningDepartment")
 
   @@unique([organizationId, code])
   @@index([itAdminEmployeeId])

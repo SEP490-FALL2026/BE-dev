@@ -3,10 +3,12 @@ import { BusinessDate, businessDateAt } from '../../core/business-date';
 import { DbTx } from '../../infrastructure/database/transaction-runner';
 import { CostCenterCatalogueService } from './cost-center/cost-center-catalogue.service';
 import { DepartmentDirectoryService } from './department/department-directory.service';
+import { DepartmentServiceAccountRegistry } from './department/service-account-registry';
 import { DepartmentHeadRecord, HeadPeriodChanges, HeadPeriodRecord } from './department/department.types';
 import { EmployeeDirectoryService } from './employee/employee-directory.service';
 import { JobTitleCatalogueService } from './job-title/job-title-catalogue.service';
 import { JobTitleListFilter, JobTitleRecord, JobTitleStatus } from './job-title/job-title.types';
+import { toLocalSeedFixtureFacts } from './mappers/local-seed-fixture.mapper';
 import { OrganizationRepo } from './organization.repo';
 import {
   CostCenterBrief,
@@ -15,22 +17,22 @@ import {
   CreateEmployeeWithPlacementInput,
   CreateOrganizationInput,
   DepartmentBrief,
+  DepartmentServiceAccountReader,
   EmployeeCandidate,
   EmployeeImportLookupData,
   EmployeeProfile,
   EmployeeRecord,
   LocalSeedFixtureFacts,
+  OfficialFieldsPatch,
   OnboardingFacts,
+  OwningUnit,
   OrganizationRecord,
 } from './organization.types';
 
 const toBrief = (record: { id: string; code: string; name: string; status: string } | null): DepartmentBrief | null =>
   record && { id: record.id, code: record.code, name: record.name, active: record.status === 'ACTIVE' };
 
-/**
- * Public facade of the organization module. Other modules call these methods with their own
- * transaction; none of them may touch the organization tables directly.
- */
+/** Public facade of the organization module: other modules call it in their own transaction, never the tables. */
 @Injectable()
 export class OrganizationService {
   /** The organization's time zone never changes after installation (I-8), so it is read once. */
@@ -42,6 +44,7 @@ export class OrganizationService {
     private readonly employees: EmployeeDirectoryService,
     private readonly costCenters: CostCenterCatalogueService,
     private readonly jobTitles: JobTitleCatalogueService,
+    private readonly serviceAccounts: DepartmentServiceAccountRegistry,
   ) {}
 
   /** Today in the organization's own calendar (`now` is a parameter for tests; `tx` reads the zone in the caller's transaction). */
@@ -68,6 +71,16 @@ export class OrganizationService {
   /** The department with this id: its code, name and whether it is still active; null when there is none. */
   async getDepartmentBrief(departmentId: string, tx?: DbTx): Promise<DepartmentBrief | null> {
     return toBrief(await this.departments.find(departmentId, tx));
+  }
+
+  /** The departments with these ids in one read, by id (`LD-07`). */
+  async getDepartmentBriefs(departmentIds: readonly string[], tx?: DbTx): Promise<DepartmentBrief[]> {
+    return (await this.departments.findMany(departmentIds, tx)).flatMap((record) => toBrief(record) ?? []);
+  }
+
+  /** The job titles with these ids in one read (`LD-07`). */
+  getJobTitles(jobTitleIds: readonly string[], tx?: DbTx): Promise<JobTitleRecord[]> {
+    return this.jobTitles.findMany(jobTitleIds, tx);
   }
 
   /** The same, held `FOR SHARE` until the caller transaction ends, so it cannot be made inactive between check and commit. */
@@ -131,6 +144,11 @@ export class OrganizationService {
   /** The installation's organization, or null before bootstrap. */
   getOrganization(tx?: DbTx): Promise<OrganizationRecord | null> {
     return this.repo.findOrganization(tx);
+  }
+
+  /** The organization, its row held shared until `tx` ends: a caller freezing a value into the reporting currency (DB-01). */
+  getOrganizationShared(tx: DbTx): Promise<OrganizationRecord | null> {
+    return this.repo.findOrganizationShared(tx);
   }
 
   /** Changes the reporting currency; the database locks it once a rate or a converted price exists (AC-9, `55000`). */
@@ -225,6 +243,11 @@ export class OrganizationService {
     return this.employees.lock(tx, employeeId, 'UPDATE');
   }
 
+  /** Corrects the official fields of an employee whose row the caller holds `FOR UPDATE` (`US-02-02` AC-19). */
+  updateEmployeeOfficialFields(tx: DbTx, employeeId: string, patch: OfficialFieldsPatch): Promise<void> {
+    return this.employees.updateOfficialFields(tx, employeeId, patch);
+  }
+
   /** Unlocked read. Pass `tx` to read inside a transaction without taking a lock. */
   getEmployee(employeeId: string, tx?: DbTx): Promise<EmployeeRecord | null> {
     return this.employees.find(employeeId, tx);
@@ -246,15 +269,11 @@ export class OrganizationService {
   }
 
   /** Several employees in one read, for list views. Unknown ids are simply absent. */
-  getEmployees(employeeIds: string[]): Promise<EmployeeRecord[]> {
-    return this.employees.findMany(employeeIds);
+  getEmployees(employeeIds: string[], tx?: DbTx): Promise<EmployeeRecord[]> {
+    return this.employees.findMany(employeeIds, tx);
   }
 
-  /**
-   * Employees who have not left, matched literally on code, name or work email, in employee-code
-   * order, leaving out `excludeEmployeeIds` (the caller's own filter, for example employees that
-   * already have an account). One query: the exclusion is applied before the limit.
-   */
+  /** Employees who have not left, matched on code, name or work email, by code, minus `excludeEmployeeIds` (one query). */
   searchActiveEmployees(
     search: string | undefined,
     onDate: Date,
@@ -318,11 +337,7 @@ export class OrganizationService {
     return without.filter((department) => wanted.has(department.id));
   }
 
-  /**
-   * The three local seed fixture items by their stable keys, in the caller's transaction (`pnpm dev:seed`, P23-RV-01):
-   * the cost center with the department charged to it, the department with its cost center, and the job title with
-   * this normalized name. Each is null when absent.
-   */
+  /** The three local seed fixture items by their stable keys, in the caller's transaction (`pnpm dev:seed`); null when absent. */
   async readLocalSeedFixture(
     tx: DbTx,
     keys: { organizationId: string; costCenterCode: string; departmentCode: string; normalizedJobTitleName: string },
@@ -331,31 +346,22 @@ export class OrganizationService {
     const department = await this.departments.findByCode(tx, keys.organizationId, keys.departmentCode);
     const jobTitle = await this.jobTitles.findByNormalizedName(keys.organizationId, keys.normalizedJobTitleName, tx);
 
-    return {
-      costCenter: costCenter && {
-        id: costCenter.id,
-        code: costCenter.code,
-        name: costCenter.name,
-        kind: costCenter.kind,
-        status: costCenter.status,
-        departmentCode: costCenter.department?.code ?? null,
-      },
-      department: department && {
-        id: department.id,
-        code: department.code,
-        name: department.name,
-        status: department.status,
-        costCenterId: department.costCenter.id,
-        costCenterCode: department.costCenter.code,
-      },
-      jobTitle: jobTitle && {
-        id: jobTitle.id,
-        name: jobTitle.name,
-        // Found by this key, so it is the key itself.
-        normalizedName: keys.normalizedJobTitleName,
-        status: jobTitle.status,
-      },
-    };
+    return toLocalSeedFixtureFacts(costCenter, department, jobTitle, keys.normalizedJobTitleName);
+  }
+
+  /** For each employee, the department they were in on `onDate` and its Unit: where a service account they answer for is owned and charged (`QĐ-86c`). */
+  getOwningUnits(employeeIds: readonly string[], onDate: BusinessDate, tx?: DbTx): Promise<Map<string, OwningUnit>> {
+    return this.departments.owningUnitsOn(employeeIds, onDate, tx);
+  }
+
+  /** `licensing` hands over how the organization reads the service accounts a department owns, when its module starts. */
+  registerServiceAccountReader(reader: DepartmentServiceAccountReader): void {
+    this.serviceAccounts.register(reader);
+  }
+
+  /** The first `limit` open or future service accounts the department owns and how many there are (`QĐ-86c`). */
+  getOwnedServiceAccounts(departmentId: string, onDate: BusinessDate, limit: number, tx?: DbTx) {
+    return this.serviceAccounts.current().ownedBy(departmentId, onDate, limit, tx);
   }
 
   /** The numbers and gaps of the onboarding checklist (US-02-04 AC-1, AC-6); with `tx`, in order in that transaction. */

@@ -19,8 +19,8 @@ export class RoleGrantService {
     return this.grants.effectiveRolesFor(appUserIds);
   }
 
-  grantHistory(appUserId: string): Promise<RoleGrantRecord[]> {
-    return this.grants.grantHistory(appUserId);
+  grantHistory(appUserId: string, limit: number): Promise<RoleGrantRecord[]> {
+    return this.grants.grantHistory(appUserId, limit);
   }
 
   grantRole(

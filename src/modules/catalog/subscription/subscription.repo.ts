@@ -14,7 +14,18 @@ import type {
   UnitPriceRecord,
 } from './subscription.types';
 
-const WITH_PLAN = { plan: { include: { application: { include: { vendor: true } } } } } as const;
+/** The plan, its application and the vendor of it, only as far as a subscription is answered with them (`LD-01`). */
+const WITH_PLAN = {
+  plan: {
+    select: {
+      name: true,
+      pricingModel: true,
+      application: {
+        select: { id: true, name: true, kind: true, vendor: { select: { id: true, name: true } } },
+      },
+    },
+  },
+} as const;
 type Row = Prisma.SubscriptionGetPayload<{ include: typeof WITH_PLAN }>;
 
 const date = (value: Date | null) => (value ? fromDateColumn(value) : null);
@@ -159,10 +170,31 @@ export class SubscriptionRepo {
     return toRecord(row);
   }
 
-  /** Every active term subscription, optionally of one plan, oldest first: what the notice and the alerts are drawn from. */
-  async listActiveTerms(planId?: string): Promise<SubscriptionRecord[]> {
+  /**
+   * The active term subscriptions whose milestone (the base date of `deriveNotice`: the declared deadline, else the renewal
+   * or end date less the notice period, else the end date of one that does not renew itself) falls between `from` and `to`,
+   * oldest first: the only ones a review alert can need (`LD-02`), read by that window instead of all of them. The
+   * rule is written twice (here and in `deriveNotice`); `catalog-subscription-read-model` checks that they agree.
+   */
+  async listTermsWithMilestoneBetween(
+    from: BusinessDate,
+    to: BusinessDate,
+    planId?: string,
+  ): Promise<SubscriptionRecord[]> {
+    const ids = await this.prisma.$queryRaw<{ id: string }[]>`
+      SELECT s.id
+        FROM subscriptions s
+       WHERE s.status = 'ACTIVE' AND s.kind = 'TERM'
+         ${planId ? Prisma.sql`AND s.plan_id = ${planId}::uuid` : Prisma.empty}
+         AND (CASE
+                WHEN s.notice_deadline IS NOT NULL THEN s.notice_deadline
+                WHEN s.notice_period_days IS NOT NULL AND COALESCE(s.renewal_date, s.end_date) IS NOT NULL
+                  THEN COALESCE(s.renewal_date, s.end_date) - s.notice_period_days
+                WHEN NOT s.auto_renew AND s.end_date IS NOT NULL THEN s.end_date
+              END) BETWEEN ${from}::date AND ${to}::date`;
+    if (ids.length === 0) return [];
     const rows = await this.prisma.subscription.findMany({
-      where: { status: 'ACTIVE', kind: 'TERM', ...(planId ? { planId } : {}) },
+      where: { id: { in: ids.map((row) => row.id) } },
       include: WITH_PLAN,
       orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
     });

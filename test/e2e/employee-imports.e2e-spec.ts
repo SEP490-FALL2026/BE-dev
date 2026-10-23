@@ -6,6 +6,7 @@ import { AppModule } from '../../src/app.module';
 import { configureApplication } from '../../src/bootstrap';
 import { ACCESS_TOKEN_VERIFIER } from '../../src/infrastructure/security/tokens/access-token-verifier.port';
 import { bodyOf } from '../support/api-body';
+import { HR_BASIS } from '../support/hr-basis';
 
 const ID = '3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11';
 
@@ -39,7 +40,7 @@ const ROUTES: Array<[string, Call]> = [
     (server) =>
       request(server)
         .post(`/api/v1/employee-imports/${ID}/confirmations`)
-        .send({ previewVersion: 1, idempotencyKey: 'a-key-of-8' }),
+        .send({ previewVersion: 1, idempotencyKey: 'a-key-of-8', hrBasis: HR_BASIS }),
   ],
   [
     'POST /employee-imports/{id}/cancellations',
@@ -67,7 +68,7 @@ describe('people import routes (e2e, no database)', () => {
   });
 
   it.each(ROUTES)('%s without a token is 401', async (_name, call) => {
-    app = await appFor(principal(['IT_ADMIN']));
+    app = await appFor(principal(['SUPER_ADMIN']));
 
     const response = await call(app.getHttpServer()).expect(401);
 
@@ -76,7 +77,7 @@ describe('people import routes (e2e, no database)', () => {
 
   it.each([
     ['the finance officer', ['FINANCE'], []],
-    ['the Super Admin, who never does business work (SoD-1)', ['SUPER_ADMIN'], []],
+    ['the IT Admin, who no longer imports people (QĐ-82i)', ['IT_ADMIN'], []],
     ['an employee', ['EMPLOYEE'], []],
     ['an account with no role', [], []],
     ['a department head, whose role is derived', [], ['MANAGER']],
@@ -94,7 +95,7 @@ describe('people import routes (e2e, no database)', () => {
     const asIt = () => ({ Authorization: 'Bearer any' });
 
     it('turns away an upload with no file, 422 IMPORT.FILE_REQUIRED', async () => {
-      app = await appFor(principal(['IT_ADMIN']));
+      app = await appFor(principal(['SUPER_ADMIN']));
 
       const response = await request(app.getHttpServer()).post('/api/v1/employee-imports').set(asIt()).expect(422);
 
@@ -102,13 +103,58 @@ describe('people import routes (e2e, no database)', () => {
     });
 
     it.each([
-      ['no version', { idempotencyKey: 'a-key-of-8' }],
-      ['a version of zero', { previewVersion: 0, idempotencyKey: 'a-key-of-8' }],
-      ['no key', { previewVersion: 1 }],
-      ['a key that is too short', { previewVersion: 1, idempotencyKey: 'short' }],
-      ['an unknown field', { previewVersion: 1, idempotencyKey: 'a-key-of-8', force: true }],
+      [
+        'fifty text fields next to the file',
+        (s: App) => {
+          let call = request(s).post('/api/v1/employee-imports');
+          for (let index = 0; index < 50; index += 1) call = call.field(`extra${index}`, 'x');
+
+          return call.attach('file', Buffer.from('a,b\n1,2'), 'people.csv');
+        },
+      ],
+      [
+        'a text field of a megabyte',
+        (s: App) =>
+          request(s)
+            .post('/api/v1/employee-imports')
+            .field('note', 'x'.repeat(1024 * 1024))
+            .attach('file', Buffer.from('a,b\n1,2'), 'people.csv'),
+      ],
+      [
+        'two files',
+        (s: App) =>
+          request(s)
+            .post('/api/v1/employee-imports')
+            .attach('file', Buffer.from('a,b\n1,2'), 'people.csv')
+            .attach('file', Buffer.from('a,b\n3,4'), 'more.csv'),
+      ],
+    ])('refuses an upload with %s before it is read (SEC-06)', async (_name, call) => {
+      app = await appFor(principal(['SUPER_ADMIN']));
+
+      const response = await call(app.getHttpServer()).set(asIt());
+
+      // The multipart parser stops at the limit: the form never reaches the validation that would have judged it.
+      expect(response.status).toBe(400);
+      expect(bodyOf(response).error.code).toBe('HTTP_BAD_REQUEST');
+    });
+
+    it.each([
+      ['no version', { idempotencyKey: 'a-key-of-8', hrBasis: HR_BASIS }],
+      ['a version of zero', { previewVersion: 0, idempotencyKey: 'a-key-of-8', hrBasis: HR_BASIS }],
+      ['no key', { previewVersion: 1, hrBasis: HR_BASIS }],
+      ['a key that is too short', { previewVersion: 1, idempotencyKey: 'short', hrBasis: HR_BASIS }],
+      ['an unknown field', { previewVersion: 1, idempotencyKey: 'a-key-of-8', hrBasis: HR_BASIS, force: true }],
+      ['no HR basis', { previewVersion: 1, idempotencyKey: 'a-key-of-8' }],
+      [
+        'an HR basis without a type',
+        { previewVersion: 1, idempotencyKey: 'a-key-of-8', hrBasis: { ...HR_BASIS, type: '' } },
+      ],
+      [
+        'an HR basis without an issuer',
+        { previewVersion: 1, idempotencyKey: 'a-key-of-8', hrBasis: { ...HR_BASIS, issuer: undefined } },
+      ],
     ])('turns away a confirmation with %s, 422 VALIDATION_ERROR', async (_name, body) => {
-      app = await appFor(principal(['IT_ADMIN']));
+      app = await appFor(principal(['SUPER_ADMIN']));
 
       const response = await request(app.getHttpServer())
         .post(`/api/v1/employee-imports/${ID}/confirmations`)
@@ -124,14 +170,14 @@ describe('people import routes (e2e, no database)', () => {
       ['a filter that is not an outcome', `/api/v1/employee-imports/${ID}/rows?outcome=GOOD`],
       ['a page size of 201', `/api/v1/employee-imports/${ID}/rows?pageSize=201`],
     ])('turns away a read with %s, 422', async (_name, path) => {
-      app = await appFor(principal(['IT_ADMIN']));
+      app = await appFor(principal(['SUPER_ADMIN']));
 
       await request(app.getHttpServer()).get(path).set(asIt()).expect(422);
     });
   });
 
   it('has no route that writes people without a confirmation, or that deletes an import', async () => {
-    app = await appFor(principal(['IT_ADMIN']));
+    app = await appFor(principal(['SUPER_ADMIN']));
 
     for (const [method, path] of [
       ['put', `/api/v1/employee-imports/${ID}`],

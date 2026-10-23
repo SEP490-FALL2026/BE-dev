@@ -385,13 +385,15 @@ describe('the application catalog over HTTP (integration, real PostgreSQL)', () 
       expect(codeOf(await create({ ...body, name: name.toUpperCase() }).expect(409))).toBe('APPLICATION.NAME_TAKEN');
     });
 
-    it('AC-12: free external software is refused whole: 422, and no application, vendor or proposal appears', async () => {
+    it('BBI-D09 (QĐ-82n): there is no kind for free external software; the request schema refuses it whole, with no application, vendor, proposal or audit event', async () => {
       const before = await counts();
+      const audited = await n('audit_events');
 
       const response = await create(base({ kind: 'FREE_EXTERNAL', name: 'Photo editor (Free plan)' })).expect(422);
 
-      expect(codeOf(response)).toBe('APPLICATION.KIND_NOT_MANAGED');
+      expect(codeOf(response)).toBe('VALIDATION_ERROR');
       expect(await counts()).toEqual(before);
+      expect(await n('audit_events')).toBe(audited);
     });
 
     it('AC-13: licensed software is stored without any plan or subscription', async () => {

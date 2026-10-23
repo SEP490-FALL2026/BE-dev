@@ -7,6 +7,8 @@ import type {
 } from '../../src/infrastructure/object-storage/object-storage.port';
 
 interface StoredObject {
+  /** Names this exact content: a new one every time the object is put. */
+  etag?: string;
   contentLength: number;
   contentType: string;
   /** The bytes of the object; left out, it begins the way its type says it does. */
@@ -20,7 +22,8 @@ const GENUINE_START: Record<string, number[]> = {
   'image/jpeg': [0xff, 0xd8, 0xff],
 };
 
-export type FakeStorageCall = 'head' | 'readPrefix' | 'delete' | 'createUploadUrl' | 'createDownloadUrl';
+export type FakeStorageCall =
+  'head' | 'readPrefix' | 'copyIfMatch' | 'delete' | 'createUploadUrl' | 'createDownloadUrl';
 
 /**
  * The object storage in memory, for the tests that need what a real bucket would say: which links were asked for and
@@ -29,8 +32,24 @@ export type FakeStorageCall = 'head' | 'readPrefix' | 'delete' | 'createUploadUr
  */
 export class FakeObjectStorage implements ObjectStoragePort {
   readonly objects = new Map<string, StoredObject>();
-  readonly uploadLinks: { key: string; contentType: string; expiresInSeconds: number; url: string }[] = [];
-  readonly downloadLinks: { key: string; expiresInSeconds: number; url: string; issuedAt: Date }[] = [];
+  readonly uploadLinks: {
+    key: string;
+    contentType: string;
+    contentLength: number;
+    expiresInSeconds: number;
+    url: string;
+  }[] = [];
+  readonly downloadLinks: {
+    key: string;
+    fileName: string;
+    contentType: string;
+    expiresInSeconds: number;
+    url: string;
+    issuedAt: Date;
+  }[] = [];
+  readonly copied: { from: string; to: string }[] = [];
+  /** Runs after the object was looked at and before it is copied: a client that puts the file again in that moment. */
+  beforeCopy: ((fromKey: string) => void) | undefined;
   readonly deleted: string[] = [];
   /** The calls that answer as an outage until they are taken out of the set. */
   readonly unavailable = new Set<FakeStorageCall>();
@@ -67,16 +86,34 @@ export class FakeObjectStorage implements ObjectStoragePort {
       contentLength: stored.contentLength,
       contentType: stored.contentType,
       checksum: undefined,
+      etag: stored.etag,
     });
   }
 
-  readPrefix(key: string, length: number): Promise<Uint8Array> {
+  readPrefix(key: string, length: number, ifMatchEtag?: string): Promise<Uint8Array> {
     this.refuseWhileDown('readPrefix');
     const stored = this.objects.get(key);
     if (!stored) return Promise.reject(Object.assign(new Error('NotFound'), { name: 'NotFound' }));
+    if (ifMatchEtag !== undefined && stored.etag !== ifMatchEtag) {
+      return Promise.reject(Object.assign(new Error('PreconditionFailed'), { name: 'PreconditionFailed' }));
+    }
     const content = stored.content ?? Uint8Array.from(GENUINE_START[stored.contentType] ?? []);
 
     return Promise.resolve(content.slice(0, length));
+  }
+
+  copyIfMatch(fromKey: string, toKey: string, etag: string): Promise<void> {
+    this.refuseWhileDown('copyIfMatch');
+    this.beforeCopy?.(fromKey);
+    const stored = this.objects.get(fromKey);
+    if (!stored) return Promise.reject(Object.assign(new Error('NotFound'), { name: 'NotFound' }));
+    if (stored.etag !== etag) {
+      return Promise.reject(Object.assign(new Error('PreconditionFailed'), { name: 'PreconditionFailed' }));
+    }
+    this.objects.set(toKey, { ...stored, etag: `e${(this.counter += 1)}` });
+    this.copied.push({ from: fromKey, to: toKey });
+
+    return Promise.resolve();
   }
 
   delete(key: string): Promise<void> {
@@ -89,7 +126,7 @@ export class FakeObjectStorage implements ObjectStoragePort {
 
   /** What the client does after it is given an upload link: puts the file, which may not be what it declared. */
   put(key: string, stored: StoredObject): void {
-    this.objects.set(key, stored);
+    this.objects.set(key, { ...stored, etag: `e${(this.counter += 1)}` });
   }
 
   /** Opens a link at a given time, the way the storage would: a link past its time, or of a deleted object, opens nothing. */

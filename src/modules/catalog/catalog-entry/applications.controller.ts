@@ -21,8 +21,9 @@ import {
 } from './application.dto';
 import { toApplicationApiException } from './application.http-errors';
 import { usageCollectionDefault } from './application.policy';
+import { ApplicationListService } from './application-list.service';
 import { ApplicationService } from './application.service';
-import type { ApplicationView } from './application.types';
+import type { ApplicationSummaryView, ApplicationView } from './application.types';
 
 const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPONSE] as const;
 const IT_ONLY = {
@@ -36,7 +37,7 @@ const READERS = {
 const INVALID = {
   status: HttpStatus.UNPROCESSABLE_ENTITY,
   description:
-    'The request is invalid (VALIDATION_ERROR) or a rule refuses it: APPLICATION.KIND_NOT_MANAGED, NAME_INVALID, VENDOR_NAME_INVALID, DOMAIN_INVALID, TOO_MANY_DOMAINS, NOTE_INVALID, VENDOR_REQUIRED, VENDOR_SOURCE_AMBIGUOUS, INTERNAL_HAS_NO_VENDOR, BUSINESS_OWNER_INVALID, FUNCTIONAL_GROUP_INVALID, DICTIONARY_LINE_NOT_FOUND, DICTIONARY_LINE_MISMATCH or UPDATE_EMPTY.',
+    'The request is invalid (VALIDATION_ERROR) or a rule refuses it: NAME_INVALID, VENDOR_NAME_INVALID, DOMAIN_INVALID, TOO_MANY_DOMAINS, NOTE_INVALID, VENDOR_REQUIRED, VENDOR_SOURCE_AMBIGUOUS, INTERNAL_HAS_NO_VENDOR, BUSINESS_OWNER_INVALID, FUNCTIONAL_GROUP_INVALID, DICTIONARY_LINE_NOT_FOUND, DICTIONARY_LINE_MISMATCH or UPDATE_EMPTY.',
 } as const;
 const CONFLICT = {
   status: HttpStatus.CONFLICT,
@@ -48,23 +49,31 @@ const NOT_FOUND = {
   description: 'The application does not exist (APPLICATION.NOT_FOUND).',
 } as const;
 
-function toWire(application: ApplicationView) {
+function toSummaryWire(application: ApplicationSummaryView) {
   return {
     id: application.id,
     name: application.name,
     kind: application.kind,
     vendor: application.vendor ? { id: application.vendor.id, name: application.vendor.name } : null,
-    dictionaryServiceLineId: application.dictionaryServiceLineId,
-    domains: application.domains,
     dataSensitivity: application.dataSensitivity,
+    isCommunicationService: application.isCommunicationService,
     businessOwner: application.businessOwner,
     businessOwnerReplacementRequired: application.businessOwnerReplacementRequired,
-    communication: application.communication,
-    usageCollectionDefault: usageCollectionDefault(application.communication.isCommunicationService),
+    usageCollectionDefault: usageCollectionDefault(application.isCommunicationService),
     functionalGroup: application.functionalGroup,
     status: application.status,
-    createdAt: application.createdAt.toISOString(),
     updatedAt: application.updatedAt.toISOString(),
+  };
+}
+
+/** The detail: the summary fields (the same function) and the rest of the application. */
+function toWire(application: ApplicationView) {
+  return {
+    ...toSummaryWire({ ...application, isCommunicationService: application.communication.isCommunicationService }),
+    dictionaryServiceLineId: application.dictionaryServiceLineId,
+    domains: application.domains,
+    communication: application.communication,
+    createdAt: application.createdAt.toISOString(),
   };
 }
 
@@ -76,7 +85,10 @@ function toWire(application: ApplicationView) {
 @ApiTags('applications')
 @Controller({ path: 'applications', version: '1' })
 export class ApplicationsController {
-  constructor(private readonly applications: ApplicationService) {}
+  constructor(
+    private readonly applications: ApplicationService,
+    private readonly summaries: ApplicationListService,
+  ) {}
 
   @Get()
   @RequireRoles('IT_ADMIN', 'FINANCE')
@@ -92,10 +104,10 @@ export class ApplicationsController {
   })
   async list(@Query() query: ListApplicationsQueryDto) {
     try {
-      const page = await this.applications.list(query);
+      const page = await this.summaries.list(query);
       const emptyState = page.items.length === 0 ? await this.applications.emptyState() : null;
 
-      return { items: page.items.map(toWire), pagination: page.pagination, emptyState };
+      return { items: page.items.map(toSummaryWire), pagination: page.pagination, emptyState };
     } catch (error) {
       throw toApplicationApiException(error);
     }
@@ -127,7 +139,7 @@ export class ApplicationsController {
   @ApiSuccessResponse(ApplicationDetailResponseDto, {
     message: 'APPLICATION.FETCHED',
     description:
-      'The application and, in similarApplications, the other approved applications of its functional group; recommendations says, without blocking anything, when a K2 plan is worth considering (three different people on K1 plans).',
+      'The application and, in similarApplications, the first 20 other approved applications of its functional group and, in similarTotal, how many there are; recommendations says, without blocking anything, when a K2 plan is worth considering (three different people on K1 plans).',
   })
   @ApiErrorResponses(...AUTH_ERRORS, READERS, NOT_FOUND, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -135,9 +147,9 @@ export class ApplicationsController {
   })
   async get(@Param() params: ApplicationIdParamDto) {
     try {
-      const { application, similar, recommendations } = await this.applications.get(params.id);
+      const { application, similar, similarTotal, recommendations } = await this.applications.get(params.id);
 
-      return { ...toWire(application), similarApplications: similar, recommendations };
+      return { ...toWire(application), similarApplications: similar, similarTotal, recommendations };
     } catch (error) {
       throw toApplicationApiException(error);
     }

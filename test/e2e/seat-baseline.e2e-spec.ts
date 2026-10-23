@@ -124,6 +124,43 @@ describe('seat baseline routes (e2e, no database)', () => {
     });
 
     it.each([
+      [
+        'fifty text fields next to the file',
+        (s: App) => {
+          let call = request(s).post('/api/v1/seat-baseline-imports').field('subscriptionId', ID);
+          for (let index = 0; index < 50; index += 1) call = call.field(`extra${index}`, 'x');
+
+          return call.attach('file', Buffer.from('a'), 'f.csv');
+        },
+      ],
+      [
+        'a text field of a megabyte',
+        (s: App) =>
+          request(s)
+            .post('/api/v1/seat-baseline-imports')
+            .field('subscriptionId', 'x'.repeat(1024 * 1024))
+            .attach('file', Buffer.from('a'), 'f.csv'),
+      ],
+      [
+        'two files',
+        (s: App) =>
+          request(s)
+            .post('/api/v1/seat-baseline-imports')
+            .field('subscriptionId', ID)
+            .attach('file', Buffer.from('a'), 'f.csv')
+            .attach('file', Buffer.from('b'), 'g.csv'),
+      ],
+    ])('refuses an upload with %s before it is read (SEC-06)', async (_name, call) => {
+      app = await appFor(principal(['IT_ADMIN']));
+
+      const response = await call(app.getHttpServer()).set(asIt());
+
+      // The multipart parser stops at the limit: the form never reaches the validation that would have judged it.
+      expect(response.status).toBe(400);
+      expect(bodyOf(response).error.code).toBe('HTTP_BAD_REQUEST');
+    });
+
+    it.each([
       ['a version that is not positive', { previewVersion: 0, idempotencyKey: 'key-00000001' }],
       ['a version that is not a whole number', { previewVersion: 1.5, idempotencyKey: 'key-00000001' }],
       ['a key that is too short', { previewVersion: 1, idempotencyKey: 'short' }],

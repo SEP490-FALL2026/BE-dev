@@ -16,6 +16,11 @@ export class PlanLookupService {
     return this.plans.lockSharedLookup(tx, id);
   }
 
+  /** The plans with these ids as `LockedPlan`s without a lock, in one read. */
+  lookups(ids: readonly string[], tx?: DbTx): Promise<LockedPlan[]> {
+    return this.plans.findLookups(ids, tx);
+  }
+
   /** The plans with these ids by name, with their application: for the views that list seats. */
   summaries(ids: readonly string[]): Promise<PlanSummary[]> {
     return this.plans.findSummaries(ids);
@@ -24,8 +29,9 @@ export class PlanLookupService {
   /** The plans declared under an application: for the rules and the views that look at a software through its plans. */
   plansOfApplication(
     applicationId: string,
+    tx?: DbTx,
   ): Promise<{ id: string; name: string; provisioningType: 'K1' | 'K2' | 'K3' | 'K4' | 'K5' }[]> {
-    return this.plans.findOfApplication(applicationId);
+    return this.plans.findOfApplication(applicationId, tx);
   }
 
   /** The plans of an application locked until the transaction ends: nothing is granted under them meanwhile. */

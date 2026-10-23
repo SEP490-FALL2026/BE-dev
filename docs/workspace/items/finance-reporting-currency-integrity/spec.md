@@ -67,22 +67,24 @@ Migration mới (trigger khóa `FOR SHARE`, FK); `finance.service.ts`, `exchange
 
 ## Test matrix
 
-| AC / rủi ro | Tình huống (gồm từ chối, edge case)                                            | Cấp test    | Kết quả mong đợi                                        | Bằng chứng sau implement |
-| ----------- | ------------------------------------------------------------------------------ | ----------- | ------------------------------------------------------- | ------------------------ |
-| `DB-01`     | tx A đổi VND→USD giữ khóa; tx B ghi tỷ giá USD (chờ `pg_locks`, không `sleep`) | integration | một bên bị từ chối; không có tỷ giá cho tiền tệ báo cáo | chưa chạy                |
-| `DB-01`     | tx A đổi tiền tệ; tx B chụp giá theo VND                                       | integration | không còn ảnh chụp theo tiền tệ cũ sau khi khóa         | chưa chạy                |
-| `DB-02`     | khởi tạo với `MYR`; migration trên CSDL có `MYR`                               | integration | khởi tạo từ chối; migration dừng có hướng dẫn           | chưa chạy                |
-| `DB-02`     | ghi giá khi tiền tệ báo cáo không hỗ trợ (dữ liệu cũ)                          | integration | 409 có mã, không 500                                    | chưa chạy                |
+| AC / rủi ro | Tình huống (gồm từ chối, edge case)                                            | Cấp test    | Kết quả mong đợi                                        | Bằng chứng sau implement                                                    |
+| ----------- | ------------------------------------------------------------------------------ | ----------- | ------------------------------------------------------- | --------------------------------------------------------------------------- |
+| `DB-01`     | tx A đổi VND→USD giữ khóa; tx B ghi tỷ giá USD (chờ `pg_locks`, không `sleep`) | integration | một bên bị từ chối; không có tỷ giá cho tiền tệ báo cáo | xanh — `reporting-currency-integrity` (8), `reporting-currency-application` |
+| `DB-01`     | tx A đổi tiền tệ; tx B chụp giá theo VND                                       | integration | không còn ảnh chụp theo tiền tệ cũ sau khi khóa         | xanh — `reporting-currency-integrity` (8), `reporting-currency-application` |
+| `DB-02`     | khởi tạo với `MYR`; migration trên CSDL có `MYR`                               | integration | khởi tạo từ chối; migration dừng có hướng dẫn           | xanh — `reporting-currency-integrity` (8), `reporting-currency-application` |
+| `DB-02`     | ghi giá khi tiền tệ báo cáo không hỗ trợ (dữ liệu cũ)                          | integration | 409 có mã, không 500                                    | xanh — `reporting-currency-integrity` (8), `reporting-currency-application` |
 
 ## Definition of Done
 
 - [ ] Mọi primary AC `full` có test đỏ-trước/xanh-sau ở cấp phù hợp; AC `partial` ghi đúng vế đã làm — áp cho `DB-01`,
       `DB-02`.
-- [ ] Gate theo [CONTRIBUTING](../../../../CONTRIBUTING.md) chạy xanh trên revision cuối; HTTP đổi thì e2e + OpenAPI.
-- [ ] Spec/plan/roadmap phản ánh implementation cuối; contract đổi đã ghi và báo consumer FE.
-- [ ] Không tăng legacy ledger kiến trúc; nếu gỡ được mục nào thì xóa mục đó.
-- [ ] Tài liệu vận hành/runbook bị ảnh hưởng đã cập nhật; phần chưa kiểm chứng ghi rõ.
+- [x] Gate theo [CONTRIBUTING](../../../../CONTRIBUTING.md) chạy xanh trên revision cuối; HTTP đổi thì e2e + OpenAPI.
+- [x] Spec/plan/roadmap phản ánh implementation cuối; contract đổi đã ghi và báo consumer FE.
+- [x] Không tăng legacy ledger kiến trúc; nếu gỡ được mục nào thì xóa mục đó.
+- [x] Tài liệu vận hành/runbook bị ảnh hưởng đã cập nhật; phần chưa kiểm chứng ghi rõ.
 
 ## Changes and acceptance
 
 22/10/2026: lập theo Prompt 08. Chưa code, chưa review, chưa nghiệm thu.
+
+23/10/2026 (Prompt 10 — xử lý tồn đọng G0→G4): `DB-01`, `DB-02` hiện thực: migration `20261022100000_reporting_currency_integrity` (kiểm kê dừng có danh sách khi đồng tiền không thuộc bảng `currencies`; `CHAR(3)` + FK; `exchange_rates_reject_reporting_currency` đọc tổ chức `FOR SHARE`; trigger `subscriptions_price_in_reporting_currency` 23514). Ứng dụng: `getOrganizationShared` cho `snapshotMoney`; `ReportingCurrencyNotSupportedError` → 409 `REPORTING_CURRENCY_NOT_SUPPORTED`; lệnh cài đặt kiểm đồng tiền qua `FinanceService.findCurrency` trước khi băm mật khẩu hay khóa. Chưa kiểm chứng: dữ liệu cài đặt thật (chỉ CSDL dùng một lần). Kiểm chứng: `reporting-currency-integrity` (8), `reporting-currency-application` — xanh trên cây làm việc chưa commit, nhánh `Bao_dev_be`, nền `dev` `19be620`, 23/10/2026. Gate toàn cây trên cùng cây: `pnpm lint`, `tsc --noEmit`, `pnpm test` (unit 2.074 (141 suite)), `pnpm test:e2e` (839 (32 suite)), `pnpm test:integration` (112 suite, 1.429 test, gồm 4 test kho S3 thật trên LocalStack), `prisma migrate deploy` trên CSDL mới + `migrate diff --exit-code` (không lệch), `pnpm openapi:export`. Giới hạn: Không chạm CSDL dùng chung; migration chỉ chạy trên CSDL dùng một lần. ADR-0005 và ADR-0007 có chú thích về ràng buộc ngoài Prisma và tiền tệ báo cáo (vẫn Proposed). Chưa commit khi viết dòng này, chưa remote CI, chưa Owner review, chưa nghiệm thu: không có gì là `accepted`; đỏ-trước của từng test không được ghi lại.

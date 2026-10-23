@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpStatus, Param, Post } from '@nestjs/common';
+import { Body, Controller, Header, Get, HttpStatus, Param, Post } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
@@ -61,13 +61,14 @@ export class DocumentsController {
   constructor(private readonly documents: DocumentService) {}
 
   @Post()
+  @Header('Cache-Control', 'no-store')
   @RequireRoles('IT_ADMIN', 'FINANCE')
   @ApiOperation({ operationId: 'documentCreate', summary: 'Declare a file and get the link to upload it' })
   @ApiSuccessResponse(CreateDocumentResponseDto, {
     status: HttpStatus.CREATED,
     message: 'DOCUMENT.CREATED',
     description:
-      'The file is declared as awaiting its upload, with the link to put it in the storage. The uploader is the signed-in person; the body cannot say otherwise.',
+      'The file is declared as awaiting its upload, with the link to put it in the storage: it lives two minutes and takes only a file of the declared type and size. The response is never cached. The uploader is the signed-in person; the body cannot say otherwise.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
@@ -107,7 +108,11 @@ export class DocumentsController {
     ...AUTH_ERRORS,
     ROLES,
     NOT_FOUND,
-    { status: HttpStatus.CONFLICT, description: 'The upload is done already (DOCUMENT.NOT_AWAITING_UPLOAD).' },
+    {
+      status: HttpStatus.CONFLICT,
+      description:
+        'The upload is done already (DOCUMENT.NOT_AWAITING_UPLOAD), has not reached the storage yet and can be said again (DOCUMENT.UPLOAD_PENDING), or never came in a day and was given up (DOCUMENT.UPLOAD_EXPIRED).',
+    },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
@@ -174,12 +179,13 @@ export class DocumentsController {
   }
 
   @Post(':id/links')
+  @Header('Cache-Control', 'no-store')
   @RequireRoles('IT_ADMIN', 'FINANCE')
   @ApiOperation({ operationId: 'documentLink', summary: 'Get a link that opens a file for five minutes' })
   @ApiSuccessResponse(DocumentLinkResponseDto, {
     message: 'DOCUMENT.LINK_ISSUED',
     description:
-      'A link valid for five minutes, kept nowhere: every request is one more link and one more event of the audit trail, which does not hold the link.',
+      'A link valid for five minutes, kept nowhere: it opens the file as a download under its own name and type, and the response is never cached. Every request is one more link and one more event of the audit trail, which does not hold the link.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, ROLES, NOT_FOUND, INVALID_ID)
   async link(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: IdParamDto) {

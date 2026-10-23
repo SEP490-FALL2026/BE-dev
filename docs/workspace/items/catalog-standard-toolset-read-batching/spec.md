@@ -62,20 +62,22 @@ danh sách); facade `organization` (tên phòng, chức vụ theo lô). `openapi
 
 ## Test matrix
 
-| AC / rủi ro | Tình huống (gồm từ chối, edge case)                         | Cấp test              | Kết quả mong đợi                               | Bằng chứng sau implement |
-| ----------- | ----------------------------------------------------------- | --------------------- | ---------------------------------------------- | ------------------------ |
-| `LD-07`     | 100 bộ chuẩn, mỗi bộ 50 gói                                 | integration + harness | số câu lệnh hằng số; item có tên phòng/chức vụ | chưa chạy                |
-| `LD-07`     | lịch sử 40 phiên bản                                        | integration + harness | một lần đọc gói                                | chưa chạy                |
-| hồi quy     | trưởng phòng đọc phòng khác 403; nhân viên `mine` như trước | integration           | như hiện hành                                  | chưa chạy                |
+| AC / rủi ro | Tình huống (gồm từ chối, edge case)                         | Cấp test              | Kết quả mong đợi                               | Bằng chứng sau implement                        |
+| ----------- | ----------------------------------------------------------- | --------------------- | ---------------------------------------------- | ----------------------------------------------- |
+| `LD-07`     | 100 bộ chuẩn, mỗi bộ 50 gói                                 | integration + harness | số câu lệnh hằng số; item có tên phòng/chức vụ | xanh — `catalog-standard-toolset-read-batching` |
+| `LD-07`     | lịch sử 40 phiên bản                                        | integration + harness | một lần đọc gói                                | xanh — `catalog-standard-toolset-read-batching` |
+| hồi quy     | trưởng phòng đọc phòng khác 403; nhân viên `mine` như trước | integration           | như hiện hành                                  | xanh — `catalog-standard-toolset-read-batching` |
 
 ## Definition of Done
 
 - [ ] Mọi primary AC `full` có test đỏ-trước/xanh-sau ở cấp phù hợp; AC `partial` ghi đúng vế đã làm — áp cho `LD-07`.
-- [ ] Gate theo [CONTRIBUTING](../../../../CONTRIBUTING.md) chạy xanh trên revision cuối; HTTP đổi thì e2e + OpenAPI.
-- [ ] Spec/plan/roadmap phản ánh implementation cuối; contract đổi đã ghi và báo consumer FE.
-- [ ] Không tăng legacy ledger kiến trúc; hai mục registry đã gỡ.
+- [x] Gate theo [CONTRIBUTING](../../../../CONTRIBUTING.md) chạy xanh trên revision cuối; HTTP đổi thì e2e + OpenAPI.
+- [x] Spec/plan/roadmap phản ánh implementation cuối; contract đổi đã ghi và báo consumer FE.
+- [x] Không tăng legacy ledger kiến trúc; hai mục registry đã gỡ.
 - [ ] Tài liệu vận hành/runbook bị ảnh hưởng đã cập nhật; phần chưa kiểm chứng ghi rõ.
 
 ## Changes and acceptance
 
 22/10/2026: lập theo Prompt 08. Chưa code, chưa review, chưa nghiệm thu.
+
+23/10/2026 (Prompt 10 — xử lý tồn đọng G0→G4): `LD-7`: `listCurrent` một `findMany`, tên phòng/chức vụ đọc theo lô qua `getDepartmentBriefs`/`getJobTitles`; `ToolsetView` thêm `department`, `jobTitle`. Kiểm chứng: `catalog-standard-toolset-read-batching` — xanh trên cây làm việc chưa commit, nhánh `Bao_dev_be`, nền `dev` `19be620`, 23/10/2026. Gate toàn cây trên cùng cây: `pnpm lint`, `tsc --noEmit`, `pnpm test` (unit 2.074 (141 suite)), `pnpm test:e2e` (839 (32 suite)), `pnpm test:integration` (112 suite, 1.429 test, gồm 4 test kho S3 thật trên LocalStack), `prisma migrate deploy` trên CSDL mới + `migrate diff --exit-code` (không lệch), `pnpm openapi:export`. Giới hạn: Thêm trường (không bớt). Chưa commit khi viết dòng này, chưa remote CI, chưa Owner review, chưa nghiệm thu: không có gì là `accepted`; đỏ-trước của từng test không được ghi lại.

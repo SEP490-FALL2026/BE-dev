@@ -82,7 +82,9 @@ const departmentProfileSchema = departmentSchema.extend({
       validTo: z.string().nullable(),
     }),
   ),
+  headHistoryHasMore: z.boolean(),
   projects: z.array(projectSchema),
+  projectTotal: z.number().int().nonnegative(),
 });
 
 const departmentPageSchema = z.strictObject({ items: z.array(departmentSchema), pagination });
@@ -109,12 +111,14 @@ const warningsSchema = z.strictObject({
       warning: z.enum(['MISSING_HEAD', 'MISSING_IT_ADMIN']),
     }),
   ),
+  pagination,
 });
 
 export class CreateDepartmentBodyDto extends createZodDto(createDepartmentBodySchema) {}
 export class UpdateDepartmentBodyDto extends createZodDto(updateDepartmentBodySchema) {}
 export class ListDepartmentsQueryDto extends createZodDto(listDepartmentsQuerySchema) {}
 export class ListMembersQueryDto extends createZodDto(listMembersQuerySchema) {}
+export class ListWarningsQueryDto extends createZodDto(listMembersQuerySchema) {}
 export class DepartmentIdParamDto extends createZodDto(departmentIdParamSchema) {}
 export class AssignHeadBodyDto extends createZodDto(assignHeadBodySchema) {}
 export class VacateHeadBodyDto extends createZodDto(vacateHeadBodySchema) {}

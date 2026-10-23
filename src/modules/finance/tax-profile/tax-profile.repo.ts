@@ -42,6 +42,23 @@ export class TaxProfileRepo {
     return rows[0].current_version;
   }
 
+  /** The newest declaration of each vendor given, in two reads however many are given; one with no declaration is absent. */
+  async readCurrentMany(vendorIds: readonly string[], tx?: DbTx): Promise<Map<string, TaxProfileVersion>> {
+    if (vendorIds.length === 0) return new Map();
+    const client = tx ?? this.prisma;
+    const heads = await client.vendorTaxProfile.findMany({
+      where: { vendorId: { in: [...vendorIds] }, currentVersion: { gt: 0 } },
+      select: { vendorId: true, currentVersion: true },
+    });
+    if (heads.length === 0) return new Map();
+    const rows = await client.vendorTaxProfileVersion.findMany({
+      where: { OR: heads.map((head) => ({ vendorId: head.vendorId, version: head.currentVersion })) },
+      include: WITH_LINES,
+    });
+
+    return new Map(rows.map((row) => [row.vendorId, toVersion(row)]));
+  }
+
   async readVersion(vendorId: string, version: number, tx?: DbTx): Promise<TaxProfileVersion | null> {
     const row = await (tx ?? this.prisma).vendorTaxProfileVersion.findUnique({
       where: { vendorId_version: { vendorId, version } },

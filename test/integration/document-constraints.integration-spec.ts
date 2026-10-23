@@ -59,9 +59,12 @@ describe('contracts and the files kept for them (integration, PostgreSQL constra
   };
   const move = (id: string, set: string, values: unknown[] = []) =>
     sqlState(sql, `UPDATE document_attachments SET ${set} WHERE id = $1`, [id, ...values]);
+  /** The file was looked at and its bytes copied to the key it is kept under (SEC-01). */
+  const keep = (id: string) =>
+    move(id, `status = 'PENDING_ATTACH', final_object_key = $2`, [`documents/2026/10/kept-${id}`]);
   const uploaded = async (purpose?: string): Promise<string> => {
     const { id } = await newDocument({ purpose });
-    await move(id, `status = 'PENDING_ATTACH'`);
+    await keep(id);
 
     return id;
   };
@@ -145,10 +148,38 @@ describe('contracts and the files kept for them (integration, PostgreSQL constra
       const awaiting = (await newDocument()).id;
 
       expect(await move(awaiting, `status = 'READY', contract_id = $2, attached_at = now()`, [contract])).toBe('55000');
-      expect(await move(awaiting, `status = 'PENDING_ATTACH'`)).toBeNull();
+      expect(await keep(awaiting)).toBeNull();
       expect(await move(awaiting, `status = 'AWAITING_UPLOAD'`)).toBe('55000');
       expect(await move(awaiting, `status = 'QUARANTINED'`)).toBe('55000');
       expect(await move(awaiting, `status = 'READY', contract_id = $2, attached_at = now()`, [contract])).toBeNull();
+    });
+
+    it('is kept under a final key exactly when it was uploaded, and that key never changes (SEC-01)', async () => {
+      const awaiting = (await newDocument()).id;
+      const kept = await uploaded();
+
+      expect(await move(awaiting, `status = 'PENDING_ATTACH'`)).toBe('23514');
+      expect(await move(awaiting, `final_object_key = 'documents/2026/10/early'`)).toBe('23514');
+      expect(await move(kept, `final_object_key = 'documents/2026/10/replaced'`)).toBe('55000');
+      expect(await move(kept, `final_object_key = NULL`)).toBe('55000');
+      const other = await newDocument();
+      expect(
+        await move(other.id, `status = 'PENDING_ATTACH', final_object_key = $2`, [`documents/2026/10/kept-${kept}`]),
+      ).toBe('23505');
+    });
+
+    it('is given up when its upload never came, and stays given up (DB-13)', async () => {
+      const abandoned = (await newDocument()).id;
+      const kept = await uploaded();
+      const contract = await newContract();
+
+      expect(await move(kept, `status = 'EXPIRED'`)).toBe('55000');
+      expect(await move(abandoned, `status = 'EXPIRED'`)).toBeNull();
+      expect(await move(abandoned, `status = 'PENDING_ATTACH'`)).toBe('55000');
+      expect(await move(abandoned, `status = 'AWAITING_UPLOAD'`)).toBe('55000');
+      expect(await move(abandoned, `status = 'READY', contract_id = $2, attached_at = now()`, [contract])).toBe(
+        '55000',
+      );
     });
 
     it('stays as it is once attached or quarantined, and has only one owner', async () => {

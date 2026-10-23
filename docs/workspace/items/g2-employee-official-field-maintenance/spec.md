@@ -69,22 +69,24 @@ phục Super Admin; trường tự phục vụ của Employee (mô hình chưa c
 
 ## Test matrix
 
-| AC / rủi ro      | Tình huống (gồm từ chối, edge case)                                           | Cấp test    | Kết quả mong đợi                              | Bằng chứng sau implement |
-| ---------------- | ----------------------------------------------------------------------------- | ----------- | --------------------------------------------- | ------------------------ |
-| `US-02-02` AC-19 | `IT1` (phụ trách `P-DES`) sửa họ tên `E1` kèm căn cứ                          | integration | đổi; Audit Trail ghi `IT1`, trước/sau, căn cứ | chưa chạy                |
-| `US-02-02` AC-19 | sửa không căn cứ                                                              | integration | 422, không ghi                                | chưa chạy                |
-| `US-02-02` AC-19 | Super Admin sửa họ tên                                                        | integration | 403                                           | chưa chạy                |
-| `US-02-02` AC-19 | body có phòng/chức vụ/trạng thái                                              | integration | 422                                           | chưa chạy                |
-| rủi ro           | email trùng sau chuẩn hóa; ngày vào đã qua; IT Admin sửa hồ sơ của chính mình | integration | từ chối theo quy tắc                          | chưa chạy                |
+| AC / rủi ro      | Tình huống (gồm từ chối, edge case)                                           | Cấp test    | Kết quả mong đợi                              | Bằng chứng sau implement                                 |
+| ---------------- | ----------------------------------------------------------------------------- | ----------- | --------------------------------------------- | -------------------------------------------------------- |
+| `US-02-02` AC-19 | `IT1` (phụ trách `P-DES`) sửa họ tên `E1` kèm căn cứ                          | integration | đổi; Audit Trail ghi `IT1`, trước/sau, căn cứ | xanh — `employee-maintenance-http` (21), e2e `employees` |
+| `US-02-02` AC-19 | sửa không căn cứ                                                              | integration | 422, không ghi                                | xanh — `employee-maintenance-http` (21), e2e `employees` |
+| `US-02-02` AC-19 | Super Admin sửa họ tên                                                        | integration | 403                                           | xanh — `employee-maintenance-http` (21), e2e `employees` |
+| `US-02-02` AC-19 | body có phòng/chức vụ/trạng thái                                              | integration | 422                                           | xanh — `employee-maintenance-http` (21), e2e `employees` |
+| rủi ro           | email trùng sau chuẩn hóa; ngày vào đã qua; IT Admin sửa hồ sơ của chính mình | integration | từ chối theo quy tắc                          | xanh — `employee-maintenance-http` (21), e2e `employees` |
 
 ## Definition of Done
 
 - [ ] Mọi primary AC `full` có test đỏ-trước/xanh-sau ở cấp phù hợp; AC `partial` ghi đúng vế đã làm.
-- [ ] Gate theo [CONTRIBUTING](../../../../CONTRIBUTING.md) chạy xanh trên revision cuối; HTTP đổi thì e2e + OpenAPI.
-- [ ] Spec/plan/roadmap phản ánh implementation cuối; contract đổi đã ghi và báo consumer FE.
-- [ ] Không tăng legacy ledger kiến trúc; nếu gỡ được mục nào thì xóa mục đó.
+- [x] Gate theo [CONTRIBUTING](../../../../CONTRIBUTING.md) chạy xanh trên revision cuối; HTTP đổi thì e2e + OpenAPI.
+- [x] Spec/plan/roadmap phản ánh implementation cuối; contract đổi đã ghi và báo consumer FE.
+- [x] Không tăng legacy ledger kiến trúc; nếu gỡ được mục nào thì xóa mục đó.
 - [ ] Tài liệu vận hành/runbook bị ảnh hưởng đã cập nhật; phần chưa kiểm chứng ghi rõ.
 
 ## Changes and acceptance
 
 22/10/2026: lập theo Prompt 07. Chưa code, chưa review, chưa nghiệm thu.
+
+23/10/2026 (Prompt 10 — xử lý tồn đọng G0→G4): `BBI-D02` hiện thực: `PATCH /employees/{id}` (IT Admin) sửa họ tên, email công việc, loại nhân sự, ngày vào chưa tới, bắt buộc căn cứ HR; Audit `EMPLOYEE.OFFICIAL_FIELDS_CHANGED` có trước/sau, căn cứ, `byItAdminInCharge`, `selfExecuted`; hồ sơ của chính IT Admin theo `SoD-5`/`QĐ-77m` (IT Admin khác sửa nếu còn người dùng được; hết người thì tự sửa và gắn cờ). Không đổi email đăng nhập, phòng, chức vụ, trạng thái. Mã ngày vào: `HIRE_DATE_LOCKED`, `HIRE_DATE_IN_PAST`. Kiểm chứng: `employee-maintenance-http` (21), e2e `employees` — xanh trên cây làm việc chưa commit, nhánh `Bao_dev_be`, nền `dev` `19be620`, 23/10/2026. Gate toàn cây trên cùng cây: `pnpm lint`, `tsc --noEmit`, `pnpm test` (unit 2.074 (141 suite)), `pnpm test:e2e` (839 (32 suite)), `pnpm test:integration` (112 suite, 1.429 test, gồm 4 test kho S3 thật trên LocalStack), `prisma migrate deploy` trên CSDL mới + `migrate diff --exit-code` (không lệch), `pnpm openapi:export`. Giới hạn: Thông báo "tự thực thi" cho Super Admin chờ hộp thông báo (`g4-notification-delivery`). Chưa commit khi viết dòng này, chưa remote CI, chưa Owner review, chưa nghiệm thu: không có gì là `accepted`; đỏ-trước của từng test không được ghi lại.

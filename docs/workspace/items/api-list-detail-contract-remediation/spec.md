@@ -341,3 +341,5 @@ DTO hay query. Bảy quyết định `LD-13` vẫn mở; không hạng mục cap
 (37 collection + 67 lồng), `NESTED_ARRAYS` 67 mục đóng băng kèm phân loại thay `RESOURCE_ARRAYS` và `nested-bound`;
 `detail-reuse.maxItems` = `pageSize.maximum`; `maxItems` = `maxItems` của schema khi có; điều kiện xem lại theo nguồn;
 `LD-16` hai vế. Chỉ đổi gate và tài liệu; runtime, OpenAPI không đổi. Chưa có Owner review cuối hay remote CI.
+
+23/10/2026 (Prompt 10): các hạng mục chủ đã gỡ mục registry tương ứng: registry `COLLECTION_EXCEPTIONS` còn **14 mục trên 12 operation** (`detail-reuse` 3, `bounded` 5, `owner-decision` 5, `unbounded` 1) và `NESTED_ARRAYS` **63 mục** (`bounded` 60, `unbounded` 2, `owner-decision` 1); các mục `query` đã gỡ khi test harness chứng minh, và `departmentWarningList`, `nonWorkingDateList`, `projectList` không còn mục vì đã phân trang. Mục mới `projectGet#departments` (`bounded`, route mới ở `organization-identity-read-contracts`). Chưa có Owner review cuối; bảy điểm `LD-13` còn chờ Owner (xem review mục 11).

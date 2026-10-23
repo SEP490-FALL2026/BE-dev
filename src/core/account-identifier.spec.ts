@@ -48,6 +48,13 @@ describe('looksLikeSecret (AC-9: a token is not an account name and must never b
     expect(looksLikeSecret(value)).toBe(true);
   });
 
+  it.each([' ghp_abc123', 'ghp_abc​123', 'ghp_﻿abc', 'ｇｈｐ_abc123', 'gh p_abc', 'glpat-‍abc', 'xoxb -123'])(
+    'flags %j once its spaces, invisible characters and compatibility forms are taken out (SEC-03)',
+    (value) => {
+      expect(looksLikeSecret(value)).toBe(true);
+    },
+  );
+
   it.each(['ci-bot', 'release-bot', 'sk-bot', 'akia@congty.vn', 'ghpage@congty.vn', 'design@congty.vn', 'xoxo-team'])(
     'does not flag %j',
     (value) => {

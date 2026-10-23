@@ -63,6 +63,7 @@ const accountDetailSchema = accountSchema.extend({
   roleHistory: z.array(
     z.strictObject({ role: appRoleSchema, grantedAt: z.iso.datetime(), revokedAt: z.iso.datetime().nullable() }),
   ),
+  roleHistoryHasMore: z.boolean(),
   invitation: z
     .strictObject({
       usable: z.boolean(),

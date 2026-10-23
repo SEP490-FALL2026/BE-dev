@@ -11,6 +11,7 @@ import type {
   PlanListFilter,
   PlanLookup,
   PlanRecord,
+  PlanSummaryRecord,
   ProvisioningType,
   WorkspaceProfileRecord,
 } from './plan.types';
@@ -95,8 +96,9 @@ export class PlanRepo {
   /** The plans declared under an application, by name: the plan, its name and its kind of provisioning. */
   async findOfApplication(
     applicationId: string,
+    tx?: DbTx,
   ): Promise<{ id: string; name: string; provisioningType: ProvisioningType }[]> {
-    const rows = await this.prisma.plan.findMany({
+    const rows = await (tx ?? this.prisma).plan.findMany({
       where: { applicationId },
       select: { id: true, name: true, provisioningType: true },
       orderBy: [{ name: 'asc' }, { id: 'asc' }],
@@ -158,6 +160,30 @@ export class PlanRepo {
       : null;
   }
 
+  /** The plans with these ids as `findLookup` answers them, in one read; an id that does not exist is absent. */
+  async findLookups(ids: readonly string[], tx?: DbTx): Promise<PlanLookup[]> {
+    if (ids.length === 0) return [];
+    const rows = await (tx ?? this.prisma).plan.findMany({
+      where: { id: { in: [...ids] } },
+      include: {
+        application: { select: { name: true, kind: true, catalogStatus: true, businessOwnerEmployeeId: true } },
+      },
+    });
+
+    return rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      provisioningType: row.provisioningType,
+      pricingModel: row.pricingModel,
+      sharingPolicy: row.sharingPolicy,
+      applicationId: row.applicationId,
+      applicationName: row.application.name,
+      applicationKind: row.application.kind,
+      applicationStatus: row.application.catalogStatus,
+      businessOwnerEmployeeId: row.application.businessOwnerEmployeeId,
+    }));
+  }
+
   /** The plans with these ids, as far as they exist, with the name of their application. */
   async findSummaries(ids: readonly string[]): Promise<PlanSummary[]> {
     if (ids.length === 0) return [];
@@ -182,8 +208,11 @@ export class PlanRepo {
     return this.findLookup(id, tx);
   }
 
-  /** One page by application name then plan name, and the total for the same filter, from one snapshot. */
-  async list(filter: PlanListFilter): Promise<{ items: PlanRecord[]; total: number }> {
+  /**
+   * One page by application name then plan name, and the total for the same filter, from one snapshot. The revocation note
+   * (up to 2000 characters a plan) is not selected: the list does not show it (`LD-05`).
+   */
+  async list(filter: PlanListFilter): Promise<{ items: PlanSummaryRecord[]; total: number }> {
     const where: Prisma.PlanWhereInput = {
       ...(filter.applicationId ? { applicationId: filter.applicationId } : {}),
       ...(filter.provisioningType ? { provisioningType: filter.provisioningType } : {}),
@@ -193,13 +222,32 @@ export class PlanRepo {
       async (tx) => {
         const rows = await tx.plan.findMany({
           where,
-          include: WITH_APPLICATION,
+          select: {
+            id: true,
+            applicationId: true,
+            name: true,
+            provisioningType: true,
+            pricingModel: true,
+            controlLevel: true,
+            dataLossOnRemoval: true,
+            sharingPolicy: true,
+            createdAt: true,
+            updatedAt: true,
+            application: { select: { name: true, kind: true } },
+          },
           orderBy: [{ application: { normalizedName: 'asc' } }, { normalizedName: 'asc' }, { id: 'asc' }],
           skip: filter.skip,
           take: filter.take,
         });
 
-        return { items: rows.map(toPlan), total: await tx.plan.count({ where }) };
+        return {
+          items: rows.map(({ application, ...row }) => ({
+            ...row,
+            applicationName: application.name,
+            applicationKind: application.kind,
+          })),
+          total: await tx.plan.count({ where }),
+        };
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
     );

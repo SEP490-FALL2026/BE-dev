@@ -24,6 +24,8 @@ export const toolsetHistoryQuerySchema = z.strictObject(pageQuery);
 const toolsetSchema = z.strictObject({
   departmentId: z.uuid(),
   jobTitleId: z.uuid(),
+  department: z.strictObject({ id: z.uuid(), code: z.string(), name: z.string() }).nullable(),
+  jobTitle: z.strictObject({ id: z.uuid(), name: z.string() }).nullable(),
   version: z.number().int().positive(),
   plans: z.array(
     z.strictObject({

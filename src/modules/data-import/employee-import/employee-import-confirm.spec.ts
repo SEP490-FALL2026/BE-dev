@@ -2,6 +2,7 @@ import {
   ACTOR,
   FAKE_CLOCK,
   FILE,
+  HR_BASIS,
   NOW,
   TODAY,
   confirmBody,
@@ -44,13 +45,16 @@ describe('EmployeeImportService: confirm (H8 Phase 0 characterization)', () => {
         'BEGIN',
         'repo.lock(tx)',
         'repo.findCompletedWithContent(tx)',
+        'org.getEmployee(tx)',
         'repo.rows(tx)',
         'org.lookupForEmployeeImport(tx)',
         'org.lockForEmployeeImport(tx)',
         'org.lookupForEmployeeImport(tx)',
         'org.businessToday',
         'org.createEmployeeWithPlacement(tx, N-1)',
+        'audit.record(tx)',
         'org.createEmployeeWithPlacement(tx, N-2)',
+        'audit.record(tx)',
         'org.departmentsWithoutHead(d-ops,d-des)',
         'repo.markCompleted(tx)',
         'audit.record(tx)',
@@ -99,12 +103,33 @@ describe('EmployeeImportService: confirm (H8 Phase 0 characterization)', () => {
         confirmKey: 'key-00000001',
         confirmedAt: NOW,
       });
-      expect(h.audits).toEqual([
+      expect(h.audits.slice(0, 2)).toEqual(
+        ['N-1', 'N-2'].map((employeeCode, index) => ({
+          organizationId: 'org-1',
+          actorKind: 'USER',
+          actorAppUserId: 'u-sa',
+          actorRoles: ['SUPER_ADMIN'],
+          action: 'EMPLOYEE.CREATED',
+          resourceType: 'Employee',
+          resourceId: `new-${employeeCode}`,
+          before: null,
+          // The code, the department and the title of the file and the HR basis: no name and no email.
+          after: {
+            employeeCode,
+            department: index === 0 ? 'P-OPS' : 'P-DES',
+            jobTitle: index === 0 ? 'Administrator' : 'Designer',
+            importId: id,
+            hrBasis: HR_BASIS,
+          },
+          correlationId: 'session-1',
+        })),
+      );
+      expect(h.audits.slice(2)).toEqual([
         {
           organizationId: 'org-1',
           actorKind: 'USER',
-          actorAppUserId: 'u-it',
-          actorRoles: ['IT_ADMIN'],
+          actorAppUserId: 'u-sa',
+          actorRoles: ['SUPER_ADMIN'],
           action: 'EMPLOYEE_IMPORT.CONFIRMED',
           resourceType: 'EmployeeImport',
           resourceId: id,
@@ -116,6 +141,7 @@ describe('EmployeeImportService: confirm (H8 Phase 0 characterization)', () => {
             existingDifferent: 1,
             errors: 1,
             repeatedFile: false,
+            hrBasis: HR_BASIS,
           },
           correlationId: 'session-1',
         },
@@ -245,6 +271,7 @@ describe('EmployeeImportService: confirm (H8 Phase 0 characterization)', () => {
         'BEGIN',
         'repo.lock(tx)',
         'repo.findCompletedWithContent(tx)',
+        'org.getEmployee(tx)',
         'repo.rows(tx)',
         'org.lookupForEmployeeImport(tx)',
         'org.lockForEmployeeImport(tx)',
@@ -289,7 +316,10 @@ describe('EmployeeImportService: confirm (H8 Phase 0 characterization)', () => {
       expect(error).toBeInstanceOf(ImportPreviewStaleError);
       expect((error as ImportPreviewStaleError).changedLines).toEqual([3]);
       expect(h.calls.slice(-2)).toEqual(['org.createEmployeeWithPlacement(tx, N-2)', 'ROLLBACK']);
-      expect(h.audits).toEqual([]);
+      // The transaction rolls back with what it recorded: the import itself was never recorded as confirmed.
+      expect(h.audits.filter((event) => (event as { action: string }).action === 'EMPLOYEE_IMPORT.CONFIRMED')).toEqual(
+        [],
+      );
     });
 
     it('passes any other write failure through unchanged', async () => {

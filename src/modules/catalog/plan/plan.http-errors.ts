@@ -14,6 +14,7 @@ import {
   PlanPricingModelNotApplicableError,
   PlanControlLevelRequiredError,
   PlanDataLossNoteRequiredError,
+  PlanInUseBlocksChangeError,
   PlanTermsBlockTypeChangeError,
   PlanUpdateEmptyError,
   PlanWorkspaceProfileNotApplicableError,
@@ -78,6 +79,9 @@ export function toPlanApiException(error: unknown): unknown {
   }
   if (error instanceof PlanWorkspaceProfileBlocksTypeChangeError)
     return refuse(HttpStatus.CONFLICT, 'PLAN.WORKSPACE_PROFILE_BLOCKS_TYPE_CHANGE', error.message);
+  if (error instanceof PlanInUseBlocksChangeError) {
+    return refuse(HttpStatus.CONFLICT, 'PLAN.IN_USE_BLOCKS_CHANGE', error.message, { reason: error.reason });
+  }
 
   return toUnavailableApiException(error) ?? error;
 }

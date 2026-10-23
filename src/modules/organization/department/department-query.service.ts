@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Page, pageOf } from '../../../core/application/pagination';
+import { Page, cutHistory, pageOf } from '../../../core/application/pagination';
 import { normalizeDisplayName } from '../../../core/display-name';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { IdentityAccessService } from '../../identity-access/identity-access.service';
@@ -56,10 +56,18 @@ export class DepartmentQueryService {
 
     const [view] = await this.toViews([record]);
 
+    const projects = await this.projects.forProfile(id);
+    const heads = cutHistory(
+      await this.organization.getDepartmentHeadHistory(id, DEPARTMENT_HEAD_HISTORY_LIMIT + 1),
+      DEPARTMENT_HEAD_HISTORY_LIMIT,
+    );
+
     return {
       ...view,
-      headHistory: await this.organization.getDepartmentHeadHistory(id, DEPARTMENT_HEAD_HISTORY_LIMIT),
-      projects: await this.projects.list(id),
+      headHistory: heads.items,
+      headHistoryHasMore: heads.hasMore,
+      projects: projects.items,
+      projectTotal: projects.total,
     };
   }
 
@@ -80,8 +88,12 @@ export class DepartmentQueryService {
     return pageOf(items, total, query.page, query.pageSize);
   }
 
-  /** Every active department that needs attention, for the IT Admin and the Super Admin (US-03-06 AC-9, AC-15). */
-  async warnings(): Promise<DepartmentWarningItem[]> {
+  /**
+   * One page of the active departments that need attention, for the IT Admin and the Super Admin (US-03-06 AC-9, AC-15),
+   * by code then warning. Whether an IT Admin is usable is the identity capability's to say, so the warnings of all
+   * active departments are worked out from two light reads of the same moment and the page is cut from them (`LD-15`).
+   */
+  async warnings(query: { page: number; pageSize: number }): Promise<Page<DepartmentWarningItem>> {
     const today = await this.organization.businessToday();
     const [withoutHead, withItAdmin] = await Promise.all([
       this.repo.activeDepartmentsWithoutHead(today),
@@ -112,7 +124,10 @@ export class DepartmentQueryService {
         })),
     ];
 
-    return items.sort((a, b) => (a.code === b.code ? a.warning.localeCompare(b.warning) : a.code < b.code ? -1 : 1));
+    items.sort((a, b) => (a.code === b.code ? a.warning.localeCompare(b.warning) : a.code < b.code ? -1 : 1));
+    const start = (query.page - 1) * query.pageSize;
+
+    return pageOf(items.slice(start, start + query.pageSize), items.length, query.page, query.pageSize);
   }
 
   /** IT Admin sees any department; a department head sees only the one they head (AC-17). */

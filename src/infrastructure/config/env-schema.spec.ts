@@ -338,8 +338,44 @@ describe('invitation email configuration', () => {
       ['the id of the current key', `spec-vault-1:${key(1)}`, 'must not repeat LICENSE_KEY_VAULT_KEY_ID'],
       ['the same id twice', `old-1:${key(1)},old-1:${key(2)}`, 'must not repeat an id'],
       ['the current key under another id', `old-1:${key(6)}`, 'must differ from LICENSE_KEY_VAULT_KEY'],
+      [
+        'a key written as base64url, which is the same bytes as one in standard base64 (SEC-05)',
+        `old-1:${Buffer.alloc(32, 0xfb).toString('base64url')}`,
+        'keys of 32 bytes encoded as base64',
+      ],
+      ['a key without its padding (SEC-05)', `old-1:${key(1).slice(0, -1)}`, 'keys of 32 bytes encoded as base64'],
+      ['a key with a stray character (SEC-05)', `old-1:${key(1).slice(0, 10)}!${key(1).slice(11)}`, 'keys of 32 bytes'],
     ])('refuses %s', (_label, value, message) => {
       expect(() => validateEnvironment(withPrevious(value))).toThrow(message);
+    });
+
+    it('refuses a previous key that is the bytes of another key of either purpose, however it is written (SEC-05)', () => {
+      const outbox = Buffer.alloc(32, 5);
+      const sameBytesButOthersAlphabet = Buffer.from(outbox.toString('base64').replace(/[+/]/g, ''), 'base64');
+
+      expect(() =>
+        validateEnvironment({
+          ...OWN_SECRETS,
+          LICENSE_KEY_VAULT_PREVIOUS_KEYS: `old-1:${outbox.toString('base64')}`,
+        }),
+      ).toThrow('LICENSE_KEY_VAULT_PREVIOUS_KEYS must differ from OUTBOX_PAYLOAD_KEY');
+      expect(sameBytesButOthersAlphabet.length).toBeGreaterThan(0);
+      expect(() =>
+        validateEnvironment({
+          ...OWN_SECRETS,
+          OUTBOX_PAYLOAD_PREVIOUS_KEYS: `old-o:${Buffer.alloc(32, 9).toString('base64')}`,
+          LICENSE_KEY_VAULT_PREVIOUS_KEYS: `old-v:${Buffer.alloc(32, 9).toString('base64')}`,
+        }),
+      ).toThrow('LICENSE_KEY_VAULT_PREVIOUS_KEYS must differ from OUTBOX_PAYLOAD_PREVIOUS_KEYS');
+    });
+
+    it('refuses an outbox or a vault key that is not in standard base64, as one in base64url is the same bytes', () => {
+      expect(() =>
+        validateEnvironment({ ...OWN_SECRETS, OUTBOX_PAYLOAD_KEY: Buffer.alloc(32, 0xfb).toString('base64url') }),
+      ).toThrow('OUTBOX_PAYLOAD_KEY must be 32 bytes encoded as standard base64');
+      expect(() =>
+        validateEnvironment({ ...OWN_SECRETS, LICENSE_KEY_VAULT_KEY: Buffer.alloc(32, 0xfb).toString('base64url') }),
+      ).toThrow('LICENSE_KEY_VAULT_KEY must be 32 bytes encoded as standard base64');
     });
 
     it('refuses the public test vault key outside test, as it would be a way back to every sealed key', () => {

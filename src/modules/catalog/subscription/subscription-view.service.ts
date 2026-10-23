@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { formatAmount } from '../../../core/money/money';
 import { formatRate } from '../../../core/money/rate';
 import { FinanceService } from '../../finance/finance.service';
+import type { TaxEstimateResult } from '../../finance/finance.types';
 import { OperatingParametersService } from '../../operating-parameters/operating-parameters.service';
 import { alertDates, deriveNotice, missingData, noticeInputOf, noticeWarnings } from './subscription.policy';
 import type { SubscriptionRecord, SubscriptionView, TaxEstimateSummary } from './subscription.types';
@@ -34,6 +35,18 @@ export class SubscriptionViewService {
       return found.minorUnit;
     };
 
+    const priced = records.filter((record) => record.unitPrice !== null);
+    const estimates = new Map(
+      (
+        await this.finance.estimateTaxMany(
+          priced.map((record) => ({
+            vendorId: record.vendor.id,
+            netMinor: (record.unitPrice as { amountMinor: bigint }).amountMinor,
+          })),
+        )
+      ).map((estimate, index) => [priced[index].id, estimate]),
+    );
+
     const views: SubscriptionView[] = [];
     for (const record of records) {
       const notice = deriveNotice(noticeInputOf(record));
@@ -53,7 +66,7 @@ export class SubscriptionViewService {
       if (record.unitPrice) {
         const units = await minorUnitOf(record.unitPrice.currency);
         unitPrice = { amount: formatAmount(record.unitPrice.amountMinor, units), currency: record.unitPrice.currency };
-        const estimate = await this.finance.estimateTax(record.vendor.id, record.unitPrice.amountMinor);
+        const estimate = estimates.get(record.id) as TaxEstimateResult;
         taxEstimate = {
           basis: estimate.basis,
           label: estimate.basis === 'PROFILE' ? 'ESTIMATE' : 'ESTIMATE_NO_PROFILE',

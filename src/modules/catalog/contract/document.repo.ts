@@ -11,6 +11,8 @@ export interface DocumentRecord {
   contentType: string;
   sizeBytes: number;
   objectKey: string;
+  /** Where the bytes that were looked at are kept; null until the file is uploaded and kept. */
+  finalObjectKey: string | null;
   uploadedByAppUserId: string;
   contractId: string | null;
   attachedAt: Date | null;
@@ -54,8 +56,22 @@ export class DocumentRepo {
     return this.find(id, tx);
   }
 
-  async markUploaded(tx: DbTx, id: string): Promise<void> {
-    await tx.documentAttachment.update({ where: { id }, data: { status: 'PENDING_ATTACH' } });
+  async markUploaded(tx: DbTx, id: string, finalObjectKey: string): Promise<void> {
+    await tx.documentAttachment.update({ where: { id }, data: { status: 'PENDING_ATTACH', finalObjectKey } });
+  }
+
+  async markExpired(tx: DbTx, id: string): Promise<void> {
+    await tx.documentAttachment.update({ where: { id }, data: { status: 'EXPIRED' } });
+  }
+
+  /** The files still awaiting an upload that were declared before `before`, the oldest first, at most `limit`. */
+  async findAbandoned(before: Date, limit: number): Promise<{ id: string; objectKey: string }[]> {
+    return this.prisma.documentAttachment.findMany({
+      where: { status: 'AWAITING_UPLOAD', createdAt: { lt: before } },
+      select: { id: true, objectKey: true },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      take: limit,
+    });
   }
 
   async markQuarantined(tx: DbTx, id: string): Promise<void> {

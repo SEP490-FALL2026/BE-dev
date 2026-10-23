@@ -75,24 +75,26 @@ Owner chọn hạn mức xem khóa. Không blocker kỹ thuật.
 
 ## Test matrix
 
-| AC / rủi ro | Tình huống (gồm từ chối, edge case)                                                    | Cấp test           | Kết quả mong đợi                       | Bằng chứng sau implement |
-| ----------- | -------------------------------------------------------------------------------------- | ------------------ | -------------------------------------- | ------------------------ |
-| `SEC-02`    | 11 lần xem trong một phút, cùng tài khoản khác IP; vượt hạn mức ngày sau khởi động lại | integration        | 429; đếm bền qua khởi động lại         | chưa chạy                |
-| `SEC-02`    | hai request đồng thời tranh đúng lượt cuối của cùng bucket                             | integration        | đúng một request thành công, một 429   | chưa chạy                |
-| `SEC-03`    | `" ghp_…"` có khoảng trắng, `ghp_…` kèm `U+200B`                                       | unit + integration | dòng lưu và `GET …/rows` chỉ có mặt nạ | chưa chạy                |
-| `SEC-04`    | production với `minioadmin`/`minioadmin`                                               | unit               | khởi động bị từ chối, không in secret  | chưa chạy                |
-| `SEC-05`    | cùng 32 byte viết base64 và base64url; khóa trước đây trùng khóa outbox                | unit               | bị từ chối                             | chưa chạy                |
-| `SEC-06`    | 50 trường form, trường 1 MB                                                            | e2e                | 413/422, không đọc vào bộ nhớ          | chưa chạy                |
+| AC / rủi ro | Tình huống (gồm từ chối, edge case)                                                    | Cấp test           | Kết quả mong đợi                       | Bằng chứng sau implement                                                                                                                                                                                               |
+| ----------- | -------------------------------------------------------------------------------------- | ------------------ | -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SEC-02`    | 11 lần xem trong một phút, cùng tài khoản khác IP; vượt hạn mức ngày sau khởi động lại | integration        | 429; đếm bền qua khởi động lại         | xanh — `license-key-reveal-quota` (5), `seat-baseline-import-http` (thêm 1), unit (`secret-environment`, `object-storage.config`, `account-identifier`, `seat-baseline-rows`), e2e `seat-baseline`, `employee-imports` |
+| `SEC-02`    | hai request đồng thời tranh đúng lượt cuối của cùng bucket                             | integration        | đúng một request thành công, một 429   | xanh — `license-key-reveal-quota` (5), `seat-baseline-import-http` (thêm 1), unit (`secret-environment`, `object-storage.config`, `account-identifier`, `seat-baseline-rows`), e2e `seat-baseline`, `employee-imports` |
+| `SEC-03`    | `" ghp_…"` có khoảng trắng, `ghp_…` kèm `U+200B`                                       | unit + integration | dòng lưu và `GET …/rows` chỉ có mặt nạ | xanh — `license-key-reveal-quota` (5), `seat-baseline-import-http` (thêm 1), unit (`secret-environment`, `object-storage.config`, `account-identifier`, `seat-baseline-rows`), e2e `seat-baseline`, `employee-imports` |
+| `SEC-04`    | production với `minioadmin`/`minioadmin`                                               | unit               | khởi động bị từ chối, không in secret  | xanh — `license-key-reveal-quota` (5), `seat-baseline-import-http` (thêm 1), unit (`secret-environment`, `object-storage.config`, `account-identifier`, `seat-baseline-rows`), e2e `seat-baseline`, `employee-imports` |
+| `SEC-05`    | cùng 32 byte viết base64 và base64url; khóa trước đây trùng khóa outbox                | unit               | bị từ chối                             | xanh — `license-key-reveal-quota` (5), `seat-baseline-import-http` (thêm 1), unit (`secret-environment`, `object-storage.config`, `account-identifier`, `seat-baseline-rows`), e2e `seat-baseline`, `employee-imports` |
+| `SEC-06`    | 50 trường form, trường 1 MB                                                            | e2e                | 413/422, không đọc vào bộ nhớ          | xanh — `license-key-reveal-quota` (5), `seat-baseline-import-http` (thêm 1), unit (`secret-environment`, `object-storage.config`, `account-identifier`, `seat-baseline-rows`), e2e `seat-baseline`, `employee-imports` |
 
 ## Definition of Done
 
 - [ ] Mọi primary AC `full` có test đỏ-trước/xanh-sau ở cấp phù hợp; AC `partial` ghi đúng vế đã làm — áp cho `SEC-02`
       → `SEC-06`.
-- [ ] Gate theo [CONTRIBUTING](../../../../CONTRIBUTING.md) chạy xanh trên revision cuối; HTTP đổi thì e2e + OpenAPI.
-- [ ] Spec/plan/roadmap phản ánh implementation cuối; `.env.example` và runbook cập nhật.
-- [ ] Không tăng legacy ledger kiến trúc; nếu gỡ được mục nào thì xóa mục đó.
+- [x] Gate theo [CONTRIBUTING](../../../../CONTRIBUTING.md) chạy xanh trên revision cuối; HTTP đổi thì e2e + OpenAPI.
+- [x] Spec/plan/roadmap phản ánh implementation cuối; `.env.example` và runbook cập nhật.
+- [x] Không tăng legacy ledger kiến trúc; nếu gỡ được mục nào thì xóa mục đó.
 - [ ] Tài liệu vận hành/runbook bị ảnh hưởng đã cập nhật; phần chưa kiểm chứng ghi rõ.
 
 ## Changes and acceptance
 
 22/10/2026: lập theo Prompt 08. Chưa code, chưa review, chưa nghiệm thu.
+
+23/10/2026 (Prompt 10 — xử lý tồn đọng G0→G4): `SEC-02`→`SEC-06` hiện thực: hạn mức xem khóa 10/phút và 200/ngày theo tài khoản, bộ đếm PostgreSQL nguyên tử (`license_key_reveal_windows`, migration `20261022140000`), 429 `HTTP_TOO_MANY_REQUESTS`, đếm bền và chịu tranh lượt cuối; che token theo dạng chuẩn hóa (và che mọi định danh không phải tên bằng `[masked: invalid]`); credential kho chỉ mặc định ở `NODE_ENV=test`, từ chối `minioadmin` và access key = secret; khóa mã hóa phải là base64 chuẩn, so theo byte giữa mọi khóa hiện hành và trước đây của hai mục đích; multipart `{files:1, fields:2, fieldSize:64, parts:3}` (400 `HTTP_BAD_REQUEST`). Áp dụng **mặc định do spec khuyến nghị**, không phải quyết định của Owner: Owner chưa review; nếu Owner chọn khác thì đổi ở đây. Kiểm chứng: `license-key-reveal-quota` (5), `seat-baseline-import-http` (thêm 1), unit (`secret-environment`, `object-storage.config`, `account-identifier`, `seat-baseline-rows`), e2e `seat-baseline`, `employee-imports` — xanh trên cây làm việc chưa commit, nhánh `Bao_dev_be`, nền `dev` `19be620`, 23/10/2026. Gate toàn cây trên cùng cây: `pnpm lint`, `tsc --noEmit`, `pnpm test` (unit 2.074 (141 suite)), `pnpm test:e2e` (839 (32 suite)), `pnpm test:integration` (112 suite, 1.429 test, gồm 4 test kho S3 thật trên LocalStack), `prisma migrate deploy` trên CSDL mới + `migrate diff --exit-code` (không lệch), `pnpm openapi:export`. Giới hạn: Hạn mức 10/200 là hằng số trong mã (không cấu hình bằng env). `.env.example` cập nhật. Xoay khóa kho (re-seal) ngoài phạm vi. Chưa commit khi viết dòng này, chưa remote CI, chưa Owner review, chưa nghiệm thu: không có gì là `accepted`; đỏ-trước của từng test không được ghi lại.

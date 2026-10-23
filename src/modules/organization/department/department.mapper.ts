@@ -29,5 +29,11 @@ export function toDepartmentWire(view: DepartmentView) {
 
 /** The wire model of one department's profile: the list model, who headed it and the projects it takes part in. */
 export function toDepartmentProfileWire(view: DepartmentProfileView) {
-  return { ...toDepartmentWire(view), headHistory: view.headHistory, projects: view.projects.map(toProjectWire) };
+  return {
+    ...toDepartmentWire(view),
+    headHistory: view.headHistory,
+    headHistoryHasMore: view.headHistoryHasMore,
+    projects: view.projects.map(toProjectWire),
+    projectTotal: view.projectTotal,
+  };
 }

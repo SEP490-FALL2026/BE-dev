@@ -2,7 +2,12 @@ import { PlacementReasonCode, PlacementSubject, placementReasons } from '../empl
 import { JobTitleStatus } from '../job-title/job-title.types';
 
 /** The shared placement reasons (BEH.1), then the two keys the form checks against the people already there. */
-export type EmployeeRowReasonCode = PlacementReasonCode | 'EMPLOYEE_CODE_TAKEN' | 'WORK_EMAIL_TAKEN';
+export type EmployeeRowReasonCode =
+  | PlacementReasonCode
+  | 'EMPLOYEE_CODE_TAKEN'
+  | 'WORK_EMAIL_TAKEN'
+  /** The code or the email is the record of the person entering: nobody enters their own (`US-02-02` AC-18). */
+  | 'OWN_RECORD';
 
 /** The form field a reason is about (the import names a file column instead: H8 D-1). */
 export type EmployeeRowField = 'departmentCode' | 'jobTitleId' | 'employeeCode' | 'workEmail';
@@ -26,6 +31,9 @@ export interface EmployeeRowLookup {
   jobTitle: { status: JobTitleStatus } | null;
   employeeCodeTaken: boolean;
   workEmailTaken: boolean;
+  /** The code, or the normalized email, is the one of the person who is entering. */
+  ownCode?: boolean;
+  ownEmail?: boolean;
 }
 
 const isBlank = (value: string | null | undefined): boolean =>
@@ -50,8 +58,10 @@ export function validateEmployeeRow(
     },
   }).map(({ subject, code }) => ({ field: FORM_FIELD[subject], code }));
 
-  if (lookup.employeeCodeTaken) reasons.push({ field: 'employeeCode', code: 'EMPLOYEE_CODE_TAKEN' });
-  if (lookup.workEmailTaken) reasons.push({ field: 'workEmail', code: 'WORK_EMAIL_TAKEN' });
+  if (lookup.ownCode) reasons.push({ field: 'employeeCode', code: 'OWN_RECORD' });
+  else if (lookup.employeeCodeTaken) reasons.push({ field: 'employeeCode', code: 'EMPLOYEE_CODE_TAKEN' });
+  if (lookup.ownEmail) reasons.push({ field: 'workEmail', code: 'OWN_RECORD' });
+  else if (lookup.workEmailTaken) reasons.push({ field: 'workEmail', code: 'WORK_EMAIL_TAKEN' });
 
   return reasons;
 }

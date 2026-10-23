@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { BusinessDate, fromDateColumn, toDateColumn } from '../../core/business-date';
+import { Prisma } from '../../generated/prisma/client';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { DbTx } from '../../infrastructure/database/transaction-runner';
 import { isUniqueViolation } from '../../infrastructure/database/unique-violation';
@@ -83,6 +84,40 @@ export class OperatingParametersRepo {
     });
 
     return rows.map((row) => ({ date: fromDateColumn(row.date), reason: row.reason }));
+  }
+
+  /** One page of the days nobody works, by date, and the total for the same range, from one snapshot (`LD-15`). */
+  async pageNonWorkingDates(
+    range: { from?: BusinessDate; to?: BusinessDate },
+    skip: number,
+    take: number,
+  ): Promise<{ items: NonWorkingDateRow[]; total: number }> {
+    const where = {
+      ...(range.from || range.to
+        ? {
+            date: {
+              ...(range.from ? { gte: toDateColumn(range.from) } : {}),
+              ...(range.to ? { lte: toDateColumn(range.to) } : {}),
+            },
+          }
+        : {}),
+    };
+
+    return this.prisma.$transaction(
+      async (tx) => ({
+        items: (
+          await tx.nonWorkingDate.findMany({
+            where,
+            select: { date: true, reason: true },
+            orderBy: { date: 'asc' },
+            skip,
+            take,
+          })
+        ).map((row) => ({ date: fromDateColumn(row.date), reason: row.reason })),
+        total: await tx.nonWorkingDate.count({ where }),
+      }),
+      { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
+    );
   }
 
   /** Takes the row lock of one day and reads it. Null when the day is not a non-working date. */

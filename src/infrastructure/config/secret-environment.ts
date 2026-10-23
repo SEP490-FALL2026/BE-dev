@@ -88,13 +88,22 @@ export const secretKeys = {
 
 const KEY_ID_SHAPE = /^[A-Za-z0-9._-]{1,32}$/;
 
-/**
- * The vault keys kept to open what was sealed before a rotation, read as `id:base64` pairs. Every pair is held to what the
- * current key is held to: 32 bytes, an id of the same shape, and a key of its own (a key that was never public).
- */
-function previousVaultKeys(result: { LICENSE_KEY_VAULT_KEY: string; LICENSE_KEY_VAULT_KEY_ID: string }, raw: string) {
+/** The 32 bytes of a key written as standard, padded base64, or null: base64url, a missing pad or stray characters are not accepted. */
+function keyBytes(value: string): Buffer | null {
+  if (!/^[A-Za-z0-9+/]{43}=$/.test(value)) return null;
+  const bytes = Buffer.from(value, 'base64');
+
+  return bytes.length === 32 && bytes.toString('base64') === value ? bytes : null;
+}
+
+/** The `id:base64` pairs of a list of previous keys, each key as its bytes; anything else fails with the name of the setting. */
+function previousKeys(
+  setting: string,
+  raw: string,
+  current: { setting: string; id: string },
+): { id: string; key: string; bytes: Buffer }[] {
   const fail = (reason: string): never => {
-    throw new EnvironmentValidationError(`Environment validation failed: LICENSE_KEY_VAULT_PREVIOUS_KEYS ${reason}`);
+    throw new EnvironmentValidationError(`Environment validation failed: ${setting} ${reason}`);
   };
   const seen = new Set<string>();
 
@@ -108,38 +117,69 @@ function previousVaultKeys(result: { LICENSE_KEY_VAULT_KEY: string; LICENSE_KEY_
       const id = pair.slice(0, separator);
       const key = pair.slice(separator + 1);
       if (!KEY_ID_SHAPE.test(id)) fail('must hold an id of letters, digits, dot, dash and underscore, up to 32');
-      if (Buffer.from(key, 'base64').length !== 32) fail('must hold keys of 32 bytes encoded as base64');
-      if (id === result.LICENSE_KEY_VAULT_KEY_ID) fail('must not repeat LICENSE_KEY_VAULT_KEY_ID');
+      const bytes = keyBytes(key);
+      if (bytes === null) fail('must hold keys of 32 bytes encoded as base64 (standard alphabet, with its padding)');
+      if (id === current.id) fail(`must not repeat ${current.setting}`);
       if (seen.has(id)) fail('must not repeat an id');
-      if (key === result.LICENSE_KEY_VAULT_KEY) fail('must differ from LICENSE_KEY_VAULT_KEY');
       seen.add(id);
 
-      return key;
+      return { id, key, bytes: bytes as Buffer };
     });
 }
 
-/** Rejects a malformed outbox or vault key everywhere, and any public secret value outside NODE_ENV=test. */
+/**
+ * Rejects a malformed outbox or vault key everywhere, and any public secret value outside NODE_ENV=test. Every key, the
+ * current ones and the previous ones of both purposes, is 32 bytes in standard base64, and no two of them are the same
+ * bytes however they are written (`SEC-05`): one key seals one kind of thing, so a leak of the outbox key never opens the
+ * license keys.
+ */
 export function assertSecrets(
-  result: SecretEnvironmentVariables & { NODE_ENV: string; LICENSE_KEY_VAULT_PREVIOUS_KEYS?: string },
+  result: SecretEnvironmentVariables & {
+    NODE_ENV: string;
+    LICENSE_KEY_VAULT_PREVIOUS_KEYS?: string;
+    OUTBOX_PAYLOAD_PREVIOUS_KEYS?: string;
+  },
 ): void {
+  const bytesOf = {} as Record<'OUTBOX_PAYLOAD_KEY' | 'LICENSE_KEY_VAULT_KEY', Buffer>;
   for (const key of ['OUTBOX_PAYLOAD_KEY', 'LICENSE_KEY_VAULT_KEY'] as const) {
-    if (Buffer.from(result[key], 'base64').length !== 32) {
-      throw new EnvironmentValidationError(`Environment validation failed: ${key} must be 32 bytes encoded as base64`);
+    const bytes = keyBytes(result[key]);
+    if (bytes === null) {
+      throw new EnvironmentValidationError(
+        `Environment validation failed: ${key} must be 32 bytes encoded as standard base64`,
+      );
     }
+    bytesOf[key] = bytes;
   }
-  // One key seals one kind of thing: a leak of the outbox key must not open the license keys.
-  if (result.LICENSE_KEY_VAULT_KEY === result.OUTBOX_PAYLOAD_KEY) {
-    throw new EnvironmentValidationError(
-      'Environment validation failed: LICENSE_KEY_VAULT_KEY must differ from OUTBOX_PAYLOAD_KEY',
-    );
-  }
-  const previous = previousVaultKeys(result, result.LICENSE_KEY_VAULT_PREVIOUS_KEYS ?? '');
+  const held: { setting: string; bytes: Buffer }[] = [
+    { setting: 'OUTBOX_PAYLOAD_KEY', bytes: bytesOf.OUTBOX_PAYLOAD_KEY },
+    { setting: 'LICENSE_KEY_VAULT_KEY', bytes: bytesOf.LICENSE_KEY_VAULT_KEY },
+  ];
+  const outboxPrevious = previousKeys('OUTBOX_PAYLOAD_PREVIOUS_KEYS', result.OUTBOX_PAYLOAD_PREVIOUS_KEYS ?? '', {
+    setting: 'OUTBOX_PAYLOAD_KEY_ID',
+    id: result.OUTBOX_PAYLOAD_KEY_ID,
+  });
+  const vaultPrevious = previousKeys('LICENSE_KEY_VAULT_PREVIOUS_KEYS', result.LICENSE_KEY_VAULT_PREVIOUS_KEYS ?? '', {
+    setting: 'LICENSE_KEY_VAULT_KEY_ID',
+    id: result.LICENSE_KEY_VAULT_KEY_ID,
+  });
+  for (const { bytes } of outboxPrevious) held.push({ setting: 'OUTBOX_PAYLOAD_PREVIOUS_KEYS', bytes });
+  for (const { bytes } of vaultPrevious) held.push({ setting: 'LICENSE_KEY_VAULT_PREVIOUS_KEYS', bytes });
+  held.forEach((one, index) => {
+    const other = held.slice(0, index).find((earlier) => earlier.bytes.equals(one.bytes));
+    if (other) {
+      throw new EnvironmentValidationError(
+        `Environment validation failed: ${one.setting} must differ from ${other.setting}: a key of one kind never seals another kind`,
+      );
+    }
+  });
 
   if (result.NODE_ENV === 'test') return;
 
   const reused: string[] = SECRET_VALUE_KEYS.filter((key) => PUBLIC_VALUES[key].has(result[key]));
-  if (previous.some((key) => PUBLIC_VALUES.LICENSE_KEY_VAULT_KEY.has(key)))
+  if (vaultPrevious.some(({ key }) => PUBLIC_VALUES.LICENSE_KEY_VAULT_KEY.has(key)))
     reused.push('LICENSE_KEY_VAULT_PREVIOUS_KEYS');
+  if (outboxPrevious.some(({ key }) => PUBLIC_VALUES.OUTBOX_PAYLOAD_KEY.has(key)))
+    reused.push('OUTBOX_PAYLOAD_PREVIOUS_KEYS');
   if (reused.length > 0) {
     throw new EnvironmentValidationError(
       `Environment validation failed: ${result.NODE_ENV} must not use a value that is public in the repository for ` +

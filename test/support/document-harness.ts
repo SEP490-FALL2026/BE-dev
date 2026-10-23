@@ -80,6 +80,21 @@ export class DocumentHarness extends ProvisioningHarness {
     ).rows[0].object_key;
   }
 
+  /** Where the bytes that were looked at are kept: null until the file is uploaded and kept (SEC-01). */
+  async finalKeyOf(id: string): Promise<string | null> {
+    return (
+      await this.ctx.sql.query<{ final_object_key: string | null }>(
+        `SELECT final_object_key FROM document_attachments WHERE id = $1`,
+        [id],
+      )
+    ).rows[0].final_object_key;
+  }
+
+  async statusOf(id: string): Promise<string> {
+    return (await this.ctx.sql.query<{ status: string }>(`SELECT status FROM document_attachments WHERE id = $1`, [id]))
+      .rows[0].status;
+  }
+
   async documentCount(): Promise<number> {
     return Number(
       (await this.ctx.sql.query<{ n: string }>(`SELECT count(*) AS n FROM document_attachments`)).rows[0].n,

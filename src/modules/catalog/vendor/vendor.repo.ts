@@ -107,13 +107,28 @@ export class VendorRepo {
     return row ? toRow(row) : null;
   }
 
-  /** Links a vendor that has no dictionary group to one; null when another vendor already holds that group. */
-  async setDictionaryGroup(tx: DbTx, id: string, groupId: string): Promise<VendorRow | null> {
+  /**
+   * Links a vendor that has no dictionary group to one, in a single conditional write (`dictionary_group_id IS NULL`), so
+   * two adopters at once cannot both win (DB-03). `adopted` says whether this call made the link; a vendor that already
+   * holds that very group answers with `adopted: false`. Null when the vendor holds another group, does not exist, or
+   * another vendor already holds that group.
+   */
+  async setDictionaryGroup(
+    tx: DbTx,
+    id: string,
+    groupId: string,
+  ): Promise<{ vendor: VendorRow; adopted: boolean } | null> {
+    let linked: number;
     try {
-      return toRow(await tx.vendor.update({ where: { id }, data: { dictionaryGroupId: groupId } }));
+      linked = (
+        await tx.vendor.updateMany({ where: { id, dictionaryGroupId: null }, data: { dictionaryGroupId: groupId } })
+      ).count;
     } catch (error) {
       if (isUniqueViolation(error, 'dictionary_group_id')) return null;
       throw error;
     }
+    const row = await tx.vendor.findUnique({ where: { id } });
+
+    return row && row.dictionaryGroupId === groupId ? { vendor: toRow(row), adopted: linked === 1 } : null;
   }
 }

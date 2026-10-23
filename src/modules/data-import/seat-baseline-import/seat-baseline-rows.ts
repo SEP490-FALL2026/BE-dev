@@ -52,7 +52,17 @@ export interface SeatFacts {
   target: { kind: 'SUBSCRIPTION' | 'PLAN'; purchasedQuantity: number | null };
   recordedOn: BusinessDate;
   /** By employee code. */
-  employees: ReadonlyMap<string, { id: string; status: string; employmentType: string; hireDate: BusinessDate }>;
+  employees: ReadonlyMap<
+    string,
+    {
+      id: string;
+      status: string;
+      employmentType: string;
+      hireDate: BusinessDate;
+      /** The department the person is in on `recordedOn` and its Unit; null when they are in none. */
+      owningUnit?: { departmentId: string; costCenter: { id: string; code: string; status: string } } | null;
+    }
+  >;
   /** By Cost Center code. */
   costCenters: ReadonlyMap<string, { id: string; kind: string; status: string }>;
   companyDomains: readonly string[];
@@ -61,6 +71,8 @@ export interface SeatFacts {
 
 const TIME_LIMITED = new Set(['CONTRACTOR', 'FREELANCER', 'INTERN']);
 const MASK = '[masked]';
+/** Kept where an identifier was not a name at all (spaces, invisible or control characters): what it said is not kept either. */
+const MASK_INVALID = '[masked: invalid]';
 
 const cell = (cells: SeatCells, column: SeatColumn): string => (cells[column] ?? '').trim();
 
@@ -79,13 +91,18 @@ export function lookupNamesOf(rows: readonly { cells: SeatCells }[]): {
   return { employeeCodes: [...employees], costCenterCodes: [...costCenters] };
 }
 
-/** The row as it is kept: an identifier that looks like a secret is replaced, so a token is never stored. */
+/**
+ * The row as it is kept: an identifier that any check flags is replaced, so a token is never stored (`SEC-03`). What looks
+ * like a secret, with its spaces and invisible characters taken out, is masked as one; what is not a name at all is masked as
+ * invalid, because a secret of a shape nobody knows looks just like that.
+ */
 export function maskSecretCells(cells: SeatCells): SeatCells {
   const identifier = cells.account_identifier;
+  if (identifier === undefined) return cells;
+  if (looksLikeSecret(identifier)) return { ...cells, account_identifier: MASK };
+  if (hasInvalidCharacters(identifier.trim())) return { ...cells, account_identifier: MASK_INVALID };
 
-  return identifier !== undefined && !hasInvalidCharacters(identifier) && looksLikeSecret(identifier)
-    ? { ...cells, account_identifier: MASK }
-    : cells;
+  return cells;
 }
 
 const periodOf = (assignment: ExistingAssignment): SeatPeriod => ({
@@ -120,8 +137,9 @@ function judgeAlone(cells: SeatCells, facts: SeatFacts): { errors: SeatRowErrorC
   if (identifier === '') errors.push('ACCOUNT_IDENTIFIER_MISSING');
   // A stored row holds the mask where a token was: it is judged again as the token it replaced, so the preview stands.
   else if (identifier === MASK) errors.push('ACCOUNT_IDENTIFIER_LOOKS_LIKE_SECRET');
-  else if (hasInvalidCharacters(identifier)) errors.push('ACCOUNT_IDENTIFIER_INVALID');
+  else if (identifier === MASK_INVALID) errors.push('ACCOUNT_IDENTIFIER_INVALID');
   else if (looksLikeSecret(identifier)) errors.push('ACCOUNT_IDENTIFIER_LOOKS_LIKE_SECRET');
+  else if (hasInvalidCharacters(identifier)) errors.push('ACCOUNT_IDENTIFIER_INVALID');
   else if (kind !== null && (kind === 'PERSONAL' || identifier.includes('@'))) {
     if (!isCompanyAccount(identifier, facts.companyDomains)) errors.push('NOT_COMPANY_ACCOUNT');
   }
@@ -158,16 +176,22 @@ function judgeAlone(cells: SeatCells, facts: SeatFacts): { errors: SeatRowErrorC
   const reason = cell(cells, 'reason');
   const costCenterCode = cell(cells, 'cost_center_code');
   let costCenterId: string | null = null;
+  let owningDepartmentId: string | null = null;
   if (kind === 'SERVICE') {
     if (reason === '') errors.push('REASON_REQUIRED');
-    if (costCenterCode === '') {
-      errors.push('COST_CENTER_REQUIRED');
-    } else {
-      const costCenter = facts.costCenters.get(costCenterCode);
-      if (!costCenter) errors.push('COST_CENTER_NOT_FOUND');
-      else if (costCenter.status !== 'ACTIVE') errors.push('COST_CENTER_INACTIVE');
-      else if (costCenter.kind !== 'COMPANY') errors.push('COST_CENTER_NOT_COMPANY');
-      else costCenterId = costCenter.id;
+    // A service account belongs to the department of the person who answers for it, and is charged to the Unit of that
+    // department (`QĐ-86c`); the Cost Center column, when given, can only name that Unit.
+    const unit = employee?.owningUnit ?? null;
+    if (employee && !unit) errors.push('OWNING_DEPARTMENT_NOT_FOUND');
+    if (costCenterCode !== '') {
+      const named = facts.costCenters.get(costCenterCode);
+      if (!named) errors.push('COST_CENTER_NOT_FOUND');
+      else if (unit && named.id !== unit.costCenter.id) errors.push('COST_CENTER_NOT_OWNING_UNIT');
+    }
+    if (unit) {
+      if (unit.costCenter.status !== 'ACTIVE') errors.push('COST_CENTER_INACTIVE');
+      costCenterId = unit.costCenter.id;
+      owningDepartmentId = unit.departmentId;
     }
   } else if (kind === 'PERSONAL' && costCenterCode !== '') {
     errors.push('COST_CENTER_NOT_ALLOWED');
@@ -183,6 +207,7 @@ function judgeAlone(cells: SeatCells, facts: SeatFacts): { errors: SeatRowErrorC
       accountIdentifier: identifier,
       reason: reason === '' ? null : reason,
       costCenterId,
+      owningDepartmentId,
       effectiveFrom,
       effectiveFromBasis: grantedOn === '' ? 'RECORDED' : 'ACTUAL',
       expectedEndDate,

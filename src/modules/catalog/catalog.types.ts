@@ -3,6 +3,13 @@ import type { DbTx } from '../../infrastructure/database/transaction-runner';
 /** What a seat is held against: a subscription of a paid plan, or an internal plan that has no subscription. */
 export type SeatTargetRef = { subscriptionId: string } | { planId: string };
 
+/** What holds a set of plans: a bounded list of assignments and the counts that are not bounded. */
+export interface OpenSeatHoldings {
+  items: OpenSeatHolding[];
+  total: number;
+  byPlan: { planId: string; count: number }[];
+}
+
 /** An assignment that holds, or will hold, a seat: the facts a screen or a rule needs to name it. */
 export interface OpenSeatHolding {
   assignmentId: string;
@@ -21,8 +28,16 @@ export interface SeatOccupancyReader {
   occupiedBySubscription(subscriptionId: string, day: BusinessDate, tx?: DbTx): Promise<number>;
   /** How many different people hold an assignment on these plans that has not ended and has not failed. */
   openHolderCount(planIds: readonly string[], day: BusinessDate): Promise<number>;
-  /** The assignments on these plans that have not ended and have not failed. */
-  openAssignmentsOfPlans(planIds: readonly string[], day: BusinessDate): Promise<OpenSeatHolding[]>;
+  /**
+   * The first `limit` assignments on these plans that have not ended and have not failed, how many there are in all and
+   * how many per plan (`LD-06`: never every seat); with `tx`, read in the caller's transaction.
+   */
+  openAssignmentsOfPlans(
+    planIds: readonly string[],
+    day: BusinessDate,
+    limit: number,
+    tx?: DbTx,
+  ): Promise<OpenSeatHoldings>;
 }
 
 /** The facts about a seat target that the assignments of seats (licensing) read. */

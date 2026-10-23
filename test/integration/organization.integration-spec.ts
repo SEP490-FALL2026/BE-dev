@@ -18,6 +18,7 @@ import {
   EmployeeNotFoundError,
   OrganizationAlreadyExistsError,
 } from '../../src/modules/organization/organization.errors';
+import { DepartmentServiceAccountRegistry } from '../../src/modules/organization/department/service-account-registry';
 import { OrganizationService } from '../../src/modules/organization/organization.service';
 import {
   DisposableDatabase,
@@ -51,6 +52,7 @@ describe('organization foundation (integration)', () => {
       new EmployeeDirectoryService(new EmployeeRepo(prisma), new ImportLookupRepo(prisma)),
       new CostCenterCatalogueService(new CostCenterRepo(prisma)),
       new JobTitleCatalogueService(new JobTitleRepo(prisma)),
+      new DepartmentServiceAccountRegistry(),
     );
     sql = new Client({ connectionString: database.url });
     await sql.connect();
@@ -107,22 +109,6 @@ describe('organization foundation (integration)', () => {
   it('rejects changing the organization time zone', async () => {
     await expect(sql.query(`UPDATE organizations SET time_zone = 'UTC'`)).rejects.toThrow(/immutable/);
     await expect(sql.query(`UPDATE organizations SET name = 'Renamed'`)).resolves.toBeDefined();
-  });
-
-  it('rejects a department charged to a non-UNIT cost center', async () => {
-    await sql.query(
-      `INSERT INTO cost_centers (id, organization_id, code, name, kind)
-       VALUES (gen_random_uuid(), $1, 'CC-CO', 'Company', 'COMPANY')`,
-      [organizationId],
-    );
-    const { rows } = await sql.query<{ id: string }>(`SELECT id FROM cost_centers WHERE code = 'CC-CO'`);
-    await expect(
-      sql.query(
-        `INSERT INTO departments (id, organization_id, code, name, cost_center_id)
-         VALUES (gen_random_uuid(), $1, 'P-BAD', 'Bad', $2)`,
-        [organizationId, rows[0].id],
-      ),
-    ).rejects.toThrow(/UNIT cost center/);
   });
 
   it('rejects a second department on the same cost center', async () => {
@@ -268,8 +254,6 @@ describe('organization foundation (integration)', () => {
     ]);
     expect(await free()).toBe(before + 1);
 
-    await sql.query(`UPDATE cost_centers SET kind = 'COMPANY' WHERE id = $1`, [unit.id]);
-    expect(await free()).toBe(before);
     await sql.query(
       `UPDATE cost_centers SET kind = 'UNIT', status = 'INACTIVE', deactivated_at = now() WHERE id = $1`,
       [unit.id],

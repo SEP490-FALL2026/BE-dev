@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { InstallationConfigurationModule } from '../../infrastructure/config/installation-configuration.module';
 import { DatabaseModule } from '../../infrastructure/database/database.module';
 import { AuditModule } from '../audit/audit.module';
+import { FinanceModule } from '../finance/finance.module';
 import { IdentityAccessFacadeModule } from '../identity-access/identity-access-facade.module';
 import { OrganizationModule } from '../organization/organization.module';
 import { InstallationRepo } from './installation.repo';
@@ -15,6 +16,7 @@ import { InstallationService } from './installation.service';
     OrganizationModule,
     IdentityAccessFacadeModule,
     AuditModule,
+    FinanceModule,
   ],
   providers: [InstallationRepo, InstallationService],
   exports: [InstallationService],

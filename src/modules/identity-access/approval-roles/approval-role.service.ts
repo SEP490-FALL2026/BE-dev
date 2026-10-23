@@ -7,6 +7,7 @@ import { AccountDirectoryService } from '../accounts/account-directory.service';
 import { RoleGrantService } from '../accounts/role-grant.service';
 import { employeeHasNotLeft } from '../policies/account-policy';
 import { ApprovalRoleHolderInvalidError, ApprovalRolePairingError } from './approval-role.errors';
+import { cutHistory } from '../../../core/application/pagination';
 import { APPROVAL_ROLES, ApprovalRoleName, ApprovalRoleRepo } from './approval-role.repo';
 
 const HISTORY_LIMIT = 20;
@@ -15,6 +16,8 @@ export interface ApprovalRoleView {
   role: ApprovalRoleName;
   holder: { employeeId: string; employeeCode: string; fullName: string; since: Date } | null;
   history: { employeeId: string; employeeCode: string; fullName: string; from: Date; until: Date | null }[];
+  /** The role has older holders than the {@link HISTORY_LIMIT} shown. */
+  historyHasMore: boolean;
 }
 
 /**
@@ -37,11 +40,12 @@ export class ApprovalRoleService {
 
   async list(): Promise<ApprovalRoleView[]> {
     const current = await this.repo.currentHolders();
-    const histories = await Promise.all(APPROVAL_ROLES.map((role) => this.repo.history(role, HISTORY_LIMIT)));
+    const histories = await Promise.all(APPROVAL_ROLES.map((role) => this.repo.history(role, HISTORY_LIMIT + 1)));
+    const cuts = histories.map((rows) => cutHistory(rows, HISTORY_LIMIT));
     const employeeIds = [
       ...new Set([
         ...current.map((row) => row.employeeId),
-        ...histories.flatMap((rows) => rows.map((row) => row.employeeId)),
+        ...cuts.flatMap((cut) => cut.items.map((row) => row.employeeId)),
       ]),
     ];
     const people = new Map(
@@ -59,7 +63,8 @@ export class ApprovalRoleService {
       return {
         role,
         holder: holder ? { ...named(holder.employeeId), since: holder.heldFrom } : null,
-        history: histories[index].map((row) => ({
+        historyHasMore: cuts[index].hasMore,
+        history: cuts[index].items.map((row) => ({
           ...named(row.employeeId),
           from: row.heldFrom,
           until: row.heldUntil,

@@ -464,6 +464,8 @@ enum DocumentStatus {
   PENDING_ATTACH
   READY
   QUARANTINED
+  // The upload never arrived and the file was given up (DB-13); like a quarantined one it is final.
+  EXPIRED
 }
 
 // A contract, for now only a name (the Story of the contract itself is not written, OQ-B-17). Never changed or deleted.
@@ -491,7 +493,10 @@ model DocumentAttachment {
   fileName            String          @map("file_name")
   contentType         String          @map("content_type")
   sizeBytes           Int             @map("size_bytes")
+  // Where the upload link put the bytes: it may be put again until the link expires, so nothing is read from here.
   objectKey           String          @unique @map("object_key")
+  // Where the bytes that were looked at are kept: a copy made once, that no upload link can reach (SEC-01).
+  finalObjectKey      String?         @unique @map("final_object_key")
   uploadedByAppUserId String          @map("uploaded_by_app_user_id") @db.Uuid
   contractId          String?         @map("contract_id") @db.Uuid
   attachedAt          DateTime?       @map("attached_at") @db.Timestamptz(3)

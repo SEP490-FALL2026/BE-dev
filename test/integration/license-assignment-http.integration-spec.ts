@@ -27,12 +27,11 @@ describe('license assignments over HTTP (integration, real PostgreSQL)', () => {
     account_identifier: `${code.toLowerCase()}@acme.vn`,
     ...extra,
   });
-  const bot = (code: string, identifier: string, costCenterCode: string, extra: Record<string, string> = {}) => ({
+  const bot = (code: string, identifier: string, extra: Record<string, string> = {}) => ({
     employee_code: code,
     account_identifier: identifier,
     kind: 'service',
     reason: 'CI pipeline',
-    cost_center_code: costCenterCode,
     ...extra,
   });
   const change = (id: string, body: object, account = h.it1) =>
@@ -68,9 +67,8 @@ describe('license assignments over HTTP (integration, real PostgreSQL)', () => {
     it('lists by person and kind, pages the list, and refuses a filter that is not valid', async () => {
       today('2026-10-01');
       const subscriptionId = await h.subscription(10);
-      const corp = await h.costCenter('COMPANY');
       await h.crowd('LST', 3);
-      await h.written({ subscriptionId }, [row('LST0'), row('LST1'), bot('LST2', 'lst-bot', corp.code)]);
+      await h.written({ subscriptionId }, [row('LST0'), row('LST1'), bot('LST2', 'lst-bot')]);
 
       expect(await h.assignmentsOf({ subscriptionId, kind: 'SERVICE' })).toHaveLength(1);
       expect(await h.assignmentsOf({ subscriptionId, kind: 'PERSONAL' })).toHaveLength(2);
@@ -85,14 +83,14 @@ describe('license assignments over HTTP (integration, real PostgreSQL)', () => {
   });
 
   describe('AC-7: a service account', () => {
-    it('is held by the person responsible and charged to the Company Cost Center, and makes no new employee', async () => {
+    it('is held by the person responsible, owned by their department and charged to its Unit, and makes no new employee', async () => {
       today('2026-10-01');
       const subscriptionId = await h.subscription(10);
-      const corp = await h.costCenter('COMPANY');
+      const unit = await h.ownUnit();
       const holder = await h.person('SVC1');
       const employees = await h.count('employees');
 
-      await h.written({ subscriptionId }, [bot('SVC1', 'ci-bot', corp.code)]);
+      await h.written({ subscriptionId }, [bot('SVC1', 'ci-bot')]);
 
       expect(await h.count('employees')).toBe(employees);
       expect(await h.assignmentsOf({ subscriptionId })).toEqual([
@@ -101,27 +99,39 @@ describe('license assignments over HTTP (integration, real PostgreSQL)', () => {
           employeeId: holder,
           accountIdentifier: 'ci-bot',
           reason: 'CI pipeline',
-          costCenterId: corp.id,
+          costCenterId: unit.id,
+          owningDepartmentId: unit.departmentId,
         }),
       ]);
     });
 
-    it('refuses a service row without a reason, without a Cost Center, with an unknown one, or with a Unit one', async () => {
+    it('refuses a service row without a reason, with an unknown Cost Center, with one that is not the owning Unit, or without a department', async () => {
       const subscriptionId = await h.subscription(10);
-      const corp = await h.costCenter('COMPANY');
-      const unit = await h.costCenter('UNIT');
-      await h.crowd('SVR', 4);
+      const other = await h.costCenter('UNIT');
+      await h.crowd('SVR', 5);
+      await h.ctx.sql.query(
+        `DELETE FROM employee_placements WHERE employee_id = (SELECT id FROM employees WHERE employee_code = 'SVR3')`,
+      );
+      const unit = await h.ownUnit();
+      const own = (await h.ctx.sql.query<{ code: string }>(`SELECT code FROM cost_centers WHERE id = $1`, [unit.id]))
+        .rows[0].code;
 
       const preview = await h.preview({ subscriptionId }, [
-        bot('SVR0', 'bot-a', corp.code, { reason: '' }),
-        bot('SVR1', 'bot-b', ''),
-        bot('SVR2', 'bot-c', 'CC-NONE-9'),
-        bot('SVR3', 'bot-d', unit.code),
+        bot('SVR0', 'bot-a', { reason: '' }),
+        bot('SVR1', 'bot-b', { cost_center_code: 'CC-NONE-9' }),
+        bot('SVR2', 'bot-c', { cost_center_code: other.code }),
+        bot('SVR3', 'bot-d'),
+        bot('SVR4', 'bot-e', { cost_center_code: own }),
       ]);
 
       expect(preview.summary).toMatchObject({
-        valid: 0,
-        byCode: { REASON_REQUIRED: 1, COST_CENTER_REQUIRED: 1, COST_CENTER_NOT_FOUND: 1, COST_CENTER_NOT_COMPANY: 1 },
+        valid: 1,
+        byCode: {
+          REASON_REQUIRED: 1,
+          COST_CENTER_NOT_FOUND: 1,
+          COST_CENTER_NOT_OWNING_UNIT: 1,
+          OWNING_DEPARTMENT_NOT_FOUND: 1,
+        },
       });
     });
   });
@@ -130,13 +140,13 @@ describe('license assignments over HTTP (integration, real PostgreSQL)', () => {
     it('ends the old assignment the day the new one begins, chains them, and keeps the seats taken at eight on every day', async () => {
       today('2026-10-01');
       const subscriptionId = await h.subscription(10);
-      const corp = await h.costCenter('COMPANY');
+      const unit = await h.ownUnit();
       await h.crowd('GIT', 7);
       const e2 = await h.person('GHE2');
       const e5 = await h.person('GHE5');
       await h.written({ subscriptionId }, [
         ...Array.from({ length: 7 }, (_, index) => row(`GIT${index}`)),
-        bot('GHE2', 'ci-bot', corp.code),
+        bot('GHE2', 'ci-bot'),
       ]);
       const original = (await h.assignmentsOf({ subscriptionId, kind: 'SERVICE' }))[0];
       expect(original.employeeId).toBe(e2);
@@ -152,7 +162,8 @@ describe('license assignments over HTTP (integration, real PostgreSQL)', () => {
         employeeId: e5,
         accountIdentifier: 'ci-bot',
         reason: 'CI pipeline',
-        costCenterId: corp.id,
+        costCenterId: unit.id,
+        owningDepartmentId: unit.departmentId,
         effectiveFrom: '2026-10-15',
         effectiveFromBasis: 'ACTUAL',
         grantedOn: '2026-10-15',
@@ -190,10 +201,9 @@ describe('license assignments over HTTP (integration, real PostgreSQL)', () => {
     it('works when every seat is taken, because the count does not change on any day', async () => {
       today('2026-10-01');
       const subscriptionId = await h.subscription(1);
-      const corp = await h.costCenter('COMPANY');
       await h.person('FUL1');
       const next = await h.person('FUL2');
-      await h.written({ subscriptionId }, [bot('FUL1', 'only-bot', corp.code)]);
+      await h.written({ subscriptionId }, [bot('FUL1', 'only-bot')]);
       const original = (await h.assignmentsOf({ subscriptionId }))[0];
 
       const response = await change(original.id, { employeeId: next, effectiveFrom: '2026-10-08' }).expect(200);
@@ -208,11 +218,10 @@ describe('license assignments over HTTP (integration, real PostgreSQL)', () => {
     it('refuses a personal seat, an assignment that has ended, a day that is not after the start or is in the past', async () => {
       today('2026-10-01');
       const subscriptionId = await h.subscription(10);
-      const corp = await h.costCenter('COMPANY');
       await h.person('REF1');
       await h.person('REF2');
       const next = await h.person('REF3');
-      await h.written({ subscriptionId }, [row('REF1'), bot('REF2', 'ref-bot', corp.code)]);
+      await h.written({ subscriptionId }, [row('REF1'), bot('REF2', 'ref-bot')]);
       const [personal, service] = [
         (await h.assignmentsOf({ subscriptionId, kind: 'PERSONAL' }))[0],
         (await h.assignmentsOf({ subscriptionId, kind: 'SERVICE' }))[0],
@@ -240,12 +249,11 @@ describe('license assignments over HTTP (integration, real PostgreSQL)', () => {
     it('refuses a person who has left, one who does not exist, the person already responsible, and an intern without an end date', async () => {
       today('2026-10-01');
       const subscriptionId = await h.subscription(10);
-      const corp = await h.costCenter('COMPANY');
       const holder = await h.person('REG1');
       const left = await h.person('REG2');
       const intern = await h.person('REG3', 'INTERN');
       await h.ctx.sql.query(`UPDATE employees SET status = 'TERMINATED' WHERE id = $1`, [left]);
-      await h.written({ subscriptionId }, [bot('REG1', 'reg-bot', corp.code)]);
+      await h.written({ subscriptionId }, [bot('REG1', 'reg-bot')]);
       const service = (await h.assignmentsOf({ subscriptionId }))[0];
       const body = (employeeId: string, extra: object = {}) => ({ employeeId, effectiveFrom: '2026-10-15', ...extra });
 
@@ -264,9 +272,8 @@ describe('license assignments over HTTP (integration, real PostgreSQL)', () => {
     it('leaves everything as it was when the change is refused', async () => {
       today('2026-10-01');
       const subscriptionId = await h.subscription(10);
-      const corp = await h.costCenter('COMPANY');
       await h.person('NOC1');
-      await h.written({ subscriptionId }, [bot('NOC1', 'noc-bot', corp.code)]);
+      await h.written({ subscriptionId }, [bot('NOC1', 'noc-bot')]);
       const service = (await h.assignmentsOf({ subscriptionId }))[0];
       const before = await h.count('license_assignments');
 

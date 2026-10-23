@@ -182,3 +182,12 @@ fixture SQL không chứng minh workflow tạo tài khoản. Dùng `bodyOf(respo
 - Máy không chạy được Docker: PostgreSQL 17 nhúng (`embedded-postgres`) đủ cho `TEST_DATABASE_ADMIN_URL`;
   dùng bootstrap superuser của nó để provision role ordinary cùng thuộc tính phía trên trước khi chạy suite.
   `TEST_DATABASE_ADMIN_URL` phải dùng role ordinary đó để kiểm chứng cả `btree_gist` trusted-extension.
+
+## Kho đối tượng thật (tùy chọn)
+
+`test/integration/object-storage-real.integration-spec.ts` chạy adapter S3 thật với một dịch vụ tương thích S3 **kiểm chữ ký**
+(MinIO, hoặc LocalStack có `S3_SKIP_SIGNATURE_VALIDATION=0`): đặt `TEST_OBJECT_STORAGE_ENDPOINT` (và, nếu không phải `test`/`test`,
+`TEST_OBJECT_STORAGE_ACCESS_KEY_ID`, `TEST_OBJECT_STORAGE_SECRET_ACCESS_KEY`). Không đặt biến thì suite được bỏ qua và nói lý do —
+test HTTP của tệp hợp đồng dùng kho trong bộ nhớ, nên chỉ suite này chứng minh việc kho từ chối liên kết ký sai loại/kích thước.
+Ví dụ cục bộ: `docker run -d -p 127.0.0.1:54566:4566 -e SERVICES=s3 -e S3_SKIP_SIGNATURE_VALIDATION=0 localstack/localstack:3.8.1`
+rồi `TEST_OBJECT_STORAGE_ENDPOINT=http://127.0.0.1:54566 pnpm exec jest --config ./test/config/jest.integration.cjs --runInBand test/integration/object-storage-real`.

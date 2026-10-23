@@ -150,8 +150,8 @@ export class DepartmentService {
   }
 
   /**
-   * Retires a department. Refused while anyone is still a member (AC-19); open work (reviews, recommendations) joins
-   * this check when its slices exist. Shared accounts are not a case: the system manages none (QĐ-75).
+   * Retires a department. Refused while anyone is still a member or a service account it owns is still open (AC-19,
+   * `QĐ-86c`); open work (reviews, recommendations) joins this check when its slices exist.
    * What the department was, who headed it and what was charged to it stay as they were. Already retired ⟹ the same answer.
    */
   async deactivate(actor: AuthenticatedPrincipal, id: string): Promise<void> {
@@ -164,10 +164,14 @@ export class DepartmentService {
 
       const today = await this.organization.businessToday();
       const members = await this.repo.members(tx, id, today, { skip: 0, take: IN_USE_LISTED_MEMBERS });
-      if (members.total > 0) {
+      // A service account is owned by the department, not held by a member: it stays until its chain ends (`QĐ-86c`).
+      const accounts = await this.organization.getOwnedServiceAccounts(id, today, IN_USE_LISTED_MEMBERS, tx);
+      if (members.total > 0 || accounts.total > 0) {
         throw new DepartmentInUseError(
           members.items.map((member) => ({ employeeCode: member.employeeCode, fullName: member.fullName })),
           members.total,
+          accounts.items,
+          accounts.total,
         );
       }
 

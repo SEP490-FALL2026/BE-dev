@@ -1,4 +1,5 @@
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
+import type { HrBasis } from '../../../core/hr-basis';
 import type { AuditEventInput } from '../../audit/audit.types';
 import type { ImportResult, ImportSummary } from './employee-import.types';
 
@@ -62,7 +63,7 @@ export function importConfirmedEvent(
   organizationId: string,
   actor: AuthenticatedPrincipal,
   importId: string,
-  confirmed: { previewVersion: number; result: ImportResult; repeatedFile: boolean },
+  confirmed: { previewVersion: number; result: ImportResult; repeatedFile: boolean; hrBasis: HrBasis },
 ): AuditEventInput {
   return importEvent(
     organizationId,
@@ -77,6 +78,37 @@ export function importConfirmedEvent(
       existingDifferent: confirmed.result.existingDifferent,
       errors: confirmed.result.errors,
       repeatedFile: confirmed.repeatedFile,
+      hrBasis: { ...confirmed.hrBasis },
     },
   );
+}
+
+/**
+ * One new person of a confirmed import, with the HR basis the import was confirmed on (`US-02-02` AC-16). It carries the
+ * code, the department and the title and nothing of the file's names or emails.
+ */
+export function importEmployeeCreatedEvent(
+  organizationId: string,
+  actor: AuthenticatedPrincipal,
+  employeeId: string,
+  created: { importId: string; employeeCode: string; department: string; jobTitle: string; hrBasis: HrBasis },
+): AuditEventInput {
+  return {
+    organizationId,
+    actorKind: 'USER',
+    actorAppUserId: actor.appUserId,
+    actorRoles: actor.roles,
+    action: 'EMPLOYEE.CREATED',
+    resourceType: 'Employee',
+    resourceId: employeeId,
+    before: null,
+    after: {
+      employeeCode: created.employeeCode,
+      department: created.department,
+      jobTitle: created.jobTitle,
+      importId: created.importId,
+      hrBasis: { ...created.hrBasis },
+    },
+    correlationId: actor.sessionId,
+  };
 }

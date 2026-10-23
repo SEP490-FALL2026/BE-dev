@@ -21,6 +21,7 @@ import {
   DepartmentPageResponseDto,
   DepartmentResponseDto,
   DepartmentWarningsResponseDto,
+  ListWarningsQueryDto,
   ListDepartmentsQueryDto,
   ListMembersQueryDto,
   UpdateDepartmentBodyDto,
@@ -165,7 +166,7 @@ export class DepartmentsController {
   })
   @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, VALIDATION_ERROR, NOT_FOUND, {
     status: HttpStatus.CONFLICT,
-    description: 'It still has members (DEPARTMENT.IN_USE; details lists them).',
+    description: 'It still has members or owns service accounts (DEPARTMENT.IN_USE; details lists them).',
   })
   async deactivate(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: DepartmentIdParamDto) {
     try {
@@ -253,15 +254,15 @@ export class DepartmentsController {
   @ApiSuccessResponse(DepartmentWarningsResponseDto, {
     message: 'DEPARTMENT.WARNINGS_LISTED',
     description:
-      'The active departments that miss a head or a usable IT Admin in charge. The Super Admin sees these and nothing else of the departments.',
+      'A page of the active departments that miss a head or a usable IT Admin in charge, by department code then warning. The Super Admin sees these and nothing else of the departments.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, {
     status: HttpStatus.FORBIDDEN,
     description: 'Only the IT Admin and the Super Admin see department warnings.',
   })
-  async warnings() {
+  async warnings(@Query() query: ListWarningsQueryDto) {
     try {
-      return { items: await this.queries.warnings() };
+      return await this.queries.warnings(query);
     } catch (error) {
       throw toOrganizationApiException(error);
     }

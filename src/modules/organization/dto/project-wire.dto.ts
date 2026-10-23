@@ -4,6 +4,17 @@ import { z } from 'zod';
  * The project resource, shared by the project routes and the department profile, which embeds the same resource: one
  * definition for both (the schema twin of `mappers/project.mapper.ts`).
  */
+const departmentRef = z.strictObject({ id: z.uuid(), code: z.string(), name: z.string() });
+
+/** What a list of projects shows of each: the description is read from the project itself (`LD-12`). */
+export const projectSummarySchema = z.strictObject({
+  id: z.uuid(),
+  name: z.string(),
+  status: z.enum(['RUNNING', 'FINISHED']),
+  departments: z.array(departmentRef),
+  updatedAt: z.iso.datetime(),
+});
+
 export const projectSchema = z.strictObject({
   id: z.uuid(),
   name: z.string(),

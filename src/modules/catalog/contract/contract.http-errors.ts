@@ -14,7 +14,9 @@ import {
   DocumentPurposeNotAvailableError,
   DocumentTooLargeError,
   DocumentTypeNotAllowedError,
+  DocumentUploadExpiredError,
   DocumentUploadMismatchError,
+  DocumentUploadPendingError,
 } from './contract.errors';
 
 const refuse = (status: HttpStatus, code: string, message: string, details?: Record<string, unknown>): ApiException =>
@@ -50,6 +52,8 @@ export function toContractApiException(error: unknown): unknown {
     return refuse(UNPROCESSABLE, 'DOCUMENT.UPLOAD_MISMATCH', error.message);
   if (error instanceof DocumentNotAwaitingUploadError)
     return refuse(CONFLICT, 'DOCUMENT.NOT_AWAITING_UPLOAD', error.message);
+  if (error instanceof DocumentUploadPendingError) return refuse(CONFLICT, 'DOCUMENT.UPLOAD_PENDING', error.message);
+  if (error instanceof DocumentUploadExpiredError) return refuse(CONFLICT, 'DOCUMENT.UPLOAD_EXPIRED', error.message);
   if (error instanceof DocumentAlreadyAttachedError)
     return refuse(CONFLICT, 'DOCUMENT.ALREADY_ATTACHED', error.message);
   if (error instanceof DocumentNotReadyToAttachError)

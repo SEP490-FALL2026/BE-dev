@@ -82,24 +82,26 @@ service nêu trên; `FinanceService.declareCostAllocation` nhận `tx`; sự ki�
 
 ## Test matrix
 
-| AC / rủi ro | Tình huống (gồm từ chối, edge case)                                                     | Cấp test    | Kết quả mong đợi                              | Bằng chứng sau implement |
-| ----------- | --------------------------------------------------------------------------------------- | ----------- | --------------------------------------------- | ------------------------ |
-| `DB-03`     | hai IT Admin gắn cùng nhà cung cấp vào G1/G2 đồng thời (`pg_locks`)                     | integration | một thành công, một 409; nhóm không bị ghi đè | chưa chạy                |
-| `DB-03`     | ghi thẳng đổi `dictionary_group_id` từ G1 sang G2                                       | integration | CSDL từ chối                                  | chưa chạy                |
-| `DB-07`     | đổi gói `FLAT_RATE`→`PER_SEAT` khi còn thuê bao `ACTIVE` không số lượng; K4→K1 còn khóa | integration | 409; CSDL từ chối ghi thẳng                   | chưa chạy                |
-| `DB-14`     | ghi thẳng lùi/nhảy `current_version` của hồ sơ thuế, phân bổ                            | integration | CSDL từ chối                                  | chưa chạy                |
-| `DB-10`     | đổi mô hình giá đồng thời khi khai phân bổ                                              | integration | không có phân bổ cho gói tính theo người      | chưa chạy                |
-| `DB-11`     | gắn nhóm từ điển; khai ứng dụng sinh đề xuất                                            | integration | mỗi thao tác một sự kiện audit riêng          | chưa chạy                |
+| AC / rủi ro | Tình huống (gồm từ chối, edge case)                                                     | Cấp test    | Kết quả mong đợi                              | Bằng chứng sau implement                                                                                                                                                                 |
+| ----------- | --------------------------------------------------------------------------------------- | ----------- | --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DB-03`     | hai IT Admin gắn cùng nhà cung cấp vào G1/G2 đồng thời (`pg_locks`)                     | integration | một thành công, một 409; nhóm không bị ghi đè | xanh — `catalog-licensing-write-integrity` (12), thử DB-09 trong `application-retirement-http`, `cost-allocation-constraints`, `vendor-tax-profile-constraints` (sửa theo ràng buộc mới) |
+| `DB-03`     | ghi thẳng đổi `dictionary_group_id` từ G1 sang G2                                       | integration | CSDL từ chối                                  | xanh — `catalog-licensing-write-integrity` (12), thử DB-09 trong `application-retirement-http`, `cost-allocation-constraints`, `vendor-tax-profile-constraints` (sửa theo ràng buộc mới) |
+| `DB-07`     | đổi gói `FLAT_RATE`→`PER_SEAT` khi còn thuê bao `ACTIVE` không số lượng; K4→K1 còn khóa | integration | 409; CSDL từ chối ghi thẳng                   | xanh — `catalog-licensing-write-integrity` (12), thử DB-09 trong `application-retirement-http`, `cost-allocation-constraints`, `vendor-tax-profile-constraints` (sửa theo ràng buộc mới) |
+| `DB-14`     | ghi thẳng lùi/nhảy `current_version` của hồ sơ thuế, phân bổ                            | integration | CSDL từ chối                                  | xanh — `catalog-licensing-write-integrity` (12), thử DB-09 trong `application-retirement-http`, `cost-allocation-constraints`, `vendor-tax-profile-constraints` (sửa theo ràng buộc mới) |
+| `DB-10`     | đổi mô hình giá đồng thời khi khai phân bổ                                              | integration | không có phân bổ cho gói tính theo người      | xanh — `catalog-licensing-write-integrity` (12), thử DB-09 trong `application-retirement-http`, `cost-allocation-constraints`, `vendor-tax-profile-constraints` (sửa theo ràng buộc mới) |
+| `DB-11`     | gắn nhóm từ điển; khai ứng dụng sinh đề xuất                                            | integration | mỗi thao tác một sự kiện audit riêng          | xanh — `catalog-licensing-write-integrity` (12), thử DB-09 trong `application-retirement-http`, `cost-allocation-constraints`, `vendor-tax-profile-constraints` (sửa theo ràng buộc mới) |
 
 ## Definition of Done
 
 - [ ] Mọi primary AC `full` có test đỏ-trước/xanh-sau ở cấp phù hợp; AC `partial` ghi đúng vế đã làm — áp cho `DB-03`,
       `DB-07` → `DB-11`, `DB-14`.
-- [ ] Gate theo [CONTRIBUTING](../../../../CONTRIBUTING.md) chạy xanh trên revision cuối; HTTP đổi thì e2e + OpenAPI.
-- [ ] Spec/plan/roadmap phản ánh implementation cuối; ADR-0005 ghi ràng buộc ngoài Prisma mới.
-- [ ] Không tăng legacy ledger kiến trúc; nếu gỡ được mục nào thì xóa mục đó.
-- [ ] Tài liệu vận hành/runbook bị ảnh hưởng đã cập nhật; phần chưa kiểm chứng ghi rõ.
+- [x] Gate theo [CONTRIBUTING](../../../../CONTRIBUTING.md) chạy xanh trên revision cuối; HTTP đổi thì e2e + OpenAPI.
+- [x] Spec/plan/roadmap phản ánh implementation cuối; ADR-0005 ghi ràng buộc ngoài Prisma mới.
+- [x] Không tăng legacy ledger kiến trúc; nếu gỡ được mục nào thì xóa mục đó.
+- [x] Tài liệu vận hành/runbook bị ảnh hưởng đã cập nhật; phần chưa kiểm chứng ghi rõ.
 
 ## Changes and acceptance
 
 22/10/2026: lập theo Prompt 08. Chưa code, chưa review, chưa nghiệm thu.
+
+23/10/2026 (Prompt 10 — xử lý tồn đọng G0→G4): `DB-03`, `DB-07`→`DB-11`, `DB-14` hiện thực: migration `20261022110000_catalog_licensing_write_integrity` (nhóm từ điển cố định `55000`; `plans_keep_children_valid` 23514; đầu/phiên bản chỉ tiến cho thuế và phân bổ; khẳng định READ COMMITTED cho trigger sức chứa seat); ứng dụng: nhận nhóm từ điển bằng `UPDATE` có điều kiện, `ApplicationVendorLinkService`, phân bổ trong một transaction dưới khóa kế hoạch `FOR SHARE`, mã `PLAN.IN_USE_BLOCKS_CHANGE`. **Lệch spec có chủ ý:** `plans_keep_children_valid` không chặn khi có phân bổ chi phí trỏ tới thuê bao (test US-04-08 đã merge yêu cầu phân bổ còn nguyên khi gói đổi sang tính theo ghế). Kiểm chứng: `catalog-licensing-write-integrity` (12), thử DB-09 trong `application-retirement-http`, `cost-allocation-constraints`, `vendor-tax-profile-constraints` (sửa theo ràng buộc mới) — xanh trên cây làm việc chưa commit, nhánh `Bao_dev_be`, nền `dev` `19be620`, 23/10/2026. Gate toàn cây trên cùng cây: `pnpm lint`, `tsc --noEmit`, `pnpm test` (unit 2.074 (141 suite)), `pnpm test:e2e` (839 (32 suite)), `pnpm test:integration` (112 suite, 1.429 test, gồm 4 test kho S3 thật trên LocalStack), `prisma migrate deploy` trên CSDL mới + `migrate diff --exit-code` (không lệch), `pnpm openapi:export`. Giới hạn: Chưa chạy trên dữ liệu thật; ADR-0005/ADR-0007 chú thích nhưng vẫn Proposed. ADR-0005 ghi các ràng buộc ngoài Prisma mới (chú thích 23/10/2026). Chưa commit khi viết dòng này, chưa remote CI, chưa Owner review, chưa nghiệm thu: không có gì là `accepted`; đỏ-trước của từng test không được ghi lại.

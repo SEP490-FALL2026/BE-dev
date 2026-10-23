@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { TransactionRunner } from '../../infrastructure/database/transaction-runner';
 import { AuditService } from '../audit/audit.service';
+import { FinanceService } from '../finance/finance.service';
 import { IdentityAccessService } from '../identity-access/identity-access.service';
 import { OrganizationService } from '../organization/organization.service';
 import { AlreadyInstalledError, InstallationInputError } from './installation.errors';
@@ -31,6 +32,7 @@ export class InstallationService {
     private readonly identity: IdentityAccessService,
     private readonly audit: AuditService,
     private readonly repo: InstallationRepo,
+    private readonly finance: FinanceService,
   ) {}
 
   async install(rawInput: unknown, password: string): Promise<InstallationResult> {
@@ -41,6 +43,13 @@ export class InstallationService {
       );
     }
     const input = parsed.data;
+    // The reporting currency must be one finance has a minor-unit table for (DB-02): a code outside it would only fail
+    // later, at the first conversion, with no way back once rates and prices are recorded in it.
+    if (!(await this.finance.findCurrency(input.reportingCurrency))) {
+      throw new InstallationInputError([
+        `reportingCurrency: ${input.reportingCurrency} is not in the currency table of this installation`,
+      ]);
+    }
     const loginEmail = input.loginEmail ?? input.superAdmin.workEmail;
 
     // Policy check and the slow hash happen before any lock is taken.

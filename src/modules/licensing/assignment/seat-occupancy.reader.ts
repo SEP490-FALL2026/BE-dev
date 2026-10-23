@@ -2,7 +2,7 @@ import { Injectable, OnModuleInit } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { CatalogService } from '../../catalog/catalog.service';
-import type { OpenSeatHolding, SeatOccupancyReader } from '../../catalog/catalog.types';
+import type { OpenSeatHolding, OpenSeatHoldings, SeatOccupancyReader } from '../../catalog/catalog.types';
 import { AssignmentRepo } from './assignment.repo';
 
 /**
@@ -30,14 +30,23 @@ export class AssignmentSeatOccupancy implements SeatOccupancyReader, OnModuleIni
     return this.repo.countHoldersOfPlans(planIds, day);
   }
 
-  async openAssignmentsOfPlans(planIds: readonly string[], day: BusinessDate): Promise<OpenSeatHolding[]> {
-    const rows = await this.repo.holdingOfPlans(planIds, day);
+  async openAssignmentsOfPlans(
+    planIds: readonly string[],
+    day: BusinessDate,
+    limit: number,
+    tx?: DbTx,
+  ): Promise<OpenSeatHoldings> {
+    const { items, byPlan } = await this.repo.holdingOfPlans(planIds, day, limit, tx);
 
-    return rows.map((row) => ({
-      assignmentId: row.id,
-      employeeId: row.employeeId,
-      planId: row.planId,
-      subscriptionId: row.subscriptionId,
-    }));
+    return {
+      items: items.map((row): OpenSeatHolding => ({
+        assignmentId: row.id,
+        employeeId: row.employeeId,
+        planId: row.planId,
+        subscriptionId: row.subscriptionId,
+      })),
+      total: byPlan.reduce((sum, plan) => sum + plan.count, 0),
+      byPlan,
+    };
   }
 }

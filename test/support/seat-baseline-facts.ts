@@ -4,18 +4,34 @@ import { judgeSeatRows, type SeatFacts } from '../../src/modules/data-import/sea
 
 export type { ExistingAssignment };
 
-/** Fixtures of the seat baseline row judgement: a company with people of every kind and Cost Centers of both. */
+/** Fixtures of the seat baseline row judgement: a company with people of every kind, departments and their Units. */
 export const TODAY = '2026-10-01';
 
 /** Everyone started long before `TODAY`, so no row is early unless a test says so. */
 const HIRED = '2020-01-01';
-const staff = { id: 'e-staff', status: 'ACTIVE', employmentType: 'STAFF', hireDate: HIRED } as const;
+const DESIGN = { departmentId: 'd-des', costCenter: { id: 'cc-des', code: 'CC-DES', status: 'ACTIVE' } } as const;
+const staff = {
+  id: 'e-staff',
+  status: 'ACTIVE',
+  employmentType: 'STAFF',
+  hireDate: HIRED,
+  owningUnit: DESIGN,
+} as const;
 export const facts = (over: Partial<SeatFacts> = {}): SeatFacts => ({
   target: { kind: 'SUBSCRIPTION', purchasedQuantity: 100 },
   recordedOn: TODAY,
   employees: new Map([
     ['E1', { ...staff, id: 'e1' }],
     ['E2', { ...staff, id: 'e2' }],
+    [
+      'E6',
+      {
+        ...staff,
+        id: 'e6',
+        owningUnit: { departmentId: 'd-old', costCenter: { id: 'cc-old', code: 'CC-OLD', status: 'INACTIVE' } },
+      },
+    ],
+    ['E7', { ...staff, id: 'e7', owningUnit: null }],
     ['E3', { ...staff, id: 'e3' }],
     ['E4', { ...staff, id: 'e4' }],
     ['E5', { ...staff, id: 'e5' }],
@@ -25,8 +41,8 @@ export const facts = (over: Partial<SeatFacts> = {}): SeatFacts => ({
     ['T3', { id: 'e-freelancer', status: 'ACTIVE', employmentType: 'FREELANCER', hireDate: HIRED }],
   ]),
   costCenters: new Map([
-    ['CC-CORP', { id: 'cc-corp', kind: 'COMPANY', status: 'ACTIVE' }],
-    ['CC-OLD', { id: 'cc-old', kind: 'COMPANY', status: 'INACTIVE' }],
+    ['CC-DES', { id: 'cc-des', kind: 'UNIT', status: 'ACTIVE' }],
+    ['CC-OLD', { id: 'cc-old', kind: 'UNIT', status: 'INACTIVE' }],
     ['CC-A', { id: 'cc-a', kind: 'UNIT', status: 'ACTIVE' }],
   ]),
   companyDomains: ['congty.vn'],

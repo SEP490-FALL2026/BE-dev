@@ -14,12 +14,13 @@ import { EmployeeManualService } from './employee-manual.service';
 import { toOrganizationApiException } from '../mappers/organization.http-errors';
 
 /**
- * Entering people by hand (`US-02-02` AC-14). IT Admin only: the Super Admin does no business work (`SoD-1`).
- * It creates the person and their one placement; it never creates a login (that is the Super Admin's step).
+ * Entering people by hand (`US-02-02` AC-14). Super Admin only, on an HR basis (`QĐ-82i`, `US-01-05` AC-14): the IT
+ * Admin, a department head and Finance do not enter new records. It creates the person and their one placement; it
+ * never creates a login, a role or an invitation.
  */
 @ApiTags('employees')
 @Controller({ path: 'employees', version: '1' })
-@RequireRoles('IT_ADMIN')
+@RequireRoles('SUPER_ADMIN')
 export class EmployeesController {
   constructor(private readonly employees: EmployeeManualService) {}
 
@@ -33,11 +34,11 @@ export class EmployeesController {
   })
   @ApiErrorResponses(
     UNAUTHENTICATED_RESPONSE,
-    { status: HttpStatus.FORBIDDEN, description: 'Only an IT Admin may enter people.' },
+    { status: HttpStatus.FORBIDDEN, description: 'Only the Super Admin may enter people.' },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The body is malformed (VALIDATION_ERROR), or the row cannot become an employee (EMPLOYEE.ROW_INVALID; details.reasons lists every field and code).',
+        "The body is malformed or lacks a part of the HR basis (VALIDATION_ERROR), or the row cannot become an employee (EMPLOYEE.ROW_INVALID; details.reasons lists every field and code, among them OWN_RECORD for the Super Admin's own code or email).",
     },
     GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   )

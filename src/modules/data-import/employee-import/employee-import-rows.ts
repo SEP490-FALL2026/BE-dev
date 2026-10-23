@@ -83,6 +83,8 @@ export interface EmployeeImportLookup {
   existing: ReadonlyMap<string, ExistingEmployee>;
   /** Normalized work email of an employee ⟹ that employee's code. */
   emailOwners: ReadonlyMap<string, string>;
+  /** The record of the person importing: a row naming it is refused, however it compares (`US-02-02` AC-18). */
+  own?: { employeeCode: string; normalizedEmail: string | null } | null;
 }
 
 export interface ParsedEmployeeRow {
@@ -177,11 +179,21 @@ export class EmployeeRowClassifier {
       if (normalizedEmail !== null) {
         if (this.seenEmails.has(normalizedEmail)) {
           errors.push({ column: 'work_email', code: 'WORK_EMAIL_DUPLICATE_IN_FILE' });
-        } else if (existing === undefined && this.lookup.emailOwners.has(normalizedEmail)) {
+        } else if (
+          existing === undefined &&
+          this.lookup.emailOwners.has(normalizedEmail) &&
+          normalizedEmail !== this.lookup.own?.normalizedEmail
+        ) {
           errors.push({ column: 'work_email', code: 'WORK_EMAIL_TAKEN' });
         }
         this.seenEmails.add(normalizedEmail);
       }
+    }
+
+    const own = this.lookup.own;
+    if (own && code !== '' && code === own.employeeCode) errors.push({ column: 'employee_code', code: 'OWN_RECORD' });
+    if (own?.normalizedEmail && normalizedEmail === own.normalizedEmail) {
+      errors.push({ column: 'work_email', code: 'OWN_RECORD' });
     }
 
     if (!EMPLOYMENT_TYPES.includes(typeText as EmploymentTypeName)) {

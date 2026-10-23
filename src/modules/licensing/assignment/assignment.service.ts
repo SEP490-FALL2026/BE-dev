@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import { Page, pageOf } from '../../../core/application/pagination';
 import { normalizeAccountIdentifier } from '../../../core/account-identifier';
 import type { BusinessDate } from '../../../core/business-date';
 import { DbTx, TransactionRunner } from '../../../infrastructure/database/transaction-runner';
@@ -11,7 +10,6 @@ import { EmployeeNotFoundError } from '../../organization/organization.errors';
 import { OrganizationService } from '../../organization/organization.service';
 import { AssignmentNotFoundError, AssignmentNotOpenError, SeatTargetNotFoundError } from '../licensing.errors';
 import type {
-  AssignmentListFilter,
   AssignmentRecord,
   AssignmentView,
   ExistingAssignment,
@@ -119,6 +117,7 @@ export class AssignmentService {
           normalizedAccountIdentifier: normalizeAccountIdentifier(row.accountIdentifier),
           reason: row.reason,
           costCenterId: row.costCenterId,
+          owningDepartmentId: row.owningDepartmentId,
           effectiveFrom: row.effectiveFrom,
           effectiveFromBasis: row.effectiveFromBasis,
           expectedEndDate: row.expectedEndDate,
@@ -178,6 +177,7 @@ export class AssignmentService {
         normalizedAccountIdentifier: normalizeAccountIdentifier(input.accountIdentifier),
         reason: null,
         costCenterId: null,
+        owningDepartmentId: null,
         effectiveFrom: input.effectiveFrom,
         effectiveFromBasis: 'ACTUAL',
         expectedEndDate: input.expectedEndDate,
@@ -239,16 +239,6 @@ export class AssignmentService {
     );
   }
 
-  /** One page of assignments, with the start shown as the grant date only when it is the real one. */
-  async list(
-    filter: Omit<AssignmentListFilter, 'skip' | 'take'> & { page: number; pageSize: number },
-  ): Promise<Page<AssignmentView>> {
-    const { page, pageSize, ...rest } = filter;
-    const { items, total } = await this.repo.page({ ...rest, skip: (page - 1) * pageSize, take: pageSize });
-
-    return pageOf(items.map(toAssignmentView), total, page, pageSize);
-  }
-
   /** The seats bought, taken and free on today in the organization calendar. Throws SeatTargetNotFoundError. */
   async seatUsage(subscriptionId: string): Promise<SeatUsage> {
     const target = await this.catalog.findSeatTarget({ subscriptionId });
@@ -290,7 +280,7 @@ export class AssignmentService {
       const current = await this.repo.lock(tx, assignmentId);
       if (!current) throw new AssignmentNotFoundError();
 
-      const holder = await this.lockHolder(tx, input.employeeId);
+      const holder = await this.lockHolder(tx, input.employeeId, input.effectiveFrom);
       assertResponsibleChange(current, input, holder, today);
 
       await this.repo.end(tx, current.id, input.effectiveFrom);
@@ -305,6 +295,7 @@ export class AssignmentService {
         normalizedAccountIdentifier: normalizeAccountIdentifier(current.accountIdentifier),
         reason: current.reason,
         costCenterId: current.costCenterId,
+        owningDepartmentId: current.owningDepartmentId,
         effectiveFrom: input.effectiveFrom,
         effectiveFromBasis: 'ACTUAL',
         expectedEndDate: input.expectedEndDate,
@@ -350,7 +341,7 @@ export class AssignmentService {
   }
 
   /** The person who would take over, locked `FOR SHARE` so they cannot leave meanwhile; null when there is none. */
-  private async lockHolder(tx: DbTx, employeeId: string) {
+  private async lockHolder(tx: DbTx, employeeId: string, onDate: BusinessDate) {
     try {
       await this.organization.lockEmployeeForShare(tx, employeeId);
     } catch (error) {
@@ -359,6 +350,13 @@ export class AssignmentService {
     }
     const employee = await this.organization.getEmployee(employeeId, tx);
 
-    return employee ? { status: employee.status, employmentType: employee.employmentType } : null;
+    if (!employee) return null;
+    const unit = (await this.organization.getOwningUnits([employeeId], onDate, tx)).get(employeeId);
+
+    return {
+      status: employee.status,
+      employmentType: employee.employmentType,
+      departmentId: unit?.departmentId ?? null,
+    };
   }
 }

@@ -21,7 +21,11 @@ import {
   DepartmentUpdateEmptyError,
   HeadAssignmentError,
 } from '../department/department.errors';
-import { EmployeeRowInvalidError } from '../employee/employee.errors';
+import {
+  EmployeeAnotherItAdminNeededError,
+  EmployeeRowInvalidError,
+  EmployeeUpdateEmptyError,
+} from '../employee/employee.errors';
 import {
   JobTitleNameRequiredError,
   JobTitleNameTakenError,
@@ -186,12 +190,27 @@ const CASES: [string, Error, HttpStatus, string, Record<string, unknown> | undef
     undefined,
   ],
   ['DepartmentInactiveError', new DepartmentInactiveError(), HttpStatus.CONFLICT, 'DEPARTMENT.INACTIVE', undefined],
+  ['EmployeeNotFoundError', new EmployeeNotFoundError('emp-1'), HttpStatus.NOT_FOUND, 'EMPLOYEE.NOT_FOUND', undefined],
+  [
+    'EmployeeUpdateEmptyError',
+    new EmployeeUpdateEmptyError(),
+    HttpStatus.UNPROCESSABLE_ENTITY,
+    'EMPLOYEE.UPDATE_EMPTY',
+    undefined,
+  ],
+  [
+    'EmployeeAnotherItAdminNeededError',
+    new EmployeeAnotherItAdminNeededError(),
+    HttpStatus.FORBIDDEN,
+    'EMPLOYEE.ANOTHER_IT_ADMIN_NEEDED',
+    undefined,
+  ],
   [
     'DepartmentInUseError',
     new DepartmentInUseError(people, 4),
     HttpStatus.CONFLICT,
     'DEPARTMENT.IN_USE',
-    { members: people, totalMembers: 4, openWork: [] },
+    { members: people, totalMembers: 4, serviceAccounts: [], totalServiceAccounts: 0, openWork: [] },
   ],
   ...(
     [
@@ -229,10 +248,18 @@ describe('toOrganizationApiException (organization HTTP error contract)', () => 
     });
   });
 
-  it('keeps DEPARTMENT.IN_USE details to exactly members, openWork and totalMembers (QĐ-75)', () => {
-    const { body } = answer(new DepartmentInUseError(people, 1));
+  it('keeps DEPARTMENT.IN_USE details to the members, the service accounts it owns and open work, never shared accounts (QĐ-75, QĐ-86c)', () => {
+    const { body } = answer(
+      new DepartmentInUseError(people, 1, [{ assignmentId: 'a-1', accountIdentifier: 'ci-bot' }], 1),
+    );
 
-    expect(Object.keys((body as { details: object }).details).sort()).toEqual(['members', 'openWork', 'totalMembers']);
+    expect(Object.keys((body as { details: object }).details).sort()).toEqual([
+      'members',
+      'openWork',
+      'serviceAccounts',
+      'totalMembers',
+      'totalServiceAccounts',
+    ]);
   });
 
   it('passes an ApiException through as the same object', () => {
@@ -250,7 +277,6 @@ describe('toOrganizationApiException (organization HTTP error contract)', () => 
 
   it.each([
     ['a plain Error', new Error('boom')],
-    ['EmployeeNotFoundError (handled by callers, not by this mapper)', new EmployeeNotFoundError('emp-1')],
     ['OrganizationAlreadyExistsError', new OrganizationAlreadyExistsError()],
     ['EmployeeCodeTakenError', new EmployeeCodeTakenError('E-1')],
     ['a non-error value', 'not an error'],

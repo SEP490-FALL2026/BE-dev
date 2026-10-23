@@ -25,6 +25,8 @@ import { ImportView } from './employee-import.types';
 
 /** The largest file the route reads: a people file of 1 000 rows is far smaller. */
 const MAX_FILE_BYTES = 2 * 1024 * 1024;
+/** One file and nothing else of any size: a form of 50 fields, or a field of a megabyte, is refused before it is read (`SEC-06`). */
+const UPLOAD_LIMITS = { fileSize: MAX_FILE_BYTES, files: 1, fields: 2, fieldSize: 64, parts: 3 };
 
 /** The part of a multipart upload this controller uses; multer's own type is not a dependency of the project. */
 interface UploadedBinary {
@@ -35,7 +37,7 @@ interface UploadedBinary {
 
 const COMMON_ERRORS = [
   UNAUTHENTICATED_RESPONSE,
-  { status: HttpStatus.FORBIDDEN, description: 'Only an IT Admin imports people.' },
+  { status: HttpStatus.FORBIDDEN, description: 'Only the Super Admin imports people.' },
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
 ] as const;
 const NOT_FOUND = {
@@ -64,9 +66,9 @@ function toWire(view: ImportView) {
 }
 
 /**
- * Importing people from a file in six steps (`US-02-01`): upload → read → preview → confirm → write → summary. The IT
- * Admin uploads a CSV file; nothing is written until the preview is confirmed, and then once. Finance, Managers and
- * the Super Admin do not import people (`US-02-02` AC-12).
+ * Importing people from a file in six steps (`US-02-01`): upload → read → preview → confirm → write → summary. The Super
+ * Admin uploads a CSV file and confirms it with the HR basis it is entered on; nothing is written until the preview is
+ * confirmed, and then once. The IT Admin, Managers and Finance do not import people (`US-02-02` AC-12, `QĐ-82i`).
  */
 @ApiTags('employee-imports')
 @Controller({ path: 'employee-imports', version: '1' })
@@ -74,8 +76,8 @@ export class EmployeeImportsController {
   constructor(private readonly imports: EmployeeImportService) {}
 
   @Post()
-  @RequireRoles('IT_ADMIN')
-  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_FILE_BYTES, files: 1 } }))
+  @RequireRoles('SUPER_ADMIN')
+  @UseInterceptors(FileInterceptor('file', { limits: UPLOAD_LIMITS }))
   @ApiOperation({ operationId: 'employeeImportUpload', summary: 'Upload an employee file for preview' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
@@ -103,7 +105,7 @@ export class EmployeeImportsController {
   }
 
   @Get(':id')
-  @RequireRoles('IT_ADMIN')
+  @RequireRoles('SUPER_ADMIN')
   @ApiOperation({ operationId: 'employeeImportGet', summary: 'Get an employee import' })
   @ApiSuccessResponse(EmployeeImportResponseDto, {
     message: 'EMPLOYEE_IMPORT.FETCHED',
@@ -119,7 +121,7 @@ export class EmployeeImportsController {
   }
 
   @Get(':id/rows')
-  @RequireRoles('IT_ADMIN')
+  @RequireRoles('SUPER_ADMIN')
   @ApiOperation({ operationId: 'employeeImportRowList', summary: 'List the rows of an employee import' })
   @ApiSuccessResponse(EmployeeImportRowsResponseDto, {
     message: 'EMPLOYEE_IMPORT.ROWS_LISTED',
@@ -150,7 +152,7 @@ export class EmployeeImportsController {
   }
 
   @Post(':id/preview-refreshes')
-  @RequireRoles('IT_ADMIN')
+  @RequireRoles('SUPER_ADMIN')
   @ApiOperation({ operationId: 'employeeImportPreviewRefresh', summary: 'Check an employee import again' })
   @ApiSuccessResponse(EmployeeImportResponseDto, {
     message: 'EMPLOYEE_IMPORT.PREVIEW_REFRESHED',
@@ -161,28 +163,28 @@ export class EmployeeImportsController {
     status: HttpStatus.CONFLICT,
     description: 'The import is no longer a preview (IMPORT.CANCELLED, IMPORT.NOT_PREVIEW).',
   })
-  async refresh(@Param() params: ImportIdParamDto) {
+  async refresh(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: ImportIdParamDto) {
     try {
-      return toWire(await this.imports.refresh(params.id));
+      return toWire(await this.imports.refresh(actor, params.id));
     } catch (error) {
       throw toImportApiException(error);
     }
   }
 
   @Post(':id/confirmations')
-  @RequireRoles('IT_ADMIN')
+  @RequireRoles('SUPER_ADMIN')
   @ApiOperation({ operationId: 'employeeImportConfirm', summary: 'Confirm an employee import' })
   @ApiSuccessResponse(EmployeeImportConfirmationResponseDto, {
     message: 'EMPLOYEE_IMPORT.CONFIRMED',
     description:
-      'The people the preview promised are created, once. The same confirmation sent again (same idempotency key) returns the first answer with replayed set.',
+      'The people the preview promised are created, once, on the HR basis given; each carries it in the Audit Trail. The same confirmation sent again (same idempotency key) returns the first answer with replayed set.',
   })
   @ApiErrorResponses(
     ...COMMON_ERRORS,
     NOT_FOUND,
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
-      description: 'The request is invalid (VALIDATION_ERROR).',
+      description: 'The request is invalid or lacks a part of the HR basis (VALIDATION_ERROR).',
     },
     {
       status: HttpStatus.CONFLICT,
@@ -205,7 +207,7 @@ export class EmployeeImportsController {
   }
 
   @Post(':id/cancellations')
-  @RequireRoles('IT_ADMIN')
+  @RequireRoles('SUPER_ADMIN')
   @ApiOperation({ operationId: 'employeeImportCancel', summary: 'Cancel an employee import' })
   @ApiSuccessResponse(EmployeeImportResponseDto, {
     message: 'EMPLOYEE_IMPORT.CANCELLED',

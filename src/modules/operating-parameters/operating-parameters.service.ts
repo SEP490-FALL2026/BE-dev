@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { cutHistory } from '../../core/application/pagination';
 import { BusinessDate } from '../../core/business-date';
 import { TransactionRunner } from '../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../infrastructure/security/tokens/access-token-verifier.port';
@@ -79,11 +80,14 @@ export class OperatingParametersService {
     });
   }
 
-  async history(key: string): Promise<{ value: ParameterValue; from: Date; until: Date | null }[]> {
+  /** The newest {@link HISTORY_LIMIT} values of a parameter, and whether there are older ones (`LD-14`). */
+  async history(
+    key: string,
+  ): Promise<{ items: { value: ParameterValue; from: Date; until: Date | null }[]; hasMore: boolean }> {
     if (!definitionOf(key)) throw new ParameterNotFoundError(key);
-    const rows = await this.repo.history(key, HISTORY_LIMIT);
+    const { items, hasMore } = cutHistory(await this.repo.history(key, HISTORY_LIMIT + 1), HISTORY_LIMIT);
 
-    return rows.map((row) => ({ value: row.value, from: row.validFrom, until: row.validTo }));
+    return { items: items.map((row) => ({ value: row.value, from: row.validFrom, until: row.validTo })), hasMore };
   }
 
   /**

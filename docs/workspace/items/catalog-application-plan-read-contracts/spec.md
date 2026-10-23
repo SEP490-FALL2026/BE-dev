@@ -79,23 +79,25 @@ businessOwnerEmployeeId, updatedAt, vendor: { select: { id, name } }, functional
 
 ## Test matrix
 
-| AC / rủi ro | Tình huống (gồm từ chối, edge case)                                             | Cấp test              | Kết quả mong đợi                                                          | Bằng chứng sau implement |
-| ----------- | ------------------------------------------------------------------------------- | --------------------- | ------------------------------------------------------------------------- | ------------------------ |
-| `LD-04`     | 100 ứng dụng, mỗi cái 20 domain dài tối đa, ghi chú 1000 ký tự                  | integration + harness | item không có `domains`/`communication`; số câu lệnh hằng số; body ≤ biên | chưa chạy                |
-| `LD-04`     | detail cùng ứng dụng                                                            | integration           | đủ trường như trước; trường chung bằng item danh sách                     | chưa chạy                |
-| `LD-05`     | 100 gói có `revocationNote` 2000 ký tự                                          | integration + harness | item không có ghi chú; SQL không đọc cột đó                               | chưa chạy                |
-| `LD-06`     | 60 ý kiến điều khoản; 120 Assignment chặn ngừng dùng; 30 lần đổi Business Owner | integration           | 50/50 + tổng đúng; route con phân trang ổn định                           | chưa chạy                |
-| hồi quy     | quyền `FINANCE` đọc, `MANAGER` 403; OpenAPI chỉ đổi đúng các schema trên        | e2e + OpenAPI         | như dự kiến                                                               | chưa chạy                |
+| AC / rủi ro | Tình huống (gồm từ chối, edge case)                                             | Cấp test              | Kết quả mong đợi                                                          | Bằng chứng sau implement        |
+| ----------- | ------------------------------------------------------------------------------- | --------------------- | ------------------------------------------------------------------------- | ------------------------------- |
+| `LD-04`     | 100 ứng dụng, mỗi cái 20 domain dài tối đa, ghi chú 1000 ký tự                  | integration + harness | item không có `domains`/`communication`; số câu lệnh hằng số; body ≤ biên | xanh — `catalog-read-contracts` |
+| `LD-04`     | detail cùng ứng dụng                                                            | integration           | đủ trường như trước; trường chung bằng item danh sách                     | xanh — `catalog-read-contracts` |
+| `LD-05`     | 100 gói có `revocationNote` 2000 ký tự                                          | integration + harness | item không có ghi chú; SQL không đọc cột đó                               | xanh — `catalog-read-contracts` |
+| `LD-06`     | 60 ý kiến điều khoản; 120 Assignment chặn ngừng dùng; 30 lần đổi Business Owner | integration           | 50/50 + tổng đúng; route con phân trang ổn định                           | xanh — `catalog-read-contracts` |
+| hồi quy     | quyền `FINANCE` đọc, `MANAGER` 403; OpenAPI chỉ đổi đúng các schema trên        | e2e + OpenAPI         | như dự kiến                                                               | xanh — `catalog-read-contracts` |
 
 ## Definition of Done
 
 - [ ] Mọi primary AC `full` có test đỏ-trước/xanh-sau ở cấp phù hợp; AC `partial` ghi đúng vế đã làm — áp cho `LD-04`
       → `LD-06`.
-- [ ] Gate theo [CONTRIBUTING](../../../../CONTRIBUTING.md) chạy xanh trên revision cuối; HTTP đổi thì e2e + OpenAPI.
-- [ ] Spec/plan/roadmap phản ánh implementation cuối; contract đổi đã ghi và báo consumer FE.
-- [ ] Không tăng legacy ledger kiến trúc; mục registry `applicationList`, `planList` đã gỡ.
+- [x] Gate theo [CONTRIBUTING](../../../../CONTRIBUTING.md) chạy xanh trên revision cuối; HTTP đổi thì e2e + OpenAPI.
+- [x] Spec/plan/roadmap phản ánh implementation cuối; contract đổi đã ghi và báo consumer FE.
+- [x] Không tăng legacy ledger kiến trúc; mục registry `applicationList`, `planList` đã gỡ.
 - [ ] Tài liệu vận hành/runbook bị ảnh hưởng đã cập nhật; phần chưa kiểm chứng ghi rõ.
 
 ## Changes and acceptance
 
 22/10/2026: lập theo Prompt 08. Chưa code, chưa review, chưa nghiệm thu.
+
+23/10/2026 (Prompt 10 — xử lý tồn đọng G0→G4): `LD-04`→`LD-06` hiện thực: `GET /applications` và `GET /plans` trả bản tóm tắt (`select` đúng cột, không `revocationNote`), chi tiết trả đủ và `isCommunicationService`; `similarTotal` + 20 ứng dụng tương tự; business owners phân trang; 50 ý kiến điều khoản mới nhất + `opinionTotal` và route **mới** `GET /plans/{id}/term-opinions`; chặn ngừng dùng cắt 50 mỗi nhóm kèm tổng. Đổi wire (FE): xem OpenAPI. Kiểm chứng: `catalog-read-contracts` — xanh trên cây làm việc chưa commit, nhánh `Bao_dev_be`, nền `dev` `19be620`, 23/10/2026. Gate toàn cây trên cùng cây: `pnpm lint`, `tsc --noEmit`, `pnpm test` (unit 2.074 (141 suite)), `pnpm test:e2e` (839 (32 suite)), `pnpm test:integration` (112 suite, 1.429 test, gồm 4 test kho S3 thật trên LocalStack), `prisma migrate deploy` trên CSDL mới + `migrate diff --exit-code` (không lệch), `pnpm openapi:export`. Giới hạn: Gate registry: các mục `applicationList`, `planList`, các mảng lồng liên quan đã gỡ hoặc chuyển `bounded`. Chưa commit khi viết dòng này, chưa remote CI, chưa Owner review, chưa nghiệm thu: không có gì là `accepted`; đỏ-trước của từng test không được ghi lại.

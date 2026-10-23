@@ -35,9 +35,16 @@ export interface PlanTermsView {
   applicable: boolean;
   sharingPolicy: SharingPolicy | null;
   terms: TermsRecord | null;
+  /** The newest opinions, at most `OPINIONS_IN_VIEW`; `opinionTotal` counts them all (`LD-06`). */
   opinions: OpinionView[];
+  opinionTotal: number;
+  /** The earliest review alerts, at most `WARNINGS_IN_VIEW`; `warningTotal` counts them all (`LD-16`). */
   warnings: ReviewWarning[];
+  warningTotal: number;
 }
+
+export const OPINIONS_IN_VIEW = 50;
+export const WARNINGS_IN_VIEW = 50;
 
 const snapshot = (terms: TermsContent | null) =>
   terms === null
@@ -86,16 +93,41 @@ export class PlanTermsService {
     const plan = await this.plans.find(planId);
     if (!plan) throw new PlanTermsPlanNotFoundError();
     if (plan.provisioningType === 'K5') {
-      return { planId, applicable: false, sharingPolicy: plan.sharingPolicy, terms: null, opinions: [], warnings: [] };
+      return {
+        planId,
+        applicable: false,
+        sharingPolicy: plan.sharingPolicy,
+        terms: null,
+        opinions: [],
+        opinionTotal: 0,
+        warnings: [],
+        warningTotal: 0,
+      };
     }
 
     const [terms, opinions, warnings] = await Promise.all([
       this.terms.find(planId),
-      this.opinionViews(planId),
+      this.opinionPage(planId, { page: 1, pageSize: OPINIONS_IN_VIEW }),
       this.warningsFor(planId),
     ]);
 
-    return { planId, applicable: true, sharingPolicy: plan.sharingPolicy, terms, opinions, warnings };
+    return {
+      planId,
+      applicable: true,
+      sharingPolicy: plan.sharingPolicy,
+      terms,
+      opinions: opinions.items,
+      opinionTotal: opinions.pagination.totalItems,
+      warnings: warnings.slice(0, WARNINGS_IN_VIEW),
+      warningTotal: warnings.length,
+    };
+  }
+
+  /** Throws PlanTermsPlanNotFoundError. One page of the opinions on a plan, newest first. */
+  async opinions(planId: string, query: { page: number; pageSize: number }): Promise<Page<OpinionView>> {
+    if (!(await this.plans.find(planId))) throw new PlanTermsPlanNotFoundError();
+
+    return this.opinionPage(planId, query);
   }
 
   /**
@@ -200,7 +232,7 @@ export class PlanTermsService {
 
   private async warningsFor(planId?: string, asOf?: BusinessDate): Promise<ReviewWarning[]> {
     const today = asOf ?? (await this.organization.businessToday());
-    const notices = await this.notices.activeNotices(planId);
+    const notices = await this.notices.activeNotices(today, planId);
     const reviews = await this.terms.lastReviews([...new Set(notices.map((notice) => notice.planId))]);
     const warnings: ReviewWarning[] = [];
 
@@ -230,8 +262,10 @@ export class PlanTermsService {
     );
   }
 
-  private async opinionViews(planId: string): Promise<OpinionView[]> {
-    return this.viewOpinions(await this.terms.listOpinions(planId));
+  private async opinionPage(planId: string, query: { page: number; pageSize: number }): Promise<Page<OpinionView>> {
+    const { items, total } = await this.terms.listOpinions(planId, (query.page - 1) * query.pageSize, query.pageSize);
+
+    return pageOf(await this.viewOpinions(items), total, query.page, query.pageSize);
   }
 
   private async viewOpinions(

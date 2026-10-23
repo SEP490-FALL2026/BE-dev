@@ -12,7 +12,27 @@ import type {
   ExistingAssignment,
 } from '../licensing.types';
 
-type Row = Prisma.LicenseAssignmentGetPayload<object>;
+/** The columns an assignment is answered with: a list reads these and nothing else (`LD-10`). */
+const RECORD_SELECT = {
+  id: true,
+  source: true,
+  kind: true,
+  planId: true,
+  subscriptionId: true,
+  employeeId: true,
+  accountIdentifier: true,
+  reason: true,
+  costCenterId: true,
+  owningDepartmentId: true,
+  validFrom: true,
+  validFromBasis: true,
+  validUntil: true,
+  expectedEndDate: true,
+  predecessorId: true,
+  failedAt: true,
+  createdAt: true,
+} satisfies Prisma.LicenseAssignmentSelect;
+type Row = Prisma.LicenseAssignmentGetPayload<{ select: typeof RECORD_SELECT }>;
 
 /** An assignment holds a seat from the day it is made until it ends or fails: not ended as of `day` and not failed. */
 const HOLDING = (day: BusinessDate): Prisma.LicenseAssignmentWhereInput => ({
@@ -30,6 +50,7 @@ const toRecord = (row: Row): AssignmentRecord => ({
   accountIdentifier: row.accountIdentifier,
   reason: row.reason,
   costCenterId: row.costCenterId,
+  owningDepartmentId: row.owningDepartmentId,
   effectiveFrom: fromDateColumn(row.validFrom),
   effectiveFromBasis: row.validFromBasis,
   validUntil: row.validUntil ? fromDateColumn(row.validUntil) : null,
@@ -50,6 +71,7 @@ export interface NewAssignment {
   normalizedAccountIdentifier: string;
   reason: string | null;
   costCenterId: string | null;
+  owningDepartmentId: string | null;
   effectiveFrom: BusinessDate;
   effectiveFromBasis: AssignmentDateBasis;
   expectedEndDate: BusinessDate | null;
@@ -79,6 +101,7 @@ export class AssignmentRepo {
         normalizedAccountIdentifier: input.normalizedAccountIdentifier,
         reason: input.reason,
         costCenterId: input.costCenterId,
+        owningDepartmentId: input.owningDepartmentId,
         validFrom: toDateColumn(input.effectiveFrom),
         validFromBasis: input.effectiveFromBasis,
         expectedEndDate: input.expectedEndDate ? toDateColumn(input.expectedEndDate) : null,
@@ -161,14 +184,24 @@ export class AssignmentRepo {
   }
 
   /** The assignments of these plan ids that have not ended and have not failed as of `day`, by start then id. */
-  async holdingOfPlans(planIds: readonly string[], day: BusinessDate): Promise<AssignmentRecord[]> {
-    if (planIds.length === 0) return [];
-    const rows = await this.prisma.licenseAssignment.findMany({
-      where: { planId: { in: [...planIds] }, ...HOLDING(day) },
-      orderBy: [{ validFrom: 'asc' }, { id: 'asc' }],
-    });
+  async holdingOfPlans(
+    planIds: readonly string[],
+    day: BusinessDate,
+    take: number,
+    tx?: DbTx,
+  ): Promise<{ items: AssignmentRecord[]; byPlan: { planId: string; count: number }[] }> {
+    if (planIds.length === 0) return { items: [], byPlan: [] };
+    const db = tx ?? this.prisma;
+    const where = { planId: { in: [...planIds] }, ...HOLDING(day) };
+    const [rows, groups] = await Promise.all([
+      db.licenseAssignment.findMany({ where, orderBy: [{ validFrom: 'asc' }, { id: 'asc' }], take }),
+      db.licenseAssignment.groupBy({ by: ['planId'], where, _count: { _all: true }, orderBy: { planId: 'asc' } }),
+    ]);
 
-    return rows.map(toRecord);
+    return {
+      items: rows.map(toRecord),
+      byPlan: groups.map((group) => ({ planId: group.planId, count: group._count._all })),
+    };
   }
 
   /** How many different people hold an assignment of these plan ids that has not ended and has not failed. */
@@ -194,20 +227,74 @@ export class AssignmentRepo {
     return groups.map((group) => ({ employeeId: group.employeeId, seats: group._count._all }));
   }
 
-  /** The assignments these people hold on `day`, by start date then id. */
-  async openOf(employeeIds: readonly string[], day: BusinessDate): Promise<AssignmentRecord[]> {
-    if (employeeIds.length === 0) return [];
+  /**
+   * One page of what a department uses on `day`, by start date then id, the total, and how many seats each plan holds, from
+   * one snapshot (`LD-09`): the personal seats its members hold and the service accounts it owns (`QĐ-86c`), whoever
+   * answers for them now. Only the page is read in full.
+   */
+  async toolsOfDepartment(
+    input: { memberIds: readonly string[]; departmentId: string },
+    day: BusinessDate,
+    skip: number,
+    take: number,
+  ): Promise<{ items: AssignmentRecord[]; total: number; byPlan: { planId: string; count: number }[] }> {
     const date = toDateColumn(day);
-    const rows = await this.prisma.licenseAssignment.findMany({
-      where: {
-        employeeId: { in: [...employeeIds] },
-        validFrom: { lte: date },
-        OR: [{ validUntil: null }, { validUntil: { gt: date } }],
-      },
-      orderBy: [{ validFrom: 'asc' }, { id: 'asc' }],
-    });
+    const where: Prisma.LicenseAssignmentWhereInput = {
+      validFrom: { lte: date },
+      AND: [
+        { OR: [{ validUntil: null }, { validUntil: { gt: date } }] },
+        {
+          OR: [
+            { kind: 'PERSONAL', employeeId: { in: [...input.memberIds] } },
+            { kind: 'SERVICE', owningDepartmentId: input.departmentId },
+          ],
+        },
+      ],
+    };
 
-    return rows.map(toRecord);
+    return this.prisma.$transaction(
+      async (tx) => {
+        const [rows, total, groups] = await Promise.all([
+          tx.licenseAssignment.findMany({ where, orderBy: [{ validFrom: 'asc' }, { id: 'asc' }], skip, take }),
+          tx.licenseAssignment.count({ where }),
+          tx.licenseAssignment.groupBy({ by: ['planId'], where, _count: { _all: true }, orderBy: { planId: 'asc' } }),
+        ]);
+
+        return {
+          items: rows.map(toRecord),
+          total,
+          byPlan: groups.map((group) => ({ planId: group.planId, count: group._count._all })),
+        };
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
+    );
+  }
+
+  /** The service accounts a department owns that are open on `day` or will be: the first `take` and how many in all. */
+  async ownedServiceAccounts(
+    departmentId: string,
+    day: BusinessDate,
+    take: number,
+    tx?: DbTx,
+  ): Promise<{ items: { assignmentId: string; accountIdentifier: string }[]; total: number }> {
+    const db = tx ?? this.prisma;
+    const where: Prisma.LicenseAssignmentWhereInput = {
+      kind: 'SERVICE',
+      owningDepartmentId: departmentId,
+      failedAt: null,
+      OR: [{ validUntil: null }, { validUntil: { gt: toDateColumn(day) } }],
+    };
+    const [rows, total] = await Promise.all([
+      db.licenseAssignment.findMany({
+        where,
+        select: { id: true, accountIdentifier: true },
+        orderBy: [{ validFrom: 'asc' }, { id: 'asc' }],
+        take,
+      }),
+      db.licenseAssignment.count({ where }),
+    ]);
+
+    return { items: rows.map((row) => ({ assignmentId: row.id, accountIdentifier: row.accountIdentifier })), total };
   }
 
   /** How many assignments came from the baseline import. */
@@ -229,6 +316,7 @@ export class AssignmentRepo {
       async (tx) => {
         const rows = await tx.licenseAssignment.findMany({
           where,
+          select: RECORD_SELECT,
           orderBy: [{ validFrom: 'asc' }, { id: 'asc' }],
           skip: filter.skip,
           take: filter.take,

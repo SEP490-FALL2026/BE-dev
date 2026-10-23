@@ -1,7 +1,7 @@
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
-import { projectSchema } from '../dto/project-wire.dto';
+import { projectSchema, projectSummarySchema } from '../dto/project-wire.dto';
 
 export const createProjectBodySchema = z.strictObject({
   name: z.string().max(1000),
@@ -17,7 +17,11 @@ export const updateProjectBodySchema = z.strictObject({
   departmentIds: z.array(z.uuid()).max(100).optional(),
 });
 
-export const listProjectsQuerySchema = z.strictObject({ departmentId: z.uuid().optional() });
+export const listProjectsQuerySchema = z.strictObject({
+  departmentId: z.uuid().optional(),
+  page: z.coerce.number().int().positive().default(1),
+  pageSize: z.coerce.number().int().positive().max(100).default(20),
+});
 export const projectIdParamSchema = z.strictObject({ id: z.uuid() });
 
 export class CreateProjectBodyDto extends createZodDto(createProjectBodySchema) {}
@@ -26,5 +30,15 @@ export class ListProjectsQueryDto extends createZodDto(listProjectsQuerySchema) 
 export class ProjectIdParamDto extends createZodDto(projectIdParamSchema) {}
 export class ProjectResponseDto extends createZodDto(successEnvelopeSchema(projectSchema)) {}
 export class ProjectListResponseDto extends createZodDto(
-  successEnvelopeSchema(z.strictObject({ items: z.array(projectSchema) })),
+  successEnvelopeSchema(
+    z.strictObject({
+      items: z.array(projectSummarySchema),
+      pagination: z.strictObject({
+        page: z.number().int().positive(),
+        pageSize: z.number().int().positive(),
+        totalItems: z.number().int().nonnegative(),
+        totalPages: z.number().int().nonnegative(),
+      }),
+    }),
+  ),
 ) {}

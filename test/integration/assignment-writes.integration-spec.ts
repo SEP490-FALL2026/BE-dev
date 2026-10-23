@@ -44,6 +44,7 @@ describe('what the database refuses when assignments are written (integration, r
     accountIdentifier: `${code.toLowerCase()}@acme.vn`,
     reason: null,
     costCenterId: null,
+    owningDepartmentId: null,
     effectiveFrom: '2026-10-01',
     effectiveFromBasis: 'RECORDED',
     expectedEndDate: null,

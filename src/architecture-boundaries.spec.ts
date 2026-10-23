@@ -46,6 +46,7 @@ const PRISMA_MODEL_OWNER: Readonly<Record<string, string>> = {
   LicenseAssignment: 'licensing',
   ProvisioningTask: 'licensing',
   LicenseKey: 'licensing',
+  LicenseKeyRevealWindow: 'licensing',
   ApplicationRetirementConfirmation: 'catalog',
   Contract: 'catalog',
   DocumentAttachment: 'catalog',

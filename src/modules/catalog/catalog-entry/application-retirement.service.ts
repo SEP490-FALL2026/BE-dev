@@ -19,24 +19,31 @@ import {
   assertConfirmable,
   cleanConfirmationNote,
   decideRetirement,
+  RETIREMENT_LIST_LIMIT,
 } from './application-retirement.policy';
 import { ApplicationRetirementRepo, type RetirementConfirmationRecord } from './application-retirement.repo';
 import { ApplicationRepo } from './application.repo';
-import type { ApplicationRecord } from './application.types';
 
+/** What holds the application: the first of each (`RETIREMENT_LIST_LIMIT`), and the counts of all of them (`LD-06`). */
 export interface RetirementBlockers {
   assignments: (RetirementBlockingAssignment & {
     employeeCode: string | null;
     fullName: string | null;
     planName: string;
   })[];
+  assignmentTotal: number;
+  /** How many assignments hold each plan, so a long list is still readable as a whole. */
+  assignmentsByPlan: { planId: string; planName: string; count: number }[];
   subscriptions: (RetirementBlockingSubscription & { planName: string })[];
+  subscriptionTotal: number;
 }
 
 export interface RetirementView {
   status: 'APPROVED' | 'RETIRED';
   retiredAt: Date | null;
+  /** The newest confirmations, at most `RETIREMENT_LIST_LIMIT`; `confirmationTotal` counts them all. */
   confirmations: RetirementConfirmationRecord[];
+  confirmationTotal: number;
   /** The Business Owner of today has confirmed. */
   confirmed: boolean;
   blockers: RetirementBlockers;
@@ -123,22 +130,23 @@ export class ApplicationRetirementService {
     const application = await this.applications.find(applicationId);
     if (!application) throw new ApplicationNotFoundError();
     const today = await this.organization.businessToday();
-    const confirmations = await this.retirements.confirmations(applicationId);
+    const confirmations = await this.retirements.confirmations(applicationId, RETIREMENT_LIST_LIMIT);
     const state = await this.retirements.stateOf(applicationId);
     const blockers = await this.blockersOf(applicationId, today);
-    const confirmed = this.confirmedBy(application, confirmations) !== null;
+    const confirmed = (await this.retirements.latestBy(applicationId, application.businessOwnerEmployeeId)) !== null;
 
     return {
       status: application.status,
       retiredAt: state?.retiredAt ?? null,
-      confirmations,
+      confirmations: confirmations.items,
+      confirmationTotal: confirmations.total,
       confirmed,
       blockers,
       canRetire:
         application.status === 'APPROVED' &&
         confirmed &&
-        blockers.assignments.length === 0 &&
-        blockers.subscriptions.length === 0,
+        blockers.assignmentTotal === 0 &&
+        blockers.subscriptionTotal === 0,
     };
   }
 
@@ -155,7 +163,7 @@ export class ApplicationRetirementService {
       if (!application) throw new ApplicationNotFoundError();
       await this.plans.lockPlansOfApplication(tx, applicationId);
       const today = await this.organization.businessToday(now, tx);
-      const confirmation = this.confirmedBy(application, await this.retirements.confirmations(applicationId, tx));
+      const confirmation = await this.retirements.latestBy(applicationId, application.businessOwnerEmployeeId, tx);
       const blockers = await this.blockersOf(applicationId, today, tx);
 
       decideRetirement({
@@ -163,6 +171,8 @@ export class ApplicationRetirementService {
         confirmedByCurrentOwner: confirmation !== null,
         assignments: blockers.assignments,
         subscriptions: blockers.subscriptions,
+        assignmentTotal: blockers.assignmentTotal,
+        subscriptionTotal: blockers.subscriptionTotal,
       });
       if (!confirmation) return;
 
@@ -191,43 +201,37 @@ export class ApplicationRetirementService {
     });
   }
 
-  /** The newest confirmation by the Business Owner of today, or null: the confirmation of anyone else does not count. */
-  private confirmedBy(
-    application: ApplicationRecord,
-    confirmations: readonly RetirementConfirmationRecord[],
-  ): RetirementConfirmationRecord | null {
-    return (
-      confirmations.find(
-        (confirmation) => confirmation.businessOwnerEmployeeId === application.businessOwnerEmployeeId,
-      ) ?? null
-    );
-  }
-
   private async blockersOf(applicationId: string, today: BusinessDate, tx?: DbTx): Promise<RetirementBlockers> {
-    const plans = await this.plans.plansOfApplication(applicationId);
+    const plans = await this.plans.plansOfApplication(applicationId, tx);
     const planIds = plans.map((plan) => plan.id);
     const planName = new Map(plans.map((plan) => [plan.id, plan.name]));
-    const holdings = await this.occupancy.current().openAssignmentsOfPlans(planIds, today);
+    const holdings = await this.occupancy.current().openAssignmentsOfPlans(planIds, today, RETIREMENT_LIST_LIMIT, tx);
     const people = new Map(
-      (await this.organization.getEmployees([...new Set(holdings.map((holding) => holding.employeeId))])).map(
+      (await this.organization.getEmployees([...new Set(holdings.items.map((holding) => holding.employeeId))], tx)).map(
         (employee) => [employee.id, employee],
       ),
     );
     const running = activeTermSubscriptions(await this.subscriptions.termsOfPlans(planIds, tx), today);
 
     return {
-      assignments: holdings.map((holding) => ({
+      assignments: holdings.items.map((holding) => ({
         ...holding,
         employeeCode: people.get(holding.employeeId)?.employeeCode ?? null,
         fullName: people.get(holding.employeeId)?.fullName ?? null,
         planName: planName.get(holding.planId) ?? '',
       })),
-      subscriptions: running.map((subscription) => ({
+      assignmentTotal: holdings.total,
+      assignmentsByPlan: [...holdings.byPlan]
+        .sort((a, b) => b.count - a.count || a.planId.localeCompare(b.planId))
+        .slice(0, RETIREMENT_LIST_LIMIT)
+        .map((plan) => ({ ...plan, planName: planName.get(plan.planId) ?? '' })),
+      subscriptions: running.slice(0, RETIREMENT_LIST_LIMIT).map((subscription) => ({
         subscriptionId: subscription.subscriptionId,
         planId: subscription.planId,
         endDate: subscription.endDate,
         planName: planName.get(subscription.planId) ?? '',
       })),
+      subscriptionTotal: running.length,
     };
   }
 

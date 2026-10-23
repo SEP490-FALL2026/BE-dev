@@ -91,7 +91,10 @@ describe('the onboarding checklist over HTTP (integration, real PostgreSQL)', ()
       }
     ).data.suggestions;
   const upload = (content: string) =>
-    request(server()).post('/api/v1/employee-imports').set(as(it1)).attach('file', Buffer.from(content), 'people.csv');
+    request(server())
+      .post('/api/v1/employee-imports')
+      .set({ Authorization: `Bearer ${admin}` })
+      .attach('file', Buffer.from(content), 'people.csv');
   const HEADER = 'employee_code,full_name,work_email,employment_type,hire_date,department_code,job_title';
 
   it('is for the IT Admin only', async () => {
@@ -163,7 +166,10 @@ describe('the onboarding checklist over HTTP (integration, real PostgreSQL)', ()
     const uploaded = (await upload(wrong).expect(201)).body as { data: { id: string } };
     expect((await steps())[0].status).toBe('INCOMPLETE');
 
-    await request(server()).post(`/api/v1/employee-imports/${uploaded.data.id}/cancellations`).set(as(it1)).expect(200);
+    await request(server())
+      .post(`/api/v1/employee-imports/${uploaded.data.id}/cancellations`)
+      .set({ Authorization: `Bearer ${admin}` })
+      .expect(200);
 
     // The latest import that was kept answers instead: the clean file of the case before, never the cancelled one.
     const after = (await steps())[0];

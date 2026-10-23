@@ -3,7 +3,10 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-/** The seven E3 settings (H6.3) the API's configuration requires outside NODE_ENV=test; the document needs none. */
+/**
+ * The seven E3 settings (H6.3) and the two credentials of the object storage (SEC-04) that the API's configuration
+ * requires outside NODE_ENV=test; the document needs none.
+ */
 export const EXPORT_ONLY_SETTINGS = [
   'AUTH_ACCESS_TOKEN_SECRET',
   'AUTH_THROTTLE_PEPPER',
@@ -12,6 +15,8 @@ export const EXPORT_ONLY_SETTINGS = [
   'LICENSE_KEY_VAULT_KEY',
   'LICENSE_KEY_VAULT_KEY_ID',
   'LICENSE_KEY_FINGERPRINT_PEPPER',
+  'OBJECT_STORAGE_ACCESS_KEY_ID',
+  'OBJECT_STORAGE_SECRET_ACCESS_KEY',
 ] as const;
 
 /** Fresh valid values, generated in memory for one export and never printed or written. */
@@ -24,12 +29,14 @@ function ephemeralSettings(): Record<(typeof EXPORT_ONLY_SETTINGS)[number], stri
     LICENSE_KEY_VAULT_KEY: randomBytes(32).toString('base64'),
     LICENSE_KEY_VAULT_KEY_ID: `export-${randomBytes(4).toString('hex')}`,
     LICENSE_KEY_FINGERPRINT_PEPPER: randomBytes(32).toString('base64url'),
+    OBJECT_STORAGE_ACCESS_KEY_ID: `export${randomBytes(6).toString('hex')}`,
+    OBJECT_STORAGE_SECRET_ACCESS_KEY: randomBytes(24).toString('base64url'),
   };
 }
 
 /**
  * Runs `work` (which imports and builds the API graph) with an export-only environment (OPENAPI-EXPORT.1): the caller's
- * NODE_ENV is kept, the seven E3 settings are replaced by ephemeral values for this process only, and the working
+ * NODE_ENV is kept, the E3 settings and the storage credentials are replaced by ephemeral values for this process only, and the working
  * directory is an empty temporary folder, so ConfigModule reads no `.env`. Everything is restored in `finally`. Nothing
  * here connects to PostgreSQL, SMTP, Redis or storage.
  */

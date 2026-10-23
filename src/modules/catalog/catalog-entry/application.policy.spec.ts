@@ -1,7 +1,6 @@
 import {
   ApplicationDomainInvalidError,
   ApplicationInternalHasNoVendorError,
-  ApplicationKindNotManagedError,
   ApplicationNameInvalidError,
   ApplicationNoteInvalidError,
   ApplicationTooManyDomainsError,
@@ -78,12 +77,6 @@ describe('cleanNote', () => {
 });
 
 describe('vendorSourceOf', () => {
-  it('refuses the free external software, which is not a managed object (QĐ-49a)', () => {
-    expect(() => vendorSourceOf({ kind: 'FREE_EXTERNAL', vendorName: 'Canva' })).toThrow(
-      ApplicationKindNotManagedError,
-    );
-  });
-
   it('gives an internal application no vendor at all (AC-10)', () => {
     expect(vendorSourceOf({ kind: 'INTERNAL' })).toEqual({ type: 'NONE' });
     expect(() => vendorSourceOf({ kind: 'INTERNAL', vendorName: 'Acme' })).toThrow(ApplicationInternalHasNoVendorError);

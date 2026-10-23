@@ -85,7 +85,8 @@ const workspaceProfileSchema = z.strictObject({
     .nullable(),
   updatedAt: z.iso.datetime(),
 });
-const planSchema = z.strictObject({
+/** A row of the list (`LD-05`); the plan as a detail or a write answers it is this and the revocation note. */
+const planSummarySchema = z.strictObject({
   id: z.uuid(),
   applicationId: z.uuid(),
   applicationName: z.string(),
@@ -93,13 +94,13 @@ const planSchema = z.strictObject({
   provisioningType,
   pricingModel: pricingModel.nullable(),
   controlLevel: controlLevel.nullable(),
-  revocationNote: z.string().nullable(),
   dataLossOnRemoval: z.boolean(),
   sharingPolicy: sharingPolicy.nullable(),
   seatTracking: z.enum(['APPLICABLE', 'NOT_APPLICABLE']),
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
 });
+const planSchema = planSummarySchema.extend({ revocationNote: z.string().nullable() });
 const planDetailSchema = planSchema.extend({ workspaceProfile: workspaceProfileSchema.nullable() });
 
 export class DeclarePlanBodyDto extends createZodDto(declarePlanBodySchema) {}
@@ -113,7 +114,7 @@ export class WorkspaceProfileResponseDto extends createZodDto(successEnvelopeSch
 export class PlanPageResponseDto extends createZodDto(
   successEnvelopeSchema(
     z.strictObject({
-      items: z.array(planSchema),
+      items: z.array(planSummarySchema),
       pagination: z.strictObject({
         page: z.number().int().positive(),
         pageSize: z.number().int().positive(),

@@ -10,6 +10,7 @@ import {
   EmployeeCandidate,
   EmployeeProfile,
   EmployeeRecord,
+  OfficialFieldsPatch,
 } from '../organization.types';
 
 /** The employee as the facade shows it. */
@@ -109,6 +110,29 @@ export class EmployeeRepo {
     }
   }
 
+  /** Changes the official fields of the employee whose row the caller holds `FOR UPDATE`; the unique email is the last word. */
+  async updateOfficialFields(tx: DbTx, employeeId: string, patch: OfficialFieldsPatch): Promise<void> {
+    try {
+      await tx.employee.update({
+        where: { id: employeeId },
+        data: {
+          ...(patch.fullName !== undefined ? { fullName: patch.fullName } : {}),
+          ...(patch.workEmail !== undefined
+            ? {
+                workEmail: patch.workEmail,
+                normalizedWorkEmail: patch.workEmail === null ? null : normalizeEmail(patch.workEmail),
+              }
+            : {}),
+          ...(patch.employmentType !== undefined ? { employmentType: patch.employmentType } : {}),
+          ...(patch.hireDate !== undefined ? { hireDate: toDateColumn(patch.hireDate) } : {}),
+        },
+      });
+    } catch (error) {
+      if (isUniqueViolation(error, 'normalized_work_email')) throw new EmployeeEmailTakenError();
+      throw error;
+    }
+  }
+
   /** Locks the employee row so its status cannot change until commit. */
   async lockEmployee(tx: DbTx, employeeId: string, mode: 'SHARE' | 'UPDATE'): Promise<void> {
     const rows =
@@ -135,10 +159,10 @@ export class EmployeeRepo {
     return toEmployeeRecord(row);
   }
 
-  async findEmployees(employeeIds: string[]): Promise<EmployeeRecord[]> {
+  async findEmployees(employeeIds: string[], tx?: DbTx): Promise<EmployeeRecord[]> {
     if (employeeIds.length === 0) return [];
 
-    const rows = await this.prisma.employee.findMany({ where: { id: { in: employeeIds } } });
+    const rows = await (tx ?? this.prisma).employee.findMany({ where: { id: { in: employeeIds } } });
 
     return rows.map(toEmployeeRecord);
   }

@@ -37,10 +37,10 @@ export type SeatRowErrorCode =
   | 'OVERLAP'
   | 'SEAT_LIMIT_EXCEEDED'
   | 'REASON_REQUIRED'
-  | 'COST_CENTER_REQUIRED'
+  | 'OWNING_DEPARTMENT_NOT_FOUND'
   | 'COST_CENTER_NOT_FOUND'
   | 'COST_CENTER_INACTIVE'
-  | 'COST_CENTER_NOT_COMPANY'
+  | 'COST_CENTER_NOT_OWNING_UNIT'
   | 'COST_CENTER_NOT_ALLOWED';
 
 export interface SeatRowError {
@@ -54,6 +54,8 @@ export interface ParsedSeatRow {
   accountIdentifier: string;
   reason: string | null;
   costCenterId: string | null;
+  /** The department of the responsible person on the day of the import: the owner of a service account (`QĐ-86c`). */
+  owningDepartmentId: string | null;
   effectiveFrom: BusinessDate;
   effectiveFromBasis: 'ACTUAL' | 'RECORDED';
   expectedEndDate: BusinessDate | null;

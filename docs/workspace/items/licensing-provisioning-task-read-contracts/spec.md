@@ -69,21 +69,23 @@ accountIdentifier } } }, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] })` cùn
 
 ## Test matrix
 
-| AC / rủi ro | Tình huống (gồm từ chối, edge case)                                               | Cấp test              | Kết quả mong đợi                                      | Bằng chứng sau implement |
-| ----------- | --------------------------------------------------------------------------------- | --------------------- | ----------------------------------------------------- | ------------------------ |
-| `LD-08`     | 100 tác vụ của 60 gói, mỗi tác vụ có bằng chứng 2000 ký tự và lỗi dài             | integration + harness | item không có `evidence`/`steps`; số câu lệnh hằng số | chưa chạy                |
-| `LD-08`     | detail cùng tác vụ                                                                | integration           | đủ trường; trường chung bằng item                     | chưa chạy                |
-| `LD-08`     | connector báo lỗi `detail` 10 000 ký tự                                           | unit + integration    | lưu tối đa `FAILURE_REASON_MAX_LENGTH`                | chưa chạy                |
-| hồi quy     | `provisioning-queue-http`, `provisioning-grant-http`, `provisioning-failure-http` | integration           | xanh (với `FakeGrantGate`)                            | chưa chạy                |
+| AC / rủi ro | Tình huống (gồm từ chối, edge case)                                               | Cấp test              | Kết quả mong đợi                                      | Bằng chứng sau implement                            |
+| ----------- | --------------------------------------------------------------------------------- | --------------------- | ----------------------------------------------------- | --------------------------------------------------- |
+| `LD-08`     | 100 tác vụ của 60 gói, mỗi tác vụ có bằng chứng 2000 ký tự và lỗi dài             | integration + harness | item không có `evidence`/`steps`; số câu lệnh hằng số | xanh — `licensing-provisioning-task-read-contracts` |
+| `LD-08`     | detail cùng tác vụ                                                                | integration           | đủ trường; trường chung bằng item                     | xanh — `licensing-provisioning-task-read-contracts` |
+| `LD-08`     | connector báo lỗi `detail` 10 000 ký tự                                           | unit + integration    | lưu tối đa `FAILURE_REASON_MAX_LENGTH`                | xanh — `licensing-provisioning-task-read-contracts` |
+| hồi quy     | `provisioning-queue-http`, `provisioning-grant-http`, `provisioning-failure-http` | integration           | xanh (với `FakeGrantGate`)                            | xanh — `licensing-provisioning-task-read-contracts` |
 
 ## Definition of Done
 
 - [ ] Mọi primary AC `full` có test đỏ-trước/xanh-sau ở cấp phù hợp; AC `partial` ghi đúng vế đã làm — áp cho `LD-08`.
-- [ ] Gate theo [CONTRIBUTING](../../../../CONTRIBUTING.md) chạy xanh trên revision cuối; HTTP đổi thì e2e + OpenAPI.
-- [ ] Spec/plan/roadmap phản ánh implementation cuối; contract đổi đã ghi và báo consumer FE.
-- [ ] Không tăng legacy ledger kiến trúc; mục registry đã gỡ.
+- [x] Gate theo [CONTRIBUTING](../../../../CONTRIBUTING.md) chạy xanh trên revision cuối; HTTP đổi thì e2e + OpenAPI.
+- [x] Spec/plan/roadmap phản ánh implementation cuối; contract đổi đã ghi và báo consumer FE.
+- [x] Không tăng legacy ledger kiến trúc; mục registry đã gỡ.
 - [ ] Tài liệu vận hành/runbook bị ảnh hưởng đã cập nhật; phần chưa kiểm chứng ghi rõ.
 
 ## Changes and acceptance
 
 22/10/2026: lập theo Prompt 08. Chưa code, chưa review, chưa nghiệm thu.
+
+23/10/2026 (Prompt 10 — xử lý tồn đọng G0→G4): `LD-08`: danh sách tác vụ là bản tóm tắt (không cột văn bản dài, số câu lệnh không đổi theo kích thước), chi tiết mở rộng từ tóm tắt; kế hoạch đọc theo lô qua `findPlanSeatTargets`. Định danh người theo mặc định của spec (điểm 5 `LD-13`): `{employeeCode, fullName}`. Kiểm chứng: `licensing-provisioning-task-read-contracts` — xanh trên cây làm việc chưa commit, nhánh `Bao_dev_be`, nền `dev` `19be620`, 23/10/2026. Gate toàn cây trên cùng cây: `pnpm lint`, `tsc --noEmit`, `pnpm test` (unit 2.074 (141 suite)), `pnpm test:e2e` (839 (32 suite)), `pnpm test:integration` (112 suite, 1.429 test, gồm 4 test kho S3 thật trên LocalStack), `prisma migrate deploy` trên CSDL mới + `migrate diff --exit-code` (không lệch), `pnpm openapi:export`. Giới hạn: Áp dụng **mặc định do spec khuyến nghị**, không phải quyết định của Owner: Owner chưa review; nếu Owner chọn khác thì đổi ở đây. Chưa commit khi viết dòng này, chưa remote CI, chưa Owner review, chưa nghiệm thu: không có gì là `accepted`; đỏ-trước của từng test không được ghi lại.

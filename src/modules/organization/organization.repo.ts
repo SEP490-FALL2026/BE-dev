@@ -16,6 +16,17 @@ export class OrganizationRepo {
     return (tx ?? this.prisma).organization.findFirst({ select: ORGANIZATION_SELECT });
   }
 
+  /**
+   * The organization with its row held `FOR SHARE` until the transaction ends. A change of the reporting currency waits
+   * for the holder, and a reader that comes after a change waits for it and reads the new currency: whatever the caller
+   * then freezes into that currency cannot meet a change that commits meanwhile (DB-01, the database triggers say the same).
+   */
+  async findOrganizationShared(tx: DbTx): Promise<OrganizationRecord | null> {
+    await tx.$queryRaw`SELECT "id" FROM "organizations" FOR SHARE`;
+
+    return tx.organization.findFirst({ select: ORGANIZATION_SELECT });
+  }
+
   /** Writes the reporting currency; the database refuses (55000) once rates or converted prices exist. */
   async setReportingCurrency(tx: DbTx, organizationId: string, currency: string): Promise<void> {
     await tx.organization.update({ where: { id: organizationId }, data: { reportingCurrency: currency } });

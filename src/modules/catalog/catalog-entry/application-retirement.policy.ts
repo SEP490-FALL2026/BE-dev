@@ -9,6 +9,9 @@ import {
   type RetirementBlockingSubscription,
 } from './application.errors';
 
+/** The most assignments, subscriptions and confirmations one answer lists; the totals count the rest (`LD-06`). */
+export const RETIREMENT_LIST_LIMIT = 50;
+
 /** The longest note of a confirmation; the DTO bounds the request with it. */
 export const RETIREMENT_NOTE_MAX_LENGTH = 2000;
 
@@ -59,11 +62,21 @@ export function decideRetirement(input: {
   confirmedByCurrentOwner: boolean;
   assignments: RetirementBlockingAssignment[];
   subscriptions: RetirementBlockingSubscription[];
+  /** How many in all when the lists above are only the first of them; each defaults to its list's length. */
+  assignmentTotal?: number;
+  subscriptionTotal?: number;
 }): 'RETIRE' {
   if (input.retired) throw new ApplicationAlreadyRetiredError();
   if (!input.confirmedByCurrentOwner) throw new ApplicationRetirementNeedsConfirmationError();
-  if (input.assignments.length > 0 || input.subscriptions.length > 0) {
-    throw new ApplicationRetirementBlockedError(input.assignments, input.subscriptions);
+  const assignmentTotal = input.assignmentTotal ?? input.assignments.length;
+  const subscriptionTotal = input.subscriptionTotal ?? input.subscriptions.length;
+  if (assignmentTotal > 0 || subscriptionTotal > 0) {
+    throw new ApplicationRetirementBlockedError(
+      input.assignments,
+      input.subscriptions,
+      assignmentTotal,
+      subscriptionTotal,
+    );
   }
 
   return 'RETIRE';

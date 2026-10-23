@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import { Page, pageOf } from '../../../core/application/pagination';
 import { DbTx, TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import { isCheckViolation, isUniqueViolation } from '../../../infrastructure/database/unique-violation';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
@@ -13,15 +12,13 @@ import type { EmptyState } from '../catalog.types';
 import { FunctionalGroupLookupService } from '../functional-group/functional-group-lookup.service';
 import { catalogAuditEvent } from '../mappers/catalog-audit-event';
 import { VendorDictionaryLookupService } from '../vendor-dictionary/vendor-dictionary-lookup.service';
-import { VendorProposalIntakeService } from '../vendor-dictionary/vendor-proposal-intake.service';
 import { VendorDirectoryService, type EnsuredVendor } from '../vendor/vendor-directory.service';
 import {
   ApplicationBusinessOwnerInvalidError,
-  ApplicationDictionaryLineMismatchError,
   ApplicationDictionaryLineNotFoundError,
+  ApplicationDictionaryLineMismatchError,
   ApplicationDictionaryLineTakenError,
   ApplicationFunctionalGroupInvalidError,
-  ApplicationInternalHasNoVendorError,
   ApplicationNameTakenError,
   ApplicationNotFoundError,
   ApplicationUpdateEmptyError,
@@ -32,10 +29,12 @@ import {
   cleanNote,
   isCommunicationService,
   replacementRequired,
+  SIMILAR_APPLICATION_LIMIT,
   vendorSourceOf,
   type CommunicationAnswers,
 } from './application.policy';
 import { ApplicationRepo } from './application.repo';
+import { ApplicationVendorLinkService } from './application-vendor-link.service';
 import { mergeCommunication, sameCommunication, sameList, snapshot } from './application.state';
 import type {
   ApplicationChanges,
@@ -43,13 +42,12 @@ import type {
   ApplicationRecord,
   ApplicationView,
   BusinessOwnerView,
-  CatalogStatus,
   DataSensitivity,
 } from './application.types';
 
 export interface DeclareApplicationInput {
   name: string;
-  kind: ApplicationKind | 'FREE_EXTERNAL';
+  kind: ApplicationKind;
   vendorName?: string;
   dictionaryServiceLineId?: string;
   domains?: string[];
@@ -82,33 +80,13 @@ export class ApplicationService {
     private readonly vendors: VendorDirectoryService,
     private readonly functionalGroups: FunctionalGroupLookupService,
     private readonly dictionary: VendorDictionaryLookupService,
-    private readonly proposals: VendorProposalIntakeService,
+    private readonly vendorLinks: ApplicationVendorLinkService,
     private readonly organization: OrganizationService,
     private readonly plans: PlanLookupService,
     private readonly occupancy: SeatOccupancyRegistry,
     private readonly audit: AuditService,
     private readonly runner: TransactionRunner,
   ) {}
-
-  async list(query: {
-    search?: string;
-    kind?: ApplicationKind;
-    status?: CatalogStatus;
-    functionalGroupId?: string;
-    page: number;
-    pageSize: number;
-  }): Promise<Page<ApplicationView>> {
-    const { items, total } = await this.applications.list({
-      ...(query.search ? { search: query.search } : {}),
-      ...(query.kind ? { kind: query.kind } : {}),
-      ...(query.status ? { status: query.status } : {}),
-      ...(query.functionalGroupId ? { functionalGroupId: query.functionalGroupId } : {}),
-      skip: (query.page - 1) * query.pageSize,
-      take: query.pageSize,
-    });
-
-    return pageOf(await this.withOwners(items), total, query.page, query.pageSize);
-  }
 
   /** The guidance of an empty list: set only when there is not one application at all, not when a filter matched none. */
   async emptyState(): Promise<EmptyState | null> {
@@ -125,18 +103,26 @@ export class ApplicationService {
   async get(id: string): Promise<{
     application: ApplicationView;
     similar: { id: string; name: string }[];
+    similarTotal: number;
     recommendations: K2Recommendation[];
   }> {
     const record = await this.applications.find(id);
     if (!record) throw new ApplicationNotFoundError();
     const [application] = await this.withOwners([record]);
-    const similar = record.functionalGroup ? await this.applications.similarTo(record.functionalGroup.id, id) : [];
+    const similar = record.functionalGroup
+      ? await this.applications.similarTo(record.functionalGroup.id, id, SIMILAR_APPLICATION_LIMIT)
+      : { items: [], total: 0 };
 
-    return { application, similar, recommendations: await this.recommendationsOf(id) };
+    return {
+      application,
+      similar: similar.items,
+      similarTotal: similar.total,
+      recommendations: await this.recommendationsOf(id),
+    };
   }
 
   /**
-   * Declares an application. Throws ApplicationKindNotManagedError, the vendor errors of `vendorSourceOf`, the
+   * Declares an application. Throws the vendor errors of `vendorSourceOf`, the
    * name, domain and note errors of the policy, ApplicationBusinessOwnerInvalidError,
    * ApplicationFunctionalGroupInvalidError, ApplicationDictionaryLineNotFoundError, ApplicationNameTakenError and
    * ApplicationDictionaryLineTakenError. `proposed` is true when the software is outside the dictionary.
@@ -149,7 +135,7 @@ export class ApplicationService {
     const name = cleanApplicationName(input.name);
     const domains = cleanApplicationDomains(input.domains ?? []);
     const note = cleanNote(input.communication.note);
-    const kind = input.kind as ApplicationKind;
+    const kind = input.kind;
     const communication = {
       personToPersonMessaging: input.communication.personToPersonMessaging,
       callsOrMeetings: input.communication.callsOrMeetings,
@@ -204,6 +190,15 @@ export class ApplicationService {
             }),
           );
         }
+        if (ensured?.adopted) {
+          await this.vendorLinks.recordAdopted(
+            tx,
+            actor,
+            organizationId,
+            ensured.vendor.id,
+            ensured.vendor.dictionaryGroupId,
+          );
+        }
         await this.audit.record(
           tx,
           catalogAuditEvent(
@@ -217,7 +212,12 @@ export class ApplicationService {
           ),
         );
         if (source.type === 'NAME') {
-          await this.proposals.raise(tx, { organizationId, name, domains, sourceApplicationId: created.id });
+          await this.vendorLinks.raiseProposal(tx, actor, {
+            organizationId,
+            name,
+            domains,
+            sourceApplicationId: created.id,
+          });
         }
 
         return created;
@@ -245,6 +245,7 @@ export class ApplicationService {
         const current = await this.applications.lock(tx, id);
         if (!current) throw new ApplicationNotFoundError();
         const changes: ApplicationChanges = {};
+        let adoptedGroup: { vendorId: string; groupId: string } | null = null;
 
         if (name !== undefined && name !== current.name) changes.name = name;
         if (domains !== undefined && !sameList(domains, current.domains)) changes.domains = domains;
@@ -269,8 +270,9 @@ export class ApplicationService {
           input.dictionaryServiceLineId !== undefined &&
           input.dictionaryServiceLineId !== current.dictionaryServiceLineId
         ) {
-          if (input.dictionaryServiceLineId !== null)
-            await this.requireLineForVendor(tx, current, input.dictionaryServiceLineId);
+          if (input.dictionaryServiceLineId !== null) {
+            adoptedGroup = await this.vendorLinks.requireLine(tx, current, input.dictionaryServiceLineId);
+          }
           changes.dictionaryServiceLineId = input.dictionaryServiceLineId;
         }
         if (input.communication !== undefined) {
@@ -280,6 +282,9 @@ export class ApplicationService {
         if (Object.keys(changes).length === 0) return current;
 
         const updated = await this.applications.update(tx, id, changes);
+        if (adoptedGroup) {
+          await this.vendorLinks.recordAdopted(tx, actor, organizationId, adoptedGroup.vendorId, adoptedGroup.groupId);
+        }
         if (changes.businessOwnerEmployeeId !== undefined) {
           await this.applications.closeOpenOwnerPeriod(tx, id);
           await this.applications.openOwnerPeriod(tx, {
@@ -307,18 +312,6 @@ export class ApplicationService {
       return (await this.withOwners([record]))[0];
     } catch (error) {
       throw this.mapWriteError(error);
-    }
-  }
-
-  /** The line must exist and sit in the dictionary group of the application's vendor, which takes the group if it has none. */
-  private async requireLineForVendor(tx: DbTx, application: ApplicationRecord, lineId: string): Promise<void> {
-    if (!application.vendor) throw new ApplicationInternalHasNoVendorError();
-    const line = await this.dictionary.findLine(tx, lineId);
-    if (!line) throw new ApplicationDictionaryLineNotFoundError();
-    if (application.vendor.dictionaryGroupId === line.groupId) return;
-    if (application.vendor.dictionaryGroupId !== null) throw new ApplicationDictionaryLineMismatchError();
-    if (!(await this.vendors.adoptDictionaryGroup(tx, application.vendor.id, line.groupId))) {
-      throw new ApplicationDictionaryLineMismatchError();
     }
   }
 

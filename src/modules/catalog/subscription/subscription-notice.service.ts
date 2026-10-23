@@ -30,14 +30,22 @@ export class SubscriptionNoticeService {
     private readonly parameters: OperatingParametersService,
   ) {}
 
-  async activeNotices(planId?: string): Promise<ActiveNotice[]> {
+  /**
+   * The notices whose base date is on or after `today` and within the earliest alert days (`LD-02`): the subscriptions
+   * outside that window cannot be due for a review, so they are not read.
+   */
+  async activeNotices(today: BusinessDate, planId?: string): Promise<ActiveNotice[]> {
     const value = await this.parameters.getValue('RENEWAL_ALERT_DAYS_BEFORE_DEADLINE');
     const daysBefore = Array.isArray(value) ? value : [];
     if (daysBefore.length === 0) return [];
     const earliest = Math.max(...daysBefore);
 
     const notices: ActiveNotice[] = [];
-    for (const record of await this.subscriptions.listActiveTerms(planId)) {
+    for (const record of await this.subscriptions.listTermsWithMilestoneBetween(
+      today,
+      addDays(today, earliest),
+      planId,
+    )) {
       const notice = deriveNotice(noticeInputOf(record));
       if (notice.baseDate === null) continue;
       if (notice.source !== 'DECLARED' && notice.source !== 'INFERRED_UNCONFIRMED' && notice.source !== 'BY_END_DATE') {

@@ -1,5 +1,6 @@
 import type { DbTx, TransactionRunner } from '../../infrastructure/database/transaction-runner';
 import type { AuditService } from '../audit/audit.service';
+import type { FinanceService } from '../finance/finance.service';
 import type { IdentityAccessService } from '../identity-access/identity-access.service';
 import type { OrganizationService } from '../organization/organization.service';
 import { AlreadyInstalledError, InstallationInputError } from './installation.errors';
@@ -108,12 +109,16 @@ function harness(options: { installed?: boolean } = {}) {
     },
   };
 
+  // Not recorded in `calls`: the currency table is read before anything else and changes nothing.
+  const finance = { findCurrency: (code: string) => Promise.resolve(['USD', 'VND'].includes(code) ? { code } : null) };
+
   const service = new InstallationService(
     runner as unknown as TransactionRunner,
     organization as unknown as OrganizationService,
     identity as unknown as IdentityAccessService,
     audit as unknown as AuditService,
     repo,
+    finance as unknown as FinanceService,
   );
 
   return { service, calls, audits };
@@ -264,6 +269,20 @@ describe('InstallationService (H6.3 Phase 0 characterization)', () => {
     expect((error as Error).message).toBe(
       'The installation input is not valid:\n - departmentCode: use letters, digits, ".", "_" or "-" (max 32)\n - operatorReference: Invalid input: expected string, received undefined',
     );
+    expect(h.calls).toEqual([]);
+  });
+
+  it('refuses a reporting currency outside the currency table, before hashing or locking anything (DB-02)', async () => {
+    const h = harness();
+
+    const error = await h.service
+      .install({ ...INPUT, reportingCurrency: 'MYR' }, 'a-long-enough-password')
+      .catch((thrown: unknown) => thrown);
+
+    expect(error).toBeInstanceOf(InstallationInputError);
+    expect((error as InstallationInputError).issues).toEqual([
+      'reportingCurrency: MYR is not in the currency table of this installation',
+    ]);
     expect(h.calls).toEqual([]);
   });
 

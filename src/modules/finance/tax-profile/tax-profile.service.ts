@@ -32,6 +32,16 @@ const snapshot = (profile: TaxProfileContent & { version: number }) => ({
   ),
 });
 
+function estimateFrom(current: TaxProfileContent | null, netMinor: bigint): TaxEstimateResult {
+  const profile: TaxProfileContent = current ?? DEFAULT_TAX_PROFILE;
+
+  return {
+    ...estimateTax(netMinor, profile.lines),
+    basis: current ? 'PROFILE' : 'DEFAULT_NO_PROFILE',
+    group: profile.group,
+  };
+}
+
 /**
  * The tax profile Finance declares for a vendor (`US-12-09`) and the estimate drawn from it. Every declaration that
  * changes something is a new version recorded with its author, in one transaction with its audit event; the previous
@@ -127,14 +137,20 @@ export class TaxProfileService {
    * default profile when it has none (`basis` says which, so the answer is never shown as more than an estimate).
    */
   async estimate(vendorId: string, netMinor: bigint, tx?: DbTx): Promise<TaxEstimateResult> {
-    const current = await this.repo.readCurrent(vendorId, tx);
-    const profile: TaxProfileContent = current ?? DEFAULT_TAX_PROFILE;
+    return estimateFrom(await this.repo.readCurrent(vendorId, tx), netMinor);
+  }
 
-    return {
-      ...estimateTax(netMinor, profile.lines),
-      basis: current ? 'PROFILE' : 'DEFAULT_NO_PROFILE',
-      group: profile.group,
-    };
+  /**
+   * The same estimate for many prices at once, in one read of the profiles of their vendors, in the order given (`LD-01`):
+   * a page of subscriptions does not read a profile per row, and every row of one vendor reads the same declaration.
+   */
+  async estimateMany(
+    items: readonly { vendorId: string; netMinor: bigint }[],
+    tx?: DbTx,
+  ): Promise<TaxEstimateResult[]> {
+    const profiles = await this.repo.readCurrentMany([...new Set(items.map((item) => item.vendorId))], tx);
+
+    return items.map((item) => estimateFrom(profiles.get(item.vendorId) ?? null, item.netMinor));
   }
 
   /** For each of these vendors, the group and version of its newest declaration; those with none are absent. */

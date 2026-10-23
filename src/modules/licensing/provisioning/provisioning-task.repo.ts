@@ -42,6 +42,36 @@ export interface ProvisioningTaskRecord {
   assignment: { employeeId: string; planId: string; subscriptionId: string | null; accountIdentifier: string };
 }
 
+/** The columns of a task that a list row shows: everything but the long text a detail carries (`LD-08`). */
+const SUMMARY_SELECT = {
+  id: true,
+  organizationId: true,
+  assignmentId: true,
+  kind: true,
+  channel: true,
+  status: true,
+  requestId: true,
+  defaultResponsibleEmployeeId: true,
+  claimedByAppUserId: true,
+  claimedAt: true,
+  completedByAppUserId: true,
+  completedAt: true,
+  failedByAppUserId: true,
+  failedAt: true,
+  failureKind: true,
+  attempts: true,
+  maxAttempts: true,
+  nextRetryAt: true,
+  closedByAppUserId: true,
+  closedAt: true,
+  handedOffByAppUserId: true,
+  handedOffAt: true,
+  createdByAppUserId: true,
+  createdAt: true,
+  updatedAt: true,
+  assignment: { select: { employeeId: true, planId: true, subscriptionId: true, accountIdentifier: true } },
+} as const;
+
 const WITH_ASSIGNMENT = {
   assignment: { select: { employeeId: true, planId: true, subscriptionId: true, accountIdentifier: true } },
 } as const;
@@ -255,7 +285,11 @@ export class ProvisioningTaskRepo {
     return groups.flatMap((group) => (group.defaultResponsibleEmployeeId ? [group.defaultResponsibleEmployeeId] : []));
   }
 
-  /** One page of the queue, the oldest first, and the total for the same filter, from one snapshot. */
+  /**
+   * One page of the queue as summaries, the oldest first, and the total for the same filter, from one snapshot. The
+   * evidence, the last error, the failure reason, the hand-off evidence and the close reason (long text a detail shows)
+   * are not selected (`LD-08`); the record carries them as null.
+   */
   async page(filter: TaskPageFilter): Promise<{ items: ProvisioningTaskRecord[]; total: number }> {
     const where: Prisma.ProvisioningTaskWhereInput = {
       ...(filter.channel ? { channel: filter.channel } : {}),
@@ -275,13 +309,25 @@ export class ProvisioningTaskRepo {
       async (tx) => {
         const rows = await tx.provisioningTask.findMany({
           where,
-          include: WITH_ASSIGNMENT,
+          select: SUMMARY_SELECT,
           orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
           skip: filter.skip,
           take: filter.take,
         });
 
-        return { items: rows.map(toRecord), total: await tx.provisioningTask.count({ where }) };
+        return {
+          items: rows.map((row) =>
+            toRecord({
+              ...row,
+              evidence: null,
+              lastError: null,
+              failureReason: null,
+              handOffEvidence: null,
+              closeReason: null,
+            }),
+          ),
+          total: await tx.provisioningTask.count({ where }),
+        };
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
     );

@@ -1,4 +1,5 @@
 import { BusinessDate } from '../../core/business-date';
+import type { DbTx } from '../../infrastructure/database/transaction-runner';
 import { CostCenterKind, CostCenterStatus } from './cost-center/cost-center.types';
 import { DepartmentStatus } from './department/department.types';
 import { JobTitleStatus } from './job-title/job-title.types';
@@ -40,6 +41,14 @@ export interface CreateEmployeeWithPlacementInput {
   memberSince?: BusinessDate;
   departmentId: string;
   jobTitleId: string;
+}
+
+/** The official fields of an employee record an IT Admin may correct on an HR basis (`US-02-02` AC-19). */
+export interface OfficialFieldsPatch {
+  fullName?: string;
+  workEmail?: string | null;
+  employmentType?: EmploymentType;
+  hireDate?: BusinessDate;
 }
 
 export interface EmployeeRecord {
@@ -108,6 +117,26 @@ export interface OnboardingFacts {
     itAdminEmployeeId: string | null;
     itAdminStatus: 'ACTIVE' | 'TERMINATED' | null;
   }[];
+}
+
+/**
+ * What the organization needs to know of the service accounts a department owns, without importing `licensing`: the
+ * first `limit` of those that are open or will be, and how many there are in all. `licensing` registers the reader when
+ * its module starts (as `licensing` does for the seats the catalog reads).
+ */
+export interface DepartmentServiceAccountReader {
+  ownedBy(
+    departmentId: string,
+    day: BusinessDate,
+    limit: number,
+    tx?: DbTx,
+  ): Promise<{ items: { assignmentId: string; accountIdentifier: string }[]; total: number }>;
+}
+
+/** The department an employee was in on a day and its Unit (the Cost Center the department is charged to). */
+export interface OwningUnit {
+  departmentId: string;
+  costCenter: { id: string; code: string; status: CostCenterStatus };
 }
 
 /**

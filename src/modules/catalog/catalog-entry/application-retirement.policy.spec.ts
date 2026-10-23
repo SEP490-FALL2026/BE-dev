@@ -104,4 +104,14 @@ describe('the decision to retire (US-04-01 AC-8, AC-9, AC-14)', () => {
       }
     }
   });
+
+  it('counts what holds the application in all when the lists are only the first of it (LD-06)', () => {
+    try {
+      decideRetirement({ ...clean, assignments: [assignment], assignmentTotal: 120, subscriptionTotal: 3 });
+      throw new Error('it did not refuse');
+    } catch (error) {
+      expect(error).toBeInstanceOf(ApplicationRetirementBlockedError);
+      expect(error).toMatchObject({ assignmentTotal: 120, subscriptionTotal: 3 });
+    }
+  });
 });

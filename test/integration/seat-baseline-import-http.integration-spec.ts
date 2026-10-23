@@ -261,22 +261,20 @@ describe('the seat baseline import over HTTP (integration, real PostgreSQL)', ()
       account_identifier: identifier,
       kind: 'service',
       reason: 'CI pipeline',
-      cost_center_code: '',
       ...extra,
     });
 
     it('takes a personal seat and two bots for one person, and refuses a repeated or missing identifier and a token', async () => {
       const subscriptionId = await h.subscription(10);
-      const corp = await h.costCenter('COMPANY');
       await h.person('BOT1');
 
       const preview = await h.preview({ subscriptionId }, [
         row('BOT1'),
-        bot('BOT1', 'ci-bot', { cost_center_code: corp.code }),
-        bot('BOT1', 'release-bot', { cost_center_code: corp.code }),
-        bot('BOT1', ' CI-Bot ', { cost_center_code: corp.code }),
-        bot('BOT1', '', { cost_center_code: corp.code }),
-        bot('BOT1', 'ghp_abc123', { cost_center_code: corp.code }),
+        bot('BOT1', 'ci-bot'),
+        bot('BOT1', 'release-bot'),
+        bot('BOT1', ' CI-Bot '),
+        bot('BOT1', ''),
+        bot('BOT1', 'ghp_abc123'),
       ]);
 
       expect(preview.summary).toMatchObject({ valid: 3, errors: 3 });
@@ -288,12 +286,9 @@ describe('the seat baseline import over HTTP (integration, real PostgreSQL)', ()
 
     it('never keeps a token: the row shows it masked, and the stored row and the audit trail do not hold it', async () => {
       const subscriptionId = await h.subscription(10);
-      const corp = await h.costCenter('COMPANY');
       await h.person('SEC1');
 
-      const preview = await h.preview({ subscriptionId }, [
-        bot('SEC1', 'ghp_supersecret123', { cost_center_code: corp.code }),
-      ]);
+      const preview = await h.preview({ subscriptionId }, [bot('SEC1', 'ghp_supersecret123')]);
 
       expect((await rowsOf(preview.id))[0].cells.account_identifier).toBe('[masked]');
       const stored = await h.ctx.sql.query(`SELECT 1 FROM seat_baseline_import_rows WHERE cells::text LIKE '%ghp_%'`);
@@ -304,16 +299,43 @@ describe('the seat baseline import over HTTP (integration, real PostgreSQL)', ()
       expect(events.rows).toEqual([]);
     });
 
+    it('masks a token however it is dressed before it is stored: with spaces around it, a zero-width character inside, or in full-width letters (SEC-03)', async () => {
+      const subscriptionId = await h.subscription(10);
+      for (const code of ['TOK3', 'TOK4', 'TOK5', 'TOK6']) await h.person(code);
+      const dressed = [
+        ' ghp_dressedtoken0001 ',
+        'ghp_dressed\u200btoken0002',
+        'ｇｈｐ_dressedtoken0003',
+        'my password is hunter2-dressed',
+      ];
+
+      const preview = await h.preview(
+        { subscriptionId },
+        dressed.map((identifier, index) => bot(`TOK${index + 3}`, identifier)),
+      );
+
+      const rows = await rowsOf(preview.id);
+      expect(rows.map((row) => row.cells.account_identifier)).toEqual([
+        '[masked]',
+        '[masked]',
+        '[masked]',
+        '[masked: invalid]',
+      ]);
+      expect(codesAt(rows, 2)).toEqual(['ACCOUNT_IDENTIFIER_LOOKS_LIKE_SECRET']);
+      expect(codesAt(rows, 5)).toEqual(['ACCOUNT_IDENTIFIER_INVALID']);
+      const stored = await h.ctx.sql.query(
+        `SELECT 1 FROM seat_baseline_import_rows WHERE cells::text ~* 'dressed|hunter2|ghp_'`,
+      );
+      expect(stored.rows).toEqual([]);
+      expect(JSON.stringify(rows)).not.toMatch(/dressed|hunter2/);
+    });
+
     it('confirms the valid rows of a file that holds a token, and leaves the token row an error (AC-9)', async () => {
       const subscriptionId = await h.subscription(10);
-      const corp = await h.costCenter('COMPANY');
       await h.person('TOK1');
       await h.person('TOK2');
 
-      const preview = await h.preview({ subscriptionId }, [
-        row('TOK1'),
-        bot('TOK2', 'ghp_confirmtoken123', { cost_center_code: corp.code }),
-      ]);
+      const preview = await h.preview({ subscriptionId }, [row('TOK1'), bot('TOK2', 'ghp_confirmtoken123')]);
       const confirmed = h.dataOf<{ import: ImportWire }>(await h.confirm(preview.id, 1).expect(200)).import;
 
       expect(preview.summary).toMatchObject({ valid: 1, errors: 1 });

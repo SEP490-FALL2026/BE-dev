@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { Page, pageOf } from '../../core/application/pagination';
 import { BusinessDate } from '../../core/business-date';
 import { TransactionRunner } from '../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../infrastructure/security/tokens/access-token-verifier.port';
@@ -27,8 +28,20 @@ export class NonWorkingDatesService {
     private readonly runner: TransactionRunner,
   ) {}
 
-  list(range: { from?: BusinessDate; to?: BusinessDate }): Promise<NonWorkingDateRow[]> {
-    return this.repo.listNonWorkingDates(range);
+  /** One page of the days nobody works by date, optionally between two dates (`LD-15`). */
+  async list(query: {
+    from?: BusinessDate;
+    to?: BusinessDate;
+    page: number;
+    pageSize: number;
+  }): Promise<Page<NonWorkingDateRow>> {
+    const { items, total } = await this.repo.pageNonWorkingDates(
+      query,
+      (query.page - 1) * query.pageSize,
+      query.pageSize,
+    );
+
+    return pageOf(items, total, query.page, query.pageSize);
   }
 
   /** Whether `date` is a non-working date; for the working-day arithmetic of the workflows to come. */

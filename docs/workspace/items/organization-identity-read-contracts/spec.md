@@ -87,22 +87,22 @@ updatedAt`, thứ tự `name, id`, đếm cùng transaction `RepeatableRead`; `G
 
 ## Test matrix
 
-| AC / rủi ro | Tình huống (gồm từ chối, edge case)                                                        | Cấp test              | Kết quả mong đợi                                                                      | Bằng chứng sau implement |
-| ----------- | ------------------------------------------------------------------------------------------ | --------------------- | ------------------------------------------------------------------------------------- | ------------------------ |
-| `LD-12`     | 250 dự án, mô tả 2000 ký tự, mỗi dự án 100 phòng                                           | integration + harness | trang 100; item không có mô tả; detail có mô tả                                       | chưa chạy                |
-| `LD-12`     | hồ sơ phòng có 30 dự án                                                                    | integration           | 20 dự án + `projectTotal` 30                                                          | chưa chạy                |
-| `LD-11`     | ghi nhân viên vào phòng khi đang đọc trang thành viên                                      | integration           | tổng và trang cùng snapshot; không đọc email                                          | chưa chạy                |
-| `LD-14`     | tài khoản 80 lần đổi vai; vai 25 lần đổi người giữ                                         | integration           | 50/20 + `hasMore: true`                                                               | chưa chạy                |
-| `LD-15`     | số phòng đang hoạt động lớn hơn biên đã chọn, mỗi phòng thiếu cả trưởng phòng lẫn IT Admin | integration + harness | response không vượt biên đã chọn; mục `departmentWarningList#unbounded` gỡ, gate xanh | chưa chạy                |
-| hồi quy     | quyền IT Admin/Manager/Finance như hiện hành                                               | integration + e2e     | như hiện hành                                                                         | chưa chạy                |
+| AC / rủi ro | Tình huống (gồm từ chối, edge case)                                                        | Cấp test              | Kết quả mong đợi                                                                      | Bằng chứng sau implement                                                                      |
+| ----------- | ------------------------------------------------------------------------------------------ | --------------------- | ------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `LD-12`     | 250 dự án, mô tả 2000 ký tự, mỗi dự án 100 phòng                                           | integration + harness | trang 100; item không có mô tả; detail có mô tả                                       | xanh — `organization-identity-read-contracts` (11), `departments-http`, `approval-roles-http` |
+| `LD-12`     | hồ sơ phòng có 30 dự án                                                                    | integration           | 20 dự án + `projectTotal` 30                                                          | xanh — `organization-identity-read-contracts` (11), `departments-http`, `approval-roles-http` |
+| `LD-11`     | ghi nhân viên vào phòng khi đang đọc trang thành viên                                      | integration           | tổng và trang cùng snapshot; không đọc email                                          | xanh — `organization-identity-read-contracts` (11), `departments-http`, `approval-roles-http` |
+| `LD-14`     | tài khoản 80 lần đổi vai; vai 25 lần đổi người giữ                                         | integration           | 50/20 + `hasMore: true`                                                               | xanh — `organization-identity-read-contracts` (11), `departments-http`, `approval-roles-http` |
+| `LD-15`     | số phòng đang hoạt động lớn hơn biên đã chọn, mỗi phòng thiếu cả trưởng phòng lẫn IT Admin | integration + harness | response không vượt biên đã chọn; mục `departmentWarningList#unbounded` gỡ, gate xanh | xanh — `organization-identity-read-contracts` (11), `departments-http`, `approval-roles-http` |
+| hồi quy     | quyền IT Admin/Manager/Finance như hiện hành                                               | integration + e2e     | như hiện hành                                                                         | xanh — `organization-identity-read-contracts` (11), `departments-http`, `approval-roles-http` |
 
 ## Definition of Done
 
 - [ ] Mọi primary AC `full` có test đỏ-trước/xanh-sau ở cấp phù hợp; AC `partial` ghi đúng vế đã làm — áp cho `LD-11`,
       `LD-12`, `LD-14`, `LD-15`.
-- [ ] Gate theo [CONTRIBUTING](../../../../CONTRIBUTING.md) chạy xanh trên revision cuối; HTTP đổi thì e2e + OpenAPI.
-- [ ] Spec/plan/roadmap phản ánh implementation cuối; contract đổi đã ghi và báo consumer FE.
-- [ ] Không tăng legacy ledger kiến trúc; mục registry đã gỡ.
+- [x] Gate theo [CONTRIBUTING](../../../../CONTRIBUTING.md) chạy xanh trên revision cuối; HTTP đổi thì e2e + OpenAPI.
+- [x] Spec/plan/roadmap phản ánh implementation cuối; contract đổi đã ghi và báo consumer FE.
+- [x] Không tăng legacy ledger kiến trúc; mục registry đã gỡ.
 - [ ] Tài liệu vận hành/runbook bị ảnh hưởng đã cập nhật; phần chưa kiểm chứng ghi rõ.
 
 ## Changes and acceptance
@@ -111,3 +111,5 @@ updatedAt`, thứ tự `name, id`, đếm cùng transaction `RepeatableRead`; `G
 
 23/10/2026 (Prompt 09A): nhận vế `departmentWarningList` của `LD-15` theo Owner review `LD-R2-RV-01` (mục registry chuyển
 `bounded` → `unbounded`). Chưa chọn hợp đồng, chưa code.
+
+23/10/2026 (Prompt 10 — xử lý tồn đọng G0→G4): `LD-11`, `LD-12`, `LD-14`, `LD-15` hiện thực: `GET /projects` phân trang (không `description`) + `GET /projects/{id}`; hồ sơ phòng nhúng 20 dự án + `projectTotal`; thành viên phòng và nhân viên theo Cost Center đếm + trang một snapshot; lịch sử vai tài khoản (50), người giữ vai (20), tham số (20), trưởng phòng (50) thêm `hasMore`; `GET /department-warnings` phân trang thật (pageSize ≤ 100). Hợp đồng bị chọn theo đề xuất của spec; Owner chưa duyệt. Đổi wire (FE). Kiểm chứng: `organization-identity-read-contracts` (11), `departments-http`, `approval-roles-http` — xanh trên cây làm việc chưa commit, nhánh `Bao_dev_be`, nền `dev` `19be620`, 23/10/2026. Gate toàn cây trên cùng cây: `pnpm lint`, `tsc --noEmit`, `pnpm test` (unit 2.074 (141 suite)), `pnpm test:e2e` (839 (32 suite)), `pnpm test:integration` (112 suite, 1.429 test, gồm 4 test kho S3 thật trên LocalStack), `prisma migrate deploy` trên CSDL mới + `migrate diff --exit-code` (không lệch), `pnpm openapi:export`. Giới hạn: Cảnh báo phòng tính từ hai lần đọc nhẹ của mọi phòng đang hoạt động rồi cắt trang (vì việc "IT Admin dùng được" thuộc identity-access). Chưa commit khi viết dòng này, chưa remote CI, chưa Owner review, chưa nghiệm thu: không có gì là `accepted`; đỏ-trước của từng test không được ghi lại.

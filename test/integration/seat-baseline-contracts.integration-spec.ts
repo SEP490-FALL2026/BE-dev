@@ -234,12 +234,12 @@ describe('what licensing reads of catalog and organization (integration, real Po
             }),
           ),
         )
-        .send({ code, name: 'Corporate', kind: 'COMPANY' })
+        .send({ code, name: 'Corporate', kind: 'UNIT' })
         .expect(201);
 
       const found = await organization.getCostCentersByCodes([code, 'CC-MISSING']);
 
-      expect(found).toEqual([expect.objectContaining({ code, kind: 'COMPANY', status: 'ACTIVE' })]);
+      expect(found).toEqual([expect.objectContaining({ code, kind: 'UNIT', status: 'ACTIVE' })]);
       expect(await organization.getCostCentersByCodes([])).toEqual([]);
     });
 

@@ -11,6 +11,7 @@ import { CurrentPrincipal } from '../../../infrastructure/security/models/curren
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import {
   OpinionBodyDto,
+  OpinionPageResponseDto,
   OpinionResponseDto,
   PlanIdParamDto,
   PlanTermsBodyDto,
@@ -18,6 +19,7 @@ import {
   PlanTermsSetResponseDto,
   PlanWarningPageResponseDto,
   PlanWarningsQueryDto,
+  TermOpinionsQueryDto,
 } from './plan-terms.dto';
 import { toPlanTermsApiException } from './plan-terms.http-errors';
 import { PlanTermsService } from './plan-terms.service';
@@ -101,6 +103,32 @@ export class PlanTermsController {
       const { terms, changed } = await this.terms.set(actor, params.id, body);
 
       return { terms: toTermsWire(terms), changed };
+    } catch (error) {
+      throw toPlanTermsApiException(error);
+    }
+  }
+
+  @Get('plans/:id/term-opinions')
+  @RequireRoles('IT_ADMIN', 'FINANCE')
+  @ApiOperation({ operationId: 'planTermOpinionList', summary: 'List the opinions on the terms of a plan' })
+  @ApiSuccessResponse(OpinionPageResponseDto, {
+    message: 'PLAN_TERM_OPINION.LISTED',
+    description: 'A page of the opinions of the Business Owner on the terms of the plan, the newest first.',
+  })
+  @ApiErrorResponses(
+    ...AUTH_ERRORS,
+    { status: HttpStatus.FORBIDDEN, description: 'Only the IT Admin and Finance read the opinions.' },
+    NOT_FOUND,
+    {
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      description: 'The id is not a UUID or the query is invalid (VALIDATION_ERROR).',
+    },
+  )
+  async listOpinions(@Param() params: PlanIdParamDto, @Query() query: TermOpinionsQueryDto) {
+    try {
+      const page = await this.terms.opinions(params.id, query);
+
+      return { items: page.items.map(toOpinionWire), pagination: page.pagination };
     } catch (error) {
       throw toPlanTermsApiException(error);
     }

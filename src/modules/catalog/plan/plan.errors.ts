@@ -144,3 +144,13 @@ export class PlanTermsBlockTypeChangeError extends Error {
     this.name = 'PlanTermsBlockTypeChangeError';
   }
 }
+
+/** What the database found on the plan that the change would leave invalid (`plans_keep_children_valid`). */
+export type PlanChangeBlock = 'ACTIVE_SUBSCRIPTION_WITHOUT_QUANTITY' | 'LICENSE_KEYS' | 'SUBSCRIPTIONS';
+
+export class PlanInUseBlocksChangeError extends Error {
+  constructor(readonly reason: PlanChangeBlock) {
+    super('A subscription or license key of the plan would no longer fit the pricing model or kind.');
+    this.name = 'PlanInUseBlocksChangeError';
+  }
+}
