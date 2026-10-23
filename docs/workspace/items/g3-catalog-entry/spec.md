@@ -5,6 +5,10 @@
 - Thiết kế: `ready`. Owner review: chưa review.
 - Nguồn: Docs `9416fe0` (BRD v3.46 `FR-1.1`, `FR-1.7`, `FR-1.8`, `ADR-05`, `ADR-10`, `INV-06`, `QĐ-49a/b/h`, `QĐ-50a`, `BR-06.*`; `US-04-01` AC-1→AC-7, AC-10→AC-13 và `US-04-07` AC-6 trong `BE-UserStory/src/EP-04.md`; ERD logic `vendors`, `functional_groups`, `saas_products`), BE `57b1e1c`.
 - Nhóm roadmap: G3 — chỉ là planning container, không phải phạm vi của hạng mục này (xem `## Sizing decision`).
+- _Tác động 22/10/2026 (baseline Docs `72e1480`, `QĐ-82n` A):_ `US-04-01` AC-12 đã **bỏ** — không còn loại _phần mềm/SaaS
+  miễn phí bên ngoài_ để chọn hay để từ chối. Bảng Primary bỏ AC-12 (scope map G3); contract còn nhận `FREE_EXTERNAL` rồi
+  từ chối `APPLICATION.KIND_NOT_MANAGED` là sai baseline — sửa forward ở
+  [g3-catalog-kind-contract-cleanup](../g3-catalog-kind-contract-cleanup/spec.md). Phần còn lại của spec giữ nguồn đã pin.
 - [Kế hoạch](plan.md).
 
 ## Business outcome
@@ -26,10 +30,10 @@ cấp; phần mềm miễn phí bên ngoài bị từ chối; ứng dụng ngoà
 
 ## Primary Story/AC
 
-| Story    | AC                     | Coverage | Phần còn lại thuộc                     |
-| -------- | ---------------------- | -------- | -------------------------------------- |
-| US-04-01 | AC-1→AC-7, AC-10→AC-13 | partial  | AC-8, AC-9, AC-14: `g3-catalog-retire` |
-| US-04-07 | AC-6                   | partial  | AC-1→AC-5: `g3-vendor-dictionary`      |
+| Story    | AC                             | Coverage | Phần còn lại thuộc                     |
+| -------- | ------------------------------ | -------- | -------------------------------------- |
+| US-04-01 | AC-1→AC-7, AC-10, AC-11, AC-13 | partial  | AC-8, AC-9, AC-14: `g3-catalog-retire` |
+| US-04-07 | AC-6                           | partial  | AC-1→AC-5: `g3-vendor-dictionary`      |
 
 ## Supporting references
 

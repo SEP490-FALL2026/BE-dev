@@ -19,7 +19,9 @@ API và worker có entry point riêng trong cùng codebase.
 Bảng mô tả code đang có, không phải trạng thái nghiệm thu. Tiến độ từng lát, revision/PR, trạng thái review và kết quả
 gate nằm ở [roadmap](docs/roadmap.md); bằng chứng ở [audit nền tảng 18/10/2026](docs/reviews/be-foundation-audit-2026-10-18/README.md)
 và [review G0/G1](docs/reviews/g0-g1-remediation-2026-10-15/README.md). Kế hoạch remediation theo baseline và refactor nền
-tảng: [foundation-remediation-handoff-2026-10-18](docs/workspace/items/foundation-remediation-handoff-2026-10-18/spec.md).
+tảng: [foundation-remediation-handoff-2026-10-18](docs/workspace/items/foundation-remediation-handoff-2026-10-18/spec.md);
+tác động baseline `QĐ-82` → `QĐ-86` lên code đã merge và lát sửa forward:
+[business-baseline-impact-2026-10-22](docs/workspace/items/business-baseline-impact-2026-10-22/spec.md).
 Mẫu `catalog` cũ đã bị thay (Owner E1 = A, [audit H4.0](docs/reviews/be-full-src-architecture-audit-2026-10-19/README.md#quyết-định-owner-09b);
 quyết định ở [ADR-0013](docs/decisions/0013-catalog-finance-licensing-contexts.md)): thay đổi mới đặt file theo
 [module structure](docs/rules/module-structure.md) và architecture gate.

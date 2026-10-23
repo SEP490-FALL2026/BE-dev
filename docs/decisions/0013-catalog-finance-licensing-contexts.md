@@ -7,6 +7,12 @@
 loại" (E1 = A, [audit H4.0](../reviews/be-full-src-architecture-audit-2026-10-19/README.md)). Proposed chưa phải Accepted
 và chưa phải đã triển khai: chỉ mẫu cũ được gỡ ở lát này; ba module mới xuất hiện cùng lát Story đầu tiên dùng chúng.
 
+> _Annotation trạng thái triển khai (22/10/2026, `delivery-gate-hardening`, `DB-17`):_ câu _chưa phải đã triển khai_ ở trên
+> đã cũ. Ba module `catalog`, `finance`, `licensing` đã merge vào `dev` (PR #14, `4e7097f`) đúng hướng
+> `licensing → catalog → finance`: `CatalogModule` chỉ export facade `CatalogService`, `licensing` import nó, `finance`
+> không import `catalog`, không `forwardRef` (kiểm ở `0198456`). Trạng thái quyết định **vẫn `Proposed`**: chưa có sự kiện
+> Owner review/Accepted; annotation này không đổi nội dung quyết định.
+
 ## Bối cảnh
 
 BRD 5.12.1 chia hệ thống thành tám ranh giới ngữ cảnh. G3/G4 chạm ba ranh giới: `C1` danh mục & hợp đồng (ứng dụng,

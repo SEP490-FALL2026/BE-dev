@@ -10,8 +10,11 @@ Center, phòng và trưởng phòng (vai Manager suy ra), Người duyệt chi, 
 tạo, chuyển giao Super Admin, lệnh khôi phục ngoài HTTP `pnpm ops:recover --help`, lệnh kiểm trạng thái chỉ đọc
 `pnpm ops:inspect` và lệnh dữ liệu demo chỉ local `pnpm dev:seed -- --confirm-local` (các lệnh ngoài HTTP cần
 `pnpm build`; rule: [operational commands](docs/rules/operational-commands.md)).
-Danh mục phần mềm (nhóm G3) chưa có route HTTP: mẫu `catalog` cũ đã được gỡ ở `g3-catalog-foundation` và từng lát G3 thêm
-module thật theo [ADR-0013](docs/decisions/0013-catalog-finance-licensing-contexts.md). Health là public.
+Từ PR #14 (21/10/2026) có thêm route HTTP của G3/G4 ở ba ngữ cảnh `catalog`, `finance`, `licensing`
+([ADR-0013](docs/decisions/0013-catalog-finance-licensing-contexts.md)): danh mục ứng dụng, gói, nhà cung cấp, hồ sơ thuế,
+thuê bao, hợp đồng, phân bổ chi phí, bộ công cụ chuẩn, hiện trạng seat, Assignment, hàng đợi cấp phát và kho khóa. Một
+phần code đã giao lệch baseline Docs `72e1480` (`QĐ-82` → `QĐ-86`) — xem
+[ma trận tác động](docs/workspace/items/business-baseline-impact-2026-10-22/spec.md#ma-trận-tác-động-ae). Health là public.
 Không có tài khoản mặc định trong repository: tạo Super Admin bằng lệnh khởi tạo trên database mới; tài khoản demo
 local (IT Admin, Finance, Employee) do `pnpm dev:seed` tạo với mật khẩu sinh ngẫu nhiên, in một lần.
 

@@ -5,6 +5,10 @@
 - Thiết kế: `ready`. Owner review: chưa review.
 - Nguồn: Docs `9416fe0` (BRD v3.46, US v0.15 — Story/AC ở bảng Primary Story/AC), BE `57b1e1c`.
 - Nhóm roadmap: G4 — chỉ là planning container, không phải phạm vi của hạng mục này (xem `## Sizing decision`).
+- _Ghi chú 22/10/2026 (Prompt 07):_ "(Owner Q2)", "(Owner Q3)" ở mục rủi ro là **câu hỏi** Q2, Q3 gửi Owner trong
+  [báo cáo PR #14](../../../reviews/g2-g4-completion-2026-10-21/README.md), **không** phải câu trả lời của Owner; cả hai
+  thuộc thiết kế cổng Request G5 — [ma trận](../business-baseline-impact-2026-10-22/spec.md#ma-trận-tác-động-ae) dòng
+  `BBI-B11`. Cổng `GRANT_REQUEST_GATE` hiện là stub từ chối mọi Request.
 - [Kế hoạch](plan.md).
 
 ## Business outcome

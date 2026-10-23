@@ -7,6 +7,7 @@
 - _Đính chính 18/10/2026 ([audit nền tảng](../../../reviews/be-foundation-audit-2026-10-18/README.md)):_ AC đã giao — căn cứ là bảng nghiệm thu bên dưới: `US-04-09` AC-1 → AC-4, AC-5 (vế Cost Center đã ngừng), AC-6 (bản rút gọn; nghỉ dài chờ G6), AC-10/AC-11 (vế ngừng dùng khi phòng hết người). AC-7 **không** thuộc lát này (bảng nghiệm thu ghi _Chưa làm_).
 - Trạng thái yêu cầu: Story `BASELINED` (`QĐ-72`). `OQ-B-18` (không chặn) được chọn mặc định ở mục _Làm rõ_.
 - [Kế hoạch](plan.md).
+- _Tác động 22/10/2026 (baseline Docs `72e1480`, `QĐ-86b`):_ danh mục Cost Center **chỉ** còn loại `Unit`; `Company` là gốc tổ chức và tổng hợp báo cáo, không phải Cost Center (`US-04-09` AC-4, AC-7 viết lại; phần `Company` của `OQ-B-18` hết đối tượng). Mô tả loại `Company`, kiểu `'UNIT' | 'COMPANY'` trong spec này là hành vi đã giao trên nguồn cũ, **không** dùng làm hướng dẫn — sửa forward ở [g2-g4-unit-only-cost-attribution](../g2-g4-unit-only-cost-attribution/spec.md); [ma trận](../business-baseline-impact-2026-10-22/spec.md#ma-trận-tác-động-ae).
 
 ## Vấn đề và phạm vi
 

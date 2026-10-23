@@ -17,7 +17,9 @@ Scope: this backend repository. Work from its root with the pnpm version in `pac
   coverage, revisions and evidence: [roadmap](docs/roadmap.md); module map and technical limits:
   [ARCHITECTURE.md](ARCHITECTURE.md); latest baseline check:
   [foundation audit](docs/reviews/be-foundation-audit-2026-10-18/README.md); planned remediation and refactors:
-  [foundation remediation handoff](docs/workspace/items/foundation-remediation-handoff-2026-10-18/spec.md).
+  [foundation remediation handoff](docs/workspace/items/foundation-remediation-handoff-2026-10-18/spec.md);
+  business-baseline impact (`QĐ-82` → `QĐ-86`) on merged code and forward fixes:
+  [business baseline impact](docs/workspace/items/business-baseline-impact-2026-10-22/spec.md).
 
 ## Read only what the task needs
 

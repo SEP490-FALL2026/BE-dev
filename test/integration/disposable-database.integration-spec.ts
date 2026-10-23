@@ -163,6 +163,68 @@ describe('Disposable database guard', () => {
     );
   });
 
+  describe('teardown while autovacuum works in the database (GATE-02)', () => {
+    const database = {
+      url: 'postgresql://app:hunter2@127.0.0.1:5432/slm_ab12_test',
+      name: 'slm_ab12_test',
+      runId: 'run-id',
+    };
+
+    afterEach(() => jest.restoreAllMocks());
+
+    // PostgreSQL refuses `DROP DATABASE ... WITH (FORCE)` from an ordinary role with 42501 while a process it may not
+    // signal is in the database: an autovacuum worker (reproduced 22/10/2026 on PostgreSQL 17). The ordinary role
+    // cannot even see that process's backend_type. A plain DROP DATABASE signals autovacuum workers itself and
+    // terminates nothing else: a real session still holding the database makes it fail with 55006.
+    const stubDrop = (plainDrop: 'succeeds' | 'held by a session') => {
+      jest.spyOn(promiseClientPrototype, 'connect').mockResolvedValue(undefined);
+      jest.spyOn(promiseClientPrototype, 'end').mockResolvedValue(undefined);
+      return jest.spyOn(promiseClientPrototype, 'query').mockImplementation((sql: string) => {
+        if (sql.startsWith('SELECT run_id')) return Promise.resolve({ rowCount: 1, rows: [{ run_id: 'run-id' }] });
+        if (sql.endsWith('WITH (FORCE)'))
+          return Promise.reject(Object.assign(new Error('permission denied to terminate process'), { code: '42501' }));
+        if (sql.startsWith('DROP DATABASE'))
+          return plainDrop === 'succeeds'
+            ? Promise.resolve({ rows: [] })
+            : Promise.reject(Object.assign(new Error('database is being accessed by other users'), { code: '55006' }));
+        if (sql.includes('pg_stat_activity'))
+          return Promise.resolve({
+            rows: [
+              {
+                database: database.name,
+                application_name: '',
+                pid: 900,
+                state: null,
+                wait_event_type: null,
+                wait_event: null,
+              },
+            ],
+          });
+        throw new Error('Unexpected query');
+      });
+    };
+    const drops = (query: jest.SpyInstance) =>
+      query.mock.calls.map(([sql]) => String(sql)).filter((sql) => sql.startsWith('DROP DATABASE'));
+
+    it('drops once more without FORCE when FORCE may not terminate a process in the database (42501)', async () => {
+      const query = stubDrop('succeeds');
+
+      await dropDisposableDatabase(database);
+
+      expect(drops(query)).toEqual(['DROP DATABASE "slm_ab12_test" WITH (FORCE)', 'DROP DATABASE "slm_ab12_test"']);
+    });
+
+    it('fails with both SQLSTATEs and no third DROP when a session still holds the database', async () => {
+      const query = stubDrop('held by a session');
+
+      await expect(dropDisposableDatabase(database)).rejects.toMatchObject({
+        sqlState: '42501',
+        diagnostics: { plainDropSqlState: '55006' },
+      });
+      expect(drops(query)).toHaveLength(2);
+    });
+  });
+
   describe('conditions that need no database', () => {
     it.each([
       ['a remote host', 'postgresql://app:secret@db.example.com:5432/slm_ab12_test'],

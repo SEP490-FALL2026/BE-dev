@@ -7,6 +7,7 @@
 - _Đính chính 18/10/2026 ([audit nền tảng](../../../reviews/be-foundation-audit-2026-10-18/README.md)):_ AC đã giao — căn cứ là bảng nghiệm thu bên dưới: `US-02-01` AC-1 → AC-4, AC-6 → AC-10 (AC-5 ngoài lát — G7/G9); `US-02-02` AC-1, AC-2, AC-6 → AC-13, AC-15 (AC-4 vế liên kết seat chờ G4); `US-02-03` AC-1, AC-4 → AC-6 (AC-2, AC-3 chưa có hàng nghiệm thu); `US-02-07` AC-7 (vế import), AC-12 — chỉ CSV.
 - Trạng thái yêu cầu: các Story `BASELINED` (`QĐ-72`). `OQ-A-07` (bộ cột), `OQ-A-08` (cột cũ) không chặn, được chọn mặc định ở mục _Làm rõ_.
 - [Kế hoạch](plan.md).
+- _Tác động 22/10/2026 (baseline Docs `72e1480`, `QĐ-82i`, `QĐ-82m` `INF-20`):_ người import hồ sơ nhân viên **mới** là **Super Admin** kèm căn cứ HR bắt buộc (`US-02-02` AC-1, AC-9, AC-12, AC-13, AC-16, AC-18; `US-02-03` AC-1); IT Admin không còn là actor import; sửa trường chính thức của hồ sơ đã có do IT Admin phụ trách phòng (AC-19). Actor `IT_ADMIN` và câu _Super Admin bị từ chối_ trong spec này là hành vi đã giao trên nguồn cũ — sửa forward ở [g2-employee-intake-by-super-admin](../g2-employee-intake-by-super-admin/spec.md), [g2-employee-official-field-maintenance](../g2-employee-official-field-maintenance/spec.md); [ma trận](../business-baseline-impact-2026-10-22/spec.md#ma-trận-tác-động-ae).
 
 ## Vấn đề và phạm vi
 

@@ -5,6 +5,11 @@
 - Thiết kế: `ready`. Owner review: chưa review.
 - Nguồn: Docs `9416fe0` (BRD v3.46 `FR-9.4`, `FR-2.9`→`FR-2.11`, `INV-01`, `INV-02`, `INV-07`, `QĐ-40d`, `QĐ-43`, `QĐ-49b`, `QĐ-54c`, `QĐ-75d`; `US-02-05` AC-1→AC-14 trong `BE-UserStory/epics/EP-02.md`; `US-07-01` AC-14), BE `57b1e1c`.
 - Nhóm roadmap: G4 — chỉ là planning container, không phải phạm vi của hạng mục này (xem `## Sizing decision`).
+- _Tác động 22/10/2026 (baseline Docs `72e1480`, `QĐ-86b`, `QĐ-86c`, `CERD5-17`):_ `US-02-05` AC-7 viết lại — tài khoản
+  dịch vụ thuộc phòng của người chịu trách nhiệm tại ngày ghi nhận, Cost Center là `Unit` của phòng đó, mã `Company` là lỗi
+  dòng; người chịu trách nhiệm mới (AC-10) phải thuộc phòng sở hữu. Quy tắc `COST_CENTER_NOT_COMPANY` và Cost Center
+  `Company` của tài khoản dịch vụ dưới đây lỗi thời — sửa forward ở
+  [g2-g4-unit-only-cost-attribution](../g2-g4-unit-only-cost-attribution/spec.md) (scope map G4 chia AC-7, AC-10).
 - [Kế hoạch](plan.md).
 
 ## Business outcome
@@ -26,7 +31,7 @@ IT Admin import hiện trạng ai đang giữ seat nào của **một thuê bao*
 
 | Story    | AC         | Coverage | Phần còn lại thuộc                                                                                                                                                                       |
 | -------- | ---------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| US-02-05 | AC-1→AC-14 | partial  | AC-11 vế K4: `g4-device-dependent-features`                                                                                                                                              |
+| US-02-05 | AC-1→AC-14 | partial  | AC-11 vế K4: `g4-device-dependent-features`; AC-7, AC-10 vế phòng sở hữu (`QĐ-86`, 22/10/2026): `g2-g4-unit-only-cost-attribution`                                                       |
 | US-07-01 | AC-14      | partial  | AC-1, AC-2, AC-4→AC-9, AC-11→AC-13, AC-15, AC-17: `g4-provisioning-queue-manual`; AC-1, AC-3, AC-15, AC-16: `g4-request-and-transfer-integration`; AC-10: `g4-device-dependent-features` |
 
 AC-11 `partial`: dòng K1/K2 ghi như Assignment thường trên tài khoản công ty (có test); gói K4 bị từ chối cả lần import với lý do _chưa hỗ trợ khóa và thiết bị công ty_ — vế _một khóa trong kho gắn đúng một Assignment cùng thiết bị công ty_ thuộc `g4-device-dependent-features`. US-07-01 AC-14 `partial`: lát này làm vế _Assignment khởi tạo được đánh dấu_ (`source = BASELINE`, không Request, Audit Trail ghi nguồn), không làm cấp từ Request.

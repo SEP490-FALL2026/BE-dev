@@ -8,6 +8,10 @@ interface RelayedConnection {
   queue: Array<{ to: Socket; chunk: Buffer }>;
   buffer: Buffer;
   startup: boolean;
+  /** SQL text of the statements parsed on this connection, by name ('' is the unnamed one). */
+  prepared: Map<string, string>;
+  /** SQL text bound to each portal, by name. */
+  portals: Map<string, string>;
 }
 
 export interface HeldCommitResponse {
@@ -26,13 +30,17 @@ export interface HeldCommitResponse {
  *   then holds that one connection (that statement and everything after it). `releaseHeld()` delivers
  *   what was held, so the test can see what PostgreSQL does with a statement it receives late.
  *
- * Only the SQL text of Parse and Query messages is read; bind values are never inspected.
+ * - `observe(listener)` reports every statement a client executes, for counting (test/support/query-count.ts).
+ *
+ * Only the SQL text of Parse and Query messages and the names in Bind and Execute are read; bind values are never
+ * inspected.
  */
 export class PgRelay {
   private readonly server: Server;
   private readonly connections = new Set<RelayedConnection>();
   private paused = false;
   private trigger: RegExp | null = null;
+  private readonly observers = new Set<(sql: string) => void>();
   private commitResponse: {
     connection?: RelayedConnection;
     received: () => void;
@@ -71,6 +79,16 @@ export class PgRelay {
   /** Holds the first connection that sends a statement matching `pattern`, from that statement on. */
   holdWhen(pattern: RegExp): void {
     this.trigger = pattern;
+  }
+
+  /**
+   * Calls `listener` with the SQL text of every statement a client executes through the relay: a simple Query, or an
+   * Execute of a portal bound to a parsed statement, so a prepared statement executed again counts again. Bind values
+   * are never read. Returns the function that removes the listener.
+   */
+  observe(listener: (sql: string) => void): () => void {
+    this.observers.add(listener);
+    return () => this.observers.delete(listener);
   }
 
   /** True once a connection is being held because of `holdWhen`. */
@@ -148,6 +166,8 @@ export class PgRelay {
       queue: [],
       buffer: Buffer.alloc(0),
       startup: true,
+      prepared: new Map(),
+      portals: new Map(),
     };
     this.connections.add(connection);
 
@@ -196,6 +216,10 @@ export class PgRelay {
     for (const { to, chunk } of queue) if (!to.destroyed) to.write(chunk);
   }
 
+  private executed(sql: string): void {
+    for (const observer of this.observers) observer(sql);
+  }
+
   /** SQL text of the Parse ('P') and Query ('Q') messages completed by this chunk. */
   private statements(connection: RelayedConnection, chunk: Buffer): string[] {
     connection.buffer = Buffer.concat([connection.buffer, chunk]);
@@ -216,11 +240,25 @@ export class PgRelay {
       const length = connection.buffer.readInt32BE(1);
       if (connection.buffer.length < 1 + length) break;
       const body = connection.buffer.subarray(5, 1 + length);
-      if (type === 0x51) found.push(body.toString('utf8', 0, body.indexOf(0)));
+      if (type === 0x51) {
+        const sql = body.toString('utf8', 0, body.indexOf(0));
+        found.push(sql);
+        this.executed(sql);
+      }
       if (type === 0x50) {
         const nameEnd = body.indexOf(0);
-        found.push(body.toString('utf8', nameEnd + 1, body.indexOf(0, nameEnd + 1)));
+        const sql = body.toString('utf8', nameEnd + 1, body.indexOf(0, nameEnd + 1));
+        found.push(sql);
+        connection.prepared.set(body.toString('utf8', 0, nameEnd), sql);
       }
+      // Bind ('B'): portal name, statement name, then parameters, which are never read.
+      if (type === 0x42) {
+        const portalEnd = body.indexOf(0);
+        const statement = body.toString('utf8', portalEnd + 1, body.indexOf(0, portalEnd + 1));
+        connection.portals.set(body.toString('utf8', 0, portalEnd), connection.prepared.get(statement) ?? '');
+      }
+      // Execute ('E'): portal name, then a row limit.
+      if (type === 0x45) this.executed(connection.portals.get(body.toString('utf8', 0, body.indexOf(0))) ?? '');
       connection.buffer = connection.buffer.subarray(1 + length);
     }
     return found;

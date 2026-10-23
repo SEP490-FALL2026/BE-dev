@@ -5,6 +5,9 @@
 - Thiết kế: `blocked`. Owner review: chưa review.
 - Nguồn: Docs `9416fe0` (BRD v3.46, US v0.15 — Story/AC ở bảng Primary Story/AC), BE `57b1e1c`.
 - Nhóm roadmap: G3 và G4 — chỉ là planning container, không phải phạm vi của hạng mục này (xem `## Sizing decision`).
+- _Tác động 22/10/2026 (baseline Docs `72e1480`):_ scope map G2 hoãn `US-02-02` AC-17 (báo hồ sơ nhân viên mới cho IT
+  Admin phụ trách và trưởng phòng — kiểm soát bù của `QĐ-82i`) tới khung này; khi gỡ blocker, thêm AC đó vào bảng Primary
+  và `Container` G2. Xem [g2-employee-intake-by-super-admin](../g2-employee-intake-by-super-admin/spec.md).
 - [Kế hoạch](plan.md).
 
 ## Business outcome

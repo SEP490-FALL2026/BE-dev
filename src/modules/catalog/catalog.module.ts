@@ -64,9 +64,9 @@ import { VendorRepo } from './vendor/vendor.repo';
 
 /**
  * The catalog context (C1, G3 part): the shared vendor dictionary, the application catalog and its vendors and
- * functional groups, and the plans of an application. It exports nothing yet; the HTTP controller
- * lives in the module itself because no graph other than the API needs it (ADR-0013) — a separate HTTP module is made
- * when `licensing` imports `catalog` for its contracts.
+ * functional groups, plans and their terms, subscriptions, contracts and their files, and standard toolsets. It
+ * exports only the facade `CatalogService`, which `licensing` imports; the HTTP controllers live in the module itself
+ * because no worker or command imports `catalog` (ADR-0013) — a separate HTTP module is made when one does.
  */
 @Module({
   imports: [

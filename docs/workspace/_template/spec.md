@@ -67,6 +67,10 @@ Luồng chính, biến thể, từ chối, quyền và ranh giới dữ liệu; 
 concurrency, khóa; migration và tương thích ngược; jobs/storage. Phần không áp dụng ghi `không áp dụng` và lý do. Không
 dựng kiến trúc song song; link ERD/ADR nếu cần.
 
+Collection `GET` mới hoặc đổi: summary projection, biên/paging, thứ tự ổn định, detail/subresource tương ứng và kỳ vọng số
+câu lệnh theo [API-LIST-DETAIL.1](../../rules/api-contract.md#collection-và-detail-api-list-detail1); ngoại lệ chỉ qua registry
+của gate.
+
 ## Test matrix
 
 | AC / rủi ro | Tình huống (gồm từ chối, edge case) | Cấp test | Kết quả mong đợi | Bằng chứng sau implement |

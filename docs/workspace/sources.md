@@ -2,19 +2,58 @@
 
 BRD sở hữu nghiệp vụ; US dẫn xuất phạm vi/AC; sổ quyết định ghi thay đổi nghiệp vụ. ARCHITECTURE/ADR của BE sở hữu cách hiện thực, không ghi đè yêu cầu.
 
-| Nguồn      | Vị trí nhận diện trong bộ tài liệu dự án                                                 | Link chia sẻ / revision                                                                                                                                                      |
-| ---------- | ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| BRD        | Docs/Requiments/BRD - HỆ THỐNG QUẢN TRỊ BẢN QUYỀN PHẦN MỀM & TỐI ƯU CHI PHÍ CÔNG NGHỆ.md | v3.36 `S-2026-10-12b`; v3.39 `S-2026-10-14b` = Docs `3341ea0`; v3.42 Docs `73e7379`; v3.45 `S-2026-10-18` (chưa commit); **v3.46** Docs `9416fe0`                            |
-| Phạm vi    | Docs/Requiments/Định nghĩa phạm vi & nghiệp vụ.md                                        | v1.24 `S-2026-10-12b`; v1.27 `S-2026-10-14b` = Docs `3341ea0`; v1.30 `73e7379`; v1.31 `S-2026-10-18`; **v1.31** Docs `9416fe0`                                               |
-| US         | Docs/BE-UserStory/src/ (canonical), sinh ra user-stories-and-epics.md và epics/          | v0.15 (`QĐ-67`) `S-2026-10-12b`; v0.15 (`QĐ-73`) `3341ea0`; v0.15 (`QĐ-77`, 150 mã, 1 428 AC) `73e7379`; **v0.15 (`QĐ-80`, 150 mã, 144 đang dùng, 1 433 AC)** `S-2026-10-18` |
-| Quyết định | Docs/Decisions/project-decisions.md                                                      | QĐ-01 → QĐ-67 `S-2026-10-12b`; → QĐ-73 `3341ea0`; → QĐ-77 `73e7379`; → QĐ-80 `S-2026-10-18` (chưa commit); **→ QĐ-81** Docs `9416fe0`                                        |
-| Conceptual | Docs/ERD/CONCEPTUAL ERD - DANH SÁCH ENTITY.md                                            | v5.1 (21 · 42), không đổi, `S-2026-10-12b`; v5.1 (21 · 42 · 20 bất biến), nội dung đồng bộ 17/10/2026, `S-2026-10-18`                                                        |
+| Nguồn      | Vị trí nhận diện trong bộ tài liệu dự án                                                 | Link chia sẻ / revision                                                                                                                                                                                                                  |
+| ---------- | ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| BRD        | Docs/Requiments/BRD - HỆ THỐNG QUẢN TRỊ BẢN QUYỀN PHẦN MỀM & TỐI ƯU CHI PHÍ CÔNG NGHỆ.md | v3.36 `S-2026-10-12b`; v3.39 `S-2026-10-14b` = Docs `3341ea0`; v3.42 Docs `73e7379`; v3.45 `S-2026-10-18` (chưa commit); v3.46 Docs `9416fe0`; **v3.53** Docs `72e1480`                                                                  |
+| Phạm vi    | Docs/Requiments/Định nghĩa phạm vi & nghiệp vụ.md                                        | v1.24 `S-2026-10-12b`; v1.27 `S-2026-10-14b` = Docs `3341ea0`; v1.30 `73e7379`; v1.31 `S-2026-10-18`; v1.31 Docs `9416fe0`; **v1.34** Docs `72e1480`                                                                                     |
+| US         | Docs/BE-UserStory/src/ (canonical), sinh ra user-stories-and-epics.md và epics/          | v0.15 (`QĐ-67`) `S-2026-10-12b`; v0.15 (`QĐ-73`) `3341ea0`; v0.15 (`QĐ-77`, 150 mã, 1 428 AC) `73e7379`; v0.15 (`QĐ-80`, 150 mã, 144 đang dùng, 1 433 AC) `S-2026-10-18`; **v0.15 (`QĐ-86`, 157 mã, 147 đang dùng, 1 549 AC)** `72e1480` |
+| Quyết định | Docs/Decisions/project-decisions.md                                                      | QĐ-01 → QĐ-67 `S-2026-10-12b`; → QĐ-73 `3341ea0`; → QĐ-77 `73e7379`; → QĐ-80 `S-2026-10-18` (chưa commit); → QĐ-81 Docs `9416fe0`; **→ QĐ-86** Docs `72e1480`                                                                            |
+| Conceptual | Docs/ERD/CONCEPTUAL ERD - DANH SÁCH ENTITY.md                                            | v5.1 (21 · 42), không đổi, `S-2026-10-12b`; v5.1 (21 · 42 · 20 bất biến), nội dung đồng bộ 17/10/2026, `S-2026-10-18`; **v5.1 (21 · 42 · 21 bất biến)**, đồng bộ 22/10/2026, Docs `72e1480`                                              |
 
 Vị trí trên chỉ để nhận diện tài liệu, không bắt contributor có thư mục cạnh checkout BE. Mỗi spec pin revision thực sự dùng.
 Spec G0/G1/G2 giữ nguồn đã pin khi thiết kế; tác động của `QĐ-74` → `QĐ-80` lên chúng ghi ở
-[baseline-impact-and-remediation-2026-10-17](items/baseline-impact-and-remediation-2026-10-17/spec.md).
+[baseline-impact-and-remediation-2026-10-17](items/baseline-impact-and-remediation-2026-10-17/spec.md); tác động của `QĐ-82` → `QĐ-86` lên G0–G4 ghi ở
+[business-baseline-impact-2026-10-22](items/business-baseline-impact-2026-10-22/spec.md).
 
-## Commit Docs `9416fe0` (18/10/2026, có `QĐ-81`) — pin hiện hành cho hạng mục mới
+## Commit Docs `72e1480` (22/10/2026, tới `QĐ-86`) — pin hiện hành cho hạng mục mới
+
+Docs `main` `72e1480dd6efa7a8e34ba344aa5b44f09a169dc5` (22/10/2026, _update docs_) là commit đầu tiên chứa `QĐ-86a`
+(`git log -S"QĐ-86a" -- Decisions/project-decisions.md`); working tree Docs sạch lúc kiểm. Kiểm ngày 22/10/2026: sổ
+quyết định `QĐ-01` → `QĐ-86` (`QĐ-86a`–`QĐ-86c` ở `project-decisions.md:2721-2723`), BRD **v3.53**, Phạm vi **v1.34**
+(câu phạm vi không đổi từ `QĐ-82`; Phần VII trỏ BRD v3.53), User Stories v0.15 — **157** mã Story, **147** đang dùng
+(`BASELINED` 137, `RESEARCH-DEPENDENT` 5, `DEFERRED` 5; `RETIRED` 10), **1 549** AC (`user-stories-and-epics.md:562`),
+0 câu hỏi `chặn-AC` (`python -I -B BE-UserStory/tools/build_us.py --check`, parity OK); Conceptual ERD v5.1 (21 thực
+thể · 42 quan hệ · 21 bất biến).
+
+Hạng mục mới pin Docs `72e1480` (hoặc commit sau có quyết định cần dùng). Tác động `QĐ-82` → `QĐ-86` lên code G0–G4 ở BE
+`69f4891` ghi ở [business-baseline-impact-2026-10-22](items/business-baseline-impact-2026-10-22/spec.md); spec đã thiết kế
+trước đó giữ nguồn đã pin, chỗ bị baseline mới thay có ghi chú _Tác động 22/10/2026_ trỏ về ma trận, không đổi nguồn thiết
+kế.
+
+Nguồn đã commit nên pin bằng commit. Hash dưới chỉ ghi đúng tệp lượt kiểm 22/10/2026 đã đọc, để người review đối chiếu
+nhanh: SHA-256 của `git show 72e1480:<tệp>`, chuẩn hóa LF, bỏ BOM.
+
+| Tệp (tính từ gốc Docs)                                                              | SHA-256 (LF, không BOM)                                            |
+| ----------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| Decisions/project-decisions.md                                                      | `91eb384e130761160272a1e42b9ff28754129ed650f07a23f9faec353ef5cc7b` |
+| Requiments/BRD - HỆ THỐNG QUẢN TRỊ BẢN QUYỀN PHẦN MỀM & TỐI ƯU CHI PHÍ CÔNG NGHỆ.md | `dcf3c75e5deb83ba68530eba8f63f195121310d4514597ef9134052ef2f7b727` |
+| Requiments/Định nghĩa phạm vi & nghiệp vụ.md                                        | `d6e8d3bcfc5f9c640f96ffabdea8357959d3c3de446093f6b42dc15fe93ac126` |
+| ERD/CONCEPTUAL ERD - DANH SÁCH ENTITY.md                                            | `5a62a62f5cfaa95d205938c34bb04d541686a73508dde5ef96a653e59dd802be` |
+| rules/domain-guardrails.md                                                          | `6472aae5e7945a32575c732a8bf5295dbea62326c0995a5503cc359e6241d9af` |
+| BE-UserStory/user-stories-and-epics.md                                              | `bfc25c495bd1fad5322d8d9a2c0c794e1ae8960e0b6781512bbf2ead9d0fea9e` |
+| BE-UserStory/tools/build_us.py                                                      | `aad4d112bd8d531a059517bf3b5e7c3e3521a8fe6b8451f57b4cda1fa62a902f` |
+| BE-UserStory/src/00-head.md                                                         | `4068e1e4968722357f67ce8e127ab8e123898360a77e0d5971bd37ade735144a` |
+| BE-UserStory/src/99-tail.md                                                         | `3528c848fbd2f5eafe9cfd26dd7f6db3ee61d1acc0ef4ba470e07feee7e35668` |
+| BE-UserStory/src/EP-01.md                                                           | `84d2ca83b622c9184daf85fc77e95280c8650119fabfcf39ad75f09afcf09959` |
+| BE-UserStory/src/EP-02.md                                                           | `176fea0181f4df4061c00e1a6af8139ff8372ed0f19e9b68f12c688cc579ff12` |
+| BE-UserStory/src/EP-03.md                                                           | `219800d20edb40210009a46dc6a17ac8191860ef77ba331acdc46cd1a8648e27` |
+| BE-UserStory/src/EP-04.md                                                           | `d4df81015e063f208b01c67ccbdaea73acf4f2f4046e5a5316c35aa18c0bbc97` |
+| BE-UserStory/src/EP-05.md                                                           | `68c13e7ca6d44d9336b8e6e58ebbaf71aa1bdf470189bea7bf749c35d7d9da16` |
+| BE-UserStory/src/EP-06.md                                                           | `a38c7466e084daf716b3352b8c8e03f09c0c7c18c1b3a381b1eba6fc7dd601b2` |
+| BE-UserStory/src/EP-07.md                                                           | `106f689a2734536a6420087fd6b64561827bcd0c3c180fe0940a954f36307fae` |
+| BE-UserStory/src/EP-12.md                                                           | `da244b37c23229088c8a490fdc1cd8812bbf65109e480f28260d874d2dc3d650` |
+
+## Commit Docs `9416fe0` (18/10/2026, có `QĐ-81`) — pin của hạng mục 18–21/10/2026
 
 Docs `main` `9416fe0e45300c679148e76b6438ab049a014692` (18/10/2026, _update docs_) là commit đầu tiên chứa `QĐ-81a`
 (`git log -S"QĐ-81a" -- Decisions/project-decisions.md`). Kiểm ngày 18/10/2026: sổ quyết định `QĐ-01` → `QĐ-81`
@@ -22,7 +61,7 @@ Docs `main` `9416fe0e45300c679148e76b6438ab049a014692` (18/10/2026, _update docs
 144 đang dùng, **1 433** AC (`user-stories-and-epics.md:537`). Nguồn đã commit nên pin bằng commit, không cần hash từng tệp;
 snapshot `S-2026-10-18` (working tree chưa commit) chỉ còn giá trị lịch sử cho lượt tài liệu ngày đó.
 
-Hạng mục mới pin Docs `9416fe0` (hoặc commit sau có quyết định cần dùng). R-2 dùng commit này vì cần `QĐ-81` và
+Hạng mục lập 18–21/10/2026 (R-2, G3, G4) pin Docs `9416fe0`; từ 22/10/2026 hạng mục mới pin Docs `72e1480` (mục trên). R-2 dùng commit này vì cần `QĐ-81` và
 `US-01-01` AC-6, AC-7, AC-20 bản mới. Spec G0/G1/G2 đã thiết kế giữ nguồn đã pin; đính chính claim AC ngày 18/10/2026 dựa
 trên bảng nghiệm thu của chính spec, không đổi nguồn thiết kế.
 

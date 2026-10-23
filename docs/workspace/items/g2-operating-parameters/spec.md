@@ -6,6 +6,7 @@
 - Nguồn: Docs commit `3341ea0` ([sources](../../sources.md)). `US-01-04` AC-3, AC-6, AC-7, AC-10 → AC-13 (`BE-UserStory/src/EP-01.md`); BRD v3.39 `FR-8.2`, `FR-3.8`, `FR-4.12`, `FR-4.12b`, `FR-1.4`; `QĐ-42d`, `QĐ-47d`, `QĐ-50b`, `QĐ-56a`, `QĐ-62e`, `QĐ-62i`, `QĐ-62j`, `QĐ-63b`.
 - Trạng thái yêu cầu: Story `BASELINED` (`QĐ-72`). `OQ-A-05` (`T`, giao BE chọn giá trị mặc định) được trả lời ở mục _Làm rõ_.
 - [Kế hoạch](plan.md).
+- _Tác động 22/10/2026 (baseline Docs `72e1480`, `QĐ-82e`, `QĐ-82l`(23)):_ kỳ ngân sách kiểm soát là **năm tài chính**; không còn tham số _loại kỳ_ `BUDGET_PERIOD_KIND` (tháng/quý/năm); thay bằng _tháng bắt đầu năm tài chính_ (mặc định 1, không đổi khi đã có phiên bản ngân sách) và _thời hạn chờ trình duyệt chi_ (`US-01-04` AC-7, AC-8, AC-14, AC-15). Câu _G5 phải khóa đổi `BUDGET_PERIOD_KIND`_ dưới đây lỗi thời — sửa forward ở [g2-fiscal-year-operating-parameters](../g2-fiscal-year-operating-parameters/spec.md) và khung [g2-downstream-integration](../g2-downstream-integration/spec.md); [ma trận](../business-baseline-impact-2026-10-22/spec.md#ma-trận-tác-động-ae).
 
 ## Vấn đề và phạm vi
 

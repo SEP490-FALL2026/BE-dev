@@ -46,6 +46,11 @@ CI also runs HTTP E2E, isolated PostgreSQL integration, OpenAPI drift, Docker bu
 
 `pnpm check` sinh Prisma client trước lint nên chạy được trực tiếp trên checkout sạch.
 
+Xuống dòng: `.gitattributes` chỉ có một rule `openapi.json text eol=lf` (`GATE-EOL=A`), để test export so đúng byte trên
+mọi checkout, kể cả Windows `core.autocrlf=true`. Checkout có từ trước khi có rule mà `openapi.json` còn CRLF thì sinh lại
+đúng tệp đó bằng `pnpm openapi:export` (không sửa tay). Không thêm rule toàn repo như `* text=auto eol=lf` và không chạy
+`git add --renormalize .`: đổi EOL tệp khác cần quyết định riêng.
+
 ## Chọn tài liệu theo tác vụ
 
 | Đang làm                              | Đọc thêm                                                                                                              |

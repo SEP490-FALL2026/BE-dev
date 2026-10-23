@@ -3,6 +3,9 @@
 > Retained technical decision only. Old work-package IDs and implementation notes below
 > are historical; they do not require rebuilding the removed plans. No money schema or
 > implementation exists in the reset baseline. Start new work from the current US.
+>
+> _22/10/2026:_ the sentence above about no implementation is superseded — see the implementation annotation of
+> 22/10/2026 below. The decision text is unchanged.
 
 ## Status
 
@@ -20,6 +23,8 @@ This is a technical decision inside business rules already fixed by BRD `ADR-03`
 2026-10-03
 
 **Implementation annotation (20/10/2026, `g3-money-and-exchange-rates`):** `src/core/money` (parse/format, `ScaledRate`, `convertToReporting`, worked examples M1–M18 as unit tests), the tables `currencies` and `exchange_rates` (migration `20261020100000_finance_money_and_exchange_rates`) and the facade `FinanceService` (`parseMoney`, `snapshotMoney`) are implemented and `verified` locally. Money columns on subscriptions and the frozen snapshot stored with them are not yet: they arrive with `g3-subscription-purchase`. Accepted is still not Owner-reviewed implementation.
+
+**Implementation annotation (22/10/2026, independent post-merge review — [review](../reviews/g0-g4-post-merge-review-2026-10-22/README.md#7-nghiệp-vụ-hiện-hành-qđ-82--qđ-86-và-carry-over)):** at BE `69f4891` (PR #14 merged as `4e7097f`) the decision is implemented: `src/core/money` (`money.ts`, `convert.ts`, `rate.ts`, `tax-estimate.ts`), the tables `currencies` and `exchange_rates` (`20261020100000_finance_money_and_exchange_rates`, `20261020100500_exchange_rates_immutable`), the subscription price columns with their frozen conversion snapshot (`20261020150000_catalog_subscriptions`: `unit_price_minor BIGINT`, `price_rate NUMERIC(20,10)`, `price_reporting_minor BIGINT`, CHECKs) and the facade `FinanceService`. The worked examples have tests: M1, M3–M12, M14, M15, M18 in `convert/money/rate.spec.ts` (M7 unlabelled at `convert.spec.ts:22`), M2 and M16 in `finance-money-facade.integration-spec.ts`, M17 as `US-04-05` AC-7 in `subscription-http.integration-spec.ts`; they pass on the final tree (unit, integration). Two divergences from this text, not changed here: M13 (amount without currency) is refused as 422 `VALIDATION_ERROR` by the strict request schema and a CHECK, not with a distinct `MONEY_INCOMPLETE` code; `tax-estimate.ts:69` reads a tax percentage through `Number()` of bounded integer parts (no precision loss, but §3 forbids `Number()` on rates). The sentences _Accepted is not implemented_ in the Status section and _WP-02/WP-05 and `core/money` are future work_ below are historical. Implemented is still not Owner-reviewed or accepted.
 
 **Implementation annotation after restore:** the status description of `currencies.minor_unit` above refers to the pre-restore S0 database/schema, not the current checked-out foundation schema. No live database was inspected in this documentation audit. WP-02/WP-05 and `core/money` are future work; prior acceptance does not establish current implementation. Inspect migration history before applying any new schema to an existing environment.
 

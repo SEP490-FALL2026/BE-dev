@@ -5,6 +5,10 @@
 - Thiết kế: `ready`. Owner review: chưa review.
 - Nguồn: Docs `9416fe0` (BRD v3.46 `FR-5.2`, `INV-03`, `OQ-02`, `BR-29.4`, `QĐ-49g`; `US-04-08` AC-1→AC-5 và `US-04-09` trong `BE-UserStory/epics/EP-04.md`), BE `57b1e1c`.
 - Nhóm roadmap: G3 — chỉ là planning container, không phải phạm vi của hạng mục này (xem `## Sizing decision`).
+- _Tác động 22/10/2026 (baseline Docs `72e1480`, `QĐ-86` hệ quả (1)):_ `Company` **không** phải Cost Center; dòng phân
+  bổ chỉ là Cost Center `Unit`. Câu "`Unit` hoặc `Company` đều dùng được", kiểu `costCenterKind: 'UNIT' | 'COMPANY'` và ca
+  test `COMPANY` dưới đây lỗi thời — sửa forward ở
+  [g2-g4-unit-only-cost-attribution](../g2-g4-unit-only-cost-attribution/spec.md); quy tắc tỷ lệ, tổng 100 % giữ nguyên.
 - [Kế hoạch](plan.md).
 
 ## Business outcome

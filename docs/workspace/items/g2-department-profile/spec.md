@@ -8,6 +8,7 @@
 - Trạng thái yêu cầu: các Story `BASELINED` (`QĐ-72`). Câu hỏi mở của bảng phủ (`needs-decision`: giai đoạn trưởng phòng bắt đầu trong quá khứ; `OQ-A-19` người nhận cảnh báo) được chọn mặc định ở mục _Làm rõ_ để người phụ trách làm tiếp; Owner xác nhận khi review.
 - [Kế hoạch](plan.md).
 - **Tác động baseline sau thiết kế (18/10/2026):** `QĐ-75` bỏ vế _tài khoản dùng chung_ của `US-03-06` AC-19 (còn thành viên và việc đang mở). Khóa `sharedAccounts` trong `details` của `DEPARTMENT.IN_USE` ở dưới (đã code) là lỗi thời, đã bỏ ở lát R-1 (H3a, 18/10/2026); G4/G5 **không** cộng tài khoản dùng chung vào kiểm tra ngừng phòng. Nội dung dưới giữ nguyên là thiết kế đã dùng. Xem M-01 → M-06, M-23, M-27 của [remediation](../baseline-impact-and-remediation-2026-10-17/spec.md).
+- _Tác động 22/10/2026 (baseline Docs `72e1480`, `QĐ-86b`, `QĐ-86c`):_ `US-03-06` AC-2 — mã `Company` không phải Cost Center; AC-19 thêm nhóm _tài khoản dịch vụ thuộc phòng_ chặn ngừng phòng (tài khoản dịch vụ thuộc phòng sở hữu, không còn ở `Company`). Câu _`Company` không gắn phòng_ là mô tả nguồn cũ — sửa forward ở [g2-g4-unit-only-cost-attribution](../g2-g4-unit-only-cost-attribution/spec.md); vế việc đang mở ở khung [g2-downstream-integration](../g2-downstream-integration/spec.md); [ma trận](../business-baseline-impact-2026-10-22/spec.md#ma-trận-tác-động-ae).
 
 ## Vấn đề và phạm vi
 
