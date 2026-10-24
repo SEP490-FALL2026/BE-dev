@@ -1,8 +1,11 @@
 name: Backend CD (Deploy to VPS)
 
 on:
-  push:
+  workflow_run:
+    workflows: ["Backend CI"]
     branches: [main]
+    types:
+      - completed
   workflow_dispatch:
 
 permissions:
@@ -16,6 +19,7 @@ env:
 jobs:
   build-and-push:
     name: Build & Push Production Image
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     outputs:
       image: ${{ steps.meta.outputs.image }}
@@ -23,6 +27,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.ref }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -38,7 +44,8 @@ jobs:
         id: meta
         run: |
           IMAGE_LOWERCASE=$(echo "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}" | tr '[:upper:]' '[:lower:]')
-          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          TARGET_SHA="${{ github.event.workflow_run.head_sha || github.sha }}"
+          SHORT_SHA=$(echo "${TARGET_SHA}" | cut -c1-7)
           echo "image=${IMAGE_LOWERCASE}" >> $GITHUB_OUTPUT
           echo "tag=${SHORT_SHA}" >> $GITHUB_OUTPUT
 
@@ -62,6 +69,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.ref }}
 
       - name: Copy Compose and Caddyfile to VPS
         uses: appleboy/scp-action@v0.1.7
@@ -113,8 +122,8 @@ jobs:
             echo "🚀 Đang pull image mới nhất: $API_IMAGE"
             docker compose -f docker-compose.prod.yml pull api worker
 
-            echo "📦 Khởi động database & reverse proxy nếu chưa chạy..."
-            docker compose -f docker-compose.prod.yml up -d postgres caddy
+            echo "📦 Khởi động database nếu chưa chạy..."
+            docker compose -f docker-compose.prod.yml up -d --remove-orphans postgres
 
             # 3.5. DB-05: sao lưu trước migration. Không có down migration: khôi phục = roll-forward hoặc pg_restore bản
             # sao lưu này (docs/guides/containers.md). pg_dump hoặc kiểm đọc lỗi ⟹ dừng deploy trước `migrate deploy`.
@@ -158,16 +167,40 @@ jobs:
             # P28-01 (Prompt 29): migration 20261022120000 có thể dừng trên dữ liệu cũ; `ops:preflight` chỉ đọc và cho biết
             # `migrate deploy` có mang được CSDL này qua lịch sử migration không. Mã thoát khác 0 ⟹ dừng, chưa migrate.
             echo "🔎 Kiểm tra trước migration (ops:preflight, chỉ đọc)..."
-            if ! docker compose -f docker-compose.prod.yml run --rm --no-deps api node dist/migration-preflight-cli.js; then
-              echo "❌ LỖI: ops:preflight chặn migrate deploy (xem các dòng bị chặn ở trên); dừng deploy, chưa chạy migration."
+            PREFLIGHT_STATUS=1
+            for attempt in $(seq 1 3); do
+              if docker compose -f docker-compose.prod.yml run --rm --no-deps \
+                -e DB_CONNECT_TIMEOUT_MS=15000 \
+                -e DB_TRANSACTION_MAX_WAIT_MS=10000 \
+                -e DB_LOCK_TIMEOUT_MS=10000 \
+                -e DB_STATEMENT_TIMEOUT_MS=15000 \
+                -e DB_QUERY_TIMEOUT_MS=20000 \
+                -e DB_TRANSACTION_TIMEOUT_MS=25000 \
+                api node dist/migration-preflight-cli.js; then
+                PREFLIGHT_STATUS=0
+                break
+              else
+                PREFLIGHT_STATUS=$?
+              fi
+
+              if [ "$PREFLIGHT_STATUS" -eq 2 ]; then
+                echo "⛔ ops:preflight phát hiện dữ liệu không tương thích (exit code 2); dừng deploy."
+                break
+              fi
+              echo "⚠️ ops:preflight gặp lỗi tạm thời (exit code $PREFLIGHT_STATUS), thử lại sau 3s (lần $attempt/3)..."
+              sleep 3
+            done
+
+            if [ "$PREFLIGHT_STATUS" -ne 0 ]; then
+              echo "❌ LỖI: ops:preflight chặn migrate deploy; dừng deploy, chưa chạy migration."
               exit 1
             fi
 
             echo "🔄 Chạy Prisma Migration cập nhật Database..."
             docker compose -f docker-compose.prod.yml run --rm --no-deps api node node_modules/prisma/build/index.js migrate deploy
 
-            echo "♻️ Khởi chạy lại container API & Worker với code mới..."
-            docker compose -f docker-compose.prod.yml up -d --force-recreate api worker
+            echo "♻️ Khởi chạy lại container API, Worker & Caddy với code mới..."
+            docker compose -f docker-compose.prod.yml up -d --force-recreate --remove-orphans api worker caddy
 
             echo "🧹 Dọn dẹp Docker images cũ..."
             docker image prune -f

@@ -44,8 +44,12 @@ async function main(): Promise<number> {
     return report.status === 'READY' ? EXIT.ready : EXIT.blocked;
   } catch (error) {
     if (isEnvironmentValidationError(error)) return fail(error.message);
-    // Anything else (an unreachable database included) is reported by its name only: no URL, no stack.
-    return fail(`The preflight failed: ${error instanceof Error ? error.name : 'unknown error'}`);
+    const code = (error as { code?: string }).code ? ` [${(error as { code: string }).code}]` : '';
+    const message =
+      error instanceof Error
+        ? `: ${error.message.split('\n')[0].replace(/postgresql:\/\/[^@]+@/g, 'postgresql://***@')}`
+        : '';
+    return fail(`The preflight failed: ${error instanceof Error ? error.name : 'unknown error'}${code}${message}`);
   } finally {
     await app?.close();
   }
@@ -56,7 +60,14 @@ void main().then(
     process.exitCode = code;
   },
   (error: unknown) => {
-    process.stderr.write(`The preflight failed: ${error instanceof Error ? error.name : 'unknown error'}\n`);
+    const code = (error as { code?: string }).code ? ` [${(error as { code: string }).code}]` : '';
+    const message =
+      error instanceof Error
+        ? `: ${error.message.split('\n')[0].replace(/postgresql:\/\/[^@]+@/g, 'postgresql://***@')}`
+        : '';
+    process.stderr.write(
+      `The preflight failed: ${error instanceof Error ? error.name : 'unknown error'}${code}${message}\n`,
+    );
     process.exitCode = EXIT.failed;
   },
 );

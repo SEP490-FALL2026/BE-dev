@@ -44,7 +44,17 @@ export class MigrationPreflightRepo {
 
   /** The facts in the schema before the merged migration (or after a failed attempt, which left that schema). */
   async legacyFacts(tx: DbTx): Promise<ConversionFacts> {
-    const serviceAccounts = await tx.$queryRaw<AccountRow[]>`
+    const [assignmentsTable] = await tx.$queryRaw<{ present: boolean }[]>`
+      SELECT to_regclass('public.license_assignments') IS NOT NULL AS present`;
+    const [allocationsTable] = await tx.$queryRaw<{ present: boolean }[]>`
+      SELECT to_regclass('public.subscription_cost_allocation_lines') IS NOT NULL AS present`;
+    const [departmentsTable] = await tx.$queryRaw<{ present: boolean }[]>`
+      SELECT to_regclass('public.departments') IS NOT NULL AS present`;
+    const [costCentersTable] = await tx.$queryRaw<{ present: boolean }[]>`
+      SELECT to_regclass('public.cost_centers') IS NOT NULL AS present`;
+
+    const serviceAccounts = assignmentsTable?.present
+      ? await tx.$queryRaw<AccountRow[]>`
       SELECT a."id"::text AS "assignmentId", e."employee_code" AS "employeeCode",
              to_char(a."valid_from", 'YYYY-MM-DD') AS "validFrom", to_char(r.day, 'YYYY-MM-DD') AS "recordedOn",
              sd."code" AS "startDepartment", NULL::text AS "storedDepartment", rd."code" AS "recordedDepartment"
@@ -59,28 +69,40 @@ export class MigrationPreflightRepo {
              AND (rp."valid_to" IS NULL OR r.day < rp."valid_to")
         LEFT JOIN "departments" rd ON rd."id" = rp."department_id"
        WHERE a."kind" = 'SERVICE'
-       ORDER BY a."id"`;
-    const companyAllocations = await tx.$queryRaw<ConversionFacts['companyAllocations']>`
+       ORDER BY a."id"`
+      : [];
+    const companyAllocations = allocationsTable?.present
+      ? await tx.$queryRaw<ConversionFacts['companyAllocations']>`
       SELECT v."id"::text AS "versionId", v."version" AS "version", c."code" AS "costCenter"
         FROM "subscription_cost_allocation_lines" l
         JOIN "subscription_cost_allocation_versions" v ON v."id" = l."version_id"
         JOIN "cost_centers" c ON c."id" = l."cost_center_id"
        WHERE c."kind"::text = 'COMPANY'
-       ORDER BY v."id", c."code"`;
-    const companyDepartments = await tx.$queryRaw<ConversionFacts['companyDepartments']>`
+       ORDER BY v."id", c."code"`
+      : [];
+    const companyDepartments =
+      departmentsTable?.present && costCentersTable?.present
+        ? await tx.$queryRaw<ConversionFacts['companyDepartments']>`
       SELECT d."code" AS "department", c."code" AS "costCenter"
         FROM "departments" d JOIN "cost_centers" c ON c."id" = d."cost_center_id"
        WHERE c."kind"::text = 'COMPANY'
-       ORDER BY d."code"`;
-    const companyCostCenters = await tx.$queryRaw<ConversionFacts['companyCostCenters']>`
-      SELECT "code", "status"::text AS "status" FROM "cost_centers" WHERE "kind"::text = 'COMPANY' ORDER BY "code"`;
+       ORDER BY d."code"`
+        : [];
+    const companyCostCenters = costCentersTable?.present
+      ? await tx.$queryRaw<ConversionFacts['companyCostCenters']>`
+      SELECT "code", "status"::text AS "status" FROM "cost_centers" WHERE "kind"::text = 'COMPANY' ORDER BY "code"`
+      : [];
 
     return { serviceAccounts, companyAllocations, companyDepartments, companyCostCenters };
   }
 
   /** The facts after the merged migration: every service account has the owning department it stored. */
   async convertedFacts(tx: DbTx): Promise<ConversionFacts> {
-    const serviceAccounts = await tx.$queryRaw<AccountRow[]>`
+    const [assignmentsTable] = await tx.$queryRaw<{ present: boolean }[]>`
+      SELECT to_regclass('public.license_assignments') IS NOT NULL AS present`;
+
+    const serviceAccounts = assignmentsTable?.present
+      ? await tx.$queryRaw<AccountRow[]>`
       SELECT a."id"::text AS "assignmentId", e."employee_code" AS "employeeCode",
              to_char(a."valid_from", 'YYYY-MM-DD') AS "validFrom", to_char(r.day, 'YYYY-MM-DD') AS "recordedOn",
              NULL::text AS "startDepartment", od."code" AS "storedDepartment", rd."code" AS "recordedDepartment"
@@ -93,7 +115,8 @@ export class MigrationPreflightRepo {
              AND (rp."valid_to" IS NULL OR r.day < rp."valid_to")
         LEFT JOIN "departments" rd ON rd."id" = rp."department_id"
        WHERE a."kind" = 'SERVICE'
-       ORDER BY a."id"`;
+       ORDER BY a."id"`
+      : [];
 
     return { serviceAccounts, companyAllocations: [], companyDepartments: [], companyCostCenters: [] };
   }

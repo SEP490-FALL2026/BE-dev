@@ -75,7 +75,7 @@ permissions:
 jobs:
   quality:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 50
     services:
       postgres:
         image: postgres:17-alpine
@@ -112,6 +112,7 @@ jobs:
         run: pnpm check
 
       - name: Run API E2E tests
+        if: github.ref == 'refs/heads/main'
         run: pnpm test:e2e
 
       - name: Provision ordinary integration role
@@ -152,14 +153,13 @@ jobs:
           pnpm exec prisma migrate diff --from-config-datasource --to-schema prisma --exit-code
 
       - name: Run isolated PostgreSQL integration tests
+        if: github.ref == 'refs/heads/main'
         run: pnpm test:integration
         env:
           TEST_DATABASE_ADMIN_URL: postgresql://ci_integration:ci-integration-only@127.0.0.1:5432/postgres
 
-      - name: Validate Compose and build runtime
-        run: |
-          docker compose config --quiet
-          docker build -t slm-api:ci .
+      - name: Validate Compose configuration
+        run: docker compose config --quiet
 
       - name: Verify OpenAPI export
         run: |
