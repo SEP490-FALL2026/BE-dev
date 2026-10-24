@@ -4,10 +4,25 @@ import {
   assertHandOffAllowed,
   availableDecisions,
   classifyFailure,
+  connectorErrorDetail,
   maxAttempts,
   retryDelayMinutes,
 } from './failure.policy';
 import { nextStatus } from './provisioning.policy';
+
+describe('the technical detail a connector reports (LD-08)', () => {
+  it('keeps at most 1000 characters, the first ones, trimmed, and the kind when nothing is left', () => {
+    expect(connectorErrorDetail('  timeout  ', 'TRANSIENT')).toBe('timeout');
+    expect(connectorErrorDetail('x'.repeat(1000), 'PERMANENT')).toBe('x'.repeat(1000));
+    expect(connectorErrorDetail(`${'x'.repeat(1000)}y`, 'PERMANENT')).toBe('x'.repeat(1000));
+    expect(connectorErrorDetail('   ', 'QUOTA_EXCEEDED')).toBe('QUOTA_EXCEEDED');
+  });
+
+  it('never cuts a character in two at the limit', () => {
+    // 999 characters and an emoji (two UTF-16 units): the emoji does not fit whole, so it is left out, not halved.
+    expect(connectorErrorDetail(`${'x'.repeat(999)}😀z`, 'PERMANENT')).toBe('x'.repeat(999));
+  });
+});
 
 describe('the pace of retries (US-07-04 AC-1)', () => {
   it('waits longer after each failure, from five minutes, and never more than four hours', () => {

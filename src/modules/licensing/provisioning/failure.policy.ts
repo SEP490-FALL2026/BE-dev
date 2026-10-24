@@ -5,6 +5,22 @@ import type {
   ProvisioningFailureKind,
   ProvisioningTaskStatus,
 } from '../licensing.types';
+import { FAILURE_REASON_MAX_LENGTH } from './provisioning.policy';
+
+/**
+ * What is kept of the technical detail a connector reports (LD-08): trimmed, at most the length of a failure reason a
+ * person may type (`FAILURE_REASON_MAX_LENGTH`), never a character cut in two; the kind of failure when nothing is left.
+ * It stays on the task for the IT team and never enters the audit trail.
+ */
+export function connectorErrorDetail(detail: string, kind: ProvisioningFailureKind): string {
+  const trimmed = detail.trim();
+  if (trimmed === '') return kind;
+  let end = Math.min(trimmed.length, FAILURE_REASON_MAX_LENGTH);
+  // A high surrogate at the edge would leave half a character: leave the whole character out.
+  if (end < trimmed.length && /[\uD800-\uDBFF]/.test(trimmed[end - 1])) end -= 1;
+
+  return trimmed.slice(0, end).trimEnd();
+}
 
 const FIRST_DELAY_MINUTES = 5;
 const LONGEST_DELAY_MINUTES = 240;

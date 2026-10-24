@@ -4,6 +4,7 @@ import { ZodSerializationException } from 'nestjs-zod';
 import { RequestContextService } from '../../observability/request-context.service';
 import { resolveRequestId } from '../../observability/request-id';
 import { ERROR_CODE_PATTERN, type ErrorEnvelope } from '../dto/error-envelope.dto';
+import { fromRequestParserError } from './request-parser-errors';
 
 // Widened to `number` on purpose: `HttpException.getStatus()` returns a plain number, and
 // comparing it against enum members directly trips @typescript-eslint/no-unsafe-enum-comparison.
@@ -26,10 +27,18 @@ export class HttpExceptionFilter implements ExceptionFilter {
     // proxy configuration, so it never believes the inbound header.
     const requestId =
       this.requestContext.getRequestId() ?? resolveRequestId(request.header('x-request-id'), { trustInbound: false });
-    const status = exception instanceof HttpException ? exception.getStatus() : HttpStatus.INTERNAL_SERVER_ERROR;
-    const body = this.createEnvelope(exception, status, requestId);
+    // A refusal of a request parser (body too large, a multipart form that breaks its limits) is the client's error.
+    const handled = fromRequestParserError(exception) ?? exception;
+    const status = handled instanceof HttpException ? handled.getStatus() : HttpStatus.INTERNAL_SERVER_ERROR;
+    const body = this.createEnvelope(handled, status, requestId);
 
+    // A client that left (request.aborted) has no socket to answer on: classify, but never write to it (P29-N4).
+    if (this.clientIsGone(response)) return;
     response.setHeader('x-request-id', requestId).status(status).json(body);
+  }
+
+  private clientIsGone(response: Response): boolean {
+    return response.headersSent || response.writableEnded || response.destroyed || response.socket?.destroyed === true;
   }
 
   private createEnvelope(exception: unknown, status: number, requestId: string): ErrorEnvelope {

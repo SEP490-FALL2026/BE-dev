@@ -914,12 +914,16 @@ describe('recovering the Super Admin role outside the application (integration, 
       expect(await holders()).toEqual([account.id]);
       expect(await ticketRow(ticket.ticketRef)).toMatchObject({ status: 'COMPLETED' });
       const events = await auditOf(ticket.ticketRef);
-      expect(events.map((event) => event.action)).toEqual([
+      // Events written in one transaction share a millisecond more often than not, and `ORDER BY occurred_at, id` then
+      // follows the random id, not the order of writing (P28-02): the hand-over is one pair of events
+      // with one correlation, compared as a set.
+      expect(events.map((event) => event.action).sort()).toEqual([
         'SUPER_ADMIN.RECOVERY_ACCOUNT_CREATED',
-        'SUPER_ADMIN.TRANSFERRED_OUT',
         'SUPER_ADMIN.TRANSFERRED_IN',
+        'SUPER_ADMIN.TRANSFERRED_OUT',
       ]);
-      expect(new Set(events.slice(1).map((event) => event.correlation_id)).size).toBe(1);
+      const moves = events.filter((event) => event.action.startsWith('SUPER_ADMIN.TRANSFERRED_'));
+      expect(new Set(moves.map((event) => event.correlation_id)).size).toBe(1);
       expect(await recovery.transferRole(ticket, input)).toMatchObject({ outcome: 'ALREADY_COMPLETED' });
       // The new holder signs in as Super Admin.
       expect((await login('e-rs1@acme.vn', ACCOUNT_PASSWORD)).status).toBe(200);

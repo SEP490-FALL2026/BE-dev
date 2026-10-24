@@ -1,6 +1,6 @@
 import request from 'supertest';
 import { addDays } from '../../src/core/business-date';
-import { deriveNotice } from '../../src/modules/catalog/subscription/subscription.policy';
+import { FinanceService } from '../../src/modules/finance/finance.service';
 import { PgRelay } from '../support/pg-relay';
 import { QueryCounter, dataStatements, tablesOf } from '../support/query-count';
 import { OperatingParametersService } from '../../src/modules/operating-parameters/operating-parameters.service';
@@ -55,6 +55,51 @@ describe('catalog subscription read model (integration, real PostgreSQL)', () =>
       expect(items.every((item) => item.taxEstimate?.basis === 'DEFAULT_NO_PROFILE')).toBe(true);
       expect(dataStatements(many.statements)).toHaveLength(dataStatements(few.statements).length);
     }, 180_000);
+
+    it('answers the tax profile of a priced subscription from the read its estimate came from (one version)', async () => {
+      const id = await h.subscription(5, 'K2');
+      const vendorId = (
+        await sql().query<{ vendor_id: string }>(
+          `SELECT a.vendor_id FROM subscriptions s JOIN plans p ON p.id = s.plan_id
+             JOIN applications a ON a.id = p.application_id WHERE s.id = $1`,
+          [id],
+        )
+      ).rows[0].vendor_id;
+      await request(h.server())
+        .put(`/api/v1/vendors/${vendorId}/tax-profile`)
+        .set(as(h.finance))
+        .send({
+          lines: [
+            { taxType: 'GTGT', ratePercent: '10', deductible: true },
+            { taxType: 'TNDN nhà thầu', ratePercent: '5', deductible: false },
+          ],
+        })
+        .expect(200);
+      // A declaration landing between two reads: a separate read of the groups would now answer T3 (P28-06, LD-01).
+      const groups = jest
+        .spyOn(h.ctx.app.get(FinanceService, { strict: false }), 'taxProfileGroups')
+        .mockResolvedValue(new Map([[vendorId, { group: 'T3' as const, version: 2 }]]));
+      try {
+        const items = h.dataOf<{ items: Array<{ id: string; taxProfile: unknown; taxEstimate: unknown }> }>(
+          await request(h.server()).get('/api/v1/subscriptions?pageSize=100').set(as()).expect(200),
+        ).items;
+
+        // 1 000 000 VND: VAT 10% deductible (100 000) and CIT 5% not (50 000), worked out by hand.
+        expect(items.find((item) => item.id === id)).toMatchObject({
+          taxProfile: { status: 'DECLARED', group: 'T2' },
+          taxEstimate: {
+            basis: 'PROFILE',
+            group: 'T2',
+            taxAmount: '150000',
+            deductibleTaxAmount: '100000',
+            nonDeductibleTaxAmount: '50000',
+            estimatedCost: '1050000',
+          },
+        });
+      } finally {
+        groups.mockRestore();
+      }
+    }, 120_000);
   });
 
   describe('LD-02: the warning list reads the subscriptions whose milestone is near, not all of them', () => {
@@ -64,15 +109,20 @@ describe('catalog subscription read model (integration, real PostgreSQL)', () =>
         .get(OperatingParametersService, { strict: false })
         .getValue('RENEWAL_ALERT_DAYS_BEFORE_DEADLINE');
       const earliest = Math.max(...(days as number[]));
+      // The rows' answers are written out from the rule, not computed with the code under test (P28-06): a milestone is
+      // the declared deadline, else renewal (or end) minus the notice period, else the end of a plan that does not
+      // renew; it is due when it falls from today to `earliest` days ahead. The answers hold for 10 ≤ earliest ≤ 34.
+      expect(earliest).toBeGreaterThanOrEqual(10);
+      expect(earliest).toBeLessThanOrEqual(34);
       const matrix = [
-        { deadline: addDays(day, 5), renewal: null, end: null, period: null, auto: true },
-        { deadline: addDays(day, earliest - 1), renewal: null, end: null, period: null, auto: true },
-        { deadline: addDays(day, 400), renewal: null, end: null, period: null, auto: true },
-        { deadline: addDays(day, -3), renewal: null, end: null, period: null, auto: true },
-        { deadline: null, renewal: addDays(day, 40), end: null, period: 30, auto: true },
-        { deadline: null, renewal: addDays(day, 40), end: null, period: 5, auto: true },
-        { deadline: null, renewal: null, end: addDays(day, 10), period: null, auto: false },
-        { deadline: null, renewal: null, end: addDays(day, 10), period: null, auto: true },
+        { deadline: addDays(day, 5), renewal: null, end: null, period: null, auto: true, due: true },
+        { deadline: addDays(day, earliest - 1), renewal: null, end: null, period: null, auto: true, due: true },
+        { deadline: addDays(day, 400), renewal: null, end: null, period: null, auto: true, due: false },
+        { deadline: addDays(day, -3), renewal: null, end: null, period: null, auto: true, due: false },
+        { deadline: null, renewal: addDays(day, 40), end: null, period: 30, auto: true, due: true },
+        { deadline: null, renewal: addDays(day, 40), end: null, period: 5, auto: true, due: false },
+        { deadline: null, renewal: null, end: addDays(day, 10), period: null, auto: false, due: true },
+        { deadline: null, renewal: null, end: addDays(day, 10), period: null, auto: true, due: false },
       ];
       const created: { id: string; planId: string; due: boolean }[] = [];
       for (const row of matrix) {
@@ -82,18 +132,9 @@ describe('catalog subscription read model (integration, real PostgreSQL)', () =>
             WHERE id = $1`,
           [id, row.deadline, row.renewal, row.end, row.period, row.auto],
         );
-        const notice = deriveNotice({
-          kind: 'TERM',
-          noticeDeadline: row.deadline,
-          renewalDate: row.renewal,
-          endDate: row.end,
-          noticePeriodDays: row.period,
-          autoRenew: row.auto,
-        });
-        const base = notice.baseDate;
         const planId = (await sql().query<{ plan_id: string }>(`SELECT plan_id FROM subscriptions WHERE id = $1`, [id]))
           .rows[0].plan_id;
-        created.push({ id, planId, due: base !== null && base >= day && base <= addDays(day, earliest) });
+        created.push({ id, planId, due: row.due });
       }
 
       const { result, statements } = await counter.run(() =>

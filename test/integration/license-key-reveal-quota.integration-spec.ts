@@ -54,6 +54,26 @@ describe('how many license keys an account may open (integration, real PostgreSQ
   const clear = (account: ApiAccount) =>
     h.ctx.sql.query(`DELETE FROM license_key_reveal_windows WHERE app_user_id = $1`, [account.appUserId]);
   const next = () => ids[(batch += 1) % ids.length];
+  /**
+   * The windows are named by the UTC minute and day of the clock that opens the key (`Date.now()` in the service), not
+   * of the database. Every case opens keys at an instant it chooses — 30 s into a minute that is not the first of a UTC
+   * day — so eleven openings cannot straddle a minute and a seeded row names the window the service will use (P28-13).
+   */
+  const MINUTE = 60_000;
+  const DAY = 24 * 60 * MINUTE;
+  let minuteStart = 0;
+  const at = (instant: number) => jest.spyOn(Date, 'now').mockReturnValue(instant);
+  const dayStartOf = (instant: number) => new Date(Math.floor(instant / DAY) * DAY);
+
+  beforeEach(() => {
+    minuteStart = Math.floor(Date.now() / MINUTE) * MINUTE + MINUTE;
+    if (minuteStart % DAY === 0 || (minuteStart + MINUTE) % DAY === 0) minuteStart += 2 * MINUTE;
+    at(minuteStart + 30_000);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it('lets an account open ten keys in a minute and refuses the eleventh with 429, leaving no trace of it', async () => {
     await clear(h.it1);
@@ -90,8 +110,8 @@ describe('how many license keys an account may open (integration, real PostgreSQ
     await clear(h.it1);
     await h.ctx.sql.query(
       `INSERT INTO license_key_reveal_windows (app_user_id, window_kind, window_start, count)
-       VALUES ($1, 'MINUTE', date_trunc('minute', now()), 9)`,
-      [h.it1.appUserId],
+       VALUES ($1, 'MINUTE', $2, 9)`,
+      [h.it1.appUserId, new Date(minuteStart)],
     );
     const before = await revealedEvents();
 
@@ -106,8 +126,8 @@ describe('how many license keys an account may open (integration, real PostgreSQ
     await clear(h.it1);
     await h.ctx.sql.query(
       `INSERT INTO license_key_reveal_windows (app_user_id, window_kind, window_start, count)
-       VALUES ($1, 'DAY', date_trunc('day', now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC', 199)`,
-      [h.it1.appUserId],
+       VALUES ($1, 'DAY', $2, 199)`,
+      [h.it1.appUserId, dayStartOf(minuteStart)],
     );
 
     await reveal(next()).expect(200);
@@ -115,6 +135,26 @@ describe('how many license keys an account may open (integration, real PostgreSQ
 
     expect(h.codeOf(refused)).toBe('HTTP_TOO_MANY_REQUESTS');
     expect((await windowsOf(h.it1)).find((window) => window.window_kind === 'DAY')?.count).toBe(200);
+  });
+
+  it('starts a new minute at the UTC minute boundary of the clock that opens the key: an eleventh opening just after it passes', async () => {
+    await clear(h.it1);
+    at(minuteStart + 59_900);
+    for (let index = 0; index < 10; index += 1) await reveal(next()).expect(200);
+
+    at(minuteStart + MINUTE + 100);
+    await reveal(next()).expect(200);
+
+    const windows = await h.ctx.sql.query<{ window_kind: string; window_start: Date; count: number }>(
+      `SELECT window_kind, window_start, count FROM license_key_reveal_windows WHERE app_user_id = $1
+        ORDER BY window_kind, window_start`,
+      [h.it1.appUserId],
+    );
+    expect(windows.rows.map((row) => [row.window_kind, row.window_start.getTime(), row.count])).toEqual([
+      ['DAY', dayStartOf(minuteStart).getTime(), 11],
+      ['MINUTE', minuteStart, 10],
+      ['MINUTE', minuteStart + MINUTE, 1],
+    ]);
   });
 
   it('forgets the windows of days ago, and still answers 404 for a key that does not exist without taking a slot', async () => {

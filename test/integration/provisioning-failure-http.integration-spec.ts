@@ -83,6 +83,19 @@ describe('what a failed try of the connector leads to, over HTTP (integration, r
     expect(JSON.stringify(events)).not.toContain('secret-detail-123');
   });
 
+  it('LD-08: keeps at most 1000 characters of a connector error, the first ones, and a shorter one whole', async () => {
+    // The limit is the one of a failure reason a person types (`FAILURE_REASON_MAX_LENGTH`), written out here.
+    const exact = 'e'.repeat(999) + 'X';
+    const { id: whole } = await connectorTask(e5, 1);
+    await h.recordFailure(whole, 'PERMANENT', exact);
+    const long = `${'a'.repeat(1000)}${'b'.repeat(9000)}`;
+    const { id: cut } = await connectorTask(e5, 1);
+    await h.recordFailure(cut, 'PERMANENT', `  ${long}  `);
+
+    expect((await task(whole)).lastError).toBe(exact);
+    expect((await task(cut)).lastError).toBe('a'.repeat(1000));
+  });
+
   it('US-07-04 AC-2: a permanent failure is not tried again; the IT Admin has a decision to make, the seat stays taken and nothing is closed', async () => {
     const { id, subscriptionId, assignmentId } = await connectorTask(e5, 1);
 

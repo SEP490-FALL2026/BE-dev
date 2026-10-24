@@ -178,9 +178,12 @@ describe('the retirement of an application over HTTP (integration, real PostgreS
     try {
       await retire(applicationId).expect(200);
 
-      // The earlier look, before the locks, has no transaction; the last one is made under them and passes it.
-      expect(holdings.mock.calls.at(-1)?.[2]).toBeDefined();
-      expect(plans.mock.calls.at(-1)?.[1]).toBeDefined();
+      // Every look at what holds the application is made under the locks and passes their transaction — the same one to
+      // both readers (P28-06: `holdingOfPlans(planIds, day, take, tx)` takes it fourth; the third is the limit).
+      expect(holdings.mock.calls.length).toBeGreaterThan(0);
+      const transactions = holdings.mock.calls.map((call) => call[3]);
+      expect(transactions.every((tx) => tx !== undefined)).toBe(true);
+      expect(plans.mock.calls.at(-1)?.[1]).toBe(transactions.at(-1));
     } finally {
       holdings.mockRestore();
       plans.mockRestore();

@@ -160,6 +160,36 @@ describe('seat baseline routes (e2e, no database)', () => {
       expect(bodyOf(response).error.code).toBe('HTTP_BAD_REQUEST');
     });
 
+    it('refuses a file sent under another field name with 400 HTTP_BAD_REQUEST, naming neither field nor file (P29-N2)', async () => {
+      app = await appFor(principal(['IT_ADMIN']));
+
+      const response = await request(app.getHttpServer())
+        .post('/api/v1/seat-baseline-imports')
+        .set(asIt())
+        .field('subscriptionId', ID)
+        .attach('document', Buffer.from('a'), 'seats-secret.csv');
+
+      expect(response.status).toBe(400);
+      expect(bodyOf(response).error).toMatchObject({
+        code: 'HTTP_BAD_REQUEST',
+        message: 'The request could not be processed.',
+      });
+      expect(response.text).not.toMatch(/document|seats-secret|Unexpected|stack/i);
+    });
+
+    it('refuses a file over 2 MiB with 413 HTTP_PAYLOAD_TOO_LARGE, as the contract declares', async () => {
+      app = await appFor(principal(['IT_ADMIN']));
+
+      const response = await request(app.getHttpServer())
+        .post('/api/v1/seat-baseline-imports')
+        .set(asIt())
+        .field('subscriptionId', ID)
+        .attach('file', Buffer.alloc(2 * 1024 * 1024 + 1, 0x61), 'f.csv');
+
+      expect(response.status).toBe(413);
+      expect(bodyOf(response).error.code).toBe('HTTP_PAYLOAD_TOO_LARGE');
+    });
+
     it.each([
       ['a version that is not positive', { previewVersion: 0, idempotencyKey: 'key-00000001' }],
       ['a version that is not a whole number', { previewVersion: 1.5, idempotencyKey: 'key-00000001' }],

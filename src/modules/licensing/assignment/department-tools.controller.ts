@@ -75,7 +75,7 @@ export class DepartmentToolsController {
   @ApiSuccessResponse(DepartmentToolsResponseDto, {
     message: 'DEPARTMENT_TOOLS.LISTED',
     description:
-      'The seats the people of the department hold today, one line per seat with the tool and plan, and a summary by plan over all of them; a start that is only the day of recording has a label and no grant date.',
+      'One page of what the department uses today: the personal seats its people hold and the service accounts the department owns (kind SERVICE, shown with the employee the account is assigned to), one line per seat with the tool and plan, oldest start first, then by assignment id. The summary counts the seats of every page by plan, sorted by application then plan name; pagination gives the total. A start that is only the day of recording has a label and no grant date.',
   })
   @ApiErrorResponses(
     UNAUTHENTICATED_RESPONSE,

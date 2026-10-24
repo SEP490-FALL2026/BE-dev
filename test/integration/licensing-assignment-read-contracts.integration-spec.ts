@@ -88,6 +88,36 @@ describe('assignment and license key read contracts (integration, real PostgreSQ
     expect(items.find((item) => item.kind === 'PERSONAL')?.costCenter).toBeNull();
   }, 300_000);
 
+  it('LD-09: lists the tools a department uses in the same statements for 3 seats as for 33, paging in SQL', async () => {
+    // The registry entry `departmentToolsInUse#query` was closed by the checkpoint without this proof (P28-06).
+    const tools = () =>
+      counter.run(() =>
+        request(h.server())
+          .get(`/api/v1/departments/${h.seed.departmentId}/tools-in-use`)
+          .query({ pageSize: 100 })
+          .set(h.as(h.it1))
+          .expect(200),
+      );
+    const subscriptionId = await h.subscription(100);
+    await h.crowd('LD09A', 3);
+    await h.written({ subscriptionId }, [row('LD09A0'), row('LD09A1'), row('LD09A2')]);
+    const few = await tools();
+    await h.crowd('LD09B', 30);
+    await h.written(
+      { subscriptionId },
+      Array.from({ length: 30 }, (_, index) => row(`LD09B${index}`)),
+    );
+    const many = await tools();
+
+    const listed = h.dataOf<{ items: unknown[] }>(many.result).items.length;
+    expect(listed).toBeGreaterThanOrEqual(33);
+    expect(dataStatements(many.statements)).toHaveLength(dataStatements(few.statements).length);
+    const assignmentReads = dataStatements(many.statements).filter((statement) =>
+      tablesOf(statement).includes('license_assignments'),
+    );
+    expect(assignmentReads.some((statement) => /\bLIMIT\b/i.test(statement))).toBe(true);
+  }, 300_000);
+
   it('reads only the columns of the item from license_assignments', async () => {
     const subscriptionId = await h.subscription(5);
     await h.crowd('LD10C', 1);

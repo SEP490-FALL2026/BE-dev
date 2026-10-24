@@ -22,6 +22,17 @@ export class EmployeeEmailTakenError extends Error {
   }
 }
 
+/**
+ * Thrown by the facade when PostgreSQL refuses a kind of staff that needs an expected end on every open seat while the
+ * person holds an open seat without one (`INV-07`, P28-04).
+ */
+export class EmployeeOpenSeatNeedsEndError extends Error {
+  constructor() {
+    super('A contractor, freelancer or intern needs an expected end date on every open seat.');
+    this.name = 'EmployeeOpenSeatNeedsEndError';
+  }
+}
+
 /** Thrown by the facade when a second organization would be created: the installation has exactly one (I-8). */
 export class OrganizationAlreadyExistsError extends Error {
   constructor() {

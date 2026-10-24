@@ -78,3 +78,5 @@ tính vào hai lượt liên tiếp của cây cuối. Owner review trên revisi
 - [x] Diff cuối đã tự review; tài liệu vận hành/runbook bị ảnh hưởng đã cập nhật; phần chưa kiểm chứng ghi rõ.
 - [ ] Giao Owner review trên revision cụ thể; cập nhật roadmap/PR. Chỉ ghi `merged-dev`, `accepted`, `released` sau
       đúng sự kiện thật.
+
+**Prompt 29 (23/10/2026):** remote CI PR #16 đỏ (`P28-02`, thứ tự Audit) — sửa; `P28-13` nguyên nhân đo được của deploy treo trong test là kiểm tra cập nhật của Prisma CLI (`CHECKPOINT_DISABLE=1` ở helper), helper báo rõ timeout/Prisma/SQLSTATE, setup HTTP lỗi không để lại CSDL; `P28-18` `document-http` LF; workflow deploy thêm `ops:preflight`. [g0-g4-checkpoint-fix-forward](../g0-g4-checkpoint-fix-forward/spec.md).

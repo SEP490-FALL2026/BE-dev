@@ -3,8 +3,13 @@ import { fromDateColumn, toDateColumn, type BusinessDate } from '../../../core/b
 import { normalizeEmail } from '../../../core/email';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { isUniqueViolation } from '../../../infrastructure/database/unique-violation';
-import { EmployeeCodeTakenError, EmployeeEmailTakenError, EmployeeNotFoundError } from '../organization.errors';
+import { isCheckViolation, isUniqueViolation } from '../../../infrastructure/database/unique-violation';
+import {
+  EmployeeCodeTakenError,
+  EmployeeEmailTakenError,
+  EmployeeNotFoundError,
+  EmployeeOpenSeatNeedsEndError,
+} from '../organization.errors';
 import {
   CreateEmployeeWithPlacementInput,
   EmployeeCandidate,
@@ -129,6 +134,8 @@ export class EmployeeRepo {
       });
     } catch (error) {
       if (isUniqueViolation(error, 'normalized_work_email')) throw new EmployeeEmailTakenError();
+      // The trigger of migration 20261023110000 (INV-07 from the side of the person).
+      if (isCheckViolation(error, 'on every open seat')) throw new EmployeeOpenSeatNeedsEndError();
       throw error;
     }
   }

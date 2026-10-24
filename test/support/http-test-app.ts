@@ -38,39 +38,52 @@ export async function createHttpTestApp(
   } = {},
 ): Promise<HttpTestApp> {
   const database = await provisionDisposableDatabase();
-  await migrateDisposableDatabase(database);
-
   const previous = { ...process.env };
-  process.env.TEST_DATABASE_URL = options.appDatabaseUrl ? await options.appDatabaseUrl(database.url) : database.url;
-  // Many sign-ins from one address in a test run must not trip the generic IP rate limit.
-  process.env.RATE_LIMIT_LIMIT = '10000';
-  Object.assign(process.env, options.env ?? {});
+  let app: INestApplication<App> | undefined;
+  let sql: Client | undefined;
+  try {
+    await migrateDisposableDatabase(database);
 
-  // ConfigModule.forRoot validates process.env when AppModule is first imported, so the import
-  // must happen after the variables above are set — a static import would read the real ones.
-  const { AppModule } = await import('../../src/app.module');
-  let builder = Test.createTestingModule({
-    imports: [AppModule],
-    controllers: options.extraControllers ?? [],
-  });
-  for (const override of options.providerOverrides ?? []) {
-    builder = builder.overrideProvider(override.token).useValue(override.useValue);
+    process.env.TEST_DATABASE_URL = options.appDatabaseUrl ? await options.appDatabaseUrl(database.url) : database.url;
+    // Many sign-ins from one address in a test run must not trip the generic IP rate limit.
+    process.env.RATE_LIMIT_LIMIT = '10000';
+    Object.assign(process.env, options.env ?? {});
+
+    // ConfigModule.forRoot validates process.env when AppModule is first imported, so the import
+    // must happen after the variables above are set — a static import would read the real ones.
+    const { AppModule } = await import('../../src/app.module');
+    let builder = Test.createTestingModule({
+      imports: [AppModule],
+      controllers: options.extraControllers ?? [],
+    });
+    for (const override of options.providerOverrides ?? []) {
+      builder = builder.overrideProvider(override.token).useValue(override.useValue);
+    }
+    const moduleRef = await builder.compile();
+    app = moduleRef.createNestApplication<INestApplication<App>>();
+    configureApplication(app, { mountDocs: false });
+    await app.init();
+
+    sql = new Client({ connectionString: database.url });
+    await sql.connect();
+  } catch (error) {
+    // A setup that stops half-way leaves nothing behind (operational-commands rule 8): the database it provisioned is
+    // dropped and the environment restored; a failure while cleaning never hides the first one.
+    await sql?.end().catch(() => undefined);
+    await app?.close().catch(() => undefined);
+    await dropDisposableDatabase(database).catch(() => undefined);
+    process.env = previous;
+    throw error;
   }
-  const moduleRef = await builder.compile();
-  const app = moduleRef.createNestApplication<INestApplication<App>>();
-  configureApplication(app, { mountDocs: false });
-  await app.init();
-
-  const sql = new Client({ connectionString: database.url });
-  await sql.connect();
+  const ready = { app, sql };
 
   return {
-    app,
+    app: ready.app,
     database,
-    sql,
+    sql: ready.sql,
     async close() {
-      await sql.end();
-      await app.close();
+      await ready.sql.end();
+      await ready.app.close();
       await dropDisposableDatabase(database);
       process.env = previous;
     },

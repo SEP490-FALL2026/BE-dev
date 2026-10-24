@@ -1,7 +1,7 @@
 # Lệnh vận hành ngoài HTTP
 
 Áp dụng cho mọi lệnh chạy từ terminal ngoài API/worker: `pnpm ops:bootstrap`, `pnpm ops:recover`, `pnpm ops:inspect`,
-`pnpm dev:seed` và lệnh thêm sau. Gate: [operational-commands.spec.ts](../../src/operational-commands.spec.ts) (cấu
+`pnpm dev:seed`, `pnpm ops:preflight` và lệnh thêm sau. Gate: [operational-commands.spec.ts](../../src/operational-commands.spec.ts) (cấu
 trúc, import, chuỗi bị cấm), [module-graph.spec.ts](../../src/module-graph.spec.ts) (đồ thị Nest) và test của từng
 lệnh. Vị trí file theo [module structure](module-structure.md); dữ liệu và transaction theo
 [database rules](database-business.md).
@@ -60,12 +60,24 @@ lệnh. Vị trí file theo [module structure](module-structure.md); dữ liệu
 
 ## Hợp đồng lệnh hiện có
 
-| Lệnh                               | Đồ thị / cấu hình                                   | Ghi                               | Mã thoát                                                |
-| ---------------------------------- | --------------------------------------------------- | --------------------------------- | ------------------------------------------------------- |
-| `pnpm ops:bootstrap`               | `InstallationModule`, chỉ env database              | một lần, có audit                 | 0 xong · 1 lỗi · 2 đã cài · 130 hủy                     |
-| `pnpm ops:recover`                 | `RecoveryCliModule`, env đầy đủ                     | theo phiếu, có audit              | 0 xong · 1 lỗi · 2 không cần làm                        |
-| `pnpm ops:inspect [--json]`        | `InspectionModule`, chỉ env database, phiên chỉ đọc | không bao giờ                     | 0 đã cài và nhất quán · 2 chưa cài hoặc dở dang · 1 lỗi |
-| `pnpm dev:seed -- --confirm-local` | `DevSeedModule`, chỉ env database, ba chốt local    | dữ liệu demo idempotent, có audit | 0 đã tạo · 2 đã có đủ · 3 bị từ chối, không ghi · 1 lỗi |
+| Lệnh                               | Đồ thị / cấu hình                                           | Ghi                               | Mã thoát                                                |
+| ---------------------------------- | ----------------------------------------------------------- | --------------------------------- | ------------------------------------------------------- |
+| `pnpm ops:bootstrap`               | `InstallationModule`, chỉ env database                      | một lần, có audit                 | 0 xong · 1 lỗi · 2 đã cài · 130 hủy                     |
+| `pnpm ops:recover`                 | `RecoveryCliModule`, env đầy đủ                             | theo phiếu, có audit              | 0 xong · 1 lỗi · 2 không cần làm                        |
+| `pnpm ops:inspect [--json]`        | `InspectionModule`, chỉ env database, phiên chỉ đọc         | không bao giờ                     | 0 đã cài và nhất quán · 2 chưa cài hoặc dở dang · 1 lỗi |
+| `pnpm dev:seed -- --confirm-local` | `DevSeedModule`, chỉ env database, ba chốt local            | dữ liệu demo idempotent, có audit | 0 đã tạo · 2 đã có đủ · 3 bị từ chối, không ghi · 1 lỗi |
+| `pnpm ops:preflight [--json]`      | `MigrationPreflightModule`, chỉ env database, phiên chỉ đọc | không bao giờ                     | 0 deploy được · 2 bị chặn, nêu từng dòng · 1 lỗi        |
 
 Chi tiết từng lệnh: `--help` của lệnh và
 [hạng mục H6.1 + H6.2](../workspace/items/installation-local-data-h6-1-h6-2/spec.md).
+
+`ops:preflight` (P28-01) đọc schema **trước** migration mà không model nào mô tả, nên repository của nó là ngoại lệ có
+đăng ký `PRE_MIGRATION_READERS` của [architecture-boundaries](../../src/architecture-boundaries.spec.ts). Ngoại lệ chỉ đứng
+khi gate còn chứng minh đủ bốn điều (Owner chấp nhận ở Prompt 29A, 24/10/2026): (1) **đúng tên tệp**, không thư mục hay
+wildcard; (2) chỉ câu `$queryRaw` mở đầu `SELECT`/`WITH` và mảnh `Prisma.sql`, không từ khóa ghi/khóa/đổi phiên, không
+`$executeRaw`, không `*Unsafe`, không ghi qua delegate Prisma; (3) phiên của graph preflight chỉ đọc
+([module-graph](../../src/module-graph.spec.ts), rule 1); (4) **chỉ** `migration-preflight-cli.ts` với tới tệp đó qua import —
+không API, worker, bootstrap hay lệnh khác. Thêm câu ghi, thêm reader hay thêm đường gọi làm gate đỏ.
+**Preflight chỉ kiểm, không sửa:** CSDL bị chặn (exit 2) giữ nguyên, deploy dừng trước migration; xem lịch sử được hỗ trợ và
+cách xử lý CSDL bị chặn ở [containers](../guides/containers.md#preflight-before-migrate-deploy-p28-01). Thiết kế:
+[g0-g4-checkpoint-fix-forward](../workspace/items/g0-g4-checkpoint-fix-forward/spec.md).

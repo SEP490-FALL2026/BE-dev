@@ -6,6 +6,7 @@ import {
   UNAUTHENTICATED_RESPONSE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
+import { GLOBAL_RATE_LIMIT_DESCRIPTION } from '../../../infrastructure/http/openapi-rate-limit';
 import { RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
 import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
@@ -17,6 +18,7 @@ import {
   ListKeysQueryDto,
   RevealResponseDto,
 } from './license-key.dto';
+import { REVEAL_LIMITS } from './license-key-reveal-quota.repo';
 import { toLicenseKeyApiException } from './license-key.http-errors';
 import { LicenseKeyService } from './license-key.service';
 
@@ -110,9 +112,12 @@ export class LicenseKeysController {
     { status: HttpStatus.NOT_FOUND, description: 'The key does not exist (LICENSE_KEY.NOT_FOUND).' },
     { status: HttpStatus.UNPROCESSABLE_ENTITY, description: 'The id is invalid (VALIDATION_ERROR).' },
     {
+      // Declaring a 429 here replaces the global one, so its wording is kept; the numbers are the quota's own.
       status: HttpStatus.TOO_MANY_REQUESTS,
       description:
-        'The account has opened as many keys as it may in this minute (10) or this day (200): HTTP_TOO_MANY_REQUESTS. Nothing was opened and nothing was counted.',
+        `The account has opened as many keys as it may in this minute (${REVEAL_LIMITS.MINUTE}) or this day ` +
+        `(${REVEAL_LIMITS.DAY}): HTTP_TOO_MANY_REQUESTS. Nothing was opened and nothing was counted. ` +
+        GLOBAL_RATE_LIMIT_DESCRIPTION,
     },
   )
   async reveal(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: KeyIdParamDto) {

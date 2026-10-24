@@ -209,7 +209,8 @@ export async function provisionDisposableDatabase(runId: string = randomUUID()):
       error instanceof DisposableDatabaseError
         ? error
         : new DisposableDatabaseError(
-            'Cannot provision a disposable database. Check TEST_DATABASE_ADMIN_URL and ordinary CREATEDB permission.',
+            // The SQLSTATE says which (P28-13): 42501 a missing permission, 55006 the template held by another session.
+            `Cannot provision a disposable database (SQLSTATE ${sqlState(error) ?? 'none'}). Check TEST_DATABASE_ADMIN_URL and ordinary CREATEDB permission.`,
             sqlState(error),
           );
     await closeClients([client], name, failure);
@@ -277,13 +278,41 @@ export async function migrateDisposableDatabase(database: DisposableDatabase): P
   try {
     execFileSync(process.execPath, [require.resolve('prisma/build/index.js'), 'migrate', 'deploy'], {
       cwd: process.cwd(),
-      env: { ...process.env, NODE_ENV: 'test', DATABASE_URL: database.url, TEST_DATABASE_URL: database.url },
+      env: {
+        ...process.env,
+        NODE_ENV: 'test',
+        DATABASE_URL: database.url,
+        TEST_DATABASE_URL: database.url,
+        // No update check (P28-13): the Prisma CLI otherwise calls checkpoint.prisma.io from a detached child and can
+        // wait on it, so a slow network stalled a deploy past the time limit; the child also held its working directory.
+        CHECKPOINT_DISABLE: '1',
+      },
       stdio: 'pipe',
-      timeout: 60000,
+      timeout: MIGRATE_TIMEOUT_MS,
     });
-  } catch {
-    throw new DisposableDatabaseError(
-      'Migration deployment failed on the disposable database. Check the committed migrations and Prisma configuration.',
-    );
+  } catch (error) {
+    throw new DisposableDatabaseError(migrationFailure(error));
   }
+}
+
+const MIGRATE_TIMEOUT_MS = 60000;
+
+/**
+ * Why a deploy failed, so a failure reads as what it was (P28-13): the process killed at the time limit (a machine under
+ * load), or Prisma's own error (a migration that does not apply). The tail of Prisma's output is kept with every URL
+ * removed; Prisma prints host, database and the failing statement's message, never a password.
+ */
+function migrationFailure(error: unknown): string {
+  const failure = error as { code?: string; signal?: string | null; stdout?: Buffer; stderr?: Buffer };
+  if (failure.code === 'ETIMEDOUT' || failure.signal === 'SIGTERM') {
+    return `Migration deployment did not finish within ${MIGRATE_TIMEOUT_MS / 1000} s on the disposable database (the process was stopped; the machine may be overloaded).`;
+  }
+  const output = `${failure.stdout?.toString('utf8') ?? ''}\n${failure.stderr?.toString('utf8') ?? ''}`
+    .replace(/postgres(?:ql)?:\/\/\S+/gi, '<url>')
+    .split(/\r?\n/)
+    .filter((line) => line.trim() !== '')
+    .slice(-12)
+    .join('\n');
+
+  return `Migration deployment failed on the disposable database. Prisma said:\n${output}`;
 }

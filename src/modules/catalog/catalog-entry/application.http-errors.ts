@@ -20,6 +20,7 @@ import {
   ApplicationRetirementNoteRequiredError,
   ApplicationTooManyDomainsError,
   ApplicationUpdateEmptyError,
+  ApplicationVendorGroupChangedError,
   ApplicationVendorNameInvalidError,
   ApplicationVendorRequiredError,
   ApplicationVendorSourceAmbiguousError,
@@ -98,6 +99,10 @@ export function toApplicationApiException(error: unknown): unknown {
   }
   if (error instanceof ApplicationDictionaryLineMismatchError) {
     return refuse(UNPROCESSABLE, 'APPLICATION.DICTIONARY_LINE_MISMATCH', error.message);
+  }
+  if (error instanceof ApplicationVendorGroupChangedError) {
+    // The race loser of DB-03 (P29-N3): its own code, never the 422 code of a mismatch under a second status.
+    return refuse(HttpStatus.CONFLICT, 'APPLICATION.DICTIONARY_GROUP_CHANGED', error.message);
   }
   if (error instanceof ApplicationUpdateEmptyError) {
     return refuse(UNPROCESSABLE, 'APPLICATION.UPDATE_EMPTY', error.message);

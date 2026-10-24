@@ -10,8 +10,18 @@ const sourceRoot = join(projectRoot, 'src');
 const installationRoot = join(sourceRoot, 'modules', 'installation');
 
 /** The entry points of the operational commands, and the capability folders of the commands that are not legacy. */
-const COMMAND_ENTRIES = ['installation-cli.ts', 'recovery-cli.ts', 'inspect-cli.ts', 'dev-seed-cli.ts'];
-const COMMAND_FOLDERS = ['modules/installation/inspect', 'modules/installation/dev-seed'];
+const COMMAND_ENTRIES = [
+  'installation-cli.ts',
+  'recovery-cli.ts',
+  'inspect-cli.ts',
+  'dev-seed-cli.ts',
+  'migration-preflight-cli.ts',
+];
+const COMMAND_FOLDERS = [
+  'modules/installation/inspect',
+  'modules/installation/dev-seed',
+  'modules/installation/migration-preflight',
+];
 /** Files no API or worker import may reach (rule 3). */
 const COMMAND_ONLY_FILES = [
   ...COMMAND_ENTRIES,
@@ -19,6 +29,7 @@ const COMMAND_ONLY_FILES = [
   'modules/installation/inspect/inspection.module.ts',
   'modules/identity-access/identity-access-local-seed-facade.module.ts',
   'modules/installation/dev-seed/dev-seed.module.ts',
+  'modules/installation/migration-preflight/migration-preflight.module.ts',
 ];
 /** Known weak defaults that must never appear in product code, scripts or the environment template (rule 5). */
 const WEAK_DEFAULTS = [/Password123/i, /changeme/i, /admin123/i, /P@ssw0rd/i, /correct horse battery staple/i];

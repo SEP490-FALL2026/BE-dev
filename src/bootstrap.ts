@@ -8,6 +8,8 @@ import { parseCorsOrigins } from './infrastructure/config/cors';
 import { EnvironmentVariables } from './infrastructure/config/env-schema';
 import { toOpenApi30Presentation } from './infrastructure/http/openapi-presentation';
 import { withGlobalRateLimitResponse } from './infrastructure/http/openapi-rate-limit';
+import { withRequestParserResponses } from './infrastructure/http/openapi-request-parser';
+import { applyRequestBodyLimit } from './infrastructure/http/request-body-limit';
 
 interface ConfigurableHttpInstance {
   set: (setting: string, value: unknown) => void;
@@ -36,6 +38,7 @@ export function configureApplication(app: INestApplication, options: ConfigureAp
   app.use(helmet());
   // Bearer tokens only: nothing in this API reads or sets a cookie, so cross-origin calls carry no credentials.
   app.enableCors({ origin: allowedOrigins });
+  applyRequestBodyLimit(app);
   requireExpressInstance(app.getHttpAdapter().getInstance()).set(
     'trust proxy',
     config.get('TRUST_PROXY_HOPS', { infer: true }),
@@ -58,11 +61,13 @@ export function createOpenApiDocument(app: INestApplication): OpenAPIObject {
     .addBearerAuth()
     .build();
 
-  return withGlobalRateLimitResponse(
-    toOpenApi30Presentation(
-      cleanupOpenApiDoc(SwaggerModule.createDocument(app, swaggerConfig), {
-        version: '3.0',
-      }),
+  return withRequestParserResponses(
+    withGlobalRateLimitResponse(
+      toOpenApi30Presentation(
+        cleanupOpenApiDoc(SwaggerModule.createDocument(app, swaggerConfig), {
+          version: '3.0',
+        }),
+      ),
     ),
   );
 }

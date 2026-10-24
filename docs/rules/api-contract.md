@@ -26,6 +26,39 @@ an unreachable database is 503 (`TOKEN_VERIFICATION_UNAVAILABLE`, or `AUTH.UNAVA
 never 401; account administration routes use 503 `SERVICE_UNAVAILABLE` for a transient database failure.
 Request-body validation errors are 422 `VALIDATION_ERROR`.
 
+Giới hạn thân request (P29-N1): **một** giới hạn 100 KiB cho thân JSON và URL-encoded,
+`REQUEST_BODY_LIMIT_BYTES` ở [request-body-limit.ts](../../src/infrastructure/http/request-body-limit.ts), đăng ký trong
+`configureApplication`. Thân lớn hơn bị parser từ chối trước routing, guard và validation: 413 `HTTP_PAYLOAD_TOO_LARGE`, không
+có thông điệp parser hay mảnh thân. Đổi con số là đổi contract (FE/Mobile sinh lại client, reverse proxy phải cho qua ít nhất
+mức này). Parser URL-encoded vẫn gắn (như mặc định của Nest) dù không route nào khai URL-encoded, nên giới hạn của nó ghi rõ
+trong cùng tệp: **tối đa 100 tham số** (`URLENCODED_PARAMETER_LIMIT`) và **độ sâu lồng tối đa 5** (`URLENCODED_DEPTH_LIMIT`),
+không dựa vào mặc định thư viện (P29-N4).
+
+Ma trận lỗi parser (P29-N1, P29-N2, P29-N4 — body-parser 2.3 / raw-body 3, nhận theo `type` đã tài liệu hóa **cùng** status và
+thuộc tính mà nơi tạo luôn gán; không bao giờ chỉ theo `status`, tên hay thông điệp —
+[request-parser-errors.ts](../../src/infrastructure/http/filters/request-parser-errors.ts)):
+
+| Lỗi parser                                                                   | HTTP / mã                         |
+| ---------------------------------------------------------------------------- | --------------------------------- |
+| JSON hỏng (`entity.parse.failed`; Nest tự đổi `SyntaxError` thành 400)       | 400 `HTTP_BAD_REQUEST`            |
+| `request.size.invalid` (độ dài khai báo lệch số byte), `request.aborted`     | 400 `HTTP_BAD_REQUEST`            |
+| `querystring.parse.rangeError` (URL-encoded lồng sâu quá giới hạn)           | 400 `HTTP_BAD_REQUEST`            |
+| thân nén hỏng (gzip/deflate/br): lỗi zlib/brotli có `errno`, không `type`    | 400 `HTTP_BAD_REQUEST`            |
+| `entity.too.large`, `parameters.too.many`                                    | 413 `HTTP_PAYLOAD_TOO_LARGE`      |
+| `charset.unsupported`, `encoding.unsupported`                                | 415 `HTTP_UNSUPPORTED_MEDIA_TYPE` |
+| multipart: sai tên trường tệp, phá giới hạn form / tệp quá lớn               | 400 / 413                         |
+| `stream.encoding.set`, `stream.not.readable`, type lạ, mã multer lạ, lưu trữ | 500 `INTERNAL_SERVER_ERROR`       |
+
+`entity.verify.failed` không xảy ra (không cấu hình verify hook), nên không có contract. Không có thông điệp parser, charset,
+encoding, giá trị trường hay stack nào trả về. Client đã đi (`request.aborted`) thì filter phân loại nhưng **không** ghi lên
+socket đã đóng. Multer nhận bằng `instanceof` đúng lớp `MulterError` mà `FileInterceptor` của Nest nạp, không so tên lỗi.
+Mọi operation có thân JSON khai 400, 413 và 415 của parser qua một helper
+([openapi-request-parser.ts](../../src/infrastructure/http/openapi-request-parser.ts)): mô tả 400 riêng của operation được
+giữ và thêm nghĩa của parser đúng một lần — không chép mô tả vào controller.
+
+Một mã lỗi chỉ đi với **một** HTTP status. Kẻ thua đua (ví dụ `DB-03`) dùng 409 với mã riêng bảo client làm mới rồi gửi lại —
+`APPLICATION.DICTIONARY_GROUP_CHANGED` — không mượn mã 422 của lỗi nghiệp vụ cùng chủ đề (P29-N3).
+
 ## Collection và detail (`API-LIST-DETAIL.1`)
 
 Áp cho mọi `GET` trả nhiều dòng (collection, search, page) và detail tương ứng. Gate

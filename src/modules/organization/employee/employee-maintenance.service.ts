@@ -7,7 +7,7 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { AuditService } from '../../audit/audit.service';
 import { IdentityAccessService } from '../../identity-access/identity-access.service';
 import { organizationAuditEvent } from '../mappers/audit-event.mapper';
-import { EmployeeEmailTakenError, EmployeeNotFoundError } from '../organization.errors';
+import { EmployeeEmailTakenError, EmployeeNotFoundError, EmployeeOpenSeatNeedsEndError } from '../organization.errors';
 import { OrganizationService } from '../organization.service';
 import { EmploymentType } from '../organization.types';
 import {
@@ -148,6 +148,11 @@ export class EmployeeMaintenanceService {
       // A concurrent change won the unique email after the check: the same answer the check gives.
       if (error instanceof EmployeeEmailTakenError) {
         throw new EmployeeRowInvalidError([{ field: 'workEmail', code: 'WORK_EMAIL_TAKEN' }]);
+      }
+      // A contractor, freelancer or intern holds every open seat with an expected end (INV-07, P28-04): PostgreSQL
+      // refuses the change of kind, the transaction rolls back and no audit is written.
+      if (error instanceof EmployeeOpenSeatNeedsEndError) {
+        throw new EmployeeRowInvalidError([{ field: 'employmentType', code: 'OPEN_ASSIGNMENT_NEEDS_EXPECTED_END' }]);
       }
       throw error;
     }

@@ -219,10 +219,11 @@ describe('subscriptions and perpetual purchases over HTTP (integration, real Pos
 
       const confirmed = dataOf<SubscriptionWire>(await patch(created.id, { noticeDeadline: '2026-12-01' }).expect(200));
       expect(confirmed.noticeDeadline).toEqual({ value: '2026-12-01', source: 'DECLARED' });
-      expect((await auditOf(created.id)).map((event) => event.action)).toEqual([
+      // The PATCH writes UPDATED and NOTICE_DEADLINE_CONFIRMED in one transaction: compared as a set (P28-02).
+      expect((await auditOf(created.id)).map((event) => event.action).sort()).toEqual([
         'SUBSCRIPTION.CREATED',
-        'SUBSCRIPTION.UPDATED',
         'SUBSCRIPTION.NOTICE_DEADLINE_CONFIRMED',
+        'SUBSCRIPTION.UPDATED',
       ]);
     });
 

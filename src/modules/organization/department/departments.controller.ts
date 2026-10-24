@@ -254,12 +254,16 @@ export class DepartmentsController {
   @ApiSuccessResponse(DepartmentWarningsResponseDto, {
     message: 'DEPARTMENT.WARNINGS_LISTED',
     description:
-      'A page of the active departments that miss a head or a usable IT Admin in charge, by department code then warning. The Super Admin sees these and nothing else of the departments.',
+      'One page of the active departments that miss a head or a usable IT Admin in charge, by department code then warning. The Super Admin sees these and nothing else of the departments. The list is paged: without page and pageSize the answer holds the first 20 only. pagination.totalItems counts every warning and pagination.totalPages the pages; ask for page 2 up to totalPages (pageSize up to 100) to read the rest.',
   })
-  @ApiErrorResponses(...AUTH_ERRORS, {
-    status: HttpStatus.FORBIDDEN,
-    description: 'Only the IT Admin and the Super Admin see department warnings.',
-  })
+  @ApiErrorResponses(
+    ...AUTH_ERRORS,
+    {
+      status: HttpStatus.FORBIDDEN,
+      description: 'Only the IT Admin and the Super Admin see department warnings.',
+    },
+    { status: HttpStatus.UNPROCESSABLE_ENTITY, description: 'The paging query is invalid (VALIDATION_ERROR).' },
+  )
   async warnings(@Query() query: ListWarningsQueryDto) {
     try {
       return await this.queries.warnings(query);

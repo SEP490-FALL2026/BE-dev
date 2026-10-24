@@ -50,6 +50,11 @@ export class FakeObjectStorage implements ObjectStoragePort {
   readonly copied: { from: string; to: string }[] = [];
   /** Runs after the object was looked at and before it is copied: a client that puts the file again in that moment. */
   beforeCopy: ((fromKey: string) => void) | undefined;
+  /**
+   * Awaited at the start of `head`, `readPrefix`, `copyIfMatch` and `delete`, before anything is read or changed: a test
+   * holds one call there until another request has done its part, an order instead of a sleep (P29-N5).
+   */
+  beforeCall: ((call: FakeStorageCall, key: string) => Promise<void> | void) | undefined;
   readonly deleted: string[] = [];
   /** The calls that answer as an outage until they are taken out of the set. */
   readonly unavailable = new Set<FakeStorageCall>();
@@ -77,51 +82,51 @@ export class FakeObjectStorage implements ObjectStoragePort {
     return Promise.resolve(url);
   }
 
-  head(key: string): Promise<StoredObjectMetadata> {
+  async head(key: string): Promise<StoredObjectMetadata> {
     this.refuseWhileDown('head');
+    await this.beforeCall?.('head', key);
     const stored = this.objects.get(key);
-    if (!stored) return Promise.reject(Object.assign(new Error('NotFound'), { name: 'NotFound' }));
+    if (!stored) throw Object.assign(new Error('NotFound'), { name: 'NotFound' });
 
-    return Promise.resolve({
+    return {
       contentLength: stored.contentLength,
       contentType: stored.contentType,
       checksum: undefined,
       etag: stored.etag,
-    });
+    };
   }
 
-  readPrefix(key: string, length: number, ifMatchEtag?: string): Promise<Uint8Array> {
+  async readPrefix(key: string, length: number, ifMatchEtag?: string): Promise<Uint8Array> {
     this.refuseWhileDown('readPrefix');
+    await this.beforeCall?.('readPrefix', key);
     const stored = this.objects.get(key);
-    if (!stored) return Promise.reject(Object.assign(new Error('NotFound'), { name: 'NotFound' }));
+    if (!stored) throw Object.assign(new Error('NotFound'), { name: 'NotFound' });
     if (ifMatchEtag !== undefined && stored.etag !== ifMatchEtag) {
-      return Promise.reject(Object.assign(new Error('PreconditionFailed'), { name: 'PreconditionFailed' }));
+      throw Object.assign(new Error('PreconditionFailed'), { name: 'PreconditionFailed' });
     }
     const content = stored.content ?? Uint8Array.from(GENUINE_START[stored.contentType] ?? []);
 
-    return Promise.resolve(content.slice(0, length));
+    return content.slice(0, length);
   }
 
-  copyIfMatch(fromKey: string, toKey: string, etag: string): Promise<void> {
+  async copyIfMatch(fromKey: string, toKey: string, etag: string): Promise<void> {
     this.refuseWhileDown('copyIfMatch');
+    await this.beforeCall?.('copyIfMatch', fromKey);
     this.beforeCopy?.(fromKey);
     const stored = this.objects.get(fromKey);
-    if (!stored) return Promise.reject(Object.assign(new Error('NotFound'), { name: 'NotFound' }));
+    if (!stored) throw Object.assign(new Error('NotFound'), { name: 'NotFound' });
     if (stored.etag !== etag) {
-      return Promise.reject(Object.assign(new Error('PreconditionFailed'), { name: 'PreconditionFailed' }));
+      throw Object.assign(new Error('PreconditionFailed'), { name: 'PreconditionFailed' });
     }
     this.objects.set(toKey, { ...stored, etag: `e${(this.counter += 1)}` });
     this.copied.push({ from: fromKey, to: toKey });
-
-    return Promise.resolve();
   }
 
-  delete(key: string): Promise<void> {
+  async delete(key: string): Promise<void> {
     this.refuseWhileDown('delete');
+    await this.beforeCall?.('delete', key);
     this.objects.delete(key);
     this.deleted.push(key);
-
-    return Promise.resolve();
   }
 
   /** What the client does after it is given an upload link: puts the file, which may not be what it declared. */

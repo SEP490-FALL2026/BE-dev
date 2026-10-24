@@ -42,7 +42,7 @@ const INVALID = {
 const CONFLICT = {
   status: HttpStatus.CONFLICT,
   description:
-    'The vendor already has an application of this name (APPLICATION.NAME_TAKEN) or the dictionary line belongs to another application (APPLICATION.DICTIONARY_LINE_TAKEN).',
+    'The vendor already has an application of this name (APPLICATION.NAME_TAKEN), the dictionary line belongs to another application (APPLICATION.DICTIONARY_LINE_TAKEN), or a simultaneous request changed the dictionary group of the vendor or of the line first (APPLICATION.DICTIONARY_GROUP_CHANGED): refresh the application and the line, then send the request again.',
 } as const;
 const NOT_FOUND = {
   status: HttpStatus.NOT_FOUND,

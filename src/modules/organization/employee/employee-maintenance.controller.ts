@@ -41,7 +41,7 @@ export class EmployeeMaintenanceController {
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The body is malformed, names a field that is not an official one or lacks a part of the HR basis (VALIDATION_ERROR), names nothing to change (EMPLOYEE.UPDATE_EMPTY), or a value is refused (EMPLOYEE.ROW_INVALID: WORK_EMAIL_TAKEN, HIRE_DATE_LOCKED, HIRE_DATE_IN_PAST).',
+        'The body is malformed, names a field that is not an official one or lacks a part of the HR basis (VALIDATION_ERROR), names nothing to change (EMPLOYEE.UPDATE_EMPTY), or a value is refused (EMPLOYEE.ROW_INVALID: WORK_EMAIL_TAKEN, HIRE_DATE_LOCKED, HIRE_DATE_IN_PAST, OPEN_ASSIGNMENT_NEEDS_EXPECTED_END — a contractor, freelancer or intern needs an expected end on every open seat).',
     },
     GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   )

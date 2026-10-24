@@ -84,20 +84,34 @@ export class LicenseKeyService {
       .sort((a, b) => a.fingerprint.localeCompare(b.fingerprint));
 
     const stored = await this.runner.run(async (tx) => {
+      // The purchase is held for the transaction that keeps its keys (P28-10): the subscription FOR UPDATE and its plan
+      // FOR SHARE, so a change of the plan's kind waits for the keys or the keys wait for it, and the kind is read again
+      // under the lock. The check before the transaction only answers early.
+      const held = await this.catalog.lockSeatTarget(tx, { subscriptionId: input.subscriptionId });
+      if (!held) throw new SeatTargetNotFoundError('SUBSCRIPTION');
+      if (held.provisioningType !== 'K4') throw new LicenseKeyPlanNotK4Error(held.provisioningType);
+
+      // One statement for the whole batch (P28-13: a thousand round trips outlasted the transaction on a busy server).
+      const keptIds = await this.repo.insertManyIfNew(
+        tx,
+        sealed.map((row) => {
+          const { keyId, ciphertext } = this.cipher.encrypt(row.id, row.key);
+
+          return {
+            id: row.id,
+            organizationId: organization.id,
+            subscriptionId: input.subscriptionId,
+            fingerprint: row.fingerprint,
+            masked: maskKey(row.key),
+            ciphertext,
+            cipherKeyId: keyId,
+            importedByAppUserId: actor.appUserId,
+          };
+        }),
+      );
       let kept = 0;
       for (const row of sealed) {
-        const { keyId, ciphertext } = this.cipher.encrypt(row.id, row.key);
-        const isNew = await this.repo.insertIfNew(tx, {
-          id: row.id,
-          organizationId: organization.id,
-          subscriptionId: input.subscriptionId,
-          fingerprint: row.fingerprint,
-          masked: maskKey(row.key),
-          ciphertext,
-          cipherKeyId: keyId,
-          importedByAppUserId: actor.appUserId,
-        });
-        if (isNew) kept += 1;
+        if (keptIds.has(row.id)) kept += 1;
         else lines.push({ line: row.line, code: 'ALREADY_IN_STORE' });
       }
       await this.audit.record(
@@ -182,7 +196,8 @@ export class LicenseKeyService {
    * last slot cannot both pass.
    */
   private async takeSlot(tx: DbTx, actor: AuthenticatedPrincipal): Promise<void> {
-    const now = new Date();
+    // `Date.now()`, the one clock the windows are named by, so a test can set the instant of an opening (P28-13).
+    const now = new Date(Date.now());
     for (const window of ['MINUTE', 'DAY'] as const) {
       if (!(await this.quota.take(tx, actor.appUserId, window, now))) {
         // For the operator, never for the caller: which account tried, not which key.

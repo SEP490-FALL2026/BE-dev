@@ -121,6 +121,10 @@ const INTRA_MODULE_CONTRACTS: ReadonlyMap<string, string> = new Map([
   ],
   ['modules/catalog/vendor/vendor-directory.service.ts', 'vendors found or made by the application declaration'],
   [
+    'modules/catalog/vendor/vendor.errors.ts',
+    'refusals of vendor-directory.service.ts that the application declaration maps to its own errors (P29-N3)',
+  ],
+  [
     'modules/catalog/catalog-entry/application-lookup.service.ts',
     'application locked for the plans declared under it, so it cannot be retired meanwhile',
   ],

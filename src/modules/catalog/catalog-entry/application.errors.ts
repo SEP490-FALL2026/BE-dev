@@ -82,6 +82,20 @@ export class ApplicationDictionaryLineMismatchError extends Error {
   }
 }
 
+/**
+ * The vendor had no dictionary group and nobody held the group of the line when the declaration or change read them, and
+ * a simultaneous change won before this one could write (`DB-03`): the vendor took another group, or another vendor took
+ * this one. Answered 409 with its own code (P29-N3); sent again, the request meets the state that change left.
+ */
+export class ApplicationVendorGroupChangedError extends Error {
+  constructor() {
+    super(
+      'The dictionary group of the vendor or of the line was changed by a simultaneous request. Refresh the application and the dictionary line, then send the request again.',
+    );
+    this.name = 'ApplicationVendorGroupChangedError';
+  }
+}
+
 export class ApplicationNotFoundError extends Error {
   constructor() {
     super('The application does not exist.');

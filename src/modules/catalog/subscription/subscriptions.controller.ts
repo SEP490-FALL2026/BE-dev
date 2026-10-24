@@ -42,6 +42,12 @@ const INVALID = {
     'The request is invalid (VALIDATION_ERROR) or a rule refuses it: SUBSCRIPTION.PLAN_NOT_FOUND, PLAN_HAS_NO_SUBSCRIPTION, PERPETUAL_NEEDS_LICENSED_APPLICATION, PERPETUAL_HAS_NO_TERM, DATES_INVALID or UPDATE_EMPTY; the price is refused with MONEY_SCALE_EXCEEDED, MONEY_OUT_OF_RANGE or CURRENCY_NOT_SUPPORTED.',
 } as const;
 const INVALID_UPDATE = { ...INVALID, description: INVALID.description + INVALID_UPDATE_NOTE } as const;
+/** Only where a unit price is converted (`FinanceService.snapshotMoney`); the database key of `DB-02` normally rules it out. */
+const REPORTING_CURRENCY_CONFLICT = {
+  status: HttpStatus.CONFLICT,
+  description:
+    'A unit price was to be converted, but the reporting currency of the installation is not in the currency table (REPORTING_CURRENCY_NOT_SUPPORTED, details.currency). A fault of the configuration, not of the request: the database normally prevents it, and an operator has to correct the currency table.',
+} as const;
 
 const toWire = (view: SubscriptionView) => ({
   ...view,
@@ -92,7 +98,7 @@ export class SubscriptionsController {
     description:
       'The subscription is stored: a draft while its data is incomplete, with what is missing; the unit price keeps the conversion at the rate of the day it was recorded.',
   })
-  @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, INVALID)
+  @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, INVALID, REPORTING_CURRENCY_CONFLICT)
   async declare(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: DeclareSubscriptionBodyDto) {
     try {
       return toWire(await this.subscriptions.declare(actor, body));
@@ -129,7 +135,7 @@ export class SubscriptionsController {
     description:
       'The subscription as it is after the change; a new unit price is converted again at the rate of today; a change of nothing is answered the same and not audited. The plan and the kind cannot change.',
   })
-  @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, INVALID_UPDATE, NOT_FOUND)
+  @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, INVALID_UPDATE, NOT_FOUND, REPORTING_CURRENCY_CONFLICT)
   async update(
     @CurrentPrincipal() actor: AuthenticatedPrincipal,
     @Param() params: SubscriptionIdParamDto,
@@ -150,7 +156,7 @@ export class SubscriptionsController {
     description:
       'The draft becomes active once its data is whole; a price with no rate for its day is converted at the rate entered for that day. An active subscription is answered unchanged.',
   })
-  @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, NOT_FOUND, {
+  @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, NOT_FOUND, REPORTING_CURRENCY_CONFLICT, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description:
       'The id is invalid (VALIDATION_ERROR) or the subscription still lacks data or the rate of its price day (SUBSCRIPTION.STILL_DRAFT, details.missing).',

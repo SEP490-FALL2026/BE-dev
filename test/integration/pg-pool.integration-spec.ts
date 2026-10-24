@@ -135,8 +135,17 @@ describe('createPostgresPool with the Prisma adapter (integration)', () => {
 
   it('I1: removes a connection retired on a timeout for good, and counts it once', async () => {
     const app = buildApp();
-    await app.prisma.$queryRaw`SELECT 1`; // warm: one connection
+    // P29-N6: two connections are open and idle before the stall, the victim and the one every later query runs on, so
+    // no new backend has to start inside the window the client-side timeout measures (under load that start alone can
+    // exceed it). Both are held at once, so the pool really opens two.
+    const warmed = await Promise.all([app.pool.connect(), app.pool.connect()]);
+    for (const client of warmed) client.release();
+    const open = warmed.map((client) => (client as unknown as { processID: number | null }).processID);
     const mark = app.events.length;
+    // The victim leaves the pool when Prisma hands it back, some time after the error reaches the caller: an event.
+    const removed = new Promise<number | null>((resolve) =>
+      app.pool.once('remove', (client) => resolve((client as unknown as { processID: number | null }).processID)),
+    );
     relay.holdWhen(/^UPDATE stall_probe/);
 
     const outcome = await app.prisma
@@ -153,11 +162,17 @@ describe('createPostgresPool with the Prisma adapter (integration)', () => {
 
     const [victim] = app.acquiredSince(mark);
     expect(typeof victim).toBe('number');
+    expect(open).toContain(victim);
+    const warm = open.find((pid) => pid !== victim);
     relay.releaseHeld(); // PostgreSQL now receives the UPDATE it never saw
+    expect(await removed).toBe(victim);
+    const later = app.events.length;
     for (let i = 0; i < 6; i += 1) {
       await app.prisma.$executeRawUnsafe(`INSERT INTO stall_log (note) VALUES ('later')`);
       await app.prisma.$queryRaw`SELECT 1`;
     }
+    // Every later query ran on the connection that was already open: never the victim, never a new backend.
+    expect([...new Set(app.acquiredSince(later))]).toEqual([warm]);
 
     await waitFor(async () => !(await backendExists(victim as number)));
     expect(app.events.filter((e) => e.type === 'remove').map((e) => e.pid)).toContain(victim);

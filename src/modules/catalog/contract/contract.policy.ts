@@ -145,3 +145,17 @@ export function cleanContractName(raw: string): string {
 
   return name;
 }
+
+/** The storage says the object was put again since it was looked at (S3 412 `PreconditionFailed`). */
+export function isStorageObjectChanged(error: unknown): boolean {
+  const candidate = error as { name?: string; $metadata?: { httpStatusCode?: number } };
+
+  return candidate.name === 'PreconditionFailed' || candidate.$metadata?.httpStatusCode === 412;
+}
+
+/** The storage says there is no such object (S3 404 `NotFound` or `NoSuchKey`). */
+export function isStorageObjectMissing(error: unknown): boolean {
+  const candidate = error as { name?: string; $metadata?: { httpStatusCode?: number } };
+
+  return candidate.name === 'NotFound' || candidate.name === 'NoSuchKey' || candidate.$metadata?.httpStatusCode === 404;
+}

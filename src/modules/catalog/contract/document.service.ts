@@ -25,6 +25,8 @@ import {
   assertPurposeAvailable,
   assertUploadMatches,
   contentMatchesType,
+  isStorageObjectChanged as isChanged,
+  isStorageObjectMissing as isNotFound,
   SIGNATURE_PREFIX_BYTES,
   mayOpen,
   type DocumentPurpose,
@@ -136,11 +138,13 @@ export class DocumentService {
     const current = await this.ownedBy(actor, id);
     if (current.status !== 'AWAITING_UPLOAD') throw new DocumentNotAwaitingUploadError();
     if (Date.now() - current.createdAt.getTime() > UPLOAD_ABANDONED_AFTER_MS) {
-      await this.expire(current.id, current.objectKey, actor);
-      throw new DocumentUploadExpiredError();
+      // Given up by this call, or changed first by a simultaneous one: then the row as it is now answers (P29-N7).
+      if (await this.expire(current.id, current.objectKey, actor)) throw new DocumentUploadExpiredError();
+      throw await this.answerFromRow(actor, id);
     }
     const stored = await this.stored(current.objectKey);
-    if (stored.etag === undefined) throw new DocumentUploadPendingError();
+    // Never came, or kept (or given up) by a simultaneous call that deletes it only after its commit (P29-N5).
+    if (stored.etag === undefined) throw await this.answerFromRow(actor, id);
     let finalKey: string | null = null;
     try {
       assertUploadMatches(current, stored);
@@ -155,33 +159,56 @@ export class DocumentService {
       if (!(error instanceof DocumentUploadMismatchError)) throw error;
       finalKey = null;
     }
-    // The upload link is no more use once the object is judged, whatever the answer; a failed delete leaves the object to the lifecycle of the bucket.
+    // The database first, the upload last (P28-11): a commit that fails takes its own copy back and keeps the upload, so
+    // the same call works again — no lost upload, no orphan copy, no false 409.
+    const result = await this.runner
+      .run(async (tx) => {
+        const locked = await this.documents.lock(tx, id);
+        if (!locked) throw new DocumentNotFoundError();
+        if (locked.status !== 'AWAITING_UPLOAD') throw new DocumentNotAwaitingUploadError();
+        if (finalKey !== null) await this.documents.markUploaded(tx, id, finalKey);
+        else await this.documents.markQuarantined(tx, id);
+        await this.audit.record(
+          tx,
+          catalogAuditEvent(
+            actor,
+            organization.id,
+            finalKey !== null ? 'DOCUMENT.UPLOADED' : 'DOCUMENT.QUARANTINED',
+            'DocumentAttachment',
+            id,
+            { status: 'AWAITING_UPLOAD' },
+            { status: finalKey !== null ? 'PENDING_ATTACH' : 'QUARANTINED' },
+          ),
+        );
+
+        return (await this.documents.find(id, tx)) ?? locked;
+      })
+      .catch(async (error: unknown) => {
+        if (finalKey !== null) await this.withdrawCopy(id, finalKey);
+        throw error;
+      });
+    // Known committed: the upload is no more use; a failed delete leaves it to the bucket's lifecycle.
     await this.discard(current.objectKey);
-
-    const result = await this.runner.run(async (tx) => {
-      const locked = await this.documents.lock(tx, id);
-      if (!locked) throw new DocumentNotFoundError();
-      if (locked.status !== 'AWAITING_UPLOAD') throw new DocumentNotAwaitingUploadError();
-      if (finalKey !== null) await this.documents.markUploaded(tx, id, finalKey);
-      else await this.documents.markQuarantined(tx, id);
-      await this.audit.record(
-        tx,
-        catalogAuditEvent(
-          actor,
-          organization.id,
-          finalKey !== null ? 'DOCUMENT.UPLOADED' : 'DOCUMENT.QUARANTINED',
-          'DocumentAttachment',
-          id,
-          { status: 'AWAITING_UPLOAD' },
-          { status: finalKey !== null ? 'PENDING_ATTACH' : 'QUARANTINED' },
-        ),
-      );
-
-      return (await this.documents.find(id, tx)) ?? locked;
-    });
     if (finalKey === null) throw new DocumentUploadMismatchError();
 
     return result;
+  }
+
+  /**
+   * The answer for a file a simultaneous call may have changed, from its row read again with the same owner check
+   * (P29-N5, P29-N7): still awaiting its upload ⟹ pending, given up ⟹ expired, otherwise done ⟹ not awaiting.
+   */
+  private async answerFromRow(actor: AuthenticatedPrincipal, id: string): Promise<Error> {
+    const { status } = await this.ownedBy(actor, id);
+    if (status === 'AWAITING_UPLOAD') return new DocumentUploadPendingError();
+
+    return status === 'EXPIRED' ? new DocumentUploadExpiredError() : new DocumentNotAwaitingUploadError();
+  }
+
+  /** The copy of a failed commit goes unless the row names it (the answer was lost); unreadable, it stays — never a kept file lost. */
+  private async withdrawCopy(id: string, finalKey: string): Promise<void> {
+    const row = await this.documents.find(id).catch(() => undefined);
+    if (row !== undefined && row?.finalObjectKey !== finalKey) await this.discard(finalKey);
   }
 
   /**
@@ -369,16 +396,4 @@ export class DocumentService {
 
     return organization;
   }
-}
-
-function isChanged(error: unknown): boolean {
-  const candidate = error as { name?: string; $metadata?: { httpStatusCode?: number } };
-
-  return candidate.name === 'PreconditionFailed' || candidate.$metadata?.httpStatusCode === 412;
-}
-
-function isNotFound(error: unknown): boolean {
-  const candidate = error as { name?: string; $metadata?: { httpStatusCode?: number } };
-
-  return candidate.name === 'NotFound' || candidate.name === 'NoSuchKey' || candidate.$metadata?.httpStatusCode === 404;
 }

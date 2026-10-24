@@ -39,10 +39,22 @@ services:
     profiles: ['storage']
     build: ./infra/minio
     image: slm-minio:2025-10-15
-    command: server /data --console-address ':9001'
+    # The credentials come from your shell or .env and are the API's OBJECT_STORAGE_ACCESS_KEY_ID and
+    # OBJECT_STORAGE_SECRET_ACCESS_KEY: the API refuses MinIO's public default outside NODE_ENV=test (SEC-04), so MinIO
+    # refuses to start without credentials of your own, with the public default, or with a key equal to its secret
+    # (P28-08). Nothing here is required by the default profile (PostgreSQL only).
+    entrypoint:
+      - sh
+      - -c
+      - >-
+        if [ -z "$$MINIO_ROOT_USER" ] || [ -z "$$MINIO_ROOT_PASSWORD" ] || [ "$$MINIO_ROOT_USER" = minioadmin ]
+        || [ "$$MINIO_ROOT_PASSWORD" = minioadmin ] || [ "$$MINIO_ROOT_USER" = "$$MINIO_ROOT_PASSWORD" ];
+        then echo 'Set MINIO_ROOT_USER and MINIO_ROOT_PASSWORD (not minioadmin, different from each other) and the same
+        values as OBJECT_STORAGE_ACCESS_KEY_ID and OBJECT_STORAGE_SECRET_ACCESS_KEY' >&2; exit 1; fi;
+        exec minio server /data --console-address :9001
     environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-}
     ports:
       - '127.0.0.1:${MINIO_PORT:-9000}:9000'
       - '127.0.0.1:${MINIO_CONSOLE_PORT:-9001}:9001'

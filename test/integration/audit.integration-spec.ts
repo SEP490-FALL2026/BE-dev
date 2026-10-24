@@ -66,6 +66,24 @@ describe('Audit Trail (integration)', () => {
     expect(rows[0].epoch_ms).toBe(instant.getTime());
   });
 
+  it('orders events of one millisecond by their random id, not by the order they were written (P28-02)', async () => {
+    // Why no test may read causal order from `ORDER BY occurred_at, id`: `occurred_at` keeps milliseconds and `id` is a
+    // random UUID, so two events of one transaction (one millisecond) come back in id order. Written first, read last.
+    const instant = '2026-10-23T12:00:00.123Z';
+    await prisma.$executeRaw`
+      INSERT INTO audit_events (id, organization_id, occurred_at, actor_kind, actor_roles, action, resource_type,
+                                resource_id, correlation_id)
+      VALUES ('ffffffff-ffff-4fff-bfff-ffffffffffff', ${organizationId}::uuid, ${instant}::timestamptz, 'SYSTEM', '{}',
+              'PROBE.WRITTEN_FIRST', 'Probe', 'p-order', 'corr-order'),
+             ('00000000-0000-4000-8000-000000000001', ${organizationId}::uuid, ${instant}::timestamptz, 'SYSTEM', '{}',
+              'PROBE.WRITTEN_SECOND', 'Probe', 'p-order', 'corr-order')`;
+
+    const rows = await prisma.$queryRaw<{ action: string }[]>`
+      SELECT action FROM audit_events WHERE resource_id = 'p-order' ORDER BY occurred_at, id`;
+
+    expect(rows.map((row) => row.action)).toEqual(['PROBE.WRITTEN_SECOND', 'PROBE.WRITTEN_FIRST']);
+  });
+
   it('rejects UPDATE, DELETE and TRUNCATE at the database', async () => {
     await runner.run((tx) => audit.record(tx, event('PROBE.IMMUTABLE')));
 

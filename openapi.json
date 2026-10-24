@@ -213,6 +213,10 @@
             "description": "The title was added and is active.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/JobTitleResponseDto" } } }
           },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "401": {
             "description": "Authentication is required or the token is no longer valid.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
@@ -223,6 +227,14 @@
           },
           "409": {
             "description": "Another title, active or not, already has this name once case and whitespace are ignored (JOB_TITLE.NAME_TAKEN; details.conflict names it).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
@@ -258,6 +270,10 @@
             "description": "The title has its new name; everyone who holds it keeps it.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/JobTitleResponseDto" } } }
           },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "401": {
             "description": "Authentication is required or the token is no longer valid.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
@@ -272,6 +288,14 @@
           },
           "409": {
             "description": "Another title already has this name (JOB_TITLE.NAME_TAKEN; details.conflict names it).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
@@ -387,12 +411,24 @@
             "description": "The employee and their placement were created. No account, role, invitation or mail is created. The person is a member of the department from the day they are recorded.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/EmployeeResponseDto" } } }
           },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "401": {
             "description": "Authentication is required or the token is no longer valid.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "403": {
             "description": "Only the Super Admin may enter people.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
@@ -430,6 +466,10 @@
               "application/json": { "schema": { "$ref": "#/components/schemas/MaintainedEmployeeResponseDto" } }
             }
           },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "401": {
             "description": "Authentication is required or the token is no longer valid.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
@@ -442,8 +482,16 @@
             "description": "The employee does not exist (EMPLOYEE.NOT_FOUND).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "422": {
-            "description": "The body is malformed, names a field that is not an official one or lacks a part of the HR basis (VALIDATION_ERROR), names nothing to change (EMPLOYEE.UPDATE_EMPTY), or a value is refused (EMPLOYEE.ROW_INVALID: WORK_EMAIL_TAKEN, HIRE_DATE_LOCKED, HIRE_DATE_IN_PAST).",
+            "description": "The body is malformed, names a field that is not an official one or lacks a part of the HR basis (VALIDATION_ERROR), names nothing to change (EMPLOYEE.UPDATE_EMPTY), or a value is refused (EMPLOYEE.ROW_INVALID: WORK_EMAIL_TAKEN, HIRE_DATE_LOCKED, HIRE_DATE_IN_PAST, OPEN_ASSIGNMENT_NEEDS_EXPECTED_END — a contractor, freelancer or intern needs an expected end on every open seat).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "429": {
@@ -535,6 +583,10 @@
             "description": "The cost center is in the catalogue, in use, with no department yet.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CostCenterResponseDto" } } }
           },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "401": {
             "description": "Authentication is required or the token is no longer valid.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
@@ -545,6 +597,14 @@
           },
           "409": {
             "description": "The code is already taken (COST_CENTER.CODE_TAKEN).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
@@ -580,6 +640,10 @@
             "description": "The cost center has its new name; its code, department and history do not change.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CostCenterResponseDto" } } }
           },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "401": {
             "description": "Authentication is required or the token is no longer valid.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
@@ -590,6 +654,14 @@
           },
           "404": {
             "description": "The cost center does not exist.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
@@ -790,6 +862,10 @@
             "description": "The department exists, charged to the UNIT Cost Center chosen, with nobody heading it yet. warnings says what is still missing.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DepartmentResponseDto" } } }
           },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "401": {
             "description": "Authentication is required or the token is no longer valid.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
@@ -800,6 +876,14 @@
           },
           "409": {
             "description": "The code is taken (DEPARTMENT.CODE_TAKEN) or another department already has the Cost Center (DEPARTMENT.COST_CENTER_TAKEN).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
@@ -874,6 +958,10 @@
             "description": "The name, the description or the IT Admin in charge changed. The Cost Center and the people do not.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DepartmentResponseDto" } } }
           },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "401": {
             "description": "Authentication is required or the token is no longer valid.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
@@ -884,6 +972,14 @@
           },
           "404": {
             "description": "The department does not exist.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
@@ -964,6 +1060,10 @@
             "description": "The person heads the department from the date; the head before ends the day before. The person must be a member of the department that day.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DepartmentResponseDto" } } }
           },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "401": {
             "description": "Authentication is required or the token is no longer valid.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
@@ -974,6 +1074,14 @@
           },
           "404": {
             "description": "The department does not exist.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
@@ -1009,6 +1117,10 @@
             "description": "Nobody heads the department from the date; it shows as missing a head. If there is no head to end, nothing changes.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DepartmentResponseDto" } } }
           },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "401": {
             "description": "Authentication is required or the token is no longer valid.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
@@ -1019,6 +1131,14 @@
           },
           "404": {
             "description": "The department does not exist.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
@@ -1125,7 +1245,7 @@
         ],
         "responses": {
           "200": {
-            "description": "A page of the active departments that miss a head or a usable IT Admin in charge, by department code then warning. The Super Admin sees these and nothing else of the departments.",
+            "description": "One page of the active departments that miss a head or a usable IT Admin in charge, by department code then warning. The Super Admin sees these and nothing else of the departments. The list is paged: without page and pageSize the answer holds the first 20 only. pagination.totalItems counts every warning and pagination.totalPages the pages; ask for page 2 up to totalPages (pageSize up to 100) to read the rest.",
             "content": {
               "application/json": { "schema": { "$ref": "#/components/schemas/DepartmentWarningsResponseDto" } }
             }
@@ -1136,6 +1256,10 @@
           },
           "403": {
             "description": "Only the IT Admin and the Super Admin see department warnings.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "422": {
+            "description": "The paging query is invalid (VALIDATION_ERROR).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "429": {
@@ -1223,12 +1347,24 @@
             "description": "The project is described and appears on the profile of each department that takes part.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ProjectResponseDto" } } }
           },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "401": {
             "description": "Authentication is required or the token is no longer valid.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "403": {
             "description": "Only an IT Admin keeps the projects described on department profiles.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
@@ -1303,6 +1439,10 @@
             "description": "The project has its new description, status or departments.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ProjectResponseDto" } } }
           },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "401": {
             "description": "Authentication is required or the token is no longer valid.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
@@ -1313,6 +1453,14 @@
           },
           "404": {
             "description": "The project does not exist (PROJECT.NOT_FOUND).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
@@ -1384,6 +1532,10 @@
             "description": "The value applies to what is created from now on; what already runs keeps the value it was created with. The same value again changes nothing.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ParameterResponseDto" } } }
           },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "401": {
             "description": "Authentication is required or the token is no longer valid.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
@@ -1394,6 +1546,14 @@
           },
           "404": {
             "description": "There is no such parameter (PARAMETER.NOT_FOUND).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
@@ -1489,7 +1649,7 @@
         ],
         "responses": {
           "200": {
-            "description": "A page of the days nobody works, in date order, optionally between two dates.",
+            "description": "One page of the days nobody works, in date order, optionally between two dates. The list is paged: without page and pageSize the answer holds the first 20 only. pagination.totalItems counts every matching day and pagination.totalPages the pages; ask for page 2 up to totalPages (pageSize up to 100) to read the rest.",
             "content": {
               "application/json": { "schema": { "$ref": "#/components/schemas/NonWorkingDateListResponseDto" } }
             }
@@ -1533,6 +1693,10 @@
               "application/json": { "schema": { "$ref": "#/components/schemas/NonWorkingDateResponseDto" } }
             }
           },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "401": {
             "description": "Authentication is required or the token is no longer valid.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
@@ -1543,6 +1707,14 @@
           },
           "409": {
             "description": "The day is already a non-working date (NON_WORKING_DATE.TAKEN).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
@@ -1580,6 +1752,10 @@
               "application/json": { "schema": { "$ref": "#/components/schemas/NonWorkingDateResponseDto" } }
             }
           },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "401": {
             "description": "Authentication is required or the token is no longer valid.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
@@ -1590,6 +1766,14 @@
           },
           "404": {
             "description": "The day is not a non-working date (NON_WORKING_DATE.NOT_FOUND).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
@@ -1697,6 +1881,10 @@
               "application/json": { "schema": { "$ref": "#/components/schemas/ReportingCurrencySetResponseDto" } }
             }
           },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "401": {
             "description": "Authentication is required or the token is no longer valid.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
@@ -1707,6 +1895,14 @@
           },
           "409": {
             "description": "A rate was entered or a subscription has a converted price: the currency is locked (REPORTING_CURRENCY.LOCKED, details.reason).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
@@ -1750,12 +1946,20 @@
               "application/json": { "schema": { "$ref": "#/components/schemas/EmployeeImportResponseDto" } }
             }
           },
+          "400": {
+            "description": "The form breaks a limit of the upload before it is read — more than 1 file, more than 2 text fields, more than 3 parts, a text field over 64 bytes — or it is not a readable multipart form (HTTP_BAD_REQUEST).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "401": {
             "description": "Authentication is required or the token is no longer valid.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "403": {
             "description": "Only the Super Admin imports people.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "413": {
+            "description": "The file is larger than 2 MiB (HTTP_PAYLOAD_TOO_LARGE).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
@@ -1950,6 +2154,10 @@
               "application/json": { "schema": { "$ref": "#/components/schemas/EmployeeImportConfirmationResponseDto" } }
             }
           },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "401": {
             "description": "Authentication is required or the token is no longer valid.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
@@ -1964,6 +2172,14 @@
           },
           "409": {
             "description": "The preview is not the current one (IMPORT.PREVIEW_OUTDATED), the data changed since it (IMPORT.PREVIEW_STALE), the file was imported before and not acknowledged (IMPORT.DUPLICATE_FILE_NOT_ACKNOWLEDGED), the import was already written with another key (IMPORT.ALREADY_CONFIRMED), or it was cancelled or expired. Nothing was written.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
@@ -2056,6 +2272,10 @@
             "description": "The file was read and every row judged against the seats and the people as they are: nothing is written yet. The summary says how many rows are valid, wrong and why, and the seats before and after.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SeatImportResponseDto" } } }
           },
+          "400": {
+            "description": "The form breaks a limit of the upload before it is read — more than 1 file, more than 2 text fields, more than 3 parts, a text field over 64 bytes — or it is not a readable multipart form (HTTP_BAD_REQUEST).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "401": {
             "description": "Authentication is required or the token is no longer valid.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
@@ -2070,6 +2290,10 @@
           },
           "409": {
             "description": "The baseline is closed (SEAT_BASELINE.CLOSED), the subscription has no quantity (SEAT_BASELINE.QUANTITY_UNKNOWN) or the application is retired (SEAT_TARGET.APPLICATION_RETIRED).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "413": {
+            "description": "The file is larger than 2 MiB (HTTP_PAYLOAD_TOO_LARGE).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
@@ -2215,6 +2439,10 @@
               "application/json": { "schema": { "$ref": "#/components/schemas/SeatImportConfirmationResponseDto" } }
             }
           },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "401": {
             "description": "Authentication is required or the token is no longer valid.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
@@ -2229,6 +2457,14 @@
           },
           "409": {
             "description": "The baseline is closed (SEAT_BASELINE.CLOSED), the application was retired since the preview (SEAT_TARGET.APPLICATION_RETIRED), the preview is outdated or stale (SEAT_BASELINE_IMPORT.PREVIEW_OUTDATED, PREVIEW_STALE), or the import was cancelled, expired or already written under another key (CANCELLED, EXPIRED, ALREADY_CONFIRMED).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
@@ -2387,6 +2623,10 @@
               "application/json": { "schema": { "$ref": "#/components/schemas/ResponsibleChangeResponseDto" } }
             }
           },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "401": {
             "description": "Authentication is required or the token is no longer valid.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
@@ -2401,6 +2641,14 @@
           },
           "409": {
             "description": "The assignment has ended or is set to end (LICENSE_ASSIGNMENT.NOT_OPEN), or the seats are all taken (LICENSE_ASSIGNMENT.SEAT_CAPACITY).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
@@ -2488,7 +2736,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The seats the people of the department hold today, one line per seat with the tool and plan, and a summary by plan over all of them; a start that is only the day of recording has a label and no grant date.",
+            "description": "One page of what the department uses today: the personal seats its people hold and the service accounts the department owns (kind SERVICE, shown with the employee the account is assigned to), one line per seat with the tool and plan, oldest start first, then by assignment id. The summary counts the seats of every page by plan, sorted by application then plan name; pagination gives the total. A start that is only the day of recording has a label and no grant date.",
             "content": {
               "application/json": { "schema": { "$ref": "#/components/schemas/DepartmentToolsResponseDto" } }
             }
@@ -2600,6 +2848,10 @@
             "description": "The seat is taken from today by an assignment of source REQUEST, and a manual task is queued for the IT Admin in charge of the beneficiary department (none: the general queue, with a warning). K5 takes no subscription and no seat.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GrantResponseDto" } } }
           },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "401": {
             "description": "Authentication is required or the token is no longer valid.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
@@ -2614,6 +2866,14 @@
           },
           "409": {
             "description": "PROVISIONING.REQUEST_NOT_APPROVED, REQUEST_ENDED, TYPE_NOT_SUPPORTED (K3, K4), BENEFICIARY_DEPARTED (details.nextStep CANCEL_REQUEST), BENEFICIARY_NOT_STARTED (details.startsOn: the person joins later), SEAT_TARGET.APPLICATION_RETIRED, or LICENSE_ASSIGNMENT.SEAT_CAPACITY.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
@@ -2808,6 +3068,10 @@
             "description": "The task is completed under the name of this IT Admin, whoever is in charge by default. The evidence is a note of what was done, never a password or a key.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TaskResponseDto" } } }
           },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "401": {
             "description": "Authentication is required or the token is no longer valid.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
@@ -2822,6 +3086,14 @@
           },
           "409": {
             "description": "PROVISIONING_TASK.NOT_MANUAL or NOT_IN_PROGRESS.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
@@ -2857,6 +3129,10 @@
             "description": "The task fails with the reason and is not completed; the seat stays taken. What happens next is decided by the failure handling.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TaskResponseDto" } } }
           },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "401": {
             "description": "Authentication is required or the token is no longer valid.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
@@ -2871,6 +3147,14 @@
           },
           "409": {
             "description": "PROVISIONING_TASK.NOT_MANUAL or NOT_IN_PROGRESS.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
@@ -2951,6 +3235,10 @@
             "description": "The failed connector task is queued again as a task by hand, with who handed it over and the evidence given. Nothing hands a task over by itself. The evidence is never a password or a key.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TaskResponseDto" } } }
           },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "401": {
             "description": "Authentication is required or the token is no longer valid.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
@@ -2965,6 +3253,14 @@
           },
           "409": {
             "description": "The task is not failed (NOT_FAILED) or is by hand already (PROVISIONING_TASK.ALREADY_MANUAL).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
@@ -3000,6 +3296,10 @@
             "description": "The only end of a failed task. A grant leaves a failed assignment and the seat is free again; a revocation leaves its assignment as it was. The request, its commitment and the notice to the requester belong to other modules, which read the audit event.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TaskResponseDto" } } }
           },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "401": {
             "description": "Authentication is required or the token is no longer valid.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
@@ -3014,6 +3314,14 @@
           },
           "409": {
             "description": "The task is not failed (PROVISIONING_TASK.NOT_FAILED), or its assignment is no longer open.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
@@ -3047,6 +3355,10 @@
             "description": "Every valid key is kept, sealed. A line that is not kept is reported by its number with INVALID_FORMAT, DUPLICATE_IN_BATCH or ALREADY_IN_STORE, never with the key. The summary is the capacity of the purchase: the smaller of the seats bought and the keys still usable.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ImportResponseDto" } } }
           },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "401": {
             "description": "Authentication is required or the token is no longer valid.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
@@ -3057,6 +3369,14 @@
           },
           "404": {
             "description": "The purchase does not exist (SUBSCRIPTION.NOT_FOUND).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
@@ -3175,7 +3495,7 @@
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "429": {
-            "description": "The account has opened as many keys as it may in this minute (10) or this day (200): HTTP_TOO_MANY_REQUESTS. Nothing was opened and nothing was counted.",
+            "description": "The account has opened as many keys as it may in this minute (10) or this day (200): HTTP_TOO_MANY_REQUESTS. Nothing was opened and nothing was counted. Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "503": {
@@ -3256,6 +3576,10 @@
             "description": "The vendor group exists with no service line yet.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/VendorGroupResponseDto" } } }
           },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "401": {
             "description": "Authentication is required or the token is no longer valid.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
@@ -3266,6 +3590,14 @@
           },
           "409": {
             "description": "A group with this name exists, ignoring case, accents and spacing (VENDOR_DICTIONARY.GROUP_NAME_TAKEN).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
@@ -3301,6 +3633,10 @@
             "description": "The group as it is after the change; a change that changes nothing is answered the same and not audited.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/VendorGroupResponseDto" } } }
           },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "401": {
             "description": "Authentication is required or the token is no longer valid.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
@@ -3315,6 +3651,14 @@
           },
           "409": {
             "description": "Another group has this name (VENDOR_DICTIONARY.GROUP_NAME_TAKEN).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
@@ -3352,6 +3696,10 @@
               "application/json": { "schema": { "$ref": "#/components/schemas/VendorServiceLineResponseDto" } }
             }
           },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "401": {
             "description": "Authentication is required or the token is no longer valid.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
@@ -3366,6 +3714,14 @@
           },
           "409": {
             "description": "The group already has a line with this name (VENDOR_DICTIONARY.SERVICE_LINE_NAME_TAKEN).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
@@ -3403,6 +3759,10 @@
               "application/json": { "schema": { "$ref": "#/components/schemas/VendorServiceLineResponseDto" } }
             }
           },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "401": {
             "description": "Authentication is required or the token is no longer valid.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
@@ -3417,6 +3777,14 @@
           },
           "409": {
             "description": "Another line of the group has this name (VENDOR_DICTIONARY.SERVICE_LINE_NAME_TAKEN).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
@@ -3496,12 +3864,24 @@
               "application/json": { "schema": { "$ref": "#/components/schemas/VendorNormalizationResponseDto" } }
             }
           },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "401": {
             "description": "Authentication is required or the token is no longer valid.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "403": {
             "description": "Only an IT Admin uses the vendor dictionary.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
@@ -3601,6 +3981,10 @@
               "application/json": { "schema": { "$ref": "#/components/schemas/VendorProposalResponseDto" } }
             }
           },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "401": {
             "description": "Authentication is required or the token is no longer valid.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
@@ -3615,6 +3999,14 @@
           },
           "409": {
             "description": "The proposal was already resolved (VENDOR_DICTIONARY.PROPOSAL_ALREADY_RESOLVED).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
@@ -3723,6 +4115,10 @@
               "application/json": { "schema": { "$ref": "#/components/schemas/CreatedApplicationResponseDto" } }
             }
           },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "401": {
             "description": "Authentication is required or the token is no longer valid.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
@@ -3732,7 +4128,15 @@
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "409": {
-            "description": "The vendor already has an application of this name (APPLICATION.NAME_TAKEN) or the dictionary line belongs to another application (APPLICATION.DICTIONARY_LINE_TAKEN).",
+            "description": "The vendor already has an application of this name (APPLICATION.NAME_TAKEN), the dictionary line belongs to another application (APPLICATION.DICTIONARY_LINE_TAKEN), or a simultaneous request changed the dictionary group of the vendor or of the line first (APPLICATION.DICTIONARY_GROUP_CHANGED): refresh the application and the line, then send the request again.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
@@ -3809,6 +4213,10 @@
             "description": "The application as it is after the change; a change of nothing is answered the same and not audited. The kind and the vendor cannot change.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApplicationResponseDto" } } }
           },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "401": {
             "description": "Authentication is required or the token is no longer valid.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
@@ -3822,7 +4230,15 @@
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "409": {
-            "description": "The vendor already has an application of this name (APPLICATION.NAME_TAKEN) or the dictionary line belongs to another application (APPLICATION.DICTIONARY_LINE_TAKEN).",
+            "description": "The vendor already has an application of this name (APPLICATION.NAME_TAKEN), the dictionary line belongs to another application (APPLICATION.DICTIONARY_LINE_TAKEN), or a simultaneous request changed the dictionary group of the vendor or of the line first (APPLICATION.DICTIONARY_GROUP_CHANGED): refresh the application and the line, then send the request again.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
@@ -3920,6 +4336,10 @@
               "application/json": { "schema": { "$ref": "#/components/schemas/FunctionalGroupResponseDto" } }
             }
           },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "401": {
             "description": "Authentication is required or the token is no longer valid.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
@@ -3930,6 +4350,14 @@
           },
           "409": {
             "description": "A group with this name exists, ignoring case, accents and spacing (FUNCTIONAL_GROUP.NAME_TAKEN).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
@@ -3969,6 +4397,10 @@
               "application/json": { "schema": { "$ref": "#/components/schemas/FunctionalGroupResponseDto" } }
             }
           },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "401": {
             "description": "Authentication is required or the token is no longer valid.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
@@ -3983,6 +4415,14 @@
           },
           "409": {
             "description": "A group with this name exists, ignoring case, accents and spacing (FUNCTIONAL_GROUP.NAME_TAKEN).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
@@ -4080,6 +4520,10 @@
             "description": "The plan is declared; seatTracking says whether seats are counted for it at all.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PlanResponseDto" } } }
           },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "401": {
             "description": "Authentication is required or the token is no longer valid.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
@@ -4090,6 +4534,14 @@
           },
           "409": {
             "description": "The application already has a plan of this name (PLAN.NAME_TAKEN) or the plan still has a workspace profile or a numeric install limit the new kind cannot keep (PLAN.WORKSPACE_PROFILE_BLOCKS_TYPE_CHANGE, PLAN.TERMS_BLOCK_TYPE_CHANGE), or a subscription or license key of the plan would no longer fit the new pricing model or kind (PLAN.IN_USE_BLOCKS_CHANGE, `details.reason`: ACTIVE_SUBSCRIPTION_WITHOUT_QUANTITY, LICENSE_KEYS or SUBSCRIPTIONS).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
@@ -4164,6 +4616,10 @@
             "description": "The plan as it is after the change; a change of nothing is answered the same and not audited. The application cannot change.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PlanResponseDto" } } }
           },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "401": {
             "description": "Authentication is required or the token is no longer valid.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
@@ -4178,6 +4634,14 @@
           },
           "409": {
             "description": "The application already has a plan of this name (PLAN.NAME_TAKEN) or the plan still has a workspace profile or a numeric install limit the new kind cannot keep (PLAN.WORKSPACE_PROFILE_BLOCKS_TYPE_CHANGE, PLAN.TERMS_BLOCK_TYPE_CHANGE), or a subscription or license key of the plan would no longer fit the new pricing model or kind (PLAN.IN_USE_BLOCKS_CHANGE, `details.reason`: ACTIVE_SUBSCRIPTION_WITHOUT_QUANTITY, LICENSE_KEYS or SUBSCRIPTIONS).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
@@ -4215,6 +4679,10 @@
               "application/json": { "schema": { "$ref": "#/components/schemas/WorkspaceProfileResponseDto" } }
             }
           },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "401": {
             "description": "Authentication is required or the token is no longer valid.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
@@ -4225,6 +4693,14 @@
           },
           "404": {
             "description": "The plan does not exist (PLAN.NOT_FOUND).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
@@ -4362,6 +4838,10 @@
               "application/json": { "schema": { "$ref": "#/components/schemas/DeclaredTaxProfileResponseDto" } }
             }
           },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "401": {
             "description": "Authentication is required or the token is no longer valid.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
@@ -4372,6 +4852,14 @@
           },
           "404": {
             "description": "The vendor does not exist (VENDOR.NOT_FOUND).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
@@ -4593,12 +5081,28 @@
             "description": "The subscription is stored: a draft while its data is incomplete, with what is missing; the unit price keeps the conversion at the rate of the day it was recorded.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SubscriptionResponseDto" } } }
           },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "401": {
             "description": "Authentication is required or the token is no longer valid.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "403": {
             "description": "Only an IT Admin declares or changes subscriptions.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "409": {
+            "description": "A unit price was to be converted, but the reporting currency of the installation is not in the currency table (REPORTING_CURRENCY_NOT_SUPPORTED, details.currency). A fault of the configuration, not of the request: the database normally prevents it, and an operator has to correct the currency table.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
@@ -4673,6 +5177,10 @@
             "description": "The subscription as it is after the change; a new unit price is converted again at the rate of today; a change of nothing is answered the same and not audited. The plan and the kind cannot change.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SubscriptionResponseDto" } } }
           },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "401": {
             "description": "Authentication is required or the token is no longer valid.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
@@ -4683,6 +5191,18 @@
           },
           "404": {
             "description": "The subscription does not exist (SUBSCRIPTION.NOT_FOUND).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "409": {
+            "description": "A unit price was to be converted, but the reporting currency of the installation is not in the currency table (REPORTING_CURRENCY_NOT_SUPPORTED, details.currency). A fault of the configuration, not of the request: the database normally prevents it, and an operator has to correct the currency table.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
@@ -4724,6 +5244,10 @@
           },
           "404": {
             "description": "The subscription does not exist (SUBSCRIPTION.NOT_FOUND).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "409": {
+            "description": "A unit price was to be converted, but the reporting currency of the installation is not in the currency table (REPORTING_CURRENCY_NOT_SUPPORTED, details.currency). A fault of the configuration, not of the request: the database normally prevents it, and an operator has to correct the currency table.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
@@ -4804,6 +5328,10 @@
               "application/json": { "schema": { "$ref": "#/components/schemas/DeclaredCostAllocationResponseDto" } }
             }
           },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "401": {
             "description": "Authentication is required or the token is no longer valid.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
@@ -4818,6 +5346,14 @@
           },
           "409": {
             "description": "The plan is billed per seat or its pricing model is not declared (SUBSCRIPTION.COST_ALLOCATION_NOT_APPLICABLE, details.reason).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
@@ -4953,6 +5489,10 @@
             "description": "The terms replace the previous ones as a whole, exactly as given; changed says whether anything differed. The sharing policy is not set here but on the plan.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PlanTermsSetResponseDto" } } }
           },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "401": {
             "description": "Authentication is required or the token is no longer valid.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
@@ -4963,6 +5503,14 @@
           },
           "404": {
             "description": "The plan does not exist (PLAN.NOT_FOUND).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
@@ -5055,6 +5603,10 @@
             "description": "The opinion is kept with the Business Owner of the application, who recorded it and when. It adds no step, deadline or approver.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/OpinionResponseDto" } } }
           },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "401": {
             "description": "Authentication is required or the token is no longer valid.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
@@ -5065,6 +5617,14 @@
           },
           "404": {
             "description": "The plan does not exist (PLAN.NOT_FOUND).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
@@ -5273,6 +5833,10 @@
               "application/json": { "schema": { "$ref": "#/components/schemas/RetirementConfirmationResponseDto" } }
             }
           },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "401": {
             "description": "Authentication is required or the token is no longer valid.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
@@ -5287,6 +5851,14 @@
           },
           "409": {
             "description": "The application is retired already (APPLICATION.ALREADY_RETIRED).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
@@ -5406,12 +5978,24 @@
             "description": "The contract, with the name given and who made it, as the signed-in IT Admin.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ContractResponseDto" } } }
           },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "401": {
             "description": "Authentication is required or the token is no longer valid.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "403": {
             "description": "Only an IT Admin makes a contract.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
@@ -5488,6 +6072,10 @@
               "application/json": { "schema": { "$ref": "#/components/schemas/CreateDocumentResponseDto" } }
             }
           },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "401": {
             "description": "Authentication is required or the token is no longer valid.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
@@ -5498,6 +6086,14 @@
           },
           "409": {
             "description": "The purpose has nowhere to be attached yet (DOCUMENT.PURPOSE_NOT_AVAILABLE).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
@@ -5578,6 +6174,10 @@
             "description": "The file belongs to the contract for good, and the IT Admin and Finance open it. Only its uploader attaches it, and only once.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DocumentResponseDto" } } }
           },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "401": {
             "description": "Authentication is required or the token is no longer valid.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
@@ -5592,6 +6192,14 @@
           },
           "409": {
             "description": "The document has an owner already (DOCUMENT.ALREADY_ATTACHED) or is not uploaded (DOCUMENT.NOT_READY_TO_ATTACH).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
@@ -5837,6 +6445,10 @@
             "description": "The plans are the toolset of the pair from now on; a change is a new version and changed says so. It grants and revokes nothing.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SetToolsetResponseDto" } } }
           },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "401": {
             "description": "Authentication is required or the token is no longer valid.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
@@ -5847,6 +6459,14 @@
           },
           "404": {
             "description": "The department or the job title does not exist (DEPARTMENT.NOT_FOUND, JOB_TITLE.NOT_FOUND).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
@@ -6002,6 +6622,10 @@
             "description": "The rate is recorded for that currency and day, entered by hand.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ExchangeRateResponseDto" } } }
           },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "401": {
             "description": "Authentication is required or the token is no longer valid.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
@@ -6012,6 +6636,14 @@
           },
           "409": {
             "description": "A rate for that currency and day is already recorded (EXCHANGE_RATE.ALREADY_RECORDED).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
@@ -6109,8 +6741,20 @@
             "description": "Signed in. The body carries the access token and the refresh token.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SessionTokenResponseDto" } } }
           },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "401": {
             "description": "The email or password is not valid (one answer for every reason).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
@@ -6143,8 +6787,20 @@
             "description": "A new access token and a new refresh token; the presented refresh token is spent.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SessionTokenResponseDto" } } }
           },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "401": {
             "description": "The refresh token is unknown, malformed, expired, spent or its session ended.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
@@ -6174,6 +6830,18 @@
         },
         "responses": {
           "204": { "description": "Signed out (or there was nothing to sign out)." },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "422": {
             "description": "The body has no refresh token (VALIDATION_ERROR).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
@@ -6208,6 +6876,18 @@
               "application/json": { "schema": { "$ref": "#/components/schemas/PasswordResetRequestedResponseDto" } }
             }
           },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "422": {
             "description": "The body is invalid (VALIDATION_ERROR).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
@@ -6239,7 +6919,15 @@
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PasswordResetResponseDto" } } }
           },
           "400": {
-            "description": "The link is not valid (unknown, used, replaced, expired, or the account cannot use it). One answer for all.",
+            "description": "The link is not valid (unknown, used, replaced, expired, or the account cannot use it). One answer for all. The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
@@ -6275,7 +6963,15 @@
             }
           },
           "400": {
-            "description": "The link is not valid (unknown, used, replaced, expired, or the account cannot be activated).",
+            "description": "The link is not valid (unknown, used, replaced, expired, or the account cannot be activated). The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
@@ -6337,8 +7033,20 @@
               "application/json": { "schema": { "$ref": "#/components/schemas/PasswordChangedResponseDto" } }
             }
           },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "401": {
             "description": "Authentication is required or the token is no longer valid.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
@@ -6411,6 +7119,10 @@
             "description": "The account was created (invited) and its invitation queued.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AccountDetailResponseDto" } } }
           },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "401": {
             "description": "Authentication is required or the token is no longer valid.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
@@ -6425,6 +7137,14 @@
           },
           "409": {
             "description": "The employee left, already has an account, or the email or Finance seat is taken.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
@@ -6616,6 +7336,10 @@
             "description": "The account is locked; its sessions and unused invitation are ended.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AccountDetailResponseDto" } } }
           },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "401": {
             "description": "Authentication is required or the token is no longer valid.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
@@ -6630,6 +7354,14 @@
           },
           "409": {
             "description": "The caller, or the holder of SUPER_ADMIN, cannot be locked.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
@@ -6665,6 +7397,10 @@
             "description": "The account is active again.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AccountDetailResponseDto" } } }
           },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "401": {
             "description": "Authentication is required or the token is no longer valid.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
@@ -6679,6 +7415,14 @@
           },
           "409": {
             "description": "The caller cannot change their own account.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
@@ -6714,6 +7458,10 @@
             "description": "The role is granted and takes effect at the account next request.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AccountDetailResponseDto" } } }
           },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "401": {
             "description": "Authentication is required or the token is no longer valid.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
@@ -6728,6 +7476,14 @@
           },
           "409": {
             "description": "Already granted, forbidden combination, Finance seat taken, or the caller.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
@@ -6853,6 +7609,10 @@
             "description": "The person holds the role from now on; whoever held it before stops. Naming the person who already holds it changes nothing.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApprovalRolesResponseDto" } } }
           },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "401": {
             "description": "Authentication is required or the token is no longer valid.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
@@ -6863,6 +7623,14 @@
           },
           "404": {
             "description": "The employee does not exist (ORGANIZATION.EMPLOYEE_NOT_FOUND).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {
@@ -6898,6 +7666,10 @@
               "application/json": { "schema": { "$ref": "#/components/schemas/SuperAdminTransferResponseDto" } }
             }
           },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
           "401": {
             "description": "Authentication is required or the token is no longer valid.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
@@ -6908,6 +7680,14 @@
           },
           "404": {
             "description": "The successor account does not exist (SUPER_ADMIN_TRANSFER.SUCCESSOR_NOT_FOUND).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
           },
           "422": {

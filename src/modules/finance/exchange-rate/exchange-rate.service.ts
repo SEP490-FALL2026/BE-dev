@@ -71,17 +71,21 @@ export class ExchangeRateService {
     input: { currency: string; rateDate: BusinessDate; rate: string },
   ): Promise<ExchangeRateView> {
     const rate = parseRate(input.rate);
-    const organization = await this.requireOrganization();
     if (!(await this.finance.findCurrency(input.currency))) throw new CurrencyNotSupportedError(input.currency);
-    if (input.currency === organization.reportingCurrency) {
-      throw new ExchangeRateSameAsReportingCurrencyError(input.currency);
-    }
     const problem = rateDateProblem(input.rateDate, await this.organization.businessToday());
     if (problem === 'DATE_IN_FUTURE') throw new ExchangeRateDateInFutureError();
     if (problem === 'DATE_TOO_OLD') throw new ExchangeRateDateTooOldError();
 
     try {
-      const recorded = await this.runner.run(async (tx) => {
+      return await this.runner.run(async (tx) => {
+        // The reporting currency that governs the rate, read with the organization row held FOR SHARE until the rate
+        // commits (P28-03, DB-01): a change in flight is waited for and then read, and a change after this one waits
+        // for the rate and is refused by the lock. The check, the audit and the answer all speak this currency.
+        const organization = await this.organization.getOrganizationShared(tx);
+        if (!organization) throw new Error('Exchange rates were used before installation');
+        if (input.currency === organization.reportingCurrency) {
+          throw new ExchangeRateSameAsReportingCurrencyError(input.currency);
+        }
         const row = await this.ledger.insert(tx, {
           organizationId: organization.id,
           currency: input.currency,
@@ -99,10 +103,8 @@ export class ExchangeRateService {
           }),
         );
 
-        return row;
+        return { ...row, reportingCurrency: organization.reportingCurrency };
       });
-
-      return { ...recorded, reportingCurrency: organization.reportingCurrency };
     } catch (error) {
       // The unique (organization, currency, day) decided between two simultaneous entries.
       if (readSqlState(error) === '23505') throw new ExchangeRateAlreadyRecordedError();

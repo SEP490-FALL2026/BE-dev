@@ -45,3 +45,5 @@ review trên revision cụ thể.
 - [x] Diff cuối đã tự review; tài liệu vận hành/runbook bị ảnh hưởng đã cập nhật; phần chưa kiểm chứng ghi rõ.
 - [ ] Giao Owner review trên revision cụ thể; cập nhật roadmap/PR. Chỉ ghi `merged-dev`, `accepted`, `released` sau
       đúng sự kiện thật.
+
+**Prompt 29 (23/10/2026):** `P28-03` — `DB-01` chưa đóng cho tỷ giá (đọc tiền tệ báo cáo ngoài transaction); nay đọc `FOR SHARE` trong transaction ghi, kiểm/audit/response cùng tiền tệ; test đua `exchange-rate-reporting-currency-race`. [g0-g4-checkpoint-fix-forward](../g0-g4-checkpoint-fix-forward/spec.md).

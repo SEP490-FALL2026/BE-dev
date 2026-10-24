@@ -274,7 +274,7 @@ describe('the contracts and the files kept for them over HTTP (integration, real
     const key = await h.putObject(executable.id, {
       contentLength: PDF.sizeBytes,
       contentType: PDF.contentType,
-      content: Uint8Array.from(Buffer.from('MZ  this is a program, not a PDF', 'latin1')),
+      content: Uint8Array.from(Buffer.from('MZ\u0090\u0000 this is a program, not a PDF', 'latin1')),
     });
 
     expect(h.codeOf(await h.completeDocument(executable.id).expect(422))).toBe('DOCUMENT.UPLOAD_MISMATCH');

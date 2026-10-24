@@ -135,7 +135,8 @@ export class OperatingParametersController {
   @ApiOperation({ operationId: 'nonWorkingDateList', summary: 'List non-working dates' })
   @ApiSuccessResponse(NonWorkingDateListResponseDto, {
     message: 'NON_WORKING_DATE.LISTED',
-    description: 'A page of the days nobody works, in date order, optionally between two dates.',
+    description:
+      'One page of the days nobody works, in date order, optionally between two dates. The list is paged: without page and pageSize the answer holds the first 20 only. pagination.totalItems counts every matching day and pagination.totalPages the pages; ask for page 2 up to totalPages (pageSize up to 100) to read the rest.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, VALIDATION_ERROR)
   async listNonWorkingDates(@Query() query: ListNonWorkingDatesQueryDto) {

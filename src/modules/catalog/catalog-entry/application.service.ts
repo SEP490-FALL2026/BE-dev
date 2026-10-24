@@ -13,6 +13,7 @@ import { FunctionalGroupLookupService } from '../functional-group/functional-gro
 import { catalogAuditEvent } from '../mappers/catalog-audit-event';
 import { VendorDictionaryLookupService } from '../vendor-dictionary/vendor-dictionary-lookup.service';
 import { VendorDirectoryService, type EnsuredVendor } from '../vendor/vendor-directory.service';
+import { VendorDictionaryGroupChangedError, VendorNameHeldByAnotherGroupError } from '../vendor/vendor.errors';
 import {
   ApplicationBusinessOwnerInvalidError,
   ApplicationDictionaryLineNotFoundError,
@@ -22,6 +23,7 @@ import {
   ApplicationNameTakenError,
   ApplicationNotFoundError,
   ApplicationUpdateEmptyError,
+  ApplicationVendorGroupChangedError,
 } from './application.errors';
 import {
   cleanApplicationDomains,
@@ -124,8 +126,10 @@ export class ApplicationService {
   /**
    * Declares an application. Throws the vendor errors of `vendorSourceOf`, the
    * name, domain and note errors of the policy, ApplicationBusinessOwnerInvalidError,
-   * ApplicationFunctionalGroupInvalidError, ApplicationDictionaryLineNotFoundError, ApplicationNameTakenError and
-   * ApplicationDictionaryLineTakenError. `proposed` is true when the software is outside the dictionary.
+   * ApplicationFunctionalGroupInvalidError, ApplicationDictionaryLineNotFoundError, ApplicationNameTakenError,
+   * ApplicationDictionaryLineTakenError, ApplicationDictionaryLineMismatchError (a vendor of the group's name holds
+   * another group) and ApplicationVendorGroupChangedError (a simultaneous change took the group first, `DB-03`).
+   * `proposed` is true when the software is outside the dictionary.
    */
   async declare(
     actor: AuthenticatedPrincipal,
@@ -271,7 +275,12 @@ export class ApplicationService {
           input.dictionaryServiceLineId !== current.dictionaryServiceLineId
         ) {
           if (input.dictionaryServiceLineId !== null) {
-            adoptedGroup = await this.vendorLinks.requireLine(tx, current, input.dictionaryServiceLineId);
+            adoptedGroup = await this.vendorLinks.requireLine(
+              tx,
+              organizationId,
+              current,
+              input.dictionaryServiceLineId,
+            );
           }
           changes.dictionaryServiceLineId = input.dictionaryServiceLineId;
         }
@@ -347,6 +356,8 @@ export class ApplicationService {
   }
 
   private mapWriteError(error: unknown): unknown {
+    if (error instanceof VendorNameHeldByAnotherGroupError) return new ApplicationDictionaryLineMismatchError();
+    if (error instanceof VendorDictionaryGroupChangedError) return new ApplicationVendorGroupChangedError();
     if (isUniqueViolation(error, 'dictionary_line_id')) return new ApplicationDictionaryLineTakenError();
     if (isUniqueViolation(error, 'normalized_name')) return new ApplicationNameTakenError();
     if (isCheckViolation(error)) return new ApplicationDictionaryLineMismatchError();

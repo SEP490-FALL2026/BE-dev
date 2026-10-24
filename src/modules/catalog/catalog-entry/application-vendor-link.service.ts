@@ -10,6 +10,7 @@ import {
   ApplicationDictionaryLineMismatchError,
   ApplicationDictionaryLineNotFoundError,
   ApplicationInternalHasNoVendorError,
+  ApplicationVendorGroupChangedError,
 } from './application.errors';
 import type { ApplicationRecord } from './application.types';
 
@@ -29,9 +30,12 @@ export class ApplicationVendorLinkService {
   /**
    * The line must exist and sit in the dictionary group of the application's vendor, which takes the group if it has none;
    * the answer names the vendor and group when this call made the link, for the caller to record with `recordAdopted`.
+   * A group another vendor already holds is a mismatch; losing the conditional write after both reads is a race lost to
+   * a simultaneous change (`DB-03`), ApplicationVendorGroupChangedError.
    */
   async requireLine(
     tx: DbTx,
+    organizationId: string,
     application: ApplicationRecord,
     lineId: string,
   ): Promise<{ vendorId: string; groupId: string } | null> {
@@ -40,8 +44,11 @@ export class ApplicationVendorLinkService {
     if (!line) throw new ApplicationDictionaryLineNotFoundError();
     if (application.vendor.dictionaryGroupId === line.groupId) return null;
     if (application.vendor.dictionaryGroupId !== null) throw new ApplicationDictionaryLineMismatchError();
+    // Read before the write: a refused write can abort the transaction, so nothing may be read after it.
+    const holder = await this.vendors.findByDictionaryGroup(tx, organizationId, line.groupId);
+    if (holder && holder.id !== application.vendor.id) throw new ApplicationDictionaryLineMismatchError();
     const adopted = await this.vendors.adoptDictionaryGroup(tx, application.vendor.id, line.groupId);
-    if (!adopted) throw new ApplicationDictionaryLineMismatchError();
+    if (!adopted) throw new ApplicationVendorGroupChangedError();
 
     return adopted.adopted ? { vendorId: application.vendor.id, groupId: line.groupId } : null;
   }

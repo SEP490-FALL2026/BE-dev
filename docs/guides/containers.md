@@ -6,7 +6,9 @@ object storage the API mounts for contract files (the queue is not mounted, Owne
 Check for port conflicts before starting; do not stop unrelated services.
 Create the configured MinIO bucket before using storage. The API refuses the public default credentials of MinIO
 (`minioadmin`) in every environment but `NODE_ENV=test` (SEC-04): set your own `MINIO_ROOT_USER`/`MINIO_ROOT_PASSWORD`
-and the same values as `OBJECT_STORAGE_ACCESS_KEY_ID`/`OBJECT_STORAGE_SECRET_ACCESS_KEY` (different from each other).
+in your shell or `.env` and the same values as `OBJECT_STORAGE_ACCESS_KEY_ID`/`OBJECT_STORAGE_SECRET_ACCESS_KEY`
+(different from each other). The `storage` profile of `compose.yaml` reads them and MinIO refuses to start when they are
+missing, are `minioadmin` or are equal (P28-08); the default profile needs none of them.
 
 MinIO builds locally from the pinned official release because the old prebuilt image
 cannot be pulled. The first build downloads Go dependencies and can take several minutes.
@@ -33,10 +35,18 @@ OBJECT_STORAGE_ENDPOINT with OBJECT_STORAGE_BUCKET and the access key (the varia
 `@production-required-when-mounted` in `.env.example`); the worker and the commands do not read them. The endpoint is
 the one the browser uploads to and the one signed links open: its host is written into every link, so it must be
 reachable from the user's browser over HTTPS (not a container-internal name), the bucket must already exist, and the
-bucket must allow the browser's `PUT` from the application's origin (CORS, with the `Content-Type` header: the upload link signs
-the declared type and size, ADR-0014). Links live 2 minutes to upload and 5 minutes to view. Add a lifecycle rule that
-expires the objects under `pending-documents/` after 2 days (what an upload that was never completed leaves behind);
-objects under `documents/` are the kept files and are never expired by the bucket.
+storage must allow the browser's `PUT` from the application's origin (CORS, with the `Content-Type` header: the upload
+link signs the declared type and size, ADR-0014). Where CORS is set depends on the storage: S3 and most services take a
+**bucket** CORS rule; MinIO answers `NotImplemented` to `PutBucketCors` and takes CORS **server-wide** (its
+`MINIO_API_CORS_ALLOW_ORIGIN` setting, every origin by default) — restrict it to the application's origin in any shared
+deployment (P28-17). The signature still binds the type and size whatever CORS allows: a `PUT` with another
+`Content-Type` or length is refused (403), as the real-storage integration suite shows. Links live 2 minutes to upload and
+5 minutes to view. Add a lifecycle rule that expires the objects under `pending-documents/` after 2 days (what an upload
+that was never completed leaves behind); objects under `documents/` are the kept files and are never expired by the
+bucket. Completing a file copies the upload to `documents/`, records it, and only then deletes the upload; a commit that
+fails takes its copy back (P28-11). The one case that can leave a copy under `documents/` with no row naming it is a
+database that cannot even be read after that failure: compare `documents/` with `document_attachments.final_object_key`
+before deleting anything there by hand.
 Authentication also requires AUTH_ACCESS_TOKEN_SECRET and AUTH_THROTTLE_PEPPER;
 invitation delivery requires HTTPS APP_PUBLIC_URL, OUTBOX_PAYLOAD_KEY (base64 of 32 bytes), OUTBOX_PAYLOAD_KEY_ID,
 SMTP_HOST, SMTP_FROM and SMTP_TLS=true, plus the provider's port/auth settings.
@@ -88,6 +98,12 @@ file has no Redis service. A host that ran an earlier deploy keeps its `slm-redi
 an orphan; the deploy does not pass `--remove-orphans`) and its volume: remove them by hand when no longer wanted. Compose has no SMTP sink;
 configure a reachable SMTP service separately. SMTP TLS/provider delivery remains unverified.
 
+Request size: the API refuses a JSON or URL-encoded body over **100 KiB** with 413 `HTTP_PAYLOAD_TOO_LARGE` (one limit in
+code, [API contract](../rules/api-contract.md#errors)); the two import uploads take a multipart file of at most 2 MiB. A
+reverse proxy in front of the API must let at least 2 MiB plus the form through, or those uploads fail at the proxy
+with its own answer instead of the API's. The URL-encoded parser stays mounted with at most 100 parameters and a nesting
+depth of 5; malformed, unsupported (charset or `Content-Encoding`) or corrupt compressed bodies are 400/415, never 500.
+
 ## Backup before production migrations
 
 `DB-05`, added 22/10/2026 by `delivery-gate-hardening`. The deploy workflow (`.github/workflows/deploy.yml`, step 3.5)
@@ -100,6 +116,52 @@ dumps the production database **before** `prisma migrate deploy`:
   `umask 077`) through a `.partial` file, and keeps it only when it is non-empty and `pg_restore --list` reads it;
 - stops the deploy (exit 1, partial file removed) when `pg_dump` fails, when the dump is empty or unreadable, or when
   PostgreSQL is not ready — no migration runs and the running containers are not recreated.
+
+### Preflight before `migrate deploy` (P28-01)
+
+After the backup and before `prisma migrate deploy`, the workflow runs the read-only `pnpm ops:preflight`
+(`node dist/migration-preflight-cli.js` in the API image) and stops the deploy on any exit code but 0. It judges whether
+the history can carry the database through `20261022120000_cost_centers_unit_only` — merged and already applied on the
+test VPS, so kept byte for byte (`P29-MIGRATION=B-FORWARD`) — and the forward migration
+`20261023100000_service_account_owner_on_recorded_day`, which moves every history to the rule of the application (a
+service account belongs to its responsible person's department on the day it was recorded, `QĐ-86c`). Its session is
+read-only (PostgreSQL refuses any write, `25006`). `--json` gives the same report as one object.
+
+- **0, `READY`:** the deploy may run. The report lists the service accounts the forward migration will move (each move is
+  written to the Audit Trail as `LICENSE_ASSIGNMENT.OWNER_CORRECTED`, actor `SYSTEM`) and, before the merged migration,
+  the `COMPANY` Cost Centers it deletes for good — only the backup keeps them.
+- **2, `BLOCKED`:** do not deploy; every blocked row is named and the deploy stops before `migrate deploy`, so the
+  database stays exactly as it was. `MIGRATION_FAILED`: Prisma recorded a failed attempt (it rolled back; every later
+  deploy is refused). `SERVICE_ACCOUNT_WITHOUT_DEPARTMENT_ON_START`, `SERVICE_ACCOUNT_WITHOUT_DEPARTMENT_ON_RECORDED_DAY`,
+  `COST_ALLOCATION_NAMES_COMPANY`, `DEPARTMENT_CHARGED_TO_COMPANY`: the data cannot be carried without inventing HR or
+  finance history. See _Supported and blocked histories_ below for what may happen next.
+- **1:** the command failed (database unreachable, settings invalid); nothing was judged.
+
+**The preflight is a read-only check, not a repair.** It changes nothing, and no command in this repository invents a
+department or `Unit`, rewrites immutable placement or allocation history, or recreates a database (`P29-RV-01`).
+
+Supported and blocked histories (each proven by `test/integration/unit-only-upgrade-history.integration-spec.ts`):
+
+| History                                                                             | Path                                                                                                     |
+| ----------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| Fresh database                                                                      | supported: `migrate deploy` of every migration; preflight `READY`                                        |
+| Already applied `20261022120000` with its original checksum (the known test VPS)    | supported: the forward migration `20261023100000` moves service accounts to the recorded day, with audit |
+| Older database, not yet at `20261022120000`, preflight `READY`                      | supported: both migrations in order, same end state as the other histories                               |
+| Older database, not yet at `20261022120000`, preflight `BLOCKED` (exit 2)           | **no automatic path**: kept byte and data unchanged; deploying to it is blocked                          |
+| Already at `20261022120000`, a service account in no department on its recorded day | **no automatic path**: preflight `BLOCKED`; the forward migration, if forced, stops before it writes     |
+
+A blocked database moves only through an explicit, per-database decision of the Owner:
+
+- **Recreate** it only after the Owner separately confirms that **this exact** database is disposable (the backup above
+  is still taken first).
+- A database that is **not** disposable needs an authoritative row-by-row mapping decision (which department or `Unit`
+  each blocked row belongs to, on which HR or finance basis) and a separately reviewed repair procedure. Neither exists
+  yet; this package does not make one up.
+
+This limitation does not block committing the checkpoint; it blocks deploying it to any database whose preflight exits 2.
+
+Run it by hand on any database before upgrading it: `pnpm ops:preflight` from a checkout with `DATABASE_URL` set, or the
+command above in the image. The deploy step was not exercised on the VPS in Prompt 29.
 
 There are no down migrations. After a failed or wrong migration, either **roll forward** with a new reviewed migration
 or **restore** the dump taken just before it. A restore is a manual, approved operation: stop `api` and `worker`, restore

@@ -1,6 +1,11 @@
-import { Body, Controller, Get, HttpStatus, INestApplication, Post } from '@nestjs/common';
+import { ArgumentsHost, Body, Controller, Get, HttpStatus, INestApplication, Post } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
+import type { Response } from 'express';
+import type { Server } from 'node:http';
+import { connect } from 'node:net';
+import type { AddressInfo } from 'node:net';
+import { gzipSync } from 'node:zlib';
 import { createZodDto } from 'nestjs-zod';
 import request from 'supertest';
 import { bodyOf } from '../support/api-body';
@@ -13,6 +18,7 @@ import { ApiSuccessResponse } from '../../src/infrastructure/http/decorators/api
 import { RawResponse } from '../../src/infrastructure/http/decorators/raw-response.decorator';
 import { successEnvelopeSchema } from '../../src/infrastructure/http/dto/success-envelope.dto';
 import { ApiException } from '../../src/infrastructure/http/errors/api.exception';
+import { HttpExceptionFilter } from '../../src/infrastructure/http/filters/http-exception.filter';
 import { AuthenticatedOnly, RequireRoles } from '../../src/infrastructure/security/decorators/access.decorators';
 import { Public } from '../../src/infrastructure/security/decorators/public.decorator';
 import {
@@ -251,6 +257,173 @@ describe('Application foundation (e2e)', () => {
       });
   });
 
+  describe('the JSON body limit of the parser (P29-N1)', () => {
+    // Written out, not read from the code: the documented limit is 100 KiB of JSON (docs/rules/api-contract.md).
+    const LIMIT = 100 * 1024;
+    const MARKER = 'SECRET-BODY-MARKER';
+    /** A probe body of exactly `bytes` bytes that the probe accepts when the parser lets it through. */
+    const probeBody = (bytes: number) => {
+      const [head, tail] = ['{"name":"', '","nested":{"count":1}}'];
+
+      return head + MARKER + 'x'.repeat(bytes - head.length - tail.length - MARKER.length) + tail;
+    };
+    const post = (path: string, body: string) =>
+      request(app!.getHttpServer()).post(path).set('content-type', 'application/json').send(body);
+
+    it('reads a body of exactly the limit', async () => {
+      expect(Buffer.byteLength(probeBody(LIMIT))).toBe(LIMIT);
+
+      await post('/api/v1/contract-probe', probeBody(LIMIT)).expect(201);
+    });
+
+    it.each([
+      ['a public route', '/api/v1/contract-probe'],
+      ['the public sign-in route', '/api/v1/auth/login'],
+      ['a protected route, before any token is read', '/api/v1/applications'],
+    ])(
+      'answers one byte more on %s with 413 HTTP_PAYLOAD_TOO_LARGE and nothing of the parser or the body',
+      async (_name, path) => {
+        const response = await post(path, probeBody(LIMIT + 1));
+
+        expect(response.status).toBe(413);
+        expect(bodyOf(response)).toEqual({
+          success: false,
+          error: {
+            code: 'HTTP_PAYLOAD_TOO_LARGE',
+            message: 'The request could not be processed.',
+            requestId: response.headers['x-request-id'],
+          },
+        });
+        expect(response.text).not.toMatch(/SECRET-BODY-MARKER|entity|limit|stack|102400/i);
+      },
+    );
+  });
+
+  describe('the other refusals of the request parsers (P29-N4)', () => {
+    const SECRET = 'SECRET-FIELD-VALUE';
+    const LOGIN = '/api/v1/auth/login';
+    const post = (headers: Record<string, string>, body: string | Buffer) => {
+      let call = request(app!.getHttpServer()).post(LOGIN);
+      for (const [name, value] of Object.entries(headers)) call = call.set(name, value);
+
+      return call.send(body);
+    };
+    /** Nothing of the body, the header values or the parser reaches the client. */
+    const LEAK =
+      /SECRET-FIELD-VALUE|latin1|koi8|compress|unexpected|unsupported (?:charset|content)|parse|depth|parameters|stack|zlib|Z_/i;
+    const form = (pairs: number) => Array.from({ length: pairs }, (_, index) => `p${index}=${SECRET}`).join('&');
+    const nested = (levels: number) => `a${'[b]'.repeat(levels)}=${SECRET}`;
+
+    it.each([
+      ['malformed JSON', { 'content-type': 'application/json' }, `{"email":"${SECRET}"`, 400, 'HTTP_BAD_REQUEST'],
+      [
+        'a JSON charset other than UTF',
+        { 'content-type': 'application/json; charset=latin1' },
+        `{"email":"${SECRET}"}`,
+        415,
+        'HTTP_UNSUPPORTED_MEDIA_TYPE',
+      ],
+      [
+        'a JSON charset that does not exist',
+        { 'content-type': 'application/json; charset=utf-99' },
+        `{"email":"${SECRET}"}`,
+        415,
+        'HTTP_UNSUPPORTED_MEDIA_TYPE',
+      ],
+      [
+        'a content encoding the parser does not read',
+        { 'content-type': 'application/json', 'content-encoding': 'compress' },
+        `{"email":"${SECRET}"}`,
+        415,
+        'HTTP_UNSUPPORTED_MEDIA_TYPE',
+      ],
+      [
+        'a gzip body that is not gzip',
+        { 'content-type': 'application/json', 'content-encoding': 'gzip' },
+        SECRET,
+        400,
+        'HTTP_BAD_REQUEST',
+      ],
+      [
+        'a deflate body that is not deflate',
+        { 'content-type': 'application/json', 'content-encoding': 'deflate' },
+        SECRET,
+        400,
+        'HTTP_BAD_REQUEST',
+      ],
+      [
+        'a brotli body that is not brotli',
+        { 'content-type': 'application/json', 'content-encoding': 'br' },
+        Buffer.from([0xff, 0xff, 0xff, 0xff, 0x00, 0x13]),
+        400,
+        'HTTP_BAD_REQUEST',
+      ],
+      [
+        'a gzip body cut short',
+        { 'content-type': 'application/json', 'content-encoding': 'gzip' },
+        gzipSync(`{"email":"${SECRET}"}`).subarray(0, 12),
+        400,
+        'HTTP_BAD_REQUEST',
+      ],
+      [
+        'far too many URL-encoded parameters',
+        { 'content-type': 'application/x-www-form-urlencoded' },
+        form(1001),
+        413,
+        'HTTP_PAYLOAD_TOO_LARGE',
+      ],
+      [
+        'one URL-encoded parameter over the limit of 100',
+        { 'content-type': 'application/x-www-form-urlencoded' },
+        form(101),
+        413,
+        'HTTP_PAYLOAD_TOO_LARGE',
+      ],
+      [
+        'URL-encoded nesting 40 deep',
+        { 'content-type': 'application/x-www-form-urlencoded' },
+        nested(40),
+        400,
+        'HTTP_BAD_REQUEST',
+      ],
+      [
+        'URL-encoded nesting one level over the depth of 5',
+        { 'content-type': 'application/x-www-form-urlencoded' },
+        nested(6),
+        400,
+        'HTTP_BAD_REQUEST',
+      ],
+      [
+        'a URL-encoded charset other than UTF-8 or ISO-8859-1',
+        { 'content-type': 'application/x-www-form-urlencoded; charset=koi8-r' },
+        `a=${SECRET}`,
+        415,
+        'HTTP_UNSUPPORTED_MEDIA_TYPE',
+      ],
+    ])(
+      'refuses %s with its own status and code, and returns nothing of the request',
+      async (_name, headers, body, status, code) => {
+        const response = await post(headers, body);
+
+        expect({ status: response.status, code: bodyOf(response).error.code }).toEqual({ status, code });
+        expect(bodyOf(response).error.message).toBe('The request could not be processed.');
+        expect(response.text).not.toMatch(LEAK);
+      },
+    );
+
+    it.each([
+      ['exactly 100 URL-encoded parameters', form(100)],
+      ['URL-encoded nesting exactly 5 deep', nested(5)],
+    ])('lets %s through the parser to the validation of the route', async (_name, body) => {
+      const response = await post({ 'content-type': 'application/x-www-form-urlencoded' }, body);
+
+      expect({ status: response.status, code: bodyOf(response).error.code }).toEqual({
+        status: 422,
+        code: 'VALIDATION_ERROR',
+      });
+    });
+  });
+
   it('fails closed when a response violates its Zod wire schema', () => {
     return request(app!.getHttpServer())
       .get('/api/v1/contract-probe/invalid-response')
@@ -323,33 +496,36 @@ describe('Application foundation (e2e)', () => {
   });
 
   it('enforces @RequireRoles: 403 for the wrong role, 200 for the right one', async () => {
-    for (const [roles, status] of [
-      [['EMPLOYEE'], 403],
-      [[], 403],
-      [['IT_ADMIN'], 200],
-    ] as const) {
-      const moduleFixture: TestingModule = await Test.createTestingModule({
-        imports: [AppModule],
-        controllers: [RoleProbeController],
-      })
-        .overrideProvider(ACCESS_TOKEN_VERIFIER)
-        .useValue({ verify: jest.fn().mockResolvedValue(principalWithRoles(...roles)) })
-        .compile();
-      const roleApp: INestApplication<App> = moduleFixture.createNestApplication();
-      configureApplication(roleApp);
-      await roleApp.init();
+    // One application for the three cases (P28-13): the verifier answers by token, so each request carries its roles;
+    // compiling the whole AppModule once per case made the test outlast its timeout on a loaded machine.
+    const rolesByToken: Record<string, string[]> = { employee: ['EMPLOYEE'], none: [], 'it-admin': ['IT_ADMIN'] };
+    const moduleFixture: TestingModule = await Test.createTestingModule({
+      imports: [AppModule],
+      controllers: [RoleProbeController],
+    })
+      .overrideProvider(ACCESS_TOKEN_VERIFIER)
+      .useValue({ verify: jest.fn((token: string) => Promise.resolve(principalWithRoles(...rolesByToken[token]))) })
+      .compile();
+    const roleApp: INestApplication<App> = moduleFixture.createNestApplication();
+    configureApplication(roleApp);
+    await roleApp.init();
 
-      try {
+    try {
+      for (const [token, status] of [
+        ['employee', 403],
+        ['none', 403],
+        ['it-admin', 200],
+      ] as const) {
         const response = await request(roleApp.getHttpServer())
           .get('/api/v1/role-probe')
-          .set('authorization', 'Bearer any')
+          .set('authorization', `Bearer ${token}`)
           .expect(status);
         if (status === 403) {
           expect(bodyOf(response)).toMatchObject({ success: false, error: { code: 'AUTHORIZATION.FORBIDDEN' } });
         }
-      } finally {
-        await roleApp.close();
       }
+    } finally {
+      await roleApp.close();
     }
   });
 
@@ -518,4 +694,62 @@ describe('Global guard order (e2e)', () => {
         });
       });
   }, 60_000);
+});
+
+describe('a request whose client leaves before its body is read (P29-N4)', () => {
+  let app: INestApplication<App> | undefined;
+
+  afterEach(async () => {
+    jest.restoreAllMocks();
+    await app?.close();
+  });
+
+  it('is classified without a write to the closed socket or an unexpected-error log, and the next request is served', async () => {
+    type Seen = { type: unknown; writes: number; unexpected: number };
+    let settle!: (seen: Seen) => void;
+    const caught = new Promise<Seen>((resolve) => (settle = resolve));
+    // Read without binding: the spy below calls it with the filter Nest built as `this`.
+    const original = Reflect.get(HttpExceptionFilter.prototype, 'catch');
+    // Spied before the application binds its filter, so the very filter instance Nest calls is observed.
+    jest.spyOn(HttpExceptionFilter.prototype, 'catch').mockImplementation(function (
+      this: HttpExceptionFilter,
+      exception: unknown,
+      host: ArgumentsHost,
+    ) {
+      const response = host.switchToHttp().getResponse<Response>();
+      const writes = [jest.spyOn(response, 'setHeader'), jest.spyOn(response, 'status'), jest.spyOn(response, 'json')];
+      const unexpected = jest.spyOn(this['logger'], 'error');
+      original.call(this, exception, host);
+      settle({
+        type: (exception as { type?: unknown }).type,
+        writes: writes.reduce((total, spy) => total + spy.mock.calls.length, 0),
+        unexpected: unexpected.mock.calls.length,
+      });
+    });
+    const rejections: unknown[] = [];
+    const onRejection = (reason: unknown) => rejections.push(reason);
+    process.on('unhandledRejection', onRejection);
+    try {
+      const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
+      app = moduleRef.createNestApplication();
+      configureApplication(app, { mountDocs: false });
+      await app.listen(0, '127.0.0.1');
+      const server = app.getHttpServer() as Server;
+      const { port } = server.address() as AddressInfo;
+
+      // The client leaves once the server has the headers and is reading the body: an order, never a sleep.
+      const socket = connect(port, '127.0.0.1');
+      server.once('request', () => socket.destroy());
+      socket.write(
+        'POST /api/v1/auth/login HTTP/1.1\r\nHost: localhost\r\nContent-Type: application/json\r\n' +
+          'Content-Length: 100\r\n\r\n{"email":',
+      );
+
+      expect(await caught).toEqual({ type: 'request.aborted', writes: 0, unexpected: 0 });
+      await request(server).get('/api/v1/health/live').expect(200);
+      expect(rejections).toEqual([]);
+    } finally {
+      process.off('unhandledRejection', onRejection);
+    }
+  }, 30_000);
 });

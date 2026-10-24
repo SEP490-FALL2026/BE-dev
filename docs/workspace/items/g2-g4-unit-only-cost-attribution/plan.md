@@ -73,3 +73,5 @@ co lại, mã lỗi mới, `details.serviceAccounts`); cập nhật roadmap, sco
 - [x] Diff cuối đã tự review; tài liệu vận hành/runbook bị ảnh hưởng đã cập nhật; phần chưa kiểm chứng ghi rõ.
 - [ ] Giao Owner review trên revision cụ thể; cập nhật roadmap/PR. Chỉ ghi `merged-dev`, `accepted`, `released` sau
       đúng sự kiện thật.
+
+**Prompt 29 (23/10/2026, `P28-01`):** migration `20261022120000` không nâng cấp được dữ liệu cũ (sở hữu theo ngày bắt đầu, khác quy tắc ngày ghi nhận của ứng dụng; dừng khi phân bổ lịch sử nêu `COMPANY`; hướng dẫn sửa trỏ tới cột đã rollback). Owner chọn `B-FORWARD`: migration giữ nguyên byte; sửa tiếp bằng migration `20261023100000` cho các lịch sử được hỗ trợ, với `pnpm ops:preflight` là phép kiểm chỉ đọc chặn trước khi ghi trong [g0-g4-checkpoint-fix-forward](../g0-g4-checkpoint-fix-forward/spec.md). Prompt 29A (24/10/2026, `P29-RV-01`): CSDL cũ bị preflight chặn (exit `2`) **không** có đường nâng cấp tự động — giữ nguyên, không deploy, chờ quyết định Owner riêng cho đúng CSDL đó. Test SQL cũ của suite `unit-only-cost-attribution` vẫn đúng với hành vi migration đã merge.

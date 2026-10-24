@@ -3,6 +3,7 @@ import { Client } from 'pg';
 import request from 'supertest';
 import { TransactionRunner } from '../../src/infrastructure/database/transaction-runner';
 import { VendorDirectoryService } from '../../src/modules/catalog/vendor/vendor-directory.service';
+import { bodyOf } from '../support/api-body';
 import { SeatHarness } from '../support/seat-baseline-harness';
 import { waitForLockWaiters } from '../support/lock-wait';
 
@@ -152,6 +153,114 @@ describe('write integrity of catalog, finance and licensing (integration, DB-03,
         (await sql().query<{ g: string }>(`SELECT dictionary_group_id AS g FROM vendors WHERE id = $1`, [vendor]))
           .rows[0].g,
       ).toBe(first);
+    }, 60_000);
+
+    it('answers the loser of two simultaneous changes to lines of two groups with 409 over HTTP (P28-12)', async () => {
+      const declared = async (name: string) =>
+        h.dataOf<{ id: string; vendor: { id: string } }>(await declareApp({ name, vendorName: 'Omicron' }).expect(201));
+      const [mail, chat] = [await declared('Omicron Mail'), await declared('Omicron Chat')];
+      const vendor = mail.vendor.id;
+      expect(chat.vendor.id).toBe(vendor);
+      const first = await dictionary('Omicron Cloud', 'Omicron Mail Line');
+      const second = await dictionary('Omicron Labs', 'Omicron Chat Line');
+      const patch = (id: string, lineId: string) =>
+        request(h.server()).patch(`/api/v1/applications/${id}`).set(as()).send({ dictionaryServiceLineId: lineId });
+
+      // Both changes read the vendor with no group, then meet at its row: the second sees the group the first gave it.
+      await holder.query('BEGIN');
+      await holder.query('SELECT id FROM vendors WHERE id = $1 FOR UPDATE', [vendor]);
+      const both = Promise.all([patch(mail.id, first.lineId), patch(chat.id, second.lineId)]);
+      await waitForLockWaiters(sql(), 2, 10_000);
+      await holder.query('COMMIT');
+      const [toFirst, toSecond] = await both;
+
+      const statuses = [toFirst.status, toSecond.status];
+      expect([...statuses].sort()).toEqual([200, 409]);
+      const [winner, loser] = toFirst.status === 200 ? [first, toSecond] : [second, toFirst];
+      // Its own code (P29-N3): the 422 code of a mismatch is never answered with a second status.
+      expect(h.codeOf(loser)).toBe('APPLICATION.DICTIONARY_GROUP_CHANGED');
+      expect(
+        (await sql().query<{ g: string }>(`SELECT dictionary_group_id AS g FROM vendors WHERE id = $1`, [vendor]))
+          .rows[0].g,
+      ).toBe(winner.groupId);
+      expect(
+        (
+          await sql().query<{ line: string | null }>(
+            `SELECT dictionary_line_id AS line FROM applications WHERE id = ANY($1::uuid[]) ORDER BY name`,
+            [[mail.id, chat.id]],
+          )
+        ).rows.map((row) => row.line),
+      ).toEqual(toFirst.status === 200 ? [null, first.lineId] : [second.lineId, null]);
+      expect(
+        (await auditOf('VENDOR.DICTIONARY_GROUP_ADOPTED')).filter((event) => event.resource_id === vendor),
+      ).toHaveLength(1);
+    }, 60_000);
+  });
+
+  describe('P29-N3: declaring an application from a line whose vendor name is held by another group', () => {
+    const counts = async () =>
+      (
+        await sql().query<{ applications: number; vendors: number; events: number }>(
+          `SELECT (SELECT count(*)::int FROM applications) AS applications,
+                  (SELECT count(*)::int FROM vendors) AS vendors,
+                  (SELECT count(*)::int FROM audit_events) AS events`,
+        )
+      ).rows[0];
+    const groupOf = async (vendorId: string) =>
+      (
+        await sql().query<{ g: string | null }>(`SELECT dictionary_group_id AS g FROM vendors WHERE id = $1`, [
+          vendorId,
+        ])
+      ).rows[0].g;
+
+    it('refuses with the 422 of a mismatch and writes nothing: no application, vendor or audit row', async () => {
+      // The vendor "Kappa" took the group "Kappa Labs" through an application change; the group "Kappa" then shares its name.
+      const notes = h.dataOf<{ id: string; vendor: { id: string } }>(
+        await declareApp({ name: 'Kappa Notes', vendorName: 'Kappa' }).expect(201),
+      );
+      const labs = await dictionary('Kappa Labs', 'Kappa Notes Line');
+      await request(h.server())
+        .patch(`/api/v1/applications/${notes.id}`)
+        .set(as())
+        .send({ dictionaryServiceLineId: labs.lineId })
+        .expect(200);
+      const named = await dictionary('Kappa', 'Kappa Docs');
+      const before = await counts();
+
+      const response = await declareApp({ name: 'Kappa Docs', dictionaryServiceLineId: named.lineId });
+
+      expect(response.status).toBe(422);
+      expect(bodyOf(response).error).toMatchObject({
+        code: 'APPLICATION.DICTIONARY_LINE_MISMATCH',
+        message: 'The dictionary service line is not in the dictionary group of the vendor of this application.',
+      });
+      expect(response.text).not.toMatch(/same name|another dictionary group|stack|vendors/i);
+      expect(await counts()).toEqual(before);
+      expect(await groupOf(notes.vendor.id)).toBe(labs.groupId);
+    }, 60_000);
+
+    it('answers the loser of a race for the group with 409 APPLICATION.DICTIONARY_GROUP_CHANGED and writes nothing', async () => {
+      const lambda = await freeVendor('Lambda');
+      const mu = await freeVendor('Mu');
+      const { groupId, lineId } = await dictionary('Lambda', 'Lambda Line');
+
+      // The declaration finds the free vendor "Lambda" of the group's name and waits at its row; meanwhile "Mu" takes the
+      // group and commits. Exactly one writer holds the group afterwards.
+      await holder.query('BEGIN');
+      await holder.query('SELECT id FROM vendors WHERE id = $1 FOR UPDATE', [lambda]);
+      const before = await counts();
+      const declared = declareApp({ name: 'Lambda App', dictionaryServiceLineId: lineId }).then((response) => response);
+      await waitForLockWaiters(sql(), 1, 10_000);
+      await holder.query('UPDATE vendors SET dictionary_group_id = $2 WHERE id = $1', [mu, groupId]);
+      await holder.query('COMMIT');
+      const response = await declared;
+
+      expect(response.status).toBe(409);
+      expect(bodyOf(response).error.code).toBe('APPLICATION.DICTIONARY_GROUP_CHANGED');
+      expect(bodyOf(response).error.message).toMatch(/refresh/i);
+      expect(response.text).not.toMatch(/unique|constraint|P2002|23505|stack/i);
+      expect(await counts()).toEqual(before);
+      expect({ lambda: await groupOf(lambda), mu: await groupOf(mu) }).toEqual({ lambda: null, mu: groupId });
     }, 60_000);
   });
 

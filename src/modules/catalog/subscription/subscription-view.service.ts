@@ -23,7 +23,13 @@ export class SubscriptionViewService {
   async viewAll(records: SubscriptionRecord[]): Promise<SubscriptionView[]> {
     if (records.length === 0) return [];
     const daysBefore = await this.alertDays();
-    const groups = await this.finance.taxProfileGroups([...new Set(records.map((record) => record.vendor.id))]);
+    // A priced subscription answers its tax profile from the read its estimate came from, so the two are one version
+    // (LD-01, P28-06); only the vendors of the subscriptions without a price are read for their profile alone.
+    const unpricedVendors = records.filter((record) => record.unitPrice === null).map((record) => record.vendor.id);
+    const groups =
+      unpricedVendors.length === 0
+        ? new Map<string, { group: TaxEstimateResult['group']; version: number }>()
+        : await this.finance.taxProfileGroups([...new Set(unpricedVendors)]);
     const minorUnits = new Map<string, number>();
     const minorUnitOf = async (currency: string): Promise<number> => {
       const cached = minorUnits.get(currency);
@@ -59,7 +65,7 @@ export class SubscriptionViewService {
         hasPrice: record.unitPrice !== null,
         hasSnapshot: record.priceSnapshot !== null,
       });
-      const group = groups.get(record.vendor.id)?.group ?? null;
+      let group: TaxEstimateResult['group'] | null = groups.get(record.vendor.id)?.group ?? null;
       let taxEstimate: TaxEstimateSummary | null = null;
       let unitPrice: SubscriptionView['unitPrice'] = null;
       let priceSnapshot: SubscriptionView['priceSnapshot'] = null;
@@ -67,6 +73,7 @@ export class SubscriptionViewService {
         const units = await minorUnitOf(record.unitPrice.currency);
         unitPrice = { amount: formatAmount(record.unitPrice.amountMinor, units), currency: record.unitPrice.currency };
         const estimate = estimates.get(record.id) as TaxEstimateResult;
+        group = estimate.basis === 'PROFILE' ? estimate.group : null;
         taxEstimate = {
           basis: estimate.basis,
           label: estimate.basis === 'PROFILE' ? 'ESTIMATE' : 'ESTIMATE_NO_PROFILE',

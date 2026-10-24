@@ -39,6 +39,20 @@ import type { SeatImportView } from './seat-baseline-import.types';
 const MAX_FILE_BYTES = 2 * 1024 * 1024;
 /** One file and nothing else of any size: a form of 50 fields, or a field of a megabyte, is refused before it is read (`SEC-06`). */
 const UPLOAD_LIMITS = { fileSize: MAX_FILE_BYTES, files: 1, fields: 2, fieldSize: 64, parts: 3 };
+/** What the multipart parser answers before the handler runs; the filter gives both the code of their status. */
+const UPLOAD_LIMIT_ERRORS = [
+  {
+    status: HttpStatus.BAD_REQUEST,
+    description:
+      `The form breaks a limit of the upload before it is read — more than ${UPLOAD_LIMITS.files} file, more than ` +
+      `${UPLOAD_LIMITS.fields} text fields, more than ${UPLOAD_LIMITS.parts} parts, a text field over ` +
+      `${UPLOAD_LIMITS.fieldSize} bytes — or it is not a readable multipart form (HTTP_BAD_REQUEST).`,
+  },
+  {
+    status: HttpStatus.PAYLOAD_TOO_LARGE,
+    description: `The file is larger than ${MAX_FILE_BYTES / (1024 * 1024)} MiB (HTTP_PAYLOAD_TOO_LARGE).`,
+  },
+] as const;
 
 /** The part of a multipart upload this controller uses; multer own type is not a dependency of the project. */
 interface UploadedBinary {
@@ -112,6 +126,7 @@ export class SeatBaselineImportsController {
   })
   @ApiErrorResponses(
     ...COMMON_ERRORS,
+    ...UPLOAD_LIMIT_ERRORS,
     {
       status: HttpStatus.NOT_FOUND,
       description: 'The subscription or the plan does not exist (SUBSCRIPTION.NOT_FOUND, PLAN.NOT_FOUND).',

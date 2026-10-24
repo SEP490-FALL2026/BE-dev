@@ -20,12 +20,17 @@ export interface CliResult {
   stderr: string;
 }
 
+/**
+ * On Windows a child's own helper process (Prisma's schema engine) can still hold its working directory for a moment
+ * after the child exits; Node retries EBUSY/EPERM/ENOTEMPTY on removal for that case.
+ */
+const REMOVE = { recursive: true, force: true, maxRetries: 10, retryDelay: 200 } as const;
 const running = new Set<ChildProcess>();
 const directories = new Set<string>();
 
 process.once('exit', () => {
   for (const child of running) child.kill('SIGKILL');
-  for (const directory of directories) rmSync(directory, { recursive: true, force: true });
+  for (const directory of directories) rmSync(directory, REMOVE);
 });
 
 /** An empty working directory, so no `.env` can be picked up; removed by `stopCliProcesses()`. */
@@ -103,7 +108,7 @@ function runTypeScript(path: string, args: readonly string[], options: RunOption
 export function stopCliProcesses(): void {
   for (const child of running) child.kill('SIGKILL');
   running.clear();
-  for (const directory of directories) rmSync(directory, { recursive: true, force: true });
+  for (const directory of directories) rmSync(directory, REMOVE);
   directories.clear();
 }
 

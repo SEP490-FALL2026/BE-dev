@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -325,6 +326,74 @@ const COLLECTION_EXCEPTIONS: readonly CollectionException[] = [
     ],
   },
   {
+    operationId: 'provisioningTaskList',
+    classification: 'owner-decision',
+    findings: ['LD-13'],
+    owner: 'licensing-provisioning-task-read-contracts',
+    rationale:
+      'Decision 5: which identity fields of the beneficiary, default owner and claimant a task card shows. Since LD-08 (23/10/2026) the card is a summary whose beneficiary carries {employeeId, employeeCode, fullName} and whose defaultResponsibleEmployeeId and claimedBy are ids only: the spec default, not an Owner decision.',
+    removeWhen: 'The Owner decides point 5 of LD-13 and the chosen contract ships.',
+    itemProperties: [
+      'accountIdentifier',
+      'assignmentId',
+      'attempts',
+      'availableDecisions',
+      'beneficiary',
+      'channel',
+      'claimedAt',
+      'claimedBy',
+      'closedAt',
+      'completedAt',
+      'createdAt',
+      'defaultResponsibleEmployeeId',
+      'elapsedSeconds',
+      'failedAt',
+      'failureKind',
+      'id',
+      'inGeneralQueue',
+      'kind',
+      'maxAttempts',
+      'nextRetryAt',
+      'plan',
+      'requestId',
+      'status',
+      'subscriptionId',
+    ],
+  },
+  {
+    operationId: 'licenseAssignmentList',
+    classification: 'owner-decision',
+    findings: ['LD-13'],
+    owner: 'licensing-assignment-read-contracts',
+    rationale:
+      'Decision 5: which identity fields of the holder an assignment row shows. Since LD-10 (23/10/2026) the row carries employee {employeeId, employeeCode, fullName}, plan and costCenter read in batches: the spec default, not an Owner decision.',
+    removeWhen: 'The Owner decides point 5 of LD-13 and the chosen contract ships.',
+    itemProperties: [
+      'accountIdentifier',
+      'costCenter',
+      'costCenterId',
+      'createdAt',
+      'effectiveFrom',
+      'effectiveFromBasis',
+      'effectiveFromLabel',
+      'employee',
+      'employeeId',
+      'expectedEndDate',
+      'failedAt',
+      'grantedOn',
+      'id',
+      'kind',
+      'owningDepartmentId',
+      'plan',
+      'planId',
+      'predecessorId',
+      'reason',
+      'source',
+      'subscriptionId',
+      'validUntil',
+    ],
+  },
+  {
     operationId: 'departmentList',
     classification: 'owner-decision',
     findings: ['LD-13'],
@@ -371,24 +440,45 @@ const COLLECTION_EXCEPTIONS: readonly CollectionException[] = [
 ];
 
 /**
- * Prompt 09 (22/10/2026). Keys may only be removed, here and from COLLECTION_EXCEPTIONS; adding one needs the Owner.
+ * Prompt 09 (22/10/2026). Frozen: this list is never edited again (P28-07). A key leaves COLLECTION_EXCEPTIONS, or a new
+ * one enters it, only through an event of REGISTRY_EVENTS_SINCE_INITIAL; adding one needs the Owner. Before the freeze,
  * Prompt 09A (23/10/2026, Owner review LD-R2-RV-01): departmentWarningList and nonWorkingDateList corrected from
  * `bounded` to `unbounded` (LD-15) — the only change of a key, authorized by the Owner. Prompt 09B (23/10/2026,
  * LD-R2-RV-02): `vendorTaxProfileHistory#nested-bound` removed; its array is `vendorTaxProfileHistory#lines` in
  * NESTED_ARRAYS, which now holds every nested array.
  */
 const INITIAL_EXCEPTION_KEYS: readonly string[] = [
+  'provisioningTaskList#detail-reuse',
   'subscriptionList#detail-reuse',
   'standardToolsetList#detail-reuse',
   'standardToolsetHistory#detail-reuse',
+  'applicationList#detail-projection',
+  'planList#detail-projection',
+  'projectList#unbounded',
+  'applicationBusinessOwnerHistory#unbounded',
+  'departmentWarningList#unbounded',
+  'nonWorkingDateList#unbounded',
   'currencyList#bounded',
   'approvalRoleList#bounded',
   'operatingParameterList#bounded',
   'operatingParameterHistory#bounded',
   'accountCandidatesList#bounded',
+  'subscriptionList#query',
+  'planWarningList#query',
+  'subscriptionCostAllocationHistory#query',
+  'standardToolsetList#query',
+  'standardToolsetHistory#query',
+  'provisioningTaskList#query',
+  'departmentToolsInUse#query',
+  'licenseAssignmentList#query',
+  'licenseKeyList#query',
+  'departmentMemberList#query',
+  'costCenterEmployeeList#query',
   'vendorProposalList#owner-decision',
   'subscriptionList#owner-decision',
   'auditEventList#owner-decision',
+  'provisioningTaskList#owner-decision',
+  'licenseAssignmentList#owner-decision',
   'departmentList#owner-decision',
   'vendorGroupList#owner-decision',
   'vendorSuggestionList#unbounded',
@@ -1164,8 +1254,9 @@ const NESTED_ARRAYS: readonly NestedArrayEntry[] = [
 ];
 
 /**
- * Prompt 09B (23/10/2026, LD-R2-RV-02): every nested array of the mounted contract with its classification. Entries may
- * only be removed, here and from NESTED_ARRAYS; a new key or a changed classification needs a new Owner decision.
+ * Prompt 09B (23/10/2026, LD-R2-RV-02): every nested array of the mounted contract with its classification. Frozen: this
+ * map is never edited again (P28-07). NESTED_ARRAYS differs from it only through events of REGISTRY_EVENTS_SINCE_INITIAL;
+ * a new key or a looser classification needs a new Owner decision.
  */
 const INITIAL_NESTED_ARRAYS: Readonly<Record<string, NestedClassification>> = {
   'healthGetReadiness#checks': 'bounded',
@@ -1173,11 +1264,9 @@ const INITIAL_NESTED_ARRAYS: Readonly<Record<string, NestedClassification>> = {
   'departmentList#warnings': 'bounded',
   'departmentGet#warnings': 'bounded',
   'departmentGet#headHistory': 'bounded',
-  'departmentGet#projects': 'bounded',
+  'departmentGet#projects': 'unbounded',
   'departmentGet#projects.departments': 'bounded',
   'projectList#departments': 'bounded',
-  // Added with the detail route GET /projects/{id} that the spec of organization-identity-read-contracts names (LD-12).
-  'projectGet#departments': 'bounded',
   'operatingParameterList#value': 'bounded',
   'operatingParameterList#default': 'bounded',
   'operatingParameterHistory#value': 'bounded',
@@ -1191,6 +1280,7 @@ const INITIAL_NESTED_ARRAYS: Readonly<Record<string, NestedClassification>> = {
   'employeeImportRowList#differences': 'bounded',
   'seatBaselineImportGet#ignoredColumns': 'bounded',
   'seatBaselineImportRows#errors': 'bounded',
+  'provisioningTaskList#steps': 'bounded',
   'provisioningTaskList#availableDecisions': 'bounded',
   'provisioningTaskGet#task.steps': 'bounded',
   'provisioningTaskGet#task.availableDecisions': 'bounded',
@@ -1198,8 +1288,9 @@ const INITIAL_NESTED_ARRAYS: Readonly<Record<string, NestedClassification>> = {
   'vendorGroupList#serviceLines': 'owner-decision',
   'vendorGroupList#serviceLines.domains': 'bounded',
   'vendorGroupList#serviceLines.patterns': 'bounded',
+  'applicationList#domains': 'bounded',
   'applicationGet#domains': 'bounded',
-  'applicationGet#similarApplications': 'bounded',
+  'applicationGet#similarApplications': 'unbounded',
   'applicationGet#recommendations': 'bounded',
   'planGet#workspaceProfile.members': 'bounded',
   'vendorTaxProfileGet#profile.lines': 'bounded',
@@ -1214,12 +1305,11 @@ const INITIAL_NESTED_ARRAYS: Readonly<Record<string, NestedClassification>> = {
   'subscriptionGet#warnings': 'bounded',
   'subscriptionCostAllocationGet#allocation.lines': 'bounded',
   'subscriptionCostAllocationHistory#lines': 'bounded',
-  'planTermsGet#opinions': 'bounded',
-  'planTermsGet#warnings': 'bounded',
-  'applicationRetirementGet#retirement.confirmations': 'bounded',
-  'applicationRetirementGet#retirement.blockers.assignments': 'bounded',
-  'applicationRetirementGet#retirement.blockers.assignmentsByPlan': 'bounded',
-  'applicationRetirementGet#retirement.blockers.subscriptions': 'bounded',
+  'planTermsGet#opinions': 'unbounded',
+  'planTermsGet#warnings': 'unbounded',
+  'applicationRetirementGet#retirement.confirmations': 'unbounded',
+  'applicationRetirementGet#retirement.blockers.assignments': 'unbounded',
+  'applicationRetirementGet#retirement.blockers.subscriptions': 'unbounded',
   'standardToolsetList#plans': 'bounded',
   'standardToolsetMine#toolset.plans': 'bounded',
   'standardToolsetGet#toolset.plans': 'bounded',
@@ -1233,10 +1323,262 @@ const INITIAL_NESTED_ARRAYS: Readonly<Record<string, NestedClassification>> = {
   'meGet#roles.effective': 'bounded',
   'appUserList#roles': 'bounded',
   'appUserGet#roles': 'bounded',
-  'appUserGet#roleHistory': 'bounded',
+  'appUserGet#roleHistory': 'unbounded',
   'approvalRoleList#history': 'bounded',
   'departmentToolsInUse#data.summary': 'unbounded',
 };
+
+/**
+ * One documented difference between a frozen initial registry and its live registry (P28-07). `exceptions` keys are
+ * `operationId#classification` (a new classification is one `closed` and one `added` event); `nested` keys are
+ * NestedArrayEntry keys with `from`/`to` classifications.
+ */
+interface RegistryEvent {
+  registry: 'exceptions' | 'nested';
+  key: string;
+  change: 'closed' | 'reclassified' | 'added';
+  /** Nested only: the classification INITIAL_NESTED_ARRAYS holds (closed, reclassified). */
+  from?: NestedClassification;
+  /** Nested only: the classification NESTED_ARRAYS holds now (added, reclassified). */
+  to?: NestedClassification;
+  /** Nested, `to: 'bounded'` only: the constant or validation that proves the maximum; the live source must name it. */
+  bound?: string;
+  /** The review finding the event closes or serves (`LD-<n>`). */
+  finding: string;
+  /** Folder under docs/workspace/items whose work made the change. */
+  item: string;
+  date: `${number}-${number}-${number}`;
+  reason: string;
+  /**
+   * The Owner decision that allows the event. Required to close or reclassify an `owner-decision` key (LD-13 is open), to
+   * add an exception, and to add or reclassify a nested key to anything but a proved `bounded`.
+   */
+  ownerDecision?: string;
+}
+
+const closedException = (
+  key: string,
+  finding: string,
+  item: string,
+  reason: string,
+  date: RegistryEvent['date'] = '2026-10-23',
+): RegistryEvent => ({ registry: 'exceptions', key, change: 'closed', finding, item, date, reason });
+
+const boundedNested = (
+  key: string,
+  bound: string,
+  finding: string,
+  item: string,
+  reason: string,
+  change: 'reclassified' | 'added' = 'reclassified',
+): RegistryEvent => ({
+  registry: 'nested',
+  key,
+  change,
+  ...(change === 'reclassified' ? { from: 'unbounded' as const } : {}),
+  to: 'bounded',
+  bound,
+  finding,
+  item,
+  date: '2026-10-23',
+  reason,
+});
+
+/**
+ * Every difference between INITIAL_EXCEPTION_KEYS / INITIAL_NESTED_ARRAYS and COLLECTION_EXCEPTIONS / NESTED_ARRAYS,
+ * one event each (P28-07). The gate fails on a difference without an event (a silent rewrite) and on an event without
+ * its difference. Prompt 10 (23/10/2026, commit 4cc9a47) closed these with the remediation items of the G0-G4 review.
+ */
+const REGISTRY_EVENTS_SINCE_INITIAL: readonly RegistryEvent[] = [
+  closedException(
+    'provisioningTaskList#detail-reuse',
+    'LD-08',
+    'licensing-provisioning-task-read-contracts',
+    'The queue item is a task summary; provisioningTaskGet extends it with the long fields.',
+  ),
+  closedException(
+    'applicationList#detail-projection',
+    'LD-04',
+    'catalog-application-plan-read-contracts',
+    'The application summary selects its columns and no longer carries domains, communication or the dictionary link.',
+  ),
+  closedException(
+    'planList#detail-projection',
+    'LD-05',
+    'catalog-application-plan-read-contracts',
+    'The plan summary no longer carries the revocation note.',
+  ),
+  closedException(
+    'projectList#unbounded',
+    'LD-12',
+    'organization-identity-read-contracts',
+    'GET /projects is paginated (pageSize maximum 100) without the description; GET /projects/{id} returns it.',
+  ),
+  closedException(
+    'applicationBusinessOwnerHistory#unbounded',
+    'LD-06',
+    'catalog-application-plan-read-contracts',
+    'The Business Owner history is paginated.',
+  ),
+  closedException(
+    'departmentWarningList#unbounded',
+    'LD-15',
+    'organization-identity-read-contracts',
+    'The department warnings are paginated.',
+  ),
+  closedException(
+    'nonWorkingDateList#unbounded',
+    'LD-15',
+    'g2-fiscal-year-operating-parameters',
+    'The non-working dates are paginated.',
+  ),
+  closedException(
+    'subscriptionList#query',
+    'LD-01',
+    'catalog-subscription-read-model',
+    'Tax estimates are read in batches (readCurrentMany, estimateMany) with a narrow select, proven by a query-count test.',
+  ),
+  closedException(
+    'planWarningList#query',
+    'LD-02',
+    'catalog-subscription-read-model',
+    'Paging moved into SQL (listTermsWithMilestoneBetween), proven by a query-count test.',
+  ),
+  closedException(
+    'subscriptionCostAllocationHistory#query',
+    'LD-03',
+    'catalog-subscription-read-model',
+    'Cost Centers are read once per page, proven by a query-count test.',
+  ),
+  closedException(
+    'standardToolsetList#query',
+    'LD-07',
+    'catalog-standard-toolset-read-batching',
+    'Versions, plans, departments and job titles are read in batches with a stable order, proven by a query-count test.',
+  ),
+  closedException(
+    'standardToolsetHistory#query',
+    'LD-07',
+    'catalog-standard-toolset-read-batching',
+    'Plans are read once per page, proven by a query-count test.',
+  ),
+  closedException(
+    'provisioningTaskList#query',
+    'LD-08',
+    'licensing-provisioning-task-read-contracts',
+    'Plans are read in one batch per page (findPlanSeatTargets), proven by a query-count test.',
+  ),
+  closedException(
+    'departmentToolsInUse#query',
+    'LD-09',
+    'licensing-assignment-read-contracts',
+    'Paging and the summary moved into SQL in one snapshot, proven by a query-count test.',
+  ),
+  closedException(
+    'licenseAssignmentList#query',
+    'LD-10',
+    'licensing-assignment-read-contracts',
+    'A direct select of the summary with employee, plan and Cost Center read in batches, proven by a query-count test; which person fields stay is still LD-13 point 5 (licenseAssignmentList#owner-decision).',
+  ),
+  closedException(
+    'licenseKeyList#query',
+    'LD-11',
+    'licensing-assignment-read-contracts',
+    'Count and page share one RepeatableRead transaction.',
+  ),
+  closedException(
+    'departmentMemberList#query',
+    'LD-11',
+    'organization-identity-read-contracts',
+    'Count and page share one RepeatableRead transaction.',
+  ),
+  closedException(
+    'costCenterEmployeeList#query',
+    'LD-11',
+    'organization-identity-read-contracts',
+    'Count and page share one RepeatableRead transaction.',
+  ),
+  {
+    registry: 'nested',
+    key: 'provisioningTaskList#steps',
+    change: 'closed',
+    from: 'bounded',
+    finding: 'LD-08',
+    item: 'licensing-provisioning-task-read-contracts',
+    date: '2026-10-23',
+    reason: 'The task summary no longer carries the steps; provisioningTaskGet#task.steps keeps them.',
+  },
+  {
+    registry: 'nested',
+    key: 'applicationList#domains',
+    change: 'closed',
+    from: 'bounded',
+    finding: 'LD-04',
+    item: 'catalog-application-plan-read-contracts',
+    date: '2026-10-23',
+    reason: 'The application summary no longer carries the domains; applicationGet#domains keeps them.',
+  },
+  boundedNested(
+    'projectGet#departments',
+    'departmentIds .max(100)',
+    'LD-12',
+    'organization-identity-read-contracts',
+    'The new detail route GET /projects/{id} that the item spec names returns the departments of one project.',
+    'added',
+  ),
+  boundedNested(
+    'applicationRetirementGet#retirement.blockers.assignmentsByPlan',
+    'RETIREMENT_LIST_LIMIT',
+    'LD-06',
+    'catalog-application-plan-read-contracts',
+    'Added with the capped retirement blockers: the plans holding the most seats, since the seats themselves are cut.',
+    'added',
+  ),
+  boundedNested(
+    'departmentGet#projects',
+    'PROFILE_PROJECT_LIMIT',
+    'LD-12',
+    'organization-identity-read-contracts',
+    'The profile embeds the first projects with projectTotal; the rest are read from the paginated project list.',
+  ),
+  boundedNested(
+    'applicationGet#similarApplications',
+    'SIMILAR_APPLICATION_LIMIT',
+    'LD-06',
+    'catalog-application-plan-read-contracts',
+    'The detail embeds the first similar applications with similarTotal.',
+  ),
+  boundedNested(
+    'planTermsGet#opinions',
+    'OPINIONS_IN_VIEW',
+    'LD-06',
+    'catalog-application-plan-read-contracts',
+    'The terms embed the newest opinions with opinionTotal; GET /plans/{id}/term-opinions pages them all.',
+  ),
+  boundedNested(
+    'planTermsGet#warnings',
+    'WARNINGS_IN_VIEW',
+    'LD-16',
+    'catalog-subscription-read-model',
+    'The terms embed the earliest review alerts with warningTotal; planWarningList pages them all.',
+  ),
+  ...['retirement.confirmations', 'retirement.blockers.assignments', 'retirement.blockers.subscriptions'].map((path) =>
+    boundedNested(
+      `applicationRetirementGet#${path}`,
+      'RETIREMENT_LIST_LIMIT',
+      'LD-06',
+      'catalog-application-plan-read-contracts',
+      'The retirement view takes at most RETIREMENT_LIST_LIMIT of them, with a total.',
+    ),
+  ),
+  boundedNested(
+    'appUserGet#roleHistory',
+    'ROLE_HISTORY_LIMIT',
+    'LD-14',
+    'organization-identity-read-contracts',
+    'The account embeds the newest grants with roleHistoryHasMore.',
+  ),
+];
 
 interface Schema {
   $ref?: string;
@@ -1387,14 +1729,185 @@ function nestedArrayInventory(
   return new Map([...found].map(([key, { declared, maxItems }]) => [key, declared ? maxItems : undefined]));
 }
 
-/** The entries outside INITIAL_NESTED_ARRAYS: a new key, or a key whose classification changed; each needs the Owner. */
-function nestedEntriesOutsideInitialSet(entries: readonly NestedArrayEntry[]): string[] {
+const exceptionKey = (exception: CollectionException) => `${exception.operationId}#${exception.classification}`;
+
+/** INITIAL_EXCEPTION_KEYS and INITIAL_NESTED_ARRAYS with every ledger event applied: what the live registries hold. */
+function registriesAfter(events: readonly RegistryEvent[]) {
+  const exceptionKeys = new Set(INITIAL_EXCEPTION_KEYS);
+  const nested = new Map<string, NestedClassification>(Object.entries(INITIAL_NESTED_ARRAYS));
+  for (const event of events)
+    if (event.registry === 'exceptions') {
+      if (event.change === 'closed') exceptionKeys.delete(event.key);
+      if (event.change === 'added') exceptionKeys.add(event.key);
+    } else if (event.change === 'closed') nested.delete(event.key);
+    else if (event.to !== undefined) nested.set(event.key, event.to);
+
+  return { exceptionKeys, nested };
+}
+
+/**
+ * The entries outside INITIAL_NESTED_ARRAYS with the ledger applied: a new key, or a key whose classification changed,
+ * without its event; each needs the Owner.
+ */
+function nestedEntriesOutsideInitialSet(
+  entries: readonly NestedArrayEntry[],
+  events: readonly RegistryEvent[] = REGISTRY_EVENTS_SINCE_INITIAL,
+): string[] {
+  const { nested } = registriesAfter(events);
   return entries
-    .filter(
-      (entry) =>
-        !Object.hasOwn(INITIAL_NESTED_ARRAYS, entry.key) || INITIAL_NESTED_ARRAYS[entry.key] !== entry.classification,
-    )
+    .filter((entry) => nested.get(entry.key) !== entry.classification)
     .map((entry) => `${entry.key} (${entry.classification})`);
+}
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * The frozen initial registries against the live ones (P28-07): every difference has exactly one ledger event, and every
+ * event matches a real difference (its key and classifications before and after). A difference without an event is a
+ * silent rewrite; an event without its difference is a stale or invented record.
+ */
+function ledgerProblems(
+  live: { exceptions: readonly CollectionException[]; nestedArrays: readonly NestedArrayEntry[] },
+  events: readonly RegistryEvent[],
+  ownerExists: (owner: string) => boolean,
+): string[] {
+  const problems: string[] = [];
+  const liveKeys = new Set(live.exceptions.map(exceptionKey));
+  const liveNested = new Map(live.nestedArrays.map((entry) => [entry.key, entry]));
+  const evented = new Set<string>();
+
+  for (const event of events) {
+    const label = `ledger ${event.registry} ${event.change} ${event.key}`;
+    if (evented.has(`${event.registry} ${event.key}`)) problems.push(`${label}: a second event for the key`);
+    evented.add(`${event.registry} ${event.key}`);
+    problems.push(...eventHygiene(event, label, ownerExists));
+    problems.push(
+      ...(event.registry === 'exceptions'
+        ? exceptionEventProblems(event, label, liveKeys)
+        : nestedEventProblems(event, label, liveNested)),
+    );
+  }
+
+  for (const key of INITIAL_EXCEPTION_KEYS)
+    if (!evented.has(`exceptions ${key}`) && !liveKeys.has(key))
+      problems.push(
+        `${key}: in INITIAL_EXCEPTION_KEYS but not in COLLECTION_EXCEPTIONS, and no ledger event closes it (silent removal)`,
+      );
+  for (const key of liveKeys)
+    if (!evented.has(`exceptions ${key}`) && !INITIAL_EXCEPTION_KEYS.includes(key))
+      problems.push(
+        `${key}: in COLLECTION_EXCEPTIONS but not in INITIAL_EXCEPTION_KEYS, and no ledger event adds it (silent rewrite)`,
+      );
+  for (const [key, before] of Object.entries(INITIAL_NESTED_ARRAYS)) {
+    const after = liveNested.get(key)?.classification;
+    if (evented.has(`nested ${key}`)) continue;
+    if (after === undefined)
+      problems.push(
+        `${key}: in INITIAL_NESTED_ARRAYS but not in NESTED_ARRAYS, and no ledger event closes it (silent removal)`,
+      );
+    else if (after !== before)
+      problems.push(
+        `${key}: ${before} in INITIAL_NESTED_ARRAYS but ${after} in NESTED_ARRAYS, and no ledger event reclassifies it (silent rewrite)`,
+      );
+  }
+  for (const [key, entry] of liveNested)
+    if (!evented.has(`nested ${key}`) && !Object.hasOwn(INITIAL_NESTED_ARRAYS, key))
+      problems.push(
+        `${key} (${entry.classification}): in NESTED_ARRAYS but not in INITIAL_NESTED_ARRAYS, and no ledger event adds it (silent rewrite)`,
+      );
+
+  return problems;
+}
+
+function eventHygiene(event: RegistryEvent, label: string, ownerExists: (owner: string) => boolean): string[] {
+  const problems: string[] = [];
+  if (!FINDING.test(event.finding)) problems.push(`${label}: finding '${event.finding}' is not one exact LD-<n>`);
+  if (!WORK_ITEM_FOLDER.test(event.item) || !ownerExists(event.item))
+    problems.push(`${label}: item '${event.item}' is not a work item under docs/workspace/items`);
+  if (!ISO_DATE.test(event.date) || Number.isNaN(Date.parse(event.date)))
+    problems.push(`${label}: date '${event.date}' is not a YYYY-MM-DD day`);
+  if (event.reason.trim() === '') problems.push(`${label}: needs a reason`);
+
+  return problems;
+}
+
+const OWNER_DECISION_OPEN = 'an owner-decision entry closes or changes only with the Owner decision that settles it';
+
+function exceptionEventProblems(event: RegistryEvent, label: string, liveKeys: ReadonlySet<string>): string[] {
+  const problems: string[] = [];
+  const initial = INITIAL_EXCEPTION_KEYS.includes(event.key);
+  const live = liveKeys.has(event.key);
+  const decided = (event.ownerDecision ?? '').trim() !== '';
+  if (
+    event.change === 'reclassified' ||
+    event.from !== undefined ||
+    event.to !== undefined ||
+    event.bound !== undefined
+  )
+    problems.push(
+      `${label}: an exception key carries its classification; record one closed and one added event, without from, to or bound`,
+    );
+  if (event.change === 'closed') {
+    if (!initial) problems.push(`${label}: INITIAL_EXCEPTION_KEYS has no such key, so there is nothing to close`);
+    if (live) problems.push(`${label}: the key is still in COLLECTION_EXCEPTIONS, so nothing was closed`);
+    if (event.key.endsWith('#owner-decision') && !decided) problems.push(`${label}: ${OWNER_DECISION_OPEN} (LD-13)`);
+  }
+  if (event.change === 'added') {
+    if (initial) problems.push(`${label}: the key is already in INITIAL_EXCEPTION_KEYS, so nothing was added`);
+    if (!live) problems.push(`${label}: COLLECTION_EXCEPTIONS has no such key, so nothing was added`);
+    if (!decided) problems.push(`${label}: adding an exception needs the Owner decision that allows it`);
+  }
+
+  return problems;
+}
+
+function nestedEventProblems(
+  event: RegistryEvent,
+  label: string,
+  liveNested: ReadonlyMap<string, NestedArrayEntry>,
+): string[] {
+  const problems: string[] = [];
+  const before = Object.hasOwn(INITIAL_NESTED_ARRAYS, event.key) ? INITIAL_NESTED_ARRAYS[event.key] : undefined;
+  const after = liveNested.get(event.key);
+  const decided = (event.ownerDecision ?? '').trim() !== '';
+  const fromMatches = () => {
+    if (before === undefined) problems.push(`${label}: INITIAL_NESTED_ARRAYS has no such key`);
+    else if (event.from !== before)
+      problems.push(`${label}: from '${event.from ?? 'none'}' but INITIAL_NESTED_ARRAYS holds '${before}'`);
+  };
+  const toMatches = () => {
+    if (after === undefined) problems.push(`${label}: NESTED_ARRAYS has no such key`);
+    else if (event.to !== after.classification)
+      problems.push(`${label}: to '${event.to ?? 'none'}' but NESTED_ARRAYS holds '${after.classification}'`);
+  };
+
+  if (event.change === 'closed') {
+    fromMatches();
+    if (after !== undefined) problems.push(`${label}: the key is still in NESTED_ARRAYS, so nothing was closed`);
+    if (event.to !== undefined) problems.push(`${label}: a closed event has no to`);
+  }
+  if (event.change === 'added') {
+    if (before !== undefined)
+      problems.push(`${label}: the key is already in INITIAL_NESTED_ARRAYS, so nothing was added`);
+    if (event.from !== undefined) problems.push(`${label}: an added event has no from`);
+    toMatches();
+  }
+  if (event.change === 'reclassified') {
+    fromMatches();
+    toMatches();
+    if (event.from === event.to) problems.push(`${label}: from and to are the same, so nothing was reclassified`);
+  }
+  if (before === 'owner-decision' && !decided) problems.push(`${label}: ${OWNER_DECISION_OPEN} (LD-13)`);
+  if (event.change !== 'closed' && event.to === 'bounded') {
+    if (!event.bound?.trim())
+      problems.push(`${label}: a bounded event names the constant or validation that proves the maximum (bound)`);
+    else if (after !== undefined && !(after.businessMaximum?.source ?? '').includes(event.bound))
+      problems.push(`${label}: the NESTED_ARRAYS source of the key does not name its bound '${event.bound}'`);
+  }
+  if (event.change !== 'closed' && event.to !== 'bounded' && !decided)
+    problems.push(`${label}: a nested key becomes ${event.to ?? 'none'} only with the Owner decision that allows it`);
+
+  return problems;
 }
 
 /** Classifies every GET of the document and returns everything the rule finds wrong, one sentence each. */
@@ -1604,12 +2117,19 @@ const realRegistries: Registries = {
   ownerExists: (owner) => existsSync(join(repositoryRoot, 'docs', 'workspace', 'items', owner, 'spec.md')),
 };
 
-/** The exception keys a registry holds outside INITIAL_EXCEPTION_KEYS; each one needs a new Owner decision. */
-function keysOutsideInitialSet(exceptions: readonly CollectionException[]): string[] {
-  return exceptions
-    .map((exception) => `${exception.operationId}#${exception.classification}`)
-    .filter((key) => !INITIAL_EXCEPTION_KEYS.includes(key));
+/**
+ * The exception keys a registry holds outside INITIAL_EXCEPTION_KEYS with the ledger applied; each one needs a new Owner
+ * decision.
+ */
+function keysOutsideInitialSet(
+  exceptions: readonly CollectionException[],
+  events: readonly RegistryEvent[] = REGISTRY_EVENTS_SINCE_INITIAL,
+): string[] {
+  const { exceptionKeys } = registriesAfter(events);
+  return exceptions.map(exceptionKey).filter((key) => !exceptionKeys.has(key));
 }
+
+const liveRegistries = { exceptions: COLLECTION_EXCEPTIONS, nestedArrays: NESTED_ARRAYS };
 
 /**
  * A minimal OpenAPI document: `collections` answer `{ data: { items: [...], ...wrapper } }`, `details` answer `{ data }`.
@@ -1688,10 +2208,11 @@ const INVALID_MAXIMA: Record<string, object> = {
   'no source': { maxItems: 20, source: ' ' },
 };
 
-/** The arrays review LD-R2-RV-02 named; the recursive inventory must find every one. */
+/** The arrays review LD-R2-RV-02 named; the recursive inventory must find every one the ledger has not closed. */
 const REVIEW_NAMED_ARRAYS = [
   'approvalRoleList#history',
   'standardToolsetList#plans',
+  'applicationList#domains',
   'vendorGroupList#serviceLines',
   'departmentGet#projects.departments',
   'employeeImportGet#summary.reviewQueue.items',
@@ -1719,17 +2240,38 @@ describe('collection and detail contract gate (API-LIST-DETAIL.1, LD-R2)', () =>
     expect(evaluate(document, realRegistries)).toEqual([]);
   });
 
-  it('only ever shrinks the exception registry recorded on 22/10/2026', () => {
+  it('only ever shrinks the exception registry recorded on 22/10/2026, except through a documented ledger event', () => {
     expect(keysOutsideInitialSet(COLLECTION_EXCEPTIONS)).toEqual([]);
   });
 
+  it('differs from the frozen initial registries exactly by the ledger events (no silent rewrite, no idle event)', () => {
+    expect(ledgerProblems(liveRegistries, REGISTRY_EVENTS_SINCE_INITIAL, realRegistries.ownerExists)).toEqual([]);
+  });
+
+  it('keeps the frozen initial registries of Prompt 09/09B unedited (P28-07)', () => {
+    const fingerprint = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
+
+    // The values of 19be620. A changed fingerprint is a rewrite of the baseline: record a ledger event instead.
+    expect(INITIAL_EXCEPTION_KEYS).toHaveLength(34);
+    expect(fingerprint(INITIAL_EXCEPTION_KEYS)).toBe(
+      '2dcd604ad3b1b3f0ca153d2dd634543321c39eff1ffa4c580bacd662f699de43',
+    );
+    expect(Object.keys(INITIAL_NESTED_ARRAYS)).toHaveLength(67);
+    expect(fingerprint(Object.entries(INITIAL_NESTED_ARRAYS))).toBe(
+      'e811c8edaad29ef97db5fa202924721fd12ea3a7ddb96abbe82ac2e1a4a542fb',
+    );
+  });
+
   it('has no LD-15 exception left: the department warnings and the non-working dates are pages (LD-15)', () => {
-    const keys = COLLECTION_EXCEPTIONS.map((exception) => `${exception.operationId}#${exception.classification}`);
+    const keys = COLLECTION_EXCEPTIONS.map(exceptionKey);
 
     expect(COLLECTION_EXCEPTIONS.filter((exception) => exception.findings.includes('LD-15'))).toEqual([]);
     for (const operationId of ['departmentWarningList', 'nonWorkingDateList']) {
       expect(keys.filter((key) => key.startsWith(`${operationId}#`))).toEqual([]);
     }
+    expect(
+      REGISTRY_EVENTS_SINCE_INITIAL.filter((event) => event.finding === 'LD-15').map((event) => event.key),
+    ).toEqual(['departmentWarningList#unbounded', 'nonWorkingDateList#unbounded']);
   });
 
   it('keeps the operations of the LD-13 Owner decisions recorded, so no contract is chosen by this gate', () => {
@@ -1738,20 +2280,35 @@ describe('collection and detail contract gate (API-LIST-DETAIL.1, LD-R2)', () =>
     expect(decisions.map((exception) => exception.operationId).sort()).toEqual([
       'auditEventList',
       'departmentList',
+      'licenseAssignmentList',
+      'provisioningTaskList',
       'subscriptionList',
       'vendorGroupList',
       'vendorProposalList',
       'vendorSuggestionList',
     ]);
+    // LD-13 is open: no ledger event may close or change one of its entries.
+    expect(
+      REGISTRY_EVENTS_SINCE_INITIAL.filter(
+        (event) =>
+          event.finding === 'LD-13' || event.key.endsWith('#owner-decision') || event.from === 'owner-decision',
+      ),
+    ).toEqual([]);
   });
 
-  it('discovers every nested array review LD-R2-RV-02 named, however deep', () => {
-    expect([...nestedArrayInventory(document, NON_ENVELOPE_COLLECTIONS).keys()]).toEqual(
-      expect.arrayContaining(REVIEW_NAMED_ARRAYS),
+  it('discovers every nested array review LD-R2-RV-02 named, however deep, unless the ledger closed it', () => {
+    const inventory = nestedArrayInventory(document, NON_ENVELOPE_COLLECTIONS);
+    const closed = REGISTRY_EVENTS_SINCE_INITIAL.filter(
+      (event) => event.registry === 'nested' && event.change === 'closed',
+    ).map((event) => event.key);
+
+    expect(REVIEW_NAMED_ARRAYS.filter((key) => !inventory.has(key))).toEqual(
+      REVIEW_NAMED_ARRAYS.filter((key) => closed.includes(key)),
     );
+    expect(REVIEW_NAMED_ARRAYS.filter((key) => closed.includes(key))).toEqual(['applicationList#domains']);
   });
 
-  it('only ever shrinks the nested-array inventory recorded on 23/10/2026, classification included', () => {
+  it('only ever shrinks the nested-array inventory recorded on 23/10/2026, classification included, except through the ledger', () => {
     const reclassified = NESTED_ARRAYS.map((entry) =>
       entry.key === 'onboardingChecklistGet#steps.warnings'
         ? { ...entry, classification: 'bounded' as const, businessMaximum: { maxItems: 20, source: 'a guess' } }
@@ -1777,6 +2334,128 @@ describe('collection and detail contract gate (API-LIST-DETAIL.1, LD-R2)', () =>
       'onboardingChecklistGet#steps.warnings unbounded',
       'planTermsGet#warnings bounded',
     ]);
+  });
+
+  describe('registry ledger (P28-07: the frozen registries change only through documented events)', () => {
+    const check = (
+      live: Partial<typeof liveRegistries> = {},
+      events: readonly RegistryEvent[] = REGISTRY_EVENTS_SINCE_INITIAL,
+    ) => ledgerProblems({ ...liveRegistries, ...live }, events, realRegistries.ownerExists);
+    const withoutException = (key: string) =>
+      COLLECTION_EXCEPTIONS.filter((exception) => exceptionKey(exception) !== key);
+    const eventOf = (key: string): RegistryEvent => {
+      const found = REGISTRY_EVENTS_SINCE_INITIAL.find((event) => event.key === key);
+      if (!found) throw new Error(`no ledger event for ${key}`);
+      return found;
+    };
+    const replaced = (key: string, overrides: Partial<RegistryEvent>) =>
+      REGISTRY_EVENTS_SINCE_INITIAL.map((event) => (event.key === key ? { ...event, ...overrides } : event));
+
+    it('refuses a silent removal of an exception or a nested array', () => {
+      expect(
+        check({
+          exceptions: withoutException('provisioningTaskList#owner-decision'),
+          nestedArrays: NESTED_ARRAYS.filter((entry) => entry.key !== 'healthGetReadiness#checks'),
+        }),
+      ).toEqual([
+        'provisioningTaskList#owner-decision: in INITIAL_EXCEPTION_KEYS but not in COLLECTION_EXCEPTIONS, and no ledger event closes it (silent removal)',
+        'healthGetReadiness#checks: in INITIAL_NESTED_ARRAYS but not in NESTED_ARRAYS, and no ledger event closes it (silent removal)',
+      ]);
+    });
+
+    it('refuses a silent addition and a silent reclassification', () => {
+      const reclassified = NESTED_ARRAYS.map((entry) =>
+        entry.key === 'onboardingChecklistGet#steps.warnings'
+          ? { ...entry, classification: 'bounded' as const, businessMaximum: { maxItems: 20, source: 'a guess' } }
+          : entry,
+      );
+
+      expect(
+        check({
+          exceptions: [...COLLECTION_EXCEPTIONS, entry({ operationId: 'thingList', classification: 'unbounded' })],
+          nestedArrays: [...reclassified, nestedEntry('jobTitleList#aliases')],
+        }),
+      ).toEqual([
+        'thingList#unbounded: in COLLECTION_EXCEPTIONS but not in INITIAL_EXCEPTION_KEYS, and no ledger event adds it (silent rewrite)',
+        'onboardingChecklistGet#steps.warnings: unbounded in INITIAL_NESTED_ARRAYS but bounded in NESTED_ARRAYS, and no ledger event reclassifies it (silent rewrite)',
+        'jobTitleList#aliases (bounded): in NESTED_ARRAYS but not in INITIAL_NESTED_ARRAYS, and no ledger event adds it (silent rewrite)',
+      ]);
+    });
+
+    it('refuses an event that matches no real difference', () => {
+      const idle: RegistryEvent[] = [
+        { ...eventOf('licenseKeyList#query'), key: 'currencyList#bounded' },
+        { ...eventOf('licenseKeyList#query'), key: 'thingList#query' },
+        { ...eventOf('provisioningTaskList#steps'), key: 'healthGetReadiness#checks' },
+        { ...eventOf('projectGet#departments'), key: 'auditEventList#actorRoles', bound: 'resolveEffectiveRoles' },
+      ];
+
+      expect(check({}, [...REGISTRY_EVENTS_SINCE_INITIAL, ...idle])).toEqual([
+        'ledger exceptions closed currencyList#bounded: the key is still in COLLECTION_EXCEPTIONS, so nothing was closed',
+        'ledger exceptions closed thingList#query: INITIAL_EXCEPTION_KEYS has no such key, so there is nothing to close',
+        'ledger nested closed healthGetReadiness#checks: the key is still in NESTED_ARRAYS, so nothing was closed',
+        'ledger nested added auditEventList#actorRoles: the key is already in INITIAL_NESTED_ARRAYS, so nothing was added',
+      ]);
+      expect(check({}, replaced('departmentGet#projects', { from: 'owner-decision' }))).toEqual([
+        "ledger nested reclassified departmentGet#projects: from 'owner-decision' but INITIAL_NESTED_ARRAYS holds 'unbounded'",
+      ]);
+      expect(check({}, replaced('planTermsGet#opinions', { to: 'unbounded' }))).toEqual([
+        "ledger nested reclassified planTermsGet#opinions: to 'unbounded' but NESTED_ARRAYS holds 'bounded'",
+        'ledger nested reclassified planTermsGet#opinions: from and to are the same, so nothing was reclassified',
+        'ledger nested reclassified planTermsGet#opinions: a nested key becomes unbounded only with the Owner decision that allows it',
+      ]);
+    });
+
+    it('refuses closing an LD-13 owner-decision entry without the Owner decision that settles it', () => {
+      const key = 'provisioningTaskList#owner-decision';
+      const closing: RegistryEvent = { ...eventOf('licenseKeyList#query'), key, finding: 'LD-13' };
+      const live = { exceptions: withoutException(key) };
+
+      expect(check(live, [...REGISTRY_EVENTS_SINCE_INITIAL, closing])).toEqual([
+        `ledger exceptions closed ${key}: ${OWNER_DECISION_OPEN} (LD-13)`,
+      ]);
+      expect(check(live, [...REGISTRY_EVENTS_SINCE_INITIAL, { ...closing, ownerDecision: 'QĐ-xx point 5' }])).toEqual(
+        [],
+      );
+    });
+
+    it('refuses a bounded event whose live source does not name its bound, and an exception added without the Owner', () => {
+      const added: RegistryEvent = { ...eventOf('licenseKeyList#query'), key: 'thingList#unbounded', change: 'added' };
+      const live = {
+        exceptions: [...COLLECTION_EXCEPTIONS, entry({ operationId: 'thingList', classification: 'unbounded' })],
+      };
+
+      expect(check({}, replaced('departmentGet#projects', { bound: 'A_GUESS' }))).toEqual([
+        "ledger nested reclassified departmentGet#projects: the NESTED_ARRAYS source of the key does not name its bound 'A_GUESS'",
+      ]);
+      expect(check({}, replaced('departmentGet#projects', { bound: undefined }))).toEqual([
+        'ledger nested reclassified departmentGet#projects: a bounded event names the constant or validation that proves the maximum (bound)',
+      ]);
+      expect(check(live, [...REGISTRY_EVENTS_SINCE_INITIAL, added])).toEqual([
+        'ledger exceptions added thingList#unbounded: adding an exception needs the Owner decision that allows it',
+      ]);
+    });
+
+    it('refuses a malformed event and a second event for one key', () => {
+      const event = eventOf('licenseKeyList#query');
+      const malformed = {
+        ...event,
+        finding: 'LD-x',
+        item: 'nobody',
+        date: 'yesterday' as string as RegistryEvent['date'],
+        reason: ' ',
+      };
+
+      expect(check({}, replaced('licenseKeyList#query', malformed))).toEqual([
+        "ledger exceptions closed licenseKeyList#query: finding 'LD-x' is not one exact LD-<n>",
+        "ledger exceptions closed licenseKeyList#query: item 'nobody' is not a work item under docs/workspace/items",
+        "ledger exceptions closed licenseKeyList#query: date 'yesterday' is not a YYYY-MM-DD day",
+        'ledger exceptions closed licenseKeyList#query: needs a reason',
+      ]);
+      expect(check({}, [...REGISTRY_EVENTS_SINCE_INITIAL, event])).toEqual([
+        'ledger exceptions closed licenseKeyList#query: a second event for the key',
+      ]);
+    });
   });
 
   describe('on fixture documents (each case is one way the rule is broken)', () => {

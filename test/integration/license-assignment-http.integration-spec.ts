@@ -185,16 +185,27 @@ describe('license assignments over HTTP (integration, real PostgreSQL)', () => {
           WHERE resource_id = ANY($1) AND action IN ('LICENSE_ASSIGNMENT.ENDED', 'LICENSE_ASSIGNMENT.CREATED') ORDER BY occurred_at, id`,
         [[original.id, created.id]],
       );
-      expect(events.rows.map((event) => event.action)).toEqual([
-        'LICENSE_ASSIGNMENT.CREATED',
-        'LICENSE_ASSIGNMENT.ENDED',
-        'LICENSE_ASSIGNMENT.CREATED',
-      ]);
-      expect(events.rows[1]).toMatchObject({
+      // Events written in one transaction share a millisecond more often than not, and `ORDER BY occurred_at, id` then
+      // follows the random id, not the order of writing (P28-02): each event is picked by what it is
+      // and what it is about.
+      expect(events.rows.map((event) => `${event.action} ${event.resource_id}`).sort()).toEqual(
+        [
+          `LICENSE_ASSIGNMENT.CREATED ${original.id}`,
+          `LICENSE_ASSIGNMENT.ENDED ${original.id}`,
+          `LICENSE_ASSIGNMENT.CREATED ${created.id}`,
+        ].sort(),
+      );
+      const endedEvent = events.rows.find(
+        (event) => event.action === 'LICENSE_ASSIGNMENT.ENDED' && event.resource_id === original.id,
+      );
+      expect(endedEvent).toMatchObject({
         before: { validUntil: null },
         after: { validUntil: '2026-10-15', successorId: created.id },
       });
-      expect(events.rows[2].after).toMatchObject({ source: 'HANDOVER', predecessorId: original.id });
+      const successor = events.rows.find(
+        (event) => event.action === 'LICENSE_ASSIGNMENT.CREATED' && event.resource_id === created.id,
+      );
+      expect(successor?.after).toMatchObject({ source: 'HANDOVER', predecessorId: original.id });
       expect(JSON.stringify(events.rows)).not.toContain('ci-bot');
     });
 

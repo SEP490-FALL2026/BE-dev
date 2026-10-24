@@ -138,6 +138,46 @@ describe('people import routes (e2e, no database)', () => {
       expect(bodyOf(response).error.code).toBe('HTTP_BAD_REQUEST');
     });
 
+    it('refuses a file sent under another field name with 400 HTTP_BAD_REQUEST, naming neither field nor file (P29-N2)', async () => {
+      app = await appFor(principal(['SUPER_ADMIN']));
+
+      const response = await request(app.getHttpServer())
+        .post('/api/v1/employee-imports')
+        .set(asIt())
+        .attach('document', Buffer.from('a,b\n1,2'), 'people-secret.csv');
+
+      expect(response.status).toBe(400);
+      expect(bodyOf(response).error).toMatchObject({
+        code: 'HTTP_BAD_REQUEST',
+        message: 'The request could not be processed.',
+      });
+      expect(response.text).not.toMatch(/document|people-secret|Unexpected|stack/i);
+    });
+
+    it('still answers a multipart form with no file part with its own 422 IMPORT.FILE_REQUIRED', async () => {
+      app = await appFor(principal(['SUPER_ADMIN']));
+
+      const response = await request(app.getHttpServer())
+        .post('/api/v1/employee-imports')
+        .set(asIt())
+        .field('note', 'x');
+
+      expect(response.status).toBe(422);
+      expect(bodyOf(response).error.code).toBe('IMPORT.FILE_REQUIRED');
+    });
+
+    it('refuses a file over 2 MiB with 413 HTTP_PAYLOAD_TOO_LARGE, as the contract declares', async () => {
+      app = await appFor(principal(['SUPER_ADMIN']));
+
+      const response = await request(app.getHttpServer())
+        .post('/api/v1/employee-imports')
+        .set(asIt())
+        .attach('file', Buffer.alloc(2 * 1024 * 1024 + 1, 0x61), 'people.csv');
+
+      expect(response.status).toBe(413);
+      expect(bodyOf(response).error.code).toBe('HTTP_PAYLOAD_TOO_LARGE');
+    });
+
     it.each([
       ['no version', { idempotencyKey: 'a-key-of-8', hrBasis: HR_BASIS }],
       ['a version of zero', { previewVersion: 0, idempotencyKey: 'a-key-of-8', hrBasis: HR_BASIS }],

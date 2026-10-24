@@ -8,7 +8,7 @@ import {
   ProvisioningTaskStateError,
 } from '../licensing.errors';
 import type { ProvisioningFailureKind } from '../licensing.types';
-import { classifyFailure } from './failure.policy';
+import { classifyFailure, connectorErrorDetail } from './failure.policy';
 import { ProvisioningTaskRepo } from './provisioning-task.repo';
 
 /** What the connector is told of the failure it reported. */
@@ -48,7 +48,7 @@ export class ProvisioningFailureService {
     const organization = await this.organization.getOrganization();
     if (!organization) throw new Error('A failure was recorded before installation');
     const now = input.now ?? new Date();
-    const detail = input.detail.trim() || input.kind;
+    const detail = connectorErrorDetail(input.detail, input.kind);
 
     return this.runner.run(async (tx) => {
       const task = await this.repo.lock(tx, input.taskId);

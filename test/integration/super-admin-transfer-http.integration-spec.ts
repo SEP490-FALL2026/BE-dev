@@ -95,21 +95,26 @@ describe('handing the Super Admin role to a successor over HTTP (integration, re
         to: { appUserId: u2.appUserId },
       });
       expect(await holders()).toEqual([u2.appUserId]);
+      // One transaction writes the pair, so its order in `ORDER BY occurred_at, id` is the random id's (P28-02): the pair
+      // of this transfer is compared as a set.
       const events = (await transferEvents()).slice(before);
-      expect(events).toEqual([
-        {
-          action: 'SUPER_ADMIN.TRANSFERRED_OUT',
-          resource_id: seed.superAdmin.appUserId,
-          correlation_id: data.transferId,
-          actor_app_user_id: seed.superAdmin.appUserId,
-        },
-        {
-          action: 'SUPER_ADMIN.TRANSFERRED_IN',
-          resource_id: u2.appUserId,
-          correlation_id: data.transferId,
-          actor_app_user_id: seed.superAdmin.appUserId,
-        },
-      ]);
+      expect(events).toHaveLength(2);
+      expect(events).toEqual(
+        expect.arrayContaining([
+          {
+            action: 'SUPER_ADMIN.TRANSFERRED_OUT',
+            resource_id: seed.superAdmin.appUserId,
+            correlation_id: data.transferId,
+            actor_app_user_id: seed.superAdmin.appUserId,
+          },
+          {
+            action: 'SUPER_ADMIN.TRANSFERRED_IN',
+            resource_id: u2.appUserId,
+            correlation_id: data.transferId,
+            actor_app_user_id: seed.superAdmin.appUserId,
+          },
+        ]),
+      );
       const grant = await ctx.sql.query(
         `SELECT revoked_by FROM role_grants WHERE app_user_id = $1 AND role = 'SUPER_ADMIN'`,
         [seed.superAdmin.appUserId],

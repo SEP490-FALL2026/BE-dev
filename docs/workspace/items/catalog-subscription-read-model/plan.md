@@ -67,3 +67,5 @@ Owner chọn bỏ trường); gỡ ba mục registry; cập nhật roadmap; Owne
 - [x] Diff cuối đã tự review; tài liệu vận hành/runbook bị ảnh hưởng đã cập nhật; phần chưa kiểm chứng ghi rõ.
 - [ ] Giao Owner review trên revision cụ thể; cập nhật roadmap/PR. Chỉ ghi `merged-dev`, `accepted`, `released` sau
       đúng sự kiện thật.
+
+**Prompt 29 (23/10/2026):** `P28-06` — `LD-01`: thuê bao có giá lấy hồ sơ thuế từ chính lần đọc ước tính (một phiên bản), kỳ vọng thuế tính tay; `LD-02`: kỳ vọng đến hạn viết tay thay hàm production. [g0-g4-checkpoint-fix-forward](../g0-g4-checkpoint-fix-forward/spec.md).

@@ -292,6 +292,7 @@ describe('architecture boundaries', () => {
     for (const file of listTypeScriptFiles(modulesRoot)) {
       const source = readFileSync(file, 'utf8');
       if (!/\$(?:query|execute)Raw(?:Unsafe)?/.test(source)) continue;
+      if (PRE_MIGRATION_READERS.has(relative(modulesRoot, file).split(sep).join('/'))) continue;
 
       const owner = relative(modulesRoot, file).split(sep)[0];
 
@@ -305,7 +306,109 @@ describe('architecture boundaries', () => {
       }
     }
   });
+
+  it('lets only the registered pre-migration readers read across modules, and only with SELECT', () => {
+    const modulesRoot = join(sourceRoot, 'modules');
+
+    for (const path of PRE_MIGRATION_READERS.keys()) {
+      // One exact file per entry: no directory, no wildcard, no spec.
+      const file = join(modulesRoot, ...path.split('/'));
+      const exact = /^[a-z0-9-]+(?:\/[a-z0-9-]+)*\/[a-z0-9.-]+\.ts$/.test(path) && !path.endsWith('.spec.ts');
+      expect({ path, exact, file: existsSync(file) && statSync(file).isFile() }).toEqual({
+        path,
+        exact: true,
+        file: true,
+      });
+      const { statements, fragments, otherAccess } = rawSqlOf(file);
+      // Only `$queryRaw` statements and `Prisma.sql` fragments: no `$executeRaw`, no `*Unsafe`, no delegate write.
+      expect({ path, otherAccess }).toEqual({ path, otherAccess: [] });
+      expect({ path, reads: statements.length > 0 }).toEqual({ path, reads: true });
+      const notSelect = statements.filter((sql) => !/^\s*(?:SELECT|WITH)\b/i.test(sql));
+      expect({ path, notSelect }).toEqual({ path, notSelect: [] });
+      const writes = [...statements, ...fragments].flatMap((sql) => sql.match(SQL_WRITE) ?? []);
+      expect({ path, writes }).toEqual({ path, writes: [] });
+    }
+  });
+
+  it('reaches each pre-migration reader from the preflight command only: never the API, the worker or another command', () => {
+    const importers = new Map<string, string[]>();
+    for (const file of listTypeScriptFiles(sourceRoot)) {
+      if (file.includes(`${sep}generated${sep}`)) continue;
+      for (const target of listResolvedRelativeImports(file))
+        importers.set(target, [...(importers.get(target) ?? []), file]);
+    }
+
+    for (const path of PRE_MIGRATION_READERS.keys()) {
+      const reached = new Set([join(sourceRoot, 'modules', ...path.split('/'))]);
+      const pending = [...reached];
+      while (pending.length > 0) {
+        for (const importer of importers.get(pending.pop() as string) ?? []) {
+          if (reached.has(importer)) continue;
+          reached.add(importer);
+          pending.push(importer);
+        }
+      }
+      const roots = [...reached]
+        .filter((file) => dirname(file) === sourceRoot)
+        .map((file) => relative(sourceRoot, file))
+        .sort();
+
+      expect({ path, roots }).toEqual({ path, roots: ['migration-preflight-cli.ts'] });
+    }
+  });
 });
+
+/** A statement or function that writes, locks or changes the session — none may appear in a pre-migration reader. */
+const SQL_WRITE =
+  /\b(?:INSERT|UPDATE|DELETE|MERGE|UPSERT|INTO|ALTER|CREATE|DROP|TRUNCATE|GRANT|REVOKE|COPY|LOCK|CALL|VACUUM|REINDEX|CLUSTER|REFRESH|COMMENT|SET_CONFIG|SETVAL|NEXTVAL|PG_ADVISORY_\w+)\b/gi;
+
+/**
+ * The SQL of a file: the text of every `…$queryRaw` tagged template (a statement) and every `Prisma.sql` tagged template
+ * (a fragment), placeholders left out; `otherAccess` lists every other way to reach the database it finds.
+ */
+function rawSqlOf(file: string): { statements: string[]; fragments: string[]; otherAccess: string[] } {
+  const sourceFile = ts.createSourceFile(file, readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true);
+  const statements: string[] = [];
+  const fragments: string[] = [];
+  const otherAccess: string[] = [];
+  const textOf = (template: ts.TemplateLiteral): string =>
+    ts.isNoSubstitutionTemplateLiteral(template)
+      ? template.text
+      : [template.head.text, ...template.templateSpans.map((span) => span.literal.text)].join(' ');
+
+  const visit = (node: ts.Node): void => {
+    if (ts.isTaggedTemplateExpression(node)) {
+      const tag = node.tag.getText(sourceFile);
+      if (/\.\$queryRaw$/.test(tag)) statements.push(textOf(node.template));
+      else if (tag === 'Prisma.sql') fragments.push(textOf(node.template));
+      else otherAccess.push(tag);
+    } else if (ts.isPropertyAccessExpression(node)) {
+      const name = node.name.text;
+      if (/^\$(?:executeRaw|executeRawUnsafe|queryRawUnsafe|transaction|runCommandRaw)$/.test(name))
+        otherAccess.push(name);
+      if (/^(?:create|createMany|createManyAndReturn|update|updateMany|upsert|delete|deleteMany)$/.test(name)) {
+        otherAccess.push(name);
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sourceFile);
+
+  return { statements, fragments, otherAccess };
+}
+
+/**
+ * Files that read the schema as it stands **before** a migration, which no module's Prisma model describes (a removed
+ * enum value, a column not yet added), so they cannot read through each owner's model or facade. Registered by path with
+ * the reason; every one runs in a read-only session (operational-commands rule 1) and holds SELECT statements only
+ * (asserted above). Not a pattern for business reads.
+ */
+const PRE_MIGRATION_READERS = new Map<string, string>([
+  [
+    'installation/migration-preflight/migration-preflight.repo.ts',
+    'P28-01 (Prompt 29, B-FORWARD): `pnpm ops:preflight` judges a database before 20261022120000_cost_centers_unit_only, whose COMPANY Cost Centers and missing owning department the current models cannot read',
+  ],
+]);
 
 /** The relative module specifiers of a source file: `import ... from`, `export ... from`, `import '...'` and `import('...')`. */
 function listRelativeSpecifiers(source: string): string[] {
@@ -354,6 +457,11 @@ const CLI_ENTRY_FILES: ReadonlySet<string> = new Set([
   'modules/installation/dev-seed/dev-seed.arguments.ts',
   'modules/installation/dev-seed/dev-seed.module.ts',
   'modules/installation/dev-seed/dev-seed.service.ts',
+  // P28-01 (Prompt 29): `pnpm ops:preflight` reaches its graph, its service, its arguments and its report.
+  'modules/installation/migration-preflight/migration-preflight-report.ts',
+  'modules/installation/migration-preflight/migration-preflight.arguments.ts',
+  'modules/installation/migration-preflight/migration-preflight.module.ts',
+  'modules/installation/migration-preflight/migration-preflight.service.ts',
 ]);
 
 /**

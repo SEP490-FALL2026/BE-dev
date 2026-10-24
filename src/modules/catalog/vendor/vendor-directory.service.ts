@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { searchKey } from '../vendor-dictionary/vendor-matcher';
+import { VendorDictionaryGroupChangedError, VendorNameHeldByAnotherGroupError } from './vendor.errors';
 import { VendorRepo, type VendorRow } from './vendor.repo';
 
 export type VendorRecord = VendorRow;
@@ -26,7 +27,16 @@ export class VendorDirectoryService {
     return this.vendors.find(tx, id);
   }
 
-  /** The vendor of a dictionary group; a free-text vendor of the same name takes the group over rather than doubling it. */
+  /** The vendor that holds a dictionary group in the organization, or null. */
+  findByDictionaryGroup(tx: DbTx, organizationId: string, groupId: string): Promise<VendorRecord | null> {
+    return this.vendors.findByDictionaryGroup(tx, organizationId, groupId);
+  }
+
+  /**
+   * The vendor of a dictionary group; a free-text vendor of the same name takes the group over rather than doubling it.
+   * Throws VendorNameHeldByAnotherGroupError when the vendor of that name holds another group, and
+   * VendorDictionaryGroupChangedError when a simultaneous change took the group first (`DB-03`).
+   */
   async ensureForDictionaryGroup(
     tx: DbTx,
     organizationId: string,
@@ -47,12 +57,17 @@ export class VendorDirectoryService {
     const raced = await this.vendors.findByDictionaryGroup(tx, organizationId, group.id);
     if (raced) return { vendor: raced, created: false, adopted: false };
     const sameName = await this.vendors.findByNormalizedName(tx, organizationId, normalizedName);
-    if (sameName?.dictionaryGroupId === null) {
+    if (sameName && sameName.dictionaryGroupId === group.id)
+      return { vendor: sameName, created: false, adopted: false };
+    if (sameName && sameName.dictionaryGroupId !== null) throw new VendorNameHeldByAnotherGroupError();
+    if (sameName) {
+      // A refused write (another vendor took the group meanwhile) aborts the transaction: nothing is read after it.
       const adopted = await this.vendors.setDictionaryGroup(tx, sameName.id, group.id);
       if (adopted) return { vendor: adopted.vendor, created: false, adopted: adopted.adopted };
     }
 
-    throw new Error('A vendor of the same name belongs to another dictionary group');
+    // The insert met a vendor that neither holds the group nor still carries its name, or the write lost: a race.
+    throw new VendorDictionaryGroupChangedError();
   }
 
   /** The vendor of this name outside the dictionary, found or made. */
