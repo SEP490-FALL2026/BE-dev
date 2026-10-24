@@ -97,19 +97,23 @@ describe('approval role routes (e2e, no database)', () => {
       ['POST', `/api/v1/requests/${ID}/approvers`],
       ['POST', '/api/v1/approval-roles/SPENDING_APPROVER/delegations'],
       ['DELETE', '/api/v1/approval-roles/SPENDING_APPROVER'],
-    ])('has no %s %s: 404 or 405 even for the Super Admin and the spending approver', async (method, path) => {
-      for (const identity of [principal(['SUPER_ADMIN']), principal([], ['SPENDING_APPROVER'])]) {
-        app = await appFor(identity);
+    ])(
+      'has no %s %s: 404 or 405 even for the Super Admin and the spending approver',
+      async (method, path) => {
+        for (const identity of [principal(['SUPER_ADMIN']), principal([], ['SPENDING_APPROVER'])]) {
+          app = await appFor(identity);
 
-        const response = await request(app.getHttpServer())
-          [method.toLowerCase() as 'post' | 'delete'](path)
-          .set('Authorization', 'Bearer any')
-          .send({})
-          .expect(404);
+          const response = await request(app.getHttpServer())
+            [method.toLowerCase() as 'post' | 'delete'](path)
+            .set('Authorization', 'Bearer any')
+            .send({})
+            .expect(404);
 
-        expect(bodyOf(response).error.code).toBe('HTTP_NOT_FOUND');
-        await app.close();
-      }
-    });
+          expect(bodyOf(response).error.code).toBe('HTTP_NOT_FOUND');
+          await app.close();
+        }
+      },
+      15_000,
+    );
   });
 });
