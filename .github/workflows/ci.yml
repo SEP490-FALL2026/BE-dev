@@ -19,7 +19,7 @@ on:
       - 'pnpm-workspace.yaml'
       - 'tsconfig*.json'
       - 'eslint.config.mjs'
-      - '.github/workflows/ci.yml'
+      - '.github/workflows/**'
       - 'README.md'
       - 'CONTRIBUTING.md'
       - 'ARCHITECTURE.md'
@@ -53,7 +53,7 @@ on:
       - 'pnpm-workspace.yaml'
       - 'tsconfig*.json'
       - 'eslint.config.mjs'
-      - '.github/workflows/ci.yml'
+      - '.github/workflows/**'
       - 'README.md'
       - 'CONTRIBUTING.md'
       - 'ARCHITECTURE.md'
@@ -68,9 +68,11 @@ on:
       - 'rules-check.config.json'
       - '.prettierrc'
       - '.prettierignore'
+  workflow_dispatch:
 
 permissions:
   contents: read
+  packages: write
 
 jobs:
   quality:
@@ -168,3 +170,10 @@ jobs:
 
       - name: Audit production dependencies
         run: pnpm audit --prod --audit-level high
+
+  deploy:
+    name: Deploy to VPS
+    needs: quality
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    uses: ./.github/workflows/deploy.yml
+    secrets: inherit

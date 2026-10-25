@@ -1,11 +1,7 @@
 name: Backend CD (Deploy to VPS)
 
 on:
-  workflow_run:
-    workflows: ["Backend CI"]
-    branches: [main]
-    types:
-      - completed
+  workflow_call:
   workflow_dispatch:
 
 permissions:
@@ -19,7 +15,6 @@ env:
 jobs:
   build-and-push:
     name: Build & Push Production Image
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     outputs:
       image: ${{ steps.meta.outputs.image }}
@@ -27,8 +22,6 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.workflow_run.head_sha || github.ref }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -44,8 +37,7 @@ jobs:
         id: meta
         run: |
           IMAGE_LOWERCASE=$(echo "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}" | tr '[:upper:]' '[:lower:]')
-          TARGET_SHA="${{ github.event.workflow_run.head_sha || github.sha }}"
-          SHORT_SHA=$(echo "${TARGET_SHA}" | cut -c1-7)
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
           echo "image=${IMAGE_LOWERCASE}" >> $GITHUB_OUTPUT
           echo "tag=${SHORT_SHA}" >> $GITHUB_OUTPUT
 
@@ -69,8 +61,6 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.workflow_run.head_sha || github.ref }}
 
       - name: Copy Compose and Caddyfile to VPS
         uses: appleboy/scp-action@v0.1.7
