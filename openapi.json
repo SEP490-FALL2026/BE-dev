@@ -32695,20 +32695,10 @@
                     "action": { "type": "string" },
                     "resourceType": { "type": "string" },
                     "resourceId": { "type": "string" },
-                    "before": {
-                      "type": "object",
-                      "propertyNames": { "type": "string" },
-                      "additionalProperties": {},
-                      "nullable": true
-                    },
-                    "after": {
-                      "type": "object",
-                      "propertyNames": { "type": "string" },
-                      "additionalProperties": {},
-                      "nullable": true
-                    },
+                    "before": { "type": "object", "additionalProperties": {}, "nullable": true },
+                    "after": { "type": "object", "additionalProperties": {}, "nullable": true },
                     "correlationId": { "type": "string" },
-                    "operatorReference": { "type": ["string", "null"] }
+                    "operatorReference": { "type": "string", "nullable": true }
                   },
                   "required": [
                     "id",
@@ -32864,7 +32854,7 @@
               "id": { "type": "string", "format": "uuid" },
               "employeeCode": { "type": "string" },
               "fullName": { "type": "string" },
-              "workEmail": { "type": ["string", "null"] },
+              "workEmail": { "type": "string", "nullable": true },
               "employmentType": { "type": "string", "enum": ["STAFF", "CONTRACTOR", "FREELANCER", "INTERN"] },
               "hireDate": { "type": "string" },
               "status": { "type": "string", "enum": ["ACTIVE"] },
@@ -32938,7 +32928,7 @@
               "id": { "type": "string", "format": "uuid" },
               "employeeCode": { "type": "string" },
               "fullName": { "type": "string" },
-              "workEmail": { "type": ["string", "null"] },
+              "workEmail": { "type": "string", "nullable": true },
               "employmentType": { "type": "string", "enum": ["STAFF", "CONTRACTOR", "FREELANCER", "INTERN"] },
               "hireDate": { "type": "string" },
               "status": { "type": "string", "enum": ["ACTIVE", "TERMINATED"] }
@@ -33153,7 +33143,7 @@
                     "id": { "type": "string", "format": "uuid" },
                     "code": { "type": "string" },
                     "name": { "type": "string" },
-                    "function": { "type": ["string", "null"] },
+                    "function": { "type": "string", "nullable": true },
                     "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE"] },
                     "costCenter": {
                       "type": "object",
@@ -33265,7 +33255,7 @@
               "id": { "type": "string", "format": "uuid" },
               "code": { "type": "string" },
               "name": { "type": "string" },
-              "function": { "type": ["string", "null"] },
+              "function": { "type": "string", "nullable": true },
               "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE"] },
               "costCenter": {
                 "type": "object",
@@ -33319,7 +33309,7 @@
                     "employeeCode": { "type": "string" },
                     "fullName": { "type": "string" },
                     "validFrom": { "type": "string" },
-                    "validTo": { "type": ["string", "null"] }
+                    "validTo": { "type": "string", "nullable": true }
                   },
                   "required": ["employeeId", "employeeCode", "fullName", "validFrom", "validTo"],
                   "additionalProperties": false
@@ -33333,7 +33323,7 @@
                   "properties": {
                     "id": { "type": "string", "format": "uuid" },
                     "name": { "type": "string" },
-                    "description": { "type": ["string", "null"] },
+                    "description": { "type": "string", "nullable": true },
                     "status": { "type": "string", "enum": ["RUNNING", "FINISHED"] },
                     "departments": {
                       "type": "array",
@@ -33569,7 +33559,7 @@
             "properties": {
               "id": { "type": "string", "format": "uuid" },
               "name": { "type": "string" },
-              "description": { "type": ["string", "null"] },
+              "description": { "type": "string", "nullable": true },
               "status": { "type": "string", "enum": ["RUNNING", "FINISHED"] },
               "departments": {
                 "type": "array",
@@ -34606,15 +34596,15 @@
                     "subscriptionId": { "type": "string", "format": "uuid", "nullable": true },
                     "employeeId": { "type": "string", "format": "uuid" },
                     "accountIdentifier": { "type": "string" },
-                    "reason": { "type": ["string", "null"] },
+                    "reason": { "type": "string", "nullable": true },
                     "costCenterId": { "type": "string", "format": "uuid", "nullable": true },
                     "owningDepartmentId": { "type": "string", "format": "uuid", "nullable": true },
                     "effectiveFrom": { "type": "string" },
                     "effectiveFromBasis": { "type": "string", "enum": ["ACTUAL", "RECORDED"] },
-                    "grantedOn": { "type": ["string", "null"] },
-                    "effectiveFromLabel": { "type": ["string", "null"] },
-                    "validUntil": { "type": ["string", "null"] },
-                    "expectedEndDate": { "type": ["string", "null"] },
+                    "grantedOn": { "type": "string", "nullable": true },
+                    "effectiveFromLabel": { "type": "string", "nullable": true },
+                    "validUntil": { "type": "string", "nullable": true },
+                    "expectedEndDate": { "type": "string", "nullable": true },
                     "predecessorId": { "type": "string", "format": "uuid", "nullable": true },
                     "failedAt": { "type": "string", "format": "date-time", "nullable": true },
                     "createdAt": { "type": "string", "format": "date-time" },
@@ -34730,15 +34720,15 @@
                   "subscriptionId": { "type": "string", "format": "uuid", "nullable": true },
                   "employeeId": { "type": "string", "format": "uuid" },
                   "accountIdentifier": { "type": "string" },
-                  "reason": { "type": ["string", "null"] },
+                  "reason": { "type": "string", "nullable": true },
                   "costCenterId": { "type": "string", "format": "uuid", "nullable": true },
                   "owningDepartmentId": { "type": "string", "format": "uuid", "nullable": true },
                   "effectiveFrom": { "type": "string" },
                   "effectiveFromBasis": { "type": "string", "enum": ["ACTUAL", "RECORDED"] },
-                  "grantedOn": { "type": ["string", "null"] },
-                  "effectiveFromLabel": { "type": ["string", "null"] },
-                  "validUntil": { "type": ["string", "null"] },
-                  "expectedEndDate": { "type": ["string", "null"] },
+                  "grantedOn": { "type": "string", "nullable": true },
+                  "effectiveFromLabel": { "type": "string", "nullable": true },
+                  "validUntil": { "type": "string", "nullable": true },
+                  "expectedEndDate": { "type": "string", "nullable": true },
                   "predecessorId": { "type": "string", "format": "uuid", "nullable": true },
                   "failedAt": { "type": "string", "format": "date-time", "nullable": true },
                   "createdAt": { "type": "string", "format": "date-time" }
@@ -34776,15 +34766,15 @@
                   "subscriptionId": { "type": "string", "format": "uuid", "nullable": true },
                   "employeeId": { "type": "string", "format": "uuid" },
                   "accountIdentifier": { "type": "string" },
-                  "reason": { "type": ["string", "null"] },
+                  "reason": { "type": "string", "nullable": true },
                   "costCenterId": { "type": "string", "format": "uuid", "nullable": true },
                   "owningDepartmentId": { "type": "string", "format": "uuid", "nullable": true },
                   "effectiveFrom": { "type": "string" },
                   "effectiveFromBasis": { "type": "string", "enum": ["ACTUAL", "RECORDED"] },
-                  "grantedOn": { "type": ["string", "null"] },
-                  "effectiveFromLabel": { "type": ["string", "null"] },
-                  "validUntil": { "type": ["string", "null"] },
-                  "expectedEndDate": { "type": ["string", "null"] },
+                  "grantedOn": { "type": "string", "nullable": true },
+                  "effectiveFromLabel": { "type": "string", "nullable": true },
+                  "validUntil": { "type": "string", "nullable": true },
+                  "expectedEndDate": { "type": "string", "nullable": true },
                   "predecessorId": { "type": "string", "format": "uuid", "nullable": true },
                   "failedAt": { "type": "string", "format": "date-time", "nullable": true },
                   "createdAt": { "type": "string", "format": "date-time" }
@@ -34892,7 +34882,7 @@
                       "additionalProperties": false
                     },
                     "effectiveFrom": { "type": "string" },
-                    "effectiveFromLabel": { "type": ["string", "null"] }
+                    "effectiveFromLabel": { "type": "string", "nullable": true }
                   },
                   "required": [
                     "assignmentId",
@@ -35091,15 +35081,15 @@
                     "nullable": true
                   },
                   "completedBy": { "type": "string", "format": "uuid", "nullable": true },
-                  "evidence": { "type": ["string", "null"] },
+                  "evidence": { "type": "string", "nullable": true },
                   "failedBy": { "type": "string", "format": "uuid", "nullable": true },
-                  "failureReason": { "type": ["string", "null"] },
-                  "lastError": { "type": ["string", "null"] },
+                  "failureReason": { "type": "string", "nullable": true },
+                  "lastError": { "type": "string", "nullable": true },
                   "handedOffBy": { "type": "string", "format": "uuid", "nullable": true },
                   "handedOffAt": { "type": "string", "format": "date-time", "nullable": true },
-                  "handOffEvidence": { "type": ["string", "null"] },
+                  "handOffEvidence": { "type": "string", "nullable": true },
                   "closedBy": { "type": "string", "format": "uuid", "nullable": true },
-                  "closeReason": { "type": ["string", "null"] }
+                  "closeReason": { "type": "string", "nullable": true }
                 },
                 "required": [
                   "id",
@@ -35387,15 +35377,15 @@
                     "nullable": true
                   },
                   "completedBy": { "type": "string", "format": "uuid", "nullable": true },
-                  "evidence": { "type": ["string", "null"] },
+                  "evidence": { "type": "string", "nullable": true },
                   "failedBy": { "type": "string", "format": "uuid", "nullable": true },
-                  "failureReason": { "type": ["string", "null"] },
-                  "lastError": { "type": ["string", "null"] },
+                  "failureReason": { "type": "string", "nullable": true },
+                  "lastError": { "type": "string", "nullable": true },
                   "handedOffBy": { "type": "string", "format": "uuid", "nullable": true },
                   "handedOffAt": { "type": "string", "format": "date-time", "nullable": true },
-                  "handOffEvidence": { "type": ["string", "null"] },
+                  "handOffEvidence": { "type": "string", "nullable": true },
                   "closedBy": { "type": "string", "format": "uuid", "nullable": true },
-                  "closeReason": { "type": ["string", "null"] }
+                  "closeReason": { "type": "string", "nullable": true }
                 },
                 "required": [
                   "id",
@@ -35950,7 +35940,7 @@
                       "additionalProperties": false
                     },
                     "businessOwnerReplacementRequired": { "type": "boolean" },
-                    "usageCollectionDefault": { "type": "string", "nullable": true, "enum": ["NOT_COLLECTED"] },
+                    "usageCollectionDefault": { "type": "string", "nullable": true, "enum": ["NOT_COLLECTED", null] },
                     "functionalGroup": {
                       "type": "object",
                       "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
@@ -36079,7 +36069,7 @@
                 "additionalProperties": false
               },
               "businessOwnerReplacementRequired": { "type": "boolean" },
-              "usageCollectionDefault": { "type": "string", "nullable": true, "enum": ["NOT_COLLECTED"] },
+              "usageCollectionDefault": { "type": "string", "nullable": true, "enum": ["NOT_COLLECTED", null] },
               "functionalGroup": {
                 "type": "object",
                 "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
@@ -36098,7 +36088,7 @@
                   "callsOrMeetings": { "type": "boolean" },
                   "mailbox": { "type": "boolean" },
                   "isCommunicationService": { "type": "boolean" },
-                  "note": { "type": ["string", "null"] }
+                  "note": { "type": "string", "nullable": true }
                 },
                 "required": ["personToPersonMessaging", "callsOrMeetings", "mailbox", "isCommunicationService", "note"],
                 "additionalProperties": false
@@ -36164,7 +36154,7 @@
                 "additionalProperties": false
               },
               "businessOwnerReplacementRequired": { "type": "boolean" },
-              "usageCollectionDefault": { "type": "string", "nullable": true, "enum": ["NOT_COLLECTED"] },
+              "usageCollectionDefault": { "type": "string", "nullable": true, "enum": ["NOT_COLLECTED", null] },
               "functionalGroup": {
                 "type": "object",
                 "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
@@ -36183,7 +36173,7 @@
                   "callsOrMeetings": { "type": "boolean" },
                   "mailbox": { "type": "boolean" },
                   "isCommunicationService": { "type": "boolean" },
-                  "note": { "type": ["string", "null"] }
+                  "note": { "type": "string", "nullable": true }
                 },
                 "required": ["personToPersonMessaging", "callsOrMeetings", "mailbox", "isCommunicationService", "note"],
                 "additionalProperties": false
@@ -36301,7 +36291,7 @@
                 "additionalProperties": false
               },
               "businessOwnerReplacementRequired": { "type": "boolean" },
-              "usageCollectionDefault": { "type": "string", "nullable": true, "enum": ["NOT_COLLECTED"] },
+              "usageCollectionDefault": { "type": "string", "nullable": true, "enum": ["NOT_COLLECTED", null] },
               "functionalGroup": {
                 "type": "object",
                 "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
@@ -36320,7 +36310,7 @@
                   "callsOrMeetings": { "type": "boolean" },
                   "mailbox": { "type": "boolean" },
                   "isCommunicationService": { "type": "boolean" },
-                  "note": { "type": ["string", "null"] }
+                  "note": { "type": "string", "nullable": true }
                 },
                 "required": ["personToPersonMessaging", "callsOrMeetings", "mailbox", "isCommunicationService", "note"],
                 "additionalProperties": false
@@ -36558,7 +36548,7 @@
               "seatTracking": { "type": "string", "enum": ["APPLICABLE", "NOT_APPLICABLE"] },
               "createdAt": { "type": "string", "format": "date-time" },
               "updatedAt": { "type": "string", "format": "date-time" },
-              "revocationNote": { "type": ["string", "null"] }
+              "revocationNote": { "type": "string", "nullable": true }
             },
             "required": [
               "id",
@@ -36610,7 +36600,7 @@
               "seatTracking": { "type": "string", "enum": ["APPLICABLE", "NOT_APPLICABLE"] },
               "createdAt": { "type": "string", "format": "date-time" },
               "updatedAt": { "type": "string", "format": "date-time" },
-              "revocationNote": { "type": ["string", "null"] },
+              "revocationNote": { "type": "string", "nullable": true },
               "workspaceProfile": {
                 "type": "object",
                 "properties": {
@@ -36650,7 +36640,7 @@
                     "maximum": 9007199254740991,
                     "nullable": true
                   },
-                  "ownerTransferProcedure": { "type": ["string", "null"] },
+                  "ownerTransferProcedure": { "type": "string", "nullable": true },
                   "emergencyAccount": {
                     "type": "object",
                     "properties": {
@@ -36808,7 +36798,7 @@
                 "maximum": 9007199254740991,
                 "nullable": true
               },
-              "ownerTransferProcedure": { "type": ["string", "null"] },
+              "ownerTransferProcedure": { "type": "string", "nullable": true },
               "emergencyAccount": {
                 "type": "object",
                 "properties": {
@@ -37221,9 +37211,9 @@
                       "enum": ["MONTHLY", "QUARTERLY", "ANNUAL", "OTHER", null],
                       "nullable": true
                     },
-                    "startDate": { "type": ["string", "null"] },
-                    "endDate": { "type": ["string", "null"] },
-                    "renewalDate": { "type": ["string", "null"] },
+                    "startDate": { "type": "string", "nullable": true },
+                    "endDate": { "type": "string", "nullable": true },
+                    "renewalDate": { "type": "string", "nullable": true },
                     "noticePeriodDays": {
                       "type": "integer",
                       "minimum": -9007199254740991,
@@ -37235,7 +37225,7 @@
                     "noticeDeadline": {
                       "type": "object",
                       "properties": {
-                        "value": { "type": ["string", "null"] },
+                        "value": { "type": "string", "nullable": true },
                         "source": {
                           "type": "string",
                           "enum": ["DECLARED", "INFERRED_UNCONFIRMED", "BY_END_DATE", "MISSING", "NOT_APPLICABLE"]
@@ -37247,7 +37237,7 @@
                     "alerts": {
                       "type": "object",
                       "properties": {
-                        "baseDate": { "type": ["string", "null"] },
+                        "baseDate": { "type": "string", "nullable": true },
                         "dates": { "type": "array", "items": { "type": "string" } }
                       },
                       "required": ["baseDate", "dates"],
@@ -37461,9 +37451,9 @@
                 "enum": ["MONTHLY", "QUARTERLY", "ANNUAL", "OTHER", null],
                 "nullable": true
               },
-              "startDate": { "type": ["string", "null"] },
-              "endDate": { "type": ["string", "null"] },
-              "renewalDate": { "type": ["string", "null"] },
+              "startDate": { "type": "string", "nullable": true },
+              "endDate": { "type": "string", "nullable": true },
+              "renewalDate": { "type": "string", "nullable": true },
               "noticePeriodDays": {
                 "type": "integer",
                 "minimum": -9007199254740991,
@@ -37475,7 +37465,7 @@
               "noticeDeadline": {
                 "type": "object",
                 "properties": {
-                  "value": { "type": ["string", "null"] },
+                  "value": { "type": "string", "nullable": true },
                   "source": {
                     "type": "string",
                     "enum": ["DECLARED", "INFERRED_UNCONFIRMED", "BY_END_DATE", "MISSING", "NOT_APPLICABLE"]
@@ -37487,7 +37477,7 @@
               "alerts": {
                 "type": "object",
                 "properties": {
-                  "baseDate": { "type": ["string", "null"] },
+                  "baseDate": { "type": "string", "nullable": true },
                   "dates": { "type": "array", "items": { "type": "string" } }
                 },
                 "required": ["baseDate", "dates"],
@@ -37580,9 +37570,9 @@
           },
           "billingCycle": { "type": "string", "enum": ["MONTHLY", "QUARTERLY", "ANNUAL", "OTHER"] },
           "startDate": { "type": "string" },
-          "endDate": { "type": "array", "items": { "type": "string" } },
-          "renewalDate": { "type": "array", "items": { "type": "string" } },
-          "noticeDeadline": { "type": "array", "items": { "type": "string" } },
+          "endDate": { "type": "string", "nullable": true },
+          "renewalDate": { "type": "string", "nullable": true },
+          "noticeDeadline": { "type": "string", "nullable": true },
           "noticePeriodDays": { "type": "integer", "minimum": 0, "maximum": 3650, "nullable": true },
           "autoRenew": { "type": "boolean" },
           "allowsMidTermReduction": { "type": "boolean" }
@@ -37799,10 +37789,10 @@
               "terms": {
                 "type": "object",
                 "properties": {
-                  "termsUrl": { "type": ["string", "null"] },
-                  "lastReviewedOn": { "type": ["string", "null"] },
-                  "aiTraining": { "type": ["string", "null"] },
-                  "dataLocation": { "type": ["string", "null"] },
+                  "termsUrl": { "type": "string", "nullable": true },
+                  "lastReviewedOn": { "type": "string", "nullable": true },
+                  "aiTraining": { "type": "string", "nullable": true },
+                  "dataLocation": { "type": "string", "nullable": true },
                   "installLimit": {
                     "type": "object",
                     "properties": {
@@ -37812,13 +37802,13 @@
                         "maximum": 9007199254740991,
                         "nullable": true
                       },
-                      "note": { "type": ["string", "null"] }
+                      "note": { "type": "string", "nullable": true }
                     },
                     "required": ["maxDevicesPerKey", "note"],
                     "additionalProperties": false
                   },
-                  "commercialUse": { "type": ["string", "null"] },
-                  "cancellationRefund": { "type": ["string", "null"] },
+                  "commercialUse": { "type": "string", "nullable": true },
+                  "cancellationRefund": { "type": "string", "nullable": true },
                   "updatedAt": { "type": "string", "format": "date-time" }
                 },
                 "required": [
@@ -37875,7 +37865,7 @@
                     "noticeDeadline": {
                       "type": "object",
                       "properties": {
-                        "value": { "type": ["string", "null"] },
+                        "value": { "type": "string", "nullable": true },
                         "source": { "type": "string", "enum": ["DECLARED", "INFERRED_UNCONFIRMED", "BY_END_DATE"] }
                       },
                       "required": ["value", "source"],
@@ -37883,7 +37873,7 @@
                     },
                     "baseDate": { "type": "string" },
                     "reviewFrom": { "type": "string" },
-                    "lastReviewedOn": { "type": ["string", "null"] }
+                    "lastReviewedOn": { "type": "string", "nullable": true }
                   },
                   "required": [
                     "code",
@@ -37923,7 +37913,7 @@
         "type": "object",
         "properties": {
           "termsUrl": { "type": "string", "maxLength": 10000, "nullable": true },
-          "lastReviewedOn": { "type": "array", "items": { "type": "string" } },
+          "lastReviewedOn": { "type": "string", "nullable": true },
           "aiTraining": { "type": "string", "maxLength": 10000, "nullable": true },
           "dataLocation": { "type": "string", "maxLength": 10000, "nullable": true },
           "installLimit": {
@@ -37951,10 +37941,10 @@
               "terms": {
                 "type": "object",
                 "properties": {
-                  "termsUrl": { "type": ["string", "null"] },
-                  "lastReviewedOn": { "type": ["string", "null"] },
-                  "aiTraining": { "type": ["string", "null"] },
-                  "dataLocation": { "type": ["string", "null"] },
+                  "termsUrl": { "type": "string", "nullable": true },
+                  "lastReviewedOn": { "type": "string", "nullable": true },
+                  "aiTraining": { "type": "string", "nullable": true },
+                  "dataLocation": { "type": "string", "nullable": true },
                   "installLimit": {
                     "type": "object",
                     "properties": {
@@ -37964,13 +37954,13 @@
                         "maximum": 9007199254740991,
                         "nullable": true
                       },
-                      "note": { "type": ["string", "null"] }
+                      "note": { "type": "string", "nullable": true }
                     },
                     "required": ["maxDevicesPerKey", "note"],
                     "additionalProperties": false
                   },
-                  "commercialUse": { "type": ["string", "null"] },
-                  "cancellationRefund": { "type": ["string", "null"] },
+                  "commercialUse": { "type": "string", "nullable": true },
+                  "cancellationRefund": { "type": "string", "nullable": true },
                   "updatedAt": { "type": "string", "format": "date-time" }
                 },
                 "required": [
@@ -38111,7 +38101,7 @@
                     "noticeDeadline": {
                       "type": "object",
                       "properties": {
-                        "value": { "type": ["string", "null"] },
+                        "value": { "type": "string", "nullable": true },
                         "source": { "type": "string", "enum": ["DECLARED", "INFERRED_UNCONFIRMED", "BY_END_DATE"] }
                       },
                       "required": ["value", "source"],
@@ -38119,7 +38109,7 @@
                     },
                     "baseDate": { "type": "string" },
                     "reviewFrom": { "type": "string" },
-                    "lastReviewedOn": { "type": ["string", "null"] }
+                    "lastReviewedOn": { "type": "string", "nullable": true }
                   },
                   "required": [
                     "code",
@@ -38365,8 +38355,8 @@
                           "properties": {
                             "assignmentId": { "type": "string", "format": "uuid" },
                             "employeeId": { "type": "string", "format": "uuid" },
-                            "employeeCode": { "type": ["string", "null"] },
-                            "fullName": { "type": ["string", "null"] },
+                            "employeeCode": { "type": "string", "nullable": true },
+                            "fullName": { "type": "string", "nullable": true },
                             "planId": { "type": "string", "format": "uuid" },
                             "planName": { "type": "string" },
                             "subscriptionId": { "type": "string", "format": "uuid", "nullable": true }
@@ -38412,7 +38402,7 @@
                             "subscriptionId": { "type": "string", "format": "uuid" },
                             "planId": { "type": "string", "format": "uuid" },
                             "planName": { "type": "string" },
-                            "endDate": { "type": ["string", "null"] }
+                            "endDate": { "type": "string", "nullable": true }
                           },
                           "required": ["subscriptionId", "planId", "planName", "endDate"],
                           "additionalProperties": false
@@ -39411,7 +39401,7 @@
                     "additionalProperties": false,
                     "nullable": true
                   },
-                  "jobTitle": { "type": ["string", "null"] }
+                  "jobTitle": { "type": "string", "nullable": true }
                 },
                 "required": ["id", "employeeCode", "fullName", "department", "jobTitle"],
                 "additionalProperties": false
@@ -39477,8 +39467,8 @@
                     "id": { "type": "string", "format": "uuid" },
                     "employeeCode": { "type": "string" },
                     "fullName": { "type": "string" },
-                    "workEmail": { "type": ["string", "null"] },
-                    "department": { "type": ["string", "null"] }
+                    "workEmail": { "type": "string", "nullable": true },
+                    "department": { "type": "string", "nullable": true }
                   },
                   "required": ["id", "employeeCode", "fullName", "workEmail", "department"],
                   "additionalProperties": false
@@ -39563,7 +39553,7 @@
                     "properties": {
                       "status": { "type": "string", "enum": ["PENDING", "SENDING", "SENT", "FAILED", "CANCELLED"] },
                       "attempts": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
-                      "lastErrorCode": { "type": ["string", "null"] },
+                      "lastErrorCode": { "type": "string", "nullable": true },
                       "sentAt": { "type": "string", "format": "date-time", "nullable": true }
                     },
                     "required": ["status", "attempts", "lastErrorCode", "sentAt"],

@@ -1,7 +1,7 @@
-import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
 import { isBusinessDate } from '../../../core/business-date';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
+import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 
 const businessDate = z.string().refine(isBusinessDate, { message: 'Must be a real date as YYYY-MM-DD.' });
 const parameterValue = z.union([z.number(), z.string(), z.array(z.number())]);

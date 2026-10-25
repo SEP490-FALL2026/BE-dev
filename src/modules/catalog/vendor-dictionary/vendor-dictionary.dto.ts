@@ -1,6 +1,6 @@
-import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
+import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 
 /**
  * Only the shape and a generous bound are checked here. Whether a name is empty or over 200 characters, a domain is a

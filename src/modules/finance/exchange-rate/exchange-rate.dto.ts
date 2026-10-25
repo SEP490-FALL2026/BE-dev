@@ -1,7 +1,7 @@
-import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
 import { isBusinessDate } from '../../../core/business-date';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
+import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 
 const currencyCode = z.string().regex(/^[A-Z]{3}$/);
 /** A real calendar day as `YYYY-MM-DD`; a refinement, so the OpenAPI document carries no generated date pattern. */

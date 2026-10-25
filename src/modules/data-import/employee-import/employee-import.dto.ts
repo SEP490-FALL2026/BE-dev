@@ -1,7 +1,7 @@
-import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
 import { hrBasisSchema } from '../../../infrastructure/http/dto/hr-basis.dto';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
+import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 
 export const importIdParamSchema = z.strictObject({ id: z.uuid() });
 

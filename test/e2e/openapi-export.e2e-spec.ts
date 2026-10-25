@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { findOpenApi30Violations } from '../../src/infrastructure/http/openapi-dialect';
 import {
   CLI_COLD_START_MS,
   PROJECT_ROOT,
@@ -48,6 +49,15 @@ describe('OpenAPI export (spawned process)', () => {
     },
     CLI_COLD_START_MS,
   );
+
+  it('commits one coherent OpenAPI 3.0 document that client generators accept (OPENAPI-EXAMPLE.1-F3)', () => {
+    // The artifact itself, as FE/Mobile read it: a dependency upgrade that slips JSON Schema 2020-12 shapes past the
+    // presentation step fails here, with the pointer and reason of each one.
+    const committed = JSON.parse(readFileSync(join(PROJECT_ROOT, 'openapi.json'), 'utf8')) as { openapi: string };
+
+    expect(committed.openapi).toBe('3.0.0');
+    expect(findOpenApi30Violations(committed)).toEqual([]);
+  });
 
   it('pins only openapi.json to LF in the repository attributes (GATE-EOL=A)', () => {
     const rules = readFileSync(join(PROJECT_ROOT, '.gitattributes'), 'utf8')

@@ -1,6 +1,6 @@
-import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
+import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 
 /**
  * Every role name a client may send. MANAGER and SPENDING_APPROVER are accepted only so the

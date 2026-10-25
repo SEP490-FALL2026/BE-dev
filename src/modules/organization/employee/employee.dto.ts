@@ -1,9 +1,9 @@
-import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
 import { isBusinessDate } from '../../../core/business-date';
 import { InvalidEmailError, normalizeEmail } from '../../../core/email';
 import { hrBasisSchema } from '../../../infrastructure/http/dto/hr-basis.dto';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
+import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 
 /** An address the one email rule cannot reduce (for example a name that is only a "+tag") can never be matched, so it is refused here. */
 function canBeNormalized(email: string): boolean {

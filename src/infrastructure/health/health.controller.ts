@@ -1,11 +1,11 @@
 import { Controller, Get, HttpStatus, ServiceUnavailableException } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { HealthCheckService, PrismaHealthIndicator } from '@nestjs/terminus';
-import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
 import { PrismaService } from '../database/prisma.service';
 import { ApiErrorResponses, fallbackExample } from '../http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../http/decorators/api-success-response.decorator';
+import { createZodDto } from '../http/dto/zod-dto';
 import { ApiException } from '../http/errors/api.exception';
 import { successEnvelopeSchema } from '../http/dto/success-envelope.dto';
 import { Public } from '../security/decorators/public.decorator';

@@ -19,6 +19,7 @@ import {
 } from '../../src/infrastructure/security/decorators/access.decorators';
 import { IS_PUBLIC_METADATA } from '../../src/infrastructure/security/decorators/public.decorator';
 import { errorEnvelopeSchema } from '../../src/infrastructure/http/dto/error-envelope.dto';
+import { findOpenApi30Violations } from '../../src/infrastructure/http/openapi-dialect';
 import { REVEAL_LIMITS } from '../../src/modules/licensing/license-key/license-key-reveal-quota.repo';
 import { API_COVERAGE_MANIFEST } from '../support/api-coverage-manifest';
 import {
@@ -307,6 +308,8 @@ describe('API inventory (e2e)', () => {
       });
 
       expect(problems).toEqual([]);
+      // OPENAPI-EXAMPLE.1-F3: every keyword and shape, not only `const` (type arrays, propertyNames, numeric bounds…).
+      expect(findOpenApi30Violations(document)).toEqual([]);
       expect(formatted).toBeGreaterThan(0);
       for (const generated of [
         GENERATED_UUID_PATTERN,

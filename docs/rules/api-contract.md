@@ -3,7 +3,8 @@
 ## DTO và pipeline
 
 - Base path mặc định `/api/v1`; resource plural kebab-case, JSON camelCase.
-- Dùng Zod 4 DTO qua `nestjs-zod`; request object dùng `z.strictObject`.
+- Dùng Zod 4 DTO qua `createZodDto` của ứng dụng ([dto/zod-dto.ts](../../src/infrastructure/http/dto/zod-dto.ts)), không
+  import thẳng từ `nestjs-zod` (test ranh giới đỏ); request object dùng `z.strictObject`.
 - Khai schema cho body, query **và params**. Ví dụ `@Param() params: ApplicationIdParamDto`.
   Global pipe dùng strict schema declaration; param primitive không có schema có thể trả 500.
 - Guards chạy trước pipe. Kiểm tra quyền theo input/resource đã validate ở use case.
@@ -34,7 +35,8 @@ mức này). Parser URL-encoded vẫn gắn (như mặc định của Nest) dù 
 trong cùng tệp: **tối đa 100 tham số** (`URLENCODED_PARAMETER_LIMIT`) và **độ sâu lồng tối đa 5** (`URLENCODED_DEPTH_LIMIT`),
 không dựa vào mặc định thư viện (P29-N4).
 
-Ma trận lỗi parser (P29-N1, P29-N2, P29-N4 — body-parser 2.3 / raw-body 3, nhận theo `type` đã tài liệu hóa **cùng** status và
+Ma trận lỗi parser (P29-N1, P29-N2, P29-N4 — đo lại trên body-parser 2.4.0 / raw-body 3 / multer 2.5.0 ở `SEC-UPGRADE-RV-01`,
+[test](../../test/e2e/security-upgrade-regression.e2e-spec.ts); nhận theo `type` đã tài liệu hóa **cùng** status và
 thuộc tính mà nơi tạo luôn gán; không bao giờ chỉ theo `status`, tên hay thông điệp —
 [request-parser-errors.ts](../../src/infrastructure/http/filters/request-parser-errors.ts)):
 
@@ -49,6 +51,14 @@ thuộc tính mà nơi tạo luôn gán; không bao giờ chỉ theo `status`, t
 | multipart: sai tên trường tệp, phá giới hạn form / tệp quá lớn               | 400 / 413                         |
 | `stream.encoding.set`, `stream.not.readable`, type lạ, mã multer lạ, lưu trữ | 500 `INTERNAL_SERVER_ERROR`       |
 
+Mã hóa nội dung (`Content-Encoding`) của thân JSON/URL-encoded: chỉ `gzip`, `deflate`, `br` hoặc không mã hóa — contract
+trước body-parser 2.4.0 (Owner, 25/10/2026, `SEC-UPGRADE-RV-01-F1`). body-parser 2.4.0 tự giải nén cả `zstd` nơi Node hỗ trợ
+(CI Node 22, image `node:24`), nên `contentEncodingAllowlist` ở
+[request-body-limit.ts](../../src/infrastructure/http/request-body-limit.ts) từ chối mọi mã hóa khác **trước** parser — 415
+`HTTP_UNSUPPORTED_MEDIA_TYPE`, không handler nào chạy; header đọc như body-parser (vắng/rỗng = không mã hóa, không phân biệt
+hoa/thường). Thân không phải JSON/URL-encoded (multipart) và request không thân không qua allowlist. Giới hạn 100 KiB tính
+trên byte **đã nở** (thân nén nở quá ⟹ 413). Multipart: trường văn bản tối đa **đúng** 64 byte (65 ⟹ 400, multer 2.5.0);
+tệp rỗng tới route.
 `entity.verify.failed` không xảy ra (không cấu hình verify hook), nên không có contract. Không có thông điệp parser, charset,
 encoding, giá trị trường hay stack nào trả về. Client đã đi (`request.aborted`) thì filter phân loại nhưng **không** ghi lên
 socket đã đóng. Multer nhận bằng `instanceof` đúng lớp `MulterError` mà `FileInterceptor` của Nest nạp, không so tên lỗi.
@@ -221,6 +231,15 @@ const COLLECTION_EXCEPTIONS = [{ operationId: 'currencyList', removeWhen: 'Revie
   `noExampleBecause` thay ví dụ và có mục chính xác trong `NO_EXAMPLE_RESPONSES` — danh sách chỉ co lại. Thêm hoặc đổi route ⟹ cập nhật
   [manifest ví dụ](../../test/support/openapi-example-manifest.ts) (message thành công, mã theo route); inventory test so tập
   mã chính xác.
+- **Một dialect: OpenAPI 3.0 (`OPENAPI-EXAMPLE.1-F3`).** Document khai `3.0.0` và mọi schema là Schema Object 3.0 — FE/Mobile
+  (Orval) kiểm cả document theo phiên bản khai và từ chối document lẫn JSON Schema 2020-12. Zod (qua nestjs-zod) phát 2020-12;
+  `toOpenApi30Presentation` viết lại theo 3.0 (`type` mảng → `type` + `nullable` hoặc `anyOf`; nhánh `{type: "null"}` →
+  `nullable`; enum nullable liệt kê `null`; bound số → cờ boolean; bỏ `propertyNames: {type: "string"}`) và để nguyên hình không
+  có cách viết 3.0 chính xác. [Gate dialect](../../src/infrastructure/http/openapi-dialect.ts) nêu pointer + lý do: `pnpm
+openapi:export` từ chối ghi, e2e kiểm document trong tiến trình và `openapi.json`. Gate ngữ nghĩa
+  ([openapi-dialect.e2e-spec.ts](../../test/e2e/openapi-dialect.e2e-spec.ts)) so mọi DTO body/query/path/response với bản 3.0 do
+  chính Zod dựng từ schema runtime — nâng Zod/nestjs-zod/Swagger làm đổi nghĩa document thì đỏ. Không sửa bằng cách đổi chuỗi
+  `openapi`, tắt validator hay bỏ ràng buộc.
 - Cập nhật [API inventory](../../test/support/api-coverage-manifest.ts) khi thêm/bỏ operation.
 - Chạy `pnpm test:e2e`, `pnpm openapi:export`; review diff `openapi.json`.
 - Contract sinh từ controller/DTO. Không sửa JSON hoặc generated FE client bằng tay.

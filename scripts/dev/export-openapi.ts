@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { format, resolveConfig } from 'prettier';
+import { assertOpenApi30Dialect, OpenApiDialectError } from '../../src/infrastructure/http/openapi-dialect';
 import { withExportOnlyEnvironment } from './export-environment';
 
 const PROJECT_ROOT = resolve(__dirname, '..', '..');
@@ -25,6 +26,10 @@ async function exportOpenApi(outputPath: string): Promise<void> {
     }
   });
 
+  // OPENAPI-EXAMPLE.1-F3: a document client generators would refuse (a JSON Schema 2020-12 shape in an OpenAPI 3.0
+  // document) is never written; each offending pointer is printed instead.
+  assertOpenApi30Dialect(document);
+
   // `format` does not read .prettierrc on its own. Without resolving it first, the exported
   // document is formatted with Prettier's defaults while `pnpm check` verifies it against
   // the repository's — a mismatch that stays invisible until the document grows past the
@@ -41,5 +46,8 @@ async function exportOpenApi(outputPath: string): Promise<void> {
 
 void exportOpenApi(resolve(process.argv[2] ?? join(PROJECT_ROOT, 'openapi.json'))).catch((error: unknown) => {
   console.error('OpenAPI export failed', error instanceof Error ? error.name : 'unknown error');
+  if (error instanceof OpenApiDialectError) {
+    for (const violation of error.violations) console.error(`  ${violation.pointer}: ${violation.reason}`);
+  }
   process.exitCode = 1;
 });
