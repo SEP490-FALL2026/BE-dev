@@ -9,6 +9,7 @@ import { EnvironmentVariables } from './infrastructure/config/env-schema';
 import { toOpenApi30Presentation } from './infrastructure/http/openapi-presentation';
 import { withGlobalRateLimitResponse } from './infrastructure/http/openapi-rate-limit';
 import { withRequestParserResponses } from './infrastructure/http/openapi-request-parser';
+import { withSuccessMessageExamples } from './infrastructure/http/openapi-success-examples';
 import { applyRequestBodyLimit } from './infrastructure/http/request-body-limit';
 
 interface ConfigurableHttpInstance {
@@ -64,7 +65,7 @@ export function createOpenApiDocument(app: INestApplication): OpenAPIObject {
   return withRequestParserResponses(
     withGlobalRateLimitResponse(
       toOpenApi30Presentation(
-        cleanupOpenApiDoc(SwaggerModule.createDocument(app, swaggerConfig), {
+        cleanupOpenApiDoc(withSuccessMessageExamples(SwaggerModule.createDocument(app, swaggerConfig)), {
           version: '3.0',
         }),
       ),

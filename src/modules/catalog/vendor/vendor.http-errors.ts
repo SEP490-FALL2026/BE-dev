@@ -2,6 +2,12 @@ import { HttpStatus } from '@nestjs/common';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import { toMoneyApiException } from '../../../infrastructure/http/errors/money-errors';
 import { toUnavailableApiException } from '../../../infrastructure/http/errors/service-unavailable';
+import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
+import {
+  CurrencyNotSupportedError,
+  MoneyOutOfRangeError,
+  MoneyScaleExceededError,
+} from '../../../core/money/money.errors';
 import {
   TaxProfileRateInvalidError,
   TaxProfileTaxTypeDuplicateError,
@@ -40,3 +46,17 @@ export function toVendorApiException(error: unknown): unknown {
 
   return toUnavailableApiException(error) ?? error;
 }
+
+const example = (error: Error) => errorExampleOf(toVendorApiException(error));
+
+/** The answers above as OpenAPI examples, each produced by the mapper that gives it at runtime (OPENAPI-EXAMPLE.1). */
+export const VENDOR_ERROR_EXAMPLES = {
+  NOT_FOUND: example(new VendorNotFoundError()),
+  TAX_TYPE_INVALID: example(new TaxProfileTaxTypeInvalidError()),
+  TAX_TYPE_DUPLICATE: example(new TaxProfileTaxTypeDuplicateError()),
+  RATE_INVALID: example(new TaxProfileRateInvalidError('VAT')),
+  TOO_MANY_LINES: example(new TaxProfileTooManyLinesError()),
+  MONEY_SCALE_EXCEEDED: example(new MoneyScaleExceededError(2)),
+  MONEY_OUT_OF_RANGE: example(new MoneyOutOfRangeError()),
+  CURRENCY_NOT_SUPPORTED: example(new CurrencyNotSupportedError('XYZ')),
+} as const;

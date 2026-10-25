@@ -2,14 +2,16 @@ import { Body, Controller, Get, HttpStatus, Param, Patch, Post, Query } from '@n
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
+  FORBIDDEN_EXAMPLE,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
+  VALIDATION_EXAMPLE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
 import { RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
 import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { toOrganizationApiException } from '../mappers/organization.http-errors';
+import { ORGANIZATION_ERROR_EXAMPLES, toOrganizationApiException } from '../mappers/organization.http-errors';
 import { DepartmentHeadService } from './department-head.service';
 import { DepartmentQueryService } from './department-query.service';
 import { DepartmentService } from './department.service';
@@ -34,13 +36,60 @@ const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPO
 const IT_ONLY = {
   status: HttpStatus.FORBIDDEN,
   description: 'Only an IT Admin changes department data.',
+  examples: [FORBIDDEN_EXAMPLE],
 } as const;
+const VALIDATION_ERROR_DESCRIPTION =
+  'The request is invalid (VALIDATION_ERROR) or a rule of the department refuses it; details name the reason.';
+/** The routes where no rule of the department applies: only the request itself can be invalid. */
 const VALIDATION_ERROR = {
   status: HttpStatus.UNPROCESSABLE_ENTITY,
-  description:
-    'The request is invalid (VALIDATION_ERROR) or a rule of the department refuses it; details name the reason.',
+  description: VALIDATION_ERROR_DESCRIPTION,
+  examples: [VALIDATION_EXAMPLE],
 } as const;
-const NOT_FOUND = { status: HttpStatus.NOT_FOUND, description: 'The department does not exist.' } as const;
+const CREATE_INVALID = {
+  status: HttpStatus.UNPROCESSABLE_ENTITY,
+  description: VALIDATION_ERROR_DESCRIPTION,
+  examples: [
+    VALIDATION_EXAMPLE,
+    ORGANIZATION_ERROR_EXAMPLES.DEPARTMENT_COST_CENTER_INACTIVE,
+    ORGANIZATION_ERROR_EXAMPLES.DEPARTMENT_COST_CENTER_NOT_FOUND,
+    ORGANIZATION_ERROR_EXAMPLES.DEPARTMENT_IT_ADMIN_INVALID,
+    ORGANIZATION_ERROR_EXAMPLES.DEPARTMENT_NAME_INVALID,
+  ],
+} as const;
+const UPDATE_INVALID = {
+  status: HttpStatus.UNPROCESSABLE_ENTITY,
+  description: VALIDATION_ERROR_DESCRIPTION,
+  examples: [
+    VALIDATION_EXAMPLE,
+    ORGANIZATION_ERROR_EXAMPLES.DEPARTMENT_IT_ADMIN_INVALID,
+    ORGANIZATION_ERROR_EXAMPLES.DEPARTMENT_NAME_INVALID,
+    ORGANIZATION_ERROR_EXAMPLES.DEPARTMENT_UPDATE_EMPTY,
+  ],
+} as const;
+const HEAD_ASSIGN_INVALID = {
+  status: HttpStatus.UNPROCESSABLE_ENTITY,
+  description: VALIDATION_ERROR_DESCRIPTION,
+  examples: [
+    VALIDATION_EXAMPLE,
+    ORGANIZATION_ERROR_EXAMPLES.DEPARTMENT_HEAD_DATE_IN_PAST,
+    ORGANIZATION_ERROR_EXAMPLES.DEPARTMENT_HEAD_EMPLOYEE_NOT_ACTIVE,
+    ORGANIZATION_ERROR_EXAMPLES.DEPARTMENT_HEAD_EMPLOYEE_NOT_FOUND,
+    ORGANIZATION_ERROR_EXAMPLES.DEPARTMENT_HEAD_HEADS_ANOTHER_DEPARTMENT,
+    ORGANIZATION_ERROR_EXAMPLES.DEPARTMENT_HEAD_NOT_A_MEMBER_ON_DATE,
+    ORGANIZATION_ERROR_EXAMPLES.DEPARTMENT_HEAD_SUPER_ADMIN_CANNOT_HEAD,
+  ],
+} as const;
+const HEAD_VACATE_INVALID = {
+  status: HttpStatus.UNPROCESSABLE_ENTITY,
+  description: VALIDATION_ERROR_DESCRIPTION,
+  examples: [VALIDATION_EXAMPLE, ORGANIZATION_ERROR_EXAMPLES.DEPARTMENT_HEAD_DATE_IN_PAST],
+} as const;
+const NOT_FOUND = {
+  status: HttpStatus.NOT_FOUND,
+  description: 'The department does not exist.',
+  examples: [ORGANIZATION_ERROR_EXAMPLES.DEPARTMENT_NOT_FOUND],
+} as const;
 
 /**
  * Department profiles (`US-03-06`). The IT Admin keeps them; a department head reads the one they head and the
@@ -88,10 +137,14 @@ export class DepartmentsController {
     description:
       'The department exists, charged to the UNIT Cost Center chosen, with nobody heading it yet. warnings says what is still missing.',
   })
-  @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, VALIDATION_ERROR, {
+  @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, CREATE_INVALID, {
     status: HttpStatus.CONFLICT,
     description:
       'The code is taken (DEPARTMENT.CODE_TAKEN) or another department already has the Cost Center (DEPARTMENT.COST_CENTER_TAKEN).',
+    examples: [
+      ORGANIZATION_ERROR_EXAMPLES.DEPARTMENT_CODE_TAKEN,
+      ORGANIZATION_ERROR_EXAMPLES.DEPARTMENT_COST_CENTER_TAKEN,
+    ],
   })
   async create(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: CreateDepartmentBodyDto) {
     try {
@@ -121,6 +174,7 @@ export class DepartmentsController {
     status: HttpStatus.FORBIDDEN,
     description:
       'Not an IT Admin, or a department head asking about a department that is not theirs (DEPARTMENT.OUT_OF_SCOPE).',
+    examples: [FORBIDDEN_EXAMPLE, ORGANIZATION_ERROR_EXAMPLES.DEPARTMENT_OUT_OF_SCOPE],
   })
   async get(@CurrentPrincipal() principal: AuthenticatedPrincipal, @Param() params: DepartmentIdParamDto) {
     try {
@@ -137,7 +191,7 @@ export class DepartmentsController {
     message: 'DEPARTMENT.UPDATED',
     description: 'The name, the description or the IT Admin in charge changed. The Cost Center and the people do not.',
   })
-  @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, VALIDATION_ERROR, NOT_FOUND)
+  @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, UPDATE_INVALID, NOT_FOUND)
   async update(
     @CurrentPrincipal() actor: AuthenticatedPrincipal,
     @Param() params: DepartmentIdParamDto,
@@ -167,6 +221,7 @@ export class DepartmentsController {
   @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, VALIDATION_ERROR, NOT_FOUND, {
     status: HttpStatus.CONFLICT,
     description: 'It still has members or owns service accounts (DEPARTMENT.IN_USE; details lists them).',
+    examples: [ORGANIZATION_ERROR_EXAMPLES.DEPARTMENT_IN_USE],
   })
   async deactivate(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: DepartmentIdParamDto) {
     try {
@@ -186,7 +241,7 @@ export class DepartmentsController {
     description:
       'The person heads the department from the date; the head before ends the day before. The person must be a member of the department that day.',
   })
-  @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, VALIDATION_ERROR, NOT_FOUND)
+  @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, HEAD_ASSIGN_INVALID, NOT_FOUND)
   async assignHead(
     @CurrentPrincipal() actor: AuthenticatedPrincipal,
     @Param() params: DepartmentIdParamDto,
@@ -209,7 +264,7 @@ export class DepartmentsController {
     description:
       'Nobody heads the department from the date; it shows as missing a head. If there is no head to end, nothing changes.',
   })
-  @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, VALIDATION_ERROR, NOT_FOUND)
+  @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, HEAD_VACATE_INVALID, NOT_FOUND)
   async vacateHead(
     @CurrentPrincipal() actor: AuthenticatedPrincipal,
     @Param() params: DepartmentIdParamDto,
@@ -235,6 +290,7 @@ export class DepartmentsController {
   @ApiErrorResponses(...AUTH_ERRORS, VALIDATION_ERROR, NOT_FOUND, {
     status: HttpStatus.FORBIDDEN,
     description: 'Not an IT Admin, or a department head asking about a department that is not theirs.',
+    examples: [FORBIDDEN_EXAMPLE, ORGANIZATION_ERROR_EXAMPLES.DEPARTMENT_OUT_OF_SCOPE],
   })
   async members(
     @CurrentPrincipal() principal: AuthenticatedPrincipal,
@@ -261,8 +317,13 @@ export class DepartmentsController {
     {
       status: HttpStatus.FORBIDDEN,
       description: 'Only the IT Admin and the Super Admin see department warnings.',
+      examples: [FORBIDDEN_EXAMPLE],
     },
-    { status: HttpStatus.UNPROCESSABLE_ENTITY, description: 'The paging query is invalid (VALIDATION_ERROR).' },
+    {
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      description: 'The paging query is invalid (VALIDATION_ERROR).',
+      examples: [VALIDATION_EXAMPLE],
+    },
   )
   async warnings(@Query() query: ListWarningsQueryDto) {
     try {

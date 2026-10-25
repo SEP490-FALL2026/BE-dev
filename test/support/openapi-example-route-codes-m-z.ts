@@ -1,0 +1,332 @@
+import type { RouteErrorStatus } from './openapi-example-manifest';
+
+/** Part of ROUTE_ERROR_CODES (operationIds m-z): see openapi-example-manifest.ts. */
+export const ROUTE_ERROR_CODES_M_TO_Z: Readonly<Record<string, Partial<Record<RouteErrorStatus, readonly string[]>>>> =
+  {
+    meChangePassword: {
+      '422': ['AUTH.CURRENT_PASSWORD_INVALID', 'AUTH.PASSWORD_POLICY_VIOLATION'],
+      '429': ['AUTH.LOGIN_TEMPORARILY_BLOCKED'],
+    },
+    nonWorkingDateAdd: {
+      '409': ['NON_WORKING_DATE.TAKEN'],
+      '422': ['NON_WORKING_DATE.IN_PAST', 'NON_WORKING_DATE.REASON_INVALID'],
+    },
+    nonWorkingDateRemove: {
+      '404': ['NON_WORKING_DATE.NOT_FOUND'],
+      '422': ['NON_WORKING_DATE.IN_PAST'],
+    },
+    nonWorkingDateRename: {
+      '404': ['NON_WORKING_DATE.NOT_FOUND'],
+      '422': ['NON_WORKING_DATE.IN_PAST', 'NON_WORKING_DATE.REASON_INVALID'],
+    },
+    operatingParameterHistory: {
+      '404': ['PARAMETER.NOT_FOUND'],
+    },
+    operatingParameterSet: {
+      '404': ['PARAMETER.NOT_FOUND'],
+      '422': ['PARAMETER.VALUE_INVALID'],
+    },
+    planCreate: {
+      '409': ['PLAN.NAME_TAKEN'],
+      '422': [
+        'PLAN.APPLICATION_NOT_FOUND',
+        'PLAN.APPLICATION_RETIRED',
+        'PLAN.CONTROL_LEVEL_REQUIRED',
+        'PLAN.DATA_LOSS_NOTE_REQUIRED',
+        'PLAN.NAME_INVALID',
+        'PLAN.NOTE_INVALID',
+        'PLAN.PRICING_MODEL_NOT_APPLICABLE',
+        'PLAN.PRICING_MODEL_REQUIRED',
+        'PLAN.PROVISIONING_TYPE_MISMATCH',
+        'PLAN.PROVISIONING_TYPE_NOT_SUPPORTED',
+      ],
+    },
+    planGet: {
+      '404': ['PLAN.NOT_FOUND'],
+    },
+    planTermOpinionList: {
+      '404': ['PLAN.NOT_FOUND'],
+    },
+    planTermOpinionRecord: {
+      '404': ['PLAN.NOT_FOUND'],
+      '422': ['PLAN_TERMS.NOT_APPLICABLE', 'PLAN_TERMS.TEXT_INVALID'],
+    },
+    planTermsGet: {
+      '404': ['PLAN.NOT_FOUND'],
+    },
+    planTermsSet: {
+      '404': ['PLAN.NOT_FOUND'],
+      '422': [
+        'PLAN_TERMS.INSTALL_LIMIT_NUMERIC_ONLY_FOR_K4',
+        'PLAN_TERMS.NOT_APPLICABLE',
+        'PLAN_TERMS.REVIEW_DATE_IN_FUTURE',
+        'PLAN_TERMS.TEXT_INVALID',
+        'PLAN_TERMS.URL_INVALID',
+      ],
+    },
+    planUpdate: {
+      '404': ['PLAN.NOT_FOUND'],
+      '409': [
+        'PLAN.IN_USE_BLOCKS_CHANGE',
+        'PLAN.NAME_TAKEN',
+        'PLAN.TERMS_BLOCK_TYPE_CHANGE',
+        'PLAN.WORKSPACE_PROFILE_BLOCKS_TYPE_CHANGE',
+      ],
+      '422': [
+        'PLAN.CONTROL_LEVEL_REQUIRED',
+        'PLAN.DATA_LOSS_NOTE_REQUIRED',
+        'PLAN.NAME_INVALID',
+        'PLAN.NOTE_INVALID',
+        'PLAN.PRICING_MODEL_NOT_APPLICABLE',
+        'PLAN.PRICING_MODEL_REQUIRED',
+        'PLAN.PROVISIONING_TYPE_MISMATCH',
+        'PLAN.PROVISIONING_TYPE_NOT_SUPPORTED',
+        'PLAN.UPDATE_EMPTY',
+      ],
+    },
+    planWorkspaceProfileSet: {
+      '404': ['PLAN.NOT_FOUND'],
+      '422': [
+        'PLAN.PRIMARY_OWNER_NOT_LISTED',
+        'PLAN.WORKSPACE_LIMIT_EXCEEDED',
+        'PLAN.WORKSPACE_MEMBER_DUPLICATE',
+        'PLAN.WORKSPACE_PERSON_INVALID',
+        'PLAN.WORKSPACE_PROFILE_NOT_APPLICABLE',
+        'PLAN.WORKSPACE_TEXT_INVALID',
+      ],
+    },
+    projectCreate: {
+      '422': ['PROJECT.INVALID_DEPARTMENT_NOT_FOUND', 'PROJECT.INVALID_DESCRIPTION', 'PROJECT.INVALID_NAME'],
+    },
+    projectGet: {
+      '404': ['PROJECT.NOT_FOUND'],
+    },
+    projectUpdate: {
+      '404': ['PROJECT.NOT_FOUND'],
+      '422': ['PROJECT.INVALID_DEPARTMENT_NOT_FOUND', 'PROJECT.INVALID_DESCRIPTION', 'PROJECT.INVALID_NAME'],
+    },
+    provisioningTaskClaim: {
+      '404': ['PROVISIONING_TASK.NOT_FOUND'],
+    },
+    provisioningTaskCloseFailed: {
+      '404': ['PROVISIONING_TASK.NOT_FOUND'],
+      '422': ['PROVISIONING_TASK.REASON_REQUIRED'],
+    },
+    provisioningTaskComplete: {
+      '404': ['PROVISIONING_TASK.NOT_FOUND'],
+      '422': ['PROVISIONING_TASK.EVIDENCE_REQUIRED'],
+    },
+    provisioningTaskGet: {
+      '404': ['PROVISIONING_TASK.NOT_FOUND'],
+    },
+    provisioningTaskGrant: {
+      '404': ['REQUEST.NOT_FOUND'],
+    },
+    provisioningTaskHandOff: {
+      '404': ['PROVISIONING_TASK.NOT_FOUND'],
+      '422': ['PROVISIONING_TASK.EVIDENCE_REQUIRED'],
+    },
+    provisioningTaskReportFailure: {
+      '404': ['PROVISIONING_TASK.NOT_FOUND'],
+      '422': ['PROVISIONING_TASK.REASON_REQUIRED'],
+    },
+    provisioningTaskRetry: {
+      '404': ['PROVISIONING_TASK.NOT_FOUND'],
+    },
+    reportingCurrencySet: {
+      '409': ['REPORTING_CURRENCY.LOCKED'],
+      '422': ['CURRENCY_NOT_SUPPORTED'],
+    },
+    seatBaselineImportCancel: {
+      '404': ['SEAT_BASELINE_IMPORT.NOT_FOUND'],
+      '409': ['SEAT_BASELINE_IMPORT.NOT_PREVIEW'],
+    },
+    seatBaselineImportConfirm: {
+      '404': ['SEAT_BASELINE_IMPORT.NOT_FOUND'],
+      '409': [
+        'SEAT_BASELINE.CLOSED',
+        'SEAT_BASELINE_IMPORT.ALREADY_CONFIRMED',
+        'SEAT_BASELINE_IMPORT.CANCELLED',
+        'SEAT_BASELINE_IMPORT.EXPIRED',
+        'SEAT_BASELINE_IMPORT.PREVIEW_OUTDATED',
+        'SEAT_BASELINE_IMPORT.PREVIEW_STALE',
+        'SEAT_TARGET.APPLICATION_RETIRED',
+      ],
+      '422': ['SEAT_BASELINE.PLAN_NOT_SUPPORTED', 'SEAT_BASELINE.TARGET_INVALID', 'SEAT_TARGET.SUBSCRIPTION_DRAFT'],
+    },
+    seatBaselineImportGet: {
+      '404': ['SEAT_BASELINE_IMPORT.NOT_FOUND'],
+    },
+    seatBaselineImportRows: {
+      '404': ['SEAT_BASELINE_IMPORT.NOT_FOUND'],
+    },
+    seatBaselineImportUpload: {
+      '404': ['PLAN.NOT_FOUND', 'SUBSCRIPTION.NOT_FOUND'],
+      '409': ['SEAT_BASELINE.CLOSED', 'SEAT_BASELINE.QUANTITY_UNKNOWN', 'SEAT_TARGET.APPLICATION_RETIRED'],
+      '422': [
+        'SEAT_BASELINE.PLAN_NOT_SUPPORTED',
+        'SEAT_BASELINE.TARGET_INVALID',
+        'SEAT_BASELINE_IMPORT.FILE_EMPTY',
+        'SEAT_BASELINE_IMPORT.FILE_MISSING_COLUMNS',
+        'SEAT_BASELINE_IMPORT.FILE_NOT_TEXT',
+        'SEAT_BASELINE_IMPORT.FILE_REQUIRED',
+        'SEAT_BASELINE_IMPORT.FILE_TOO_MANY_ROWS',
+        'SEAT_BASELINE_IMPORT.FILE_UNREADABLE',
+        'SEAT_TARGET.SUBSCRIPTION_DRAFT',
+        'VALIDATION_ERROR',
+      ],
+    },
+    standardToolsetGet: {
+      '403': ['DEPARTMENT.OUT_OF_SCOPE'],
+      '404': ['DEPARTMENT.NOT_FOUND', 'JOB_TITLE.NOT_FOUND'],
+    },
+    standardToolsetHistory: {
+      '404': ['DEPARTMENT.NOT_FOUND', 'JOB_TITLE.NOT_FOUND'],
+    },
+    standardToolsetList: {
+      '403': ['DEPARTMENT.OUT_OF_SCOPE'],
+    },
+    standardToolsetSet: {
+      '404': ['DEPARTMENT.NOT_FOUND', 'JOB_TITLE.NOT_FOUND'],
+      '422': [
+        'STANDARD_TOOLSET.DEPARTMENT_INACTIVE',
+        'STANDARD_TOOLSET.JOB_TITLE_INACTIVE',
+        'STANDARD_TOOLSET.PLAN_DUPLICATE',
+        'STANDARD_TOOLSET.PLAN_NOT_FOUND',
+        'STANDARD_TOOLSET.REASON_REQUIRED',
+        'STANDARD_TOOLSET.TOO_MANY_PLANS',
+      ],
+    },
+    subscriptionComplete: {
+      '404': ['SUBSCRIPTION.NOT_FOUND'],
+      '409': ['REPORTING_CURRENCY_NOT_SUPPORTED'],
+      '422': ['MONEY_OUT_OF_RANGE', 'SUBSCRIPTION.STILL_DRAFT'],
+    },
+    subscriptionCostAllocationGet: {
+      '404': ['SUBSCRIPTION.NOT_FOUND'],
+    },
+    subscriptionCostAllocationHistory: {
+      '404': ['SUBSCRIPTION.NOT_FOUND'],
+    },
+    subscriptionCostAllocationSet: {
+      '404': ['SUBSCRIPTION.NOT_FOUND'],
+      '409': ['SUBSCRIPTION.COST_ALLOCATION_NOT_APPLICABLE'],
+      '422': [
+        'COST_ALLOCATION.COST_CENTER_DUPLICATE',
+        'COST_ALLOCATION.COST_CENTER_INACTIVE',
+        'COST_ALLOCATION.COST_CENTER_NOT_FOUND',
+        'COST_ALLOCATION.LINE_COUNT_INVALID',
+        'COST_ALLOCATION.RATIO_INVALID',
+        'COST_ALLOCATION.TOTAL_NOT_100',
+      ],
+    },
+    subscriptionCreate: {
+      '409': ['REPORTING_CURRENCY_NOT_SUPPORTED'],
+      '422': [
+        'CURRENCY_NOT_SUPPORTED',
+        'MONEY_OUT_OF_RANGE',
+        'MONEY_SCALE_EXCEEDED',
+        'SUBSCRIPTION.DATES_INVALID',
+        'SUBSCRIPTION.PERPETUAL_HAS_NO_TERM',
+        'SUBSCRIPTION.PERPETUAL_NEEDS_LICENSED_APPLICATION',
+        'SUBSCRIPTION.PLAN_HAS_NO_SUBSCRIPTION',
+        'SUBSCRIPTION.PLAN_NOT_FOUND',
+      ],
+    },
+    subscriptionGet: {
+      '404': ['SUBSCRIPTION.NOT_FOUND'],
+    },
+    subscriptionSeatUsage: {
+      '404': ['SUBSCRIPTION.NOT_FOUND'],
+    },
+    subscriptionUpdate: {
+      '404': ['SUBSCRIPTION.NOT_FOUND'],
+      '409': ['REPORTING_CURRENCY_NOT_SUPPORTED'],
+      '422': [
+        'CURRENCY_NOT_SUPPORTED',
+        'MONEY_OUT_OF_RANGE',
+        'MONEY_SCALE_EXCEEDED',
+        'SUBSCRIPTION.DATES_INVALID',
+        'SUBSCRIPTION.PERPETUAL_HAS_NO_TERM',
+        'SUBSCRIPTION.QUANTITY_BELOW_OCCUPIED',
+        'SUBSCRIPTION.STILL_DRAFT',
+        'SUBSCRIPTION.UPDATE_EMPTY',
+      ],
+    },
+    superAdminTransfer: {
+      '404': ['SUPER_ADMIN_TRANSFER.SUCCESSOR_NOT_FOUND'],
+      '422': [
+        'SUPER_ADMIN_TRANSFER.ACCOUNT_LOCKED',
+        'SUPER_ADMIN_TRANSFER.APPROVAL_ROLE_HELD',
+        'SUPER_ADMIN_TRANSFER.EMAIL_NOT_VERIFIED',
+        'SUPER_ADMIN_TRANSFER.EMPLOYEE_NOT_WORKING',
+        'SUPER_ADMIN_TRANSFER.HEADS_DEPARTMENT',
+        'SUPER_ADMIN_TRANSFER.NOT_ACTIVATED',
+        'SUPER_ADMIN_TRANSFER.SUCCESSOR_IS_HOLDER',
+        'SUPER_ADMIN_TRANSFER.WORK_ROLE_HELD',
+      ],
+    },
+    vendorGroupCreate: {
+      '409': ['VENDOR_DICTIONARY.GROUP_NAME_TAKEN'],
+      '422': [
+        'VENDOR_DICTIONARY.DOMAIN_INVALID',
+        'VENDOR_DICTIONARY.NAME_INVALID',
+        'VENDOR_DICTIONARY.TOO_MANY_VALUES',
+      ],
+    },
+    vendorGroupUpdate: {
+      '404': ['VENDOR_DICTIONARY.GROUP_NOT_FOUND'],
+      '409': ['VENDOR_DICTIONARY.GROUP_NAME_TAKEN'],
+      '422': [
+        'VENDOR_DICTIONARY.DOMAIN_INVALID',
+        'VENDOR_DICTIONARY.NAME_INVALID',
+        'VENDOR_DICTIONARY.TOO_MANY_VALUES',
+        'VENDOR_DICTIONARY.UPDATE_EMPTY',
+      ],
+    },
+    vendorProposalResolve: {
+      '404': ['VENDOR_DICTIONARY.PROPOSAL_NOT_FOUND', 'VENDOR_DICTIONARY.SERVICE_LINE_NOT_FOUND'],
+      '409': ['VENDOR_DICTIONARY.PROPOSAL_ALREADY_RESOLVED'],
+      '422': ['VENDOR_DICTIONARY.PROPOSAL_RESOLUTION_INVALID'],
+    },
+    vendorServiceLineCreate: {
+      '404': ['VENDOR_DICTIONARY.GROUP_NOT_FOUND'],
+      '409': ['VENDOR_DICTIONARY.SERVICE_LINE_NAME_TAKEN'],
+      '422': [
+        'VENDOR_DICTIONARY.DOMAIN_INVALID',
+        'VENDOR_DICTIONARY.NAME_INVALID',
+        'VENDOR_DICTIONARY.PATTERN_INVALID',
+        'VENDOR_DICTIONARY.TOO_MANY_VALUES',
+      ],
+    },
+    vendorServiceLineUpdate: {
+      '404': ['VENDOR_DICTIONARY.SERVICE_LINE_NOT_FOUND'],
+      '409': ['VENDOR_DICTIONARY.SERVICE_LINE_NAME_TAKEN'],
+      '422': [
+        'VENDOR_DICTIONARY.DOMAIN_INVALID',
+        'VENDOR_DICTIONARY.NAME_INVALID',
+        'VENDOR_DICTIONARY.PATTERN_INVALID',
+        'VENDOR_DICTIONARY.TOO_MANY_VALUES',
+        'VENDOR_DICTIONARY.UPDATE_EMPTY',
+      ],
+    },
+    vendorTaxEstimate: {
+      '404': ['VENDOR.NOT_FOUND'],
+      '422': ['CURRENCY_NOT_SUPPORTED', 'MONEY_OUT_OF_RANGE', 'MONEY_SCALE_EXCEEDED'],
+    },
+    vendorTaxProfileGet: {
+      '404': ['VENDOR.NOT_FOUND'],
+    },
+    vendorTaxProfileHistory: {
+      '404': ['VENDOR.NOT_FOUND'],
+    },
+    vendorTaxProfileSet: {
+      '404': ['VENDOR.NOT_FOUND'],
+      '422': [
+        'VENDOR_TAX_PROFILE.RATE_INVALID',
+        'VENDOR_TAX_PROFILE.TAX_TYPE_DUPLICATE',
+        'VENDOR_TAX_PROFILE.TAX_TYPE_INVALID',
+        'VENDOR_TAX_PROFILE.TOO_MANY_LINES',
+      ],
+    },
+  };

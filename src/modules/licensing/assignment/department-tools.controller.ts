@@ -4,15 +4,17 @@ import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
 import {
   ApiErrorResponses,
+  FORBIDDEN_EXAMPLE,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
+  VALIDATION_EXAMPLE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
 import { RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
 import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { toLicensingApiException } from '../mappers/licensing.http-errors';
+import { LICENSING_ERROR_EXAMPLES, toLicensingApiException } from '../mappers/licensing.http-errors';
 import { DepartmentToolsService } from './department-tools.service';
 
 class DepartmentToolsParamDto extends createZodDto(z.strictObject({ id: z.uuid() })) {}
@@ -84,9 +86,18 @@ export class DepartmentToolsController {
       status: HttpStatus.FORBIDDEN,
       description:
         'Not an IT Admin, or a department head asking about a department that is not theirs (DEPARTMENT.OUT_OF_SCOPE).',
+      examples: [FORBIDDEN_EXAMPLE, LICENSING_ERROR_EXAMPLES.DEPARTMENT_OUT_OF_SCOPE],
     },
-    { status: HttpStatus.NOT_FOUND, description: 'The department does not exist (DEPARTMENT.NOT_FOUND).' },
-    { status: HttpStatus.UNPROCESSABLE_ENTITY, description: 'The id or the query is invalid (VALIDATION_ERROR).' },
+    {
+      status: HttpStatus.NOT_FOUND,
+      description: 'The department does not exist (DEPARTMENT.NOT_FOUND).',
+      examples: [LICENSING_ERROR_EXAMPLES.DEPARTMENT_NOT_FOUND],
+    },
+    {
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      description: 'The id or the query is invalid (VALIDATION_ERROR).',
+      examples: [VALIDATION_EXAMPLE],
+    },
   )
   async toolsInUse(
     @CurrentPrincipal() principal: AuthenticatedPrincipal,

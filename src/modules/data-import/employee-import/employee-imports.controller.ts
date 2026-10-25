@@ -3,8 +3,11 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBody, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
+  fallbackExample,
+  FORBIDDEN_EXAMPLE,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
+  VALIDATION_EXAMPLE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
 import { RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
@@ -19,7 +22,7 @@ import {
   ListImportRowsQueryDto,
 } from './employee-import.dto';
 import { ImportFileInvalidError } from './employee-import.errors';
-import { toImportApiException } from './employee-import.http-errors';
+import { IMPORT_ERROR_EXAMPLES, toImportApiException } from './employee-import.http-errors';
 import { EmployeeImportService } from './employee-import.service';
 import { ImportView } from './employee-import.types';
 
@@ -35,10 +38,12 @@ const UPLOAD_LIMIT_ERRORS = [
       `The form breaks a limit of the upload before it is read — more than ${UPLOAD_LIMITS.files} file, more than ` +
       `${UPLOAD_LIMITS.fields} text fields, more than ${UPLOAD_LIMITS.parts} parts, a text field over ` +
       `${UPLOAD_LIMITS.fieldSize} bytes — or it is not a readable multipart form (HTTP_BAD_REQUEST).`,
+    examples: [fallbackExample(HttpStatus.BAD_REQUEST)],
   },
   {
     status: HttpStatus.PAYLOAD_TOO_LARGE,
     description: `The file is larger than ${MAX_FILE_BYTES / (1024 * 1024)} MiB (HTTP_PAYLOAD_TOO_LARGE).`,
+    examples: [fallbackExample(HttpStatus.PAYLOAD_TOO_LARGE)],
   },
 ] as const;
 
@@ -51,16 +56,18 @@ interface UploadedBinary {
 
 const COMMON_ERRORS = [
   UNAUTHENTICATED_RESPONSE,
-  { status: HttpStatus.FORBIDDEN, description: 'Only the Super Admin imports people.' },
+  { status: HttpStatus.FORBIDDEN, description: 'Only the Super Admin imports people.', examples: [FORBIDDEN_EXAMPLE] },
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
 ] as const;
 const NOT_FOUND = {
   status: HttpStatus.NOT_FOUND,
   description: 'The import does not exist (IMPORT.NOT_FOUND).',
+  examples: [IMPORT_ERROR_EXAMPLES.NOT_FOUND],
 } as const;
 const INVALID_ID = {
   status: HttpStatus.UNPROCESSABLE_ENTITY,
   description: 'The identifier is not a UUID (VALIDATION_ERROR).',
+  examples: [VALIDATION_EXAMPLE],
 } as const;
 
 function toWire(view: ImportView) {
@@ -107,6 +114,14 @@ export class EmployeeImportsController {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description:
       'The file cannot be used as a whole: missing, empty, not text, unreadable, too many rows, or lacking a required column such as the department or the job title (IMPORT.FILE_*).',
+    examples: [
+      IMPORT_ERROR_EXAMPLES.FILE_REQUIRED,
+      IMPORT_ERROR_EXAMPLES.FILE_EMPTY,
+      IMPORT_ERROR_EXAMPLES.FILE_NOT_TEXT,
+      IMPORT_ERROR_EXAMPLES.FILE_TOO_MANY_ROWS,
+      IMPORT_ERROR_EXAMPLES.FILE_UNREADABLE,
+      IMPORT_ERROR_EXAMPLES.FILE_MISSING_COLUMNS,
+    ],
   })
   async upload(@CurrentPrincipal() actor: AuthenticatedPrincipal, @UploadedFile() file: UploadedBinary | undefined) {
     try {
@@ -145,6 +160,7 @@ export class EmployeeImportsController {
   @ApiErrorResponses(...COMMON_ERRORS, NOT_FOUND, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description: 'The identifier is not a UUID, or the filter or paging query is invalid (VALIDATION_ERROR).',
+    examples: [VALIDATION_EXAMPLE],
   })
   async rows(@Param() params: ImportIdParamDto, @Query() query: ListImportRowsQueryDto) {
     try {
@@ -176,6 +192,7 @@ export class EmployeeImportsController {
   @ApiErrorResponses(...COMMON_ERRORS, NOT_FOUND, INVALID_ID, {
     status: HttpStatus.CONFLICT,
     description: 'The import is no longer a preview (IMPORT.CANCELLED, IMPORT.NOT_PREVIEW).',
+    examples: [IMPORT_ERROR_EXAMPLES.CANCELLED, IMPORT_ERROR_EXAMPLES.NOT_PREVIEW],
   })
   async refresh(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: ImportIdParamDto) {
     try {
@@ -199,11 +216,20 @@ export class EmployeeImportsController {
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description: 'The request is invalid or lacks a part of the HR basis (VALIDATION_ERROR).',
+      examples: [VALIDATION_EXAMPLE],
     },
     {
       status: HttpStatus.CONFLICT,
       description:
         'The preview is not the current one (IMPORT.PREVIEW_OUTDATED), the data changed since it (IMPORT.PREVIEW_STALE), the file was imported before and not acknowledged (IMPORT.DUPLICATE_FILE_NOT_ACKNOWLEDGED), the import was already written with another key (IMPORT.ALREADY_CONFIRMED), or it was cancelled or expired. Nothing was written.',
+      examples: [
+        IMPORT_ERROR_EXAMPLES.PREVIEW_OUTDATED,
+        IMPORT_ERROR_EXAMPLES.PREVIEW_STALE,
+        IMPORT_ERROR_EXAMPLES.DUPLICATE_FILE_NOT_ACKNOWLEDGED,
+        IMPORT_ERROR_EXAMPLES.ALREADY_CONFIRMED,
+        IMPORT_ERROR_EXAMPLES.CANCELLED,
+        IMPORT_ERROR_EXAMPLES.EXPIRED,
+      ],
     },
   )
   async confirm(
@@ -230,6 +256,7 @@ export class EmployeeImportsController {
   @ApiErrorResponses(...COMMON_ERRORS, NOT_FOUND, INVALID_ID, {
     status: HttpStatus.CONFLICT,
     description: 'The import was already written (IMPORT.NOT_PREVIEW).',
+    examples: [IMPORT_ERROR_EXAMPLES.NOT_PREVIEW],
   })
   async cancel(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: ImportIdParamDto) {
     try {

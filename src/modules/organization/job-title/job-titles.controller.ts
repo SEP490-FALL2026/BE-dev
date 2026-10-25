@@ -2,8 +2,10 @@ import { Body, Controller, Get, HttpStatus, Param, Patch, Post, Query } from '@n
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
+  FORBIDDEN_EXAMPLE,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
+  VALIDATION_EXAMPLE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
 import { RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
@@ -17,21 +19,44 @@ import {
   ListJobTitlesQueryDto,
 } from './job-title.dto';
 import { JobTitleService } from './job-title.service';
-import { toOrganizationApiException } from '../mappers/organization.http-errors';
+import { ORGANIZATION_ERROR_EXAMPLES, toOrganizationApiException } from '../mappers/organization.http-errors';
 import { JobTitleRecord } from './job-title.types';
 
 const COMMON_ERRORS = [
   UNAUTHENTICATED_RESPONSE,
-  { status: HttpStatus.FORBIDDEN, description: 'Only an IT Admin may maintain the job title catalogue.' },
+  {
+    status: HttpStatus.FORBIDDEN,
+    description: 'Only an IT Admin may maintain the job title catalogue.',
+    examples: [FORBIDDEN_EXAMPLE],
+  },
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
 ] as const;
 
+const VALIDATION_ERROR_DESCRIPTION = 'The request is invalid (VALIDATION_ERROR), or the name is empty or too long.';
+
+/** The routes that take no name: only the request itself can be invalid. */
 const VALIDATION_ERROR = {
   status: HttpStatus.UNPROCESSABLE_ENTITY,
-  description: 'The request is invalid (VALIDATION_ERROR), or the name is empty or too long.',
+  description: VALIDATION_ERROR_DESCRIPTION,
+  examples: [VALIDATION_EXAMPLE],
 } as const;
 
-const NOT_FOUND = { status: HttpStatus.NOT_FOUND, description: 'The job title does not exist.' } as const;
+/** The routes that take a name: the request, or the name once trimmed. */
+const NAME_INVALID = {
+  status: HttpStatus.UNPROCESSABLE_ENTITY,
+  description: VALIDATION_ERROR_DESCRIPTION,
+  examples: [
+    VALIDATION_EXAMPLE,
+    ORGANIZATION_ERROR_EXAMPLES.JOB_TITLE_NAME_REQUIRED,
+    ORGANIZATION_ERROR_EXAMPLES.JOB_TITLE_NAME_TOO_LONG,
+  ],
+} as const;
+
+const NOT_FOUND = {
+  status: HttpStatus.NOT_FOUND,
+  description: 'The job title does not exist.',
+  examples: [ORGANIZATION_ERROR_EXAMPLES.JOB_TITLE_NOT_FOUND],
+} as const;
 
 function toWire(title: JobTitleRecord) {
   return {
@@ -78,10 +103,11 @@ export class JobTitlesController {
     message: 'JOB_TITLE.CREATED',
     description: 'The title was added and is active.',
   })
-  @ApiErrorResponses(...COMMON_ERRORS, VALIDATION_ERROR, {
+  @ApiErrorResponses(...COMMON_ERRORS, NAME_INVALID, {
     status: HttpStatus.CONFLICT,
     description:
       'Another title, active or not, already has this name once case and whitespace are ignored (JOB_TITLE.NAME_TAKEN; details.conflict names it).',
+    examples: [ORGANIZATION_ERROR_EXAMPLES.JOB_TITLE_NAME_TAKEN],
   })
   async create(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: JobTitleNameBodyDto) {
     try {
@@ -97,9 +123,10 @@ export class JobTitlesController {
     message: 'JOB_TITLE.RENAMED',
     description: 'The title has its new name; everyone who holds it keeps it.',
   })
-  @ApiErrorResponses(...COMMON_ERRORS, VALIDATION_ERROR, NOT_FOUND, {
+  @ApiErrorResponses(...COMMON_ERRORS, NAME_INVALID, NOT_FOUND, {
     status: HttpStatus.CONFLICT,
     description: 'Another title already has this name (JOB_TITLE.NAME_TAKEN; details.conflict names it).',
+    examples: [ORGANIZATION_ERROR_EXAMPLES.JOB_TITLE_NAME_TAKEN],
   })
   async rename(
     @CurrentPrincipal() actor: AuthenticatedPrincipal,

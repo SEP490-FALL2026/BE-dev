@@ -3,14 +3,16 @@ import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { formatRate } from '../../../core/money/rate';
 import {
   ApiErrorResponses,
+  FORBIDDEN_EXAMPLE,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
+  VALIDATION_EXAMPLE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
 import { RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
 import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { toFinanceApiException } from '../mappers/finance.http-errors';
+import { FINANCE_ERROR_EXAMPLES, toFinanceApiException } from '../mappers/finance.http-errors';
 import {
   ExchangeRatePageResponseDto,
   ExchangeRateResponseDto,
@@ -52,8 +54,16 @@ export class ExchangeRatesController {
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
-    { status: HttpStatus.FORBIDDEN, description: 'Only Finance and the IT Admin read exchange rates.' },
-    { status: HttpStatus.UNPROCESSABLE_ENTITY, description: 'The query is invalid (VALIDATION_ERROR).' },
+    {
+      status: HttpStatus.FORBIDDEN,
+      description: 'Only Finance and the IT Admin read exchange rates.',
+      examples: [FORBIDDEN_EXAMPLE],
+    },
+    {
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      description: 'The query is invalid (VALIDATION_ERROR).',
+      examples: [VALIDATION_EXAMPLE],
+    },
   )
   async list(@Query() query: ListExchangeRatesQueryDto) {
     try {
@@ -75,15 +85,30 @@ export class ExchangeRatesController {
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
-    { status: HttpStatus.FORBIDDEN, description: 'Only Finance records exchange rates.' },
+    {
+      status: HttpStatus.FORBIDDEN,
+      description: 'Only Finance records exchange rates.',
+      examples: [FORBIDDEN_EXAMPLE],
+    },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
         'The request is invalid (VALIDATION_ERROR), the currency is not supported (CURRENCY_NOT_SUPPORTED), the rate has more than ten decimals (RATE_SCALE_EXCEEDED) or is not above 0 and below 10000000000 (RATE_OUT_OF_RANGE), the currency is the reporting currency (EXCHANGE_RATE.SAME_AS_REPORTING_CURRENCY), or the day is in the future (EXCHANGE_RATE.DATE_IN_FUTURE) or before 2000-01-01 (EXCHANGE_RATE.DATE_TOO_OLD).',
+      // A rate that cannot be read is the ordinary VALIDATION_ERROR too: shown once, by the request example.
+      examples: [
+        VALIDATION_EXAMPLE,
+        FINANCE_ERROR_EXAMPLES.CURRENCY_NOT_SUPPORTED,
+        FINANCE_ERROR_EXAMPLES.EXCHANGE_RATE_DATE_IN_FUTURE,
+        FINANCE_ERROR_EXAMPLES.EXCHANGE_RATE_DATE_TOO_OLD,
+        FINANCE_ERROR_EXAMPLES.EXCHANGE_RATE_SAME_AS_REPORTING_CURRENCY,
+        FINANCE_ERROR_EXAMPLES.RATE_OUT_OF_RANGE,
+        FINANCE_ERROR_EXAMPLES.RATE_SCALE_EXCEEDED,
+      ],
     },
     {
       status: HttpStatus.CONFLICT,
       description: 'A rate for that currency and day is already recorded (EXCHANGE_RATE.ALREADY_RECORDED).',
+      examples: [FINANCE_ERROR_EXAMPLES.EXCHANGE_RATE_ALREADY_RECORDED],
     },
   )
   async record(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: RecordExchangeRateBodyDto) {

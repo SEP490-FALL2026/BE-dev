@@ -2,8 +2,10 @@ import { Body, Controller, Header, Get, HttpStatus, Param, Post } from '@nestjs/
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
+  FORBIDDEN_EXAMPLE,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
+  VALIDATION_EXAMPLE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
 import { RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
@@ -17,7 +19,7 @@ import {
   DocumentResponseDto,
   IdParamDto,
 } from './contract.dto';
-import { toContractApiException } from './contract.http-errors';
+import { CONTRACT_ERROR_EXAMPLES, toContractApiException } from './contract.http-errors';
 import type { DocumentRecord } from './document.repo';
 import { DocumentService } from './document.service';
 
@@ -26,15 +28,18 @@ const ROLES = {
   status: HttpStatus.FORBIDDEN,
   description:
     'Only the IT Admin and Finance keep and open files: the department head, an employee, the spending approver and the Super Admin are refused.',
+  examples: [FORBIDDEN_EXAMPLE],
 } as const;
 const NOT_FOUND = {
   status: HttpStatus.NOT_FOUND,
   description:
     'The document does not exist for this person: it is not theirs and not attached yet, not uploaded yet, or quarantined (DOCUMENT.NOT_FOUND).',
+  examples: [CONTRACT_ERROR_EXAMPLES.DOCUMENT_NOT_FOUND],
 } as const;
 const INVALID_ID = {
   status: HttpStatus.UNPROCESSABLE_ENTITY,
   description: 'The id is invalid (VALIDATION_ERROR).',
+  examples: [VALIDATION_EXAMPLE],
 } as const;
 
 const toWire = (document: DocumentRecord) => ({
@@ -75,15 +80,23 @@ export class DocumentsController {
     {
       status: HttpStatus.FORBIDDEN,
       description: 'Not the IT Admin or Finance, or the role may not choose this purpose (DOCUMENT.PURPOSE_FORBIDDEN).',
+      examples: [FORBIDDEN_EXAMPLE, CONTRACT_ERROR_EXAMPLES.PURPOSE_FORBIDDEN],
     },
     {
       status: HttpStatus.CONFLICT,
       description: 'The purpose has nowhere to be attached yet (DOCUMENT.PURPOSE_NOT_AVAILABLE).',
+      examples: [CONTRACT_ERROR_EXAMPLES.PURPOSE_NOT_AVAILABLE],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
         'The request is invalid (VALIDATION_ERROR) or the file is refused: DOCUMENT.TYPE_NOT_ALLOWED, TOO_LARGE or FILE_INVALID. Nothing is made.',
+      examples: [
+        VALIDATION_EXAMPLE,
+        CONTRACT_ERROR_EXAMPLES.TYPE_NOT_ALLOWED,
+        CONTRACT_ERROR_EXAMPLES.TOO_LARGE,
+        CONTRACT_ERROR_EXAMPLES.FILE_INVALID,
+      ],
     },
   )
   async create(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: CreateDocumentBodyDto) {
@@ -112,11 +125,17 @@ export class DocumentsController {
       status: HttpStatus.CONFLICT,
       description:
         'The upload is done already (DOCUMENT.NOT_AWAITING_UPLOAD), has not reached the storage yet and can be said again (DOCUMENT.UPLOAD_PENDING), or never came in a day and was given up (DOCUMENT.UPLOAD_EXPIRED).',
+      examples: [
+        CONTRACT_ERROR_EXAMPLES.NOT_AWAITING_UPLOAD,
+        CONTRACT_ERROR_EXAMPLES.UPLOAD_PENDING,
+        CONTRACT_ERROR_EXAMPLES.UPLOAD_EXPIRED,
+      ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
         'The id is invalid (VALIDATION_ERROR) or the stored file is not what was declared (DOCUMENT.UPLOAD_MISMATCH): the object is deleted and the document quarantined.',
+      examples: [VALIDATION_EXAMPLE, CONTRACT_ERROR_EXAMPLES.UPLOAD_MISMATCH],
     },
   )
   async complete(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: IdParamDto) {
@@ -137,18 +156,24 @@ export class DocumentsController {
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
-    { status: HttpStatus.FORBIDDEN, description: ROLES.description },
+    { status: HttpStatus.FORBIDDEN, description: ROLES.description, examples: [FORBIDDEN_EXAMPLE] },
     {
       status: HttpStatus.NOT_FOUND,
       description:
         "The document is not the uploader's (DOCUMENT.NOT_FOUND) or the contract does not exist (CONTRACT.NOT_FOUND).",
+      examples: [CONTRACT_ERROR_EXAMPLES.DOCUMENT_NOT_FOUND, CONTRACT_ERROR_EXAMPLES.CONTRACT_NOT_FOUND],
     },
     {
       status: HttpStatus.CONFLICT,
       description:
         'The document has an owner already (DOCUMENT.ALREADY_ATTACHED) or is not uploaded (DOCUMENT.NOT_READY_TO_ATTACH).',
+      examples: [CONTRACT_ERROR_EXAMPLES.ALREADY_ATTACHED, CONTRACT_ERROR_EXAMPLES.NOT_READY_TO_ATTACH],
     },
-    { status: HttpStatus.UNPROCESSABLE_ENTITY, description: 'The request is invalid (VALIDATION_ERROR).' },
+    {
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      description: 'The request is invalid (VALIDATION_ERROR).',
+      examples: [VALIDATION_EXAMPLE],
+    },
   )
   async attach(
     @CurrentPrincipal() actor: AuthenticatedPrincipal,

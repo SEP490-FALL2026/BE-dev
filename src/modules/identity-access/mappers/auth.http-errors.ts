@@ -2,6 +2,7 @@ import { HttpStatus } from '@nestjs/common';
 import { TransientDatabaseError } from '../../../infrastructure/database/transaction-runner';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import { toUnavailableApiException } from '../../../infrastructure/http/errors/service-unavailable';
+import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
 import {
   AccountNoLongerUsableError,
   CurrentPasswordInvalidError,
@@ -84,3 +85,14 @@ export function toPasswordResetApiException(error: unknown): unknown {
 
   return toPasswordApiException(error);
 }
+
+/** The answers above as OpenAPI examples, each produced by the mapper that gives it at runtime (OPENAPI-EXAMPLE.1). */
+export const AUTH_ERROR_EXAMPLES = {
+  INVALID_CREDENTIALS: errorExampleOf(toAuthApiException(new InvalidCredentialsError())),
+  LOGIN_TEMPORARILY_BLOCKED: errorExampleOf(toAuthApiException(new LoginTemporarilyBlockedError(60))),
+  SESSION_INVALID: errorExampleOf(toAuthApiException(new SessionInvalidError())),
+  UNAVAILABLE: errorExampleOf(toAuthApiException(new TransientDatabaseError(undefined, undefined))),
+  CURRENT_PASSWORD_INVALID: errorExampleOf(toPasswordApiException(new CurrentPasswordInvalidError())),
+  PASSWORD_RESET_INVALID: errorExampleOf(toPasswordApiException(new PasswordResetInvalidError())),
+  PASSWORD_POLICY_VIOLATION: errorExampleOf(toPasswordApiException(new PasswordPolicyError('TOO_SHORT'))),
+} as const;

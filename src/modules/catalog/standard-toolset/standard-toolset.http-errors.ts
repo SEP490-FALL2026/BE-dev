@@ -1,6 +1,7 @@
 import { HttpStatus } from '@nestjs/common';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import { toUnavailableApiException } from '../../../infrastructure/http/errors/service-unavailable';
+import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
 import {
   ToolsetDepartmentInactiveError,
   ToolsetDepartmentNotFoundError,
@@ -52,3 +53,18 @@ export function toToolsetApiException(error: unknown): unknown {
 
   return toUnavailableApiException(error) ?? error;
 }
+
+const example = (error: Error) => errorExampleOf(toToolsetApiException(error));
+
+/** The answers above as OpenAPI examples, each produced by the mapper that gives it at runtime (OPENAPI-EXAMPLE.1). */
+export const STANDARD_TOOLSET_ERROR_EXAMPLES = {
+  DEPARTMENT_NOT_FOUND: example(new ToolsetDepartmentNotFoundError()),
+  JOB_TITLE_NOT_FOUND: example(new ToolsetJobTitleNotFoundError()),
+  OUT_OF_SCOPE: example(new ToolsetOutOfScopeError()),
+  REASON_REQUIRED: example(new ToolsetReasonRequiredError()),
+  PLAN_NOT_FOUND: example(new ToolsetPlansNotFoundError(['<plan-id>'])),
+  PLAN_DUPLICATE: example(new ToolsetPlanDuplicateError('<plan-id>')),
+  TOO_MANY_PLANS: example(new ToolsetTooManyPlansError()),
+  JOB_TITLE_INACTIVE: example(new ToolsetJobTitleInactiveError()),
+  DEPARTMENT_INACTIVE: example(new ToolsetDepartmentInactiveError()),
+} as const;

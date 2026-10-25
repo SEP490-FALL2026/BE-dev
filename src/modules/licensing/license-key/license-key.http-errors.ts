@@ -1,6 +1,12 @@
 import { HttpStatus } from '@nestjs/common';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
-import { LicenseKeyNotFoundError, LicenseKeyPlanNotK4Error, LicenseKeyRevealLimitError } from '../licensing.errors';
+import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
+import {
+  LicenseKeyNotFoundError,
+  LicenseKeyPlanNotK4Error,
+  LicenseKeyRevealLimitError,
+  SeatTargetNotFoundError,
+} from '../licensing.errors';
 import { toLicensingApiException } from '../mappers/licensing.http-errors';
 
 const refuse = (status: HttpStatus, code: string, message: string, details?: Record<string, unknown>): ApiException =>
@@ -29,3 +35,13 @@ export function toLicenseKeyApiException(error: unknown): unknown {
 
   return toLicensingApiException(error);
 }
+
+const example = (error: Error) => errorExampleOf(toLicenseKeyApiException(error));
+
+/** The answers above as OpenAPI examples, each produced by the mapper that gives it at runtime (OPENAPI-EXAMPLE.1). */
+export const LICENSE_KEY_ERROR_EXAMPLES = {
+  NOT_FOUND: example(new LicenseKeyNotFoundError()),
+  PLAN_NOT_K4: example(new LicenseKeyPlanNotK4Error('K1')),
+  REVEAL_LIMIT: example(new LicenseKeyRevealLimitError('MINUTE')),
+  SUBSCRIPTION_NOT_FOUND: example(new SeatTargetNotFoundError('SUBSCRIPTION')),
+} as const;

@@ -2,6 +2,8 @@ import { Controller, Get, HttpStatus, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
+  FORBIDDEN_EXAMPLE,
+  VALIDATION_EXAMPLE,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
 } from '../../infrastructure/http/decorators/api-error-responses.decorator';
@@ -27,8 +29,16 @@ export class AuditController {
   })
   @ApiErrorResponses(
     UNAUTHENTICATED_RESPONSE,
-    { status: HttpStatus.FORBIDDEN, description: 'Only the Super Admin may read the Audit Trail.' },
-    { status: HttpStatus.UNPROCESSABLE_ENTITY, description: 'The query is invalid (VALIDATION_ERROR).' },
+    {
+      status: HttpStatus.FORBIDDEN,
+      description: 'Only the Super Admin may read the Audit Trail.',
+      examples: [FORBIDDEN_EXAMPLE],
+    },
+    {
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      description: 'The query is invalid (VALIDATION_ERROR).',
+      examples: [VALIDATION_EXAMPLE],
+    },
     GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   )
   async list(@Query() query: ListAuditEventsQueryDto) {

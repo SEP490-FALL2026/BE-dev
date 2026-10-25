@@ -15,6 +15,16 @@ const UPLOAD_413 = {
   content: { 'application/json': { schema: ERROR_ENVELOPE } },
 };
 const JSON_BODY = { content: { 'application/json': { schema: { type: 'object' } } } };
+/** What the filter answers for a parser refusal (written out, not asked of the filter). */
+const parserExample = (code: string) => ({
+  [code]: {
+    summary: 'The request could not be processed.',
+    value: {
+      success: false,
+      error: { code, message: 'The request could not be processed.', requestId: 'req_example' },
+    },
+  },
+});
 
 type Operation = { operationId: string; responses: Record<string, { description?: string }> };
 type Document = { openapi: string; paths: Record<string, Record<string, unknown>> };
@@ -46,11 +56,19 @@ describe('withRequestParserResponses (P29-N1, P29-N4)', () => {
 
   it('adds the 400, 413 and 415 of the parser, with the error envelope, to an operation that takes a JSON body', () => {
     const responses = responsesOf(withRequestParserResponses(source()), '/items', 'post');
-    const envelope = { content: { 'application/json': { schema: ERROR_ENVELOPE } } };
+    const envelope = (code: string) => ({
+      content: { 'application/json': { schema: ERROR_ENVELOPE, examples: parserExample(code) } },
+    });
 
-    expect(responses['400']).toEqual({ description: MALFORMED_BODY_DESCRIPTION, ...envelope });
-    expect(responses['413']).toEqual({ description: REQUEST_BODY_LIMIT_DESCRIPTION, ...envelope });
-    expect(responses['415']).toEqual({ description: UNSUPPORTED_BODY_DESCRIPTION, ...envelope });
+    expect(responses['400']).toEqual({ description: MALFORMED_BODY_DESCRIPTION, ...envelope('HTTP_BAD_REQUEST') });
+    expect(responses['413']).toEqual({
+      description: REQUEST_BODY_LIMIT_DESCRIPTION,
+      ...envelope('HTTP_PAYLOAD_TOO_LARGE'),
+    });
+    expect(responses['415']).toEqual({
+      description: UNSUPPORTED_BODY_DESCRIPTION,
+      ...envelope('HTTP_UNSUPPORTED_MEDIA_TYPE'),
+    });
     expect([MALFORMED_BODY_DESCRIPTION, REQUEST_BODY_LIMIT_DESCRIPTION, UNSUPPORTED_BODY_DESCRIPTION]).toEqual([
       expect.stringContaining('HTTP_BAD_REQUEST'),
       expect.stringContaining('100 KiB'),
@@ -58,13 +76,13 @@ describe('withRequestParserResponses (P29-N1, P29-N4)', () => {
     ]);
   });
 
-  it('keeps an operation’s own 400 and appends the parser’s meaning once, also when applied twice', () => {
+  it('keeps an operation’s own 400 and appends the parser’s meaning and example once, also when applied twice', () => {
     const once = withRequestParserResponses(source());
     const twice = withRequestParserResponses(once);
 
     expect(responsesOf(twice, '/links', 'post')['400']).toEqual({
-      ...OWN_400,
       description: `${OWN_400.description} ${MALFORMED_BODY_DESCRIPTION}`,
+      content: { 'application/json': { schema: ERROR_ENVELOPE, examples: parserExample('HTTP_BAD_REQUEST') } },
     });
   });
 

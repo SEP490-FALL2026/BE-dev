@@ -2,6 +2,7 @@ import { Controller, Get, HttpStatus } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
+  FORBIDDEN_EXAMPLE,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
@@ -27,6 +28,7 @@ export class CurrenciesController {
   @ApiErrorResponses(UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPONSE, {
     status: HttpStatus.FORBIDDEN,
     description: 'Only Finance and the IT Admin read the currency list.',
+    examples: [FORBIDDEN_EXAMPLE],
   })
   async list() {
     try {

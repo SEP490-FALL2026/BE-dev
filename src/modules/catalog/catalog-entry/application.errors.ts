@@ -89,8 +89,9 @@ export class ApplicationDictionaryLineMismatchError extends Error {
  */
 export class ApplicationVendorGroupChangedError extends Error {
   constructor() {
+    // At most 160 characters, like every message the API documents (OPENAPI-EXAMPLE.1).
     super(
-      'The dictionary group of the vendor or of the line was changed by a simultaneous request. Refresh the application and the dictionary line, then send the request again.',
+      'A simultaneous request changed the dictionary group of the vendor or the line. Refresh both, then send the request again.',
     );
     this.name = 'ApplicationVendorGroupChangedError';
   }

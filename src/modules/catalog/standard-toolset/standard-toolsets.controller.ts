@@ -2,8 +2,10 @@ import { Body, Controller, Get, HttpStatus, Param, Put, Query } from '@nestjs/co
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
+  FORBIDDEN_EXAMPLE,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
+  VALIDATION_EXAMPLE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
 import { AuthenticatedOnly, RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
@@ -19,7 +21,7 @@ import {
   ToolsetPairParamDto,
   ToolsetResponseDto,
 } from './standard-toolset.dto';
-import { toToolsetApiException } from './standard-toolset.http-errors';
+import { STANDARD_TOOLSET_ERROR_EXAMPLES as EXAMPLES, toToolsetApiException } from './standard-toolset.http-errors';
 import { StandardToolsetService, type ToolsetView } from './standard-toolset.service';
 
 const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPONSE] as const;
@@ -27,14 +29,17 @@ const READERS = {
   status: HttpStatus.FORBIDDEN,
   description:
     'Only the IT Admin, or a department head for their own department (DEPARTMENT.OUT_OF_SCOPE), reads the toolsets of a department.',
+  examples: [FORBIDDEN_EXAMPLE, EXAMPLES.OUT_OF_SCOPE],
 } as const;
 const NOT_FOUND = {
   status: HttpStatus.NOT_FOUND,
   description: 'The department or the job title does not exist (DEPARTMENT.NOT_FOUND, JOB_TITLE.NOT_FOUND).',
+  examples: [EXAMPLES.DEPARTMENT_NOT_FOUND, EXAMPLES.JOB_TITLE_NOT_FOUND],
 } as const;
 const INVALID = {
   status: HttpStatus.UNPROCESSABLE_ENTITY,
   description: 'The id or the query is invalid (VALIDATION_ERROR).',
+  examples: [VALIDATION_EXAMPLE],
 } as const;
 
 const toWire = (view: ToolsetView) => ({ ...view, changedAt: view.changedAt.toISOString() });
@@ -125,12 +130,25 @@ export class StandardToolsetsController {
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
-    { status: HttpStatus.FORBIDDEN, description: 'Only an IT Admin sets a standard toolset.' },
+    {
+      status: HttpStatus.FORBIDDEN,
+      description: 'Only an IT Admin sets a standard toolset.',
+      examples: [FORBIDDEN_EXAMPLE],
+    },
     NOT_FOUND,
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
         'The request is invalid (VALIDATION_ERROR) or refused: STANDARD_TOOLSET.REASON_REQUIRED, PLAN_NOT_FOUND (details.planIds), PLAN_DUPLICATE, TOO_MANY_PLANS, JOB_TITLE_INACTIVE or DEPARTMENT_INACTIVE (a new pair only).',
+      examples: [
+        VALIDATION_EXAMPLE,
+        EXAMPLES.REASON_REQUIRED,
+        EXAMPLES.PLAN_NOT_FOUND,
+        EXAMPLES.PLAN_DUPLICATE,
+        EXAMPLES.TOO_MANY_PLANS,
+        EXAMPLES.JOB_TITLE_INACTIVE,
+        EXAMPLES.DEPARTMENT_INACTIVE,
+      ],
     },
   )
   async set(
@@ -156,7 +174,7 @@ export class StandardToolsetsController {
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
-    { status: HttpStatus.FORBIDDEN, description: 'Only an IT Admin reads the history.' },
+    { status: HttpStatus.FORBIDDEN, description: 'Only an IT Admin reads the history.', examples: [FORBIDDEN_EXAMPLE] },
     NOT_FOUND,
     INVALID,
   )

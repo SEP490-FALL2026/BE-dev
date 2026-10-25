@@ -1,6 +1,7 @@
 import { HttpStatus } from '@nestjs/common';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import { toUnavailableApiException } from '../../../infrastructure/http/errors/service-unavailable';
+import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
 import {
   SeatBaselineClosedError,
   SeatPlanNotSupportedError,
@@ -20,6 +21,7 @@ import {
   SeatImportPreviewStaleError,
   SeatImportStateError,
 } from './seat-baseline-import.errors';
+import type { SeatImportResult } from './seat-baseline-import.types';
 
 const refuse = (status: HttpStatus, code: string, message: string, details?: Record<string, unknown>): ApiException =>
   new ApiException(status, { code, message, ...(details ? { details } : {}) });
@@ -94,3 +96,32 @@ export function toSeatImportApiException(error: unknown): unknown {
 
   return toUnavailableApiException(error) ?? error;
 }
+
+const example = (error: Error) => errorExampleOf(toSeatImportApiException(error));
+
+/** The answers above as OpenAPI examples, each produced by the mapper that gives it at runtime (OPENAPI-EXAMPLE.1). */
+export const SEAT_IMPORT_ERROR_EXAMPLES = {
+  FILE_REQUIRED: example(new SeatImportFileInvalidError('FILE_REQUIRED')),
+  FILE_EMPTY: example(new SeatImportFileInvalidError('FILE_EMPTY')),
+  FILE_NOT_TEXT: example(new SeatImportFileInvalidError('FILE_NOT_TEXT')),
+  FILE_TOO_MANY_ROWS: example(new SeatImportFileInvalidError('FILE_TOO_MANY_ROWS', { maxRows: 1000 })),
+  FILE_UNREADABLE: example(new SeatImportFileUnreadableError('STRAY_QUOTE', 2)),
+  FILE_MISSING_COLUMNS: example(new SeatImportFileMissingColumnsError(['account_identifier'])),
+  NOT_FOUND: example(new SeatImportNotFoundError()),
+  CANCELLED: example(new SeatImportStateError('CANCELLED')),
+  EXPIRED: example(new SeatImportStateError('EXPIRED')),
+  NOT_PREVIEW: example(new SeatImportStateError('NOT_PREVIEW')),
+  PREVIEW_OUTDATED: example(new SeatImportPreviewOutdatedError(2)),
+  PREVIEW_STALE: example(new SeatImportPreviewStaleError([2])),
+  ALREADY_CONFIRMED: example(
+    new SeatImportAlreadyConfirmedError({ created: 1, errors: 0, occupied: 3, free: 2 } satisfies SeatImportResult),
+  ),
+  BASELINE_CLOSED: example(new SeatBaselineClosedError()),
+  QUANTITY_UNKNOWN: example(new SeatQuantityUnknownError()),
+  APPLICATION_RETIRED: example(new SeatApplicationRetiredError()),
+  SUBSCRIPTION_DRAFT: example(new SeatSubscriptionDraftError(['START_DATE'])),
+  SUBSCRIPTION_NOT_FOUND: example(new SeatTargetNotFoundError('SUBSCRIPTION')),
+  PLAN_NOT_FOUND: example(new SeatTargetNotFoundError('PLAN')),
+  TARGET_INVALID: example(new SeatTargetInvalidError('PLAN_NEEDS_SUBSCRIPTION')),
+  PLAN_NOT_SUPPORTED: example(new SeatPlanNotSupportedError('K4')),
+} as const;

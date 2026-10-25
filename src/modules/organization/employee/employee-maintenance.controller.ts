@@ -2,14 +2,16 @@ import { Body, Controller, HttpStatus, Param, Patch } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
+  FORBIDDEN_EXAMPLE,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
+  VALIDATION_EXAMPLE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
 import { RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
 import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { toOrganizationApiException } from '../mappers/organization.http-errors';
+import { ORGANIZATION_ERROR_EXAMPLES, toOrganizationApiException } from '../mappers/organization.http-errors';
 import { EmployeeIdParamDto, MaintainedEmployeeResponseDto, UpdateEmployeeBodyDto } from './employee.dto';
 import { EmployeeMaintenanceService } from './employee-maintenance.service';
 
@@ -36,12 +38,22 @@ export class EmployeeMaintenanceController {
       status: HttpStatus.FORBIDDEN,
       description:
         'Only an IT Admin corrects these fields; the record of an IT Admin goes to another IT Admin when one can act (EMPLOYEE.ANOTHER_IT_ADMIN_NEEDED).',
+      examples: [FORBIDDEN_EXAMPLE, ORGANIZATION_ERROR_EXAMPLES.EMPLOYEE_ANOTHER_IT_ADMIN_NEEDED],
     },
-    { status: HttpStatus.NOT_FOUND, description: 'The employee does not exist (EMPLOYEE.NOT_FOUND).' },
+    {
+      status: HttpStatus.NOT_FOUND,
+      description: 'The employee does not exist (EMPLOYEE.NOT_FOUND).',
+      examples: [ORGANIZATION_ERROR_EXAMPLES.EMPLOYEE_NOT_FOUND],
+    },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
         'The body is malformed, names a field that is not an official one or lacks a part of the HR basis (VALIDATION_ERROR), names nothing to change (EMPLOYEE.UPDATE_EMPTY), or a value is refused (EMPLOYEE.ROW_INVALID: WORK_EMAIL_TAKEN, HIRE_DATE_LOCKED, HIRE_DATE_IN_PAST, OPEN_ASSIGNMENT_NEEDS_EXPECTED_END — a contractor, freelancer or intern needs an expected end on every open seat).',
+      examples: [
+        VALIDATION_EXAMPLE,
+        ORGANIZATION_ERROR_EXAMPLES.EMPLOYEE_UPDATE_ROW_INVALID,
+        ORGANIZATION_ERROR_EXAMPLES.EMPLOYEE_UPDATE_EMPTY,
+      ],
     },
     GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   )

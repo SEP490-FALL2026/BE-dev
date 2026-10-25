@@ -2,6 +2,12 @@ import { HttpStatus } from '@nestjs/common';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import { toMoneyApiException } from '../../../infrastructure/http/errors/money-errors';
 import { toUnavailableApiException } from '../../../infrastructure/http/errors/service-unavailable';
+import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
+import {
+  CurrencyNotSupportedError,
+  RateOutOfRangeError,
+  RateScaleExceededError,
+} from '../../../core/money/money.errors';
 import {
   ExchangeRateAlreadyRecordedError,
   ExchangeRateDateInFutureError,
@@ -39,3 +45,16 @@ export function toFinanceApiException(error: unknown): unknown {
 
   return toUnavailableApiException(error) ?? error;
 }
+
+const example = (error: Error) => errorExampleOf(toFinanceApiException(error));
+
+/** The answers above as OpenAPI examples, each produced by the mapper that gives it at runtime (OPENAPI-EXAMPLE.1). */
+export const FINANCE_ERROR_EXAMPLES = {
+  EXCHANGE_RATE_ALREADY_RECORDED: example(new ExchangeRateAlreadyRecordedError()),
+  EXCHANGE_RATE_SAME_AS_REPORTING_CURRENCY: example(new ExchangeRateSameAsReportingCurrencyError('XYZ')),
+  EXCHANGE_RATE_DATE_IN_FUTURE: example(new ExchangeRateDateInFutureError()),
+  EXCHANGE_RATE_DATE_TOO_OLD: example(new ExchangeRateDateTooOldError()),
+  CURRENCY_NOT_SUPPORTED: example(new CurrencyNotSupportedError('XYZ')),
+  RATE_OUT_OF_RANGE: example(new RateOutOfRangeError()),
+  RATE_SCALE_EXCEEDED: example(new RateScaleExceededError()),
+} as const;

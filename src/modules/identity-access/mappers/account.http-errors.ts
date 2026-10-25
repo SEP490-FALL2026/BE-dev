@@ -1,6 +1,7 @@
 import { HttpStatus } from '@nestjs/common';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import { toUnavailableApiException } from '../../../infrastructure/http/errors/service-unavailable';
+import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
 import { EmployeeNotFoundError } from '../../organization/organization.errors';
 import {
   AccountAlreadyActivatedError,
@@ -20,6 +21,7 @@ import {
   SelfChangeForbiddenError,
   SuperAdminHolderNotLockableError,
   SuperAdminTransferRefusedError,
+  type SuperAdminTransferProblem,
 } from '../accounts/account.errors';
 
 // Shared by account administration (accounts/) and the invitation redeem route of the auth controller (auth/).
@@ -101,3 +103,42 @@ export function toSuperAdminTransferApiException(error: unknown): unknown {
 
   return toAccountApiException(error);
 }
+
+const example = (error: Error) => errorExampleOf(toAccountApiException(error));
+const transferExample = (problem: SuperAdminTransferProblem) =>
+  errorExampleOf(toSuperAdminTransferApiException(new SuperAdminTransferRefusedError(problem)));
+
+/** The answers above as OpenAPI examples, each produced by the mapper that gives it at runtime (OPENAPI-EXAMPLE.1). */
+export const ACCOUNT_ERROR_EXAMPLES = {
+  NOT_FOUND: example(new AccountNotFoundError()),
+  EMPLOYEE_NOT_FOUND: example(new EmployeeNotFoundError('<employee-id>')),
+  SELF_CHANGE_FORBIDDEN: example(new SelfChangeForbiddenError()),
+  ROLE_DERIVED: example(new RoleRequestRefusedError('ROLE_DERIVED')),
+  SUPER_ADMIN_TRANSFER_ONLY: example(new RoleRequestRefusedError('SUPER_ADMIN_TRANSFER_ONLY')),
+  EMPLOYEE_TERMINATED: example(new EmployeeTerminatedError()),
+  ALREADY_EXISTS_FOR_EMPLOYEE: example(new AccountAlreadyExistsError()),
+  LOGIN_EMAIL_TAKEN: example(new LoginEmailTakenError()),
+  LOGIN_EMAIL_REQUIRED: example(new LoginEmailRequiredError()),
+  LOGIN_EMAIL_INVALID: example(new LoginEmailInvalidError()),
+  ALREADY_ACTIVATED: example(new AccountAlreadyActivatedError()),
+  ACCOUNT_LOCKED: example(new AccountLockedError()),
+  SUPER_ADMIN_HOLDER_NOT_LOCKABLE: example(new SuperAdminHolderNotLockableError()),
+  ROLE_ALREADY_GRANTED: example(new RoleAlreadyGrantedError()),
+  ROLE_NOT_GRANTED: example(new RoleNotGrantedError()),
+  ROLE_COMBINATION_FORBIDDEN: example(new RoleCombinationForbiddenError()),
+  FINANCE_ALREADY_ASSIGNED: example(new FinanceAlreadyAssignedError()),
+  INVITATION_INVALID: example(new InvitationInvalidError()),
+} as const;
+
+/** The answers above as OpenAPI examples, each produced by the mapper that gives it at runtime (OPENAPI-EXAMPLE.1). */
+export const SUPER_ADMIN_TRANSFER_ERROR_EXAMPLES = {
+  SUCCESSOR_NOT_FOUND: transferExample('SUCCESSOR_NOT_FOUND'),
+  SUCCESSOR_IS_HOLDER: transferExample('SUCCESSOR_IS_HOLDER'),
+  ACCOUNT_LOCKED: transferExample('ACCOUNT_LOCKED'),
+  EMPLOYEE_NOT_WORKING: transferExample('EMPLOYEE_NOT_WORKING'),
+  NOT_ACTIVATED: transferExample('NOT_ACTIVATED'),
+  EMAIL_NOT_VERIFIED: transferExample('EMAIL_NOT_VERIFIED'),
+  WORK_ROLE_HELD: transferExample('WORK_ROLE_HELD'),
+  APPROVAL_ROLE_HELD: transferExample('APPROVAL_ROLE_HELD'),
+  HEADS_DEPARTMENT: transferExample('HEADS_DEPARTMENT'),
+} as const;

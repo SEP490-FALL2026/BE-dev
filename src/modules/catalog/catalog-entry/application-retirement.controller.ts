@@ -2,14 +2,16 @@ import { Body, Controller, Get, HttpStatus, Param, Post } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
+  FORBIDDEN_EXAMPLE,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
+  VALIDATION_EXAMPLE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
 import { RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
 import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { toApplicationApiException } from './application.http-errors';
+import { APPLICATION_ERROR_EXAMPLES as EXAMPLES, toApplicationApiException } from './application.http-errors';
 import {
   ConfirmRetirementBodyDto,
   RetirementConfirmationResponseDto,
@@ -24,6 +26,7 @@ const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPO
 const NOT_FOUND = {
   status: HttpStatus.NOT_FOUND,
   description: 'The application does not exist (APPLICATION.NOT_FOUND).',
+  examples: [EXAMPLES.NOT_FOUND],
 } as const;
 
 const confirmationWire = (confirmation: RetirementConfirmationRecord) => ({
@@ -58,13 +61,22 @@ export class ApplicationRetirementController {
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
-    { status: HttpStatus.FORBIDDEN, description: 'Only an IT Admin records the confirmation.' },
+    {
+      status: HttpStatus.FORBIDDEN,
+      description: 'Only an IT Admin records the confirmation.',
+      examples: [FORBIDDEN_EXAMPLE],
+    },
     NOT_FOUND,
-    { status: HttpStatus.CONFLICT, description: 'The application is retired already (APPLICATION.ALREADY_RETIRED).' },
+    {
+      status: HttpStatus.CONFLICT,
+      description: 'The application is retired already (APPLICATION.ALREADY_RETIRED).',
+      examples: [EXAMPLES.ALREADY_RETIRED],
+    },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
         'The request is invalid (VALIDATION_ERROR), the person is not the Business Owner of today or has left (APPLICATION.RETIREMENT_NOT_BUSINESS_OWNER), or the note is blank (APPLICATION.RETIREMENT_NOTE_REQUIRED).',
+      examples: [VALIDATION_EXAMPLE, EXAMPLES.RETIREMENT_NOT_BUSINESS_OWNER, EXAMPLES.RETIREMENT_NOTE_REQUIRED],
     },
   )
   async confirm(
@@ -92,9 +104,17 @@ export class ApplicationRetirementController {
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
-    { status: HttpStatus.FORBIDDEN, description: 'Only the IT Admin and Finance read it.' },
+    {
+      status: HttpStatus.FORBIDDEN,
+      description: 'Only the IT Admin and Finance read it.',
+      examples: [FORBIDDEN_EXAMPLE],
+    },
     NOT_FOUND,
-    { status: HttpStatus.UNPROCESSABLE_ENTITY, description: 'The id is invalid (VALIDATION_ERROR).' },
+    {
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      description: 'The id is invalid (VALIDATION_ERROR).',
+      examples: [VALIDATION_EXAMPLE],
+    },
   )
   async get(@Param() params: RetirementParamDto) {
     try {
@@ -122,17 +142,23 @@ export class ApplicationRetirementController {
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
-    { status: HttpStatus.FORBIDDEN, description: 'Only an IT Admin retires an application.' },
+    {
+      status: HttpStatus.FORBIDDEN,
+      description: 'Only an IT Admin retires an application.',
+      examples: [FORBIDDEN_EXAMPLE],
+    },
     NOT_FOUND,
     {
       status: HttpStatus.CONFLICT,
       description:
         'The application is retired already (APPLICATION.ALREADY_RETIRED), or assignments or running term subscriptions hold it (APPLICATION.RETIREMENT_BLOCKED, details.assignments and details.subscriptions list the first 50 of them, details.assignmentTotal and details.subscriptionTotal count them all).',
+      examples: [EXAMPLES.ALREADY_RETIRED, EXAMPLES.RETIREMENT_BLOCKED],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
         'The id is invalid (VALIDATION_ERROR), or the Business Owner of today has not confirmed (APPLICATION.RETIREMENT_NEEDS_CONFIRMATION).',
+      examples: [VALIDATION_EXAMPLE, EXAMPLES.RETIREMENT_NEEDS_CONFIRMATION],
     },
   )
   async retire(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: RetirementParamDto) {

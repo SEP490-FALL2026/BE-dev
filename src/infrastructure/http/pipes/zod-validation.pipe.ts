@@ -3,17 +3,16 @@ import { createZodValidationPipe } from 'nestjs-zod';
 import { ZodError } from 'zod';
 import { ApiException } from '../errors/api.exception';
 
+/** The code and message of every request validation failure; `details.issues` lists what failed. */
+export const VALIDATION_ERROR_BODY = Object.freeze({ code: 'VALIDATION_ERROR', message: 'Request validation failed.' });
+
 const StrictZodValidationPipe = createZodValidationPipe({
   strictSchemaDeclaration: true,
   createValidationException: (error: unknown): ApiException => {
     const issues =
       error instanceof ZodError ? error.issues.map((issue) => ({ code: issue.code, path: issue.path.join('.') })) : [];
 
-    return new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, {
-      code: 'VALIDATION_ERROR',
-      message: 'Request validation failed.',
-      details: { issues },
-    });
+    return new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, { ...VALIDATION_ERROR_BODY, details: { issues } });
   },
 });
 

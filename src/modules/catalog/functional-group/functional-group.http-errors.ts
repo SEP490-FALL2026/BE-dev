@@ -1,6 +1,7 @@
 import { HttpStatus } from '@nestjs/common';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import { toUnavailableApiException } from '../../../infrastructure/http/errors/service-unavailable';
+import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
 import {
   FunctionalGroupNameInvalidError,
   FunctionalGroupNameTakenError,
@@ -29,3 +30,13 @@ export function toFunctionalGroupApiException(error: unknown): unknown {
 
   return toUnavailableApiException(error) ?? error;
 }
+
+const example = (error: Error) => errorExampleOf(toFunctionalGroupApiException(error));
+
+/** The answers above as OpenAPI examples, each produced by the mapper that gives it at runtime (OPENAPI-EXAMPLE.1). */
+export const FUNCTIONAL_GROUP_ERROR_EXAMPLES = {
+  NOT_FOUND: example(new FunctionalGroupNotFoundError()),
+  NAME_TAKEN: example(new FunctionalGroupNameTakenError()),
+  NAME_INVALID: example(new FunctionalGroupNameInvalidError()),
+  UPDATE_EMPTY: example(new FunctionalGroupUpdateEmptyError()),
+} as const;

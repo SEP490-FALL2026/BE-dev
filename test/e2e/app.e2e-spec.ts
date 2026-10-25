@@ -610,10 +610,16 @@ describe('Application foundation (e2e)', () => {
     const operation = document.paths['/api/v1/health/live']?.get;
     const schemas = document.components?.schemas as Record<string, unknown>;
 
+    // The DTO stays the schema; an overlay only shows the declared message (OPENAPI-EXAMPLE.1).
     expect(operation?.responses?.['200']).toMatchObject({
       content: {
         'application/json': {
-          schema: { $ref: '#/components/schemas/HealthResponseDto' },
+          schema: {
+            allOf: [
+              { $ref: '#/components/schemas/HealthResponseDto' },
+              { properties: { message: { example: 'HEALTH.LIVENESS_CHECKED' } } },
+            ],
+          },
         },
       },
     });

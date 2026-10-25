@@ -2,8 +2,10 @@ import { Body, Controller, Get, HttpStatus, Param, Put, Query } from '@nestjs/co
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
+  FORBIDDEN_EXAMPLE,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
+  VALIDATION_EXAMPLE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
 import { RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
@@ -19,20 +21,23 @@ import {
 } from './subscription-allocation.dto';
 import { SubscriptionAllocationService } from './subscription-allocation.service';
 import { SubscriptionIdParamDto } from './subscription.dto';
-import { toSubscriptionApiException } from './subscription.http-errors';
+import { SUBSCRIPTION_ERROR_EXAMPLES, toSubscriptionApiException } from './subscription.http-errors';
 
 const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPONSE] as const;
 const READERS = {
   status: HttpStatus.FORBIDDEN,
   description: 'Only the IT Admin and Finance read the cost allocation of a subscription.',
+  examples: [FORBIDDEN_EXAMPLE],
 } as const;
 const NOT_FOUND = {
   status: HttpStatus.NOT_FOUND,
   description: 'The subscription does not exist (SUBSCRIPTION.NOT_FOUND).',
+  examples: [SUBSCRIPTION_ERROR_EXAMPLES.NOT_FOUND],
 } as const;
 const INVALID_ID = {
   status: HttpStatus.UNPROCESSABLE_ENTITY,
   description: 'The id or the query is invalid (VALIDATION_ERROR).',
+  examples: [VALIDATION_EXAMPLE],
 } as const;
 
 const toWire = (allocation: CostAllocationView) => ({ ...allocation, declaredAt: allocation.declaredAt.toISOString() });
@@ -80,17 +85,31 @@ export class SubscriptionAllocationController {
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
-    { status: HttpStatus.FORBIDDEN, description: 'Only Finance declares a cost allocation.' },
+    {
+      status: HttpStatus.FORBIDDEN,
+      description: 'Only Finance declares a cost allocation.',
+      examples: [FORBIDDEN_EXAMPLE],
+    },
     NOT_FOUND,
     {
       status: HttpStatus.CONFLICT,
       description:
         'The plan is billed per seat or its pricing model is not declared (SUBSCRIPTION.COST_ALLOCATION_NOT_APPLICABLE, details.reason).',
+      examples: [SUBSCRIPTION_ERROR_EXAMPLES.COST_ALLOCATION_NOT_APPLICABLE],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
         'The request is invalid (VALIDATION_ERROR) or a line is refused: COST_ALLOCATION.TOTAL_NOT_100 (details.totalPercent), RATIO_INVALID, LINE_COUNT_INVALID, COST_CENTER_DUPLICATE, COST_CENTER_NOT_FOUND or COST_CENTER_INACTIVE (details.costCenterIds).',
+      examples: [
+        VALIDATION_EXAMPLE,
+        SUBSCRIPTION_ERROR_EXAMPLES.ALLOCATION_TOTAL_NOT_100,
+        SUBSCRIPTION_ERROR_EXAMPLES.ALLOCATION_RATIO_INVALID,
+        SUBSCRIPTION_ERROR_EXAMPLES.ALLOCATION_LINE_COUNT_INVALID,
+        SUBSCRIPTION_ERROR_EXAMPLES.ALLOCATION_COST_CENTER_DUPLICATE,
+        SUBSCRIPTION_ERROR_EXAMPLES.ALLOCATION_COST_CENTER_NOT_FOUND,
+        SUBSCRIPTION_ERROR_EXAMPLES.ALLOCATION_COST_CENTER_INACTIVE,
+      ],
     },
   )
   async declare(

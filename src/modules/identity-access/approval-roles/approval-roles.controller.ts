@@ -2,6 +2,8 @@ import { Body, Controller, Get, HttpStatus, Param, Put } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
+  FORBIDDEN_EXAMPLE,
+  VALIDATION_EXAMPLE,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
@@ -10,12 +12,16 @@ import { RequireRoles } from '../../../infrastructure/security/decorators/access
 import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { ApprovalRoleParamDto, ApprovalRolesResponseDto, SetApprovalRoleBodyDto } from './approval-role.dto';
-import { toApprovalRoleApiException } from './approval-role.http-errors';
+import { APPROVAL_ROLE_ERROR_EXAMPLES, toApprovalRoleApiException } from './approval-role.http-errors';
 import { ApprovalRoleService, ApprovalRoleView } from './approval-role.service';
 
 const COMMON_ERRORS = [
   UNAUTHENTICATED_RESPONSE,
-  { status: HttpStatus.FORBIDDEN, description: 'Only the Super Admin configures the approval roles.' },
+  {
+    status: HttpStatus.FORBIDDEN,
+    description: 'Only the Super Admin configures the approval roles.',
+    examples: [FORBIDDEN_EXAMPLE],
+  },
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
 ] as const;
 
@@ -75,11 +81,19 @@ export class ApprovalRolesController {
     {
       status: HttpStatus.NOT_FOUND,
       description: 'The employee does not exist (ORGANIZATION.EMPLOYEE_NOT_FOUND).',
+      examples: [APPROVAL_ROLE_ERROR_EXAMPLES.EMPLOYEE_NOT_FOUND],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
         'The request is invalid (VALIDATION_ERROR), the person has left or has no account that can sign in (APPROVAL_ROLE.EMPLOYEE_NOT_ACTIVE, APPROVAL_ROLE.NO_USABLE_ACCOUNT), holds the Super Admin role (APPROVAL_ROLE.SUPER_ADMIN_CANNOT_HOLD), or the substitute would be the spending approver (APPROVAL_ROLE.SUBSTITUTE_MUST_DIFFER).',
+      examples: [
+        VALIDATION_EXAMPLE,
+        APPROVAL_ROLE_ERROR_EXAMPLES.EMPLOYEE_NOT_ACTIVE,
+        APPROVAL_ROLE_ERROR_EXAMPLES.NO_USABLE_ACCOUNT,
+        APPROVAL_ROLE_ERROR_EXAMPLES.SUPER_ADMIN_CANNOT_HOLD,
+        APPROVAL_ROLE_ERROR_EXAMPLES.SUBSTITUTE_MUST_DIFFER,
+      ],
     },
   )
   async set(

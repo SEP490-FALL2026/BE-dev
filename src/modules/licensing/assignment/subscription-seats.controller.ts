@@ -2,12 +2,14 @@ import { Controller, Get, HttpStatus, Param } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
+  FORBIDDEN_EXAMPLE,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
+  VALIDATION_EXAMPLE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
 import { RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
-import { toLicensingApiException } from '../mappers/licensing.http-errors';
+import { LICENSING_ERROR_EXAMPLES, toLicensingApiException } from '../mappers/licensing.http-errors';
 import { SeatUsageResponseDto, SubscriptionSeatsParamDto } from './assignment.dto';
 import { AssignmentService } from './assignment.service';
 
@@ -28,9 +30,21 @@ export class SubscriptionSeatsController {
   @ApiErrorResponses(
     UNAUTHENTICATED_RESPONSE,
     GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
-    { status: HttpStatus.FORBIDDEN, description: 'Only an IT Admin reads the seats of a subscription.' },
-    { status: HttpStatus.NOT_FOUND, description: 'The subscription does not exist (SUBSCRIPTION.NOT_FOUND).' },
-    { status: HttpStatus.UNPROCESSABLE_ENTITY, description: 'The id is not a UUID (VALIDATION_ERROR).' },
+    {
+      status: HttpStatus.FORBIDDEN,
+      description: 'Only an IT Admin reads the seats of a subscription.',
+      examples: [FORBIDDEN_EXAMPLE],
+    },
+    {
+      status: HttpStatus.NOT_FOUND,
+      description: 'The subscription does not exist (SUBSCRIPTION.NOT_FOUND).',
+      examples: [LICENSING_ERROR_EXAMPLES.SUBSCRIPTION_NOT_FOUND],
+    },
+    {
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      description: 'The id is not a UUID (VALIDATION_ERROR).',
+      examples: [VALIDATION_EXAMPLE],
+    },
   )
   async seatUsage(@Param() params: SubscriptionSeatsParamDto) {
     try {

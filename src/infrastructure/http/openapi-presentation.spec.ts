@@ -184,3 +184,50 @@ describe('toOpenApi30Presentation: `const` only where it is a schema keyword', (
     expect(twice).toEqual(once);
   });
 });
+
+describe('toOpenApi30Presentation: response examples (OPENAPI-EXAMPLE.1)', () => {
+  const ENVELOPE = { $ref: '#/components/schemas/ErrorEnvelopeDto' };
+  const responses = () => ({
+    '200': {
+      description: 'ok',
+      content: {
+        'application/json': {
+          schema: {
+            allOf: [
+              { $ref: '#/components/schemas/ThingDto' },
+              { properties: { message: { example: 'THING.FETCHED' } } },
+            ],
+          },
+        },
+      },
+    },
+    '404': {
+      description: 'missing',
+      content: {
+        'application/json': {
+          schema: ENVELOPE,
+          examples: {
+            'THING.NOT_FOUND': {
+              summary: 'The thing does not exist.',
+              value: {
+                success: false,
+                error: {
+                  code: 'THING.NOT_FOUND',
+                  message: 'The thing does not exist.',
+                  const: 'x',
+                  requestId: 'req_example',
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  it('keeps the success message overlay and the named error examples exactly as they are', () => {
+    const input = { openapi: '3.0.0', paths: { '/things/{id}': { get: { responses: responses() } } } };
+
+    expect(toOpenApi30Presentation(input).paths['/things/{id}'].get.responses).toEqual(responses());
+  });
+});

@@ -4,6 +4,7 @@ import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
 import {
   ApiErrorResponses,
+  FORBIDDEN_EXAMPLE,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
@@ -27,6 +28,7 @@ class SeatBaselineClosedResponseDto extends createZodDto(
 const IT_ONLY = {
   status: HttpStatus.FORBIDDEN,
   description: 'Only an IT Admin reads or closes the seat baseline.',
+  examples: [FORBIDDEN_EXAMPLE],
 } as const;
 
 /**

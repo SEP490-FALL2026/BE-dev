@@ -2,6 +2,8 @@ import { Body, Controller, Delete, Get, HttpStatus, Param, Post, Query } from '@
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
+  FORBIDDEN_EXAMPLE,
+  VALIDATION_EXAMPLE,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
@@ -24,7 +26,7 @@ import {
   GrantRoleBodyDto,
   ListAppUsersQueryDto,
 } from '../dto/account-management.dto';
-import { toAccountApiException } from '../mappers/account.http-errors';
+import { ACCOUNT_ERROR_EXAMPLES, toAccountApiException } from '../mappers/account.http-errors';
 
 const iso = (value: Date): string => value.toISOString();
 
@@ -60,7 +62,11 @@ function toDetailWire(view: AccountDetailView) {
 
 const COMMON_ERRORS = [
   UNAUTHENTICATED_RESPONSE,
-  { status: HttpStatus.FORBIDDEN, description: 'Only the Super Admin may call this route.' },
+  {
+    status: HttpStatus.FORBIDDEN,
+    description: 'Only the Super Admin may call this route.',
+    examples: [FORBIDDEN_EXAMPLE],
+  },
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
 ] as const;
 
@@ -69,6 +75,7 @@ const STATUS_CHANGE_VALIDATION_ERROR = {
   description:
     'The identifier is not a UUID, or the reason is missing, blank, longer than 1000 characters ' +
     'or sent with other fields (VALIDATION_ERROR). Nothing changes.',
+  examples: [VALIDATION_EXAMPLE],
 } as const;
 
 /** Account administration. Super Admin only; a role other than SUPER_ADMIN gets 403 and nothing changes (AC-3). */
@@ -91,6 +98,7 @@ export class AppUsersController {
   @ApiErrorResponses(...COMMON_ERRORS, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description: 'The query is invalid.',
+    examples: [VALIDATION_EXAMPLE],
   })
   async listCandidates(@Query() query: AccountCandidatesQueryDto) {
     try {
@@ -109,14 +117,31 @@ export class AppUsersController {
   })
   @ApiErrorResponses(
     ...COMMON_ERRORS,
-    { status: HttpStatus.NOT_FOUND, description: 'The employee does not exist.' },
+    {
+      status: HttpStatus.NOT_FOUND,
+      description: 'The employee does not exist.',
+      examples: [ACCOUNT_ERROR_EXAMPLES.EMPLOYEE_NOT_FOUND],
+    },
     {
       status: HttpStatus.CONFLICT,
       description: 'The employee left, already has an account, or the email or Finance seat is taken.',
+      examples: [
+        ACCOUNT_ERROR_EXAMPLES.EMPLOYEE_TERMINATED,
+        ACCOUNT_ERROR_EXAMPLES.ALREADY_EXISTS_FOR_EMPLOYEE,
+        ACCOUNT_ERROR_EXAMPLES.LOGIN_EMAIL_TAKEN,
+        ACCOUNT_ERROR_EXAMPLES.FINANCE_ALREADY_ASSIGNED,
+      ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description: 'The body is invalid or a requested role cannot be granted by hand.',
+      examples: [
+        VALIDATION_EXAMPLE,
+        ACCOUNT_ERROR_EXAMPLES.ROLE_DERIVED,
+        ACCOUNT_ERROR_EXAMPLES.SUPER_ADMIN_TRANSFER_ONLY,
+        ACCOUNT_ERROR_EXAMPLES.LOGIN_EMAIL_REQUIRED,
+        ACCOUNT_ERROR_EXAMPLES.LOGIN_EMAIL_INVALID,
+      ],
     },
   )
   async create(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: CreateAppUserBodyDto) {
@@ -135,6 +160,7 @@ export class AppUsersController {
   @ApiErrorResponses(...COMMON_ERRORS, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description: 'The query is invalid.',
+    examples: [VALIDATION_EXAMPLE],
   })
   async list(@Query() query: ListAppUsersQueryDto) {
     try {
@@ -154,8 +180,16 @@ export class AppUsersController {
   })
   @ApiErrorResponses(
     ...COMMON_ERRORS,
-    { status: HttpStatus.NOT_FOUND, description: 'No account has this identifier.' },
-    { status: HttpStatus.UNPROCESSABLE_ENTITY, description: 'The identifier is not a UUID.' },
+    {
+      status: HttpStatus.NOT_FOUND,
+      description: 'No account has this identifier.',
+      examples: [ACCOUNT_ERROR_EXAMPLES.NOT_FOUND],
+    },
+    {
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      description: 'The identifier is not a UUID.',
+      examples: [VALIDATION_EXAMPLE],
+    },
   )
   async get(@Param() params: AppUserIdParamDto) {
     try {
@@ -174,12 +208,26 @@ export class AppUsersController {
   })
   @ApiErrorResponses(
     ...COMMON_ERRORS,
-    { status: HttpStatus.NOT_FOUND, description: 'No account has this identifier.' },
+    {
+      status: HttpStatus.NOT_FOUND,
+      description: 'No account has this identifier.',
+      examples: [ACCOUNT_ERROR_EXAMPLES.NOT_FOUND],
+    },
     {
       status: HttpStatus.CONFLICT,
       description: 'The account is activated, locked, belongs to a departed employee, or is the caller.',
+      examples: [
+        ACCOUNT_ERROR_EXAMPLES.SELF_CHANGE_FORBIDDEN,
+        ACCOUNT_ERROR_EXAMPLES.ALREADY_ACTIVATED,
+        ACCOUNT_ERROR_EXAMPLES.ACCOUNT_LOCKED,
+        ACCOUNT_ERROR_EXAMPLES.EMPLOYEE_TERMINATED,
+      ],
     },
-    { status: HttpStatus.UNPROCESSABLE_ENTITY, description: 'The identifier is not a UUID (VALIDATION_ERROR).' },
+    {
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      description: 'The identifier is not a UUID (VALIDATION_ERROR).',
+      examples: [VALIDATION_EXAMPLE],
+    },
   )
   async resendInvitation(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: AppUserIdParamDto) {
     try {
@@ -199,8 +247,16 @@ export class AppUsersController {
   })
   @ApiErrorResponses(
     ...COMMON_ERRORS,
-    { status: HttpStatus.NOT_FOUND, description: 'No account has this identifier.' },
-    { status: HttpStatus.CONFLICT, description: 'The caller, or the holder of SUPER_ADMIN, cannot be locked.' },
+    {
+      status: HttpStatus.NOT_FOUND,
+      description: 'No account has this identifier.',
+      examples: [ACCOUNT_ERROR_EXAMPLES.NOT_FOUND],
+    },
+    {
+      status: HttpStatus.CONFLICT,
+      description: 'The caller, or the holder of SUPER_ADMIN, cannot be locked.',
+      examples: [ACCOUNT_ERROR_EXAMPLES.SELF_CHANGE_FORBIDDEN, ACCOUNT_ERROR_EXAMPLES.SUPER_ADMIN_HOLDER_NOT_LOCKABLE],
+    },
     STATUS_CHANGE_VALIDATION_ERROR,
   )
   async lock(
@@ -225,8 +281,16 @@ export class AppUsersController {
   })
   @ApiErrorResponses(
     ...COMMON_ERRORS,
-    { status: HttpStatus.NOT_FOUND, description: 'No account has this identifier.' },
-    { status: HttpStatus.CONFLICT, description: 'The caller cannot change their own account.' },
+    {
+      status: HttpStatus.NOT_FOUND,
+      description: 'No account has this identifier.',
+      examples: [ACCOUNT_ERROR_EXAMPLES.NOT_FOUND],
+    },
+    {
+      status: HttpStatus.CONFLICT,
+      description: 'The caller cannot change their own account.',
+      examples: [ACCOUNT_ERROR_EXAMPLES.SELF_CHANGE_FORBIDDEN],
+    },
     STATUS_CHANGE_VALIDATION_ERROR,
   )
   async unlock(
@@ -252,12 +316,30 @@ export class AppUsersController {
   })
   @ApiErrorResponses(
     ...COMMON_ERRORS,
-    { status: HttpStatus.NOT_FOUND, description: 'No account has this identifier.' },
+    {
+      status: HttpStatus.NOT_FOUND,
+      description: 'No account has this identifier.',
+      examples: [ACCOUNT_ERROR_EXAMPLES.NOT_FOUND],
+    },
     {
       status: HttpStatus.CONFLICT,
       description: 'Already granted, forbidden combination, Finance seat taken, or the caller.',
+      examples: [
+        ACCOUNT_ERROR_EXAMPLES.SELF_CHANGE_FORBIDDEN,
+        ACCOUNT_ERROR_EXAMPLES.ROLE_ALREADY_GRANTED,
+        ACCOUNT_ERROR_EXAMPLES.ROLE_COMBINATION_FORBIDDEN,
+        ACCOUNT_ERROR_EXAMPLES.FINANCE_ALREADY_ASSIGNED,
+      ],
     },
-    { status: HttpStatus.UNPROCESSABLE_ENTITY, description: 'The role is derived or moves only by transfer.' },
+    {
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      description: 'The role is derived or moves only by transfer.',
+      examples: [
+        VALIDATION_EXAMPLE,
+        ACCOUNT_ERROR_EXAMPLES.ROLE_DERIVED,
+        ACCOUNT_ERROR_EXAMPLES.SUPER_ADMIN_TRANSFER_ONLY,
+      ],
+    },
   )
   async grantRole(
     @CurrentPrincipal() actor: AuthenticatedPrincipal,
@@ -281,9 +363,25 @@ export class AppUsersController {
   })
   @ApiErrorResponses(
     ...COMMON_ERRORS,
-    { status: HttpStatus.NOT_FOUND, description: 'No such account, or it does not hold this role.' },
-    { status: HttpStatus.CONFLICT, description: 'The caller cannot change their own account.' },
-    { status: HttpStatus.UNPROCESSABLE_ENTITY, description: 'The role is derived or moves only by transfer.' },
+    {
+      status: HttpStatus.NOT_FOUND,
+      description: 'No such account, or it does not hold this role.',
+      examples: [ACCOUNT_ERROR_EXAMPLES.NOT_FOUND, ACCOUNT_ERROR_EXAMPLES.ROLE_NOT_GRANTED],
+    },
+    {
+      status: HttpStatus.CONFLICT,
+      description: 'The caller cannot change their own account.',
+      examples: [ACCOUNT_ERROR_EXAMPLES.SELF_CHANGE_FORBIDDEN],
+    },
+    {
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      description: 'The role is derived or moves only by transfer.',
+      examples: [
+        VALIDATION_EXAMPLE,
+        ACCOUNT_ERROR_EXAMPLES.ROLE_DERIVED,
+        ACCOUNT_ERROR_EXAMPLES.SUPER_ADMIN_TRANSFER_ONLY,
+      ],
+    },
   )
   async revokeRole(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: AppUserRoleParamDto) {
     try {

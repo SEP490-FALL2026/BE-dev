@@ -1,6 +1,11 @@
 import { CanActivate, ExecutionContext, HttpStatus, Inject, Injectable, Logger, LoggerService } from '@nestjs/common';
 import type { Request } from 'express';
 import { Reflector } from '@nestjs/core';
+import {
+  AUTHENTICATION_REQUIRED_ERROR,
+  INVALID_ACCESS_TOKEN_ERROR,
+  TOKEN_VERIFICATION_UNAVAILABLE_ERROR,
+} from '../../http/errors/access-errors';
 import { ApiException } from '../../http/errors/api.exception';
 import { IS_PUBLIC_METADATA } from '../decorators/public.decorator';
 import { AUTHENTICATED_IDENTITY } from '../models/current-principal';
@@ -46,10 +51,7 @@ export class AuthenticationGuard implements CanActivate {
     const token = extractBearerToken(request.header('authorization'));
 
     if (!token) {
-      throw new ApiException(HttpStatus.UNAUTHORIZED, {
-        code: 'AUTHENTICATION_REQUIRED',
-        message: 'A Bearer access token is required.',
-      });
+      throw new ApiException(HttpStatus.UNAUTHORIZED, AUTHENTICATION_REQUIRED_ERROR);
     }
 
     try {
@@ -65,20 +67,14 @@ export class AuthenticationGuard implements CanActivate {
         // this method and turns the 503 below into a 500 with nothing logged at all.
         this.logger.error('Access token verification is unavailable', describeForOperator(error.reason));
 
-        throw new ApiException(HttpStatus.SERVICE_UNAVAILABLE, {
-          code: 'TOKEN_VERIFICATION_UNAVAILABLE',
-          message: 'Authentication is temporarily unavailable. Retry shortly.',
-        });
+        throw new ApiException(HttpStatus.SERVICE_UNAVAILABLE, TOKEN_VERIFICATION_UNAVAILABLE_ERROR);
       }
 
       if (error instanceof InvalidAccessTokenError) {
         // Deliberately not logged: rejected tokens are normal and high-volume, so logging
         // each one would hand an attacker a log-flooding vector for the cost of one request.
         // The wire message is fixed rather than the error's own, which is internal detail.
-        throw new ApiException(HttpStatus.UNAUTHORIZED, {
-          code: 'INVALID_ACCESS_TOKEN',
-          message: 'The access token is invalid.',
-        });
+        throw new ApiException(HttpStatus.UNAUTHORIZED, INVALID_ACCESS_TOKEN_ERROR);
       }
 
       // Anything else is a defect in the verifier, not a bad token. Let it surface as a 500

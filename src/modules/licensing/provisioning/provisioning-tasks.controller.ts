@@ -2,8 +2,10 @@ import { Body, Controller, Get, HttpStatus, Param, Post, Query } from '@nestjs/c
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
+  FORBIDDEN_EXAMPLE,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
+  VALIDATION_EXAMPLE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
 import { RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
@@ -21,7 +23,7 @@ import {
   TaskPageResponseDto,
   TaskResponseDto,
 } from './provisioning.dto';
-import { toProvisioningApiException } from './provisioning.http-errors';
+import { PROVISIONING_ERROR_EXAMPLES, toProvisioningApiException } from './provisioning.http-errors';
 import { ProvisioningDecisionService } from './provisioning-decision.service';
 import { ProvisioningService } from './provisioning.service';
 import type { TaskSummaryView, TaskView } from './provisioning-task-view.service';
@@ -30,11 +32,27 @@ const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPO
 const IT_ONLY = {
   status: HttpStatus.FORBIDDEN,
   description: 'Only an IT Admin works the queue of provisioning tasks.',
+  examples: [FORBIDDEN_EXAMPLE],
+} as const;
+/** The task routes: the role guard; ANOTHER_IT_ADMIN_NEEDED needs a task, which cannot exist yet (NO_TASK_YET). */
+const TASK_WORKER_FORBIDDEN = {
+  status: HttpStatus.FORBIDDEN,
+  description: 'Not an IT Admin, or PROVISIONING.ANOTHER_IT_ADMIN_NEEDED.',
+  examples: [FORBIDDEN_EXAMPLE],
 } as const;
 const NOT_FOUND = {
   status: HttpStatus.NOT_FOUND,
   description: 'The task does not exist (PROVISIONING_TASK.NOT_FOUND).',
+  examples: [PROVISIONING_ERROR_EXAMPLES.TASK_NOT_FOUND],
 } as const;
+
+/**
+ * Why the task routes show no example of a refusal that needs an existing task (OPENAPI-EXAMPLE.1): only a grant creates a
+ * task, and the request gate bound until G5 (RefusingGrantRequestGate) refuses every grant. G5 adds these examples when it
+ * binds the real gate.
+ */
+const NO_TASK_YET =
+  'Unreachable until G5 binds the request gate: no task can be created while RefusingGrantRequestGate refuses every grant.';
 
 const toSummaryWire = (view: TaskSummaryView) => ({
   ...view,
@@ -92,16 +110,23 @@ export class ProvisioningTasksController {
       status: HttpStatus.NOT_FOUND,
       description:
         'The request, the subscription, the plan or the beneficiary does not exist (REQUEST.NOT_FOUND, SUBSCRIPTION.NOT_FOUND, PLAN.NOT_FOUND, EMPLOYEE.NOT_FOUND).',
+      // Only REQUEST.NOT_FOUND today: the request gate bound until G5 (RefusingGrantRequestGate) refuses every
+      // request, so the checks after it cannot answer yet. G5 adds their examples when it binds the real gate.
+      examples: [PROVISIONING_ERROR_EXAMPLES.REQUEST_NOT_FOUND],
     },
     {
       status: HttpStatus.CONFLICT,
       description:
         'PROVISIONING.REQUEST_NOT_APPROVED, REQUEST_ENDED, TYPE_NOT_SUPPORTED (K3, K4), BENEFICIARY_DEPARTED (details.nextStep CANCEL_REQUEST), BENEFICIARY_NOT_STARTED (details.startsOn: the person joins later), SEAT_TARGET.APPLICATION_RETIRED, or LICENSE_ASSIGNMENT.SEAT_CAPACITY.',
+      noExampleBecause:
+        'Unreachable until G5 binds the request gate: RefusingGrantRequestGate answers REQUEST.NOT_FOUND to every request.',
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
         'The request is invalid (VALIDATION_ERROR) or refused: PROVISIONING.PERSONAL_ACCOUNT, SUBSCRIPTION_REQUIRED, SUBSCRIPTION_NOT_ALLOWED, SUBSCRIPTION_PLAN_MISMATCH, SUBSCRIPTION_QUANTITY_UNKNOWN, SEAT_TARGET.SUBSCRIPTION_DRAFT (details.missing lists what the subscription lacks), LICENSE_ASSIGNMENT.OVERLAP, IDENTIFIER_IN_USE or EXPECTED_END_REQUIRED.',
+      // Only the validation pipe today; the refusals after the request gate answer once G5 binds it.
+      examples: [VALIDATION_EXAMPLE],
     },
   )
   async grant(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: GrantBodyDto) {
@@ -125,6 +150,7 @@ export class ProvisioningTasksController {
   @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description: 'The query is invalid (VALIDATION_ERROR).',
+    examples: [VALIDATION_EXAMPLE],
   })
   async list(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Query() query: ListTasksQueryDto) {
     try {
@@ -146,6 +172,7 @@ export class ProvisioningTasksController {
   @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, NOT_FOUND, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description: 'The id is invalid (VALIDATION_ERROR).',
+    examples: [VALIDATION_EXAMPLE],
   })
   async get(@Param() params: TaskIdParamDto) {
     try {
@@ -165,14 +192,19 @@ export class ProvisioningTasksController {
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
-    { status: HttpStatus.FORBIDDEN, description: 'Not an IT Admin, or PROVISIONING.ANOTHER_IT_ADMIN_NEEDED.' },
+    TASK_WORKER_FORBIDDEN,
     NOT_FOUND,
     {
       status: HttpStatus.CONFLICT,
       description:
         'PROVISIONING_TASK.NOT_MANUAL, NOT_CLAIMABLE (done or failed) or PROVISIONING.BENEFICIARY_DEPARTED (close the request as cancelled).',
+      noExampleBecause: NO_TASK_YET,
     },
-    { status: HttpStatus.UNPROCESSABLE_ENTITY, description: 'The id is invalid (VALIDATION_ERROR).' },
+    {
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      description: 'The id is invalid (VALIDATION_ERROR).',
+      examples: [VALIDATION_EXAMPLE],
+    },
   )
   async claim(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: TaskIdParamDto) {
     try {
@@ -192,13 +224,18 @@ export class ProvisioningTasksController {
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
-    { status: HttpStatus.FORBIDDEN, description: 'Not an IT Admin, or PROVISIONING.ANOTHER_IT_ADMIN_NEEDED.' },
+    TASK_WORKER_FORBIDDEN,
     NOT_FOUND,
-    { status: HttpStatus.CONFLICT, description: 'PROVISIONING_TASK.NOT_MANUAL or NOT_IN_PROGRESS.' },
+    {
+      status: HttpStatus.CONFLICT,
+      description: 'PROVISIONING_TASK.NOT_MANUAL or NOT_IN_PROGRESS.',
+      noExampleBecause: NO_TASK_YET,
+    },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
         'The request is invalid (VALIDATION_ERROR) or has no evidence (PROVISIONING_TASK.EVIDENCE_REQUIRED): the task is unchanged.',
+      examples: [VALIDATION_EXAMPLE, PROVISIONING_ERROR_EXAMPLES.EVIDENCE_REQUIRED],
     },
   )
   async complete(
@@ -223,13 +260,18 @@ export class ProvisioningTasksController {
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
-    { status: HttpStatus.FORBIDDEN, description: 'Not an IT Admin, or PROVISIONING.ANOTHER_IT_ADMIN_NEEDED.' },
+    TASK_WORKER_FORBIDDEN,
     NOT_FOUND,
-    { status: HttpStatus.CONFLICT, description: 'PROVISIONING_TASK.NOT_MANUAL or NOT_IN_PROGRESS.' },
+    {
+      status: HttpStatus.CONFLICT,
+      description: 'PROVISIONING_TASK.NOT_MANUAL or NOT_IN_PROGRESS.',
+      noExampleBecause: NO_TASK_YET,
+    },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
         'The request is invalid (VALIDATION_ERROR) or has no reason (PROVISIONING_TASK.REASON_REQUIRED): the task is unchanged.',
+      examples: [VALIDATION_EXAMPLE, PROVISIONING_ERROR_EXAMPLES.REASON_REQUIRED],
     },
   )
   async reportFailure(
@@ -254,10 +296,18 @@ export class ProvisioningTasksController {
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
-    { status: HttpStatus.FORBIDDEN, description: 'Not an IT Admin, or PROVISIONING.ANOTHER_IT_ADMIN_NEEDED.' },
+    TASK_WORKER_FORBIDDEN,
     NOT_FOUND,
-    { status: HttpStatus.CONFLICT, description: 'The task is not failed (PROVISIONING_TASK.NOT_FAILED).' },
-    { status: HttpStatus.UNPROCESSABLE_ENTITY, description: 'The id is invalid (VALIDATION_ERROR).' },
+    {
+      status: HttpStatus.CONFLICT,
+      description: 'The task is not failed (PROVISIONING_TASK.NOT_FAILED).',
+      noExampleBecause: NO_TASK_YET,
+    },
+    {
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      description: 'The id is invalid (VALIDATION_ERROR).',
+      examples: [VALIDATION_EXAMPLE],
+    },
   )
   async retry(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: TaskIdParamDto) {
     try {
@@ -277,16 +327,18 @@ export class ProvisioningTasksController {
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
-    { status: HttpStatus.FORBIDDEN, description: 'Not an IT Admin, or PROVISIONING.ANOTHER_IT_ADMIN_NEEDED.' },
+    TASK_WORKER_FORBIDDEN,
     NOT_FOUND,
     {
       status: HttpStatus.CONFLICT,
       description: 'The task is not failed (NOT_FAILED) or is by hand already (PROVISIONING_TASK.ALREADY_MANUAL).',
+      noExampleBecause: NO_TASK_YET,
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
         'The request is invalid (VALIDATION_ERROR) or has no evidence (PROVISIONING_TASK.EVIDENCE_REQUIRED): the task is unchanged.',
+      examples: [VALIDATION_EXAMPLE, PROVISIONING_ERROR_EXAMPLES.EVIDENCE_REQUIRED],
     },
   )
   async handOff(
@@ -311,16 +363,18 @@ export class ProvisioningTasksController {
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
-    { status: HttpStatus.FORBIDDEN, description: 'Not an IT Admin, or PROVISIONING.ANOTHER_IT_ADMIN_NEEDED.' },
+    TASK_WORKER_FORBIDDEN,
     NOT_FOUND,
     {
       status: HttpStatus.CONFLICT,
       description: 'The task is not failed (PROVISIONING_TASK.NOT_FAILED), or its assignment is no longer open.',
+      noExampleBecause: NO_TASK_YET,
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
         'The request is invalid (VALIDATION_ERROR) or has no reason (PROVISIONING_TASK.REASON_REQUIRED): nothing changes.',
+      examples: [VALIDATION_EXAMPLE, PROVISIONING_ERROR_EXAMPLES.REASON_REQUIRED],
     },
   )
   async closeFailed(

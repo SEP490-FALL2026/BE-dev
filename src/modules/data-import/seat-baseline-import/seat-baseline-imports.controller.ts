@@ -14,8 +14,11 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBody, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
+  fallbackExample,
+  FORBIDDEN_EXAMPLE,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
+  VALIDATION_EXAMPLE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
 import { RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
@@ -31,7 +34,7 @@ import {
   UploadSeatImportBodyDto,
 } from './seat-baseline-import.dto';
 import { SeatImportFileInvalidError } from './seat-baseline-import.errors';
-import { toSeatImportApiException } from './seat-baseline-import.http-errors';
+import { SEAT_IMPORT_ERROR_EXAMPLES, toSeatImportApiException } from './seat-baseline-import.http-errors';
 import { SeatBaselineImportService } from './seat-baseline-import.service';
 import type { SeatImportView } from './seat-baseline-import.types';
 
@@ -47,10 +50,12 @@ const UPLOAD_LIMIT_ERRORS = [
       `The form breaks a limit of the upload before it is read — more than ${UPLOAD_LIMITS.files} file, more than ` +
       `${UPLOAD_LIMITS.fields} text fields, more than ${UPLOAD_LIMITS.parts} parts, a text field over ` +
       `${UPLOAD_LIMITS.fieldSize} bytes — or it is not a readable multipart form (HTTP_BAD_REQUEST).`,
+    examples: [fallbackExample(HttpStatus.BAD_REQUEST)],
   },
   {
     status: HttpStatus.PAYLOAD_TOO_LARGE,
     description: `The file is larger than ${MAX_FILE_BYTES / (1024 * 1024)} MiB (HTTP_PAYLOAD_TOO_LARGE).`,
+    examples: [fallbackExample(HttpStatus.PAYLOAD_TOO_LARGE)],
   },
 ] as const;
 
@@ -63,16 +68,22 @@ interface UploadedBinary {
 
 const COMMON_ERRORS = [
   UNAUTHENTICATED_RESPONSE,
-  { status: HttpStatus.FORBIDDEN, description: 'Only an IT Admin imports the seat baseline.' },
+  {
+    status: HttpStatus.FORBIDDEN,
+    description: 'Only an IT Admin imports the seat baseline.',
+    examples: [FORBIDDEN_EXAMPLE],
+  },
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
 ] as const;
 const NOT_FOUND = {
   status: HttpStatus.NOT_FOUND,
   description: 'The import does not exist (SEAT_BASELINE_IMPORT.NOT_FOUND).',
+  examples: [SEAT_IMPORT_ERROR_EXAMPLES.NOT_FOUND],
 } as const;
 const INVALID_ID = {
   status: HttpStatus.UNPROCESSABLE_ENTITY,
   description: 'The identifier is not a UUID (VALIDATION_ERROR).',
+  examples: [VALIDATION_EXAMPLE],
 } as const;
 
 function toWire(view: SeatImportView) {
@@ -130,16 +141,34 @@ export class SeatBaselineImportsController {
     {
       status: HttpStatus.NOT_FOUND,
       description: 'The subscription or the plan does not exist (SUBSCRIPTION.NOT_FOUND, PLAN.NOT_FOUND).',
+      examples: [SEAT_IMPORT_ERROR_EXAMPLES.SUBSCRIPTION_NOT_FOUND, SEAT_IMPORT_ERROR_EXAMPLES.PLAN_NOT_FOUND],
     },
     {
       status: HttpStatus.CONFLICT,
       description:
         'The baseline is closed (SEAT_BASELINE.CLOSED), the subscription has no quantity (SEAT_BASELINE.QUANTITY_UNKNOWN) or the application is retired (SEAT_TARGET.APPLICATION_RETIRED).',
+      examples: [
+        SEAT_IMPORT_ERROR_EXAMPLES.BASELINE_CLOSED,
+        SEAT_IMPORT_ERROR_EXAMPLES.QUANTITY_UNKNOWN,
+        SEAT_IMPORT_ERROR_EXAMPLES.APPLICATION_RETIRED,
+      ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
         'The request is invalid (VALIDATION_ERROR), the target is not one subscription or one internal plan (SEAT_BASELINE.TARGET_INVALID), its plan takes no baseline yet (SEAT_BASELINE.PLAN_NOT_SUPPORTED), the subscription is still a draft (SEAT_TARGET.SUBSCRIPTION_DRAFT, details.missing lists what it lacks), or the file cannot be used as a whole (SEAT_BASELINE_IMPORT.FILE_*).',
+      examples: [
+        VALIDATION_EXAMPLE,
+        SEAT_IMPORT_ERROR_EXAMPLES.TARGET_INVALID,
+        SEAT_IMPORT_ERROR_EXAMPLES.PLAN_NOT_SUPPORTED,
+        SEAT_IMPORT_ERROR_EXAMPLES.SUBSCRIPTION_DRAFT,
+        SEAT_IMPORT_ERROR_EXAMPLES.FILE_REQUIRED,
+        SEAT_IMPORT_ERROR_EXAMPLES.FILE_EMPTY,
+        SEAT_IMPORT_ERROR_EXAMPLES.FILE_NOT_TEXT,
+        SEAT_IMPORT_ERROR_EXAMPLES.FILE_TOO_MANY_ROWS,
+        SEAT_IMPORT_ERROR_EXAMPLES.FILE_UNREADABLE,
+        SEAT_IMPORT_ERROR_EXAMPLES.FILE_MISSING_COLUMNS,
+      ],
     },
   )
   async upload(
@@ -214,11 +243,26 @@ export class SeatBaselineImportsController {
       status: HttpStatus.CONFLICT,
       description:
         'The baseline is closed (SEAT_BASELINE.CLOSED), the application was retired since the preview (SEAT_TARGET.APPLICATION_RETIRED), the preview is outdated or stale (SEAT_BASELINE_IMPORT.PREVIEW_OUTDATED, PREVIEW_STALE), or the import was cancelled, expired or already written under another key (CANCELLED, EXPIRED, ALREADY_CONFIRMED).',
+      examples: [
+        SEAT_IMPORT_ERROR_EXAMPLES.BASELINE_CLOSED,
+        SEAT_IMPORT_ERROR_EXAMPLES.APPLICATION_RETIRED,
+        SEAT_IMPORT_ERROR_EXAMPLES.PREVIEW_OUTDATED,
+        SEAT_IMPORT_ERROR_EXAMPLES.PREVIEW_STALE,
+        SEAT_IMPORT_ERROR_EXAMPLES.CANCELLED,
+        SEAT_IMPORT_ERROR_EXAMPLES.EXPIRED,
+        SEAT_IMPORT_ERROR_EXAMPLES.ALREADY_CONFIRMED,
+      ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
         'The request is invalid (VALIDATION_ERROR) or the subscription is a draft (SEAT_TARGET.SUBSCRIPTION_DRAFT).',
+      examples: [
+        VALIDATION_EXAMPLE,
+        SEAT_IMPORT_ERROR_EXAMPLES.SUBSCRIPTION_DRAFT,
+        SEAT_IMPORT_ERROR_EXAMPLES.PLAN_NOT_SUPPORTED,
+        SEAT_IMPORT_ERROR_EXAMPLES.TARGET_INVALID,
+      ],
     },
   )
   async confirm(
@@ -246,6 +290,7 @@ export class SeatBaselineImportsController {
   @ApiErrorResponses(...COMMON_ERRORS, NOT_FOUND, INVALID_ID, {
     status: HttpStatus.CONFLICT,
     description: 'The import was already written (SEAT_BASELINE_IMPORT.NOT_PREVIEW).',
+    examples: [SEAT_IMPORT_ERROR_EXAMPLES.NOT_PREVIEW],
   })
   async cancel(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: SeatImportIdParamDto) {
     try {

@@ -1,6 +1,7 @@
 import { HttpStatus } from '@nestjs/common';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import { toUnavailableApiException } from '../../../infrastructure/http/errors/service-unavailable';
+import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
 import {
   PlanNameInvalidError,
   PlanNoteInvalidError,
@@ -85,3 +86,31 @@ export function toPlanApiException(error: unknown): unknown {
 
   return toUnavailableApiException(error) ?? error;
 }
+
+const example = (error: Error) => errorExampleOf(toPlanApiException(error));
+
+/** The answers above as OpenAPI examples, each produced by the mapper that gives it at runtime (OPENAPI-EXAMPLE.1). */
+export const PLAN_ERROR_EXAMPLES = {
+  NOT_FOUND: example(new PlanNotFoundError()),
+  NAME_TAKEN: example(new PlanNameTakenError()),
+  NAME_INVALID: example(new PlanNameInvalidError()),
+  NOTE_INVALID: example(new PlanNoteInvalidError()),
+  APPLICATION_NOT_FOUND: example(new PlanApplicationNotFoundError()),
+  APPLICATION_RETIRED: example(new PlanApplicationRetiredError()),
+  PROVISIONING_TYPE_NOT_SUPPORTED: example(new PlanProvisioningTypeNotSupportedError()),
+  PROVISIONING_TYPE_MISMATCH: example(new PlanProvisioningTypeMismatchError()),
+  PRICING_MODEL_REQUIRED: example(new PlanPricingModelRequiredError()),
+  PRICING_MODEL_NOT_APPLICABLE: example(new PlanPricingModelNotApplicableError()),
+  CONTROL_LEVEL_REQUIRED: example(new PlanControlLevelRequiredError()),
+  DATA_LOSS_NOTE_REQUIRED: example(new PlanDataLossNoteRequiredError()),
+  UPDATE_EMPTY: example(new PlanUpdateEmptyError()),
+  WORKSPACE_PROFILE_NOT_APPLICABLE: example(new PlanWorkspaceProfileNotApplicableError()),
+  WORKSPACE_PERSON_INVALID: example(new PlanWorkspacePersonInvalidError('<employee-id>')),
+  PRIMARY_OWNER_NOT_LISTED: example(new PlanPrimaryOwnerNotListedError()),
+  WORKSPACE_MEMBER_DUPLICATE: example(new PlanWorkspaceMemberDuplicateError('<employee-id>')),
+  WORKSPACE_LIMIT_EXCEEDED: example(new PlanWorkspaceLimitExceededError('OWNER')),
+  WORKSPACE_TEXT_INVALID: example(new PlanWorkspaceTextInvalidError()),
+  TERMS_BLOCK_TYPE_CHANGE: example(new PlanTermsBlockTypeChangeError()),
+  WORKSPACE_PROFILE_BLOCKS_TYPE_CHANGE: example(new PlanWorkspaceProfileBlocksTypeChangeError()),
+  IN_USE_BLOCKS_CHANGE: example(new PlanInUseBlocksChangeError('LICENSE_KEYS')),
+} as const;

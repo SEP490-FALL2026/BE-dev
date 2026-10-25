@@ -2,8 +2,10 @@ import { Body, Controller, Get, HttpStatus, Param, Patch, Post, Query } from '@n
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
+  FORBIDDEN_EXAMPLE,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
+  VALIDATION_EXAMPLE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
 import { RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
@@ -18,7 +20,7 @@ import {
   ProjectResponseDto,
   UpdateProjectBodyDto,
 } from './project.dto';
-import { toOrganizationApiException } from '../mappers/organization.http-errors';
+import { ORGANIZATION_ERROR_EXAMPLES, toOrganizationApiException } from '../mappers/organization.http-errors';
 import { ProjectService } from './project.service';
 
 const AUTH_ERRORS = [
@@ -26,12 +28,28 @@ const AUTH_ERRORS = [
   {
     status: HttpStatus.FORBIDDEN,
     description: 'Only an IT Admin keeps the projects described on department profiles.',
+    examples: [FORBIDDEN_EXAMPLE],
   },
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
 ] as const;
+const VALIDATION_ERROR_DESCRIPTION =
+  'The request is invalid (VALIDATION_ERROR) or the project is not valid (PROJECT.INVALID).';
+/** The reads: only the request itself can be invalid. */
 const VALIDATION_ERROR = {
   status: HttpStatus.UNPROCESSABLE_ENTITY,
-  description: 'The request is invalid (VALIDATION_ERROR) or the project is not valid (PROJECT.INVALID).',
+  description: VALIDATION_ERROR_DESCRIPTION,
+  examples: [VALIDATION_EXAMPLE],
+} as const;
+/** The writes: the request, or the project it describes. */
+const PROJECT_INVALID = {
+  status: HttpStatus.UNPROCESSABLE_ENTITY,
+  description: VALIDATION_ERROR_DESCRIPTION,
+  examples: [
+    VALIDATION_EXAMPLE,
+    ORGANIZATION_ERROR_EXAMPLES.PROJECT_INVALID_DEPARTMENT_NOT_FOUND,
+    ORGANIZATION_ERROR_EXAMPLES.PROJECT_INVALID_DESCRIPTION,
+    ORGANIZATION_ERROR_EXAMPLES.PROJECT_INVALID_NAME,
+  ],
 } as const;
 
 /**
@@ -72,6 +90,7 @@ export class ProjectsController {
   @ApiErrorResponses(...AUTH_ERRORS, VALIDATION_ERROR, {
     status: HttpStatus.NOT_FOUND,
     description: 'The project does not exist (PROJECT.NOT_FOUND).',
+    examples: [ORGANIZATION_ERROR_EXAMPLES.PROJECT_NOT_FOUND],
   })
   async get(@Param() params: ProjectIdParamDto) {
     try {
@@ -89,7 +108,7 @@ export class ProjectsController {
     message: 'PROJECT.CREATED',
     description: 'The project is described and appears on the profile of each department that takes part.',
   })
-  @ApiErrorResponses(...AUTH_ERRORS, VALIDATION_ERROR)
+  @ApiErrorResponses(...AUTH_ERRORS, PROJECT_INVALID)
   async create(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: CreateProjectBodyDto) {
     try {
       return toProjectWire(await this.projects.create(actor, body));
@@ -105,9 +124,10 @@ export class ProjectsController {
     message: 'PROJECT.UPDATED',
     description: 'The project has its new description, status or departments.',
   })
-  @ApiErrorResponses(...AUTH_ERRORS, VALIDATION_ERROR, {
+  @ApiErrorResponses(...AUTH_ERRORS, PROJECT_INVALID, {
     status: HttpStatus.NOT_FOUND,
     description: 'The project does not exist (PROJECT.NOT_FOUND).',
+    examples: [ORGANIZATION_ERROR_EXAMPLES.PROJECT_NOT_FOUND],
   })
   async update(
     @CurrentPrincipal() actor: AuthenticatedPrincipal,

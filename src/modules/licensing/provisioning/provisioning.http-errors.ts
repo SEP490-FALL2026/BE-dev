@@ -1,5 +1,6 @@
 import { HttpStatus } from '@nestjs/common';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
+import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
 import { EmployeeNotFoundError } from '../../organization/organization.errors';
 import {
   GrantRequestRefusedError,
@@ -92,3 +93,13 @@ export function toProvisioningApiException(error: unknown): unknown {
 
   return toLicensingApiException(error);
 }
+
+const example = (error: Error) => errorExampleOf(toProvisioningApiException(error));
+
+/** The answers above as OpenAPI examples, each produced by the mapper that gives it at runtime (OPENAPI-EXAMPLE.1). */
+export const PROVISIONING_ERROR_EXAMPLES = {
+  REQUEST_NOT_FOUND: example(new GrantRequestRefusedError('NOT_FOUND')),
+  TASK_NOT_FOUND: example(new ProvisioningTaskNotFoundError()),
+  EVIDENCE_REQUIRED: example(new ProvisioningEvidenceRequiredError()),
+  REASON_REQUIRED: example(new ProvisioningReasonRequiredError()),
+} as const;

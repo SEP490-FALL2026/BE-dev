@@ -4,14 +4,8 @@ import { ZodSerializationException } from 'nestjs-zod';
 import { RequestContextService } from '../../observability/request-context.service';
 import { resolveRequestId } from '../../observability/request-id';
 import { ERROR_CODE_PATTERN, type ErrorEnvelope } from '../dto/error-envelope.dto';
+import { fallbackErrorFor } from './fallback-error';
 import { fromRequestParserError } from './request-parser-errors';
-
-// Widened to `number` on purpose: `HttpException.getStatus()` returns a plain number, and
-// comparing it against enum members directly trips @typescript-eslint/no-unsafe-enum-comparison.
-const SERVER_ERROR: number = HttpStatus.INTERNAL_SERVER_ERROR;
-const NOT_FOUND: number = HttpStatus.NOT_FOUND;
-const UNAUTHORIZED: number = HttpStatus.UNAUTHORIZED;
-const FORBIDDEN: number = HttpStatus.FORBIDDEN;
 
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
@@ -46,11 +40,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
       this.logUnexpected(exception, requestId);
       return {
         success: false,
-        error: {
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'An unexpected error occurred.',
-          requestId,
-        },
+        error: { ...fallbackErrorFor(HttpStatus.INTERNAL_SERVER_ERROR), requestId },
       };
     }
 
@@ -93,35 +83,12 @@ export class HttpExceptionFilter implements ExceptionFilter {
       }
     }
 
-    return {
-      code: this.codeForStatus(status),
-      message: this.safeMessageForStatus(status),
-    };
+    return fallbackErrorFor(status);
   }
 
   private asDetails(value: unknown): Readonly<Record<string, unknown>> | undefined {
     if (value === null || typeof value !== 'object' || Array.isArray(value)) return undefined;
     return value as Readonly<Record<string, unknown>>;
-  }
-
-  private codeForStatus(status: number): string {
-    // Every server fault answers with one code. The HTTP_-prefixed form is a mechanical
-    // fallback for client errors that carry no deliberate code of their own; a 5xx is
-    // never something the caller can act on differently, so it gets a single stable code.
-    if (status >= SERVER_ERROR) {
-      return 'INTERNAL_SERVER_ERROR';
-    }
-
-    const name = HttpStatus[status];
-    return typeof name === 'string' ? `HTTP_${name}` : 'HTTP_ERROR';
-  }
-
-  private safeMessageForStatus(status: number): string {
-    if (status === NOT_FOUND) return 'Resource was not found.';
-    if (status === UNAUTHORIZED) return 'Authentication is required.';
-    if (status === FORBIDDEN) return 'Access is forbidden.';
-    if (status >= SERVER_ERROR) return 'An unexpected error occurred.';
-    return 'The request could not be processed.';
   }
 
   private logUnexpected(exception: unknown, requestId: string): void {

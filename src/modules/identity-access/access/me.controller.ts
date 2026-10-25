@@ -2,6 +2,7 @@ import { Body, Controller, Get, HttpStatus, Post } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
+  VALIDATION_EXAMPLE,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
@@ -12,7 +13,7 @@ import { CurrentPrincipal } from '../../../infrastructure/security/models/curren
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { PasswordChangeService } from '../auth/password-change.service';
 import { ChangePasswordBodyDto, PasswordChangedResponseDto } from '../dto/auth.dto';
-import { toPasswordApiException } from '../mappers/auth.http-errors';
+import { AUTH_ERROR_EXAMPLES, toPasswordApiException } from '../mappers/auth.http-errors';
 import { MeResponseDto } from './me.dto';
 import { MeService, MeView } from './me.service';
 
@@ -59,12 +60,18 @@ export class MeController {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
         'The body is invalid (VALIDATION_ERROR), the current password is wrong (AUTH.CURRENT_PASSWORD_INVALID) or the new one breaks the policy (AUTH.PASSWORD_POLICY_VIOLATION).',
+      examples: [
+        VALIDATION_EXAMPLE,
+        AUTH_ERROR_EXAMPLES.CURRENT_PASSWORD_INVALID,
+        AUTH_ERROR_EXAMPLES.PASSWORD_POLICY_VIOLATION,
+      ],
     },
     {
       status: HttpStatus.TOO_MANY_REQUESTS,
       description:
         'Too many wrong passwords for this email; see retryAfterSeconds (AUTH.LOGIN_TEMPORARILY_BLOCKED). ' +
         'Too many requests to this route from this address also answer 429 (HTTP_TOO_MANY_REQUESTS).',
+      examples: [AUTH_ERROR_EXAMPLES.LOGIN_TEMPORARILY_BLOCKED],
     },
     GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   )

@@ -2,8 +2,10 @@ import { Body, Controller, Get, HttpStatus, Param, Patch, Post, Query } from '@n
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
+  FORBIDDEN_EXAMPLE,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
+  VALIDATION_EXAMPLE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
 import { RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
@@ -21,21 +23,53 @@ import {
   ListCostCentersQueryDto,
   RenameCostCenterBodyDto,
 } from './cost-center.dto';
-import { toOrganizationApiException } from '../mappers/organization.http-errors';
+import { ORGANIZATION_ERROR_EXAMPLES, toOrganizationApiException } from '../mappers/organization.http-errors';
 
 const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPONSE] as const;
 
 const FINANCE_ONLY = {
   status: HttpStatus.FORBIDDEN,
   description: 'Only Finance maintains the Cost Center catalogue.',
+  examples: [FORBIDDEN_EXAMPLE],
 } as const;
 
-const NOT_FOUND = { status: HttpStatus.NOT_FOUND, description: 'The cost center does not exist.' } as const;
+const NOT_FOUND = {
+  status: HttpStatus.NOT_FOUND,
+  description: 'The cost center does not exist.',
+  examples: [ORGANIZATION_ERROR_EXAMPLES.COST_CENTER_NOT_FOUND],
+} as const;
 
+const VALIDATION_ERROR_DESCRIPTION =
+  'The request is invalid (VALIDATION_ERROR), the kind is not UNIT (COST_CENTER.KIND_NOT_SUPPORTED), or the name is empty, too long (COST_CENTER.NAME_INVALID) or reserved (COST_CENTER.NAME_RESERVED).';
+
+/** A new cost center: the request, its kind or its name. */
+const CREATE_INVALID = {
+  status: HttpStatus.UNPROCESSABLE_ENTITY,
+  description: VALIDATION_ERROR_DESCRIPTION,
+  examples: [
+    VALIDATION_EXAMPLE,
+    ORGANIZATION_ERROR_EXAMPLES.COST_CENTER_KIND_NOT_SUPPORTED,
+    ORGANIZATION_ERROR_EXAMPLES.COST_CENTER_NAME_INVALID,
+    ORGANIZATION_ERROR_EXAMPLES.COST_CENTER_NAME_RESERVED,
+  ],
+} as const;
+
+/** A new name: the request or the name. */
+const RENAME_INVALID = {
+  status: HttpStatus.UNPROCESSABLE_ENTITY,
+  description: VALIDATION_ERROR_DESCRIPTION,
+  examples: [
+    VALIDATION_EXAMPLE,
+    ORGANIZATION_ERROR_EXAMPLES.COST_CENTER_NAME_INVALID,
+    ORGANIZATION_ERROR_EXAMPLES.COST_CENTER_NAME_RESERVED,
+  ],
+} as const;
+
+/** The routes that take no kind or name: only the request itself can be invalid. */
 const VALIDATION_ERROR = {
   status: HttpStatus.UNPROCESSABLE_ENTITY,
-  description:
-    'The request is invalid (VALIDATION_ERROR), the kind is not UNIT (COST_CENTER.KIND_NOT_SUPPORTED), or the name is empty, too long (COST_CENTER.NAME_INVALID) or reserved (COST_CENTER.NAME_RESERVED).',
+  description: VALIDATION_ERROR_DESCRIPTION,
+  examples: [VALIDATION_EXAMPLE],
 } as const;
 
 function toWire(record: CostCenterRecord) {
@@ -71,8 +105,16 @@ export class CostCentersController {
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
-    { status: HttpStatus.FORBIDDEN, description: 'Only Finance and the IT Admin read the Cost Center catalogue.' },
-    { status: HttpStatus.UNPROCESSABLE_ENTITY, description: 'The query is invalid (VALIDATION_ERROR).' },
+    {
+      status: HttpStatus.FORBIDDEN,
+      description: 'Only Finance and the IT Admin read the Cost Center catalogue.',
+      examples: [FORBIDDEN_EXAMPLE],
+    },
+    {
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      description: 'The query is invalid (VALIDATION_ERROR).',
+      examples: [VALIDATION_EXAMPLE],
+    },
   )
   async list(@Query() query: ListCostCentersQueryDto) {
     try {
@@ -92,9 +134,10 @@ export class CostCentersController {
     message: 'COST_CENTER.CREATED',
     description: 'The cost center is in the catalogue, in use, with no department yet.',
   })
-  @ApiErrorResponses(...AUTH_ERRORS, FINANCE_ONLY, VALIDATION_ERROR, {
+  @ApiErrorResponses(...AUTH_ERRORS, FINANCE_ONLY, CREATE_INVALID, {
     status: HttpStatus.CONFLICT,
     description: 'The code is already taken (COST_CENTER.CODE_TAKEN).',
+    examples: [ORGANIZATION_ERROR_EXAMPLES.COST_CENTER_CODE_TAKEN],
   })
   async create(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: CreateCostCenterBodyDto) {
     try {
@@ -111,7 +154,7 @@ export class CostCentersController {
     message: 'COST_CENTER.RENAMED',
     description: 'The cost center has its new name; its code, department and history do not change.',
   })
-  @ApiErrorResponses(...AUTH_ERRORS, FINANCE_ONLY, VALIDATION_ERROR, NOT_FOUND)
+  @ApiErrorResponses(...AUTH_ERRORS, FINANCE_ONLY, RENAME_INVALID, NOT_FOUND)
   async rename(
     @CurrentPrincipal() actor: AuthenticatedPrincipal,
     @Param() params: CostCenterIdParamDto,
@@ -135,6 +178,7 @@ export class CostCentersController {
     status: HttpStatus.CONFLICT,
     description:
       'The department charged to it still has people (COST_CENTER.IN_USE; details lists the department and the people).',
+    examples: [ORGANIZATION_ERROR_EXAMPLES.COST_CENTER_IN_USE],
   })
   async deactivate(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: CostCenterIdParamDto) {
     try {

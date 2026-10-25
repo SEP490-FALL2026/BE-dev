@@ -6,6 +6,21 @@ const LOCKOUT = {
   content: { 'application/json': { schema: ERROR_ENVELOPE } },
 };
 
+/** What the filter answers for a throttled request (written out, not asked of the filter). */
+const THROTTLED = {
+  HTTP_TOO_MANY_REQUESTS: {
+    summary: 'The request could not be processed.',
+    value: {
+      success: false,
+      error: {
+        code: 'HTTP_TOO_MANY_REQUESTS',
+        message: 'The request could not be processed.',
+        requestId: 'req_example',
+      },
+    },
+  },
+};
+
 type Operation = { operationId: string; responses: Record<string, unknown> };
 type Document = { openapi: string; paths: Record<string, Record<string, unknown>> };
 
@@ -29,7 +44,7 @@ describe('withGlobalRateLimitResponse', () => {
     const result = withGlobalRateLimitResponse(source());
     const expected = {
       description: GLOBAL_RATE_LIMIT_DESCRIPTION,
-      content: { 'application/json': { schema: ERROR_ENVELOPE } },
+      content: { 'application/json': { schema: ERROR_ENVELOPE, examples: THROTTLED } },
     };
 
     expect(responsesOf(result, '/items', 'get')['429']).toEqual(expected);
@@ -37,10 +52,13 @@ describe('withGlobalRateLimitResponse', () => {
     expect(GLOBAL_RATE_LIMIT_DESCRIPTION).toContain('HTTP_TOO_MANY_REQUESTS');
   });
 
-  it('keeps an operation’s own 429, which must already name the global branch', () => {
-    const result = withGlobalRateLimitResponse(source());
+  it('keeps an operation’s own 429, which must already name the global branch, and adds its example once', () => {
+    const result = withGlobalRateLimitResponse(withGlobalRateLimitResponse(source()));
 
-    expect(responsesOf(result, '/items', 'post')['429']).toEqual(LOCKOUT);
+    expect(responsesOf(result, '/items', 'post')['429']).toEqual({
+      description: LOCKOUT.description,
+      content: { 'application/json': { schema: ERROR_ENVELOPE, examples: THROTTLED } },
+    });
   });
 
   it('leaves everything else alone and does not modify the document it is given', () => {

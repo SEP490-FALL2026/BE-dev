@@ -2,8 +2,10 @@ import { Body, Controller, Get, HttpStatus, Param, Patch, Post, Query } from '@n
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
+  FORBIDDEN_EXAMPLE,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
+  VALIDATION_EXAMPLE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
 import { RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
@@ -17,7 +19,7 @@ import {
   SubscriptionResponseDto,
   UpdateSubscriptionBodyDto,
 } from './subscription.dto';
-import { toSubscriptionApiException } from './subscription.http-errors';
+import { SUBSCRIPTION_ERROR_EXAMPLES, toSubscriptionApiException } from './subscription.http-errors';
 import { SubscriptionService } from './subscription.service';
 import type { SubscriptionView } from './subscription.types';
 
@@ -25,14 +27,17 @@ const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPO
 const IT_ONLY = {
   status: HttpStatus.FORBIDDEN,
   description: 'Only an IT Admin declares or changes subscriptions.',
+  examples: [FORBIDDEN_EXAMPLE],
 } as const;
 const READERS = {
   status: HttpStatus.FORBIDDEN,
   description: 'Only the IT Admin and Finance read subscriptions: prices and contracts are hidden from the rest.',
+  examples: [FORBIDDEN_EXAMPLE],
 } as const;
 const NOT_FOUND = {
   status: HttpStatus.NOT_FOUND,
   description: 'The subscription does not exist (SUBSCRIPTION.NOT_FOUND).',
+  examples: [SUBSCRIPTION_ERROR_EXAMPLES.NOT_FOUND],
 } as const;
 const INVALID_UPDATE_NOTE =
   ' An update that would put the seats bought under the seats taken is refused with SUBSCRIPTION.QUANTITY_BELOW_OCCUPIED (details.occupied, details.requested).';
@@ -40,13 +45,39 @@ const INVALID = {
   status: HttpStatus.UNPROCESSABLE_ENTITY,
   description:
     'The request is invalid (VALIDATION_ERROR) or a rule refuses it: SUBSCRIPTION.PLAN_NOT_FOUND, PLAN_HAS_NO_SUBSCRIPTION, PERPETUAL_NEEDS_LICENSED_APPLICATION, PERPETUAL_HAS_NO_TERM, DATES_INVALID or UPDATE_EMPTY; the price is refused with MONEY_SCALE_EXCEEDED, MONEY_OUT_OF_RANGE or CURRENCY_NOT_SUPPORTED.',
+  examples: [
+    VALIDATION_EXAMPLE,
+    SUBSCRIPTION_ERROR_EXAMPLES.PLAN_NOT_FOUND,
+    SUBSCRIPTION_ERROR_EXAMPLES.PLAN_HAS_NO_SUBSCRIPTION,
+    SUBSCRIPTION_ERROR_EXAMPLES.PERPETUAL_NEEDS_LICENSED_APPLICATION,
+    SUBSCRIPTION_ERROR_EXAMPLES.PERPETUAL_HAS_NO_TERM,
+    SUBSCRIPTION_ERROR_EXAMPLES.DATES_INVALID,
+    SUBSCRIPTION_ERROR_EXAMPLES.MONEY_SCALE_EXCEEDED,
+    SUBSCRIPTION_ERROR_EXAMPLES.MONEY_OUT_OF_RANGE,
+    SUBSCRIPTION_ERROR_EXAMPLES.CURRENCY_NOT_SUPPORTED,
+  ],
 } as const;
-const INVALID_UPDATE = { ...INVALID, description: INVALID.description + INVALID_UPDATE_NOTE } as const;
+const INVALID_UPDATE = {
+  ...INVALID,
+  description: INVALID.description + INVALID_UPDATE_NOTE,
+  examples: [
+    VALIDATION_EXAMPLE,
+    SUBSCRIPTION_ERROR_EXAMPLES.UPDATE_EMPTY,
+    SUBSCRIPTION_ERROR_EXAMPLES.QUANTITY_BELOW_OCCUPIED,
+    SUBSCRIPTION_ERROR_EXAMPLES.PERPETUAL_HAS_NO_TERM,
+    SUBSCRIPTION_ERROR_EXAMPLES.DATES_INVALID,
+    SUBSCRIPTION_ERROR_EXAMPLES.STILL_DRAFT,
+    SUBSCRIPTION_ERROR_EXAMPLES.MONEY_SCALE_EXCEEDED,
+    SUBSCRIPTION_ERROR_EXAMPLES.MONEY_OUT_OF_RANGE,
+    SUBSCRIPTION_ERROR_EXAMPLES.CURRENCY_NOT_SUPPORTED,
+  ],
+} as const;
 /** Only where a unit price is converted (`FinanceService.snapshotMoney`); the database key of `DB-02` normally rules it out. */
 const REPORTING_CURRENCY_CONFLICT = {
   status: HttpStatus.CONFLICT,
   description:
     'A unit price was to be converted, but the reporting currency of the installation is not in the currency table (REPORTING_CURRENCY_NOT_SUPPORTED, details.currency). A fault of the configuration, not of the request: the database normally prevents it, and an operator has to correct the currency table.',
+  examples: [SUBSCRIPTION_ERROR_EXAMPLES.REPORTING_CURRENCY_NOT_SUPPORTED],
 } as const;
 
 const toWire = (view: SubscriptionView) => ({
@@ -77,6 +108,7 @@ export class SubscriptionsController {
   @ApiErrorResponses(...AUTH_ERRORS, READERS, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description: 'The query is invalid (VALIDATION_ERROR).',
+    examples: [VALIDATION_EXAMPLE],
   })
   async list(@Query() query: ListSubscriptionsQueryDto) {
     try {
@@ -118,6 +150,7 @@ export class SubscriptionsController {
   @ApiErrorResponses(...AUTH_ERRORS, READERS, NOT_FOUND, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description: 'The id is not a UUID (VALIDATION_ERROR).',
+    examples: [VALIDATION_EXAMPLE],
   })
   async get(@Param() params: SubscriptionIdParamDto) {
     try {
@@ -160,6 +193,11 @@ export class SubscriptionsController {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description:
       'The id is invalid (VALIDATION_ERROR) or the subscription still lacks data or the rate of its price day (SUBSCRIPTION.STILL_DRAFT, details.missing).',
+    examples: [
+      VALIDATION_EXAMPLE,
+      SUBSCRIPTION_ERROR_EXAMPLES.STILL_DRAFT,
+      SUBSCRIPTION_ERROR_EXAMPLES.MONEY_OUT_OF_RANGE,
+    ],
   })
   async complete(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: SubscriptionIdParamDto) {
     try {

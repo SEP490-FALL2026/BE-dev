@@ -1,3 +1,7 @@
+import { HttpStatus } from '@nestjs/common';
+import { fallbackErrorFor } from './filters/fallback-error';
+import { toNamedErrorExamples, withErrorExamples } from './openapi-error-examples';
+
 /**
  * `ThrottlerGuard` is the first global guard (`SecurityModule`, `APP_GUARD`) and no route opts out, so every operation
  * can answer 429 with the filter's code `HTTP_TOO_MANY_REQUESTS`. This is the one wording for that answer.
@@ -7,11 +11,14 @@ export const GLOBAL_RATE_LIMIT_DESCRIPTION =
 
 const HTTP_METHODS = ['get', 'put', 'post', 'delete', 'options', 'head', 'patch', 'trace'];
 const ERROR_ENVELOPE = { $ref: '#/components/schemas/ErrorEnvelopeDto' };
+/** What the filter answers for a refusal of the throttler, which carries no code of its own. */
+const THROTTLED = [fallbackErrorFor(HttpStatus.TOO_MANY_REQUESTS)];
 
 /**
  * Documents the global rate limit on every operation that declares no 429 of its own. An operation that does declare
  * one (a domain lockout, a stricter route limit) keeps it, and its description must name `HTTP_TOO_MANY_REQUESTS` too —
- * the API inventory test checks that. Independent of decorator order. Returns a new document; the input is unchanged.
+ * the API inventory test checks that; the throttler's example is added after its own, once. Independent of decorator
+ * order. Returns a new document; the input is unchanged.
  */
 export function withGlobalRateLimitResponse<T extends { paths: object }>(document: T): T {
   const result = structuredClone(document);
@@ -20,10 +27,13 @@ export function withGlobalRateLimitResponse<T extends { paths: object }>(documen
       const operation = item[method] as { responses?: Record<string, unknown> } | undefined;
       if (!operation) continue;
       operation.responses ??= {};
-      operation.responses['429'] ??= {
-        description: GLOBAL_RATE_LIMIT_DESCRIPTION,
-        content: { 'application/json': { schema: ERROR_ENVELOPE } },
-      };
+      const own = operation.responses['429'] as Parameters<typeof withErrorExamples>[0] | undefined;
+      operation.responses['429'] = own
+        ? withErrorExamples(own, THROTTLED)
+        : {
+            description: GLOBAL_RATE_LIMIT_DESCRIPTION,
+            content: { 'application/json': { schema: ERROR_ENVELOPE, examples: toNamedErrorExamples(THROTTLED) } },
+          };
     }
   }
 

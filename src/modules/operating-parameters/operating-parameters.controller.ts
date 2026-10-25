@@ -2,8 +2,10 @@ import { Body, Controller, Delete, Get, HttpStatus, Param, Patch, Post, Put, Que
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
+  FORBIDDEN_EXAMPLE,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
+  VALIDATION_EXAMPLE,
 } from '../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../infrastructure/http/decorators/api-success-response.decorator';
 import { RequireRoles } from '../../infrastructure/security/decorators/access.decorators';
@@ -23,17 +25,36 @@ import {
   SetParameterBodyDto,
 } from './dto/operating-parameters.dto';
 import { NonWorkingDatesService } from './non-working-dates.service';
-import { toOperatingParametersApiException } from './operating-parameters.http-errors';
+import {
+  OPERATING_PARAMETERS_ERROR_EXAMPLES,
+  toOperatingParametersApiException,
+} from './operating-parameters.http-errors';
 import { OperatingParametersService, ParameterView } from './operating-parameters.service';
 
 const AUTH_ERRORS = [
   UNAUTHENTICATED_RESPONSE,
-  { status: HttpStatus.FORBIDDEN, description: 'Only the Super Admin configures the operating parameters.' },
+  {
+    status: HttpStatus.FORBIDDEN,
+    description: 'Only the Super Admin configures the operating parameters.',
+    examples: [FORBIDDEN_EXAMPLE],
+  },
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
 ] as const;
+const VALIDATION_ERROR_DESCRIPTION = 'The request is invalid (VALIDATION_ERROR).';
 const VALIDATION_ERROR = {
   status: HttpStatus.UNPROCESSABLE_ENTITY,
-  description: 'The request is invalid (VALIDATION_ERROR).',
+  description: VALIDATION_ERROR_DESCRIPTION,
+  examples: [VALIDATION_EXAMPLE],
+} as const;
+const PARAMETER_NOT_FOUND = {
+  status: HttpStatus.NOT_FOUND,
+  description: 'There is no such parameter (PARAMETER.NOT_FOUND).',
+  examples: [OPERATING_PARAMETERS_ERROR_EXAMPLES.PARAMETER_NOT_FOUND],
+} as const;
+const NON_WORKING_DATE_NOT_FOUND = {
+  status: HttpStatus.NOT_FOUND,
+  description: 'The day is not a non-working date (NON_WORKING_DATE.NOT_FOUND).',
+  examples: [OPERATING_PARAMETERS_ERROR_EXAMPLES.NON_WORKING_DATE_NOT_FOUND],
 } as const;
 
 function toWire(view: ParameterView) {
@@ -86,10 +107,15 @@ export class OperatingParametersController {
     description:
       'The value applies to what is created from now on; what already runs keeps the value it was created with. The same value again changes nothing.',
   })
-  @ApiErrorResponses(...AUTH_ERRORS, VALIDATION_ERROR, {
-    status: HttpStatus.NOT_FOUND,
-    description: 'There is no such parameter (PARAMETER.NOT_FOUND).',
-  })
+  @ApiErrorResponses(
+    ...AUTH_ERRORS,
+    {
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      description: VALIDATION_ERROR_DESCRIPTION,
+      examples: [VALIDATION_EXAMPLE, OPERATING_PARAMETERS_ERROR_EXAMPLES.PARAMETER_VALUE_INVALID],
+    },
+    PARAMETER_NOT_FOUND,
+  )
   async set(
     @CurrentPrincipal() actor: AuthenticatedPrincipal,
     @Param() params: ParameterKeyParamDto,
@@ -109,10 +135,7 @@ export class OperatingParametersController {
     message: 'PARAMETER.HISTORY_LISTED',
     description: 'The values the parameter has had, newest first.',
   })
-  @ApiErrorResponses(...AUTH_ERRORS, VALIDATION_ERROR, {
-    status: HttpStatus.NOT_FOUND,
-    description: 'There is no such parameter (PARAMETER.NOT_FOUND).',
-  })
+  @ApiErrorResponses(...AUTH_ERRORS, VALIDATION_ERROR, PARAMETER_NOT_FOUND)
   async history(@Param() params: ParameterKeyParamDto) {
     try {
       const history = await this.parameters.history(params.key);
@@ -157,10 +180,23 @@ export class OperatingParametersController {
     message: 'NON_WORKING_DATE.ADDED',
     description: 'The day is a non-working date from now on. Today or a later day only.',
   })
-  @ApiErrorResponses(...AUTH_ERRORS, VALIDATION_ERROR, {
-    status: HttpStatus.CONFLICT,
-    description: 'The day is already a non-working date (NON_WORKING_DATE.TAKEN).',
-  })
+  @ApiErrorResponses(
+    ...AUTH_ERRORS,
+    {
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      description: VALIDATION_ERROR_DESCRIPTION,
+      examples: [
+        VALIDATION_EXAMPLE,
+        OPERATING_PARAMETERS_ERROR_EXAMPLES.NON_WORKING_DATE_IN_PAST,
+        OPERATING_PARAMETERS_ERROR_EXAMPLES.NON_WORKING_DATE_REASON_INVALID,
+      ],
+    },
+    {
+      status: HttpStatus.CONFLICT,
+      description: 'The day is already a non-working date (NON_WORKING_DATE.TAKEN).',
+      examples: [OPERATING_PARAMETERS_ERROR_EXAMPLES.NON_WORKING_DATE_TAKEN],
+    },
+  )
   async addNonWorkingDate(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: AddNonWorkingDateBodyDto) {
     try {
       return await this.nonWorkingDates.add(actor, body);
@@ -176,10 +212,19 @@ export class OperatingParametersController {
     message: 'NON_WORKING_DATE.RENAMED',
     description: 'The reason of a non-working date changes. A day before today is refused (NON_WORKING_DATE.IN_PAST).',
   })
-  @ApiErrorResponses(...AUTH_ERRORS, VALIDATION_ERROR, {
-    status: HttpStatus.NOT_FOUND,
-    description: 'The day is not a non-working date (NON_WORKING_DATE.NOT_FOUND).',
-  })
+  @ApiErrorResponses(
+    ...AUTH_ERRORS,
+    {
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      description: VALIDATION_ERROR_DESCRIPTION,
+      examples: [
+        VALIDATION_EXAMPLE,
+        OPERATING_PARAMETERS_ERROR_EXAMPLES.NON_WORKING_DATE_IN_PAST,
+        OPERATING_PARAMETERS_ERROR_EXAMPLES.NON_WORKING_DATE_REASON_INVALID,
+      ],
+    },
+    NON_WORKING_DATE_NOT_FOUND,
+  )
   async renameNonWorkingDate(
     @CurrentPrincipal() actor: AuthenticatedPrincipal,
     @Param() params: NonWorkingDateParamDto,
@@ -199,10 +244,15 @@ export class OperatingParametersController {
     message: 'NON_WORKING_DATE.REMOVED',
     description: 'The day is a working day again. A day before today is refused (NON_WORKING_DATE.IN_PAST).',
   })
-  @ApiErrorResponses(...AUTH_ERRORS, VALIDATION_ERROR, {
-    status: HttpStatus.NOT_FOUND,
-    description: 'The day is not a non-working date (NON_WORKING_DATE.NOT_FOUND).',
-  })
+  @ApiErrorResponses(
+    ...AUTH_ERRORS,
+    {
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      description: VALIDATION_ERROR_DESCRIPTION,
+      examples: [VALIDATION_EXAMPLE, OPERATING_PARAMETERS_ERROR_EXAMPLES.NON_WORKING_DATE_IN_PAST],
+    },
+    NON_WORKING_DATE_NOT_FOUND,
+  )
   async removeNonWorkingDate(
     @CurrentPrincipal() actor: AuthenticatedPrincipal,
     @Param() params: NonWorkingDateParamDto,

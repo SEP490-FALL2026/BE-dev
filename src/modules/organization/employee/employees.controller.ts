@@ -2,8 +2,10 @@ import { Body, Controller, HttpStatus, Post } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
+  FORBIDDEN_EXAMPLE,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
+  VALIDATION_EXAMPLE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
 import { RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
@@ -11,7 +13,7 @@ import { CurrentPrincipal } from '../../../infrastructure/security/models/curren
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { CreateEmployeeBodyDto, EmployeeResponseDto } from './employee.dto';
 import { EmployeeManualService } from './employee-manual.service';
-import { toOrganizationApiException } from '../mappers/organization.http-errors';
+import { ORGANIZATION_ERROR_EXAMPLES, toOrganizationApiException } from '../mappers/organization.http-errors';
 
 /**
  * Entering people by hand (`US-02-02` AC-14). Super Admin only, on an HR basis (`QĐ-82i`, `US-01-05` AC-14): the IT
@@ -34,11 +36,16 @@ export class EmployeesController {
   })
   @ApiErrorResponses(
     UNAUTHENTICATED_RESPONSE,
-    { status: HttpStatus.FORBIDDEN, description: 'Only the Super Admin may enter people.' },
+    {
+      status: HttpStatus.FORBIDDEN,
+      description: 'Only the Super Admin may enter people.',
+      examples: [FORBIDDEN_EXAMPLE],
+    },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
         "The body is malformed or lacks a part of the HR basis (VALIDATION_ERROR), or the row cannot become an employee (EMPLOYEE.ROW_INVALID; details.reasons lists every field and code, among them OWN_RECORD for the Super Admin's own code or email).",
+      examples: [VALIDATION_EXAMPLE, ORGANIZATION_ERROR_EXAMPLES.EMPLOYEE_ROW_INVALID],
     },
     GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   )

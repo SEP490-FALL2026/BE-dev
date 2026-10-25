@@ -2,15 +2,17 @@ import { Body, Controller, Get, HttpStatus, Param, Post, Query } from '@nestjs/c
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
+  FORBIDDEN_EXAMPLE,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
+  VALIDATION_EXAMPLE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
 import { RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
 import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import type { AssignmentView } from '../licensing.types';
-import { toLicensingApiException } from '../mappers/licensing.http-errors';
+import { LICENSING_ERROR_EXAMPLES, toLicensingApiException } from '../mappers/licensing.http-errors';
 import {
   AssignmentIdParamDto,
   AssignmentPageResponseDto,
@@ -25,6 +27,7 @@ const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPO
 const IT_ONLY = {
   status: HttpStatus.FORBIDDEN,
   description: 'Only an IT Admin reads or changes the assignments of seats.',
+  examples: [FORBIDDEN_EXAMPLE],
 } as const;
 
 const toWire = (view: AssignmentView) => ({
@@ -57,6 +60,7 @@ export class AssignmentsController {
   @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description: 'The query is invalid (VALIDATION_ERROR).',
+    examples: [VALIDATION_EXAMPLE],
   })
   async list(@Query() query: ListAssignmentsQueryDto) {
     try {
@@ -82,16 +86,28 @@ export class AssignmentsController {
   @ApiErrorResponses(
     ...AUTH_ERRORS,
     IT_ONLY,
-    { status: HttpStatus.NOT_FOUND, description: 'The assignment does not exist (LICENSE_ASSIGNMENT.NOT_FOUND).' },
+    {
+      status: HttpStatus.NOT_FOUND,
+      description: 'The assignment does not exist (LICENSE_ASSIGNMENT.NOT_FOUND).',
+      examples: [LICENSING_ERROR_EXAMPLES.ASSIGNMENT_NOT_FOUND],
+    },
     {
       status: HttpStatus.CONFLICT,
       description:
         'The assignment has ended or is set to end (LICENSE_ASSIGNMENT.NOT_OPEN), or the seats are all taken (LICENSE_ASSIGNMENT.SEAT_CAPACITY).',
+      examples: [LICENSING_ERROR_EXAMPLES.ASSIGNMENT_NOT_OPEN],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
         'The request is invalid (VALIDATION_ERROR) or refused: LICENSE_ASSIGNMENT.NOT_SERVICE_ACCOUNT, RESPONSIBLE_INVALID, EFFECTIVE_DATE_INVALID, EXPECTED_END_REQUIRED, OVERLAP or IDENTIFIER_IN_USE.',
+      examples: [
+        VALIDATION_EXAMPLE,
+        LICENSING_ERROR_EXAMPLES.NOT_SERVICE_ACCOUNT,
+        LICENSING_ERROR_EXAMPLES.RESPONSIBLE_INVALID,
+        LICENSING_ERROR_EXAMPLES.EFFECTIVE_DATE_INVALID,
+        LICENSING_ERROR_EXAMPLES.EXPECTED_END_REQUIRED,
+      ],
     },
   )
   async changeResponsible(

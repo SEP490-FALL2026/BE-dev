@@ -1,6 +1,7 @@
 import { CanActivate, ExecutionContext, HttpStatus, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';
+import { FORBIDDEN_ERROR } from '../../http/errors/access-errors';
 import { ApiException } from '../../http/errors/api.exception';
 import { REQUIRED_ROLES_METADATA } from '../decorators/access.decorators';
 import { AUTHENTICATED_IDENTITY } from '../models/current-principal';
@@ -27,10 +28,7 @@ export class AuthorizationGuard implements CanActivate {
 
     const principal = context.switchToHttp().getRequest<AuthenticatedRequest>()[AUTHENTICATED_IDENTITY];
     if (!principal || !required.some((role) => principal.roles.includes(role))) {
-      throw new ApiException(HttpStatus.FORBIDDEN, {
-        code: 'AUTHORIZATION.FORBIDDEN',
-        message: 'You do not have permission to perform this action.',
-      });
+      throw new ApiException(HttpStatus.FORBIDDEN, FORBIDDEN_ERROR);
     }
 
     return true;

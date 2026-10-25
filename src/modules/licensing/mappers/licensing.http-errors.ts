@@ -1,6 +1,7 @@
 import { HttpStatus } from '@nestjs/common';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import { toUnavailableApiException } from '../../../infrastructure/http/errors/service-unavailable';
+import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
 import {
   AssignmentConflictError,
   AssignmentEffectiveDateInvalidError,
@@ -82,3 +83,18 @@ export function toLicensingApiException(error: unknown): unknown {
 
   return toUnavailableApiException(error) ?? error;
 }
+
+const example = (error: Error) => errorExampleOf(toLicensingApiException(error));
+
+/** The answers above as OpenAPI examples, each produced by the mapper that gives it at runtime (OPENAPI-EXAMPLE.1). */
+export const LICENSING_ERROR_EXAMPLES = {
+  SUBSCRIPTION_NOT_FOUND: example(new SeatTargetNotFoundError('SUBSCRIPTION')),
+  DEPARTMENT_NOT_FOUND: example(new ToolsDepartmentNotFoundError()),
+  DEPARTMENT_OUT_OF_SCOPE: example(new ToolsDepartmentOutOfScopeError()),
+  ASSIGNMENT_NOT_FOUND: example(new AssignmentNotFoundError()),
+  ASSIGNMENT_NOT_OPEN: example(new AssignmentNotOpenError()),
+  NOT_SERVICE_ACCOUNT: example(new AssignmentNotServiceAccountError()),
+  RESPONSIBLE_INVALID: example(new AssignmentResponsibleInvalidError('NOT_ACTIVE')),
+  EFFECTIVE_DATE_INVALID: example(new AssignmentEffectiveDateInvalidError('IN_THE_PAST')),
+  EXPECTED_END_REQUIRED: example(new AssignmentExpectedEndRequiredError()),
+} as const;

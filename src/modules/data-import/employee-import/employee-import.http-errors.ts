@@ -1,6 +1,7 @@
 import { HttpStatus } from '@nestjs/common';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import { toUnavailableApiException } from '../../../infrastructure/http/errors/service-unavailable';
+import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
 import {
   ImportAlreadyConfirmedError,
   ImportDuplicateFileError,
@@ -12,6 +13,7 @@ import {
   ImportPreviewStaleError,
   ImportStateError,
 } from './employee-import.errors';
+import type { ImportResult } from './employee-import.types';
 
 function refuse(status: HttpStatus, code: string, message: string, details?: Record<string, unknown>): ApiException {
   return new ApiException(status, { code, message, ...(details ? { details } : {}) });
@@ -61,3 +63,38 @@ export function toImportApiException(error: unknown): unknown {
 
   return toUnavailableApiException(error) ?? error;
 }
+
+const example = (error: Error) => errorExampleOf(toImportApiException(error));
+
+/** The answers above as OpenAPI examples, each produced by the mapper that gives it at runtime (OPENAPI-EXAMPLE.1). */
+export const IMPORT_ERROR_EXAMPLES = {
+  FILE_REQUIRED: example(new ImportFileInvalidError('FILE_REQUIRED')),
+  FILE_EMPTY: example(new ImportFileInvalidError('FILE_EMPTY')),
+  FILE_NOT_TEXT: example(new ImportFileInvalidError('FILE_NOT_TEXT')),
+  FILE_TOO_MANY_ROWS: example(new ImportFileInvalidError('FILE_TOO_MANY_ROWS', { maxRows: 1000 })),
+  FILE_UNREADABLE: example(new ImportFileUnreadableError('STRAY_QUOTE', 2)),
+  FILE_MISSING_COLUMNS: example(new ImportFileMissingColumnsError(['department_code'])),
+  NOT_FOUND: example(new ImportNotFoundError()),
+  CANCELLED: example(new ImportStateError('CANCELLED')),
+  EXPIRED: example(new ImportStateError('EXPIRED')),
+  NOT_PREVIEW: example(new ImportStateError('NOT_PREVIEW')),
+  PREVIEW_OUTDATED: example(new ImportPreviewOutdatedError(2)),
+  PREVIEW_STALE: example(new ImportPreviewStaleError([2])),
+  DUPLICATE_FILE_NOT_ACKNOWLEDGED: example(
+    new ImportDuplicateFileError({
+      importId: '<import-id>',
+      confirmedAt: new Date('2026-01-01T00:00:00.000Z'),
+      fileName: 'employees.csv',
+    }),
+  ),
+  ALREADY_CONFIRMED: example(
+    new ImportAlreadyConfirmedError({
+      created: 1,
+      existingSame: 0,
+      existingDifferent: 0,
+      errors: 0,
+      createdByDepartment: [{ departmentCode: 'D-01', count: 1 }],
+      departmentsWithoutHead: [],
+    } satisfies ImportResult),
+  ),
+} as const;

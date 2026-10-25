@@ -210,6 +210,17 @@ const COLLECTION_EXCEPTIONS = [{ operationId: 'currencyList', removeWhen: 'Revie
 - 429 của `ThrottlerGuard` toàn cục (`HTTP_TOO_MANY_REQUESTS`) được `createOpenApiDocument` thêm cho mọi operation
   không tự khai 429. Route tự khai 429 (khóa đăng nhập, limit riêng) phải nêu cả `HTTP_TOO_MANY_REQUESTS` trong mô tả.
   Không dùng `@SkipThrottle` nếu chưa sửa cách tài liệu hóa 429. Inventory test kiểm các điều trên.
+- **Ví dụ response (`OPENAPI-EXAMPLE.1`).** `@ApiSuccessResponse` tự hiện đúng `message` đã khai (một giá trị cho interceptor
+  và ví dụ, overlay `allOf` trên DTO). Mỗi mục `ApiErrorResponses` **bắt buộc** `examples`: chỉ các mã route đó thật sự trả
+  ở status đó — truy vết guard → pipe → service/policy/repo → mapper, không lấy từ mô tả. Dùng ví dụ chung
+  (`UNAUTHENTICATED_RESPONSE`, `GUARDED_SERVICE_UNAVAILABLE_RESPONSE`, `FORBIDDEN_EXAMPLE`, `VALIDATION_EXAMPLE`,
+  `fallbackExample`) và hằng `*_ERROR_EXAMPLES` của chính `*.http-errors.ts` mà controller dùng, dựng bằng
+  `errorExampleOf(toXApiException(new XError(...)))` — không chép literal mã/thông điệp. Đối số động là placeholder tất định
+  (`'<employee-id>'`, `'2026-01-01'`; thời điểm duy nhất `2026-01-01T00:00:00.000Z`); `code` ≤ 80, `message` ≤ 160 ký tự,
+  không token/secret/email/mã nội bộ. Status đã khai mà runtime đang chạy chưa trả được (đường đi chờ lát sau) dùng
+  `noExampleBecause` thay ví dụ và có mục chính xác trong `NO_EXAMPLE_RESPONSES` — danh sách chỉ co lại. Thêm hoặc đổi route ⟹ cập nhật
+  [manifest ví dụ](../../test/support/openapi-example-manifest.ts) (message thành công, mã theo route); inventory test so tập
+  mã chính xác.
 - Cập nhật [API inventory](../../test/support/api-coverage-manifest.ts) khi thêm/bỏ operation.
 - Chạy `pnpm test:e2e`, `pnpm openapi:export`; review diff `openapi.json`.
 - Contract sinh từ controller/DTO. Không sửa JSON hoặc generated FE client bằng tay.
