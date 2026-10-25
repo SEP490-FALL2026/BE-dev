@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { cutHistory } from '../../core/application/pagination';
 import { BusinessDate } from '../../core/business-date';
-import { TransactionRunner } from '../../infrastructure/database/transaction-runner';
+import { DbTx, TransactionRunner } from '../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditService } from '../audit/audit.service';
 import { OrganizationService } from '../organization/organization.service';
@@ -58,6 +58,46 @@ export class OperatingParametersService {
     if (!definitionOf(key)) throw new ParameterNotFoundError(key);
 
     return effective(await this.repo.currentRows())[key];
+  }
+
+  /**
+   * The value that was in force at `instant`: the row whose validity covers it, or the default of the parameter when none does.
+   * What a story calls "the value when it was created" is read with this, so a later change never moves it (`US-01-04` AC-15).
+   * Throws ParameterNotFoundError for an unknown key.
+   */
+  async getValueAt(key: string, instant: Date, tx?: DbTx): Promise<ParameterValue> {
+    const definition = definitionOf(key);
+    if (!definition) throw new ParameterNotFoundError(key);
+
+    return (await this.repo.rowAt(key, instant, tx))?.value ?? definition.default;
+  }
+
+  /**
+   * The value in force at each of the instants, in the order given, from one read: for a page of things that each remember the
+   * moment they were made. An instant before any row, or between rows, is read as the default.
+   */
+  async getValuesAt(key: string, instants: readonly Date[], tx?: DbTx): Promise<ParameterValue[]> {
+    const definition = definitionOf(key);
+    if (!definition) throw new ParameterNotFoundError(key);
+    if (instants.length === 0) return [];
+    const times = instants.map((instant) => instant.getTime());
+    const rows = await this.repo.rowsCovering(key, new Date(Math.min(...times)), new Date(Math.max(...times)), tx);
+
+    return times.map((time) => {
+      const row = [...rows]
+        .reverse()
+        .find(
+          (candidate) =>
+            candidate.validFrom.getTime() <= time && (!candidate.validTo || candidate.validTo.getTime() > time),
+        );
+
+      return row?.value ?? definition.default;
+    });
+  }
+
+  /** The days nobody works from `from` to `to`, both included, for the working-day arithmetic of the workflows. */
+  async getNonWorkingDates(from: BusinessDate, to: BusinessDate): Promise<Set<BusinessDate>> {
+    return new Set((await this.repo.listNonWorkingDates({ from, to })).map((row) => row.date));
   }
 
   async list(): Promise<ParameterView[]> {

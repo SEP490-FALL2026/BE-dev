@@ -205,10 +205,10 @@ describe('what an IT Admin decides about a failed task, over HTTP (integration, 
     const granted = await failed('PERMANENT', { quantity: 2 });
     // A revocation is queued for the connector, and the connector reports that the provider refused: the way G6/G7 will do it.
     await h.ctx.sql.query(
-      `INSERT INTO provisioning_tasks (id, organization_id, assignment_id, kind, channel, request_id, max_attempts,
+      `INSERT INTO provisioning_tasks (id, organization_id, assignment_id, kind, channel, revocation_source, max_attempts,
          created_by_app_user_id)
-       VALUES (gen_random_uuid(), $1, $2, 'REVOKE', 'CONNECTOR', $3, 4, $4)`,
-      [h.seed.organizationId, granted.assignmentId, randomUUID(), randomUUID()],
+       VALUES (gen_random_uuid(), $1, $2, 'REVOKE', 'CONNECTOR', 'RETURN', 4, $3)`,
+      [h.seed.organizationId, granted.assignmentId, randomUUID()],
     );
     const revoke = (
       await h.ctx.sql.query<{ id: string }>(

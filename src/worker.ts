@@ -9,10 +9,10 @@ async function bootstrapWorker(): Promise<void> {
   app.useLogger(new StructuredJsonLogger(app.get(RequestContextService), 'software-license-worker'));
   app.enableShutdownHooks();
 
-  // The mail loop (EmailDispatchLoop) is the only work for now. It polls PostgreSQL, so no queue
-  // is registered and Redis is not needed; the open timer keeps the process alive until a
-  // shutdown signal closes the application (ADR-0012).
-  new Logger('Worker').log('Worker started: delivering the email outbox.');
+  // The mail loop (EmailDispatchLoop) and the loop over the open steps of requests (RequestWorkLoop) are the
+  // work for now. Both poll PostgreSQL, so no queue is registered and Redis is not needed; the open timers
+  // keep the process alive until a shutdown signal closes the application (ADR-0012).
+  new Logger('Worker').log('Worker started: delivering the email outbox and reassigning the steps of requests.');
 }
 
 void bootstrapWorker().catch((error: unknown) => {

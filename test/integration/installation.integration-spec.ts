@@ -13,6 +13,7 @@ import {
   provisionDisposableDatabase,
 } from '../support/disposable-database';
 import { findPlacementCoverageViolations } from '../support/placement-coverage';
+import { RESET_INSTALLATION_SQL } from '../support/reset-installation';
 
 const PASSWORD = 'a long enough passphrase';
 
@@ -64,11 +65,7 @@ describe('installation command use case (integration, real PostgreSQL)', () => {
     ).rows[0];
 
   const reset = async () => {
-    await sql.query(`
-      ALTER TABLE audit_events DISABLE TRIGGER USER;
-      TRUNCATE audit_events, role_grants, password_credentials, app_users, employee_placements, employees,
-               job_titles, departments, cost_centers, organizations CASCADE;
-      ALTER TABLE audit_events ENABLE TRIGGER USER;`);
+    await sql.query(RESET_INSTALLATION_SQL);
   };
 
   beforeAll(async () => {

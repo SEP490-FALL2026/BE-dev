@@ -12,7 +12,7 @@ import { AssignmentService } from '../assignment/assignment.service';
 import {
   GrantRequestRefusedError,
   ProvisioningBeneficiaryDepartedError,
-  ProvisioningBeneficiaryNotStartedError,
+  ProvisioningResponsibleInvalidError,
   ProvisioningSubscriptionError,
   ProvisioningTaskNotFoundError,
   SeatQuantityUnknownError,
@@ -28,13 +28,17 @@ import { licensingAuditEvent } from '../mappers/licensing-audit-event';
 import {
   assertGrantableType,
   assertSubscriptionChoice,
-  chooseAccount,
+  chooseServiceIdentifier,
   cleanEvidence,
   cleanFailureReason,
   nextStatus,
 } from './provisioning.policy';
 import { maxAttempts as maxAttemptsFor } from './failure.policy';
+import { RegisteredRevocationHook } from './registered-revocation-hook.service';
+import { assertNotRevocationTask } from './revocation.policy';
+import { ProvisioningHolderService } from './provisioning-holder.service';
 import { ProvisioningTaskFrame } from './provisioning-task-frame.service';
+import { toRevocationFacts } from './provisioning-task.record';
 import { ProvisioningTaskRepo } from './provisioning-task.repo';
 import { ProvisioningTaskViewService, type TaskSummaryView, type TaskView } from './provisioning-task-view.service';
 
@@ -51,6 +55,7 @@ export class ProvisioningService {
   constructor(
     private readonly repo: ProvisioningTaskRepo,
     private readonly frame: ProvisioningTaskFrame,
+    private readonly holders: ProvisioningHolderService,
     private readonly views: ProvisioningTaskViewService,
     private readonly assignments: AssignmentService,
     private readonly catalog: CatalogService,
@@ -59,21 +64,38 @@ export class ProvisioningService {
     private readonly audit: AuditService,
     private readonly runner: TransactionRunner,
     @Inject(GRANT_REQUEST_GATE) private readonly gate: GrantRequestGate,
+    private readonly revocationHook: RegisteredRevocationHook,
   ) {}
 
   /**
    * Grants the seat of a request: the assignment (source REQUEST, from today) and a manual task in the queue of the IT
-   * Admin in charge of the beneficiary's department. Throws GrantRequestRefusedError, SeatTargetNotFoundError,
-   * ProvisioningTypeNotSupportedError, ProvisioningSubscriptionError, SeatQuantityUnknownError, EmployeeNotFoundError,
-   * ProvisioningBeneficiaryDepartedError, ProvisioningBeneficiaryNotStartedError, ProvisioningPersonalAccountError and
-   * AssignmentConflictError.
+   * Admin in charge of the department of whoever holds it. A personal seat is the beneficiary's, under a company account; a
+   * service account (`US-05-21`) is answered for by a person of the department that owns it, under the identifier the IT
+   * Admin enters. Throws GrantRequestRefusedError, SeatTargetNotFoundError, ProvisioningTypeNotSupportedError,
+   * ProvisioningSubscriptionError, SeatQuantityUnknownError, EmployeeNotFoundError, ProvisioningBeneficiaryDepartedError,
+   * ProvisioningBeneficiaryNotStartedError, ProvisioningPersonalAccountError, ProvisioningAccountIdentifierRequiredError,
+   * ProvisioningResponsibleNotInDepartmentError, ProvisioningResponsibleInvalidError, ProvisioningAnotherItAdminNeededError
+   * and AssignmentConflictError.
    */
   async grant(
     actor: AuthenticatedPrincipal,
-    input: { requestId: string; subscriptionId?: string; accountIdentifier?: string; expectedEndDate?: BusinessDate },
+    input: {
+      requestId: string;
+      subscriptionId?: string;
+      accountIdentifier?: string;
+      expectedEndDate?: BusinessDate;
+      responsibleEmployeeId?: string;
+      /** The person of a request for a group this grant is for; a request for one person has none to name. */
+      beneficiaryEmployeeId?: string;
+    },
   ): Promise<{ task: TaskView; warnings: 'DEPARTMENT_WITHOUT_IT_ADMIN'[] }> {
-    const answer = await this.gate.check(input.requestId);
+    const answer = await this.gate.check(input.requestId, input.beneficiaryEmployeeId);
     if (answer.status !== 'GRANTABLE') throw new GrantRequestRefusedError(answer.status);
+    // Only a service account has a person to name, and its identifier is the IT Admin's to give: nothing is locked or written yet.
+    if (answer.seat === 'PERSONAL' && input.responsibleEmployeeId !== undefined) {
+      throw new ProvisioningResponsibleInvalidError('NOT_SERVICE_ACCOUNT');
+    }
+    const serviceIdentifier = answer.seat === 'SERVICE' ? chooseServiceIdentifier(input.accountIdentifier) : null;
 
     const plan = await this.catalog.findSeatTarget({ planId: answer.planId });
     if (!plan) throw new SeatTargetNotFoundError('PLAN');
@@ -82,31 +104,49 @@ export class ProvisioningService {
 
     const organization = await this.requireOrganization();
     const today = await this.organization.businessToday();
-    const inCharge = await this.organization.getItAdminInCharge(answer.employeeId, today);
+    const inCharge = await this.organization.getItAdminInCharge(
+      input.responsibleEmployeeId ?? answer.employeeId,
+      today,
+    );
     // The most tries are fixed here: a parameter changed later reaches only the tasks made after it (US-01-04 AC-13).
     const maxAttempts = maxAttemptsFor(Number(await this.parameters.getValue('PROVISIONING_RETRY_COUNT')));
 
     const record = await this.runner.run(async (tx) => {
+      // The request is locked and moved to "being carried out" here, in the transaction of the grant: a second grant of
+      // the same request finds it no longer grantable, and a request that changed since the read above is refused.
+      const claimed = await this.gate.claimForGrant(tx, input.requestId, input.beneficiaryEmployeeId);
+      if (claimed.status !== 'GRANTABLE') throw new GrantRequestRefusedError(claimed.status);
+      if (
+        claimed.employeeId !== answer.employeeId ||
+        claimed.planId !== answer.planId ||
+        claimed.seat !== answer.seat
+      ) {
+        throw new GrantRequestRefusedError('NOT_APPROVED');
+      }
       const target = await this.lockTarget(tx, plan, input.subscriptionId);
-      await this.organization.lockEmployeeForShare(tx, answer.employeeId);
-      const employee = await this.organization.getEmployee(answer.employeeId, tx);
-      if (!employee || employee.status !== 'ACTIVE') throw new ProvisioningBeneficiaryDepartedError(input.requestId);
-      if (employee.hireDate > today)
-        throw new ProvisioningBeneficiaryNotStartedError(input.requestId, employee.hireDate);
-      const accountIdentifier = chooseAccount({
-        workEmail: employee.workEmail,
-        requested: input.accountIdentifier,
-        companyDomains: await this.organization.getCompanyEmailDomains(tx),
-      });
+      const holder =
+        claimed.seat === 'SERVICE' && serviceIdentifier !== null
+          ? await this.holders.service(tx, actor, {
+              requested: { employeeId: claimed.employeeId, account: claimed.serviceAccount },
+              named: input.responsibleEmployeeId,
+              accountIdentifier: serviceIdentifier,
+              today,
+            })
+          : await this.holders.personal(tx, {
+              requestId: input.requestId,
+              employeeId: answer.employeeId,
+              accountIdentifier: input.accountIdentifier,
+              today,
+            });
 
       const assignment = await this.assignments.createFromRequest(tx, actor, {
         organizationId: organization.id,
         requestId: input.requestId,
         target,
-        employeeId: answer.employeeId,
-        accountIdentifier,
+        holder,
         effectiveFrom: today,
-        expectedEndDate: input.expectedEndDate ?? null,
+        // The day the head gave for a person who is not staff is the end of the seat unless the IT Admin names another.
+        expectedEndDate: input.expectedEndDate ?? claimed.expectedEndDate,
       });
       const task = await this.repo.insert(tx, {
         organizationId: organization.id,
@@ -124,6 +164,7 @@ export class ProvisioningService {
           assignmentId: assignment.id,
           channel: task.channel,
           defaultResponsibleEmployeeId: task.defaultResponsibleEmployeeId,
+          ...(holder.selfExecuted === null ? {} : { selfExecuted: holder.selfExecuted }),
         }),
       );
 
@@ -168,7 +209,8 @@ export class ProvisioningService {
   }
 
   /**
-   * Takes the task (or takes it over from another IT Admin). Throws ProvisioningTaskNotFoundError,
+   * Takes the task (or takes it over from another IT Admin). A revocation is taken whoever its beneficiary is, a person who
+   * left included; the hook of the handover may refuse it. Throws ProvisioningTaskNotFoundError,
    * ProvisioningTaskNotManualError, ProvisioningTaskStateError, ProvisioningBeneficiaryDepartedError and
    * ProvisioningAnotherItAdminNeededError.
    */
@@ -177,11 +219,18 @@ export class ProvisioningService {
       check: (locked) => nextStatus(locked.status, 'CLAIM', locked.channel),
       write: async ({ tx, task: locked, now }) => {
         if (locked.status === 'IN_PROGRESS' && locked.claimedByAppUserId === actor.appUserId) return false;
-        const beneficiary = await this.organization.getEmployee(locked.assignment.employeeId, tx);
-        if (beneficiary && beneficiary.status !== 'ACTIVE') {
-          throw new ProvisioningBeneficiaryDepartedError(locked.requestId);
+        if (locked.kind === 'REVOKE') {
+          await this.revocationHook.beforeWork(tx, toRevocationFacts(locked), now);
+        } else {
+          const beneficiary = await this.organization.getEmployee(locked.assignment.employeeId, tx);
+          if (beneficiary && beneficiary.status !== 'ACTIVE') {
+            throw new ProvisioningBeneficiaryDepartedError(locked.requestId ?? '');
+          }
         }
         await this.repo.markClaimed(tx, locked.id, actor.appUserId, now);
+        if (locked.kind === 'REVOKE') {
+          await this.revocationHook.afterWork(tx, { ...toRevocationFacts(locked), status: 'IN_PROGRESS' }, now, actor);
+        }
 
         return { action: 'CLAIMED', after: { status: 'IN_PROGRESS', claimedBy: actor.appUserId } };
       },
@@ -191,15 +240,22 @@ export class ProvisioningService {
   }
 
   /**
-   * Completes the task with the note of what was done. Throws ProvisioningEvidenceRequiredError, the errors of `claim`
-   * except the departed beneficiary, and ProvisioningTaskStateError.
+   * Completes the task of a grant with the note of what was done; a revocation has its own completion. Throws
+   * ProvisioningEvidenceRequiredError, the errors of `claim` except the departed beneficiary, and ProvisioningTaskStateError
+   * (`IS_REVOCATION` for a revocation).
    */
   async complete(actor: AuthenticatedPrincipal, id: string, input: { evidence: string }): Promise<TaskView> {
     const evidence = cleanEvidence(input.evidence);
     const task = await this.frame.work(actor, id, {
-      check: (locked) => nextStatus(locked.status, 'COMPLETE', locked.channel),
+      check: (locked) => {
+        assertNotRevocationTask(locked.kind);
+        nextStatus(locked.status, 'COMPLETE', locked.channel);
+      },
       write: async ({ tx, task: locked, now }) => {
         await this.repo.markCompleted(tx, locked.id, actor.appUserId, evidence, now);
+        if (locked.requestId !== null) {
+          await this.gate.reportOutcome(tx, locked.requestId, 'COMPLETED', locked.assignment.employeeId);
+        }
 
         return { action: 'COMPLETED', after: { status: 'COMPLETED', completedBy: actor.appUserId } };
       },

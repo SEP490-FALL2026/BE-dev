@@ -161,7 +161,8 @@ describe('provisioning tasks (integration, PostgreSQL constraints)', () => {
          VALUES (gen_random_uuid(), $1, $2, 'GRANT', 'MANUAL', NULL, 4, $3)`,
         [organizationId, await newAssignment(), person()],
       ),
-    ).toBe('23502');
+      // Not a NOT NULL any more: a revocation has no request, so the table says a grant needs one (g6-revocation-by-grant-kind).
+    ).toBe('23514');
   });
 
   describe('status and columns say the same thing (US-07-02 AC-2, AC-5, AC-6)', () => {

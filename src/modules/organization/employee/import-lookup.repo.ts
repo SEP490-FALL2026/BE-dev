@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { fromDateColumn } from '../../../core/business-date';
+import { BusinessDate, fromDateColumn } from '../../../core/business-date';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { EmployeeImportLookupData } from '../organization.types';
@@ -17,6 +17,7 @@ export class ImportLookupRepo {
       employeeCodes: string[];
       normalizedEmails: string[];
     },
+    today: BusinessDate,
   ): Promise<EmployeeImportLookupData> {
     const db = client ?? this.prisma;
     const [departments, jobTitles, employees, emailOwners] = await Promise.all([
@@ -48,7 +49,8 @@ export class ImportLookupRepo {
             SELECT e.id, e.employee_code, e.full_name, e.work_email, e.employment_type::text AS employment_type,
                    e.hire_date, d.code AS department_code, j.name AS job_title_name
               FROM employees e
-              LEFT JOIN employee_placements p ON p.employee_id = e.id AND p.valid_to IS NULL
+              LEFT JOIN employee_placements p ON p.employee_id = e.id
+                   AND p.valid_from <= ${today}::date AND (p.valid_to IS NULL OR p.valid_to > ${today}::date)
               LEFT JOIN departments d ON d.id = p.department_id
               LEFT JOIN job_titles j ON j.id = p.job_title_id
              WHERE e.employee_code = ANY(${names.employeeCodes}::text[])`,

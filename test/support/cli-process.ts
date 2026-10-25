@@ -11,6 +11,12 @@ import { join, resolve } from 'node:path';
  */
 export const PROJECT_ROOT = resolve(__dirname, '..', '..');
 const TS_NODE = require.resolve('ts-node/register/transpile-only');
+/**
+ * Node 24 strips types natively and, once the module graph grows, that path fails to resolve modules that exist
+ * ("Cannot find module './infrastructure/http/openapi-presentation'") when ts-node loads the graph. ts-node does the
+ * compiling, so the native stripping is switched off for the child where this Node has it.
+ */
+const NATIVE_TYPESCRIPT_OFF: readonly string[] = process.features.typescript ? ['--no-experimental-strip-types'] : [];
 /** ts-node compiles the whole module graph on a cold cache. */
 export const CLI_COLD_START_MS = 120000;
 
@@ -72,12 +78,16 @@ function runTypeScript(path: string, args: readonly string[], options: RunOption
   }
 
   return new Promise((resolveRun, rejectRun) => {
-    const child = spawn(process.execPath, ['-r', TS_NODE, join(PROJECT_ROOT, path), ...args], {
-      cwd: options.cwd,
-      env: environment,
-      stdio: ['ignore', 'pipe', 'pipe'],
-      windowsHide: true,
-    });
+    const child = spawn(
+      process.execPath,
+      [...NATIVE_TYPESCRIPT_OFF, '-r', TS_NODE, join(PROJECT_ROOT, path), ...args],
+      {
+        cwd: options.cwd,
+        env: environment,
+        stdio: ['ignore', 'pipe', 'pipe'],
+        windowsHide: true,
+      },
+    );
     running.add(child);
     let stdout = '';
     let stderr = '';

@@ -3,6 +3,7 @@ import request from 'supertest';
 import { LicensingService } from '../../src/modules/licensing/licensing.service';
 import {
   GRANT_REQUEST_GATE,
+  type GrantOutcome,
   type GrantRequestAnswer,
   type GrantRequestGate,
   type ProvisioningFailureKind,
@@ -19,9 +20,30 @@ export class FakeGrantGate implements GrantRequestGate {
     return Promise.resolve(this.answers.get(requestId) ?? { status: 'NOT_FOUND' });
   }
 
+  /** What licensing told this gate about how a request ended, in order. */
+  readonly outcomes: { requestId: string; outcome: GrantOutcome }[] = [];
+
+  claimForGrant(_tx: unknown, requestId: string): Promise<GrantRequestAnswer> {
+    return this.check(requestId);
+  }
+
+  isWithdrawing(): Promise<boolean> {
+    return Promise.resolve(false);
+  }
+
+  reportCancelled(): Promise<boolean> {
+    return Promise.resolve(false);
+  }
+
+  reportOutcome(_tx: unknown, requestId: string, outcome: GrantOutcome): Promise<void> {
+    this.outcomes.push({ requestId, outcome });
+
+    return Promise.resolve();
+  }
+
   /** A request that is approved enough and not ended, for this person and plan. */
   grantable(employeeId: string, planId: string): string {
-    return this.answer({ status: 'GRANTABLE', employeeId, planId });
+    return this.answer({ status: 'GRANTABLE', seat: 'PERSONAL', employeeId, planId, expectedEndDate: null });
   }
 
   answer(answer: GrantRequestAnswer): string {
@@ -207,6 +229,8 @@ export class ProvisioningHarness extends SeatHarness {
     request(this.server()).post(`/api/v1/provisioning-tasks/${id}/retry`).set(this.as(account));
   handOff = (id: string, body: object, account: ApiAccount = this.it1) =>
     request(this.server()).post(`/api/v1/provisioning-tasks/${id}/hand-off`).set(this.as(account)).send(body);
+  cancelTask = (id: string, account: ApiAccount = this.it1) =>
+    request(this.server()).post(`/api/v1/provisioning-tasks/${id}/cancel`).set(this.as(account));
   closeFailed = (id: string, body: object, account: ApiAccount = this.it1) =>
     request(this.server()).post(`/api/v1/provisioning-tasks/${id}/close-failed`).set(this.as(account)).send(body);
 

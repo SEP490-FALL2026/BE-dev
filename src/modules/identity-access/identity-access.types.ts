@@ -1,3 +1,5 @@
+import type { DbTx } from '../../infrastructure/database/transaction-runner';
+
 export type AppRole = 'SUPER_ADMIN' | 'IT_ADMIN' | 'FINANCE' | 'EMPLOYEE';
 export type AppUserStatus = 'ACTIVE' | 'LOCKED';
 export type ActivationState = 'INVITED' | 'ACTIVATED';
@@ -105,6 +107,8 @@ export interface AccountListFilter {
   status?: AppUserStatus;
   activationState?: ActivationState;
   role?: AppRole;
+  /** True: only the accounts of people who have left; false: only those of people who have not. */
+  employeeLeft?: boolean;
   skip: number;
   take: number;
 }
@@ -131,6 +135,54 @@ export interface EmployeeAccountInspection {
 
 /** The approval roles a person can hold (US-01-03); who holds them stays inside the module. */
 export type ApprovalRoleKind = 'SPENDING_APPROVER' | 'CONFLICT_SUBSTITUTE' | 'FALLBACK_APPROVER';
+
+/**
+ * Who holds each approval role now, by employee: a role nobody holds is null. The employee may have left; whether they
+ * can still act is the organization's to say (`EmployeeStatus`), not this module's.
+ */
+export interface ApprovalRoleHolders {
+  spendingApproverEmployeeId: string | null;
+  conflictSubstituteEmployeeId: string | null;
+  fallbackApproverEmployeeId: string | null;
+}
+
+/**
+ * A person took over a role that decides who holds a step of a request, or left it (`FR-3.16`, `US-05-12`): one of the three
+ * approval roles the Super Admin sets, or the role of Finance. `id` is made when the change is announced and is what a
+ * listener that must not act twice keys on.
+ */
+export interface ApprovalRoleChange {
+  id: string;
+  role: ApprovalRoleKind | 'FINANCE';
+  fromEmployeeId: string | null;
+  toEmployeeId: string | null;
+}
+
+/**
+ * A module that acts when such a role changes hands. It is called in the transaction of the change, in the order the
+ * listeners were registered; throwing rolls the change back with it.
+ */
+export interface ApprovalRoleChangeListener {
+  onChange(tx: DbTx, change: ApprovalRoleChange): Promise<void>;
+}
+
+/** The roles of a role grant that a person who leaves may hold and that someone must take over (`US-03-04` AC-11, AC-27). */
+export type LeaverGrantRole = 'SUPER_ADMIN' | 'FINANCE';
+
+/**
+ * The person who holds the Super Admin role now and what decides whether they can act (`US-03-04` AC-13): the account (locked, not
+ * activated, waiting for the credential reset of an operator) and the employee (has left, is handing over). Never a credential or an email.
+ */
+export interface SuperAdminHolder {
+  appUserId: string;
+  employeeId: string;
+  status: AppUserStatus;
+  activationState: ActivationState;
+  employeeStatus: 'ACTIVE' | 'TERMINATED';
+  workState: 'WORKING' | 'ON_LONG_LEAVE' | 'HANDING_OVER' | 'LEFT';
+  /** An operator reset the credential and the holder has not set a new password yet (`US-01-09` AC-9). */
+  awaitingCredentialReset: boolean;
+}
 
 /** An account status and activation state as one key, for counts. */
 export type AccountStateKey = 'ACTIVE_ACTIVATED' | 'ACTIVE_INVITED' | 'LOCKED_ACTIVATED' | 'LOCKED_INVITED';

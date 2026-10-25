@@ -33,3 +33,26 @@ model EmailOutbox {
   @@index([status, nextAttemptAt])
   @@map("email_outbox")
 }
+
+// The notice a person reads inside the application (FR-3.11, US-05-15 AC-7, AC-10): written in the transaction of the caller,
+// so it exists exactly when the change behind it commits, and read by web and mobile through the same route. It is a value
+// like `email_outbox`: the recipient is an employee id with no foreign key, because the history outlives the account. What it
+// says is a code and flat parameters; the interface turns them into words, so no name or amount is copied here (INF-06).
+// One row for each (recipient, event key): writing it again is a no-op. Only `read_at` ever changes, once; nothing is deleted.
+model InAppNotification {
+  id                  String    @id @default(uuid(7)) @db.Uuid
+  organizationId      String    @map("organization_id") @db.Uuid
+  recipientEmployeeId String    @map("recipient_employee_id") @db.Uuid
+  code                String
+  // What the notice is about (a request, a return), by id; both or neither.
+  subjectType         String?   @map("subject_type")
+  subjectId           String?   @map("subject_id") @db.Uuid
+  params              Json      @default("{}")
+  eventKey            String    @map("event_key")
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  readAt              DateTime? @map("read_at") @db.Timestamptz(3)
+
+  @@unique([recipientEmployeeId, eventKey])
+  @@index([recipientEmployeeId, createdAt(sort: Desc), id(sort: Desc)])
+  @@map("in_app_notifications")
+}

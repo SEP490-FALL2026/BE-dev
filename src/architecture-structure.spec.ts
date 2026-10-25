@@ -52,6 +52,294 @@ const INTRA_MODULE_CONTRACTS: ReadonlyMap<string, string> = new Map([
     'session port ACCOUNT_SESSIONS: consumed by accounts and recovery, implemented by auth',
   ],
   [
+    'modules/licensing/provisioning/registered-grant-request-gate.service.ts',
+    'the gate the module of requests registers with the facade licensing.service.ts (G5); provisioning asks it through the token',
+  ],
+  [
+    'modules/catalog/catalog-entry/internal-software-registration.service.ts',
+    'registers internal software and its plan in the transaction of a request, read by the facade catalog.service.ts (G5)',
+  ],
+  [
+    'modules/catalog/plan/plan.service.ts',
+    'declares the plan of internal software registered on behalf of a request, called by catalog-entry/internal-software-registration.service.ts (G5)',
+  ],
+  [
+    'modules/catalog/vendor/vendor-lookup.service.ts',
+    'the name of a vendor, read by the facade catalog.service.ts for the assessment of software that is not in the catalog (G5)',
+  ],
+  // budgets (G5): the facade budgets.service.ts reads the figures of the check and registers the listeners of a change.
+  [
+    'modules/budgets/budget/budget-facts.repo.ts',
+    'the current budget and the plan line the check of a request reads, behind the facade budgets.service.ts (G5)',
+  ],
+  [
+    'modules/budgets/budget/budget-change-listeners.ts',
+    'the contexts told when a budget is decided or a plan line moves, behind the facade budgets.service.ts (G5)',
+  ],
+  [
+    'modules/budgets/budget/commitment.service.ts',
+    'holds the commitments of a request in the transaction of its approval, behind the facade budgets.service.ts (G5)',
+  ],
+  // requests (G5): the spend capability works on the same requests and steps as the capability that sends them.
+  [
+    'modules/requests/access-request/access-request.repo.ts',
+    'the one reader and writer of requests and their steps, used by the spend capability for the check, the review and the routing (G5)',
+  ],
+  [
+    'modules/requests/access-request/access-request.types.ts',
+    'the shapes of a request and its steps that the repository reads and writes, used by the spend capability (G5)',
+  ],
+  [
+    'modules/requests/access-request/access-request.policy.ts',
+    'the policy of a request, read by the spend capability for where a request stands (G5)',
+  ],
+  [
+    'modules/requests/access-request/access-request.errors.ts',
+    'the errors of a request, raised by the spend capability when the request does not exist (G5)',
+  ],
+  [
+    'modules/requests/access-request/access-request.http-errors.ts',
+    'maps the errors of a request, which the spend capability extends with its own (G5)',
+  ],
+  [
+    'modules/requests/access-request/access-request-audit-event.ts',
+    'builds the audit event of a change to a request, used by the spend capability (G5)',
+  ],
+  [
+    'modules/requests/access-request/assessment.repo.ts',
+    'the quote of the assessment of software that is not in the catalog, read by the check of the budget (G5)',
+  ],
+  [
+    'modules/requests/access-request/access-request.dto.ts',
+    'the state of a request and the choice of a line of the plan, shared with the DTOs of the spend capability (G5)',
+  ],
+  [
+    'modules/requests/access-request/pricing-view.service.ts',
+    'the cost of a request with its estimated tax, shown to the spending approver by the spend capability (G5)',
+  ],
+  [
+    'modules/requests/access-request/request-preview.dto.ts',
+    'the shape of the estimated cost, shared with the DTO of the spend step of the approver (G5)',
+  ],
+  [
+    'modules/requests/access-request/repricing.service.ts',
+    'what a request costs for another day, used by the supplementary file of the head (G5)',
+  ],
+  [
+    'modules/requests/access-request/request-assessment.service.ts',
+    'the operating parameters a request is judged by, read by the supplementary file of the head (G5)',
+  ],
+  [
+    'modules/requests/access-request/access-request-query.service.ts',
+    'reads a request with the names of its people for the routes of service accounts, which answer with the request they made or decided (G5)',
+  ],
+  [
+    'modules/requests/access-request/access-request.wire.ts',
+    'the wire form of a request, returned by the routes of service accounts (G5)',
+  ],
+  [
+    'modules/requests/spend/plan-line.service.ts',
+    'attaches a request to a line of the plan, called by the approval of the need step (G5)',
+  ],
+  [
+    'modules/requests/spend/spend-entry.service.ts',
+    'checks at once a request nobody can send on in a batch, called when its need or its assessment is done (G5)',
+  ],
+  [
+    'modules/requests/spend/spend-status.service.ts',
+    'where a request stands on its way to the spending approver, read by access-request-query.service.ts (G5)',
+  ],
+  [
+    'modules/requests/spend/budget-information.service.ts',
+    'closes the questions to Finance that wait, called when a request is withdrawn by withdrawal.service.ts (G5)',
+  ],
+  [
+    'modules/requests/spend/spend-batch.repo.ts',
+    'says a request left the batch it was sent in, called when it is withdrawn by withdrawal.service.ts (G5)',
+  ],
+  [
+    'modules/requests/spend/spend-step.repo.ts',
+    'closes the open steps of a request, called when it is withdrawn by withdrawal.service.ts (G5)',
+  ],
+  [
+    'modules/requests/access-request/access-request.service.ts',
+    'sends a request in the transaction of a renewal that turned out to be sent after the end of the right, called by renewal-request/renewal-request.service.ts (G5)',
+  ],
+  [
+    'modules/requests/access-request/need-decision.policy.ts',
+    'the twelve-month limit and the state an approved request goes to, read by renewal-request/renewal-request.service.ts for the renewal a head sends (G5)',
+  ],
+  // requests (G5, US-05-17): the request for a group is its own capability, which reads the people and the rules of the others.
+  [
+    'modules/requests/group-request/group-request.types.ts',
+    'the state of a line and the line a request record carries, read by access-request.types.ts and grant.policy.ts, which judge a request for a group (G5)',
+  ],
+  [
+    'modules/requests/access-request/beneficiary-eligibility.policy.ts',
+    'what a person must have to be given access by the request of somebody else, shared by the head who sends for the department and the request for a group (G5)',
+  ],
+  [
+    'modules/requests/access-request/pricing.policy.ts',
+    'the payments of a request, which the request for a group lays out again for the people that stay (G5)',
+  ],
+  [
+    'modules/requests/group-request/group-grant.service.ts',
+    'claims, completes, fails and cancels the grant of one person of a request for a group, called by the grant gate access-request-grant.gate.ts (G5)',
+  ],
+  [
+    'modules/requests/group-request/group-withdrawal.service.ts',
+    'withdraws one person or all the people left of a request for a group, called by withdrawal.service.ts when the request is for a group (G5)',
+  ],
+  [
+    'modules/requests/group-request/group-line-closure.service.ts',
+    'removes one person who left from a request for a group, called by departure-cancellation.service.ts when the leaver holds the last live line (G6)',
+  ],
+  [
+    'modules/requests/group-request/group-line-closure.policy.ts',
+    'which person of a request for a group a whole-request closing means, read by departure-cancellation.service.ts (G6)',
+  ],
+  [
+    'modules/requests/group-request/line-allocation.policy.ts',
+    'lays the payments of a request out again for the people approved, read by the budget check spend/budget-check.service.ts (G5)',
+  ],
+  [
+    'modules/requests/group-request/group-supplement.service.ts',
+    'leaves the people of a group out of a supplementary file and keeps who, called by spend/supplement.service.ts (G5)',
+  ],
+  [
+    'modules/requests/access-request/need-spend.service.ts',
+    'the line of the plan and the day a head gives with an approval of the need, shared by the decision of one person and the decision of the lines of a group (G5)',
+  ],
+  [
+    'modules/requests/access-request/withdrawal.policy.ts',
+    'who withdraws a request and in which stage the head may, judged again on each line of a group by group-request/group-withdrawal.policy.ts (G5)',
+  ],
+  [
+    'modules/requests/access-request/open-request.service.ts',
+    'the requests of a person that are still open, reached through the requests facade requests.service.ts (G6, US-03-04 AC-24)',
+  ],
+  [
+    'modules/requests/spend/spend-effects.service.ts',
+    'what a spend decision does to the budget and to the step, shared by the decision of one person and the decision of the lines of a group (G5)',
+  ],
+  [
+    'modules/requests/spend/spend-decision.policy.ts',
+    'who may decide the spend step and what the check made again allows, judged for the lines of a group by group-request/group-spend-decision.service.ts (G5)',
+  ],
+  [
+    'modules/requests/spend/spend-decision.repo.ts',
+    'the one writer of the record of a spend decision, called by group-request/group-spend-record.service.ts for the lines of a group (G5)',
+  ],
+  [
+    'modules/requests/spend/spend-routing.service.ts',
+    'reopens the review of Finance when the approver checks a request again, called by group-request/group-spend-decision.service.ts (G5)',
+  ],
+  [
+    'modules/requests/spend/budget-check.service.ts',
+    'makes the check of the budget on the people of a group who were approved, called by group-request/group-spend-decision.service.ts (G5)',
+  ],
+  [
+    'modules/requests/spend/spend.errors.ts',
+    'the refusals of a spend decision, raised as they are by the decision of the lines of a group (G5)',
+  ],
+  [
+    'modules/requests/spend/spend.http-errors.ts',
+    'the answers of the spend routes, which the routes of a group fall through to for the errors that are not its own (G5)',
+  ],
+  [
+    'modules/requests/spend/spend-approval-view.service.ts',
+    'the panel of the spending approver, read after the decision of the lines of a group by group-request/group-lines.controller.ts (G5)',
+  ],
+  [
+    'modules/requests/spend/spend-approval.dto.ts',
+    'the response of the panel of the spending approver, returned by the route that decides the lines of a group (G5)',
+  ],
+  [
+    'modules/requests/group-request/group-request.http-errors.ts',
+    'the answers of the group routes, which the supplementary file of the head uses for the people left out of a group (G5)',
+  ],
+  [
+    'modules/requests/renewal-request/renewal-apply.service.ts',
+    'writes the record that follows when a renewal is approved in full, called by the approval of the need step and of the spend step (G5)',
+  ],
+  // requests (G5, FR-3.16): the reassignment of steps runs the routing tables again on the data of today.
+  [
+    'modules/requests/access-request/routing-facts.service.ts',
+    'the facts the routing table of the need step reads on a day, read again by the reassignment of steps when the organization changes (G5)',
+  ],
+  [
+    'modules/requests/access-request/routing.policy.ts',
+    'the routing table of the need step, run again on the data of today by the reassignment of steps (G5)',
+  ],
+  [
+    'modules/requests/spend/spend-routing.policy.ts',
+    'the tables of the spend step and of the review of Finance, run again on the data of today by the reassignment of steps (G5)',
+  ],
+  [
+    'modules/requests/reassignment/step-target.service.ts',
+    'who a step is given to on the data of today, used by the spend routing to leave out a role holder who has left (G5)',
+  ],
+  [
+    'modules/requests/reassignment/step-reassignment.service.ts',
+    'the reassignment of steps, called from the module root by the sweep the worker runs (G5)',
+  ],
+  // notifications (G5, FR-3.11): the facade gives an in-app notice through the inbox capability.
+  [
+    'modules/notifications/inbox/inbox.service.ts',
+    'gives an in-app notice in the transaction of the caller, read by the facade notifications.service.ts (G5)',
+  ],
+  // requests (G5, US-05-15): the root contract the worker calls reads the projection of the audit events into the inbox.
+  [
+    'modules/requests/status/request-status-projector.service.ts',
+    'the projection of the audit events of the requests into the inbox, called from the module root by request-status-projector.service.ts for the worker (G5)',
+  ],
+  // requests (G5, FR-3.8): the root contract the worker calls runs the reminders of the late steps and the alert of a backlog.
+  [
+    'modules/requests/sla/step-sla.service.ts',
+    'the reminders of the steps and of the queue of the head, called from the module root by step-sla-sweep.service.ts for the worker (G5)',
+  ],
+  [
+    'modules/requests/sla/backlog-alert.service.ts',
+    'the alert of a backlog to the Super Admin, called from the module root by step-sla-sweep.service.ts for the worker (G5)',
+  ],
+  [
+    'modules/requests/sla/sla-queue-age.service.ts',
+    'how long a request has waited in the queue of the head and how many reminders it had, read by spend/spend-queue.service.ts for the list of the head (G5)',
+  ],
+  // identity-access (G5, FR-3.16): the roles announce that they changed hands through the one registry of the facade.
+  [
+    'modules/identity-access/approval-roles/approval-role-change.registry.ts',
+    'where the approval roles and the role of Finance announce a change of holder: announced by accounts and approval-roles, registered through the facade identity-access.service.ts (G5)',
+  ],
+  [
+    'modules/licensing/assignment/assignment-renewal.service.ts',
+    'reads a seat with its chain and renews it, read by the facade licensing.service.ts (G5)',
+  ],
+  [
+    'modules/licensing/assignment/registered-renewal-hold.service.ts',
+    'the hold the module of requests registers with the facade licensing.service.ts: whether a seat has a renewal waiting (G5)',
+  ],
+  [
+    'modules/licensing/assignment/registered-responsible-deadline.service.ts',
+    'the provider the module of personnel registers with the facade licensing.service.ts: which people have a transfer or a departure that is not closed (G6)',
+  ],
+  [
+    'modules/licensing/assignment/service-account-duty.service.ts',
+    'the open service accounts a person answers for, reached through the licensing facade licensing.service.ts (G6)',
+  ],
+  [
+    'modules/licensing/provisioning/provisioning-cancellation.service.ts',
+    'cancels the grant of a withdrawn request, read by the facade licensing.service.ts (G5)',
+  ],
+  [
+    'modules/licensing/provisioning/provisioning-task-frame.service.ts',
+    'the rule for an IT Admin who works for themselves, read by the facade licensing.service.ts for the review of a service account (G5)',
+  ],
+  [
+    'modules/identity-access/approval-roles/approval-role-holders.service.ts',
+    'who holds the approval roles now, read by the facade identity-access.service.ts for the routing of a request (G5)',
+  ],
+  [
     'modules/identity-access/accounts/account-directory.service.ts',
     'account lookup for access, approval-roles, auth, recovery and the facade',
   ],
@@ -175,6 +463,34 @@ const INTRA_MODULE_CONTRACTS: ReadonlyMap<string, string> = new Map([
     'seat targets, facts and the writing of baseline assignments, reached through the licensing facade licensing.service.ts',
   ],
   [
+    'modules/licensing/provisioning/revocation.service.ts',
+    'the one gate that opens the revocation of a seat for every source, reached through the licensing facade licensing.service.ts (G6)',
+  ],
+  [
+    'modules/licensing/provisioning/revocation-read.service.ts',
+    'the personal seats of a person and the K1 seats whose access runs on, reached through the licensing facade licensing.service.ts (G6)',
+  ],
+  [
+    'modules/licensing/provisioning/open-grant-task.service.ts',
+    'the grant tasks of a person that are not finished, reached through the licensing facade licensing.service.ts (G6, US-03-04 AC-24)',
+  ],
+  [
+    'modules/licensing/provisioning/registered-revocation-hook.service.ts',
+    'the hook the handover confirmation registers with the facade licensing.service.ts (G6); provisioning calls it at three points',
+  ],
+  [
+    'modules/licensing/handover/handover.service.ts',
+    'opens, moves and cancels the handover duties of a person who leaves, reached through the licensing facade licensing.service.ts (G6)',
+  ],
+  [
+    'modules/licensing/provisioning/provisioning.http-errors.ts',
+    'maps the refusals of the gate that opens a revocation for the route that starts one for a right that ended (G6)',
+  ],
+  [
+    'modules/licensing/assignment/assignment-end.service.ts',
+    'ends or shortens the seat a revocation gives back, called by the revocation services of provisioning (G6)',
+  ],
+  [
     'modules/licensing/provisioning/provisioning-failure.service.ts',
     'the entry the connector calls when a try failed, reached through the licensing facade licensing.service.ts',
   ],
@@ -195,6 +511,55 @@ const INTRA_MODULE_CONTRACTS: ReadonlyMap<string, string> = new Map([
     'modules/finance/exchange-rate/exchange-rate.errors.ts',
     'exchange-rate errors thrown through the facade and mapped by the shared mappers/finance.http-errors.ts',
   ],
+  // personnel (G6, ADR-0017): what the capabilities of the context share.
+  [
+    'modules/personnel/grounds/grounds.policy.ts',
+    'the basis a personnel change rests on, judged the same way by the transfer and by the flows that follow (G6)',
+  ],
+  [
+    'modules/personnel/personnel-self-action.policy.ts',
+    'whether an IT Admin may record an event about their own person, judged the same way by every personnel flow (G6)',
+  ],
+  [
+    'modules/personnel/personnel-file-hooks.ts',
+    'the hooks the flows that follow a personnel file register, called by the transfer when it is recorded, moved or cancelled (G6)',
+  ],
+  [
+    'modules/personnel/offboarding/offboarding-blocker.registry.ts',
+    'the registry of what keeps the record of a departure open, where the service accounts that wait for a new person register their count (G6)',
+  ],
+  [
+    'modules/personnel/role-duties/role-duties.service.ts',
+    'which of the roles that need someone to take over a person who leaves holds, read in one batch by the list and the case of the departure (G6)',
+  ],
+  [
+    'modules/personnel/leave/leave-query.service.ts',
+    'the days a person was on long leave, read by the facade personnel.service.ts for the rules of the recommendations (G6)',
+  ],
+  [
+    'modules/personnel/leave/leave-departure.service.ts',
+    'ends the long leave of a person who leaves and resumes it when the handover is cancelled, called by the record of a departure (G6)',
+  ],
+  [
+    'modules/personnel/transfer/transfer-change.service.ts',
+    'the transfer that waits and its cancellation inside the transaction of the record of a departure that ends before its day (G6)',
+  ],
+  [
+    'modules/personnel/transfer/transfer-guard.service.ts',
+    'who the actor is to the person recorded and whether the one chosen to follow a head can take the department, judged alike by a transfer and by a departure (G6)',
+  ],
+  [
+    'modules/personnel/notice/notice-recorder.registry.ts',
+    'the registry of the recorders of a notice of a head: the transfer, the long leave and the departure each register how the event a notice announces is written (G6)',
+  ],
+  [
+    'modules/personnel/notice/notice.errors.ts',
+    'the refusal of a notice that a recorder raises when the person already has the event the notice announces (G6)',
+  ],
+  [
+    'modules/personnel/notice/notice.types.ts',
+    'the kinds and records of a notice that the recorders of the transfer, the long leave and the departure are given and answer with (G6)',
+  ],
   // organization (Waves 2 and 3: the facade and the department use cases reach the other capabilities here; GATE2-02:
   // the shared mappers/organization.http-errors.ts maps the errors of all five capabilities for their routes).
   [
@@ -209,6 +574,10 @@ const INTRA_MODULE_CONTRACTS: ReadonlyMap<string, string> = new Map([
   [
     'modules/organization/cost-center/cost-center.types.ts',
     'code format shared with departments; Cost Center views used by department records',
+  ],
+  [
+    'modules/organization/change-announcement/organization-change.service.ts',
+    'registers the listeners of a change of the organization and tells them of it, behind the facade and the history facade (G6)',
   ],
   ['modules/organization/department/department-directory.service.ts', 'department head periods behind the facade'],
   [
@@ -383,6 +752,10 @@ const PUBLIC_ROOT_CONTRACT_FILES: ReadonlySet<string> = new Set([
   'notifications/email-delivery.service.ts',
   'identity-access/identity-access-inspection.service.ts',
   'identity-access/local-demo-account.service.ts',
+  'requests/step-redetermination-sweep.service.ts',
+  'requests/request-status-projector.service.ts',
+  'requests/step-sla-sweep.service.ts',
+  'organization/organization-history.service.ts',
 ]);
 
 /** BEH.1: the exact shared policy files; the same list as in architecture-boundaries.spec.ts (checked by policy-ownership.spec.ts). */

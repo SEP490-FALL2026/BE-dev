@@ -369,13 +369,17 @@ describe('API inventory (e2e)', () => {
       'currencyList',
       'healthGetLiveness',
       'healthGetReadiness',
+      'meDepartureNoticeGet',
       'meGet',
+      'notificationMarkAllRead',
+      'notificationUnreadCount',
       'onboardingChecklistGet',
       'operatingParameterList',
       'reportingCurrencyGet',
       'seatBaselineClose',
       'seatBaselineGet',
       'standardToolsetMine',
+      'superAdminWatchGet',
     ];
     const NEW_422 = [
       'costCenterList',
@@ -438,7 +442,7 @@ describe('API inventory (e2e)', () => {
         })
         .map((operation) => operation.key);
 
-      expect(operations).toHaveLength(146);
+      expect(operations).toHaveLength(296);
       expect(missing).toEqual([]);
     });
 

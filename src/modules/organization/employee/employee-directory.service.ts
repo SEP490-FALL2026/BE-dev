@@ -7,8 +7,13 @@ import {
   EmployeeImportLookupData,
   EmployeeProfile,
   EmployeeRecord,
+  EmployeeWorkState,
   OfficialFieldsPatch,
+  PlacementInForce,
+  ScheduledStructureChange,
+  StructureChangeInput,
 } from '../organization.types';
+import { EmployeeDepartureRepo } from './employee-departure.repo';
 import { EmployeeRepo } from './employee.repo';
 import { ImportLookupRepo } from './import-lookup.repo';
 
@@ -23,6 +28,7 @@ export class EmployeeDirectoryService {
   constructor(
     private readonly repo: EmployeeRepo,
     private readonly importLookup: ImportLookupRepo,
+    private readonly departures: EmployeeDepartureRepo,
   ) {}
 
   createWithPlacement(tx: DbTx, input: CreateEmployeeWithPlacementInput): Promise<{ id: string }> {
@@ -45,8 +51,12 @@ export class EmployeeDirectoryService {
     return this.repo.findEmployees(employeeIds, tx);
   }
 
-  placementOn(employeeId: string, onDate: BusinessDate): Promise<{ departmentId: string; jobTitleId: string } | null> {
-    return this.repo.placementIdsOn(employeeId, onDate);
+  placementOn(
+    employeeId: string,
+    onDate: BusinessDate,
+    tx?: DbTx,
+  ): Promise<{ departmentId: string; jobTitleId: string } | null> {
+    return this.repo.placementIdsOn(employeeId, onDate, tx);
   }
 
   findManyByCodes(employeeCodes: readonly string[], tx?: DbTx): Promise<EmployeeRecord[]> {
@@ -99,8 +109,48 @@ export class EmployeeDirectoryService {
       employeeCodes: string[];
       normalizedEmails: string[];
     },
+    today: BusinessDate,
   ): Promise<EmployeeImportLookupData> {
-    return this.importLookup.lookup(tx, names);
+    return this.importLookup.lookup(tx, names, today);
+  }
+
+  scheduleStructureChange(tx: DbTx, input: StructureChangeInput): Promise<ScheduledStructureChange> {
+    return this.repo.scheduleStructureChange(tx, input);
+  }
+
+  cancelStructureChange(
+    tx: DbTx,
+    change: Pick<ScheduledStructureChange, 'closedPlacementId' | 'openedPlacementId'>,
+  ): Promise<void> {
+    return this.repo.cancelStructureChange(tx, change);
+  }
+
+  placementInForce(tx: DbTx, employeeId: string, onDate: BusinessDate): Promise<PlacementInForce | null> {
+    return this.repo.placementInForce(tx, employeeId, onDate);
+  }
+
+  placementStart(tx: DbTx, placementId: string): Promise<BusinessDate | null> {
+    return this.repo.placementStart(tx, placementId);
+  }
+
+  setWorkState(tx: DbTx, employeeId: string, workState: EmployeeWorkState): Promise<void> {
+    return this.repo.setWorkState(tx, employeeId, workState);
+  }
+
+  scheduleDepartureEnd(
+    tx: DbTx,
+    employeeId: string,
+    endsOn: BusinessDate,
+  ): Promise<{ closedPlacementId: string; departmentId: string; validFrom: BusinessDate }> {
+    return this.departures.scheduleEnd(tx, employeeId, endsOn);
+  }
+
+  cancelDepartureEnd(tx: DbTx, placementId: string): Promise<void> {
+    return this.departures.cancelEnd(tx, placementId);
+  }
+
+  markLeft(tx: DbTx, employeeId: string): Promise<void> {
+    return this.departures.markLeft(tx, employeeId);
   }
 
   lockForImport(tx: DbTx, departmentIds: string[], jobTitleIds: string[]): Promise<void> {

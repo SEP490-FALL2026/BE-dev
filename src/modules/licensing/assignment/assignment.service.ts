@@ -6,12 +6,11 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { AuditService } from '../../audit/audit.service';
 import type { SeatTarget, SeatTargetRef } from '../../catalog/catalog.types';
 import { CatalogService } from '../../catalog/catalog.service';
-import { EmployeeNotFoundError } from '../../organization/organization.errors';
 import { OrganizationService } from '../../organization/organization.service';
 import { AssignmentNotFoundError, AssignmentNotOpenError, SeatTargetNotFoundError } from '../licensing.errors';
 import type {
+  AssignmentHolder,
   AssignmentRecord,
-  AssignmentView,
   ExistingAssignment,
   NewBaselineAssignment,
   SeatHolder,
@@ -19,26 +18,23 @@ import type {
 } from '../licensing.types';
 import { licensingAuditEvent } from '../mappers/licensing-audit-event';
 import { toAssignmentFailure } from './assignment-conflicts';
-import { assertResponsibleChange, toAssignmentView } from './assignment.policy';
+import { assignmentCreatedSnapshot } from './assignment.policy';
 import { assertBaselineTarget, assertSeatTargetUsable, toSeatTargetRef } from './baseline-target.policy';
-import { AssignmentRepo, type NewAssignment } from './assignment.repo';
+import { AssignmentRepo } from './assignment.repo';
 
-const recorded = (record: AssignmentRecord, importId: string | null) => ({
-  source: record.source,
-  kind: record.kind,
-  planId: record.planId,
-  subscriptionId: record.subscriptionId,
-  employeeId: record.employeeId,
-  effectiveFrom: record.effectiveFrom,
-  effectiveFromBasis: record.effectiveFromBasis,
-  importId,
-});
+/** What ending an open assignment without a seat needs: the assignment, the request that led to it and the day. */
+interface EndWithoutSeatInput {
+  organizationId: string;
+  assignmentId: string;
+  requestId: string;
+  now: Date;
+}
 
 /**
  * The assignments of seats (`US-02-05`, `US-07-01` AC-14). Assignments reach this service by the baseline import and by
- * a change of the person responsible for a service account; both are written under the lock of the subscription, with an
- * audit event for each, and the database holds the invariants whoever writes. The account identifier never enters an
- * audit event.
+ * a request; both are written under the lock of the subscription, with an audit event for each, and the database holds the
+ * invariants whoever writes. A change of the person responsible for a service account is `AssignmentResponsibleService`. The
+ * account identifier never enters an audit event.
  */
 @Injectable()
 export class AssignmentService {
@@ -82,6 +78,21 @@ export class AssignmentService {
   /** Who holds a seat today in the organization calendar, and how many. */
   async openHolders(): Promise<SeatHolder[]> {
     return this.repo.openHolders(await this.organization.businessToday());
+  }
+
+  /** One page of the personal seats a person holds today in these plans, and the total. */
+  async pageHeldOfPlans(
+    employeeId: string,
+    planIds: readonly string[],
+    page: { skip: number; take: number },
+  ): Promise<{ items: AssignmentRecord[]; total: number }> {
+    return this.repo.pageHeldOfPlans(
+      employeeId,
+      planIds,
+      await this.organization.businessToday(),
+      page.skip,
+      page.take,
+    );
   }
 
   countBaseline(): Promise<number> {
@@ -137,7 +148,7 @@ export class AssignmentService {
           'LicenseAssignment',
           record.id,
           null,
-          recorded(record, input.importId),
+          assignmentCreatedSnapshot(record, input.importId),
         ),
       );
       created.push(record);
@@ -147,9 +158,10 @@ export class AssignmentService {
   }
 
   /**
-   * Writes the seat a request is granted, in the caller transaction, which holds the lock of the seat target, with its
-   * audit event. Throws AssignmentConflictError when the database refuses it: the person already holds a seat there, the
-   * seats are all taken, time-limited staff has no expected end date, or the baseline rule the database keeps.
+   * Writes the seat a request is granted, in the caller transaction (which holds the lock of the seat target), with its
+   * audit event: a personal seat, or a service account with its reason, owning department and Cost Center (`US-05-21`).
+   * Throws AssignmentConflictError when the database refuses it: an overlap, the seats all taken, the identifier in use,
+   * no expected end date for time-limited staff, or a rule of the baseline or of the owning department.
    */
   async createFromRequest(
     tx: DbTx,
@@ -158,26 +170,26 @@ export class AssignmentService {
       organizationId: string;
       requestId: string;
       target: SeatTarget;
-      employeeId: string;
-      accountIdentifier: string;
+      holder: AssignmentHolder;
       effectiveFrom: BusinessDate;
       expectedEndDate: BusinessDate | null;
     },
   ): Promise<AssignmentRecord> {
+    const { holder } = input;
     let record: AssignmentRecord;
     try {
       record = await this.repo.insert(tx, {
         organizationId: input.organizationId,
         source: 'REQUEST',
-        kind: 'PERSONAL',
+        kind: holder.kind,
         planId: input.target.planId,
         subscriptionId: input.target.subscriptionId,
-        employeeId: input.employeeId,
-        accountIdentifier: input.accountIdentifier,
-        normalizedAccountIdentifier: normalizeAccountIdentifier(input.accountIdentifier),
-        reason: null,
-        costCenterId: null,
-        owningDepartmentId: null,
+        employeeId: holder.employeeId,
+        accountIdentifier: holder.accountIdentifier,
+        normalizedAccountIdentifier: normalizeAccountIdentifier(holder.accountIdentifier),
+        reason: holder.reason,
+        costCenterId: holder.costCenterId,
+        owningDepartmentId: holder.owningDepartmentId,
         effectiveFrom: input.effectiveFrom,
         effectiveFromBasis: 'ACTUAL',
         expectedEndDate: input.expectedEndDate,
@@ -197,8 +209,10 @@ export class AssignmentService {
         'LicenseAssignment',
         record.id,
         null,
+        // Neither the identifier of the account nor its purpose is written to the trail.
         {
-          ...recorded(record, null),
+          ...assignmentCreatedSnapshot(record, null),
+          owningDepartmentId: record.owningDepartmentId,
           requestId: input.requestId,
         },
       ),
@@ -208,33 +222,48 @@ export class AssignmentService {
   }
 
   /**
-   * Closes the assignment of a grant that failed for good: it becomes a failed assignment, the seat is free again on every
-   * day, and the row stays as what was decided. Done in the caller transaction, under the lock of the subscription as every
-   * writer of its seats does. Throws AssignmentNotFoundError and AssignmentNotOpenError.
+   * Closes the assignment of a grant that failed for good: it becomes a failed assignment, the seat is free again on every day,
+   * and the row stays as what was decided. Done in the caller transaction, under the lock of the subscription. Throws
+   * AssignmentNotFoundError and AssignmentNotOpenError.
    */
-  async closeFailed(
+  closeFailed(tx: DbTx, actor: AuthenticatedPrincipal, input: EndWithoutSeatInput): Promise<void> {
+    return this.endWithoutSeat(tx, actor, input, 'FAILED');
+  }
+
+  /** The same for the grant of a request that was withdrawn (`US-05-08`): a cancelled assignment holds no seat either. */
+  cancel(tx: DbTx, actor: AuthenticatedPrincipal, input: EndWithoutSeatInput): Promise<void> {
+    return this.endWithoutSeat(tx, actor, input, 'CANCELLED');
+  }
+
+  private async endWithoutSeat(
     tx: DbTx,
     actor: AuthenticatedPrincipal,
-    input: { organizationId: string; assignmentId: string; requestId: string; now: Date },
+    input: EndWithoutSeatInput,
+    how: 'FAILED' | 'CANCELLED',
   ): Promise<void> {
     const probe = await this.repo.find(input.assignmentId, tx);
     if (!probe) throw new AssignmentNotFoundError();
     if (probe.subscriptionId) await this.catalog.lockSeatTarget(tx, { subscriptionId: probe.subscriptionId });
     const current = await this.repo.lock(tx, input.assignmentId);
     if (!current) throw new AssignmentNotFoundError();
-    if (current.validUntil !== null || current.failedAt !== null) throw new AssignmentNotOpenError();
+    if (current.validUntil !== null || current.failedAt !== null || current.cancelledAt !== null) {
+      throw new AssignmentNotOpenError();
+    }
 
-    await this.repo.markFailed(tx, current.id, input.now);
+    const failed = how === 'FAILED';
+    await (failed
+      ? this.repo.markFailed(tx, current.id, input.now)
+      : this.repo.markCancelled(tx, current.id, input.now));
     await this.audit.record(
       tx,
       licensingAuditEvent(
         actor,
         input.organizationId,
-        'LICENSE_ASSIGNMENT.FAILED',
+        failed ? 'LICENSE_ASSIGNMENT.FAILED' : 'LICENSE_ASSIGNMENT.CANCELLED',
         'LicenseAssignment',
         current.id,
         { validUntil: null },
-        { failedAt: input.now.toISOString(), requestId: input.requestId },
+        { [failed ? 'failedAt' : 'cancelledAt']: input.now.toISOString(), requestId: input.requestId },
       ),
     );
   }
@@ -253,110 +282,6 @@ export class AssignmentService {
       occupied,
       free: purchased === null ? null : Math.max(0, purchased - occupied),
       asOf,
-    };
-  }
-
-  /**
-   * Passes an open service account to another person from `effectiveFrom` (`AC-10`, `QĐ-43a`): the old assignment ends
-   * that day (it no longer counts), the new one begins that day with the same kind, Cost Center, reason and identifier,
-   * chained to the old one, in one transaction under the lock of the subscription, so the seats taken do not change on any
-   * day. It grants no new seat, so it is allowed after the baseline is closed. Throws the errors of the policy,
-   * AssignmentNotFoundError and AssignmentConflictError.
-   */
-  async changeResponsible(
-    actor: AuthenticatedPrincipal,
-    assignmentId: string,
-    input: { employeeId: string; effectiveFrom: BusinessDate; expectedEndDate: BusinessDate | null },
-  ): Promise<{ ended: AssignmentView; created: AssignmentView }> {
-    const organization = await this.organization.getOrganization();
-    if (!organization) throw new Error('A service account changed hands before installation');
-    const today = await this.organization.businessToday();
-
-    return this.runner.run(async (tx) => {
-      const probe = await this.repo.find(assignmentId, tx);
-      if (!probe) throw new AssignmentNotFoundError();
-      // The subscription first, as every writer of its seats does, then the assignment: one order, no deadlock.
-      if (probe.subscriptionId) await this.catalog.lockSeatTarget(tx, { subscriptionId: probe.subscriptionId });
-      const current = await this.repo.lock(tx, assignmentId);
-      if (!current) throw new AssignmentNotFoundError();
-
-      const holder = await this.lockHolder(tx, input.employeeId, input.effectiveFrom);
-      assertResponsibleChange(current, input, holder, today);
-
-      await this.repo.end(tx, current.id, input.effectiveFrom);
-      const base: NewAssignment = {
-        organizationId: organization.id,
-        source: 'HANDOVER',
-        kind: current.kind,
-        planId: current.planId,
-        subscriptionId: current.subscriptionId,
-        employeeId: input.employeeId,
-        accountIdentifier: current.accountIdentifier,
-        normalizedAccountIdentifier: normalizeAccountIdentifier(current.accountIdentifier),
-        reason: current.reason,
-        costCenterId: current.costCenterId,
-        owningDepartmentId: current.owningDepartmentId,
-        effectiveFrom: input.effectiveFrom,
-        effectiveFromBasis: 'ACTUAL',
-        expectedEndDate: input.expectedEndDate,
-        predecessorId: current.id,
-        baselineImportId: null,
-        createdByAppUserId: actor.appUserId,
-      };
-      let created: AssignmentRecord;
-      try {
-        created = await this.repo.insert(tx, base);
-      } catch (error) {
-        throw toAssignmentFailure(error, 0) ?? error;
-      }
-      const ended: AssignmentRecord = { ...current, validUntil: input.effectiveFrom };
-
-      await this.audit.record(
-        tx,
-        licensingAuditEvent(
-          actor,
-          organization.id,
-          'LICENSE_ASSIGNMENT.ENDED',
-          'LicenseAssignment',
-          current.id,
-          { validUntil: null },
-          { validUntil: input.effectiveFrom, successorId: created.id },
-        ),
-      );
-      await this.audit.record(
-        tx,
-        licensingAuditEvent(
-          actor,
-          organization.id,
-          'LICENSE_ASSIGNMENT.CREATED',
-          'LicenseAssignment',
-          created.id,
-          null,
-          { ...recorded(created, null), predecessorId: current.id },
-        ),
-      );
-
-      return { ended: toAssignmentView(ended), created: toAssignmentView(created) };
-    });
-  }
-
-  /** The person who would take over, locked `FOR SHARE` so they cannot leave meanwhile; null when there is none. */
-  private async lockHolder(tx: DbTx, employeeId: string, onDate: BusinessDate) {
-    try {
-      await this.organization.lockEmployeeForShare(tx, employeeId);
-    } catch (error) {
-      if (error instanceof EmployeeNotFoundError) return null;
-      throw error;
-    }
-    const employee = await this.organization.getEmployee(employeeId, tx);
-
-    if (!employee) return null;
-    const unit = (await this.organization.getOwningUnits([employeeId], onDate, tx)).get(employeeId);
-
-    return {
-      status: employee.status,
-      employmentType: employee.employmentType,
-      departmentId: unit?.departmentId ?? null,
     };
   }
 }

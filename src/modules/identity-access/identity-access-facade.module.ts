@@ -10,6 +10,10 @@ import { CredentialService } from './accounts/credential.service';
 import { PasswordHasher } from './accounts/password-hasher.service';
 import { RoleGrantRepo } from './accounts/role-grant.repo';
 import { RoleGrantService } from './accounts/role-grant.service';
+import { SuperAdminHolderRepo } from './accounts/super-admin-holder.repo';
+import { ApprovalRoleChangeRegistry } from './approval-roles/approval-role-change.registry';
+import { ApprovalRoleHoldersService } from './approval-roles/approval-role-holders.service';
+import { ApprovalRoleReaderRepo } from './approval-roles/approval-role-reader.repo';
 import { IdentityAccessService } from './identity-access.service';
 
 /**
@@ -23,7 +27,11 @@ import { IdentityAccessService } from './identity-access.service';
     AppUserRepo,
     CredentialRepo,
     RoleGrantRepo,
+    SuperAdminHolderRepo,
     ActionTokenRepo,
+    ApprovalRoleReaderRepo,
+    ApprovalRoleHoldersService,
+    ApprovalRoleChangeRegistry,
     PasswordHasher,
     AccountDirectoryService,
     RoleGrantService,
@@ -31,6 +39,13 @@ import { IdentityAccessService } from './identity-access.service';
     CredentialService,
     IdentityAccessService,
   ],
-  exports: [IdentityAccessService, AccountDirectoryService, RoleGrantService, ActionLinkService, CredentialService],
+  exports: [
+    IdentityAccessService,
+    AccountDirectoryService,
+    RoleGrantService,
+    ActionLinkService,
+    CredentialService,
+    ApprovalRoleChangeRegistry,
+  ],
 })
 export class IdentityAccessFacadeModule {}

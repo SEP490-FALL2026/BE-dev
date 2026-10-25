@@ -56,10 +56,32 @@ export class DepartmentDirectoryService {
     return this.departments.activeDepartmentsWithItAdmin(tx);
   }
 
+  /** `FOR UPDATE` on a department the caller is about to change the head of (the lock protocol: departments in id order first). */
+  lockForUpdate(tx: DbTx, id: string): Promise<DepartmentRecord | null> {
+    return this.departments.lock(tx, id, 'UPDATE');
+  }
+
   // --- heads --------------------------------------------------------------------------
 
-  headsOn(departmentIds: string[], onDate: BusinessDate): Promise<Map<string, DepartmentHeadRecord>> {
-    return this.heads.currentHeads(departmentIds, onDate);
+  endHeadPeriodOf(
+    tx: DbTx,
+    departmentId: string,
+    employeeId: string,
+    from: BusinessDate,
+  ): Promise<{ periodId: string; endedBefore: BusinessDate | null } | null> {
+    return this.heads.endPeriodOf(tx, departmentId, employeeId, from);
+  }
+
+  restoreHeadPeriodEnd(tx: DbTx, periodId: string, validTo: BusinessDate | null): Promise<void> {
+    return this.heads.restorePeriodEnd(tx, periodId, validTo);
+  }
+
+  deleteHeadPeriod(tx: DbTx, periodId: string): Promise<void> {
+    return this.heads.deletePeriod(tx, periodId);
+  }
+
+  headsOn(departmentIds: string[], onDate: BusinessDate, tx?: DbTx): Promise<Map<string, DepartmentHeadRecord>> {
+    return this.heads.currentHeads(departmentIds, onDate, tx);
   }
 
   headHistory(client: DbTx | undefined, departmentId: string, limit: number): Promise<HeadPeriodRecord[]> {
@@ -99,22 +121,47 @@ export class DepartmentDirectoryService {
   }
 
   /** The IT Admin in charge of the department while still working; null when there is none or they have left. */
-  async itAdminInChargeOf(id: string): Promise<string | null> {
-    const itAdmin = (await this.departments.findById(id))?.itAdmin;
+  async itAdminInChargeOf(id: string, tx?: DbTx): Promise<string | null> {
+    const itAdmin = (await this.departments.findById(id, tx))?.itAdmin;
 
     return itAdmin?.employeeStatus === 'ACTIVE' ? itAdmin.employeeId : null;
+  }
+
+  /** The departments that name this employee IT Admin in charge, while they still work; empty otherwise. */
+  idsInChargeOf(employeeId: string, tx?: DbTx): Promise<string[]> {
+    return this.departments.idsInChargeOf(employeeId, tx);
+  }
+
+  /** The active departments each of these employees is named IT Admin in charge of (one read, in code order). */
+  inChargeOfMany(employeeIds: readonly string[], tx?: DbTx) {
+    return this.departments.inChargeOfMany(employeeIds, tx);
   }
 
   lockShared(tx: DbTx, id: string): Promise<DepartmentRecord | null> {
     return this.departments.lockShared(tx, id);
   }
 
-  memberIdsOn(departmentId: string, onDate: BusinessDate): Promise<string[] | null> {
-    return this.departments.memberIdsOn(departmentId, onDate);
+  memberIdsOn(departmentId: string, onDate: BusinessDate, tx?: DbTx): Promise<string[] | null> {
+    return this.departments.memberIdsOn(departmentId, onDate, tx);
   }
 
   headedDepartment(employeeId: string, onDate: BusinessDate): Promise<{ departmentId: string } | null> {
     return this.heads.headedDepartment(employeeId, onDate);
+  }
+
+  headsOnDates(
+    queries: readonly { departmentId: string; onDate: BusinessDate }[],
+    tx?: DbTx,
+  ): Promise<Map<string, string>> {
+    return this.heads.headsOnDates(queries, tx);
+  }
+
+  headPeriodsOf(
+    employeeId: string,
+    from: BusinessDate,
+    tx?: DbTx,
+  ): Promise<{ departmentId: string; validFrom: BusinessDate; validTo: BusinessDate | null }[]> {
+    return this.heads.periodsOf(employeeId, from, tx);
   }
 
   hasHeadPeriodFrom(client: DbTx | undefined, employeeId: string, onDate: BusinessDate): Promise<boolean> {
@@ -132,10 +179,16 @@ export class DepartmentDirectoryService {
    */
   async startHeadPeriod(
     tx: DbTx,
-    input: { organizationId: string; departmentId: string; employeeId: string; validFrom: BusinessDate },
-  ): Promise<void> {
+    input: {
+      organizationId: string;
+      departmentId: string;
+      employeeId: string;
+      validFrom: BusinessDate;
+      validTo?: BusinessDate | null;
+    },
+  ): Promise<{ periodId: string }> {
     try {
-      await this.heads.insertHeadPeriod(tx, input);
+      return await this.heads.insertHeadPeriod(tx, input);
     } catch (error) {
       if (readSqlState(error) === '23P01') throw new HeadAssignmentError('HEADS_ANOTHER_DEPARTMENT');
       if (isCheckViolation(error)) throw new HeadAssignmentError('NOT_A_MEMBER_ON_DATE');

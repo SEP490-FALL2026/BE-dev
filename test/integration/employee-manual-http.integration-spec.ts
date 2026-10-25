@@ -145,6 +145,7 @@ describe('manual employee entry over HTTP (integration, real PostgreSQL)', () =>
           'memberSince',
           'status',
           'workEmail',
+          'workState',
         ].sort(),
       );
       expect(await sideTables()).toEqual(before);

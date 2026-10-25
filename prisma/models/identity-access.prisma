@@ -42,6 +42,8 @@ model AppUser {
   activationState         ActivationState          @default(INVITED) @map("activation_state")
   emailVerificationSource EmailVerificationSource? @map("email_verification_source")
   emailVerifiedAt         DateTime?                @map("email_verified_at") @db.Timestamptz(3)
+  // The day the person behind the account left (set once, by the record of a departure); the account itself is locked by the Super Admin.
+  employeeLeftOn          DateTime?                @map("employee_left_on") @db.Date
   createdAt               DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt               DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(3)
 

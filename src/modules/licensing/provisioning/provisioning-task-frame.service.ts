@@ -5,9 +5,11 @@ import { AuditService } from '../../audit/audit.service';
 import { IdentityAccessService } from '../../identity-access/identity-access.service';
 import { OrganizationService } from '../../organization/organization.service';
 import { ProvisioningTaskNotFoundError } from '../licensing.errors';
+import type { SelfExecutionMode } from '../licensing.types';
 import { licensingAuditEvent } from '../mappers/licensing-audit-event';
 import { selfExecution } from './provisioning.policy';
-import { ProvisioningTaskRepo, type ProvisioningTaskRecord } from './provisioning-task.repo';
+import type { ProvisioningTaskRecord } from './provisioning-task.record';
+import { ProvisioningTaskRepo } from './provisioning-task.repo';
 
 /** What a write of one of the actions decided: the audit action and the after-snapshot, or nothing changed. */
 export type TaskWrite = false | { action: string; after: Record<string, string | number | boolean | null> };
@@ -51,7 +53,7 @@ export class ProvisioningTaskFrame {
       const task = await this.repo.lock(tx, id);
       if (!task) throw new ProvisioningTaskNotFoundError();
       action.check(task);
-      const mode = await this.selfMode(actor, task.assignment.employeeId);
+      const mode = await this.selfExecutionMode(actor, task.assignment.employeeId);
       const done = await action.write({ tx, task, organizationId: organization.id, now });
       if (done === false) return task;
 
@@ -81,8 +83,11 @@ export class ProvisioningTaskFrame {
     });
   }
 
-  /** The rule for an IT Admin who works a task of which they are the beneficiary (`QĐ-77m`). */
-  private async selfMode(actor: AuthenticatedPrincipal, beneficiaryEmployeeId: string) {
+  /**
+   * The rule for an IT Admin who works for a person who is themselves (`QĐ-77m`): not while another usable IT Admin can, and
+   * marked as self-executed when none can. Throws ProvisioningAnotherItAdminNeededError.
+   */
+  async selfExecutionMode(actor: AuthenticatedPrincipal, beneficiaryEmployeeId: string): Promise<SelfExecutionMode> {
     const isSelf = actor.employeeId === beneficiaryEmployeeId;
 
     return selfExecution({

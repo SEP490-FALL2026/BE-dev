@@ -47,6 +47,14 @@ export const PARAMETER_DEFINITIONS: readonly ParameterDefinition[] = [
     source: 'FR-3.8, OI-14a',
   },
   {
+    key: 'BACKLOG_ALERT_THRESHOLD',
+    shape: { kind: 'int', min: 1, max: 500 },
+    default: 10,
+    unit: 'steps',
+    description: 'How many approval steps one person may hold before the Super Admin is told of the backlog.',
+    source: 'FR-3.8, US-05-10',
+  },
+  {
     key: 'ACTIVITY_WINDOW_MINUTES',
     shape: { kind: 'int', min: 1, max: 120 },
     default: 5,
@@ -78,6 +86,34 @@ export const PARAMETER_DEFINITIONS: readonly ParameterDefinition[] = [
     description: 'How long the new head of a department has to review tools outside its standard set after a transfer.',
     source: 'FR-8.2, QĐ-50b, QĐ-56a',
   },
+  {
+    key: 'PERSONNEL_NOTICE_REVIEW_WORKING_DAYS',
+    shape: { kind: 'int', min: 1, max: 30 },
+    default: 2,
+    unit: 'working days',
+    description:
+      'How long the IT Admin has to verify and record, or reject, the notice of a department head about a change coming for one of their people.',
+    source: 'FR-2.14, FR-8.2',
+  },
+  {
+    key: 'SAAS_ISSUE_RESPONSE_WORKING_DAYS',
+    shape: { kind: 'int', min: 1, max: 30 },
+    default: 1,
+    unit: 'working days',
+    description:
+      'How long the IT Admin in charge has to take up a new report of an error in a SaaS right before they are reminded; the report is never reassigned or closed by the reminder.',
+    source: 'FR-2.15, FR-8.2',
+  },
+  {
+    key: 'SAAS_ISSUE_REOPEN_WORKING_DAYS',
+    shape: { kind: 'int', min: 1, max: 30 },
+    default: 5,
+    unit: 'working days',
+    description:
+      'How long after a report of an error in a SaaS right is resolved its reporter may reopen it; after that it is closed and only a new report can be sent.',
+    source: 'FR-2.15, FR-8.2',
+  },
+
   {
     key: 'ABRUPT_DEPARTURE_HOLD_WORKING_DAYS',
     shape: { kind: 'int', min: 1, max: 30 },

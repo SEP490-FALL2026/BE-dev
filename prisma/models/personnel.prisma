@@ -1,0 +1,418 @@
+// The personnel context (ADR-0017): what happens to the place of a person in the organization, with the day it takes effect and
+// the basis it rests on. The placements and head periods a transfer writes belong to organization; this context keeps the
+// record of the transfer and what became of it.
+
+enum DepartmentTransferStatus {
+  PENDING
+  EFFECTIVE
+  CANCELLED
+}
+
+enum DepartmentTransferChangeKind {
+  RESCHEDULED
+  CANCELLED
+}
+
+// A change of department or job title with a day it takes effect. The periods are written when it is recorded; a transfer is
+// PENDING until its day, then EFFECTIVE, or CANCELLED. At most one is PENDING for each employee (a partial unique index).
+model DepartmentTransfer {
+  id                   String                   @id @default(uuid(7)) @db.Uuid
+  organizationId       String                   @map("organization_id") @db.Uuid
+  employeeId           String                   @map("employee_id") @db.Uuid
+  fromDepartmentId     String                   @map("from_department_id") @db.Uuid
+  toDepartmentId       String                   @map("to_department_id") @db.Uuid
+  fromJobTitleId       String                   @map("from_job_title_id") @db.Uuid
+  toJobTitleId         String                   @map("to_job_title_id") @db.Uuid
+  effectiveOn          DateTime                 @map("effective_on") @db.Date
+  status               DepartmentTransferStatus @default(PENDING)
+  closesPlacementId    String                   @map("closes_placement_id") @db.Uuid
+  opensPlacementId     String                   @map("opens_placement_id") @db.Uuid
+  headHandover         Json?                    @map("head_handover")
+  groundsType          String                   @map("grounds_type")
+  groundsReference     String                   @map("grounds_reference")
+  groundsIssuer        String                   @map("grounds_issuer")
+  groundsIssuedOn      DateTime                 @map("grounds_issued_on") @db.Date
+  selfExecuted         Boolean                  @default(false) @map("self_executed")
+  recordedByAppUserId  String                   @map("recorded_by_app_user_id") @db.Uuid
+  recordedAt           DateTime                 @default(now()) @map("recorded_at") @db.Timestamptz(3)
+  effectiveAt          DateTime?                @map("effective_at") @db.Timestamptz(3)
+  cancelledAt          DateTime?                @map("cancelled_at") @db.Timestamptz(3)
+  cancelledByAppUserId String?                  @map("cancelled_by_app_user_id") @db.Uuid
+  cancelledReason      String?                  @map("cancelled_reason")
+  // Closed by the IT Admin once the people who answer for the service accounts of the person are named (US-03-08); only an EFFECTIVE transfer.
+  closedAt             DateTime?                @map("closed_at") @db.Timestamptz(3)
+  closedByAppUserId    String?                  @map("closed_by_app_user_id") @db.Uuid
+  // The notice of a head this transfer was recorded from, when there was one (US-03-11).
+  noticeId             String?                  @unique @map("notice_id") @db.Uuid
+
+  organization   Organization               @relation(fields: [organizationId], references: [id])
+  notice         PersonnelNotice?           @relation(fields: [noticeId], references: [id], onDelete: Restrict)
+  employee       Employee                   @relation(fields: [employeeId], references: [id])
+  fromDepartment Department                 @relation("TransferFromDepartment", fields: [fromDepartmentId], references: [id])
+  toDepartment   Department                 @relation("TransferToDepartment", fields: [toDepartmentId], references: [id])
+  fromJobTitle   JobTitle                   @relation("TransferFromJobTitle", fields: [fromJobTitleId], references: [id])
+  toJobTitle     JobTitle                   @relation("TransferToJobTitle", fields: [toJobTitleId], references: [id])
+  changes        DepartmentTransferChange[]
+  reviews        TransferReview[]
+
+  @@index([effectiveOn(sort: Desc), id])
+  @@index([employeeId])
+  @@index([organizationId])
+  @@map("department_transfers")
+}
+
+// One row for each move of the day or cancellation of a transfer that had not taken effect. Append-only (a trigger).
+model DepartmentTransferChange {
+  id                 String                       @id @default(uuid(7)) @db.Uuid
+  transferId         String                       @map("transfer_id") @db.Uuid
+  kind               DepartmentTransferChangeKind
+  oldEffectiveOn     DateTime                     @map("old_effective_on") @db.Date
+  newEffectiveOn     DateTime?                    @map("new_effective_on") @db.Date
+  reason             String
+  groundsType        String                       @map("grounds_type")
+  groundsReference   String                       @map("grounds_reference")
+  groundsIssuer      String                       @map("grounds_issuer")
+  groundsIssuedOn    DateTime                     @map("grounds_issued_on") @db.Date
+  changedByAppUserId String                       @map("changed_by_app_user_id") @db.Uuid
+  changedAt          DateTime                     @default(now()) @map("changed_at") @db.Timestamptz(3)
+
+  transfer DepartmentTransfer @relation(fields: [transferId], references: [id])
+
+  @@index([transferId, changedAt, id])
+  @@map("department_transfer_changes")
+}
+
+enum TransferReviewStatus {
+  OPEN
+  COMPLETED
+  SUPERSEDED
+}
+
+enum TransferReviewDecision {
+  PENDING
+  STILL_NEEDED
+  NOT_NEEDED
+  NEEDS_NEW_TOOL
+}
+
+// The review a new head makes of the tools a person brought from another department that are outside the standard toolset of the
+// department and job title they came to (US-03-07): one for each placement a transfer opened, OPEN until every line is decided
+// (COMPLETED) or a later transfer of the person makes it obsolete (SUPERSEDED). Who decides is the head of the department
+// today, read from the organization. Never reopened; identity columns fixed (a trigger).
+model TransferReview {
+  id               String               @id @default(uuid(7)) @db.Uuid
+  organizationId   String               @map("organization_id") @db.Uuid
+  employeeId       String               @map("employee_id") @db.Uuid
+  transferId       String?              @map("transfer_id") @db.Uuid
+  placementId      String               @unique @map("placement_id") @db.Uuid
+  departmentId     String               @map("department_id") @db.Uuid
+  jobTitleId       String               @map("job_title_id") @db.Uuid
+  effectiveOn      DateTime             @map("effective_on") @db.Date
+  dueOn            DateTime             @map("due_on") @db.Date
+  status           TransferReviewStatus @default(OPEN)
+  openedAt         DateTime             @default(now()) @map("opened_at") @db.Timestamptz(3)
+  completedAt      DateTime?            @map("completed_at") @db.Timestamptz(3)
+  overdueNoticedAt DateTime?            @map("overdue_noticed_at") @db.Timestamptz(3)
+
+  organization Organization         @relation(fields: [organizationId], references: [id])
+  employee     Employee             @relation("TransferReviewEmployee", fields: [employeeId], references: [id], onDelete: Restrict)
+  transfer     DepartmentTransfer?  @relation(fields: [transferId], references: [id], onDelete: Restrict)
+  placement    EmployeePlacement    @relation(fields: [placementId], references: [id], onDelete: Restrict)
+  department   Department           @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  jobTitle     JobTitle             @relation(fields: [jobTitleId], references: [id], onDelete: Restrict)
+  items        TransferReviewItem[]
+
+  @@index([dueOn, id])
+  @@index([employeeId])
+  @@index([departmentId])
+  @@map("transfer_reviews")
+}
+
+// One tool outside the standard toolset, with the decision about it. Written once: a trigger refuses to change a decided line, and
+// the checks keep the decision, the person, the moment, the note and the revocation of the line together (migration).
+model TransferReviewItem {
+  reviewId            String                 @map("review_id") @db.Uuid
+  assignmentId        String                 @map("assignment_id") @db.Uuid
+  planId              String                 @map("plan_id") @db.Uuid
+  position            Int
+  grantReason         String?                @map("grant_reason")
+  decision            TransferReviewDecision @default(PENDING)
+  decidedByEmployeeId String?                @map("decided_by_employee_id") @db.Uuid
+  decidedAt           DateTime?              @map("decided_at") @db.Timestamptz(3)
+  newToolNote         String?                @map("new_tool_note")
+  revocationTaskId    String?                @map("revocation_task_id") @db.Uuid
+
+  review         TransferReview    @relation(fields: [reviewId], references: [id], onDelete: Restrict)
+  assignment     LicenseAssignment @relation(fields: [assignmentId], references: [id], onDelete: Restrict)
+  decidedBy      Employee?         @relation("TransferReviewDecidedBy", fields: [decidedByEmployeeId], references: [id], onDelete: Restrict)
+  revocationTask ProvisioningTask? @relation(fields: [revocationTaskId], references: [id], onDelete: Restrict)
+
+  @@id([reviewId, assignmentId])
+  @@index([assignmentId])
+  @@map("transfer_review_items")
+}
+
+enum EmployeeLeaveStatus {
+  ACTIVE
+  ENDED
+}
+
+enum EmployeeLeaveEndKind {
+  RETURNED
+  DEPARTURE_STARTED
+}
+
+enum EmployeeLeaveChangeKind {
+  STARTED
+  RETURN_DATE_CHANGED
+  RETURNED
+  ENDED_FOR_DEPARTURE
+  RESUMED
+}
+
+// One period of long leave (US-03-03): the day the person is due back and the basis of that day, ACTIVE until the person comes
+// back or a handover for leaving begins (ENDED). At most one is ACTIVE for each employee (a partial unique index). No column keeps
+// the reason for the leave and none keeps medical data. Only the approved day with its basis, the mark of the reminder and the end
+// change (a trigger); an ended leave never does.
+model EmployeeLeave {
+  id                      String                @id @default(uuid(7)) @db.Uuid
+  organizationId          String                @map("organization_id") @db.Uuid
+  employeeId              String                @map("employee_id") @db.Uuid
+  startedOn               DateTime              @map("started_on") @db.Date
+  approvedReturnOn        DateTime              @map("approved_return_on") @db.Date
+  status                  EmployeeLeaveStatus   @default(ACTIVE)
+  endedOn                 DateTime?             @map("ended_on") @db.Date
+  endKind                 EmployeeLeaveEndKind? @map("end_kind")
+  resumesLeaveId          String?               @map("resumes_leave_id") @db.Uuid
+  groundsType             String                @map("grounds_type")
+  groundsReference        String                @map("grounds_reference")
+  groundsIssuer           String                @map("grounds_issuer")
+  groundsIssuedOn         DateTime              @map("grounds_issued_on") @db.Date
+  startedByAppUserId      String                @map("started_by_app_user_id") @db.Uuid
+  startedAt               DateTime              @default(now()) @map("started_at") @db.Timestamptz(3)
+  selfExecuted            Boolean               @default(false) @map("self_executed")
+  returnOverdueNoticedFor DateTime?             @map("return_overdue_noticed_for") @db.Date
+  // The notice of a head this leave was recorded from, when there was one (US-03-11).
+  noticeId                String?               @unique @map("notice_id") @db.Uuid
+
+  organization Organization          @relation(fields: [organizationId], references: [id])
+  notice       PersonnelNotice?      @relation(fields: [noticeId], references: [id], onDelete: Restrict)
+  employee     Employee              @relation(fields: [employeeId], references: [id])
+  resumes      EmployeeLeave?        @relation("EmployeeLeaveResumed", fields: [resumesLeaveId], references: [id], onDelete: Restrict)
+  resumedBy    EmployeeLeave[]       @relation("EmployeeLeaveResumed")
+  changes      EmployeeLeaveChange[]
+
+  @@index([approvedReturnOn, id])
+  @@index([employeeId, startedOn])
+  @@index([organizationId])
+  @@map("employee_leaves")
+}
+
+// What happened to a leave, one row for each event. Append-only (a trigger). The basis is kept whole or not at all.
+model EmployeeLeaveChange {
+  id                  String                  @id @default(uuid(7)) @db.Uuid
+  leaveId             String                  @map("leave_id") @db.Uuid
+  kind                EmployeeLeaveChangeKind
+  oldReturnOn         DateTime?               @map("old_return_on") @db.Date
+  newReturnOn         DateTime?               @map("new_return_on") @db.Date
+  returnedOn          DateTime?               @map("returned_on") @db.Date
+  onSchedule          Boolean?                @map("on_schedule")
+  groundsType         String?                 @map("grounds_type")
+  groundsReference    String?                 @map("grounds_reference")
+  groundsIssuer       String?                 @map("grounds_issuer")
+  groundsIssuedOn     DateTime?               @map("grounds_issued_on") @db.Date
+  recordedByAppUserId String                  @map("recorded_by_app_user_id") @db.Uuid
+  recordedAt          DateTime                @default(now()) @map("recorded_at") @db.Timestamptz(3)
+  selfExecuted        Boolean                 @default(false) @map("self_executed")
+
+  leave EmployeeLeave @relation(fields: [leaveId], references: [id], onDelete: Restrict)
+
+  @@index([leaveId, recordedAt, id])
+  @@map("employee_leave_changes")
+}
+
+enum OffboardingState {
+  HANDING_OVER
+  LEFT
+  CANCELLED
+}
+
+// The roles a person who leaves holds that someone must take over: a snapshot for the filter of the list, never a decision.
+enum OffboardingRoleFlag {
+  SUPER_ADMIN_HOLDER
+  FINANCE
+  SPENDING_APPROVER
+  SUBSTITUTE_APPROVER
+  FALLBACK_APPROVER
+  IT_ADMIN_IN_CHARGE
+  DEPARTMENT_HEAD
+  WORKSPACE_OWNER
+}
+
+enum OffboardingChangeKind {
+  RECORDED
+  LAST_DAY_CHANGED
+  CANCELLED
+  MARKED_LEFT
+  ACCOUNT_LOCK_RECORDED
+  REVOCATIONS_OPENED
+  CLOSED
+}
+
+// The record of a person who leaves, from the day it is written until it is closed (g6-offboarding-record): a planned handover
+// with a last working day (HANDING_OVER) that ends as LEFT or CANCELLED, or an abrupt departure that is LEFT at once. At most one
+// live case (HANDING_OVER or LEFT) for each employee. The periods the case wrote (the placement, the head of the department) are
+// named here so a move or a cancellation puts them back exactly; the basis never changes after it is written.
+model OffboardingCase {
+  id                     String                @id @default(uuid(7)) @db.Uuid
+  organizationId         String                @map("organization_id") @db.Uuid
+  employeeId             String                @map("employee_id") @db.Uuid
+  departmentId           String                @map("department_id") @db.Uuid
+  state                  OffboardingState      @default(HANDING_OVER)
+  abrupt                 Boolean               @default(false)
+  priorWorkState         EmployeeWorkState     @map("prior_work_state")
+  lastWorkingDay         DateTime              @map("last_working_day") @db.Date
+  departureEffectiveOn   DateTime              @map("departure_effective_on") @db.Date
+  handoverDueOn          DateTime?             @map("handover_due_on") @db.Date
+  groundsType            String                @map("grounds_type")
+  groundsReference       String                @map("grounds_reference")
+  groundsIssuer          String                @map("grounds_issuer")
+  groundsIssuedOn        DateTime              @map("grounds_issued_on") @db.Date
+  headHandover           Json?                 @map("head_handover")
+  placementClosedId      String?               @map("placement_closed_id") @db.Uuid
+  leftOn                 DateTime?             @map("left_on") @db.Date
+  leftAt                 DateTime?             @map("left_at") @db.Timestamptz(3)
+  leftByAppUserId        String?               @map("left_by_app_user_id") @db.Uuid
+  cancelledAt            DateTime?             @map("cancelled_at") @db.Timestamptz(3)
+  cancelledByAppUserId   String?               @map("cancelled_by_app_user_id") @db.Uuid
+  cancelReason           String?               @map("cancel_reason")
+  accountLockByAppUserId String?               @map("account_lock_by_app_user_id") @db.Uuid
+  accountLockAt          DateTime?             @map("account_lock_at") @db.Timestamptz(3)
+  accountLockNote        String?               @map("account_lock_note")
+  closedAt               DateTime?             @map("closed_at") @db.Timestamptz(3)
+  closedByAppUserId      String?               @map("closed_by_app_user_id") @db.Uuid
+  selfExecuted           Boolean               @default(false) @map("self_executed")
+  recordedByAppUserId    String                @map("recorded_by_app_user_id") @db.Uuid
+  recordedAt             DateTime              @default(now()) @map("recorded_at") @db.Timestamptz(3)
+  // The roles the person held when the case was written or the day it moved (g6-leaver-role-and-workspace-duties); a snapshot.
+  roleFlags              OffboardingRoleFlag[] @default([]) @map("role_flags")
+  // The notice of a head this case was recorded from, when there was one (US-03-11).
+  noticeId               String?               @unique @map("notice_id") @db.Uuid
+
+  organization Organization            @relation(fields: [organizationId], references: [id])
+  notice       PersonnelNotice?        @relation(fields: [noticeId], references: [id], onDelete: Restrict)
+  employee     Employee                @relation(fields: [employeeId], references: [id])
+  department   Department              @relation(fields: [departmentId], references: [id])
+  changes      OffboardingCaseChange[]
+
+  @@index([lastWorkingDay, id])
+  @@index([employeeId])
+  @@index([state, lastWorkingDay, id])
+  @@index([organizationId])
+  @@index([roleFlags], type: Gin)
+  @@map("offboarding_cases")
+}
+
+// What happened to a case, one row for each event. Append-only (a trigger).
+model OffboardingCaseChange {
+  id                 String                @id @default(uuid(7)) @db.Uuid
+  caseId             String                @map("case_id") @db.Uuid
+  kind               OffboardingChangeKind
+  oldLastWorkingDay  DateTime?             @map("old_last_working_day") @db.Date
+  newLastWorkingDay  DateTime?             @map("new_last_working_day") @db.Date
+  reason             String?
+  detail             Json?
+  changedByAppUserId String                @map("changed_by_app_user_id") @db.Uuid
+  changedAt          DateTime              @default(now()) @map("changed_at") @db.Timestamptz(3)
+  selfExecuted       Boolean               @default(false) @map("self_executed")
+
+  offboardingCase OffboardingCase @relation(fields: [caseId], references: [id], onDelete: Restrict)
+
+  @@index([caseId, changedAt, id])
+  @@map("offboarding_case_changes")
+}
+
+enum PersonnelNoticeKind {
+  DEPARTMENT_TRANSFER_OUT
+  DEPARTMENT_TRANSFER_IN
+  JOB_TITLE_CHANGE
+  DEPARTURE
+  ABRUPT_DEPARTURE
+  LONG_LEAVE
+}
+
+enum PersonnelNoticeStatus {
+  PENDING_VERIFICATION
+  RECORDED
+  REJECTED
+  WITHDRAWN
+}
+
+enum VerificationMethod {
+  ATTACHED_DOCUMENT
+  EMAIL_FROM_ISSUER
+  DIRECT_CONTACT
+}
+
+enum PersonnelNoticeEventKind {
+  DEPARTMENT_TRANSFER
+  LONG_LEAVE
+  OFFBOARDING_CASE
+}
+
+// The notice (BM-09) of a department head about a change coming for one of their people (US-03-10): information with no legal
+// effect, PENDING_VERIFICATION until the IT Admin rejects it, records the event it announces or the head withdraws it. At most one
+// waiting for each employee and kind (a partial unique index). The code `BM09-<year>-<six digits>` is never a basis. What it says
+// never changes and a handled notice never changes again (a trigger); no column keeps a reason for leaving.
+model PersonnelNotice {
+  id                       String                    @id @default(uuid(7)) @db.Uuid
+  code                     String                    @unique
+  organizationId           String                    @map("organization_id") @db.Uuid
+  employeeId               String                    @map("employee_id") @db.Uuid
+  kind                     PersonnelNoticeKind
+  proposedOn               DateTime                  @map("proposed_on") @db.Date
+  targetDepartmentId       String?                   @map("target_department_id") @db.Uuid
+  note                     String?
+  senderEmployeeId         String                    @map("sender_employee_id") @db.Uuid
+  senderDepartmentId       String                    @map("sender_department_id") @db.Uuid
+  status                   PersonnelNoticeStatus     @default(PENDING_VERIFICATION)
+  rejectReason             String?                   @map("reject_reason")
+  recordedEventKind        PersonnelNoticeEventKind? @map("recorded_event_kind")
+  recordedEventId          String?                   @map("recorded_event_id") @db.Uuid
+  defaultItAdminEmployeeId String?                   @map("default_it_admin_employee_id") @db.Uuid
+  dueOn                    DateTime                  @map("due_on") @db.Date
+  handledByAppUserId       String?                   @map("handled_by_app_user_id") @db.Uuid
+  handledAt                DateTime?                 @map("handled_at") @db.Timestamptz(3)
+  overdueNoticedAt         DateTime?                 @map("overdue_noticed_at") @db.Timestamptz(3)
+  createdAt                DateTime                  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  organization     Organization                 @relation(fields: [organizationId], references: [id])
+  employee         Employee                     @relation("NoticeAbout", fields: [employeeId], references: [id])
+  sender           Employee                     @relation("NoticeSender", fields: [senderEmployeeId], references: [id])
+  targetDepartment Department?                  @relation("NoticeTargetDepartment", fields: [targetDepartmentId], references: [id], onDelete: Restrict)
+  senderDepartment Department                   @relation("NoticeSenderDepartment", fields: [senderDepartmentId], references: [id])
+  verification     PersonnelNoticeVerification?
+  transfer         DepartmentTransfer?
+  leave            EmployeeLeave?
+  offboardingCase  OffboardingCase?
+
+  @@index([status, dueOn, id])
+  @@index([senderEmployeeId, createdAt, id])
+  @@index([employeeId])
+  @@index([organizationId])
+  @@map("personnel_notices")
+}
+
+// What the IT Admin checked before a notice was recorded: one row for each recorded notice, written once and never changed.
+model PersonnelNoticeVerification {
+  id                  String             @id @default(uuid(7)) @db.Uuid
+  noticeId            String             @unique @map("notice_id") @db.Uuid
+  method              VerificationMethod
+  reference           String
+  verifiedByAppUserId String             @map("verified_by_app_user_id") @db.Uuid
+  verifiedAt          DateTime           @default(now()) @map("verified_at") @db.Timestamptz(3)
+
+  notice PersonnelNotice @relation(fields: [noticeId], references: [id], onDelete: Restrict)
+
+  @@map("personnel_notice_verifications")
+}

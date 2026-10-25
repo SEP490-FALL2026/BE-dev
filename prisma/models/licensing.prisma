@@ -41,22 +41,34 @@ model LicenseAssignment {
   expectedEndDate             DateTime?           @map("expected_end_date") @db.Date
   // Set once when the grant it was made for is closed as failed: the period is then empty, so no seat is taken.
   failedAt                    DateTime?           @map("failed_at") @db.Timestamptz(3)
+  // Set once when the grant it was made for was cancelled because the request was withdrawn: the period is empty as well.
+  cancelledAt                 DateTime?           @map("cancelled_at") @db.Timestamptz(3)
   predecessorId               String?             @map("predecessor_id") @db.Uuid
   baselineImportId            String?             @map("baseline_import_id") @db.Uuid
   // A value, not a foreign key: the history outlives the account (as the audit trail does).
   createdByAppUserId          String              @map("created_by_app_user_id") @db.Uuid
   createdAt                   DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
 
-  organization      Organization        @relation(fields: [organizationId], references: [id])
-  plan              Plan                @relation(fields: [planId], references: [id])
-  subscription      Subscription?       @relation(fields: [subscriptionId], references: [id], onDelete: Restrict)
-  employee          Employee            @relation(fields: [employeeId], references: [id])
-  costCenter        CostCenter?         @relation(fields: [costCenterId], references: [id], onDelete: Restrict)
-  owningDepartment  Department?         @relation("AssignmentOwningDepartment", fields: [owningDepartmentId], references: [id], onDelete: Restrict)
-  predecessor       LicenseAssignment?  @relation("AssignmentChain", fields: [predecessorId], references: [id], onDelete: Restrict)
-  successors        LicenseAssignment[] @relation("AssignmentChain")
-  baselineImport    SeatBaselineImport? @relation(fields: [baselineImportId], references: [id], onDelete: Restrict)
-  provisioningTasks ProvisioningTask[]
+  organization        Organization               @relation(fields: [organizationId], references: [id])
+  plan                Plan                       @relation(fields: [planId], references: [id])
+  subscription        Subscription?              @relation(fields: [subscriptionId], references: [id], onDelete: Restrict)
+  employee            Employee                   @relation(fields: [employeeId], references: [id])
+  costCenter          CostCenter?                @relation(fields: [costCenterId], references: [id], onDelete: Restrict)
+  owningDepartment    Department?                @relation("AssignmentOwningDepartment", fields: [owningDepartmentId], references: [id], onDelete: Restrict)
+  predecessor         LicenseAssignment?         @relation("AssignmentChain", fields: [predecessorId], references: [id], onDelete: Restrict)
+  successors          LicenseAssignment[]        @relation("AssignmentChain")
+  baselineImport      SeatBaselineImport?        @relation(fields: [baselineImportId], references: [id], onDelete: Restrict)
+  provisioningTasks   ProvisioningTask[]
+  returnRequests      ReturnRequest[]
+  handoverDuties      HandoverDuty[]
+  serviceAccountMoves ServiceAccountMove[]       @relation("MoveOfAssignment")
+  resultOfMove        ServiceAccountMove?        @relation("MoveResultAssignment")
+  dutyNotices         ServiceAccountDutyNotice[]
+  expiryReminders     AssignmentExpiryReminder[]
+  saasIssues          SaasIssue[]
+  transferReviewItems TransferReviewItem[]
+  renewalRequests     AccessRequestRenewal[]     @relation("RenewalOf")
+  renewalOfRequest    AccessRequestRenewal?      @relation("RenewalSuccessor")
 
   @@index([subscriptionId])
   @@index([planId])
@@ -96,6 +108,8 @@ enum ProvisioningTaskStatus {
   COMPLETED
   FAILED
   CLOSED_FAILED
+  // Ended because the request was withdrawn: never a failure (FR-2.5). Its assignment holds no seat.
+  CANCELLED
 }
 
 enum ProvisioningFailureKind {
@@ -117,7 +131,8 @@ model ProvisioningTask {
   kind                         ProvisioningTaskKind
   channel                      ProvisioningChannel
   status                       ProvisioningTaskStatus   @default(QUEUED)
-  requestId                    String                   @map("request_id") @db.Uuid
+  // The request a grant answers for; a revocation has none (it answers for the source that opened it).
+  requestId                    String?                  @map("request_id") @db.Uuid
   // The IT Admin in charge of the department of the beneficiary when the task was made; null when there was none.
   defaultResponsibleEmployeeId String?                  @map("default_responsible_employee_id") @db.Uuid
   // Accounts are values, not foreign keys: the history outlives the account (as the audit trail does).
@@ -143,18 +158,79 @@ model ProvisioningTask {
   handedOffByAppUserId         String?                  @map("handed_off_by_app_user_id") @db.Uuid
   handedOffAt                  DateTime?                @map("handed_off_at") @db.Timestamptz(3)
   handOffEvidence              String?                  @map("hand_off_evidence")
+  // A revocation (g6-revocation-by-grant-kind): the reason that opened it, and, once completed, how it was done. A K1 seat
+  // keeps its access to the end of the paid period (`paidThroughOn`) unless it was cut earlier (`accessCutOn`).
+  revocationSource             RevocationSource?        @map("revocation_source")
+  completion                   RevocationCompletion?
+  paidThroughOn                DateTime?                @map("paid_through_on") @db.Date
+  accessState                  AccessState?             @map("access_state")
+  accessCutOn                  DateTime?                @map("access_cut_on") @db.Date
+  accessEvidence               String?                  @map("access_evidence")
+  completionNote               String?                  @map("completion_note")
   createdByAppUserId           String                   @map("created_by_app_user_id") @db.Uuid
   createdAt                    DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt                    DateTime                 @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  organization       Organization      @relation(fields: [organizationId], references: [id])
-  assignment         LicenseAssignment @relation(fields: [assignmentId], references: [id], onDelete: Restrict)
-  defaultResponsible Employee?         @relation("TaskDefaultResponsible", fields: [defaultResponsibleEmployeeId], references: [id], onDelete: Restrict)
+  organization        Organization             @relation(fields: [organizationId], references: [id])
+  assignment          LicenseAssignment        @relation(fields: [assignmentId], references: [id], onDelete: Restrict)
+  defaultResponsible  Employee?                @relation("TaskDefaultResponsible", fields: [defaultResponsibleEmployeeId], references: [id], onDelete: Restrict)
+  reasons             ProvisioningTaskReason[]
+  returnRequest       ReturnRequest?
+  transferReviewItems TransferReviewItem[]
 
-  @@unique([assignmentId, kind])
+  // One grant for an assignment and one live revocation are partial unique indexes the model cannot say (SQL migration).
+  @@index([assignmentId, kind])
   @@index([status, createdAt])
   @@index([defaultResponsibleEmployeeId])
   @@map("provisioning_tasks")
+}
+
+enum RevocationSource {
+  RETURN
+  MANAGER_NOT_NEEDED
+  TRANSFER_REVIEW
+  GHOST_SEAT
+  DEPARTURE
+  ABRUPT_DEPARTURE
+  TIME_LIMITED_EXPIRY
+  SUBSCRIPTION_REDUCTION
+  SUBSCRIPTION_CANCELLATION
+  SUBSCRIPTION_EXPIRED
+  NOT_LEGALIZED
+  RE_EXECUTION
+}
+
+enum RevocationCompletion {
+  ACCOUNT_REMOVED
+  ALREADY_GONE
+  RENEWAL_CANCELLED
+  OFF_SYSTEM_REVOKED
+}
+
+enum AccessState {
+  CUT
+  UNTIL_PAID_END
+}
+
+// A reason that asked for the revocation of a seat: one row for each source and what it refers to (a seat has one live
+// revocation task, however many reasons ask for it: QĐ-64a). A fact of what was decided and by whom: never changed or
+// deleted. The uniqueness of (task, source, reference) is an expression index the model cannot say (SQL migration).
+model ProvisioningTaskReason {
+  id                  String           @id @default(uuid()) @db.Uuid
+  taskId              String           @map("task_id") @db.Uuid
+  source              RevocationSource
+  decidedByEmployeeId String?          @map("decided_by_employee_id") @db.Uuid
+  decidedRole         String           @map("decided_role")
+  referenceKind       String?          @map("reference_kind")
+  referenceId         String?          @map("reference_id") @db.Uuid
+  note                String?
+  createdAt           DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  task      ProvisioningTask @relation(fields: [taskId], references: [id], onDelete: Restrict)
+  decidedBy Employee?        @relation("TaskReasonDecidedBy", fields: [decidedByEmployeeId], references: [id], onDelete: Restrict)
+
+  @@index([taskId])
+  @@map("provisioning_task_reasons")
 }
 
 // How many license keys an account has opened in a minute and in a day (SEC-02): one row per account and window, raised
@@ -198,4 +274,262 @@ model LicenseKey {
   @@unique([organizationId, fingerprint])
   @@index([subscriptionId, status])
   @@map("license_keys")
+}
+
+enum HandoverConfirmerRole {
+  DEPARTMENT_HEAD
+  REQUESTER
+  IT_ADMIN
+}
+
+enum HandoverConfirmedRole {
+  DEPARTMENT_HEAD
+  DESIGNATED_SUCCESSOR
+  REQUESTER
+  IT_ADMIN
+}
+
+enum HandoverValue {
+  HANDED_OVER
+  NOT_NEEDED
+  HANDLED
+}
+
+// What a seat asks of the person who confirms that the data of a tool was handed over before the seat is taken away (US-03-09,
+// US-07-09): one row for each seat, made when the handover is opened, and written once when someone confirms. Who confirms is not
+// kept here but read from the organization each time (the head of the department today, or the one designated to follow a head who
+// leaves), except where the person is fixed by the decision that made the duty (a return, a head who decided). A confirmation
+// is never changed or deleted. The one open row of a seat, the check that the confirmation columns go together and the freeze
+// of a confirmed or cancelled row are SQL the model cannot say (migration).
+model HandoverDuty {
+  id                     String                 @id @default(uuid(7)) @db.Uuid
+  organizationId         String                 @map("organization_id") @db.Uuid
+  assignmentId           String                 @map("assignment_id") @db.Uuid
+  employeeId             String                 @map("employee_id") @db.Uuid
+  source                 RevocationSource
+  caseRefId              String?                @map("case_ref_id") @db.Uuid
+  departmentId           String?                @map("department_id") @db.Uuid
+  leaverIsHead           Boolean                @map("leaver_is_head")
+  resolveOn              DateTime?              @map("resolve_on") @db.Date
+  confirmerRole          HandoverConfirmerRole  @map("confirmer_role")
+  confirmerEmployeeId    String?                @map("confirmer_employee_id") @db.Uuid
+  dataLoss               Boolean                @map("data_loss")
+  noticeText             String?                @map("notice_text")
+  dueOn                  DateTime               @map("due_on") @db.Date
+  confirmedValue         HandoverValue?         @map("confirmed_value")
+  confirmedByEmployeeId  String?                @map("confirmed_by_employee_id") @db.Uuid
+  confirmedRole          HandoverConfirmedRole? @map("confirmed_role")
+  confirmedAt            DateTime?              @map("confirmed_at") @db.Timestamptz(3)
+  confirmedLate          Boolean                @default(false) @map("confirmed_late")
+  overdueNoticedAt       DateTime?              @map("overdue_noticed_at") @db.Timestamptz(3)
+  proceededUnconfirmedAt DateTime?              @map("proceeded_unconfirmed_at") @db.Timestamptz(3)
+  cancelledAt            DateTime?              @map("cancelled_at") @db.Timestamptz(3)
+  cancelReason           String?                @map("cancel_reason")
+  createdByAppUserId     String                 @map("created_by_app_user_id") @db.Uuid
+  createdAt              DateTime               @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  organization Organization      @relation(fields: [organizationId], references: [id])
+  assignment   LicenseAssignment @relation(fields: [assignmentId], references: [id], onDelete: Restrict)
+  employee     Employee          @relation("HandoverDutyEmployee", fields: [employeeId], references: [id], onDelete: Restrict)
+  department   Department?       @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  confirmer    Employee?         @relation("HandoverDutyConfirmer", fields: [confirmerEmployeeId], references: [id], onDelete: Restrict)
+  confirmedBy  Employee?         @relation("HandoverDutyConfirmedBy", fields: [confirmedByEmployeeId], references: [id], onDelete: Restrict)
+
+  @@index([assignmentId])
+  @@index([employeeId])
+  @@index([dueOn, id])
+  @@map("handover_duties")
+}
+
+enum ServiceAccountMoveStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+}
+
+enum ServiceAccountMoveConfirmerRole {
+  DEPARTMENT_HEAD
+  FALLBACK_APPROVER
+}
+
+// A proposal to move a service account to another department (US-03-08 AC-10, QĐ-86c): a record that waits and touches no assignment
+// until the head of the receiving department (or the fallback approver when it has none) confirms; the confirmation ends the old
+// assignment and opens a new one in the receiving department in the same transaction. One PENDING proposal for each assignment (a
+// partial unique index), the columns of the state go together, and a confirmed or cancelled proposal is never changed (migration).
+model ServiceAccountMove {
+  id                       String                           @id @default(uuid(7)) @db.Uuid
+  organizationId           String                           @map("organization_id") @db.Uuid
+  assignmentId             String                           @map("assignment_id") @db.Uuid
+  fromDepartmentId         String                           @map("from_department_id") @db.Uuid
+  toDepartmentId           String                           @map("to_department_id") @db.Uuid
+  newResponsibleEmployeeId String                           @map("new_responsible_employee_id") @db.Uuid
+  effectiveFrom            DateTime                         @map("effective_from") @db.Date
+  expectedEndDate          DateTime?                        @map("expected_end_date") @db.Date
+  status                   ServiceAccountMoveStatus         @default(PENDING)
+  // The accounts that proposed and cancelled are values, as in the audit trail: the history outlives the account.
+  proposedByAppUserId      String                           @map("proposed_by_app_user_id") @db.Uuid
+  proposedAt               DateTime                         @default(now()) @map("proposed_at") @db.Timestamptz(3)
+  confirmedByEmployeeId    String?                          @map("confirmed_by_employee_id") @db.Uuid
+  confirmedByRole          ServiceAccountMoveConfirmerRole? @map("confirmed_by_role")
+  confirmedAt              DateTime?                        @map("confirmed_at") @db.Timestamptz(3)
+  cancelledByAppUserId     String?                          @map("cancelled_by_app_user_id") @db.Uuid
+  cancelledAt              DateTime?                        @map("cancelled_at") @db.Timestamptz(3)
+  cancelledReason          String?                          @map("cancelled_reason")
+  resultingAssignmentId    String?                          @unique @map("resulting_assignment_id") @db.Uuid
+
+  organization        Organization       @relation(fields: [organizationId], references: [id])
+  assignment          LicenseAssignment  @relation("MoveOfAssignment", fields: [assignmentId], references: [id], onDelete: Restrict)
+  fromDepartment      Department         @relation("MoveFromDepartment", fields: [fromDepartmentId], references: [id], onDelete: Restrict)
+  toDepartment        Department         @relation("MoveToDepartment", fields: [toDepartmentId], references: [id], onDelete: Restrict)
+  newResponsible      Employee           @relation("MoveNewResponsible", fields: [newResponsibleEmployeeId], references: [id], onDelete: Restrict)
+  confirmedBy         Employee?          @relation("MoveConfirmedBy", fields: [confirmedByEmployeeId], references: [id], onDelete: Restrict)
+  resultingAssignment LicenseAssignment? @relation("MoveResultAssignment", fields: [resultingAssignmentId], references: [id], onDelete: Restrict)
+
+  @@index([assignmentId])
+  @@index([toDepartmentId, status])
+  @@index([effectiveFrom, id])
+  @@map("service_account_moves")
+}
+
+// The reminder that a service account still has no new person after the day of the file that moves its person, written once for each
+// assignment and day (the overdue sweep). Insert-only (a trigger).
+model ServiceAccountDutyNotice {
+  id           String   @id @default(uuid(7)) @db.Uuid
+  assignmentId String   @map("assignment_id") @db.Uuid
+  dueOn        DateTime @map("due_on") @db.Date
+  noticedAt    DateTime @default(now()) @map("noticed_at") @db.Timestamptz(3)
+
+  assignment LicenseAssignment @relation(fields: [assignmentId], references: [id], onDelete: Restrict)
+
+  @@unique([assignmentId, dueOn])
+  @@map("service_account_duty_notices")
+}
+
+enum ExpiryReminderAudience {
+  EMPLOYEE
+  HEAD
+  IT_ADMIN
+}
+
+// The reminder that a right which ends on a day is about to end (US-03-05 AC-1): one for each right, end date and person told, written
+// by the hourly pass. The recipient, the department and the organization are values, not foreign keys, as in the audit trail:
+// the history of who was told outlives a change of the organization. Insert-only (a trigger). The queue of the rights that have
+// ended is not stored.
+model AssignmentExpiryReminder {
+  id                  String                 @id @default(uuid(7)) @db.Uuid
+  organizationId      String                 @map("organization_id") @db.Uuid
+  assignmentId        String                 @map("assignment_id") @db.Uuid
+  expectedEndDate     DateTime               @map("expected_end_date") @db.Date
+  audience            ExpiryReminderAudience
+  recipientEmployeeId String                 @map("recipient_employee_id") @db.Uuid
+  departmentId        String?                @map("department_id") @db.Uuid
+  createdAt           DateTime               @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  assignment LicenseAssignment @relation(fields: [assignmentId], references: [id], onDelete: Restrict)
+
+  @@unique([assignmentId, expectedEndDate, audience])
+  @@index([recipientEmployeeId, createdAt(sort: Desc), id])
+  @@index([createdAt(sort: Desc), id])
+  @@map("assignment_expiry_reminders")
+}
+
+enum SaasIssueState {
+  NEW
+  IN_PROGRESS
+  WAITING_REPORTER
+  WAITING_PROVIDER
+  RESOLVED
+  CLOSED
+  DUPLICATE
+}
+
+enum SaasIssueCategory {
+  NO_ACCESS
+  INVITATION_OR_ACTIVATION
+  MISSING_PLAN_FEATURE
+  PROVIDER_OUTAGE
+  OTHER
+}
+
+enum SaasIssueImpact {
+  UNUSABLE
+  PARTIAL
+  QUESTION_OR_OTHER
+}
+
+enum SaasIssueEntryKind {
+  MESSAGE
+  TRANSITION
+}
+
+enum SaasIssueAuthorRole {
+  REPORTER
+  IT_ADMIN
+  SYSTEM
+}
+
+// The report (BM-11) of an error in a SaaS right the person holds, handled by one IT Admin (g6-saas-error-report). It never changes the
+// assignment, the grant task or a request, and nothing is sent to the vendor: the vendor ticket is a text the IT Admin types. The
+// people, the organization and the grant task are values, not foreign keys, as in the audit trail. What was reported and who it was
+// given to never change, a closed report or a duplicate never moves again, and none is deleted (a trigger); the checks that tie a
+// state to its columns, the code form and the sequence of the codes are in the SQL migration.
+model SaasIssue {
+  id                        String            @id @default(uuid(7)) @db.Uuid
+  code                      String            @unique
+  organizationId            String            @map("organization_id") @db.Uuid
+  reporterEmployeeId        String            @map("reporter_employee_id") @db.Uuid
+  assignmentId              String            @map("assignment_id") @db.Uuid
+  grantTaskId               String?           @map("grant_task_id") @db.Uuid
+  category                  SaasIssueCategory
+  impact                    SaasIssueImpact
+  description               String
+  occurredAt                DateTime          @map("occurred_at") @db.Timestamptz(3)
+  state                     SaasIssueState    @default(NEW)
+  assignedItAdminEmployeeId String            @map("assigned_it_admin_employee_id") @db.Uuid
+  assignedByFallback        Boolean           @default(false) @map("assigned_by_fallback")
+  responseDueOn             DateTime          @map("response_due_on") @db.Date
+  responseOverdueNoticedAt  DateTime?         @map("response_overdue_noticed_at") @db.Timestamptz(3)
+  resolution                String?
+  vendorTicketRef           String?           @map("vendor_ticket_ref")
+  duplicateOfId             String?           @map("duplicate_of_id") @db.Uuid
+  duplicateReason           String?           @map("duplicate_reason")
+  linkedWork                Json?             @map("linked_work")
+  resolvedAt                DateTime?         @map("resolved_at") @db.Timestamptz(3)
+  reopenUntil               DateTime?         @map("reopen_until") @db.Date
+  closedAt                  DateTime?         @map("closed_at") @db.Timestamptz(3)
+  reopenCount               Int               @default(0) @map("reopen_count")
+  createdAt                 DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt                 DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  assignment  LicenseAssignment @relation(fields: [assignmentId], references: [id], onDelete: Restrict)
+  duplicateOf SaasIssue?        @relation("SaasIssueDuplicate", fields: [duplicateOfId], references: [id], onDelete: Restrict)
+  duplicates  SaasIssue[]       @relation("SaasIssueDuplicate")
+  entries     SaasIssueEntry[]
+
+  @@index([reporterEmployeeId, createdAt(sort: Desc), id])
+  @@index([assignedItAdminEmployeeId, createdAt(sort: Desc), id])
+  @@index([createdAt(sort: Desc), id])
+  @@index([state, responseDueOn])
+  @@index([state, reopenUntil])
+  @@index([assignmentId])
+  @@map("saas_issues")
+}
+
+// What the reporter and the IT Admin said on a report, and each change of its state. Insert-only (a trigger).
+model SaasIssueEntry {
+  id                   String              @id @default(uuid(7)) @db.Uuid
+  issueId              String              @map("issue_id") @db.Uuid
+  kind                 SaasIssueEntryKind
+  authorEmployeeId     String?             @map("author_employee_id") @db.Uuid
+  authorRole           SaasIssueAuthorRole @map("author_role")
+  body                 String?
+  fromState            SaasIssueState?     @map("from_state")
+  toState              SaasIssueState?     @map("to_state")
+  onBehalfOfEmployeeId String?             @map("on_behalf_of_employee_id") @db.Uuid
+  createdAt            DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  issue SaasIssue @relation(fields: [issueId], references: [id], onDelete: Restrict)
+
+  @@index([issueId, createdAt, id])
+  @@map("saas_issue_entries")
 }

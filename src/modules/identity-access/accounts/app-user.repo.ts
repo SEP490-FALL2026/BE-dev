@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import type { BusinessDate } from '../../../core/business-date';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import {
@@ -143,6 +144,66 @@ export class AppUserRepo {
     return new Set(rows.map((row) => row.employeeId));
   }
 
+  /** The employee with the smallest employee code who holds an effective IT_ADMIN grant on an account that can act, or null. */
+  async findFirstUsableItAdminEmployeeId(tx?: DbTx): Promise<string | null> {
+    const row = await (tx ?? this.prisma).appUser.findFirst({
+      where: {
+        status: 'ACTIVE',
+        activationState: 'ACTIVATED',
+        employee: { status: 'ACTIVE' },
+        roleGrants: { some: { role: 'IT_ADMIN', revokedAt: null } },
+      },
+      orderBy: { employee: { employeeCode: 'asc' } },
+      select: { employeeId: true },
+    });
+
+    return row?.employeeId ?? null;
+  }
+
+  /**
+   * The employee who holds the FINANCE role on an account that can act, if there is one (at most one account holds it, `QĐ-67e`):
+   * the person a review of Finance is given to.
+   */
+  async findUsableFinanceEmployeeId(tx?: DbTx): Promise<string | null> {
+    const row = await (tx ?? this.prisma).appUser.findFirst({
+      where: {
+        status: 'ACTIVE',
+        activationState: 'ACTIVATED',
+        employee: { status: 'ACTIVE' },
+        roleGrants: { some: { role: 'FINANCE', revokedAt: null } },
+      },
+      select: { employeeId: true },
+    });
+
+    return row?.employeeId ?? null;
+  }
+
+  /** The employee who holds the SUPER_ADMIN role on an account that can act (there is one), or null: who is told to configure a role. */
+  async findUsableSuperAdminEmployeeId(tx?: DbTx): Promise<string | null> {
+    const row = await (tx ?? this.prisma).appUser.findFirst({
+      where: {
+        status: 'ACTIVE',
+        activationState: 'ACTIVATED',
+        employee: { status: 'ACTIVE' },
+        roleGrants: { some: { role: 'SUPER_ADMIN', revokedAt: null } },
+      },
+      select: { employeeId: true },
+    });
+
+    return row?.employeeId ?? null;
+  }
+
+  /** The employee behind each of these accounts, by account id; an account that does not exist is absent. */
+  async employeeIdsOfAccounts(appUserIds: readonly string[], tx?: DbTx): Promise<Map<string, string>> {
+    if (appUserIds.length === 0) return new Map();
+    const rows = await (tx ?? this.prisma).appUser.findMany({
+      where: { id: { in: [...appUserIds] } },
+      select: { id: true, employeeId: true },
+    });
+
+    return new Map(rows.map((row) => [row.id, row.employeeId]));
+  }
+
   /** How many IT Admins other than this employee can act: an active, activated account with the role, of someone still working. */
   countUsableItAdminsExcept(employeeId: string, tx?: DbTx): Promise<number> {
     return (tx ?? this.prisma).appUser.count({
@@ -195,6 +256,7 @@ export class AppUserRepo {
       ...(filter.status ? { status: filter.status } : {}),
       ...(filter.activationState ? { activationState: filter.activationState } : {}),
       ...(filter.role ? { roleGrants: { some: { role: filter.role, revokedAt: null } } } : {}),
+      ...(filter.employeeLeft === undefined ? {} : { employeeLeftOn: filter.employeeLeft ? { not: null } : null }),
     };
     // One snapshot for the page and the count (database rules; same as the catalog): otherwise an
     // account created in between makes totalItems disagree with the rows just returned (R-14).
@@ -212,6 +274,12 @@ export class AppUserRepo {
       },
       { isolationLevel: 'RepeatableRead' },
     );
+  }
+
+  /** Writes the day the person behind the account left, once (a trigger refuses a change); nothing when the employee has no account. */
+  async setEmployeeLeftOn(tx: DbTx, employeeId: string, leftOn: BusinessDate): Promise<void> {
+    await tx.$executeRaw`UPDATE app_users SET employee_left_on = ${leftOn}::date, updated_at = now()
+       WHERE employee_id = ${employeeId}::uuid AND employee_left_on IS NULL`;
   }
 
   async setStatus(tx: DbTx, appUserId: string, status: 'ACTIVE' | 'LOCKED'): Promise<void> {

@@ -1,0 +1,289 @@
+import { Injectable } from '@nestjs/common';
+import { addDays, type BusinessDate } from '../../../core/business-date';
+import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
+import { isUniqueViolation } from '../../../infrastructure/database/unique-violation';
+import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
+import { AuditService } from '../../audit/audit.service';
+import { CatalogService } from '../../catalog/catalog.service';
+import { OrganizationHistoryService } from '../../organization/organization-history.service';
+import {
+  EmployeeNotFoundError,
+  HeadHandoverRefusedError,
+  PlacementDepartmentInactiveError,
+  PlacementOverlapError,
+} from '../../organization/organization.errors';
+import { OrganizationService } from '../../organization/organization.service';
+import { groundsSnapshot, normalizedGrounds } from '../grounds/grounds.policy';
+import { personnelAuditEvent } from '../mappers/personnel-audit-event';
+import { PersonnelFileHooks } from '../personnel-file-hooks';
+import { TransferRefusedError } from './transfer.errors';
+import { newTransferRefusal, retiredDestinationRefusal } from './transfer.policy';
+import { TransferGuardService } from './transfer-guard.service';
+import { TransferRepo } from './transfer.repo';
+import { TransferSettlementService } from './transfer-settlement.service';
+import {
+  WARNING_APPLICATION_LIMIT,
+  type HeadHandoverFacts,
+  type RecordTransferInput,
+  type TransferOutcome,
+  type TransferRecord,
+  type TransferWarning,
+} from './transfer.types';
+
+/**
+ * Records a change of department or job title with the day it takes effect and the basis it rests on (`US-03-01` AC-1, AC-2,
+ * AC-4 -> AC-8, AC-11, AC-13 -> AC-18, AC-22). The periods are written ahead, in this transaction: the one the person has ends
+ * on the day, the new one begins on it, and the head of the department they leave is handed over or left empty by choice. No
+ * seat is touched and no step of a request is moved here: the listeners of the organization act on the day.
+ */
+@Injectable()
+export class TransferService {
+  constructor(
+    private readonly runner: TransactionRunner,
+    private readonly organization: OrganizationService,
+    private readonly history: OrganizationHistoryService,
+    private readonly guard: TransferGuardService,
+    private readonly transfers: TransferRepo,
+    private readonly settlement: TransferSettlementService,
+    private readonly audit: AuditService,
+    private readonly hooks: PersonnelFileHooks,
+    private readonly catalog: CatalogService,
+  ) {}
+
+  /** Throws TransferRefusedError for everything the policy or the database refuses. */
+  async record(actor: AuthenticatedPrincipal, input: RecordTransferInput): Promise<TransferOutcome> {
+    const transfer = await this.runner.run((tx) => this.recordInTx(tx, actor, input));
+    const owned = await this.catalog.getApplicationsOwnedBy(input.employeeId, WARNING_APPLICATION_LIMIT);
+    const warnings: TransferWarning[] =
+      owned.total > 0
+        ? [{ code: 'BUSINESS_OWNER_REPLACEMENT_NEEDED', applications: owned.items, totalApplications: owned.total }]
+        : [];
+
+    return { transfer, warnings };
+  }
+
+  /** The same in the transaction of the caller (the writes that start from a notice of the head, later). */
+  async recordInTx(tx: DbTx, actor: AuthenticatedPrincipal, input: RecordTransferInput): Promise<TransferRecord> {
+    const organization = await this.guard.requireOrganization();
+    const today = await this.organization.businessToday(new Date(), tx);
+    const selfMode = await this.guard.selfMode(actor, input.employeeId);
+
+    // What the person is now, read before the locks so they can be taken in the order of the protocol.
+    const seen = await this.organization.getEmployee(input.employeeId, tx);
+    if (!seen) throw new TransferRefusedError('EMPLOYEE_NOT_FOUND');
+    if (seen.status === 'TERMINATED') throw new TransferRefusedError('EMPLOYEE_LEFT');
+    const before = await this.history.getPlacementInForce(tx, input.employeeId, today);
+    if (!before) throw new TransferRefusedError('PLACEMENT_OVERLAP');
+    const toDepartmentId = input.toDepartmentId ?? before.departmentId;
+    const toJobTitleId = input.toJobTitleId ?? before.jobTitleId;
+    const departmentChanges = toDepartmentId !== before.departmentId;
+    const dayBefore = addDays(input.effectiveOn, -1);
+    const leavesAsHead =
+      departmentChanges &&
+      (await this.organization.getHeadedDepartment(input.employeeId, dayBefore))?.departmentId === before.departmentId;
+
+    // Locks (T-11): the departments by id, then the job title, then the employee (and a chosen successor), then accounts.
+    const departments = await this.history.lockDepartments(tx, {
+      updateIds: leavesAsHead ? [before.departmentId] : [],
+      shareIds: [before.departmentId, toDepartmentId],
+    });
+    const destinationTitle =
+      toJobTitleId === before.jobTitleId ? null : await this.organization.lockJobTitleForShare(tx, toJobTitleId);
+    await this.organization.lockEmployeeForUpdate(tx, input.employeeId);
+    if (leavesAsHead && input.successor?.kind === 'EMPLOYEE') {
+      await this.lockSuccessor(tx, input.successor.employeeId);
+    }
+
+    const employee = await this.organization.getEmployee(input.employeeId, tx);
+    const current = await this.history.getPlacementInForce(tx, input.employeeId, today);
+    if (!employee || !current || current.placementId !== before.placementId) {
+      throw new TransferRefusedError('CONCURRENT_CHANGE');
+    }
+    const headNow =
+      departmentChanges &&
+      (await this.organization.getHeadedDepartment(input.employeeId, dayBefore))?.departmentId === before.departmentId;
+    if (headNow && !leavesAsHead) throw new TransferRefusedError('CONCURRENT_CHANGE');
+
+    await this.settlement.settleDueOf(tx, input.employeeId, today);
+    const destination = departments.get(toDepartmentId) ?? null;
+    const oldDepartment = departments.get(before.departmentId);
+    const refusal = newTransferRefusal({
+      today,
+      effectiveOn: input.effectiveOn,
+      employee: { status: employee.status, workState: employee.workState },
+      current: { departmentId: current.departmentId, jobTitleId: current.jobTitleId, validFrom: current.validFrom },
+      target: { departmentId: toDepartmentId, jobTitleId: toJobTitleId },
+      destinationDepartment: destination && {
+        active: destination.active,
+        costCenterActive: destination.costCenterActive,
+      },
+      destinationJobTitle: destinationTitle && { active: destinationTitle.status === 'ACTIVE' },
+      grounds: input.grounds,
+      pending: await this.pendingOf(tx, input.employeeId),
+      namedAsSuccessor: await this.transfers.isNamedSuccessorOfPending(tx, input.employeeId),
+      selfMode,
+      successor: await this.guard.successorFacts(tx, {
+        required: leavesAsHead,
+        chosen: input.successor,
+        transfereeId: input.employeeId,
+        oldDepartmentId: before.departmentId,
+        day: input.effectiveOn,
+      }),
+    });
+    if (refusal)
+      this.guard.refuse(
+        refusal,
+        refusal.code === 'HEAD_SUCCESSOR_REQUIRED' ? { departmentName: oldDepartment?.name } : undefined,
+      );
+    const grounds = normalizedGrounds(input.grounds ?? {});
+
+    const handover = await this.handOverHead(tx, {
+      organizationId: organization.id,
+      departmentId: before.departmentId,
+      employeeId: input.employeeId,
+      effectiveOn: input.effectiveOn,
+      successor: leavesAsHead ? input.successor : undefined,
+    });
+    const scheduled = await this.scheduleStructure(tx, {
+      organizationId: organization.id,
+      employeeId: input.employeeId,
+      effectiveOn: input.effectiveOn,
+      departmentId: toDepartmentId,
+      jobTitleId: toJobTitleId,
+    });
+    const record = await this.insertTransfer(tx, {
+      organizationId: organization.id,
+      employeeId: input.employeeId,
+      fromDepartmentId: before.departmentId,
+      toDepartmentId,
+      fromJobTitleId: before.jobTitleId,
+      toJobTitleId,
+      effectiveOn: input.effectiveOn,
+      closesPlacementId: scheduled.closedPlacementId,
+      opensPlacementId: scheduled.openedPlacementId,
+      headHandover: handover,
+      grounds,
+      selfExecuted: selfMode === 'ALLOW_SELF_EXECUTED',
+      recordedByAppUserId: actor.appUserId,
+      noticeId: input.noticeId ?? null,
+    });
+
+    const titles = await this.organization.getJobTitles([before.jobTitleId, toJobTitleId], tx);
+    const titleName = (id: string) => titles.find((title) => title.id === id)?.name ?? null;
+    await this.audit.record(
+      tx,
+      personnelAuditEvent(
+        actor,
+        organization.id,
+        'DEPARTMENT_TRANSFER.RECORDED',
+        'DepartmentTransfer',
+        record.id,
+        {
+          employeeCode: employee.employeeCode,
+          department: oldDepartment?.code ?? null,
+          jobTitle: titleName(before.jobTitleId),
+        },
+        {
+          department: destination?.code ?? null,
+          jobTitle: titleName(toJobTitleId),
+          effectiveOn: input.effectiveOn,
+          grounds: groundsSnapshot(grounds),
+          headSuccessor: handover ? (handover.successorEmployeeId ?? 'NONE') : null,
+          selfExecuted: record.selfExecuted,
+        },
+      ),
+    );
+    if (record.selfExecuted) {
+      await this.audit.record(
+        tx,
+        personnelAuditEvent(actor, organization.id, 'PERSONNEL.SELF_EXECUTED', 'DepartmentTransfer', record.id, null, {
+          employeeCode: employee.employeeCode,
+          event: 'TRANSFER_RECORDED',
+        }),
+      );
+    }
+    await this.hooks.onRecorded(tx, {
+      fileKind: 'TRANSFER',
+      fileId: record.id,
+      employeeId: record.employeeId,
+      dueOn: record.effectiveOn,
+    });
+    // A transfer for today has already taken effect: the placement began in this transaction and the listeners were told.
+    if (input.effectiveOn <= today) await this.settlement.settleOne(tx, record.id, 'RECORDED_FOR_TODAY');
+
+    return (await this.transfers.find(record.id, tx)) ?? record;
+  }
+
+  private async pendingOf(tx: DbTx, employeeId: string): Promise<{ effectiveOn: BusinessDate } | null> {
+    const pending = await this.transfers.findPendingOf(tx, employeeId);
+
+    return pending && { effectiveOn: pending.effectiveOn };
+  }
+
+  /** Takes the successor row `FOR SHARE`; one that does not exist is judged by the policy, not here. */
+  private async lockSuccessor(tx: DbTx, employeeId: string): Promise<void> {
+    try {
+      await this.organization.lockEmployeeForShare(tx, employeeId);
+    } catch (error) {
+      if (!(error instanceof EmployeeNotFoundError)) throw error;
+    }
+  }
+
+  /** Ends the head's period and opens the successor's; null when the person heads nothing across the day. */
+  private async handOverHead(
+    tx: DbTx,
+    input: {
+      organizationId: string;
+      departmentId: string;
+      employeeId: string;
+      effectiveOn: BusinessDate;
+      successor: RecordTransferInput['successor'];
+    },
+  ): Promise<HeadHandoverFacts | null> {
+    if (!input.successor) return null;
+    const successorEmployeeId = input.successor.kind === 'EMPLOYEE' ? input.successor.employeeId : null;
+    try {
+      const moved = await this.history.scheduleHeadHandover(tx, {
+        organizationId: input.organizationId,
+        departmentId: input.departmentId,
+        outgoingEmployeeId: input.employeeId,
+        effectiveOn: input.effectiveOn,
+        successorEmployeeId,
+      });
+
+      return moved && { ...moved, successor: successorEmployeeId ? 'EMPLOYEE' : 'NONE', successorEmployeeId };
+    } catch (error) {
+      if (error instanceof HeadHandoverRefusedError) {
+        throw new TransferRefusedError('SUCCESSOR_NOT_A_MEMBER_ON_DATE', { reason: error.reason });
+      }
+      throw error;
+    }
+  }
+
+  private async scheduleStructure(
+    tx: DbTx,
+    input: Parameters<OrganizationHistoryService['scheduleStructureChange']>[1],
+  ) {
+    try {
+      return await this.history.scheduleStructureChange(tx, input);
+    } catch (error) {
+      if (error instanceof PlacementOverlapError)
+        throw new TransferRefusedError('PLACEMENT_OVERLAP', { reason: error.reason });
+      if (error instanceof PlacementDepartmentInactiveError) {
+        const refusal = retiredDestinationRefusal();
+        throw new TransferRefusedError(refusal.code, refusal.details);
+      }
+      throw error;
+    }
+  }
+
+  private async insertTransfer(tx: DbTx, input: Parameters<TransferRepo['insert']>[1]): Promise<TransferRecord> {
+    try {
+      return await this.transfers.insert(tx, input);
+    } catch (error) {
+      if (isUniqueViolation(error, 'one_pending_per_employee', 'employee_id'))
+        throw new TransferRefusedError('PENDING_EVENT_EXISTS', { kind: 'TRANSFER' });
+      throw error;
+    }
+  }
+}

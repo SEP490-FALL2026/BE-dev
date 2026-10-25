@@ -6,7 +6,8 @@ import { AuditEventInput } from './audit.types';
 describe('AuditService', () => {
   const insert = jest.fn().mockResolvedValue(undefined);
   const countByAction = jest.fn().mockResolvedValue(new Map([['INSTALLATION.EMPLOYEE_CREATED', 2]]));
-  const service = new AuditService({ insert, countByAction });
+  const readSince = jest.fn().mockResolvedValue([]);
+  const service = new AuditService({ insert, countByAction, readSince });
   const tx = {} as DbTx;
   const base: AuditEventInput = {
     organizationId: '11111111-1111-4111-8111-111111111111',
@@ -56,5 +57,15 @@ describe('AuditService', () => {
         ['INSTALLATION.DEPARTMENT_CREATED', 0],
       ]),
     );
+  });
+
+  it('reads the next events of the named actions for a consumer of the system, in the caller transaction', async () => {
+    const cursor = { occurredAt: new Date('2026-10-24T00:00:00.000Z'), id: '22222222-2222-4222-8222-222222222222' };
+    const options = { upTo: new Date('2026-10-24T01:00:00.000Z'), actions: ['ACCESS_REQUEST.WITHDRAWN'], limit: 200 };
+    const slice = [{ id: 'e1', action: 'ACCESS_REQUEST.WITHDRAWN' }];
+    readSince.mockResolvedValueOnce(slice);
+
+    await expect(service.readSince(tx, cursor, options)).resolves.toBe(slice);
+    expect(readSince).toHaveBeenCalledWith(tx, cursor, options);
   });
 });

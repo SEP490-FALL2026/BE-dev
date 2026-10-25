@@ -237,6 +237,15 @@ describe('invitation email configuration', () => {
     });
   });
 
+  it('looks at the open steps of requests every 10 seconds, within 1 and 300 seconds', () => {
+    expect(validateEnvironment(OWN_SECRETS)).toMatchObject({ REQUEST_WORK_INTERVAL_MS: 10_000 });
+    expect(validateEnvironment({ ...OWN_SECRETS, REQUEST_WORK_INTERVAL_MS: '1000' })).toMatchObject({
+      REQUEST_WORK_INTERVAL_MS: 1_000,
+    });
+    expect(() => validateEnvironment({ ...OWN_SECRETS, REQUEST_WORK_INTERVAL_MS: '999' })).toThrow();
+    expect(() => validateEnvironment({ ...OWN_SECRETS, REQUEST_WORK_INTERVAL_MS: '300001' })).toThrow();
+  });
+
   describe('password reset settings (T-1, T-2)', () => {
     it('defaults the reset link to 30 minutes and three requests per hour', () => {
       expect(validateEnvironment(OWN_SECRETS)).toMatchObject({

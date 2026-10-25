@@ -1,112 +1,17 @@
 import { Injectable } from '@nestjs/common';
+import { toDateColumn, type BusinessDate } from '../../../core/business-date';
 import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type {
+  AccessState,
   ProvisioningChannel,
   ProvisioningFailureKind,
-  ProvisioningTaskKind,
   ProvisioningTaskStatus,
+  RevocationCompletion,
+  RevocationSource,
 } from '../licensing.types';
-
-/** A task as it is kept, with the few facts of its assignment a card needs. */
-export interface ProvisioningTaskRecord {
-  id: string;
-  kind: ProvisioningTaskKind;
-  channel: ProvisioningChannel;
-  status: ProvisioningTaskStatus;
-  requestId: string;
-  assignmentId: string;
-  defaultResponsibleEmployeeId: string | null;
-  claimedByAppUserId: string | null;
-  claimedAt: Date | null;
-  completedByAppUserId: string | null;
-  completedAt: Date | null;
-  evidence: string | null;
-  failedByAppUserId: string | null;
-  failedAt: Date | null;
-  failureReason: string | null;
-  failureKind: ProvisioningFailureKind | null;
-  attempts: number;
-  /** The most tries the task gets, fixed when it was made (US-01-04 AC-13). */
-  maxAttempts: number;
-  lastError: string | null;
-  nextRetryAt: Date | null;
-  closedByAppUserId: string | null;
-  closedAt: Date | null;
-  closeReason: string | null;
-  handedOffByAppUserId: string | null;
-  handedOffAt: Date | null;
-  handOffEvidence: string | null;
-  createdAt: Date;
-  assignment: { employeeId: string; planId: string; subscriptionId: string | null; accountIdentifier: string };
-}
-
-/** The columns of a task that a list row shows: everything but the long text a detail carries (`LD-08`). */
-const SUMMARY_SELECT = {
-  id: true,
-  organizationId: true,
-  assignmentId: true,
-  kind: true,
-  channel: true,
-  status: true,
-  requestId: true,
-  defaultResponsibleEmployeeId: true,
-  claimedByAppUserId: true,
-  claimedAt: true,
-  completedByAppUserId: true,
-  completedAt: true,
-  failedByAppUserId: true,
-  failedAt: true,
-  failureKind: true,
-  attempts: true,
-  maxAttempts: true,
-  nextRetryAt: true,
-  closedByAppUserId: true,
-  closedAt: true,
-  handedOffByAppUserId: true,
-  handedOffAt: true,
-  createdByAppUserId: true,
-  createdAt: true,
-  updatedAt: true,
-  assignment: { select: { employeeId: true, planId: true, subscriptionId: true, accountIdentifier: true } },
-} as const;
-
-const WITH_ASSIGNMENT = {
-  assignment: { select: { employeeId: true, planId: true, subscriptionId: true, accountIdentifier: true } },
-} as const;
-type Row = Prisma.ProvisioningTaskGetPayload<{ include: typeof WITH_ASSIGNMENT }>;
-
-const toRecord = (row: Row): ProvisioningTaskRecord => ({
-  id: row.id,
-  kind: row.kind,
-  channel: row.channel,
-  status: row.status,
-  requestId: row.requestId,
-  assignmentId: row.assignmentId,
-  defaultResponsibleEmployeeId: row.defaultResponsibleEmployeeId,
-  claimedByAppUserId: row.claimedByAppUserId,
-  claimedAt: row.claimedAt,
-  completedByAppUserId: row.completedByAppUserId,
-  completedAt: row.completedAt,
-  evidence: row.evidence,
-  failedByAppUserId: row.failedByAppUserId,
-  failedAt: row.failedAt,
-  failureReason: row.failureReason,
-  failureKind: row.failureKind,
-  attempts: row.attempts,
-  maxAttempts: row.maxAttempts,
-  lastError: row.lastError,
-  nextRetryAt: row.nextRetryAt,
-  closedByAppUserId: row.closedByAppUserId,
-  closedAt: row.closedAt,
-  closeReason: row.closeReason,
-  handedOffByAppUserId: row.handedOffByAppUserId,
-  handedOffAt: row.handedOffAt,
-  handOffEvidence: row.handOffEvidence,
-  createdAt: row.createdAt,
-  assignment: row.assignment,
-});
+import { SUMMARY_SELECT, WITH_ASSIGNMENT, toRecord, type ProvisioningTaskRecord } from './provisioning-task.record';
 
 export interface TaskPageFilter {
   channel?: ProvisioningChannel;
@@ -275,6 +180,126 @@ export class ProvisioningTaskRepo {
     });
   }
 
+  /**
+   * The grant task of a request, locked `FOR UPDATE` until the transaction ends, or null when the request has none. A request
+   * for one person has at most one: its grant makes one assignment and one task. A request for a group has one for each person,
+   * so the task is the one of the seat of that person (`employeeId`).
+   */
+  async lockGrantOfRequest(tx: DbTx, requestId: string, employeeId?: string): Promise<ProvisioningTaskRecord | null> {
+    const locked =
+      employeeId === undefined
+        ? await tx.$queryRaw<
+            { id: string }[]
+          >`SELECT id FROM provisioning_tasks WHERE request_id = ${requestId}::uuid AND kind = 'GRANT' ORDER BY created_at DESC LIMIT 1 FOR UPDATE`
+        : await tx.$queryRaw<{ id: string }[]>`SELECT t.id FROM provisioning_tasks t
+            JOIN license_assignments a ON a.id = t.assignment_id
+           WHERE t.request_id = ${requestId}::uuid AND t.kind = 'GRANT' AND a.employee_id = ${employeeId}::uuid
+           ORDER BY t.created_at DESC LIMIT 1 FOR UPDATE OF t`;
+    if (locked.length === 0) return null;
+
+    return this.find(locked[0].id, tx);
+  }
+
+  /** The cancellation of a task whose request was withdrawn: the end of it. A failure it had stays on the task. */
+  async markCancelled(tx: DbTx, id: string, appUserId: string, reason: string, now: Date): Promise<void> {
+    await tx.provisioningTask.update({
+      where: { id },
+      data: { status: 'CANCELLED', closedByAppUserId: appUserId, closedAt: now, closeReason: reason },
+    });
+  }
+
+  /** A revocation of a seat: queued for a person, with the source that opened it. It has no request. */
+  async insertRevocation(
+    tx: DbTx,
+    input: {
+      organizationId: string;
+      assignmentId: string;
+      source: RevocationSource;
+      defaultResponsibleEmployeeId: string | null;
+      createdByAppUserId: string;
+      maxAttempts: number;
+    },
+  ): Promise<ProvisioningTaskRecord> {
+    const row = await tx.provisioningTask.create({
+      data: {
+        organizationId: input.organizationId,
+        assignmentId: input.assignmentId,
+        kind: 'REVOKE',
+        channel: 'MANUAL',
+        revocationSource: input.source,
+        defaultResponsibleEmployeeId: input.defaultResponsibleEmployeeId,
+        createdByAppUserId: input.createdByAppUserId,
+        maxAttempts: input.maxAttempts,
+      },
+      include: WITH_ASSIGNMENT,
+    });
+
+    return toRecord(row);
+  }
+
+  /**
+   * The revocation of a seat that is still alive (not closed as failed, not cancelled; a completed one is alive too: it ended
+   * the seat), locked `FOR UPDATE` until the transaction ends, or null when the seat has none.
+   */
+  async lockLiveRevocation(tx: DbTx, assignmentId: string): Promise<ProvisioningTaskRecord | null> {
+    const locked = await tx.$queryRaw<{ id: string }[]>`
+      SELECT id FROM provisioning_tasks
+       WHERE assignment_id = ${assignmentId}::uuid AND kind = 'REVOKE' AND status NOT IN ('CLOSED_FAILED', 'CANCELLED')
+       FOR UPDATE`;
+    if (locked.length === 0) return null;
+
+    return this.find(locked[0].id, tx);
+  }
+
+  /** The completion of a revocation: who did it, the evidence, how it was done and what is known of the access. */
+  async markRevocationCompleted(
+    tx: DbTx,
+    id: string,
+    appUserId: string,
+    input: {
+      completion: RevocationCompletion;
+      evidence: string;
+      note: string | null;
+      paidThroughOn: BusinessDate | null;
+      accessState: AccessState | null;
+      accessCutOn: BusinessDate | null;
+      accessEvidence: string | null;
+    },
+    now: Date,
+  ): Promise<void> {
+    await tx.provisioningTask.update({
+      where: { id },
+      data: {
+        status: 'COMPLETED',
+        completedByAppUserId: appUserId,
+        completedAt: now,
+        evidence: input.evidence,
+        completion: input.completion,
+        completionNote: input.note,
+        paidThroughOn: input.paidThroughOn ? toDateColumn(input.paidThroughOn) : null,
+        accessState: input.accessState,
+        accessCutOn: input.accessCutOn ? toDateColumn(input.accessCutOn) : null,
+        accessEvidence: input.accessEvidence,
+      },
+    });
+  }
+
+  /** The one change a completed revocation takes: its access, left to run to the end of the paid period, was cut on a day. */
+  async markAccessCut(
+    tx: DbTx,
+    id: string,
+    input: { accessCutOn: BusinessDate; accessEvidence: string },
+  ): Promise<void> {
+    await tx.provisioningTask.update({
+      where: { id },
+      data: {
+        accessState: 'CUT',
+        accessCutOn: toDateColumn(input.accessCutOn),
+        accessEvidence: input.accessEvidence,
+      },
+    });
+  }
+
   /** The people who are in charge by default of some task: a few IT Admins, to learn which of them still work. */
   async responsibleEmployeeIds(): Promise<string[]> {
     const groups = await this.prisma.provisioningTask.groupBy({
@@ -324,6 +349,8 @@ export class ProvisioningTaskRepo {
               failureReason: null,
               handOffEvidence: null,
               closeReason: null,
+              accessEvidence: null,
+              completionNote: null,
             }),
           ),
           total: await tx.provisioningTask.count({ where }),

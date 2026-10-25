@@ -1,6 +1,6 @@
 import { BusinessDate } from '../../../core/business-date';
 import { CostCenterStatus } from '../cost-center/cost-center.types';
-import { EmployeeStatus } from '../organization.types';
+import { EmployeeStatus, EmployeeWorkState } from '../organization.types';
 import { ProjectRecord } from '../project/project.types';
 
 export type DepartmentStatus = 'ACTIVE' | 'INACTIVE';
@@ -44,6 +44,9 @@ export interface DepartmentHeadRecord {
 export interface HeadPeriodChanges {
   cancelled: HeadPeriodRecord[];
   ended: HeadPeriodRecord[];
+  /** The ids of the periods in `ended` and of those in `cancelled`, each in the same order: what a change announced to the listeners names. */
+  endedPeriodIds: string[];
+  cancelledPeriodIds: string[];
 }
 
 export interface DepartmentView extends DepartmentRecord {
@@ -76,6 +79,7 @@ export interface DepartmentMemberRecord {
   employeeCode: string;
   fullName: string;
   status: EmployeeStatus;
+  workState: EmployeeWorkState;
   hasWorkEmail: boolean;
   /** The first day of the person's current period in the department. */
   memberSince: BusinessDate;

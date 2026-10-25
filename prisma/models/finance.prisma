@@ -8,9 +8,17 @@ model Currency {
   name      String
   minorUnit Int    @map("minor_unit") @db.SmallInt
 
-  rates         ExchangeRate[]
-  subscriptions Subscription[] @relation("SubscriptionPriceCurrency")
-  organizations Organization[] @relation("OrganizationReportingCurrency")
+  rates                ExchangeRate[]
+  subscriptions        Subscription[]            @relation("SubscriptionPriceCurrency")
+  accessRequestAmounts AccessRequest[]           @relation("AccessRequestAmountCurrency")
+  assessmentQuotes     AccessRequestAssessment[] @relation("AssessmentQuoteCurrency")
+  requestBudgetChecks  RequestBudgetCheck[]      @relation("RequestBudgetCheckCurrency")
+  requestSupplements   RequestSupplement[]       @relation("RequestSupplementCurrency")
+  lineAmounts          AccessRequestLineAmount[] @relation("LineAmountCurrency")
+  budgetProposals      BudgetProposal[]          @relation("BudgetProposalCurrency")
+  budgetVersions       BudgetVersion[]           @relation("BudgetVersionCurrency")
+  budgetCommitments    BudgetCommitment[]        @relation("BudgetCommitmentCurrency")
+  organizations        Organization[]            @relation("OrganizationReportingCurrency")
 
   @@map("currencies")
 }

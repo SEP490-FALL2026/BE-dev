@@ -2,20 +2,26 @@ import { Injectable } from '@nestjs/common';
 import { fromDateColumn, toDateColumn, type BusinessDate } from '../../../core/business-date';
 import { normalizeEmail } from '../../../core/email';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
-import { DbTx } from '../../../infrastructure/database/transaction-runner';
+import { DbTx, readSqlState } from '../../../infrastructure/database/transaction-runner';
 import { isCheckViolation, isUniqueViolation } from '../../../infrastructure/database/unique-violation';
 import {
   EmployeeCodeTakenError,
   EmployeeEmailTakenError,
   EmployeeNotFoundError,
   EmployeeOpenSeatNeedsEndError,
+  PlacementDepartmentInactiveError,
+  PlacementOverlapError,
 } from '../organization.errors';
 import {
   CreateEmployeeWithPlacementInput,
   EmployeeCandidate,
   EmployeeProfile,
   EmployeeRecord,
+  EmployeeWorkState,
   OfficialFieldsPatch,
+  PlacementInForce,
+  ScheduledStructureChange,
+  StructureChangeInput,
 } from '../organization.types';
 
 /** The employee as the facade shows it. */
@@ -27,6 +33,7 @@ function toEmployeeRecord(row: {
   workEmail: string | null;
   employmentType: EmployeeRecord['employmentType'];
   status: EmployeeRecord['status'];
+  workState: EmployeeWorkState;
   hireDate: Date;
 }): EmployeeRecord {
   return {
@@ -37,6 +44,7 @@ function toEmployeeRecord(row: {
     workEmail: row.workEmail,
     employmentType: row.employmentType,
     status: row.status,
+    workState: row.workState,
     hireDate: fromDateColumn(row.hireDate),
   };
 }
@@ -150,6 +158,92 @@ export class EmployeeRepo {
     if (rows.length === 0) throw new EmployeeNotFoundError(employeeId);
   }
 
+  /**
+   * Ends the placement the person has open on `effectiveOn` and opens the next one from that day, so every read by day is
+   * right from midnight of it (ADR-04). The caller holds the employee `FOR UPDATE`. The database is the last word on two
+   * placements meeting (`employee_placements_no_overlap`) and on a retired department taking a member.
+   */
+  async scheduleStructureChange(tx: DbTx, input: StructureChangeInput): Promise<ScheduledStructureChange> {
+    const open = (
+      await tx.$queryRaw<{ id: string; department_id: string; job_title_id: string; valid_from: Date }[]>`
+        SELECT id, department_id, job_title_id, valid_from FROM employee_placements
+         WHERE employee_id = ${input.employeeId}::uuid AND valid_to IS NULL FOR UPDATE`
+    )[0];
+    if (!open) throw new PlacementOverlapError('NO_OPEN_PLACEMENT');
+    const validFrom = fromDateColumn(open.valid_from);
+    if (validFrom >= input.effectiveOn) throw new PlacementOverlapError('NOT_AFTER_CURRENT_PERIOD');
+
+    try {
+      await tx.$executeRaw`UPDATE employee_placements SET valid_to = ${input.effectiveOn}::date WHERE id = ${open.id}::uuid`;
+      const opened = await tx.employeePlacement.create({
+        data: {
+          organizationId: input.organizationId,
+          employeeId: input.employeeId,
+          departmentId: input.departmentId,
+          jobTitleId: input.jobTitleId,
+          validFrom: toDateColumn(input.effectiveOn),
+        },
+        select: { id: true },
+      });
+
+      return {
+        closedPlacementId: open.id,
+        openedPlacementId: opened.id,
+        from: { departmentId: open.department_id, jobTitleId: open.job_title_id, validFrom },
+      };
+    } catch (error) {
+      if (readSqlState(error) === '23P01' || isUniqueViolation(error, 'valid_from')) {
+        throw new PlacementOverlapError('OVERLAP');
+      }
+      if (isCheckViolation(error)) throw new PlacementDepartmentInactiveError();
+      throw error;
+    }
+  }
+
+  /** Takes back a change that has not taken effect: removes the placement it opened and opens the one it ended again. */
+  async cancelStructureChange(
+    tx: DbTx,
+    change: Pick<ScheduledStructureChange, 'closedPlacementId' | 'openedPlacementId'>,
+  ): Promise<void> {
+    const removed = await tx.$executeRaw`DELETE FROM employee_placements WHERE id = ${change.openedPlacementId}::uuid`;
+    if (removed !== 1) throw new PlacementOverlapError('NO_OPEN_PLACEMENT');
+    await tx.$executeRaw`UPDATE employee_placements SET valid_to = NULL WHERE id = ${change.closedPlacementId}::uuid`;
+  }
+
+  /** The placement in force on `onDate` with its days, read in the caller's transaction; null when there is none. */
+  async placementInForce(tx: DbTx, employeeId: string, onDate: BusinessDate): Promise<PlacementInForce | null> {
+    const rows = await tx.$queryRaw<
+      { id: string; department_id: string; job_title_id: string; valid_from: Date; valid_to: Date | null }[]
+    >`
+      SELECT id, department_id, job_title_id, valid_from, valid_to FROM employee_placements
+       WHERE employee_id = ${employeeId}::uuid AND valid_from <= ${onDate}::date
+         AND (valid_to IS NULL OR valid_to > ${onDate}::date)`;
+    const row = rows[0];
+
+    return row
+      ? {
+          placementId: row.id,
+          departmentId: row.department_id,
+          jobTitleId: row.job_title_id,
+          validFrom: fromDateColumn(row.valid_from),
+          validTo: row.valid_to ? fromDateColumn(row.valid_to) : null,
+        }
+      : null;
+  }
+
+  /** The first day of a placement, or null when it does not exist. */
+  async placementStart(tx: DbTx, placementId: string): Promise<BusinessDate | null> {
+    const rows = await tx.$queryRaw<{ valid_from: Date }[]>`
+      SELECT valid_from FROM employee_placements WHERE id = ${placementId}::uuid`;
+
+    return rows[0] ? fromDateColumn(rows[0].valid_from) : null;
+  }
+
+  /** Moves the work state of the employee whose row the caller holds `FOR UPDATE`; the database refuses a step off the graph. */
+  async setWorkState(tx: DbTx, employeeId: string, workState: EmployeeWorkState): Promise<void> {
+    await tx.$executeRaw`UPDATE employees SET work_state = ${workState}::"EmployeeWorkState", updated_at = now() WHERE id = ${employeeId}::uuid`;
+  }
+
   /** Unlocked read: the per-request guard must not take locks (and must not deadlock with termination). */
   async findEmployee(employeeId: string, tx?: DbTx): Promise<EmployeeRecord | null> {
     const row = await (tx ?? this.prisma).employee.findUnique({ where: { id: employeeId } });
@@ -178,9 +272,10 @@ export class EmployeeRepo {
   async placementIdsOn(
     employeeId: string,
     onDate: BusinessDate,
+    tx?: DbTx,
   ): Promise<{ departmentId: string; jobTitleId: string } | null> {
     const date = toDateColumn(onDate);
-    const row = await this.prisma.employeePlacement.findFirst({
+    const row = await (tx ?? this.prisma).employeePlacement.findFirst({
       where: { employeeId, validFrom: { lte: date }, OR: [{ validTo: null }, { validTo: { gt: date } }] },
       select: { departmentId: true, jobTitleId: true },
     });

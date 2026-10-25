@@ -88,3 +88,5 @@ Ma trận trên là khung từ tiêu đề AC; tình huống cụ thể (từ ch
 ## Changes and acceptance
 
 20/10/2026: lập khung theo bản đồ phân rã G3/G4 của [roadmap](../../../roadmap.md). Chưa thiết kế chi tiết, chưa code, chưa review, chưa nghiệm thu.
+
+23/10/2026: phần cổng cấp phát của hạng mục này — `US-07-01` AC-1, AC-3, AC-15, AC-16 — đã được làm kèm ở [`g5-internal-software-path`](../g5-internal-software-path/spec.md) (cổng `claimForGrant` và `reportOutcome`, Request cấp một lần). Phần còn lại (`US-04-10` AC-5, AC-6, AC-11; `US-07-04` AC-4, AC-6, AC-12, AC-15; mọi thứ chờ G6) vẫn `blocked`; chưa đổi trạng thái hạng mục.

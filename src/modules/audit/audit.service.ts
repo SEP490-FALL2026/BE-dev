@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { DbTx } from '../../infrastructure/database/transaction-runner';
 import { UnsafeAuditPayloadError } from './audit.errors';
 import { AuditRepo } from './audit.repo';
-import { AuditEventInput, AuditValue } from './audit.types';
+import { AuditCursor, AuditEventInput, AuditEventSlice, AuditValue } from './audit.types';
 
 /** Keys that must never be written to the Audit Trail (US-01-10 AC-9, FR-8.11(b)). */
 const FORBIDDEN_KEY = /pass(word)?|hash|token|secret|cookie|credential|authorization|pepper/i;
@@ -31,6 +31,21 @@ export class AuditService {
     assertSafe(event.before ?? null, 'before');
     assertSafe(event.after ?? null, 'after');
     await this.repo.insert(tx, event);
+  }
+
+  /**
+   * The next events of the named actions after the cursor, oldest first, none newer than `upTo`, at most `limit`, for a consumer
+   * of the system (the projection of the status of requests into the inbox). A consumer keeps the cursor of the last event it
+   * handled and passes an `upTo` old enough that no transaction can still commit an event older than the cursor: an event is
+   * stamped when its transaction begins, not when it commits. Never reachable through HTTP; the trail is read by the Super Admin
+   * through its own query.
+   */
+  readSince(
+    tx: DbTx,
+    cursor: AuditCursor | null,
+    options: { upTo: Date; actions: readonly string[]; limit: number },
+  ): Promise<AuditEventSlice[]> {
+    return this.repo.readSince(tx, cursor, options);
   }
 
   /**

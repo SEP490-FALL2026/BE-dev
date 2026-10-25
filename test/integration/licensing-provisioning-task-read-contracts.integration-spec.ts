@@ -27,6 +27,7 @@ const SUMMARY_KEYS = [
   'nextRetryAt',
   'plan',
   'requestId',
+  'revocation',
   'status',
   'subscriptionId',
 ];

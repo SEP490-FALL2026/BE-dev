@@ -74,7 +74,8 @@ export class AssignmentNotServiceAccountError extends Error {
   }
 }
 
-export type ResponsibleProblem = 'NOT_FOUND' | 'NOT_ACTIVE' | 'SAME_PERSON' | 'OUTSIDE_OWNING_DEPARTMENT';
+export type ResponsibleProblem =
+  'NOT_FOUND' | 'NOT_ACTIVE' | 'HANDING_OVER' | 'SAME_PERSON' | 'OUTSIDE_OWNING_DEPARTMENT';
 
 export class AssignmentResponsibleInvalidError extends Error {
   constructor(readonly problem: ResponsibleProblem) {
@@ -116,9 +117,16 @@ export class ToolsDepartmentOutOfScopeError extends Error {
   }
 }
 
-/** The request cannot be granted: the gate that answers for requests does not know it, has not seen it approved, or has ended it. */
+/**
+ * The request cannot be granted: the gate that answers for requests does not know it, has not seen it approved, has ended
+ * it, it asks for software that is not in the catalog yet (`US-05-06` AC-8), or it is for a service account whose boundary
+ * the IT Admin has not accepted (`US-05-21` AC-3).
+ */
 export class GrantRequestRefusedError extends Error {
-  constructor(readonly reason: 'NOT_FOUND' | 'NOT_APPROVED' | 'ENDED') {
+  constructor(
+    readonly reason:
+      'NOT_FOUND' | 'NOT_APPROVED' | 'ENDED' | 'NOT_IN_CATALOG' | 'BOUNDARY_NOT_CHECKED' | 'BENEFICIARY_REQUIRED',
+  ) {
     super(`The request cannot be granted: ${reason}.`);
     this.name = 'GrantRequestRefusedError';
   }
@@ -147,6 +155,32 @@ export class ProvisioningPersonalAccountError extends Error {
   constructor() {
     super('A paid right is granted to a company account only.');
     this.name = 'ProvisioningPersonalAccountError';
+  }
+}
+
+/** A service account is granted to the identifier the IT Admin enters, never to one taken from the request (`US-05-21` AC-4). */
+export class ProvisioningAccountIdentifierRequiredError extends Error {
+  constructor() {
+    super('The IT Admin enters the account identifier of a service account.');
+    this.name = 'ProvisioningAccountIdentifierRequiredError';
+  }
+}
+
+/** The person who answers for the service account is no longer active or no longer in its department (`QĐ-86c`). */
+export class ProvisioningResponsibleNotInDepartmentError extends Error {
+  constructor() {
+    super('The person who answers for the service account is not active in the department that owns it.');
+    this.name = 'ProvisioningResponsibleNotInDepartmentError';
+  }
+}
+
+export type ProvisioningResponsibleProblem = 'NOT_SERVICE_ACCOUNT' | 'NOT_FOUND' | 'NOT_ACTIVE' | 'OUTSIDE_DEPARTMENT';
+
+/** The person the IT Admin names to answer for the service account cannot: the request is not for one, or they are not active in its department. */
+export class ProvisioningResponsibleInvalidError extends Error {
+  constructor(readonly problem: ProvisioningResponsibleProblem) {
+    super(`The person named cannot answer for the service account: ${problem}.`);
+    this.name = 'ProvisioningResponsibleInvalidError';
   }
 }
 
@@ -184,7 +218,21 @@ export class ProvisioningTaskNotManualError extends Error {
   }
 }
 
-export type ProvisioningTaskStateProblem = 'NOT_CLAIMABLE' | 'NOT_IN_PROGRESS' | 'NOT_FAILED' | 'NOT_RUNNING';
+export type ProvisioningTaskStateProblem =
+  | 'NOT_CLAIMABLE'
+  | 'NOT_IN_PROGRESS'
+  | 'NOT_FAILED'
+  | 'NOT_RUNNING'
+  /** The requester withdrew: only cancelling the task is left, not retrying, handing off or closing it as failed. */
+  | 'WITHDRAWAL_PENDING'
+  /** The task is cancelled only when its request was withdrawn. */
+  | 'NO_WITHDRAWAL'
+  /** A revocation ends by its own completion, never by the completion of a grant. */
+  | 'IS_REVOCATION'
+  /** Only a revocation is completed as a revocation or has the access of its seat cut. */
+  | 'NOT_REVOCATION'
+  /** The access of a seat is cut early only while it runs on to the end of the paid period. */
+  | 'NOT_TERMINATING';
 
 export class ProvisioningTaskStateError extends Error {
   constructor(readonly problem: ProvisioningTaskStateProblem) {
@@ -269,5 +317,69 @@ export class LicenseKeyRevealLimitError extends Error {
   constructor(readonly window: 'MINUTE' | 'DAY') {
     super('Too many license keys were opened by this account. Try again later.');
     this.name = 'LicenseKeyRevealLimitError';
+  }
+}
+
+export type RevocationProblem = 'SOURCE_REQUIRED' | 'ASSIGNMENT_IS_SERVICE_ACCOUNT' | 'TYPE_NOT_SUPPORTED';
+
+/**
+ * The seat cannot be revoked: no source says why, the assignment is a service account (answered for by a person, not part
+ * of the personal rights a departure takes away: `US-03-04` AC-17), or its kind of provisioning has no revocation (K3, K4).
+ */
+export class RevocationRefusedError extends Error {
+  constructor(
+    readonly problem: RevocationProblem,
+    readonly provisioningType?: string,
+  ) {
+    super(`The seat cannot be revoked: ${problem}.`);
+    this.name = 'RevocationRefusedError';
+  }
+}
+
+export type RevocationCompletionProblem =
+  | 'COMPLETION_NOT_ALLOWED'
+  | 'NOTE_REQUIRED'
+  | 'PAID_THROUGH_REQUIRED'
+  | 'ACCESS_STATE_REQUIRED'
+  | 'ACCESS_STATE_INVALID';
+
+/** The way a revocation is completed does not fit its kind of provisioning, or lacks what the kind needs to be stored. */
+export class RevocationCompletionError extends Error {
+  constructor(readonly problem: RevocationCompletionProblem) {
+    super(`The completion of the revocation is not valid: ${problem}.`);
+    this.name = 'RevocationCompletionError';
+  }
+}
+
+export type AssignmentRenewalProblem =
+  /** It has ended, failed or been cancelled: there is nothing left to renew. */
+  | 'NOT_OPEN'
+  | 'SERVICE_ACCOUNT'
+  /** The end it was expected to have is not the end the renewal was asked against: it changed, or it has none. */
+  | 'END_CHANGED'
+  /** The seat is being revoked: renewing it would end the record the revocation has to end. */
+  | 'REVOCATION_PENDING';
+
+/** The seat cannot be renewed as the request asks: the record it would follow is not the one the request was made against. */
+export class AssignmentRenewalRefusedError extends Error {
+  constructor(readonly problem: AssignmentRenewalProblem) {
+    super(`The seat cannot be renewed: ${problem}.`);
+    this.name = 'AssignmentRenewalRefusedError';
+  }
+}
+
+/**
+ * A module that extends a revocation through its hook refuses the step: the code is its own and stable, and the refusal is
+ * answered as a conflict. Throw it from `beforeWork` to stop the task being completed (the handover of a return, the
+ * confirmation of a departure) so the caller sees a code and not a failure of the server.
+ */
+export class RevocationHookRefusedError extends Error {
+  constructor(
+    readonly code: string,
+    message: string,
+    readonly details?: Record<string, string | number | boolean | null>,
+  ) {
+    super(message);
+    this.name = 'RevocationHookRefusedError';
   }
 }

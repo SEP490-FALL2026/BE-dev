@@ -50,6 +50,7 @@ const assignmentSchema = z.strictObject({
   expectedEndDate: z.string().nullable(),
   predecessorId: z.uuid().nullable(),
   failedAt: z.iso.datetime().nullable(),
+  cancelledAt: z.iso.datetime().nullable(),
   createdAt: z.iso.datetime(),
 });
 const assignmentSummarySchema = assignmentSchema.extend({

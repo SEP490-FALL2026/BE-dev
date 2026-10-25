@@ -3,8 +3,10 @@ import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from '../../src/app.module';
-import { configureApplication } from '../../src/bootstrap';
+import { configureApplication, createOpenApiDocument } from '../../src/bootstrap';
 import { ACCESS_TOKEN_VERIFIER } from '../../src/infrastructure/security/tokens/access-token-verifier.port';
+import { GRANT_REQUEST_GATE } from '../../src/modules/licensing/licensing.types';
+import { RefusingGrantRequestGate } from '../../src/modules/licensing/provisioning/refusing-grant-request-gate.service';
 import { bodyOf } from '../support/api-body';
 
 const ID = '3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11';
@@ -29,6 +31,9 @@ describe('provisioning queue routes (e2e, no database)', () => {
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
       .overrideProvider(ACCESS_TOKEN_VERIFIER)
       .useValue({ verify: jest.fn().mockResolvedValue(identity) })
+      // No database stands behind this app: the gate that knows no request keeps the requests out of it.
+      .overrideProvider(GRANT_REQUEST_GATE)
+      .useValue(new RefusingGrantRequestGate())
       .compile();
     const created = moduleRef.createNestApplication<INestApplication<App>>();
     configureApplication(created, { mountDocs: false });
@@ -51,6 +56,8 @@ describe('provisioning queue routes (e2e, no database)', () => {
     ['post', `${BASE}/${ID}/retry`],
     ['post', `${BASE}/${ID}/hand-off`],
     ['post', `${BASE}/${ID}/close-failed`],
+    ['post', `${BASE}/${ID}/revocation-completion`],
+    ['post', `${BASE}/${ID}/access-cut`],
   ] as const)('answers 401 to %s %s without a token', async (method, path) => {
     app = await appFor(null);
 
@@ -81,6 +88,12 @@ describe('provisioning queue routes (e2e, no database)', () => {
       await as(request(server).post(`${BASE}/${ID}/retry`)),
       await as(request(server).post(`${BASE}/${ID}/hand-off`).send({ evidence: 'x' })),
       await as(request(server).post(`${BASE}/${ID}/close-failed`).send({ reason: 'x' })),
+      await as(
+        request(server)
+          .post(`${BASE}/${ID}/revocation-completion`)
+          .send({ completion: 'ACCOUNT_REMOVED', evidence: 'x' }),
+      ),
+      await as(request(server).post(`${BASE}/${ID}/access-cut`).send({ accessCutOn: '2026-11-12', evidence: 'x' })),
     ]) {
       expect(response.status).toBe(403);
       expect(bodyOf(response).error.code).toBe('AUTHORIZATION.FORBIDDEN');
@@ -117,6 +130,39 @@ describe('provisioning queue routes (e2e, no database)', () => {
     ],
     ['a closing with an unknown field', 'post', `${BASE}/${ID}/close-failed`, { reason: 'x', force: true }],
     ['a retry for an id that is not a UUID', 'post', `${BASE}/not-a-uuid/retry`, {}],
+    ['a revocation completion with no way', 'post', `${BASE}/${ID}/revocation-completion`, { evidence: 'x' }],
+    [
+      'a revocation completion with a way that does not exist',
+      'post',
+      `${BASE}/${ID}/revocation-completion`,
+      { completion: 'DELETED', evidence: 'x' },
+    ],
+    [
+      'a revocation completion with a day that is not one',
+      'post',
+      `${BASE}/${ID}/revocation-completion`,
+      { completion: 'RENEWAL_CANCELLED', evidence: 'x', paidThroughOn: '2026-02-30' },
+    ],
+    [
+      'a revocation completion with an unknown field',
+      'post',
+      `${BASE}/${ID}/revocation-completion`,
+      { completion: 'ACCOUNT_REMOVED', evidence: 'x', password: 'p' },
+    ],
+    [
+      'a revocation note of over a thousand characters',
+      'post',
+      `${BASE}/${ID}/revocation-completion`,
+      { completion: 'ALREADY_GONE', note: 'x'.repeat(1001) },
+    ],
+    ['an access cut with no day', 'post', `${BASE}/${ID}/access-cut`, { evidence: 'x' }],
+    ['an access cut with a day that is not one', 'post', `${BASE}/${ID}/access-cut`, { accessCutOn: 'soon' }],
+    [
+      'an access cut for an id that is not a UUID',
+      'post',
+      `${BASE}/not-a-uuid/access-cut`,
+      { accessCutOn: '2026-11-12' },
+    ],
   ] as const)('turns away %s with 422', async (_name, method, path, body) => {
     app = await appFor(principal(['IT_ADMIN']));
     const req = request(app.getHttpServer())[method](path).set('Authorization', 'Bearer any');
@@ -126,7 +172,7 @@ describe('provisioning queue routes (e2e, no database)', () => {
     expect(bodyOf(response).error.code).toBe('VALIDATION_ERROR');
   });
 
-  it('knows no request until the module of requests exists: a grant is answered REQUEST.NOT_FOUND and nothing is written', async () => {
+  it('answers REQUEST.NOT_FOUND to a grant of a request the gate does not know, and writes nothing', async () => {
     app = await appFor(principal(['IT_ADMIN']));
 
     const response = await request(app.getHttpServer())
@@ -136,6 +182,35 @@ describe('provisioning queue routes (e2e, no database)', () => {
       .expect(404);
 
     expect(bodyOf(response).error.code).toBe('REQUEST.NOT_FOUND');
+  });
+
+  it('has no route that makes a revocation: each source opens it through the licensing facade (US-07-05 AC-3)', async () => {
+    app = await appFor(principal(['IT_ADMIN']));
+    const posts = Object.entries(createOpenApiDocument(app).paths)
+      .filter(([path, item]) => path.startsWith(BASE) && item.post)
+      .map(([path]) => path.slice(BASE.length))
+      .sort();
+
+    // The grant, and what is done to a task that exists: nothing here makes a task of kind REVOKE.
+    expect(posts).toEqual(
+      [
+        '',
+        '/{id}/access-cut',
+        '/{id}/cancel',
+        '/{id}/claim',
+        '/{id}/close-failed',
+        '/{id}/complete',
+        '/{id}/hand-off',
+        '/{id}/report-failure',
+        '/{id}/retry',
+        '/{id}/revocation-completion',
+      ].sort(),
+    );
+    await request(app.getHttpServer())
+      .post(`${BASE}/revoke`)
+      .set('Authorization', 'Bearer any')
+      .send({ source: 'RETURN' })
+      .expect(404);
   });
 
   it('has no route that deletes or rewrites a task', async () => {

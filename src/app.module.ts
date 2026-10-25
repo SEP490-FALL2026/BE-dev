@@ -11,10 +11,14 @@ import { FinanceHttpModule } from './modules/finance/finance-http.module';
 import { DataImportModule } from './modules/data-import/data-import.module';
 import { IdentityAccessModule } from './modules/identity-access/identity-access.module';
 import { LicensingModule } from './modules/licensing/licensing.module';
+import { NotificationsHttpModule } from './modules/notifications/notifications-http.module';
 import { OnboardingModule } from './modules/onboarding/onboarding.module';
+import { PersonnelModule } from './modules/personnel/personnel.module';
 import { OperatingParametersHttpModule } from './modules/operating-parameters/operating-parameters-http.module';
 import { OrganizationHttpModule } from './modules/organization/organization-http.module';
 import { OrganizationModule } from './modules/organization/organization.module';
+import { BudgetsModule } from './modules/budgets/budgets.module';
+import { RequestsModule } from './modules/requests/requests.module';
 import { ObservabilityModule } from './infrastructure/observability/observability.module';
 import { HttpInfrastructureModule } from './infrastructure/http/http-infrastructure.module';
 
@@ -30,11 +34,15 @@ import { HttpInfrastructureModule } from './infrastructure/http/http-infrastruct
     AuditHttpModule,
     OrganizationModule,
     OrganizationHttpModule,
+    PersonnelModule,
     OperatingParametersHttpModule,
     DataImportModule,
     FinanceHttpModule,
     CatalogModule,
     LicensingModule,
+    NotificationsHttpModule,
+    RequestsModule,
+    BudgetsModule,
     OnboardingModule,
     IdentityAccessModule,
     SecurityModule.register({ verifierModule: IdentityAccessModule }),

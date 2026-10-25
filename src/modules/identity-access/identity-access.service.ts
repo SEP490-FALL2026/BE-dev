@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import type { BusinessDate } from '../../core/business-date';
 import { normalizeEmail } from '../../core/email';
 import { DbTx } from '../../infrastructure/database/transaction-runner';
 import { OrganizationService } from '../organization/organization.service';
@@ -6,7 +7,16 @@ import { AccountDirectoryService } from './accounts/account-directory.service';
 import { ActionLinkService } from './accounts/action-link.service';
 import { CredentialService } from './accounts/credential.service';
 import { RoleGrantService } from './accounts/role-grant.service';
-import { BootstrapSuperAdminInput, EmployeeAccountInspection } from './identity-access.types';
+import { ApprovalRoleChangeRegistry } from './approval-roles/approval-role-change.registry';
+import { ApprovalRoleHoldersService } from './approval-roles/approval-role-holders.service';
+import {
+  ApprovalRoleChangeListener,
+  ApprovalRoleHolders,
+  BootstrapSuperAdminInput,
+  EmployeeAccountInspection,
+  LeaverGrantRole,
+  SuperAdminHolder,
+} from './identity-access.types';
 import { employeeHasNotLeft, isActionLinkRedeemable } from './policies/account-policy';
 
 /** Public facade of the identity-access module. */
@@ -18,6 +28,8 @@ export class IdentityAccessService {
     private readonly links: ActionLinkService,
     private readonly credentials: CredentialService,
     private readonly organization: OrganizationService,
+    private readonly approvalRoles: ApprovalRoleHoldersService,
+    private readonly roleChanges: ApprovalRoleChangeRegistry,
   ) {}
 
   /**
@@ -87,13 +99,70 @@ export class IdentityAccessService {
     };
   }
 
+  /**
+   * The person behind the account of this employee left on `leftOn` (the record of a departure calls it once, in its transaction): the
+   * Super Admin then lists such accounts and locks them with a reason. The sign-in and the guard refuse the person from the status of
+   * the employee, not from this day. Nothing when the employee has no account.
+   */
+  markEmployeeLeft(tx: DbTx, employeeId: string, leftOn: BusinessDate): Promise<void> {
+    return this.accounts.markEmployeeLeft(tx, employeeId, leftOn);
+  }
+
   /** Among these employees, those who hold the IT Admin role on a usable account (an unlocked read, for lists). */
   findUsableItAdminEmployeeIds(employeeIds: readonly string[]): Promise<Set<string>> {
     return this.accounts.findUsableItAdminEmployeeIds(employeeIds);
   }
 
+  /** The usable IT Admin with the smallest employee code, or null: who a report is given to when nobody is in charge. */
+  findFirstUsableItAdminEmployeeId(tx?: DbTx): Promise<string | null> {
+    return this.accounts.findFirstUsableItAdminEmployeeId(tx);
+  }
+
+  /** The employee who holds the FINANCE role on an account that can act now, or null: who a review of Finance is given to. */
+  findUsableFinanceEmployeeId(tx?: DbTx): Promise<string | null> {
+    return this.accounts.findUsableFinanceEmployeeId(tx);
+  }
+
+  /** The employee who holds the SUPER_ADMIN role on an account that can act, or null: who is told to configure a role (an unlocked read). */
+  findUsableSuperAdminEmployeeId(tx?: DbTx): Promise<string | null> {
+    return this.accounts.findUsableSuperAdminEmployeeId(tx);
+  }
+
+  /** The employee behind each of these accounts, by account id; for a consumer that reads who acted from an audit event (an unlocked read). */
+  employeeIdsOfAccounts(appUserIds: readonly string[], tx?: DbTx): Promise<Map<string, string>> {
+    return this.accounts.employeeIdsOfAccounts(appUserIds, tx);
+  }
+
   /** How many IT Admins other than this employee can act (an unlocked read, `QĐ-77m`). */
   countUsableItAdminsExcept(employeeId: string): Promise<number> {
     return this.accounts.countUsableItAdminsExcept(employeeId);
+  }
+
+  /**
+   * Who holds the spending approver, the substitute for a conflict of interest and the fallback approver now (an unlocked
+   * read): what the routing of a request needs to name the person who holds a step. A role nobody holds is null.
+   */
+  getApprovalRoleHolders(tx?: DbTx): Promise<ApprovalRoleHolders> {
+    return this.approvalRoles.current(tx);
+  }
+
+  /** The one account that holds the Super Admin role and what decides whether it can act; null when nobody holds it (an unlocked read). */
+  getSuperAdminHolder(tx?: DbTx): Promise<SuperAdminHolder | null> {
+    return this.accounts.findSuperAdminHolder(tx);
+  }
+
+  /** Which of the Super Admin and Finance roles each of these employees holds, whatever the state of the account (one unlocked read). */
+  async listRoleHoldersAmong(employeeIds: readonly string[], tx?: DbTx): Promise<Map<string, LeaverGrantRole[]>> {
+    const held = await this.grants.listHoldersAmong(employeeIds, ['SUPER_ADMIN', 'FINANCE'], tx);
+
+    return new Map([...held].map(([employeeId, roles]) => [employeeId, roles as LeaverGrantRole[]]));
+  }
+
+  /**
+   * A module that acts when an approval role or the role of Finance changes hands asks to be told, in the transaction of
+   * the change (`FR-3.16`). It calls this when its module starts, in every graph that hears such a change.
+   */
+  registerApprovalRoleListener(listener: ApprovalRoleChangeListener): void {
+    this.roleChanges.register(listener);
   }
 }

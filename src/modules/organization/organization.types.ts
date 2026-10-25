@@ -6,6 +6,8 @@ import { JobTitleStatus } from './job-title/job-title.types';
 
 export type EmploymentType = 'STAFF' | 'CONTRACTOR' | 'FREELANCER' | 'INTERN';
 export type EmployeeStatus = 'ACTIVE' | 'TERMINATED';
+/** What a person is doing for the organization apart from whether they have left (`FR-2.13`). */
+export type EmployeeWorkState = 'WORKING' | 'ON_LONG_LEAVE' | 'HANDING_OVER' | 'LEFT';
 
 export interface CreateOrganizationInput {
   name: string;
@@ -59,6 +61,7 @@ export interface EmployeeRecord {
   workEmail: string | null;
   employmentType: EmploymentType;
   status: EmployeeStatus;
+  workState: EmployeeWorkState;
   hireDate: BusinessDate;
 }
 
@@ -75,6 +78,35 @@ export interface OrganizationRecord {
   name: string;
   timeZone: string;
   reportingCurrency: string;
+}
+
+/** What a people file names, by what the import looks each of them up by. */
+export interface EmployeeImportNames {
+  departmentCodes: string[];
+  normalizedJobTitleNames: string[];
+  employeeCodes: string[];
+  normalizedEmails: string[];
+}
+
+/** A department locked for the entry of a person, with what the entry needs to judge it. */
+export interface DepartmentEntryLock {
+  id: string;
+  code: string;
+  name: string;
+  active: boolean;
+  costCenterActive: boolean;
+}
+
+/** The department and the job title an employee had on a day, by id. */
+export interface EmployeePlacementIds {
+  departmentId: string;
+  jobTitleId: string;
+}
+
+/** The department an employee was in on a day and the IT Admin in charge of it, named only while still working. */
+export interface ItAdminInCharge {
+  departmentId: string;
+  itAdminEmployeeId: string | null;
 }
 
 export interface EmployeeCandidate {
@@ -163,12 +195,69 @@ export interface LocalSeedFixtureFacts {
   jobTitle: { id: string; name: string; normalizedName: string; status: JobTitleStatus } | null;
 }
 
-/** What another module needs to know of a department to point at it: its code, name and whether it is still active. */
+/** What another module needs to know of a department to point at it: its code, name and whether it and its Cost Center are active. */
 export interface DepartmentBrief {
   id: string;
   code: string;
   name: string;
   active: boolean;
+  /** A retired Cost Center has no people (`US-04-09` AC-3), so a department charged to one takes nobody in. */
+  costCenterActive: boolean;
+}
+
+/**
+ * A change of the organization that has taken effect, told to the modules that act on it, in the transaction of the change
+ * (`FR-3.16`). The contract is the one of `g6-transfer-record` (`PLACEMENT_START`, `HEAD_PERIOD_START`, `HEAD_PERIOD_END`) with
+ * one more kind for a person who has left (`EMPLOYEE_LEFT`), which `g6-offboarding-record` announces when it writes the
+ * `TERMINATED` status. `id` identifies the change: a listener that must not act twice keys on it.
+ *
+ * Until `g6-transfer-record` is built, the only changes announced are the head periods the department use cases write for a
+ * day that is today; the transfer of a person and the leaving of a person are announced by the items that write them.
+ */
+export type OrganizationChange =
+  | {
+      id: string;
+      kind: 'PLACEMENT_START';
+      placementId: string;
+      employeeId: string;
+      fromDepartmentId: string | null;
+      toDepartmentId: string;
+      fromJobTitleId: string | null;
+      toJobTitleId: string;
+      effectiveOn: BusinessDate;
+    }
+  | {
+      id: string;
+      kind: 'HEAD_PERIOD_START';
+      periodId: string;
+      departmentId: string;
+      headEmployeeId: string;
+      previousHeadEmployeeId: string | null;
+      effectiveOn: BusinessDate;
+    }
+  | {
+      id: string;
+      kind: 'HEAD_PERIOD_END';
+      periodId: string;
+      departmentId: string;
+      headEmployeeId: string;
+      effectiveOn: BusinessDate;
+    }
+  | { id: string; kind: 'EMPLOYEE_LEFT'; employeeId: string; effectiveOn: BusinessDate };
+
+/** A change before it is announced: the registry gives it its `id`. */
+export type NewOrganizationChange = OrganizationChange extends infer Change
+  ? Change extends unknown
+    ? Omit<Change, 'id'>
+    : never
+  : never;
+
+/**
+ * A module that acts on a change of the organization. It is called in the transaction of the change, in the order the
+ * listeners were registered; throwing rolls the change back with it.
+ */
+export interface OrganizationChangeListener {
+  onChange(tx: DbTx, change: OrganizationChange): Promise<void>;
 }
 
 /** What another module needs to know of a Cost Center to point at it: its code, name, kind and whether it takes new use. */
@@ -178,4 +267,60 @@ export interface CostCenterBrief {
   name: string;
   kind: CostCenterKind;
   status: CostCenterStatus;
+}
+
+/** The placement of a person in force on a day, with the days it covers: the first day, and the last (exclusive) when it is to end. */
+export interface PlacementInForce {
+  placementId: string;
+  departmentId: string;
+  jobTitleId: string;
+  validFrom: BusinessDate;
+  validTo: BusinessDate | null;
+}
+
+/** A change of the department and/or the job title of a person from a day: what `scheduleStructureChange` writes. */
+export interface StructureChangeInput {
+  organizationId: string;
+  employeeId: string;
+  effectiveOn: BusinessDate;
+  departmentId: string;
+  jobTitleId: string;
+}
+
+/** The two placements a scheduled change wrote, and what the person had before it: what a later move or cancellation needs. */
+export interface ScheduledStructureChange {
+  closedPlacementId: string;
+  openedPlacementId: string;
+  from: { departmentId: string; jobTitleId: string; validFrom: BusinessDate };
+}
+
+/**
+ * The head periods a scheduled handover moved: the period of the person leaving (ended on the day, `endedPeriodValidTo` is
+ * where it ended before, null when it was open) and the period of the successor it opened, null when nobody follows.
+ */
+export interface HeadHandoverRecord {
+  endedPeriodId: string;
+  endedPeriodValidTo: BusinessDate | null;
+  createdPeriodId: string | null;
+}
+
+/** A department and a day to ask who heads it on. */
+export interface HeadOnDateQuery {
+  departmentId: string;
+  onDate: BusinessDate;
+}
+
+/** A period in which a person heads a department; `validTo` is the first day they no longer do, null while it is open. */
+export interface HeadPeriodOfEmployee {
+  departmentId: string;
+  validFrom: BusinessDate;
+  validTo: BusinessDate | null;
+}
+
+export interface HeadHandoverInput {
+  organizationId: string;
+  departmentId: string;
+  outgoingEmployeeId: string;
+  effectiveOn: BusinessDate;
+  successorEmployeeId: string | null;
 }

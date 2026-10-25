@@ -30,6 +30,7 @@ const RECORD_SELECT = {
   expectedEndDate: true,
   predecessorId: true,
   failedAt: true,
+  cancelledAt: true,
   createdAt: true,
 } satisfies Prisma.LicenseAssignmentSelect;
 type Row = Prisma.LicenseAssignmentGetPayload<{ select: typeof RECORD_SELECT }>;
@@ -37,6 +38,7 @@ type Row = Prisma.LicenseAssignmentGetPayload<{ select: typeof RECORD_SELECT }>;
 /** An assignment holds a seat from the day it is made until it ends or fails: not ended as of `day` and not failed. */
 const HOLDING = (day: BusinessDate): Prisma.LicenseAssignmentWhereInput => ({
   failedAt: null,
+  cancelledAt: null,
   OR: [{ validUntil: null }, { validUntil: { gt: toDateColumn(day) } }],
 });
 
@@ -57,6 +59,7 @@ const toRecord = (row: Row): AssignmentRecord => ({
   expectedEndDate: row.expectedEndDate ? fromDateColumn(row.expectedEndDate) : null,
   predecessorId: row.predecessorId,
   failedAt: row.failedAt,
+  cancelledAt: row.cancelledAt,
   createdAt: row.createdAt,
 });
 
@@ -120,6 +123,17 @@ export class AssignmentRepo {
     return row ? toRecord(row) : null;
   }
 
+  /** These assignments in one statement (the rows a list names). */
+  async findByIds(ids: readonly string[]): Promise<AssignmentRecord[]> {
+    if (ids.length === 0) return [];
+    const rows = await this.prisma.licenseAssignment.findMany({
+      where: { id: { in: [...ids] } },
+      select: RECORD_SELECT,
+    });
+
+    return rows.map(toRecord);
+  }
+
   /** The assignment, locked `FOR UPDATE` for the rest of the transaction, or null. */
   async lock(tx: DbTx, id: string): Promise<AssignmentRecord | null> {
     const locked = await tx.$queryRaw<
@@ -141,6 +155,14 @@ export class AssignmentRepo {
    */
   async markFailed(tx: DbTx, id: string, now: Date): Promise<void> {
     await tx.$executeRaw`UPDATE license_assignments SET failed_at = ${now}, valid_until = valid_from WHERE id = ${id}::uuid`;
+  }
+
+  /**
+   * Marks the assignment as cancelled, because the request it was made for was withdrawn: like a failed one it ends the day it
+   * started, so no day counts it among the seats taken. The database lets this happen once and only to an open assignment.
+   */
+  async markCancelled(tx: DbTx, id: string, now: Date): Promise<void> {
+    await tx.$executeRaw`UPDATE license_assignments SET cancelled_at = ${now}, valid_until = valid_from WHERE id = ${id}::uuid`;
   }
 
   /** Every assignment of one subscription, or of one internal plan that has none, as a judgement needs to see them. */
@@ -202,6 +224,39 @@ export class AssignmentRepo {
       items: rows.map(toRecord),
       byPlan: groups.map((group) => ({ planId: group.planId, count: group._count._all })),
     };
+  }
+
+  /**
+   * The seats a person holds on `day` among these plan ids, oldest first then by id, with the total, from one snapshot
+   * (`API-LIST-DETAIL.1`): one page and one count, never the whole set.
+   */
+  async pageHeldOfPlans(
+    employeeId: string,
+    planIds: readonly string[],
+    day: BusinessDate,
+    skip: number,
+    take: number,
+  ): Promise<{ items: AssignmentRecord[]; total: number }> {
+    if (planIds.length === 0) return { items: [], total: 0 };
+    const where: Prisma.LicenseAssignmentWhereInput = {
+      employeeId,
+      kind: 'PERSONAL',
+      planId: { in: [...planIds] },
+      validFrom: { lte: toDateColumn(day) },
+      ...HOLDING(day),
+    };
+
+    return this.prisma.$transaction(
+      async (tx) => {
+        const [rows, total] = await Promise.all([
+          tx.licenseAssignment.findMany({ where, orderBy: [{ validFrom: 'asc' }, { id: 'asc' }], skip, take }),
+          tx.licenseAssignment.count({ where }),
+        ]);
+
+        return { items: rows.map(toRecord), total };
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
+    );
   }
 
   /** How many different people hold an assignment of these plan ids that has not ended and has not failed. */
@@ -282,6 +337,7 @@ export class AssignmentRepo {
       kind: 'SERVICE',
       owningDepartmentId: departmentId,
       failedAt: null,
+      cancelledAt: null,
       OR: [{ validUntil: null }, { validUntil: { gt: toDateColumn(day) } }],
     };
     const [rows, total] = await Promise.all([

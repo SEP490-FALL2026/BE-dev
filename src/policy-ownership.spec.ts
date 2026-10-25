@@ -32,6 +32,7 @@ const PUBLIC_ROOT_POLICY_FILES: ReadonlyMap<string, PolicyContract> = new Map([
       consumers: [
         'data-import/employee-import/employee-import-rows.ts',
         'organization/employee/employee-row.validator.ts',
+        'personnel/transfer/transfer.policy.ts',
       ],
     },
   ],

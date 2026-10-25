@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '../../../generated/prisma/client';
 import { fromDateColumn, toDateColumn } from '../../../core/business-date';
-import type { PlanSummary } from '../catalog.types';
+import type { PlanRevocationInfo, PlanSummary, WorkspaceDuty } from '../catalog.types';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { searchKey } from '../vendor-dictionary/vendor-matcher';
@@ -184,6 +184,33 @@ export class PlanRepo {
     }));
   }
 
+  /** How the seats of these plans are taken away, in one read; a plan that does not exist is absent. */
+  async findRevocationInfos(ids: readonly string[], tx?: DbTx): Promise<PlanRevocationInfo[]> {
+    if (ids.length === 0) return [];
+    const rows = await (tx ?? this.prisma).plan.findMany({
+      where: { id: { in: [...ids] } },
+      select: {
+        id: true,
+        name: true,
+        applicationId: true,
+        provisioningType: true,
+        revocationNote: true,
+        dataLossOnRemoval: true,
+        application: { select: { name: true } },
+      },
+    });
+
+    return rows.map((row) => ({
+      planId: row.id,
+      planName: row.name,
+      applicationId: row.applicationId,
+      applicationName: row.application.name,
+      provisioningType: row.provisioningType,
+      revocationNote: row.revocationNote,
+      dataLossOnRemoval: row.dataLossOnRemoval,
+    }));
+  }
+
   /** The plans with these ids, as far as they exist, with the name of their application. */
   async findSummaries(ids: readonly string[]): Promise<PlanSummary[]> {
     if (ids.length === 0) return [];
@@ -198,6 +225,45 @@ export class PlanRepo {
       applicationId: row.applicationId,
       applicationName: row.application.name,
     }));
+  }
+
+  /**
+   * The plans of the other applications in the functional group of this plan's application: what a person may already
+   * have that does the same work (`US-05-04` AC-3). Empty when the application is in no group. The first `limit` by id.
+   */
+  async findSimilarIds(planId: string, limit: number, tx?: DbTx): Promise<string[]> {
+    const rows = await (tx ?? this.prisma).$queryRaw<{ id: string }[]>`
+      SELECT other.id
+        FROM plans own
+        JOIN applications own_app ON own_app.id = own.application_id
+        JOIN applications other_app
+          ON other_app.functional_group_id = own_app.functional_group_id AND other_app.id <> own_app.id
+        JOIN plans other ON other.application_id = other_app.id
+       WHERE own.id = ${planId}::uuid AND own_app.functional_group_id IS NOT NULL
+       ORDER BY other.id
+       LIMIT ${limit}`;
+
+    return rows.map((row) => row.id);
+  }
+
+  /** The vendor of the application of the plan: null when the application has none (internal software) or the plan does not exist. */
+  async findVendorId(planId: string, tx?: DbTx): Promise<string | null> {
+    const row = await (tx ?? this.prisma).plan.findUnique({
+      where: { id: planId },
+      select: { application: { select: { vendorId: true } } },
+    });
+
+    return row?.application.vendorId ?? null;
+  }
+
+  /** The Business Owner the application of the plan has now; null when the plan does not exist. */
+  async findBusinessOwnerId(planId: string, tx?: DbTx): Promise<string | null> {
+    const row = await (tx ?? this.prisma).plan.findUnique({
+      where: { id: planId },
+      select: { application: { select: { businessOwnerEmployeeId: true } } },
+    });
+
+    return row?.application.businessOwnerEmployeeId ?? null;
   }
 
   /** The same, locked `FOR SHARE` for the rest of the transaction so its kind cannot change under the caller. */
@@ -260,6 +326,39 @@ export class PlanRepo {
     });
 
     return row ? toProfile(row) : null;
+  }
+
+  /** The workspaces these people own or administer, one row for each person and plan, the primary owner first (one read, `US-03-04` AC-28). */
+  async findWorkspaceDuties(employeeIds: readonly string[], tx?: DbTx): Promise<WorkspaceDuty[]> {
+    if (employeeIds.length === 0) return [];
+    const ids = [...employeeIds];
+    const profiles = await (tx ?? this.prisma).planWorkspaceProfile.findMany({
+      where: { OR: [{ primaryOwnerEmployeeId: { in: ids } }, { members: { some: { employeeId: { in: ids } } } }] },
+      select: {
+        planId: true,
+        primaryOwnerEmployeeId: true,
+        emergencyIdentity: true,
+        members: { where: { employeeId: { in: ids } }, select: { employeeId: true, role: true } },
+        plan: { select: { name: true, application: { select: { name: true } } } },
+      },
+      orderBy: { planId: 'asc' },
+    });
+
+    return profiles.flatMap((profile) => {
+      const named = {
+        planId: profile.planId,
+        planName: profile.plan.name,
+        applicationName: profile.plan.application.name,
+        emergencyAccountDeclared: profile.emergencyIdentity !== null,
+      };
+      const owner = ids.includes(profile.primaryOwnerEmployeeId) ? profile.primaryOwnerEmployeeId : null;
+      const members = profile.members.filter((member) => member.employeeId !== owner);
+
+      return [
+        ...(owner ? [{ ...named, employeeId: owner, role: 'PRIMARY_OWNER' as const }] : []),
+        ...members.map((member) => ({ ...named, employeeId: member.employeeId, role: member.role })),
+      ];
+    });
   }
 
   /** Writes the whole profile of the plan: the profile row, then its members replaced by the given list. */

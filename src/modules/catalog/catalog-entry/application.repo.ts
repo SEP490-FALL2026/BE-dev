@@ -194,6 +194,24 @@ export class ApplicationRepo {
     return rows.map((row) => row.businessOwnerEmployeeId);
   }
 
+  /** The first `take` applications still in use whose Business Owner is this employee, by name, and how many there are. */
+  async ownedBy(
+    employeeId: string,
+    take: number,
+    tx?: DbTx,
+  ): Promise<{ items: { id: string; name: string }[]; total: number }> {
+    const where: Prisma.ApplicationWhereInput = { businessOwnerEmployeeId: employeeId, retiredAt: null };
+    const client = tx ?? this.prisma;
+    const items = await client.application.findMany({
+      where,
+      select: { id: true, name: true },
+      orderBy: [{ normalizedName: 'asc' }, { id: 'asc' }],
+      take,
+    });
+
+    return { items, total: await client.application.count({ where }) };
+  }
+
   /** One page of the applications of these Business Owners, by name, and the total, from one snapshot. */
   async listByOwners(
     ownerIds: readonly string[],

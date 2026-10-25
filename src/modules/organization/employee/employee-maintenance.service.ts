@@ -9,7 +9,7 @@ import { IdentityAccessService } from '../../identity-access/identity-access.ser
 import { organizationAuditEvent } from '../mappers/audit-event.mapper';
 import { EmployeeEmailTakenError, EmployeeNotFoundError, EmployeeOpenSeatNeedsEndError } from '../organization.errors';
 import { OrganizationService } from '../organization.service';
-import { EmploymentType } from '../organization.types';
+import { EmployeeWorkState, EmploymentType } from '../organization.types';
 import {
   EmployeeAnotherItAdminNeededError,
   EmployeeRowInvalidError,
@@ -33,6 +33,7 @@ export interface MaintainedEmployeeView {
   employmentType: EmploymentType;
   hireDate: BusinessDate;
   status: 'ACTIVE' | 'TERMINATED';
+  workState: EmployeeWorkState;
 }
 
 const OFFICIAL = ['fullName', 'workEmail', 'employmentType', 'hireDate'] as const;
@@ -142,6 +143,7 @@ export class EmployeeMaintenanceService {
           employmentType: input.employmentType ?? current.employmentType,
           hireDate: 'hireDate' in changes ? (changes.hireDate as BusinessDate) : current.hireDate,
           status: current.status,
+          workState: current.workState,
         };
       });
     } catch (error) {

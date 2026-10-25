@@ -24,6 +24,15 @@ export class ApplicationLookupService {
     return this.applications.lockShared(tx, id);
   }
 
+  /** The first `limit` applications still in use that this employee is the Business Owner of, and how many there are. */
+  ownedBy(
+    employeeId: string,
+    limit: number,
+    tx?: DbTx,
+  ): Promise<{ items: { id: string; name: string }[]; total: number }> {
+    return this.applications.ownedBy(employeeId, limit, tx);
+  }
+
   /** How many applications the catalog holds. */
   count(): Promise<number> {
     return this.applications.count();
