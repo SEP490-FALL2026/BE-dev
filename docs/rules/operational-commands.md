@@ -1,7 +1,7 @@
 # Lệnh vận hành ngoài HTTP
 
 Áp dụng cho mọi lệnh chạy từ terminal ngoài API/worker: `pnpm ops:bootstrap`, `pnpm ops:recover`, `pnpm ops:inspect`,
-`pnpm dev:seed`, `pnpm ops:preflight` và lệnh thêm sau. Gate: [operational-commands.spec.ts](../../src/operational-commands.spec.ts) (cấu
+`pnpm dev:seed`, `pnpm ops:preflight`, `pnpm ops:db-roles` và lệnh thêm sau. Gate: [operational-commands.spec.ts](../../src/operational-commands.spec.ts) (cấu
 trúc, import, chuỗi bị cấm), [module-graph.spec.ts](../../src/module-graph.spec.ts) (đồ thị Nest) và test của từng
 lệnh. Vị trí file theo [module structure](module-structure.md); dữ liệu và transaction theo
 [database rules](database-business.md).
@@ -60,13 +60,14 @@ lệnh. Vị trí file theo [module structure](module-structure.md); dữ liệu
 
 ## Hợp đồng lệnh hiện có
 
-| Lệnh                               | Đồ thị / cấu hình                                           | Ghi                               | Mã thoát                                                |
-| ---------------------------------- | ----------------------------------------------------------- | --------------------------------- | ------------------------------------------------------- |
-| `pnpm ops:bootstrap`               | `InstallationModule`, chỉ env database                      | một lần, có audit                 | 0 xong · 1 lỗi · 2 đã cài · 130 hủy                     |
-| `pnpm ops:recover`                 | `RecoveryCliModule`, env đầy đủ                             | theo phiếu, có audit              | 0 xong · 1 lỗi · 2 không cần làm                        |
-| `pnpm ops:inspect [--json]`        | `InspectionModule`, chỉ env database, phiên chỉ đọc         | không bao giờ                     | 0 đã cài và nhất quán · 2 chưa cài hoặc dở dang · 1 lỗi |
-| `pnpm dev:seed -- --confirm-local` | `DevSeedModule`, chỉ env database, ba chốt local            | dữ liệu demo idempotent, có audit | 0 đã tạo · 2 đã có đủ · 3 bị từ chối, không ghi · 1 lỗi |
-| `pnpm ops:preflight [--json]`      | `MigrationPreflightModule`, chỉ env database, phiên chỉ đọc | không bao giờ                     | 0 deploy được · 2 bị chặn, nêu từng dòng · 1 lỗi        |
+| Lệnh                                                            | Đồ thị / cấu hình                                           | Ghi                                                  | Mã thoát                                                           |
+| --------------------------------------------------------------- | ----------------------------------------------------------- | ---------------------------------------------------- | ------------------------------------------------------------------ |
+| `pnpm ops:bootstrap`                                            | `InstallationModule`, chỉ env database                      | một lần, có audit                                    | 0 xong · 1 lỗi · 2 đã cài · 130 hủy                                |
+| `pnpm ops:recover`                                              | `RecoveryCliModule`, env đầy đủ                             | theo phiếu, có audit                                 | 0 xong · 1 lỗi · 2 không cần làm                                   |
+| `pnpm ops:inspect [--json]`                                     | `InspectionModule`, chỉ env database, phiên chỉ đọc         | không bao giờ                                        | 0 đã cài và nhất quán · 2 chưa cài hoặc dở dang · 1 lỗi            |
+| `pnpm dev:seed -- --confirm-local`                              | `DevSeedModule`, chỉ env database, ba chốt local            | dữ liệu demo idempotent, có audit                    | 0 đã tạo · 2 đã có đủ · 3 bị từ chối, không ghi · 1 lỗi            |
+| `pnpm ops:preflight [--json]`                                   | `MigrationPreflightModule`, chỉ env database, phiên chỉ đọc | không bao giờ                                        | 0 deploy được · 2 bị chặn, nêu từng dòng · 1 lỗi                   |
+| `pnpm ops:db-roles <provision \| reconcile \| verify> [--json]` | không Nest: một kết nối `pg`, biến riêng của lệnh           | vai, owner, quyền; một transaction; `verify` chỉ đọc | 0 xong/nhất quán · 2 bị từ chối/không nhất quán, không ghi · 1 lỗi |
 
 Chi tiết từng lệnh: `--help` của lệnh và
 [hạng mục H6.1 + H6.2](../workspace/items/installation-local-data-h6-1-h6-2/spec.md).
@@ -78,6 +79,13 @@ wildcard; (2) chỉ câu `$queryRaw` mở đầu `SELECT`/`WITH` và mảnh `Pri
 `$executeRaw`, không `*Unsafe`, không ghi qua delegate Prisma; (3) phiên của graph preflight chỉ đọc
 ([module-graph](../../src/module-graph.spec.ts), rule 1); (4) **chỉ** `migration-preflight-cli.ts` với tới tệp đó qua import —
 không API, worker, bootstrap hay lệnh khác. Thêm câu ghi, thêm reader hay thêm đường gọi làm gate đỏ.
+`ops:db-roles` (H7) quản trị **vai** PostgreSQL, không phải dữ liệu nghiệp vụ, nên không có đồ thị Nest, Prisma hay Audit
+Trail: `provision` nối bằng superuser của cluster (`DATABASE_BOOTSTRAP_URL`), `reconcile`/`verify` bằng deploy role
+(`DATABASE_URL`) và chỉ nhận tên runtime role (`DATABASE_RUNTIME_ROLE`). Mọi câu lệnh nằm trong
+`src/infrastructure/database/roles/`, thư mục mà API/worker không được với tới (rule 3, `operational-commands.spec.ts`); chúng
+chỉ dùng chung phán định thuần `database-role-judgement.ts` với bước kiểm danh tính khi khởi động. Không bao giờ in URL hay mật
+khẩu; mật khẩu gửi lên server dưới dạng verifier SCRAM. Vai nào chạy lệnh nào: [containers](../guides/containers.md#postgresql-roles-h7).
+
 **Preflight chỉ kiểm, không sửa:** CSDL bị chặn (exit 2) giữ nguyên, deploy dừng trước migration; xem lịch sử được hỗ trợ và
 cách xử lý CSDL bị chặn ở [containers](../guides/containers.md#preflight-before-migrate-deploy-p28-01). Thiết kế:
 [g0-g4-checkpoint-fix-forward](../workspace/items/g0-g4-checkpoint-fix-forward/spec.md).

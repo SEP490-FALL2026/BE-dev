@@ -3,47 +3,16 @@
 // the Git for Windows one, whatever shell started the suite (GATE-RV-01).
 import { strict as assert } from 'node:assert';
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve, win32 } from 'node:path';
+import { join, resolve } from 'node:path';
 import { afterEach, describe, it } from 'node:test';
+import { bashFor } from './git-bash.mjs';
 
 const SCRIPT = resolve(import.meta.dirname, '..', 'ops', 'postgres-backup-retention.sh');
 const NOW = '20261022T120000Z';
 const NOW_MS = Date.UTC(2026, 9, 22, 12, 0, 0);
 const created = [];
-
-/** Git Bash reads `/c/...`, not `C:\...`. */
-const toGitBashPath = (path) =>
-  path.replace(/^([A-Za-z]):[\\/]/, (_, drive) => `/${drive.toLowerCase()}/`).replace(/\\/g, '/');
-
-function activeGitExecPath() {
-  const result = spawnSync('git', ['--exec-path'], { encoding: 'utf8' });
-  return result.status === 0 ? result.stdout.trim() : undefined;
-}
-
-const isExistingFile = (path) => statSync(path, { throwIfNoEntry: false })?.isFile() === true;
-
-/**
- * The bash that runs the script, and the path form it reads. A bare `bash` on Windows follows the parent shell's PATH:
- * from PowerShell that is the WSL launcher (`System32` or `WindowsApps`), which cannot read Git-Bash paths (exit 127).
- * Windows therefore takes `bin\bash.exe` of the Git for Windows that `git --exec-path` reports
- * (`<root>\mingw64\libexec\git-core`). Not `usr\bin\bash.exe`: started outside Git Bash it finds Windows `sort`.
- */
-function bashFor({ platform = process.platform, gitExecPath = activeGitExecPath, isFile = isExistingFile } = {}) {
-  if (platform !== 'win32') return { executable: 'bash', path: (path) => path };
-  const execPath = gitExecPath();
-  const executable = /^[A-Za-z]:[\\/]/.test(execPath ?? '')
-    ? win32.resolve(execPath, '..', '..', '..', 'bin', 'bash.exe')
-    : undefined;
-  if (!executable || !isFile(executable)) {
-    throw new Error(
-      `Git for Windows Bash not found (looked for ${executable ?? 'bin\\bash.exe beside git --exec-path'}). ` +
-        'The retention tests need Git for Windows with `git` on PATH; the WSL bash in System32/WindowsApps cannot run them.',
-    );
-  }
-  return { executable, path: toGitBashPath };
-}
 
 /** Resolved once; when it fails, the retention suite reports the setup message once instead of six exit codes. */
 const setup = (() => {

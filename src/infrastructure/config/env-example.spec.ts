@@ -18,6 +18,11 @@ const COMPOSE_ONLY = new Set([
   'POSTGRES_PASSWORD',
   'POSTGRES_DB',
   'POSTGRES_PORT',
+  // H7: the two roles of docker-compose.prod.yml; the API and the worker receive only the runtime role's DATABASE_URL.
+  'DATABASE_DEPLOY_USER',
+  'DATABASE_DEPLOY_PASSWORD',
+  'DATABASE_RUNTIME_USER',
+  'DATABASE_RUNTIME_PASSWORD',
   'MINIO_ROOT_USER',
   'MINIO_ROOT_PASSWORD',
   'MINIO_PORT',

@@ -35,14 +35,20 @@ export async function createHttpTestApp(
     env?: Record<string, string>;
     /** Providers to replace with a stand-in, such as the gate of a module that does not exist yet. */
     providerOverrides?: { token: unknown; useValue: unknown }[];
+    /**
+     * An already migrated database the caller owns (the PostgreSQL role suites, H7): it is neither provisioned, migrated
+     * nor dropped here. `sql` connects through its URL; the application through `appDatabaseUrl` when given.
+     */
+    database?: DisposableDatabase;
   } = {},
 ): Promise<HttpTestApp> {
-  const database = await provisionDisposableDatabase();
+  const owned = options.database === undefined;
+  const database = options.database ?? (await provisionDisposableDatabase());
   const previous = { ...process.env };
   let app: INestApplication<App> | undefined;
   let sql: Client | undefined;
   try {
-    await migrateDisposableDatabase(database);
+    if (owned) await migrateDisposableDatabase(database);
 
     process.env.TEST_DATABASE_URL = options.appDatabaseUrl ? await options.appDatabaseUrl(database.url) : database.url;
     // Many sign-ins from one address in a test run must not trip the generic IP rate limit.
@@ -71,7 +77,7 @@ export async function createHttpTestApp(
     // dropped and the environment restored; a failure while cleaning never hides the first one.
     await sql?.end().catch(() => undefined);
     await app?.close().catch(() => undefined);
-    await dropDisposableDatabase(database).catch(() => undefined);
+    if (owned) await dropDisposableDatabase(database).catch(() => undefined);
     process.env = previous;
     throw error;
   }
@@ -84,7 +90,7 @@ export async function createHttpTestApp(
     async close() {
       await ready.sql.end();
       await ready.app.close();
-      await dropDisposableDatabase(database);
+      if (owned) await dropDisposableDatabase(database);
       process.env = previous;
     },
   };

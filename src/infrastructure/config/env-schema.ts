@@ -3,6 +3,7 @@ import { parseCorsOrigins, validateProductionCorsOrigins } from './cors';
 import {
   DatabaseEnvironmentVariables,
   assertDatabaseLimits,
+  assertNoDatabaseAdministrationCredentials,
   databaseKeys,
   resolveDatabaseSettings,
 } from './database-environment';
@@ -138,6 +139,8 @@ export function validateEnvironment(input: Record<string, unknown>): Environment
   assertSecrets(result);
 
   if (result.NODE_ENV === 'production') {
+    assertNoDatabaseAdministrationCredentials(input);
+
     if (!result.SMTP_TLS) {
       throw new EnvironmentValidationError(
         'Environment validation failed: SMTP_TLS must be true in production (the mail carries a bearer activation link)',

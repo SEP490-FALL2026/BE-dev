@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigurationModule } from './infrastructure/config/configuration.module';
 import { HealthModule } from './infrastructure/health/health.module';
 import { DatabaseModule } from './infrastructure/database/database.module';
+import { RuntimeDatabaseRoleModule } from './infrastructure/database/runtime-role.module';
 import { SecurityModule } from './infrastructure/security/security.module';
 import { AuditHttpModule } from './modules/audit/audit-http.module';
 import { AuditModule } from './modules/audit/audit.module';
@@ -24,6 +25,7 @@ import { HttpInfrastructureModule } from './infrastructure/http/http-infrastruct
     HttpInfrastructureModule,
     HealthModule,
     DatabaseModule,
+    RuntimeDatabaseRoleModule,
     AuditModule,
     AuditHttpModule,
     OrganizationModule,

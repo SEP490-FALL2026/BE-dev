@@ -86,15 +86,42 @@ try {
   docker exec slm-foundation-test-db psql -X -U ci_bootstrap -d postgres -v ON_ERROR_STOP=1 -c "CREATE ROLE ci_integration LOGIN NOSUPERUSER CREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS PASSWORD 'ci-integration-only';"
   if ($LASTEXITCODE -ne 0) { throw 'Integration role provisioning failed.' }
   $env:TEST_DATABASE_ADMIN_URL = 'postgresql://ci_integration:ci-integration-only@127.0.0.1:55432/postgres'
+  $env:TEST_DATABASE_BOOTSTRAP_URL = 'postgresql://ci_bootstrap:ci-bootstrap-only@127.0.0.1:55432/postgres'
   pnpm test:integration
 } finally {
   docker rm -f slm-foundation-test-db
-  Remove-Item Env:TEST_DATABASE_ADMIN_URL -ErrorAction SilentlyContinue
+  Remove-Item Env:TEST_DATABASE_ADMIN_URL, Env:TEST_DATABASE_BOOTSTRAP_URL -ErrorAction SilentlyContinue
 }
 ```
 
+Bốn suite vai PostgreSQL của H7 (`database-roles-*`, `database-runtime-*`) đóng vai quản trị cluster: chúng tạo/xóa vai
+`slm_<hex>_deploy`/`slm_<hex>_runtime` và database `slm_<hex>_test` qua `support/role-separated-database.ts`, nên cần thêm
+`TEST_DATABASE_BOOTSTRAP_URL` = **superuser** của đúng server test cô lập đó (ví dụ trên:
+`postgresql://ci_bootstrap:ci-bootstrap-only@127.0.0.1:55432/postgres`; CI đặt cùng giá trị cho service container). Thiếu
+biến thì các suite đó đỏ với lời nhắc, không skip. Đây là quyền của harness test, không bao giờ là cấu hình của API/worker;
+helper chỉ nhận `localhost`/`127.0.0.1`, URL không query, và xóa đúng tên đã ghi (database trước, vai sau).
+
 Chờ pg_isready thành công trước khi chạy test. Dùng tên/port khác nếu đã có container.
 Không mount volume dữ liệu thật vào container test.
+
+**Môi trường của lượt test (H7-VRF-01).** Với `NODE_ENV=test`, `ConfigModule` (cả hai bộ option ở
+`src/infrastructure/config/env-config.ts`) và `prisma.config.ts` **không đọc `.env`**: kết quả không phụ thuộc file `.env`
+nào của máy dev, và không key nào của nó lọt vào `process.env` nơi harness đọc URL test-admin. Mọi giá trị test cần
+(`TEST_DATABASE_ADMIN_URL`, `TEST_DATABASE_BOOTSTRAP_URL`) phải có trong môi trường tiến trình; thiếu thì harness từ chối
+bằng lời nhắc của nó (`test-environment-isolation.integration-spec.ts`). Suite dựng SMTP giả đặt **đủ** cấu hình SMTP qua
+`support/fake-smtp.ts` (`fakeSmtpEnvironment`) và khôi phục `process.env` sau đó. Một tiến trình con chạy CLI production
+không có `DATABASE_URL` phải chạy từ thư mục rỗng (`--config` tuyệt đối) và đặt `DOTENV_CONFIG_PATH` không trỏ file nào.
+
+**Database mẫu đã migrate (H7-RUN-01).** `globalSetup` của runner integration (`config/integration-global-setup.ts`)
+chạy **một** `prisma migrate deploy` cho cả lượt vào một database mẫu `slm_<random>_test`; `globalTeardown` xóa nó theo
+đúng tên và marker. `migrateDisposableDatabase` thay database vừa provision bằng bản sao phía server
+(`CREATE DATABASE … TEMPLATE`, giữ tên và marker riêng) **chỉ khi** database vẫn đúng như lúc provision — không đối tượng
+nào ngoài marker, không session nào còn lại (chờ tối đa 2 s) — nên kết quả trùng một lần deploy
+(`migration-setup.integration-spec.ts` so lịch sử migration và catalog). Còn lại — database suite đã dùng trước khi
+migrate, handle không do harness provision (deploy role, superuser của suite vai PostgreSQL, relay) và chính database mẫu
+— đi Prisma CLI trong `support/migration-deploy.ts`: tiến trình riêng, giới hạn 60 s, lỗi nêu thời điểm từng pha (kết nối,
+CLI khởi động, đọc lịch sử, thoát, đóng pipe), không bao giờ còn tiến trình hay session sau một lần dừng. Đặt
+`TEST_MIGRATION_TIMINGS_FILE=<file ngoài repo>` để ghi một dòng JSON mỗi lần migrate/sao (chỉ thời gian, không URL).
 
 Mỗi suite tạo slm_<random>_test với ownership marker riêng. Mọi suite áp dụng
 migration đã commit. Cleanup chỉ drop đúng URL/name/runId; query parameters bị từ chối
@@ -113,7 +140,7 @@ CI provision role qua bootstrap riêng rồi assert SQL trước integration; he
 cho mỗi database local. Chạy local không thay thế kết quả GitHub Actions: remote CI vẫn `UNVERIFIED`
 khi chưa có run của revision đang review.
 
-Nếu process bị kill trước cleanup, DB tạm có thể còn lại. Kiểm tra tên, marker và
+Nếu process bị kill trước cleanup, DB tạm (kể cả database mẫu của lượt) có thể còn lại. Kiểm tra tên, marker và
 connection trước khi dọn thủ công; không xóa theo wildcard.
 
 ## HTTP trên PostgreSQL thật

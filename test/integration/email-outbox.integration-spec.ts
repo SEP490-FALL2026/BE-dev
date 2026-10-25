@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { SMTPServer } from 'smtp-server';
+import { fakeSmtpEnvironment, listenOnLoopback } from '../support/fake-smtp';
 import { TransactionRunner } from '../../src/infrastructure/database/transaction-runner';
 import { EmailDispatcher } from '../../src/modules/notifications/email-dispatcher.service';
 import { NotificationsService } from '../../src/modules/notifications/notifications.service';
@@ -56,11 +57,8 @@ describe('email outbox and dispatcher (integration, PostgreSQL + in-process SMTP
         });
       },
     });
-    const port = await new Promise<number>((resolve) => {
-      smtp.listen(0, '127.0.0.1', () => resolve((smtp.server.address() as { port: number }).port));
-    });
-    process.env.SMTP_HOST = '127.0.0.1';
-    process.env.SMTP_PORT = String(port);
+    // The suite owns the whole SMTP configuration (H7-VRF-01); `originalEnv` is restored in afterAll.
+    Object.assign(process.env, fakeSmtpEnvironment(await listenOnLoopback(smtp)));
     process.env.APP_PUBLIC_URL = 'https://app.acme.test';
 
     ctx = await createHttpTestApp();

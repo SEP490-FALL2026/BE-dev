@@ -37,6 +37,7 @@ src/
   recovery-cli.ts, recovery-cli.module.ts  # lệnh khôi phục Super Admin theo phiếu, ngoài HTTP (pnpm ops:recover)
   inspect-cli.ts              # kiểm trạng thái cài đặt chỉ đọc (pnpm ops:inspect)
   dev-seed-cli.ts             # dữ liệu demo chỉ local (pnpm dev:seed -- --confirm-local)
+  database-roles-cli.ts       # vai PostgreSQL bootstrap/deploy/runtime (pnpm ops:db-roles, H7)
   operational-commands.spec.ts  # gate của rule lệnh vận hành
   core/                       # thuần TypeScript: pagination, email, business-date, money (tiền, tỷ giá, quy đổi — ADR-0007)
   infrastructure/
@@ -251,6 +252,8 @@ schema đầy đủ. Secret theo Owner E3 = C: chỉ `NODE_ENV=test` có fallbac
 khai, development và production từ chối mọi giá trị công khai trong repository.
 
 Compose local mặc định chỉ chạy PostgreSQL; Redis và MinIO chỉ chạy với profile `queue`/`storage`. Compose production
-không còn Redis. Dockerfile build runtime API/worker.
+không còn Redis. Production tách ba danh tính PostgreSQL (H7): API/worker dùng runtime role chỉ có DML và tự từ chối khởi
+động khi là superuser/owner (`RuntimeDatabaseRoleModule`, chỉ `AppModule`/`WorkerModule` import); backup, preflight, migration
+và `ops:db-roles reconcile` dùng deploy role sở hữu schema; superuser của cluster chỉ cho `ops:db-roles provision`. Dockerfile build runtime API/worker.
 Migrations chạy riêng trước rollout. Xem [containers](docs/guides/containers.md),
 [database rules](docs/rules/database-business.md) và [tests](test/README.md).

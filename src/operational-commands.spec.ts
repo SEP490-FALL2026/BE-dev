@@ -8,6 +8,7 @@ import { dirname, join, relative, resolve, sep } from 'node:path';
 const projectRoot = process.cwd();
 const sourceRoot = join(projectRoot, 'src');
 const installationRoot = join(sourceRoot, 'modules', 'installation');
+const databaseRolesRoot = join(sourceRoot, 'infrastructure', 'database', 'roles');
 
 /** The entry points of the operational commands, and the capability folders of the commands that are not legacy. */
 const COMMAND_ENTRIES = [
@@ -16,11 +17,15 @@ const COMMAND_ENTRIES = [
   'inspect-cli.ts',
   'dev-seed-cli.ts',
   'migration-preflight-cli.ts',
+  'database-roles-cli.ts',
 ];
 const COMMAND_FOLDERS = [
   'modules/installation/inspect',
   'modules/installation/dev-seed',
   'modules/installation/migration-preflight',
+  // H7: `pnpm ops:db-roles` administers PostgreSQL roles; the API and the worker share only the pure judgement beside
+  // their start-up check (infrastructure/database/database-role-judgement.ts), never the provisioning.
+  'infrastructure/database/roles',
 ];
 /** Files no API or worker import may reach (rule 3). */
 const COMMAND_ONLY_FILES = [
@@ -132,6 +137,7 @@ describe('operational commands (docs/rules/operational-commands.md)', () => {
     const argumentFiles = [
       ...listFiles(installationRoot, (file) => isSource(file) && file.endsWith('.arguments.ts')),
       join(sourceRoot, 'modules', 'identity-access', 'recovery', 'recovery.arguments.ts'),
+      join(databaseRolesRoot, 'database-roles.arguments.ts'),
     ];
     const findings = argumentFiles.filter((file) =>
       /['"`-](?:force|yes|skip-checks?|unsafe)['"`:\s]/i.test(readFileSync(file, 'utf8')),
@@ -159,6 +165,7 @@ describe('operational commands (docs/rules/operational-commands.md)', () => {
     const commandFiles = [
       ...COMMAND_ENTRIES.map((entry) => join(sourceRoot, entry)),
       ...listFiles(installationRoot, isSource),
+      ...listFiles(databaseRolesRoot, isSource),
     ];
     expect(
       commandFiles
@@ -177,7 +184,12 @@ describe('operational commands (docs/rules/operational-commands.md)', () => {
   });
 
   it('rule 8: starts child processes in tests only through test/support/cli-process.ts', () => {
-    const allowed = new Set(['test/support/cli-process.ts', 'test/support/disposable-database.ts']);
+    // migration-deploy.ts: the harness's one Prisma CLI runner (H7-RUN-01), split from disposable-database.ts.
+    const allowed = new Set([
+      'test/support/cli-process.ts',
+      'test/support/disposable-database.ts',
+      'test/support/migration-deploy.ts',
+    ]);
     const tests = [
       ...listFiles(join(projectRoot, 'test'), (file) => file.endsWith('.ts')),
       ...listFiles(sourceRoot, (file) => file.endsWith('.spec.ts')),

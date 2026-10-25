@@ -71,11 +71,13 @@ docker run --rm --env-file .env.migration slm-migrate:foundation
 docker run --rm --env-file .env.container -p 127.0.0.1:3000:3000 slm-api:foundation
 ```
 
-The migration image requires DATABASE_URL with migration privileges. The runtime
-does not run migrations automatically. The baseline is for a fresh database;
-existing databases need a separately reviewed transition, never an automatic reset.
+The migration image requires DATABASE_URL of the **deploy role** (it owns the schema; see
+[PostgreSQL roles](#postgresql-roles-h7)). The runtime does not run migrations automatically. The baseline is for a fresh
+database; existing databases need a separately reviewed transition, never an automatic reset.
 First-run installation (once, on an empty database after migrations) is an interactive command in the
-same runtime image: `docker run --rm -it --env-file .env.container slm-api:foundation node dist/installation-cli.js --help`.
+same runtime image: `docker run --rm -it --env-file .env.container slm-api:foundation node dist/installation-cli.js --help`
+(with the production Compose file: `docker compose -f docker-compose.prod.yml run --rm api node dist/installation-cli.js …`,
+which gives it the runtime role).
 The command validates only `NODE_ENV` (the image sets it to production), `DATABASE_URL` (the runtime role)
 and the optional `DB_*` limits; it does not read the JWT, SMTP, outbox, Redis, object-storage or `APP_PUBLIC_URL`
 settings, so `docker run --rm -it -e DATABASE_URL=... slm-api:foundation node dist/installation-cli.js ...` is enough.
@@ -83,7 +85,9 @@ settings, so `docker run --rm -it -e DATABASE_URL=... slm-api:foundation node di
 unrelated variables are ignored. Exit code 1 does not prove that nothing was written: if the connection or the
 reply to `COMMIT` was lost, check the installation state before running it again (a rerun that exits 2 means the
 first run committed). Check the state without writing anything:
-`docker run --rm -e DATABASE_URL=... slm-api:foundation node dist/inspect-cli.js` (`--json` for a machine; exit 0
+`docker run --rm -e DATABASE_URL=... slm-api:foundation node dist/inspect-cli.js`, in production
+`docker compose -f docker-compose.prod.yml run --rm --no-deps migrate node dist/inspect-cli.js` (it reads
+`_prisma_migrations`, which the runtime role may not; its sessions stay read-only) (`--json` for a machine; exit 0
 installed and consistent, 2 not installed or incomplete, 1 error). It reads the database settings only and opens every
 session read-only; it prints counts and the Super Admin email masked. `dev-seed-cli.js` is in the image too, but it
 refuses with exit 3 unless `NODE_ENV` is development or test and the database host is loopback: never point it at a
@@ -95,7 +99,9 @@ through the remediation revision; manual interactive PowerShell verification is 
 The worker uses the same runtime image with command `node dist/worker.js` and runs the PostgreSQL
 outbox polling loop for SMTP delivery. It mounts no queue and registers no BullMQ processor; the production Compose
 file has no Redis service. A host that ran an earlier deploy keeps its `slm-redis` container (Compose only warns about
-an orphan; the deploy does not pass `--remove-orphans`) and its volume: remove them by hand when no longer wanted. Compose has no SMTP sink;
+an orphan; the deploy never removes an orphan, H7-OPS-RV-03) and its volume: the Owner removes them by hand when no longer
+wanted, by exact name (`docker stop slm-redis`, `docker rm slm-redis`, then `docker volume rm` with the volume name that
+`docker inspect slm-redis` listed). Compose has no SMTP sink;
 configure a reachable SMTP service separately. SMTP TLS/provider delivery remains unverified.
 
 Request size: the API refuses a JSON or URL-encoded body over **100 KiB** with 413 `HTTP_PAYLOAD_TOO_LARGE` (one limit in
@@ -104,14 +110,228 @@ reverse proxy in front of the API must let at least 2 MiB plus the form through,
 with its own answer instead of the API's. The URL-encoded parser stays mounted with at most 100 parameters and a nesting
 depth of 5; malformed, unsupported (charset or `Content-Encoding`) or corrupt compressed bodies are 400/415, never 500.
 
+## PostgreSQL roles (H7)
+
+`F-15`, `DB-04`, Owner decision `Q9`; design and evidence:
+[h7-postgresql-runtime-role-separation](../workspace/items/h7-postgresql-runtime-role-separation/spec.md). Production uses
+three PostgreSQL identities; each process gets exactly one:
+
+| Identity                             | Variables (`.env` beside the Compose file)           | Used by                                                                                                                                              | Attributes and privileges                                                                                                                                                                                                 |
+| ------------------------------------ | ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Cluster superuser (bootstrap)        | `POSTGRES_USER`, `POSTGRES_PASSWORD`                 | the `postgres` container; `ops:db-roles provision` (service `db-admin`, profile `admin`); a restore                                                  | superuser created by the image; never the URL of the API, the worker or a deploy step                                                                                                                                     |
+| Deploy role (default `slm_deploy`)   | `DATABASE_DEPLOY_USER`, `DATABASE_DEPLOY_PASSWORD`   | services `backup` (`pg_dump`) and `migrate` (preflight, `prisma migrate deploy`, `ops:db-roles reconcile`/`verify`, `ops:inspect`), profile `deploy` | `LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS`, no membership; owns the database and every object of schema `public`                                                                               |
+| Runtime role (default `slm_runtime`) | `DATABASE_RUNTIME_USER`, `DATABASE_RUNTIME_PASSWORD` | `api`, `worker`; `ops:bootstrap`, `ops:recover` through `run api`                                                                                    | same attributes; `CONNECT`, `USAGE` on `public`, `SELECT, INSERT, UPDATE, DELETE` on every application table except `_prisma_migrations` (none) and `audit_events` (`SELECT, INSERT`), `USAGE` on sequences; owns nothing |
+
+- **Two files.** `.env` feeds Compose interpolation only (the three identities, `DOMAIN`, `PORT`); a missing password stops
+  every Compose command before it starts anything. `.env.app` holds the application settings (`.env.example` above the
+  _Docker Compose only_ part) and **no** `POSTGRES_*`, `DATABASE_*` or `PG*` variable: it is the only file the API and the
+  worker read, and their `DATABASE_URL` is built from the runtime role. Both files are `0600` and never committed.
+- **Fail closed.** In production the API and the worker check their own login before any work starts and refuse a
+  superuser, a role with `CREATEDB`/`CREATEROLE`/`REPLICATION`/`BYPASSRLS`, a member of another role, an owner of the
+  database or of any object (the deploy role) and a session whose `session_replication_role` is not `origin`; their
+  environment validation refuses `POSTGRES_PASSWORD`, `DATABASE_BOOTSTRAP_URL`, `DATABASE_DEPLOY_URL` and
+  `DATABASE_DEPLOY_PASSWORD`. The deploy workflow refuses to start without `.env.app`, with a database variable in it,
+  with a Compose file that does not interpolate, or with a candidate Caddyfile that Caddy refuses.
+- **`pnpm ops:db-roles`** (`node dist/database-roles-cli.js`, `--help`): `provision` (as the superuser: create or correct
+  both roles, give the database and every object of `public` to the deploy role, grant, verify — one transaction),
+  `reconcile` (as the deploy role after every migration: grant again — the history table and the Audit Trail exceptions —
+  and verify), `verify` (read-only). Exit 0 done/consistent, 2 refused or inconsistent with nothing written (every finding
+  named), 1 error. It refuses an existing role that has an elevated attribute, a membership or a setting instead of
+  demoting it, sends passwords as SCRAM-SHA-256 verifiers and never prints a URL or a password. Default privileges of the
+  deploy role give the runtime role DML on the tables of the next migration before `reconcile` runs.
+- **Migrations** never name a role: they run as the deploy role and must also apply on the integration harness, which has
+  none. A new table that needs other runtime privileges than plain DML (append-only like `audit_events`) is added to
+  `RUNTIME_TABLE_EXCEPTIONS` in `src/infrastructure/database/database-role-judgement.ts` in the same change. A
+  `SECURITY DEFINER` routine in `public` is reported by `reconcile`: it would run as the owner for the runtime role.
+
+### Deploys after H7 (H7-OPS-02, H7-OPS-RV-01..07)
+
+The deploy workflow has two modes. **publish-only** (manual, the default of _Run workflow_) builds and pushes
+`ghcr.io/<owner>/<repo>:<full commit sha>` for exactly the selected commit and never connects to the VPS. **deploy**
+(automatic after CI on `main`, or manual) pushes the same image, copies the candidate — `docker-compose.prod.yml`,
+`Caddyfile`, `scripts/ops/deploy-release.sh` — to `<app dir>/releases/<sha>/` and runs that script with the immutable image
+and the attempt id `<run id>-<run attempt>` of the job. The same script also runs by hand (step 7 below).
+
+- **One deployment at a time on the host (H7-OPS-RV-07).** GitHub's `concurrency` (`production-deploy`) orders only the
+  deploy jobs of the workflow; it knows nothing of a script started by hand on the host. So the script takes a lock
+  itself: right after checking its arguments — before it reads any file of the host, claims an attempt or calls Docker —
+  it opens `<APP_DIR>/releases/.deploy.lock` and takes a kernel `flock` on it **without waiting**, and keeps it until it
+  exits, through the readiness check, the success marker and the recovery. An exit, an error, a signal or a lost SSH
+  session releases it (the kernel does, once the script and the commands it started have ended): there is nothing to
+  clean up. Meanwhile a second deployment — from the workflow or by hand, of any release or attempt — refuses with exit 2
+  before any Docker call, claims no attempt and changes nothing; its message names the holder as the holder recorded
+  itself (pid, release, attempt, start time). A workflow job refused this way fails and leaves `latest` alone: re-run it
+  (a new attempt) once the other deployment has ended. The script also exits 2 when `flock` (util-linux, present on
+  Debian and Ubuntu) is missing or the lock file is not a regular file it can open.
+- **Is a deployment running?** `flock -n <APP_DIR>/releases/.deploy.lock true && echo free || echo held` (it holds the
+  lock for an instant only; a deployment starting at that very instant is refused and can be run again).
+  `head -n 1 <APP_DIR>/releases/.deploy.lock` shows what the last holder recorded — then `ps -p <pid>` — and proves nothing
+  on its own. **Never delete the lock file:** that releases nothing, and the next deployment would lock a new file while
+  the running one still holds the old one — two deployments at once.
+- **Candidate first.** The script validates the candidate Compose file with the live `.env`/`.env.app`, then the candidate
+  Caddyfile with Caddy itself (`caddy validate` in a one-off `caddy` container of the candidate Compose; the mount source
+  is `CADDYFILE_PATH`, which the script points at `releases/<sha>/Caddyfile`, so the live file is neither read nor
+  replaced; Caddy's output is discarded because it can carry environment values). Then it pulls, backs up, and runs
+  preflight, migrate and `reconcile` from the candidate. A failure in any of these leaves the live release and the
+  running containers as they were.
+- **One attempt, its own evidence (H7-OPS-RV-05).** Every run names a new `--attempt <id>` (letters, digits, `-`, `_`):
+  the workflow passes `<run id>-<run attempt>`, so a re-run is a new attempt; by hand, choose a new one each time (for
+  example `h7-rollout-1`, then `h7-rollout-2`). Before any Docker command the script claims
+  `releases/<sha>/attempts/<id>/` with one `mkdir` and refuses an id that already exists: an earlier attempt is never
+  rewritten or deleted, even for the same commit.
+- **One release state.** The live `docker-compose.prod.yml`, `Caddyfile` and `releases/current-image` (the image of the
+  live release) change together. The script keeps the previous ones — and `releases/current-attempt`, when there is one —
+  in `releases/<sha>/attempts/<id>/replaced/`, replaces each by one rename and recreates `api`, `worker`, `caddy`.
+- **Ready before success (H7-OPS-RV-04).** `up -d` exiting 0 is not a success. The script then waits at most 120 s
+  (`--ready-timeout`), looking every 2 s (`--poll-interval`), for one look where each of `api`, `worker`, `caddy` has
+  exactly one container, running and not restarting; `api` and `worker` run exactly `<IMAGE>:<SHA>`; Caddy mounts the live
+  `Caddyfile` (the sha256 of `/etc/caddy/Caddyfile` in the container is the one on disk); and `/api/v1/health/ready`,
+  called from inside the API container, answers 2xx. It then watches for 20 s (`--stability-window`): every look must
+  find the same containers with the same restart count, still ready — a crash-looping worker or a container another
+  deployment replaced fails here. The workflow uses these defaults; the options exist for a slow host and for tests.
+- **Failure after the promotion began** — a rename, the recreation, the readiness or the record below: the script puts
+  the previous release state back whole, recreates the previous containers when the new ones had been created (one
+  attempt, at most 300 s, with the image of `releases/current-image`, or of the `api` container on a host deployed before
+  that file existed), and checks the previous release exactly as above. It always exits 1 and prints two separate
+  verdicts: `RESULT: release <sha> (attempt <id>) FAILED while <step>` and one of `RECOVERY: the previous release <image>
+is ready`, `RECOVERY: FAILED — …` (the previous release does not answer ready, or its containers or files could not be
+  brought back: finish by hand, below) or `RECOVERY: not possible — …` (no previous release on this host). No migration is
+  rolled back: the database keeps them and the dump taken before them is the way back for the data.
+- **What moves when.** `releases/current-image` moves at the promotion, before the recreation, and is put back by a
+  failure. `releases/current-attempt`, the successful-attempt marker, holds `releases/<sha>/attempts/<id>` and moves only
+  after the readiness check, in one rename: it names the attempt whose `replaced/` holds the release before the live one
+  (deploying again the release already live keeps the attempt that made it live). If it cannot be written, the release
+  counts as failed and is rolled back as above. **`latest`** moves last, in the workflow step after the script exited 0;
+  neither mode tags it at build time, so a failed deployment leaves it on the last ready release.
+- **An interrupted run** (SSH lost between the promotion and the end): `releases/current-image` names the new sha while
+  `releases/current-attempt` does not start with `releases/<that sha>/`. First check the lock (above): `held` means the
+  script or a command it started is still running — wait for it. Once `free`, nothing was verified: check the release
+  (step 8) and roll back from the attempt the log named (`🧾 Attempt <id> of <sha>`), the newest directory under
+  `releases/<sha>/attempts/`.
+- **Cleanup is by hand and exact.** The deploy removes no image, volume, container (orphans included) or attempt directory.
+  Older release images stay until removed by exact reference once no container uses them
+  (`docker image rm <IMAGE>:<old SHA>`); the legacy `slm-redis` container and volume are described above.
+
+Nothing the script prints carries a credential.
+
+### Rollout on an existing installation (manual, once)
+
+The deploy job runs automatically after CI on `main`: do these steps **before** merging H7 to `main`. Until they are done,
+a deploy stops at its first check and changes nothing on the host. The host lock covers every run of `deploy-release.sh`
+(step 7, and the workflow of the H7 commit), not the manual steps 1–6, and the deploy workflow of `main` is still the one
+from before H7, which takes no lock: from step 1 to step 8, merge or push nothing to `main` and do not run the workflow
+in mode `deploy`. Below, `<SHA>` is the full commit sha of the H7 commit,
+`<IMAGE>` is `ghcr.io/<owner>/<repo>` in lowercase, and `<APP_DIR>` is the application directory (`/opt/slm/backend` by
+default). Every command pins `<IMAGE>:<SHA>`; none uses `latest`.
+
+0. **Publish the image** — on GitHub, _Actions → Backend CD → Run workflow_ on the branch holding `<SHA>`, mode
+   `publish-only`. Check that `<IMAGE>:<SHA>` exists. On the host, note the image in service now for the rollback:
+   `docker inspect slm-api --format '{{.Config.Image}}'`.
+1. **Back up** while the old wiring still runs (with the old Compose file):
+   `docker compose -f docker-compose.prod.yml exec -T postgres sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" --format=custom --no-owner --no-privileges' > <dump>`,
+   then check it: `docker compose -f docker-compose.prod.yml exec -T postgres pg_restore --list < <dump> > /dev/null`.
+2. **Split the environment.** Keep the old file as `.env.pre-h7` (`cp -p .env .env.pre-h7`, `chmod 600`). Move every
+   application setting from `.env` to a new `.env.app` (`chmod 600`); keep in `.env` only `POSTGRES_USER`,
+   `POSTGRES_PASSWORD`, `POSTGRES_DB`, `DOMAIN`, `PORT` and add `DATABASE_DEPLOY_USER`, `DATABASE_DEPLOY_PASSWORD`,
+   `DATABASE_RUNTIME_USER`, `DATABASE_RUNTIME_PASSWORD` (two new passwords of 32+ characters, `openssl rand -hex 32`,
+   different from each other and from `POSTGRES_PASSWORD`). Remove `DATABASE_URL` from both files. The running containers
+   keep the environment they were created with; do not recreate them with the old Compose file from here on.
+3. **Transfer and validate the candidate** from a checkout at `<SHA>` (the live files are not touched):
+   `ssh <host> mkdir -p <APP_DIR>/releases/<SHA>/scripts/ops`, then
+   `scp docker-compose.prod.yml Caddyfile <host>:<APP_DIR>/releases/<SHA>/` and
+   `scp scripts/ops/deploy-release.sh <host>:<APP_DIR>/releases/<SHA>/scripts/ops/` (from a Windows checkout,
+   `tr -d '\r'` the script first). On the host, in `<APP_DIR>`:
+   `export API_IMAGE=<IMAGE>:<SHA>`,
+   `C="env CADDYFILE_PATH=<APP_DIR>/releases/<SHA>/Caddyfile docker compose --project-directory <APP_DIR> -f <APP_DIR>/releases/<SHA>/docker-compose.prod.yml"`,
+   `$C config --quiet` (must succeed with the new `.env`/`.env.app`),
+   `$C run --rm --no-deps -T caddy caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile` (the candidate
+   Caddyfile; must print `Valid configuration`), `$C pull api worker`.
+4. **Stop** `api` and `worker`: `docker compose -f docker-compose.prod.yml stop api worker`. The service is down from here
+   until step 7 recreates the containers; plan the window. Provisioning waits at most 10 s for each lock.
+5. **Provision** as the cluster superuser: `$C run --rm --no-deps db-admin` → `ops:db-roles provision: DONE`, the number
+   of objects whose owner moved to the deploy role, `findings: none`. Exit 2 lists what was refused; nothing was written.
+6. **Verify** as the deploy role: `$C run --rm --no-deps migrate node dist/database-roles-cli.js verify` → `CONSISTENT`.
+7. **Deploy** the release with the script the workflow runs, naming a new attempt id `<ATTEMPT>` (for example
+   `h7-rollout-1`; a later try `h7-rollout-2`) and the environment kept in step 2:
+   `bash <APP_DIR>/releases/<SHA>/scripts/ops/deploy-release.sh --app-dir <APP_DIR> --release <SHA> --image <IMAGE>:<SHA> --attempt <ATTEMPT> --first-rollout-env .env.pre-h7`.
+   It validates the candidate Compose and Caddyfile, backs up as the deploy role, runs preflight, migrate and
+   `reconcile`, promotes the candidate, recreates `api`, `worker`, `caddy` with the runtime role and succeeds only once
+   they are ready and stable (see above). Use this command, not _Run workflow_ in mode `deploy`: the workflow never passes
+   `--first-rollout-env`, so it could not put `.env.pre-h7` back. `--first-rollout-env` is for this first rollout only:
+   the script refuses it once `releases/current-image` exists, and no later deployment passes it. Merging H7 to `main`
+   afterwards deploys the merge commit with the workflow, without it. While step 7 runs it holds the host lock: a
+   deployment started meanwhile exits 2. If step 7 itself exits 2 because another deployment holds the lock, nothing was
+   changed and no attempt was claimed: wait until the lock is free, then run it again.
+8. **Check**: the API and the worker logs say `Database role "slm_runtime" is a runtime role`;
+   `docker exec slm-api node -e "fetch('http://127.0.0.1:3000/api/v1/health/ready').then(r=>{console.log(r.status);process.exit(r.ok?0:1)})"`
+   prints `200`; a sign-in works; no log shows `RuntimeDatabaseRoleRefusedError`. `releases/current-attempt` holds
+   `releases/<SHA>/attempts/<ATTEMPT>`.
+
+**Recovery and rollback by hand** (the two failures below, _Roll back a ready release_) change the same files as the
+script: do them holding the host lock in your shell — in `<APP_DIR>`,
+`exec 9<> releases/.deploy.lock && flock -n 9 && echo 'lock held'` (it fails at once if a deployment is running: wait, then
+try again) — and leave that shell when done, which releases it. A deployment started meanwhile exits 2.
+
+**If step 7 fails before the promotion** (the script names the step and says _failed before the promotion_; the live files
+are untouched and `.env` was **not** restored, because nothing live changed): `api`/`worker` are still stopped from step 4.
+Either fix the cause and run step 7 again with a new `<ATTEMPT>`, or return to the old wiring by hand:
+`cp -p .env.pre-h7 .env`, then `API_IMAGE=<image noted in step 0> docker compose -f docker-compose.prod.yml up -d api worker`.
+The roles and owners provisioned in step 5 do not stop the old wiring (the superuser bypasses every privilege).
+
+**If step 7 fails after the promotion began** (`RESULT: … FAILED while <step>`: a rename, the recreation, the readiness or
+the marker): the script has put the old `docker-compose.prod.yml` and `Caddyfile` back and removed the
+`releases/current-image` it wrote; kept the H7 `.env` beside it as `.env.h7-<ATTEMPT>` (`0600`, never under `releases/`);
+put `.env.pre-h7` back as `.env` in one rename (`0600`) **before** recreating `api`, `worker`, `caddy` with the image the
+old `api` container ran; and checked that old release like a new one. `RECOVERY: the previous release <image> is ready`:
+the old wiring serves again. `RECOVERY: FAILED`: finish by hand — `cp -p .env.pre-h7 .env` if the output says `.env` was
+not restored, then
+`API_IMAGE=<image noted in step 0> docker compose -f docker-compose.prod.yml up -d --force-recreate api worker caddy` and
+the check of step 8. The database keeps the migrations; the dump of step 7 is in `backups/postgres/`. To try again later:
+`cp -p .env.h7-<ATTEMPT> .env` (the role passwords it holds are the provisioned ones), then step 7 with a new
+`<ATTEMPT>`.
+
+On a **fresh** installation: steps 0, 2 (write the files from `.env.example`) and 3, `$C up -d postgres`, step 5 (the
+database is empty), step 7 without `--first-rollout-env` (there is no environment to go back to), then `ops:bootstrap`
+through `$C run --rm api node dist/installation-cli.js` with a terminal.
+
+**Rotate a password:** change `DATABASE_DEPLOY_PASSWORD` or `DATABASE_RUNTIME_PASSWORD` in `.env`, run step 5 again (it
+sets both passwords, nothing else changes on a consistent database), then `up -d --force-recreate api worker`. The
+superuser password is the image's own: change it with `ALTER ROLE` in the `postgres` container and in `.env` together.
+
+**Roll back a ready release** (no migration is undone), in `<APP_DIR>`, from the exact attempt that made it live — never a
+guess between attempts:
+
+1. `head -n 1 releases/current-attempt` prints `releases/<SHA>/attempts/<ATTEMPT>`; the way back is that directory's
+   `replaced/`, and only it: `releases/<SHA>/attempts/<ATTEMPT>/replaced/`. (No `releases/current-attempt`, or one that
+   does not start with the sha of `releases/current-image`: see _An interrupted run_ above.)
+2. `cp -p releases/<SHA>/attempts/<ATTEMPT>/replaced/docker-compose.prod.yml releases/<SHA>/attempts/<ATTEMPT>/replaced/Caddyfile .`
+3. `cp -p releases/<SHA>/attempts/<ATTEMPT>/replaced/current-image releases/current-image` when `replaced/` holds one,
+   otherwise (it replaced a release from before H7) `rm -f releases/current-image`.
+4. Last, since step 1 read it: `cp -p releases/<SHA>/attempts/<ATTEMPT>/replaced/current-attempt releases/current-attempt`
+   when `replaced/` holds one, otherwise `rm -f releases/current-attempt`.
+5. **Normal rollback after H7** (`releases/current-image` is back): keep `.env` and `.env.app` and recreate with the
+   previous image,
+   `API_IMAGE="$(head -n 1 releases/current-image)" docker compose -f docker-compose.prod.yml up -d --force-recreate api worker caddy`.
+   **Rollback of the first H7 release to the wiring before H7** (step 3 removed `releases/current-image`): first
+   `cp -p .env .env.h7` (keep the role passwords), then `cp -p .env.pre-h7 .env`, then
+   `API_IMAGE=<image noted in step 0> docker compose -f docker-compose.prod.yml up -d --force-recreate api worker caddy`.
+6. Check as in step 8. Attempt directories stay as they are.
+
+The superuser bypasses every privilege, so the old wiring runs on the provisioned database; the roles and owners can stay. To remove them as well, as the superuser in the application database, one statement per role
+and the runtime role first:
+`REASSIGN OWNED BY slm_deploy TO <POSTGRES_USER>; DROP OWNED BY slm_runtime; DROP OWNED BY slm_deploy; DROP ROLE slm_runtime, slm_deploy;`
+(`DROP OWNED BY slm_deploy, slm_runtime` in one statement fails on PostgreSQL 17: _could not find tuple for default
+ACL_). `provision` can run again afterwards.
+
 ## Backup before production migrations
 
-`DB-05`, added 22/10/2026 by `delivery-gate-hardening`. The deploy workflow (`.github/workflows/deploy.yml`, step 3.5)
-dumps the production database **before** `prisma migrate deploy`:
+`DB-05`, added 22/10/2026 by `delivery-gate-hardening`. The deploy (`scripts/ops/deploy-release.sh`, run by
+`.github/workflows/deploy.yml` in mode `deploy`, H7-OPS-02) dumps the production database **before** `prisma migrate deploy`:
 
-- waits for PostgreSQL (`pg_isready`, 60 s), then runs `pg_dump --format=custom --no-owner --no-privileges` inside the
-  `postgres` container over its local socket with that container's own `POSTGRES_USER`/`POSTGRES_DB`; no credential is
-  passed on a command line or printed;
+- waits for PostgreSQL (`pg_isready`, 60 s), then runs `pg_dump --format=custom --no-owner --no-privileges` in the
+  one-off `backup` service (the server's own image) as the **deploy role** over TCP with SCRAM (H7: not the cluster
+  superuser, never the runtime role); the credentials come from `.env` through Compose, none is passed on a command line
+  or printed, and a wrong or missing deploy password stops the deploy here;
 - writes `<APP_DIR>/backups/postgres/slm-pre-migrate-<UTC yyyyMMddTHHmmssZ>-<short sha>.dump` (directory `0700`,
   `umask 077`) through a `.partial` file, and keeps it only when it is non-empty and `pg_restore --list` reads it;
 - stops the deploy (exit 1, partial file removed) when `pg_dump` fails, when the dump is empty or unreadable, or when
@@ -120,7 +340,8 @@ dumps the production database **before** `prisma migrate deploy`:
 ### Preflight before `migrate deploy` (P28-01)
 
 After the backup and before `prisma migrate deploy`, the workflow runs the read-only `pnpm ops:preflight`
-(`node dist/migration-preflight-cli.js` in the API image) and stops the deploy on any exit code but 0. It judges whether
+(`node dist/migration-preflight-cli.js` in the `migrate` service, as the deploy role) and stops the deploy on any exit
+code but 0. It judges whether
 the history can carry the database through `20261022120000_cost_centers_unit_only` — merged and already applied on the
 test VPS, so kept byte for byte (`P29-MIGRATION=B-FORWARD`) — and the forward migration
 `20261023100000_service_account_owner_on_recorded_day`, which moves every history to the rule of the application (a
@@ -168,7 +389,8 @@ or **restore** the dump taken just before it. A restore is a manual, approved op
 into a new empty database (for example
 `docker compose -f docker-compose.prod.yml exec -T postgres sh -c 'createdb -U "$POSTGRES_USER" slm_restore && pg_restore -U "$POSTGRES_USER" -d slm_restore --no-owner --exit-on-error' < <dump>`),
 check `_prisma_migrations` and the data, then point `DATABASE_URL` at it or swap the databases, and start the image that
-matches that schema. Never restore over the live database in place.
+matches that schema. The restored objects belong to the superuser (`--no-owner`): run `ops:db-roles provision` against
+the database that will serve before starting `api` and `worker`. Never restore over the live database in place.
 
 Retention (manual, bounded): the workflow never deletes a backup. `scripts/ops/postgres-backup-retention.sh` keeps the
 10 newest `slm-pre-migrate-<stamp>-<sha>.dump` files **and** every file younger than 30 days (age from the UTC stamp in

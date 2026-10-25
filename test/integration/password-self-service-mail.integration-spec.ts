@@ -1,5 +1,6 @@
 import { INestApplicationContext } from '@nestjs/common';
 import { SMTPServer } from 'smtp-server';
+import { fakeSmtpEnvironment, listenOnLoopback } from '../support/fake-smtp';
 import request from 'supertest';
 import { bodyOf } from '../support/api-body';
 import {
@@ -61,11 +62,8 @@ describe('password self-service mail through the real worker and an in-process S
         });
       },
     });
-    const port = await new Promise<number>((resolve) => {
-      smtp.listen(0, '127.0.0.1', () => resolve((smtp.server.address() as { port: number }).port));
-    });
-    process.env.SMTP_HOST = '127.0.0.1';
-    process.env.SMTP_PORT = String(port);
+    // The suite owns the whole SMTP configuration (H7-VRF-01); `originalEnv` is restored in afterAll.
+    Object.assign(process.env, fakeSmtpEnvironment(await listenOnLoopback(smtp)));
     process.env.OUTBOX_POLL_INTERVAL_MS = '500';
     process.env.APP_PUBLIC_URL = 'https://app.acme.test';
 

@@ -1,6 +1,6 @@
 import { randomBytes, randomUUID } from 'node:crypto';
-import { execFileSync } from 'node:child_process';
 import { Client } from 'pg';
+import { MIGRATE_TIMEOUT_MS, deployMigrations, migrationFailure, recordCopy, recordTimings } from './migration-deploy';
 
 export const MARKER_TABLE = 'disposable_test_run';
 export interface DisposableDatabase {
@@ -164,7 +164,7 @@ export async function assertDisposableDatabase(url: string, runId: string): Prom
   }
 }
 
-function adminUrl(source: string): string {
+export function adminUrl(source: string): string {
   const url = parse(source);
   requireLocalHost(url);
   url.pathname = '/postgres';
@@ -203,7 +203,9 @@ export async function provisionDisposableDatabase(runId: string = randomUUID()):
     await client.query('CREATE SCHEMA test_harness');
     await client.query('CREATE TABLE test_harness.' + quote(MARKER_TABLE) + ' (run_id text PRIMARY KEY)');
     await client.query('INSERT INTO test_harness.' + quote(MARKER_TABLE) + ' (run_id) VALUES ($1)', [runId]);
-    return { url, name, runId };
+    const database = { url, name, runId };
+    provisioned.add(database);
+    return database;
   } catch (error) {
     failure =
       error instanceof DisposableDatabaseError
@@ -270,49 +272,129 @@ export async function dropDisposableDatabase(database: DisposableDatabase): Prom
   }
 }
 
-/** Applies the committed baseline to an owned database; never uses db push/reset. */
-export async function migrateDisposableDatabase(database: DisposableDatabase): Promise<void> {
+/**
+ * Applies the committed baseline to an owned database; never uses db push/reset (H7-RUN-01). A database this file just
+ * provisioned becomes a server-side copy of the run's migrated template (`prepareMigratedTemplate`): no Prisma process
+ * per suite. Any other handle — the PostgreSQL role suites (deploy role, superuser), a relay — is deployed by the Prisma
+ * CLI itself, as is the template.
+ */
+export async function migrateDisposableDatabase(
+  database: DisposableDatabase,
+  options: { timeoutMs?: number } = {},
+): Promise<void> {
   if (checkDisposableUrl(database.url).database !== database.name)
     throw new DisposableDatabaseError('Database handle name does not match its URL.');
+  const started = performance.now();
   await assertDisposableDatabase(database.url, database.runId);
+  const template = migratedTemplate();
+  if (template && provisioned.has(database) && (await cloneMigratedTemplate(database, template.name))) {
+    recordCopy(database.name, performance.now() - started);
+    return;
+  }
+  const phases = await deployMigrations(
+    database.url,
+    performance.now() - started,
+    options.timeoutMs ?? MIGRATE_TIMEOUT_MS,
+  );
+  recordTimings(database.name, phases);
+  if (phases.outcome !== 'applied') throw new DisposableDatabaseError(migrationFailure(phases));
+}
+
+/** The migrated template of this Jest run, named in the environment by `prepareMigratedTemplate` (globalSetup). */
+const TEMPLATE_ENV = 'SLM_TEST_MIGRATED_TEMPLATE';
+/** Databases this file provisioned (empty, marked, no session held): only these may be swapped for a template copy. */
+const provisioned = new WeakSet<DisposableDatabase>();
+
+/** Names (or, with null, forgets) the run's migrated template; only test/support/migrated-template.ts calls it. */
+export function useMigratedTemplate(template: { name: string; runId: string } | null): void {
+  if (template === null) delete process.env[TEMPLATE_ENV];
+  else process.env[TEMPLATE_ENV] = JSON.stringify(template);
+}
+
+export function migratedTemplate(): { name: string; runId: string } | null {
+  const value = process.env[TEMPLATE_ENV];
+  if (!value) return null;
+  const template = JSON.parse(value) as { name: string; runId: string };
+  if (!SAFE_NAME.test(template.name))
+    throw new DisposableDatabaseError(`${TEMPLATE_ENV} does not name a test database.`);
+  return template;
+}
+
+async function markDatabase(url: string, runId: string, fresh: boolean): Promise<void> {
+  const client = new Client({ connectionString: url, connectionTimeoutMillis: 5000 });
+  await client.connect();
   try {
-    execFileSync(process.execPath, [require.resolve('prisma/build/index.js'), 'migrate', 'deploy'], {
-      cwd: process.cwd(),
-      env: {
-        ...process.env,
-        NODE_ENV: 'test',
-        DATABASE_URL: database.url,
-        TEST_DATABASE_URL: database.url,
-        // No update check (P28-13): the Prisma CLI otherwise calls checkpoint.prisma.io from a detached child and can
-        // wait on it, so a slow network stalled a deploy past the time limit; the child also held its working directory.
-        CHECKPOINT_DISABLE: '1',
-      },
-      stdio: 'pipe',
-      timeout: MIGRATE_TIMEOUT_MS,
-    });
-  } catch (error) {
-    throw new DisposableDatabaseError(migrationFailure(error));
+    if (fresh) {
+      await client.query('CREATE SCHEMA test_harness');
+      await client.query('CREATE TABLE test_harness.' + quote(MARKER_TABLE) + ' (run_id text PRIMARY KEY)');
+    } else {
+      await client.query('DELETE FROM test_harness.' + quote(MARKER_TABLE));
+    }
+    await client.query('INSERT INTO test_harness.' + quote(MARKER_TABLE) + ' (run_id) VALUES ($1)', [runId]);
+  } finally {
+    await client.end();
   }
 }
 
-const MIGRATE_TIMEOUT_MS = 60000;
+/** Objects of a database besides the harness marker: anything means a suite already used it. */
+const FOREIGN_OBJECTS = `SELECT (SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname NOT IN ('pg_catalog', 'information_schema', 'test_harness') AND n.nspname NOT LIKE 'pg_toast%')
+  + (SELECT count(*) FROM pg_namespace WHERE nspname NOT IN ('pg_catalog', 'information_schema', 'test_harness', 'public')
+    AND nspname NOT LIKE 'pg_toast%' AND nspname NOT LIKE 'pg_temp%')
+  + (SELECT count(*) FROM pg_proc WHERE pronamespace = 'public'::regnamespace)
+  + (SELECT count(*) FROM pg_type WHERE typnamespace = 'public'::regnamespace)
+  + (SELECT count(*) FROM pg_extension WHERE extname <> 'plpgsql')
+  + (SELECT count(*) - 1 FROM test_harness.${quote(MARKER_TABLE)}) AS count`;
 
 /**
- * Why a deploy failed, so a failure reads as what it was (P28-13): the process killed at the time limit (a machine under
- * load), or Prisma's own error (a migration that does not apply). The tail of Prisma's output is kept with every URL
- * removed; Prisma prints host, database and the failing statement's message, never a password.
+ * Replaces the provisioned database by a copy of the template, keeping its name and its own marker — only when that is
+ * exactly what a deploy would give: the database still holds nothing but the marker and no session is left on it (a
+ * process that just exited gets up to 2 s to go). Otherwise it returns false and the caller deploys with the CLI, so a
+ * suite that already used its database never loses what it made.
  */
-function migrationFailure(error: unknown): string {
-  const failure = error as { code?: string; signal?: string | null; stdout?: Buffer; stderr?: Buffer };
-  if (failure.code === 'ETIMEDOUT' || failure.signal === 'SIGTERM') {
-    return `Migration deployment did not finish within ${MIGRATE_TIMEOUT_MS / 1000} s on the disposable database (the process was stopped; the machine may be overloaded).`;
+async function cloneMigratedTemplate(database: DisposableDatabase, template: string): Promise<boolean> {
+  const target = new Client({ connectionString: database.url, connectionTimeoutMillis: 5000 });
+  await target.connect();
+  const foreign = await target.query<{ count: string }>(FOREIGN_OBJECTS).finally(() => target.end());
+  if (Number(foreign.rows[0].count) !== 0) return false;
+  const admin = new Client({
+    connectionString: adminUrl(database.url),
+    connectionTimeoutMillis: 5000,
+    query_timeout: 30000,
+    application_name: 'slm-disposable-harness',
+  });
+  let failure: DisposableDatabaseError | undefined;
+  try {
+    await admin.connect();
+    const drainedBy = Date.now() + 2000;
+    for (;;) {
+      const { rows } = await admin.query<{ count: number }>(
+        'SELECT count(*)::int AS count FROM pg_stat_activity WHERE datname = $1',
+        [database.name],
+      );
+      if (rows[0].count === 0) break;
+      if (Date.now() > drainedBy) return false;
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    // A plain DROP: it fails (55006) if a session arrived meanwhile; then the suite holds the database.
+    await admin.query('DROP DATABASE ' + quote(database.name));
+    try {
+      await admin.query('CREATE DATABASE ' + quote(database.name) + ' TEMPLATE ' + quote(template));
+    } catch (error) {
+      // Give the suite back an empty marked database, so its own teardown still finds what it owns.
+      await admin.query('CREATE DATABASE ' + quote(database.name));
+      await markDatabase(database.url, database.runId, true);
+      throw error;
+    }
+  } catch (error) {
+    failure = new DisposableDatabaseError(
+      `Cannot copy the migrated template (SQLSTATE ${sqlState(error) ?? 'none'}; 55006: a session holds the database or the template).`,
+      sqlState(error),
+    );
+    throw failure;
+  } finally {
+    await closeClients([admin], database.name, failure);
   }
-  const output = `${failure.stdout?.toString('utf8') ?? ''}\n${failure.stderr?.toString('utf8') ?? ''}`
-    .replace(/postgres(?:ql)?:\/\/\S+/gi, '<url>')
-    .split(/\r?\n/)
-    .filter((line) => line.trim() !== '')
-    .slice(-12)
-    .join('\n');
-
-  return `Migration deployment failed on the disposable database. Prisma said:\n${output}`;
+  await markDatabase(database.url, database.runId, false);
+  return true;
 }

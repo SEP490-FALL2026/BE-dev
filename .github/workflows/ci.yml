@@ -9,6 +9,7 @@ on:
       - 'prisma/**'
       - 'prisma.config.ts'
       - 'compose.yaml'
+      - 'docker-compose.prod.yml'
       - 'Dockerfile'
       - '.dockerignore'
       - 'infra/**'
@@ -43,6 +44,7 @@ on:
       - 'prisma/**'
       - 'prisma.config.ts'
       - 'compose.yaml'
+      - 'docker-compose.prod.yml'
       - 'Dockerfile'
       - '.dockerignore'
       - 'infra/**'
@@ -159,9 +161,24 @@ jobs:
         run: pnpm test:integration
         env:
           TEST_DATABASE_ADMIN_URL: postgresql://ci_integration:ci-integration-only@127.0.0.1:5432/postgres
+          # H7: the role-separation suites play the cluster administrator of this disposable service container only.
+          TEST_DATABASE_BOOTSTRAP_URL: postgresql://ci_bootstrap:ci-bootstrap-only@127.0.0.1:5432/postgres
 
       - name: Validate Compose configuration
         run: docker compose config --quiet
+
+      # H7: every profile of the production file interpolates with the three role passwords, and refuses without one.
+      - name: Validate production Compose configuration
+        run: |
+          : > .env.app
+          printf 'POSTGRES_PASSWORD=ci-placeholder-bootstrap\nDATABASE_DEPLOY_PASSWORD=ci-placeholder-deploy\nDATABASE_RUNTIME_PASSWORD=ci-placeholder-runtime\n' > "$RUNNER_TEMP/prod.env"
+          docker compose --env-file "$RUNNER_TEMP/prod.env" -f docker-compose.prod.yml --profile deploy --profile admin config --quiet
+          grep -v RUNTIME "$RUNNER_TEMP/prod.env" > "$RUNNER_TEMP/prod-missing.env"
+          if docker compose --env-file "$RUNNER_TEMP/prod-missing.env" -f docker-compose.prod.yml config --quiet 2>/dev/null; then
+            echo 'docker-compose.prod.yml accepted a missing DATABASE_RUNTIME_PASSWORD' >&2
+            exit 1
+          fi
+          rm .env.app
 
       - name: Verify OpenAPI export
         run: |
@@ -176,4 +193,6 @@ jobs:
     needs: quality
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     uses: ./.github/workflows/deploy.yml
+    with:
+      mode: deploy
     secrets: inherit

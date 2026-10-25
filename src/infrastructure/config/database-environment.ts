@@ -106,6 +106,31 @@ export function assertDatabaseLimits(result: DatabaseEnvironmentVariables): void
   }
 }
 
+/**
+ * Credentials that administer the database (H7: F-15, DB-04, Q9): the cluster superuser and the deploy role. Compose
+ * reads them from `.env` for interpolation only; the API, the worker and the recovery command get `.env.app` and the
+ * runtime `DATABASE_URL`, so in production any of these in their environment is a wiring mistake.
+ */
+const DATABASE_ADMINISTRATION_KEYS = [
+  'POSTGRES_PASSWORD',
+  'DATABASE_BOOTSTRAP_URL',
+  'DATABASE_DEPLOY_URL',
+  'DATABASE_DEPLOY_PASSWORD',
+] as const;
+
+/** Refuses, in production, an environment that carries a database administration credential; names keys, never values. */
+export function assertNoDatabaseAdministrationCredentials(input: Record<string, unknown>): void {
+  if (input.NODE_ENV !== 'production') return;
+  const present = DATABASE_ADMINISTRATION_KEYS.filter((key) => typeof input[key] === 'string' && input[key] !== '');
+  if (present.length > 0) {
+    throw new EnvironmentValidationError(
+      `Environment validation failed: the API, the worker and the recovery command must not receive database ` +
+        `administration credentials (${present.join(', ')}); give them the runtime role only ` +
+        '(docs/guides/containers.md#postgresql-roles-h7)',
+    );
+  }
+}
+
 /** Validates what the installation command reads: the database settings and NODE_ENV, nothing else. */
 export function validateInstallationEnvironment(input: Record<string, unknown>): DatabaseEnvironmentVariables {
   const result = resolveDatabaseSettings(
