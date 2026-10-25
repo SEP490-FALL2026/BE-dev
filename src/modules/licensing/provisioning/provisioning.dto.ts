@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { isBusinessDate } from '../../../core/business-date';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
 import { EVIDENCE_MAX_LENGTH, FAILURE_REASON_MAX_LENGTH } from './provisioning.policy';
+import { REVOCATION_NOTE_MAX_LENGTH } from './revocation.policy';
 
 /**
  * Only the shape and a generous bound are checked here, and no field can carry a secret: a grant names the request, the
@@ -17,13 +18,43 @@ export const grantBodySchema = z.strictObject({
   subscriptionId: z.uuid().optional(),
   accountIdentifier: z.string().max(254).optional(),
   expectedEndDate: businessDate.optional(),
+  /** Only for the request of a service account: the person of its department who answers for it, in the place of the one it names. */
+  responsibleEmployeeId: z.uuid().optional(),
+  /** Only for a request for a group, which is granted one person at a time: the person of the request this grant is for. */
+  beneficiaryEmployeeId: z.uuid().optional(),
 });
 export const completeBodySchema = z.strictObject({ evidence: z.string().max(EVIDENCE_MAX_LENGTH).default('') });
 export const failureBodySchema = z.strictObject({ reason: z.string().max(FAILURE_REASON_MAX_LENGTH).default('') });
 export const handOffBodySchema = completeBodySchema;
 export const closeFailedBodySchema = failureBodySchema;
+/**
+ * How a revocation was completed. Which way fits which kind of provisioning, which of the fields it needs (a K1 completion
+ * needs the day the paid period ends and what is known of the access) and whether the evidence is enough are judged by the
+ * policy and answer with their own codes; a note of evidence is never a password or a key.
+ */
+export const revocationCompletionBodySchema = z.strictObject({
+  completion: z.enum(['ACCOUNT_REMOVED', 'ALREADY_GONE', 'RENEWAL_CANCELLED', 'OFF_SYSTEM_REVOKED']),
+  evidence: z.string().max(EVIDENCE_MAX_LENGTH).default(''),
+  note: z.string().max(REVOCATION_NOTE_MAX_LENGTH).optional(),
+  paidThroughOn: businessDate.optional(),
+  accessState: z.enum(['CUT', 'UNTIL_PAID_END']).optional(),
+  accessCutOn: businessDate.optional(),
+  accessEvidence: z.string().max(EVIDENCE_MAX_LENGTH).optional(),
+});
+export const accessCutBodySchema = z.strictObject({
+  accessCutOn: businessDate,
+  evidence: z.string().max(EVIDENCE_MAX_LENGTH).default(''),
+});
 
-const TASK_STATUSES = ['QUEUED', 'RETRY_SCHEDULED', 'IN_PROGRESS', 'COMPLETED', 'FAILED', 'CLOSED_FAILED'] as const;
+const TASK_STATUSES = [
+  'QUEUED',
+  'RETRY_SCHEDULED',
+  'IN_PROGRESS',
+  'COMPLETED',
+  'FAILED',
+  'CLOSED_FAILED',
+  'CANCELLED',
+] as const;
 
 const pageQuery = {
   page: z.coerce.number().int().positive().default(1),
@@ -44,10 +75,53 @@ const stepSchema = z.strictObject({
     'GRANT_IN_INTERNAL_SOFTWARE',
     'OPEN_KEY_STORE',
     'ASSIGN_KEY_WITH_COMPANY_DEVICE',
+    'CANCEL_RENEWAL_ON_PROVIDER',
+    'RECORD_ACCESS_STATE',
+    'REMOVE_FROM_WORKSPACE',
+    'REVOKE_IN_INTERNAL_SOFTWARE',
     'CONFIRM_WITH_EVIDENCE',
   ]),
   accountIdentifier: z.string().optional(),
   adminIdentity: z.enum(['ACTING_IT_ADMIN']).optional(),
+});
+const REVOCATION_SOURCES = [
+  'RETURN',
+  'MANAGER_NOT_NEEDED',
+  'TRANSFER_REVIEW',
+  'GHOST_SEAT',
+  'DEPARTURE',
+  'ABRUPT_DEPARTURE',
+  'TIME_LIMITED_EXPIRY',
+  'SUBSCRIPTION_REDUCTION',
+  'SUBSCRIPTION_CANCELLATION',
+  'SUBSCRIPTION_EXPIRED',
+  'NOT_LEGALIZED',
+  'RE_EXECUTION',
+] as const;
+/** What a row of the list says of a revocation: no reasons, notes or evidence (the detail has those). */
+const revocationSummarySchema = z.strictObject({
+  source: z.enum(REVOCATION_SOURCES),
+  reasonCount: z.number().int().nonnegative(),
+  completion: z.enum(['ACCOUNT_REMOVED', 'ALREADY_GONE', 'RENEWAL_CANCELLED', 'OFF_SYSTEM_REVOKED']).nullable(),
+  accessState: z.enum(['CUT', 'UNTIL_PAID_END']).nullable(),
+  paidThroughOn: businessDate.nullable(),
+  terminating: z.boolean(),
+  terminatingUntil: businessDate.nullable(),
+});
+const revocationDetailSchema = revocationSummarySchema.extend({
+  completionNote: z.string().nullable(),
+  accessCutOn: businessDate.nullable(),
+  accessEvidence: z.string().nullable(),
+  firstReason: z
+    .strictObject({
+      decidedByEmployeeId: z.uuid().nullable(),
+      decidedRole: z.string(),
+      referenceKind: z.string().nullable(),
+      referenceId: z.uuid().nullable(),
+      note: z.string().nullable(),
+      decidedAt: z.iso.datetime(),
+    })
+    .nullable(),
 });
 /** A row of the list (`LD-08`): the task without its steps, evidence and errors; the detail is this and those. */
 const taskSummarySchema = z.strictObject({
@@ -55,7 +129,7 @@ const taskSummarySchema = z.strictObject({
   kind: z.enum(['GRANT', 'REVOKE']),
   channel: z.enum(['MANUAL', 'CONNECTOR']),
   status: z.enum(TASK_STATUSES),
-  requestId: z.uuid(),
+  requestId: z.uuid().nullable(),
   assignmentId: z.uuid(),
   beneficiary: z.strictObject({ employeeId: z.uuid(), employeeCode: z.string(), fullName: z.string() }).nullable(),
   plan: z
@@ -82,12 +156,21 @@ const taskSummarySchema = z.strictObject({
   nextRetryAt: z.iso.datetime().nullable(),
   availableDecisions: z.array(z.enum(['RETRY', 'HAND_OFF', 'CLOSE_FAILED'])),
   closedAt: z.iso.datetime().nullable(),
+  revocation: revocationSummarySchema.nullable(),
   elapsedSeconds: z.number().int().nonnegative(),
 });
 const taskSchema = taskSummarySchema.extend({
   steps: z.array(stepSchema),
   doneWhen: z
-    .enum(['PURCHASE_CONFIRMED', 'MEMBER_ACTIVE', 'KEY_ASSIGNED_WITH_DEVICE', 'CONFIRMED_WITH_EVIDENCE'])
+    .enum([
+      'PURCHASE_CONFIRMED',
+      'MEMBER_ACTIVE',
+      'KEY_ASSIGNED_WITH_DEVICE',
+      'CONFIRMED_WITH_EVIDENCE',
+      'RENEWAL_CANCELLED_WITH_ACCESS_STATE',
+      'ACCOUNT_REMOVED_OR_NOT_NEEDED',
+      'REVOKED_OFF_SYSTEM_WITH_EVIDENCE',
+    ])
     .nullable(),
   completedBy: z.uuid().nullable(),
   evidence: z.string().nullable(),
@@ -99,6 +182,7 @@ const taskSchema = taskSummarySchema.extend({
   handOffEvidence: z.string().nullable(),
   closedBy: z.uuid().nullable(),
   closeReason: z.string().nullable(),
+  revocation: revocationDetailSchema.nullable(),
 });
 const pagination = z.strictObject({
   page: z.number().int().positive(),
@@ -112,6 +196,8 @@ export class CompleteBodyDto extends createZodDto(completeBodySchema) {}
 export class FailureBodyDto extends createZodDto(failureBodySchema) {}
 export class HandOffBodyDto extends createZodDto(handOffBodySchema) {}
 export class CloseFailedBodyDto extends createZodDto(closeFailedBodySchema) {}
+export class RevocationCompletionBodyDto extends createZodDto(revocationCompletionBodySchema) {}
+export class AccessCutBodyDto extends createZodDto(accessCutBodySchema) {}
 export class ListTasksQueryDto extends createZodDto(listTasksQuerySchema) {}
 export class TaskIdParamDto extends createZodDto(taskIdParamSchema) {}
 export class TaskResponseDto extends createZodDto(successEnvelopeSchema(z.strictObject({ task: taskSchema }))) {}

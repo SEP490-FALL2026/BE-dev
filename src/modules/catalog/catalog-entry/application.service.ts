@@ -131,6 +131,13 @@ export class ApplicationService {
     actor: AuthenticatedPrincipal,
     input: DeclareApplicationInput,
   ): Promise<{ application: ApplicationView; proposed: boolean }> {
+    const [application] = await this.withOwners([await this.declareRecord(actor, input)]);
+
+    return { application, proposed: vendorSourceOf(input).type === 'NAME' };
+  }
+
+  /** The same declaration, returning the record; with `outer` it is written in the caller's transaction (`US-05-20`). */
+  async declareRecord(actor: AuthenticatedPrincipal, input: DeclareApplicationInput, outer?: DbTx) {
     const source = vendorSourceOf(input);
     const name = cleanApplicationName(input.name);
     const domains = cleanApplicationDomains(input.domains ?? []);
@@ -145,8 +152,8 @@ export class ApplicationService {
     };
     const organizationId = await this.requireOrganizationId();
 
-    try {
-      const record = await this.runner.run(async (tx) => {
+    const write = async (tx: DbTx): Promise<ApplicationRecord> => {
+      {
         await this.requireWorkingOwner(tx, input.businessOwnerEmployeeId);
         const group = input.functionalGroupId ? await this.requireActiveGroup(tx, input.functionalGroupId) : null;
 
@@ -221,9 +228,11 @@ export class ApplicationService {
         }
 
         return created;
-      });
+      }
+    };
 
-      return { application: (await this.withOwners([record]))[0], proposed: source.type === 'NAME' };
+    try {
+      return await (outer ? write(outer) : this.runner.run(write));
     } catch (error) {
       throw this.mapWriteError(error);
     }

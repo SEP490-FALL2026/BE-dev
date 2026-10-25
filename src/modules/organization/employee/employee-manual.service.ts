@@ -35,6 +35,8 @@ export interface ManualEmployeeView {
   employmentType: EmploymentType;
   hireDate: BusinessDate;
   status: 'ACTIVE';
+  /** A person just entered works. */
+  workState: 'WORKING';
   /** The day the person became a member of the department: the day they were recorded, not the hire date. */
   memberSince: BusinessDate;
   department: { id: string; code: string; name: string };
@@ -137,6 +139,7 @@ export class EmployeeManualService {
           employmentType: input.employmentType,
           hireDate: input.hireDate,
           status: 'ACTIVE' as const,
+          workState: 'WORKING' as const,
           memberSince,
           department: { id: department.id, code: department.code, name: department.name },
           jobTitle: { id: jobTitle.id, name: jobTitle.name },

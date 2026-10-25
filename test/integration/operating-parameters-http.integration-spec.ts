@@ -102,6 +102,9 @@ describe('the operating parameters and the non-working dates over HTTP (integrat
       expect(parameters.has('BUDGET_PERIOD_KIND')).toBe(false);
       expect([...parameters.keys()].filter((key) => /HIGH_VALUE/.test(key))).toEqual([]);
       expect(parameters.get('TRANSFER_REVIEW_WORKING_DAYS')?.value).toBe(5);
+      expect(parameters.get('PERSONNEL_NOTICE_REVIEW_WORKING_DAYS')?.value).toBe(2);
+      expect(parameters.get('SAAS_ISSUE_RESPONSE_WORKING_DAYS')?.value).toBe(1);
+      expect(parameters.get('SAAS_ISSUE_REOPEN_WORKING_DAYS')?.value).toBe(5);
       expect(parameters.get('ABRUPT_DEPARTURE_HOLD_WORKING_DAYS')?.value).toBe(1);
       expect(parameters.get('DETECTION_THRESHOLD_DAYS')?.value).toEqual([30, 60, 90]);
       expect(parameters.get('RENEWAL_ALERT_DAYS_BEFORE_DEADLINE')?.value).toEqual([15, 7]);
@@ -206,6 +209,44 @@ describe('the operating parameters and the non-working dates over HTTP (integrat
       });
     });
 
+    it('keeps the backlog threshold between 1 and 500, records before and after, and answers what was in force at a moment (US-05-10 AC-1)', async () => {
+      const service = ctx.app.get(OperatingParametersService);
+      const beforeAny = new Date(Date.now() - 60_000);
+      expect((await list()).get('BACKLOG_ALERT_THRESHOLD')).toMatchObject({ value: 10, isDefault: true });
+      await expect(service.getValueAt('BACKLOG_ALERT_THRESHOLD', beforeAny)).resolves.toBe(10);
+
+      for (const refused of [0, 501]) {
+        expect(errorOf(await setParameter('BACKLOG_ALERT_THRESHOLD', refused).expect(422)).details).toMatchObject({
+          problem: 'OUT_OF_RANGE',
+        });
+      }
+      await setParameter('BACKLOG_ALERT_THRESHOLD', 12).expect(200);
+      const changedAt = new Date();
+      await setParameter('BACKLOG_ALERT_THRESHOLD', 20).expect(200);
+
+      expect(await auditFor('BACKLOG_ALERT_THRESHOLD')).toEqual([
+        expect.objectContaining({ action: 'PARAMETER.CHANGED', before: { value: 10 }, after: { value: 12 } }),
+        expect.objectContaining({ action: 'PARAMETER.CHANGED', before: { value: 12 }, after: { value: 20 } }),
+      ]);
+      await expect(service.getValueAt('BACKLOG_ALERT_THRESHOLD', beforeAny)).resolves.toBe(10);
+      await expect(service.getValueAt('BACKLOG_ALERT_THRESHOLD', changedAt)).resolves.toBe(12);
+      await expect(service.getValueAt('BACKLOG_ALERT_THRESHOLD', new Date(Date.now() + 60_000))).resolves.toBe(20);
+      await expect(service.getValueAt('NO_SUCH_PARAMETER', changedAt)).rejects.toThrow();
+    });
+
+    it('answers the non-working days of a range as a set, so the calendar of the workflows reads one place', async () => {
+      const first = addDays(today(), 400);
+      await request(server())
+        .post('/api/v1/non-working-dates')
+        .set(asAdmin())
+        .send({ date: first, reason: 'Range probe' })
+        .expect(201);
+
+      const found = await ctx.app.get(OperatingParametersService).getNonWorkingDates(first, addDays(first, 3));
+
+      expect([...found]).toEqual([first]);
+    });
+
     it('does not return, and does not fail on, a budget period kind stored before it was removed (AC-8)', async () => {
       await ctx.sql.query(
         `INSERT INTO parameter_values (id, organization_id, key, value, valid_from)
@@ -216,7 +257,7 @@ describe('the operating parameters and the non-working dates over HTTP (integrat
       const parameters = await list();
 
       expect(parameters.has('BUDGET_PERIOD_KIND')).toBe(false);
-      expect(parameters.size).toBe(16);
+      expect(parameters.size).toBe(20);
     });
 
     it('is 404 for a parameter that does not exist, the time zone included (AC-11)', async () => {

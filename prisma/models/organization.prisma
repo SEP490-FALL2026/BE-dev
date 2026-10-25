@@ -35,6 +35,22 @@ enum EmployeeStatus {
   TERMINATED
 }
 
+// What the person is doing for the organization apart from whether they have left; the graph is a trigger (migration 20261024140000).
+enum EmployeeWorkState {
+  WORKING
+  ON_LONG_LEAVE
+  HANDING_OVER
+  LEFT
+}
+
+// The kinds of change of the organization told to the modules that act on them (FR-3.16).
+enum OrganizationChangeKind {
+  PLACEMENT_START
+  HEAD_PERIOD_START
+  HEAD_PERIOD_END
+  EMPLOYEE_LEFT
+}
+
 // One row per installation (ADR-01); the migration enforces it.
 model Organization {
   id                   String    @id @default(uuid()) @db.Uuid
@@ -64,12 +80,32 @@ model Organization {
   seatBaselineImports                SeatBaselineImport[]
   licenseAssignments                 LicenseAssignment[]
   provisioningTasks                  ProvisioningTask[]
+  returnRequests                     ReturnRequest[]
+  handoverDuties                     HandoverDuty[]
+  serviceAccountMoves                ServiceAccountMove[]
+  accessRequests                     AccessRequest[]
+  approvalRecords                    ApprovalRecord[]
+  controlledWaitAlerts               ControlledWaitAlert[]
+  stepSlaReminders                   StepSlaReminder[]
+  congestionIncidents                CongestionIncident[]
+  requestBudgetChecks                RequestBudgetCheck[]
+  spendBatches                       SpendBatch[]
+  requestSupplements                 RequestSupplement[]
+  budgetProposals                    BudgetProposal[]
+  budgetVersions                     BudgetVersion[]
+  budgetCommitments                  BudgetCommitment[]
   applicationRetirementConfirmations ApplicationRetirementConfirmation[]
   contracts                          Contract[]
   documentAttachments                DocumentAttachment[]
   licenseKeys                        LicenseKey[]
   seatBaselineState                  SeatBaselineState?
   standardToolsets                   StandardToolset[]
+  changeAnnouncements                OrganizationChangeAnnouncement[]
+  departmentTransfers                DepartmentTransfer[]
+  transferReviews                    TransferReview[]
+  employeeLeaves                     EmployeeLeave[]
+  offboardingCases                   OffboardingCase[]
+  personnelNotices                   PersonnelNotice[]
 
   @@map("organizations")
 }
@@ -89,6 +125,10 @@ model CostCenter {
   department                      Department?
   subscriptionCostAllocationLines SubscriptionCostAllocationLine[]
   licenseAssignments              LicenseAssignment[]
+  accessRequests                  AccessRequest[]
+  budgetProposals                 BudgetProposal[]
+  budgetVersions                  BudgetVersion[]
+  budgetCommitments               BudgetCommitment[]
 
   @@unique([organizationId, code])
   @@map("cost_centers")
@@ -117,6 +157,19 @@ model Department {
   standardToolsets        StandardToolset[]
   // The service accounts the department owns (QĐ-86c); the migration keeps each charged to this department's Cost Center.
   ownedServiceAssignments LicenseAssignment[]    @relation("AssignmentOwningDepartment")
+  returnRequests          ReturnRequest[]
+  handoverDuties          HandoverDuty[]
+  serviceAccountMovesFrom ServiceAccountMove[]   @relation("MoveFromDepartment")
+  serviceAccountMovesTo   ServiceAccountMove[]   @relation("MoveToDepartment")
+  accessRequests          AccessRequest[]
+  approvalRecords         ApprovalRecord[]
+  spendBatches            SpendBatch[]
+  transfersFrom           DepartmentTransfer[]   @relation("TransferFromDepartment")
+  transfersTo             DepartmentTransfer[]   @relation("TransferToDepartment")
+  transferReviews         TransferReview[]
+  offboardingCases        OffboardingCase[]
+  noticesTargeting        PersonnelNotice[]      @relation("NoticeTargetDepartment")
+  noticesSent             PersonnelNotice[]      @relation("NoticeSenderDepartment")
 
   @@unique([organizationId, code])
   @@index([itAdminEmployeeId])
@@ -182,42 +235,88 @@ model JobTitle {
   createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt      DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  organization     Organization        @relation(fields: [organizationId], references: [id])
+  organization     Organization         @relation(fields: [organizationId], references: [id])
   placements       EmployeePlacement[]
   standardToolsets StandardToolset[]
+  transfersFrom    DepartmentTransfer[] @relation("TransferFromJobTitle")
+  transfersTo      DepartmentTransfer[] @relation("TransferToJobTitle")
+  transferReviews  TransferReview[]
 
   @@unique([organizationId, normalizedName])
   @@map("job_titles")
 }
 
 model Employee {
-  id                  String         @id @default(uuid()) @db.Uuid
-  organizationId      String         @map("organization_id") @db.Uuid
-  employeeCode        String         @map("employee_code")
-  fullName            String         @map("full_name")
-  workEmail           String?        @map("work_email")
-  normalizedWorkEmail String?        @map("normalized_work_email")
-  employmentType      EmploymentType @map("employment_type")
-  hireDate            DateTime       @map("hire_date") @db.Date
-  status              EmployeeStatus @default(ACTIVE)
-  createdAt           DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt           DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
+  id                  String            @id @default(uuid()) @db.Uuid
+  organizationId      String            @map("organization_id") @db.Uuid
+  employeeCode        String            @map("employee_code")
+  fullName            String            @map("full_name")
+  workEmail           String?           @map("work_email")
+  normalizedWorkEmail String?           @map("normalized_work_email")
+  employmentType      EmploymentType    @map("employment_type")
+  hireDate            DateTime          @map("hire_date") @db.Date
+  status              EmployeeStatus    @default(ACTIVE)
+  workState           EmployeeWorkState @default(WORKING) @map("work_state")
+  createdAt           DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt           DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  organization                 Organization                        @relation(fields: [organizationId], references: [id])
-  placements                   EmployeePlacement[]
-  appUser                      AppUser?
-  itAdminOf                    Department[]                        @relation("DepartmentItAdmin")
-  headPeriods                  DepartmentHeadPeriod[]
-  approvalRoles                ApprovalRoleHolder[]
-  ownedApplications            Application[]
-  workspacePrimaryOwnerOf      PlanWorkspaceProfile[]              @relation("WorkspacePrimaryOwner")
-  workspaceEmergencyHolderOf   PlanWorkspaceProfile[]              @relation("WorkspaceEmergencyHolder")
-  workspaceMemberships         PlanWorkspaceAdmin[]                @relation("WorkspaceMember")
-  planTermOpinions             PlanTermOpinion[]
-  applicationBusinessOwners    ApplicationBusinessOwner[]
-  licenseAssignments           LicenseAssignment[]
-  provisioningTasksInCharge    ProvisioningTask[]                  @relation("TaskDefaultResponsible")
-  retirementConfirmationsGiven ApplicationRetirementConfirmation[] @relation("RetirementConfirmingOwner")
+  organization                    Organization                        @relation(fields: [organizationId], references: [id])
+  placements                      EmployeePlacement[]
+  appUser                         AppUser?
+  itAdminOf                       Department[]                        @relation("DepartmentItAdmin")
+  headPeriods                     DepartmentHeadPeriod[]
+  approvalRoles                   ApprovalRoleHolder[]
+  ownedApplications               Application[]
+  workspacePrimaryOwnerOf         PlanWorkspaceProfile[]              @relation("WorkspacePrimaryOwner")
+  workspaceEmergencyHolderOf      PlanWorkspaceProfile[]              @relation("WorkspaceEmergencyHolder")
+  workspaceMemberships            PlanWorkspaceAdmin[]                @relation("WorkspaceMember")
+  planTermOpinions                PlanTermOpinion[]
+  applicationBusinessOwners       ApplicationBusinessOwner[]
+  licenseAssignments              LicenseAssignment[]
+  provisioningTasksInCharge       ProvisioningTask[]                  @relation("TaskDefaultResponsible")
+  revocationReasonsDecided        ProvisioningTaskReason[]            @relation("TaskReasonDecidedBy")
+  retirementConfirmationsGiven    ApplicationRetirementConfirmation[] @relation("RetirementConfirmingOwner")
+  accessRequestsMade              AccessRequest[]                     @relation("AccessRequestRequester")
+  accessRequestsWithdrawn         AccessRequest[]                     @relation("AccessRequestWithdrawer")
+  accessRequestsCancelled         AccessRequest[]                     @relation("AccessRequestCanceller")
+  serviceAccountsAnsweredFor      AccessRequestServiceAccount[]       @relation("ServiceAccountResponsible")
+  serviceAccountBoundariesDecided AccessRequestServiceAccount[]       @relation("ServiceAccountBoundaryDecider")
+  returnRequestsSent              ReturnRequest[]                     @relation("ReturnRequestSender")
+  returnRequestsHeld              ReturnRequest[]                     @relation("ReturnRequestHolder")
+  returnHandoversConfirmed        ReturnRequest[]                     @relation("ReturnRequestHandoverConfirmer")
+  handoverDutiesAbout             HandoverDuty[]                      @relation("HandoverDutyEmployee")
+  handoverDutiesFixedTo           HandoverDuty[]                      @relation("HandoverDutyConfirmer")
+  handoverDutiesConfirmed         HandoverDuty[]                      @relation("HandoverDutyConfirmedBy")
+  serviceAccountMovesTaking       ServiceAccountMove[]                @relation("MoveNewResponsible")
+  serviceAccountMovesConfirmed    ServiceAccountMove[]                @relation("MoveConfirmedBy")
+  accessRequestBeneficiaries      AccessRequestBeneficiary[]
+  accessRequestLinesEnded         AccessRequestLine[]                 @relation("AccessRequestLineEnder")
+  lineDecisionsGiven              AccessRequestLineDecision[]         @relation("LineDecisionDecider")
+  supplementDropsAbout            RequestSupplementDrop[]             @relation("SupplementDropEmployee")
+  accessRequestStepsAssigned      AccessRequestStep[]                 @relation("AccessRequestStepAssignee")
+  approvalRecordsGiven            ApprovalRecord[]                    @relation("ApprovalRecordDecider")
+  requestBudgetChecksRun          RequestBudgetCheck[]                @relation("RequestBudgetCheckRanBy")
+  spendBatchesSubmitted           SpendBatch[]                        @relation("SpendBatchSubmitter")
+  spendDecisionsGiven             SpendDecision[]                     @relation("SpendDecisionDecider")
+  budgetQuestionsAsked            BudgetInformationRequest[]          @relation("BudgetInformationAsker")
+  commitmentReleases              BudgetCommitmentRelease[]           @relation("CommitmentReleaser")
+  budgetQuestionsAnswered         BudgetInformationRequest[]          @relation("BudgetInformationAnswerer")
+  stepSlaRemindersHeld            StepSlaReminder[]                   @relation("StepSlaReminderHolder")
+  stepSlaRemindersReceived        StepSlaReminderRecipient[]          @relation("StepSlaReminderRecipient")
+  congestionIncidentsAbout        CongestionIncident[]                @relation("CongestionIncidentHolder")
+  requestSupplementsMade          RequestSupplement[]                 @relation("RequestSupplementAuthor")
+  requestFinanceReviewsGiven      RequestFinanceReview[]              @relation("RequestFinanceReviewDecider")
+  assessmentsProposedOwner        AccessRequestAssessment[]           @relation("AssessmentProposedOwner")
+  assessmentsSaved                AccessRequestAssessment[]           @relation("AssessmentSavedBy")
+  assessmentsRejected             AccessRequestAssessment[]           @relation("AssessmentRejectedBy")
+  assessmentsCompleted            AccessRequestAssessment[]           @relation("AssessmentCompletedBy")
+  departmentTransfers             DepartmentTransfer[]
+  transferReviewsAbout            TransferReview[]                    @relation("TransferReviewEmployee")
+  transferReviewsDecided          TransferReviewItem[]                @relation("TransferReviewDecidedBy")
+  employeeLeaves                  EmployeeLeave[]
+  offboardingCases                OffboardingCase[]
+  noticesAbout                    PersonnelNotice[]                   @relation("NoticeAbout")
+  noticesSent                     PersonnelNotice[]                   @relation("NoticeSender")
 
   @@unique([organizationId, employeeCode])
   @@unique([organizationId, normalizedWorkEmail])
@@ -234,11 +333,29 @@ model EmployeePlacement {
   validFrom      DateTime  @map("valid_from") @db.Date
   validTo        DateTime? @map("valid_to") @db.Date
 
-  employee   Employee   @relation(fields: [employeeId], references: [id])
-  department Department @relation(fields: [departmentId], references: [id])
-  jobTitle   JobTitle   @relation(fields: [jobTitleId], references: [id])
+  employee       Employee        @relation(fields: [employeeId], references: [id])
+  department     Department      @relation(fields: [departmentId], references: [id])
+  jobTitle       JobTitle        @relation(fields: [jobTitleId], references: [id])
+  transferReview TransferReview?
 
   @@unique([employeeId, validFrom])
   @@index([departmentId])
   @@map("employee_placements")
+}
+
+// A change of the organization that has been told to the modules that act on it (FR-3.16): one row for each placement, head
+// period or employee, per kind, so it is told exactly once. `subjectId` names the placement (PLACEMENT_START), the head period
+// (HEAD_PERIOD_START, HEAD_PERIOD_END) or the employee (EMPLOYEE_LEFT) without a foreign key: a period removed later stays told.
+model OrganizationChangeAnnouncement {
+  id             String                 @id @default(uuid(7)) @db.Uuid
+  organizationId String                 @map("organization_id") @db.Uuid
+  kind           OrganizationChangeKind
+  subjectId      String                 @map("subject_id") @db.Uuid
+  effectiveOn    DateTime               @map("effective_on") @db.Date
+  announcedAt    DateTime               @default(now()) @map("announced_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([kind, subjectId])
+  @@map("organization_change_announcements")
 }

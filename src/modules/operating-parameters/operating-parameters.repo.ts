@@ -38,6 +38,28 @@ export class OperatingParametersRepo {
     return rows.map((row) => ({ ...row, value: row.value as ParameterValue }));
   }
 
+  /** The row of the key that was in force at `instant`: begun at or before it and not yet ended by it; null when none was. */
+  async rowAt(key: string, instant: Date, client?: DbTx): Promise<ParameterRow | null> {
+    const row = await (client ?? this.prisma).parameterValue.findFirst({
+      where: { key, validFrom: { lte: instant }, OR: [{ validTo: null }, { validTo: { gt: instant } }] },
+      select: { key: true, value: true, validFrom: true, validTo: true, changedBy: true },
+      orderBy: { validFrom: 'desc' },
+    });
+
+    return row ? { ...row, value: row.value as ParameterValue } : null;
+  }
+
+  /** Every row of the key whose validity touches the span from `from` to `to`, oldest first: the values in force at any moment of it. */
+  async rowsCovering(key: string, from: Date, to: Date, client?: DbTx): Promise<ParameterRow[]> {
+    const rows = await (client ?? this.prisma).parameterValue.findMany({
+      where: { key, validFrom: { lte: to }, OR: [{ validTo: null }, { validTo: { gt: from } }] },
+      select: { key: true, value: true, validFrom: true, validTo: true, changedBy: true },
+      orderBy: [{ validFrom: 'asc' }, { id: 'asc' }],
+    });
+
+    return rows.map((row) => ({ ...row, value: row.value as ParameterValue }));
+  }
+
   async history(key: string, limit: number): Promise<ParameterRow[]> {
     const rows = await this.prisma.parameterValue.findMany({
       where: { key },

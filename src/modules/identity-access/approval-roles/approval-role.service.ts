@@ -9,6 +9,7 @@ import { employeeHasNotLeft } from '../policies/account-policy';
 import { ApprovalRoleHolderInvalidError, ApprovalRolePairingError } from './approval-role.errors';
 import { cutHistory } from '../../../core/application/pagination';
 import { APPROVAL_ROLES, ApprovalRoleName, ApprovalRoleRepo } from './approval-role.repo';
+import { ApprovalRoleChangeRegistry } from './approval-role-change.registry';
 
 const HISTORY_LIMIT = 20;
 
@@ -36,6 +37,7 @@ export class ApprovalRoleService {
     private readonly organization: OrganizationService,
     private readonly audit: AuditService,
     private readonly runner: TransactionRunner,
+    private readonly changes: ApprovalRoleChangeRegistry,
   ) {}
 
   async list(): Promise<ApprovalRoleView[]> {
@@ -141,6 +143,12 @@ export class ApprovalRoleService {
         before: { role, holder: previous?.employeeCode ?? null },
         after: { role, holder: employee.employeeCode },
         correlationId: actor.sessionId,
+      });
+      // The steps held by the one who held the role move in this transaction, so the one who held it cannot decide after it.
+      await this.changes.announce(tx, {
+        role,
+        fromEmployeeId: current?.employeeId ?? null,
+        toEmployeeId: employeeId,
       });
     });
 

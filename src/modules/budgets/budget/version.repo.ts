@@ -1,0 +1,258 @@
+import { Injectable } from '@nestjs/common';
+import type { Prisma } from '../../../generated/prisma/client';
+import { PrismaService } from '../../../infrastructure/database/prisma.service';
+import type { DbTx } from '../../../infrastructure/database/transaction-runner';
+import { lineData, type VersionLineRecord } from './version-line.repo';
+
+export type VersionState = 'DRAFT' | 'SENT' | 'APPROVED' | 'REJECTED' | 'CHANGES_REQUESTED' | 'SUPERSEDED';
+
+export interface VersionRecord {
+  id: string;
+  organizationId: string;
+  costCenterId: string;
+  year: number;
+  number: number;
+  kind: 'INITIAL' | 'REVISION';
+  state: VersionState;
+  proposalId: string | null;
+  basedOnVersionId: string | null;
+  baseMinor: bigint;
+  reserveMinor: bigint;
+  totalMinor: bigint;
+  currency: string;
+  highValuePercent: number;
+  /** The amount over which a line is high value, whatever is left; null when the version sets none. */
+  highValueAmountMinor: bigint | null;
+  quarters: [bigint, bigint, bigint, bigint] | null;
+  reason: string | null;
+  createdByEmployeeId: string;
+  createdAt: Date;
+  sentByEmployeeId: string | null;
+  sentAt: Date | null;
+}
+
+export interface NewVersion {
+  organizationId: string;
+  costCenterId: string;
+  year: number;
+  kind: 'INITIAL' | 'REVISION';
+  proposalId: string | null;
+  basedOnVersionId: string | null;
+  baseMinor: bigint;
+  reserveMinor: bigint;
+  currency: string;
+  highValuePercent: number;
+  highValueAmountMinor: bigint | null;
+  quarters: [bigint, bigint, bigint, bigint] | null;
+  reason: string | null;
+  createdByEmployeeId: string;
+  now: Date;
+  lines: Omit<VersionLineRecord, 'position'>[];
+}
+
+/** The fields of a version Finance changes while it is a draft: a key that is present is written. */
+export interface VersionPatch {
+  baseMinor?: bigint;
+  reserveMinor?: bigint;
+  highValuePercent?: number;
+  highValueAmountMinor?: bigint | null;
+  quarters?: [bigint, bigint, bigint, bigint] | null;
+  reason?: string | null;
+}
+
+const toRecord = (row: Prisma.BudgetVersionGetPayload<object>): VersionRecord => ({
+  id: row.id,
+  organizationId: row.organizationId,
+  costCenterId: row.costCenterId,
+  year: row.year,
+  number: row.number,
+  kind: row.kind,
+  state: row.state,
+  proposalId: row.proposalId,
+  basedOnVersionId: row.basedOnVersionId,
+  baseMinor: row.baseMinor,
+  reserveMinor: row.reserveMinor,
+  totalMinor: row.totalMinor,
+  currency: row.currency,
+  highValuePercent: row.highValuePercent,
+  highValueAmountMinor: row.highValueAmountMinor,
+  quarters:
+    row.q1Minor === null || row.q2Minor === null || row.q3Minor === null || row.q4Minor === null
+      ? null
+      : [row.q1Minor, row.q2Minor, row.q3Minor, row.q4Minor],
+  reason: row.reason,
+  createdByEmployeeId: row.createdByEmployeeId,
+  createdAt: row.createdAt,
+  sentByEmployeeId: row.sentByEmployeeId,
+  sentAt: row.sentAt,
+});
+
+const quarterColumns = (quarters: [bigint, bigint, bigint, bigint] | null) => ({
+  q1Minor: quarters?.[0] ?? null,
+  q2Minor: quarters?.[1] ?? null,
+  q3Minor: quarters?.[2] ?? null,
+  q4Minor: quarters?.[3] ?? null,
+});
+
+export interface VersionFilter {
+  costCenterIds?: readonly string[];
+  state?: VersionState;
+  year?: number;
+  skip: number;
+  take: number;
+}
+
+/** The one writer of `budget_versions`, their lines and the history of the lines, and their reads. */
+@Injectable()
+export class VersionRepo {
+  constructor(private readonly prisma: PrismaService) {}
+
+  /** The number the next version of the Cost Center and year takes, from the versions already there. */
+  async nextNumber(tx: DbTx, costCenterId: string, year: number): Promise<number> {
+    const last = await tx.budgetVersion.aggregate({ where: { costCenterId, year }, _max: { number: true } });
+
+    return (last._max.number ?? 0) + 1;
+  }
+
+  async insert(tx: DbTx, input: NewVersion): Promise<string> {
+    const number = await this.nextNumber(tx, input.costCenterId, input.year);
+    const total = input.baseMinor + input.reserveMinor;
+    const created = await tx.budgetVersion.create({
+      data: {
+        organizationId: input.organizationId,
+        costCenterId: input.costCenterId,
+        year: input.year,
+        number,
+        kind: input.kind,
+        state: 'DRAFT',
+        proposalId: input.proposalId,
+        basedOnVersionId: input.basedOnVersionId,
+        baseMinor: input.baseMinor,
+        reserveMinor: input.reserveMinor,
+        totalMinor: total,
+        currency: input.currency,
+        highValuePercent: input.highValuePercent,
+        highValueAmountMinor: input.highValueAmountMinor,
+        ...quarterColumns(input.quarters),
+        reason: input.reason,
+        createdByEmployeeId: input.createdByEmployeeId,
+        createdAt: input.now,
+        lines: { create: input.lines.map((line, index) => ({ position: index + 1, ...lineData(line) })) },
+      },
+      select: { id: true },
+    });
+
+    return created.id;
+  }
+
+  async findById(id: string, tx?: DbTx): Promise<VersionRecord | null> {
+    const row = await (tx ?? this.prisma).budgetVersion.findUnique({ where: { id } });
+
+    return row ? toRecord(row) : null;
+  }
+
+  async lockById(tx: DbTx, id: string): Promise<VersionRecord | null> {
+    const locked = await tx.$queryRaw<
+      { id: string }[]
+    >`SELECT id FROM budget_versions WHERE id = ${id}::uuid FOR UPDATE`;
+
+    return locked.length === 0 ? null : this.findById(id, tx);
+  }
+
+  /** The ids of every version the Cost Center has for the year, whatever their state. */
+  async idsOf(tx: DbTx, costCenterId: string, year: number): Promise<string[]> {
+    const rows = await tx.budgetVersion.findMany({ where: { costCenterId, year }, select: { id: true } });
+
+    return rows.map((row) => row.id);
+  }
+
+  /** The current version of the Cost Center and year, if any: at most one (INV-21). */
+  async current(costCenterId: string, year: number, tx?: DbTx): Promise<VersionRecord | null> {
+    const row = await (tx ?? this.prisma).budgetVersion.findFirst({ where: { costCenterId, year, state: 'APPROVED' } });
+
+    return row ? toRecord(row) : null;
+  }
+
+  /** The version of the Cost Center and year that is being built or waits for a decision, if any. */
+  async inFlight(costCenterId: string, year: number, tx?: DbTx): Promise<VersionRecord | null> {
+    const row = await (tx ?? this.prisma).budgetVersion.findFirst({
+      where: { costCenterId, year, state: { in: ['DRAFT', 'SENT', 'CHANGES_REQUESTED'] } },
+    });
+
+    return row ? toRecord(row) : null;
+  }
+
+  async page(filter: VersionFilter): Promise<{ items: VersionRecord[]; total: number }> {
+    const where: Prisma.BudgetVersionWhereInput = {
+      ...(filter.costCenterIds ? { costCenterId: { in: [...filter.costCenterIds] } } : {}),
+      ...(filter.state ? { state: filter.state } : {}),
+      ...(filter.year ? { year: filter.year } : {}),
+    };
+    const [rows, total] = await this.prisma.$transaction([
+      this.prisma.budgetVersion.findMany({
+        where,
+        orderBy: [{ year: 'desc' }, { costCenterId: 'asc' }, { number: 'desc' }],
+        skip: filter.skip,
+        take: filter.take,
+      }),
+      this.prisma.budgetVersion.count({ where }),
+    ]);
+
+    return { items: rows.map(toRecord), total };
+  }
+
+  async patch(tx: DbTx, id: string, patch: VersionPatch): Promise<void> {
+    const base = patch.baseMinor;
+    const reserve = patch.reserveMinor;
+    const current = await tx.budgetVersion.findUniqueOrThrow({
+      where: { id },
+      select: { baseMinor: true, reserveMinor: true },
+    });
+    const nextBase = base ?? current.baseMinor;
+    const nextReserve = reserve ?? current.reserveMinor;
+    await tx.budgetVersion.update({
+      where: { id },
+      data: {
+        baseMinor: nextBase,
+        reserveMinor: nextReserve,
+        totalMinor: nextBase + nextReserve,
+        ...(patch.highValuePercent !== undefined ? { highValuePercent: patch.highValuePercent } : {}),
+        ...(patch.highValueAmountMinor !== undefined ? { highValueAmountMinor: patch.highValueAmountMinor } : {}),
+        ...(patch.quarters !== undefined ? quarterColumns(patch.quarters) : {}),
+        ...(patch.reason !== undefined ? { reason: patch.reason } : {}),
+      },
+    });
+  }
+
+  async setState(tx: DbTx, id: string, state: VersionState): Promise<void> {
+    await tx.budgetVersion.update({ where: { id }, data: { state } });
+  }
+
+  /** The total of each of these versions, for the views that say what a revision changes. */
+  async totalsOf(ids: readonly string[]): Promise<Map<string, bigint>> {
+    if (ids.length === 0) return new Map();
+    const rows = await this.prisma.budgetVersion.findMany({
+      where: { id: { in: [...ids] } },
+      select: { id: true, totalMinor: true },
+    });
+
+    return new Map(rows.map((row) => [row.id, row.totalMinor]));
+  }
+
+  /** The newest version of the Cost Center and year, whatever its state. */
+  async latestOf(costCenterId: string, year: number): Promise<VersionRecord | null> {
+    const row = await this.prisma.budgetVersion.findFirst({
+      where: { costCenterId, year },
+      orderBy: { number: 'desc' },
+    });
+
+    return row ? toRecord(row) : null;
+  }
+
+  async setSent(tx: DbTx, id: string, byEmployeeId: string, now: Date): Promise<void> {
+    await tx.budgetVersion.update({
+      where: { id },
+      data: { state: 'SENT', sentByEmployeeId: byEmployeeId, sentAt: now },
+    });
+  }
+}

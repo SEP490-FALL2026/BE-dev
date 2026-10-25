@@ -7,10 +7,15 @@ import { DepartmentHeadRepo } from './department/department-head.repo';
 import { DepartmentRepo } from './department/department.repo';
 import { DepartmentServiceAccountRegistry } from './department/service-account-registry';
 import { EmployeeDirectoryService } from './employee/employee-directory.service';
+import { EmployeeDepartureRepo } from './employee/employee-departure.repo';
 import { EmployeeRepo } from './employee/employee.repo';
 import { ImportLookupRepo } from './employee/import-lookup.repo';
 import { JobTitleCatalogueService } from './job-title/job-title-catalogue.service';
 import { JobTitleRepo } from './job-title/job-title.repo';
+import { AnnouncementRepo } from './change-announcement/announcement.repo';
+import { OrganizationChangeRegistry } from './change-announcement/organization-change.registry';
+import { OrganizationChangeService } from './change-announcement/organization-change.service';
+import { OrganizationHistoryService } from './organization-history.service';
 import { OrganizationRepo } from './organization.repo';
 import { OrganizationService } from './organization.service';
 
@@ -25,9 +30,14 @@ import { OrganizationService } from './organization.service';
     DepartmentHeadRepo,
     DepartmentDirectoryService,
     DepartmentServiceAccountRegistry,
+    OrganizationChangeRegistry,
+    OrganizationChangeService,
+    AnnouncementRepo,
+    OrganizationHistoryService,
     ImportLookupRepo,
     EmployeeDirectoryService,
     EmployeeRepo,
+    EmployeeDepartureRepo,
     JobTitleCatalogueService,
     JobTitleRepo,
   ],
@@ -37,6 +47,6 @@ import { OrganizationService } from './organization.service';
   // in the same folder shares one instance: CostCenterService injects CostCenterRepo; DepartmentService,
   // DepartmentQueryService and DepartmentHeadService inject DepartmentRepo. OrganizationRepo has no HTTP consumer
   // since Wave 2; E4 keeps its export until G3 reviews the decision.
-  exports: [OrganizationService, OrganizationRepo, CostCenterRepo, DepartmentRepo],
+  exports: [OrganizationService, OrganizationHistoryService, OrganizationRepo, CostCenterRepo, DepartmentRepo],
 })
 export class OrganizationModule {}

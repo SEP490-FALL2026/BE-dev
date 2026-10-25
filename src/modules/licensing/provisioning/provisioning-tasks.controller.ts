@@ -24,7 +24,7 @@ import {
 import { toProvisioningApiException } from './provisioning.http-errors';
 import { ProvisioningDecisionService } from './provisioning-decision.service';
 import { ProvisioningService } from './provisioning.service';
-import type { TaskSummaryView, TaskView } from './provisioning-task-view.service';
+import { toSummaryWire, toWire } from './provisioning-task.wire';
 
 const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPONSE] as const;
 const IT_ONLY = {
@@ -35,33 +35,6 @@ const NOT_FOUND = {
   status: HttpStatus.NOT_FOUND,
   description: 'The task does not exist (PROVISIONING_TASK.NOT_FOUND).',
 } as const;
-
-const toSummaryWire = (view: TaskSummaryView) => ({
-  ...view,
-  createdAt: view.createdAt.toISOString(),
-  claimedAt: view.claimedAt?.toISOString() ?? null,
-  completedAt: view.completedAt?.toISOString() ?? null,
-  failedAt: view.failedAt?.toISOString() ?? null,
-  nextRetryAt: view.nextRetryAt?.toISOString() ?? null,
-  closedAt: view.closedAt?.toISOString() ?? null,
-});
-
-const toWire = (view: TaskView) => ({ ...toSummaryWire(view), ...detailOf(view) });
-
-const detailOf = (view: TaskView) => ({
-  steps: view.steps,
-  doneWhen: view.doneWhen,
-  completedBy: view.completedBy,
-  evidence: view.evidence,
-  failedBy: view.failedBy,
-  failureReason: view.failureReason,
-  lastError: view.lastError,
-  handedOffBy: view.handedOffBy,
-  handedOffAt: view.handedOffAt?.toISOString() ?? null,
-  handOffEvidence: view.handOffEvidence,
-  closedBy: view.closedBy,
-  closeReason: view.closeReason,
-});
 
 /**
  * The queue of the work that makes a seat real (`US-07-01`, `US-07-02`): the grant of a request, and the task a person
@@ -83,11 +56,15 @@ export class ProvisioningTasksController {
     status: HttpStatus.CREATED,
     message: 'PROVISIONING_TASK.CREATED',
     description:
-      'The seat is taken from today by an assignment of source REQUEST, and a manual task is queued for the IT Admin in charge of the beneficiary department (none: the general queue, with a warning). K5 takes no subscription and no seat.',
+      'The seat is taken from today by an assignment of source REQUEST, and a manual task is queued for the IT Admin in charge of the beneficiary department (none: the general queue, with a warning). K5 takes no subscription and no seat. For the request of a service account the IT Admin enters the account identifier (not read from the request) and may name another active person of the owning department to answer for it (responsibleEmployeeId); the assignment is a service one, owned by that department and charged to its Unit Cost Center, with the purpose as its reason.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
-    IT_ONLY,
+    {
+      status: HttpStatus.FORBIDDEN,
+      description:
+        'Only an IT Admin works the queue of provisioning tasks, and an IT Admin who answers for the service account themselves waits for another usable IT Admin to grant it (PROVISIONING.ANOTHER_IT_ADMIN_NEEDED); with none left they may.',
+    },
     {
       status: HttpStatus.NOT_FOUND,
       description:
@@ -96,12 +73,12 @@ export class ProvisioningTasksController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'PROVISIONING.REQUEST_NOT_APPROVED, REQUEST_ENDED, TYPE_NOT_SUPPORTED (K3, K4), BENEFICIARY_DEPARTED (details.nextStep CANCEL_REQUEST), BENEFICIARY_NOT_STARTED (details.startsOn: the person joins later), SEAT_TARGET.APPLICATION_RETIRED, or LICENSE_ASSIGNMENT.SEAT_CAPACITY.',
+        'PROVISIONING.REQUEST_NOT_APPROVED, REQUEST_ENDED, REQUEST_NOT_IN_CATALOG (the software is not registered in the catalog yet), REQUEST_BOUNDARY_NOT_CHECKED (a service account whose boundary the IT Admin has not accepted), RESPONSIBLE_NOT_IN_DEPARTMENT (the person who answers for a service account left its department or the company: name another), TYPE_NOT_SUPPORTED (K3, K4), BENEFICIARY_DEPARTED (details.nextStep CANCEL_REQUEST), BENEFICIARY_NOT_STARTED (details.startsOn: the person joins later), SEAT_TARGET.APPLICATION_RETIRED, or LICENSE_ASSIGNMENT.SEAT_CAPACITY.',
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The request is invalid (VALIDATION_ERROR) or refused: PROVISIONING.PERSONAL_ACCOUNT, SUBSCRIPTION_REQUIRED, SUBSCRIPTION_NOT_ALLOWED, SUBSCRIPTION_PLAN_MISMATCH, SUBSCRIPTION_QUANTITY_UNKNOWN, SEAT_TARGET.SUBSCRIPTION_DRAFT (details.missing lists what the subscription lacks), LICENSE_ASSIGNMENT.OVERLAP, IDENTIFIER_IN_USE or EXPECTED_END_REQUIRED.',
+        'The request is invalid (VALIDATION_ERROR) or refused: PROVISIONING.PERSONAL_ACCOUNT, ACCOUNT_IDENTIFIER_REQUIRED (a service account without the identifier the IT Admin enters), RESPONSIBLE_INVALID (the person named is not active in the owning department, or the request is not for a service account), SUBSCRIPTION_REQUIRED, SUBSCRIPTION_NOT_ALLOWED, SUBSCRIPTION_PLAN_MISMATCH, SUBSCRIPTION_QUANTITY_UNKNOWN, SEAT_TARGET.SUBSCRIPTION_DRAFT (details.missing lists what the subscription lacks), LICENSE_ASSIGNMENT.OVERLAP, IDENTIFIER_IN_USE or EXPECTED_END_REQUIRED.',
     },
   )
   async grant(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: GrantBodyDto) {
@@ -161,7 +138,7 @@ export class ProvisioningTasksController {
   @ApiSuccessResponse(TaskResponseDto, {
     message: 'PROVISIONING_TASK.CLAIMED',
     description:
-      'The task is in progress under the name of this IT Admin; an IT Admin other than the one in charge may take it, and another may take it over. Taking it again is a no-op.',
+      'The task is in progress under the name of this IT Admin; an IT Admin other than the one in charge may take it, and another may take it over. Taking it again is a no-op. A revocation is taken whoever its beneficiary is, a person who left included.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
@@ -194,7 +171,11 @@ export class ProvisioningTasksController {
     ...AUTH_ERRORS,
     { status: HttpStatus.FORBIDDEN, description: 'Not an IT Admin, or PROVISIONING.ANOTHER_IT_ADMIN_NEEDED.' },
     NOT_FOUND,
-    { status: HttpStatus.CONFLICT, description: 'PROVISIONING_TASK.NOT_MANUAL or NOT_IN_PROGRESS.' },
+    {
+      status: HttpStatus.CONFLICT,
+      description:
+        'PROVISIONING_TASK.NOT_MANUAL or NOT_IN_PROGRESS, or IS_REVOCATION (a revocation is completed by its own route).',
+    },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
@@ -330,6 +311,36 @@ export class ProvisioningTasksController {
   ) {
     try {
       return { task: toWire(await this.decisions.closeFailed(actor, params.id, body)) };
+    } catch (error) {
+      throw toProvisioningApiException(error);
+    }
+  }
+
+  @Post(':id/cancel')
+  @RequireRoles('IT_ADMIN')
+  @ApiOperation({
+    operationId: 'provisioningTaskCancel',
+    summary: 'Close the failed task of a withdrawn request as cancelled',
+  })
+  @ApiSuccessResponse(TaskResponseDto, {
+    message: 'PROVISIONING_TASK.CANCELLED',
+    description:
+      'The only decision left on the failed task of a request its requester withdrew: the task ends as cancelled and never as failed, its assignment becomes a cancelled one so the seat is free again, the request ends as withdrawn and what was held for it goes back to the budget.',
+  })
+  @ApiErrorResponses(
+    ...AUTH_ERRORS,
+    { status: HttpStatus.FORBIDDEN, description: 'Not an IT Admin, or PROVISIONING.ANOTHER_IT_ADMIN_NEEDED.' },
+    NOT_FOUND,
+    {
+      status: HttpStatus.CONFLICT,
+      description:
+        'The task is not failed (PROVISIONING_TASK.NOT_FAILED), or its request was not withdrawn (PROVISIONING_TASK.NO_WITHDRAWAL): nothing changes.',
+    },
+    { status: HttpStatus.UNPROCESSABLE_ENTITY, description: 'The id is invalid (VALIDATION_ERROR).' },
+  )
+  async cancel(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: TaskIdParamDto) {
+    try {
+      return { task: toWire(await this.decisions.cancel(actor, params.id)) };
     } catch (error) {
       throw toProvisioningApiException(error);
     }

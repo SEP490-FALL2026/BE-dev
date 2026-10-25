@@ -1,18 +1,23 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AssignmentService } from '../assignment/assignment.service';
+import { ProvisioningTaskStateError } from '../licensing.errors';
+import { GRANT_REQUEST_GATE, WITHDRAWAL_CANCEL_REASON, type GrantRequestGate } from '../licensing.types';
 import { assertDecidable, assertHandOffAllowed } from './failure.policy';
 import { cleanEvidence, cleanFailureReason } from './provisioning.policy';
+import { RegisteredRevocationHook } from './registered-revocation-hook.service';
+import { toRevocationFacts, type ProvisioningTaskRecord } from './provisioning-task.record';
 import { ProvisioningTaskFrame } from './provisioning-task-frame.service';
 import { ProvisioningTaskViewService, type TaskView } from './provisioning-task-view.service';
 import { ProvisioningTaskRepo } from './provisioning-task.repo';
 
 /**
- * The three decisions of an IT Admin on a task that failed (`US-07-04` AC-8→AC-10, AC-14): try again on the same channel,
+ * The decisions of an IT Admin on a task that failed (`US-07-04` AC-8→AC-10, AC-14): try again on the same channel,
  * hand a connector task to a person with the evidence, or close it as failed with a reason. Each is made on a failed task
- * only, and nothing decides for the IT Admin or by time. Only closing is the end: a grant that is closed leaves its
- * assignment as a failed one and the seat free; a revocation that is closed leaves its assignment as it was. Every
- * decision is one transaction with its audit event.
+ * only, and nothing decides for the IT Admin or by time. Closing is the end: a grant that is closed leaves its
+ * assignment as a failed one and the seat free; a revocation that is closed leaves its assignment as it was. When the
+ * requester withdrew the request while the grant had failed, none of those three is left: the task is closed as cancelled
+ * (`cancel`), never as failed (`US-05-08` AC-9). Every decision is one transaction with its audit event.
  */
 @Injectable()
 export class ProvisioningDecisionService {
@@ -21,6 +26,8 @@ export class ProvisioningDecisionService {
     private readonly frame: ProvisioningTaskFrame,
     private readonly views: ProvisioningTaskViewService,
     private readonly assignments: AssignmentService,
+    @Inject(GRANT_REQUEST_GATE) private readonly gate: GrantRequestGate,
+    private readonly revocationHook: RegisteredRevocationHook,
   ) {}
 
   /** Puts the failed task back in the queue of its channel. Throws ProvisioningTaskNotFoundError, ProvisioningTaskStateError. */
@@ -28,6 +35,7 @@ export class ProvisioningDecisionService {
     const task = await this.frame.work(actor, id, {
       check: (locked) => assertDecidable(locked.status),
       write: async ({ tx, task: locked }) => {
+        await this.refuseWhileWithdrawing(tx, locked);
         await this.repo.markRetried(tx, locked.id);
 
         return {
@@ -53,6 +61,7 @@ export class ProvisioningDecisionService {
         assertHandOffAllowed(locked.channel);
       },
       write: async ({ tx, task: locked, now }) => {
+        await this.refuseWhileWithdrawing(tx, locked);
         await this.repo.markHandedOff(tx, locked.id, actor.appUserId, evidence, now);
 
         return {
@@ -75,15 +84,27 @@ export class ProvisioningDecisionService {
     const task = await this.frame.work(actor, id, {
       check: (locked) => assertDecidable(locked.status),
       write: async ({ tx, task: locked, organizationId, now }) => {
-        if (locked.kind === 'GRANT') {
+        await this.refuseWhileWithdrawing(tx, locked);
+        if (locked.kind === 'GRANT' && locked.requestId !== null) {
           await this.assignments.closeFailed(tx, actor, {
             organizationId,
             assignmentId: locked.assignmentId,
             requestId: locked.requestId,
             now,
           });
+          await this.gate.reportOutcome(tx, locked.requestId, 'FAILED', locked.assignment.employeeId);
         }
         await this.repo.markClosedFailed(tx, locked.id, actor.appUserId, reason, now);
+        if (locked.kind === 'REVOKE') {
+          // The modules that extend a revocation learn that it will not be done: the seat is still held.
+          await this.revocationHook.afterClosedFailed(
+            tx,
+            { ...toRevocationFacts(locked), status: 'CLOSED_FAILED' },
+            reason,
+            now,
+            actor,
+          );
+        }
 
         return {
           action: 'CLOSED_FAILED',
@@ -93,11 +114,66 @@ export class ProvisioningDecisionService {
             requestId: locked.requestId,
             failureKind: locked.failureKind,
             closeReason: reason,
+            // A revocation that could not be done leaves the right where it was: the seat is still taken.
+            ...(locked.kind === 'REVOKE' ? { assignmentStillOpen: true } : {}),
           },
         };
       },
     });
 
     return (await this.views.views([task]))[0];
+  }
+
+  /**
+   * Closes the failed task of a request its requester withdrew as cancelled, and not as failed: the request ends as
+   * withdrawn, what was held for it goes back, and the assignment becomes a cancelled one, so the seat is free again
+   * (`US-05-08` AC-9). Throws ProvisioningTaskStateError (`NOT_FAILED`, `NO_WITHDRAWAL`) and the errors of `retry`.
+   */
+  async cancel(actor: AuthenticatedPrincipal, id: string): Promise<TaskView> {
+    const task = await this.frame.work(actor, id, {
+      check: (locked) => assertDecidable(locked.status),
+      write: async ({ tx, task: locked, organizationId, now }) => {
+        if (
+          locked.kind !== 'GRANT' ||
+          locked.requestId === null ||
+          !(await this.gate.reportCancelled(tx, locked.requestId, locked.assignment.employeeId))
+        ) {
+          throw new ProvisioningTaskStateError('NO_WITHDRAWAL');
+        }
+        await this.assignments.cancel(tx, actor, {
+          organizationId,
+          assignmentId: locked.assignmentId,
+          requestId: locked.requestId,
+          now,
+        });
+        await this.repo.markCancelled(tx, locked.id, actor.appUserId, WITHDRAWAL_CANCEL_REASON, now);
+
+        return {
+          action: 'CANCELLED',
+          after: {
+            status: 'CANCELLED',
+            taskKind: locked.kind,
+            requestId: locked.requestId,
+            failureKind: locked.failureKind,
+            closeReason: WITHDRAWAL_CANCEL_REASON,
+          },
+        };
+      },
+    });
+
+    return (await this.views.views([task]))[0];
+  }
+
+  /**
+   * A request whose requester withdrew has one decision left: cancelling. A revocation answers for no request, so nothing
+   * withdraws it. Throws ProvisioningTaskStateError.
+   */
+  private async refuseWhileWithdrawing(
+    tx: Parameters<GrantRequestGate['isWithdrawing']>[0],
+    task: ProvisioningTaskRecord,
+  ) {
+    if (task.requestId !== null && (await this.gate.isWithdrawing(tx, task.requestId, task.assignment.employeeId))) {
+      throw new ProvisioningTaskStateError('WITHDRAWAL_PENDING');
+    }
   }
 }

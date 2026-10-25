@@ -7,6 +7,7 @@ import { DepartmentDirectoryService } from '../../src/modules/organization/depar
 import { DepartmentHeadRepo } from '../../src/modules/organization/department/department-head.repo';
 import { DepartmentRepo } from '../../src/modules/organization/department/department.repo';
 import { EmployeeDirectoryService } from '../../src/modules/organization/employee/employee-directory.service';
+import { EmployeeDepartureRepo } from '../../src/modules/organization/employee/employee-departure.repo';
 import { EmployeeRepo } from '../../src/modules/organization/employee/employee.repo';
 import { ImportLookupRepo } from '../../src/modules/organization/employee/import-lookup.repo';
 import { JobTitleCatalogueService } from '../../src/modules/organization/job-title/job-title-catalogue.service';
@@ -19,6 +20,9 @@ import {
   OrganizationAlreadyExistsError,
 } from '../../src/modules/organization/organization.errors';
 import { DepartmentServiceAccountRegistry } from '../../src/modules/organization/department/service-account-registry';
+import { AnnouncementRepo } from '../../src/modules/organization/change-announcement/announcement.repo';
+import { OrganizationChangeRegistry } from '../../src/modules/organization/change-announcement/organization-change.registry';
+import { OrganizationChangeService } from '../../src/modules/organization/change-announcement/organization-change.service';
 import { OrganizationService } from '../../src/modules/organization/organization.service';
 import {
   DisposableDatabase,
@@ -49,10 +53,11 @@ describe('organization foundation (integration)', () => {
     organization = new OrganizationService(
       new OrganizationRepo(prisma),
       new DepartmentDirectoryService(new DepartmentRepo(prisma), new DepartmentHeadRepo(prisma)),
-      new EmployeeDirectoryService(new EmployeeRepo(prisma), new ImportLookupRepo(prisma)),
+      new EmployeeDirectoryService(new EmployeeRepo(prisma), new ImportLookupRepo(prisma), new EmployeeDepartureRepo()),
       new CostCenterCatalogueService(new CostCenterRepo(prisma)),
       new JobTitleCatalogueService(new JobTitleRepo(prisma)),
       new DepartmentServiceAccountRegistry(),
+      new OrganizationChangeService(new OrganizationChangeRegistry(), new AnnouncementRepo(prisma), runner),
     );
     sql = new Client({ connectionString: database.url });
     await sql.connect();
@@ -239,6 +244,7 @@ describe('organization foundation (integration)', () => {
       'organizationId',
       'status',
       'workEmail',
+      'workState',
     ]);
   });
 

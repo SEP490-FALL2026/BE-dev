@@ -4,11 +4,12 @@ import { DbTx } from '../../infrastructure/database/transaction-runner';
 import { CostCenterCatalogueService } from './cost-center/cost-center-catalogue.service';
 import { DepartmentDirectoryService } from './department/department-directory.service';
 import { DepartmentServiceAccountRegistry } from './department/service-account-registry';
+import { OrganizationChangeService } from './change-announcement/organization-change.service';
 import { DepartmentHeadRecord, HeadPeriodChanges, HeadPeriodRecord } from './department/department.types';
 import { EmployeeDirectoryService } from './employee/employee-directory.service';
 import { JobTitleCatalogueService } from './job-title/job-title-catalogue.service';
 import { JobTitleListFilter, JobTitleRecord, JobTitleStatus } from './job-title/job-title.types';
-import { toLocalSeedFixtureFacts } from './mappers/local-seed-fixture.mapper';
+import { toBrief, toLocalSeedFixtureFacts } from './mappers/local-seed-fixture.mapper';
 import { OrganizationRepo } from './organization.repo';
 import {
   CostCenterBrief,
@@ -17,20 +18,23 @@ import {
   CreateEmployeeWithPlacementInput,
   CreateOrganizationInput,
   DepartmentBrief,
+  DepartmentEntryLock,
   DepartmentServiceAccountReader,
   EmployeeCandidate,
+  EmployeeImportNames,
+  EmployeePlacementIds,
   EmployeeImportLookupData,
   EmployeeProfile,
   EmployeeRecord,
   LocalSeedFixtureFacts,
+  ItAdminInCharge,
+  NewOrganizationChange,
   OfficialFieldsPatch,
   OnboardingFacts,
+  OrganizationChangeListener,
   OwningUnit,
   OrganizationRecord,
 } from './organization.types';
-
-const toBrief = (record: { id: string; code: string; name: string; status: string } | null): DepartmentBrief | null =>
-  record && { id: record.id, code: record.code, name: record.name, active: record.status === 'ACTIVE' };
 
 /** Public facade of the organization module: other modules call it in their own transaction, never the tables. */
 @Injectable()
@@ -45,6 +49,7 @@ export class OrganizationService {
     private readonly costCenters: CostCenterCatalogueService,
     private readonly jobTitles: JobTitleCatalogueService,
     private readonly serviceAccounts: DepartmentServiceAccountRegistry,
+    private readonly changes: OrganizationChangeService,
   ) {}
 
   /** Today in the organization's own calendar (`now` is a parameter for tests; `tx` reads the zone in the caller's transaction). */
@@ -92,35 +97,36 @@ export class OrganizationService {
   async getEmployeePlacement(
     employeeId: string,
     onDate?: BusinessDate,
-  ): Promise<{ departmentId: string; jobTitleId: string } | null> {
-    return this.employees.placementOn(employeeId, onDate ?? (await this.businessToday()));
+    tx?: DbTx,
+  ): Promise<EmployeePlacementIds | null> {
+    return this.employees.placementOn(employeeId, onDate ?? (await this.businessToday(new Date(), tx)), tx);
   }
 
   /** The department of the employee on `onDate` and its IT Admin, named only while still working (`US-01-11` AC-4, AC-8). */
-  async getItAdminInCharge(
-    employeeId: string,
-    onDate?: BusinessDate,
-  ): Promise<{ departmentId: string; itAdminEmployeeId: string | null } | null> {
-    const placement = await this.getEmployeePlacement(employeeId, onDate);
+  async getItAdminInCharge(employeeId: string, onDate?: BusinessDate, tx?: DbTx): Promise<ItAdminInCharge | null> {
+    const placement = await this.getEmployeePlacement(employeeId, onDate, tx);
 
     return (
       placement && {
         departmentId: placement.departmentId,
-        itAdminEmployeeId: await this.departments.itAdminInChargeOf(placement.departmentId),
+        itAdminEmployeeId: await this.departments.itAdminInChargeOf(placement.departmentId, tx),
       }
     );
   }
 
-  /** Everyone placed in the department on `onDate` (default today), by employee id; null when it does not exist. */
-  async getDepartmentMemberIds(departmentId: string, onDate?: BusinessDate): Promise<string[] | null> {
-    return this.departments.memberIdsOn(departmentId, onDate ?? (await this.businessToday()));
+  /** The departments this employee is named IT Admin in charge of, while they still work (an unlocked read, `US-01-11`). */
+  getDepartmentIdsInChargeOf(employeeId: string, tx?: DbTx): Promise<string[]> {
+    return this.departments.idsInChargeOf(employeeId, tx);
   }
 
-  // --- the head periods of departments, for the department use cases (in their transaction) -------------
+  /** Everyone placed in the department on `onDate` (default today), by employee id; null when it does not exist. */
+  async getDepartmentMemberIds(departmentId: string, onDate?: BusinessDate, tx?: DbTx): Promise<string[] | null> {
+    return this.departments.memberIdsOn(departmentId, onDate ?? (await this.businessToday(new Date(), tx)), tx);
+  }
 
   /** Who heads each of these departments on `onDate`; a department nobody heads is absent. */
-  getDepartmentHeads(departmentIds: string[], onDate: BusinessDate): Promise<Map<string, DepartmentHeadRecord>> {
-    return this.departments.headsOn(departmentIds, onDate);
+  getDepartmentHeads(ids: string[], onDate: BusinessDate, tx?: DbTx): Promise<Map<string, DepartmentHeadRecord>> {
+    return this.departments.headsOn(ids, onDate, tx);
   }
 
   /** Who headed the department, newest period first, at most `limit` periods. Pass `tx` to read in a transaction. */
@@ -137,8 +143,18 @@ export class OrganizationService {
   startDepartmentHeadPeriod(
     tx: DbTx,
     input: { organizationId: string; departmentId: string; employeeId: string; validFrom: BusinessDate },
-  ): Promise<void> {
+  ): Promise<{ periodId: string }> {
     return this.departments.startHeadPeriod(tx, input);
+  }
+
+  /** A module that acts when the organization changes asks to be told in the transaction of the change (`FR-3.16`). */
+  registerChangeListener(listener: OrganizationChangeListener): void {
+    this.changes.register(listener);
+  }
+
+  /** Tells the registered listeners of a change that has taken effect, in the caller's transaction; one that throws rolls it back. */
+  emitChange(tx: DbTx, change: NewOrganizationChange): Promise<void> {
+    return this.changes.emit(tx, change);
   }
 
   /** The installation's organization, or null before bootstrap. */
@@ -186,8 +202,6 @@ export class OrganizationService {
   createJobTitle(tx: DbTx, organizationId: string, name: string): Promise<{ id: string }> {
     return this.jobTitles.createForInstallation(tx, organizationId, name);
   }
-
-  // --- the job title catalogue, for its HTTP use cases (in their transaction) ---------------------------
 
   /** One page of the catalogue and the total for the same filter, from one snapshot. */
   listJobTitles(filter: JobTitleListFilter): Promise<{ items: JobTitleRecord[]; total: number }> {
@@ -288,16 +302,8 @@ export class OrganizationService {
   }
 
   /** What a people file names, as the database knows it: departments, job titles, people and work-email owners. */
-  lookupForEmployeeImport(
-    names: {
-      departmentCodes: string[];
-      normalizedJobTitleNames: string[];
-      employeeCodes: string[];
-      normalizedEmails: string[];
-    },
-    tx?: DbTx,
-  ): Promise<EmployeeImportLookupData> {
-    return this.employees.lookupForImport(tx, names);
+  async lookupForEmployeeImport(names: EmployeeImportNames, tx?: DbTx): Promise<EmployeeImportLookupData> {
+    return this.employees.lookupForImport(tx, names, await this.businessToday(new Date(), tx));
   }
 
   /** The row locks a write of imported people needs, in protocol order: departments, then job titles (T-11). */
@@ -305,19 +311,13 @@ export class OrganizationService {
     return this.employees.lockForImport(tx, departmentIds, jobTitleIds);
   }
 
-  // --- manual entry of one person, in its transaction and lock order (T-11) ------------------------------
-
   /** The database clock at the start of the transaction: the instant the new employee's `created_at` gets. */
   employeeRecordingInstant(tx: DbTx): Promise<Date> {
     return this.employees.recordingInstant(tx);
   }
 
   /** `FOR SHARE` on the department a person is entered into (it must stay until commit), then its state; null if none. */
-  lockDepartmentForEntry(
-    tx: DbTx,
-    organizationId: string,
-    code: string,
-  ): Promise<{ id: string; code: string; name: string; active: boolean; costCenterActive: boolean } | null> {
+  lockDepartmentForEntry(tx: DbTx, organizationId: string, code: string): Promise<DepartmentEntryLock | null> {
     return this.departments.lockForEntry(tx, organizationId, code);
   }
 

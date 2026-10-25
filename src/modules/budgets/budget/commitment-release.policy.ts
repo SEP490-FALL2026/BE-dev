@@ -1,0 +1,80 @@
+/**
+ * The rules of the money that goes back to the budget from a commitment (`US-06-06`), as pure decisions: how much goes back
+ * and from which commitment, and what refuses it. A commitment that became an expense or was released does not go back to
+ * being held (`AC-4`), and what became an expense stays when the rest is released.
+ */
+
+export interface CommitmentRow {
+  id: string;
+  year: number;
+  amountMinor: bigint;
+  releasedMinor: bigint;
+  state: 'HELD' | 'RELEASED' | 'EXPENSED';
+}
+
+export type ReleaseRefusal =
+  /** The request holds no commitment for the year named. */
+  | 'NO_COMMITMENT'
+  /** The commitment is released or became an expense: it is not held, and it does not become held again (`AC-4`). */
+  | 'NOT_HELD'
+  | 'AMOUNT_NOT_POSITIVE'
+  | 'EXCEEDS_HELD'
+  | 'REASON_REQUIRED'
+  /** The year is named twice. */
+  | 'YEAR_REPEATED';
+
+export interface PlannedRelease {
+  id: string;
+  year: number;
+  /** What goes back now. */
+  takeMinor: bigint;
+  /** What is held after it. */
+  leftMinor: bigint;
+}
+
+export type ReleasePlan = { ok: true; items: PlannedRelease[] } | { ok: false; refusal: ReleaseRefusal; year?: number };
+
+export const heldOf = (row: CommitmentRow): bigint => row.amountMinor - row.releasedMinor;
+
+/** Everything still held, or the amounts named; the commitments that are not held are left as they are when nothing is named. */
+export function planRelease(
+  rows: readonly CommitmentRow[],
+  amounts?: readonly { year: number; amountMinor: bigint }[],
+): ReleasePlan {
+  if (amounts === undefined) {
+    return {
+      ok: true,
+      items: rows
+        .filter((row) => row.state === 'HELD')
+        .map((row) => ({ id: row.id, year: row.year, takeMinor: heldOf(row), leftMinor: 0n })),
+    };
+  }
+
+  const items: PlannedRelease[] = [];
+  for (const named of amounts) {
+    if (items.some((item) => item.year === named.year)) {
+      return { ok: false, refusal: 'YEAR_REPEATED', year: named.year };
+    }
+    const row = rows.find((candidate) => candidate.year === named.year);
+    if (!row) return { ok: false, refusal: 'NO_COMMITMENT', year: named.year };
+    if (row.state !== 'HELD') return { ok: false, refusal: 'NOT_HELD', year: named.year };
+    if (named.amountMinor <= 0n) return { ok: false, refusal: 'AMOUNT_NOT_POSITIVE', year: named.year };
+    if (named.amountMinor > heldOf(row)) return { ok: false, refusal: 'EXCEEDS_HELD', year: named.year };
+    items.push({
+      id: row.id,
+      year: row.year,
+      takeMinor: named.amountMinor,
+      leftMinor: heldOf(row) - named.amountMinor,
+    });
+  }
+
+  return { ok: true, items };
+}
+
+/** Finance lets the remainder of one commitment go: only one that is still held, and only with a reason (`AC-6`). */
+export function planRemainder(row: CommitmentRow, reason: string): ReleasePlan {
+  if (row.state !== 'HELD') return { ok: false, refusal: 'NOT_HELD', year: row.year };
+  if (reason.trim() === '') return { ok: false, refusal: 'REASON_REQUIRED' };
+
+  return { ok: true, items: [{ id: row.id, year: row.year, takeMinor: heldOf(row), leftMinor: 0n }] };
+}

@@ -836,7 +836,14 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
       const items = (list.body as { data: { items: Record<string, unknown>[] } }).data.items;
       expect(items.map((item) => item.employeeCode)).toEqual([head.code, colleague.code].sort());
       for (const item of items) {
-        expect(Object.keys(item).sort()).toEqual(['employeeCode', 'fullName', 'hasWorkEmail', 'memberSince', 'status']);
+        expect(Object.keys(item).sort()).toEqual([
+          'employeeCode',
+          'fullName',
+          'hasWorkEmail',
+          'memberSince',
+          'status',
+          'workState',
+        ]);
       }
       expect(items.find((item) => item.employeeCode === colleague.code)).toMatchObject({
         hasWorkEmail: false,
@@ -1253,6 +1260,7 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
             employeeCode: second.code,
             fullName: `Person ${second.code}`,
             status: 'ACTIVE',
+            workState: 'WORKING',
             hasWorkEmail: second === withEmail,
             memberSince: today(),
           },

@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import type { BusinessDate } from '../../../core/business-date';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import {
   AccountListFilter,
@@ -7,8 +8,10 @@ import {
   ActivationState,
   AppUserStatus,
   CreateAppUserInput,
+  SuperAdminHolder,
 } from '../identity-access.types';
 import { AppUserRepo } from './app-user.repo';
+import { SuperAdminHolderRepo } from './super-admin-holder.repo';
 
 /**
  * The account itself (AppUser): the one door other capabilities, the recovery command and the use cases of the API
@@ -18,7 +21,10 @@ import { AppUserRepo } from './app-user.repo';
  */
 @Injectable()
 export class AccountDirectoryService {
-  constructor(private readonly accounts: AppUserRepo) {}
+  constructor(
+    private readonly accounts: AppUserRepo,
+    private readonly superAdmin: SuperAdminHolderRepo,
+  ) {}
 
   /** Unlocked lookup used before the transaction to decide what to verify. */
   findAccountByLoginEmail(organizationId: string, normalizedLoginEmail: string): Promise<AccountSnapshot | null> {
@@ -59,6 +65,11 @@ export class AccountDirectoryService {
     return this.accounts.findAccountIdByEmployee(tx, employeeId);
   }
 
+  /** The one account that holds the Super Admin role and what decides whether it can act; null when nobody holds it. */
+  findSuperAdminHolder(tx?: DbTx): Promise<SuperAdminHolder | null> {
+    return this.superAdmin.find(tx);
+  }
+
   findLoginEmail(appUserId: string): Promise<string | null> {
     return this.accounts.findLoginEmail(appUserId);
   }
@@ -90,6 +101,26 @@ export class AccountDirectoryService {
     return this.accounts.findUsableItAdminEmployeeIds(employeeIds, tx);
   }
 
+  /** The usable IT Admin with the smallest employee code, or null: who a report is given to when nobody is in charge. */
+  findFirstUsableItAdminEmployeeId(tx?: DbTx): Promise<string | null> {
+    return this.accounts.findFirstUsableItAdminEmployeeId(tx);
+  }
+
+  /** The employee who holds the FINANCE role on an account that can act, or null. */
+  findUsableFinanceEmployeeId(tx?: DbTx): Promise<string | null> {
+    return this.accounts.findUsableFinanceEmployeeId(tx);
+  }
+
+  /** The employee who holds the SUPER_ADMIN role on an account that can act, or null. */
+  findUsableSuperAdminEmployeeId(tx?: DbTx): Promise<string | null> {
+    return this.accounts.findUsableSuperAdminEmployeeId(tx);
+  }
+
+  /** The employee behind each of these accounts, by account id. */
+  employeeIdsOfAccounts(appUserIds: readonly string[], tx?: DbTx): Promise<Map<string, string>> {
+    return this.accounts.employeeIdsOfAccounts(appUserIds, tx);
+  }
+
   /** How many IT Admins other than this employee can act, for the rule that an IT Admin does not serve themselves. */
   countUsableItAdminsExcept(employeeId: string, tx?: DbTx): Promise<number> {
     return this.accounts.countUsableItAdminsExcept(employeeId, tx);
@@ -103,6 +134,11 @@ export class AccountDirectoryService {
 
   listAccountRecords(filter: AccountListFilter): Promise<{ items: AccountRecord[]; total: number }> {
     return this.accounts.listAccountRecords(filter);
+  }
+
+  /** The person behind the account left on `leftOn`: written once, by the record of a departure. */
+  markEmployeeLeft(tx: DbTx, employeeId: string, leftOn: BusinessDate): Promise<void> {
+    return this.accounts.setEmployeeLeftOn(tx, employeeId, leftOn);
   }
 
   /** Ids of every Employee that already has an account, whatever its state (one per Employee, AC-8). */

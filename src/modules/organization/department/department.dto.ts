@@ -95,6 +95,7 @@ const memberPageSchema = z.strictObject({
       employeeCode: z.string(),
       fullName: z.string(),
       status: z.enum(['ACTIVE', 'TERMINATED']),
+      workState: z.enum(['WORKING', 'ON_LONG_LEAVE', 'HANDING_OVER', 'LEFT']),
       hasWorkEmail: z.boolean(),
       memberSince: z.string(),
     }),

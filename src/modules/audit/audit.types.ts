@@ -19,6 +19,28 @@ export interface StoredAuditEvent {
   operatorReference: string | null;
 }
 
+/** A position in the trail: events are ordered by when they happened and then by id, so two at one instant keep one order. */
+export interface AuditCursor {
+  occurredAt: Date;
+  id: string;
+}
+
+/**
+ * What a consumer of the system reads of an event (the projection of the status of requests into the inbox): enough to decide who
+ * is to be told and no more. It is never shown through HTTP; the readers of the Audit Trail see `StoredAuditEvent`.
+ */
+export interface AuditEventSlice {
+  id: string;
+  organizationId: string;
+  occurredAt: Date;
+  action: string;
+  resourceType: string;
+  resourceId: string;
+  /** Null for the system and for an operator. A value, not a foreign key: the log outlives accounts. */
+  actorAppUserId: string | null;
+  after: { [key: string]: AuditValue } | null;
+}
+
 export interface AuditEventInput {
   organizationId: string;
   actorKind: AuditActorKind;

@@ -39,6 +39,10 @@ export const listAppUsersQuerySchema = z.strictObject({
   status: z.enum(['ACTIVE', 'LOCKED']).optional(),
   activationState: z.enum(['INVITED', 'ACTIVATED']).optional(),
   role: appRoleSchema.optional(),
+  employeeLeft: z
+    .enum(['true', 'false'])
+    .transform((value) => value === 'true')
+    .optional(),
 });
 
 export const accountCandidatesQuerySchema = z.strictObject({ search: z.string().trim().max(100).optional() });

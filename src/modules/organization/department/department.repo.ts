@@ -5,7 +5,7 @@ import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { isUniqueViolation } from '../../../infrastructure/database/unique-violation';
 import { CostCenterStatus } from '../cost-center/cost-center.types';
-import { CreateDepartmentInput, EmployeeStatus } from '../organization.types';
+import { CreateDepartmentInput, EmployeeStatus, EmployeeWorkState } from '../organization.types';
 import { DepartmentCodeTakenError, DepartmentCostCenterError } from './department.errors';
 import { DepartmentMemberRecord, DepartmentRecord, DepartmentStatus } from './department.types';
 
@@ -104,10 +104,7 @@ export class DepartmentRepo {
     return tx.department.create({ data: input, select: { id: true } });
   }
 
-  /**
-   * Takes the department's row lock (`FOR UPDATE` to change it or what hangs on it, `FOR SHARE` to rely on it),
-   * then reads it in a separate statement. Null when it does not exist.
-   */
+  /** Takes the row lock (`FOR UPDATE` to change it or what hangs on it, `FOR SHARE` to rely on it), then reads it. Null when absent. */
   async lock(tx: DbTx, id: string, mode: 'SHARE' | 'UPDATE'): Promise<DepartmentRecord | null> {
     const rows =
       mode === 'SHARE'
@@ -118,10 +115,7 @@ export class DepartmentRepo {
     return this.findById(id, tx);
   }
 
-  /**
-   * Takes the department's row lock (`FOR SHARE`: it must still exist, and its cost center must not change, until
-   * commit) and reads it. Null when there is no department with this code.
-   */
+  /** Takes the row lock (`FOR SHARE`: it must still exist, its cost center unchanged, until commit) and reads it. Null when absent. */
   async lockByCode(
     tx: DbTx,
     organizationId: string,
@@ -293,10 +287,29 @@ export class DepartmentRepo {
     return this.findById(id, tx);
   }
 
+  /** The departments that name this employee IT Admin in charge, by id, while the employee has not left. */
+  async idsInChargeOf(employeeId: string, tx?: DbTx): Promise<string[]> {
+    const rows = await (tx ?? this.prisma).$queryRaw<{ id: string }[]>`
+      SELECT d.id FROM departments d JOIN employees e ON e.id = d.it_admin_employee_id
+       WHERE d.it_admin_employee_id = ${employeeId}::uuid AND e.status = 'ACTIVE'
+       ORDER BY d.id`;
+
+    return rows.map((row) => row.id);
+  }
+
+  /** The active departments that name each of these employees IT Admin in charge, in code order; whether they still work is not asked. */
+  inChargeOfMany(employeeIds: readonly string[], tx?: DbTx) {
+    return (tx ?? this.prisma).department.findMany({
+      where: { itAdminEmployeeId: { in: [...employeeIds] }, status: 'ACTIVE' },
+      select: { id: true, code: true, itAdminEmployeeId: true },
+      orderBy: [{ code: 'asc' }, { id: 'asc' }],
+    });
+  }
+
   /** Everyone placed in the department on `onDate`, by employee id; null when the department does not exist. */
-  async memberIdsOn(departmentId: string, onDate: BusinessDate): Promise<string[] | null> {
-    if (!(await this.findById(departmentId))) return null;
-    const rows = await this.prisma.$queryRaw<{ employee_id: string }[]>`
+  async memberIdsOn(departmentId: string, onDate: BusinessDate, tx?: DbTx): Promise<string[] | null> {
+    if (!(await this.findById(departmentId, tx))) return null;
+    const rows = await (tx ?? this.prisma).$queryRaw<{ employee_id: string }[]>`
       SELECT p.employee_id FROM employee_placements p
        WHERE p.department_id = ${departmentId}::uuid
          AND p.valid_from <= ${onDate}::date AND (p.valid_to IS NULL OR p.valid_to > ${onDate}::date)`;
@@ -332,11 +345,12 @@ export class DepartmentRepo {
         employee_code: string;
         full_name: string;
         status: EmployeeStatus;
+        work_state: EmployeeWorkState;
         has_work_email: boolean;
         valid_from: Date;
       }[]
     >`
-      SELECT e.employee_code, e.full_name, e.status, (e.work_email IS NOT NULL) AS has_work_email, p.valid_from
+      SELECT e.employee_code, e.full_name, e.status, e.work_state, (e.work_email IS NOT NULL) AS has_work_email, p.valid_from
         FROM employee_placements p JOIN employees e ON e.id = p.employee_id
        WHERE p.department_id = ${departmentId}::uuid
          AND p.valid_from <= ${onDate}::date AND (p.valid_to IS NULL OR p.valid_to > ${onDate}::date)
@@ -351,6 +365,7 @@ export class DepartmentRepo {
         employeeCode: row.employee_code,
         fullName: row.full_name,
         status: row.status,
+        workState: row.work_state,
         hasWorkEmail: row.has_work_email,
         memberSince: fromDateColumn(row.valid_from),
       })),

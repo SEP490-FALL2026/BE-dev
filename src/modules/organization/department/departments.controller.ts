@@ -230,7 +230,7 @@ export class DepartmentsController {
   @ApiSuccessResponse(DepartmentMembersResponseDto, {
     message: 'DEPARTMENT.MEMBERS_LISTED',
     description:
-      'The people in the department today: code, name, status, whether they have a work email, and since when. No email, contract or finance data.',
+      'The people in the department today: code, name, status, work state (working, on long leave, handing over), whether they have a work email, and since when. No email, contract or finance data.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, VALIDATION_ERROR, NOT_FOUND, {
     status: HttpStatus.FORBIDDEN,

@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { DatabaseModule } from '../../infrastructure/database/database.module';
 import { AuditModule } from '../audit/audit.module';
 import { IdentityAccessFacadeModule } from '../identity-access/identity-access-facade.module';
+import { OrganizationChangeSweeper } from './change-announcement/organization-change.sweeper';
 import { CostCenterService } from './cost-center/cost-center.service';
 import { CostCentersController } from './cost-center/cost-centers.controller';
 import { DepartmentHeadService } from './department/department-head.service';
@@ -44,6 +45,8 @@ import { ProjectsController } from './project/projects.controller';
     DepartmentHeadService,
     ProjectService,
     ProjectRepo,
+    // The hourly telling of the changes dated for a day that has come: in the API graph only, where every listener is registered.
+    OrganizationChangeSweeper,
   ],
 })
 export class OrganizationHttpModule {}

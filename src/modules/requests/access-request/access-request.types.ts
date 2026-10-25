@@ -1,0 +1,202 @@
+import type { Money } from '../../../core/money/money';
+import type { BusinessDate } from '../../../core/business-date';
+import type { AccessRequestBranchCode, RequestPolicy } from './access-request.policy';
+import type { BillingCycleCode, MissingPriceReason, PaymentPeriod } from './pricing.policy';
+import type { WaitingReason } from './routing.policy';
+import type { LineRecord } from '../group-request/group-request.types';
+
+/** The shapes the repository of requests reads and writes; the repository re-exports them, so importers do not change. */
+
+export type AccessRequestState =
+  | 'PENDING'
+  | 'WAITING_CONTROLLED'
+  | 'AWAITING_EXECUTION'
+  | 'AWAITING_IT_ASSESSMENT'
+  | 'AWAITING_SPEND_SUBMISSION'
+  | 'AWAITING_FINANCE_REVIEW'
+  | 'AWAITING_BUDGET'
+  | 'AWAITING_SPEND_DECISION'
+  | 'REJECTED'
+  | 'IT_REJECTED'
+  | 'EXECUTING'
+  | 'COMPLETED'
+  | 'FAILED'
+  | 'AWAITING_IT_CLOSE'
+  | 'WITHDRAWN'
+  | 'CANCELLED';
+/** A need step is held or waiting, then decided, or closed because the request ended without a decision (`US-05-08`). */
+export type NeedStepState = 'PENDING' | 'WAITING' | 'APPROVED' | 'REJECTED' | 'CLOSED';
+export type DeciderRole = 'MANAGER' | 'SPENDING_APPROVER' | 'FALLBACK_APPROVER' | 'CONFLICT_SUBSTITUTE';
+
+/** What the request costs: nothing for internal software, a priced amount and its payments, or a missing price. */
+export interface PricingRecord {
+  status: 'NOT_APPLICABLE' | 'PRICED' | 'MISSING';
+  missingReason: MissingPriceReason | null;
+  expectedSpendOn: BusinessDate | null;
+  budgetYear: number | null;
+  amount: Money | null;
+  unitPrice: Money | null;
+  billingCycle: BillingCycleCode | null;
+  schedule: PaymentPeriod[] | null;
+}
+
+/** What the request of a service account adds to a request (`US-05-21`); neither a password nor a key is kept. */
+export interface ServiceAccountRecord {
+  purpose: string;
+  /** The sender's guess of the identifier at the vendor; the one that counts is entered by the IT Admin when granting. */
+  expectedIdentifier: string;
+  /** The person who answers for the account: the sender. */
+  responsibleEmployeeId: string;
+  boundaryState: 'PENDING' | 'ACCEPTED' | 'REJECTED';
+  boundaryReason: string | null;
+  boundaryDecidedByEmployeeId: string | null;
+  boundaryDecidedAt: Date | null;
+  /** The IT Admin who decided answers for the account themselves and no other usable IT Admin could (`QĐ-77m`). */
+  boundarySelfExecuted: boolean;
+}
+
+/** What a request for the renewal of a right adds (`US-05-14`): the right it renews, the ends, and what approval wrote. */
+export interface RenewalRecord {
+  assignmentId: string;
+  previousExpectedEndDate: BusinessDate;
+  newExpectedEndDate: BusinessDate;
+  /** The months the right would run on without a break once renewed; over twelve needs the confirmation of the head. */
+  consecutiveMonths: number;
+  /** The record that follows the old one, written when the request was approved; null until then. */
+  successorAssignmentId: string | null;
+  appliedAt: Date | null;
+}
+
+export type AccessRequestKind = 'GRANT' | 'SERVICE_ACCOUNT' | 'RENEWAL' | 'GROUP_GRANT';
+
+export interface NewAccessRequest {
+  /** A request for a service account also gets its row of detail, written in the same transaction by its own repository. */
+  type?: AccessRequestKind;
+  organizationId: string;
+  branch: AccessRequestBranchCode;
+  state: AccessRequestState;
+  /** Null for a proposal of software that is not in the catalog yet. */
+  planId: string | null;
+  requesterEmployeeId: string;
+  /** The people it is for, in order: one today. */
+  beneficiaryEmployeeIds: readonly string[];
+  departmentId: string;
+  costCenterId: string;
+  businessReason: string;
+  termMonths: number;
+  projectLabel: string | null;
+  outsideStandardReason: string | null;
+  outsideStandard: boolean;
+  pricing: PricingRecord;
+  policy: RequestPolicy;
+  delegatedBatchId?: string | null;
+  expectedEndDate?: BusinessDate | null;
+  createdByAppUserId: string;
+  now: Date;
+  needStep: NewNeedStep;
+}
+
+/** A need step as it is written: the first one with the request, the others after it (`addNeedStep`). */
+export interface NewNeedStep {
+  state: NeedStepState;
+  assigneeEmployeeId: string | null;
+  routingRow: number;
+  waitingReason: WaitingReason | null;
+  samePersonAsSpend: boolean;
+  slaWorkingDays: number;
+}
+
+export interface NeedStepRecord {
+  id: string;
+  state: NeedStepState;
+  assigneeEmployeeId: string | null;
+  routingRow: number;
+  waitingReason: WaitingReason | null;
+  samePersonAsSpend: boolean;
+  slaWorkingDays: number;
+  createdAt: Date;
+  assignedAt: Date | null;
+  decidedAt: Date | null;
+}
+
+/** A need step with the record of the decision that was taken on it, for a request that has more than one. */
+export interface NeedStepWithDecision extends NeedStepRecord {
+  decision: ApprovalRecordRecord | null;
+}
+
+/** The electronic approval record of a decision (never changed once written). */
+export interface ApprovalRecordRecord {
+  decision: 'APPROVED' | 'REJECTED';
+  decidedByEmployeeId: string;
+  deciderRole: DeciderRole;
+  reason: string | null;
+  termConfirmationReason: string | null;
+  decidedAt: Date;
+}
+
+export interface NewNeedDecision {
+  organizationId: string;
+  requestId: string;
+  stepId: string;
+  requestState: AccessRequestState;
+  departmentId: string;
+  record: ApprovalRecordRecord;
+}
+
+/** The withdrawal of a request: who asked, when, why, and when it ended (null while the IT Admin has still to close the task). */
+export interface WithdrawalRecord {
+  requestedAt: Date;
+  requestedByEmployeeId: string;
+  reason: string | null;
+  withdrawnAt: Date | null;
+}
+
+/** The closing of a request whose beneficiary left: who closed it, when, why and the note they gave (`US-03-04` AC-25). */
+export interface CancellationRecord {
+  cancelledAt: Date;
+  cancelledByEmployeeId: string;
+  cause: 'BENEFICIARY_LEFT';
+  note: string | null;
+}
+
+export interface AccessRequestRecord {
+  id: string;
+  organizationId: string;
+  type: AccessRequestKind;
+  branch: AccessRequestBranchCode;
+  state: AccessRequestState;
+  planId: string | null;
+  requesterEmployeeId: string;
+  departmentId: string;
+  costCenterId: string;
+  businessReason: string;
+  termMonths: number;
+  projectLabel: string | null;
+  outsideStandardReason: string | null;
+  outsideStandard: boolean;
+  pricing: PricingRecord;
+  /** The line of the plan of the budget it is attached to; null when it is attached to none. */
+  planLine: { versionId: string; position: number; confirmed: boolean } | null;
+  /** The head chose "outside the plan": a flag for Finance and the approver, never an exception. */
+  offPlan: boolean;
+  delegatedBatchId: string | null;
+  expectedEndDate: BusinessDate | null;
+  policy: RequestPolicy;
+  submittedAt: Date;
+  /** Null unless the request was withdrawn or is waiting for the IT Admin to close the task of its grant. */
+  withdrawal: WithdrawalRecord | null;
+  /** Null unless the IT Admin cancelled the request because its beneficiary left. */
+  cancellation: CancellationRecord | null;
+  /** Set for a request for a service account and for no other. */
+  serviceAccount: ServiceAccountRecord | null;
+  /** Set for a request for the renewal of a right and for no other. */
+  renewal: RenewalRecord | null;
+  beneficiaryEmployeeIds: string[];
+  /** The first need step: the only one of a request for one person, and the one the single-person routes decide. */
+  needStep: NeedStepRecord;
+  /** Every need step in order; one for any request but a request for a group, which has one for the others and one for the head. */
+  needSteps: NeedStepWithDecision[];
+  needDecision: ApprovalRecordRecord | null;
+  /** The people of a request for a group, in the order they were named, each with their own state; empty for any other request. */
+  lines: LineRecord[];
+}

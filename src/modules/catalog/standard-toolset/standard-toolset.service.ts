@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Page, pageOf } from '../../../core/application/pagination';
-import { readSqlState, TransactionRunner } from '../../../infrastructure/database/transaction-runner';
+import { DbTx, readSqlState, TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditService } from '../../audit/audit.service';
 import { OrganizationService } from '../../organization/organization.service';
@@ -183,6 +183,16 @@ export class StandardToolsetService {
       jobTitle: jobTitle ? { id: jobTitle.id, name: jobTitle.name } : null,
       toolset: current ? await this.show(current) : null,
     };
+  }
+
+  /** Whether the current toolset of the pair has the plan: false when the pair has no toolset (`US-05-04` AC-7). */
+  async includesPlan(departmentId: string, jobTitleId: string, planId: string, tx?: DbTx): Promise<boolean> {
+    return (await this.repo.readCurrent(departmentId, jobTitleId, tx))?.planIds.includes(planId) ?? false;
+  }
+
+  /** The plans of the current toolset of the pair; empty when the pair has none (`US-03-07`: then every tool is outside it). */
+  async planIdsOf(departmentId: string, jobTitleId: string, tx?: DbTx): Promise<string[]> {
+    return [...((await this.repo.readCurrent(departmentId, jobTitleId, tx))?.planIds ?? [])];
   }
 
   /** How many pairs have a toolset, for the onboarding checklist. */

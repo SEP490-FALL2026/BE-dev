@@ -1,5 +1,6 @@
 import { isCompanyAccount } from '../../../core/account-identifier';
 import {
+  ProvisioningAccountIdentifierRequiredError,
   ProvisioningAnotherItAdminNeededError,
   ProvisioningEvidenceRequiredError,
   ProvisioningPersonalAccountError,
@@ -13,6 +14,7 @@ import type {
   ProvisioningAction,
   ProvisioningChannel,
   ProvisioningKind,
+  ProvisioningTaskKind,
   ProvisioningTaskStatus,
   TaskDoneWhen,
   TaskStep,
@@ -29,7 +31,12 @@ const CONFIRM: TaskStep = { code: 'CONFIRM_WITH_EVIDENCE' };
  * AC-8). K3 is only specified and has no card. A K2 step names no identity but "whoever does the work": the account that
  * administers the workspace is that IT Admin's own, never shared (`QĐ-77d`).
  */
-export function stepsFor(type: ProvisioningKind, accountIdentifier: string): TaskStep[] {
+export function stepsFor(
+  type: ProvisioningKind,
+  accountIdentifier: string,
+  taskKind: ProvisioningTaskKind = 'GRANT',
+): TaskStep[] {
+  if (taskKind === 'REVOKE') return revocationStepsFor(type);
   switch (type) {
     case 'K1':
       return [{ code: 'BUY_ON_COMPANY_ACCOUNT', accountIdentifier }, CONFIRM];
@@ -44,8 +51,38 @@ export function stepsFor(type: ProvisioningKind, accountIdentifier: string): Tas
   }
 }
 
-/** When the work is done for each kind: a lingering invitation of K2 is not done. */
-export function doneWhenFor(type: ProvisioningKind): TaskDoneWhen {
+/**
+ * The steps of the card of a revocation (`US-07-05`): K1 cancels the renewal at the provider and records what is known of the
+ * access, K2 removes the member under the name of the IT Admin who works (`QĐ-77d`), K5 revokes in the internal software.
+ * K3 is specified only and K4 waits for the company devices: neither has a card.
+ */
+function revocationStepsFor(type: ProvisioningKind): TaskStep[] {
+  switch (type) {
+    case 'K1':
+      return [{ code: 'CANCEL_RENEWAL_ON_PROVIDER' }, { code: 'RECORD_ACCESS_STATE' }, CONFIRM];
+    case 'K2':
+      return [{ code: 'REMOVE_FROM_WORKSPACE', adminIdentity: 'ACTING_IT_ADMIN' }, CONFIRM];
+    case 'K5':
+      return [{ code: 'REVOKE_IN_INTERNAL_SOFTWARE' }, CONFIRM];
+    default:
+      return [];
+  }
+}
+
+/** When the work is done for each kind: a lingering invitation of K2 is not done; a revocation by what it leaves behind. */
+export function doneWhenFor(type: ProvisioningKind, taskKind: ProvisioningTaskKind = 'GRANT'): TaskDoneWhen {
+  if (taskKind === 'REVOKE') {
+    switch (type) {
+      case 'K1':
+        return 'RENEWAL_CANCELLED_WITH_ACCESS_STATE';
+      case 'K2':
+        return 'ACCOUNT_REMOVED_OR_NOT_NEEDED';
+      case 'K5':
+        return 'REVOKED_OFF_SYSTEM_WITH_EVIDENCE';
+      default:
+        return 'CONFIRMED_WITH_EVIDENCE';
+    }
+  }
   switch (type) {
     case 'K1':
       return 'PURCHASE_CONFIRMED';
@@ -86,6 +123,18 @@ export function chooseAccount(input: {
   if (!candidate || !isCompanyAccount(candidate, input.companyDomains)) throw new ProvisioningPersonalAccountError();
 
   return candidate;
+}
+
+/**
+ * The identifier a service account is granted to (`US-05-21` AC-4): the one the IT Admin enters, trimmed. It is not taken from
+ * the request, whose identifier is only the sender's guess, and the rule of a company mail address does not apply: a
+ * non-human subject has a login or a name, not a mailbox. Throws ProvisioningAccountIdentifierRequiredError.
+ */
+export function chooseServiceIdentifier(requested: string | undefined): string {
+  const identifier = requested?.trim();
+  if (!identifier) throw new ProvisioningAccountIdentifierRequiredError();
+
+  return identifier;
 }
 
 /** The note of what was done, trimmed. Throws ProvisioningEvidenceRequiredError when there is none (`US-07-02` AC-5). */

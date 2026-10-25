@@ -1,0 +1,170 @@
+import { Injectable } from '@nestjs/common';
+import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
+import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
+import { AuditService } from '../../audit/audit.service';
+import { LicensingService } from '../../licensing/licensing.service';
+import { OrganizationService } from '../../organization/organization.service';
+import { accessRequestAuditEvent } from '../access-request/access-request-audit-event';
+import { AccessRequestNoDepartmentError } from '../access-request/access-request.errors';
+import { hasSpendStep } from '../access-request/access-request.policy';
+import { AccessRequestRepo } from '../access-request/access-request.repo';
+import type { AccessRequestRecord } from '../access-request/access-request.types';
+import { RequestAssessmentService } from '../access-request/request-assessment.service';
+import type { ServiceAccountSubmitBodyDto } from './service-account-request.dto';
+import { ServiceAccountSubmitRefusedError } from './service-account-request.errors';
+import { submitRefusal } from './service-account-request.policy';
+import { ServiceAccountRequestRepo } from './service-account-request.repo';
+
+/**
+ * Sending a request for a service account (`US-05-21` AC-1, AC-2): the person asks for the account of a non-human subject
+ * for themselves, and answers for it. It is the same request as any other, so the facts it is judged by are read by the same
+ * `RequestAssessmentService`, and every step after it (the need, the spend, the commitment) is the one of the plan: the
+ * department and Unit Cost Center are those of the sender on the day, the branch and the chain come from the kind of the
+ * application, and a paid plan always has its spend step whatever seats the subscription has left (`QĐ-82m` C). What is
+ * particular is the detail (purpose, expected identifier, who answers) and the two rules of `submitRefusal`. The request,
+ * its detail and its audit events are written in one transaction, so a refused request leaves nothing behind. Neither the
+ * purpose nor the identifier enters an audit event.
+ */
+@Injectable()
+export class ServiceAccountRequestService {
+  constructor(
+    private readonly runner: TransactionRunner,
+    private readonly requests: AccessRequestRepo,
+    private readonly details: ServiceAccountRequestRepo,
+    private readonly organization: OrganizationService,
+    private readonly assessment: RequestAssessmentService,
+    private readonly licensing: LicensingService,
+    private readonly audit: AuditService,
+  ) {}
+
+  /**
+   * Throws AccessRequestNoDepartmentError, AccessRequestPlanNotFoundError, AccessRequestApplicationRetiredError,
+   * AccessRequestSpendDateNotAllowedError and ServiceAccountSubmitRefusedError.
+   */
+  async submit(actor: AuthenticatedPrincipal, body: ServiceAccountSubmitBodyDto): Promise<AccessRequestRecord> {
+    const settings = await this.assessment.settings();
+    const baseline = await this.licensing.getBaselineProgress();
+
+    return this.runner.run(async (tx) => {
+      // The sender is relied on until commit: they cannot leave the company between the check and the write.
+      await this.organization.lockEmployeeForShare(tx, actor.employeeId);
+      const employee = await this.organization.getEmployee(actor.employeeId, tx);
+      if (!employee) throw new AccessRequestNoDepartmentError();
+
+      const now = new Date();
+      const assessed = await this.assessment.assess(tx, {
+        employeeId: actor.employeeId,
+        planId: body.planId,
+        termMonths: body.termMonths,
+        expectedSpendOn: body.expectedSpendOn,
+        now,
+        settings,
+        lockDepartment: true,
+      });
+      const refusal = submitRefusal({
+        baselineClosed: baseline.closed,
+        provisioningType: assessed.target.provisioningType,
+      });
+      if (refusal) throw new ServiceAccountSubmitRefusedError(refusal);
+
+      // INV-02 compares personal seats only, and the toolset of a person says nothing of a non-human subject: neither stops it.
+      const { unit, policy, pricing, routing } = assessed;
+      const { decision, departmentHeadEmployeeId } = routing;
+      const assigned = decision.outcome === 'ASSIGNED';
+      const state = assigned ? 'PENDING' : 'WAITING_CONTROLLED';
+      const created = await this.requests.insert(tx, {
+        type: 'SERVICE_ACCOUNT',
+        organizationId: employee.organizationId,
+        branch: policy.branch,
+        state,
+        planId: body.planId,
+        requesterEmployeeId: actor.employeeId,
+        beneficiaryEmployeeIds: [actor.employeeId],
+        departmentId: unit.departmentId,
+        costCenterId: unit.costCenter.id,
+        businessReason: body.businessReason,
+        termMonths: body.termMonths,
+        projectLabel: body.projectLabel ?? null,
+        outsideStandardReason: null,
+        outsideStandard: false,
+        pricing,
+        policy,
+        createdByAppUserId: actor.appUserId,
+        now,
+        needStep: {
+          state: assigned ? 'PENDING' : 'WAITING',
+          assigneeEmployeeId: assigned ? decision.assigneeEmployeeId : null,
+          routingRow: decision.row,
+          waitingReason: assigned ? null : decision.reason,
+          samePersonAsSpend: assigned && decision.samePersonAsSpend,
+          slaWorkingDays: policy.slaWorkingDays,
+        },
+      });
+      await this.details.insert(tx, {
+        requestId: created.id,
+        purpose: body.purpose,
+        expectedIdentifier: body.expectedIdentifier,
+        responsibleEmployeeId: actor.employeeId,
+      });
+
+      await this.audit.record(
+        tx,
+        accessRequestAuditEvent(
+          actor,
+          employee.organizationId,
+          'ACCESS_REQUEST.SUBMITTED',
+          'ACCESS_REQUEST',
+          created.id,
+          {
+            type: 'SERVICE_ACCOUNT',
+            branch: policy.branch,
+            state,
+            planId: body.planId,
+            termMonths: body.termMonths,
+            requesterEmployeeId: actor.employeeId,
+            beneficiaryEmployeeIds: [actor.employeeId],
+            departmentId: unit.departmentId,
+            costCenterId: unit.costCenter.id,
+            policyVersion: policy.version,
+            hasSpendStep: hasSpendStep(policy),
+            slaWorkingDays: policy.slaWorkingDays,
+            pricingStatus: pricing.status,
+            amountMinor: pricing.amount?.amountMinor.toString() ?? null,
+            amountCurrency: pricing.amount?.currency ?? null,
+            budgetYear: pricing.budgetYear,
+            expectedSpendOn: pricing.expectedSpendOn,
+            outsideStandard: false,
+          },
+        ),
+      );
+      await this.audit.record(
+        tx,
+        accessRequestAuditEvent(
+          actor,
+          employee.organizationId,
+          'ACCESS_REQUEST.NEED_STEP_ROUTED',
+          'ACCESS_REQUEST_STEP',
+          created.needStepId,
+          {
+            type: 'SERVICE_ACCOUNT',
+            requestId: created.id,
+            routingRow: decision.row,
+            outcome: decision.outcome,
+            assigneeEmployeeId: assigned ? decision.assigneeEmployeeId : null,
+            role: assigned ? decision.role : null,
+            waitingReason: assigned ? null : decision.reason,
+            samePersonAsSpend: assigned && decision.samePersonAsSpend,
+            requesterEmployeeId: actor.employeeId,
+            departmentId: unit.departmentId,
+            departmentHeadEmployeeId,
+          },
+        ),
+      );
+
+      const record = await this.requests.findById(created.id, tx);
+      if (!record) throw new Error(`The request ${created.id} was not found after it was written.`);
+
+      return record;
+    });
+  }
+}

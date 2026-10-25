@@ -1,4 +1,5 @@
 import {
+  ProvisioningAccountIdentifierRequiredError,
   ProvisioningAnotherItAdminNeededError,
   ProvisioningEvidenceRequiredError,
   ProvisioningPersonalAccountError,
@@ -12,6 +13,7 @@ import {
   assertGrantableType,
   assertSubscriptionChoice,
   chooseAccount,
+  chooseServiceIdentifier,
   cleanEvidence,
   cleanFailureReason,
   doneWhenFor,
@@ -186,5 +188,18 @@ describe('an IT Admin who is the beneficiary (US-01-05 AC-12, QĐ-77m)', () => {
     expect(selfExecution({ actorEmployeeId: 'a1', beneficiaryEmployeeId: 'a1', otherUsableItAdmins: 0 })).toBe(
       'ALLOW_SELF_EXECUTED',
     );
+  });
+});
+
+describe('the identifier of a service account (US-05-21 AC-4)', () => {
+  it('is the one the IT Admin enters, trimmed, with no rule of a company mail address', () => {
+    expect(chooseServiceIdentifier('  ci-bot-2  ')).toBe('ci-bot-2');
+    expect(chooseServiceIdentifier('svc_deploy@gmail.com')).toBe('svc_deploy@gmail.com');
+  });
+
+  it('is required: nothing, an empty text and spaces alone are refused', () => {
+    for (const given of [undefined, '', '   ']) {
+      expect(() => chooseServiceIdentifier(given)).toThrow(ProvisioningAccountIdentifierRequiredError);
+    }
   });
 });

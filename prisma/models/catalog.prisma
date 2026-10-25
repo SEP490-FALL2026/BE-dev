@@ -94,10 +94,11 @@ model Vendor {
   createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt         DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  organization    Organization      @relation(fields: [organizationId], references: [id])
-  dictionaryGroup VendorGroup?      @relation(fields: [dictionaryGroupId], references: [id], onDelete: Restrict)
+  organization    Organization              @relation(fields: [organizationId], references: [id])
+  dictionaryGroup VendorGroup?              @relation(fields: [dictionaryGroupId], references: [id], onDelete: Restrict)
   applications    Application[]
   taxProfile      VendorTaxProfile?
+  assessments     AccessRequestAssessment[]
 
   @@unique([organizationId, normalizedName])
   @@unique([organizationId, dictionaryGroupId])
@@ -212,15 +213,21 @@ model Plan {
   createdAt         DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt         DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  organization         Organization          @relation(fields: [organizationId], references: [id])
-  application          Application           @relation(fields: [applicationId], references: [id])
-  workspaceProfile     PlanWorkspaceProfile?
-  subscriptions        Subscription[]
-  terms                PlanTerms?
-  termOpinions         PlanTermOpinion[]
-  seatBaselineImports  SeatBaselineImport[]
-  licenseAssignments   LicenseAssignment[]
-  standardToolsetItems StandardToolsetItem[]
+  organization           Organization              @relation(fields: [organizationId], references: [id])
+  application            Application               @relation(fields: [applicationId], references: [id])
+  workspaceProfile       PlanWorkspaceProfile?
+  subscriptions          Subscription[]
+  terms                  PlanTerms?
+  termOpinions           PlanTermOpinion[]
+  seatBaselineImports    SeatBaselineImport[]
+  licenseAssignments     LicenseAssignment[]
+  accessRequests         AccessRequest[]
+  returnRequests         ReturnRequest[]
+  assessmentsEquivalent  AccessRequestAssessment[] @relation("AssessmentEquivalentPlan")
+  assessmentsAlternative AccessRequestAssessment[] @relation("AssessmentAlternativePlan")
+  budgetProposalLines    BudgetProposalLine[]      @relation("BudgetProposalLinePlan")
+  budgetVersionLines     BudgetVersionLine[]       @relation("BudgetVersionLinePlan")
+  standardToolsetItems   StandardToolsetItem[]
 
   @@unique([organizationId, applicationId, normalizedName])
   @@index([applicationId])

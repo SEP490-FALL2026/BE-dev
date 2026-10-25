@@ -1,0 +1,78 @@
+import type { BusinessDate } from '../../../core/business-date';
+import type { PlanRevocationInfo } from '../../catalog/catalog.types';
+import type { OrganizationService } from '../../organization/organization.service';
+import type { DepartmentBrief, EmployeeRecord } from '../../organization/organization.types';
+import type { TransferReviewItemWire, TransferReviewSummaryWire } from './transfer-review.dto';
+import { isReviewOverdue, overdueDaysOf, waitingReasonOf } from './transfer-review.policy';
+import type { ReviewItemRecord, ReviewSummaryRecord } from './transfer-review.types';
+
+type JobTitleRecord = Awaited<ReturnType<OrganizationService['getJobTitles']>>[number];
+
+/** What the wire needs of the organization and the catalog, read in batches for a whole page. */
+export interface ReviewNames {
+  employees: ReadonlyMap<string, EmployeeRecord>;
+  departments: ReadonlyMap<string, DepartmentBrief>;
+  jobTitles: ReadonlyMap<string, JobTitleRecord>;
+  plans: ReadonlyMap<string, PlanRevocationInfo>;
+  /** The head of each department today, by department id; absent while it has none. */
+  heads: ReadonlyMap<string, string>;
+}
+
+export const employeeBriefOf = (employee: EmployeeRecord) => ({
+  id: employee.id,
+  employeeCode: employee.employeeCode,
+  fullName: employee.fullName,
+});
+
+/** The wire form of a name that must exist: a row whose person or department vanished is a broken reference, never a silent gap. */
+function required<T>(value: T | undefined, what: string): T {
+  if (value === undefined) throw new Error(`A transfer review points at a ${what} that does not exist`);
+
+  return value;
+}
+
+export function toSummary(
+  record: ReviewSummaryRecord,
+  names: ReviewNames,
+  today: BusinessDate,
+  callerEmployeeId: string,
+): TransferReviewSummaryWire {
+  const head = names.heads.get(record.departmentId) ?? null;
+  const department = required(names.departments.get(record.departmentId), 'department');
+  const jobTitle = required(names.jobTitles.get(record.jobTitleId), 'job title');
+
+  return {
+    id: record.id,
+    employee: employeeBriefOf(required(names.employees.get(record.employeeId), 'person')),
+    department: { id: department.id, code: department.code, name: department.name },
+    jobTitle: { id: jobTitle.id, name: jobTitle.name },
+    effectiveOn: record.effectiveOn,
+    dueOn: record.dueOn,
+    status: record.status,
+    totalItems: record.totalItems,
+    pendingItems: record.pendingItems,
+    waitingReason: waitingReasonOf(record.status, head),
+    overdue: isReviewOverdue(record.status, record.dueOn, today),
+    overdueDays: overdueDaysOf(record.status, record.dueOn, today),
+    canDecide: record.status === 'OPEN' && head === callerEmployeeId,
+  };
+}
+
+export function toItem(item: ReviewItemRecord, names: ReviewNames): TransferReviewItemWire {
+  const plan = required(names.plans.get(item.planId), 'plan');
+  const decidedBy = item.decidedByEmployeeId ? names.employees.get(item.decidedByEmployeeId) : undefined;
+
+  return {
+    assignmentId: item.assignmentId,
+    position: item.position,
+    application: { id: plan.applicationId, name: plan.applicationName },
+    plan: { id: plan.planId, name: plan.planName },
+    provisioningType: plan.provisioningType,
+    grantReason: item.grantReason,
+    decision: item.decision,
+    decidedBy: decidedBy ? employeeBriefOf(decidedBy) : null,
+    decidedAt: item.decidedAt ? item.decidedAt.toISOString() : null,
+    newToolNote: item.newToolNote,
+    revocationTaskId: item.revocationTaskId,
+  };
+}

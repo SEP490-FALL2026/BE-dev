@@ -15,6 +15,13 @@ export class RoleGrantRepo {
     return tx.roleGrant.create({ data: input, select: { id: true } });
   }
 
+  /** The employee an account belongs to; null when there is no such account. */
+  async employeeOf(tx: DbTx, appUserId: string): Promise<string | null> {
+    const row = await tx.appUser.findUnique({ where: { id: appUserId }, select: { employeeId: true } });
+
+    return row?.employeeId ?? null;
+  }
+
   /** The account that holds the effective SUPER_ADMIN grant, whatever its state; null when nobody does. */
   async findSuperAdminHolderId(tx: DbTx): Promise<string | null> {
     const row = await tx.roleGrant.findFirst({
@@ -23,6 +30,24 @@ export class RoleGrantRepo {
     });
 
     return row?.appUserId ?? null;
+  }
+
+  /** Which of the roles `roles` each of these employees holds on an effective grant, whatever the state of the account (one read). */
+  async listHoldersAmong(
+    employeeIds: readonly string[],
+    roles: readonly AppRole[],
+    tx?: DbTx,
+  ): Promise<Map<string, AppRole[]>> {
+    const held = new Map<string, AppRole[]>();
+    if (employeeIds.length === 0) return held;
+    const rows = await (tx ?? this.prisma).roleGrant.findMany({
+      where: { role: { in: [...roles] }, revokedAt: null, appUser: { employeeId: { in: [...employeeIds] } } },
+      select: { role: true, appUser: { select: { employeeId: true } } },
+      orderBy: [{ role: 'asc' }, { id: 'asc' }],
+    });
+    for (const row of rows) held.set(row.appUser.employeeId, [...(held.get(row.appUser.employeeId) ?? []), row.role]);
+
+    return held;
   }
 
   /** How many effective (not revoked) grants each role has, whatever the account state (roles with none are absent). */

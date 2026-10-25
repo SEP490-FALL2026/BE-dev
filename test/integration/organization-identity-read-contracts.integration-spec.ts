@@ -141,6 +141,7 @@ describe('organization and identity read contracts (integration, real PostgreSQL
         'hasWorkEmail',
         'memberSince',
         'status',
+        'workState',
       ]);
       expect(oneSnapshot(statements, 'employee_placements', 2)).toBe(true);
       expect(JSON.stringify(page)).not.toContain('@acme.vn');

@@ -43,7 +43,7 @@ Mọi phần đã giao cho hạng mục khác trong scope map.
 
 ## Dependencies and blockers
 
-Blocker: hộp thông báo trong ứng dụng chưa có (module `notifications` hiện chỉ có outbox thư). Điều kiện gỡ: `US-05-15` `verified`.
+Blocker: hộp thông báo trong ứng dụng chưa có (module `notifications` hiện chỉ có outbox thư). Điều kiện gỡ: `US-05-15` `verified`. _Cập nhật 24/10/2026: hộp thư và cửa `NotificationsService.notifyInApp` đã có (Phase 1 của `g5-request-status-notifications`, `verified` local; bảng mã đóng và khóa tham số ở `inbox/inbox.policy.ts`, thêm mã của hạng mục này vào đó); hạng mục này chưa mở khóa cho tới khi người tích hợp ghi `US-05-15` `verified` ở roadmap._
 
 ## Ownership: module, data, API
 

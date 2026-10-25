@@ -62,6 +62,8 @@ export const updateEmployeeBodySchema = z.strictObject({
 });
 export const employeeIdParamSchema = z.strictObject({ id: z.uuid() });
 
+const employeeWorkState = z.enum(['WORKING', 'ON_LONG_LEAVE', 'HANDING_OVER', 'LEFT']);
+
 const employeeSchema = z.strictObject({
   id: z.uuid(),
   employeeCode: z.string(),
@@ -70,6 +72,7 @@ const employeeSchema = z.strictObject({
   employmentType,
   hireDate: z.string(),
   status: z.literal('ACTIVE'),
+  workState: z.literal('WORKING'),
   memberSince: z.string(),
   department: z.strictObject({ id: z.uuid(), code: z.string(), name: z.string() }),
   jobTitle: z.strictObject({ id: z.uuid(), name: z.string() }),
@@ -88,5 +91,6 @@ const maintainedEmployeeSchema = z.strictObject({
   employmentType,
   hireDate: z.string(),
   status: z.enum(['ACTIVE', 'TERMINATED']),
+  workState: employeeWorkState,
 });
 export class MaintainedEmployeeResponseDto extends createZodDto(successEnvelopeSchema(maintainedEmployeeSchema)) {}

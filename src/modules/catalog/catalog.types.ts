@@ -78,10 +78,35 @@ export interface EmptyState {
   nextStep: { step: 2 | 3; key: 'APPLICATIONS' | 'CONTRACTS_AND_SUBSCRIPTIONS' };
 }
 
+/** How a seat of a plan is taken away: its kind of provisioning and what is said of the removal (`US-07-05`). */
+export interface PlanRevocationInfo {
+  planId: string;
+  planName: string;
+  applicationId: string;
+  applicationName: string;
+  provisioningType: 'K1' | 'K2' | 'K3' | 'K4' | 'K5';
+  revocationNote: string | null;
+  dataLossOnRemoval: boolean;
+}
+
 /** A plan and the application it belongs to, by name, for the views that list seats. */
 export interface PlanSummary {
   planId: string;
   planName: string;
   applicationId: string;
   applicationName: string;
+}
+
+/**
+ * A workspace of a K2 plan that a person owns or administers (`QĐ-77d`, `US-03-04` AC-28): the plan and its application by name, and how
+ * the person stands in it. The primary owner is named on the profile; a member is an owner or an administrator of the workspace.
+ */
+export interface WorkspaceDuty {
+  employeeId: string;
+  planId: string;
+  planName: string;
+  applicationName: string;
+  role: 'PRIMARY_OWNER' | 'OWNER' | 'ADMIN';
+  /** The plan declares an emergency account: only that it exists, never its name, its holder or any secret. */
+  emergencyAccountDeclared: boolean;
 }

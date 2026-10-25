@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Page, pageOf } from '../../../core/application/pagination';
-import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
+import { DbTx, TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import { isCheckViolation, isUniqueViolation } from '../../../infrastructure/database/unique-violation';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditService } from '../../audit/audit.service';
@@ -110,13 +110,13 @@ export class PlanService {
    * Declares a plan. Throws PlanApplicationNotFoundError, PlanApplicationRetiredError, the name and note errors, the
    * shape errors of `assertPlanShape` and PlanNameTakenError.
    */
-  async declare(actor: AuthenticatedPrincipal, input: DeclarePlanInput): Promise<PlanRecord> {
+  async declare(actor: AuthenticatedPrincipal, input: DeclarePlanInput, outer?: DbTx): Promise<PlanRecord> {
     const name = cleanPlanName(input.name);
     const revocationNote = cleanRevocationNote(input.revocationNote);
     const organizationId = await this.requireOrganizationId();
 
-    try {
-      return await this.runner.run(async (tx) => {
+    const write = async (tx: DbTx): Promise<PlanRecord> => {
+      {
         const application = await this.applications.lockShared(tx, input.applicationId);
         if (!application) throw new PlanApplicationNotFoundError();
         if (application.status === 'RETIRED') throw new PlanApplicationRetiredError();
@@ -141,7 +141,11 @@ export class PlanService {
         );
 
         return created;
-      });
+      }
+    };
+
+    try {
+      return await (outer ? write(outer) : this.runner.run(write));
     } catch (error) {
       throw this.mapWriteError(error);
     }

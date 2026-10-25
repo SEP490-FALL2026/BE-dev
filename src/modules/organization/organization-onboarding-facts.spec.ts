@@ -5,6 +5,10 @@ import { EmployeeDirectoryService } from './employee/employee-directory.service'
 import { JobTitleCatalogueService } from './job-title/job-title-catalogue.service';
 import { OrganizationRepo } from './organization.repo';
 import { DepartmentServiceAccountRegistry } from './department/service-account-registry';
+import { AnnouncementRepo } from './change-announcement/announcement.repo';
+import { OrganizationChangeRegistry } from './change-announcement/organization-change.registry';
+import { OrganizationChangeService } from './change-announcement/organization-change.service';
+import type { TransactionRunner } from '../../infrastructure/database/transaction-runner';
 import { OrganizationService } from './organization.service';
 
 /** P23-RV-02: with a transaction, every read behind the onboarding facts runs in it; without one, none is passed. */
@@ -34,6 +38,7 @@ describe('OrganizationService.getOnboardingFacts', () => {
       costCenters as unknown as CostCenterCatalogueService,
       {} as JobTitleCatalogueService,
       new DepartmentServiceAccountRegistry(),
+      new OrganizationChangeService(new OrganizationChangeRegistry(), {} as AnnouncementRepo, {} as TransactionRunner),
     );
     return { service, calls };
   }

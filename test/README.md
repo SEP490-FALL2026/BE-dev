@@ -127,6 +127,109 @@ fixture SQL không chứng minh workflow tạo tài khoản. Dùng `bodyOf(respo
 (`support/api-body.ts`) thay cho `response.body` (kiểu `any`).
 
 - `ConfigModule` kiểm tra env **lúc import** `AppModule`, nên helper đặt biến môi trường rồi mới `import()` động.
+- `support/status-harness.ts`: the spend harness with the inbox and the projection of the audit events of requests: `project()` runs
+  one pass at the clock of the database (the audit events carry the clock of the database, and a pass only reads events older than
+  the delay it keeps), `projectUpTo(moment)` a pass made at an earlier moment, `noticesOf` and `noticesAbout` read the notices,
+  `writeAudit` writes an audit event the way a service does for what no route can yet do, `openClient` gives a connection of its
+  own for a transaction a test holds open. Mechanics (late commit, a held cursor, a failing pass) are in
+  `request-status-projection.integration-spec.ts`, the flows in `request-status-notifications.integration-spec.ts`.
+- `support/group-harness.ts`: the status harness with the requests for a group: `colleague(s)` make people of a department with a work email who
+  start today, `groupBody` the body of a group, `groupWaiting` a group the head sent on so that its spend step waits for the approver,
+  `groupApproved` the same with every person approved, the calls of the routes of a group, and reads of the lines, their decisions, their
+  shares, the commitments and the audit trail as the database keeps them. The flows are in `group-request-submit.integration-spec.ts`,
+  `group-request-need-decision.integration-spec.ts`, `group-request-spend.integration-spec.ts`, `group-request-grant.integration-spec.ts`,
+  `group-request-withdrawal.integration-spec.ts`, `group-request-supplement.integration-spec.ts`,
+  `group-request-notifications.integration-spec.ts` and `group-request-edge.integration-spec.ts`; what the database refuses is in
+  `group-request-constraints.integration-spec.ts`.
+- `support/sla-harness.ts`: the status harness with the reminders of late steps: `sweepAt(now)` runs one pass of the worker at a moment the
+  test chooses, `beganAt` makes the open step of a request begin at a moment (the clock of the SLA runs from its creation),
+  `queuedAt` does the same for the queue of the head, `dayOff` writes a day nobody works the way a past day is written (no route adds
+  one), `parameterFrom` gives a parameter a value from a moment, `remindersOf`, `decisionState` and `emailRows` read back what a
+  pass must or must not write, and `board`, `recordIncident` and `incidents` call the board of the Super Admin. A suite counts
+  its days from a Friday three weeks ahead of the day it runs, because the data of the organization (who heads a department, where
+  a person is placed) takes effect from the day it was written and a reminder asks who is who on the day of the pass. The flows are in
+  `step-sla.integration-spec.ts`, the queue of the head in `step-sla-queue.integration-spec.ts`, Finance and the Super Admin lookup in
+  `step-sla-finance-question.integration-spec.ts`, the backlog alert, the board and the incidents in `step-congestion.integration-spec.ts`,
+  what the database refuses in `step-sla-constraints.integration-spec.ts`.
+- `support/handover-harness.ts`: the transfer harness with what the handover confirmation needs: `seatOf` (a seat of a person the harness
+  made, a person who joined long ago), `describePlan` (data loss and the notice of a plan), `open` (what a source module does to open
+  a revocation), `openDuties`, `reconcileDuties` and `cancelDuties` (what the record of a departure does), `noticeOverdue` (the hourly
+  reminder by hand), the three routes (`duties`, `duty`, `confirmDuty`), `makeHeadFrom` (a head named for a day to come, which is
+  who follows a head who leaves) and `dutyRows`, `auditActions`, `liveTaskOf`, `assignmentRow` for what the database keeps. Deadlines
+  are given as days from the real today (`h.day(n)`), never by moving the clock: a duty whose deadline has passed is one opened with a
+  past `dueOn`. The flows are in `handover-duty-departure.integration-spec.ts`, who confirms when the head is missing or leaves in
+  `handover-duty-successor.integration-spec.ts`, every source of a revocation in `handover-duty-sources.integration-spec.ts`, the
+  lists with the statement count in `handover-duty-read.integration-spec.ts`; what the database refuses is in
+  `handover-duty-constraints.integration-spec.ts`.
+- `support/transfer-review-harness.ts`: the handover harness with what the review after a transfer needs: `movedWith` (a person of a
+  department who holds tools and is moved to another from today; returns the seats in the order of the tools and the review the move
+  opened), `moveToday`, the four routes (`reviews`, `review`, `reviewItems`, `decide`), `noticeLateReviews` (the hourly reminder by
+  hand), `backdate` (moves the deadline of a review into the past with the guard trigger off for that one update) and `reviewRows`,
+  `itemRows`, `taskRow`, `reasonRows` for what the database keeps. The opening is in `transfer-review-open.integration-spec.ts`, the
+  decisions and the late review in `transfer-review-decide.integration-spec.ts`, the reads with the statement count in
+  `transfer-review-read.integration-spec.ts`; what the database refuses is in `transfer-review-constraints.integration-spec.ts`.
+- `support/leave-harness.ts`: the transfer harness with what a long leave needs: `worker` (a person who joined long ago, so a leave may
+  begin on any recent day), the six routes (`startLeave`, `changeReturnDate`, `confirmReturn`, `readLeave`, `listLeaves`, `leaveChanges`),
+  `started` (a leave expected to begin), `noticeOverdueAt(day)` (the hourly reminder by hand, as of a day), `departure()` and `personnel()`
+  (the two functions for the leaving of a person and the read of the days of leave), `inTransaction`, and `workState`, `leavesOf`,
+  `changeRows` for what the database keeps. The start is in `long-leave-start.integration-spec.ts`, the return, the new day and the late
+  return in `long-leave-return.integration-spec.ts`, what the database refuses, the list with the statement count, the leaving functions
+  and `getLeaveIntervals` in `long-leave-integrity.integration-spec.ts`.
+- `support/offboarding-harness.ts`: the handover harness with what the record of a departure needs: `worker` (a person who joined long ago),
+  the eleven routes (`recordCase`, `readCase`, `listCases`, `rightsOf`, `caseChanges`, `changeLastDay`, `cancelCase`, `markLeft`, `lockAccount`,
+  `revokeRights`, `closeCase`), `body` and `recordedCase` (a departure expected to be recorded), `dueBefore(day)` (a working day before a day,
+  no day off), and `caseRow`, `caseCount`, `changeKinds`, `workState`, `employeeLeftOn`, `taskCount` for what the database keeps. The record
+  is in `offboarding-record.integration-spec.ts`, moving and cancelling in `offboarding-change.integration-spec.ts`, the departure, the
+  revocations and the closing in `offboarding-departure.integration-spec.ts`, an IT Admin who leaves in `offboarding-self.integration-spec.ts`,
+  what the database refuses and the reads with the statement count in `offboarding-integrity.integration-spec.ts`, and the routes without a
+  database in `test/e2e/offboarding-cases.e2e-spec.ts`.
+- `support/offboarding-harness.ts` also has the routes of the requests of a person who left: `openRequestsOf`, `openGrantTasksOf` and
+  `cancelForDeparture`. They are in `leaver-request-closure.integration-spec.ts` (what is open and warned of, the closing of each kind of
+  request and task, the batch and the question to Finance, the refusals, the grant that is not started for a person who left, what the
+  database refuses and the statement count of the lists), `leaver-request-closure-group.integration-spec.ts` (a request for a group is listed as
+  closable for the person who left, and the whole is refused while two people are live), `group-line-closure.integration-spec.ts` (removing one person who
+  left from a request for a group: the line, the task, the share, the end of the request, the notices, what the database refuses) and
+  `test/e2e/group-line-closure.e2e-spec.ts` (the route without a database) and `test/e2e/access-request-cancellation.e2e-spec.ts` (the route without a database).
+- The roles of a person who leaves are in `role-duties.integration-spec.ts` (the flags and the audit of each role, the snapshot that moves with the
+  last working day, the four states of the Super Admin role and their reasons, the notice of the person themselves, a workspace whose owner left
+  and the closing that waits for it, Finance and the spending approver who leave with nothing taken over, the statement count of the list by
+  role) on the offboarding harness; the Super Admin of the harness leaves in the last case of the file, after which no account can be made or
+  given a role in that database, so keep a case that needs the Super Admin before it. `test/e2e/role-duties.e2e-spec.ts` is the two routes without
+  a database.
+- `support/service-account-handover-harness.ts`: the offboarding harness with what the handover of service accounts needs: `botOf` (a
+  service account written through the baseline import), the routes (`changeResponsibleOf`, `proposeMove`, `confirmMove`, `cancelMove`,
+  `listMoves`, `listServiceDuties`, `closeTransfer`), `chainOf` (the chain of an assignment as the database keeps it), `seatsTaken(day)`,
+  `unitOf`, `moveRow`, `noticeCount`, `sweepOverdue(now)` (the hourly reminder by hand) and `pretendToday(day)` (the organization says
+  it is another day). The duties, the change of the person responsible, the departure and the reminder are in
+  `service-account-duty.integration-spec.ts`, the move and its confirmation in `service-account-move.integration-spec.ts`, what the
+  database refuses in `service-account-integrity.integration-spec.ts`, and the routes without a database in
+  `test/e2e/service-account-handover.e2e-spec.ts`.
+- `support/expiry-harness.ts`: the return harness with what the rights that end on a day need: the three routes (`queue`,
+  `startRevocation`, `reminders`), `noticeDue(now)` (the hourly reminder by hand), `queueRows`, `reminderRows`, `dutyRows` (the handover
+  of a seat), `giveEndDate` (the database refuses to change an end date that was set) and `waitingRenewals(map)` (a stand-in for the
+  renewals that wait, which returns the real reader when called back). The reminders and what the database refuses are in
+  `assignment-expiry-reminders.integration-spec.ts`, the queue, the start of the revocation, the handover and the failure in
+  `assignment-expiry-queue.integration-spec.ts`, and the routes without a database in `test/e2e/assignment-expiry.e2e-spec.ts`.
+- `support/saas-issue-harness.ts`: the expiry harness with what the reports of errors in SaaS rights need: the nine calls (`issueOptions`,
+  `submitIssue`, `listIssues`, `readIssue`, `issueEntries`, `addIssueMessage`, `reopenIssue`, `moveIssue`, `duplicateIssue`), `reported`
+  (201 or fail), `reporterIn(code, inCharge, target)` (a department, a member with a seat), `openGrantTask` (a grant that is not finished,
+  written by SQL), `issueRow`, `issueEvents`, `entriesOf`, `sweepIssues(now)` (the hourly pass by hand) and `pretendToday(day)` (the
+  organization says what day it is; `MONDAY` is a Monday with no holiday near it, so the working days are the same on any run day). The
+  report, who it goes to, who reads it and the count of statements are in `saas-issue-submit.integration-spec.ts`, the handling, the
+  duplicates, the reopening and the two days in `saas-issue-handling.integration-spec.ts`, what the database refuses in
+  `saas-issue-integrity.integration-spec.ts`, and the routes without a database (and the OpenAPI check that no route is for mobile) in
+  `test/e2e/saas-issues.e2e-spec.ts`.
+- `support/notice-harness.ts`: the offboarding harness with what the notices of the department heads need: the seven calls (`sendNotice`,
+  `listNotices`, `readNotice`, `withdrawNotice`, `rejectNotice`, `recordNotice`, `linkNotice`), `sentNotice` (201 or fail), `head`, the body
+  of a recording (`recording(event)` with the check and the basis), the notices and verifications as the database keeps them
+  (`noticeRows`, `verificationRows`, `eventsOfNotice`, `eventCounts`, `runningLeaveOf`) and `noticeOverdueAt(day)` (the hourly telling by
+  hand). The sending, the queue, the late notices and the count of statements are in `personnel-notice-send.integration-spec.ts`, the
+  rejection, the recording through the three events, the link and the basis in `personnel-notice-record.integration-spec.ts`, what the
+  database refuses in `personnel-notice-integrity.integration-spec.ts`, and the routes without a database in
+  `test/e2e/personnel-notices.e2e-spec.ts`.
+- `support/cli-process.ts` starts a child with `--no-experimental-strip-types` where Node strips types by itself (Node 24): beside ts-node it
+  fails to find files that exist once the module graph is large. To run `pnpm openapi:export` by hand on such a Node, set
+  `NODE_OPTIONS=--no-experimental-strip-types`.
 - `support/placement-coverage.ts`: truy vấn kiểm coverage của placement (bắt khoảng trống mà exclusion
   constraint cho phép). Chạy ở cuối test ghi dữ liệu tổ chức.
 - `support/test-config.ts`: `ConfigService` có kiểu cho test tự dựng service.

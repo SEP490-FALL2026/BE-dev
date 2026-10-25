@@ -157,6 +157,34 @@ export class SubscriptionRepo {
     }));
   }
 
+  /**
+   * The price a plan is bought at: the unit price and billing cycle of its newest active subscription that has both. A
+   * draft has no price to rely on; two active subscriptions of one plan are told apart by the later start, then the id.
+   */
+  async findPricedOfPlan(
+    planId: string,
+    tx?: DbTx,
+  ): Promise<{
+    unitPriceMinor: bigint;
+    currency: string;
+    billingCycle: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER';
+  } | null> {
+    const row = await (tx ?? this.prisma).subscription.findFirst({
+      where: {
+        planId,
+        status: 'ACTIVE',
+        unitPriceMinor: { not: null },
+        unitPriceCurrency: { not: null },
+        billingCycle: { not: null },
+      },
+      orderBy: [{ startDate: { sort: 'desc', nulls: 'last' } }, { id: 'asc' }],
+      select: { unitPriceMinor: true, unitPriceCurrency: true, billingCycle: true },
+    });
+    if (!row || row.unitPriceMinor === null || row.unitPriceCurrency === null || row.billingCycle === null) return null;
+
+    return { unitPriceMinor: row.unitPriceMinor, currency: row.unitPriceCurrency, billingCycle: row.billingCycle };
+  }
+
   async find(id: string, tx?: DbTx): Promise<SubscriptionRecord | null> {
     const row = await (tx ?? this.prisma).subscription.findUnique({ where: { id }, include: WITH_PLAN });
 

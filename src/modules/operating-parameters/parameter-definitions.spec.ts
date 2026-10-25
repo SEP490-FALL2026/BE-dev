@@ -9,7 +9,11 @@ describe('operating parameter definitions (US-01-04)', () => {
     expect(defaults.FISCAL_YEAR_START_MONTH).toBe(1);
     expect(defaults.SPEND_SUBMISSION_WAIT_WORKING_DAYS).toBe(2);
     expect(defaults.TRANSFER_REVIEW_WORKING_DAYS).toBe(5);
+    expect(defaults.PERSONNEL_NOTICE_REVIEW_WORKING_DAYS).toBe(2);
+    expect(defaults.SAAS_ISSUE_RESPONSE_WORKING_DAYS).toBe(1);
+    expect(defaults.SAAS_ISSUE_REOPEN_WORKING_DAYS).toBe(5);
     expect(defaults.ABRUPT_DEPARTURE_HOLD_WORKING_DAYS).toBe(1);
+    expect(defaults.BACKLOG_ALERT_THRESHOLD).toBe(10);
     expect(defaults.DETECTION_THRESHOLD_DAYS).toEqual([30, 60, 90]);
     expect(defaults.RENEWAL_ALERT_DAYS_BEFORE_DEADLINE).toEqual([15, 7]);
     expect(defaults.RULE_SCHEDULE_G1_G2).toBe('DAILY');
@@ -56,6 +60,9 @@ describe('operating parameter definitions (US-01-04)', () => {
     ['month zero', 'FISCAL_YEAR_START_MONTH', 0],
     ['no waiting days', 'SPEND_SUBMISSION_WAIT_WORKING_DAYS', 0],
     ['more than thirty waiting days', 'SPEND_SUBMISSION_WAIT_WORKING_DAYS', 31],
+    ['a backlog threshold of none', 'BACKLOG_ALERT_THRESHOLD', 0],
+    ['a backlog threshold above five hundred', 'BACKLOG_ALERT_THRESHOLD', 501],
+    ['a backlog threshold with a fraction', 'BACKLOG_ALERT_THRESHOLD', 10.5],
     ['thresholds out of order', 'DETECTION_THRESHOLD_DAYS', [60, 30, 90]],
     ['thresholds with a repeat', 'DETECTION_THRESHOLD_DAYS', [30, 30, 90]],
     ['two thresholds instead of three', 'DETECTION_THRESHOLD_DAYS', [30, 60]],

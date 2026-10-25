@@ -34,6 +34,7 @@ import { PayloadCipher } from './modules/notifications/payload-cipher';
 import { ObjectStorageModule } from './infrastructure/object-storage/object-storage.module';
 import { QueueInfrastructureModule } from './infrastructure/queue/queue-infrastructure.module';
 import { EmailDispatchLoop } from './email-dispatch.loop';
+import { RequestWorkLoop } from './request-work.loop';
 import { RecoveryCliModule } from './recovery-cli.module';
 import { WorkerModule } from './worker.module';
 
@@ -44,6 +45,8 @@ import { WorkerModule } from './worker.module';
  */
 const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   'AuditModule: AuditService',
+  // G5 (ADR-0016): the budgets facade the check of a request reads the figures through, and registers its listener with.
+  'BudgetsModule: BudgetsService',
   // G4 (ADR-0013): the catalog facade licensing reads the seat targets (subscription or internal plan) through.
   'CatalogModule: CatalogService',
   // H8.3 (A4-10): the data-import facade; onboarding reads the latest people import through it.
@@ -60,6 +63,9 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   'IdentityAccessFacadeModule: AccountDirectoryService',
   'IdentityAccessFacadeModule: ActionLinkService',
   'IdentityAccessFacadeModule: CredentialService',
+  // G5 (FR-3.16): where the approval roles and the role of Finance announce that they changed hands, so the account
+  // services of the API announce into the one registry the facade holds and requests listens to.
+  'IdentityAccessFacadeModule: ApprovalRoleChangeRegistry',
   'IdentityAccessFacadeModule: RoleGrantService',
   // H6.1: the read-only account contract of `ops:inspect`, declared only in the inspection graph.
   'IdentityAccessInspectionFacadeModule: IdentityAccessInspectionService',
@@ -74,8 +80,31 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   'NotificationsModule: NotificationsService',
   // ROOT.1: the delivery contract the worker's mail loop (composition root, ADR-0012) calls; EmailDispatcher stays private.
   'NotificationsModule: EmailDeliveryService',
+  // G5 (FR-3.11): the inbox the routes of `NotificationsHttpModule` read, held once in the module that gives the notices.
+  'NotificationsModule: InboxService',
   'OperatingParametersModule: OperatingParametersService',
+  // G6 (ADR-0017): the registry the flows that follow a personnel file (the owner of a service account) register their hooks with.
+  'PersonnelModule: PersonnelFileHooks',
+  // G6 (US-03-03): the days a person was on long leave, read by the rules of the recommendations of G7.
+  'PersonnelModule: PersonnelService',
   'OrganizationModule: OrganizationService',
+  // G6 (ADR-0017): the writes of history (a placement and a head period written ahead of their day) the personnel context calls.
+  'OrganizationModule: OrganizationHistoryService',
+  // G5 (FR-3.16): the loop of the worker calls the sweep; the API module of requests reads the rest through the same module,
+  // which holds the reassignment of steps once for both graphs (who a step is given to, the routing facts, the queue of waits).
+  'RequestsWorkFacadeModule: StepRedeterminationSweepService',
+  // G5 (US-05-15): the loop of the worker calls the projection of the audit events of the requests into the inbox.
+  'RequestsWorkFacadeModule: RequestStatusProjectorService',
+  // G5 (FR-3.8): the loop of the worker calls the reminders of the late steps; the API of the same context reads the age of the
+  // queue of the head and the board of the Super Admin through the one declaration of each, so no provider is declared twice.
+  'RequestsWorkFacadeModule: StepSlaSweepService',
+  'RequestsWorkFacadeModule: SlaQueueAgeService',
+  'RequestsWorkFacadeModule: CongestionRepo',
+  'RequestsWorkFacadeModule: StepTargetService',
+  'RequestsWorkFacadeModule: RoutingFactsService',
+  'RequestsWorkFacadeModule: ControlledWaitQueryService',
+  // G6 (US-03-04): the facade the personnel context reads the open requests of a person who leaves through.
+  'RequestsModule: RequestsService',
   // The two entry services of `pnpm ops:recover` (Q6; E7): the holder's own account, and the role transfer.
   'RecoveryModule: HolderRecoveryService',
   'RecoveryModule: RoleTransferRecoveryService',
@@ -474,6 +503,37 @@ describe('module graph', () => {
     expect(tokens.filter((token) => token.startsWith('BullQueue_'))).toEqual([]);
     expect(sourceFilesDeclaring('registerQueue')).toEqual([]);
     expect(sourceFilesDeclaring('@Processor(')).toEqual([]);
+  });
+
+  it('G5: runs the reminders of late steps in the worker through the narrow requests graph, with no catalog and no controller, and declares what the API shares once', () => {
+    const worker = collectGraph(WorkerModule);
+    const api = collectGraph(AppModule);
+
+    expect(worker.map((node) => node.module.name)).toContain('RequestsWorkFacadeModule');
+    expect(worker.map((node) => node.module.name)).not.toContain('CatalogModule');
+    expect(declarationsOf(worker, RequestWorkLoop)).toHaveLength(1);
+    for (const name of [
+      'StepSlaSweepService',
+      'StepSlaService',
+      'BacklogAlertService',
+      'ReminderWriter',
+      'SlaSubjectRepo',
+      'SlaReminderRepo',
+      'SlaQueueAgeService',
+      'CongestionRepo',
+    ]) {
+      const named = (graph: ModuleNode[]) =>
+        graph.flatMap((node) =>
+          node.providers.filter((provider) => tokenName(tokenOf(provider)) === name).map(() => node.module.name),
+        );
+      expect({ name, worker: named(worker) }).toEqual({ name, worker: ['RequestsWorkFacadeModule'] });
+      expect({ name, api: named(api) }).toEqual({ name, api: ['RequestsWorkFacadeModule'] });
+    }
+    // Only the API serves the board of the Super Admin and has the controller that shows it.
+    expect(controllersOf(worker)).toEqual([]);
+    expect(controllersOf(api).map((controller) => (controller as { name: string }).name)).toContain(
+      'CongestionController',
+    );
   });
 
   it('mounts the identity-access module and its three controllers in the API', () => {

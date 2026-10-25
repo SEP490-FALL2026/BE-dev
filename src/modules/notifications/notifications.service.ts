@@ -1,8 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { DbTx } from '../../infrastructure/database/transaction-runner';
+import { InboxService } from './inbox/inbox.service';
 import { NotificationsRepo } from './notifications.repo';
-import { DeliveryState, EnqueueEmailInput } from './notifications.types';
+import { DeliveryState, EnqueueEmailInput, InAppNotificationInput } from './notifications.types';
 import { PayloadCipher } from './payload-cipher';
 
 /** Public facade of the notifications module. */
@@ -11,6 +12,7 @@ export class NotificationsService {
   constructor(
     private readonly repo: NotificationsRepo,
     private readonly cipher: PayloadCipher,
+    private readonly inbox: InboxService,
   ) {}
 
   /**
@@ -33,6 +35,16 @@ export class NotificationsService {
     });
 
     return { id };
+  }
+
+  /**
+   * Gives the person an in-app notice in the caller's transaction, so it exists exactly when the change behind it commits and
+   * is gone if that change rolls back (`FR-3.11`). True when it was written, false when the recipient already has a notice for
+   * this event key, which is what makes an event tell once however many times it is looked at. No mail is made and nothing is
+   * pushed. Throws InvalidInAppNotificationError for a notice the closed table of codes and keys refuses.
+   */
+  notifyInApp(tx: DbTx, input: InAppNotificationInput): Promise<boolean> {
+    return this.inbox.deliver(tx, input);
   }
 
   cancelPendingForTokens(tx: DbTx, actionTokenHashes: string[]): Promise<number> {
