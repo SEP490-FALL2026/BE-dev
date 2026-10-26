@@ -4,6 +4,7 @@ import {
   ApiErrorResponses,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
+  VALIDATION_EXAMPLE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
 import { AuthenticatedOnly } from '../../../infrastructure/security/decorators/access.decorators';
@@ -19,7 +20,10 @@ import {
   TransferReviewItemPageResponseDto,
   TransferReviewPageResponseDto,
 } from './transfer-review.dto';
-import { toTransferReviewApiException } from './transfer-review.http-errors';
+import {
+  TRANSFER_REVIEW_ERROR_EXAMPLES as EXAMPLES,
+  toTransferReviewApiException,
+} from './transfer-review.http-errors';
 import { TransferReviewDecisionService } from './transfer-review-decision.service';
 import { TransferReviewViewService } from './transfer-review-view.service';
 
@@ -27,6 +31,7 @@ const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPO
 const NOT_FOUND = {
   status: HttpStatus.NOT_FOUND,
   description: 'The review does not exist, or has nothing to do with the caller (TRANSFER_REVIEW.NOT_FOUND).',
+  examples: [EXAMPLES.NOT_FOUND],
 } as const;
 
 /**
@@ -53,6 +58,7 @@ export class TransferReviewsController {
   @ApiErrorResponses(...AUTH_ERRORS, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description: 'A filter or a page parameter is invalid (VALIDATION_ERROR).',
+    examples: [VALIDATION_EXAMPLE],
   })
   async list(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Query() query: ListTransferReviewsQueryDto) {
     try {
@@ -72,6 +78,7 @@ export class TransferReviewsController {
   @ApiErrorResponses(...AUTH_ERRORS, NOT_FOUND, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description: 'The id is not valid (VALIDATION_ERROR).',
+    examples: [VALIDATION_EXAMPLE],
   })
   async get(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: TransferReviewIdParamDto) {
     try {
@@ -91,6 +98,7 @@ export class TransferReviewsController {
   @ApiErrorResponses(...AUTH_ERRORS, NOT_FOUND, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description: 'The id or a page parameter is not valid (VALIDATION_ERROR).',
+    examples: [VALIDATION_EXAMPLE],
   })
   async listItems(
     @CurrentPrincipal() actor: AuthenticatedPrincipal,
@@ -118,21 +126,30 @@ export class TransferReviewsController {
       status: HttpStatus.FORBIDDEN,
       description:
         'The caller is not the head of the department the person came to today: the head before, an IT Admin, a stand-in approver or anyone else (TRANSFER_REVIEW.NOT_REVIEWER). Nothing is written.',
+      examples: [EXAMPLES.NOT_REVIEWER],
     },
     {
       status: HttpStatus.NOT_FOUND,
       description:
         'The review does not exist (TRANSFER_REVIEW.NOT_FOUND) or the tool is not part of it (TRANSFER_REVIEW.ITEM_NOT_FOUND).',
+      examples: [EXAMPLES.NOT_FOUND, EXAMPLES.ITEM_NOT_FOUND],
     },
     {
       status: HttpStatus.CONFLICT,
       description:
         'A decision about the tool was written already (TRANSFER_REVIEW.DECISION_ALREADY_RECORDED), the review is not open (NOT_OPEN), the person has left (EMPLOYEE_LEFT), the kind of tool cannot be taken away through the system (REVOCATION_NOT_SUPPORTED) or the seat has ended (SEAT_NOT_OPEN): nothing changes.',
+      examples: [
+        EXAMPLES.DECISION_ALREADY_RECORDED,
+        EXAMPLES.NOT_OPEN,
+        EXAMPLES.REVOCATION_NOT_SUPPORTED,
+        EXAMPLES.SEAT_NOT_OPEN,
+      ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
         'The request is invalid (VALIDATION_ERROR): an unknown decision, or a note that does not go with the decision or is longer than 500 characters.',
+      examples: [VALIDATION_EXAMPLE],
     },
   )
   async decide(

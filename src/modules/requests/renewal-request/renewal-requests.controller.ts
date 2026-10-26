@@ -4,6 +4,7 @@ import {
   ApiErrorResponses,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
+  VALIDATION_EXAMPLE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
 import { AuthenticatedOnly } from '../../../infrastructure/security/decorators/access.decorators';
@@ -12,7 +13,7 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { AccessRequestQueryService } from '../access-request/access-request-query.service';
 import { toWire } from '../access-request/access-request.wire';
 import { RenewalBodyDto, RenewalResponseDto } from './renewal-request.dto';
-import { toRenewalApiException } from './renewal-request.http-errors';
+import { RENEWAL_ERROR_EXAMPLES, toRenewalApiException } from './renewal-request.http-errors';
 import { RenewalRequestService } from './renewal-request.service';
 
 const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPONSE] as const;
@@ -48,17 +49,38 @@ export class RenewalRequestsController {
       status: HttpStatus.FORBIDDEN,
       description:
         'The caller is neither the holder nor the head of the department of the holder (RENEWAL_REQUEST.NOT_HOLDER), or heads another department (RENEWAL_REQUEST.OUTSIDE_DEPARTMENT).',
+      examples: [RENEWAL_ERROR_EXAMPLES.NOT_HOLDER, RENEWAL_ERROR_EXAMPLES.OUTSIDE_DEPARTMENT],
     },
-    { status: HttpStatus.NOT_FOUND, description: 'The seat does not exist (RENEWAL_REQUEST.ASSIGNMENT_NOT_FOUND).' },
+    {
+      status: HttpStatus.NOT_FOUND,
+      description: 'The seat does not exist (RENEWAL_REQUEST.ASSIGNMENT_NOT_FOUND).',
+      examples: [RENEWAL_ERROR_EXAMPLES.ASSIGNMENT_NOT_FOUND],
+    },
     {
       status: HttpStatus.CONFLICT,
       description:
         'The seat cannot be renewed (RENEWAL_REQUEST.ASSIGNMENT_NOT_RENEWABLE, with the reason in details: it is a service account, another record follows it, it has ended, it has no end date, its grant is not done, or it is being revoked), it already has a renewal waiting (RENEWAL_REQUEST.ALREADY_REQUESTED), the head asks after the end (RENEWAL_REQUEST.END_PASSED), the application is retired (ACCESS_REQUEST.APPLICATION_RETIRED) or, after the end, the person holds another seat of the tool (ACCESS_REQUEST.ALREADY_HOLDS_ACCESS). Nothing is written.',
+      examples: [
+        RENEWAL_ERROR_EXAMPLES.ASSIGNMENT_NOT_RENEWABLE,
+        RENEWAL_ERROR_EXAMPLES.ALREADY_REQUESTED,
+        RENEWAL_ERROR_EXAMPLES.END_PASSED,
+        RENEWAL_ERROR_EXAMPLES.APPLICATION_RETIRED,
+        RENEWAL_ERROR_EXAMPLES.ALREADY_HOLDS_ACCESS,
+        RENEWAL_ERROR_EXAMPLES.NO_DEPARTMENT,
+      ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
         'The form is incomplete or invalid (VALIDATION_ERROR). The end is not after the end the right has, or after today (RENEWAL_REQUEST.END_NOT_AFTER), the term is too long (RENEWAL_REQUEST.END_TOO_FAR), a head who sends it for more than twelve months gives no confirmation (RENEWAL_REQUEST.TERM_CONFIRMATION_REQUIRED), or a request sent after the end for a tool outside the standard toolset gives no reason (ACCESS_REQUEST.OUTSIDE_STANDARD_REASON_REQUIRED). Nothing is written.',
+      examples: [
+        VALIDATION_EXAMPLE,
+        RENEWAL_ERROR_EXAMPLES.END_NOT_AFTER,
+        RENEWAL_ERROR_EXAMPLES.END_TOO_FAR,
+        RENEWAL_ERROR_EXAMPLES.TERM_CONFIRMATION_REQUIRED,
+        RENEWAL_ERROR_EXAMPLES.OUTSIDE_STANDARD_REASON_REQUIRED,
+        RENEWAL_ERROR_EXAMPLES.NO_SPEND_FOR_FREE_SOFTWARE,
+      ],
     },
   )
   async submit(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: RenewalBodyDto) {

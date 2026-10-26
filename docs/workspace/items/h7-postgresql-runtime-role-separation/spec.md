@@ -307,6 +307,20 @@ ONLY`; chỉ đọc danh tính (che bằng hash), phiên bản, trạng thái re
   deploy của `main` trước H7 không có khóa ⟹ từ bước 1 tới bước 8 không merge/push `main`, không chạy workflow chế độ
   `deploy`.
 
+### Prompt 02 — harness Windows đợi hết tiến trình của lượt (`H7-TEST-RV-08`)
+
+- **Nguyên nhân (đo trực tiếp, 26/10/2026).** Test spawn launcher `bin/bash.exe` của Git; `spawnSync` trả về và sự kiện
+  `exit` đến khi launcher thoát, trong khi tiến trình msys mà script khởi động có thể còn sống: `docker` giả dưới `timeout`
+  nằm trong nhóm tiến trình riêng, ngoài tầm dừng-nhóm, và còn giữ tệp của thư mục tạm (tệp script `bin/docker` mà bash đang
+  đọc, tệp output của lượt). Thí nghiệm: một con cháu ở nhóm của `timeout` sống thêm 2 s thì `spawnSync` vẫn trả sau ~80 ms;
+  afterEach xóa thư mục khi tiến trình đó còn giữ tệp ⟹ `EPERM`.
+- **Sửa (chỉ harness).** Mỗi lượt có thêm một pipe ở fd 3 (`TREE`), không ai đọc/ghi: mọi tiến trình của lượt — bất kể nhóm
+  tiến trình hay output đi đâu — giữ một handle kế thừa của nó, nên pipe chỉ đóng khi tiến trình cuối của lượt kết thúc.
+  `deploy()` (`spawnSync` đợi mọi pipe đóng), `finish()` và afterEach đợi tín hiệu đó (có hạn 60 s; quá hạn thì test đỏ với
+  danh tính lượt, không kill hay xóa gì) **trước** khi xóa đúng thư mục của lượt; dừng lượt vẫn theo đúng PGID/PID đã ghi.
+  Retry của `rmSync` giữ nguyên (không tăng), không nuốt `EPERM`, không sleep cố định. `deploy-release.sh`, workflow,
+  Compose, ngữ nghĩa khóa production và runbook trùng byte.
+
 ## Test matrix
 
 | Rủi ro                              | Tình huống                                                                                                                                                                                                                                          | Cấp test                                           | Kỳ vọng                                                                                                                | Bằng chứng |
@@ -332,6 +346,7 @@ ONLY`; chỉ đọc danh tính (che bằng hash), phiên bản, trạng thái re
 | Attempt (H7-OPS-RV-05)              | lần đầu của SHA; thử lại bằng attempt mới; dùng lại attempt id; rollback sau hai attempt; deploy lại release đang live; ghi marker lỗi                                                                                                              | script + gate + smoke Docker                       | attempt cũ trùng byte; id trùng bị từ chối trước Docker; marker chỉ sau readiness; rollback từ đúng attempt            | xem plan   |
 | Environment rollout đầu (RV-06)     | image cũ hỏng với `.env` mới; release mới không ready; không có tùy chọn; lỗi rename; thành công; lỗi trước promote; nguồn không an toàn                                                                                                            | script + gate + smoke Docker (ranh giới thật)      | `.env` cũ về trước recreate, image cũ ready; thành công giữ env mới; không secret trong `releases/`/log                | xem plan   |
 | Khóa host (H7-OPS-RV-07)            | lượt giữ dừng ở barrier sau khóa (trước thay đổi, trong readiness, ở marker, trong khôi phục), lượt khác release/attempt; lượt giữ bị kết thúc cưỡng bức; hai thư mục app; thiếu `flock`, tệp khóa là thư mục/symlink                               | script (barrier) + gate + smoke Linux `flock` thật | lượt sau exit 2 ngay, 0 lệnh Docker, không attempt, host trùng byte; xong/bị giết thì lượt kế lấy được, không dọn khóa | xem plan   |
+| Dọn harness (H7-TEST-RV-08)         | một tiến trình của lượt ở nhóm `timeout` sống quá script ~2 s, qua `deploy()` và qua `start()`/`finish()`; ba lượt liên tiếp bảy ca khóa host, mỗi lượt `TEMP` riêng                                                                                | script (harness) từ PowerShell                     | đỏ trên harness cũ; xanh sau sửa; 0 tiến trình, 0 thư mục `slm-deploy-release-*` sót                                   | xem plan   |
 | Sự cố `H7-INC-01`                   | database của `.env` dev, phiên read-only                                                                                                                                                                                                            | triage (ngoài repo)                                | phân loại có bằng chứng, ghi thử bị từ chối, không in URL                                                              | xem plan   |
 | Image production                    | smoke Compose production: provision, backup, preflight, migrate, reconcile, API/worker bằng runtime; API bằng deploy/bootstrap bị từ chối                                                                                                           | smoke thủ công                                     | như trên; dọn sạch                                                                                                     | xem plan   |
 
@@ -344,6 +359,10 @@ ONLY`; chỉ đọc danh tính (che bằng hash), phiên bản, trạng thái re
 - [ ] Không đổi route/OpenAPI/nghiệp vụ (bằng chứng hash).
 
 ## Changes and acceptance
+
+Prompt 02 (26/10/2026, sau Owner commit H7 `471de5e` và merge G5/G6 `0da8f56`): `H7-TEST-RV-08` — harness đợi hết tiến trình
+của lượt bằng pipe fd 3 trước khi xóa thư mục tạm (xem _Prompt 02_ ở trên và plan). Chỉ
+`scripts/verify/deploy-release.test.mjs` đổi; script host, workflow, Compose, runbook trùng byte. `H7-OPS-01` vẫn mở.
 
 Prompt 01D (26/10/2026): H7-OPS-RV-07 — khóa host `releases/.deploy.lock` cho mọi lượt `deploy-release.sh` (workflow và
 runbook bước 7), xem _Prompt 01D_ ở trên và plan. Không đổi mã sản phẩm, Prisma, vai CSDL, harness integration hay môi

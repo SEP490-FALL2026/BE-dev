@@ -1,5 +1,7 @@
 import { HttpStatus } from '@nestjs/common';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
+import { toUnavailableApiException } from '../../../infrastructure/http/errors/service-unavailable';
+import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
 import { OffboardingRefusedError } from './offboarding.errors';
 
 /** The answer of each refusal, by its semantic code. A code the table does not know is a programming error and stays a 500. */
@@ -68,10 +70,13 @@ const MESSAGES: Readonly<Record<string, string>> = {
   CONCURRENT_CHANGE: 'The person was changed by someone else meanwhile; read the case again.',
 };
 
-/** Maps a refusal of the record of a departure to its answer; anything else is returned unchanged for the global filter. */
+/**
+ * Maps a refusal of the record of a departure to its answer; a database that cannot answer is a 503, anything else
+ * is returned unchanged for the global filter.
+ */
 export function toOffboardingApiException(error: unknown): unknown {
   if (error instanceof ApiException) return error;
-  if (!(error instanceof OffboardingRefusedError)) return error;
+  if (!(error instanceof OffboardingRefusedError)) return toUnavailableApiException(error) ?? error;
   const status = STATUS[error.code];
   if (status === undefined) return error;
 
@@ -81,3 +86,62 @@ export function toOffboardingApiException(error: unknown): unknown {
     ...(error.details && Object.keys(error.details).length > 0 ? { details: error.details } : {}),
   });
 }
+
+const example = (error: Error) => errorExampleOf(toOffboardingApiException(error));
+
+/**
+ * The answers above as OpenAPI examples, each produced by the mapper that gives it at runtime (OPENAPI-EXAMPLE.1). The details
+ * have the shape of the site that throws the code (the policy, or the service where the policy does not judge it).
+ */
+export const OFFBOARDING_ERROR_EXAMPLES = {
+  NOT_FOUND: example(new OffboardingRefusedError('NOT_FOUND')),
+  EMPLOYEE_NOT_FOUND: example(new OffboardingRefusedError('EMPLOYEE_NOT_FOUND')),
+  EMPLOYEE_LEFT: example(new OffboardingRefusedError('EMPLOYEE_LEFT')),
+  ALREADY_HANDING_OVER: example(new OffboardingRefusedError('ALREADY_HANDING_OVER')),
+  LAST_WORKING_DAY_REQUIRED: example(new OffboardingRefusedError('LAST_WORKING_DAY_REQUIRED')),
+  LAST_WORKING_DAY_INVALID: example(
+    new OffboardingRefusedError('LAST_WORKING_DAY_INVALID', { reason: 'IN_PAST', today: '2026-01-01' }),
+  ),
+  LAST_DAY_ALREADY_PASSED: example(
+    new OffboardingRefusedError('LAST_DAY_ALREADY_PASSED', { lastWorkingDay: '2026-01-01' }),
+  ),
+  NO_CHANGE: example(new OffboardingRefusedError('NO_CHANGE')),
+  CASE_LEFT: example(new OffboardingRefusedError('CASE_LEFT')),
+  CASE_NOT_LEFT: example(new OffboardingRefusedError('CASE_NOT_LEFT')),
+  CASE_CLOSED: example(new OffboardingRefusedError('CASE_CLOSED')),
+  NOT_HANDING_OVER: example(new OffboardingRefusedError('NOT_HANDING_OVER')),
+  DEPARTED_ON_INVALID: example(
+    new OffboardingRefusedError('DEPARTED_ON_INVALID', { today: '2026-01-01', recordedOn: '2026-01-01' }),
+  ),
+  GROUNDS_REQUIRED: example(new OffboardingRefusedError('GROUNDS_REQUIRED')),
+  GROUNDS_INCOMPLETE: example(new OffboardingRefusedError('GROUNDS_INCOMPLETE', { missing: ['issuedOn'] })),
+  GROUNDS_IS_NOTICE: example(new OffboardingRefusedError('GROUNDS_IS_NOTICE')),
+  REASON_REQUIRED: example(new OffboardingRefusedError('REASON_REQUIRED')),
+  SUCCESSOR_NOT_A_MEMBER_ON_DATE: example(
+    new OffboardingRefusedError('SUCCESSOR_NOT_A_MEMBER_ON_DATE', { reason: 'NOT_A_MEMBER_ON_DATE' }),
+  ),
+  PENDING_EVENT_EXISTS: example(
+    new OffboardingRefusedError('PENDING_EVENT_EXISTS', { kind: 'TRANSFER', effectiveOn: '2026-01-01' }),
+  ),
+  TRANSFER_CANCELLATION_REASON_REQUIRED: example(new OffboardingRefusedError('TRANSFER_CANCELLATION_REASON_REQUIRED')),
+  COUNT_MISMATCH: example(new OffboardingRefusedError('COUNT_MISMATCH', { expected: 1 })),
+  ASSIGNMENT_NOT_AVAILABLE: example(
+    new OffboardingRefusedError('ASSIGNMENT_NOT_AVAILABLE', { assignmentId: '<assignment-id>' }),
+  ),
+  ACCOUNT_LOCK_NOT_RECORDED: example(new OffboardingRefusedError('ACCOUNT_LOCK_NOT_RECORDED')),
+  ALREADY_RECORDED: example(new OffboardingRefusedError('ALREADY_RECORDED')),
+  REVOCATION_NOT_SUPPORTED: example(
+    new OffboardingRefusedError('REVOCATION_NOT_SUPPORTED', {
+      assignmentId: '<assignment-id>',
+      provisioningType: 'K3',
+    }),
+  ),
+  CASE_NOT_CLOSEABLE: example(
+    new OffboardingRefusedError('CASE_NOT_CLOSEABLE', {
+      blockers: ['ACCOUNT_LOCK_NOT_RECORDED', 'PERSONAL_RIGHTS_OPEN'],
+    }),
+  ),
+  SELF_EVENT_NEEDS_ANOTHER_IT_ADMIN: example(new OffboardingRefusedError('SELF_EVENT_NEEDS_ANOTHER_IT_ADMIN')),
+  PLACEMENT_OVERLAP: example(new OffboardingRefusedError('PLACEMENT_OVERLAP', { reason: 'NO_OPEN_PLACEMENT' })),
+  CONCURRENT_CHANGE: example(new OffboardingRefusedError('CONCURRENT_CHANGE')),
+} as const;

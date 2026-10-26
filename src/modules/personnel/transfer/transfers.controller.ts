@@ -2,8 +2,10 @@ import { Body, Controller, Get, HttpStatus, Param, Post, Query } from '@nestjs/c
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
+  FORBIDDEN_EXAMPLE,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
+  VALIDATION_EXAMPLE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
 import { RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
@@ -21,7 +23,7 @@ import {
   TransferPageResponseDto,
   TransferRecordedResponseDto,
 } from './transfer.dto';
-import { toTransferApiException } from './transfer.http-errors';
+import { TRANSFER_ERROR_EXAMPLES as EXAMPLES, toTransferApiException } from './transfer.http-errors';
 import { TransferChangeService } from './transfer-change.service';
 import { TransferClosureService } from './transfer-closure.service';
 import { TransferQueryService } from './transfer-query.service';
@@ -30,12 +32,33 @@ import { TransferService } from './transfer.service';
 const FORBIDDEN = {
   status: HttpStatus.FORBIDDEN,
   description: 'Only an IT Admin records, moves, cancels or reads transfers.',
+  examples: [FORBIDDEN_EXAMPLE],
 } as const;
 const COMMON = [UNAUTHENTICATED_RESPONSE, FORBIDDEN, GUARDED_SERVICE_UNAVAILABLE_RESPONSE] as const;
 const NOT_FOUND = {
   status: HttpStatus.NOT_FOUND,
   description: 'The transfer does not exist (DEPARTMENT_TRANSFER.NOT_FOUND).',
+  examples: [EXAMPLES.NOT_FOUND],
 } as const;
+
+/** The refusals of the basis of a change, the same on every write that needs one. */
+const GROUNDS_EXAMPLES = [EXAMPLES.GROUNDS_REQUIRED, EXAMPLES.GROUNDS_INCOMPLETE, EXAMPLES.GROUNDS_IS_NOTICE] as const;
+/**
+ * The refusals of a change of a transfer that waits: it took effect or was cancelled, the actor is the person moved, or the head
+ * or the placements were changed meanwhile.
+ */
+const SETTLED_OR_SELF_EXAMPLES = [
+  EXAMPLES.ALREADY_EFFECTIVE,
+  EXAMPLES.ALREADY_CANCELLED,
+  EXAMPLES.SELF_EVENT_NEEDS_ANOTHER_IT_ADMIN,
+  EXAMPLES.CONCURRENT_CHANGE,
+] as const;
+/** The refusals of the day of a change. */
+const DAY_EXAMPLES = [
+  EXAMPLES.NO_CHANGE,
+  EXAMPLES.EFFECTIVE_DATE_IN_PAST,
+  EXAMPLES.EFFECTIVE_DATE_NOT_AFTER_CURRENT_PERIOD,
+] as const;
 
 const GROUNDS_REFUSALS =
   'the basis is empty or lacks a part (DEPARTMENT_TRANSFER.GROUNDS_REQUIRED, GROUNDS_INCOMPLETE) or is the code of a notice and not a document (GROUNDS_IS_NOTICE)';
@@ -68,15 +91,35 @@ export class TransfersController {
     {
       status: HttpStatus.NOT_FOUND,
       description: 'The employee does not exist (DEPARTMENT_TRANSFER.EMPLOYEE_NOT_FOUND).',
+      examples: [EXAMPLES.EMPLOYEE_NOT_FOUND],
     },
     {
       status: HttpStatus.CONFLICT,
       description:
         'The person has left (DEPARTMENT_TRANSFER.EMPLOYEE_LEFT) or has another event waiting (PENDING_EVENT_EXISTS), the destination cannot take people (DEPARTMENT_INACTIVE), an IT Admin records it for themselves while another can (SELF_EVENT_NEEDS_ANOTHER_IT_ADMIN), or the placements cannot take it (PLACEMENT_OVERLAP, CONCURRENT_CHANGE).',
+      examples: [
+        EXAMPLES.EMPLOYEE_LEFT,
+        EXAMPLES.PENDING_EVENT_EXISTS,
+        EXAMPLES.DEPARTMENT_INACTIVE,
+        EXAMPLES.DEPARTMENT_COST_CENTER_INACTIVE,
+        EXAMPLES.SELF_EVENT_NEEDS_ANOTHER_IT_ADMIN,
+        EXAMPLES.PLACEMENT_OVERLAP,
+        EXAMPLES.CONCURRENT_CHANGE,
+      ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description: `The body is invalid (VALIDATION_ERROR), the day is in the past or not after the first day of the current placement (DEPARTMENT_TRANSFER.EFFECTIVE_DATE_IN_PAST, EFFECTIVE_DATE_NOT_AFTER_CURRENT_PERIOD), nothing changes (NO_CHANGE), the department or the title is unknown or retired (DEPARTMENT_NOT_FOUND, JOB_TITLE_NOT_FOUND, JOB_TITLE_INACTIVE), ${GROUNDS_REFUSALS}, or the head of the department they leave is not provided for (HEAD_SUCCESSOR_REQUIRED, SUCCESSOR_NOT_A_MEMBER_ON_DATE).`,
+      examples: [
+        VALIDATION_EXAMPLE,
+        ...DAY_EXAMPLES,
+        EXAMPLES.DEPARTMENT_NOT_FOUND,
+        EXAMPLES.JOB_TITLE_NOT_FOUND,
+        EXAMPLES.JOB_TITLE_INACTIVE,
+        ...GROUNDS_EXAMPLES,
+        EXAMPLES.HEAD_SUCCESSOR_REQUIRED,
+        EXAMPLES.SUCCESSOR_NOT_A_MEMBER_ON_DATE,
+      ],
     },
   )
   async record(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: RecordTransferBodyDto) {
@@ -99,6 +142,7 @@ export class TransfersController {
   @ApiErrorResponses(...COMMON, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description: 'A filter is invalid (VALIDATION_ERROR).',
+    examples: [VALIDATION_EXAMPLE],
   })
   async list(@Query() query: ListTransfersQueryDto) {
     try {
@@ -118,6 +162,7 @@ export class TransfersController {
   @ApiErrorResponses(...COMMON, NOT_FOUND, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description: 'The id is not valid (VALIDATION_ERROR).',
+    examples: [VALIDATION_EXAMPLE],
   })
   async get(@Param() params: TransferIdParamDto) {
     try {
@@ -137,6 +182,7 @@ export class TransfersController {
   @ApiErrorResponses(...COMMON, NOT_FOUND, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description: 'The id or a page parameter is not valid (VALIDATION_ERROR).',
+    examples: [VALIDATION_EXAMPLE],
   })
   async listChanges(@Param() params: TransferIdParamDto, @Query() query: ListTransferChangesQueryDto) {
     try {
@@ -160,10 +206,18 @@ export class TransfersController {
       status: HttpStatus.CONFLICT,
       description:
         'The transfer has taken effect (DEPARTMENT_TRANSFER.ALREADY_EFFECTIVE) or was cancelled (ALREADY_CANCELLED), or an IT Admin moves it for themselves while another can (SELF_EVENT_NEEDS_ANOTHER_IT_ADMIN).',
+      examples: [...SETTLED_OR_SELF_EXAMPLES, EXAMPLES.DEPARTMENT_INACTIVE],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description: `The body is invalid (VALIDATION_ERROR), no reason is given (DEPARTMENT_TRANSFER.REASON_REQUIRED), ${GROUNDS_REFUSALS}, the day is the same, in the past or not after the current placement (NO_CHANGE, EFFECTIVE_DATE_IN_PAST, EFFECTIVE_DATE_NOT_AFTER_CURRENT_PERIOD), or the head of the department cannot be handed over on the new day (HEAD_SUCCESSOR_REQUIRED, SUCCESSOR_NOT_A_MEMBER_ON_DATE): nothing is saved.`,
+      examples: [
+        VALIDATION_EXAMPLE,
+        EXAMPLES.REASON_REQUIRED,
+        ...GROUNDS_EXAMPLES,
+        ...DAY_EXAMPLES,
+        EXAMPLES.SUCCESSOR_NOT_A_MEMBER_ON_DATE,
+      ],
     },
   )
   async reschedule(
@@ -194,10 +248,12 @@ export class TransfersController {
       status: HttpStatus.CONFLICT,
       description:
         'The transfer has taken effect (DEPARTMENT_TRANSFER.ALREADY_EFFECTIVE) or was cancelled already (ALREADY_CANCELLED), or an IT Admin cancels it for themselves while another can (SELF_EVENT_NEEDS_ANOTHER_IT_ADMIN).',
+      examples: [...SETTLED_OR_SELF_EXAMPLES],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description: `The body is invalid (VALIDATION_ERROR), no reason is given (DEPARTMENT_TRANSFER.REASON_REQUIRED), or ${GROUNDS_REFUSALS}.`,
+      examples: [VALIDATION_EXAMPLE, EXAMPLES.REASON_REQUIRED, ...GROUNDS_EXAMPLES],
     },
   )
   async cancel(
@@ -228,8 +284,13 @@ export class TransfersController {
       status: HttpStatus.CONFLICT,
       description:
         'The transfer cannot be closed yet (DEPARTMENT_TRANSFER.NOT_CLOSEABLE: details.blockers lists NOT_EFFECTIVE while it waits, or SERVICE_ACCOUNT_UNASSIGNED while a service account still has the person responsible), or it was closed already (ALREADY_CLOSED) or cancelled (ALREADY_CANCELLED). Nothing changes.',
+      examples: [EXAMPLES.NOT_CLOSEABLE, EXAMPLES.ALREADY_CLOSED, EXAMPLES.ALREADY_CANCELLED],
     },
-    { status: HttpStatus.UNPROCESSABLE_ENTITY, description: 'The id is not valid (VALIDATION_ERROR).' },
+    {
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      description: 'The id is not valid (VALIDATION_ERROR).',
+      examples: [VALIDATION_EXAMPLE],
+    },
   )
   async close(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: TransferIdParamDto) {
     try {

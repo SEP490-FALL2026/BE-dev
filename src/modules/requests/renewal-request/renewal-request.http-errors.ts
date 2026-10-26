@@ -1,5 +1,13 @@
 import { HttpStatus } from '@nestjs/common';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
+import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
+import {
+  AccessRequestAlreadyHoldsAccessError,
+  AccessRequestApplicationRetiredError,
+  AccessRequestNoDepartmentError,
+  AccessRequestOutsideStandardReasonRequiredError,
+  AccessRequestSpendDateNotAllowedError,
+} from '../access-request/access-request.errors';
 import { toAccessRequestApiException } from '../access-request/access-request.http-errors';
 import { RenewalRequestRefusedError, type RenewalRefusal } from './renewal-request.errors';
 
@@ -29,3 +37,29 @@ export function toRenewalApiException(error: unknown): unknown {
 
   return toAccessRequestApiException(error);
 }
+
+const example = (error: Error) => errorExampleOf(toRenewalApiException(error));
+
+/** The answers above as OpenAPI examples, each produced by the mapper that gives it at runtime (OPENAPI-EXAMPLE.1). */
+export const RENEWAL_ERROR_EXAMPLES = {
+  NOT_HOLDER: example(new RenewalRequestRefusedError('NOT_HOLDER')),
+  OUTSIDE_DEPARTMENT: example(new RenewalRequestRefusedError('OUTSIDE_DEPARTMENT')),
+  ASSIGNMENT_NOT_FOUND: example(new RenewalRequestRefusedError('ASSIGNMENT_NOT_FOUND')),
+  ASSIGNMENT_NOT_RENEWABLE: example(new RenewalRequestRefusedError('ASSIGNMENT_NOT_RENEWABLE', 'NOT_OPEN')),
+  ALREADY_REQUESTED: example(new RenewalRequestRefusedError('ALREADY_REQUESTED')),
+  END_PASSED: example(new RenewalRequestRefusedError('END_PASSED')),
+  END_NOT_AFTER: example(new RenewalRequestRefusedError('END_NOT_AFTER')),
+  END_TOO_FAR: example(new RenewalRequestRefusedError('END_TOO_FAR')),
+  TERM_CONFIRMATION_REQUIRED: example(new RenewalRequestRefusedError('TERM_CONFIRMATION_REQUIRED')),
+  APPLICATION_RETIRED: example(new AccessRequestApplicationRetiredError()),
+  ALREADY_HOLDS_ACCESS: example(
+    new AccessRequestAlreadyHoldsAccessError({
+      assignmentId: '<assignment-id>',
+      effectiveFrom: '2026-01-01',
+      validUntil: null,
+    }),
+  ),
+  NO_DEPARTMENT: example(new AccessRequestNoDepartmentError()),
+  OUTSIDE_STANDARD_REASON_REQUIRED: example(new AccessRequestOutsideStandardReasonRequiredError()),
+  NO_SPEND_FOR_FREE_SOFTWARE: example(new AccessRequestSpendDateNotAllowedError()),
+} as const;

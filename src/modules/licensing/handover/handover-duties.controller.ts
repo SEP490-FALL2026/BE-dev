@@ -4,6 +4,7 @@ import {
   ApiErrorResponses,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
+  VALIDATION_EXAMPLE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
 import { AuthenticatedOnly } from '../../../infrastructure/security/decorators/access.decorators';
@@ -18,12 +19,13 @@ import {
   HandoverDutyPageResponseDto,
   ListHandoverDutiesQueryDto,
 } from './handover.dto';
-import { toHandoverApiException } from './handover.http-errors';
+import { HANDOVER_ERROR_EXAMPLES as EXAMPLES, toHandoverApiException } from './handover.http-errors';
 
 const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPONSE] as const;
 const NOT_FOUND = {
   status: HttpStatus.NOT_FOUND,
   description: 'The duty does not exist, or has nothing to do with the caller (HANDOVER_DUTY.NOT_FOUND).',
+  examples: [EXAMPLES.NOT_FOUND],
 } as const;
 
 /**
@@ -52,8 +54,13 @@ export class HandoverDutiesController {
     {
       status: HttpStatus.FORBIDDEN,
       description: 'Only an IT Admin asks for scope all (HANDOVER_DUTY.SCOPE_FORBIDDEN).',
+      examples: [EXAMPLES.SCOPE_FORBIDDEN],
     },
-    { status: HttpStatus.UNPROCESSABLE_ENTITY, description: 'A filter is invalid (VALIDATION_ERROR).' },
+    {
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      description: 'A filter is invalid (VALIDATION_ERROR).',
+      examples: [VALIDATION_EXAMPLE],
+    },
   )
   async list(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Query() query: ListHandoverDutiesQueryDto) {
     try {
@@ -73,6 +80,7 @@ export class HandoverDutiesController {
   @ApiErrorResponses(...AUTH_ERRORS, NOT_FOUND, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description: 'The id is not valid (VALIDATION_ERROR).',
+    examples: [VALIDATION_EXAMPLE],
   })
   async get(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: HandoverDutyIdParamDto) {
     try {
@@ -96,17 +104,20 @@ export class HandoverDutiesController {
       status: HttpStatus.FORBIDDEN,
       description:
         'The caller is not the person the duty falls to: another head, the head before a transfer, an IT Admin for the duty of a head, a stand-in approver, Finance, a spending approver or the Super Admin (HANDOVER_DUTY.NOT_CONFIRMER). Nothing is written.',
+      examples: [EXAMPLES.NOT_CONFIRMER],
     },
     NOT_FOUND,
     {
       status: HttpStatus.CONFLICT,
       description:
         'The duty was confirmed already (HANDOVER_DUTY.ALREADY_CONFIRMED) or was cancelled with the case it belonged to (HANDOVER_DUTY.CANCELLED): nothing changes.',
+      examples: [EXAMPLES.ALREADY_CONFIRMED, EXAMPLES.CANCELLED],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
         'The request is invalid (VALIDATION_ERROR), or the value is not one this duty allows (HANDOVER_DUTY.VALUE_NOT_ALLOWED).',
+      examples: [VALIDATION_EXAMPLE, EXAMPLES.VALUE_NOT_ALLOWED],
     },
   )
   async confirm(

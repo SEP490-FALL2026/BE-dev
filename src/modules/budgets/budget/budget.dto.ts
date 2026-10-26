@@ -1,4 +1,4 @@
-import { createZodDto } from 'nestjs-zod';
+import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { z } from 'zod';
 import { isBusinessDate } from '../../../core/business-date';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
@@ -297,9 +297,9 @@ const importSchema = z.strictObject({
   errors: z.array(z.strictObject({ row: z.number().int().positive(), code: z.string() })),
 });
 
-export class ProposalBodyDto extends createZodDto(proposalBodySchema) {}
+export class BudgetProposalBodyDto extends createZodDto(proposalBodySchema) {}
 export class ResubmissionBodyDto extends createZodDto(resubmissionBodySchema) {}
-export class ReturnBodyDto extends createZodDto(returnBodySchema) {}
+export class BudgetProposalReturnBodyDto extends createZodDto(returnBodySchema) {}
 export class DecisionBodyDto extends createZodDto(decisionBodySchema) {}
 export class VersionBodyDto extends createZodDto(versionBodySchema) {}
 export class RevisionBodyDto extends createZodDto(revisionBodySchema) {}
@@ -331,7 +331,9 @@ export class LineChangePageResponseDto extends createZodDto(page(lineChangeSchem
 export class MineResponseDto extends createZodDto(successEnvelopeSchema(z.strictObject({ budget: mineSchema }))) {}
 export class MineLinePageResponseDto extends createZodDto(page(versionLineSchema)) {}
 export class BudgetTablePageResponseDto extends createZodDto(page(tableRowSchema)) {}
-export class ImportResponseDto extends createZodDto(successEnvelopeSchema(z.strictObject({ result: importSchema }))) {}
+export class BudgetLineImportResponseDto extends createZodDto(
+  successEnvelopeSchema(z.strictObject({ result: importSchema })),
+) {}
 
 export type ProposalWire = z.infer<typeof proposalSchema>;
 export type ProposalSummaryWire = z.infer<typeof proposalSummarySchema>;

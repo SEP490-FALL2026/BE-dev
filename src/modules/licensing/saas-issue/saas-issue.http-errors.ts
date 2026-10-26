@@ -1,5 +1,6 @@
 import { HttpStatus } from '@nestjs/common';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
+import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
 import { toLicensingApiException } from '../mappers/licensing.http-errors';
 import { SaasIssueError, type SaasIssueProblem } from './saas-issue.errors';
 
@@ -59,3 +60,24 @@ export function toSaasIssueApiException(error: unknown): unknown {
 
   return toLicensingApiException(error);
 }
+
+const example = (error: Error) => errorExampleOf(toSaasIssueApiException(error));
+
+/** The answers above as OpenAPI examples, each produced by the mapper that gives it at runtime (OPENAPI-EXAMPLE.1). */
+export const SAAS_ISSUE_ERROR_EXAMPLES = {
+  NOT_FOUND: example(new SaasIssueError('NOT_FOUND')),
+  ASSIGNMENT_NOT_YOURS: example(new SaasIssueError('ASSIGNMENT_NOT_YOURS')),
+  ASSIGNMENT_NOT_OPEN: example(new SaasIssueError('ASSIGNMENT_NOT_OPEN')),
+  NO_IT_ADMIN: example(new SaasIssueError('NO_IT_ADMIN')),
+  INVALID_TRANSITION: example(new SaasIssueError('INVALID_TRANSITION')),
+  RESOLUTION_REQUIRED: example(new SaasIssueError('RESOLUTION_REQUIRED')),
+  MESSAGE_REQUIRED: example(new SaasIssueError('MESSAGE_REQUIRED')),
+  DUPLICATE_TARGET_INVALID: example(new SaasIssueError('DUPLICATE_TARGET_INVALID')),
+  REASON_REQUIRED: example(new SaasIssueError('REASON_REQUIRED')),
+  REOPEN_WINDOW_ENDED: example(new SaasIssueError('REOPEN_WINDOW_ENDED')),
+  NOT_RESOLVED: example(new SaasIssueError('NOT_RESOLVED')),
+  CLOSED: example(new SaasIssueError('CLOSED')),
+  OCCURRED_IN_FUTURE: example(new SaasIssueError('OCCURRED_IN_FUTURE')),
+  SCOPE_FORBIDDEN: example(new SaasIssueError('SCOPE_FORBIDDEN')),
+  LINKED_WORK_INVALID: example(new SaasIssueError('LINKED_WORK_INVALID', 'GRANT_TASK_NOT_FOUND')),
+} as const;

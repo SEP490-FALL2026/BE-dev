@@ -15,8 +15,11 @@ import { ApiBody, ApiConsumes } from '@nestjs/swagger';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
+  fallbackExample,
+  FORBIDDEN_EXAMPLE,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
+  VALIDATION_EXAMPLE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
 import { AuthenticatedOnly, RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
@@ -25,7 +28,7 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import {
   AddLinesBodyDto,
   IdParamDto,
-  ImportResponseDto,
+  BudgetLineImportResponseDto,
   LineChangePageResponseDto,
   LineParamDto,
   LinePatchDto,
@@ -36,7 +39,7 @@ import {
   WindowBodyDto,
 } from './budget.dto';
 import { BudgetImportFileInvalidError } from './budget.errors';
-import { toBudgetApiException } from './budget.http-errors';
+import { BUDGET_ERROR_EXAMPLES as EXAMPLES, toBudgetApiException } from './budget.http-errors';
 import { LineImportService } from './line-import.service';
 import { VersionLineService } from './version-line.service';
 import { VersionViewService } from './version-view.service';
@@ -44,6 +47,21 @@ import { VersionViewService } from './version-view.service';
 /** The largest file the route reads: a file of 1 000 lines is far smaller. */
 const MAX_FILE_BYTES = 2 * 1024 * 1024;
 const UPLOAD_LIMITS = { fileSize: MAX_FILE_BYTES, files: 1, fields: 0, parts: 1 };
+/** What the multipart parser answers before the handler runs; the filter gives both the code of their status. */
+const UPLOAD_LIMIT_ERRORS = [
+  {
+    status: HttpStatus.BAD_REQUEST,
+    description:
+      `The form breaks a limit of the upload before it is read — more than ${UPLOAD_LIMITS.files} file, any text field, ` +
+      `more than ${UPLOAD_LIMITS.parts} part — or it is not a readable multipart form (HTTP_BAD_REQUEST).`,
+    examples: [fallbackExample(HttpStatus.BAD_REQUEST)],
+  },
+  {
+    status: HttpStatus.PAYLOAD_TOO_LARGE,
+    description: `The file is larger than ${MAX_FILE_BYTES / (1024 * 1024)} MiB (HTTP_PAYLOAD_TOO_LARGE).`,
+    examples: [fallbackExample(HttpStatus.PAYLOAD_TOO_LARGE)],
+  },
+] as const;
 
 interface UploadedBinary {
   originalname: string;
@@ -51,23 +69,50 @@ interface UploadedBinary {
 }
 
 const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPONSE] as const;
+const FINANCE_ONLY_DESCRIPTION = 'Only Finance builds the versions of a budget.';
 const FINANCE_ONLY = {
   status: HttpStatus.FORBIDDEN,
-  description: 'Only Finance builds the versions of a budget.',
+  description: FINANCE_ONLY_DESCRIPTION,
+  examples: [FORBIDDEN_EXAMPLE],
 } as const;
+/** The reading routes have no role guard: the service lets Finance, the spending approver and the substitute read. */
+const READERS_ONLY = {
+  status: HttpStatus.FORBIDDEN,
+  description: FINANCE_ONLY_DESCRIPTION,
+  examples: [EXAMPLES.NOT_A_READER],
+} as const;
+const NOT_FOUND_DESCRIPTION =
+  'The version or the line does not exist (BUDGET.VERSION_NOT_FOUND, BUDGET.LINE_NOT_FOUND).';
+/** A route that reads a line by its position. */
 const NOT_FOUND = {
   status: HttpStatus.NOT_FOUND,
-  description: 'The version or the line does not exist (BUDGET.VERSION_NOT_FOUND, BUDGET.LINE_NOT_FOUND).',
+  description: NOT_FOUND_DESCRIPTION,
+  examples: [EXAMPLES.VERSION_NOT_FOUND, EXAMPLES.LINE_NOT_FOUND],
+} as const;
+/** A route that reads the version only. */
+const VERSION_NOT_FOUND = {
+  status: HttpStatus.NOT_FOUND,
+  description: NOT_FOUND_DESCRIPTION,
+  examples: [EXAMPLES.VERSION_NOT_FOUND],
 } as const;
 const INVALID = {
   status: HttpStatus.UNPROCESSABLE_ENTITY,
   description: 'The request is invalid (VALIDATION_ERROR).',
+  examples: [VALIDATION_EXAMPLE],
 } as const;
 const NOT_EDITABLE = {
   status: HttpStatus.CONFLICT,
   description:
     'The version is not a draft nor sent back to Finance, so it is not changed (BUDGET.VERSION_NOT_EDITABLE).',
+  examples: [EXAMPLES.VERSION_NOT_EDITABLE],
 } as const;
+/** What an amount of a line refuses after the request validation: its currency and its range. */
+const MONEY_EXAMPLES = [
+  EXAMPLES.CURRENCY_NOT_REPORTING,
+  EXAMPLES.CURRENCY_NOT_SUPPORTED,
+  EXAMPLES.MONEY_SCALE_EXCEEDED,
+  EXAMPLES.MONEY_OUT_OF_RANGE,
+] as const;
 
 /**
  * The versions of a budget as Finance builds them (`US-06-09`): a first version from the proposal that waits, a revision of
@@ -91,7 +136,7 @@ export class BudgetVersionLinesController {
     message: 'BUDGET_VERSION.LINES_LISTED',
     description: 'In order, with the position of the line of the proposal each adjusts.',
   })
-  @ApiErrorResponses(...AUTH_ERRORS, FINANCE_ONLY, NOT_FOUND, INVALID)
+  @ApiErrorResponses(...AUTH_ERRORS, READERS_ONLY, VERSION_NOT_FOUND, INVALID)
   async lines(
     @CurrentPrincipal() actor: AuthenticatedPrincipal,
     @Param() params: IdParamDto,
@@ -115,6 +160,7 @@ export class BudgetVersionLinesController {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description:
       'The body is invalid (VALIDATION_ERROR), the window runs backwards (BUDGET.WINDOW_BACKWARDS) or the reason of the adjustment is missing (BUDGET.ADJUSTMENT_REASON_REQUIRED).',
+    examples: [VALIDATION_EXAMPLE, EXAMPLES.WINDOW_BACKWARDS, EXAMPLES.ADJUSTMENT_REASON_REQUIRED, ...MONEY_EXAMPLES],
   })
   async updateLine(
     @CurrentPrincipal() actor: AuthenticatedPrincipal,
@@ -136,10 +182,11 @@ export class BudgetVersionLinesController {
     message: 'BUDGET_VERSION.LINES_ADDED',
     description: 'Lines of Finance own, saying what every line says.',
   })
-  @ApiErrorResponses(...AUTH_ERRORS, FINANCE_ONLY, NOT_FOUND, NOT_EDITABLE, {
+  @ApiErrorResponses(...AUTH_ERRORS, FINANCE_ONLY, VERSION_NOT_FOUND, NOT_EDITABLE, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description:
       'The body is invalid (VALIDATION_ERROR), a line is incomplete (BUDGET.PROPOSAL_INCOMPLETE) or a window runs backwards (BUDGET.WINDOW_BACKWARDS).',
+    examples: [VALIDATION_EXAMPLE, EXAMPLES.PROPOSAL_INCOMPLETE, EXAMPLES.WINDOW_BACKWARDS, ...MONEY_EXAMPLES],
   })
   async addLines(
     @CurrentPrincipal() actor: AuthenticatedPrincipal,
@@ -171,11 +218,13 @@ export class BudgetVersionLinesController {
       status: HttpStatus.CONFLICT,
       description:
         'The version is not the current budget (BUDGET.VERSION_NOT_CURRENT), or an amount is given: that is a revision (BUDGET.REVISION_REQUIRED).',
+      examples: [EXAMPLES.VERSION_NOT_CURRENT, EXAMPLES.REVISION_REQUIRED],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
         'The body is invalid (VALIDATION_ERROR), the reason is missing (BUDGET.WINDOW_REASON_REQUIRED) or the window runs backwards (BUDGET.WINDOW_BACKWARDS).',
+      examples: [VALIDATION_EXAMPLE, EXAMPLES.WINDOW_REASON_REQUIRED, EXAMPLES.WINDOW_BACKWARDS, ...MONEY_EXAMPLES],
     },
   )
   async changeWindow(
@@ -197,7 +246,7 @@ export class BudgetVersionLinesController {
     message: 'BUDGET_VERSION.CHANGES_LISTED',
     description: 'Newest first: the window before and after, the reason, who and when.',
   })
-  @ApiErrorResponses(...AUTH_ERRORS, FINANCE_ONLY, NOT_FOUND, INVALID)
+  @ApiErrorResponses(...AUTH_ERRORS, READERS_ONLY, NOT_FOUND, INVALID)
   async changes(
     @CurrentPrincipal() actor: AuthenticatedPrincipal,
     @Param() params: LineParamDto,
@@ -218,15 +267,16 @@ export class BudgetVersionLinesController {
   @ApiBody({
     schema: { type: 'object', required: ['file'], properties: { file: { type: 'string', format: 'binary' } } },
   })
-  @ApiSuccessResponse(ImportResponseDto, {
+  @ApiSuccessResponse(BudgetLineImportResponseDto, {
     status: HttpStatus.CREATED,
     message: 'BUDGET_VERSION.LINES_IMPORTED',
     description:
       'Each row is judged on its own: the right ones are added to the version, which is a draft and so budgets nothing until it is approved, and the others are reported with the row and the reason.',
   })
-  @ApiErrorResponses(...AUTH_ERRORS, FINANCE_ONLY, NOT_FOUND, NOT_EDITABLE, {
+  @ApiErrorResponses(...AUTH_ERRORS, ...UPLOAD_LIMIT_ERRORS, FINANCE_ONLY, VERSION_NOT_FOUND, NOT_EDITABLE, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description: 'The file cannot be read as a table, lacks a column, or is empty (BUDGET.IMPORT_FILE_INVALID).',
+    examples: [VALIDATION_EXAMPLE, EXAMPLES.IMPORT_FILE_INVALID],
   })
   async load(
     @CurrentPrincipal() actor: AuthenticatedPrincipal,

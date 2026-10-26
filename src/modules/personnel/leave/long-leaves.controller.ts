@@ -2,8 +2,10 @@ import { Body, Controller, Get, HttpStatus, Param, Post, Query } from '@nestjs/c
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
+  FORBIDDEN_EXAMPLE,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
+  VALIDATION_EXAMPLE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
 import { RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
@@ -20,19 +22,26 @@ import {
   ListLeavesQueryDto,
   StartLeaveBodyDto,
 } from './leave.dto';
-import { toLeaveApiException } from './leave.http-errors';
+import { LEAVE_ERROR_EXAMPLES as EXAMPLES, toLeaveApiException } from './leave.http-errors';
 import { LeaveQueryService } from './leave-query.service';
 import { LeaveService } from './leave.service';
 
 const FORBIDDEN = {
   status: HttpStatus.FORBIDDEN,
   description: 'Only an IT Admin starts, moves, ends or reads long leaves.',
+  examples: [FORBIDDEN_EXAMPLE],
 } as const;
 const COMMON = [UNAUTHENTICATED_RESPONSE, FORBIDDEN, GUARDED_SERVICE_UNAVAILABLE_RESPONSE] as const;
 const NOT_FOUND = {
   status: HttpStatus.NOT_FOUND,
   description: 'The long leave does not exist (LONG_LEAVE.NOT_FOUND).',
+  examples: [EXAMPLES.NOT_FOUND],
 } as const;
+
+/** The refusals of the basis of a day, the same on every write that needs one. */
+const GROUNDS_EXAMPLES = [EXAMPLES.GROUNDS_REQUIRED, EXAMPLES.GROUNDS_INCOMPLETE, EXAMPLES.GROUNDS_IS_NOTICE] as const;
+/** The refusals of a write on a leave that runs. */
+const ENDED_OR_SELF_EXAMPLES = [EXAMPLES.NOT_ACTIVE, EXAMPLES.SELF_EVENT_NEEDS_ANOTHER_IT_ADMIN] as const;
 
 const GROUNDS_REFUSALS =
   'the basis is empty or lacks a part (LONG_LEAVE.GROUNDS_REQUIRED, GROUNDS_INCOMPLETE) or is the code of a notice and not a document (GROUNDS_IS_NOTICE)';
@@ -63,15 +72,23 @@ export class LongLeavesController {
     {
       status: HttpStatus.NOT_FOUND,
       description: 'The employee does not exist (LONG_LEAVE.EMPLOYEE_NOT_FOUND).',
+      examples: [EXAMPLES.EMPLOYEE_NOT_FOUND],
     },
     {
       status: HttpStatus.CONFLICT,
       description:
         'The employee is on long leave already (LONG_LEAVE.ALREADY_ON_LEAVE), is handing over or has left (EMPLOYEE_NOT_WORKING), or an IT Admin records it for themselves while another can (SELF_EVENT_NEEDS_ANOTHER_IT_ADMIN).',
+      examples: [EXAMPLES.ALREADY_ON_LEAVE, EXAMPLES.EMPLOYEE_NOT_WORKING, EXAMPLES.SELF_EVENT_NEEDS_ANOTHER_IT_ADMIN],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description: `The body is invalid or names a field the route does not know (VALIDATION_ERROR), the start is in the future or before the employee joined (LONG_LEAVE.START_DATE_INVALID), the day of return is not after the start (RETURN_DATE_INVALID), or ${GROUNDS_REFUSALS}: nothing is saved.`,
+      examples: [
+        VALIDATION_EXAMPLE,
+        EXAMPLES.START_DATE_INVALID,
+        EXAMPLES.RETURN_DATE_NOT_AFTER_START,
+        ...GROUNDS_EXAMPLES,
+      ],
     },
   )
   async start(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: StartLeaveBodyDto) {
@@ -92,6 +109,7 @@ export class LongLeavesController {
   @ApiErrorResponses(...COMMON, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description: 'A filter is invalid (VALIDATION_ERROR).',
+    examples: [VALIDATION_EXAMPLE],
   })
   async list(@Query() query: ListLeavesQueryDto) {
     try {
@@ -110,6 +128,7 @@ export class LongLeavesController {
   @ApiErrorResponses(...COMMON, NOT_FOUND, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description: 'The id is not valid (VALIDATION_ERROR).',
+    examples: [VALIDATION_EXAMPLE],
   })
   async get(@Param() params: LeaveIdParamDto) {
     try {
@@ -129,6 +148,7 @@ export class LongLeavesController {
   @ApiErrorResponses(...COMMON, NOT_FOUND, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description: 'The id or a page parameter is not valid (VALIDATION_ERROR).',
+    examples: [VALIDATION_EXAMPLE],
   })
   async listChanges(@Param() params: LeaveIdParamDto, @Query() query: ListLeaveChangesQueryDto) {
     try {
@@ -152,10 +172,17 @@ export class LongLeavesController {
       status: HttpStatus.CONFLICT,
       description:
         'The leave has ended (LONG_LEAVE.NOT_ACTIVE), or an IT Admin changes it for themselves while another can (SELF_EVENT_NEEDS_ANOTHER_IT_ADMIN).',
+      examples: [...ENDED_OR_SELF_EXAMPLES],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description: `The body is invalid (VALIDATION_ERROR), the day is the same, not after the start (LONG_LEAVE.RETURN_DATE_INVALID) or before today (RETURN_DATE_IN_PAST), or ${GROUNDS_REFUSALS}: nothing is saved and the person stays on long leave.`,
+      examples: [
+        VALIDATION_EXAMPLE,
+        EXAMPLES.RETURN_DATE_NOT_AFTER_START,
+        EXAMPLES.RETURN_DATE_IN_PAST,
+        ...GROUNDS_EXAMPLES,
+      ],
     },
   )
   async changeReturnDate(
@@ -184,10 +211,12 @@ export class LongLeavesController {
       status: HttpStatus.CONFLICT,
       description:
         'The leave has ended (LONG_LEAVE.NOT_ACTIVE), or an IT Admin records it for themselves while another can (SELF_EVENT_NEEDS_ANOTHER_IT_ADMIN).',
+      examples: [...ENDED_OR_SELF_EXAMPLES],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description: `The body is invalid (VALIDATION_ERROR), the day is before the leave began or in the future (LONG_LEAVE.RETURN_DATE_INVALID), or, on a day other than the approved one, ${GROUNDS_REFUSALS}: nothing is saved and the person stays on long leave.`,
+      examples: [VALIDATION_EXAMPLE, EXAMPLES.RETURN_DATE_IN_FUTURE, ...GROUNDS_EXAMPLES],
     },
   )
   async confirmReturn(

@@ -4,6 +4,7 @@ import {
   ApiErrorResponses,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
+  VALIDATION_EXAMPLE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
 import { AuthenticatedOnly } from '../../../infrastructure/security/decorators/access.decorators';
@@ -20,7 +21,7 @@ import {
 } from './access-request.dto';
 import { PreviewBodyDto, PreviewResponseDto } from './request-preview.dto';
 import { RequestPreviewService } from './request-preview.service';
-import { toAccessRequestApiException } from './access-request.http-errors';
+import { ACCESS_REQUEST_ERROR_EXAMPLES as EXAMPLES, toAccessRequestApiException } from './access-request.http-errors';
 import { AccessRequestQueryService } from './access-request-query.service';
 import { toWire } from './access-request.wire';
 import { AccessRequestService } from './access-request.service';
@@ -29,6 +30,16 @@ import { SimilarSeatsService } from './similar-seats.service';
 import { WithdrawalService } from './withdrawal.service';
 
 const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPONSE] as const;
+const PLAN_NOT_FOUND = {
+  status: HttpStatus.NOT_FOUND,
+  description: 'The plan does not exist (ACCESS_REQUEST.PLAN_NOT_FOUND).',
+  examples: [EXAMPLES.PLAN_NOT_FOUND],
+} as const;
+const NOT_FOUND = {
+  status: HttpStatus.NOT_FOUND,
+  description: 'The request does not exist, or the caller has no part in it (ACCESS_REQUEST.NOT_FOUND).',
+  examples: [EXAMPLES.NOT_FOUND],
+} as const;
 
 /**
  * A request for access to software (`US-05-02`, `US-05-03`): any signed-in person sends one for themselves, and only the
@@ -58,19 +69,18 @@ export class AccessRequestsController {
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
-    {
-      status: HttpStatus.NOT_FOUND,
-      description: 'The plan does not exist (ACCESS_REQUEST.PLAN_NOT_FOUND).',
-    },
+    PLAN_NOT_FOUND,
     {
       status: HttpStatus.CONFLICT,
       description:
         'The application of the plan is retired (ACCESS_REQUEST.APPLICATION_RETIRED), the sender belongs to no department (ACCESS_REQUEST.NO_DEPARTMENT) or already holds a seat of the plan (ACCESS_REQUEST.ALREADY_HOLDS_ACCESS, with the seat in details).',
+      examples: [EXAMPLES.APPLICATION_RETIRED, EXAMPLES.NO_DEPARTMENT, EXAMPLES.ALREADY_HOLDS_ACCESS],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
         'The form is incomplete or invalid (VALIDATION_ERROR): the reason and the term are required; a tool outside the standard toolset needs its reason (ACCESS_REQUEST.OUTSIDE_STANDARD_REASON_REQUIRED). Nothing is written.',
+      examples: [VALIDATION_EXAMPLE, EXAMPLES.OUTSIDE_STANDARD_REASON_REQUIRED, EXAMPLES.NO_SPEND_FOR_FREE_SOFTWARE],
     },
   )
   async submit(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: SubmitBodyDto) {
@@ -93,19 +103,18 @@ export class AccessRequestsController {
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
-    {
-      status: HttpStatus.NOT_FOUND,
-      description: 'The plan does not exist (ACCESS_REQUEST.PLAN_NOT_FOUND).',
-    },
+    PLAN_NOT_FOUND,
     {
       status: HttpStatus.CONFLICT,
       description:
         'The application of the plan is retired (ACCESS_REQUEST.APPLICATION_RETIRED) or the caller belongs to no department (ACCESS_REQUEST.NO_DEPARTMENT).',
+      examples: [EXAMPLES.APPLICATION_RETIRED, EXAMPLES.NO_DEPARTMENT],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
         'The body is invalid (VALIDATION_ERROR), or an expected spend date is given for internal software (ACCESS_REQUEST.NO_SPEND_FOR_FREE_SOFTWARE).',
+      examples: [VALIDATION_EXAMPLE, EXAMPLES.NO_SPEND_FOR_FREE_SOFTWARE],
     },
   )
   async preview(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: PreviewBodyDto) {
@@ -124,17 +133,11 @@ export class AccessRequestsController {
     description:
       'The request with the person who holds its need step, the row of the routing table that named them (or why nobody holds it) and whether the same person also holds the spend step. Only the sender, the person it is for, the person who holds the step and an IT Admin read it.',
   })
-  @ApiErrorResponses(
-    ...AUTH_ERRORS,
-    {
-      status: HttpStatus.NOT_FOUND,
-      description: 'The request does not exist, or the caller has no part in it (ACCESS_REQUEST.NOT_FOUND).',
-    },
-    {
-      status: HttpStatus.UNPROCESSABLE_ENTITY,
-      description: 'The id is invalid (VALIDATION_ERROR).',
-    },
-  )
+  @ApiErrorResponses(...AUTH_ERRORS, NOT_FOUND, {
+    status: HttpStatus.UNPROCESSABLE_ENTITY,
+    description: 'The id is invalid (VALIDATION_ERROR).',
+    examples: [VALIDATION_EXAMPLE],
+  })
   async get(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: RequestIdParamDto) {
     try {
       return { request: toWire(await this.queries.get(actor, params.id)) };
@@ -157,20 +160,27 @@ export class AccessRequestsController {
       status: HttpStatus.FORBIDDEN,
       description:
         'The caller asked for or is given the request (ACCESS_REQUEST.OWN_REQUEST), or does not hold the step (ACCESS_REQUEST.NOT_THE_ASSIGNEE).',
+      examples: [EXAMPLES.DECISION_OWN_REQUEST, EXAMPLES.DECISION_NOT_THE_ASSIGNEE],
     },
-    {
-      status: HttpStatus.NOT_FOUND,
-      description: 'The request does not exist, or the caller has no part in it (ACCESS_REQUEST.NOT_FOUND).',
-    },
+    NOT_FOUND,
     {
       status: HttpStatus.CONFLICT,
       description:
         'The step is not pending: it is decided, or waits for somebody to hold it (ACCESS_REQUEST.STEP_NOT_PENDING).',
+      examples: [EXAMPLES.STEP_NOT_PENDING, EXAMPLES.GROUP_USES_LINES],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
         'The decision is invalid (VALIDATION_ERROR: a refusal without a reason, a signature, both a line and outside the plan) or a term over twelve months is approved without a confirmation (ACCESS_REQUEST.TERM_CONFIRMATION_REQUIRED). The head who approves a request that costs money gives a line of the plan of the budget or says it is outside the plan, else nothing is saved (ACCESS_REQUEST.PLAN_LINE_REQUIRED); a line that is not there (ACCESS_REQUEST.LINE_NOT_FOUND) or whose window has gone by and is not confirmed as still needed (ACCESS_REQUEST.STILL_NEEDED_REQUIRED) is refused, and a line or a day is not for anyone else or for a request that costs nothing (ACCESS_REQUEST.SPEND_NOT_APPLICABLE).',
+      examples: [
+        VALIDATION_EXAMPLE,
+        EXAMPLES.TERM_CONFIRMATION_REQUIRED,
+        EXAMPLES.PLAN_LINE_REQUIRED,
+        EXAMPLES.LINE_NOT_FOUND,
+        EXAMPLES.STILL_NEEDED_REQUIRED,
+        EXAMPLES.SPEND_NOT_APPLICABLE,
+      ],
     },
   )
   async decide(
@@ -215,20 +225,25 @@ export class AccessRequestsController {
       status: HttpStatus.FORBIDDEN,
       description:
         'The caller is not the requester, the person it was sent for included, and not the head in a stage the head acts on (ACCESS_REQUEST.NOT_REQUESTER).',
+      examples: [EXAMPLES.NOT_REQUESTER],
     },
-    {
-      status: HttpStatus.NOT_FOUND,
-      description: 'The request does not exist, or the caller has no part in it (ACCESS_REQUEST.NOT_FOUND).',
-    },
+    NOT_FOUND,
     {
       status: HttpStatus.CONFLICT,
       description:
         'Nothing is left to withdraw (ACCESS_REQUEST.ALREADY_ENDED), the withdrawal waits for the IT Admin (ACCESS_REQUEST.WITHDRAWAL_PENDING), the task of the grant is being worked: ask again when it has a result (ACCESS_REQUEST.GRANT_RUNNING), or the seat is real and the way back is a return (ACCESS_REQUEST.GRANT_COMPLETED). Nothing changes.',
+      examples: [
+        EXAMPLES.WITHDRAWAL_ALREADY_ENDED,
+        EXAMPLES.WITHDRAWAL_PENDING,
+        EXAMPLES.GRANT_RUNNING,
+        EXAMPLES.GRANT_COMPLETED,
+      ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
         'The body is invalid (VALIDATION_ERROR: a blank reason), or the head gives no reason (ACCESS_REQUEST.REASON_REQUIRED). Nothing is saved.',
+      examples: [VALIDATION_EXAMPLE, EXAMPLES.WITHDRAWAL_REASON_REQUIRED],
     },
   )
   async withdraw(
@@ -262,12 +277,14 @@ export class AccessRequestsController {
       status: HttpStatus.FORBIDDEN,
       description:
         'The caller has a part in the request but does not hold its need step (ACCESS_REQUEST.NOT_THE_ASSIGNEE).',
+      examples: [EXAMPLES.NOT_ASSIGNEE],
     },
+    NOT_FOUND,
     {
-      status: HttpStatus.NOT_FOUND,
-      description: 'The request does not exist, or the caller has no part in it (ACCESS_REQUEST.NOT_FOUND).',
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      description: 'The id or the query is invalid (VALIDATION_ERROR).',
+      examples: [VALIDATION_EXAMPLE, EXAMPLES.EMPLOYEE_REQUIRED],
     },
-    { status: HttpStatus.UNPROCESSABLE_ENTITY, description: 'The id or the query is invalid (VALIDATION_ERROR).' },
   )
   async listSimilarSeats(
     @CurrentPrincipal() actor: AuthenticatedPrincipal,

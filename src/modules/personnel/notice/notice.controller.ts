@@ -2,8 +2,10 @@ import { Body, Controller, Get, HttpStatus, Param, Post, Query } from '@nestjs/c
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
+  FORBIDDEN_EXAMPLE,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
+  VALIDATION_EXAMPLE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
 import { RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
@@ -19,7 +21,7 @@ import {
   RejectNoticeBodyDto,
   SendNoticeBodyDto,
 } from './notice.dto';
-import { toNoticeApiException } from './notice.http-errors';
+import { NOTICE_ERROR_EXAMPLES as EXAMPLES, toNoticeApiException } from './notice.http-errors';
 import { NoticeHandlingService } from './notice-handling.service';
 import { NoticeQueryService } from './notice-query.service';
 import { NoticeService } from './notice.service';
@@ -28,15 +30,18 @@ const COMMON = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPONSE] 
 const NOT_FOUND = {
   status: HttpStatus.NOT_FOUND,
   description: 'The notice does not exist, or is one that another head sent (PERSONNEL_NOTICE.NOT_FOUND).',
+  examples: [EXAMPLES.NOT_FOUND],
 } as const;
 const IT_ADMIN_ONLY = {
   status: HttpStatus.FORBIDDEN,
   description:
     'Only an IT Admin handles a notice: a department head, Finance, an approver and the Super Admin are refused.',
+  examples: [FORBIDDEN_EXAMPLE],
 } as const;
 const NOT_PENDING = {
   status: HttpStatus.CONFLICT,
   description: 'The notice has been recorded, rejected or withdrawn already (PERSONNEL_NOTICE.NOT_PENDING).',
+  examples: [EXAMPLES.NOT_PENDING],
 } as const;
 
 const GROUNDS_REFUSALS =
@@ -71,17 +76,29 @@ export class NoticesController {
       status: HttpStatus.FORBIDDEN,
       description:
         'The caller does not head a department, or does not head the department of the person (a notice of a transfer to their own department: the one it names) (PERSONNEL_NOTICE.NOT_DEPARTMENT_HEAD, KIND_NOT_ALLOWED). Nothing is saved.',
+      examples: [FORBIDDEN_EXAMPLE, EXAMPLES.NOT_DEPARTMENT_HEAD, EXAMPLES.KIND_NOT_ALLOWED],
     },
-    { status: HttpStatus.NOT_FOUND, description: 'The employee does not exist (PERSONNEL_NOTICE.EMPLOYEE_NOT_FOUND).' },
+    {
+      status: HttpStatus.NOT_FOUND,
+      description: 'The employee does not exist (PERSONNEL_NOTICE.EMPLOYEE_NOT_FOUND).',
+      examples: [EXAMPLES.EMPLOYEE_NOT_FOUND],
+    },
     {
       status: HttpStatus.CONFLICT,
       description:
         'The employee has left (PERSONNEL_NOTICE.EMPLOYEE_LEFT), or a notice of the same kind about them already waits, named in details.pendingCode (DUPLICATE_PENDING).',
+      examples: [EXAMPLES.EMPLOYEE_LEFT, EXAMPLES.DUPLICATE_PENDING],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
         'The body is invalid or names a field the form does not have, such as a reason for leaving (VALIDATION_ERROR), the head names the person themselves (PERSONNEL_NOTICE.SELF_NOTICE), or the department of a transfer is missing, is not usable, or is named for a kind that takes none (TARGET_DEPARTMENT_REQUIRED, TARGET_DEPARTMENT_INVALID): nothing is saved.',
+      examples: [
+        VALIDATION_EXAMPLE,
+        EXAMPLES.SELF_NOTICE,
+        EXAMPLES.TARGET_DEPARTMENT_REQUIRED,
+        EXAMPLES.TARGET_DEPARTMENT_INVALID,
+      ],
     },
   )
   async send(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: SendNoticeBodyDto) {
@@ -105,10 +122,12 @@ export class NoticesController {
     {
       status: HttpStatus.FORBIDDEN,
       description: 'The caller is neither an IT Admin nor the head of a department.',
+      examples: [FORBIDDEN_EXAMPLE],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description: 'A filter or a page parameter is invalid (VALIDATION_ERROR).',
+      examples: [VALIDATION_EXAMPLE],
     },
   )
   async list(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Query() query: ListNoticesQueryDto) {
@@ -129,9 +148,17 @@ export class NoticesController {
   })
   @ApiErrorResponses(
     ...COMMON,
-    { status: HttpStatus.FORBIDDEN, description: 'The caller is neither an IT Admin nor the head of a department.' },
+    {
+      status: HttpStatus.FORBIDDEN,
+      description: 'The caller is neither an IT Admin nor the head of a department.',
+      examples: [FORBIDDEN_EXAMPLE],
+    },
     NOT_FOUND,
-    { status: HttpStatus.UNPROCESSABLE_ENTITY, description: 'The id is not valid (VALIDATION_ERROR).' },
+    {
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      description: 'The id is not valid (VALIDATION_ERROR).',
+      examples: [VALIDATION_EXAMPLE],
+    },
   )
   async get(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: NoticeIdParamDto) {
     try {
@@ -150,10 +177,18 @@ export class NoticesController {
   })
   @ApiErrorResponses(
     ...COMMON,
-    { status: HttpStatus.FORBIDDEN, description: 'The caller does not head a department.' },
+    {
+      status: HttpStatus.FORBIDDEN,
+      description: 'The caller does not head a department.',
+      examples: [FORBIDDEN_EXAMPLE],
+    },
     NOT_FOUND,
     NOT_PENDING,
-    { status: HttpStatus.UNPROCESSABLE_ENTITY, description: 'The id is not valid (VALIDATION_ERROR).' },
+    {
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      description: 'The id is not valid (VALIDATION_ERROR).',
+      examples: [VALIDATION_EXAMPLE],
+    },
   )
   async withdraw(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: NoticeIdParamDto) {
     try {
@@ -175,6 +210,7 @@ export class NoticesController {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description:
       'The reason is missing or empty, or the body is invalid (VALIDATION_ERROR, PERSONNEL_NOTICE.REASON_REQUIRED): nothing is saved.',
+    examples: [VALIDATION_EXAMPLE, EXAMPLES.REASON_REQUIRED],
   })
   async reject(
     @CurrentPrincipal() actor: AuthenticatedPrincipal,
@@ -205,10 +241,19 @@ export class NoticesController {
       status: HttpStatus.CONFLICT,
       description:
         'The notice is not waiting (PERSONNEL_NOTICE.NOT_PENDING), the person already has such an event: reject the notice or link it to that event (DUPLICATE_EVENT), or the event refuses with its own code, such as a person who has left or an IT Admin who records an event about themselves while another can. Nothing is saved and the notice keeps waiting.',
+      examples: [EXAMPLES.NOT_PENDING, EXAMPLES.DUPLICATE_EVENT],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description: `The body is invalid (VALIDATION_ERROR), how the notice was checked is missing (PERSONNEL_NOTICE.VERIFICATION_REQUIRED), ${GROUNDS_REFUSALS}, the event lacks a field its kind needs or carries one it does not take (EVENT_INVALID), or the event refuses with its own code, such as a day before today: nothing is saved and the notice keeps waiting.`,
+      examples: [
+        VALIDATION_EXAMPLE,
+        EXAMPLES.VERIFICATION_REQUIRED,
+        EXAMPLES.GROUNDS_REQUIRED,
+        EXAMPLES.GROUNDS_INCOMPLETE,
+        EXAMPLES.GROUNDS_IS_NOTICE,
+        EXAMPLES.EVENT_INVALID,
+      ],
     },
   )
   async record(
@@ -239,11 +284,13 @@ export class NoticesController {
       status: HttpStatus.CONFLICT,
       description:
         'The notice is not waiting (PERSONNEL_NOTICE.NOT_PENDING), or the event is not one of this person and of the kind of the notice that is in force (NO_MATCHING_EVENT).',
+      examples: [EXAMPLES.NOT_PENDING, EXAMPLES.NO_MATCHING_EVENT],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
         'The body is invalid (VALIDATION_ERROR) or how the notice was checked is missing (PERSONNEL_NOTICE.VERIFICATION_REQUIRED): nothing is saved.',
+      examples: [VALIDATION_EXAMPLE, EXAMPLES.VERIFICATION_REQUIRED],
     },
   )
   async link(

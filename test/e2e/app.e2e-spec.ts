@@ -21,6 +21,7 @@ import { ApiException } from '../../src/infrastructure/http/errors/api.exception
 import { HttpExceptionFilter } from '../../src/infrastructure/http/filters/http-exception.filter';
 import { AuthenticatedOnly, RequireRoles } from '../../src/infrastructure/security/decorators/access.decorators';
 import { Public } from '../../src/infrastructure/security/decorators/public.decorator';
+import { OPENAPI_DOCUMENT_BUDGET_MS } from '../support/openapi-document-budget';
 import {
   ACCESS_TOKEN_VERIFIER,
   TokenVerificationUnavailableError,
@@ -605,54 +606,58 @@ describe('Application foundation (e2e)', () => {
     }
   });
 
-  it('documents the actual success and error wire envelopes in OpenAPI', () => {
-    const document = createOpenApiDocument(app!);
-    const operation = document.paths['/api/v1/health/live']?.get;
-    const schemas = document.components?.schemas as Record<string, unknown>;
+  it(
+    'documents the actual success and error wire envelopes in OpenAPI',
+    () => {
+      const document = createOpenApiDocument(app!);
+      const operation = document.paths['/api/v1/health/live']?.get;
+      const schemas = document.components?.schemas as Record<string, unknown>;
 
-    // The DTO stays the schema; an overlay only shows the declared message (OPENAPI-EXAMPLE.1).
-    expect(operation?.responses?.['200']).toMatchObject({
-      content: {
-        'application/json': {
-          schema: {
-            allOf: [
-              { $ref: '#/components/schemas/HealthResponseDto' },
-              { properties: { message: { example: 'HEALTH.LIVENESS_CHECKED' } } },
-            ],
+      // The DTO stays the schema; an overlay only shows the declared message (OPENAPI-EXAMPLE.1).
+      expect(operation?.responses?.['200']).toMatchObject({
+        content: {
+          'application/json': {
+            schema: {
+              allOf: [
+                { $ref: '#/components/schemas/HealthResponseDto' },
+                { properties: { message: { example: 'HEALTH.LIVENESS_CHECKED' } } },
+              ],
+            },
           },
         },
-      },
-    });
-    expect(operation?.responses?.['500']).toMatchObject({
-      content: {
-        'application/json': {
-          schema: { $ref: '#/components/schemas/ErrorEnvelopeDto' },
+      });
+      expect(operation?.responses?.['500']).toMatchObject({
+        content: {
+          'application/json': {
+            schema: { $ref: '#/components/schemas/ErrorEnvelopeDto' },
+          },
         },
-      },
-    });
-    expect(schemas.HealthResponseDto).toMatchObject({
-      required: ['success', 'message', 'data'],
-      properties: {
-        success: { enum: [true] },
-        message: { type: 'string' },
-        data: {
-          type: 'object',
-          nullable: true,
-          required: ['status'],
+      });
+      expect(schemas.HealthResponseDto).toMatchObject({
+        required: ['success', 'message', 'data'],
+        properties: {
+          success: { enum: [true] },
+          message: { type: 'string' },
+          data: {
+            type: 'object',
+            nullable: true,
+            required: ['status'],
+          },
         },
-      },
-    });
-    expect(schemas.ErrorEnvelopeDto).toMatchObject({
-      required: ['success', 'error'],
-      properties: {
-        // OpenAPI 3.0 has no `const`: the single allowed value is a one-value enum (H2a).
-        success: { type: 'boolean', enum: [false] },
-        error: {
-          required: ['code', 'message', 'requestId'],
+      });
+      expect(schemas.ErrorEnvelopeDto).toMatchObject({
+        required: ['success', 'error'],
+        properties: {
+          // OpenAPI 3.0 has no `const`: the single allowed value is a one-value enum (H2a).
+          success: { type: 'boolean', enum: [false] },
+          error: {
+            required: ['code', 'message', 'requestId'],
+          },
         },
-      },
-    });
-  });
+      });
+    },
+    OPENAPI_DOCUMENT_BUDGET_MS,
+  );
 });
 
 describe('Global guard order (e2e)', () => {

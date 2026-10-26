@@ -2,8 +2,10 @@ import { Body, Controller, Get, HttpStatus, Param, Post, Query } from '@nestjs/c
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
+  FORBIDDEN_EXAMPLE,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
+  VALIDATION_EXAMPLE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
 import { AuthenticatedOnly, RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
@@ -23,7 +25,7 @@ import {
   SaasIssueTransitionBodyDto,
   SubmitSaasIssueBodyDto,
 } from './saas-issue.dto';
-import { toSaasIssueApiException } from './saas-issue.http-errors';
+import { SAAS_ISSUE_ERROR_EXAMPLES as EXAMPLES, toSaasIssueApiException } from './saas-issue.http-errors';
 import { SaasIssueService } from './saas-issue.service';
 import { SaasIssueHandlingService } from './saas-issue-handling.service';
 import { SaasIssueViewService } from './saas-issue-view.service';
@@ -33,6 +35,7 @@ const NOT_FOUND = {
   status: HttpStatus.NOT_FOUND,
   description:
     'The report does not exist, or it is not the caller’s own and the caller is not an IT Admin (SAAS_ISSUE.NOT_FOUND): the two are not told apart.',
+  examples: [EXAMPLES.NOT_FOUND],
 } as const;
 const WEB_ONLY = ' This operation is for the web client only; there is no separate operation for mobile.';
 
@@ -60,6 +63,7 @@ export class SaasIssuesController {
   @ApiErrorResponses(...AUTH_ERRORS, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description: 'A page parameter is invalid (VALIDATION_ERROR).',
+    examples: [VALIDATION_EXAMPLE],
   })
   async options(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Query() query: SaasIssuePageQueryDto) {
     try {
@@ -83,16 +87,19 @@ export class SaasIssuesController {
       status: HttpStatus.FORBIDDEN,
       description:
         'The assignment is not a personal right granted to the caller, or does not exist (SAAS_ISSUE.ASSIGNMENT_NOT_YOURS): the two are not told apart. Nothing is written.',
+      examples: [EXAMPLES.ASSIGNMENT_NOT_YOURS],
     },
     {
       status: HttpStatus.CONFLICT,
       description:
         'The right has ended or never took a seat (SAAS_ISSUE.ASSIGNMENT_NOT_OPEN), or no IT Admin can take the report (SAAS_ISSUE.NO_IT_ADMIN).',
+      examples: [EXAMPLES.ASSIGNMENT_NOT_OPEN, EXAMPLES.NO_IT_ADMIN],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
         'The request is invalid (VALIDATION_ERROR), or the moment of the error is in the future (SAAS_ISSUE.OCCURRED_IN_FUTURE).',
+      examples: [VALIDATION_EXAMPLE, EXAMPLES.OCCURRED_IN_FUTURE],
     },
   )
   async submit(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: SubmitSaasIssueBodyDto) {
@@ -117,8 +124,13 @@ export class SaasIssuesController {
     {
       status: HttpStatus.FORBIDDEN,
       description: 'A person who is not an IT Admin asked for the reports of others (SAAS_ISSUE.SCOPE_FORBIDDEN).',
+      examples: [EXAMPLES.SCOPE_FORBIDDEN],
     },
-    { status: HttpStatus.UNPROCESSABLE_ENTITY, description: 'A filter is invalid (VALIDATION_ERROR).' },
+    {
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      description: 'A filter is invalid (VALIDATION_ERROR).',
+      examples: [VALIDATION_EXAMPLE],
+    },
   )
   async list(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Query() query: ListSaasIssuesQueryDto) {
     try {
@@ -138,6 +150,7 @@ export class SaasIssuesController {
   @ApiErrorResponses(...AUTH_ERRORS, NOT_FOUND, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description: 'The id is invalid (VALIDATION_ERROR).',
+    examples: [VALIDATION_EXAMPLE],
   })
   async get(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: SaasIssueIdParamDto) {
     try {
@@ -157,6 +170,7 @@ export class SaasIssuesController {
   @ApiErrorResponses(...AUTH_ERRORS, NOT_FOUND, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description: 'The id or a page parameter is invalid (VALIDATION_ERROR).',
+    examples: [VALIDATION_EXAMPLE],
   })
   async entries(
     @CurrentPrincipal() actor: AuthenticatedPrincipal,
@@ -184,10 +198,12 @@ export class SaasIssuesController {
     {
       status: HttpStatus.CONFLICT,
       description: 'The report is closed or a duplicate (SAAS_ISSUE.CLOSED).',
+      examples: [EXAMPLES.CLOSED],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description: 'The request is invalid (VALIDATION_ERROR) or has no text (SAAS_ISSUE.MESSAGE_REQUIRED).',
+      examples: [VALIDATION_EXAMPLE, EXAMPLES.MESSAGE_REQUIRED],
     },
   )
   async addMessage(
@@ -218,10 +234,12 @@ export class SaasIssuesController {
       status: HttpStatus.CONFLICT,
       description:
         'The report is not resolved (SAAS_ISSUE.NOT_RESOLVED), or the time to reopen it has ended (SAAS_ISSUE.REOPEN_WINDOW_ENDED).',
+      examples: [EXAMPLES.NOT_RESOLVED, EXAMPLES.REOPEN_WINDOW_ENDED],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description: 'The request is invalid (VALIDATION_ERROR) or has no reason (SAAS_ISSUE.REASON_REQUIRED).',
+      examples: [VALIDATION_EXAMPLE, EXAMPLES.REASON_REQUIRED],
     },
   )
   async reopen(
@@ -247,16 +265,23 @@ export class SaasIssuesController {
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
-    { status: HttpStatus.FORBIDDEN, description: 'Only an IT Admin handles a report.' },
+    { status: HttpStatus.FORBIDDEN, description: 'Only an IT Admin handles a report.', examples: [FORBIDDEN_EXAMPLE] },
     NOT_FOUND,
     {
       status: HttpStatus.CONFLICT,
       description: 'The report cannot move from its state to the one asked for (SAAS_ISSUE.INVALID_TRANSITION).',
+      examples: [EXAMPLES.INVALID_TRANSITION],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
         'The request is invalid (VALIDATION_ERROR), the result is missing (SAAS_ISSUE.RESOLUTION_REQUIRED), the question is missing (SAAS_ISSUE.MESSAGE_REQUIRED) or a grant task named does not exist (SAAS_ISSUE.LINKED_WORK_INVALID). Nothing is written.',
+      examples: [
+        VALIDATION_EXAMPLE,
+        EXAMPLES.RESOLUTION_REQUIRED,
+        EXAMPLES.MESSAGE_REQUIRED,
+        EXAMPLES.LINKED_WORK_INVALID,
+      ],
     },
   )
   async transition(
@@ -288,16 +313,18 @@ export class SaasIssuesController {
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
-    { status: HttpStatus.FORBIDDEN, description: 'Only an IT Admin marks a duplicate.' },
+    { status: HttpStatus.FORBIDDEN, description: 'Only an IT Admin marks a duplicate.', examples: [FORBIDDEN_EXAMPLE] },
     NOT_FOUND,
     {
       status: HttpStatus.CONFLICT,
       description: 'The report cannot be marked a duplicate from its state (SAAS_ISSUE.INVALID_TRANSITION).',
+      examples: [EXAMPLES.INVALID_TRANSITION],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
         'The request is invalid or lacks the other report (VALIDATION_ERROR), has no reason (SAAS_ISSUE.REASON_REQUIRED), or the other report is the same one, a duplicate itself or does not exist (SAAS_ISSUE.DUPLICATE_TARGET_INVALID). Nothing is written.',
+      examples: [VALIDATION_EXAMPLE, EXAMPLES.REASON_REQUIRED, EXAMPLES.DUPLICATE_TARGET_INVALID],
     },
   )
   async markDuplicate(

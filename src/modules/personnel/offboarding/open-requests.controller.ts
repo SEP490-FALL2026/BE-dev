@@ -2,26 +2,34 @@ import { Controller, Get, HttpStatus, Param, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
+  FORBIDDEN_EXAMPLE,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
+  VALIDATION_EXAMPLE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
 import { RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
 import { OffboardingIdParamDto, OffboardingPageQueryDto } from './offboarding.dto';
-import { toOffboardingApiException } from './offboarding.http-errors';
+import { OFFBOARDING_ERROR_EXAMPLES, toOffboardingApiException } from './offboarding.http-errors';
 import { OpenGrantTaskPageResponseDto, OpenRequestPageResponseDto } from './open-requests.dto';
 import { OpenRequestsService } from './open-requests.service';
 
 const COMMON = [
   UNAUTHENTICATED_RESPONSE,
-  { status: HttpStatus.FORBIDDEN, description: 'Only an IT Admin reads what is still open for a person who leaves.' },
+  {
+    status: HttpStatus.FORBIDDEN,
+    description: 'Only an IT Admin reads what is still open for a person who leaves.',
+    examples: [FORBIDDEN_EXAMPLE],
+  },
   {
     status: HttpStatus.NOT_FOUND,
     description: 'The offboarding case does not exist (OFFBOARDING_CASE.NOT_FOUND).',
+    examples: [OFFBOARDING_ERROR_EXAMPLES.NOT_FOUND],
   },
   {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description: 'The id or a page parameter is not valid (VALIDATION_ERROR).',
+    examples: [VALIDATION_EXAMPLE],
   },
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
 ] as const;

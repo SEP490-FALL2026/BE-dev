@@ -2,8 +2,10 @@ import { Body, Controller, Get, HttpStatus, Param, Post, Query } from '@nestjs/c
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
+  FORBIDDEN_EXAMPLE,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
+  VALIDATION_EXAMPLE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
 import { AuthenticatedOnly, RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
@@ -11,7 +13,7 @@ import { CurrentPrincipal } from '../../../infrastructure/security/models/curren
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { FinanceReviewService } from './finance-review.service';
 import { SpendViewService } from './spend-view.service';
-import { toSpendApiException } from './spend.http-errors';
+import { SPEND_ERROR_EXAMPLES, toSpendApiException } from './spend.http-errors';
 import {
   BudgetCheckResponseDto,
   RequestParamDto,
@@ -27,15 +29,20 @@ const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPO
 const INVALID = {
   status: HttpStatus.UNPROCESSABLE_ENTITY,
   description: 'The request is invalid (VALIDATION_ERROR).',
+  examples: [VALIDATION_EXAMPLE],
 } as const;
+/** The reads: a request that does not exist answers SPEND.REVIEW_NOT_FOUND too, so it cannot be probed. */
 const NOT_FOUND = {
   status: HttpStatus.NOT_FOUND,
   description:
     'The request has no check or review for the caller to read (SPEND.REVIEW_NOT_FOUND), or does not exist (ACCESS_REQUEST.NOT_FOUND).',
+  examples: [SPEND_ERROR_EXAMPLES.REVIEW_NOT_FOUND],
 } as const;
+/** The role guard; SPEND.NOT_FINANCE is reachable only where a review held by another person is ended. */
 const FINANCE_ONLY = {
   status: HttpStatus.FORBIDDEN,
   description: 'Only Finance reviews (SPEND.NOT_FINANCE).',
+  examples: [FORBIDDEN_EXAMPLE],
 } as const;
 
 /**
@@ -95,17 +102,24 @@ export class FinanceReviewsController {
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
-    FINANCE_ONLY,
-    NOT_FOUND,
+    { ...FINANCE_ONLY, examples: [FORBIDDEN_EXAMPLE, SPEND_ERROR_EXAMPLES.NOT_FINANCE] },
+    { ...NOT_FOUND, examples: [SPEND_ERROR_EXAMPLES.REQUEST_NOT_FOUND] },
     {
       status: HttpStatus.CONFLICT,
       description:
         'The request has no review open (SPEND.REVIEW_NOT_OPEN), the plan line is still overdue (SPEND.PLAN_LINE_NOT_UPDATED), the year has no budget to make or has one (SPEND.NO_BUDGET_TO_MAKE), or nobody heads the department to propose it (SPEND.NO_HEAD_TO_PROPOSE).',
+      examples: [
+        SPEND_ERROR_EXAMPLES.REVIEW_NOT_OPEN,
+        SPEND_ERROR_EXAMPLES.PLAN_LINE_NOT_UPDATED,
+        SPEND_ERROR_EXAMPLES.NO_BUDGET_TO_MAKE,
+        SPEND_ERROR_EXAMPLES.NO_HEAD_TO_PROPOSE,
+      ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
         'The outcome lacks what it needs: an opinion needs its text and direction, the others need a reason (VALIDATION_ERROR). Nothing is written.',
+      examples: [VALIDATION_EXAMPLE],
     },
   )
   async complete(

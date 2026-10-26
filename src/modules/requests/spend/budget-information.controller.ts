@@ -2,8 +2,10 @@ import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, Query } from 
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
+  FORBIDDEN_EXAMPLE,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
+  VALIDATION_EXAMPLE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
 import { AuthenticatedOnly, RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
@@ -21,12 +23,13 @@ import {
 import { BudgetInformationService } from './budget-information.service';
 import { BudgetInformationViewService } from './budget-information-view.service';
 import { IdParamDto } from './spend-submission.dto';
-import { toSpendApiException } from './spend.http-errors';
+import { SPEND_ERROR_EXAMPLES, toSpendApiException } from './spend.http-errors';
 
 const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPONSE] as const;
 const INVALID = {
   status: HttpStatus.UNPROCESSABLE_ENTITY,
   description: 'The request is invalid (VALIDATION_ERROR).',
+  examples: [VALIDATION_EXAMPLE],
 } as const;
 
 /**
@@ -56,12 +59,18 @@ export class BudgetInformationController {
       status: HttpStatus.FORBIDDEN,
       description:
         'The caller does not hold the spend step (BUDGET_INFORMATION.NOT_THE_ASSIGNEE) or asked for or is given the access (BUDGET_INFORMATION.OWN_REQUEST).',
+      examples: [SPEND_ERROR_EXAMPLES.INFORMATION_NOT_THE_ASSIGNEE, SPEND_ERROR_EXAMPLES.INFORMATION_OWN_REQUEST],
     },
-    { status: HttpStatus.NOT_FOUND, description: 'The request does not exist (ACCESS_REQUEST.NOT_FOUND).' },
+    {
+      status: HttpStatus.NOT_FOUND,
+      description: 'The request does not exist (ACCESS_REQUEST.NOT_FOUND).',
+      examples: [SPEND_ERROR_EXAMPLES.REQUEST_NOT_FOUND],
+    },
     {
       status: HttpStatus.CONFLICT,
       description:
         'The request has no spend step open (BUDGET_INFORMATION.NO_SPEND_STEP), the step is not pending (BUDGET_INFORMATION.STEP_NOT_PENDING) or a question is still open (BUDGET_INFORMATION.ALREADY_OPEN).',
+      examples: [SPEND_ERROR_EXAMPLES.INFORMATION_NO_SPEND_STEP, SPEND_ERROR_EXAMPLES.INFORMATION_ALREADY_OPEN],
     },
     INVALID,
   )
@@ -89,6 +98,7 @@ export class BudgetInformationController {
     {
       status: HttpStatus.NOT_FOUND,
       description: 'The caller has no part in the questions of the request (BUDGET_INFORMATION.NOT_FOUND).',
+      examples: [SPEND_ERROR_EXAMPLES.INFORMATION_NOT_FOUND],
     },
     INVALID,
   )
@@ -114,7 +124,7 @@ export class BudgetInformationController {
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
-    { status: HttpStatus.FORBIDDEN, description: 'Only Finance reads the questions.' },
+    { status: HttpStatus.FORBIDDEN, description: 'Only Finance reads the questions.', examples: [FORBIDDEN_EXAMPLE] },
     INVALID,
   )
   async list(@Query() query: InformationQueryDto) {
@@ -140,11 +150,21 @@ export class BudgetInformationController {
       status: HttpStatus.FORBIDDEN,
       description:
         'The caller is not Finance, takes part in the request (BUDGET_INFORMATION.OWN_REQUEST) or decides it as the spending approver (BUDGET_INFORMATION.SOD_APPROVER).',
+      examples: [
+        FORBIDDEN_EXAMPLE,
+        SPEND_ERROR_EXAMPLES.INFORMATION_OWN_REQUEST,
+        SPEND_ERROR_EXAMPLES.INFORMATION_SOD_APPROVER,
+      ],
     },
-    { status: HttpStatus.NOT_FOUND, description: 'The question does not exist (BUDGET_INFORMATION.NOT_FOUND).' },
+    {
+      status: HttpStatus.NOT_FOUND,
+      description: 'The question does not exist (BUDGET_INFORMATION.NOT_FOUND).',
+      examples: [SPEND_ERROR_EXAMPLES.INFORMATION_NOT_FOUND],
+    },
     {
       status: HttpStatus.CONFLICT,
       description: 'The question is answered or closed, not open (BUDGET_INFORMATION.NOT_OPEN).',
+      examples: [SPEND_ERROR_EXAMPLES.INFORMATION_NOT_OPEN],
     },
     INVALID,
   )

@@ -2,8 +2,10 @@ import { Body, Controller, Get, HttpStatus, Param, Post, Query } from '@nestjs/c
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
+  FORBIDDEN_EXAMPLE,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
+  VALIDATION_EXAMPLE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
 import { AuthenticatedOnly, RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
@@ -16,7 +18,10 @@ import {
   ServiceAccountMovePageResponseDto,
   ServiceAccountMoveResponseDto,
 } from './service-account.dto';
-import { toServiceAccountApiException } from './service-account.http-errors';
+import {
+  SERVICE_ACCOUNT_ERROR_EXAMPLES as EXAMPLES,
+  toServiceAccountApiException,
+} from './service-account.http-errors';
 import { ServiceAccountMoveViewService } from './service-account-move-view.service';
 import { ServiceAccountMoveService } from './service-account-move.service';
 
@@ -24,6 +29,7 @@ const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPO
 const NOT_FOUND = {
   status: HttpStatus.NOT_FOUND,
   description: 'The move does not exist (SERVICE_ACCOUNT_MOVE.NOT_FOUND).',
+  examples: [EXAMPLES.MOVE_NOT_FOUND],
 } as const;
 
 /**
@@ -49,6 +55,7 @@ export class ServiceAccountMovesController {
   @ApiErrorResponses(...AUTH_ERRORS, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description: 'A filter is invalid (VALIDATION_ERROR).',
+    examples: [VALIDATION_EXAMPLE],
   })
   async list(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Query() query: ListServiceAccountMovesQueryDto) {
     try {
@@ -73,17 +80,25 @@ export class ServiceAccountMovesController {
       status: HttpStatus.FORBIDDEN,
       description:
         'The caller is not the head of the receiving department, nor the fallback approver while the department has no head (SERVICE_ACCOUNT_MOVE.NOT_CONFIRMER). Nothing is written.',
+      examples: [EXAMPLES.NOT_CONFIRMER],
     },
     NOT_FOUND,
     {
       status: HttpStatus.CONFLICT,
       description:
         'The move was confirmed or cancelled already (SERVICE_ACCOUNT_MOVE.NOT_PENDING), the day it takes effect has passed (MOVE_EFFECTIVE_DATE_PASSED: propose it again), or the account has ended meanwhile (LICENSE_ASSIGNMENT.NOT_OPEN).',
+      examples: [EXAMPLES.NOT_PENDING, EXAMPLES.MOVE_EFFECTIVE_DATE_PASSED, EXAMPLES.ASSIGNMENT_NOT_OPEN],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
         'The id is invalid (VALIDATION_ERROR), or the department or the person no longer fits (SERVICE_ACCOUNT_MOVE.TARGET_DEPARTMENT_INVALID, RESPONSIBLE_INVALID, LICENSE_ASSIGNMENT.EXPECTED_END_REQUIRED).',
+      examples: [
+        VALIDATION_EXAMPLE,
+        EXAMPLES.TARGET_DEPARTMENT_INVALID,
+        EXAMPLES.MOVE_RESPONSIBLE_INVALID,
+        EXAMPLES.EXPECTED_END_REQUIRED,
+      ],
     },
   )
   async confirm(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: ServiceAccountMoveIdParamDto) {
@@ -106,15 +121,21 @@ export class ServiceAccountMovesController {
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
-    { status: HttpStatus.FORBIDDEN, description: 'Only an IT Admin cancels a proposal.' },
+    {
+      status: HttpStatus.FORBIDDEN,
+      description: 'Only an IT Admin cancels a proposal.',
+      examples: [FORBIDDEN_EXAMPLE],
+    },
     NOT_FOUND,
     {
       status: HttpStatus.CONFLICT,
       description: 'The move was confirmed or cancelled already (SERVICE_ACCOUNT_MOVE.NOT_PENDING).',
+      examples: [EXAMPLES.NOT_PENDING],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description: 'The request is invalid (VALIDATION_ERROR) or has no reason (SERVICE_ACCOUNT_MOVE.REASON_REQUIRED).',
+      examples: [VALIDATION_EXAMPLE, EXAMPLES.REASON_REQUIRED],
     },
   )
   async cancel(

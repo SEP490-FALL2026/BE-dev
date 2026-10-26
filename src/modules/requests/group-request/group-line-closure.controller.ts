@@ -2,8 +2,10 @@ import { Body, Controller, HttpStatus, Param, Post } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
+  FORBIDDEN_EXAMPLE,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
+  VALIDATION_EXAMPLE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
 import { RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
@@ -14,7 +16,7 @@ import { toWire } from '../access-request/access-request.wire';
 import { LineClosureBodyDto, LineParamsDto } from './group-decision.dto';
 import { GroupLineClosureService } from './group-line-closure.service';
 import { GroupResponseDto } from './group-request.dto';
-import { toGroupRequestApiException } from './group-request.http-errors';
+import { GROUP_REQUEST_ERROR_EXAMPLES, toGroupRequestApiException } from './group-request.http-errors';
 
 /**
  * The IT Admin removes one person who left from a request for a group, without ending the request for the people who remain
@@ -44,21 +46,29 @@ export class GroupLineClosureController {
     {
       status: HttpStatus.FORBIDDEN,
       description: 'Only an IT Admin removes a person who left from a request for a group.',
+      examples: [FORBIDDEN_EXAMPLE],
     },
     {
       status: HttpStatus.NOT_FOUND,
       description:
         'The request does not exist, is not a request for a group, or has no such person (ACCESS_REQUEST.NOT_FOUND).',
+      examples: [GROUP_REQUEST_ERROR_EXAMPLES.REQUEST_NOT_FOUND],
     },
     {
       status: HttpStatus.CONFLICT,
       description:
         'The line has ended already (ACCESS_REQUEST.ALREADY_ENDED), the withdrawal of the person waits for the IT Admin to close their task (ACCESS_REQUEST.WITHDRAWAL_PENDING), or the person still works, handing over included (ACCESS_REQUEST.BENEFICIARY_NOT_LEFT). Nothing changes.',
+      examples: [
+        GROUP_REQUEST_ERROR_EXAMPLES.CLOSURE_ALREADY_ENDED,
+        GROUP_REQUEST_ERROR_EXAMPLES.CLOSURE_WITHDRAWAL_PENDING,
+        GROUP_REQUEST_ERROR_EXAMPLES.BENEFICIARY_NOT_LEFT,
+      ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
         'The ids or the body are invalid (VALIDATION_ERROR), or the task of the grant is being worked and no evidence says the work was undone (ACCESS_REQUEST.EVIDENCE_REQUIRED). Nothing is saved.',
+      examples: [VALIDATION_EXAMPLE, GROUP_REQUEST_ERROR_EXAMPLES.EVIDENCE_REQUIRED],
     },
     GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   )

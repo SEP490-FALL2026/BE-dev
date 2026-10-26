@@ -2,15 +2,17 @@ import { Body, Controller, HttpStatus, Param, Post } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
+  FORBIDDEN_EXAMPLE,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
+  VALIDATION_EXAMPLE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
 import { RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
 import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AccessCutBodyDto, RevocationCompletionBodyDto, TaskIdParamDto, TaskResponseDto } from './provisioning.dto';
-import { toProvisioningApiException } from './provisioning.http-errors';
+import { PROVISIONING_ERROR_EXAMPLES as EXAMPLES, toProvisioningApiException } from './provisioning.http-errors';
 import { toWire } from './provisioning-task.wire';
 import { RevocationCompletionService } from './revocation-completion.service';
 
@@ -18,7 +20,10 @@ const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPO
 const NOT_FOUND = {
   status: HttpStatus.NOT_FOUND,
   description: 'The task does not exist (PROVISIONING_TASK.NOT_FOUND).',
+  examples: [EXAMPLES.TASK_NOT_FOUND],
 } as const;
+/** The role guard, and the IT Admin who is the person revoked while another can work the task. */
+const WORKER_EXAMPLES = [FORBIDDEN_EXAMPLE, EXAMPLES.ANOTHER_IT_ADMIN_NEEDED] as const;
 
 /**
  * The work an IT Admin does on a revocation: completing it, which is what gives the seat back, and cutting the access of a K1
@@ -47,17 +52,28 @@ export class RevocationTasksController {
       status: HttpStatus.FORBIDDEN,
       description:
         'Only an IT Admin works the queue of provisioning tasks, and an IT Admin who is the person revoked waits for another usable IT Admin (PROVISIONING.ANOTHER_IT_ADMIN_NEEDED); with none left they may.',
+      examples: WORKER_EXAMPLES,
     },
     NOT_FOUND,
     {
       status: HttpStatus.CONFLICT,
       description:
         'The task is not a revocation (PROVISIONING_TASK.NOT_REVOCATION), is not in progress or is completed already (NOT_IN_PROGRESS), is not for a person (NOT_MANUAL), or the assignment is no longer open (LICENSE_ASSIGNMENT.NOT_OPEN): nothing changes.',
+      examples: [EXAMPLES.NOT_REVOCATION, EXAMPLES.NOT_IN_PROGRESS],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
         'The request is invalid (VALIDATION_ERROR), or the completion is refused and nothing is stored: REVOCATION.COMPLETION_NOT_ALLOWED (the way does not fit the kind of grant), NOTE_REQUIRED, PAID_THROUGH_REQUIRED, ACCESS_STATE_REQUIRED, ACCESS_STATE_INVALID, or no evidence (PROVISIONING_TASK.EVIDENCE_REQUIRED).',
+      examples: [
+        VALIDATION_EXAMPLE,
+        EXAMPLES.COMPLETION_NOT_ALLOWED,
+        EXAMPLES.NOTE_REQUIRED,
+        EXAMPLES.PAID_THROUGH_REQUIRED,
+        EXAMPLES.ACCESS_STATE_REQUIRED,
+        EXAMPLES.ACCESS_STATE_INVALID,
+        EXAMPLES.EVIDENCE_REQUIRED,
+      ],
     },
   )
   async completeRevocation(
@@ -88,17 +104,20 @@ export class RevocationTasksController {
     {
       status: HttpStatus.FORBIDDEN,
       description: 'Not an IT Admin, or PROVISIONING.ANOTHER_IT_ADMIN_NEEDED.',
+      examples: WORKER_EXAMPLES,
     },
     NOT_FOUND,
     {
       status: HttpStatus.CONFLICT,
       description:
         'The task is not a revocation (PROVISIONING_TASK.NOT_REVOCATION) or its access is not running on to the end of the paid period, or was cut already (NOT_TERMINATING): nothing changes.',
+      examples: [EXAMPLES.NOT_REVOCATION, EXAMPLES.NOT_TERMINATING],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
         'The request is invalid (VALIDATION_ERROR), the day is ahead (REVOCATION.ACCESS_STATE_INVALID) or there is no evidence (PROVISIONING_TASK.EVIDENCE_REQUIRED): nothing changes.',
+      examples: [VALIDATION_EXAMPLE, EXAMPLES.ACCESS_STATE_INVALID, EXAMPLES.EVIDENCE_REQUIRED],
     },
   )
   async recordAccessCut(

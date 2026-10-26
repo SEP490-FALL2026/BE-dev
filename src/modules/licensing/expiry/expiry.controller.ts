@@ -2,8 +2,10 @@ import { Controller, Get, HttpStatus, Param, Post, Query } from '@nestjs/common'
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
+  FORBIDDEN_EXAMPLE,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
+  VALIDATION_EXAMPLE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
 import { AuthenticatedOnly, RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
@@ -17,7 +19,7 @@ import {
   ListExpiryRemindersQueryDto,
   StartedRevocationResponseDto,
 } from './expiry.dto';
-import { toExpiryApiException } from './expiry.http-errors';
+import { EXPIRY_ERROR_EXAMPLES as EXAMPLES, toExpiryApiException } from './expiry.http-errors';
 import { ExpiryQueueService } from './expiry-queue.service';
 import { ExpiryReminderService } from './expiry-reminder.service';
 
@@ -48,8 +50,13 @@ export class ExpiryController {
     {
       status: HttpStatus.FORBIDDEN,
       description: 'Only an IT Admin reads the queue.',
+      examples: [FORBIDDEN_EXAMPLE],
     },
-    { status: HttpStatus.UNPROCESSABLE_ENTITY, description: 'A filter is invalid (VALIDATION_ERROR).' },
+    {
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      description: 'A filter is invalid (VALIDATION_ERROR).',
+      examples: [VALIDATION_EXAMPLE],
+    },
   )
   async list(@Query() query: ListExpiryQueueQueryDto) {
     try {
@@ -73,17 +80,32 @@ export class ExpiryController {
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
-    { status: HttpStatus.FORBIDDEN, description: 'Only an IT Admin starts the revocation.' },
+    {
+      status: HttpStatus.FORBIDDEN,
+      description: 'Only an IT Admin starts the revocation.',
+      examples: [FORBIDDEN_EXAMPLE, EXAMPLES.ANOTHER_IT_ADMIN_NEEDED],
+    },
     {
       status: HttpStatus.NOT_FOUND,
       description: 'The right does not exist or does not end on a day (ASSIGNMENT_EXPIRY.NOT_FOUND).',
+      examples: [EXAMPLES.NOT_FOUND],
     },
     {
       status: HttpStatus.CONFLICT,
       description:
         'The right was ended already (ASSIGNMENT_EXPIRY.NOT_OPEN), its end day has not passed (ASSIGNMENT_EXPIRY.NOT_EXPIRED), a renewal sent in time waits for its decision (ASSIGNMENT_EXPIRY.RENEWAL_PENDING), or the revocation gate refuses it (for example PROVISIONING.ANOTHER_IT_ADMIN_NEEDED when the IT Admin is the holder). Nothing is written.',
+      examples: [
+        EXAMPLES.NOT_OPEN,
+        EXAMPLES.NOT_EXPIRED,
+        EXAMPLES.RENEWAL_PENDING,
+        EXAMPLES.REVOCATION_TYPE_NOT_SUPPORTED,
+      ],
     },
-    { status: HttpStatus.UNPROCESSABLE_ENTITY, description: 'The id is not valid (VALIDATION_ERROR).' },
+    {
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      description: 'The id is not valid (VALIDATION_ERROR).',
+      examples: [VALIDATION_EXAMPLE],
+    },
   )
   async startRevocation(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: ExpiryAssignmentParamDto) {
     try {
@@ -109,8 +131,13 @@ export class ExpiryController {
     {
       status: HttpStatus.FORBIDDEN,
       description: 'Only an IT Admin asks for scope all (ASSIGNMENT_EXPIRY.SCOPE_FORBIDDEN).',
+      examples: [EXAMPLES.SCOPE_FORBIDDEN],
     },
-    { status: HttpStatus.UNPROCESSABLE_ENTITY, description: 'A filter is invalid (VALIDATION_ERROR).' },
+    {
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      description: 'A filter is invalid (VALIDATION_ERROR).',
+      examples: [VALIDATION_EXAMPLE],
+    },
   )
   async listReminders(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Query() query: ListExpiryRemindersQueryDto) {
     try {

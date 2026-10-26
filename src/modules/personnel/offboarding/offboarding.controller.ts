@@ -2,8 +2,10 @@ import { Body, Controller, Get, HttpStatus, Param, Post, Query } from '@nestjs/c
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
+  FORBIDDEN_EXAMPLE,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
+  VALIDATION_EXAMPLE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
 import { RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
@@ -25,27 +27,46 @@ import {
   RecordAccountLockBodyDto,
   RecordOffboardingBodyDto,
 } from './offboarding.dto';
-import { toOffboardingApiException } from './offboarding.http-errors';
+import { OFFBOARDING_ERROR_EXAMPLES, toOffboardingApiException } from './offboarding.http-errors';
 import { OffboardingChangeService } from './offboarding-change.service';
 import { OffboardingLeftService } from './offboarding-left.service';
 import { OffboardingRevocationService } from './offboarding-revocation.service';
 import { OffboardingViewService } from './offboarding-view.service';
 import { OffboardingService } from './offboarding.service';
 
+const E = OFFBOARDING_ERROR_EXAMPLES;
 const FORBIDDEN = {
   status: HttpStatus.FORBIDDEN,
   description: 'Only an IT Admin records, changes, closes or reads the departure of a person.',
+  examples: [FORBIDDEN_EXAMPLE],
 } as const;
 const COMMON = [UNAUTHENTICATED_RESPONSE, FORBIDDEN, GUARDED_SERVICE_UNAVAILABLE_RESPONSE] as const;
 const NOT_FOUND = {
   status: HttpStatus.NOT_FOUND,
   description: 'The offboarding case does not exist (OFFBOARDING_CASE.NOT_FOUND).',
+  examples: [E.NOT_FOUND],
+} as const;
+const ID_INVALID = {
+  status: HttpStatus.UNPROCESSABLE_ENTITY,
+  description: 'The id is not valid (VALIDATION_ERROR).',
+  examples: [VALIDATION_EXAMPLE],
+} as const;
+const PAGE_INVALID = {
+  status: HttpStatus.UNPROCESSABLE_ENTITY,
+  description: 'The id or a page parameter is not valid (VALIDATION_ERROR).',
+  examples: [VALIDATION_EXAMPLE],
 } as const;
 const SELF = 'an IT Admin does it for themselves while another IT Admin can (SELF_EVENT_NEEDS_ANOTHER_IT_ADMIN)';
 const CONCURRENT = 'the person or the case was changed meanwhile (CONCURRENT_CHANGE)';
+const NOT_UNDER_WAY = [E.CASE_LEFT, E.NOT_HANDING_OVER] as const;
+const SELF_OR_CONCURRENT = [E.SELF_EVENT_NEEDS_ANOTHER_IT_ADMIN, E.CONCURRENT_CHANGE] as const;
+const PERSON_REFUSALS = [E.EMPLOYEE_LEFT, E.ALREADY_HANDING_OVER, E.PENDING_EVENT_EXISTS] as const;
+const DAY_REFUSALS = [E.LAST_WORKING_DAY_INVALID, E.SUCCESSOR_NOT_A_MEMBER_ON_DATE] as const;
+const LOCK_REFUSALS = [E.ACCOUNT_LOCK_NOT_RECORDED, E.ALREADY_RECORDED] as const;
 
 const GROUNDS_REFUSALS =
   'the basis is empty or lacks a part (OFFBOARDING_CASE.GROUNDS_REQUIRED, GROUNDS_INCOMPLETE) or is the code of a notice and not a document (GROUNDS_IS_NOTICE)';
+const GROUNDS_EXAMPLES = [E.GROUNDS_REQUIRED, E.GROUNDS_INCOMPLETE, E.GROUNDS_IS_NOTICE] as const;
 
 /**
  * The departure of a person: a handover with the last working day and the basis it rests on, or an abrupt departure, the list of the
@@ -74,14 +95,26 @@ export class OffboardingController {
   })
   @ApiErrorResponses(
     ...COMMON,
-    { status: HttpStatus.NOT_FOUND, description: 'The employee does not exist (OFFBOARDING_CASE.EMPLOYEE_NOT_FOUND).' },
+    {
+      status: HttpStatus.NOT_FOUND,
+      description: 'The employee does not exist (OFFBOARDING_CASE.EMPLOYEE_NOT_FOUND).',
+      examples: [E.EMPLOYEE_NOT_FOUND],
+    },
     {
       status: HttpStatus.CONFLICT,
       description: `The person has left (OFFBOARDING_CASE.EMPLOYEE_LEFT) or is handing over already (ALREADY_HANDING_OVER), has a transfer that takes effect before the last working day or another event waiting (PENDING_EVENT_EXISTS), ${SELF}, or ${CONCURRENT}.`,
+      examples: [...PERSON_REFUSALS, ...SELF_OR_CONCURRENT, E.PLACEMENT_OVERLAP],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description: `The body is invalid (VALIDATION_ERROR), there is no last working day or it is not allowed (OFFBOARDING_CASE.LAST_WORKING_DAY_REQUIRED, LAST_WORKING_DAY_INVALID), ${GROUNDS_REFUSALS}, the reason to cancel the transfer that waits is missing (TRANSFER_CANCELLATION_REASON_REQUIRED), or the person chosen to follow the head cannot take the department that day (SUCCESSOR_NOT_A_MEMBER_ON_DATE): nothing is saved.`,
+      examples: [
+        VALIDATION_EXAMPLE,
+        E.LAST_WORKING_DAY_REQUIRED,
+        ...DAY_REFUSALS,
+        ...GROUNDS_EXAMPLES,
+        E.TRANSFER_CANCELLATION_REASON_REQUIRED,
+      ],
     },
   )
   async record(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: RecordOffboardingBodyDto) {
@@ -102,6 +135,7 @@ export class OffboardingController {
   @ApiErrorResponses(...COMMON, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description: 'A filter is invalid (VALIDATION_ERROR).',
+    examples: [VALIDATION_EXAMPLE],
   })
   async list(@Query() query: ListOffboardingQueryDto) {
     try {
@@ -118,10 +152,7 @@ export class OffboardingController {
     description:
       'The case with its basis, who follows the head of the department, the four steps of the checklist in the order they are done, what keeps the case from closing and what needs a person.',
   })
-  @ApiErrorResponses(...COMMON, NOT_FOUND, {
-    status: HttpStatus.UNPROCESSABLE_ENTITY,
-    description: 'The id is not valid (VALIDATION_ERROR).',
-  })
+  @ApiErrorResponses(...COMMON, NOT_FOUND, ID_INVALID)
   async get(@Param() params: OffboardingIdParamDto) {
     try {
       return await this.view.get(params.id);
@@ -137,10 +168,7 @@ export class OffboardingController {
     description:
       'A page of the personal seats the person holds, oldest first: the tool and plan, the way it is taken away and what to do first, whether it loses data, the confirmation of the handover of the tool and the task that takes it away. Service accounts are not among them.',
   })
-  @ApiErrorResponses(...COMMON, NOT_FOUND, {
-    status: HttpStatus.UNPROCESSABLE_ENTITY,
-    description: 'The id or a page parameter is not valid (VALIDATION_ERROR).',
-  })
+  @ApiErrorResponses(...COMMON, NOT_FOUND, PAGE_INVALID)
   async rights(@Param() params: OffboardingIdParamDto, @Query() query: OffboardingPageQueryDto) {
     try {
       return await this.view.rights(params.id, query);
@@ -156,10 +184,7 @@ export class OffboardingController {
     description:
       'A page of what was done to the case, oldest first: the record, each move of the last working day with its reason, the cancellation, the departure, the lock of the account, the revocations opened and the closing.',
   })
-  @ApiErrorResponses(...COMMON, NOT_FOUND, {
-    status: HttpStatus.UNPROCESSABLE_ENTITY,
-    description: 'The id or a page parameter is not valid (VALIDATION_ERROR).',
-  })
+  @ApiErrorResponses(...COMMON, NOT_FOUND, PAGE_INVALID)
   async listChanges(@Param() params: OffboardingIdParamDto, @Query() query: OffboardingPageQueryDto) {
     try {
       return await this.view.changes(params.id, query);
@@ -181,11 +206,13 @@ export class OffboardingController {
     {
       status: HttpStatus.CONFLICT,
       description: `The person has left (OFFBOARDING_CASE.CASE_LEFT), the handover is not under way (NOT_HANDING_OVER), the last working day has passed (LAST_DAY_ALREADY_PASSED), ${SELF}, or ${CONCURRENT}.`,
+      examples: [...NOT_UNDER_WAY, E.LAST_DAY_ALREADY_PASSED, ...SELF_OR_CONCURRENT],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
         'The body is invalid (VALIDATION_ERROR), no reason is given (OFFBOARDING_CASE.REASON_REQUIRED), the day is the same or not allowed (NO_CHANGE, LAST_WORKING_DAY_INVALID), or the head of the department cannot be handed over on the new day (SUCCESSOR_NOT_A_MEMBER_ON_DATE): nothing is saved, and the old day and the old choice stay.',
+      examples: [VALIDATION_EXAMPLE, E.REASON_REQUIRED, E.NO_CHANGE, ...DAY_REFUSALS],
     },
   )
   async changeLastDay(
@@ -215,10 +242,12 @@ export class OffboardingController {
     {
       status: HttpStatus.CONFLICT,
       description: `The person has left (OFFBOARDING_CASE.CASE_LEFT), the handover is not under way (NOT_HANDING_OVER), ${SELF}, or ${CONCURRENT}.`,
+      examples: [...NOT_UNDER_WAY, ...SELF_OR_CONCURRENT],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description: 'The body is invalid (VALIDATION_ERROR) or no reason is given (OFFBOARDING_CASE.REASON_REQUIRED).',
+      examples: [VALIDATION_EXAMPLE, E.REASON_REQUIRED],
     },
   )
   async cancel(
@@ -248,11 +277,13 @@ export class OffboardingController {
     {
       status: HttpStatus.CONFLICT,
       description: `The person has left already (OFFBOARDING_CASE.CASE_LEFT), the handover is not under way (NOT_HANDING_OVER), or ${CONCURRENT}.`,
+      examples: NOT_UNDER_WAY,
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
         'The body is invalid (VALIDATION_ERROR) or the day the person left is ahead or before the handover was recorded (OFFBOARDING_CASE.DEPARTED_ON_INVALID).',
+      examples: [VALIDATION_EXAMPLE, E.DEPARTED_ON_INVALID],
     },
   )
   async markLeft(
@@ -281,10 +312,12 @@ export class OffboardingController {
       status: HttpStatus.CONFLICT,
       description:
         'The person has not left yet (OFFBOARDING_CASE.CASE_NOT_LEFT) or the lock was recorded already (ALREADY_RECORDED).',
+      examples: [E.CASE_NOT_LEFT, E.ALREADY_RECORDED],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description: 'The body is invalid or the note is empty (VALIDATION_ERROR).',
+      examples: [VALIDATION_EXAMPLE],
     },
   )
   async recordAccountLock(
@@ -312,11 +345,13 @@ export class OffboardingController {
     {
       status: HttpStatus.CONFLICT,
       description: `The person has not left yet (OFFBOARDING_CASE.CASE_NOT_LEFT) or the case is closed (CASE_CLOSED), the lock of the company account is not recorded (ACCOUNT_LOCK_NOT_RECORDED) or was recorded already (ALREADY_RECORDED), a seat named has no revocation (REVOCATION_NOT_SUPPORTED), ${SELF}, or ${CONCURRENT}.`,
+      examples: [E.CASE_NOT_LEFT, E.CASE_CLOSED, ...LOCK_REFUSALS, E.REVOCATION_NOT_SUPPORTED],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
         'The body is invalid (VALIDATION_ERROR), no reason is given (OFFBOARDING_CASE.REASON_REQUIRED), the number does not match the rights chosen, which the answer states (COUNT_MISMATCH), or a seat named is not held or has a task (ASSIGNMENT_NOT_AVAILABLE): nothing is made.',
+      examples: [VALIDATION_EXAMPLE, E.REASON_REQUIRED, E.COUNT_MISMATCH, E.ASSIGNMENT_NOT_AVAILABLE],
     },
   )
   async openRevocations(
@@ -348,8 +383,9 @@ export class OffboardingController {
       status: HttpStatus.CONFLICT,
       description:
         'The person has not left yet (OFFBOARDING_CASE.CASE_NOT_LEFT), or something keeps the case open (CASE_NOT_CLOSEABLE, with the codes in the details): the lock of the account is not recorded, a personal right is held (also one whose access runs on to the end of the paid period), or a later flow still waits.',
+      examples: [E.CASE_NOT_LEFT, E.CASE_NOT_CLOSEABLE],
     },
-    { status: HttpStatus.UNPROCESSABLE_ENTITY, description: 'The id is not valid (VALIDATION_ERROR).' },
+    ID_INVALID,
   )
   async close(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: OffboardingIdParamDto) {
     try {

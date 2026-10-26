@@ -4,6 +4,7 @@ import {
   ApiErrorResponses,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
+  VALIDATION_EXAMPLE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
 import { AuthenticatedOnly } from '../../../infrastructure/security/decorators/access.decorators';
@@ -16,11 +17,21 @@ import {
   ReturnListResponseDto,
   ReturnResponseDto,
 } from './return-request.dto';
-import { toReturnApiException } from './return-request.http-errors';
+import { RETURN_ERROR_EXAMPLES, toReturnApiException } from './return-request.http-errors';
 import { ReturnRequestQueryService } from './return-request-query.service';
 import { ReturnRequestService } from './return-request.service';
 
 const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPONSE] as const;
+const NOT_FOUND = {
+  status: HttpStatus.NOT_FOUND,
+  description: 'The return does not exist, or the caller has no part in it (RETURN_REQUEST.NOT_FOUND).',
+  examples: [RETURN_ERROR_EXAMPLES.NOT_FOUND],
+} as const;
+const INVALID_ID = {
+  status: HttpStatus.UNPROCESSABLE_ENTITY,
+  description: 'The id is invalid (VALIDATION_ERROR).',
+  examples: [VALIDATION_EXAMPLE],
+} as const;
 
 /**
  * The return of a seat: the person who holds it, or the head of their department who confirms it is no longer needed, sends it,
@@ -50,17 +61,29 @@ export class ReturnRequestsController {
       status: HttpStatus.FORBIDDEN,
       description:
         'The caller is neither the holder nor the head of the department of the holder (RETURN_REQUEST.NOT_HOLDER), or heads another department (RETURN_REQUEST.OUTSIDE_DEPARTMENT).',
+      examples: [RETURN_ERROR_EXAMPLES.NOT_HOLDER, RETURN_ERROR_EXAMPLES.OUTSIDE_DEPARTMENT],
     },
-    { status: HttpStatus.NOT_FOUND, description: 'The seat does not exist (RETURN_REQUEST.ASSIGNMENT_NOT_FOUND).' },
+    {
+      status: HttpStatus.NOT_FOUND,
+      description: 'The seat does not exist (RETURN_REQUEST.ASSIGNMENT_NOT_FOUND).',
+      examples: [RETURN_ERROR_EXAMPLES.ASSIGNMENT_NOT_FOUND],
+    },
     {
       status: HttpStatus.CONFLICT,
       description:
         'The seat cannot be returned (RETURN_REQUEST.ASSIGNMENT_NOT_RETURNABLE, with the reason in details: it has ended, it is a service account, its plan is not supported, or its grant is not done), it already has a return waiting (RETURN_REQUEST.ALREADY_REQUESTED), a renewal of it waits for its decision (RETURN_REQUEST.RENEWAL_PENDING) or the holder belongs to no department (RETURN_REQUEST.NO_DEPARTMENT). Nothing is written.',
+      examples: [
+        RETURN_ERROR_EXAMPLES.ASSIGNMENT_NOT_RETURNABLE,
+        RETURN_ERROR_EXAMPLES.ALREADY_REQUESTED,
+        RETURN_ERROR_EXAMPLES.RENEWAL_PENDING,
+        RETURN_ERROR_EXAMPLES.NO_DEPARTMENT,
+      ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
         'The form is invalid (VALIDATION_ERROR): exactly one seat and a reason are required. The request named is not the one whose grant made the seat, or the caller has no part in it (RETURN_REQUEST.ORIGIN_MISMATCH). Nothing is written.',
+      examples: [VALIDATION_EXAMPLE, RETURN_ERROR_EXAMPLES.ORIGIN_MISMATCH],
     },
   )
   async submit(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: ReturnBodyDto) {
@@ -84,6 +107,7 @@ export class ReturnRequestsController {
   @ApiErrorResponses(...AUTH_ERRORS, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description: 'The query is invalid (VALIDATION_ERROR).',
+    examples: [VALIDATION_EXAMPLE],
   })
   async list(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Query() query: ReturnListQueryDto) {
     try {
@@ -101,14 +125,7 @@ export class ReturnRequestsController {
     description:
       'The return with its reason, the note of the plan, the handover and how the revocation ended. Only the holder, the person who sent it, the head of the department of the holder and the IT Admin read it.',
   })
-  @ApiErrorResponses(
-    ...AUTH_ERRORS,
-    {
-      status: HttpStatus.NOT_FOUND,
-      description: 'The return does not exist, or the caller has no part in it (RETURN_REQUEST.NOT_FOUND).',
-    },
-    { status: HttpStatus.UNPROCESSABLE_ENTITY, description: 'The id is invalid (VALIDATION_ERROR).' },
-  )
+  @ApiErrorResponses(...AUTH_ERRORS, NOT_FOUND, INVALID_ID)
   async get(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: ReturnIdParamDto) {
     try {
       return { returnRequest: await this.queries.get(actor, params.id) };
@@ -134,17 +151,20 @@ export class ReturnRequestsController {
     {
       status: HttpStatus.FORBIDDEN,
       description: 'The caller did not send the return (RETURN_REQUEST.NOT_REQUESTER).',
+      examples: [RETURN_ERROR_EXAMPLES.NOT_REQUESTER],
     },
-    {
-      status: HttpStatus.NOT_FOUND,
-      description: 'The return does not exist, or the caller has no part in it (RETURN_REQUEST.NOT_FOUND).',
-    },
+    NOT_FOUND,
     {
       status: HttpStatus.CONFLICT,
       description:
         'The plan asks for no handover (RETURN_REQUEST.HANDOVER_NOT_REQUIRED), it is confirmed already (RETURN_REQUEST.HANDOVER_ALREADY_CONFIRMED) or the return has ended (RETURN_REQUEST.NOT_AWAITING). Nothing changes.',
+      examples: [
+        RETURN_ERROR_EXAMPLES.HANDOVER_NOT_REQUIRED,
+        RETURN_ERROR_EXAMPLES.HANDOVER_ALREADY_CONFIRMED,
+        RETURN_ERROR_EXAMPLES.NOT_AWAITING,
+      ],
     },
-    { status: HttpStatus.UNPROCESSABLE_ENTITY, description: 'The id is invalid (VALIDATION_ERROR).' },
+    INVALID_ID,
   )
   async confirmHandover(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: ReturnIdParamDto) {
     try {

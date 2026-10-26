@@ -1,25 +1,58 @@
 /**
  * The literal expectations of the OpenAPI examples (OPENAPI-EXAMPLE.1), written out so the test never asks the code that
- * builds the examples what they should be. Traced on BE `ea73c2f` (25/10/2026) from each handler through its service,
- * policies and repository to the HTTP mapper — never from a response description; see
- * docs/workspace/items/openapi-response-examples/spec.md.
+ * builds the examples what they should be. Traced on BE `ea73c2f` (25/10/2026), and for the G5/G6 routes on their
+ * merge `0da8f56` (Prompt 02, 26/10/2026), from each handler through its service, policies and repository to the HTTP
+ * mapper — never from a response description; see docs/workspace/items/openapi-response-examples/spec.md.
  *
  * - SUCCESS_MESSAGES: the success `message` each operation answers with (its `@ApiSuccessResponse` metadata).
  * - BODYLESS_RESPONSES: success responses that have no JSON body, with the reason.
  * - ROUTE_ERROR_CODES: the codes an operation can answer with at a status beyond the ones every operation of its kind
  *   answers with (guards, validation pipe, throttler, request parsers — written out in api-inventory.e2e-spec.ts).
- *   Adding a code here needs the traced code path; a code that cannot be reached is never listed.
+ *   Adding a code here needs the traced code path; a code that cannot be reached is never listed. A reachable code of
+ *   another capability that the route only passes through is not shown until its owner can give the example within the
+ *   module boundaries (Prompt 02 decision: personnelNoticeRecord, the revocation hooks; see the item spec).
  * - NO_EXAMPLE_RESPONSES: declared error responses the running system cannot answer yet, so they show no example
  *   (their declaration says why in `noExampleBecause`). The list only shrinks: the slice that makes one reachable adds
  *   its examples and removes the entry.
  */
 
 import { ROUTE_ERROR_CODES_A_TO_L } from './openapi-example-route-codes-a-l';
+import { ROUTE_ERROR_CODES_BUDGETS } from './openapi-example-route-codes-budgets';
+import { ROUTE_ERROR_CODES_LICENSING } from './openapi-example-route-codes-licensing';
 import { ROUTE_ERROR_CODES_M_TO_Z } from './openapi-example-route-codes-m-z';
+import { ROUTE_ERROR_CODES_PERSONNEL } from './openapi-example-route-codes-personnel';
+import { ROUTE_ERROR_CODES_REQUESTS } from './openapi-example-route-codes-requests';
+import { ROUTE_ERROR_CODES_REQUESTS_SPEND } from './openapi-example-route-codes-requests-spend';
 
 export type RouteErrorStatus = '400' | '401' | '403' | '404' | '409' | '413' | '422' | '429' | '500' | '503';
 
 export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
+  accessRequestAssessmentComplete: 'ACCESS_REQUEST.ASSESSMENT_COMPLETED',
+  accessRequestAssessmentGet: 'ACCESS_REQUEST.ASSESSMENT_FETCHED',
+  accessRequestAssessmentReject: 'ACCESS_REQUEST.ASSESSMENT_REJECTED',
+  accessRequestAssessmentSave: 'ACCESS_REQUEST.ASSESSMENT_SAVED',
+  accessRequestCancelForDeparture: 'ACCESS_REQUEST.CANCELLED',
+  accessRequestCatalogLink: 'ACCESS_REQUEST.CATALOG_LINKED',
+  accessRequestGet: 'ACCESS_REQUEST.FETCHED',
+  accessRequestInternalRegister: 'ACCESS_REQUEST.INTERNAL_SOFTWARE_REGISTERED',
+  accessRequestLineCloseForDeparture: 'ACCESS_REQUEST.LINE_CANCELLED',
+  accessRequestLineList: 'GROUP_REQUEST.LINES_LISTED',
+  accessRequestLineNeedDecide: 'GROUP_REQUEST.NEED_DECIDED',
+  accessRequestLineWithdraw: 'GROUP_REQUEST.LINE_WITHDRAWN',
+  accessRequestNeedDecide: 'ACCESS_REQUEST.NEED_DECIDED',
+  accessRequestPlanLineSet: 'ACCESS_REQUEST.PLAN_LINE_SET',
+  accessRequestPlanLineSuggestionList: 'ACCESS_REQUEST.PLAN_LINE_SUGGESTIONS_LISTED',
+  accessRequestPreview: 'ACCESS_REQUEST.PREVIEWED',
+  accessRequestPropose: 'ACCESS_REQUEST.PROPOSED',
+  accessRequestRenewalSubmit: 'ACCESS_REQUEST.RENEWAL_SUBMITTED',
+  accessRequestServiceAccountReview: 'ACCESS_REQUEST.SERVICE_ACCOUNT_REVIEWED',
+  accessRequestServiceAccountSubmit: 'ACCESS_REQUEST.SERVICE_ACCOUNT_SUBMITTED',
+  accessRequestSimilarSeatList: 'ACCESS_REQUEST.SIMILAR_SEATS_LISTED',
+  accessRequestSubmit: 'ACCESS_REQUEST.SUBMITTED',
+  accessRequestSupplementAdd: 'ACCESS_REQUEST.SUPPLEMENT_ADDED',
+  accessRequestSupplementList: 'ACCESS_REQUEST.SUPPLEMENTS_LISTED',
+  accessRequestTimingsGet: 'ACCESS_REQUEST.TIMINGS_FETCHED',
+  accessRequestWithdraw: 'ACCESS_REQUEST.WITHDRAWN',
   accountCandidatesList: 'APP_USER.CANDIDATES_LISTED',
   appUserCreate: 'APP_USER.CREATED',
   appUserGet: 'APP_USER.RETRIEVED',
@@ -39,21 +72,58 @@ export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   applicationUpdate: 'APPLICATION.UPDATED',
   approvalRoleList: 'APPROVAL_ROLE.LISTED',
   approvalRoleSet: 'APPROVAL_ROLE.SET',
+  assignmentExpiryQueueList: 'ASSIGNMENT_EXPIRY_QUEUE.LISTED',
+  assignmentExpiryReminderList: 'ASSIGNMENT_EXPIRY_REMINDER.LISTED',
+  assignmentExpiryStartRevocation: 'ASSIGNMENT_EXPIRY.REVOCATION_STARTED',
   auditEventList: 'AUDIT.EVENTS_LISTED',
   authLogin: 'AUTH.LOGGED_IN',
   authRedeemInvitation: 'AUTH.ACCOUNT_ACTIVATED',
   authRefresh: 'AUTH.SESSION_REFRESHED',
   authRequestPasswordReset: 'AUTH.PASSWORD_RESET_REQUESTED',
   authResetPassword: 'AUTH.PASSWORD_RESET',
+  budgetCheckGet: 'BUDGET_CHECK.FETCHED',
+  budgetCheckYearList: 'BUDGET_CHECK.YEARS_LISTED',
+  budgetCommitmentList: 'BUDGET_COMMITMENT.LISTED',
+  budgetCommitmentRelease: 'BUDGET_COMMITMENT.RELEASED',
+  budgetCommitmentReleases: 'BUDGET_COMMITMENT.RELEASES_LISTED',
+  budgetInformationAnswer: 'BUDGET_INFORMATION.ANSWERED',
+  budgetInformationAsk: 'BUDGET_INFORMATION.ASKED',
+  budgetInformationList: 'BUDGET_INFORMATION.LISTED',
+  budgetInformationOfRequest: 'BUDGET_INFORMATION.LISTED',
+  budgetMine: 'BUDGET.FETCHED',
+  budgetMineLineList: 'BUDGET.LINES_LISTED',
+  budgetProposalGet: 'BUDGET_PROPOSAL.FETCHED',
+  budgetProposalLineList: 'BUDGET_PROPOSAL.LINES_LISTED',
+  budgetProposalList: 'BUDGET_PROPOSAL.LISTED',
+  budgetProposalResubmit: 'BUDGET_PROPOSAL.RESUBMITTED',
+  budgetProposalReturn: 'BUDGET_PROPOSAL.RETURNED',
+  budgetProposalSubmit: 'BUDGET_PROPOSAL.SUBMITTED',
+  budgetProposalWithdraw: 'BUDGET_PROPOSAL.WITHDRAWN',
+  budgetTable: 'BUDGET.LISTED',
+  budgetVersionCreate: 'BUDGET_VERSION.CREATED',
+  budgetVersionDecide: 'BUDGET_VERSION.DECIDED',
+  budgetVersionGet: 'BUDGET_VERSION.FETCHED',
+  budgetVersionImport: 'BUDGET_VERSION.LINES_IMPORTED',
+  budgetVersionLineAdd: 'BUDGET_VERSION.LINES_ADDED',
+  budgetVersionLineChangeList: 'BUDGET_VERSION.CHANGES_LISTED',
+  budgetVersionLineList: 'BUDGET_VERSION.LINES_LISTED',
+  budgetVersionLineUpdate: 'BUDGET_VERSION.LINE_CHANGED',
+  budgetVersionLineWindow: 'BUDGET_VERSION.WINDOW_MOVED',
+  budgetVersionList: 'BUDGET_VERSION.LISTED',
+  budgetVersionRevise: 'BUDGET_VERSION.REVISION_CREATED',
+  budgetVersionSend: 'BUDGET_VERSION.SENT',
+  budgetVersionUpdate: 'BUDGET_VERSION.UPDATED',
   businessOwnerWarningList: 'BUSINESS_OWNER_WARNING.LISTED',
   contractCreate: 'CONTRACT.CREATED',
   contractGet: 'CONTRACT.FETCHED',
+  controlledWaitList: 'CONTROLLED_WAIT.LISTED',
   costCenterCreate: 'COST_CENTER.CREATED',
   costCenterDeactivate: 'COST_CENTER.DEACTIVATED',
   costCenterEmployeeList: 'COST_CENTER.EMPLOYEES_LISTED',
   costCenterList: 'COST_CENTER.LISTED',
   costCenterRename: 'COST_CENTER.RENAMED',
   currencyList: 'CURRENCY.LISTED',
+  delegatedRequestSend: 'DELEGATED_REQUEST.SENT',
   departmentCreate: 'DEPARTMENT.CREATED',
   departmentDeactivate: 'DEPARTMENT.DEACTIVATED',
   departmentGet: 'DEPARTMENT.FETCHED',
@@ -62,6 +132,13 @@ export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   departmentList: 'DEPARTMENT.LISTED',
   departmentMemberList: 'DEPARTMENT.MEMBERS_LISTED',
   departmentToolsInUse: 'DEPARTMENT_TOOLS.LISTED',
+  departmentTransferCancel: 'DEPARTMENT_TRANSFER.CANCELLED',
+  departmentTransferChangeList: 'DEPARTMENT_TRANSFER.CHANGES_LISTED',
+  departmentTransferClose: 'DEPARTMENT_TRANSFER.CLOSED',
+  departmentTransferGet: 'DEPARTMENT_TRANSFER.RETRIEVED',
+  departmentTransferList: 'DEPARTMENT_TRANSFER.LISTED',
+  departmentTransferRecord: 'DEPARTMENT_TRANSFER.RECORDED',
+  departmentTransferReschedule: 'DEPARTMENT_TRANSFER.RESCHEDULED',
   departmentUpdate: 'DEPARTMENT.UPDATED',
   departmentWarningList: 'DEPARTMENT.WARNINGS_LISTED',
   documentAttach: 'DOCUMENT.ATTACHED',
@@ -79,9 +156,19 @@ export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   employeeUpdateOfficialFields: 'EMPLOYEE.UPDATED',
   exchangeRateList: 'EXCHANGE_RATE.LISTED',
   exchangeRateRecord: 'EXCHANGE_RATE.RECORDED',
+  financeReviewComplete: 'FINANCE_REVIEW.COMPLETED',
+  financeReviewGet: 'FINANCE_REVIEW.FETCHED',
+  financeReviewList: 'FINANCE_REVIEW.LISTED',
   functionalGroupCreate: 'FUNCTIONAL_GROUP.CREATED',
   functionalGroupList: 'FUNCTIONAL_GROUP.LISTED',
   functionalGroupUpdate: 'FUNCTIONAL_GROUP.UPDATED',
+  grantQueueList: 'GRANT_QUEUE.LISTED',
+  groupRequestCandidateList: 'GROUP_REQUEST.CANDIDATES_LISTED',
+  groupRequestCheck: 'GROUP_REQUEST.CHECKED',
+  groupRequestSubmit: 'GROUP_REQUEST.SUBMITTED',
+  handoverDutyConfirm: 'HANDOVER_DUTY.CONFIRMED',
+  handoverDutyGet: 'HANDOVER_DUTY.RETRIEVED',
+  handoverDutyList: 'HANDOVER_DUTY.LISTED',
   healthGetLiveness: 'HEALTH.LIVENESS_CHECKED',
   healthGetReadiness: 'HEALTH.READINESS_CHECKED',
   jobTitleCreate: 'JOB_TITLE.CREATED',
@@ -91,19 +178,51 @@ export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   jobTitleRename: 'JOB_TITLE.RENAMED',
   licenseAssignmentChangeResponsible: 'LICENSE_ASSIGNMENT.RESPONSIBLE_CHANGED',
   licenseAssignmentList: 'LICENSE_ASSIGNMENT.LISTED',
+  licenseAssignmentProposeDepartmentMove: 'SERVICE_ACCOUNT_MOVE.PROPOSED',
   licenseKeyImport: 'LICENSE_KEY.IMPORTED',
   licenseKeyList: 'LICENSE_KEY.LISTED',
   licenseKeyReveal: 'LICENSE_KEY.REVEALED',
+  longLeaveChangeList: 'LONG_LEAVE.CHANGES_LISTED',
+  longLeaveChangeReturnDate: 'LONG_LEAVE.RETURN_DATE_CHANGED',
+  longLeaveConfirmReturn: 'LONG_LEAVE.RETURNED',
+  longLeaveGet: 'LONG_LEAVE.RETRIEVED',
+  longLeaveList: 'LONG_LEAVE.LISTED',
+  longLeaveStart: 'LONG_LEAVE.STARTED',
   meChangePassword: 'AUTH.PASSWORD_CHANGED',
+  meDepartureNoticeGet: 'ME.DEPARTURE_NOTICE_RETRIEVED',
   meGet: 'ME.RETRIEVED',
   nonWorkingDateAdd: 'NON_WORKING_DATE.ADDED',
   nonWorkingDateList: 'NON_WORKING_DATE.LISTED',
   nonWorkingDateRemove: 'NON_WORKING_DATE.REMOVED',
   nonWorkingDateRename: 'NON_WORKING_DATE.RENAMED',
+  notificationList: 'NOTIFICATION.LISTED',
+  notificationMarkAllRead: 'NOTIFICATION.ALL_READ',
+  notificationMarkRead: 'NOTIFICATION.READ',
+  notificationUnreadCount: 'NOTIFICATION.UNREAD_COUNTED',
+  offboardingCaseCancel: 'OFFBOARDING_CASE.CANCELLED',
+  offboardingCaseChangeLastDay: 'OFFBOARDING_CASE.LAST_DAY_CHANGED',
+  offboardingCaseChangeList: 'OFFBOARDING_CASE.CHANGES_LISTED',
+  offboardingCaseClose: 'OFFBOARDING_CASE.CLOSED',
+  offboardingCaseGet: 'OFFBOARDING_CASE.RETRIEVED',
+  offboardingCaseList: 'OFFBOARDING_CASE.LISTED',
+  offboardingCaseMarkLeft: 'OFFBOARDING_CASE.LEFT',
+  offboardingCaseOpenGrantTaskList: 'OFFBOARDING_CASE.OPEN_GRANT_TASKS_LISTED',
+  offboardingCaseOpenRequestList: 'OFFBOARDING_CASE.OPEN_REQUESTS_LISTED',
+  offboardingCaseOpenRevocations: 'OFFBOARDING_CASE.REVOCATIONS_OPENED',
+  offboardingCaseRecord: 'OFFBOARDING_CASE.RECORDED',
+  offboardingCaseRecordAccountLock: 'OFFBOARDING_CASE.ACCOUNT_LOCK_RECORDED',
+  offboardingCaseRightList: 'OFFBOARDING_CASE.RIGHTS_LISTED',
   onboardingChecklistGet: 'ONBOARDING.CHECKLIST_FETCHED',
   operatingParameterHistory: 'PARAMETER.HISTORY_LISTED',
   operatingParameterList: 'PARAMETER.LISTED',
   operatingParameterSet: 'PARAMETER.SET',
+  personnelNoticeGet: 'PERSONNEL_NOTICE.RETRIEVED',
+  personnelNoticeLinkEvent: 'PERSONNEL_NOTICE.LINKED',
+  personnelNoticeList: 'PERSONNEL_NOTICE.LISTED',
+  personnelNoticeRecord: 'PERSONNEL_NOTICE.RECORDED',
+  personnelNoticeReject: 'PERSONNEL_NOTICE.REJECTED',
+  personnelNoticeSend: 'PERSONNEL_NOTICE.SENT',
+  personnelNoticeWithdraw: 'PERSONNEL_NOTICE.WITHDRAWN',
   planCreate: 'PLAN.CREATED',
   planGet: 'PLAN.FETCHED',
   planList: 'PLAN.LISTED',
@@ -118,17 +237,33 @@ export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   projectGet: 'PROJECT.FETCHED',
   projectList: 'PROJECT.LISTED',
   projectUpdate: 'PROJECT.UPDATED',
+  provisioningTaskCancel: 'PROVISIONING_TASK.CANCELLED',
   provisioningTaskClaim: 'PROVISIONING_TASK.CLAIMED',
   provisioningTaskCloseFailed: 'PROVISIONING_TASK.CLOSED_FAILED',
   provisioningTaskComplete: 'PROVISIONING_TASK.COMPLETED',
+  provisioningTaskCompleteRevocation: 'PROVISIONING_TASK.REVOCATION_COMPLETED',
   provisioningTaskGet: 'PROVISIONING_TASK.FETCHED',
   provisioningTaskGrant: 'PROVISIONING_TASK.CREATED',
   provisioningTaskHandOff: 'PROVISIONING_TASK.HANDED_OFF',
   provisioningTaskList: 'PROVISIONING_TASK.LISTED',
+  provisioningTaskRecordAccessCut: 'PROVISIONING_TASK.ACCESS_CUT',
   provisioningTaskReportFailure: 'PROVISIONING_TASK.FAILED',
   provisioningTaskRetry: 'PROVISIONING_TASK.RETRY_REQUESTED',
   reportingCurrencyGet: 'REPORTING_CURRENCY.FETCHED',
   reportingCurrencySet: 'REPORTING_CURRENCY.SET',
+  returnRequestGet: 'RETURN_REQUEST.READ',
+  returnRequestHandoverConfirm: 'RETURN_REQUEST.HANDOVER_CONFIRMED',
+  returnRequestList: 'RETURN_REQUEST.LISTED',
+  returnRequestSubmit: 'RETURN_REQUEST.SUBMITTED',
+  saasIssueAddMessage: 'SAAS_ISSUE.MESSAGE_ADDED',
+  saasIssueEntryList: 'SAAS_ISSUE.ENTRIES_LISTED',
+  saasIssueFormOptions: 'SAAS_ISSUE.OPTIONS_READ',
+  saasIssueGet: 'SAAS_ISSUE.READ',
+  saasIssueList: 'SAAS_ISSUE.LISTED',
+  saasIssueMarkDuplicate: 'SAAS_ISSUE.DUPLICATED',
+  saasIssueReopen: 'SAAS_ISSUE.REOPENED',
+  saasIssueSubmit: 'SAAS_ISSUE.SUBMITTED',
+  saasIssueTransition: 'SAAS_ISSUE.TRANSITIONED',
   seatBaselineClose: 'SEAT_BASELINE.CLOSED',
   seatBaselineGet: 'SEAT_BASELINE.FETCHED',
   seatBaselineImportCancel: 'SEAT_BASELINE_IMPORT.CANCELLED',
@@ -136,11 +271,28 @@ export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   seatBaselineImportGet: 'SEAT_BASELINE_IMPORT.FETCHED',
   seatBaselineImportRows: 'SEAT_BASELINE_IMPORT.ROWS_LISTED',
   seatBaselineImportUpload: 'SEAT_BASELINE_IMPORT.UPLOADED',
+  serviceAccountDutyList: 'SERVICE_ACCOUNT_DUTY.LISTED',
+  serviceAccountMoveCancel: 'SERVICE_ACCOUNT_MOVE.CANCELLED',
+  serviceAccountMoveConfirm: 'SERVICE_ACCOUNT_MOVE.CONFIRMED',
+  serviceAccountMoveList: 'SERVICE_ACCOUNT_MOVE.LISTED',
+  spendApprovalDecide: 'SPEND_APPROVAL.DECIDED',
+  spendApprovalGet: 'SPEND_APPROVAL.FETCHED',
+  spendApprovalLineDecide: 'SPEND_APPROVAL.LINES_DECIDED',
+  spendApprovalList: 'SPEND_APPROVAL.LISTED',
+  spendBatchDecide: 'SPEND_BATCH.DECIDED',
+  spendBatchGet: 'SPEND_BATCH.FETCHED',
+  spendBatchItemList: 'SPEND_BATCH.ITEMS_LISTED',
+  spendBatchSubmit: 'SPEND_BATCH.SUBMITTED',
+  spendQueueList: 'SPEND_QUEUE.LISTED',
   standardToolsetGet: 'STANDARD_TOOLSET.FETCHED',
   standardToolsetHistory: 'STANDARD_TOOLSET.HISTORY_LISTED',
   standardToolsetList: 'STANDARD_TOOLSET.LISTED',
   standardToolsetMine: 'STANDARD_TOOLSET.FETCHED',
   standardToolsetSet: 'STANDARD_TOOLSET.SET',
+  stepCongestionIncidentList: 'STEP_CONGESTION.INCIDENTS_LISTED',
+  stepCongestionIncidentRecord: 'STEP_CONGESTION.INCIDENT_RECORDED',
+  stepCongestionList: 'STEP_CONGESTION.LISTED',
+  stepCongestionStepList: 'STEP_CONGESTION.STEPS_LISTED',
   subscriptionComplete: 'SUBSCRIPTION.COMPLETED',
   subscriptionCostAllocationGet: 'SUBSCRIPTION_COST_ALLOCATION.FETCHED',
   subscriptionCostAllocationHistory: 'SUBSCRIPTION_COST_ALLOCATION.HISTORY_LISTED',
@@ -151,6 +303,11 @@ export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   subscriptionSeatUsage: 'SUBSCRIPTION_SEAT_USAGE.FETCHED',
   subscriptionUpdate: 'SUBSCRIPTION.UPDATED',
   superAdminTransfer: 'SUPER_ADMIN.TRANSFERRED',
+  superAdminWatchGet: 'SUPER_ADMIN_WATCH.RETRIEVED',
+  transferReviewDecide: 'TRANSFER_REVIEW.DECIDED',
+  transferReviewGet: 'TRANSFER_REVIEW.RETRIEVED',
+  transferReviewItemList: 'TRANSFER_REVIEW.ITEMS_LISTED',
+  transferReviewList: 'TRANSFER_REVIEW.LISTED',
   vendorGroupCreate: 'VENDOR_DICTIONARY.GROUP_CREATED',
   vendorGroupList: 'VENDOR_DICTIONARY.GROUPS_LISTED',
   vendorGroupUpdate: 'VENDOR_DICTIONARY.GROUP_UPDATED',
@@ -171,25 +328,21 @@ export const BODYLESS_RESPONSES: Readonly<Record<string, string>> = {
   'authLogout 204': 'Signed out: 204 No Content has no body (@RawResponse).',
 };
 
-export const NO_EXAMPLE_RESPONSES: Readonly<Record<string, string>> = {
-  'provisioningTaskClaim 409':
-    'Unreachable until G5 binds the request gate: no task can be created while RefusingGrantRequestGate refuses every grant.',
-  'provisioningTaskCloseFailed 409':
-    'Unreachable until G5 binds the request gate: no task can be created while RefusingGrantRequestGate refuses every grant.',
-  'provisioningTaskComplete 409':
-    'Unreachable until G5 binds the request gate: no task can be created while RefusingGrantRequestGate refuses every grant.',
-  'provisioningTaskGrant 409':
-    'Unreachable until G5 binds the request gate: RefusingGrantRequestGate answers REQUEST.NOT_FOUND to every request.',
-  'provisioningTaskHandOff 409':
-    'Unreachable until G5 binds the request gate: no task can be created while RefusingGrantRequestGate refuses every grant.',
-  'provisioningTaskReportFailure 409':
-    'Unreachable until G5 binds the request gate: no task can be created while RefusingGrantRequestGate refuses every grant.',
-  'provisioningTaskRetry 409':
-    'Unreachable until G5 binds the request gate: no task can be created while RefusingGrantRequestGate refuses every grant.',
-};
+export const NO_EXAMPLE_RESPONSES: Readonly<Record<string, string>> = {};
 
-/** The route-specific codes, in two files to keep each support file small (TEST-HARDEN.1). */
-export const ROUTE_ERROR_CODES: Readonly<Record<string, Partial<Record<RouteErrorStatus, readonly string[]>>>> = {
-  ...ROUTE_ERROR_CODES_A_TO_L,
-  ...ROUTE_ERROR_CODES_M_TO_Z,
-};
+/**
+ * The route-specific codes, in several files to keep each support file small (TEST-HARDEN.1): the routes up to G4 by
+ * operationId, those G5/G6 added by area. An operationId listed twice is a mistake the inventory test reports.
+ */
+const PARTS = [
+  ROUTE_ERROR_CODES_A_TO_L,
+  ROUTE_ERROR_CODES_M_TO_Z,
+  ROUTE_ERROR_CODES_BUDGETS,
+  ROUTE_ERROR_CODES_REQUESTS,
+  ROUTE_ERROR_CODES_REQUESTS_SPEND,
+  ROUTE_ERROR_CODES_PERSONNEL,
+  ROUTE_ERROR_CODES_LICENSING,
+];
+export const ROUTE_ERROR_CODE_PARTS: readonly string[][] = PARTS.map((part) => Object.keys(part));
+export const ROUTE_ERROR_CODES: Readonly<Record<string, Partial<Record<RouteErrorStatus, readonly string[]>>>> =
+  PARTS.reduce((all, part) => ({ ...all, ...part }), {});

@@ -4,12 +4,16 @@ import {
   ApiErrorResponses,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
+  VALIDATION_EXAMPLE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
 import { AuthenticatedOnly } from '../../../infrastructure/security/decorators/access.decorators';
 import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { toAccessRequestApiException } from '../access-request/access-request.http-errors';
+import {
+  ACCESS_REQUEST_ERROR_EXAMPLES,
+  toAccessRequestApiException,
+} from '../access-request/access-request.http-errors';
 import { RequestTimingsResponseDto, TimingParamDto, type RequestTimingsWire } from './request-timing.dto';
 import { RequestTimingService } from './request-timing.service';
 
@@ -32,8 +36,13 @@ export class RequestTimingsController {
     {
       status: HttpStatus.NOT_FOUND,
       description: 'The request does not exist, or the caller may not see it (ACCESS_REQUEST.NOT_FOUND).',
+      examples: [ACCESS_REQUEST_ERROR_EXAMPLES.NOT_FOUND],
     },
-    { status: HttpStatus.UNPROCESSABLE_ENTITY, description: 'The id is invalid (VALIDATION_ERROR).' },
+    {
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      description: 'The id is invalid (VALIDATION_ERROR).',
+      examples: [VALIDATION_EXAMPLE],
+    },
     GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   )
   async get(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: TimingParamDto) {

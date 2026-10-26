@@ -25,9 +25,9 @@ import {
 } from './budget.policy';
 import { budgetAuditEvent, BudgetSupportService } from './budget-support.service';
 import { ProposalRepo, type ProposalLineRecord, type ProposalRecord } from './proposal.repo';
-import type { ProposalBodyDto, ProposalLineWire, ProposalSummaryWire, ProposalWire } from './budget.dto';
+import type { BudgetProposalBodyDto, ProposalLineWire, ProposalSummaryWire, ProposalWire } from './budget.dto';
 
-type LineBody = ProposalBodyDto['lines'][number];
+type LineBody = BudgetProposalBodyDto['lines'][number];
 
 /**
  * The proposals a head of department sends for the Cost Center of the department and a fiscal year (`US-06-10`): sent,
@@ -48,7 +48,7 @@ export class ProposalService {
    * Throws BudgetCostCenterNotFoundError, BudgetNotYourCostCenterError, BudgetYearEndedError, BudgetProposalIncompleteError,
    * BudgetWindowBackwardsError, BudgetProposalOpenError, BudgetCurrencyError and the money errors.
    */
-  async submit(actor: AuthenticatedPrincipal, body: ProposalBodyDto): Promise<ProposalWire> {
+  async submit(actor: AuthenticatedPrincipal, body: BudgetProposalBodyDto): Promise<ProposalWire> {
     const fiscalStart = await this.support.fiscalYearStartMonth();
 
     return this.runner.run(async (tx) => {

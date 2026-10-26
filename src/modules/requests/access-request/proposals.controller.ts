@@ -2,8 +2,10 @@ import { Body, Controller, Get, HttpStatus, Param, Post, Put } from '@nestjs/com
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
+  FORBIDDEN_EXAMPLE,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
+  VALIDATION_EXAMPLE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
 import { AuthenticatedOnly, RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
@@ -20,22 +22,36 @@ import {
   InternalRegistrationBodyDto,
   ProposalBodyDto,
 } from './assessment.dto';
-import { toAssessmentApiException } from './assessment.http-errors';
+import { ASSESSMENT_ERROR_EXAMPLES as EXAMPLES, toAssessmentApiException } from './assessment.http-errors';
 import { AssessmentService } from './assessment.service';
 import { CatalogLinkService } from './catalog-link.service';
 import { InternalRegistrationService } from './internal-registration.service';
 import { ProposalService } from './proposal.service';
 
 const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPONSE] as const;
+const IT_ONLY_DESCRIPTION =
+  'Only an IT Admin does this, and not for a request they asked for or are given (ACCESS_REQUEST.OWN_REQUEST).';
 const IT_ONLY = {
   status: HttpStatus.FORBIDDEN,
-  description:
-    'Only an IT Admin does this, and not for a request they asked for or are given (ACCESS_REQUEST.OWN_REQUEST).',
+  description: IT_ONLY_DESCRIPTION,
+  examples: [FORBIDDEN_EXAMPLE, EXAMPLES.OWN_REQUEST],
 } as const;
+const NOT_FOUND_DESCRIPTION =
+  'The request does not exist, is not a proposal, or the caller has no part in it (ACCESS_REQUEST.NOT_FOUND).';
 const NOT_FOUND = {
   status: HttpStatus.NOT_FOUND,
-  description:
-    'The request does not exist, is not a proposal, or the caller has no part in it (ACCESS_REQUEST.NOT_FOUND).',
+  description: NOT_FOUND_DESCRIPTION,
+  examples: [EXAMPLES.NOT_FOUND],
+} as const;
+const ID_INVALID = {
+  status: HttpStatus.UNPROCESSABLE_ENTITY,
+  description: 'The id is invalid (VALIDATION_ERROR).',
+  examples: [VALIDATION_EXAMPLE],
+} as const;
+const NOT_AWAITING_ASSESSMENT = {
+  status: HttpStatus.CONFLICT,
+  description: 'The request is not waiting for its assessment (ACCESS_REQUEST.NOT_AWAITING_ASSESSMENT).',
+  examples: [EXAMPLES.NOT_AWAITING_ASSESSMENT],
 } as const;
 
 /**
@@ -68,11 +84,13 @@ export class ProposalsController {
     {
       status: HttpStatus.CONFLICT,
       description: 'The sender belongs to no department (ACCESS_REQUEST.NO_DEPARTMENT).',
+      examples: [EXAMPLES.NO_DEPARTMENT],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
         'The form is incomplete or invalid (VALIDATION_ERROR): the name, the homepage, the purpose, the company data that will go through the software and the term are required. Nothing is written.',
+      examples: [VALIDATION_EXAMPLE],
     },
   )
   async propose(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: ProposalBodyDto) {
@@ -93,10 +111,7 @@ export class ProposalsController {
     description:
       'What the Employee declared and what the IT Admin has filled so far, the quote and the amount it gives, the control level and whether the assessment can be completed. Only the people of the request, the head, an IT Admin and, once it is completed, the spending approver read it.',
   })
-  @ApiErrorResponses(...AUTH_ERRORS, NOT_FOUND, {
-    status: HttpStatus.UNPROCESSABLE_ENTITY,
-    description: 'The id is invalid (VALIDATION_ERROR).',
-  })
+  @ApiErrorResponses(...AUTH_ERRORS, NOT_FOUND, ID_INVALID)
   async getAssessment(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: RequestIdParamDto) {
     try {
       return { assessment: await this.assessments.get(actor, params.id) };
@@ -113,20 +128,19 @@ export class ProposalsController {
     description:
       'The fields given are written and the ones that can be cleared take null; the others stay. It can be saved in several steps while the request waits for its assessment, and not once it is completed.',
   })
-  @ApiErrorResponses(
-    ...AUTH_ERRORS,
-    IT_ONLY,
-    NOT_FOUND,
-    {
-      status: HttpStatus.CONFLICT,
-      description: 'The request is not waiting for its assessment (ACCESS_REQUEST.NOT_AWAITING_ASSESSMENT).',
-    },
-    {
-      status: HttpStatus.UNPROCESSABLE_ENTITY,
-      description:
-        'A field is invalid (VALIDATION_ERROR), a vendor, plan or person it names does not exist (ASSESSMENT.REFERENCE_NOT_FOUND), or the quote runs backwards (ASSESSMENT.QUOTE_PERIOD_INVALID).',
-    },
-  )
+  @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, NOT_FOUND, NOT_AWAITING_ASSESSMENT, {
+    status: HttpStatus.UNPROCESSABLE_ENTITY,
+    description:
+      'A field is invalid (VALIDATION_ERROR), a vendor, plan or person it names does not exist (ASSESSMENT.REFERENCE_NOT_FOUND), or the quote runs backwards (ASSESSMENT.QUOTE_PERIOD_INVALID).',
+    examples: [
+      VALIDATION_EXAMPLE,
+      EXAMPLES.REFERENCE_NOT_FOUND,
+      EXAMPLES.QUOTE_PERIOD_INVALID,
+      EXAMPLES.MONEY_SCALE_EXCEEDED,
+      EXAMPLES.MONEY_OUT_OF_RANGE,
+      EXAMPLES.CURRENCY_NOT_SUPPORTED,
+    ],
+  })
   async saveAssessment(
     @CurrentPrincipal() actor: AuthenticatedPrincipal,
     @Param() params: RequestIdParamDto,
@@ -155,11 +169,23 @@ export class ProposalsController {
       status: HttpStatus.CONFLICT,
       description:
         'The request is not waiting for its assessment (ACCESS_REQUEST.NOT_AWAITING_ASSESSMENT), internal software is completed by registering it (ASSESSMENT.INTERNAL_COMPLETES_BY_REGISTRATION), or a tool that cannot be controlled is refused at the gate (ASSESSMENT.CONTROL_LEVEL_UNCONTROLLABLE).',
+      examples: [
+        EXAMPLES.NOT_AWAITING_ASSESSMENT,
+        EXAMPLES.INTERNAL_COMPLETES_BY_REGISTRATION,
+        EXAMPLES.CONTROL_LEVEL_UNCONTROLLABLE,
+      ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
         'The assessment lacks fields, with the names in details.missing (ASSESSMENT.INCOMPLETE), or the quote cannot price the request (ASSESSMENT.QUOTE_NOT_IN_FORCE, PAYMENT_FREQUENCY_INVALID, AMOUNT_TOO_LARGE). Nothing is written and the request stays with the IT Admin.',
+      examples: [
+        VALIDATION_EXAMPLE,
+        EXAMPLES.INCOMPLETE,
+        EXAMPLES.QUOTE_NOT_IN_FORCE,
+        EXAMPLES.PAYMENT_FREQUENCY_INVALID,
+        EXAMPLES.AMOUNT_TOO_LARGE,
+      ],
     },
   )
   async completeAssessment(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: RequestIdParamDto) {
@@ -180,20 +206,12 @@ export class ProposalsController {
     description:
       'The IT Admin concludes that a tool cannot be controlled, or that the software is not eligible for the catalog, with the reason that must go with it and an alternative when there is one. The request ends as refused by IT: no spend step, no snapshot, no commitment, and nothing is added to the catalog. The person who asked and the head read the reason and the alternative in the assessment.',
   })
-  @ApiErrorResponses(
-    ...AUTH_ERRORS,
-    IT_ONLY,
-    NOT_FOUND,
-    {
-      status: HttpStatus.CONFLICT,
-      description: 'The request is not waiting for its assessment (ACCESS_REQUEST.NOT_AWAITING_ASSESSMENT).',
-    },
-    {
-      status: HttpStatus.UNPROCESSABLE_ENTITY,
-      description:
-        'The reason is missing or blank, or the kind is not one of the two (VALIDATION_ERROR); the alternative plan does not exist (ASSESSMENT.REFERENCE_NOT_FOUND). Nothing is written and the request stays with the IT Admin.',
-    },
-  )
+  @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, NOT_FOUND, NOT_AWAITING_ASSESSMENT, {
+    status: HttpStatus.UNPROCESSABLE_ENTITY,
+    description:
+      'The reason is missing or blank, or the kind is not one of the two (VALIDATION_ERROR); the alternative plan does not exist (ASSESSMENT.REFERENCE_NOT_FOUND). Nothing is written and the request stays with the IT Admin.',
+    examples: [VALIDATION_EXAMPLE, EXAMPLES.ALTERNATIVE_PLAN_NOT_FOUND],
+  })
   async rejectAssessment(
     @CurrentPrincipal() actor: AuthenticatedPrincipal,
     @Param() params: RequestIdParamDto,
@@ -227,11 +245,24 @@ export class ProposalsController {
       status: HttpStatus.CONFLICT,
       description:
         'The request is not waiting for its assessment (ACCESS_REQUEST.NOT_AWAITING_ASSESSMENT), was not classified as internal software (ASSESSMENT.NOT_INTERNAL), or the name is taken (APPLICATION.NAME_TAKEN).',
+      examples: [EXAMPLES.NOT_AWAITING_ASSESSMENT, EXAMPLES.NOT_INTERNAL, EXAMPLES.NAME_TAKEN],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
         'The Business Owner is missing or has left (APPLICATION.BUSINESS_OWNER_INVALID), the data sensitivity is not known (ASSESSMENT.INCOMPLETE), the quote cannot price the request (ASSESSMENT.QUOTE_NOT_IN_FORCE and the others), or the body is invalid (VALIDATION_ERROR). Nothing is registered and the request stays with the IT Admin.',
+      examples: [
+        VALIDATION_EXAMPLE,
+        EXAMPLES.BUSINESS_OWNER_INVALID,
+        EXAMPLES.INCOMPLETE_DATA_SENSITIVITY,
+        EXAMPLES.QUOTE_PERIOD_INVALID,
+        EXAMPLES.QUOTE_NOT_IN_FORCE,
+        EXAMPLES.PAYMENT_FREQUENCY_INVALID,
+        EXAMPLES.AMOUNT_TOO_LARGE,
+        EXAMPLES.MONEY_SCALE_EXCEEDED,
+        EXAMPLES.MONEY_OUT_OF_RANGE,
+        EXAMPLES.CURRENCY_NOT_SUPPORTED,
+      ],
     },
   )
   async registerInternal(
@@ -258,16 +289,23 @@ export class ProposalsController {
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
-    IT_ONLY,
-    NOT_FOUND,
+    // The link checks no assessor, so OWN_REQUEST is not reachable; a plan that does not exist is (PLAN_NOT_FOUND).
+    { status: HttpStatus.FORBIDDEN, description: IT_ONLY_DESCRIPTION, examples: [FORBIDDEN_EXAMPLE] },
+    {
+      status: HttpStatus.NOT_FOUND,
+      description: NOT_FOUND_DESCRIPTION,
+      examples: [EXAMPLES.NOT_FOUND, EXAMPLES.PLAN_NOT_FOUND],
+    },
     {
       status: HttpStatus.CONFLICT,
       description:
         'The request is not waiting for its grant or is already linked (ACCESS_REQUEST.CATALOG_LINK_NOT_ALLOWED), the application is retired (ACCESS_REQUEST.APPLICATION_RETIRED), or it has no Business Owner who works (ACCESS_REQUEST.BUSINESS_OWNER_REQUIRED).',
+      examples: [EXAMPLES.CATALOG_LINK_NOT_ALLOWED, EXAMPLES.APPLICATION_RETIRED, EXAMPLES.BUSINESS_OWNER_REQUIRED],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description: 'The body is invalid (VALIDATION_ERROR).',
+      examples: [VALIDATION_EXAMPLE],
     },
   )
   async linkCatalogPlan(

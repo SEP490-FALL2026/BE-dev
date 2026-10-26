@@ -1,6 +1,14 @@
 import { HttpStatus } from '@nestjs/common';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
+import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
 import { ProvisioningAnotherItAdminNeededError } from '../../licensing/licensing.errors';
+import {
+  AccessRequestApplicationRetiredError,
+  AccessRequestNoDepartmentError,
+  AccessRequestNotFoundError,
+  AccessRequestPlanNotFoundError,
+  AccessRequestSpendDateNotAllowedError,
+} from '../access-request/access-request.errors';
 import { toAccessRequestApiException } from '../access-request/access-request.http-errors';
 import { ServiceAccountReviewRefusedError, ServiceAccountSubmitRefusedError } from './service-account-request.errors';
 
@@ -29,3 +37,19 @@ export function toServiceAccountApiException(error: unknown): unknown {
 
   return toAccessRequestApiException(error);
 }
+
+const example = (error: Error) => errorExampleOf(toServiceAccountApiException(error));
+
+/** The answers above as OpenAPI examples, each produced by the mapper that gives it at runtime (OPENAPI-EXAMPLE.1). */
+export const SERVICE_ACCOUNT_ERROR_EXAMPLES = {
+  BASELINE_NOT_CLOSED: example(new ServiceAccountSubmitRefusedError('BASELINE_NOT_CLOSED')),
+  PLAN_NOT_SUPPORTED: example(new ServiceAccountSubmitRefusedError('PLAN_NOT_SUPPORTED')),
+  NOT_REVIEWABLE: example(new ServiceAccountReviewRefusedError('NOT_REVIEWABLE')),
+  BOUNDARY_ALREADY_DECIDED: example(new ServiceAccountReviewRefusedError('BOUNDARY_ALREADY_DECIDED')),
+  ANOTHER_IT_ADMIN_NEEDED: example(new ProvisioningAnotherItAdminNeededError()),
+  REQUEST_NOT_FOUND: example(new AccessRequestNotFoundError()),
+  PLAN_NOT_FOUND: example(new AccessRequestPlanNotFoundError()),
+  APPLICATION_RETIRED: example(new AccessRequestApplicationRetiredError()),
+  NO_DEPARTMENT: example(new AccessRequestNoDepartmentError()),
+  NO_SPEND_FOR_FREE_SOFTWARE: example(new AccessRequestSpendDateNotAllowedError()),
+} as const;

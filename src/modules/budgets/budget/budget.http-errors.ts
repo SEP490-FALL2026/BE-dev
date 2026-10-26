@@ -1,7 +1,13 @@
 import { HttpStatus } from '@nestjs/common';
+import {
+  CurrencyNotSupportedError,
+  MoneyOutOfRangeError,
+  MoneyScaleExceededError,
+} from '../../../core/money/money.errors';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import { toMoneyApiException } from '../../../infrastructure/http/errors/money-errors';
 import { toUnavailableApiException } from '../../../infrastructure/http/errors/service-unavailable';
+import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
 import { isUniqueViolation } from '../../../infrastructure/database/unique-violation';
 import {
   BudgetCommitmentExistsError,
@@ -136,13 +142,10 @@ export function toBudgetApiException(error: unknown): unknown {
   if (error instanceof BudgetVersionNotCurrentError) {
     return refuse(HttpStatus.CONFLICT, 'BUDGET.VERSION_NOT_CURRENT', error.message);
   }
-  // A race between two writers of the same Cost Center and year is stopped by the partial unique indexes.
+  // A race between two writers of the same Cost Center and year is stopped by the partial unique indexes. The loser
+  // answers exactly what the check before the write answers: one code, one message (Owner, Prompt 02, 26/10/2026).
   if (isUniqueViolation(error, 'budget_proposals_open_key')) {
-    return refuse(
-      HttpStatus.CONFLICT,
-      'BUDGET.PROPOSAL_ALREADY_OPEN',
-      'The Cost Center already has a proposal for this year.',
-    );
+    return toBudgetApiException(new BudgetProposalOpenError());
   }
   if (isUniqueViolation(error, 'budget_versions_current_key')) {
     return refuse(
@@ -152,11 +155,7 @@ export function toBudgetApiException(error: unknown): unknown {
     );
   }
   if (isUniqueViolation(error, 'budget_versions_in_flight_key', 'budget_versions_cost_center_id_year_number_key')) {
-    return refuse(
-      HttpStatus.CONFLICT,
-      'BUDGET.VERSION_IN_FLIGHT',
-      'The Cost Center already has a version in progress for this year.',
-    );
+    return toBudgetApiException(new BudgetVersionInFlightError());
   }
 
   const money = toMoneyApiException(error);
@@ -164,3 +163,47 @@ export function toBudgetApiException(error: unknown): unknown {
 
   return toUnavailableApiException(error) ?? error;
 }
+
+const example = (error: Error) => errorExampleOf(toBudgetApiException(error));
+
+/** The answers above as OpenAPI examples, each produced by the mapper that gives it at runtime (OPENAPI-EXAMPLE.1). */
+export const BUDGET_ERROR_EXAMPLES = {
+  PROPOSAL_NOT_FOUND: example(new BudgetProposalNotFoundError()),
+  VERSION_NOT_FOUND: example(new BudgetVersionNotFoundError()),
+  LINE_NOT_FOUND: example(new BudgetLineNotFoundError()),
+  COST_CENTER_NOT_FOUND: example(new BudgetCostCenterNotFoundError()),
+  COMMITMENT_NOT_FOUND: example(new BudgetCommitmentNotFoundError()),
+  COMMITMENT_NOT_HELD: example(new BudgetCommitmentRefusedError('NOT_HELD', 2026)),
+  COMMITMENT_REQUEST_OPEN: example(new BudgetCommitmentRefusedError('REQUEST_OPEN')),
+  NOT_SPENDING_APPROVER: example(new BudgetDecisionRefusedError('NOT_SPENDING_APPROVER')),
+  CONFLICT_OF_INTEREST: example(new BudgetDecisionRefusedError('CONFLICT_OF_INTEREST')),
+  OWN_VERSION: example(new BudgetDecisionRefusedError('OWN_VERSION')),
+  VERSION_NOT_SENT: example(new BudgetDecisionRefusedError('NOT_SENT')),
+  NOT_A_READER: example(new BudgetNotAReaderError()),
+  NOT_YOUR_COST_CENTER: example(new BudgetNotYourCostCenterError()),
+  YEAR_ENDED: example(new BudgetYearEndedError(2025)),
+  PROPOSAL_INCOMPLETE: example(
+    new BudgetProposalIncompleteError([{ line: 1, fields: ['servicePeriodMonths', 'repeatCycle'] }]),
+  ),
+  WINDOW_BACKWARDS: example(new BudgetWindowBackwardsError([1])),
+  CURRENCY_NOT_REPORTING: example(new BudgetCurrencyError('USD', 'VND')),
+  QUARTERS_MISMATCH: example(new BudgetQuartersMismatchError()),
+  REVISION_REASON_REQUIRED: example(new BudgetReasonRequiredError('REVISION')),
+  ADJUSTMENT_REASON_REQUIRED: example(new BudgetReasonRequiredError('ADJUSTMENT')),
+  WINDOW_REASON_REQUIRED: example(new BudgetReasonRequiredError('WINDOW')),
+  IMPORT_FILE_INVALID: example(new BudgetImportFileInvalidError('MISSING_COLUMNS', 'cost_center_code')),
+  // Not shown yet: two writers at once answer the same code with the message given for the unique index above.
+  PROPOSAL_ALREADY_OPEN: example(new BudgetProposalOpenError()),
+  PROPOSAL_CANNOT_WITHDRAW: example(new BudgetProposalStateError('WITHDRAW', 'REVIEWED')),
+  PROPOSAL_CANNOT_RETURN: example(new BudgetProposalStateError('RETURN', 'REVIEWED')),
+  PROPOSAL_CANNOT_RESUBMIT: example(new BudgetProposalStateError('RESUBMIT', 'SUBMITTED')),
+  PROPOSAL_NOT_SUBMITTED: example(new BudgetProposalStateError('REVIEW', 'WITHDRAWN')),
+  VERSION_NOT_EDITABLE: example(new BudgetVersionNotEditableError('SENT')),
+  VERSION_IN_FLIGHT: example(new BudgetVersionInFlightError()),
+  NO_CURRENT_BUDGET: example(new BudgetNoCurrentError()),
+  REVISION_REQUIRED: example(new BudgetRevisionRequiredError()),
+  VERSION_NOT_CURRENT: example(new BudgetVersionNotCurrentError()),
+  MONEY_SCALE_EXCEEDED: example(new MoneyScaleExceededError(2)),
+  MONEY_OUT_OF_RANGE: example(new MoneyOutOfRangeError()),
+  CURRENCY_NOT_SUPPORTED: example(new CurrencyNotSupportedError('XYZ')),
+} as const;

@@ -4,9 +4,9 @@ import {
   ApiErrorResponses,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
+  VALIDATION_EXAMPLE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
-import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import { AuthenticatedOnly } from '../../../infrastructure/security/decorators/access.decorators';
 import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
@@ -15,6 +15,7 @@ import { RequestIdParamDto } from '../access-request/access-request.dto';
 import { toWire } from '../access-request/access-request.wire';
 import { ApprovalDetailResponseDto } from '../spend/spend-approval.dto';
 import { SpendApprovalViewService } from '../spend/spend-approval-view.service';
+import { toRecheckedApiException } from '../spend/spend.http-errors';
 import {
   LineNeedDecisionBodyDto,
   LineParamsDto,
@@ -24,7 +25,7 @@ import {
 import { GroupLineQueryService } from './group-line-query.service';
 import { GroupNeedDecisionService } from './group-need-decision.service';
 import { LinesQueryDto, LinesResponseDto, GroupResponseDto } from './group-request.dto';
-import { toGroupRequestApiException } from './group-request.http-errors';
+import { GROUP_REQUEST_ERROR_EXAMPLES, toGroupRequestApiException } from './group-request.http-errors';
 import { GroupSpendDecisionService } from './group-spend-decision.service';
 import { GroupWithdrawalService } from './group-withdrawal.service';
 
@@ -33,6 +34,7 @@ const NOT_FOUND = {
   status: HttpStatus.NOT_FOUND,
   description:
     'The request does not exist, is not a request for a group, or the caller has no part in it (ACCESS_REQUEST.NOT_FOUND).',
+  examples: [GROUP_REQUEST_ERROR_EXAMPLES.REQUEST_NOT_FOUND],
 } as const;
 
 /**
@@ -63,6 +65,7 @@ export class GroupLinesController {
   @ApiErrorResponses(...AUTH_ERRORS, NOT_FOUND, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description: 'The id or the query is invalid (VALIDATION_ERROR).',
+    examples: [VALIDATION_EXAMPLE],
   })
   async list(
     @CurrentPrincipal() actor: AuthenticatedPrincipal,
@@ -90,17 +93,28 @@ export class GroupLinesController {
       status: HttpStatus.FORBIDDEN,
       description:
         'The caller asked for the request or is one of the people of the step (ACCESS_REQUEST.OWN_REQUEST), or does not hold the step (ACCESS_REQUEST.NOT_THE_ASSIGNEE).',
+      examples: [GROUP_REQUEST_ERROR_EXAMPLES.NEED_OWN_REQUEST, GROUP_REQUEST_ERROR_EXAMPLES.NEED_NOT_THE_ASSIGNEE],
     },
     NOT_FOUND,
     {
       status: HttpStatus.CONFLICT,
       description:
         'The step is not pending (ACCESS_REQUEST.STEP_NOT_PENDING), or a person approved holds a seat of the plan now (GROUP_REQUEST.LINE_HOLDS_ACCESS, with the people): the person who decides refuses that line and the others are not touched.',
+      examples: [GROUP_REQUEST_ERROR_EXAMPLES.NEED_STEP_NOT_PENDING, GROUP_REQUEST_ERROR_EXAMPLES.LINE_HOLDS_ACCESS],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
         'The body is invalid (VALIDATION_ERROR: a refusal without its reason, a person twice); the decision leaves out people of the step or names others (GROUP_REQUEST.LINES_MISMATCH, with who); a term over twelve months is approved without its confirmation (ACCESS_REQUEST.TERM_CONFIRMATION_REQUIRED); the head who approves gives no line of the plan or outside the plan (ACCESS_REQUEST.PLAN_LINE_REQUIRED). Nothing is saved.',
+      examples: [
+        VALIDATION_EXAMPLE,
+        GROUP_REQUEST_ERROR_EXAMPLES.LINES_MISMATCH,
+        GROUP_REQUEST_ERROR_EXAMPLES.NEED_TERM_CONFIRMATION_REQUIRED,
+        GROUP_REQUEST_ERROR_EXAMPLES.PLAN_LINE_REQUIRED,
+        GROUP_REQUEST_ERROR_EXAMPLES.SPEND_NOT_APPLICABLE,
+        GROUP_REQUEST_ERROR_EXAMPLES.PLAN_LINE_NOT_FOUND,
+        GROUP_REQUEST_ERROR_EXAMPLES.STILL_NEEDED_REQUIRED,
+      ],
     },
   )
   async decideNeed(
@@ -144,17 +158,31 @@ export class GroupLinesController {
       status: HttpStatus.FORBIDDEN,
       description:
         'The caller does not hold the step (SPEND.NOT_THE_ASSIGNEE) or asked for the request or is one of its people (SPEND.OWN_REQUEST).',
+      examples: [GROUP_REQUEST_ERROR_EXAMPLES.SPEND_NOT_THE_ASSIGNEE, GROUP_REQUEST_ERROR_EXAMPLES.SPEND_OWN_REQUEST],
     },
     NOT_FOUND,
     {
       status: HttpStatus.CONFLICT,
       description:
         'The request has no spend step open (SPEND.NO_SPEND_STEP), the step is decided (SPEND.STEP_NOT_PENDING), the request cannot be checked now (SPEND.NOT_CHECKABLE), or it was checked again and went back to Finance (SPEND.RECHECKED_NEEDS_FINANCE_REVIEW) or to its head (SPEND.RECHECKED_RETURNED_TO_HEAD).',
+      examples: [
+        GROUP_REQUEST_ERROR_EXAMPLES.NO_SPEND_STEP,
+        GROUP_REQUEST_ERROR_EXAMPLES.NOT_CHECKABLE,
+        GROUP_REQUEST_ERROR_EXAMPLES.RECHECKED_NEEDS_FINANCE_REVIEW,
+        GROUP_REQUEST_ERROR_EXAMPLES.RECHECKED_RETURNED_TO_HEAD,
+      ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
         'The body is invalid (VALIDATION_ERROR: a refusal without its reason); the decision leaves out people whose need is confirmed or names others (GROUP_REQUEST.LINES_MISMATCH, with who); the override is missing or names other years than the ones that need it (SPEND.OVERRIDE_REQUIRED, SPEND.OVERRIDE_MISMATCH, with the years) or has nothing to accept (SPEND.OVERRIDE_NOT_NEEDED).',
+      examples: [
+        VALIDATION_EXAMPLE,
+        GROUP_REQUEST_ERROR_EXAMPLES.LINES_MISMATCH,
+        GROUP_REQUEST_ERROR_EXAMPLES.OVERRIDE_REQUIRED,
+        GROUP_REQUEST_ERROR_EXAMPLES.OVERRIDE_MISMATCH,
+        GROUP_REQUEST_ERROR_EXAMPLES.OVERRIDE_NOT_NEEDED,
+      ],
     },
   )
   async decideSpend(
@@ -164,19 +192,7 @@ export class GroupLinesController {
   ) {
     try {
       const result = await this.spends.decide(actor, params.id, body);
-      if (result.status === 'BOUNCED') {
-        throw new ApiException(HttpStatus.CONFLICT, {
-          code:
-            result.to === 'FINANCE_REVIEW'
-              ? 'SPEND.RECHECKED_NEEDS_FINANCE_REVIEW'
-              : 'SPEND.RECHECKED_RETURNED_TO_HEAD',
-          message:
-            result.to === 'FINANCE_REVIEW'
-              ? 'The request was checked again, is now an exception that Finance has not reviewed, and went back to Finance. Nothing was decided.'
-              : 'The request was checked again, its data is at fault, and it went back to its head. Nothing was decided.',
-          ...(result.to === 'HEAD' ? { details: { reason: result.reason } } : {}),
-        });
-      }
+      if (result.status === 'BOUNCED') throw toRecheckedApiException(result);
 
       return { spendApproval: await this.approvals.detail(actor, params.id) };
     } catch (error) {
@@ -198,17 +214,25 @@ export class GroupLinesController {
       status: HttpStatus.FORBIDDEN,
       description:
         'The caller is not the sender, the person withdrawn included, and not the head in a stage the head acts on (ACCESS_REQUEST.NOT_REQUESTER).',
+      examples: [GROUP_REQUEST_ERROR_EXAMPLES.NOT_REQUESTER],
     },
     NOT_FOUND,
     {
       status: HttpStatus.CONFLICT,
       description:
         'Nothing is left to withdraw (ACCESS_REQUEST.ALREADY_ENDED), the withdrawal waits for the IT Admin (ACCESS_REQUEST.WITHDRAWAL_PENDING), the task of the grant is being worked (ACCESS_REQUEST.GRANT_RUNNING), or the seat is real and the way back is a return (ACCESS_REQUEST.GRANT_COMPLETED). Nothing changes.',
+      examples: [
+        GROUP_REQUEST_ERROR_EXAMPLES.WITHDRAWAL_ALREADY_ENDED,
+        GROUP_REQUEST_ERROR_EXAMPLES.WITHDRAWAL_PENDING,
+        GROUP_REQUEST_ERROR_EXAMPLES.GRANT_RUNNING,
+        GROUP_REQUEST_ERROR_EXAMPLES.GRANT_COMPLETED,
+      ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
         'The body is invalid (VALIDATION_ERROR: a blank reason), or the head gives no reason (ACCESS_REQUEST.REASON_REQUIRED). Nothing is saved.',
+      examples: [VALIDATION_EXAMPLE, GROUP_REQUEST_ERROR_EXAMPLES.REASON_REQUIRED],
     },
   )
   async withdrawLine(

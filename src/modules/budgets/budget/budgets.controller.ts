@@ -2,8 +2,10 @@ import { Controller, Get, HttpStatus, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
+  FORBIDDEN_EXAMPLE,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
+  VALIDATION_EXAMPLE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
 import { RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
@@ -18,12 +20,18 @@ import {
   MineResponseDto,
 } from './budget.dto';
 import { BudgetViewService } from './budget-view.service';
-import { toBudgetApiException } from './budget.http-errors';
+import { BUDGET_ERROR_EXAMPLES as EXAMPLES, toBudgetApiException } from './budget.http-errors';
 
 const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPONSE] as const;
 const INVALID = {
   status: HttpStatus.UNPROCESSABLE_ENTITY,
   description: 'The query is invalid (VALIDATION_ERROR).',
+  examples: [VALIDATION_EXAMPLE],
+} as const;
+const HEADS_ONLY = {
+  status: HttpStatus.FORBIDDEN,
+  description: 'The caller heads no department (BUDGET.NOT_YOUR_COST_CENTER).',
+  examples: [FORBIDDEN_EXAMPLE, EXAMPLES.NOT_YOUR_COST_CENTER],
 } as const;
 
 /**
@@ -44,11 +52,7 @@ export class BudgetsController {
     description:
       'The Cost Center of the department the caller heads, the year, whether it has a current budget (ACTIVE) or not (NO_ACTIVE_BUDGET), the total, and the proposal behind it. No part of this says what is left.',
   })
-  @ApiErrorResponses(
-    ...AUTH_ERRORS,
-    { status: HttpStatus.FORBIDDEN, description: 'The caller heads no department (BUDGET.NOT_YOUR_COST_CENTER).' },
-    INVALID,
-  )
+  @ApiErrorResponses(...AUTH_ERRORS, HEADS_ONLY, INVALID)
   async mine(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Query() query: MineQueryDto) {
     try {
       return { budget: await this.budgets.mine(actor, query.year) };
@@ -65,11 +69,7 @@ export class BudgetsController {
     description:
       'The lines of the current version: what is planned to be bought, its amount, its window, and whether the window has gone by. Without the comments Finance made.',
   })
-  @ApiErrorResponses(
-    ...AUTH_ERRORS,
-    { status: HttpStatus.FORBIDDEN, description: 'The caller heads no department (BUDGET.NOT_YOUR_COST_CENTER).' },
-    INVALID,
-  )
+  @ApiErrorResponses(...AUTH_ERRORS, HEADS_ONLY, INVALID)
   async mineLines(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Query() query: MineLinesQueryDto) {
     try {
       return await this.budgets.mineLines(actor, query.year, query);
@@ -88,7 +88,11 @@ export class BudgetsController {
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
-    { status: HttpStatus.FORBIDDEN, description: 'Only Finance reads the budgets of the company.' },
+    {
+      status: HttpStatus.FORBIDDEN,
+      description: 'Only Finance reads the budgets of the company.',
+      examples: [FORBIDDEN_EXAMPLE],
+    },
     INVALID,
   )
   async table(@Query() query: BudgetsQueryDto) {

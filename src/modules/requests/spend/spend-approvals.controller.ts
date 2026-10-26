@@ -4,9 +4,9 @@ import {
   ApiErrorResponses,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
+  VALIDATION_EXAMPLE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
-import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import { AuthenticatedOnly } from '../../../infrastructure/security/decorators/access.decorators';
 import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
@@ -22,16 +22,18 @@ import { SpendApprovalViewService } from './spend-approval-view.service';
 import { SpendBatchDecisionService } from './spend-batch-decision.service';
 import { SpendDecisionService } from './spend-decision.service';
 import { IdParamDto } from './spend-submission.dto';
-import { toSpendApiException } from './spend.http-errors';
+import { SPEND_ERROR_EXAMPLES, toRecheckedApiException, toSpendApiException } from './spend.http-errors';
 
 const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPONSE] as const;
 const INVALID = {
   status: HttpStatus.UNPROCESSABLE_ENTITY,
   description: 'The request is invalid (VALIDATION_ERROR).',
+  examples: [VALIDATION_EXAMPLE],
 } as const;
 const NOT_FOUND = {
   status: HttpStatus.NOT_FOUND,
   description: 'The request has no spend step the caller holds (SPEND.REVIEW_NOT_FOUND).',
+  examples: [SPEND_ERROR_EXAMPLES.REVIEW_NOT_FOUND],
 } as const;
 
 /**
@@ -97,17 +99,32 @@ export class SpendApprovalsController {
       status: HttpStatus.FORBIDDEN,
       description:
         'The caller does not hold the step (SPEND.NOT_THE_ASSIGNEE) or asked for or is given the access (SPEND.OWN_REQUEST).',
+      examples: [SPEND_ERROR_EXAMPLES.NOT_THE_ASSIGNEE, SPEND_ERROR_EXAMPLES.OWN_REQUEST],
     },
-    NOT_FOUND,
+    // The decision reads the request itself first: a request that does not exist is ACCESS_REQUEST.NOT_FOUND here.
+    { ...NOT_FOUND, examples: [SPEND_ERROR_EXAMPLES.REQUEST_NOT_FOUND] },
     {
       status: HttpStatus.CONFLICT,
       description:
         'The request has no spend step open (SPEND.NO_SPEND_STEP), the step is decided (SPEND.STEP_NOT_PENDING), the request cannot be checked now (SPEND.NOT_CHECKABLE), or it was checked again and went back to Finance (SPEND.RECHECKED_NEEDS_FINANCE_REVIEW) or to its head (SPEND.RECHECKED_RETURNED_TO_HEAD).',
+      examples: [
+        SPEND_ERROR_EXAMPLES.NO_SPEND_STEP,
+        SPEND_ERROR_EXAMPLES.NOT_CHECKABLE,
+        SPEND_ERROR_EXAMPLES.RECHECKED_NEEDS_FINANCE_REVIEW,
+        SPEND_ERROR_EXAMPLES.RECHECKED_RETURNED_TO_HEAD,
+        SPEND_ERROR_EXAMPLES.GROUP_USES_LINES,
+      ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
         'The body is invalid (VALIDATION_ERROR: a refusal without a reason), or the override is missing or names other years than the ones that need it (SPEND.OVERRIDE_REQUIRED, SPEND.OVERRIDE_MISMATCH, with the years) or has nothing to accept (SPEND.OVERRIDE_NOT_NEEDED).',
+      examples: [
+        VALIDATION_EXAMPLE,
+        SPEND_ERROR_EXAMPLES.OVERRIDE_REQUIRED,
+        SPEND_ERROR_EXAMPLES.OVERRIDE_MISMATCH,
+        SPEND_ERROR_EXAMPLES.OVERRIDE_NOT_NEEDED,
+      ],
     },
   )
   async decide(
@@ -117,19 +134,7 @@ export class SpendApprovalsController {
   ) {
     try {
       const result = await this.decisions.decide(actor, params.id, body);
-      if (result.status === 'BOUNCED') {
-        throw new ApiException(HttpStatus.CONFLICT, {
-          code:
-            result.to === 'FINANCE_REVIEW'
-              ? 'SPEND.RECHECKED_NEEDS_FINANCE_REVIEW'
-              : 'SPEND.RECHECKED_RETURNED_TO_HEAD',
-          message:
-            result.to === 'FINANCE_REVIEW'
-              ? 'The request was checked again, is now an exception that Finance has not reviewed, and went back to Finance. Nothing was decided.'
-              : 'The request was checked again, its data is at fault, and it went back to its head. Nothing was decided.',
-          ...(result.to === 'HEAD' ? { details: { reason: result.reason } } : {}),
-        });
-      }
+      if (result.status === 'BOUNCED') throw toRecheckedApiException(result);
 
       return { spendApproval: await this.views.detail(actor, params.id) };
     } catch (error) {
@@ -150,6 +155,7 @@ export class SpendApprovalsController {
     {
       status: HttpStatus.NOT_FOUND,
       description: 'The batch does not exist, or the caller holds nothing of it (SPEND.BATCH_NOT_FOUND).',
+      examples: [SPEND_ERROR_EXAMPLES.BATCH_NOT_FOUND],
     },
     INVALID,
   )

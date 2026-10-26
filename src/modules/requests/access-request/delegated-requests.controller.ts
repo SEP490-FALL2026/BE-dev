@@ -2,14 +2,16 @@ import { Body, Controller, Get, HttpStatus, Post, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
+  FORBIDDEN_EXAMPLE,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
+  VALIDATION_EXAMPLE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
 import { AuthenticatedOnly, RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
 import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { toAccessRequestApiException } from './access-request.http-errors';
+import { ACCESS_REQUEST_ERROR_EXAMPLES as EXAMPLES, toAccessRequestApiException } from './access-request.http-errors';
 import { AccessRequestQueryService } from './access-request-query.service';
 import { toWire } from './access-request.wire';
 import {
@@ -50,20 +52,33 @@ export class DelegatedRequestsController {
     {
       status: HttpStatus.FORBIDDEN,
       description: 'The caller does not head the department (DELEGATED_REQUEST.NOT_HEAD).',
+      examples: [EXAMPLES.NOT_HEAD],
     },
     {
       status: HttpStatus.NOT_FOUND,
       description: 'A plan does not exist (ACCESS_REQUEST.PLAN_NOT_FOUND).',
+      examples: [EXAMPLES.PLAN_NOT_FOUND],
     },
     {
       status: HttpStatus.CONFLICT,
       description:
         'A person already holds a seat of a plan (ACCESS_REQUEST.ALREADY_HOLDS_ACCESS), has left the company (DELEGATED_REQUEST.BENEFICIARY_NOT_ACTIVE) or an application is retired (ACCESS_REQUEST.APPLICATION_RETIRED).',
+      examples: [EXAMPLES.ALREADY_HOLDS_ACCESS, EXAMPLES.BENEFICIARY_NOT_ACTIVE, EXAMPLES.APPLICATION_RETIRED],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
         'The form is invalid (VALIDATION_ERROR), a person is outside the department (DELEGATED_REQUEST.OUTSIDE_DEPARTMENT), has no work email (DELEGATED_REQUEST.EMAIL_REQUIRED), is a contractor, freelancer or intern without the day the access ends (DELEGATED_REQUEST.END_DATE_REQUIRED, DELEGATED_REQUEST.END_DATE_TOO_EARLY), a long term is not confirmed (DELEGATED_REQUEST.TERM_CONFIRMATION_REQUIRED) or a tool outside the standard toolset has no reason (ACCESS_REQUEST.OUTSIDE_STANDARD_REASON_REQUIRED).',
+      examples: [
+        VALIDATION_EXAMPLE,
+        EXAMPLES.OUTSIDE_DEPARTMENT,
+        EXAMPLES.EMAIL_REQUIRED,
+        EXAMPLES.END_DATE_REQUIRED,
+        EXAMPLES.END_DATE_TOO_EARLY,
+        EXAMPLES.DELEGATED_TERM_CONFIRMATION_REQUIRED,
+        EXAMPLES.OUTSIDE_STANDARD_REASON_REQUIRED,
+        EXAMPLES.NO_SPEND_FOR_FREE_SOFTWARE,
+      ],
     },
   )
   async send(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: DelegatedBodyDto) {
@@ -88,8 +103,16 @@ export class DelegatedRequestsController {
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
-    { status: HttpStatus.FORBIDDEN, description: 'Only the IT Admin reads what waits to be carried out.' },
-    { status: HttpStatus.UNPROCESSABLE_ENTITY, description: 'The query is invalid (VALIDATION_ERROR).' },
+    {
+      status: HttpStatus.FORBIDDEN,
+      description: 'Only the IT Admin reads what waits to be carried out.',
+      examples: [FORBIDDEN_EXAMPLE],
+    },
+    {
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      description: 'The query is invalid (VALIDATION_ERROR).',
+      examples: [VALIDATION_EXAMPLE],
+    },
   )
   async grantQueue(@Query() query: GrantQueueQueryDto) {
     try {

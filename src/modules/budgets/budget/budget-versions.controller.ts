@@ -2,8 +2,10 @@ import { Body, Controller, Get, HttpStatus, Param, Post, Put, Query } from '@nes
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
+  FORBIDDEN_EXAMPLE,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
+  VALIDATION_EXAMPLE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
 import { AuthenticatedOnly, RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
@@ -19,7 +21,7 @@ import {
   VersionPatchDto,
   VersionResponseDto,
 } from './budget.dto';
-import { toBudgetApiException } from './budget.http-errors';
+import { BUDGET_ERROR_EXAMPLES as EXAMPLES, toBudgetApiException } from './budget.http-errors';
 import { VersionDecisionService } from './version-decision.service';
 import { LineImportService } from './line-import.service';
 import { VersionLineService } from './version-line.service';
@@ -27,23 +29,43 @@ import { VersionService } from './version.service';
 import { VersionViewService } from './version-view.service';
 
 const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPONSE] as const;
+const FINANCE_ONLY_DESCRIPTION = 'Only Finance builds the versions of a budget.';
 const FINANCE_ONLY = {
   status: HttpStatus.FORBIDDEN,
-  description: 'Only Finance builds the versions of a budget.',
+  description: FINANCE_ONLY_DESCRIPTION,
+  examples: [FORBIDDEN_EXAMPLE],
 } as const;
+/** The reading routes have no role guard: the service lets Finance, the spending approver and the substitute read. */
+const READERS_ONLY = {
+  status: HttpStatus.FORBIDDEN,
+  description: FINANCE_ONLY_DESCRIPTION,
+  examples: [EXAMPLES.NOT_A_READER],
+} as const;
+/** Every route of this controller that names an id reaches only the version: none of them reads a line by position. */
 const NOT_FOUND = {
   status: HttpStatus.NOT_FOUND,
   description: 'The version or the line does not exist (BUDGET.VERSION_NOT_FOUND, BUDGET.LINE_NOT_FOUND).',
+  examples: [EXAMPLES.VERSION_NOT_FOUND],
 } as const;
 const INVALID = {
   status: HttpStatus.UNPROCESSABLE_ENTITY,
   description: 'The request is invalid (VALIDATION_ERROR).',
+  examples: [VALIDATION_EXAMPLE],
 } as const;
+const NOT_EDITABLE_DESCRIPTION =
+  'The version is not a draft nor sent back to Finance, so it is not changed (BUDGET.VERSION_NOT_EDITABLE).';
 const NOT_EDITABLE = {
   status: HttpStatus.CONFLICT,
-  description:
-    'The version is not a draft nor sent back to Finance, so it is not changed (BUDGET.VERSION_NOT_EDITABLE).',
+  description: NOT_EDITABLE_DESCRIPTION,
+  examples: [EXAMPLES.VERSION_NOT_EDITABLE],
 } as const;
+/** What the figures of a version refuse after the request validation: their currency and their range. */
+const MONEY_EXAMPLES = [
+  EXAMPLES.CURRENCY_NOT_REPORTING,
+  EXAMPLES.CURRENCY_NOT_SUPPORTED,
+  EXAMPLES.MONEY_SCALE_EXCEEDED,
+  EXAMPLES.MONEY_OUT_OF_RANGE,
+] as const;
 
 /**
  * The versions of a budget as Finance builds them (`US-06-09`): a first version from the proposal that waits, a revision of
@@ -74,16 +96,23 @@ export class BudgetVersionsController {
   @ApiErrorResponses(
     ...AUTH_ERRORS,
     FINANCE_ONLY,
-    { status: HttpStatus.NOT_FOUND, description: 'The proposal does not exist (BUDGET.PROPOSAL_NOT_FOUND).' },
+    {
+      status: HttpStatus.NOT_FOUND,
+      description: 'The proposal does not exist (BUDGET.PROPOSAL_NOT_FOUND).',
+      examples: [EXAMPLES.PROPOSAL_NOT_FOUND],
+    },
     {
       status: HttpStatus.CONFLICT,
       description:
         'The proposal is not waiting (BUDGET.PROPOSAL_NOT_SUBMITTED), the Cost Center has a current budget (BUDGET.CURRENT_EXISTS) or a version in progress (BUDGET.VERSION_IN_FLIGHT).',
+      // CURRENT_EXISTS is not shown: a current budget keeps the proposal behind it REVIEWED, so none can wait beside it.
+      examples: [EXAMPLES.PROPOSAL_NOT_SUBMITTED, EXAMPLES.VERSION_IN_FLIGHT],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
         'The body is invalid (VALIDATION_ERROR), the year has ended (BUDGET.YEAR_ENDED) or the quarters do not add up to the total (BUDGET.QUARTERS_MISMATCH).',
+      examples: [VALIDATION_EXAMPLE, EXAMPLES.YEAR_ENDED, EXAMPLES.QUARTERS_MISMATCH, ...MONEY_EXAMPLES],
     },
   )
   async create(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: VersionBodyDto) {
@@ -106,16 +135,22 @@ export class BudgetVersionsController {
   @ApiErrorResponses(
     ...AUTH_ERRORS,
     FINANCE_ONLY,
-    { status: HttpStatus.NOT_FOUND, description: 'The Cost Center does not exist (BUDGET.COST_CENTER_NOT_FOUND).' },
+    {
+      status: HttpStatus.NOT_FOUND,
+      description: 'The Cost Center does not exist (BUDGET.COST_CENTER_NOT_FOUND).',
+      examples: [EXAMPLES.COST_CENTER_NOT_FOUND],
+    },
     {
       status: HttpStatus.CONFLICT,
       description:
         'There is no current budget to revise (BUDGET.NO_CURRENT_BUDGET) or a version is in progress (BUDGET.VERSION_IN_FLIGHT).',
+      examples: [EXAMPLES.NO_CURRENT_BUDGET, EXAMPLES.VERSION_IN_FLIGHT],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
         'The body is invalid (VALIDATION_ERROR), the year has ended (BUDGET.YEAR_ENDED) or the quarters do not add up (BUDGET.QUARTERS_MISMATCH).',
+      examples: [VALIDATION_EXAMPLE, EXAMPLES.YEAR_ENDED, EXAMPLES.QUARTERS_MISMATCH, ...MONEY_EXAMPLES],
     },
   )
   async revise(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: RevisionBodyDto) {
@@ -133,7 +168,7 @@ export class BudgetVersionsController {
     message: 'BUDGET_VERSION.LISTED',
     description: 'Newest year first, then by Cost Center and number.',
   })
-  @ApiErrorResponses(...AUTH_ERRORS, FINANCE_ONLY, INVALID)
+  @ApiErrorResponses(...AUTH_ERRORS, READERS_ONLY, INVALID)
   async list(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Query() query: VersionListQueryDto) {
     try {
       return await this.views.list(actor, query);
@@ -149,7 +184,7 @@ export class BudgetVersionsController {
     message: 'BUDGET_VERSION.FETCHED',
     description: 'The version without its lines, which are a paged list of their own.',
   })
-  @ApiErrorResponses(...AUTH_ERRORS, FINANCE_ONLY, NOT_FOUND, INVALID)
+  @ApiErrorResponses(...AUTH_ERRORS, READERS_ONLY, NOT_FOUND, INVALID)
   async get(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: IdParamDto) {
     try {
       return { version: await this.views.get(actor, params.id) };
@@ -169,6 +204,7 @@ export class BudgetVersionsController {
   @ApiErrorResponses(...AUTH_ERRORS, FINANCE_ONLY, NOT_FOUND, NOT_EDITABLE, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description: 'The body is invalid (VALIDATION_ERROR) or the quarters do not add up (BUDGET.QUARTERS_MISMATCH).',
+    examples: [VALIDATION_EXAMPLE, EXAMPLES.QUARTERS_MISMATCH, ...MONEY_EXAMPLES],
   })
   async update(
     @CurrentPrincipal() actor: AuthenticatedPrincipal,
@@ -190,11 +226,23 @@ export class BudgetVersionsController {
     description:
       'The version waits for the spending approver. A revision is sent with its reason; the current budget stays what it is until it is approved.',
   })
-  @ApiErrorResponses(...AUTH_ERRORS, FINANCE_ONLY, NOT_FOUND, NOT_EDITABLE, {
-    status: HttpStatus.UNPROCESSABLE_ENTITY,
-    description:
-      'A revision has no reason (BUDGET.REVISION_REASON_REQUIRED) or the year has ended (BUDGET.YEAR_ENDED).',
-  })
+  @ApiErrorResponses(
+    ...AUTH_ERRORS,
+    FINANCE_ONLY,
+    NOT_FOUND,
+    {
+      status: HttpStatus.CONFLICT,
+      description: NOT_EDITABLE_DESCRIPTION,
+      // The proposal behind a first version was taken back or given back while it was being built.
+      examples: [EXAMPLES.VERSION_NOT_EDITABLE, EXAMPLES.PROPOSAL_NOT_SUBMITTED],
+    },
+    {
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      description:
+        'A revision has no reason (BUDGET.REVISION_REASON_REQUIRED) or the year has ended (BUDGET.YEAR_ENDED).',
+      examples: [VALIDATION_EXAMPLE, EXAMPLES.REVISION_REASON_REQUIRED, EXAMPLES.YEAR_ENDED],
+    },
+  )
   async send(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: IdParamDto) {
     try {
       return { version: await this.versions.send(actor, params.id) };
@@ -217,16 +265,19 @@ export class BudgetVersionsController {
       status: HttpStatus.FORBIDDEN,
       description:
         'The caller is not the spending approver (BUDGET.NOT_SPENDING_APPROVER) or built or sent the version (BUDGET.OWN_VERSION).',
+      examples: [EXAMPLES.NOT_SPENDING_APPROVER, EXAMPLES.CONFLICT_OF_INTEREST, EXAMPLES.OWN_VERSION],
     },
     NOT_FOUND,
     {
       status: HttpStatus.CONFLICT,
       description: 'The version was not sent, or was already decided (BUDGET.VERSION_NOT_SENT).',
+      examples: [EXAMPLES.VERSION_NOT_SENT],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
         'The decision is invalid (VALIDATION_ERROR): a refusal or a request to look again without its reason, an approval with one.',
+      examples: [VALIDATION_EXAMPLE],
     },
   )
   async decide(

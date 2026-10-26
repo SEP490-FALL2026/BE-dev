@@ -5,9 +5,7 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { AuditService } from '../../audit/audit.service';
 import { EmployeeNotFoundError } from '../../organization/organization.errors';
 import { OrganizationService } from '../../organization/organization.service';
-import { PlanLookupService } from '../plan/plan-lookup.service';
-import { recommendK2, type K2Recommendation } from '../subscription/seat-guard.policy';
-import { SeatOccupancyRegistry } from '../subscription/seat-occupancy.registry';
+import type { K2Recommendation } from '../subscription/seat-guard.policy';
 import type { EmptyState } from '../catalog.types';
 import { FunctionalGroupLookupService } from '../functional-group/functional-group-lookup.service';
 import { catalogAuditEvent } from '../mappers/catalog-audit-event';
@@ -30,20 +28,19 @@ import {
   cleanApplicationName,
   cleanNote,
   isCommunicationService,
-  replacementRequired,
   SIMILAR_APPLICATION_LIMIT,
   vendorSourceOf,
   type CommunicationAnswers,
 } from './application.policy';
 import { ApplicationRepo } from './application.repo';
 import { ApplicationVendorLinkService } from './application-vendor-link.service';
+import { ApplicationViewService } from './application-view.service';
 import { mergeCommunication, sameCommunication, sameList, snapshot } from './application.state';
 import type {
   ApplicationChanges,
   ApplicationKind,
   ApplicationRecord,
   ApplicationView,
-  BusinessOwnerView,
   DataSensitivity,
 } from './application.types';
 
@@ -84,8 +81,7 @@ export class ApplicationService {
     private readonly dictionary: VendorDictionaryLookupService,
     private readonly vendorLinks: ApplicationVendorLinkService,
     private readonly organization: OrganizationService,
-    private readonly plans: PlanLookupService,
-    private readonly occupancy: SeatOccupancyRegistry,
+    private readonly views: ApplicationViewService,
     private readonly audit: AuditService,
     private readonly runner: TransactionRunner,
   ) {}
@@ -110,7 +106,7 @@ export class ApplicationService {
   }> {
     const record = await this.applications.find(id);
     if (!record) throw new ApplicationNotFoundError();
-    const [application] = await this.withOwners([record]);
+    const [application] = await this.views.withOwners([record]);
     const similar = record.functionalGroup
       ? await this.applications.similarTo(record.functionalGroup.id, id, SIMILAR_APPLICATION_LIMIT)
       : { items: [], total: 0 };
@@ -119,7 +115,7 @@ export class ApplicationService {
       application,
       similar: similar.items,
       similarTotal: similar.total,
-      recommendations: await this.recommendationsOf(id),
+      recommendations: await this.views.recommendationsOf(id),
     };
   }
 
@@ -135,7 +131,7 @@ export class ApplicationService {
     actor: AuthenticatedPrincipal,
     input: DeclareApplicationInput,
   ): Promise<{ application: ApplicationView; proposed: boolean }> {
-    const [application] = await this.withOwners([await this.declareRecord(actor, input)]);
+    const [application] = await this.views.withOwners([await this.declareRecord(actor, input)]);
 
     return { application, proposed: vendorSourceOf(input).type === 'NAME' };
   }
@@ -327,22 +323,10 @@ export class ApplicationService {
         return updated;
       });
 
-      return (await this.withOwners([record]))[0];
+      return (await this.views.withOwners([record]))[0];
     } catch (error) {
       throw this.mapWriteError(error);
     }
-  }
-
-  /** The plan changes worth recommending to the owner today, read not decided: three people on K1 plans suggest K2. */
-  private async recommendationsOf(applicationId: string): Promise<K2Recommendation[]> {
-    const k1Plans = (await this.plans.plansOfApplication(applicationId))
-      .filter((plan) => plan.provisioningType === 'K1')
-      .map((plan) => plan.id);
-    if (k1Plans.length === 0) return [];
-    const today = await this.organization.businessToday();
-    const recommendation = recommendK2(await this.occupancy.current().openHolderCount(k1Plans, today));
-
-    return recommendation ? [recommendation] : [];
   }
 
   /** Locks the employee `FOR SHARE` so a departure cannot slip in, then requires them to be still working (`INV-06`). */
@@ -372,30 +356,6 @@ export class ApplicationService {
     if (isCheckViolation(error)) return new ApplicationDictionaryLineMismatchError();
 
     return error;
-  }
-
-  private async withOwners(records: ApplicationRecord[]): Promise<ApplicationView[]> {
-    const employees = await this.organization.getEmployees([
-      ...new Set(records.map((record) => record.businessOwnerEmployeeId)),
-    ]);
-    const byId = new Map<string, BusinessOwnerView>(
-      employees.map((employee) => [
-        employee.id,
-        {
-          employeeId: employee.id,
-          employeeCode: employee.employeeCode,
-          fullName: employee.fullName,
-          status: employee.status,
-        },
-      ]),
-    );
-
-    return records.map((record) => {
-      const businessOwner = byId.get(record.businessOwnerEmployeeId);
-      if (!businessOwner) throw new Error('The Business Owner of an application is not an employee');
-
-      return { ...record, businessOwner, businessOwnerReplacementRequired: replacementRequired(businessOwner.status) };
-    });
   }
 
   private async requireOrganizationId(): Promise<string> {

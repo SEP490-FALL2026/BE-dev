@@ -1,5 +1,7 @@
 import { HttpStatus } from '@nestjs/common';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
+import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
+import { ProvisioningAnotherItAdminNeededError, RevocationRefusedError } from '../licensing.errors';
 import { toProvisioningApiException } from '../provisioning/provisioning.http-errors';
 import { ExpiryError, type ExpiryProblem } from './expiry.errors';
 
@@ -30,3 +32,16 @@ export function toExpiryApiException(error: unknown): unknown {
 
   return toProvisioningApiException(error);
 }
+
+const example = (error: Error) => errorExampleOf(toExpiryApiException(error));
+
+/** The answers above as OpenAPI examples, each produced by the mapper that gives it at runtime (OPENAPI-EXAMPLE.1). */
+export const EXPIRY_ERROR_EXAMPLES = {
+  NOT_FOUND: example(new ExpiryError('NOT_FOUND')),
+  NOT_OPEN: example(new ExpiryError('NOT_OPEN')),
+  NOT_EXPIRED: example(new ExpiryError('NOT_EXPIRED')),
+  RENEWAL_PENDING: example(new ExpiryError('RENEWAL_PENDING')),
+  SCOPE_FORBIDDEN: example(new ExpiryError('SCOPE_FORBIDDEN')),
+  ANOTHER_IT_ADMIN_NEEDED: example(new ProvisioningAnotherItAdminNeededError()),
+  REVOCATION_TYPE_NOT_SUPPORTED: example(new RevocationRefusedError('TYPE_NOT_SUPPORTED', 'K4')),
+} as const;

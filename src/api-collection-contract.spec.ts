@@ -331,7 +331,7 @@ const COLLECTION_EXCEPTIONS: readonly CollectionException[] = [
     findings: ['LD-13'],
     owner: 'licensing-provisioning-task-read-contracts',
     rationale:
-      'Decision 5: which identity fields of the beneficiary, default owner and claimant a task card shows. Since LD-08 (23/10/2026) the card is a summary whose beneficiary carries {employeeId, employeeCode, fullName} and whose defaultResponsibleEmployeeId and claimedBy are ids only: the spec default, not an Owner decision.',
+      'Decision 5: which identity fields of the beneficiary, default owner and claimant a task card shows. Since LD-08 (23/10/2026) the card is a summary whose beneficiary carries {employeeId, employeeCode, fullName} and whose defaultResponsibleEmployeeId and claimedBy are ids only: the spec default, not an Owner decision. Reviewed after the G5/G6 merge (Prompt 02, 26/10/2026): the row gained `revocation` (the source and state of a revocation task), no identity field; decision 5 is still open.',
     removeWhen: 'The Owner decides point 5 of LD-13 and the chosen contract ships.',
     itemProperties: [
       'accountIdentifier',
@@ -356,6 +356,7 @@ const COLLECTION_EXCEPTIONS: readonly CollectionException[] = [
       'nextRetryAt',
       'plan',
       'requestId',
+      'revocation',
       'status',
       'subscriptionId',
     ],
@@ -366,10 +367,11 @@ const COLLECTION_EXCEPTIONS: readonly CollectionException[] = [
     findings: ['LD-13'],
     owner: 'licensing-assignment-read-contracts',
     rationale:
-      'Decision 5: which identity fields of the holder an assignment row shows. Since LD-10 (23/10/2026) the row carries employee {employeeId, employeeCode, fullName}, plan and costCenter read in batches: the spec default, not an Owner decision.',
+      'Decision 5: which identity fields of the holder an assignment row shows. Since LD-10 (23/10/2026) the row carries employee {employeeId, employeeCode, fullName}, plan and costCenter read in batches: the spec default, not an Owner decision. Reviewed after the G5/G6 merge (Prompt 02, 26/10/2026): the row gained `cancelledAt` (a grant cancelled when its request was withdrawn), no identity field; decision 5 is still open.',
     removeWhen: 'The Owner decides point 5 of LD-13 and the chosen contract ships.',
     itemProperties: [
       'accountIdentifier',
+      'cancelledAt',
       'costCenter',
       'costCenterId',
       'createdAt',

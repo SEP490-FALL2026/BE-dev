@@ -91,10 +91,4 @@ export const LICENSING_ERROR_EXAMPLES = {
   SUBSCRIPTION_NOT_FOUND: example(new SeatTargetNotFoundError('SUBSCRIPTION')),
   DEPARTMENT_NOT_FOUND: example(new ToolsDepartmentNotFoundError()),
   DEPARTMENT_OUT_OF_SCOPE: example(new ToolsDepartmentOutOfScopeError()),
-  ASSIGNMENT_NOT_FOUND: example(new AssignmentNotFoundError()),
-  ASSIGNMENT_NOT_OPEN: example(new AssignmentNotOpenError()),
-  NOT_SERVICE_ACCOUNT: example(new AssignmentNotServiceAccountError()),
-  RESPONSIBLE_INVALID: example(new AssignmentResponsibleInvalidError('NOT_ACTIVE')),
-  EFFECTIVE_DATE_INVALID: example(new AssignmentEffectiveDateInvalidError('IN_THE_PAST')),
-  EXPECTED_END_REQUIRED: example(new AssignmentExpectedEndRequiredError()),
 } as const;

@@ -1,5 +1,14 @@
 import { HttpStatus } from '@nestjs/common';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
+import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
+import {
+  AssignmentEffectiveDateInvalidError,
+  AssignmentExpectedEndRequiredError,
+  AssignmentNotFoundError,
+  AssignmentNotOpenError,
+  AssignmentNotServiceAccountError,
+  AssignmentResponsibleInvalidError,
+} from '../licensing.errors';
 import { toLicensingApiException } from '../mappers/licensing.http-errors';
 import {
   AssignmentResponsibleAfterDeadlineError,
@@ -61,3 +70,25 @@ export function toServiceAccountApiException(error: unknown): unknown {
 
   return toLicensingApiException(error);
 }
+
+const example = (error: Error) => errorExampleOf(toServiceAccountApiException(error));
+
+/** The answers above as OpenAPI examples, each produced by the mapper that gives it at runtime (OPENAPI-EXAMPLE.1). */
+export const SERVICE_ACCOUNT_ERROR_EXAMPLES = {
+  ASSIGNMENT_NOT_FOUND: example(new AssignmentNotFoundError()),
+  ASSIGNMENT_NOT_OPEN: example(new AssignmentNotOpenError()),
+  NOT_SERVICE_ACCOUNT: example(new AssignmentNotServiceAccountError()),
+  RESPONSIBLE_INVALID: example(new AssignmentResponsibleInvalidError('NOT_ACTIVE')),
+  EFFECTIVE_DATE_INVALID: example(new AssignmentEffectiveDateInvalidError('IN_THE_PAST')),
+  EXPECTED_END_REQUIRED: example(new AssignmentExpectedEndRequiredError()),
+  RESPONSIBLE_AFTER_DEADLINE: example(new AssignmentResponsibleAfterDeadlineError('2026-01-01')),
+  MOVE_NOT_FOUND: example(new ServiceAccountMoveError('NOT_FOUND')),
+  NOT_CONFIRMER: example(new ServiceAccountMoveError('NOT_CONFIRMER')),
+  NOT_PENDING: example(new ServiceAccountMoveError('NOT_PENDING')),
+  MOVE_EFFECTIVE_DATE_PASSED: example(new ServiceAccountMoveError('MOVE_EFFECTIVE_DATE_PASSED')),
+  PENDING_EXISTS: example(new ServiceAccountMoveError('PENDING_EXISTS')),
+  TARGET_DEPARTMENT_INVALID: example(new ServiceAccountMoveError('TARGET_DEPARTMENT_INVALID', 'INACTIVE')),
+  MOVE_RESPONSIBLE_INVALID: example(new ServiceAccountMoveError('RESPONSIBLE_INVALID', 'NOT_ACTIVE')),
+  REASON_REQUIRED: example(new ServiceAccountMoveError('REASON_REQUIRED')),
+  DUTY_TOO_MANY: example(new ServiceAccountDutyTooManyError()),
+} as const;

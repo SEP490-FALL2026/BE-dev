@@ -1,5 +1,7 @@
 import { HttpStatus } from '@nestjs/common';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
+import { toUnavailableApiException } from '../../../infrastructure/http/errors/service-unavailable';
+import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
 import { NoticeRefusedError } from './notice.errors';
 
 /** The answer of each refusal, by its semantic code. A code the table does not know is a programming error and stays a 500. */
@@ -45,10 +47,13 @@ const MESSAGES: Readonly<Record<string, string>> = {
   NO_MATCHING_EVENT: 'The event is not one of this person and of the kind of this notice that is in force.',
 };
 
-/** Maps a refusal of a notice to its answer; anything else is returned unchanged for the global filter. */
+/**
+ * Maps a refusal of a notice to its answer; a database that cannot answer is a 503, anything else
+ * is returned unchanged for the global filter.
+ */
 export function toNoticeApiException(error: unknown): unknown {
   if (error instanceof ApiException) return error;
-  if (!(error instanceof NoticeRefusedError)) return error;
+  if (!(error instanceof NoticeRefusedError)) return toUnavailableApiException(error) ?? error;
   const status = STATUS[error.code];
   if (status === undefined) return error;
 
@@ -58,3 +63,27 @@ export function toNoticeApiException(error: unknown): unknown {
     ...(error.details && Object.keys(error.details).length > 0 ? { details: error.details } : {}),
   });
 }
+
+const example = (error: Error) => errorExampleOf(toNoticeApiException(error));
+
+/** The answers above as OpenAPI examples, each produced by the mapper that gives it at runtime (OPENAPI-EXAMPLE.1). */
+export const NOTICE_ERROR_EXAMPLES = {
+  NOT_FOUND: example(new NoticeRefusedError('NOT_FOUND')),
+  EMPLOYEE_NOT_FOUND: example(new NoticeRefusedError('EMPLOYEE_NOT_FOUND')),
+  EMPLOYEE_LEFT: example(new NoticeRefusedError('EMPLOYEE_LEFT')),
+  NOT_DEPARTMENT_HEAD: example(new NoticeRefusedError('NOT_DEPARTMENT_HEAD')),
+  KIND_NOT_ALLOWED: example(new NoticeRefusedError('KIND_NOT_ALLOWED')),
+  SELF_NOTICE: example(new NoticeRefusedError('SELF_NOTICE')),
+  TARGET_DEPARTMENT_REQUIRED: example(new NoticeRefusedError('TARGET_DEPARTMENT_REQUIRED')),
+  TARGET_DEPARTMENT_INVALID: example(new NoticeRefusedError('TARGET_DEPARTMENT_INVALID')),
+  DUPLICATE_PENDING: example(new NoticeRefusedError('DUPLICATE_PENDING', { pendingCode: 'BM09-2026-000001' })),
+  NOT_PENDING: example(new NoticeRefusedError('NOT_PENDING')),
+  REASON_REQUIRED: example(new NoticeRefusedError('REASON_REQUIRED')),
+  VERIFICATION_REQUIRED: example(new NoticeRefusedError('VERIFICATION_REQUIRED')),
+  GROUNDS_REQUIRED: example(new NoticeRefusedError('GROUNDS_REQUIRED')),
+  GROUNDS_INCOMPLETE: example(new NoticeRefusedError('GROUNDS_INCOMPLETE', { missing: ['issuer'] })),
+  GROUNDS_IS_NOTICE: example(new NoticeRefusedError('GROUNDS_IS_NOTICE')),
+  EVENT_INVALID: example(new NoticeRefusedError('EVENT_INVALID', { missing: ['approvedReturnOn'], notAllowed: [] })),
+  DUPLICATE_EVENT: example(new NoticeRefusedError('DUPLICATE_EVENT')),
+  NO_MATCHING_EVENT: example(new NoticeRefusedError('NO_MATCHING_EVENT')),
+} as const;

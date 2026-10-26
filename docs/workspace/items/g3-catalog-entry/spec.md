@@ -158,3 +158,10 @@ Danh mục không chứa dữ liệu cá nhân ngoài tham chiếu nhân viên (
 
 20/10/2026: thiết kế `ready`. Quyết định cần Owner xác nhận khi review: `IT_ADMIN` và `FINANCE` đọc danh mục (các vai khác chưa); nhà cung cấp của tổ chức tạo ngầm từ khai báo
 (không route riêng); đề xuất từ điển lấy tên **ứng dụng**; `usageCollectionDefault` chỉ suy ra khi đọc; chưa cho đổi `kind`/nhà cung cấp. Đã `verified` local (xem [plan](plan.md#verification-and-handoff)); chưa review, chưa nghiệm thu.
+
+26/10/2026 (Prompt 02, `MERGE-G56-SIZE`): sau merge G5/G6 (`0da8f56`), `catalog-entry/application.service.ts` 407 dòng vượt
+cap 400 (G5 thêm `declareRecord` ghi trong transaction của request, `US-05-20`). Tách collaborator đọc
+`ApplicationViewService` (`application-view.service.ts`): Business Owner của bản ghi kèm cờ cần thay (`INV-06`) và khuyến
+nghị K2 (`US-04-02` AC-9) — chỉ đọc, không ghi, không chặn. `ApplicationService` giữ mọi chữ ký public và ủy quyền; transaction,
+thứ tự khóa, payload audit, ánh xạ lỗi, ghi CSDL và wire không đổi (367 dòng, 9 dependency thay 10). Không nâng cap, không
+ledger.

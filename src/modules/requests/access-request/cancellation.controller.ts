@@ -2,15 +2,17 @@ import { Body, Controller, HttpStatus, Param, Post } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
+  FORBIDDEN_EXAMPLE,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
+  VALIDATION_EXAMPLE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
 import { RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
 import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AccessRequestResponseDto, RequestIdParamDto } from './access-request.dto';
-import { toAccessRequestApiException } from './access-request.http-errors';
+import { ACCESS_REQUEST_ERROR_EXAMPLES as EXAMPLES, toAccessRequestApiException } from './access-request.http-errors';
 import { AccessRequestQueryService } from './access-request-query.service';
 import { toWire } from './access-request.wire';
 import { CancelBodyDto } from './cancellation.dto';
@@ -44,20 +46,29 @@ export class CancellationController {
     {
       status: HttpStatus.FORBIDDEN,
       description: 'Only an IT Admin closes a request because the person it was for left.',
+      examples: [FORBIDDEN_EXAMPLE],
     },
     {
       status: HttpStatus.NOT_FOUND,
       description: 'The request does not exist (ACCESS_REQUEST.NOT_FOUND).',
+      examples: [EXAMPLES.NOT_FOUND],
     },
     {
       status: HttpStatus.CONFLICT,
       description:
         'Nothing is left to close (ACCESS_REQUEST.ALREADY_ENDED), the withdrawal waits for the IT Admin to close its task (WITHDRAWAL_PENDING), the request is for a group with more than one person still open (GROUP_REQUEST_UNSUPPORTED: remove each person who left on their own line) or the person it is for still works, handing over included (BENEFICIARY_NOT_LEFT). Nothing changes.',
+      examples: [
+        EXAMPLES.CANCELLATION_ALREADY_ENDED,
+        EXAMPLES.CANCELLATION_WITHDRAWAL_PENDING,
+        EXAMPLES.GROUP_REQUEST_UNSUPPORTED,
+        EXAMPLES.BENEFICIARY_NOT_LEFT,
+      ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
         'The body is invalid (VALIDATION_ERROR), or the task of the grant is being worked and no evidence says the work was undone (ACCESS_REQUEST.EVIDENCE_REQUIRED). Nothing is saved.',
+      examples: [VALIDATION_EXAMPLE, EXAMPLES.EVIDENCE_REQUIRED],
     },
     GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   )

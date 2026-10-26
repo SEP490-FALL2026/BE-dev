@@ -16,6 +16,7 @@ import { ApplicationOwnersController } from './catalog-entry/application-owners.
 import { ApplicationRepo } from './catalog-entry/application.repo';
 import { ApplicationListService } from './catalog-entry/application-list.service';
 import { ApplicationService } from './catalog-entry/application.service';
+import { ApplicationViewService } from './catalog-entry/application-view.service';
 import { ApplicationVendorLinkService } from './catalog-entry/application-vendor-link.service';
 import { ApplicationsController } from './catalog-entry/applications.controller';
 import { ContractRepo } from './contract/contract.repo';
@@ -112,6 +113,7 @@ import { VendorRepo } from './vendor/vendor.repo';
     FunctionalGroupRepo,
     FunctionalGroupLookupService,
     ApplicationService,
+    ApplicationViewService,
     ApplicationListService,
     ApplicationVendorLinkService,
     ApplicationRepo,

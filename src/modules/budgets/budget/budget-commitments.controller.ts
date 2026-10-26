@@ -2,8 +2,10 @@ import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, Query } from 
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
+  FORBIDDEN_EXAMPLE,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
+  VALIDATION_EXAMPLE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
 import { RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
@@ -19,7 +21,23 @@ import {
   ReleaseListResponseDto,
 } from './commitment.dto';
 import { CommitmentService } from './commitment.service';
-import { toBudgetApiException } from './budget.http-errors';
+import { BUDGET_ERROR_EXAMPLES as EXAMPLES, toBudgetApiException } from './budget.http-errors';
+
+const READERS = {
+  status: HttpStatus.FORBIDDEN,
+  description: 'Only Finance reads the commitments.',
+  examples: [FORBIDDEN_EXAMPLE],
+} as const;
+const NOT_FOUND = {
+  status: HttpStatus.NOT_FOUND,
+  description: 'The commitment does not exist (BUDGET.COMMITMENT_NOT_FOUND).',
+  examples: [EXAMPLES.COMMITMENT_NOT_FOUND],
+} as const;
+const INVALID_QUERY = {
+  status: HttpStatus.UNPROCESSABLE_ENTITY,
+  description: 'The query is invalid (VALIDATION_ERROR).',
+  examples: [VALIDATION_EXAMPLE],
+} as const;
 
 /**
  * The commitments of the budget, read by Finance (`US-06-07`, `US-06-09` AC-2): what each request holds, for which year, and
@@ -39,12 +57,7 @@ export class BudgetCommitmentsController {
     description:
       'The commitments, the newest first, each with its request, Cost Center, year and amount, and whether it is attached to the budget of its year or waits for one (no budget yet). Narrowed by `attached`, the year, the Cost Center or the request.',
   })
-  @ApiErrorResponses(
-    UNAUTHENTICATED_RESPONSE,
-    GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
-    { status: HttpStatus.FORBIDDEN, description: 'Only Finance reads the commitments.' },
-    { status: HttpStatus.UNPROCESSABLE_ENTITY, description: 'The query is invalid (VALIDATION_ERROR).' },
-  )
+  @ApiErrorResponses(UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPONSE, READERS, INVALID_QUERY)
   async list(@Query() query: CommitmentListQueryDto) {
     try {
       return await this.commitments.page(query);
@@ -64,13 +77,7 @@ export class BudgetCommitmentsController {
     description:
       'Each time money went back to the budget from the commitment, the oldest first: how much, why (the request ended, a grant failed, a share was withdrawn, or Finance let the remainder go), and who, when a person did it.',
   })
-  @ApiErrorResponses(
-    UNAUTHENTICATED_RESPONSE,
-    GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
-    { status: HttpStatus.FORBIDDEN, description: 'Only Finance reads the commitments.' },
-    { status: HttpStatus.NOT_FOUND, description: 'The commitment does not exist (BUDGET.COMMITMENT_NOT_FOUND).' },
-    { status: HttpStatus.UNPROCESSABLE_ENTITY, description: 'The query is invalid (VALIDATION_ERROR).' },
-  )
+  @ApiErrorResponses(UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPONSE, READERS, NOT_FOUND, INVALID_QUERY)
   async releases(@Param() params: CommitmentIdParamDto, @Query() query: ReleaseListQueryDto) {
     try {
       return await this.commitments.pageReleases(params.id, query);
@@ -91,14 +98,19 @@ export class BudgetCommitmentsController {
   @ApiErrorResponses(
     UNAUTHENTICATED_RESPONSE,
     GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
-    { status: HttpStatus.FORBIDDEN, description: 'Only Finance releases a commitment.' },
-    { status: HttpStatus.NOT_FOUND, description: 'The commitment does not exist (BUDGET.COMMITMENT_NOT_FOUND).' },
+    { status: HttpStatus.FORBIDDEN, description: 'Only Finance releases a commitment.', examples: [FORBIDDEN_EXAMPLE] },
+    NOT_FOUND,
     {
       status: HttpStatus.CONFLICT,
       description:
         'The commitment is not held (BUDGET.COMMITMENT_NOT_HELD) or its request has not ended (BUDGET.COMMITMENT_REQUEST_OPEN).',
+      examples: [EXAMPLES.COMMITMENT_NOT_HELD, EXAMPLES.COMMITMENT_REQUEST_OPEN],
     },
-    { status: HttpStatus.UNPROCESSABLE_ENTITY, description: 'The reason is missing or empty (VALIDATION_ERROR).' },
+    {
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      description: 'The reason is missing or empty (VALIDATION_ERROR).',
+      examples: [VALIDATION_EXAMPLE],
+    },
   )
   async release(
     @CurrentPrincipal() actor: AuthenticatedPrincipal,

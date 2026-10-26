@@ -12,7 +12,7 @@ import { RequireRoles } from '../../../infrastructure/security/decorators/access
 import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import type { AssignmentView } from '../licensing.types';
-import { LICENSING_ERROR_EXAMPLES, toLicensingApiException } from '../mappers/licensing.http-errors';
+import { toLicensingApiException } from '../mappers/licensing.http-errors';
 import {
   AssignmentIdParamDto,
   AssignmentPageResponseDto,
@@ -23,7 +23,10 @@ import {
 import { AssignmentListService } from './assignment-list.service';
 import { AssignmentResponsibleService } from './assignment-responsible.service';
 import { ProposeMoveBodyDto, ServiceAccountMoveResponseDto } from './service-account.dto';
-import { toServiceAccountApiException } from './service-account.http-errors';
+import {
+  SERVICE_ACCOUNT_ERROR_EXAMPLES as EXAMPLES,
+  toServiceAccountApiException,
+} from './service-account.http-errors';
 import { ServiceAccountMoveViewService } from './service-account-move-view.service';
 import { ServiceAccountMoveService } from './service-account-move.service';
 
@@ -32,6 +35,11 @@ const IT_ONLY = {
   status: HttpStatus.FORBIDDEN,
   description: 'Only an IT Admin reads or changes the assignments of seats.',
   examples: [FORBIDDEN_EXAMPLE],
+} as const;
+const NOT_FOUND = {
+  status: HttpStatus.NOT_FOUND,
+  description: 'The assignment does not exist (LICENSE_ASSIGNMENT.NOT_FOUND).',
+  examples: [EXAMPLES.ASSIGNMENT_NOT_FOUND],
 } as const;
 
 const toWire = (view: AssignmentView) => ({
@@ -93,16 +101,12 @@ export class AssignmentsController {
   @ApiErrorResponses(
     ...AUTH_ERRORS,
     IT_ONLY,
-    {
-      status: HttpStatus.NOT_FOUND,
-      description: 'The assignment does not exist (LICENSE_ASSIGNMENT.NOT_FOUND).',
-      examples: [LICENSING_ERROR_EXAMPLES.ASSIGNMENT_NOT_FOUND],
-    },
+    NOT_FOUND,
     {
       status: HttpStatus.CONFLICT,
       description:
         'The assignment has ended or is set to end (LICENSE_ASSIGNMENT.NOT_OPEN), the seats are all taken (LICENSE_ASSIGNMENT.SEAT_CAPACITY), or the day is later than the day the transfer or the departure of the person responsible takes effect while that day has not come (LICENSE_ASSIGNMENT.RESPONSIBLE_AFTER_DEADLINE).',
-      examples: [LICENSING_ERROR_EXAMPLES.ASSIGNMENT_NOT_OPEN],
+      examples: [EXAMPLES.ASSIGNMENT_NOT_OPEN, EXAMPLES.RESPONSIBLE_AFTER_DEADLINE],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -110,10 +114,10 @@ export class AssignmentsController {
         'The request is invalid (VALIDATION_ERROR) or refused: LICENSE_ASSIGNMENT.NOT_SERVICE_ACCOUNT, RESPONSIBLE_INVALID (the person is not found, not active, handing over, the person already responsible, or outside the owning department), EFFECTIVE_DATE_INVALID, EXPECTED_END_REQUIRED, OVERLAP or IDENTIFIER_IN_USE.',
       examples: [
         VALIDATION_EXAMPLE,
-        LICENSING_ERROR_EXAMPLES.NOT_SERVICE_ACCOUNT,
-        LICENSING_ERROR_EXAMPLES.RESPONSIBLE_INVALID,
-        LICENSING_ERROR_EXAMPLES.EFFECTIVE_DATE_INVALID,
-        LICENSING_ERROR_EXAMPLES.EXPECTED_END_REQUIRED,
+        EXAMPLES.NOT_SERVICE_ACCOUNT,
+        EXAMPLES.RESPONSIBLE_INVALID,
+        EXAMPLES.EFFECTIVE_DATE_INVALID,
+        EXAMPLES.EXPECTED_END_REQUIRED,
       ],
     },
   )
@@ -150,19 +154,25 @@ export class AssignmentsController {
   @ApiErrorResponses(
     ...AUTH_ERRORS,
     IT_ONLY,
-    {
-      status: HttpStatus.NOT_FOUND,
-      description: 'The assignment does not exist (LICENSE_ASSIGNMENT.NOT_FOUND).',
-    },
+    NOT_FOUND,
     {
       status: HttpStatus.CONFLICT,
       description:
         'The assignment has ended (LICENSE_ASSIGNMENT.NOT_OPEN), a move of it already waits (SERVICE_ACCOUNT_MOVE.PENDING_EXISTS), or the day is later than the day the transfer or the departure of the person responsible takes effect while that day has not come (LICENSE_ASSIGNMENT.RESPONSIBLE_AFTER_DEADLINE).',
+      examples: [EXAMPLES.ASSIGNMENT_NOT_OPEN, EXAMPLES.PENDING_EXISTS, EXAMPLES.RESPONSIBLE_AFTER_DEADLINE],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
         'The request is invalid (VALIDATION_ERROR) or refused: LICENSE_ASSIGNMENT.NOT_SERVICE_ACCOUNT, EFFECTIVE_DATE_INVALID, EXPECTED_END_REQUIRED, SERVICE_ACCOUNT_MOVE.TARGET_DEPARTMENT_INVALID (the department is unknown, retired or the one that owns the account) or SERVICE_ACCOUNT_MOVE.RESPONSIBLE_INVALID (the person is not found, not active, handing over, or not in the receiving department on that day).',
+      examples: [
+        VALIDATION_EXAMPLE,
+        EXAMPLES.NOT_SERVICE_ACCOUNT,
+        EXAMPLES.EFFECTIVE_DATE_INVALID,
+        EXAMPLES.EXPECTED_END_REQUIRED,
+        EXAMPLES.TARGET_DEPARTMENT_INVALID,
+        EXAMPLES.MOVE_RESPONSIBLE_INVALID,
+      ],
     },
   )
   async proposeDepartmentMove(

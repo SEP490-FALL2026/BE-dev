@@ -2,8 +2,10 @@ import { Body, Controller, Get, HttpStatus, Param, Post, Put, Query } from '@nes
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
+  FORBIDDEN_EXAMPLE,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
+  VALIDATION_EXAMPLE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
 import { AuthenticatedOnly, RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
@@ -27,22 +29,30 @@ import {
   SupplementListResponseDto,
   SupplementResponseDto,
 } from './spend-submission.dto';
-import { toGroupRequestApiException } from '../group-request/group-request.http-errors';
-import { toSpendApiException } from './spend.http-errors';
+import { GROUP_REQUEST_ERROR_EXAMPLES, toGroupRequestApiException } from '../group-request/group-request.http-errors';
+import { SPEND_ERROR_EXAMPLES, toSpendApiException } from './spend.http-errors';
 import { SupplementService } from './supplement.service';
 
 const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPONSE] as const;
 const INVALID = {
   status: HttpStatus.UNPROCESSABLE_ENTITY,
   description: 'The request is invalid (VALIDATION_ERROR).',
+  examples: [VALIDATION_EXAMPLE],
 } as const;
 const NOT_HEAD = {
   status: HttpStatus.FORBIDDEN,
   description: 'The caller does not head a department (SPEND.NOT_HEAD).',
+  examples: [FORBIDDEN_EXAMPLE, SPEND_ERROR_EXAMPLES.NOT_HEAD],
 } as const;
 const NOT_FOUND = {
   status: HttpStatus.NOT_FOUND,
   description: 'The request does not exist, or is not one of the department of the caller (ACCESS_REQUEST.NOT_FOUND).',
+  examples: [SPEND_ERROR_EXAMPLES.REQUEST_NOT_FOUND],
+} as const;
+const BATCH_NOT_FOUND = {
+  status: HttpStatus.NOT_FOUND,
+  description: 'The batch does not exist, or the caller has no part in it (SPEND.BATCH_NOT_FOUND).',
+  examples: [SPEND_ERROR_EXAMPLES.BATCH_NOT_FOUND],
 } as const;
 
 /**
@@ -96,6 +106,7 @@ export class SpendSubmissionController {
       status: HttpStatus.CONFLICT,
       description:
         'A request chosen is not waiting in the queue: it was sent on, or does not cost money (SPEND.NOT_IN_QUEUE).',
+      examples: [SPEND_ERROR_EXAMPLES.NOT_IN_QUEUE],
     },
     INVALID,
   )
@@ -117,14 +128,7 @@ export class SpendSubmissionController {
     description:
       'Who sent the batch, when, and how many requests it holds. It has no decision and no commitment: each request keeps its own steps, state and reason. Read by the head who sent it and by a person who holds the spend step of a request in it.',
   })
-  @ApiErrorResponses(
-    ...AUTH_ERRORS,
-    {
-      status: HttpStatus.NOT_FOUND,
-      description: 'The batch does not exist, or the caller has no part in it (SPEND.BATCH_NOT_FOUND).',
-    },
-    INVALID,
-  )
+  @ApiErrorResponses(...AUTH_ERRORS, BATCH_NOT_FOUND, INVALID)
   async get(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: IdParamDto) {
     try {
       return { batch: await this.batchViews.get(actor, params.id) };
@@ -141,14 +145,7 @@ export class SpendSubmissionController {
     description:
       'The requests of the batch in the order they were sent, each with how it fared (sent to the approver, sent to Finance, or stopped with its reason), whether it left the batch and why, and the state the request is in now. The head sees all of them; the person who holds a spend step sees the requests they hold.',
   })
-  @ApiErrorResponses(
-    ...AUTH_ERRORS,
-    {
-      status: HttpStatus.NOT_FOUND,
-      description: 'The batch does not exist, or the caller has no part in it (SPEND.BATCH_NOT_FOUND).',
-    },
-    INVALID,
-  )
+  @ApiErrorResponses(...AUTH_ERRORS, BATCH_NOT_FOUND, INVALID)
   async items(
     @CurrentPrincipal() actor: AuthenticatedPrincipal,
     @Param() params: IdParamDto,
@@ -176,11 +173,17 @@ export class SpendSubmissionController {
     {
       status: HttpStatus.CONFLICT,
       description: 'The request is not waiting in the queue of the head (SPEND.NOT_IN_QUEUE).',
+      examples: [SPEND_ERROR_EXAMPLES.NOT_IN_QUEUE],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
         'The body is invalid (VALIDATION_ERROR), the line is not there (ACCESS_REQUEST.LINE_NOT_FOUND), or its window has gone by and it is not confirmed as still needed (ACCESS_REQUEST.STILL_NEEDED_REQUIRED).',
+      examples: [
+        VALIDATION_EXAMPLE,
+        SPEND_ERROR_EXAMPLES.PLAN_LINE_NOT_FOUND,
+        SPEND_ERROR_EXAMPLES.STILL_NEEDED_REQUIRED,
+      ],
     },
   )
   async setPlanLine(
@@ -239,11 +242,23 @@ export class SpendSubmissionController {
       status: HttpStatus.CONFLICT,
       description:
         'The request is not back in the queue (SPEND.SUPPLEMENT_NOT_IN_QUEUE), has no price (SPEND.SUPPLEMENT_NOT_PRICED), nothing changes (SPEND.SUPPLEMENT_NO_CHANGE), cannot be priced for it (ACCESS_REQUEST.NOT_PRICEABLE), or a person to leave out is not a line whose need is confirmed (SUPPLEMENT.LINE_NOT_DROPPABLE).',
+      examples: [
+        GROUP_REQUEST_ERROR_EXAMPLES.SUPPLEMENT_NOT_IN_QUEUE,
+        GROUP_REQUEST_ERROR_EXAMPLES.SUPPLEMENT_NOT_PRICED,
+        GROUP_REQUEST_ERROR_EXAMPLES.SUPPLEMENT_NO_CHANGE,
+        GROUP_REQUEST_ERROR_EXAMPLES.NOT_PRICEABLE,
+        GROUP_REQUEST_ERROR_EXAMPLES.LINE_NOT_DROPPABLE,
+      ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
         'The body is invalid (VALIDATION_ERROR: neither a day nor a person, a blank reason); nobody would be left in the request (SUPPLEMENT.CANNOT_DROP_LAST_LINE); the request is not for a group (SUPPLEMENT.DROP_NOT_FOR_GROUP).',
+      examples: [
+        VALIDATION_EXAMPLE,
+        GROUP_REQUEST_ERROR_EXAMPLES.CANNOT_DROP_LAST_LINE,
+        GROUP_REQUEST_ERROR_EXAMPLES.DROP_NOT_FOR_GROUP,
+      ],
     },
   )
   async addSupplement(

@@ -1,4 +1,4 @@
-import { createZodDto } from 'nestjs-zod';
+import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { z } from 'zod';
 import { isBusinessDate } from '../../../core/business-date';
 import { PROJECT_LABEL_MAX_LENGTH, REASON_MAX_LENGTH, TERM_MONTHS_MAX } from '../access-request/access-request.dto';

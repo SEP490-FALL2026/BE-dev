@@ -23,7 +23,11 @@ import {
   TaskPageResponseDto,
   TaskResponseDto,
 } from './provisioning.dto';
-import { PROVISIONING_ERROR_EXAMPLES, toProvisioningApiException } from './provisioning.http-errors';
+import {
+  PROVISIONING_ERROR_EXAMPLES,
+  PROVISIONING_GRANT_EXAMPLES,
+  toProvisioningApiException,
+} from './provisioning.http-errors';
 import { ProvisioningDecisionService } from './provisioning-decision.service';
 import { ProvisioningService } from './provisioning.service';
 import { toSummaryWire, toWire } from './provisioning-task.wire';
@@ -34,24 +38,17 @@ const IT_ONLY = {
   description: 'Only an IT Admin works the queue of provisioning tasks.',
   examples: [FORBIDDEN_EXAMPLE],
 } as const;
-/** The task routes: the role guard; ANOTHER_IT_ADMIN_NEEDED needs a task, which cannot exist yet (NO_TASK_YET). */
+/** The task routes: the role guard, and the IT Admin who is the beneficiary of the task while another can work it. */
 const TASK_WORKER_FORBIDDEN = {
   status: HttpStatus.FORBIDDEN,
   description: 'Not an IT Admin, or PROVISIONING.ANOTHER_IT_ADMIN_NEEDED.',
-  examples: [FORBIDDEN_EXAMPLE],
+  examples: [FORBIDDEN_EXAMPLE, PROVISIONING_ERROR_EXAMPLES.ANOTHER_IT_ADMIN_NEEDED],
 } as const;
 const NOT_FOUND = {
   status: HttpStatus.NOT_FOUND,
   description: 'The task does not exist (PROVISIONING_TASK.NOT_FOUND).',
   examples: [PROVISIONING_ERROR_EXAMPLES.TASK_NOT_FOUND],
 } as const;
-
-/**
- * Temporary Prompt 26 exception carried by the pre-G5 side of this merge. G5 makes these task-state paths reachable,
- * so the post-merge OpenAPI reconciliation must replace this reason with examples produced by the runtime mapper.
- */
-const NO_TASK_YET =
-  'Pending post-merge G5 OpenAPI reconciliation: this response needs examples produced by the now-reachable runtime mapper.';
 
 /**
  * The queue of the work that makes a seat real (`US-07-01`, `US-07-02`): the grant of a request, and the task a person
@@ -81,24 +78,26 @@ export class ProvisioningTasksController {
       status: HttpStatus.FORBIDDEN,
       description:
         'Only an IT Admin works the queue of provisioning tasks, and an IT Admin who answers for the service account themselves waits for another usable IT Admin to grant it (PROVISIONING.ANOTHER_IT_ADMIN_NEEDED); with none left they may.',
+      examples: [FORBIDDEN_EXAMPLE, PROVISIONING_ERROR_EXAMPLES.ANOTHER_IT_ADMIN_NEEDED],
     },
     {
       status: HttpStatus.NOT_FOUND,
       description:
         'The request, the subscription, the plan or the beneficiary does not exist (REQUEST.NOT_FOUND, SUBSCRIPTION.NOT_FOUND, PLAN.NOT_FOUND, EMPLOYEE.NOT_FOUND).',
-      // Only REQUEST.NOT_FOUND today: the request gate bound until G5 (RefusingGrantRequestGate) refuses every
-      // request, so the checks after it cannot answer yet. G5 adds their examples when it binds the real gate.
-      examples: [PROVISIONING_ERROR_EXAMPLES.REQUEST_NOT_FOUND],
+      // The plan and the beneficiary of a request always exist (plans and people are never deleted): not shown.
+      examples: PROVISIONING_GRANT_EXAMPLES.NOT_FOUND,
     },
     {
       status: HttpStatus.CONFLICT,
       description:
         'PROVISIONING.REQUEST_NOT_APPROVED, REQUEST_ENDED, REQUEST_NOT_IN_CATALOG (the software is not registered in the catalog yet), REQUEST_BOUNDARY_NOT_CHECKED (a service account whose boundary the IT Admin has not accepted), RESPONSIBLE_NOT_IN_DEPARTMENT (the person who answers for a service account left its department or the company: name another), TYPE_NOT_SUPPORTED (K3, K4), BENEFICIARY_DEPARTED (details.nextStep CANCEL_REQUEST), BENEFICIARY_NOT_STARTED (details.startsOn: the person joins later), SEAT_TARGET.APPLICATION_RETIRED, or LICENSE_ASSIGNMENT.SEAT_CAPACITY.',
+      examples: PROVISIONING_GRANT_EXAMPLES.CONFLICT,
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
         'The request is invalid (VALIDATION_ERROR) or refused: PROVISIONING.PERSONAL_ACCOUNT, ACCOUNT_IDENTIFIER_REQUIRED (a service account without the identifier the IT Admin enters), RESPONSIBLE_INVALID (the person named is not active in the owning department, or the request is not for a service account), SUBSCRIPTION_REQUIRED, SUBSCRIPTION_NOT_ALLOWED, SUBSCRIPTION_PLAN_MISMATCH, SUBSCRIPTION_QUANTITY_UNKNOWN, SEAT_TARGET.SUBSCRIPTION_DRAFT (details.missing lists what the subscription lacks), LICENSE_ASSIGNMENT.OVERLAP, IDENTIFIER_IN_USE or EXPECTED_END_REQUIRED.',
+      examples: [VALIDATION_EXAMPLE, ...PROVISIONING_GRANT_EXAMPLES.UNPROCESSABLE],
     },
   )
   async grant(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: GrantBodyDto) {
@@ -170,7 +169,7 @@ export class ProvisioningTasksController {
       status: HttpStatus.CONFLICT,
       description:
         'PROVISIONING_TASK.NOT_MANUAL, NOT_CLAIMABLE (done or failed) or PROVISIONING.BENEFICIARY_DEPARTED (close the request as cancelled).',
-      noExampleBecause: NO_TASK_YET,
+      examples: [PROVISIONING_ERROR_EXAMPLES.NOT_CLAIMABLE, PROVISIONING_ERROR_EXAMPLES.BENEFICIARY_DEPARTED],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -202,6 +201,7 @@ export class ProvisioningTasksController {
       status: HttpStatus.CONFLICT,
       description:
         'PROVISIONING_TASK.NOT_MANUAL or NOT_IN_PROGRESS, or IS_REVOCATION (a revocation is completed by its own route).',
+      examples: [PROVISIONING_ERROR_EXAMPLES.NOT_IN_PROGRESS, PROVISIONING_ERROR_EXAMPLES.IS_REVOCATION],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -237,7 +237,7 @@ export class ProvisioningTasksController {
     {
       status: HttpStatus.CONFLICT,
       description: 'PROVISIONING_TASK.NOT_MANUAL or NOT_IN_PROGRESS.',
-      noExampleBecause: NO_TASK_YET,
+      examples: [PROVISIONING_ERROR_EXAMPLES.NOT_IN_PROGRESS],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -273,7 +273,7 @@ export class ProvisioningTasksController {
     {
       status: HttpStatus.CONFLICT,
       description: 'The task is not failed (PROVISIONING_TASK.NOT_FAILED).',
-      noExampleBecause: NO_TASK_YET,
+      examples: [PROVISIONING_ERROR_EXAMPLES.NOT_FAILED, PROVISIONING_ERROR_EXAMPLES.WITHDRAWAL_PENDING],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -304,7 +304,7 @@ export class ProvisioningTasksController {
     {
       status: HttpStatus.CONFLICT,
       description: 'The task is not failed (NOT_FAILED) or is by hand already (PROVISIONING_TASK.ALREADY_MANUAL).',
-      noExampleBecause: NO_TASK_YET,
+      examples: [PROVISIONING_ERROR_EXAMPLES.NOT_FAILED, PROVISIONING_ERROR_EXAMPLES.ALREADY_MANUAL],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -340,7 +340,7 @@ export class ProvisioningTasksController {
     {
       status: HttpStatus.CONFLICT,
       description: 'The task is not failed (PROVISIONING_TASK.NOT_FAILED), or its assignment is no longer open.',
-      noExampleBecause: NO_TASK_YET,
+      examples: [PROVISIONING_ERROR_EXAMPLES.NOT_FAILED, PROVISIONING_ERROR_EXAMPLES.WITHDRAWAL_PENDING],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -374,14 +374,19 @@ export class ProvisioningTasksController {
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
-    { status: HttpStatus.FORBIDDEN, description: 'Not an IT Admin, or PROVISIONING.ANOTHER_IT_ADMIN_NEEDED.' },
+    TASK_WORKER_FORBIDDEN,
     NOT_FOUND,
     {
       status: HttpStatus.CONFLICT,
       description:
         'The task is not failed (PROVISIONING_TASK.NOT_FAILED), or its request was not withdrawn (PROVISIONING_TASK.NO_WITHDRAWAL): nothing changes.',
+      examples: [PROVISIONING_ERROR_EXAMPLES.NOT_FAILED, PROVISIONING_ERROR_EXAMPLES.NO_WITHDRAWAL],
     },
-    { status: HttpStatus.UNPROCESSABLE_ENTITY, description: 'The id is invalid (VALIDATION_ERROR).' },
+    {
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      description: 'The id is invalid (VALIDATION_ERROR).',
+      examples: [VALIDATION_EXAMPLE],
+    },
   )
   async cancel(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: TaskIdParamDto) {
     try {

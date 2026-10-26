@@ -5,6 +5,7 @@ import { App } from 'supertest/types';
 import { AppModule } from '../../src/app.module';
 import { configureApplication, createOpenApiDocument } from '../../src/bootstrap';
 import { findOpenApi30Violations } from '../../src/infrastructure/http/openapi-dialect';
+import { OPENAPI_DOCUMENT_BUDGET_MS } from '../support/openapi-document-budget';
 import {
   clientShape,
   routeDtos,
@@ -57,7 +58,7 @@ describe('OpenAPI dialect and runtime contract (e2e)', () => {
       ),
     );
     routes = routeDtos(app).filter((route) => route.operationId !== undefined);
-  });
+  }, OPENAPI_DOCUMENT_BUDGET_MS);
 
   afterAll(async () => {
     await app.close();

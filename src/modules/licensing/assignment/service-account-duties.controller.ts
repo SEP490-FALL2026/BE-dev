@@ -2,14 +2,25 @@ import { Controller, Get, HttpStatus, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
+  FORBIDDEN_EXAMPLE,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
+  VALIDATION_EXAMPLE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
 import { RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
 import { ListServiceAccountDutiesQueryDto, ServiceAccountDutyPageResponseDto } from './service-account.dto';
-import { toServiceAccountApiException } from './service-account.http-errors';
+import {
+  SERVICE_ACCOUNT_ERROR_EXAMPLES as EXAMPLES,
+  toServiceAccountApiException,
+} from './service-account.http-errors';
 import { ServiceAccountDutyService } from './service-account-duty.service';
+
+/** The 503 of every guarded route, and SERVICE_ACCOUNT_DUTY.TOO_MANY when more people are in it than the list can take. */
+const UNAVAILABLE_OR_TOO_MANY = {
+  ...GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
+  examples: [...GUARDED_SERVICE_UNAVAILABLE_RESPONSE.examples, EXAMPLES.DUTY_TOO_MANY],
+} as const;
 
 /**
  * The service accounts that wait for a person to answer for them before a transfer or a departure takes effect (`US-03-08`). IT Admin
@@ -33,9 +44,14 @@ export class ServiceAccountDutiesController {
     {
       status: HttpStatus.FORBIDDEN,
       description: 'Only an IT Admin reads the service accounts that need a new person.',
+      examples: [FORBIDDEN_EXAMPLE],
     },
-    GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
-    { status: HttpStatus.UNPROCESSABLE_ENTITY, description: 'A filter is invalid (VALIDATION_ERROR).' },
+    UNAVAILABLE_OR_TOO_MANY,
+    {
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      description: 'A filter is invalid (VALIDATION_ERROR).',
+      examples: [VALIDATION_EXAMPLE],
+    },
   )
   async list(@Query() query: ListServiceAccountDutiesQueryDto) {
     try {

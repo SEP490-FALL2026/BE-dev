@@ -5,7 +5,8 @@
 - Thiết kế: `ready`. Owner review: chưa review.
 - Nguồn: Docs `72e1480` (baseline nghiệp vụ hiện hành tới `QĐ-86`; hạng mục không đổi nghiệp vụ), BE `ea73c2f`. Không Story/AC nào.
 - Nhóm roadmap: xuyên module — `technical-enabler` (xem `## Sizing decision`).
-- [Kế hoạch](plan.md) · [Inventory operation/status/code](inventory.md).
+- [Kế hoạch](plan.md) · [Inventory operation/status/code](inventory.md) · [Inventory sau merge G5/G6](inventory-g5-g6.md)
+  (Prompt 02, 26/10/2026).
 
 ## Business outcome
 
@@ -139,7 +140,70 @@ khai báo).
 - `OPENAPI-EXAMPLE.1-F5` — 500 không khai từ `Error` thường (trước cài đặt, registry chưa đăng ký, giải mã khóa) — đúng
   contract fallback, chỉ ghi nhận.
 - `OPENAPI-EXAMPLE.1-F6` — **status khai nhưng runtime hiện tại không trả**: bảy 409 của route cấp/tác vụ (mục _Behavior_);
-  mô tả của chúng vẫn liệt kê mã sau gate. Chủ: G5 (`g4-request-and-transfer-integration`).
+  mô tả của chúng vẫn liệt kê mã sau gate. Chủ: G5 (`g4-request-and-transfer-integration`). **Đóng ở Prompt 02** (G5 gắn gate
+  thật; bảy response có ví dụ từ mapper).
+- `OPENAPI-EXAMPLE.1-F7` (Prompt 02) — **mô tả lệch code ở G5/G6**: 52 mục (mã nêu mà không với tới, mã với tới mà không nêu,
+  hằng khai báo dùng chung với mô tả sai cho một route) — danh sách ở [inventory sau merge](inventory-g5-g6.md); mô tả không sửa
+  ở đây. Chủ: Prompt 03.
+- `OPENAPI-EXAMPLE.1-F8` (Prompt 02) — **mã với tới nhưng không hiện** (quyết định Owner 3): 26 mã chuyển qua của
+  `personnelNoticeRecord`, hai mã hook thu hồi. Chủ: Prompt 03/04 (port ví dụ hoặc contract nội module).
+- `OPENAPI-EXAMPLE.1-F9` (Prompt 02) — **lỗi runtime thấy khi truy vết** (không phải ví dụ): `budgetVersionUpdate` với `reason`
+  null trên phiên bản bị trả lại vi phạm `budget_versions_reason_check` ⟹ 500; `planId` không tồn tại ở đề xuất/dòng ngân sách
+  vi phạm khóa ngoại ⟹ 500; bản nháp đầu của đề xuất đã rút/trả lại không gửi hay xóa được, chặn `budgetVersionCreate` cùng
+  Cost Center/năm (`VERSION_IN_FLIGHT`); đường ghi nghỉ việc từ thông báo bỏ qua `OffboardingFrame.guarded()` ⟹ xung đột
+  thành 500; năm mã placement của transfer có thông điệp chung "The transfer was refused (<CODE>)."; mapper có mục chết
+  (`LONG_LEAVE.CONCURRENT_CHANGE`, `GROUP_REQUEST.LINE_NOT_FOUND`). Chủ: Prompt 03.
+- `OPENAPI-EXAMPLE.1-F11` (Prompt 02, đã sửa) — **contract sai do merge**: ba component trùng tên (route đề xuất phần mềm, trả
+  seat, import license key công bố schema của ngân sách hoặc ngược lại) và `LinePatchDto.quoteValidUntil` in thành `string[]`
+  (31 DTO G5/G6 bỏ qua adapter) — đổi tên lớp, dùng adapter; FE/Mobile sinh lại client khi nối API.
+- `OPENAPI-EXAMPLE.1-F10` (Prompt 02) — **chưa chứng minh với tới**: `LICENSE_ASSIGNMENT.NOT_OPEN` ở `close-failed`,
+  `revocation-completion`, `access-cut` (không tìm thấy đường đóng assignment khi tác vụ còn mở) — không hiện. Chủ: Prompt 03.
+
+## Phase sau merge G5/G6 (Prompt 02, 26/10/2026)
+
+Merge G5/G6 `0da8f56` mang 150 operation viết trước gate Prompt 26: `pnpm typecheck` đỏ 149 lời gọi `ApiErrorResponses` (mỗi
+lời gọi TypeScript chỉ báo đối số lỗi đầu tiên); inventory bằng parser trên cây merge: **450** response lỗi không ví dụ ở 149
+operation, 38 controller (110 × 403, 113 × 404, 80 × 409, 147 × 422), cộng năm `noExampleBecause` cũ của route tác vụ.
+
+- **Truy vết.** 161 operation (150 mới + 11 operation cũ mà G5/G6 đổi đường đi: chín route cấp/tác vụ, hai route assignment) truy
+  từ guard/pipe qua service/policy/repo tới mapper, chia 8 nhóm theo capability (mỗi nhóm một tập tệp riêng, chỉ một tác tử
+  tích hợp); kết quả: [inventory sau merge](inventory-g5-g6.md) và manifest. Ví dụ theo route dựng bằng
+  `errorExampleOf(toXApiException(new XError(...)))` trong `*_ERROR_EXAMPLES` của đúng mapper controller dùng.
+- **Bảy 409 của route cấp/tác vụ.** G5 gắn `AccessRequestGrantGate` thật (đăng ký qua `RegisteredGrantRequestGate`): tác vụ tồn
+  tại, nên bảy ngoại lệ (gồm lý do tạm `NO_TASK_YET`) đều với tới được ⟹ gỡ cả bảy, thay bằng ví dụ từ mapper;
+  `NO_EXAMPLE_RESPONSES` nay rỗng. Mã không với tới: `PROVISIONING_TASK.NOT_MANUAL` (không đường nào tạo tác vụ `CONNECTOR`),
+  `PLAN.NOT_FOUND`/`EMPLOYEE.NOT_FOUND` ở cấp (không đường xóa) — không hiện, ghi finding.
+- **Quyết định Owner 26/10/2026.** (1) `BUDGET.PROPOSAL_ALREADY_OPEN` và `BUDGET.VERSION_IN_FLIGHT` có hai thông điệp (kiểm tra
+  trước khi ghi và kẻ thua đua ở unique index) ⟹ **một thông điệp**: kẻ thua trả đúng lỗi domain của kiểm tra (đổi runtime chỉ
+  ở đường đua, mã/status/details giữ). (2) `budgetProposalList` khai 403 nhưng route `@AuthenticatedOnly` không bao giờ từ chối
+  (người không được đọc nhận trang rỗng) ⟹ **bỏ 403**. (3) Mã của capability/module khác mà route chỉ chuyển qua
+  (`personnelNoticeRecord`: mã của nghỉ dài/điều chuyển/nghỉ việc; hook thu hồi ở `claim`/`revocation-completion`:
+  `HANDOVER.CONFIRMATION_PENDING`, `PROVISIONING.HANDOVER_PENDING`) ⟹ **không hiện, hoãn Prompt 03**: hiện chúng cần đăng ký
+  contract nội module mới hoặc port ví dụ mới; ví dụ đang hiện vẫn đúng, chỉ không đầy đủ.
+- **Theo tiền lệ đã commit của Prompt 26.** Thông điệp dựng từ một mẫu với tham số enum (`LICENSE_ASSIGNMENT.EFFECTIVE_DATE_INVALID`,
+  `ASSESSMENT.REFERENCE_NOT_FOUND`, `GROUP_REQUEST.PLAN_NOT_ELIGIBLE`…) hiện một đại diện; `VALIDATION_ERROR` của pipe vẫn là
+  ví dụ khi parser tiền cũng trả mã đó (`-F4`).
+- **503 đúng contract.** `api-contract`: route có guard khai 503 `GUARDED_SERVICE_UNAVAILABLE_RESPONSE` (`SERVICE_UNAVAILABLE` sau
+  guard). Mapper của long leave, notice, transfer, transfer review, offboarding, congestion và route controlled wait trả mọi lỗi
+  không phải của mình thẳng cho filter (500) ⟹ thêm `toUnavailableApiException(error) ?? error` như mọi mapper khác (đỏ trước
+  7 ca, xanh sau; lỗi khác vẫn qua nguyên vẹn).
+- **Gate của chính đợt merge mà typecheck đỏ đã che.** `budgetVersionImport` (multipart, giới hạn multer 2 MiB) không khai
+  400/413 dù filter trả cả hai ⟹ khai bằng `fallbackExample` như hai route upload kia; 31 DTO G5/G6 dựng bằng `createZodDto` của
+  `nestjs-zod` thay vì adapter `infrastructure/http/dto/zod-dto` ⟹ đổi import (runtime không đổi; OpenAPI sửa đúng một thuộc
+  tính: `LinePatchDto.quoteValidUntil` từ `string[]` sai thành `string` nullable — lỗi `-F3a`); ví dụ chuyển của transfer lấy
+  mã/subject qua `newTransferRefusal` (không literal lý do placement, `BEH.1`).
+- **Gate e2e/unit chưa từng chạy được trên cây merge (lượt cuối Prompt 02).** (a) Ba lớp DTO của ngân sách trùng tên với DTO
+  của module khác (`ImportResponseDto` với license key — contract trước merge, `ProposalBodyDto` với đề xuất phần mềm,
+  `ReturnBodyDto` với trả seat): component Swagger theo tên lớp nên một route công bố schema của route kia ⟹ đổi tên lớp ngân
+  sách (`BudgetLineImportResponseDto`, `BudgetProposalBodyDto`, `BudgetProposalReturnBodyDto`); `ImportResponseDto` trùng byte
+  bản `471de5e` trở lại. (b) `params` của hộp thông báo viết `z.union([...]).nullable()` thay cho thành viên `z.null()`:
+  cùng giá trị hợp lệ (đã đối chiếu), Zod dựng đúng `anyOf` + `nullable` mà document hiện. (c) Snapshot `itemProperties` của
+  hai ngoại lệ `owner-decision` (`LD-13` điểm 5) review lại: hàng assignment thêm `cancelledAt`, hàng tác vụ thêm
+  `revocation` — không phải trường danh tính, quyết định 5 vẫn mở; khóa registry không đổi. (d) Bốn chỗ e2e dựng cả document
+  (`createOpenApiDocument`, đo 3–4 s cho 296 operation, thêm ~0,7 s của ví dụ/presentation) dùng ngân sách đặt tên
+  `OPENAPI_DOCUMENT_BUDGET_MS` (30 s) thay mặc định 5 s của Jest.
+- **Manifest.** `SUCCESS_MESSAGES` 295 mục (150 mới); `ROUTE_ERROR_CODES` thêm năm tệp theo vùng (budgets, requests, requests
+  spend, personnel, licensing; mỗi tệp ≤ 400 dòng) và test mới "mỗi operation chỉ một lần giữa các phần".
 
 ## Test matrix
 
@@ -173,4 +237,6 @@ khai báo).
   changed the dictionary group of the vendor or the line. Refresh both, then send the request again."
 - 25/10/2026 — `provisioningTaskGrant` và các route tác vụ: người giao việc chọn **chặt** — chỉ hiện mã runtime hiện tại trả
   được; mã sau request gate chờ G5 (mục _Behavior_, `-F6`).
+- 26/10/2026 (Prompt 02, Owner) — ba quyết định ở _Phase sau merge G5/G6_: một thông điệp cho hai mã ngân sách (đổi runtime ở
+  đường đua), bỏ 403 của `budgetProposalList`, hoãn mã chuyển qua của capability/module khác sang Prompt 03.
 - Chưa nghiệm thu.

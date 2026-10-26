@@ -8,6 +8,7 @@ import { ACCESS_TOKEN_VERIFIER } from '../../src/infrastructure/security/tokens/
 import { GRANT_REQUEST_GATE } from '../../src/modules/licensing/licensing.types';
 import { RefusingGrantRequestGate } from '../../src/modules/licensing/provisioning/refusing-grant-request-gate.service';
 import { bodyOf } from '../support/api-body';
+import { OPENAPI_DOCUMENT_BUDGET_MS } from '../support/openapi-document-budget';
 
 const ID = '3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11';
 const BASE = '/api/v1/provisioning-tasks';
@@ -184,34 +185,38 @@ describe('provisioning queue routes (e2e, no database)', () => {
     expect(bodyOf(response).error.code).toBe('REQUEST.NOT_FOUND');
   });
 
-  it('has no route that makes a revocation: each source opens it through the licensing facade (US-07-05 AC-3)', async () => {
-    app = await appFor(principal(['IT_ADMIN']));
-    const posts = Object.entries(createOpenApiDocument(app).paths)
-      .filter(([path, item]) => path.startsWith(BASE) && item.post)
-      .map(([path]) => path.slice(BASE.length))
-      .sort();
+  it(
+    'has no route that makes a revocation: each source opens it through the licensing facade (US-07-05 AC-3)',
+    async () => {
+      app = await appFor(principal(['IT_ADMIN']));
+      const posts = Object.entries(createOpenApiDocument(app).paths)
+        .filter(([path, item]) => path.startsWith(BASE) && item.post)
+        .map(([path]) => path.slice(BASE.length))
+        .sort();
 
-    // The grant, and what is done to a task that exists: nothing here makes a task of kind REVOKE.
-    expect(posts).toEqual(
-      [
-        '',
-        '/{id}/access-cut',
-        '/{id}/cancel',
-        '/{id}/claim',
-        '/{id}/close-failed',
-        '/{id}/complete',
-        '/{id}/hand-off',
-        '/{id}/report-failure',
-        '/{id}/retry',
-        '/{id}/revocation-completion',
-      ].sort(),
-    );
-    await request(app.getHttpServer())
-      .post(`${BASE}/revoke`)
-      .set('Authorization', 'Bearer any')
-      .send({ source: 'RETURN' })
-      .expect(404);
-  });
+      // The grant, and what is done to a task that exists: nothing here makes a task of kind REVOKE.
+      expect(posts).toEqual(
+        [
+          '',
+          '/{id}/access-cut',
+          '/{id}/cancel',
+          '/{id}/claim',
+          '/{id}/close-failed',
+          '/{id}/complete',
+          '/{id}/hand-off',
+          '/{id}/report-failure',
+          '/{id}/retry',
+          '/{id}/revocation-completion',
+        ].sort(),
+      );
+      await request(app.getHttpServer())
+        .post(`${BASE}/revoke`)
+        .set('Authorization', 'Bearer any')
+        .send({ source: 'RETURN' })
+        .expect(404);
+    },
+    OPENAPI_DOCUMENT_BUDGET_MS,
+  );
 
   it('has no route that deletes or rewrites a task', async () => {
     app = await appFor(principal(['IT_ADMIN']));

@@ -1,4 +1,4 @@
-import { createZodDto } from 'nestjs-zod';
+import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { z } from 'zod';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
 
@@ -13,7 +13,8 @@ export const notificationListQuerySchema = z.strictObject({
 
 export const notificationIdParamSchema = z.strictObject({ id: z.uuid() });
 
-const paramValue = z.union([z.string(), z.number(), z.boolean(), z.null()]);
+// Nullable union rather than a null member: the same values, rendered as `anyOf` + `nullable` like the document shows.
+const paramValue = z.union([z.string(), z.number(), z.boolean()]).nullable();
 
 /**
  * One notice as its recipient reads it: a code, what it is about by id, and flat parameters. It has no text: web and mobile

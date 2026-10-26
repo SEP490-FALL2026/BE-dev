@@ -2,6 +2,7 @@ import { Controller, Get, HttpStatus } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
+  FORBIDDEN_EXAMPLE,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
@@ -33,6 +34,7 @@ export class SuperAdminWatchController {
     {
       status: HttpStatus.FORBIDDEN,
       description: 'Only the Super Admin and an IT Admin read the state of the Super Admin role.',
+      examples: [FORBIDDEN_EXAMPLE],
     },
     GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   )

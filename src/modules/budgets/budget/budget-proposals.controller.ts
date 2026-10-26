@@ -2,8 +2,10 @@ import { Body, Controller, Get, HttpStatus, Param, Post, Query } from '@nestjs/c
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
+  FORBIDDEN_EXAMPLE,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
+  VALIDATION_EXAMPLE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
 import { AuthenticatedOnly, RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
@@ -12,30 +14,52 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import {
   IdParamDto,
   PageQueryDto,
-  ProposalBodyDto,
+  BudgetProposalBodyDto,
   ProposalLinePageResponseDto,
   ProposalListQueryDto,
   ProposalPageResponseDto,
   ProposalResponseDto,
   ResubmissionBodyDto,
-  ReturnBodyDto,
+  BudgetProposalReturnBodyDto,
 } from './budget.dto';
-import { toBudgetApiException } from './budget.http-errors';
+import { BUDGET_ERROR_EXAMPLES as EXAMPLES, toBudgetApiException } from './budget.http-errors';
 import { ProposalService } from './proposal.service';
 
 const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPONSE] as const;
 const NOT_FOUND = {
   status: HttpStatus.NOT_FOUND,
   description: 'The proposal does not exist, or the caller has no part in it (BUDGET.PROPOSAL_NOT_FOUND).',
+  examples: [EXAMPLES.PROPOSAL_NOT_FOUND],
 } as const;
+const INVALID_DESCRIPTION = 'The request is invalid (VALIDATION_ERROR).';
 const INVALID = {
   status: HttpStatus.UNPROCESSABLE_ENTITY,
-  description: 'The request is invalid (VALIDATION_ERROR).',
+  description: INVALID_DESCRIPTION,
+  examples: [VALIDATION_EXAMPLE],
 } as const;
+const HEAD_ONLY_DESCRIPTION =
+  'Only the head of the department proposes for its Cost Center (BUDGET.NOT_YOUR_COST_CENTER).';
 const HEAD_ONLY = {
   status: HttpStatus.FORBIDDEN,
-  description: 'Only the head of the department proposes for its Cost Center (BUDGET.NOT_YOUR_COST_CENTER).',
+  description: HEAD_ONLY_DESCRIPTION,
+  examples: [FORBIDDEN_EXAMPLE, EXAMPLES.NOT_YOUR_COST_CENTER],
 } as const;
+/** The role guard alone: on a proposal already sent, a caller who is not its head finds nothing (404). */
+const HEAD_ROLE_ONLY = {
+  status: HttpStatus.FORBIDDEN,
+  description: HEAD_ONLY_DESCRIPTION,
+  examples: [FORBIDDEN_EXAMPLE],
+} as const;
+/** What sending the lines refuses after the request validation: a first proposal and one sent again alike. */
+const SEND_EXAMPLES = [
+  EXAMPLES.PROPOSAL_INCOMPLETE,
+  EXAMPLES.WINDOW_BACKWARDS,
+  EXAMPLES.YEAR_ENDED,
+  EXAMPLES.CURRENCY_NOT_REPORTING,
+  EXAMPLES.CURRENCY_NOT_SUPPORTED,
+  EXAMPLES.MONEY_SCALE_EXCEEDED,
+  EXAMPLES.MONEY_OUT_OF_RANGE,
+] as const;
 
 /**
  * The budget proposals of the heads of department (`US-06-10`): sent for the Cost Center of the department and a fiscal
@@ -59,19 +83,25 @@ export class BudgetProposalsController {
   @ApiErrorResponses(
     ...AUTH_ERRORS,
     HEAD_ONLY,
-    { status: HttpStatus.NOT_FOUND, description: 'The Cost Center does not exist (BUDGET.COST_CENTER_NOT_FOUND).' },
+    {
+      status: HttpStatus.NOT_FOUND,
+      description: 'The Cost Center does not exist (BUDGET.COST_CENTER_NOT_FOUND).',
+      examples: [EXAMPLES.COST_CENTER_NOT_FOUND],
+    },
     {
       status: HttpStatus.CONFLICT,
       description:
         'A proposal for the Cost Center and the year already waits or is being reviewed (BUDGET.PROPOSAL_ALREADY_OPEN).',
+      examples: [EXAMPLES.PROPOSAL_ALREADY_OPEN],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
         'The form is invalid (VALIDATION_ERROR), a line lacks its window, service period or repeat cycle, with the line and the fields in details.lines (BUDGET.PROPOSAL_INCOMPLETE), a window runs backwards (BUDGET.WINDOW_BACKWARDS), the year has ended (BUDGET.YEAR_ENDED) or an amount is not in the reporting currency (BUDGET.CURRENCY_NOT_REPORTING).',
+      examples: [VALIDATION_EXAMPLE, ...SEND_EXAMPLES],
     },
   )
-  async submit(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: ProposalBodyDto) {
+  async submit(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: BudgetProposalBodyDto) {
     try {
       return { proposal: await this.proposals.submit(actor, body) };
     } catch (error) {
@@ -87,11 +117,8 @@ export class BudgetProposalsController {
     description:
       'Newest first. Finance and the spending approver read every proposal, a head of department those of the Cost Center of their department, and anybody else none; a proposal sent again points at the one it corrects, so the history of what was sent stays readable.',
   })
-  @ApiErrorResponses(
-    ...AUTH_ERRORS,
-    { status: HttpStatus.FORBIDDEN, description: 'Only Finance and the heads of department read proposals.' },
-    INVALID,
-  )
+  // No 403: the list never refuses, a caller who may read no proposal gets an empty page (Owner, Prompt 02, 26/10/2026).
+  @ApiErrorResponses(...AUTH_ERRORS, INVALID)
   async list(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Query() query: ProposalListQueryDto) {
     try {
       return await this.proposals.list(actor, query);
@@ -146,11 +173,12 @@ export class BudgetProposalsController {
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
-    HEAD_ONLY,
+    HEAD_ROLE_ONLY,
     NOT_FOUND,
     {
       status: HttpStatus.CONFLICT,
       description: 'The proposal is no longer waiting for Finance (BUDGET.PROPOSAL_CANNOT_WITHDRAW).',
+      examples: [EXAMPLES.PROPOSAL_CANNOT_WITHDRAW],
     },
     INVALID,
   )
@@ -172,21 +200,23 @@ export class BudgetProposalsController {
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
-    { status: HttpStatus.FORBIDDEN, description: 'Only Finance gives a proposal back.' },
+    { status: HttpStatus.FORBIDDEN, description: 'Only Finance gives a proposal back.', examples: [FORBIDDEN_EXAMPLE] },
     NOT_FOUND,
     {
       status: HttpStatus.CONFLICT,
       description: 'The proposal is not waiting for Finance (BUDGET.PROPOSAL_CANNOT_RETURN).',
+      examples: [EXAMPLES.PROPOSAL_CANNOT_RETURN],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description: 'The reason is missing (VALIDATION_ERROR): nothing is saved.',
+      examples: [VALIDATION_EXAMPLE],
     },
   )
   async giveBack(
     @CurrentPrincipal() actor: AuthenticatedPrincipal,
     @Param() params: IdParamDto,
-    @Body() body: ReturnBodyDto,
+    @Body() body: BudgetProposalReturnBodyDto,
   ) {
     try {
       return { proposal: await this.proposals.giveBack(actor, params.id, body.reason) };
@@ -208,14 +238,19 @@ export class BudgetProposalsController {
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
-    HEAD_ONLY,
+    HEAD_ROLE_ONLY,
     NOT_FOUND,
     {
       status: HttpStatus.CONFLICT,
       description:
         'The proposal was not given back (BUDGET.PROPOSAL_CANNOT_RESUBMIT), or another waits (BUDGET.PROPOSAL_ALREADY_OPEN).',
+      examples: [EXAMPLES.PROPOSAL_CANNOT_RESUBMIT, EXAMPLES.PROPOSAL_ALREADY_OPEN],
     },
-    INVALID,
+    {
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      description: INVALID_DESCRIPTION,
+      examples: [VALIDATION_EXAMPLE, ...SEND_EXAMPLES],
+    },
   )
   async resubmit(
     @CurrentPrincipal() actor: AuthenticatedPrincipal,

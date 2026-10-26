@@ -8,7 +8,8 @@
 // whole and verifies it, every attempt keeps its own rollback evidence, the first H7 rollout gets its old environment
 // back, nothing is pruned or removed as an orphan, and no credential is printed. RV-07: a run paused at a barrier of the
 // fakes, past the host lock, makes a second run of the same directory exit 2 at once; the lock is the real `flock` where
-// there is one (Linux), else a stand-in taking the same flock(2) lock (Git for Windows ships no `flock`).
+// there is one (Linux), else a stand-in taking the same flock(2) lock (Git for Windows ships no `flock`). RV-08: a run is
+// over only when every process it started has ended, not when the bash the test spawned exits (see `TREE`).
 import { strict as assert } from 'node:assert';
 import { spawn, spawnSync } from 'node:child_process';
 import {
@@ -69,6 +70,9 @@ const created = [];
  *
  * Barrier (H7-OPS-RV-07): the first call containing FAKE_PAUSE creates $FAKE_BARRIER/paused, then waits — at most 300 s —
  * for $FAKE_BARRIER/go. The test thus knows the run is inside the script, past the host lock, at that exact step.
+ *
+ * Linger (H7-TEST-RV-08): the first call containing FAKE_LINGER leaves behind a process of the run in a process group of its
+ * own, as `timeout` puts the fake it runs, that runs three seconds more and then creates $FAKE_LINGERED.
  */
 const barrier = (
   variable,
@@ -89,6 +93,10 @@ const FAKE_DOCKER = `#!/usr/bin/env bash
 printf '%s\\n' "$*" >> "$FAKE_DOCKER_LOG"
 printf 'API_IMAGE=%s CADDYFILE_PATH=%s\\n' "\${API_IMAGE:-}" "\${CADDYFILE_PATH:-}" >> "$FAKE_DOCKER_LOG.env"
 ${barrier('FAKE_PAUSE')}
+if [ -n "\${FAKE_LINGER:-}" ] && [[ "$*" == *"$FAKE_LINGER"* ]] && [ ! -e "$FAKE_LINGERED.started" ]; then
+  : > "$FAKE_LINGERED.started"
+  timeout 30 bash -c 'sleep 3; : > "$0"' "$FAKE_LINGERED" > /dev/null 2>&1 < /dev/null &
+fi
 project=''
 previous=''
 for arg in "$@"; do
@@ -324,7 +332,7 @@ const argumentsFor = (target, { attempt = ATTEMPT, extra = [], release = RELEASE
 
 function environmentFor(target, options, log) {
   const { fail, failCode, once, mvFail, runningImage, badNew, badOld, oldNeedsPreH7, gen0Stopped } = options;
-  const { pause, mvPause, barrier } = options;
+  const { pause, mvPause, barrier, linger } = options;
   const { bash } = setup;
   return {
     ...process.env,
@@ -347,19 +355,33 @@ function environmentFor(target, options, log) {
     ...(barrier ? { FAKE_BARRIER: bash.path(barrier) } : {}),
     ...(pause ? { FAKE_PAUSE: pause } : {}),
     ...(mvPause ? { FAKE_MV_PAUSE: mvPause } : {}),
+    ...(linger ? { FAKE_LINGER: linger, FAKE_LINGERED: bash.path(join(target.root, 'lingered')) } : {}),
   };
 }
 
 const lines = (path) => (existsSync(path) ? readFileSync(path, 'utf8').split('\n').filter(Boolean) : []);
+
+/**
+ * H7-TEST-RV-08: the end of a run is the end of every process it started, not the exit of the process the test spawned. On
+ * Windows that process is Git's bash launcher: the msys processes the script starts can outlive it (a fake in a process
+ * group of its own under `timeout`, still holding a file of the temporary directory), so its exit says nothing about them.
+ * Each run therefore gets one more pipe, its fd 3, that nothing reads or writes: every process of the run, whatever its
+ * process group and wherever its output goes, holds an inherited handle of it, and the pipe closes only when the last of
+ * them has ended. That close, which belongs to the test, is what `deploy` and `finish` wait for before a directory is
+ * removed.
+ */
+const TREE = 'pipe';
 
 function deploy(target, options = {}) {
   const { bash } = setup;
   target.runs += 1;
   const log = join(target.root, `docker-${target.runs}.log`);
   const started = Date.now();
+  // spawnSync returns once every pipe is closed: with fd 3 (TREE), once every process of the run has ended.
   const result = spawnSync(bash.executable, [bash.path(SCRIPT), ...(options.args ?? argumentsFor(target, options))], {
     encoding: 'utf8',
     env: environmentFor(target, options, log),
+    stdio: ['ignore', 'pipe', 'pipe', TREE],
   });
   return {
     status: result.status,
@@ -375,7 +397,8 @@ function deploy(target, options = {}) {
  * this test process — ends whatever is left, by its exact identity, never by name. POSIX: the process group the test
  * created (`detached`). Windows: the msys process group of the script, whose leader recorded its PID through BASH_ENV,
  * then `taskkill /T` of the exact PID spawned (Git's bash launcher). `taskkill /T` alone does not reach the commands the
- * script started: msys fork/exec does not keep the Windows parent chain.
+ * script started: msys fork/exec does not keep the Windows parent chain. A fake in a process group of its own (under
+ * `timeout`) is out of reach of both and ends by itself once its run is gone; `settled` waits for it (H7-TEST-RV-08).
  */
 const running = [];
 
@@ -418,7 +441,7 @@ function start(target, options = {}) {
         ...environmentFor(target, { ...options, barrier: run.barrier }, run.log),
         FAKE_RUN_PID: bash.path(run.pidFile),
       },
-      stdio: ['ignore', out, out],
+      stdio: ['ignore', out, out, TREE],
       detached: process.platform !== 'win32',
       windowsHide: true,
     });
@@ -429,7 +452,35 @@ function start(target, options = {}) {
     run.child.once('exit', (status) => resolve(status));
     run.child.once('error', () => resolve(null));
   });
+  // Every process of the run has ended once fd 3 (TREE) is closed; a run that could not start has none.
+  run.ended = new Promise((resolve) => {
+    const tree = run.child.stdio[3];
+    if (!tree) return resolve();
+    tree.resume();
+    tree.once('close', resolve);
+    run.child.once('error', resolve);
+  });
   return run;
+}
+
+/**
+ * Resolves once every process of the run has ended (H7-TEST-RV-08); a process of the run still alive after `within` ms
+ * fails the test with the identity of the run, and nothing is removed or killed for it here.
+ */
+async function settled(run, within = 60_000) {
+  let timer;
+  const ended = await Promise.race([
+    run.ended.then(() => true),
+    new Promise((resolve) => {
+      timer = setTimeout(() => resolve(false), within);
+    }),
+  ]);
+  clearTimeout(timer);
+  if (!ended) {
+    assert.fail(
+      `a process of the run ${run.outPath} (leader ${optional(run.pidFile)?.trim() ?? 'unknown'}) is still alive`,
+    );
+  }
 }
 
 /** Waits for the run to end — at most `within` ms, then its exact tree is ended and `timedOut` says so. */
@@ -444,6 +495,7 @@ async function finish(run, within = 600_000) {
   clearTimeout(timer);
   if (timedOut) endTree(run);
   const status = await run.exited;
+  await settled(run);
   return {
     status: timedOut ? null : status,
     timedOut,
@@ -503,12 +555,13 @@ const PROBE = (generation) => new RegExp(`^exec fake-api-${generation} node -e `
 
 describe('deploy-release.sh (H7-OPS-02, H7-OPS-RV-01..07)', () => {
   afterEach(async () => {
-    // Processes first: a directory cannot go while a run still uses it. A fake waiting at a barrier under `timeout` ends
-    // itself within 0.1 s of its run; Windows frees the directory a moment after the last process in it ends.
+    // Processes first: a directory cannot go while a process of a run still holds a file of it. Each run is ended by its
+    // exact identity, then waited for until every process it started has ended (H7-TEST-RV-08) — a fake waiting at a
+    // barrier under `timeout` ends itself once its run is gone — and only then is its exact directory removed.
     while (running.length > 0) {
       const run = running.pop();
       endTree(run);
-      if (run.exited) await run.exited;
+      if (run.ended) await settled(run);
     }
     while (created.length > 0) rmSync(created.pop(), { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
   });
@@ -990,6 +1043,28 @@ describe('deploy-release.sh (H7-OPS-02, H7-OPS-RV-01..07)', () => {
       assert.deepEqual(later.calls, []);
       assert.equal(existsSync(join(target.release, 'attempts')), false);
       assert.equal(readFileSync(join(target.app, '.env'), 'utf8'), H7_ENV);
+    });
+  });
+
+  describe('every process of a run has ended before the test goes on (H7-TEST-RV-08)', () => {
+    it('a deployment that returned left no process of its run running, even one in a process group of its own', () => {
+      const target = host();
+      // Left behind by the recreation, near the end of the run: it outlives the script by about two seconds.
+      const result = deploy(target, { linger: '--force-recreate' });
+
+      assert.equal(result.status, 0, result.output);
+      assert.ok(existsSync(join(target.root, 'lingered.started')), 'the lingering process did not start');
+      assert.ok(existsSync(join(target.root, 'lingered')), 'deploy() returned while a process of the run still ran');
+    });
+
+    it('a run started without waiting is finished only once every process it started has ended', async () => {
+      const target = host();
+      const run = start(target, { linger: '--force-recreate' });
+      const result = await finish(run);
+
+      assert.equal(result.status, 0, result.output);
+      assert.ok(existsSync(join(target.root, 'lingered.started')), 'the lingering process did not start');
+      assert.ok(existsSync(join(target.root, 'lingered')), 'finish() resolved while a process of the run still ran');
     });
   });
 

@@ -22,9 +22,11 @@ import { errorEnvelopeSchema } from '../../src/infrastructure/http/dto/error-env
 import { findOpenApi30Violations } from '../../src/infrastructure/http/openapi-dialect';
 import { REVEAL_LIMITS } from '../../src/modules/licensing/license-key/license-key-reveal-quota.repo';
 import { API_COVERAGE_MANIFEST } from '../support/api-coverage-manifest';
+import { OPENAPI_DOCUMENT_BUDGET_MS } from '../support/openapi-document-budget';
 import {
   BODYLESS_RESPONSES,
   NO_EXAMPLE_RESPONSES,
+  ROUTE_ERROR_CODE_PARTS,
   ROUTE_ERROR_CODES,
   SUCCESS_MESSAGES,
   type RouteErrorStatus,
@@ -117,7 +119,7 @@ describe('API inventory (e2e)', () => {
           : [];
       }),
     );
-  });
+  }, OPENAPI_DOCUMENT_BUDGET_MS);
 
   afterAll(async () => {
     await app.close();
@@ -505,12 +507,13 @@ describe('API inventory (e2e)', () => {
         .map((candidate) => candidate.operationId)
         .sort();
 
-    it('declares the 400 and 413 of the multipart limits on the two upload routes, which are the only multipart routes', () => {
-      expect(idsWhere((candidate) => Boolean(candidate.requestBody?.content?.['multipart/form-data']))).toEqual([
-        'employeeImportUpload',
-        'seatBaselineImportUpload',
-      ]);
-      for (const id of ['employeeImportUpload', 'seatBaselineImportUpload']) {
+    it('declares the 400 and 413 of the multipart limits on the three upload routes, which are the only multipart routes', () => {
+      // budgetVersionImport (G5) takes one file under the same limits (Prompt 02: it declared neither answer).
+      const uploads = ['budgetVersionImport', 'employeeImportUpload', 'seatBaselineImportUpload'];
+      expect(idsWhere((candidate) => Boolean(candidate.requestBody?.content?.['multipart/form-data']))).toEqual(
+        uploads,
+      );
+      for (const id of uploads) {
         const { responses } = operation(id);
         expect({ id, schema400: schemaOf(responses['400']), schema413: schemaOf(responses['413']) }).toEqual({
           id,
@@ -537,6 +540,7 @@ describe('API inventory (e2e)', () => {
       }
       // A 413 anywhere else is a multipart upload's own file limit, or a mistake.
       expect(idsWhere((candidate) => candidate.responses['413'] !== undefined && !takesJson(candidate))).toEqual([
+        'budgetVersionImport',
         'employeeImportUpload',
         'seatBaselineImportUpload',
       ]);
@@ -791,6 +795,12 @@ describe('API inventory (e2e)', () => {
       expect(mismatches).toEqual([]);
       expect(stale).toEqual([]);
       expect(staleNoExample).toEqual([]);
+    });
+
+    it('lists each operation once across the parts of the route-code manifest', () => {
+      const listed = ROUTE_ERROR_CODE_PARTS.flat();
+
+      expect(listed.filter((operationId, index) => listed.indexOf(operationId) !== index)).toEqual([]);
     });
 
     it('keeps every example short, readable and free of secrets, personal data and internal codes', () => {
