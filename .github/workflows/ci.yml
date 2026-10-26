@@ -113,6 +113,8 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Run local quality gate
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
         run: pnpm check
 
       - name: Run API E2E tests
