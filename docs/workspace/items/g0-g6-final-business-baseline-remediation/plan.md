@@ -1,0 +1,823 @@
+# Plan: remediation G0–G6 theo baseline nghiệp vụ cuối `QĐ-87` → `QĐ-92`
+
+- [Spec](spec.md); revision đầu vào: Docs `e0cb5a0045c1db2b8d607fe3cddd46dc2aaa1f36` (Owner pin cuối, P03-D16 = A; pin trước `769bb64`),
+  BE `7c28e75`. [Impact matrix](impact-matrix.md) · [test matrix](test-matrix.md).
+- Phụ trách: chưa phân công (Prompt 04). Thiết kế ban đầu bởi: AI theo giao việc Owner (Prompt 03, 26/10/2026).
+- Owner review: chưa review tài liệu; Owner đã trả lời mọi disposition chặn ngày 27/10/2026 (chín mục = A — [spec mục L](spec.md#l-hệ-quả-của-disposition-owner-27102026)).
+  Peer review: tùy chọn.
+- Triển khai: `not-started`. PR: chưa có.
+
+## Before coding
+
+- Đọc `AGENTS.md`, `CONTRIBUTING.md`, `docs/rules/{api-contract,database-business,security-jobs,module-structure,work-item-sizing}.md`,
+  `test/README.md`, [spec](spec.md), [impact matrix](impact-matrix.md), [test matrix](test-matrix.md).
+- Preflight: `HEAD = dev = origin/dev`, cây sạch, không stash; nếu `dev` đã đi tiếp sau `7c28e75`, đối chiếu lại từng finding trên
+  revision mới trước khi sửa (không tin số dòng cũ).
+- Disposition _chặn_ đã trả lời (Owner 27/10/2026: P03-D01 → P03-D07, P03-D09, P03-D11 = A; P03-D08 đóng theo nguồn; P03-D16 = A ngày
+  26/10/2026); hệ quả chốt ở [spec mục L](spec.md#l-hệ-quả-của-disposition-owner-27102026) — không hỏi lại. Mục không chặn dùng mặc định A (spec L.9). **Dừng** chỉ khi
+  Owner ghi quyết định mới đổi các mục này, hoặc một finding mới cần quyết định Owner.
+- Docs phải vẫn là `e0cb5a0` (hoặc SHA mới hơn Owner pin, ghi ở tracker); nếu khác, audit lại delta nguồn trước khi sửa.
+- **Thứ tự (review `P03-RV-01` → `P03-RV-04`):** **bản tương thích** (Task 1.2a, 1.1a, 1.3a, 1.4a, 1.9a, 3.2a, 4.7a, Checkpoint E —
+  [spec L.10](spec.md#l10-ranh-giới-bản-tương-thích-và-bản-cuối-review-p03-rv-03)) làm **đầu tiên**, một mình, trên commit tài liệu Prompt 03 của Owner; Prompt 04 dừng nội bộ **một lần** ở
+  `expansion-ready-owner-action`; Owner/operator làm Task 1.2b (dọn, kích hoạt rồi liên kết Cost Center — review `P03-RV-04`, gán, mọi cổng hợp đồng `READY`); rồi tiếp tục **cùng** Prompt 04 từ P0.
+  Migration (B) của Task 1.2c chỉ viết sau khi tiếp tục và là migration **đầu tiên** của bản cuối (Task 1.2c mở đầu Phase 1); migration của
+  bản tương thích chỉ cộng thêm/nới, tương thích image `7c28e75` (review `P03-RV-02`); mọi migration của bản cuối tương thích image tương
+  thích đang chạy hoặc được H7 phục hồi (review `P03-RV-03`).
+- Dựng PostgreSQL 17 cô lập theo `test/README.md`; dựng **CSDL diễn tập có dữ liệu** ở `7c28e75` (`pnpm dev:seed` + chạy harness tạo
+  Request/ngân sách/điều chuyển/tài khoản dịch vụ/thuê bao/phân bổ/bộ chuẩn, và dữ liệu ngân sách của F62/F63/F36: phiên bản hiện hành,
+  nháp, chờ quyết định của một năm **đã kết thúc**; đề xuất đường cũ R1 và R2 của F63 (phiên bản `INITIAL` bị từ chối, đề xuất đã `RETURNED`, R2 có đúng một bản nộp lại) và một Finance trả lại thật; bản nháp của đề xuất đã rút;
+  Request `AWAITING_BUDGET`; thuê bao chưa có phòng sở hữu; `BM-09` `JOB_TITLE_CHANGE` đang chờ, điều chuyển chờ chỉ đổi chức vụ, chuyển
+  phòng tài khoản dịch vụ chờ) và lưu `pg_dump` làm mốc trước migration — tài liệu sao lưu được bảo vệ, ngoài mọi repo
+  ([spec L.5](spec.md#l5-gỡ-bộ-chuẩn-phân-bổ-chuyển-phòng-tài-khoản-dịch-vụ-và-bản-sao-lưu-p03-d06-f04-f05-f06)).
+- Trong lúc sửa chỉ chạy test focused đỏ-trước/xanh-sau; full gate chỉ ở Phase 7 (`EXEC-DEC-01`).
+
+## Tasks
+
+### Mốc tương thích — chạy trước mọi phase (review `P03-RV-01`, `P03-RV-02`, `P03-RV-03`)
+
+Một revision triển khai độc lập (**bản tương thích** — [spec L.10](spec.md#l10-ranh-giới-bản-tương-thích-và-bản-cuối-review-p03-rv-03)), làm tuần tự Task 1.2a → 1.1a → 1.3a → 1.4a → 1.9a →
+3.2a → 4.7a rồi Checkpoint E; không task nào khác của gói vào revision này. Mọi migration của nó chỉ cộng thêm/nới và giữ `7c28e75` hợp
+lệ; mọi chuyển ứng dụng khỏi đối tượng mà bản cuối thu hẹp/xóa xong trước điểm dừng.
+
+### Task 1.2a: Mốc mở rộng — cột phòng sở hữu, bảng gán, lệnh gán (F02; P03-D03 = A)
+
+- Files: `prisma/models/catalog.prisma` (`Subscription.ownerDepartmentId String?`, `SubscriptionOwnerAssignment`); migration (A)
+  `…_subscription_owner_column` (migration đầu tiên của Prompt 04; **chỉ cộng thêm** — cột NULL, FK nullable, chỉ mục, bảng gán và trigger
+  của riêng bảng gán; không trigger, CHECK hay `NOT NULL` nào trên `subscriptions`); `src/modules/catalog/subscription/*` (repo, service,
+  DTO, mapper, `subscription.http-errors.ts` — `ownerDepartmentId` bắt buộc khi khai, đọc nullable, 422
+  `SUBSCRIPTION.OWNER_DEPARTMENT_INACTIVE`); lệnh gán `src/subscription-owner-assignment-cli.ts`,
+  `src/subscription-owner-assignment-cli.module.ts`, `src/modules/catalog/subscription-owner-assignment/*` (probe schema, `SCHEMA_NOT_READY`),
+  script `ops:assign-subscription-owner` trong `package.json`, `src/operational-commands.spec.ts`, `src/module-graph.spec.ts`; preflight
+  (`src/modules/installation/migration-preflight/*`: probe schema, `SUBSCRIPTION_OWNER_TO_ASSIGN`, `SUBSCRIPTION_OWNER_UNASSIGNED`,
+  `SUBSCRIPTION_OWNER_SCHEMA_PARTIAL`); manifest ví dụ OpenAPI; test của task. Không tệp nào của task khác.
+- Depends on: Owner commit tài liệu Prompt 03 (cây `7c28e75` + tài liệu); không phụ thuộc task nào khác.
+- Acceptance: theo [spec L.3](spec.md#l3-phòng-sở-hữu-cho-thuê-bao-đã-có-p03-d03-f02) _Mốc mở rộng_ — (A) chỉ cộng thêm và runtime `7c28e75` vẫn tạo/sửa/đọc thuê bao trên schema
+  sau (A); bất biến ghi mới ở tầng ứng dụng (`subscriptionCreate` bắt buộc `ownerDepartmentId`, kiểu repo bắt buộc), đọc nullable; lệnh gán
+  theo hợp đồng L.3 (một giao dịch, Audit `OPERATOR`, mã thoát 0/2/1, đầu ra chỉ UUID, không gán hàng loạt); preflight và lệnh gán probe
+  schema trước mọi câu nhắc cột/bảng mới; preflight bản mở rộng `READY` trước (A) kèm danh sách, sau (A) kiểm kê sống `BLOCKED`
+  `SUBSCRIPTION_OWNER_UNASSIGNED` tới khi gán đủ; `migrate deploy` exit 0; `prisma migrate diff` rỗng với schema mở rộng.
+- Verify: integration `subscription-owner-expansion` (CSDL có thuê bao ở `7c28e75`: preflight `READY` + danh sách, deploy exit 0, lịch sử
+  migration sạch; sau (A): chèn và sửa thuê bao theo đúng tập cột mà `SubscriptionRepo` của `7c28e75` ghi — không có `owner_department_id` —
+  đều thành công và ID mới có trong `SUBSCRIPTION_OWNER_UNASSIGNED` của lần preflight kế; `pg_trigger` không có trigger mới nào trên
+  `subscriptions`; đọc thuê bao cũ trả `ownerDepartmentId: null`); unit + integration probe (CSDL chưa có (A): không câu nào nhắc cột/bảng
+  chưa có — đối chứng bỏ probe chỉ trong lượt đối chứng ⟹ đỏ `42703`/`42P01`; lệnh gán `SCHEMA_NOT_READY`); integration
+  `subscription-owner-assignment-cli` (mã thoát, từ chối, đầu ra chỉ UUID); e2e `subscription-http` (thiếu `ownerDepartmentId` 422
+  `VALIDATION_ERROR`; phòng không hoạt động 422 `SUBSCRIPTION.OWNER_DEPARTMENT_INACTIVE`; phòng hoạt động 201; đọc có trường); diễn tập bước
+  3 của [test matrix](test-matrix.md#diễn-tập-migration-rollout-rollback).
+
+### Task 1.1a: Bản tương thích — liên kết Cost Center → phòng, Cost Center luôn có phòng, bước kích hoạt (F01; review `P03-RV-03`, `P03-RV-04`)
+
+- Files: `prisma/models/organization.prisma` (`CostCenter.departmentId String?`, `linkedAt DateTime?`; `CostCenterDepartmentLink`,
+  `CostCenterDirectionActivation`; `Department.costCenterId` `@ignore`), migration `…_cost_center_department_link` (chỉ cộng thêm/nới — spec
+  L.10 dòng F01 và L.11: cột, CHECK `cost_centers_link_together`, chỉ mục `cost_centers_one_active_per_department`, trigger
+  `cost_centers_department_link_once`, bỏ `NOT NULL` của `departments.cost_center_id`, hàm `departments_require_unit_cost_center` nhận NULL,
+  trigger `departments_cost_center_link_forward`, `cost_centers_department_link_backward`, hai bảng của L.11 cùng trigger chỉ ghi thêm), raw SQL
+  đọc Cost Center của phòng (`department.repo.ts`, `cost-center.repo.ts`, `cost-center.service.ts`, `import-lookup.repo.ts`,
+  `migration-preflight.repo.ts`), `organization/cost-center/*` (`costCenterCreate` contract cuối, kiểu `CostCenterRepo.insert` bắt buộc
+  `departmentId`, 422 `COST_CENTER.DEPARTMENT_NOT_ACTIVE`), `organization/department/*` (`departmentCreate` contract cuối: Super Admin,
+  `hrBasis`, không `costCenterId`, 409 `DEPARTMENT.CREATION_AWAITING_ACTIVATION`; policy ở service), `src/infrastructure/http/dto/hr-basis.dto.ts`,
+  `onboarding/*` (bỏ `NO_FREE_COST_CENTER`, thêm `AWAITING_ACTIVATION`), `installation/*` và dev-seed (phòng trước, Cost Center có
+  `departmentId`; dòng kích hoạt `LOCAL_TEST` của `dev:seed`), lệnh `src/cost-center-direction-cli.ts`, `src/cost-center-direction-cli.module.ts`,
+  `src/modules/organization/cost-center-direction/*`, script `ops:cost-center-direction` trong `package.json`, `src/operational-commands.spec.ts`,
+  `src/module-graph.spec.ts`, `docs/rules/operational-commands.md`; preflight (`COST_CENTER_TO_LINK`, `COST_CENTER_UNLINKED`,
+  `COST_CENTER_LINK_MISMATCH`, `COST_CENTER_DIRECTION_NOT_ACTIVATED`); mọi chỗ suy ra Cost Center từ phòng ở `requests/*`, `budgets/*`,
+  `licensing/*`, `data-import/*` (409 `FINANCE.SETUP_INCOMPLETE` khi không có), DTO/mapper đọc phòng (`costCenter` nullable), manifest ví dụ
+  OpenAPI, test của task.
+- Depends on: Task 1.2a (migration (A) là migration đầu tiên của gói).
+- Acceptance: theo [spec L.10](spec.md#l10-ranh-giới-bản-tương-thích-và-bản-cuối-review-p03-rv-03) dòng F01 và [spec L.11](spec.md#l11-cost-center-luôn-thuộc-một-phòng-chuyển-tiếp-và-bước-kích-hoạt-review-p03-rv-04) — migration chỉ cộng thêm/nới; `7c28e75` vẫn
+  tạo phòng (gắn một Cost Center tự do của nó) và Cost Center tự do trên schema mới, dòng đó vào kiểm kê sống; hai trigger đồng bộ giữ mọi phòng
+  `7c28e75` có liên kết mới và bất biến _mọi Cost Center `ACTIVE` có phòng là cột cũ của phòng đó_; API/worker không nhắc
+  `departments.cost_center_id`; **không** đường nào của bản tương thích tạo Cost Center thiếu phòng (`costCenterCreate` contract cuối, liên kết
+  trong cùng câu chèn); `departmentCreate` contract cuối, 409 trước kích hoạt, 201 không Cost Center sau kích hoạt; lệnh
+  `ops:cost-center-direction` theo hợp đồng L.11 (probe, tách người, một giao dịch, Audit `OPERATOR`, mã thoát 0/2/1, đầu ra chỉ UUID, không suy
+  diễn hay hàng loạt); kiểm kê sống tính lại mỗi lần; đọc chịu được phòng không có Cost Center; mọi đường suy ra Cost Center mà không có ⟹ 409
+  `FINANCE.SETUP_INCOMPLETE`, 0 ghi; `prisma migrate diff` rỗng với schema bản tương thích.
+- Verify: integration `cost-center-link-compatibility` (CSDL ở `7c28e75` + migration: chèn phòng đúng tập cột `DepartmentRepo` của `7c28e75` ⟹
+  liên kết mới có ngay; chèn Cost Center đúng tập cột của `7c28e75` sau migration ⟹ có trong `COST_CENTER_UNLINKED` lần preflight kế;
+  `costCenterCreate` cho phòng có Cost Center đã ngừng ⟹ cột cũ trỏ Cost Center mới và câu đọc phòng của `7c28e75` thấy phòng; đối chứng tắt
+  trigger chỉ trong lượt đối chứng ⟹ `COST_CENTER_LINK_MISMATCH`; phòng không Cost Center dựng bằng SQL ⟹ đọc 200, gửi Request trả phí 409);
+  integration `cost-center-direction-cli` (mỗi mode: probe `SCHEMA_NOT_READY`, từ chối, tách người, chạy lại exit 2, đầu ra chỉ UUID; đua
+  `link`/`link` và `link`/`costCenterCreate` bằng `waitForLockWaiters`); e2e `departments-http`, `cost-centers-http` (409 trước kích hoạt, 201
+  sau; `costCenterCreate` thiếu `departmentId` 422 `VALIDATION_ERROR`; phòng không `ACTIVE` 422; phòng đã có Cost Center `ACTIVE` 409); diễn tập
+  bước 3; phần trên schema cuối ở bước 4, 5.
+
+### Task 1.3a: Bản tương thích — chức vụ chữ tự do trên hồ sơ; từ chối loại đã bỏ (F03, F41; review `P03-RV-03`)
+
+- Files: `prisma/models/organization.prisma` (`Employee.jobTitle String?`; `EmployeePlacement.jobTitleId` `@ignore`; `JobTitle` `@@ignore`),
+  `prisma/models/personnel.prisma` (`fromJobTitleId`, `toJobTitleId`, `TransferReview.jobTitleId` `@ignore`), migration `…_job_title_text`
+  (spec L.10 dòng F03, F41: cột, chép theo L.4, bỏ `NOT NULL` bốn cột `job_title_id`, trigger `employees_job_title_forward`,
+  `job_title_id_backfill`), `src/modules/organization/employee/*`, `employee-placement.policy.ts`, `data-import/employee-import/*`, gỡ
+  `organization/job-title/*` (năm operation `jobTitle*`), `personnel/transfer/*` (thân không còn chức vụ), `personnel/notice/*` (từ chối
+  `JOB_TITLE_CHANGE` khi tạo), preflight (`PERSONNEL_NOTICE_RETIRED_KIND_PENDING`, `DEPARTMENT_TRANSFER_TITLE_ONLY_PENDING` — cùng biểu thức
+  với migration của Task 1.3), `me.service`, dev-seed, test.
+- Depends on: Task 1.1a.
+- Acceptance: theo [spec L.10](spec.md#l10-ranh-giới-bản-tương-thích-và-bản-cuối-review-p03-rv-03) dòng F03, F41 và L.4 _Thời điểm_ — `employees.job_title` chép theo L.4; trigger đồng bộ cho dòng
+  `7c28e75` và dòng bản tương thích (mục `job_titles` theo tên chuẩn hóa); chức vụ là chữ tự do nhưng **bắt buộc** như `7c28e75`; `BM-09`
+  `JOB_TITLE_CHANGE` và điều chuyển chỉ đổi chức vụ ⟹ 422 `VALIDATION_ERROR` trước khi ghi; từ chối `BM-09`/hủy điều chuyển chờ cũ vẫn
+  được; API/worker không nhắc `job_title_id`, `job_titles`.
+- Verify: integration `job-title-text-compatibility` (ghi đúng tập cột của `7c28e75` sau migration ⟹ `employees.job_title` điền; bản tương
+  thích tạo/điều chuyển ⟹ `job_title_id` có và `7c28e75` đọc được; đối chứng tắt trigger ⟹ đỏ); e2e `employee-*`, `department-transfers`,
+  `personnel-notices` (422 đỏ trước); diễn tập bước 3, 4.
+
+### Task 1.4a: Bản tương thích — thôi dùng bộ chuẩn, phân bổ tỷ lệ, chuyển phòng tài khoản dịch vụ (F04, F05, F06, F42 phạm vi; P03-D06 = A, P03-D07 = A)
+
+- Files: `prisma/models/{catalog,finance,licensing,requests}.prisma` (bảy model `@@ignore`, `outsideStandard`/`outsideStandardReason`
+  `@ignore`); gỡ `catalog/standard-toolset/*`, `finance/cost-allocation/*`, `subscription-allocation.*`,
+  `licensing/assignment/service-account-move*`, `licenseAssignmentProposeDepartmentMove`; Request: `request-assessment.service.ts`,
+  `access-request.service.ts`, `group-submission-facts.service.ts`, `renewal-request.service.ts`, `spend-approval-view.service.ts`,
+  `request-preview.service.ts`, DTO/mapper, `test/support/request-harness.ts` (nội dung của Task 4.2 cũ); `onboarding/*` (gợi ý bộ chuẩn);
+  `personnel/transfer-review/*` (phạm vi mọi quyền cá nhân); preflight (`SERVICE_ACCOUNT_MOVE_PENDING` chặn deploy bản tương thích);
+  registry collection; gate tĩnh mới `src/contract-objects-unused.spec.ts`.
+- Depends on: Task 1.3a.
+- Acceptance: theo [spec L.10](spec.md#l10-ranh-giới-bản-tương-thích-và-bản-cuối-review-p03-rv-03) dòng F04, F05, F06 — không đường API/worker nào đọc/ghi bảy bảng và hai cột `outside_standard*`;
+  12 operation gỡ (404 như route không tồn tại); Request không còn `outsideStandard*`, `businessReason` vẫn bắt buộc; rà soát sau điều chuyển
+  phủ mọi quyền cá nhân; preflight `BLOCKED` `SERVICE_ACCOUNT_MOVE_PENDING` khi còn dòng chờ; gate tĩnh liệt kê **mọi** đối tượng sắp xóa của
+  F01, F03, F04 → F06 (bảng, cột, hàm, trigger) và khẳng định 0 tham chiếu trong `src` trừ `src/generated` và nhánh sau probe của
+  `migration-preflight`.
+- Verify: e2e inventory 12 operation 404; `access-request-preview`, `group-request-submit` (assertion cũ đỏ) → xanh; `transfer-review-open`
+  phạm vi mọi quyền; gate tĩnh đỏ khi gài một tham chiếu trong lượt đối chứng; diễn tập bước 4 (`pg_stat_user_tables`, nhật ký câu lệnh).
+
+### Task 1.9a: Bản tương thích — từ vựng enum và nullability chung (F19, F21, F27, F29, F62, F65; review `P03-RV-03`)
+
+- Files: migration `…_final_vocabulary_values` (chỉ `ALTER TYPE … ADD VALUE` — tám giá trị của spec L.10, không dùng giá trị trong cùng
+  migration, ghi _không hoàn tác_ — `DB-05`); migration `…_actor_columns_nullable` (mười cột người thực hiện của spec L.2 bỏ `NOT NULL`);
+  enum và `String?` ở `prisma/models/{requests,licensing,budgets,personnel}.prisma`; mapper/DTO đọc của `requests/*`, `budgets/*`,
+  `licensing/*`, `personnel/*` (switch toàn phần, enum phản hồi cộng thêm, trường người thực hiện nullable); lọc `DRAFT` ở mọi đọc Request.
+- Depends on: Task 1.4a.
+- Acceptance: theo [spec L.10](spec.md#l10-ranh-giới-bản-tương-thích-và-bản-cuối-review-p03-rv-03) dòng _Từ vựng_ — tập giá trị enum của bản tương thích bằng bản cuối; mọi mapper toàn phần
+  (`pnpm typecheck` bắt nhánh thiếu); Request `DRAFT` không hiện ở đọc nào (404, không liệt kê); bản tương thích không ghi giá trị mới nào.
+- Verify: integration `final-vocabulary-compatibility` (chèn bằng SQL dòng mang từng giá trị mới và cột người thực hiện NULL như bản cuối ghi
+  ⟹ danh sách/chi tiết 200, `DRAFT` ẩn; đỏ trước: lỗi đọc enum); diễn tập bước 4, 5.
+
+### Task 3.2a: Bản tương thích — guard phòng sở hữu của Assignment, 422 chốt (F20; review `P03-RV-03`)
+
+- Files: `licensing/assignment/assignment.policy.ts`, chỗ ghi Assignment duy nhất (`assignment.service.ts`/`assignment.repo.ts`),
+  `licensing.types.ts`, mapper lỗi của operation cấp (`provisioningTaskGrant`), `data-import/seat-baseline-import/*` (dòng `ERROR`), ví dụ
+  OpenAPI + manifest `test/support/openapi-example-route-codes-*`, test.
+- Depends on: Task 1.2a.
+- Acceptance: theo [spec mục K](spec.md#k-tên-chốt--mã-lỗi-cột-khóa-mã-thông-báo-26102026-prompt-03-tiếp) dòng F20 và L.10 — thuê bao đã có
+  `owner_department_id` khác `owning_department_id` của Assignment trả phí ⟹ 422 `LICENSE_ASSIGNMENT.SUBSCRIPTION_DEPARTMENT_MISMATCH`
+  **trước** khi ghi; thuê bao chưa gán phòng sở hữu và seat cá nhân `owning_department_id` NULL không kiểm; mapper dịch `23514` có
+  constraint `license_assignments_owner_department_guard` sang cùng 422; Prompt 04 xác nhận operation với tới bằng test trước khi khai ví dụ.
+- Verify: integration `assignment-owner-department-guard` (đỏ trước: Assignment lệch phòng được ghi; `provisioningTaskGrant` 422, 0 dòng
+  Assignment/tác vụ đổi; dòng nhập seat `ERROR`; trigger tạm của test cùng tên constraint giả lập (B), đối chứng tắt guard service ⟹ phản
+  hồi vẫn 422, không 500); e2e ví dụ OpenAPI khớp mã với tới được; trên (B) thật ở diễn tập bước 4.
+
+### Task 4.7a: Bản tương thích — từ chối giữ đề xuất `REVIEWED`; tách bản nháp khi rút/trả lại (F63, F36; review `P03-RV-03`)
+
+- Files: migration `…_budget_version_detached_at` (cột NULL, chưa CHECK, chưa đổi chỉ mục), `prisma/models/budgets.prisma`
+  (`detachedAt DateTime?`), `version-decision.service.ts` (bỏ nhánh `:87-95`), `proposal.service.ts` (rút/trả lại đặt `detached_at` cho bản
+  `DRAFT` trong cùng giao dịch), preflight (`BUDGET_PROPOSAL_LEGACY_RETURN_AMBIGUOUS` và danh sách R1/R2 — cùng biểu thức spec J.2), test.
+- Depends on: Task 1.9a.
+- Acceptance: theo [spec L.10](spec.md#l10-ranh-giới-bản-tương-thích-và-bản-cuối-review-p03-rv-03) dòng F63, F36 — từ khi bản tương thích chạy không còn đề xuất `RETURNED` dạng từ chối mới;
+  bản nháp của đề xuất rút/trả lại có `detached_at`; lập lại/kế tiếp sau từ chối trả 409 hiện có; `7c28e75` đọc đề xuất `REVIEWED` có phiên
+  bản bị từ chối như bình thường.
+- Verify: integration `budget-rejection-compatibility` (đỏ trước: đề xuất thành `RETURNED`) → xanh; unit preflight J.2; diễn tập bước 3
+  (dòng `RETURNED` dạng từ chối do `7c28e75` tạo trong cửa sổ được preflight liệt kê R1/R2).
+
+### Checkpoint E — dừng nội bộ `expansion-ready-owner-action`
+
+Focused của Task 1.2a, 1.1a, 1.3a, 1.4a, 1.9a, 3.2a, 4.7a xanh; `pnpm typecheck`; `prisma migrate diff` rỗng với schema bản tương thích — cũng
+là bằng chứng `@ignore`/`@@ignore` không làm Prisma Migrate bỏ đối tượng (spec L.10, **UNVERIFIED** tới bước này; không rỗng ⟹ dừng báo
+Owner, không nới gate); gate tĩnh đối tượng sắp xóa xanh; `pnpm openapi:export` hai lần trùng byte (wire thêm `ownerDepartmentId`, gỡ 17
+operation, enum phản hồi cộng thêm, `costCenter` và `…ByAppUserId` nullable, 422 F20); `pnpm check` một lượt vì Owner push đúng commit này và
+chờ CI; diễn tập bước 3 của test matrix — gồm runtime `7c28e75` thật (cây lấy bằng `git archive 7c28e75` vào thư mục tạm ngoài repo, build ở
+đó) trên CSDL sau migration của bản tương thích và runtime tương thích. Bằng chứng F01 (review `P03-RV-04`, spec L.11): ghi của runtime tương thích **trước** kích hoạt (Cost Center cho phòng có Cost Center đã ngừng; `departmentCreate` 409) được runtime `7c28e75` đọc lại sau phục hồi giả lập; Cost Center tự do runtime `7c28e75` tạo muộn có trong `COST_CENTER_UNLINKED` lần preflight kế; `activate`/`link` theo hợp đồng L.11. Prompt 04 dừng **một lần** ở `expansion-ready-owner-action`: báo danh
+sách path của mốc (để Owner commit), bằng chứng, các bản dump giữ lại (tên, SHA-256, vị trí được bảo vệ) và việc của Task 1.2b; dọn mọi container, CSDL tạm, tiến trình và cây tạm, chỉ giữ các bản dump ghi trong báo
+cáo. Agent không commit, push, deploy hay chạm máy chủ thật. Tiếp tục **cùng** Prompt 04 khi tracker ghi xong Task 1.2b.
+
+### Task 1.2b: Mốc gán — Owner/operator gán từng thuê bao (F02)
+
+- Người làm: Owner/operator, không phải agent; agent chỉ đối chiếu bằng chứng khi tiếp tục.
+- Files: không mã; bằng chứng ghi ở tracker.
+- Depends on: Checkpoint E.
+- Acceptance: theo [spec L.3](spec.md#l3-phòng-sở-hữu-cho-thuê-bao-đã-có-p03-d03-f02) _Mốc gán_ và [spec L.10](spec.md#l10-ranh-giới-bản-tương-thích-và-bản-cuối-review-p03-rv-03) _Thứ tự
+  deploy_ — **trước** deploy: trên `7c28e75` hủy mọi `service_account_moves` `PENDING` với lý do L.5 (bản tương thích không còn thao tác này);
+  commit mốc mở rộng đã push, CI xanh, đã deploy lên mọi CSDL có dữ liệu sẽ nhận bản cuối (deploy exit 0); **sau** khi H7 báo bản tương thích sẵn sàng và tracker ghi SHA image: `pnpm ops:cost-center-direction activate` (spec L.11, review `P03-RV-04`); với mỗi `COST_CENTER_UNLINKED`, Finance xác định phòng từ căn cứ có thẩm quyền (chưa có phòng hợp lệ ⟹ Super Admin tạo phòng thật bằng `departmentCreate` trước) rồi `pnpm ops:cost-center-direction link` từng Cost Center — không suy diễn, không mặc định, không tự ngừng/xóa; gán từng thuê bao theo căn cứ mua/hợp đồng đã duyệt, không suy diễn, không mặc định hàng loạt; trên bản tương thích đang chạy từ chối `BM-09` `JOB_TITLE_CHANGE` chờ và hủy điều chuyển
+  chờ chỉ đổi chức vụ với lý do L.4; ca mơ hồ J.2 (nếu có) theo ID do Owner/operator xử lý; nếu deploy mở rộng lỗi và H7 phục hồi image cũ,
+  hoặc bản mở rộng bị rollback, thuê bao image cũ tạo được lần preflight kế liệt kê và được gán như mọi ID khác; dòng chuyển phòng chờ do image
+  cũ tạo sau preflight ⟹ rollback có chủ đích về `7c28e75` (chỉ trước bước kích hoạt), hủy, deploy lại bản tương thích; `ops:preflight` của bản mở rộng `READY` — **mọi
+  cổng hợp đồng** của bản cuối đóng — trên từng CSDL **trong khi bản đang chạy là bản mở rộng**. Không có bước sửa lịch sử migration nào.
+- Verify: tracker ghi SHA commit mốc và CI run, từng CSDL đã deploy, image đang chạy (`releases/current-image`, SHA image) là image mở rộng,
+  bằng chứng kích hoạt (lượt deploy H7, SHA image), số Cost Center đã liên kết, số ID đã gán, số dòng đã hủy/từ chối theo L.4/L.5, đầu ra `READY` (chỉ ID), SHA-256 bản sao lưu của deploy; hoặc Owner ghi rằng ngoài CSDL diễn tập local không có CSDL có dữ liệu nào.
+  Agent đối chiếu ở preflight khi tiếp tục.
+
+### Phase 0 — Khung tài liệu
+
+### Task 0.1: Re-pin scope map G2–G6 và trạng thái hạng mục chủ (F60)
+
+- Files: `docs/roadmap.md` (khối `Work-item decomposition: G2` → `G6`), `docs/workspace/items/g2-*`…`g6-*/spec.md` bị ảnh hưởng.
+- Depends on: Owner dispositions đã trả lời.
+- Acceptance: mỗi scope map pin Docs `e0cb5a0`, BE revision đầu vào; khóa `US-02-07`, `US-04-08`, `US-04-10` thành `not affected`
+  (`RETIRED`); AC mới (`US-05-02` AC-12, `US-07-01` AC-18, `US-03-06` AC-21/22, `US-02-05` AC-15/16, …, và delta cuối `US-06-09` AC-20 →
+  AC-23, `US-06-10` AC-11 → AC-13, `US-06-11` AC-10, `US-06-13` AC-13) có đúng một chủ — chủ đề xuất ở impact matrix mục 9.1; `US-12-15`
+  AC-24 ghi `partial` (phát thông báo ở G5, danh mục/dashboard G8); số `Active` khớp bảng; Primary của spec chủ khớp map.
+- Verify: `pnpm rules:check` → 0 lỗi; đối chiếu tay với [impact matrix mục 9](impact-matrix.md#9-phụ-lục-delta-user-stories-72e1480--769bb64)
+  và [mục 9.1](impact-matrix.md#91-delta-user-stories-769bb64--e0cb5a0).
+
+### Checkpoint 0
+
+`pnpm rules:check` và `pnpm rules:format` xanh; chưa đổi mã.
+
+### Phase 1 — Nền schema và dữ liệu (tuần tự, một người)
+
+### Task 1.2c: Mốc thu hẹp — NOT NULL và ràng buộc phòng sở hữu (F02, F20 schema; P03-D03 = A)
+
+- Files: `prisma/models/catalog.prisma` (`ownerDepartmentId String`), `prisma/models/licensing.prisma`, migration (B)
+  `…_subscription_owner_required` (migration **đầu tiên** của bản cuối; trigger `subscriptions_owner_immutable`,
+  `license_assignments_owner_department_guard`, CHECK seat cá nhân thay `license_assignments_service_has_owning_department`), preflight
+  (`SUBSCRIPTION_OWNER_EXPANSION_REQUIRED`; probe schema và kiểm kê sống của bản cuối), mapper đọc của `catalog/subscription` (không còn null).
+- Depends on: Task 1.2b, Checkpoint 0 — viết sau khi tiếp tục Prompt 04, không trước; task đầu tiên của Phase 1 (migration (B) liền sau (A)).
+- Acceptance: theo [spec L.3](spec.md#l3-phòng-sở-hữu-cho-thuê-bao-đã-có-p03-d03-f02) _Mốc thu hẹp_ — (B) kiểm 0 thiếu và 0 xung đột **trước mọi ghi**, `RAISE` chỉ ID khi có; đủ
+  ⟹ chép phòng, Audit `SYSTEM` mỗi thuê bao, `SET NOT NULL`, guard F02/F20, CHECK seat cá nhân; áp ở lượt `migrate deploy` bình thường đầu
+  tiên; runtime mở rộng hợp lệ trên (A) + (B) — seat lệch phòng 422 `LICENSE_ASSIGNMENT.SUBSCRIPTION_DEPARTMENT_MISMATCH` từ guard của Task
+  3.2a; preflight bản cuối `BLOCKED` `SUBSCRIPTION_OWNER_EXPANSION_REQUIRED` cho CSDL chưa qua mở rộng
+  còn thuê bao, `READY` cho CSDL trống; `prisma migrate diff` rỗng với schema thu hẹp.
+- Verify: integration `subscription-owner-contract` (CSDL mở rộng đã gán đủ: deploy exit 0, NOT NULL, đủ Audit, lịch sử migration sạch; CSDL
+  dựng tới (B) bằng harness migration của test: các hình dạng ghi của runtime mở rộng — tạo thuê bao có phòng, sửa không đổi phòng, seat cá
+  nhân `owning_department_id` NULL, seat tài khoản dịch vụ cùng phòng — đều thành công, seat lệch phòng 422 (guard) và đổi phòng sở hữu bị
+  trigger từ chối, 0 ghi; CSDL gán thiếu và CSDL chưa qua mở rộng: preflight `BLOCKED` trước migration, không deploy; lưới an toàn: SQL của (B) chạy riêng
+  trong một giao dịch trên CSDL tạm của test thiếu gán ⟹ `RAISE` chỉ ID, 0 ghi; CSDL trống: cả chuỗi một lượt, lịch sử sạch); unit
+  preflight; diễn tập bước 4 → 8 của test matrix.
+
+### Task 1.1: Đảo chiều phòng ↔ Cost Center — thu hẹp (F01)
+
+- Files: `prisma/models/organization.prisma` (bỏ `Department.costCenterId`; `CostCenter.departmentId String`, `linkedAt DateTime` không null),
+  migration mới `…_cost_center_belongs_to_department`, guard tài khoản dịch vụ, preflight của bản cuối (`COST_CENTER_DIRECTION_NOT_ACTIVATED`,
+  `COST_CENTER_DIRECTION_EXPANSION_REQUIRED` `BLOCKED`); phần đọc qua liên kết mới, lệnh thủ tục và kiểm kê sống đã ở Task 1.1a.
+- Depends on: Task 1.1a, Task 1.2b, Task 1.2c.
+- Acceptance: theo [spec L.10](spec.md#l10-ranh-giới-bản-tương-thích-và-bản-cuối-review-p03-rv-03) dòng F01 và [spec L.11](spec.md#l11-cost-center-luôn-thuộc-một-phòng-chuyển-tiếp-và-bước-kích-hoạt-review-p03-rv-04) _Migration thu hẹp_ — khối `DO $$` trước mọi
+  ghi `RAISE` chỉ ID khi còn Cost Center `department_id`/`linked_at` NULL, lệch cột cũ hoặc tổ chức chưa kích hoạt; đủ ⟹ `SET NOT NULL` cho cả
+  hai, bỏ CHECK `cost_centers_link_together`, giữ `cost_centers_one_active_per_department` và `cost_centers_department_link_once`, rồi bỏ hai
+  trigger đồng bộ, `departments_unit_cost_center` và hàm, cột `departments.cost_center_id`; không chép hay suy liên kết nào; giữ hai bảng của
+  L.11; guard tài khoản dịch vụ đọc liên kết mới; `access_requests.cost_center_id` nullable có CHECK chỉ cho nháp (Task 1.6); image tương thích
+  hợp lệ trước và sau migration (tạo phòng không Cost Center, tạo Cost Center cho phòng); preflight bản cuối `BLOCKED` khi còn cổng F01; `prisma
+migrate diff` rỗng.
+- Verify: integration mới `cost-center-direction-contract` (đỏ trước: migration chưa có): CSDL tương thích đã kích hoạt và liên kết đủ ⟹ deploy
+  exit 0, `is_nullable = NO` cho `department_id`/`linked_at`, chèn Cost Center thiếu phòng `23502`; CSDL còn một Cost Center thiếu phòng hoặc chưa
+  kích hoạt ⟹ preflight `BLOCKED` chỉ ID, không deploy; SQL migration chạy riêng trong một giao dịch ⟹ `RAISE` chỉ ID, 0 ghi; `prisma migrate
+diff` rỗng; diễn tập bước 4 (image tương thích tạo phòng không Cost Center và Cost Center cho phòng sau migration), 5, 7.
+
+### Task 1.3: Chức vụ thành chữ tự do (F03, F41 schema; P03-D04 = A, P03-D05 = A)
+
+- Files: `prisma/models/organization.prisma`, `prisma/models/personnel.prisma`, migration mới, trigger `employee_placements_keep_history`,
+  preflight (`PERSONNEL_NOTICE_RETIRED_KIND_PENDING`, `DEPARTMENT_TRANSFER_TITLE_ONLY_PENDING`).
+- Depends on: Task 1.3a, Task 1.1.
+- Acceptance: theo [spec L.4](spec.md#l4-chức-vụ-và-dữ-liệu-đổi-chức-vụ-cũ-p03-d04-p03-d05-f03-f41) và L.10 — `employees.job_title` đã chép ở Task 1.3a (không chép lại); bỏ hai trigger đồng bộ; `job_title_name` chỉ đọc ở
+  `employee_placements`, `department_transfers` (`from_`/`to_`), `transfer_reviews` với trigger `history_job_title_name_frozen`; bỏ bốn cột
+  `job_title_id`, CHECK `department_transfers_something_changes_check`, bảng `job_titles`; trigger `BEFORE INSERT`
+  `personnel_notices_no_retired_kind`, `department_transfers_department_changes`; khối `DO $$ RAISE` khi còn dòng chờ của loại đã bỏ; không
+  giá trị bịa, không mất tên.
+- Verify: integration `job-title-retirement-upgrade` so tên trước/sau trên CSDL diễn tập (giai đoạn hiện hành, lịch sử, người đã nghỉ;
+  image tương thích hợp lệ trước và sau migration — diễn tập bước 4); dòng
+  mới `JOB_TITLE_CHANGE` và điều chuyển chỉ đổi chức vụ bị trigger từ chối, dòng lịch sử vẫn cập nhật được (đóng hồ sơ điều chuyển); bản
+  sao có dòng chờ ⟹ preflight `BLOCKED` chỉ ID, migration `RAISE`, 0 ghi.
+
+### Task 1.4: Gỡ schema bộ chuẩn, phân bổ tỷ lệ, chuyển phòng tài khoản dịch vụ (F04, F05, F06; P03-D06 = A)
+
+- Files: `prisma/models/{catalog,finance,licensing,requests}.prisma` (bỏ model/trường đã `@@ignore`/`@ignore` ở Task 1.4a), migration mới,
+  preflight bản cuối (`SERVICE_ACCOUNT_MOVE_PENDING`).
+- Depends on: Task 1.4a, Task 1.2c.
+- Acceptance: theo [spec L.5](spec.md#l5-gỡ-bộ-chuẩn-phân-bổ-chuyển-phòng-tài-khoản-dịch-vụ-và-bản-sao-lưu-p03-d06-f04-f05-f06) — bỏ bảy bảng, hàm/trigger của chúng và hai cột `access_requests.outside_standard*`;
+  khối `DO $$ RAISE` khi còn dòng `service_account_moves` `PENDING` (hủy trên `7c28e75` trước bản tương thích); không còn tham chiếu trong
+  `src` (đạt từ Task 1.4a, gate tĩnh); image tương thích hợp lệ trước và sau migration;
+  bản `pg_dump` trước migration là tài liệu sao lưu được bảo vệ (ngoài repo, không artifact CI; bằng chứng chỉ SHA-256, thời điểm UTC,
+  revision, tham chiếu vị trí).
+- Verify: integration upgrade xác nhận đối tượng không còn; bản sao có dòng chờ ⟹ preflight `BLOCKED` chỉ ID, migration `RAISE`, 0 ghi;
+  `git ls-files '*.dump' '*.backup' '*.sql.gz'` rỗng; `pnpm typecheck` focused.
+
+### Task 1.5: Tác vụ cấp duy nhất trong tác vụ mở; nới `hand_off_whole` (F07, F08 schema)
+
+- Files: migration mới (index, CHECK), `prisma/models/licensing.prisma`.
+- Depends on: Checkpoint 0.
+- Acceptance: `UNIQUE(assignment_id) WHERE kind='GRANT' AND status NOT IN ('COMPLETED','CLOSED_FAILED','CANCELLED')`; CHECK chỉ ràng
+  `handed_off_by` ↔ `handed_off_at`.
+- Verify: `provisioning-revocation-constraints`/`provisioning-failure-constraints` integration — sửa assertion đỏ cũ thành hành vi mới
+  (đỏ trước trên schema cũ).
+
+### Task 1.6: Enum, trạng thái cộng thêm và nháp Request (F27, F29; P03-D01 = A)
+
+- Files: `prisma/models/requests.prisma`, `prisma/models/licensing.prisma`; migration cấu trúc (giá trị enum đã ở migration giá trị của bản
+  tương thích — Task 1.9a).
+- Depends on: Task 1.1, Task 1.9a.
+- Acceptance: dùng `AccessRequestState.DRAFT`, `AccessRequestCancelCause.BENEFICIARY_TRANSFERRED`, nguyên nhân dòng nhóm, lý do hủy tác vụ,
+  `RevocationSource.POST_SETUP_REVIEW` (có từ Task 1.9a); theo [spec L.1](spec.md#l1-nháp-request-trả-phí-p03-d01-f27) — CHECK `access_requests_cost_center_unless_draft`,
+  `access_requests_submitted_unless_draft` (`submitted_at` NULL chỉ khi `DRAFT`), trigger `access_requests_draft_has_no_work`.
+- Verify: integration constraint mới: nháp không Cost Center, không `submitted_at` được; trạng thái khác bị CHECK từ chối; bước, kiểm tra,
+  khoản cam kết, mục lô cho Request `DRAFT` bị trigger từ chối.
+
+### Task 1.7: Schema vòng đời ngân sách năm (F62, F63, F65, F36, F66, F67)
+
+Thiết kế chốt ở [spec mục J](spec.md#j-thiết-kế-đã-chốt-cho-f63-f65-f66-26102026-prompt-03-tiếp); giá trị enum (`BudgetVersionState` _hết
+hiệu lực_, `BudgetProposalState` _đóng — hết năm tài chính_, `BudgetCheckTrigger` `FINANCE_OUTCOME_WHILE_WAITING`) đã ở migration giá trị của
+bản tương thích (Task 1.9a), cột `detached_at` ở Task 4.7a; ở đây một migration cấu trúc:
+
+- Files: `prisma/models/{budgets,requests,notifications}.prisma`; migration `…_budget_lifecycle_structure` — cột, ràng buộc, đối soát dữ liệu cũ, bảng lịch sử,
+  thông báo giữ chờ; `migration-preflight.types.ts`, `migration-preflight.repo.ts`, `migration-preflight-judgement.ts`,
+  `migration-preflight-report.ts` ở `src/modules/installation/migration-preflight/` (blocker và correction mới).
+- Depends on: Task 1.1 (Cost Center → phòng cho kiểm trưởng phòng và thông báo giữ chờ theo phòng), Task 1.9a, Task 4.7a.
+- Acceptance:
+  - F62: cột cờ _chưa từng hiện hành_ + mốc đóng (CHECK: chỉ khi _hết hiệu lực_; `budget_versions_sent_check` nhận bản _hết hiệu lực_ chưa
+    từng gửi); nhánh _đóng_ của `budget_proposals_state_check`.
+  - F63 (J.1): `budget_proposals.successor_of_proposal_id` (FK `RESTRICT`, `UNIQUE`), `succeeded_at`, CHECK `budget_proposals_succession_check`,
+    trigger `budget_proposals_succession_guard`, constraint trigger `budget_proposals_succession_consistent`, `budget_proposals_open_key` mới;
+    `budget_versions.rejected_predecessor_id` (FK `RESTRICT`, `UNIQUE`) + trigger `budget_versions_rejected_predecessor_guard`.
+  - F63 (J.2): khối `DO $$` chặn ca mơ hồ (`RAISE EXCEPTION`, liệt kê ID, không ghi), đối soát R1/R2 qua bảng tạm `ON COMMIT DROP`, Audit
+    `SYSTEM` `BUDGET_PROPOSAL.LEGACY_REJECTION_RECONCILED` trước khi đổi dòng, rồi mới tạo ràng buộc/trigger/chỉ mục mới; `ops:preflight`
+    blocker `BUDGET_PROPOSAL_LEGACY_RETURN_AMBIGUOUS` (chỉ ID) và correction R1/R2 — cùng biểu thức với migration.
+  - F36: CHECK của cột _tách khỏi đề xuất_ (cột có từ Task 4.7a) + `budget_versions_in_flight_key` loại bản tách; backfill tất định bản `DRAFT`
+    của đề xuất `WITHDRAWN`/`RETURNED` chưa có `detached_at` (sau đối soát J.2: bản nháp của đề xuất trở lại `REVIEWED` không tách).
+  - F66 (J.4): bảng `budget_version_history`, enum `BudgetVersionHistoryKind`, `UNIQUE (version_id, seq)`, CHECK hình dạng/kích thước, trigger
+    chặn `UPDATE`/`DELETE`/`TRUNCATE`; không backfill.
+  - F67: bảng `held_department_notifications` của capability `notifications` (`prisma/models/notifications.prisma`): `id`, `organization_id`, `department_id` (FK `RESTRICT`), `code`, `subject_type`, `subject_id`, `params` JSONB, `event_key` (`UNIQUE`), `held_at`, `delivered_at` NULL, `delivered_to_employee_id` NULL; CHECK `delivered_at` ⟺ `delivered_to_employee_id` (`T-11`).
+  - Tên migration lớn hơn migration cuối đã merge (F51); image tương thích hợp lệ trước và sau migration (spec L.10, diễn tập bước 4).
+- Verify: integration `budget-lifecycle-upgrade` trên CSDL diễn tập (đỏ trước: cột/trạng thái chưa có) → xanh; integration
+  `budget-proposal-succession-constraints` (CHECK/trigger/`UNIQUE` từ chối từng ca sai bằng SQL trực tiếp); integration
+  `budget-legacy-return-reconciliation` (R1, R2, mỗi ca A, Finance trả lại thật, 0 ghi dở khi chặn); unit `migration-preflight-judgement`;
+  `budget-version-history-constraints` (chỉ ghi thêm); `prisma migrate diff` rỗng.
+
+### Task 1.8: Phiếu thủ tục và người thực hiện là phiếu (F19 schema; P03-D02 = A)
+
+- Files: `prisma/models/personnel.prisma` (`SuperAdminEventTicket`, enum `SuperAdminEventMode`, cột `…_by_ticket_id`), migration mới.
+- Depends on: Task 1.3 (cùng bảng điều chuyển và rà soát).
+- Acceptance: theo [spec L.2](spec.md#l2-thủ-tục-có-kiểm-soát-khi-super-admin-là-đối-tượng-p03-d02-f19) — bảng `super_admin_event_tickets` (`UNIQUE (organization_id, ticket_ref)`, CHECK môi
+  trường, trigger chặn `UPDATE`/`DELETE`/`TRUNCATE`); mười cột người thực hiện có cột anh em `…_by_ticket_id` (FK `RESTRICT`) với CHECK
+  _đúng một_ (cột NOT NULL cũ) hoặc _tối đa một_ (cột nullable cũ); CHECK trạng thái/mốc gắn với người thực hiện đổi sang _đúng một trong
+  hai cột_; không backfill.
+- Verify: integration `super-admin-event-constraints` (SQL trực tiếp: dòng có cả hai cột hoặc không cột nào bị từ chối; phiếu trùng
+  `ticket_ref` bị 23505; sửa/xóa phiếu bị trigger từ chối; dòng cũ hợp lệ sau migration); `prisma migrate diff` rỗng.
+
+### Checkpoint 1
+
+Diễn tập (theo [test matrix](test-matrix.md#diễn-tập-migration-rollout-rollback), bước 4 → 8): image tương thích qua **từng** migration của
+bản cuối (bước 4), phục hồi H7 giả lập ở bốn điểm lỗi (bước 5), gate đồng thuận schema bản tương thích ↔ bản cuối, rồi khôi phục **mốc đã
+gán** của Checkpoint E →
+`pnpm ops:preflight` (`READY`) → `pnpm prisma migrate deploy` (exit 0 ở lượt đầu) → `pnpm ops:db-roles reconcile` + `verify` →
+`pnpm ops:inspect`; lịch sử migration sạch; các ca chặn (bỏ qua mở rộng, gán thiếu, Cost Center chưa liên kết hoặc chưa kích hoạt — F01, F63 ca A, dòng chờ) `BLOCKED` trước migration; CSDL
+trống một lượt;
+`prisma migrate diff` rỗng; integration focused của Phase 1 xanh. Gate tên migration mới (Task 6.3) áp cho các migration này.
+
+### Phase 2 — Tổ chức, danh tính, khởi tạo
+
+### Task 2.1: Lệnh cài đặt và `ops:inspect` (F09)
+
+- Files: `src/modules/installation/installation.service.ts`, `installation.input.ts`, `inspect/inspection-facts.ts`, test cài đặt.
+- Depends on: Checkpoint 1.
+- Acceptance: tập bản ghi `QĐ-87f`(1); Audit _ngoại lệ cài đặt_; chạy lại thoát; inspect nhận tập cũ và mới.
+- Verify: `installation.service.spec.ts`, `installation.integration-spec.ts` đỏ trước → xanh.
+
+### Task 2.2: Thẩm quyền và căn cứ của cơ cấu tổ chức (F10, F13, F16; F01 phía API)
+
+- Files: `src/modules/organization/department/*`, `project/*`, `cost-center/*`, policy mới mỗi capability, DTO `hrBasis`, operation chỉ
+  định/hủy người kế nhiệm.
+- Depends on: Task 2.1.
+- Acceptance: Super Admin ghi kèm căn cứ; IT Admin 403; thiếu căn cứ 422; policy ở service; Finance ngừng Cost Center có điều kiện nghĩa vụ; `costCenterCreate` và `departmentCreate` đã ở contract cuối từ Task 1.1a (spec L.11) — task này bỏ cổng kích hoạt khỏi `departmentCreate` của bản cuối (mã bản cuối không đọc bảng kích hoạt) và làm các ghi tổ chức còn lại; `departmentList`/`departmentGet` trả `costCenter` nullable + cảnh báo _cấu hình tài chính chưa hoàn tất_ (F01 wire).
+- Verify: `departments-http`, `cost-center-*` integration đỏ trước (Super Admin 403 hiện tại) → xanh; test policy service.
+
+### Task 2.3: Ngừng phòng và checklist bước 1 (F14, F15; F04 phía khởi tạo)
+
+- Files: `department.service.ts`, `department.errors.ts`, `src/modules/onboarding/*`.
+- Depends on: Task 1.2c, Task 2.2.
+- Acceptance: bốn nhóm chặn có biên; khoản mua vĩnh viễn không còn Assignment không chặn; cảnh báo `MISSING_COST_CENTER`; bỏ `AWAITING_ACTIVATION` của bản tương thích (`NO_FREE_COST_CENTER` đã bỏ ở Task 1.1a), gợi ý bộ chuẩn; Super Admin đọc checklist.
+- Verify: integration ngừng phòng còn thuê bao có nghĩa vụ ⟹ 409; `onboarding.service.spec.ts` đỏ trước → xanh.
+
+### Task 2.4: Hồ sơ Employee, import, chức vụ chữ tự do (F03, F11)
+
+- Files: `src/modules/organization/employee/*`, `employee-placement.policy.ts`, `src/modules/data-import/employee-import/*`, gỡ
+  `job-title/*`, `me.service`, dev-seed.
+- Depends on: Task 1.3, Task 2.2.
+- Acceptance: Super Admin sửa trường chính thức (gồm chức vụ) kèm căn cứ, từ chối hồ sơ của chính mình (403
+  `EMPLOYEE.SELF_CHANGE_FORBIDDEN`); service hồ sơ nhận actor `USER | OPERATOR` (đính chính qua thủ tục — spec L.2); import thiếu chức
+  vụ không lỗi;
+  `jobTitle*` đã gỡ ở Task 1.3a; chức vụ thôi bắt buộc (bản tương thích còn giữ bắt buộc); `DEPARTMENT_COST_CENTER_INACTIVE` bỏ khỏi nhận
+  người.
+- Verify: `employee-maintenance-http`, `employee-imports-http`, `employee-row.validator.spec.ts` đỏ trước → xanh.
+
+### Task 2.5: Phạm vi đọc và thông báo bù (F12, F17)
+
+- Files: `department-query.service.ts`, DTO đọc tối thiểu, `src/modules/notifications/inbox/inbox.policy.ts` (mã F17 chốt ở spec K), nơi ghi hồ sơ/sự
+  kiện.
+- Depends on: Task 2.2, Task 2.4.
+- Acceptance: Super Admin đọc đầy đủ; IT Admin chỉ phòng được giao + projection tối thiểu; thông báo theo spec B trong cùng giao dịch.
+- Verify: integration đọc theo vai; integration thông báo hồ sơ mới tới trưởng phòng + IT Admin phụ trách (`US-02-02` AC-17).
+
+### Task 2.6: `P28-05` và Super Admin là đối tượng trong ứng dụng (F18, F19)
+
+- Files: `src/modules/identity-access/recovery/successor-enrolment.service.ts`, policy hồ sơ của `organization/employee`.
+- Depends on: Task 2.4.
+- Acceptance: lời mời `REASSIGN` tới `loginEmail`; đổi email công việc không đổi đích token đang hiệu lực; Super Admin sửa hồ sơ của chính
+  mình ⟹ 403 `EMPLOYEE.SELF_CHANGE_FORBIDDEN` (mô tả lỗi chỉ tới thủ tục). Lệnh thủ tục ở Task 5.5 (cần Task 1.8, 5.1); `REASSIGN` không đổi.
+- Verify: `super-admin-recovery.integration-spec.ts` ca đổi email công việc (đỏ trước) → xanh; e2e Super Admin sửa hồ sơ của mình ⟹ 403.
+
+### Checkpoint 2
+
+Focused unit + integration của `organization`, `installation`, `onboarding`, `identity-access/recovery`, `data-import/employee-import`
+xanh; `pnpm typecheck` xanh.
+
+### Phase 3 — Danh mục và license
+
+### Task 3.1: Thuê bao theo phòng sở hữu; gỡ API bộ chuẩn và phân bổ (F02, F04, F05, F23, F26)
+
+- Files: `src/modules/catalog/subscription/*`, `license-key.service.ts` (gỡ `catalog/standard-toolset/*`, `finance/cost-allocation/*`,
+  `subscription-allocation.*` và mục registry đã ở Task 1.4a).
+- Depends on: Checkpoint 2.
+- Acceptance: `ownerDepartmentId` bắt buộc khi khai (có từ Task 1.2a); PATCH không đổi phòng sở hữu; ứng dụng `RETIRED` bị từ chối; PATCH tạo/tăng/kéo dài
+  nghĩa vụ khi phòng sở hữu chưa có Cost Center ⟹ 409 `FINANCE.SETUP_INCOMPLETE` theo [spec L.7](spec.md#l7-patch-thuê-bao-khi-phòng-chưa-có-cost-center-p03-d09-f26) (bốn kiểu; sửa khác
+  được); operation bộ chuẩn/phân bổ đã gỡ ở Task 1.4a.
+- Verify: `subscription-http`, `license-key` integration đỏ trước → xanh.
+
+### Task 3.2: Assignment, đích cấp, `G1`, bước 4, read model (F20, F21, F22)
+
+- Files: `src/modules/licensing/provisioning/{provisioning.service,provisioning-holder.service}.ts`, `licensing/assignment/*`,
+  `data-import/seat-baseline-import/*`, `department-tools.service.ts`, `assignment.repo.ts`.
+- Depends on: Task 3.1, Task 3.2a.
+- Acceptance: bất biến phòng sở hữu (guard + 422 có từ Task 3.2a); đích cấp chỉ thuê bao phòng Request; read model theo phòng sở hữu, nhãn `K1`; bước 4 ghi phòng
+  sở hữu và mở rà soát sau khởi tạo khi chốt (dữ liệu cho Phase 5).
+- Verify: `provisioning-grant-http`, `department-tools-http`, `seat-baseline-*` integration đỏ trước → xanh.
+
+### Task 3.3: Kênh thủ công, `SoD-5`, thứ tự khóa (F08, F24, F25; F13 phía license)
+
+- Files: `provisioning.dto.ts`, `provisioning-decision.service.ts`, `provisioning-task.repo.ts`, `provisioning-task-frame.service.ts`,
+  `identity-access.service.ts` (facade nhận `tx`), cổng cấp Request.
+- Depends on: Task 1.5.
+- Acceptance: chuyển làm tay không bằng chứng, giữ lỗi gần nhất; hoàn tất `MANUAL` theo từng kiểu cấp đòi bằng chứng; đếm IT Admin
+  trong giao dịch + thông báo Super Admin; một thứ tự khóa (test barrier tái hiện trước; không tái hiện ⟹ ghi `aligned` kèm bằng chứng);
+  vai IT Admin kiểm ở policy service của quyết định tác vụ, không chỉ guard (F13).
+- Verify: `provisioning-decision-http` (assertion cũ đỏ) → xanh; test đua có barrier `test/support/lock-wait.ts`.
+
+### Checkpoint 3
+
+Focused `catalog`, `licensing`, `data-import/seat-baseline-import` xanh; `pnpm typecheck` xanh.
+
+### Phase 4 — Request và ngân sách
+
+### Task 4.1: Cổng cấu hình tài chính và nháp; Super Admin không gửi (F27, F30)
+
+- Files: `src/modules/requests/{access-request,group-request,delegated-request,service-account-request,renewal-request,spend}/*`,
+  `src/modules/budgets/budget/{proposal,version,budget-support}.service.ts`, mã lỗi mới; controller/DTO nháp mới ở
+  `requests/access-request`, gate `src/api-collection-contract.spec.ts` (collection `accessRequestDraftList`), manifest ví dụ OpenAPI.
+- Depends on: Task 1.1, Task 1.6, Checkpoint 3.
+- Acceptance: 409 `FINANCE.SETUP_INCOMPLETE` trước kiểm tra ngân sách trên mọi đường liệt kê ở spec F; nháp theo [spec L.1](spec.md#l1-nháp-request-trả-phí-p03-d01-f27)
+  — `accessRequestDraftSave`, `accessRequestDraftList`, `accessRequestDraftSubmit`, `accessRequestDraftDelete` (quyền ở service; 404 với
+  nháp không phải của mình; 409 `ACCESS_REQUEST.NOT_DRAFT`; trình chạy lại mọi cổng; nháp bị xóa khi người tạo nghỉ việc); nội bộ không
+  phí đi qua; Super Admin 403.
+- Verify: integration mới `finance-setup-gate` đỏ trước → xanh; không vào `KPI-2` (`access-request-timings`); e2e bốn operation nháp
+  (mã, trang, chỉ của mình).
+
+### Task 4.2: Gỡ _ngoài bộ chuẩn_ khỏi Request (F04)
+
+- Files: phần gỡ đã ở Task 1.4a (bản tương thích); ở đây chỉ kiểm lại sau Task 4.1.
+- Depends on: Task 1.4a, Task 4.1.
+- Acceptance: nháp, cổng tài chính và màn duyệt chi mới không đưa lại `outsideStandard*`; `businessReason` vẫn bắt buộc.
+- Verify: e2e inventory OpenAPI không có `outsideStandard*`; `access-request-preview`, `group-request-submit` integration xanh.
+
+### Task 4.3: Điều chuyển với Request trả phí (F28, F29 phía Request; F13 phía Request)
+
+- Files: `src/modules/requests/reassignment/*`, `access-request/departure-cancellation.service.ts`, `cancellation.*`,
+  `group-request/group-line-closure.*`, `request-end.service.ts`.
+- Depends on: Task 1.6.
+- Acceptance: chỉ Request nội bộ đổi bước nhu cầu; trigger đổi trưởng phòng theo `department_id`; IT Admin đóng phần chưa cấp xong với
+  `BENEFICIARY_TRANSFERRED` (policy ở service), chỉ giải phóng phần chưa phát sinh chi; `DepartureCancellationService` và
+  `GroupLineClosureService` tự kiểm vai, không dựa vào `@RequireRoles` của controller (F13).
+- Verify: `step-reassignment.integration-spec.ts` ca trả phí (đỏ trước) → xanh; integration đóng điều chuyển.
+
+### Task 4.4: Đồng thời và `SoD-8` (F31, F32)
+
+- Files: `src/modules/requests/spend/{spend-decision,budget-check,finance-review}.service.ts`, `spend-batch*.service.ts`,
+  `src/modules/budgets/budget/commitment.repo.ts`.
+- Depends on: Task 4.1.
+- Acceptance: khóa (Cost Center, năm) quanh kiểm tra + ghi cam kết; `SoD-8` 409.
+- Verify: integration đua có barrier hai Request cùng Cost Center/năm (đỏ trước) → xanh; integration `SoD-8`.
+
+### Task 4.5: Ngân sách và các lỗi runtime (F33, F34, F36, F37, F38, F39)
+
+- Files: `finance-review.policy.ts`, `spend-budget.listener.ts`, `pricing.policy.ts`, `version.service.ts`, `version.repo.ts`,
+  `proposal.service.ts`, `version-line.service.ts`, `budget.http-errors.ts`, `subscription-lookup.service.ts`, `subscription.repo.ts`.
+- Depends on: Task 4.1, Task 1.7.
+- Acceptance: F33 theo spec F (P03-D08 đóng theo nguồn: `INSUFFICIENT_BUDGET` + `NO_ACTIVE_BUDGET` khi có trưởng phòng; kiểm lại theo kết
+  cục, không theo mã); nguồn giá theo [spec L.8](spec.md#l8-nguồn-giá-của-request-p03-d11-f38) (`findPricedOfPlan` lọc phòng của Request); giá 0 ⟹ chưa đủ dữ liệu
+  giá; bản nháp của đề xuất rút/trả về **tách** (giữ `DRAFT`, chỉ đọc, ngoài ràng
+  buộc đang làm) trong cùng giao dịch — không `CANCELLED`, không xóa (F36, `QĐ-91a`); ba đường 500 thành 4xx theo spec K (`BUDGET.REVISION_REASON_REQUIRED`, `BUDGET.PLAN_NOT_FOUND`,
+  `CONCURRENT_CHANGE`); va chạm số phiên bản 409 `BUDGET.VERSION_NUMBER_TAKEN`.
+- Verify: integration tái hiện từng 500, bản nháp kẹt và `INSUFFICIENT_BUDGET` bị từ chối _cần sửa ngân sách_ (đỏ trước) → xanh.
+
+### Task 4.6: Đóng cuối năm tài chính (F62; F13 phía `budgets`)
+
+- Files: `src/modules/budgets/budget/{budget.policy,version.service,version-line.service,line-import.service,proposal.service,
+version-decision.service,budget-view.service,budget-facts.repo,version.repo,proposal.repo}.ts`, sweeper mới
+  `src/modules/budgets/budget/year-end.sweeper.ts` + service, `budgets.module.ts`.
+- Depends on: Task 1.7, Task 4.4 (khóa (Cost Center, năm)).
+- Acceptance: theo spec mục I _Đóng cuối năm_; mọi thao tác ghi trên phiên bản/đề xuất của năm đã kết thúc ⟹ `BUDGET.YEAR_ENDED` trước
+  khi sweeper chạy; chạy lại không đổi; Audit `SYSTEM`; view đọc ngân sách đối chiếu; vai `FINANCE`/Người duyệt chi kiểm ở policy service
+  (F13). Sweeper đăng ký như sweeper hiện có (P03-D12 A).
+- Verify: integration `budget-year-end` (đỏ trước: quyết định phiên bản năm đã kết thúc thành `APPROVED`) → xanh; ca đua sweeper ↔ quyết
+  định bằng `waitForLockWaiters` (luật F59); ca chạy lại.
+
+### Task 4.7: Phiên bản tiếp theo sau khi bị từ chối; đề xuất kế tiếp; phòng chưa có trưởng phòng (F63, F64)
+
+- Files: `version-decision.service.ts`, `version.service.ts`, `proposal.service.ts`, `budget.policy.ts`, `proposal.repo.ts`,
+  `version.repo.ts` (phiên bản mới nhất lập từ một đề xuất), `budget.dto.ts`, mapper/`budget.http-errors.ts`, `budget-proposals.controller.ts`,
+  `budget-versions.controller.ts` (mô tả OpenAPI), manifest ví dụ OpenAPI.
+- Depends on: Task 1.7, Task 2.2 (trưởng phòng theo Super Admin), Task 4.4 (khóa (Cost Center, năm)), Task 4.5.
+- Acceptance: theo [spec J.1](spec.md#j1-liên-kết-kế-tiếp-của-đề-xuất-f63) — từ chối giữ đề xuất `REVIEWED`; `createFromProposal` nhận đề xuất
+  `REVIEWED` có phiên bản mới nhất `REJECTED` và chưa có kế tiếp, đặt `rejectedPredecessorId`; `submit` tự nối đề xuất mới làm kế tiếp khi có đề
+  xuất `REVIEWED` như vậy, còn lại 409 `BUDGET.PROPOSAL_ALREADY_OPEN`; _trả lại_ đề xuất đã dùng bị từ chối; wire thêm `successorOfProposalId`,
+  `successorProposalId`, `succeededAt`, `rejectedPredecessorId`; F64: phiên bản sửa đổi bị từ chối 409 `BUDGET.DEPARTMENT_HAS_NO_HEAD` khi phòng chưa có trưởng phòng, phiên bản
+  đã tạo tiếp tục; quyền ở policy service (F13).
+- Verify: integration `budget-version-successor`, `budget-proposal-succession` (gồm đua kế tiếp ↔ lập lại từ cùng đề xuất, hai thứ tự, và hai kế
+  tiếp cùng lúc, bằng `waitForLockWaiters`), `budget-revision-no-head` (đỏ trước: đề xuất thành `RETURNED`; đề xuất mới bị
+  `BUDGET.PROPOSAL_ALREADY_OPEN`; sửa đổi tạo được khi không có trưởng phòng) → xanh; e2e contract trường mới.
+
+### Task 4.8: Request chờ phiên bản — `financeReviewComplete` (F65; F32 phía đường chờ)
+
+- Files: `spend-budget.listener.ts` (bỏ `reopenReview` khi từ chối/yêu cầu sửa/hết hiệu lực), `spend-routing.service.ts`,
+  `finance-review.service.ts`, `finance-review.policy.ts`, `finance-reviews.controller.ts`, `spend.errors.ts`, `spend.http-errors.ts`,
+  `spend-step.repo.ts`, `spend-request.repo.ts`, `budget-check.repo.ts` (trigger mới), manifest ví dụ OpenAPI.
+- Depends on: Task 1.7, Task 4.4 (`SoD-8`), Task 4.6, Task 4.7.
+- Acceptance: theo [spec J.3](spec.md#j3-finance-xử-lý-request-đang-chờ-phiên-bản-f65) — Request giữ `AWAITING_BUDGET` khi phiên bản bị từ chối,
+  yêu cầu sửa hoặc hết hiệu lực; `financeReviewComplete` trên Request `AWAITING_BUDGET` không có bước mở: `RETURN_TO_HEAD`/`ASSESSED` mở và hoàn
+  tất bước `FINANCE_REVIEW` trong cùng giao dịch, `ASSESSED` chạy lại kiểm tra (`FINANCE_OUTCOME_WHILE_WAITING`) và mã dữ liệu ⟹ về hàng đợi,
+  `NEEDS_BUDGET` ⟹ 409 `SPEND.ALREADY_AWAITING_BUDGET`; 403 `SPEND.NOT_FINANCE`, `SPEND.OWN_REQUEST` (403 cả ở `SpendReviewRefusedError`);
+  409 `SPEND.REVIEW_NOT_OPEN`, `SPEND.REVIEWER_IS_APPROVER`; lặp sau thành công ⟹ 409, không bản ghi thứ hai; không operation mới.
+- Verify: integration `spend-awaiting-budget` (đỏ trước: Request thành `AWAITING_FINANCE_REVIEW`; Finance không có thao tác) → xanh, gồm đua
+  bằng `waitForLockWaiters` (hai Finance; Finance ↔ duyệt phiên bản; Finance ↔ rút); e2e `finance-reviews` cho từng status/mã; OpenAPI ví dụ
+  khớp mã với tới được.
+
+### Task 4.9: Thông báo vòng ngân sách và vòng Finance–trưởng phòng (F67)
+
+- Files: `src/modules/notifications/{notifications.types,inbox/inbox.policy}.ts`, nơi phát thông báo ở `budgets/budget/*`,
+  `requests/spend/*`, bộ chiếu `requests/status/status-rules.*.ts`, nơi gán trưởng phòng `organization/department` (giao thông báo giữ
+  chờ). Phân chia cố định: dòng của Request (41, 47, 48) đi qua bộ chiếu trạng thái từ sự kiện audit như các thông báo Request hiện có;
+  dòng của đề xuất/phiên bản (18, 40, 52 → 55) gọi `notifyInApp` trực tiếp trong giao dịch của `budgets/budget` (capability này không có
+  bộ chiếu). Không đổi OpenAPI (`code` của hộp thông báo là chuỗi).
+- Depends on: Task 4.6, Task 4.7, Task 4.8, Task 2.2 (Task 4.10 độc lập).
+- Acceptance: các dòng 18, 40, 41, 47, 48, 52 → 55 theo spec mục I — đúng người nhận, cùng giao dịch, không số tiền; dòng 53 giữ chờ
+  tới trưởng phòng đầu tiên; dòng 55 không gửi Super Admin thêm; không mã ngoài bảng.
+- Verify: integration theo `US-12-15` AC-24 và từng dòng (đỏ trước: không có thông báo) → xanh; unit `inbox.policy` cho mã mới.
+
+### Task 4.10: Lịch sử sửa phiên bản (F66)
+
+- Files: `budget-support.service.ts` (`budgetAuditEvent` nhận `before`), `version.service.ts`, `version-line.service.ts`,
+  `line-import.service.ts`, repo mới `version-history.repo.ts`, service đọc mới `version-history.service.ts`, `budget-versions.controller.ts`
+  (route `budgetVersionHistoryList`), `budget.dto.ts` (`BudgetVersionHistoryPageResponseDto`), `budget.http-errors.ts`, gate
+  `src/api-collection-contract.spec.ts` (đăng ký collection), manifest ví dụ OpenAPI.
+- Depends on: Task 1.7, Task 4.6 (khóa năm), Task 4.7.
+- Acceptance: theo [spec J.4](spec.md#j4-lịch-sử-sửa-phiên-bản-f66) — mỗi sửa số/dòng/thêm/nhập/dời khoảng ghi Audit trước/sau thật **và** một
+  dòng lịch sử trong cùng giao dịch, `seq` liên tục dưới khóa phiên bản; `GET /budget-versions/{id}/history` theo trang (`pageSize` ≤ 100,
+  `seq` giảm dần), chỉ Finance và người quyết phiên bản (policy service), 403 `AUTHORIZATION.FORBIDDEN`, 404 `BUDGET.VERSION_NOT_FOUND`, 422
+  `VALIDATION_ERROR`; DTO không có vai/phiên/`correlationId`/IP; không đọc `audit_events`.
+- Verify: integration `budget-version-history` (đỏ trước: không có bảng/route; Audit `before` null) → xanh; ca giao dịch lỗi giữa chừng bằng
+  trigger tạm của test trên `audit_events` (0 dòng lịch sử, phiên bản không đổi; trigger bỏ ngay sau ca); e2e quyền, trang, thứ tự, khóa JSON.
+
+### Checkpoint 4
+
+Focused `requests`, `budgets`, `notifications`, `installation/migration-preflight` xanh; `pnpm typecheck` xanh.
+
+### Phase 5 — Nhân sự
+
+### Task 5.1: Actor, căn cứ, tự thao tác của sự kiện và `BM-09` (F40, F45, F19 phía sự kiện; F12, F13, F17 phía nhân sự)
+
+- Files: `src/modules/personnel/{transfer,leave,offboarding,notice}/*`, `personnel-self-action.policy.ts`, `transfer-guard.service.ts`,
+  `notice-query.service.ts`, `notice-overdue.service.ts`, `transfer-review-overdue.service.ts`, `role-duties.hook.ts`.
+- Depends on: Checkpoint 4.
+- Acceptance: Super Admin ghi/xử lý; IT Admin 403 ghi, đọc tối thiểu — projection không `grounds`, không bản ghi xác minh, chỉ phòng
+  được giao (F12); Super Admin về chính mình 403 `PERSONNEL.SELF_CHANGE_FORBIDDEN`; service sự kiện/`BM-09` nhận `PersonnelActor = USER |
+OPERATOR` — policy chỉ nhận `OPERATOR` khi đối tượng giữ `SUPER_ADMIN`, controller chỉ dựng `USER`, DTO đọc có `…ByAppUserId` nullable
+  và `…ByProcedure` (spec L.2); vai kiểm ở policy service (F13); bỏ `selfExecuted` của sự kiện; bản ghi xác minh chỉ
+  ở đường `BM-09`; thông báo bù của sự kiện theo spec B trong cùng giao dịch (F17: nhân viên + trưởng phòng liên quan, `BM-09` mới/quá
+  hạn → Super Admin, nghỉ đột ngột → Super Admin + IT Admin phụ trách, người giữ vai rời đi → Super Admin, hạn rà soát → trưởng phòng mới).
+- Verify: e2e `department-transfers`, `long-leaves`, `offboarding-cases`, `personnel-notices` (assertion cũ đỏ) → xanh.
+
+### Task 5.2: Chức vụ không là sự kiện; điều chuyển vào phòng chưa có Cost Center (F41, F44)
+
+- Files: `transfer.dto.ts`, `transfer.service.ts`, `transfer.policy.ts`, `notice.*`, `employee-placement.policy.ts`.
+- Depends on: Task 1.3a, Task 1.3, Task 5.1.
+- Acceptance: điều chuyển chỉ đổi phòng; `BM-09` bốn loại (từ chối loại đã bỏ có từ Task 1.3a); điều chuyển vào phòng chưa có Cost Center được ghi.
+- Verify: `department-transfer-record` (assertion title-only đỏ) → xanh; integration phòng chưa có Cost Center.
+
+### Task 5.3: Rà soát sau điều chuyển, `STILL_NEEDED`, rà soát sau khởi tạo, tài khoản dịch vụ (F06, F42, F43, F21 phía rà soát, F29 phía rà soát, F04 phía rà soát)
+
+- Files: `src/modules/personnel/transfer-review/*`, `transfer-closure.service.ts`, hook thu hồi (gỡ
+  `licensing/assignment/service-account-move*` và phạm vi _mọi quyền cá nhân_ đã ở Task 1.4a).
+- Depends on: Task 3.2, Task 4.3, Task 5.2.
+- Acceptance: mọi quyền cá nhân; danh sách phần Request trả phí chưa cấp xong; `STILL_NEEDED` theo spec G; rà soát sau khởi tạo do
+  trưởng phòng của người giữ; đóng hồ sơ điều chuyển chặn khi còn phần chưa đóng; chuyển phòng tài khoản dịch vụ đã gỡ (Task 1.4a).
+- Verify: `transfer-review-open` (assertion _ngoài bộ chuẩn_ đỏ) → xanh; integration `STILL_NEEDED` → seat cũ thu hồi sau cấp mới.
+
+### Task 5.4: Một sự kiện chờ, recorder, seed múi giờ, sequence (F37 phía nhân sự, F46, F47, F48)
+
+- Files: `offboarding-notice.recorder.ts`, `transfer-notice.recorder.ts`, migration tiến bổ sung dấu _đã báo_, sequence theo năm.
+- Depends on: Task 5.1.
+- Acceptance: xung đột → 409; test đua có barrier điều chuyển ↔ nghỉ việc ↔ nghỉ dài; seed lệch được phát hiện/bổ sung; mã theo năm, cấp số
+  theo [spec L.10](spec.md#l10-ranh-giới-bản-tương-thích-và-bản-cuối-review-p03-rv-03) dòng F48 (không trùng với sequence cũ khi image tương thích được phục hồi).
+- Verify: integration barrier (đỏ trước nếu tái hiện) → xanh.
+
+### Task 5.5: Lệnh thủ tục có kiểm soát khi Super Admin là đối tượng (F19; P03-D02 = A)
+
+- Files: `src/super-admin-event-cli.ts`, `src/super-admin-event-cli.module.ts`, `src/modules/personnel/super-admin-event/*`, script
+  `ops:record-super-admin-event` trong `package.json`, `src/operational-commands.spec.ts`, `src/module-graph.spec.ts`, test.
+- Depends on: Task 1.8, Task 2.4, Task 5.1, Task 5.4.
+- Acceptance: theo [spec L.2](spec.md#l2-thủ-tục-có-kiểm-soát-khi-super-admin-là-đối-tượng-p03-d02-f19) — mười mode; tham số chung bắt buộc; tham số bí mật bị từ chối theo tên; tách người ở mọi
+  môi trường (`SHARED` thêm người chạy khác người phê duyệt); đối tượng phải giữ `SUPER_ADMIN`; một giao dịch phiếu → sự kiện → Audit
+  `OPERATOR` → thông báo; mã thoát 0/2/1; đầu ra chỉ `ticket`, `mode`, `outcome`, `record`; không đổi vai, người giữ vai, mật khẩu, phiên
+  hay trạng thái khóa; trình tự người giữ vai đã rời chạy tới `ops:recover transfer-role`.
+- Verify: unit `super-admin-event.arguments.spec.ts`, `super-admin-event.policy.spec.ts`; integration `super-admin-event-cli` (mỗi mode;
+  mỗi từ chối với số dòng và Audit không đổi; lặp phiếu ⟹ 2; khác tham số ⟹ 1; đầu ra không chứa tên, email, mã nhân viên, tham chiếu
+  người, căn cứ; `departure-record` → hiệu lực → `ops:recover transfer-role` thành công); gate `operational-commands`, `module-graph` xanh.
+
+### Checkpoint 5
+
+Focused `personnel` (gồm `personnel/super-admin-event`), `licensing/handover`, `notifications`, gate `operational-commands` và
+`module-graph` xanh; `pnpm typecheck` xanh.
+
+### Phase 6 — Contract, gate, tài liệu
+
+### Task 6.1: OpenAPI và ví dụ (F49, F50)
+
+- Files: controller/decorator mô tả lỗi, `test/support/openapi-example-*`, mapper chết, `openapi.json` (qua generator).
+- Depends on: Checkpoint 5.
+- Acceptance: `F1`, `F2`, `F4`, `F7`, `F8`, `F10` đóng; registry collection bỏ operation gỡ đúng luật sự kiện registry.
+- Verify: `pnpm openapi:export` hai lần trùng byte; `test/e2e/api-inventory.e2e-spec.ts` focused xanh.
+
+### Task 6.2: Tài liệu năng lực và trạng thái (F53, F60)
+
+- Files: `AGENTS.md`, `ARCHITECTURE.md`, `docs/roadmap.md`, spec/plan chủ, ADR theo P03-D12 (mặc định A),
+  `docs/rules/operational-commands.md` (hai lệnh mới — spec L.2, L.3), `docs/guides/containers.md` (hai lượt deploy của L.3, dòng chờ hủy
+  trước deploy của L.4/L.5, bản sao lưu được bảo vệ của L.5).
+- Depends on: Task 6.1.
+- Acceptance: mô tả khớp mã cuối; không còn chức vụ danh mục/bộ chuẩn/phân bổ như năng lực; worker/sweeper đúng thực tế.
+- Verify: `pnpm rules:check`, `pnpm rules:format`.
+
+### Task 6.3: Gate tên migration và vai runtime (F51, F52)
+
+- Files: gate mới `src/migration-order.spec.ts` (chạy trong `pnpm check` cùng các gate `src/*.spec.ts`),
+  `test/integration/database-runtime-role-app.integration-spec.ts`.
+- Depends on: Checkpoint 1.
+- Acceptance: migration mới phải lớn hơn migration cuối đã merge (không đổi tên migration cũ); suite vai runtime chạy một đường ghi G5 và
+  một G6.
+- Verify: test gate đỏ với tên lùi; integration vai runtime xanh.
+
+### Task 6.4: Test đồng thời có barrier (F59)
+
+- Files: chỉ test — tám tệp `test/integration/<tên>.integration-spec.ts` với `<tên>` là `provisioning-decision-http`,
+  `provisioning-queue-http`, `spend-commitments`, `spend-finance-review`, `budget-decisions`, `license-assignment-constraints`,
+  `seat-baseline-close-http`, `seat-baseline-closing-http`; dùng lại helper chuẩn `waitForLockWaiters` của `test/support/lock-wait.ts`
+  (không thêm helper barrier thứ hai, không sửa helper trừ khi chứng minh được lỗi của nó). Không sửa mã sản phẩm, trừ trường hợp ở
+  Acceptance.
+- Depends on: Checkpoint 5 (Task 3.3, 4.4, 5.4 có thể đã sửa các tệp này; định vị lại từng ca trên cây hiện tại, không tin số dòng ở
+  `7c28e75`).
+- Ca phải chuyển (tên `it(...)` ở `7c28e75`; chi tiết ở [test matrix Phase 6](test-matrix.md#phase-6--contract-và-gate)):
+  `Promise.all` trần — _two IT Admins closing one failed task at once…_, _retry and close at once leave the task and its assignment
+  consistent…_ (`provisioning-decision-http`); _two IT Admins completing one task at once…_, _two IT Admins taking one task at once…_
+  (`provisioning-queue-http`); _is held once when two approvals come at the same time_ (`spend-commitments`); _is ended once: of two
+  endings at once…_ (`spend-finance-review`); _is decided by one of two who ask at once_ (`budget-decisions`). Sleep cố định — _lets only
+  one of two writers take the last seat, however they interleave_ (`wait(400)`, `license-assignment-constraints`); _closes after a
+  confirmation that is in flight…_ (`wait(500)`, `seat-baseline-close-http`); _refuses a confirmation that meets the closing…_
+  (`wait(500)`, `seat-baseline-closing-http`).
+- Cách chuyển:
+  1. Xác định khóa mà đường mã bị tranh chấp lấy (khóa dòng của bản ghi chung hoặc `pg_advisory_xact_lock` cùng khóa băm); một kết nối
+     `pg` riêng giữ khóa đó (`BEGIN` + `SELECT … FOR UPDATE`, hoặc cùng advisory lock).
+  2. Gửi bên tranh chấp thứ nhất → `await waitForLockWaiters(observer, 1)` → gửi bên thứ hai → `await waitForLockWaiters(observer, 2)`
+     → nhả khóa (`COMMIT`/`ROLLBACK`) → mới `await` kết quả. `observer` là kết nối không chờ khóa (kết nối giữ khóa dùng được). Thứ tự
+     vào hàng chờ cố định nên kết quả từng bên tất định; ca phụ thuộc thứ tự (thử lại ↔ đóng) tách thành hai ca, mỗi thứ tự một kết quả.
+  3. Ca sleep: thay `await wait(n)` bằng `await waitForLockWaiters(observer, 1)`, giữ khẳng định _chưa xong_ rồi nhả khóa.
+  4. `Promise.all` chỉ còn được dùng để **thu** kết quả sau barrier; cấm làm bằng chứng đồng thời: sleep cố định (`wait(n)`,
+     `setTimeout`), `Promise.all` trần không barrier, chạy lại tới khi xanh, tăng timeout.
+  5. Đối chứng mỗi ca chuyển: bỏ tạm bước giữ khóa của kết nối holder (chỉ trong test, không giữ lại) ⟹ helper ném _Fewer than N
+     backends reached a lock wait in time_; khôi phục trùng byte. Ghi kết quả đối chứng vào bảng Verification.
+  6. Quét lại `test/integration` và `test/e2e` (`rg "Promise\.all\(|await (wait|sleep|delay)\("`) — mọi test **đua** khác (gồm test đua
+     mới của Task 3.3, 4.4, 4.6, 5.4) cũng theo luật trên; vòng chờ một trạng thái quan sát được (`pg-pool`, `database-stall`,
+     `account-list-and-redeem`) và `Promise.all` dựng dữ liệu không phải bằng chứng đồng thời — ghi kết quả quét. Ca `wait(400)` của
+     `cost-allocation-http` mất cùng F05 (Task 3.1; P03-D06 = A).
+- Acceptance: tám tệp không còn sleep cố định hay `Promise.all` trần làm bằng chứng; mỗi ca đua chứng minh thứ tự qua
+  `waitForLockWaiters`; khẳng định kết quả (mã HTTP, số bản ghi, trạng thái) **giữ nguyên** so với `7c28e75`. Hành vi sản phẩm giữ nguyên;
+  chỉ khi một test barrier tất định đỏ vì lỗi sản phẩm thật (không phải harness) mới sửa mã — ghi finding mới vào impact matrix mục 3.6,
+  đỏ trước → xanh sau trong cùng task, không đổi wire trừ khi lỗi buộc phải đổi (ghi bàn giao FE/Mobile).
+- Verify: `pnpm exec jest --config ./test/config/jest.integration.cjs --runInBand <tám tệp>` trên PostgreSQL cô lập xanh; đối chứng bước 5
+  đỏ đúng thông báo của helper; `rg -n "await wait\(|setTimeout\(" <tám tệp>` không còn trong ca đua.
+
+### Checkpoint 6
+
+`pnpm typecheck`, `pnpm rules:check`, `pnpm rules:format` xanh; focused integration của Task 6.3, 6.4 xanh, đối chứng barrier của Task 6.4
+đỏ đúng nguyên nhân; diff tự review theo spec.
+
+### Phase 7 — Gate cuối (một lượt, sau khi mọi phase xong)
+
+### Task 7.1: Lượt gate cuối trên cây ổn định
+
+- Files: không sửa mã; chỉ ghi bằng chứng vào plan/roadmap.
+- Depends on: Checkpoint 6.
+- Acceptance: theo [test matrix mục gate cuối](test-matrix.md#gate-cuối); lỗi ⟹ chẩn đoán, sửa trong Prompt 04, focused, rồi chỉ chạy lại
+  gate bị ảnh hưởng trên cây cuối.
+- Verify: `pnpm check`; `pnpm test:e2e`; `pnpm test:integration` (PostgreSQL cô lập); `pnpm openapi:export` ×2; diễn tập migration
+  Checkpoint 1 lần cuối; `pnpm ops:db-roles verify`; `git diff --check`; dọn đúng tài nguyên.
+
+## Phủ finding
+
+Mỗi finding trong bảng chuẩn [impact matrix mục 3.0](impact-matrix.md#30-tóm-tắt) — gồm finding của delta Docs cuối `769bb64..e0cb5a0`
+(mục 3.8) — có **một** dòng ở bảng dưới và **một** chủ: task trong plan này **và** dòng test/bằng chứng ở [test matrix](test-matrix.md)
+(cột _Test matrix_ ghi `Pn Fxx` = dòng có finding đó ở bảng Phase n), hoặc một nhãn không triển khai ghi rõ lý do. Bảng này đi theo impact
+matrix: finding mới (kể cả finding phát hiện khi đang làm Prompt 04) thêm một dòng ở đây trước khi sửa; không văn bản nào dùng dải ID cố
+định thay bảng. Nhãn: `fix` (sửa, đỏ trước → xanh sau) · `aligned-after-test` (chỉ khi test barrier không tái hiện) · `documentation-only` ·
+`deferred-by-disposition` (theo mặc định khuyến nghị A của disposition không chặn) · `Docs-owned` · `out-of-scope`. Không finding nào
+`aligned` lúc audit (43 dòng `aligned` là trace AC ở impact matrix mục 4, không phải finding). Chín disposition chặn = A (Owner 27/10/2026), nên cột _Nếu Owner đổi
+mặc định_ chỉ còn cho mục không chặn (P03-D10, P03-D12 → P03-D15); đổi ⟹ finding vào đúng task ở cột đó và thêm dòng test **trước** khi sửa. Cột _Chủ schema/contract_ ghi một chủ duy nhất cho mọi thay đổi schema (tệp `prisma/models/*.prisma`) và wire (capability sở hữu operation); `— (không đổi schema/contract)` chỉ cho finding không triển khai hoặc không đổi schema/wire.
+
+| ID  | Mức     | Xử lý                                                                                                                                  | Task                          | Test matrix / bằng chứng                                      | Nếu Owner đổi mặc định (chỉ P03-D10, P03-D12 → P03-D15) | Chủ schema/contract                                                                                                                                                                                                                                                                                                                                                 |
+| --- | ------- | -------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------- | ------------------------------------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| F01 | Blocker | `fix` — review `P03-RV-04` (spec L.11)                                                                                                 | 1.1a, 1.2b, 1.1, 2.2          | P1 F01 ×12; P2 F01                                            | —                                                       | `organization.prisma` (Cost Center → phòng, NOT NULL ở bản cuối; `CostCenterDepartmentLink`, `CostCenterDirectionActivation`); contract `organization/cost-center` (`costCenterCreate` + `departmentId`), `organization/department` (`departmentCreate`); lệnh `organization/cost-center-direction` (`ops:cost-center-direction` — Owner/operator chạy ở Task 1.2b) |
+| F02 | Blocker | `fix` — P03-D03 = A (spec L.3)                                                                                                         | 1.2a, 1.2b, 1.2c, 3.1         | P1 F02 ×11, F02/F20; P3 F02                                   | —                                                       | `catalog.prisma` (`ownerDepartmentId` — NULL ở mốc mở rộng, NOT NULL ở mốc thu hẹp; `SubscriptionOwnerAssignment`) + trigger `licensing.prisma`; contract `catalog/subscription` (`ownerDepartmentId`, 422 `SUBSCRIPTION.OWNER_DEPARTMENT_INACTIVE`); lệnh `catalog/subscription-owner-assignment`; việc gán: Owner/operator (Task 1.2b)                            |
+| F03 | High    | `fix` — P03-D04 = A, P03-D07 = A (spec L.4, L.6)                                                                                       | 1.3a, 1.3, 2.4                | P1 F03 ×5; P2 F11 (sửa chức vụ)                               | —                                                       | `organization.prisma`, `personnel.prisma`; contract `organization/employee` (gỡ `jobTitle*`)                                                                                                                                                                                                                                                                        |
+| F04 | High    | `fix` — P03-D06 = A, P03-D07 = A (spec L.5, L.6)                                                                                       | 1.4a, 1.4, 2.3, 3.1, 4.2, 5.3 | P1 F04–F06 ×2; P1 F06 ×2; P2 F14; P3 F04, F05; P4 F04; P5 F42 | —                                                       | `catalog.prisma`, `requests.prisma` (gỡ); contract gỡ `standardToolset*`, trường `outsideStandard*`                                                                                                                                                                                                                                                                 |
+| F05 | High    | `fix` — P03-D06 = A, P03-D07 = A (spec L.5, L.6)                                                                                       | 1.4a, 1.4, 3.1                | P1 F04–F06 ×2; P3 F04, F05                                    | —                                                       | `finance.prisma` (gỡ); contract gỡ `subscriptionCostAllocation*`                                                                                                                                                                                                                                                                                                    |
+| F06 | High    | `fix` — P03-D06 = A, P03-D07 = A (spec L.5, L.6)                                                                                       | 1.4a, 1.4, 5.3                | P1 F04–F06 ×2; P1 F06 ×4; P5 F06                              | —                                                       | `licensing.prisma` (gỡ `service_account_moves`); contract gỡ `serviceAccountMove*`                                                                                                                                                                                                                                                                                  |
+| F07 | Medium  | `fix`                                                                                                                                  | 1.5                           | P1 F07                                                        | —                                                       | `licensing.prisma` (chỉ mục tác vụ cấp đang mở)                                                                                                                                                                                                                                                                                                                     |
+| F08 | High    | `fix`                                                                                                                                  | 1.5, 3.3                      | P1 F08; P3 F08                                                | —                                                       | `licensing.prisma` (CHECK `hand_off_whole`); contract `licensing/provisioning` (`/hand-off` body)                                                                                                                                                                                                                                                                   |
+| F09 | High    | `fix`                                                                                                                                  | 2.1                           | P2 F09                                                        | —                                                       | lệnh `ops` `installation` (tập bản ghi cài đặt); không schema                                                                                                                                                                                                                                                                                                       |
+| F10 | Blocker | `fix`                                                                                                                                  | 2.2                           | P2 F10 ×2, F10/F13                                            | —                                                       | contract `organization/department`, `organization/project`, `organization/cost-center` (vai, `hrBasis`)                                                                                                                                                                                                                                                             |
+| F11 | High    | `fix`                                                                                                                                  | 2.4                           | P2 F11                                                        | —                                                       | contract `organization/employee` (sửa trường chính thức)                                                                                                                                                                                                                                                                                                            |
+| F12 | Medium  | `fix`                                                                                                                                  | 2.5, 5.1                      | P2 F12; P5 F12                                                | —                                                       | contract đọc `organization/*`, `personnel/*` (projection tối thiểu)                                                                                                                                                                                                                                                                                                 |
+| F13 | Medium  | `fix`                                                                                                                                  | 2.2, 3.3, 4.3, 4.6, 5.1       | P2 F10/F13; P3 F13; P4 F13 ×2; P5 F13                         | —                                                       | policy service của từng capability (`organization`, `licensing`, `requests`, `personnel`, `budgets`); không đổi wire                                                                                                                                                                                                                                                |
+| F14 | Medium  | `fix`                                                                                                                                  | 2.3                           | P2 F14                                                        | —                                                       | contract `onboarding` (checklist bước 1)                                                                                                                                                                                                                                                                                                                            |
+| F15 | High    | `fix`                                                                                                                                  | 2.3                           | P2 F15                                                        | —                                                       | contract `organization/department` (`DEPARTMENT.IN_USE` theo nhóm)                                                                                                                                                                                                                                                                                                  |
+| F16 | High    | `fix`                                                                                                                                  | 2.2                           | P2 F16                                                        | —                                                       | contract `organization/cost-center` (tạo cho phòng, ngừng có điều kiện)                                                                                                                                                                                                                                                                                             |
+| F17 | High    | `fix` trong phạm vi P03-D15 A                                                                                                          | 2.5, 5.1                      | P2 F17; P5 F17                                                | D15 B: thêm cảnh báo F58 vào Task 5.1, dòng P5 mới      | bảng mã đóng `notifications.types.ts` + `inbox.policy.ts` (không schema); phát ở `organization`, `data-import`, `personnel`                                                                                                                                                                                                                                         |
+| F18 | Medium  | `fix`                                                                                                                                  | 2.6                           | P2 F18                                                        | —                                                       | `identity-access/recovery` (đích thư); không schema                                                                                                                                                                                                                                                                                                                 |
+| F19 | High    | `fix` — P03-D02 = A (spec L.2)                                                                                                         | 1.8, 2.6, 5.1, 5.5            | P1 F19; P2 F19; P5 F19 ×5                                     | —                                                       | `personnel.prisma` (`SuperAdminEventTicket`, cột `…_by_ticket_id`); lệnh `personnel/super-admin-event` (`ops:record-super-admin-event`); contract `personnel/*` (`…ByProcedure`), `organization/employee` (403 `EMPLOYEE.SELF_CHANGE_FORBIDDEN`)                                                                                                                    |
+| F20 | High    | `fix`                                                                                                                                  | 3.2a, 1.2c, 3.2               | P1 F20; P1 F02/F20 ×3; P3 F20                                 | —                                                       | trigger `licensing.prisma`; hành vi `licensing/provisioning`                                                                                                                                                                                                                                                                                                        |
+| F21 | Medium  | `fix`                                                                                                                                  | 3.2, 5.3                      | P3 F21                                                        | —                                                       | `licensing.prisma` (`RevocationSource`); `data-import/seat-baseline-import`, `personnel/transfer-review`                                                                                                                                                                                                                                                            |
+| F22 | Medium  | `fix`                                                                                                                                  | 3.2                           | P3 F22                                                        | —                                                       | contract đọc `licensing/assignment` (read model phần mềm phòng)                                                                                                                                                                                                                                                                                                     |
+| F23 | Low     | `fix`                                                                                                                                  | 3.1                           | P3 F23                                                        | —                                                       | contract `catalog/subscription`, `licensing/license-key` (mã từ chối)                                                                                                                                                                                                                                                                                               |
+| F24 | Medium  | `fix` (barrier)                                                                                                                        | 3.3                           | P3 F24                                                        | —                                                       | `licensing/provisioning` + facade `identity-access` (nhận `tx`) + bảng mã `notifications.types.ts`; không schema                                                                                                                                                                                                                                                    |
+| F25 | Medium  | `fix`, hoặc `aligned-after-test` khi barrier không tái hiện                                                                            | 3.3                           | P3 F25                                                        | —                                                       | `licensing/provisioning`, `requests` (thứ tự khóa); không schema                                                                                                                                                                                                                                                                                                    |
+| F26 | Medium  | `fix` — P03-D09 = A (spec L.7)                                                                                                         | 3.1                           | P3 F26                                                        | —                                                       | contract `catalog/subscription` (`subscriptionUpdate` 409 `FINANCE.SETUP_INCOMPLETE`)                                                                                                                                                                                                                                                                               |
+| F27 | Blocker | `fix` — P03-D01 = A (spec L.1)                                                                                                         | 1.1a, 1.9a, 1.6, 4.1          | P1 F27; P4 F27 ×3                                             | —                                                       | `requests.prisma` (`DRAFT`, CHECK Cost Center và `submitted_at`, trigger nháp); contract `requests/access-request` (bốn operation nháp), mã cổng tài chính ở `requests/*`, `budgets/budget`                                                                                                                                                                         |
+| F28 | High    | `fix`                                                                                                                                  | 4.3                           | P4 F28                                                        | —                                                       | `requests/reassignment`; không schema                                                                                                                                                                                                                                                                                                                               |
+| F29 | High    | `fix`                                                                                                                                  | 1.9a, 1.6, 4.3, 5.3           | P4 F29; P5 F42                                                | —                                                       | `requests.prisma`, `licensing.prisma` (nguyên nhân hủy); contract `requests/*`, `personnel/transfer-review`                                                                                                                                                                                                                                                         |
+| F30 | Medium  | `fix`                                                                                                                                  | 4.1                           | P4 F30                                                        | —                                                       | contract `requests/*` (403 Super Admin)                                                                                                                                                                                                                                                                                                                             |
+| F31 | High    | `fix` (barrier)                                                                                                                        | 4.4                           | P4 F31                                                        | —                                                       | `requests/spend`, `budgets/budget` (khóa (Cost Center, năm)); không schema                                                                                                                                                                                                                                                                                          |
+| F32 | Medium  | `fix`                                                                                                                                  | 4.4, 4.8                      | P4 F32; P4 F65 (quyền và lỗi)                                 | —                                                       | contract `requests/spend` — 409 `SPEND.REVIEWER_IS_APPROVER` ở `financeReviewComplete`, `spendApprovalDecide`                                                                                                                                                                                                                                                       |
+| F33 | Medium  | `fix` (P03-D08 đóng theo nguồn — 26/10/2026)                                                                                           | 4.5, 4.8                      | P4 F33 ×2                                                     | —                                                       | `requests/spend` (`finance-review.policy.ts`, listener); không schema                                                                                                                                                                                                                                                                                               |
+| F34 | Medium  | `fix`                                                                                                                                  | 4.5                           | P4 F34                                                        | —                                                       | contract `requests/access-request` (giá 0 ⟹ chưa đủ dữ liệu giá)                                                                                                                                                                                                                                                                                                    |
+| F35 | Low     | `deferred-by-disposition` — P03-D10 A: hoãn tới G8, giữ hành vi, ghi giới hạn                                                          | —                             | không có ca trong Prompt 04                                   | Task 4.5 (`pricing.policy.ts`) + dòng P4 F35 mới        | — (không đổi schema/contract)                                                                                                                                                                                                                                                                                                                                       |
+| F36 | High    | `fix` (trong tập trạng thái `QĐ-91a` — bản nháp tách, không `CANCELLED`)                                                               | 4.7a, 1.7, 4.5                | P1 F36 ×2; P1 F63/F36; P4 F36                                 | —                                                       | `budgets.prisma` (cờ tách, `budget_versions_in_flight_key`); wire đọc `budgets/budget`                                                                                                                                                                                                                                                                              |
+| F37 | Medium  | `fix` (đua: barrier)                                                                                                                   | 4.5, 5.4                      | P4 F37; P5 F37                                                | —                                                       | contract `budgets/budget`, `personnel/offboarding` (4xx thay 500)                                                                                                                                                                                                                                                                                                   |
+| F38 | Low     | `fix` — P03-D11 = A (spec L.8)                                                                                                         | 4.5                           | P4 F38                                                        | —                                                       | `catalog/subscription` (`findPricedOfPlan` lọc phòng của Request — spec L.8); không đổi wire                                                                                                                                                                                                                                                                        |
+| F39 | Low     | `fix`                                                                                                                                  | 4.5                           | P4 F39                                                        | —                                                       | contract `budgets/budget` (mã va chạm số phiên bản)                                                                                                                                                                                                                                                                                                                 |
+| F40 | Blocker | `fix`                                                                                                                                  | 5.1                           | P5 F40 ×2                                                     | —                                                       | contract `personnel/*` (vai ghi sự kiện, `BM-09`)                                                                                                                                                                                                                                                                                                                   |
+| F41 | High    | `fix` — P03-D05 = A (spec L.4)                                                                                                         | 1.3a, 1.3, 5.2                | P1 F41 ×3; P1 F03/F41; P5 F41                                 | —                                                       | `personnel.prisma`, `organization.prisma`; contract `personnel/transfer`, `personnel/notice`                                                                                                                                                                                                                                                                        |
+| F42 | Blocker | `fix`                                                                                                                                  | 1.4a, 5.3                     | P5 F42                                                        | —                                                       | `personnel/transfer-review` (phạm vi rà soát); không schema                                                                                                                                                                                                                                                                                                         |
+| F43 | High    | `fix`                                                                                                                                  | 5.3                           | P5 F43                                                        | —                                                       | `personnel/transfer-review`, `requests` (`STILL_NEEDED`); không schema                                                                                                                                                                                                                                                                                              |
+| F44 | Medium  | `fix`                                                                                                                                  | 5.2                           | P5 F44                                                        | —                                                       | contract `personnel/transfer` (bỏ chặn phòng chưa có Cost Center)                                                                                                                                                                                                                                                                                                   |
+| F45 | Low     | `fix`                                                                                                                                  | 5.1                           | P5 F45                                                        | —                                                       | contract `personnel/*` (bỏ `selfExecuted`)                                                                                                                                                                                                                                                                                                                          |
+| F46 | Medium  | `fix` (barrier)                                                                                                                        | 5.4                           | P5 F46                                                        | —                                                       | `personnel/*` (test đua); không schema                                                                                                                                                                                                                                                                                                                              |
+| F47 | Low     | `fix`                                                                                                                                  | 5.4                           | P5 F47                                                        | —                                                       | migration `organization` + `installation/inspect`                                                                                                                                                                                                                                                                                                                   |
+| F48 | Low     | `fix`                                                                                                                                  | 5.4                           | P5 F48                                                        | —                                                       | `personnel.prisma`, `licensing.prisma` (đánh số theo năm)                                                                                                                                                                                                                                                                                                           |
+| F49 | Medium  | `fix`                                                                                                                                  | 6.1                           | P6 F49                                                        | —                                                       | mô tả OpenAPI của controller + `test/support/openapi-example-*`                                                                                                                                                                                                                                                                                                     |
+| F50 | Low     | `fix`                                                                                                                                  | 6.1                           | P6 F50                                                        | —                                                       | mapper `requests/group-request`, `personnel/leave` (gỡ)                                                                                                                                                                                                                                                                                                             |
+| F51 | Low     | `fix`                                                                                                                                  | 6.3                           | P6 F51                                                        | —                                                       | gate mới `src/migration-order.spec.ts` (trong `pnpm check`)                                                                                                                                                                                                                                                                                                         |
+| F52 | Low     | `fix`                                                                                                                                  | 6.3                           | P6 F52; gate cuối _Vai runtime H7_                            | —                                                       | `test/integration/database-runtime-role-app.integration-spec.ts`                                                                                                                                                                                                                                                                                                    |
+| F53 | Medium  | `documentation-only` — P03-D12 A: giữ sweeper trong API, ghi ADR và sửa tài liệu                                                       | 6.2                           | P6 F53                                                        | Task 6.2 chuyển sweeper sang worker + dòng P6 F53 mới   | `AGENTS.md`, `ARCHITECTURE.md`, ADR (P03-D12 A)                                                                                                                                                                                                                                                                                                                     |
+| F54 | Medium  | `deferred-by-disposition` — P03-D13 A: chấp nhận, đóng băng allowlist                                                                  | —                             | P6 F54 (allowlist không tăng)                                 | refactor trong Task 4.x/5.x + gate cấu trúc             | — (không đổi schema/contract)                                                                                                                                                                                                                                                                                                                                       |
+| F55 | Medium  | `deferred-by-disposition` — P03-D14 A; chỉ bỏ mục registry của operation bị gỡ (Task 6.1)                                              | 6.1 (phần registry)           | P6 F49; e2e `api-inventory` (Task 6.1)                        | Task 6.1 mở rộng + dòng P6 gate POST                    | `src/api-collection-contract.spec.ts` (chỉ mục registry của operation gỡ)                                                                                                                                                                                                                                                                                           |
+| F56 | Low     | `deferred-by-disposition` — P03-D14 A                                                                                                  | —                             | không có ca trong Prompt 04                                   | Task 6.1 + dòng P6 `format`/`pattern`                   | — (không đổi schema/contract)                                                                                                                                                                                                                                                                                                                                       |
+| F57 | Low     | `out-of-scope` — ghi nhận; không thuộc `QĐ-87` → `QĐ-90`; rule phiên bản UUID là ADR mới của Owner                                     | —                             | không có ca                                                   | —                                                       | — (không đổi schema/contract)                                                                                                                                                                                                                                                                                                                                       |
+| F58 | Medium  | `deferred-by-disposition` — P03-D15 A: hạng mục `g4-notification-delivery`                                                             | —                             | không có ca trong Prompt 04                                   | task mới Phase 5 (`notifications/inbox`) + dòng P5      | — (không đổi schema/contract)                                                                                                                                                                                                                                                                                                                                       |
+| F59 | Low     | `fix` (chỉ test, giữ hành vi sản phẩm)                                                                                                 | 6.4                           | P6 F59 (mười hai dòng)                                        | —                                                       | `test/integration/*` (chỉ test)                                                                                                                                                                                                                                                                                                                                     |
+| F60 | Medium  | `documentation-only`                                                                                                                   | 0.1, 6.2                      | P6 F60                                                        | —                                                       | `docs/roadmap.md`, spec/plan hạng mục chủ                                                                                                                                                                                                                                                                                                                           |
+| F61 | Low     | `Docs-owned` — chuyển chat Docs (câu _chưa Owner review/commit_ ở `769bb64` và `e0cb5a0`; Logical _chưa hiện thực_); BE không sửa Docs | —                             | không có ca                                                   | —                                                       | Docs (chat Docs) — BE không sửa                                                                                                                                                                                                                                                                                                                                     |
+| F62 | High    | `fix`                                                                                                                                  | 1.9a, 1.7, 4.6                | P1 F62; P1 F62/F65; P4 F62 ×3                                 | —                                                       | `budgets.prisma` (enum, cờ, mốc); sweeper `budgets/budget`; contract đọc `budgets/budget` (enum trạng thái)                                                                                                                                                                                                                                                         |
+| F63 | High    | `fix`                                                                                                                                  | 4.7a, 1.7, 4.7                | P1 F63 ×7; P1 F63/F36; P4 F63 ×3                              | —                                                       | `budgets.prisma` (`successor_of_proposal_id`, `succeeded_at`, `rejected_predecessor_id`, ràng buộc — J.1) + `installation/migration-preflight` (J.2); contract `budgets/budget` (trường chỉ đọc, hành vi `budgetProposalSubmit`, `budgetVersionCreate`, `budgetVersionDecide`)                                                                                      |
+| F64 | Medium  | `fix`                                                                                                                                  | 4.7                           | P4 F64                                                        | —                                                       | contract `budgets/budget` (`budgetVersionRevise` — mã từ chối)                                                                                                                                                                                                                                                                                                      |
+| F65 | High    | `fix`                                                                                                                                  | 1.9a, 1.7, 4.8                | P1 F65; P1 F62/F65; P4 F65 ×4                                 | —                                                       | `requests.prisma` (`BudgetCheckTrigger`); contract `requests/spend` — `financeReviewComplete` mở rộng (J.3)                                                                                                                                                                                                                                                         |
+| F66 | Medium  | `fix`                                                                                                                                  | 1.7, 4.10                     | P1 F66; P4 F66 ×5                                             | —                                                       | `budgets.prisma` (`budget_version_history`); contract `budgets/budget` — `budgetVersionHistoryList` (J.4)                                                                                                                                                                                                                                                           |
+| F67 | High    | `fix` (do `QĐ-92b`/AC xác định — ngoài lựa chọn P03-D15)                                                                               | 1.7, 4.9                      | P1 F67; P4 F67 ×2                                             | —                                                       | `notifications.prisma` (thông báo giữ chờ) + bảng mã đóng `notifications.types.ts`/`inbox.policy.ts`; phát ở `budgets/budget`, `requests/spend`, `requests/status`                                                                                                                                                                                                  |
+
+Tổng: `fix` 58 (gồm F25 có thể thành `aligned-after-test`) · `documentation-only` 2 · `deferred-by-disposition` 5 · `Docs-owned` 1 ·
+`out-of-scope` 1 = 67 = số dòng của bảng chuẩn impact matrix mục 3.0; 0 finding không có chủ.
+
+## Phân công trong cùng hạng mục
+
+Một work item, một Prompt 04, một agent/người chính tích hợp và chạy gate cuối. Song song chỉ khi file rời nhau và không dùng chung
+database kiểm thử:
+
+| Phase           | Người đề xuất                    | Song song với                 | Ghi chú                                                                                                                                     |
+| --------------- | -------------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| Mốc tương thích | Người chính                      | —                             | Task 1.2a, 1.1a, 1.3a, 1.4a, 1.9a, 3.2a, 4.7a chạy đầu tiên, tuần tự, dừng `expansion-ready-owner-action`; Task 1.2b là việc Owner/operator |
+| P0, P1          | Người chính (một người, tuần tự) | —                             | Migration là chuỗi; không chia                                                                                                              |
+| P2              | Dev BE khác (đã làm G0–G2/H4–H5) | P3 sau Checkpoint 1           | `organization`, `installation`, `onboarding`, `identity-access`                                                                             |
+| P3              | Dev BE khác hoặc Dev A           | P2                            | `catalog`, `licensing`, `data-import/seat-baseline-import`                                                                                  |
+| P4              | Dev A (tác giả G5)               | P2/P3 khi không chạm cùng tệp | `requests`, `budgets`, `notifications`; Task 4.1 cần Task 1.1/1.6; Task 4.6 → 4.10 (delta `QĐ-91`/`QĐ-92`) cần Task 1.7 và chạy tuần tự     |
+| P5              | Dev A (tác giả G6)               | Không — cần P2–P4             | `personnel` (gồm Task 5.5 — lệnh thủ tục), `licensing/handover`                                                                             |
+| P6, P7          | Người chính                      | —                             | Tích hợp, OpenAPI, tài liệu, test barrier (Task 6.4), gate cuối                                                                             |
+
+## Verification and handoff
+
+| Lệnh / kiểm tra AC | Revision / môi trường | Kết quả thực chạy | Giới hạn / việc còn lại |
+| ------------------ | --------------------- | ----------------- | ----------------------- |
+| —                  | —                     | chưa chạy         | chờ Prompt 04           |
+
+- [ ] AC/finding trong scope có bằng chứng; lỗi đã xử lý hoặc ghi blocker.
+- [ ] Spec/plan/test matrix phản ánh implementation cuối; disposition Owner ghi đủ.
+- [ ] Diff cuối đã tự review; `AGENTS.md`, `ARCHITECTURE.md`, roadmap, runbook bị ảnh hưởng đã cập nhật; phần chưa kiểm chứng ghi rõ.
+- [ ] Giao Owner review trên revision cụ thể; chỉ ghi `merged-dev`, `accepted`, `released` sau đúng sự kiện thật.

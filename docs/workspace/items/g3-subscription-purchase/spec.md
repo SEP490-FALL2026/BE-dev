@@ -144,3 +144,8 @@ Audit cùng giao dịch: `SUBSCRIPTION.CREATED`, `SUBSCRIPTION.UPDATED` (trướ
 ## Changes and acceptance
 
 20/10/2026: thiết kế `ready`. Quyết định cần Owner xác nhận khi review: hạn chót suy ra/nguồn/mốc **suy ra khi đọc** (không lưu); nguồn `BY_END_DATE` thêm vào ERD; số ngày báo trước là trường của thuê bao (chưa có `Contract`, `OQ-B-17`); khoản mua vĩnh viễn chỉ cho ứng dụng `LICENSED`; gói K5 không có thuê bao; ngày ghi giá = ngày làm việc hôm nay theo múi giờ tổ chức, hoàn tất nháp chụp ảnh theo ngày đã ghi; trạng thái chỉ `DRAFT`/`ACTIVE` ở G3; thuê bao nháp vẫn có cảnh báo `NO_ALERT_ANCHOR` nếu thiếu mốc; `IT_ADMIN` và `FINANCE` đọc, chỉ `IT_ADMIN` ghi. Đã `verified` local (xem [plan](plan.md#verification-and-handoff)); chưa review, chưa nghiệm thu.
+
+## Mở lại theo baseline `769bb64` (Prompt 03, 26/10/2026)
+
+- Audit G0–G6 trên Docs `769bb64` ↔ BE `7c28e75` mở lại hạng mục này: F02, F23, F26 — phòng sở hữu bắt buộc; ứng dụng đã ngừng; PATCH khi phòng chưa có Cost Center.
+- Remediation duy nhất: [g0-g6-final-business-baseline-remediation](../g0-g6-final-business-baseline-remediation/spec.md) ([impact matrix](../g0-g6-final-business-baseline-remediation/impact-matrix.md#3-findings)). AC liên quan không còn được coi là thỏa nguồn hiện hành cho tới khi remediation xong; trạng thái triển khai ở roadmap. Phần đã ghi phía trên là lịch sử, giữ nguyên.

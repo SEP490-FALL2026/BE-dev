@@ -167,3 +167,8 @@ Audit cùng giao dịch như bảng _Làm rõ yêu cầu_. Định danh tài kho
 Triển khai và kiểm chứng cục bộ đã ghi ở [plan](plan.md) (bảng _Verification and handoff_). Owner review: chưa review. Peer review: chưa có. Chưa có nghiệm thu nào.
 
 21/10/2026 (đợt hoàn tất G2–G4, [audit](../../../reviews/g2-g4-completion-2026-10-21/README.md), quyết định D1 của AI, chờ Owner): thêm mã lỗi dòng `EFFECTIVE_BEFORE_HIRE` — một seat không bao giờ bắt đầu trước ngày vào làm của người giữ (xem hàng _Ngày cấp_ ở bảng _Làm rõ yêu cầu_ và hàng `US-02-02` AC-15 của test matrix). Không đổi bảng Primary Story/AC. Mô tả OpenAPI của tải lên và xác nhận nay nêu `SEAT_TARGET.APPLICATION_RETIRED` và `SEAT_TARGET.SUBSCRIPTION_DRAFT` (bảng HTTP đã cập nhật). Harness test tạo người hiện trạng với ngày vào làm 2020-01-01. Lệnh `pnpm check`, `pnpm test:e2e`, `pnpm test:integration` của đợt này ghi ở plan của `g4-provisioning-queue-manual` và `g4-provisioning-failure-handling` (cùng một cây làm việc).
+
+## Mở lại theo baseline `769bb64` (Prompt 03, 26/10/2026)
+
+- Audit G0–G6 trên Docs `769bb64` ↔ BE `7c28e75` mở lại hạng mục này: F21 — phòng sở hữu và rà soát sau khởi tạo (`QĐ-89e`).
+- Remediation duy nhất: [g0-g6-final-business-baseline-remediation](../g0-g6-final-business-baseline-remediation/spec.md) ([impact matrix](../g0-g6-final-business-baseline-remediation/impact-matrix.md#3-findings)). AC liên quan không còn được coi là thỏa nguồn hiện hành cho tới khi remediation xong; trạng thái triển khai ở roadmap. Phần đã ghi phía trên là lịch sử, giữ nguyên.

@@ -141,3 +141,8 @@ Cập nhật 25/10/2026 bởi người phụ trách (AI theo giao việc của n
 **Chưa kiểm chứng / giới hạn:** hộp thông báo trong ứng dụng (người gửi thấy kết cục, nhân viên được báo, cảnh báo ưu tiên) chờ `g4-notification-delivery` và `g5-request-status-notifications`; điểm gọi là các audit event ở trên. Hai IT Admin ghi cùng một thông báo một lúc được tuần tự hóa bằng khóa dòng nhưng chưa có test đồng thời riêng. Hạn 2 ngày làm việc là mặc định do người phụ trách chọn, chưa phải Owner chọn.
 
 **Cho hạng mục sau:** FE: bảy thao tác mới, các mã `PERSONNEL_NOTICE.*`, mã thông báo `BM09-…` không bao giờ nhập vào ô căn cứ. `g6-saas-error-report` không dùng bảng này. Hộp thông báo lấy từ `PERSONNEL_NOTICE.{SENT,ABRUPT_SENT,REJECTED,RECORDED,LINKED,OVERDUE}`.
+
+## Mở lại theo baseline `769bb64` (Prompt 03, 26/10/2026)
+
+- Audit G0–G6 trên Docs `769bb64` ↔ BE `7c28e75` mở lại hạng mục này: F17, F40, F41, F48 — Super Admin xử lý `BM-09`; bốn loại; người nhận `D-7`; mã theo năm.
+- Remediation duy nhất: [g0-g6-final-business-baseline-remediation](../g0-g6-final-business-baseline-remediation/spec.md) ([impact matrix](../g0-g6-final-business-baseline-remediation/impact-matrix.md#3-findings)). AC liên quan không còn được coi là thỏa nguồn hiện hành cho tới khi remediation xong; trạng thái triển khai ở roadmap. Phần đã ghi phía trên là lịch sử, giữ nguyên.

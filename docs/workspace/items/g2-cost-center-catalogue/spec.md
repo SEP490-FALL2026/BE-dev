@@ -90,3 +90,8 @@ Audit cùng giao dịch: `COST_CENTER.CREATED` (`after` code, tên, loại, tr�
 16/10/2026: thiết kế và triển khai trong cùng phiên theo giao việc của Owner (tự thiết kế, tự làm). Quyết định cần Owner xác nhận khi review: mã bất biến và không có thao tác mở lại; "còn người" = còn nhân viên hiệu lực hôm nay; AC-6 liệt kê chỉ người đang làm việc. Chưa review, chưa nghiệm thu.
 
 21/10/2026 (đợt hoàn tất G2–G4, [audit](../../../reviews/g2-g4-completion-2026-10-21/README.md), câu hỏi Q1 cho Owner): dòng ở bảng _Trong lát/Ngoài lát_ về Cost Center `Company` được ghi lại cho đúng hiện trạng. Từ khi `g4-seat-baseline-import` có, Assignment tài khoản dịch vụ mang `cost_center_id` của một Cost Center `Company` đang dùng; nhưng việc ngừng dùng ở lát này chỉ kiểm nhân viên hiệu lực của phòng gắn Cost Center `Unit`, **không** kiểm Assignment tài khoản dịch vụ. Có chặn ngừng dùng Cost Center `Company` đang được Assignment tài khoản dịch vụ dùng hay không **vẫn là câu hỏi mở** (`OQ-B-18` còn mở; `US-04-09` không có AC cho việc này) và chờ Owner quyết; lát này không tự đặt quy tắc. Hành vi và test của lát không đổi; Owner review: chưa review.
+
+## Mở lại theo baseline `769bb64` (Prompt 03, 26/10/2026)
+
+- Audit G0–G6 trên Docs `769bb64` ↔ BE `7c28e75` mở lại hạng mục này: F01, F16 — Cost Center tạo cho phòng đã có, `linkedAt`, ngừng khi nghĩa vụ mở đã xử lý.
+- Remediation duy nhất: [g0-g6-final-business-baseline-remediation](../g0-g6-final-business-baseline-remediation/spec.md) ([impact matrix](../g0-g6-final-business-baseline-remediation/impact-matrix.md#3-findings)). AC liên quan không còn được coi là thỏa nguồn hiện hành cho tới khi remediation xong; trạng thái triển khai ở roadmap. Phần đã ghi phía trên là lịch sử, giữ nguyên.

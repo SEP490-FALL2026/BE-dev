@@ -65,3 +65,8 @@ Audit: `SUPER_ADMIN.TRANSFERRED_OUT/IN`, `SUPER_ADMIN.RECOVERY_LINK_ISSUED`, `SU
 ## Thay đổi và nghiệm thu
 
 16/10/2026: thiết kế và triển khai cùng phiên. **Owner xác nhận khi review:** (1) `BOOTSTRAP_ASSERTED` không đủ để **nhận** vai (`QĐ-67b`) — nếu Owner muốn khác, đổi ở `SuccessorEligibility`; (2) liên kết khôi phục dùng cùng hạn lời mời và không có tham số riêng; (3) quy trình vận hành thật (ai giữ phiếu, kênh xác minh danh tính, nơi lưu nhật ký lệnh) là việc tổ chức, không phải của mã — lệnh chỉ ghi tham chiếu. Chưa review, chưa nghiệm thu; chưa chạy thử lệnh trên môi trường dùng chung.
+
+## Mở lại theo baseline `769bb64` (Prompt 03, 26/10/2026)
+
+- Audit G0–G6 trên Docs `769bb64` ↔ BE `7c28e75` mở lại hạng mục này: F18, F19 — lời mời `REASSIGN` tới email đăng nhập; Super Admin là đối tượng.
+- Remediation duy nhất: [g0-g6-final-business-baseline-remediation](../g0-g6-final-business-baseline-remediation/spec.md) ([impact matrix](../g0-g6-final-business-baseline-remediation/impact-matrix.md#3-findings)). AC liên quan không còn được coi là thỏa nguồn hiện hành cho tới khi remediation xong; trạng thái triển khai ở roadmap. Phần đã ghi phía trên là lịch sử, giữ nguyên.

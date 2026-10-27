@@ -103,3 +103,9 @@ Người duyệt chi quyết phiên bản ngân sách mà Finance đã gửi: du
 23/10/2026: lập khung theo scope map G5 của [roadmap](../../../roadmap.md). Chưa thiết kế chi tiết, chưa code, chưa review, chưa nghiệm thu.
 
 23/10/2026: implement và `verified` local (người phụ trách: AI theo giao việc của người dùng). Các test cần khoản cam kết chờ ngân sách đặt chúng bằng SQL vì việc tạo khoản thuộc `g5-commitment-creation`. `makeCurrent` của harness (đặt `APPROVED` bằng SQL) vẫn dùng ở các suite của `g5-budget-proposal-and-review`; suite quyết định dùng đường thật. Chưa commit, chưa peer review, chưa Owner review, chưa nghiệm thu.
+
+## Mở lại theo baseline `769bb64` (Prompt 03, 26/10/2026)
+
+- Audit G0–G6 trên Docs `769bb64` ↔ BE `7c28e75` mở lại hạng mục này: F27, F36, F37, F39 — cổng tài chính; bản nháp kẹt; `reason: null` → 500; va chạm số phiên bản.
+- Remediation duy nhất: [g0-g6-final-business-baseline-remediation](../g0-g6-final-business-baseline-remediation/spec.md) ([impact matrix](../g0-g6-final-business-baseline-remediation/impact-matrix.md#3-findings)). AC liên quan không còn được coi là thỏa nguồn hiện hành cho tới khi remediation xong; trạng thái triển khai ở roadmap. Phần đã ghi phía trên là lịch sử, giữ nguyên.
+- _26/10/2026 (Prompt 03, delta Docs `769bb64..e0cb5a0` — Owner pin `e0cb5a0`, `QĐ-91`, `QĐ-92`):_ thêm F62, F63, F67 — đóng cuối năm (`US-06-09` AC-21, `US-06-11` AC-10: hôm nay phiên bản của năm đã kết thúc vẫn duyệt được thành `APPROVED`); từ chối không còn trả đề xuất về `RETURNED` mà giữ đề xuất _đã dùng_ cho phiên bản tiếp theo (`US-06-11` AC-3); thông báo dòng 18, 40, 52. Duyệt = hiện hành + bị thay cùng giao dịch và yêu cầu sửa trả chính phiên bản vẫn `aligned` ([impact matrix mục 3.8](../g0-g6-final-business-baseline-remediation/impact-matrix.md#38-delta-docs-769bb64e0cb5a0-qđ-91-qđ-92)).

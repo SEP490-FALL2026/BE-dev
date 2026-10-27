@@ -117,3 +117,9 @@ Khi một Request có chi phí được trình, hệ thống kiểm ngân sách 
 23/10/2026: lập khung theo scope map G5 của [roadmap](../../../roadmap.md). Chưa thiết kế chi tiết, chưa code, chưa review, chưa nghiệm thu.
 
 23/10/2026: implement và `verified` local (người phụ trách: AI theo giao việc của người dùng). Phép kiểm chạy trong transaction của người gọi vì chưa có route trình (`g5-spend-submission-batches`); test gọi nó như việc trình sẽ gọi và đặt dòng kế hoạch, cờ _ngoài kế hoạch_ bằng SQL. Rà soát bị rút (`US-06-13` AC-7) kiểm bằng trạng thái bước _đã đóng_, việc đóng khi rút thuộc `g5-request-withdrawal`. Chưa commit, chưa peer review, chưa Owner review, chưa nghiệm thu.
+
+## Mở lại theo baseline `769bb64` (Prompt 03, 26/10/2026)
+
+- Audit G0–G6 trên Docs `769bb64` ↔ BE `7c28e75` mở lại hạng mục này: F27, F31, F32, F33 — cổng trước kiểm tra; khóa (Cost Center, năm); `SoD-8`; _cần sửa ngân sách_.
+- Remediation duy nhất: [g0-g6-final-business-baseline-remediation](../g0-g6-final-business-baseline-remediation/spec.md) ([impact matrix](../g0-g6-final-business-baseline-remediation/impact-matrix.md#3-findings)). AC liên quan không còn được coi là thỏa nguồn hiện hành cho tới khi remediation xong; trạng thái triển khai ở roadmap. Phần đã ghi phía trên là lịch sử, giữ nguyên.
+- _26/10/2026 (Prompt 03, delta Docs `769bb64..e0cb5a0` — Owner pin `e0cb5a0`, `QĐ-91`, `QĐ-92`):_ P03-D08 đóng theo nguồn (BRD v3.57 `FR-3.20`, `QĐ-92d`(2), `US-06-13` AC-13) — F33 là implementation gap: _cần sửa ngân sách_ chọn được cho `INSUFFICIENT_BUDGET` khi phòng có trưởng phòng, kiểm lại mọi Request đang chờ phiên bản; thêm F65 (Request giữ chờ khi phiên bản bị từ chối/hết hiệu lực, Finance chuyển (i)/(iii) khi đang chờ) và F67 (thông báo dòng 41, 47, 48). Mở lại `US-06-13` AC-9, AC-11; AC mới `US-06-13` AC-13 ([impact matrix mục 3.8](../g0-g6-final-business-baseline-remediation/impact-matrix.md#38-delta-docs-769bb64e0cb5a0-qđ-91-qđ-92)).

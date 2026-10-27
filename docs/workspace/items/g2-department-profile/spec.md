@@ -115,3 +115,8 @@ _18/10/2026 — contract sau [H3a](../h3a-r1-department-in-use-details/spec.md) 
 - _Ngừng phòng còn việc đang mở:_ không chờ "G5/G7" chung chung. Việc đang mở của `US-03-06` AC-19 là rà soát, khuyến nghị và xác nhận (`US-03-07`, `US-03-09` ở G6; khuyến nghị ghế ma ở G7); `IN_USE.details.openWork` giữ `[]` cho tới khi chúng có. Tài khoản dùng chung đã bị `QĐ-75` bỏ (R-1/H3a) nên không còn là việc chờ; mục (4) của ghi chú 16/10/2026 phía trên là lịch sử.
 - _`US-01-02` AC-5:_ không còn chỉ "không có route". Test từ chối `MANAGER` có ở từng lát tài chính, hợp đồng và khóa bản quyền: `document.e2e-spec`, `license-key`, `subscription-purchase`, `exchange-rates`, `vendor-tax-profile`, `cost-allocation`.
 - _`US-01-11`:_ AC-1, AC-2, AC-4, AC-5, AC-6, AC-8 do hàng đợi tác vụ G4 giao; vế đuôi của AC-7 ("tác vụ tạo sau thay đổi đi về IT Admin mới") nay có test `provisioning-queue-http.integration-spec.ts` ‘US-01-11 AC-7: a change of the IT Admin in charge of a department reaches the tasks made after it…’. AC-3 (`SoD-5`) thuộc G5.
+
+## Mở lại theo baseline `769bb64` (Prompt 03, 26/10/2026)
+
+- Audit G0–G6 trên Docs `769bb64` ↔ BE `7c28e75` mở lại hạng mục này: F01, F10, F12, F15, F22 — phòng chưa có Cost Center; Super Admin ghi kèm căn cứ; đọc tối thiểu IT Admin; ngừng phòng còn thuê bao có nghĩa vụ.
+- Remediation duy nhất: [g0-g6-final-business-baseline-remediation](../g0-g6-final-business-baseline-remediation/spec.md) ([impact matrix](../g0-g6-final-business-baseline-remediation/impact-matrix.md#3-findings)). AC liên quan không còn được coi là thỏa nguồn hiện hành cho tới khi remediation xong; trạng thái triển khai ở roadmap. Phần đã ghi phía trên là lịch sử, giữ nguyên.

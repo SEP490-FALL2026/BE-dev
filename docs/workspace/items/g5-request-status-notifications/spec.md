@@ -207,3 +207,9 @@ Người: `E1` người yêu cầu, `E2` người thụ hưởng của Request t
 24/10/2026 (sau `g5-group-requests`): `AC-9` nay kiểm đầu cuối. Request nhóm thật ghi các audit event theo dòng (`ACCESS_REQUEST.LINE_*`, mang `beneficiaryEmployeeId`) và bảng luật `status-rules.group.ts` (6 hàng, ngoài 16 hàng của bảng gốc) báo từng người đúng phần của mình, kèm người gửi (`group-request-notifications.integration-spec`). Còn thiếu: người giữ bước bị đóng không được báo khi lần rút cuối kết thúc cả Request nhóm.
 
 25/10/2026 (sau `g6-leaver-request-closure`): `POST /access-requests/{id}/cancellation` nay ghi `ACCESS_REQUEST.CANCELLED` với đúng khóa mà hàng 16 đọc (`reasonKind`, `cancelledByEmployeeId`); hàng `AC-12` của bảng Primary vẫn ghi `full` như khung, phía nhận đã có sự kiện thật từ route này (chưa có test tích hợp đi qua bộ chiếu với sự kiện do route ghi; `request-status-projection` vẫn tổng hợp).
+
+## Mở lại theo baseline `769bb64` (Prompt 03, 26/10/2026)
+
+- Audit G0–G6 trên Docs `769bb64` ↔ BE `7c28e75` mở lại hạng mục này: F29 — kết cục _bị hủy — người thụ hưởng điều chuyển_.
+- Remediation duy nhất: [g0-g6-final-business-baseline-remediation](../g0-g6-final-business-baseline-remediation/spec.md) ([impact matrix](../g0-g6-final-business-baseline-remediation/impact-matrix.md#3-findings)). AC liên quan không còn được coi là thỏa nguồn hiện hành cho tới khi remediation xong; trạng thái triển khai ở roadmap. Phần đã ghi phía trên là lịch sử, giữ nguyên.
+- _26/10/2026 (Prompt 03, delta Docs `769bb64..e0cb5a0` — Owner pin `e0cb5a0`):_ F67 — thông báo vòng Finance–trưởng phòng mà mục _Explicit out of scope_ giao cho hạng mục của từng Story chưa được làm ở hạng mục nào (không có mã hộp thông báo, không có quy tắc bộ chiếu); gom về remediation cùng các dòng mới của `QĐ-92b` ([impact matrix F67](../g0-g6-final-business-baseline-remediation/impact-matrix.md#f67--không-có-thông-báo-vòng-ngân-sách-và-vòng-financetrưởng-phòng)).

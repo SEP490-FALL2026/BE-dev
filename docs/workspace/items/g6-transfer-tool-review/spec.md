@@ -141,3 +141,8 @@ Cập nhật 24/10/2026 bởi người phụ trách (AI theo giao việc của n
 **Cho hạng mục sau:** `g6-offboarding-record`: người nghỉ việc có phiên `OPEN` thì quyết bị `409 EMPLOYEE_LEFT` nhưng phiên vẫn `OPEN` và sweeper vẫn nhắc quá hạn; nếu muốn bỏ nhắc cần một lệnh đóng phiên theo nghỉ việc (chưa có). `g6-downstream-integration` đọc `transfer_reviews.status` và `due_on` nếu cần báo cáo chi phí chờ quyết. FE: bốn thao tác mới; `waitingReason`, `canDecide`, `overdue` và `overdueDays` có sẵn trên dòng danh sách.
 
 25/10/2026: `g6-offboarding-record` đã xong (`verified` local): khi người rời đi (`EMPLOYEE_LEFT`), `TransferReviewListener` chuyển phiên `OPEN` của người đó sang `SUPERSEDED` (audit `TRANSFER_REVIEW.SUPERSEDED`), nên `TransferReviewSweeper` không còn nhắc quá hạn cho người đã nghỉ; không cần lệnh đóng phiên riêng.
+
+## Mở lại theo baseline `769bb64` (Prompt 03, 26/10/2026)
+
+- Audit G0–G6 trên Docs `769bb64` ↔ BE `7c28e75` mở lại hạng mục này: F42, F43 — rà soát mọi quyền; `STILL_NEEDED` → Request mới, seat cũ thành `G1`.
+- Remediation duy nhất: [g0-g6-final-business-baseline-remediation](../g0-g6-final-business-baseline-remediation/spec.md) ([impact matrix](../g0-g6-final-business-baseline-remediation/impact-matrix.md#3-findings)). AC liên quan không còn được coi là thỏa nguồn hiện hành cho tới khi remediation xong; trạng thái triển khai ở roadmap. Phần đã ghi phía trên là lịch sử, giữ nguyên.

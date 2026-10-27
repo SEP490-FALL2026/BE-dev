@@ -114,3 +114,8 @@ Employee xem trước khi gửi: số tiền của Request, bốn con số ướ
 23/10/2026: lập khung theo scope map G5 của [roadmap](../../../roadmap.md). Chưa thiết kế chi tiết, chưa code, chưa review, chưa nghiệm thu.
 
 23/10/2026: implement và `verified` local (người phụ trách: AI theo giao việc của người dùng). Làm kèm hai thay đổi của `POST /access-requests` mà spec của `g5-request-submission-and-routing` đã hẹn cho hạng mục này: chặn Request trùng quyền đang giữ và bắt buộc lý do cho công cụ ngoài bộ chuẩn; test `internal-path` về cấp thất bại vì quyền chồng được sửa thứ tự (quyền ghi sau khi gửi) cho đúng ý, và `form()` của harness luôn kèm lý do ngoài bộ chuẩn. `US-05-01` AC-8 chỉ phần BE (404 cho gói không có), phần đề xuất thuộc `g5-it-assessment-of-new-software`. Chưa commit, chưa peer review, chưa Owner review, chưa nghiệm thu.
+
+## Mở lại theo baseline `769bb64` (Prompt 03, 26/10/2026)
+
+- Audit G0–G6 trên Docs `769bb64` ↔ BE `7c28e75` mở lại hạng mục này: F04, F27 — bỏ _ngoài bộ chuẩn_; cổng tài chính.
+- Remediation duy nhất: [g0-g6-final-business-baseline-remediation](../g0-g6-final-business-baseline-remediation/spec.md) ([impact matrix](../g0-g6-final-business-baseline-remediation/impact-matrix.md#3-findings)). AC liên quan không còn được coi là thỏa nguồn hiện hành cho tới khi remediation xong; trạng thái triển khai ở roadmap. Phần đã ghi phía trên là lịch sử, giữ nguyên.

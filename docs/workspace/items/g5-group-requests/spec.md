@@ -214,3 +214,8 @@ Làm ngày 25/10/2026 trên cây làm việc chưa commit, trên cơ sở `verif
 25/10/2026 (sau `g6-leaver-request-closure`, `verified` ở local): `removeParticipant` vẫn chưa có. Hạng mục đó liệt kê Request nhóm của người nghỉ việc (dòng của người đó còn `AWAITING_NEED`, `NEED_CONFIRMED`, `APPROVED` hay `EXECUTING`) với `group: true, cancellable: false` và đóng nó bị `409 ACCESS_REQUEST.GROUP_REQUEST_UNSUPPORTED`; một thao tác theo người cho Request nhóm dùng `GroupResolutionService`/`GroupWithdrawalService` (không dùng `RequestEndService`) và phát `ACCESS_REQUEST.CANCELLED` kèm `reasonKind` như Request thường.
 
 25/10/2026 (follow-up): đã thêm `POST /access-requests/{id}/lines/{employeeId}/departure-closure` (IT Admin gỡ dòng của người đã nghỉ, dòng `CANCELLED`, hai migration `20261025010000` và `20261025010100`, kiểm kê e2e 296); xem mục _Follow-up 25/10/2026_ và [plan](plan.md#follow-up-25102026-đóng-dòng-của-người-đã-nghỉ-việc). Vẫn `verified` ở local, chưa commit, chưa peer review, chưa Owner review, chưa nghiệm thu; các lựa chọn thiết kế chưa phải quyết định của Owner.
+
+## Mở lại theo baseline `769bb64` (Prompt 03, 26/10/2026)
+
+- Audit G0–G6 trên Docs `769bb64` ↔ BE `7c28e75` mở lại hạng mục này: F04, F27, F29 — bỏ _ngoài bộ chuẩn_; cổng tài chính; dòng của người điều chuyển.
+- Remediation duy nhất: [g0-g6-final-business-baseline-remediation](../g0-g6-final-business-baseline-remediation/spec.md) ([impact matrix](../g0-g6-final-business-baseline-remediation/impact-matrix.md#3-findings)). AC liên quan không còn được coi là thỏa nguồn hiện hành cho tới khi remediation xong; trạng thái triển khai ở roadmap. Phần đã ghi phía trên là lịch sử, giữ nguyên.

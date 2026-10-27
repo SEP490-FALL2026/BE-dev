@@ -184,3 +184,8 @@ Giới hạn đã biết (không sửa; thuộc câu hỏi cho Owner hoặc hạ
 - Cổng được gắn trong `LicensingModule`: G5 phải sửa chính `LicensingModule`; một provider `GRANT_REQUEST_GATE` ở module khác không thay được `RefusingGrantRequestGate`.
 - Việc người thụ hưởng đã nghỉ chỉ được kiểm lúc cấp và lúc nhận việc.
 - `US-07-02` AC-2 (không gì tự hoàn tất theo thời gian) chỉ được chứng minh bằng việc không có bộ hẹn giờ nào; test lùi `claimed_at` 10 ngày chỉ xác nhận không route nào đổi trạng thái.
+
+## Mở lại theo baseline `769bb64` (Prompt 03, 26/10/2026)
+
+- Audit G0–G6 trên Docs `769bb64` ↔ BE `7c28e75` mở lại hạng mục này: F07, F20, F24, F25 — duy nhất tác vụ đang mở; đích cấp theo phòng; `SoD-5` trong giao dịch; thứ tự khóa.
+- Remediation duy nhất: [g0-g6-final-business-baseline-remediation](../g0-g6-final-business-baseline-remediation/spec.md) ([impact matrix](../g0-g6-final-business-baseline-remediation/impact-matrix.md#3-findings)). AC liên quan không còn được coi là thỏa nguồn hiện hành cho tới khi remediation xong; trạng thái triển khai ở roadmap. Phần đã ghi phía trên là lịch sử, giữ nguyên.

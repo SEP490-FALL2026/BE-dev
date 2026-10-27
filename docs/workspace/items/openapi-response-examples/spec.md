@@ -240,3 +240,8 @@ operation, 38 controller (110 × 403, 113 × 404, 80 × 409, 147 × 422), cộng
 - 26/10/2026 (Prompt 02, Owner) — ba quyết định ở _Phase sau merge G5/G6_: một thông điệp cho hai mã ngân sách (đổi runtime ở
   đường đua), bỏ 403 của `budgetProposalList`, hoãn mã chuyển qua của capability/module khác sang Prompt 03.
 - Chưa nghiệm thu.
+
+## Mở lại theo baseline `769bb64` (Prompt 03, 26/10/2026)
+
+- Audit G0–G6 trên Docs `769bb64` ↔ BE `7c28e75` mở lại hạng mục này: F49, F50 — `F1`, `F2`, `F4`, `F7`, `F8`, `F10` còn mở; mapper chết.
+- Remediation duy nhất: [g0-g6-final-business-baseline-remediation](../g0-g6-final-business-baseline-remediation/spec.md) ([impact matrix](../g0-g6-final-business-baseline-remediation/impact-matrix.md#3-findings)). AC liên quan không còn được coi là thỏa nguồn hiện hành cho tới khi remediation xong; trạng thái triển khai ở roadmap. Phần đã ghi phía trên là lịch sử, giữ nguyên.

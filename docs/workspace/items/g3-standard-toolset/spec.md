@@ -138,3 +138,8 @@ Migration `20261020210000_catalog_standard_toolsets` và `20261021110000_catalog
 Giới hạn còn lại: không có chặn `TRUNCATE` (giống các bảng khác); gói của ứng dụng đã ngừng vẫn được nhận vào bộ chuẩn; `ToolsetEmployeeNotFoundError` được khai báo nhưng chưa dùng; `list` và `mine` đọc theo N+1; chưa có remote CI.
 
 Câu hỏi cho Owner: Q7 của kiểm kê (cũng là `OQ-B-09`) — gói của ứng dụng đã ngừng có được đưa vào bộ công cụ chuẩn không; hiện lát này nhận và không cảnh báo.
+
+## Mở lại theo baseline `769bb64` (Prompt 03, 26/10/2026)
+
+- Audit G0–G6 trên Docs `769bb64` ↔ BE `7c28e75` mở lại hạng mục này: F04 — bộ công cụ chuẩn bị gỡ (`US-04-10` `RETIRED`).
+- Remediation duy nhất: [g0-g6-final-business-baseline-remediation](../g0-g6-final-business-baseline-remediation/spec.md) ([impact matrix](../g0-g6-final-business-baseline-remediation/impact-matrix.md#3-findings)). AC liên quan không còn được coi là thỏa nguồn hiện hành cho tới khi remediation xong; trạng thái triển khai ở roadmap. Phần đã ghi phía trên là lịch sử, giữ nguyên.

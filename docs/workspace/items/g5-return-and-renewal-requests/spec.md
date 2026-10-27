@@ -156,3 +156,8 @@ Suite mới: `return-request` (10 ca), `return-request-handover` (5), `return-re
 24/10/2026: `g6-handover-confirmation` đã đăng ký hook của mình cạnh `RETURN_REQUESTS`. Bản ghi hoàn trả vẫn giữ bàn giao nhẹ của chính nó: hook xác nhận bỏ qua các lý do có `referenceKind = RETURN_REQUEST`, nên một hoàn trả không bị hỏi xác nhận hai lần. Nếu sau này muốn hoàn trả dùng bảng `handover_duties`, đổi ở đó, không ở hook của hoàn trả.
 
 25/10/2026: `g6-time-limited-access` đã xong (`verified` local) và dùng cổng `RenewalHold` của hạng mục này: thêm `pendingRenewalsOf(assignmentIds)` (trả `requestId` và `state` của Request gia hạn chưa kết thúc theo lô, `RenewalRequestRepo.pendingOf`) để hàng đợi quyền hết hạn của IT Admin giữ mục ở trạng thái `WAITING_RENEWAL_DECISION`. Không thêm `getContinuousTermMonths` vì `getAssignmentFacts(...).chainStartsOn` đã đủ. Gia hạn được duyệt vẫn kết thúc Assignment cũ ở ngày kết thúc cũ nên mục rời hàng đợi; không cần đổi gì ở đây.
+
+## Mở lại theo baseline `769bb64` (Prompt 03, 26/10/2026)
+
+- Audit G0–G6 trên Docs `769bb64` ↔ BE `7c28e75` mở lại hạng mục này: F04, F27 — bỏ _ngoài bộ chuẩn_; cổng tài chính cho gia hạn có thời hạn.
+- Remediation duy nhất: [g0-g6-final-business-baseline-remediation](../g0-g6-final-business-baseline-remediation/spec.md) ([impact matrix](../g0-g6-final-business-baseline-remediation/impact-matrix.md#3-findings)). AC liên quan không còn được coi là thỏa nguồn hiện hành cho tới khi remediation xong; trạng thái triển khai ở roadmap. Phần đã ghi phía trên là lịch sử, giữ nguyên.

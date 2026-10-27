@@ -81,3 +81,8 @@ danh sách); facade `organization` (tên phòng, chức vụ theo lô). `openapi
 22/10/2026: lập theo Prompt 08. Chưa code, chưa review, chưa nghiệm thu.
 
 23/10/2026 (Prompt 10 — xử lý tồn đọng G0→G4): `LD-7`: `listCurrent` một `findMany`, tên phòng/chức vụ đọc theo lô qua `getDepartmentBriefs`/`getJobTitles`; `ToolsetView` thêm `department`, `jobTitle`. Kiểm chứng: `catalog-standard-toolset-read-batching` — xanh trên cây làm việc chưa commit, nhánh `Bao_dev_be`, nền `dev` `19be620`, 23/10/2026. Gate toàn cây trên cùng cây: `pnpm lint`, `tsc --noEmit`, `pnpm test` (unit 2.074 (141 suite)), `pnpm test:e2e` (839 (32 suite)), `pnpm test:integration` (112 suite, 1.429 test, gồm 4 test kho S3 thật trên LocalStack), `prisma migrate deploy` trên CSDL mới + `migrate diff --exit-code` (không lệch), `pnpm openapi:export`. Giới hạn: Thêm trường (không bớt). Chưa commit khi viết dòng này, chưa remote CI, chưa Owner review, chưa nghiệm thu: không có gì là `accepted`; đỏ-trước của từng test không được ghi lại.
+
+## Mở lại theo baseline `769bb64` (Prompt 03, 26/10/2026)
+
+- Audit G0–G6 trên Docs `769bb64` ↔ BE `7c28e75` mở lại hạng mục này: F04 — bộ công cụ chuẩn bị gỡ.
+- Remediation duy nhất: [g0-g6-final-business-baseline-remediation](../g0-g6-final-business-baseline-remediation/spec.md) ([impact matrix](../g0-g6-final-business-baseline-remediation/impact-matrix.md#3-findings)). AC liên quan không còn được coi là thỏa nguồn hiện hành cho tới khi remediation xong; trạng thái triển khai ở roadmap. Phần đã ghi phía trên là lịch sử, giữ nguyên.

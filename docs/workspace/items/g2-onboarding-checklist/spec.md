@@ -63,3 +63,8 @@ Module mới `onboarding` không sở hữu bảng: đọc facade `organization`
 - Lượt này không đổi mã của lát; chỉ đưa tài liệu về đúng trạng thái và ghi bằng chứng ở [plan](plan.md).
 
 Giới hạn còn lại: bước 5 (G7); chưa có remote CI; chưa chạy trên môi trường dùng chung. Không câu nào trong Q1–Q8 của kiểm kê liên quan trực tiếp tới lát này; câu Q7 (gói của ứng dụng đã ngừng trong bộ chuẩn) ảnh hưởng `configuredPairs` chỉ khi Owner đổi quy tắc ở `g3-standard-toolset`.
+
+## Mở lại theo baseline `769bb64` (Prompt 03, 26/10/2026)
+
+- Audit G0–G6 trên Docs `769bb64` ↔ BE `7c28e75` mở lại hạng mục này: F14 — bước 1 hoàn tất khi không còn lỗi chặn; thiếu Cost Center là cảnh báo; bỏ gợi ý bộ chuẩn.
+- Remediation duy nhất: [g0-g6-final-business-baseline-remediation](../g0-g6-final-business-baseline-remediation/spec.md) ([impact matrix](../g0-g6-final-business-baseline-remediation/impact-matrix.md#3-findings)). AC liên quan không còn được coi là thỏa nguồn hiện hành cho tới khi remediation xong; trạng thái triển khai ở roadmap. Phần đã ghi phía trên là lịch sử, giữ nguyên.

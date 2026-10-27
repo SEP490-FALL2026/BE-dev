@@ -84,3 +84,8 @@ Trưởng phòng được giao bước nhu cầu xem yêu cầu kèm các seat n
 23/10/2026: implement và `verified` local (người phụ trách: AI theo giao việc của người dùng). Chưa commit, chưa peer review, chưa Owner review, chưa nghiệm thu.
 
 24/10/2026 (sau `g5-group-requests`): `GET /access-requests/{id}/similar-seats` nhận thêm `employeeId`, bắt buộc với Request nhóm (người đó phải là một dòng của bước mà người gọi giữ; thiếu là `422 ACCESS_REQUEST.EMPLOYEE_REQUIRED`).
+
+## Mở lại theo baseline `769bb64` (Prompt 03, 26/10/2026)
+
+- Audit G0–G6 trên Docs `769bb64` ↔ BE `7c28e75` mở lại hạng mục này: F04 — bỏ cờ _ngoài bộ chuẩn_.
+- Remediation duy nhất: [g0-g6-final-business-baseline-remediation](../g0-g6-final-business-baseline-remediation/spec.md) ([impact matrix](../g0-g6-final-business-baseline-remediation/impact-matrix.md#3-findings)). AC liên quan không còn được coi là thỏa nguồn hiện hành cho tới khi remediation xong; trạng thái triển khai ở roadmap. Phần đã ghi phía trên là lịch sử, giữ nguyên.

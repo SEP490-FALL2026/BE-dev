@@ -232,3 +232,8 @@ Người: `E1`, `E4` người yêu cầu (`E4` thuộc `P-HR` chưa có trưởn
 24/10/2026: implement xong ở cây làm việc (chưa commit, chưa Owner review, chưa nghiệm thu). Làm đủ cả hai Story và AC-13 của `US-05-03`, trừ việc đưa cảnh báo vào hộp thư (chưa có hộp thư: xem _Explicit out of scope_). Đã dựng phần hợp đồng người nghe tổ chức vì `g6-transfer-record` chưa có, kèm bên phát cho gán và gỡ trưởng phòng hiệu lực hôm nay; ghi một dòng ở spec G6. Sửa `openSpend` không lọc người nghỉ việc. Các quyết định ở mục _quyết định thiết kế_ vẫn chờ Owner xác nhận.
 
 24/10/2026 (sau `g5-group-requests`): `StepTargetService` biết dòng của Request nhóm: bước giữ dòng của trưởng phòng được định tuyến như Request của trưởng phòng, để trưởng phòng không giữ bước quyết dòng của chính mình khi dữ liệu tổ chức đổi (`ReassignableRequest.lines`).
+
+## Mở lại theo baseline `769bb64` (Prompt 03, 26/10/2026)
+
+- Audit G0–G6 trên Docs `769bb64` ↔ BE `7c28e75` mở lại hạng mục này: F28 — chỉ Request nội bộ đổi bước nhu cầu khi điều chuyển.
+- Remediation duy nhất: [g0-g6-final-business-baseline-remediation](../g0-g6-final-business-baseline-remediation/spec.md) ([impact matrix](../g0-g6-final-business-baseline-remediation/impact-matrix.md#3-findings)). AC liên quan không còn được coi là thỏa nguồn hiện hành cho tới khi remediation xong; trạng thái triển khai ở roadmap. Phần đã ghi phía trên là lịch sử, giữ nguyên.

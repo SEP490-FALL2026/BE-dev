@@ -148,3 +148,8 @@ chuyển `ready`. Chưa implement, chưa nghiệm thu.
 16/10/2026: implement xong năm bước của plan, kiểm chứng local (chi tiết và các quyết định khi triển khai ở [plan](plan.md)). Khác spec: lớp HTTP ở `OrganizationHttpModule` riêng; bộ khoảng trắng T-12 viết tường minh vì `\s` của PostgreSQL không đủ; `departmentCode`/`jobTitleId` tùy chọn ở DTO để thành lý do T-16; thêm mã `JOB_TITLE.NAME_TOO_LONG`. Chưa review, chưa nghiệm thu.
 
 21/10/2026 (đợt hoàn tất G2–G4, [audit](../../../reviews/g2-g4-completion-2026-10-21/README.md)): chỉ đính chính văn bản — đuôi `US-02-02` AC-15 (không Assignment hiệu lực trước ngày vào làm) mà mục _Quyền từ ngày vào_ ghi là chờ G4/G5 nay đã làm cho import hiện trạng seat và lệnh cấp (quyết định D1 của AI, chờ Owner). Hành vi và test của lát này không đổi; Owner review: chưa review.
+
+## Mở lại theo baseline `769bb64` (Prompt 03, 26/10/2026)
+
+- Audit G0–G6 trên Docs `769bb64` ↔ BE `7c28e75` mở lại hạng mục này: F03 — danh mục chức vụ bị gỡ (`US-02-07` `RETIRED`), chức vụ là chữ tự do tùy chọn.
+- Remediation duy nhất: [g0-g6-final-business-baseline-remediation](../g0-g6-final-business-baseline-remediation/spec.md) ([impact matrix](../g0-g6-final-business-baseline-remediation/impact-matrix.md#3-findings)). AC liên quan không còn được coi là thỏa nguồn hiện hành cho tới khi remediation xong; trạng thái triển khai ở roadmap. Phần đã ghi phía trên là lịch sử, giữ nguyên.

@@ -149,3 +149,8 @@ Làm ngày 25/10/2026 trên cây làm việc chưa commit, sau `verified` (local
 - Thông báo: dòng bị gỡ phát `ACCESS_REQUEST.LINE_CANCELLED` (luật `status-rules.group.ts` → `REQUEST_CANCELLED` cho người gửi và người của dòng, không cho IT Admin, không cho người khác của nhóm). **Chưa có:** thông báo cho người giữ bước nhu cầu vừa được đóng khi dòng cuối bị gỡ (không có mã thông báo tương ứng; đóng Request thường vì người nghỉ cũng không báo họ).
 
 **Bằng chứng (local, chưa commit):** xem [plan](plan.md#follow-up-25102026-request-nhóm-đóng-theo-dòng). Trạng thái hạng mục vẫn là `verified` ở local, chưa commit; chưa peer review, chưa Owner review, chưa nghiệm thu.
+
+## Mở lại theo baseline `769bb64` (Prompt 03, 26/10/2026)
+
+- Audit G0–G6 trên Docs `769bb64` ↔ BE `7c28e75` mở lại hạng mục này: F29 — đường đóng _bị hủy — người thụ hưởng điều chuyển_.
+- Remediation duy nhất: [g0-g6-final-business-baseline-remediation](../g0-g6-final-business-baseline-remediation/spec.md) ([impact matrix](../g0-g6-final-business-baseline-remediation/impact-matrix.md#3-findings)). AC liên quan không còn được coi là thỏa nguồn hiện hành cho tới khi remediation xong; trạng thái triển khai ở roadmap. Phần đã ghi phía trên là lịch sử, giữ nguyên.

@@ -139,3 +139,8 @@ Cập nhật 25/10/2026 bởi người phụ trách (AI theo giao việc của n
 **Chưa kiểm chứng / giới hạn:** tệp minh chứng, thời hạn lưu phiếu (`OQ-31`, không xóa tự động) và hộp thông báo ngoài phạm vi; `AC-9` của `US-07-10` chỉ kiểm được ở mức OpenAPI. Chưa có test đồng thời riêng cho hai IT Admin cùng chuyển một phiếu (tuần tự hóa bằng khóa dòng) hay hai lượt chạy `SaasIssueSweeper` một lúc (dấu `response_overdue_noticed_at` đặt trong cùng transaction). Phiếu của IT Admin về quyền của chính họ do chính họ xử lý được, vì thiết kế không nêu quy tắc tách vai (`SoD-5`) cho phiếu; cần Owner xem nếu muốn chặn. Hai tham số mặc định lấy từ ví dụ của Story, chưa phải Owner chọn.
 
 **Cho hạng mục sau / FE:** chín route mới, hai tham số, các mã `SAAS_ISSUE.*`; `options` là collection; `linkedWork` là object bốn khóa; mô tả không đi vào audit. Hộp thông báo lấy từ `SAAS_ISSUE.{SUBMITTED,TRANSITIONED,MESSAGE_ADDED,REOPENED,DUPLICATED,RESOLVED,RESPONSE_OVERDUE,CLOSED}` (trường `notifyEmployeeId`).
+
+## Mở lại theo baseline `769bb64` (Prompt 03, 26/10/2026)
+
+- Audit G0–G6 trên Docs `769bb64` ↔ BE `7c28e75` mở lại hạng mục này: F48 — sequence mã báo lỗi theo năm.
+- Remediation duy nhất: [g0-g6-final-business-baseline-remediation](../g0-g6-final-business-baseline-remediation/spec.md) ([impact matrix](../g0-g6-final-business-baseline-remediation/impact-matrix.md#3-findings)). AC liên quan không còn được coi là thỏa nguồn hiện hành cho tới khi remediation xong; trạng thái triển khai ở roadmap. Phần đã ghi phía trên là lịch sử, giữ nguyên.

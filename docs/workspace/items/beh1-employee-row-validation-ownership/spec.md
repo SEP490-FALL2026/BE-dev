@@ -126,3 +126,8 @@ với spec.
 20/10/2026 — sau review: chỉ sửa chú thích đầu `employee-import-rows.validation-parity.spec.ts` (bỏ tên dự kiến
 `beh1-employee-row-validation-alignment`; ghi rằng Prompt 25 chỉ dùng chung policy ngữ nghĩa và cố ý giữ H8 D-1 → D-4).
 Cả 13 ca, fixture và kỳ vọng không đổi; không đổi code, gate, OpenAPI hay hành vi.
+
+## Mở lại theo baseline `769bb64` (Prompt 03, 26/10/2026)
+
+- Audit G0–G6 trên Docs `769bb64` ↔ BE `7c28e75` mở lại hạng mục này: F03 — bỏ kiểm chức vụ trong danh mục.
+- Remediation duy nhất: [g0-g6-final-business-baseline-remediation](../g0-g6-final-business-baseline-remediation/spec.md) ([impact matrix](../g0-g6-final-business-baseline-remediation/impact-matrix.md#3-findings)). AC liên quan không còn được coi là thỏa nguồn hiện hành cho tới khi remediation xong; trạng thái triển khai ở roadmap. Phần đã ghi phía trên là lịch sử, giữ nguyên.

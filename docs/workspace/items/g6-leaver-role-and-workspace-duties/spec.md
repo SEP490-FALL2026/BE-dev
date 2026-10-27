@@ -136,3 +136,8 @@ Cập nhật 25/10/2026 bởi người phụ trách (AI theo giao việc của n
 **Chưa kiểm chứng / giới hạn:** việc bước rà soát của Finance hay của Người duyệt chi chuyển sang _chờ có kiểm soát_ khi họ nghỉ việc vẫn của `g5-step-reassignment-and-controlled-wait` (không đổi ở đây); hộp thư trong ứng dụng chờ `g4-notification-delivery` (điểm gọi là audit `ROLE_HOLDER_FLAGGED`); lọc `roleFlag` đọc ảnh chụp nên một vai đã chuyển giao sau khi ghi vẫn còn trong bộ lọc (kết luận hiển thị luôn tính lại); `NO_HOLDER` chỉ kiểm bằng cách thu hồi grant bằng SQL trong test (không route nào làm được); không đo tải.
 
 **Cho hạng mục sau:** `g5-step-reassignment-and-controlled-wait` nghe `EMPLOYEE_LEFT` (đã có người phát); `g4-notification-delivery` đọc audit `OFFBOARDING_CASE.ROLE_HOLDER_FLAGGED` (`audience: SUPER_ADMIN, IT_ADMIN`, `priority`); FE: hai route mới, `roleFlags` ở dòng và chi tiết của hồ sơ nghỉ việc, lọc `roleFlag`, `warnings.workspaces`, `warnings.registered.ROLE_HOLDER_NEEDS_REPLACEMENT`, `blockers.WORKSPACE_OWNER_NOT_TRANSFERRED`; lưu ý khi viết test: sau khi Super Admin của harness `LEFT` thì không còn tạo được tài khoản hay đặt vai trong cùng cơ sở dữ liệu, nên ca đó phải chạy cuối suite.
+
+## Mở lại theo baseline `769bb64` (Prompt 03, 26/10/2026)
+
+- Audit G0–G6 trên Docs `769bb64` ↔ BE `7c28e75` mở lại hạng mục này: F17 — người nhận cảnh báo theo `D-7`.
+- Remediation duy nhất: [g0-g6-final-business-baseline-remediation](../g0-g6-final-business-baseline-remediation/spec.md) ([impact matrix](../g0-g6-final-business-baseline-remediation/impact-matrix.md#3-findings)). AC liên quan không còn được coi là thỏa nguồn hiện hành cho tới khi remediation xong; trạng thái triển khai ở roadmap. Phần đã ghi phía trên là lịch sử, giữ nguyên.

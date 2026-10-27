@@ -132,3 +132,8 @@ Audit cùng giao dịch: `COST_ALLOCATION.DECLARED` (phiên bản và dòng trư
 ## Changes and acceptance
 
 20/10/2026: thiết kế `ready`. Quyết định cần Owner xác nhận khi review: một phân bổ hiện hành cho mỗi thuê bao kèm lịch sử (chưa chia theo kỳ); tỷ lệ phần vạn tối đa 2 chữ số thập phân, mỗi dòng `> 0`, cho phép một dòng 100; gói `PER_HOST` được phân bổ và gói chưa khai mô hình giá bị từ chối; Cost Center ngừng dùng không nhận phân bổ mới; IT Admin và Finance đọc, chỉ Finance ghi; route đặt ở `catalog/subscription`. Chưa code, chưa review, chưa nghiệm thu.
+
+## Mở lại theo baseline `769bb64` (Prompt 03, 26/10/2026)
+
+- Audit G0–G6 trên Docs `769bb64` ↔ BE `7c28e75` mở lại hạng mục này: F05 — phân bổ theo tỷ lệ bị gỡ (`US-04-08` `RETIRED`).
+- Remediation duy nhất: [g0-g6-final-business-baseline-remediation](../g0-g6-final-business-baseline-remediation/spec.md) ([impact matrix](../g0-g6-final-business-baseline-remediation/impact-matrix.md#3-findings)). AC liên quan không còn được coi là thỏa nguồn hiện hành cho tới khi remediation xong; trạng thái triển khai ở roadmap. Phần đã ghi phía trên là lịch sử, giữ nguyên.

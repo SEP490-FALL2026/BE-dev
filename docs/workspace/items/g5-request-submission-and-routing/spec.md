@@ -107,3 +107,8 @@ Trong một `TransactionRunner.run`: (1) đọc `APPROVAL_SLA_WORKING_DAYS` trư
 ## Changes and acceptance
 
 23/10/2026: thiết kế `ready` và implement (người phụ trách: AI theo giao việc của người dùng). Bản đồ phân rã G5 sửa hai Story chia theo vế: `US-05-03` AC-9 và AC-13, `US-05-02` AC-5 là dòng `partial` ở [roadmap](../../../roadmap.md#work-item-decomposition-g5). Chưa commit, chưa peer review, chưa Owner review, chưa nghiệm thu.
+
+## Mở lại theo baseline `769bb64` (Prompt 03, 26/10/2026)
+
+- Audit G0–G6 trên Docs `769bb64` ↔ BE `7c28e75` mở lại hạng mục này: F27, F30 — cổng cấu hình tài chính chưa hoàn tất, nháp; Super Admin không gửi Request.
+- Remediation duy nhất: [g0-g6-final-business-baseline-remediation](../g0-g6-final-business-baseline-remediation/spec.md) ([impact matrix](../g0-g6-final-business-baseline-remediation/impact-matrix.md#3-findings)). AC liên quan không còn được coi là thỏa nguồn hiện hành cho tới khi remediation xong; trạng thái triển khai ở roadmap. Phần đã ghi phía trên là lịch sử, giữ nguyên.

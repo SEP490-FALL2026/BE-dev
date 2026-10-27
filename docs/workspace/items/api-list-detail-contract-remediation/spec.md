@@ -343,3 +343,8 @@ DTO hay query. Bảy quyết định `LD-13` vẫn mở; không hạng mục cap
 `LD-16` hai vế. Chỉ đổi gate và tài liệu; runtime, OpenAPI không đổi. Chưa có Owner review cuối hay remote CI.
 
 23/10/2026 (Prompt 10): các hạng mục chủ đã gỡ mục registry tương ứng: registry `COLLECTION_EXCEPTIONS` còn **14 mục trên 12 operation** (`detail-reuse` 3, `bounded` 5, `owner-decision` 5, `unbounded` 1) và `NESTED_ARRAYS` **63 mục** (`bounded` 60, `unbounded` 2, `owner-decision` 1); các mục `query` đã gỡ khi test harness chứng minh, và `departmentWarningList`, `nonWorkingDateList`, `projectList` không còn mục vì đã phân trang. Mục mới `projectGet#departments` (`bounded`, route mới ở `organization-identity-read-contracts`). Chưa có Owner review cuối; bảy điểm `LD-13` còn chờ Owner (xem review mục 11).
+
+## Mở lại theo baseline `769bb64` (Prompt 03, 26/10/2026)
+
+- Audit G0–G6 trên Docs `769bb64` ↔ BE `7c28e75` mở lại hạng mục này: F55 — `LD-13` điểm 1 → 7 còn mở (P03-D14).
+- Remediation duy nhất: [g0-g6-final-business-baseline-remediation](../g0-g6-final-business-baseline-remediation/spec.md) ([impact matrix](../g0-g6-final-business-baseline-remediation/impact-matrix.md#3-findings)). AC liên quan không còn được coi là thỏa nguồn hiện hành cho tới khi remediation xong; trạng thái triển khai ở roadmap. Phần đã ghi phía trên là lịch sử, giữ nguyên.

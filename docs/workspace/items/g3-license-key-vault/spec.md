@@ -130,3 +130,8 @@ Migration `20261020260000_licensing_license_keys` (`…250000` đã dùng cho h�
 - _Thay đổi của lượt rà soát (có test):_ schema môi trường từ chối `LICENSE_KEY_VAULT_KEY` trùng `OUTBOX_PAYLOAD_KEY` và kiểm `LICENSE_KEY_VAULT_PREVIOUS_KEYS` (test ở `src/infrastructure/config/env-schema.spec.ts`); `docs/guides/containers.md` sửa; viết [runbook kho khóa](../../../guides/license-key-vault.md).
 - _Giới hạn đã biết, không giấu:_ (1) không có lệnh niêm lại (re-seal) nên một khóa cũ trong `LICENSE_KEY_VAULT_PREVIOUS_KEYS` không bao giờ gỡ được khi còn dòng mang `cipher_key_id` của nó (câu hỏi Owner Q8 của [lượt rà soát](../../../reviews/g2-g4-completion-2026-10-21/README.md)); (2) xem đầy đủ được phép ở mọi trạng thái khóa và được ghi Audit Trail nhưng không giới hạn tần suất; (3) import 1.000 khóa là 1.000 lệnh chèn trong một giao dịch (test chạy với timeout 120 s); (4) `assignmentId` rỗng và chưa có chặn cấp vượt sức chứa cho tới khi `g4-device-dependent-features` làm AC-5→AC-8.
 - _Chưa kiểm chứng:_ chạy trên môi trường dùng chung, remote CI, khối lượng thật, xoay khóa thật trên dữ liệu thật. Không ghi `accepted`; mọi quyết định nêu ở mục 20/10/2026 vẫn chờ Owner.
+
+## Mở lại theo baseline `769bb64` (Prompt 03, 26/10/2026)
+
+- Audit G0–G6 trên Docs `769bb64` ↔ BE `7c28e75` mở lại hạng mục này: F22, F23 — khóa `K4` trong read model phần mềm phòng; ứng dụng đã ngừng.
+- Remediation duy nhất: [g0-g6-final-business-baseline-remediation](../g0-g6-final-business-baseline-remediation/spec.md) ([impact matrix](../g0-g6-final-business-baseline-remediation/impact-matrix.md#3-findings)). AC liên quan không còn được coi là thỏa nguồn hiện hành cho tới khi remediation xong; trạng thái triển khai ở roadmap. Phần đã ghi phía trên là lịch sử, giữ nguyên.
