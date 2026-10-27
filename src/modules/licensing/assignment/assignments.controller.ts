@@ -22,13 +22,10 @@ import {
 } from './assignment.dto';
 import { AssignmentListService } from './assignment-list.service';
 import { AssignmentResponsibleService } from './assignment-responsible.service';
-import { ProposeMoveBodyDto, ServiceAccountMoveResponseDto } from './service-account.dto';
 import {
   SERVICE_ACCOUNT_ERROR_EXAMPLES as EXAMPLES,
   toServiceAccountApiException,
 } from './service-account.http-errors';
-import { ServiceAccountMoveViewService } from './service-account-move-view.service';
-import { ServiceAccountMoveService } from './service-account-move.service';
 
 const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPONSE] as const;
 const IT_ONLY = {
@@ -60,8 +57,6 @@ export class AssignmentsController {
   constructor(
     private readonly responsible: AssignmentResponsibleService,
     private readonly assignmentList: AssignmentListService,
-    private readonly moves: ServiceAccountMoveService,
-    private readonly moveViews: ServiceAccountMoveViewService,
   ) {}
 
   @Get()
@@ -134,61 +129,6 @@ export class AssignmentsController {
       });
 
       return { ended: toWire(ended), created: toWire(created) };
-    } catch (error) {
-      throw toServiceAccountApiException(error);
-    }
-  }
-
-  @Post(':id/department-moves')
-  @RequireRoles('IT_ADMIN')
-  @ApiOperation({
-    operationId: 'licenseAssignmentProposeDepartmentMove',
-    summary: 'Propose moving a service account to another department',
-  })
-  @ApiSuccessResponse(ServiceAccountMoveResponseDto, {
-    status: HttpStatus.CREATED,
-    message: 'SERVICE_ACCOUNT_MOVE.PROPOSED',
-    description:
-      'The proposal waits and changes no assignment: the head of the receiving department confirms it (or the fallback approver when the department has no head). The new person has to belong to the receiving department on the day the move takes effect. On confirmation the old assignment ends that day and the new one begins in the receiving department, charged to its Cost Center, with the seats taken unchanged on every day.',
-  })
-  @ApiErrorResponses(
-    ...AUTH_ERRORS,
-    IT_ONLY,
-    NOT_FOUND,
-    {
-      status: HttpStatus.CONFLICT,
-      description:
-        'The assignment has ended (LICENSE_ASSIGNMENT.NOT_OPEN), a move of it already waits (SERVICE_ACCOUNT_MOVE.PENDING_EXISTS), or the day is later than the day the transfer or the departure of the person responsible takes effect while that day has not come (LICENSE_ASSIGNMENT.RESPONSIBLE_AFTER_DEADLINE).',
-      examples: [EXAMPLES.ASSIGNMENT_NOT_OPEN, EXAMPLES.PENDING_EXISTS, EXAMPLES.RESPONSIBLE_AFTER_DEADLINE],
-    },
-    {
-      status: HttpStatus.UNPROCESSABLE_ENTITY,
-      description:
-        'The request is invalid (VALIDATION_ERROR) or refused: LICENSE_ASSIGNMENT.NOT_SERVICE_ACCOUNT, EFFECTIVE_DATE_INVALID, EXPECTED_END_REQUIRED, SERVICE_ACCOUNT_MOVE.TARGET_DEPARTMENT_INVALID (the department is unknown, retired or the one that owns the account) or SERVICE_ACCOUNT_MOVE.RESPONSIBLE_INVALID (the person is not found, not active, handing over, or not in the receiving department on that day).',
-      examples: [
-        VALIDATION_EXAMPLE,
-        EXAMPLES.NOT_SERVICE_ACCOUNT,
-        EXAMPLES.EFFECTIVE_DATE_INVALID,
-        EXAMPLES.EXPECTED_END_REQUIRED,
-        EXAMPLES.TARGET_DEPARTMENT_INVALID,
-        EXAMPLES.MOVE_RESPONSIBLE_INVALID,
-      ],
-    },
-  )
-  async proposeDepartmentMove(
-    @CurrentPrincipal() actor: AuthenticatedPrincipal,
-    @Param() params: AssignmentIdParamDto,
-    @Body() body: ProposeMoveBodyDto,
-  ) {
-    try {
-      const move = await this.moves.propose(actor, params.id, {
-        toDepartmentId: body.toDepartmentId,
-        newResponsibleEmployeeId: body.newResponsibleEmployeeId,
-        effectiveFrom: body.effectiveFrom,
-        expectedEndDate: body.expectedEndDate ?? null,
-      });
-
-      return (await this.moveViews.wireOf([move]))[0];
     } catch (error) {
       throw toServiceAccountApiException(error);
     }

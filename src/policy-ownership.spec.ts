@@ -45,8 +45,7 @@ const PLACEMENT_REASON_CODES: ReadonlySet<string> = new Set([
   'DEPARTMENT_INACTIVE',
   'DEPARTMENT_COST_CENTER_INACTIVE',
   'JOB_TITLE_REQUIRED',
-  'JOB_TITLE_NOT_FOUND',
-  'JOB_TITLE_INACTIVE',
+  'JOB_TITLE_TOO_LONG',
 ]);
 
 /**
@@ -57,19 +56,30 @@ const OTHER_DECISIONS: ReadonlyMap<string, { codes: readonly string[]; reason: s
   [
     'installation/dev-seed/dev-seed-plan.ts',
     {
-      codes: ['DEPARTMENT_INACTIVE', 'JOB_TITLE_INACTIVE'],
+      codes: ['DEPARTMENT_INACTIVE'],
       reason: 'dev:seed compares an existing fixture item with the fixture (P23-RV-01 SeedConflict), not a row',
     },
   ],
   [
     'installation/dev-seed/dev-seed.types.ts',
-    { codes: ['DEPARTMENT_INACTIVE', 'JOB_TITLE_INACTIVE'], reason: 'the SeedConflict type of the same comparison' },
+    { codes: ['DEPARTMENT_INACTIVE'], reason: 'the SeedConflict type of the same comparison' },
   ],
   [
     'organization/project/project.errors.ts',
     { codes: ['DEPARTMENT_NOT_FOUND'], reason: 'a project names departments that must exist (ProjectInvalidError)' },
   ],
   ['organization/project/project.service.ts', { codes: ['DEPARTMENT_NOT_FOUND'], reason: 'raises that project error' }],
+  [
+    'organization/cost-center-direction/cost-center-direction.errors.ts',
+    {
+      codes: ['DEPARTMENT_NOT_FOUND'],
+      reason: 'the refusal of `ops:cost-center-direction link` for a department code that names none (spec L.11)',
+    },
+  ],
+  [
+    'organization/cost-center-direction/cost-center-direction.service.ts',
+    { codes: ['DEPARTMENT_NOT_FOUND'], reason: 'raises that refusal' },
+  ],
 ]);
 
 function listSources(directory: string): string[] {
@@ -209,14 +219,14 @@ describe('BEH.1: a shared business policy has one owner (A4-11)', () => {
     it('finds a copied reason switch, in values and in literal types, and ignores comments and other text', () => {
       const copied = `
         // DEPARTMENT_INACTIVE in a comment does not count
-        type Code = 'JOB_TITLE_INACTIVE' | 'OTHER';
+        type Code = 'JOB_TITLE_TOO_LONG' | 'OTHER';
         const label = 'DEPARTMENT_INACTIVE_SOON';
         if (!department.active) errors.push({ column: 'department_code', code: \`DEPARTMENT_INACTIVE\` });
       `;
 
       expect(reasonLiterals('copy.ts', copied, PLACEMENT_REASON_CODES)).toEqual([
         'DEPARTMENT_INACTIVE',
-        'JOB_TITLE_INACTIVE',
+        'JOB_TITLE_TOO_LONG',
       ]);
     });
 

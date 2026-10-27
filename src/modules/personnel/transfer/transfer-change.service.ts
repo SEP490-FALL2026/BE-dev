@@ -326,7 +326,6 @@ export class TransferChangeService {
         employeeId: held.employeeId,
         effectiveOn,
         departmentId: held.toDepartmentId,
-        jobTitleId: held.toJobTitleId,
       });
     } catch (error) {
       if (error instanceof PlacementOverlapError)

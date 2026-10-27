@@ -156,6 +156,7 @@ describe('the notices of the department heads (integration, real PostgreSQL)', (
         { employeeId: e1.employeeId, kind: 'JOB_TITLE_CHANGE', proposedOn: h.day(7) },
         h2.account,
       );
+      // A change of job title is not told any more (QĐ-87e): the body is refused before anyone is asked who sends it.
 
       expect(transfer.status).toBe(201);
       expect(h.dataOf<NoticeWire>(transfer)).toMatchObject({
@@ -163,7 +164,7 @@ describe('the notices of the department heads (integration, real PostgreSQL)', (
         targetDepartment: { id: fin.id },
       });
       expect([leaving.status, h.codeOf(leaving)]).toEqual([403, 'PERSONNEL_NOTICE.NOT_DEPARTMENT_HEAD']);
-      expect([title.status, h.codeOf(title)]).toEqual([403, 'PERSONNEL_NOTICE.NOT_DEPARTMENT_HEAD']);
+      expect([title.status, h.codeOf(title)]).toEqual([422, 'VALIDATION_ERROR']);
       expect(await h.noticeRows(e1.employeeId)).toHaveLength(1);
     });
 

@@ -83,8 +83,6 @@ export class ReassignmentHarness extends SpendHarness {
         employeeId,
         fromDepartmentId: old.department_id,
         toDepartmentId: departmentId,
-        fromJobTitleId: old.job_title_id,
-        toJobTitleId: old.job_title_id,
         effectiveOn: today,
       });
     });

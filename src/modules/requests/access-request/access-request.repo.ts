@@ -40,8 +40,6 @@ export class AccessRequestRepo {
         businessReason: input.businessReason,
         termMonths: input.termMonths,
         projectLabel: input.projectLabel,
-        outsideStandardReason: input.outsideStandardReason,
-        outsideStandard: input.outsideStandard,
         delegatedBatchId: input.delegatedBatchId ?? null,
         expectedEndDate: input.expectedEndDate ? toDateColumn(input.expectedEndDate) : null,
         ...pricingColumns(input.pricing),
@@ -259,7 +257,7 @@ export class AccessRequestRepo {
         JOIN access_requests r ON r.id = b.request_id
         LEFT JOIN access_request_lines l ON l.request_id = b.request_id AND l.employee_id = b.employee_id
        WHERE r.plan_id = ${planId}::uuid AND b.employee_id = ANY(${[...employeeIds]}::uuid[])
-         AND r.type IN ('GRANT', 'GROUP_GRANT')
+         AND r.type IN ('GRANT', 'GROUP_GRANT') AND r.state <> 'DRAFT'
          AND (
            (r.type = 'GRANT' AND r.state NOT IN ('REJECTED', 'IT_REJECTED', 'FAILED', 'WITHDRAWN', 'CANCELLED', 'COMPLETED'))
            OR (r.type = 'GROUP_GRANT'
@@ -269,8 +267,15 @@ export class AccessRequestRepo {
     return new Set(rows.map((row) => row.employee_id));
   }
 
+  /**
+   * A request that is being drafted (`DRAFT`, spec L.1) is written by the release after this one and is not read here: it is
+   * answered as a request that does not exist, so no service of this release can see, list, decide or move it.
+   */
   async findById(id: string, tx?: DbTx): Promise<AccessRequestRecord | null> {
-    const row = await (tx ?? this.prisma).accessRequest.findUnique({ where: { id }, select: SELECT_REQUEST });
+    const row = await (tx ?? this.prisma).accessRequest.findUnique({
+      where: { id, state: { not: 'DRAFT' } },
+      select: SELECT_REQUEST,
+    });
 
     return row ? toRecord(row) : null;
   }

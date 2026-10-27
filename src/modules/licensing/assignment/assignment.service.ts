@@ -18,7 +18,7 @@ import type {
 } from '../licensing.types';
 import { licensingAuditEvent } from '../mappers/licensing-audit-event';
 import { toAssignmentFailure } from './assignment-conflicts';
-import { assignmentCreatedSnapshot } from './assignment.policy';
+import { assertSubscriptionDepartment, assignmentCreatedSnapshot } from './assignment.policy';
 import { assertBaselineTarget, assertSeatTargetUsable, toSeatTargetRef } from './baseline-target.policy';
 import { AssignmentRepo } from './assignment.repo';
 
@@ -115,6 +115,7 @@ export class AssignmentService {
   ): Promise<AssignmentRecord[]> {
     const created: AssignmentRecord[] = [];
     for (const [index, row] of input.rows.entries()) {
+      assertSubscriptionDepartment(input.target, row.owningDepartmentId, index);
       let record: AssignmentRecord;
       try {
         record = await this.repo.insert(tx, {
@@ -160,8 +161,9 @@ export class AssignmentService {
   /**
    * Writes the seat a request is granted, in the caller transaction (which holds the lock of the seat target), with its
    * audit event: a personal seat, or a service account with its reason, owning department and Cost Center (`US-05-21`).
-   * Throws AssignmentConflictError when the database refuses it: an overlap, the seats all taken, the identifier in use,
-   * no expected end date for time-limited staff, or a rule of the baseline or of the owning department.
+   * Throws AssignmentConflictError when a service account would sit on a subscription of another department (before anything is
+   * written), or when the database refuses it: an overlap, the seats all taken, the identifier in use, no expected end date for
+   * time-limited staff, or a rule of the baseline or of the owning department.
    */
   async createFromRequest(
     tx: DbTx,
@@ -176,6 +178,7 @@ export class AssignmentService {
     },
   ): Promise<AssignmentRecord> {
     const { holder } = input;
+    assertSubscriptionDepartment(input.target, holder.owningDepartmentId, 0);
     let record: AssignmentRecord;
     try {
       record = await this.repo.insert(tx, {

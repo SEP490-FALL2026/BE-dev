@@ -65,7 +65,6 @@ export class GroupHarness extends StatusHarness {
     lines: people.map((person) => ({ employeeId: person.employeeId })),
     businessReason: 'The new brand needs the shared workspace',
     termMonths: 12,
-    outsideStandardReason: 'Not in the standard toolset',
     ...extra,
   });
 

@@ -57,11 +57,12 @@ export class ServiceAccountRequestsController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The seat baseline is not closed yet (SERVICE_ACCOUNT_REQUEST.BASELINE_NOT_CLOSED), the application of the plan is retired (ACCESS_REQUEST.APPLICATION_RETIRED) or the sender belongs to no department (ACCESS_REQUEST.NO_DEPARTMENT). Nothing is written.',
+        'The seat baseline is not closed yet (SERVICE_ACCOUNT_REQUEST.BASELINE_NOT_CLOSED), the application of the plan is retired (ACCESS_REQUEST.APPLICATION_RETIRED) , the sender belongs to no department (ACCESS_REQUEST.NO_DEPARTMENT) or the department has no Cost Center in use yet (FINANCE.SETUP_INCOMPLETE). Nothing is written.',
       examples: [
         SERVICE_ACCOUNT_ERROR_EXAMPLES.BASELINE_NOT_CLOSED,
         SERVICE_ACCOUNT_ERROR_EXAMPLES.APPLICATION_RETIRED,
         SERVICE_ACCOUNT_ERROR_EXAMPLES.NO_DEPARTMENT,
+        SERVICE_ACCOUNT_ERROR_EXAMPLES.FINANCE_SETUP_INCOMPLETE,
       ],
     },
     {

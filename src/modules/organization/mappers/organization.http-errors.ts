@@ -4,6 +4,8 @@ import { toUnavailableApiException } from '../../../infrastructure/http/errors/s
 import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
 import {
   CostCenterCodeTakenError,
+  CostCenterDepartmentAlreadyLinkedError,
+  CostCenterDepartmentNotActiveError,
   CostCenterInUseError,
   CostCenterKindNotSupportedError,
   CostCenterNameInvalidError,
@@ -12,7 +14,7 @@ import {
 } from '../cost-center/cost-center.errors';
 import {
   DepartmentCodeTakenError,
-  DepartmentCostCenterError,
+  DepartmentCreationAwaitingActivationError,
   DepartmentInUseError,
   DepartmentInactiveError,
   DepartmentItAdminInvalidError,
@@ -28,12 +30,6 @@ import {
   EmployeeUpdateEmptyError,
 } from '../employee/employee.errors';
 import { EmployeeNotFoundError } from '../organization.errors';
-import {
-  JobTitleNameRequiredError,
-  JobTitleNameTakenError,
-  JobTitleNameTooLongError,
-  JobTitleNotFoundError,
-} from '../job-title/job-title.errors';
 import { PROJECT_INVALID_REASONS, ProjectInvalidError, ProjectNotFoundError } from '../project/project.errors';
 
 function refuse(status: HttpStatus, code: string, message: string, details?: Record<string, unknown>): ApiException {
@@ -58,27 +54,17 @@ export function toOrganizationApiException(error: unknown): unknown {
   if (error instanceof EmployeeAnotherItAdminNeededError) {
     return refuse(HttpStatus.FORBIDDEN, 'EMPLOYEE.ANOTHER_IT_ADMIN_NEEDED', error.message);
   }
-  if (error instanceof JobTitleNotFoundError) return refuse(HttpStatus.NOT_FOUND, 'JOB_TITLE.NOT_FOUND', error.message);
-  if (error instanceof JobTitleNameRequiredError) {
-    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'JOB_TITLE.NAME_REQUIRED', error.message);
-  }
-  if (error instanceof JobTitleNameTooLongError) {
-    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'JOB_TITLE.NAME_TOO_LONG', error.message);
-  }
-  if (error instanceof JobTitleNameTakenError) {
-    return refuse(
-      HttpStatus.CONFLICT,
-      'JOB_TITLE.NAME_TAKEN',
-      error.message,
-      error.conflict ? { conflict: error.conflict } : undefined,
-    );
-  }
-
   if (error instanceof CostCenterNotFoundError) {
     return refuse(HttpStatus.NOT_FOUND, 'COST_CENTER.NOT_FOUND', error.message);
   }
   if (error instanceof CostCenterCodeTakenError) {
     return refuse(HttpStatus.CONFLICT, 'COST_CENTER.CODE_TAKEN', error.message);
+  }
+  if (error instanceof CostCenterDepartmentNotActiveError) {
+    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'COST_CENTER.DEPARTMENT_NOT_ACTIVE', error.message);
+  }
+  if (error instanceof CostCenterDepartmentAlreadyLinkedError) {
+    return refuse(HttpStatus.CONFLICT, 'COST_CENTER.DEPARTMENT_ALREADY_LINKED', error.message);
   }
   if (error instanceof CostCenterKindNotSupportedError) {
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'COST_CENTER.KIND_NOT_SUPPORTED', error.message);
@@ -106,10 +92,8 @@ export function toOrganizationApiException(error: unknown): unknown {
   if (error instanceof DepartmentCodeTakenError) {
     return refuse(HttpStatus.CONFLICT, 'DEPARTMENT.CODE_TAKEN', error.message);
   }
-  if (error instanceof DepartmentCostCenterError) {
-    const status = error.problem === 'TAKEN' ? HttpStatus.CONFLICT : HttpStatus.UNPROCESSABLE_ENTITY;
-
-    return refuse(status, `DEPARTMENT.COST_CENTER_${error.problem}`, error.message);
+  if (error instanceof DepartmentCreationAwaitingActivationError) {
+    return refuse(HttpStatus.CONFLICT, 'DEPARTMENT.CREATION_AWAITING_ACTIVATION', error.message);
   }
   if (error instanceof DepartmentNameInvalidError) {
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'DEPARTMENT.NAME_INVALID', error.message);
@@ -155,14 +139,10 @@ export const ORGANIZATION_ERROR_EXAMPLES = {
   EMPLOYEE_NOT_FOUND: example(new EmployeeNotFoundError('<employee-id>')),
   EMPLOYEE_UPDATE_EMPTY: example(new EmployeeUpdateEmptyError()),
   EMPLOYEE_ANOTHER_IT_ADMIN_NEEDED: example(new EmployeeAnotherItAdminNeededError()),
-  JOB_TITLE_NOT_FOUND: example(new JobTitleNotFoundError()),
-  JOB_TITLE_NAME_REQUIRED: example(new JobTitleNameRequiredError()),
-  JOB_TITLE_NAME_TOO_LONG: example(new JobTitleNameTooLongError()),
-  JOB_TITLE_NAME_TAKEN: example(
-    new JobTitleNameTakenError({ id: '<job-title-id>', name: 'Designer', status: 'ACTIVE' }),
-  ),
   COST_CENTER_NOT_FOUND: example(new CostCenterNotFoundError()),
   COST_CENTER_CODE_TAKEN: example(new CostCenterCodeTakenError('CC-01')),
+  COST_CENTER_DEPARTMENT_NOT_ACTIVE: example(new CostCenterDepartmentNotActiveError()),
+  COST_CENTER_DEPARTMENT_ALREADY_LINKED: example(new CostCenterDepartmentAlreadyLinkedError('<department-id>')),
   COST_CENTER_KIND_NOT_SUPPORTED: example(new CostCenterKindNotSupportedError()),
   COST_CENTER_NAME_RESERVED: example(new CostCenterNameReservedError()),
   COST_CENTER_NAME_INVALID: example(new CostCenterNameInvalidError()),
@@ -176,9 +156,7 @@ export const ORGANIZATION_ERROR_EXAMPLES = {
   DEPARTMENT_NOT_FOUND: example(new DepartmentNotFoundError()),
   DEPARTMENT_OUT_OF_SCOPE: example(new DepartmentOutOfScopeError()),
   DEPARTMENT_CODE_TAKEN: example(new DepartmentCodeTakenError('D01')),
-  DEPARTMENT_COST_CENTER_TAKEN: example(new DepartmentCostCenterError('TAKEN')),
-  DEPARTMENT_COST_CENTER_NOT_FOUND: example(new DepartmentCostCenterError('NOT_FOUND')),
-  DEPARTMENT_COST_CENTER_INACTIVE: example(new DepartmentCostCenterError('INACTIVE')),
+  DEPARTMENT_CREATION_AWAITING_ACTIVATION: example(new DepartmentCreationAwaitingActivationError()),
   DEPARTMENT_NAME_INVALID: example(new DepartmentNameInvalidError()),
   DEPARTMENT_IT_ADMIN_INVALID: example(new DepartmentItAdminInvalidError()),
   DEPARTMENT_UPDATE_EMPTY: example(new DepartmentUpdateEmptyError()),

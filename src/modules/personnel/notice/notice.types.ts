@@ -1,7 +1,11 @@
 import type { BusinessDate } from '../../../core/business-date';
 import type { GroundsInput } from '../grounds/grounds.policy';
 
-/** What a head tells: a person going to another department, coming to theirs, a new job title, leaving, leaving suddenly, or long leave. */
+/**
+ * What a notice can be about as it is read: a person going to another department, coming to theirs, a new job title, leaving,
+ * leaving suddenly, or long leave. A change of job title is no longer told (`QĐ-87e`): a notice of that kind that already exists
+ * is read, rejected and kept as history, and none is sent.
+ */
 export const NOTICE_KINDS = [
   'DEPARTMENT_TRANSFER_OUT',
   'DEPARTMENT_TRANSFER_IN',
@@ -12,6 +16,15 @@ export const NOTICE_KINDS = [
 ] as const;
 
 export type NoticeKind = (typeof NOTICE_KINDS)[number];
+
+/** The kinds a head can send: all but the retired change of job title (`QĐ-87e`). */
+export const SENDABLE_NOTICE_KINDS = [
+  'DEPARTMENT_TRANSFER_OUT',
+  'DEPARTMENT_TRANSFER_IN',
+  'DEPARTURE',
+  'ABRUPT_DEPARTURE',
+  'LONG_LEAVE',
+] as const satisfies readonly NoticeKind[];
 
 export type NoticeStatus = 'PENDING_VERIFICATION' | 'RECORDED' | 'REJECTED' | 'WITHDRAWN';
 
@@ -62,7 +75,8 @@ export interface NoticeSummaryRecord {
 export interface NoticeVerificationRecord {
   method: VerificationMethod;
   reference: string;
-  verifiedByAppUserId: string;
+  /** Null only for an event the controlled procedure of the release after this one recorded (spec L.2); this release always writes its account. */
+  verifiedByAppUserId: string | null;
   verifiedAt: Date;
 }
 
@@ -85,7 +99,6 @@ export interface VerificationInput {
  */
 export interface NoticeEventInput {
   toDepartmentId?: string | undefined;
-  toJobTitleId?: string | undefined;
   effectiveOn?: BusinessDate | undefined;
   lastWorkingDay?: BusinessDate | undefined;
   successor?: { kind: 'EMPLOYEE'; employeeId: string } | { kind: 'NONE' } | undefined;

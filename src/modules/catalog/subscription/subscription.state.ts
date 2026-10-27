@@ -4,6 +4,7 @@ import type { PriceSnapshotRecord, SubscriptionRecord, SubscriptionState } from 
 
 /** What the audit trail keeps of a subscription: the business fields, the price and its frozen conversion as text. */
 export const snapshotOf = (record: SubscriptionRecord) => ({
+  ownerDepartmentId: record.ownerDepartmentId,
   quantity: record.purchasedQuantity,
   unitPrice: record.unitPrice
     ? `${record.unitPrice.amountMinor} ${record.unitPrice.currency} on ${record.unitPrice.recordedOn}`

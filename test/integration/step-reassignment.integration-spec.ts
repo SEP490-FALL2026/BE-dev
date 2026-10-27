@@ -124,8 +124,6 @@ describe('who holds a step when the organization or a role changes, over Postgre
         employeeId: unit.member.employeeId,
         fromDepartmentId: unit.department.id,
         toDepartmentId: unit.department.id,
-        fromJobTitleId: randomUUID(),
-        toJobTitleId: randomUUID(),
         effectiveOn: h.today(),
       });
 

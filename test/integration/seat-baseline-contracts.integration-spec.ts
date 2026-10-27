@@ -75,7 +75,7 @@ describe('what licensing reads of catalog and organization (integration, real Po
       await request(server())
         .post('/api/v1/subscriptions')
         .set(as(it1))
-        .send({ planId, kind: 'TERM', ...extra })
+        .send({ ownerDepartmentId: seed.departmentId, planId, kind: 'TERM', ...extra })
         .expect(201),
     ).id;
 
@@ -98,6 +98,7 @@ describe('what licensing reads of catalog and organization (integration, real Po
         status: 'DRAFT',
         missing: ['START_DATE', 'BILLING_CYCLE', 'UNIT_PRICE'],
         purchasedQuantity: 100,
+        ownerDepartmentId: seed.departmentId,
       });
     });
 
@@ -154,6 +155,7 @@ describe('what licensing reads of catalog and organization (integration, real Po
         status: null,
         missing: [],
         purchasedQuantity: null,
+        ownerDepartmentId: null,
       });
     });
 
@@ -222,6 +224,16 @@ describe('what licensing reads of catalog and organization (integration, real Po
 
     it('finds Cost Centers by code with their kind and status', async () => {
       const code = `CC-LOOKUP-${(counter += 1)}`;
+      const bareDepartmentId = async (): Promise<string> =>
+        (
+          await runner.run((tx) =>
+            organization.createDepartment(tx, {
+              organizationId: seed.organizationId,
+              code: `P-LOOKUP-${counter}`,
+              name: 'Lookup',
+            }),
+          )
+        ).id;
       await request(server())
         .post('/api/v1/cost-centers')
         .set(
@@ -234,7 +246,8 @@ describe('what licensing reads of catalog and organization (integration, real Po
             }),
           ),
         )
-        .send({ code, name: 'Corporate', kind: 'UNIT' })
+        // A Cost Center is created for a department that exists (`QĐ-87d(1)`).
+        .send({ code, name: 'Corporate', kind: 'UNIT', departmentId: await bareDepartmentId() })
         .expect(201);
 
       const found = await organization.getCostCentersByCodes([code, 'CC-MISSING']);

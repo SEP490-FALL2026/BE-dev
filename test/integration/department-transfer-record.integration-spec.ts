@@ -9,16 +9,15 @@ const h = new TransferHarness();
 describe('recording a transfer of a person (integration, real PostgreSQL)', () => {
   let des: Department;
   let fin: Department;
+  /** The catalogue entry of the one title everybody has: the SQL of these cases writes placements that name it. */
   let designer: string;
-  let senior: string;
   const NO = { personToPersonMessaging: false, callsOrMeetings: false, mailbox: false };
 
   beforeAll(async () => {
     await h.start();
     des = await h.departmentWithUnit('P-DES');
     fin = await h.departmentWithUnit('P-FIN');
-    designer = await h.title();
-    senior = await h.jobTitle('Senior Designer');
+    designer = await h.catalogueId(await h.title());
   }, 300000);
 
   afterAll(async () => {
@@ -63,7 +62,6 @@ describe('recording a transfer of a person (integration, real PostgreSQL)', () =
 
     expect(wire).toMatchObject({
       status: 'PENDING',
-      changes: 'DEPARTMENT',
       effectiveOn,
       from: { department: { code: 'P-DES' } },
       to: { department: { code: 'P-FIN' } },
@@ -76,7 +74,7 @@ describe('recording a transfer of a person (integration, real PostgreSQL)', () =
       expect.objectContaining({ department_id: fin.id, valid_from: effectiveOn, valid_to: null }),
     ]);
     const owning = async (day: string) =>
-      (await h.organizationService().getOwningUnits([e1.employeeId], day)).get(e1.employeeId)?.costCenter.id;
+      (await h.organizationService().getOwningUnits([e1.employeeId], day)).get(e1.employeeId)?.costCenter?.id;
     expect(await owning(h.day(29))).toBe(des.unitId);
     expect(await owning(effectiveOn)).toBe(fin.unitId);
     expect(await h.auditEventsOf('DEPARTMENT_TRANSFER.RECORDED', wire.id)).toEqual([
@@ -159,7 +157,7 @@ describe('recording a transfer of a person (integration, real PostgreSQL)', () =
       expect(members).toHaveLength(2);
       expect(head.employeeId).not.toBe(next.employeeId);
       const unit = (await h.organizationService().getOwningUnits([next.employeeId], h.today())).get(next.employeeId);
-      expect(unit?.costCenter.id).toBe(department.unitId);
+      expect(unit?.costCenter?.id).toBe(department.unitId);
     });
 
     it('wants to know who follows: refuses with the name of the department and writes nothing', async () => {
@@ -222,42 +220,48 @@ describe('recording a transfer of a person (integration, real PostgreSQL)', () =
       expect(await state(head)).toEqual(before);
     });
 
-    it('keeps the head a head when only the title changes (AC-11)', async () => {
+    it('leaves a head a head when a body names only a title: the body has no such field, and nothing is written (QĐ-87e)', async () => {
       const { department, head } = await headOf('P-HEAD5');
 
-      await h.recorded({
+      const refused = await h.recordTransfer({
         employeeId: head.employeeId,
-        toJobTitleId: senior,
+        toJobTitleId: randomUUID(),
         effectiveOn: h.day(30),
         grounds: h.grounds,
       });
 
+      expect([refused.status, codeOf(refused)]).toEqual([422, 'VALIDATION_ERROR']);
       expect(await h.headPeriods(department.id)).toEqual([
         { employee_id: head.employeeId, valid_from: h.today(), valid_to: null },
       ]);
     });
   });
 
-  it('changes only the title inside the department: a new period of the title, the department and the Cost Center the same (AC-11)', async () => {
+  it('records the move of a person to another department with the same job title: the title is theirs, the placements carry the catalogue entry the database names (QĐ-87e)', async () => {
     const person = await h.veteran(des, code('E'));
     const effectiveOn = h.day(45);
 
-    const wire = await h.recorded({
-      employeeId: person.employeeId,
-      toJobTitleId: senior,
-      effectiveOn,
-      grounds: h.grounds,
-    });
+    const wire = await h.recorded(body(person.employeeId, { effectiveOn }));
 
-    expect(wire).toMatchObject({ changes: 'JOB_TITLE', from: { jobTitle: { name: expect.any(String) as unknown } } });
+    // The wire answers where the person goes from and to; a job title is no part of it.
+    expect(Object.keys(wire).sort()).not.toContain('changes');
+    expect(wire.from).toEqual({ department: expect.objectContaining({ code: 'P-DES' }) as unknown });
+    expect(wire.to).toEqual({ department: expect.objectContaining({ code: 'P-FIN' }) as unknown });
     expect(await h.placements(person.employeeId)).toEqual([
       expect.objectContaining({ department_id: des.id, job_title_id: designer, valid_to: effectiveOn }),
-      expect.objectContaining({ department_id: des.id, job_title_id: senior, valid_from: effectiveOn, valid_to: null }),
+      expect.objectContaining({
+        department_id: fin.id,
+        job_title_id: designer,
+        valid_from: effectiveOn,
+        valid_to: null,
+      }),
     ]);
-    const unit = async (day: string) =>
-      (await h.organizationService().getOwningUnits([person.employeeId], day)).get(person.employeeId)?.costCenter.id;
-    expect(await unit(h.day(44))).toBe(des.unitId);
-    expect(await unit(effectiveOn)).toBe(des.unitId);
+    // The row of the transfer names the same entry on both sides, and the release before this one reads it through its join.
+    const row = await h.ctx.sql.query<{ from_job_title_id: string; to_job_title_id: string }>(
+      'SELECT from_job_title_id, to_job_title_id FROM department_transfers WHERE id = $1',
+      [wire.id],
+    );
+    expect(row.rows).toEqual([{ from_job_title_id: designer, to_job_title_id: designer }]);
   });
 
   it('warns without stopping when the person is the Business Owner of an application (AC-13)', async () => {
@@ -345,31 +349,44 @@ describe('recording a transfer of a person (integration, real PostgreSQL)', () =
     ]);
   });
 
-  describe('the job title comes from the catalogue (AC-17)', () => {
-    it('refuses a title that is not there, and one that is not in use, without adding or reviving either', async () => {
+  describe('a job title is not a fact of a transfer (QĐ-87e, AC-17)', () => {
+    it('refuses a body that names a job title, with or without a department, and a body that names no department: 422 VALIDATION_ERROR, nothing written', async () => {
       const person = await h.veteran(des, code('E'));
-      const retired = await h.jobTitle(h.unique('Retired title'));
-      await h.ctx.sql.query(`UPDATE job_titles SET status = 'INACTIVE' WHERE id = $1`, [retired]);
+      const before = await state(person);
       const titles = async () =>
         (await h.ctx.sql.query<{ id: string; status: string }>(`SELECT id, status FROM job_titles ORDER BY id`)).rows;
-      const before = await titles();
+      const titlesBefore = await titles();
 
-      const unknown = await h.recordTransfer(body(person.employeeId, { toJobTitleId: randomUUID() }));
-      const inactive = await h.recordTransfer(body(person.employeeId, { toJobTitleId: retired }));
+      const withBoth = await h.recordTransfer(body(person.employeeId, { toJobTitleId: randomUUID() }));
+      const titleOnly = await h.recordTransfer({
+        employeeId: person.employeeId,
+        toJobTitleId: randomUUID(),
+        effectiveOn: h.day(30),
+        grounds: h.grounds,
+      });
+      const neither = await h.recordTransfer({
+        employeeId: person.employeeId,
+        effectiveOn: h.day(30),
+        grounds: h.grounds,
+      });
 
-      expect([unknown.status, codeOf(unknown)]).toEqual([422, 'DEPARTMENT_TRANSFER.JOB_TITLE_NOT_FOUND']);
-      expect([inactive.status, codeOf(inactive)]).toEqual([422, 'DEPARTMENT_TRANSFER.JOB_TITLE_INACTIVE']);
-      expect(await titles()).toEqual(before);
+      expect([withBoth, titleOnly, neither].map((answer) => [answer.status, codeOf(answer)])).toEqual([
+        [422, 'VALIDATION_ERROR'],
+        [422, 'VALIDATION_ERROR'],
+        [422, 'VALIDATION_ERROR'],
+      ]);
+      expect(await state(person)).toEqual(before);
+      expect(await titles()).toEqual(titlesBefore);
     });
 
-    it('accepts the title the person keeps even when it is not in use any more', async () => {
+    it('answers a move to the department the person is in with NO_CHANGE', async () => {
       const person = await h.veteran(des, code('E'));
-      await h.ctx.sql.query(`UPDATE job_titles SET status = 'INACTIVE' WHERE id = $1`, [designer]);
-      try {
-        await h.recorded(body(person.employeeId));
-      } finally {
-        await h.ctx.sql.query(`UPDATE job_titles SET status = 'ACTIVE' WHERE id = $1`, [designer]);
-      }
+      const before = await state(person);
+
+      const same = await h.recordTransfer(body(person.employeeId, { toDepartmentId: des.id }));
+
+      expect([same.status, codeOf(same)]).toEqual([422, 'DEPARTMENT_TRANSFER.NO_CHANGE']);
+      expect(await state(person)).toEqual(before);
     });
   });
 
@@ -406,9 +423,7 @@ describe('recording a transfer of a person (integration, real PostgreSQL)', () =
     const person = await h.veteran(des, code('E'));
     const first = await h.recorded(body(person.employeeId, { effectiveOn: h.day(30) }));
 
-    const second = await h.recordTransfer(
-      body(person.employeeId, { toDepartmentId: des.id, toJobTitleId: senior, effectiveOn: h.day(60) }),
-    );
+    const second = await h.recordTransfer(body(person.employeeId, { effectiveOn: h.day(60) }));
 
     expect([second.status, codeOf(second)]).toEqual([409, 'DEPARTMENT_TRANSFER.PENDING_EVENT_EXISTS']);
     expect(h.detailsOf(second)).toEqual({ kind: 'TRANSFER', effectiveOn: first.effectiveOn });

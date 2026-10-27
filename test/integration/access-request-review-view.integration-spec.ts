@@ -62,29 +62,16 @@ describe('requests over HTTP: what the head sees of a request (integration, real
   const wire = async (id: string, account: Person['account'], query = '') =>
     h.dataOf<SeatsWire>(await seats(id, account, query).expect(200));
 
-  describe('the flag outside the standard toolset (US-05-04 AC-7)', () => {
-    it('is raised for a tool outside the standard toolset of the sender, with their reason, and stops nothing', async () => {
-      const sent = await h.sent(designer, figma, { outsideStandardReason: 'The project needs a wiki' });
+  describe('no flag about a standard toolset any more (QĐ-87h)', () => {
+    it('shows the head the request without it, and the head decides as before', async () => {
+      const sent = await h.sent(designer, figma);
 
       const read = h.dataOf<{ request: AccessRequestWire }>(await h.fetch(sent.id, head.account).expect(200)).request;
       const approved = await h.decide(sent.id, { decision: 'APPROVE' }, head.account).expect(200);
 
-      expect(read).toMatchObject({ outsideStandard: true, outsideStandardReason: 'The project needs a wiki' });
+      expect(Object.keys(read)).not.toContain('outsideStandard');
+      expect(Object.keys(read)).not.toContain('outsideStandardReason');
       expect(h.dataOf<{ request: AccessRequestWire }>(approved).request.state).toBe('AWAITING_SPEND_SUBMISSION');
-    });
-
-    it('is not raised for a tool in the toolset, and is fixed when the request is sent', async () => {
-      await h.setToolset(design, [figma]);
-      const inside = await h.sent(designer, figma);
-      await h.setToolset(design, []);
-      const outside = await h.sent(designer, figma);
-      const reread = h.dataOf<{ request: AccessRequestWire }>(
-        await h.fetch(inside.id, head.account).expect(200),
-      ).request;
-
-      expect(inside.outsideStandard).toBe(false);
-      expect(reread.outsideStandard).toBe(false);
-      expect(outside.outsideStandard).toBe(true);
     });
   });
 

@@ -110,6 +110,7 @@ model SubscriptionCostAllocation {
   versions     SubscriptionCostAllocationVersion[]
 
   @@map("subscription_cost_allocations")
+  @@ignore
 }
 
 // One declaration of the allocation, by whom and when. Immutable; its lines add up to 10 000 when it commits.
@@ -125,6 +126,7 @@ model SubscriptionCostAllocationVersion {
 
   @@unique([subscriptionId, version])
   @@map("subscription_cost_allocation_versions")
+  @@ignore
 }
 
 // One Cost Center of a version and its share in hundredths of a percent (6000 is 60%): whole numbers, no float.
@@ -141,4 +143,5 @@ model SubscriptionCostAllocationLine {
   @@unique([versionId, costCenterId])
   @@index([costCenterId])
   @@map("subscription_cost_allocation_lines")
+  @@ignore
 }

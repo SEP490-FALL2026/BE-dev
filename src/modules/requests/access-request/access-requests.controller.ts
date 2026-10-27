@@ -73,14 +73,19 @@ export class AccessRequestsController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The application of the plan is retired (ACCESS_REQUEST.APPLICATION_RETIRED), the sender belongs to no department (ACCESS_REQUEST.NO_DEPARTMENT) or already holds a seat of the plan (ACCESS_REQUEST.ALREADY_HOLDS_ACCESS, with the seat in details).',
-      examples: [EXAMPLES.APPLICATION_RETIRED, EXAMPLES.NO_DEPARTMENT, EXAMPLES.ALREADY_HOLDS_ACCESS],
+        'The application of the plan is retired (ACCESS_REQUEST.APPLICATION_RETIRED), the sender belongs to no department (ACCESS_REQUEST.NO_DEPARTMENT), the department has no Cost Center in use yet (FINANCE.SETUP_INCOMPLETE) or the sender already holds a seat of the plan (ACCESS_REQUEST.ALREADY_HOLDS_ACCESS, with the seat in details).',
+      examples: [
+        EXAMPLES.APPLICATION_RETIRED,
+        EXAMPLES.NO_DEPARTMENT,
+        EXAMPLES.FINANCE_SETUP_INCOMPLETE,
+        EXAMPLES.ALREADY_HOLDS_ACCESS,
+      ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The form is incomplete or invalid (VALIDATION_ERROR): the reason and the term are required; a tool outside the standard toolset needs its reason (ACCESS_REQUEST.OUTSIDE_STANDARD_REASON_REQUIRED). Nothing is written.',
-      examples: [VALIDATION_EXAMPLE, EXAMPLES.OUTSIDE_STANDARD_REASON_REQUIRED, EXAMPLES.NO_SPEND_FOR_FREE_SOFTWARE],
+        'The form is incomplete or invalid (VALIDATION_ERROR): the reason and the term are required. Nothing is written.',
+      examples: [VALIDATION_EXAMPLE, EXAMPLES.NO_SPEND_FOR_FREE_SOFTWARE],
     },
   )
   async submit(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: SubmitBodyDto) {
@@ -107,8 +112,8 @@ export class AccessRequestsController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The application of the plan is retired (ACCESS_REQUEST.APPLICATION_RETIRED) or the caller belongs to no department (ACCESS_REQUEST.NO_DEPARTMENT).',
-      examples: [EXAMPLES.APPLICATION_RETIRED, EXAMPLES.NO_DEPARTMENT],
+        'The application of the plan is retired (ACCESS_REQUEST.APPLICATION_RETIRED), the caller belongs to no department (ACCESS_REQUEST.NO_DEPARTMENT) or the department has no Cost Center in use yet (FINANCE.SETUP_INCOMPLETE).',
+      examples: [EXAMPLES.APPLICATION_RETIRED, EXAMPLES.NO_DEPARTMENT, EXAMPLES.FINANCE_SETUP_INCOMPLETE],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,

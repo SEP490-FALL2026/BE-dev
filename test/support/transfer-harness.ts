@@ -11,9 +11,8 @@ import type { Department } from './request-harness';
 export interface TransferWire {
   id: string;
   employee: { id: string; employeeCode: string; fullName: string };
-  changes: 'DEPARTMENT' | 'JOB_TITLE' | 'DEPARTMENT_AND_JOB_TITLE';
-  from: { department: { id: string; code: string; name: string }; jobTitle: { id: string; name: string } };
-  to: { department: { id: string; code: string; name: string }; jobTitle: { id: string; name: string } };
+  from: { department: { id: string; code: string; name: string } };
+  to: { department: { id: string; code: string; name: string } };
   effectiveOn: string;
   status: 'PENDING' | 'EFFECTIVE' | 'CANCELLED';
   selfExecuted: boolean;

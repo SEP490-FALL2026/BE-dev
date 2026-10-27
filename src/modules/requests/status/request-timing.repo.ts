@@ -16,8 +16,9 @@ export class RequestTimingRepo {
   constructor(private readonly prisma: PrismaService) {}
 
   async sourceOf(requestId: string): Promise<TimingSource | null> {
+    // A request being drafted is written by the release after this one and has no moments to read (spec L.1): 404 like a missing one.
     const row = await this.prisma.accessRequest.findUnique({
-      where: { id: requestId },
+      where: { id: requestId, state: { not: 'DRAFT' } },
       select: {
         state: true,
         submittedAt: true,

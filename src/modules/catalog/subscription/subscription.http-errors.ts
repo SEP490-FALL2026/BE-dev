@@ -9,19 +9,10 @@ import {
   MoneyScaleExceededError,
   ReportingCurrencyNotSupportedError,
 } from '../../../core/money/money.errors';
-import { formatRatePercent } from '../../../core/money/tax-estimate';
 import {
-  CostAllocationCostCenterDuplicateError,
-  CostAllocationCostCenterRefusedError,
-  CostAllocationLineCountError,
-  CostAllocationRatioInvalidError,
-  CostAllocationSubscriptionNotFoundError,
-  CostAllocationTotalError,
-} from '../../finance/finance.errors';
-import {
-  SubscriptionCostAllocationNotApplicableError,
   SubscriptionDatesInvalidError,
   SubscriptionNotFoundError,
+  SubscriptionOwnerDepartmentInactiveError,
   SubscriptionPerpetualHasNoTermError,
   SubscriptionPerpetualNeedsLicensedApplicationError,
   SubscriptionPlanHasNoSubscriptionError,
@@ -40,11 +31,14 @@ const UNPROCESSABLE = HttpStatus.UNPROCESSABLE_ENTITY;
 export function toSubscriptionApiException(error: unknown): unknown {
   if (error instanceof ApiException) return error;
 
-  if (error instanceof SubscriptionNotFoundError || error instanceof CostAllocationSubscriptionNotFoundError) {
+  if (error instanceof SubscriptionNotFoundError) {
     return refuse(HttpStatus.NOT_FOUND, 'SUBSCRIPTION.NOT_FOUND', error.message);
   }
   if (error instanceof SubscriptionPlanNotFoundError) {
     return refuse(UNPROCESSABLE, 'SUBSCRIPTION.PLAN_NOT_FOUND', error.message);
+  }
+  if (error instanceof SubscriptionOwnerDepartmentInactiveError) {
+    return refuse(UNPROCESSABLE, 'SUBSCRIPTION.OWNER_DEPARTMENT_INACTIVE', error.message);
   }
   if (error instanceof SubscriptionPlanHasNoSubscriptionError) {
     return refuse(UNPROCESSABLE, 'SUBSCRIPTION.PLAN_HAS_NO_SUBSCRIPTION', error.message);
@@ -71,33 +65,6 @@ export function toSubscriptionApiException(error: unknown): unknown {
     return refuse(UNPROCESSABLE, 'SUBSCRIPTION.STILL_DRAFT', error.message, { missing: error.missing });
   }
 
-  if (error instanceof SubscriptionCostAllocationNotApplicableError) {
-    return refuse(HttpStatus.CONFLICT, 'SUBSCRIPTION.COST_ALLOCATION_NOT_APPLICABLE', error.message, {
-      reason: error.reason,
-    });
-  }
-  if (error instanceof CostAllocationTotalError) {
-    return refuse(UNPROCESSABLE, 'COST_ALLOCATION.TOTAL_NOT_100', error.message, {
-      totalPercent: formatRatePercent(error.totalBp),
-    });
-  }
-  if (error instanceof CostAllocationRatioInvalidError) {
-    return refuse(UNPROCESSABLE, 'COST_ALLOCATION.RATIO_INVALID', error.message, { costCenterId: error.costCenterId });
-  }
-  if (error instanceof CostAllocationCostCenterDuplicateError) {
-    return refuse(UNPROCESSABLE, 'COST_ALLOCATION.COST_CENTER_DUPLICATE', error.message, {
-      costCenterId: error.costCenterId,
-    });
-  }
-  if (error instanceof CostAllocationLineCountError) {
-    return refuse(UNPROCESSABLE, 'COST_ALLOCATION.LINE_COUNT_INVALID', error.message, { lines: error.lines });
-  }
-  if (error instanceof CostAllocationCostCenterRefusedError) {
-    return refuse(UNPROCESSABLE, `COST_ALLOCATION.COST_CENTER_${error.reason}`, error.message, {
-      costCenterIds: error.costCenterIds,
-    });
-  }
-
   const money = toMoneyApiException(error);
   if (money !== error) return money;
 
@@ -110,6 +77,7 @@ const example = (error: Error) => errorExampleOf(toSubscriptionApiException(erro
 export const SUBSCRIPTION_ERROR_EXAMPLES = {
   NOT_FOUND: example(new SubscriptionNotFoundError()),
   PLAN_NOT_FOUND: example(new SubscriptionPlanNotFoundError()),
+  OWNER_DEPARTMENT_INACTIVE: example(new SubscriptionOwnerDepartmentInactiveError()),
   PLAN_HAS_NO_SUBSCRIPTION: example(new SubscriptionPlanHasNoSubscriptionError()),
   PERPETUAL_NEEDS_LICENSED_APPLICATION: example(new SubscriptionPerpetualNeedsLicensedApplicationError()),
   PERPETUAL_HAS_NO_TERM: example(new SubscriptionPerpetualHasNoTermError(['endDate'])),
@@ -117,15 +85,6 @@ export const SUBSCRIPTION_ERROR_EXAMPLES = {
   UPDATE_EMPTY: example(new SubscriptionUpdateEmptyError()),
   QUANTITY_BELOW_OCCUPIED: example(new SubscriptionQuantityBelowOccupiedError(3, 2)),
   STILL_DRAFT: example(new SubscriptionStillDraftError(['EXCHANGE_RATE'])),
-  COST_ALLOCATION_NOT_APPLICABLE: example(new SubscriptionCostAllocationNotApplicableError('PER_SEAT')),
-  ALLOCATION_TOTAL_NOT_100: example(new CostAllocationTotalError(9000)),
-  ALLOCATION_RATIO_INVALID: example(new CostAllocationRatioInvalidError('<cost-center-id>')),
-  ALLOCATION_COST_CENTER_DUPLICATE: example(new CostAllocationCostCenterDuplicateError('<cost-center-id>')),
-  ALLOCATION_LINE_COUNT_INVALID: example(new CostAllocationLineCountError(0)),
-  ALLOCATION_COST_CENTER_NOT_FOUND: example(
-    new CostAllocationCostCenterRefusedError('NOT_FOUND', ['<cost-center-id>']),
-  ),
-  ALLOCATION_COST_CENTER_INACTIVE: example(new CostAllocationCostCenterRefusedError('INACTIVE', ['<cost-center-id>'])),
   MONEY_SCALE_EXCEEDED: example(new MoneyScaleExceededError(2)),
   MONEY_OUT_OF_RANGE: example(new MoneyOutOfRangeError()),
   CURRENCY_NOT_SUPPORTED: example(new CurrencyNotSupportedError('XYZ')),

@@ -7,18 +7,9 @@ import { RATE_DECIMALS, type ScaledRate } from '../../core/money/rate';
 import { DbTx } from '../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../infrastructure/security/tokens/access-token-verifier.port';
 import { OrganizationService } from '../organization/organization.service';
-import { CostAllocationService } from './cost-allocation/cost-allocation.service';
 import { CurrencyService } from './currency/currency.service';
 import { ExchangeRateLedgerService } from './exchange-rate/exchange-rate-ledger.service';
-import type {
-  AllocationLineInput,
-  CostAllocationView,
-  CurrencyRecord,
-  SnapshotResult,
-  TaxEstimateResult,
-  TaxGroup,
-  TaxLineInput,
-} from './finance.types';
+import type { CurrencyRecord, SnapshotResult, TaxEstimateResult, TaxGroup, TaxLineInput } from './finance.types';
 import { TaxProfileService } from './tax-profile/tax-profile.service';
 
 const RATE_ONE: ScaledRate = 10n ** BigInt(RATE_DECIMALS);
@@ -34,7 +25,6 @@ export class FinanceService {
     private readonly rates: ExchangeRateLedgerService,
     private readonly organization: OrganizationService,
     private readonly taxProfiles: TaxProfileService,
-    private readonly costAllocations: CostAllocationService,
   ) {}
 
   listCurrencies(): Promise<CurrencyRecord[]> {
@@ -153,34 +143,5 @@ export class FinanceService {
   /** The ids of every vendor that has a declared tax profile. */
   declaredTaxProfileVendorIds(): Promise<string[]> {
     return this.taxProfiles.declaredVendorIds();
-  }
-
-  /**
-   * The cost allocation of a subscription as answered: `DECLARED` with the newest declaration, or `MISSING`. The
-   * subscription itself, and whether its plan takes an allocation, are the caller's to check (a catalog table).
-   */
-  costAllocationOf(subscriptionId: string): ReturnType<CostAllocationService['view']> {
-    return this.costAllocations.view(subscriptionId);
-  }
-
-  /**
-   * Records the allocation Finance declares for a subscription over Cost Centers, as a new version when it differs
-   * from the current one, with its audit event in the same transaction. Throws the allocation errors of
-   * `finance.errors`. The caller checks that the actor may declare (the Finance role).
-   */
-  declareCostAllocation(
-    actor: AuthenticatedPrincipal,
-    subscriptionId: string,
-    input: { lines: AllocationLineInput[] },
-    tx?: DbTx,
-  ): Promise<{ allocation: CostAllocationView; changed: boolean }> {
-    return this.costAllocations.declare(actor, subscriptionId, input, tx);
-  }
-
-  costAllocationHistory(
-    subscriptionId: string,
-    query: { page: number; pageSize: number },
-  ): ReturnType<CostAllocationService['history']> {
-    return this.costAllocations.history(subscriptionId, query);
   }
 }

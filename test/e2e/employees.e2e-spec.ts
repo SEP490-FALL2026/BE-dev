@@ -27,7 +27,7 @@ const VALID = {
   employmentType: 'STAFF',
   hireDate: '2026-10-01',
   departmentCode: 'P-OPS',
-  jobTitleId: '3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11',
+  jobTitle: 'Administrator',
   hrBasis: HR_BASIS,
 };
 

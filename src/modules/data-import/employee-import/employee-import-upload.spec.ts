@@ -42,7 +42,6 @@ describe('EmployeeImportService: upload (H8 Phase 0 characterization)', () => {
       ]);
       expect(h.lookups[0]).toEqual({
         departmentCodes: ['P-OPS', 'P-DES', 'P-NOPE'],
-        normalizedJobTitleNames: ['administrator', 'designer', 'unknown'],
         employeeCodes: ['N-1', 'N-2', 'E-001', 'E-002', 'N-3'],
         normalizedEmails: ['binh@acme.vn', 'an@acme.vn', 'hoa@acme.vn', 'dung@acme.vn'],
       });
@@ -154,7 +153,6 @@ describe('EmployeeImportService: upload (H8 Phase 0 characterization)', () => {
           errors: [
             { column: 'hire_date', code: 'HIRE_DATE_INVALID' },
             { column: 'department_code', code: 'DEPARTMENT_NOT_FOUND' },
-            { column: 'job_title', code: 'JOB_TITLE_NOT_FOUND' },
           ],
           differences: null,
         },

@@ -32,6 +32,8 @@ export interface SubscriptionRecord {
   planId: string;
   planName: string;
   planPricingModel: PlanPricingModel | null;
+  /** Null only on a row made before the column existed or by the previous release (an operator assigns it). */
+  ownerDepartmentId: string | null;
   applicationId: string;
   applicationName: string;
   applicationKind: ApplicationKind;
@@ -56,6 +58,8 @@ export interface SubscriptionRecord {
 export interface NewSubscription {
   organizationId: string;
   planId: string;
+  /** Required in the type: the one writer of `subscriptions` never stores a subscription without its owner (F02). */
+  ownerDepartmentId: string;
   kind: SubscriptionKind;
   status: SubscriptionStatus;
   purchasedQuantity: number | null;
@@ -72,7 +76,7 @@ export interface NewSubscription {
 }
 
 /** What a write stores: the whole mutable state of the subscription, as computed. */
-export type SubscriptionState = Omit<NewSubscription, 'organizationId' | 'planId' | 'kind'>;
+export type SubscriptionState = Omit<NewSubscription, 'organizationId' | 'planId' | 'kind' | 'ownerDepartmentId'>;
 
 export interface SubscriptionListFilter {
   applicationId?: string;
@@ -100,6 +104,7 @@ export interface SubscriptionView {
   id: string;
   planId: string;
   planName: string;
+  ownerDepartmentId: string | null;
   applicationId: string;
   applicationName: string;
   vendor: { id: string; name: string };

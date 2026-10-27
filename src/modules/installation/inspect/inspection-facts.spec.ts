@@ -42,12 +42,11 @@ describe('summarizeMigrations', () => {
 describe('bootstrapMismatches', () => {
   const complete = new Map(BOOTSTRAP_ACTIONS.map(({ action, expected }) => [action, expected]));
 
-  it('expects the seven installation actions, the employee one twice', () => {
+  it('expects the six installation actions, the employee one twice (the job title is free text: no action of its own)', () => {
     expect(BOOTSTRAP_ACTIONS).toEqual([
       { action: 'INSTALLATION.ORGANIZATION_CREATED', expected: 1 },
       { action: 'INSTALLATION.COST_CENTER_CREATED', expected: 1 },
       { action: 'INSTALLATION.DEPARTMENT_CREATED', expected: 1 },
-      { action: 'INSTALLATION.JOB_TITLE_CREATED', expected: 1 },
       { action: 'INSTALLATION.EMPLOYEE_CREATED', expected: 2 },
       { action: 'INSTALLATION.SUPER_ADMIN_CREATED', expected: 1 },
     ]);

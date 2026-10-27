@@ -50,7 +50,6 @@ export const transferReviewSummarySchema = z.strictObject({
   id: z.uuid(),
   employee: employeeBrief,
   department: departmentBrief,
-  jobTitle: nameBrief,
   effectiveOn: z.string(),
   dueOn: z.string(),
   status: z.enum(STATUSES),

@@ -39,17 +39,13 @@ import { PlanRepo } from './plan/plan.repo';
 import { PlanService } from './plan/plan.service';
 import { PlansController } from './plan/plans.controller';
 import { OnboardingFactsService } from './subscription/onboarding-facts.service';
-import { StandardToolsetRepo } from './standard-toolset/standard-toolset.repo';
-import { StandardToolsetService } from './standard-toolset/standard-toolset.service';
-import { StandardToolsetsController } from './standard-toolset/standard-toolsets.controller';
 import { SeatOccupancyRegistry } from './subscription/seat-occupancy.registry';
 import { SeatTargetService } from './subscription/seat-target.service';
-import { SubscriptionAllocationController } from './subscription/subscription-allocation.controller';
-import { SubscriptionAllocationService } from './subscription/subscription-allocation.service';
 import { SubscriptionLookupService } from './subscription/subscription-lookup.service';
 import { SubscriptionNoticeService } from './subscription/subscription-notice.service';
 import { SubscriptionRepo } from './subscription/subscription.repo';
 import { SubscriptionService } from './subscription/subscription.service';
+import { SubscriptionPricingService } from './subscription/subscription-pricing.service';
 import { SubscriptionViewService } from './subscription/subscription-view.service';
 import { SubscriptionsController } from './subscription/subscriptions.controller';
 import { VendorDictionaryController } from './vendor-dictionary/vendor-dictionary.controller';
@@ -70,7 +66,7 @@ import { VendorRepo } from './vendor/vendor.repo';
 
 /**
  * The catalog context (C1, G3 part): the shared vendor dictionary, the application catalog and its vendors and
- * functional groups, plans and their terms, subscriptions, contracts and their files, and standard toolsets. It
+ * functional groups, plans and their terms, subscriptions, contracts and their files. It
  * exports only the facade `CatalogService`, which `licensing` imports; the HTTP controllers live in the module itself
  * because no worker or command imports `catalog` (ADR-0013) — a separate HTTP module is made when one does.
  */
@@ -91,13 +87,11 @@ import { VendorRepo } from './vendor/vendor.repo';
     PlansController,
     VendorsController,
     SubscriptionsController,
-    SubscriptionAllocationController,
     PlanTermsController,
     ApplicationOwnersController,
     ApplicationRetirementController,
     ContractsController,
     DocumentsController,
-    StandardToolsetsController,
   ],
   providers: [
     VendorDictionaryService,
@@ -127,10 +121,10 @@ import { VendorRepo } from './vendor/vendor.repo';
     VendorTaxService,
     PlanLookupService,
     SubscriptionService,
+    SubscriptionPricingService,
     SubscriptionRepo,
     SubscriptionViewService,
     SubscriptionNoticeService,
-    SubscriptionAllocationService,
     SeatTargetService,
     OnboardingFactsService,
     SeatOccupancyRegistry,
@@ -142,8 +136,6 @@ import { VendorRepo } from './vendor/vendor.repo';
     SubscriptionLookupService,
     ApplicationRetirementRepo,
     ApplicationRetirementService,
-    StandardToolsetRepo,
-    StandardToolsetService,
     CatalogService,
     PlanTermsService,
     PlanTermsRepo,

@@ -2,7 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { BusinessDate } from '../../../core/business-date';
 import { DbTx, readSqlState } from '../../../infrastructure/database/transaction-runner';
 import { isCheckViolation } from '../../../infrastructure/database/unique-violation';
-import { CreateDepartmentInput, EmployeeStatus, OwningUnit } from '../organization.types';
+import { FinanceSetupIncompleteError } from '../organization.errors';
+import { CostedOwningUnit, CreateDepartmentInput, EmployeeStatus, OwningUnit } from '../organization.types';
 import { HeadAssignmentError } from './department.errors';
 import { DepartmentHeadRepo } from './department-head.repo';
 import { DepartmentRepo } from './department.repo';
@@ -102,14 +103,24 @@ export class DepartmentDirectoryService {
     );
 
     return new Map(
-      placements.flatMap((placement) => {
-        const costCenter = units.get(placement.departmentId);
-
-        return costCenter
-          ? [[placement.employeeId, { departmentId: placement.departmentId, costCenter }] as const]
-          : [];
-      }),
+      placements.flatMap((placement) =>
+        units.has(placement.departmentId)
+          ? [
+              [
+                placement.employeeId,
+                { departmentId: placement.departmentId, costCenter: units.get(placement.departmentId) ?? null },
+              ] as const,
+            ]
+          : [],
+      ),
     );
+  }
+
+  /** The unit with its Cost Center; throws FinanceSetupIncompleteError when the department has none yet (`QĐ-87d(1)`). */
+  requireUnitCostCenter(unit: OwningUnit): CostedOwningUnit {
+    if (!unit.costCenter) throw new FinanceSetupIncompleteError(unit.departmentId);
+
+    return { ...unit, costCenter: unit.costCenter };
   }
 
   find(id: string, tx?: DbTx): Promise<DepartmentRecord | null> {

@@ -243,8 +243,6 @@ describe('moving, cancelling and telling a transfer (integration, real PostgreSQ
           employeeId: person.employeeId,
           fromDepartmentId: des.id,
           toDepartmentId: fin.id,
-          fromJobTitleId: expect.any(String) as unknown,
-          toJobTitleId: expect.any(String) as unknown,
           effectiveOn: h.today(),
         },
       ]);
@@ -276,23 +274,6 @@ describe('moving, cancelling and telling a transfer (integration, real PostgreSQ
         before: { status: 'PENDING' },
         after: { status: 'EFFECTIVE' },
       });
-    });
-
-    it('tells a change of title alone with the same department on both sides, which the listeners of a department skip', async () => {
-      const person = await h.veteran(des, code('E'));
-      const senior = await h.jobTitle(h.unique('Senior'));
-
-      await h.recorded({
-        employeeId: person.employeeId,
-        toJobTitleId: senior,
-        effectiveOn: h.day(30),
-        grounds: h.grounds,
-      });
-      await h.sweepAt(h.day(30));
-
-      expect(about(person.employeeId)).toEqual([
-        expect.objectContaining({ kind: 'PLACEMENT_START', fromDepartmentId: des.id, toDepartmentId: des.id }),
-      ]);
     });
 
     it('tells the end of the head and the start of the successor when the handover takes effect', async () => {

@@ -15,7 +15,6 @@ import { OnboardingFactsService } from './subscription/onboarding-facts.service'
 import { ApplicationLookupService } from './catalog-entry/application-lookup.service';
 import { PlanLookupService } from './plan/plan-lookup.service';
 import { SubscriptionLookupService } from './subscription/subscription-lookup.service';
-import { StandardToolsetService } from './standard-toolset/standard-toolset.service';
 import { SeatTargetService } from './subscription/seat-target.service';
 import { VendorLookupService } from './vendor/vendor-lookup.service';
 import {
@@ -33,7 +32,6 @@ export class CatalogService {
     private readonly seatTargets: SeatTargetService,
     private readonly onboarding: OnboardingFactsService,
     private readonly occupancy: SeatOccupancyRegistry,
-    private readonly toolsets: StandardToolsetService,
     private readonly plans: PlanLookupService,
     private readonly subscriptions: SubscriptionLookupService,
     private readonly vendors: VendorLookupService,
@@ -65,16 +63,6 @@ export class CatalogService {
   /** The plans with these ids by name, with their application, as far as they exist. */
   getPlanSummaries(ids: readonly string[]): Promise<PlanSummary[]> {
     return this.onboarding.planSummaries(ids);
-  }
-
-  /** Whether the standard toolset of the department and job title has the plan; false when that pair has none. */
-  isPlanInStandardToolset(departmentId: string, jobTitleId: string, planId: string, tx?: DbTx): Promise<boolean> {
-    return this.toolsets.includesPlan(departmentId, jobTitleId, planId, tx);
-  }
-
-  /** The plans of the current standard toolset of the pair, one statement; empty when the pair has no toolset (`US-03-07`). */
-  getStandardToolsetPlanIds(departmentId: string, jobTitleId: string, tx?: DbTx): Promise<string[]> {
-    return this.toolsets.planIdsOf(departmentId, jobTitleId, tx);
   }
 
   /** What a plan is bought at (unit price and billing cycle), from its newest priced active subscription; null when none. */

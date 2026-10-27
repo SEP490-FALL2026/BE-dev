@@ -13,8 +13,6 @@ import { EmployeeMaintenanceController } from './employee/employee-maintenance.c
 import { EmployeeMaintenanceService } from './employee/employee-maintenance.service';
 import { EmployeeManualService } from './employee/employee-manual.service';
 import { EmployeesController } from './employee/employees.controller';
-import { JobTitleService } from './job-title/job-title.service';
-import { JobTitlesController } from './job-title/job-titles.controller';
 import { OrganizationModule } from './organization.module';
 import { ProjectRepo } from './project/project.repo';
 import { ProjectService } from './project/project.service';
@@ -28,7 +26,6 @@ import { ProjectsController } from './project/projects.controller';
 @Module({
   imports: [DatabaseModule, AuditModule, OrganizationModule, IdentityAccessFacadeModule],
   controllers: [
-    JobTitlesController,
     EmployeesController,
     EmployeeMaintenanceController,
     CostCentersController,
@@ -36,7 +33,6 @@ import { ProjectsController } from './project/projects.controller';
     ProjectsController,
   ],
   providers: [
-    JobTitleService,
     EmployeeManualService,
     EmployeeMaintenanceService,
     CostCenterService,

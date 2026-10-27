@@ -17,10 +17,6 @@ import { ServiceAccountDutiesController } from './assignment/service-account-dut
 import { ServiceAccountDutyRepo } from './assignment/service-account-duty.repo';
 import { ServiceAccountDutyService } from './assignment/service-account-duty.service';
 import { ServiceAccountDutySweeper } from './assignment/service-account-duty.sweeper';
-import { ServiceAccountMoveRepo } from './assignment/service-account-move.repo';
-import { ServiceAccountMoveService } from './assignment/service-account-move.service';
-import { ServiceAccountMoveViewService } from './assignment/service-account-move-view.service';
-import { ServiceAccountMovesController } from './assignment/service-account-moves.controller';
 import { AssignmentRepo } from './assignment/assignment.repo';
 import { AssignmentSeatOccupancy } from './assignment/seat-occupancy.reader';
 import { AssignmentServiceAccountReader } from './assignment/service-account-reader';
@@ -108,7 +104,6 @@ import { SeatBaselineService } from './seat-baseline/seat-baseline.service';
     SubscriptionSeatsController,
     DepartmentToolsController,
     ServiceAccountDutiesController,
-    ServiceAccountMovesController,
     SeatBaselineController,
     ProvisioningTasksController,
     RevocationTasksController,
@@ -128,9 +123,6 @@ import { SeatBaselineService } from './seat-baseline/seat-baseline.service';
     RegisteredRenewalHold,
     RegisteredResponsibleDeadline,
     AssignmentResponsibleService,
-    ServiceAccountMoveRepo,
-    ServiceAccountMoveService,
-    ServiceAccountMoveViewService,
     ServiceAccountDutyRepo,
     ServiceAccountDutyService,
     ServiceAccountDutySweeper,

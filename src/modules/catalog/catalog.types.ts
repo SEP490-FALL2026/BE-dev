@@ -58,6 +58,11 @@ export interface SeatTarget {
   missing: string[];
   /** The seats bought; null while the subscription has no quantity, and always null for a plan with no subscription. */
   purchasedQuantity: number | null;
+  /**
+   * The department that owns the subscription (`QĐ-89a`); null for a plan that has no subscription and for a subscription nobody
+   * has assigned a department to yet, which no seat is checked against.
+   */
+  ownerDepartmentId: string | null;
 }
 
 /** How much of the catalog exists, for the onboarding checklist: judged from the data, not from how it was entered. */
@@ -65,8 +70,6 @@ export interface CatalogOnboardingFacts {
   applications: number;
   plans: number;
   subscriptions: number;
-  /** The department and job title pairs that have a standard toolset (US-04-10). */
-  standardToolsets: number;
 }
 
 /**

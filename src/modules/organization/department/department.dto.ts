@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { isBusinessDate } from '../../../core/business-date';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
+import { hrBasisSchema } from '../../../infrastructure/http/dto/hr-basis.dto';
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { COST_CENTER_CODE_MAX_LENGTH, COST_CENTER_CODE_PATTERN } from '../cost-center/cost-center.types';
 import { projectSchema } from '../dto/project-wire.dto';
@@ -12,8 +13,9 @@ export const createDepartmentBodySchema = z.strictObject({
   code: z.string().trim().min(1).max(COST_CENTER_CODE_MAX_LENGTH).regex(COST_CENTER_CODE_PATTERN),
   name: z.string().max(1000),
   function: z.string().max(5000).nullish(),
-  costCenterId: z.uuid(),
   itAdminEmployeeId: z.uuid().nullish(),
+  /** The HR document the department is created from (`QĐ-87b`): every part is required. */
+  hrBasis: hrBasisSchema,
 });
 
 /** A department has no parent and its Cost Center cannot change: neither is a field (US-03-06 AC-3, AC-4). */
@@ -53,12 +55,15 @@ const departmentSchema = z.strictObject({
   name: z.string(),
   function: z.string().nullable(),
   status: z.enum(['ACTIVE', 'INACTIVE']),
-  costCenter: z.strictObject({
-    id: z.uuid(),
-    code: z.string(),
-    name: z.string(),
-    status: z.enum(['ACTIVE', 'INACTIVE']),
-  }),
+  /** The Cost Center Finance created for the department and that is in use; null while it has none (`QĐ-87d(1)`). */
+  costCenter: z
+    .strictObject({
+      id: z.uuid(),
+      code: z.string(),
+      name: z.string(),
+      status: z.enum(['ACTIVE', 'INACTIVE']),
+    })
+    .nullable(),
   itAdmin: z
     .strictObject({ employeeId: z.uuid(), employeeCode: z.string(), fullName: z.string(), usable: z.boolean() })
     .nullable(),

@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { normalizeDisplayName } from '../../../core/display-name';
+import type { HrBasis } from '../../../core/hr-basis';
 import { DbTx, TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditService } from '../../audit/audit.service';
@@ -8,7 +9,7 @@ import { CostCenterService } from '../cost-center/cost-center.service';
 import { organizationAuditEvent } from '../mappers/audit-event.mapper';
 import { OrganizationService } from '../organization.service';
 import {
-  DepartmentCostCenterError,
+  DepartmentCreationAwaitingActivationError,
   DepartmentInUseError,
   DepartmentInactiveError,
   DepartmentItAdminInvalidError,
@@ -32,9 +33,9 @@ const normalizeFunction = (raw: string | null | undefined): string | null => {
 };
 
 /**
- * Department profiles (`US-03-06`, `US-01-11`): the IT Admin creates a department on a free `UNIT` Cost Center,
- * names who is in charge of its technical work, and retires it once nobody is left in it. Who heads it is
- * `DepartmentHeadService`; what a profile shows is `DepartmentQueryService`.
+ * Department profiles (`US-03-06`, `US-01-11`): the Super Admin creates a department, with no Cost Center (Finance
+ * creates one for it afterwards, `QĐ-87d(1)`); the IT Admin names who is in charge of its technical work and retires it
+ * once nobody is left in it. Who heads it is `DepartmentHeadService`; what a profile shows is `DepartmentQueryService`.
  */
 @Injectable()
 export class DepartmentService {
@@ -48,8 +49,11 @@ export class DepartmentService {
   ) {}
 
   /**
-   * Creates a department on a `UNIT` Cost Center that is in use and has no department (AC-1, AC-2) and returns its id.
-   * The Cost Center follows from the department and is never changed by renaming it or changing its head (AC-4).
+   * Creates a department with no Cost Center and returns its id: Finance creates the Cost Center for it afterwards, and it
+   * is never changed by renaming the department or changing its head (AC-4). The HR basis is recorded with the change
+   * (`QĐ-87b`). Until the operator has activated the direction of the Cost Center link nothing is written (spec L.11).
+   * Throws DepartmentCreationAwaitingActivationError, DepartmentNameInvalidError, DepartmentItAdminInvalidError or
+   * DepartmentCodeTakenError.
    */
   async create(
     actor: AuthenticatedPrincipal,
@@ -57,8 +61,8 @@ export class DepartmentService {
       code: string;
       name: string;
       functionDescription?: string | null;
-      costCenterId: string;
       itAdminEmployeeId?: string | null;
+      hrBasis: HrBasis;
     },
   ): Promise<string> {
     const name = this.requireName(input.name);
@@ -67,12 +71,9 @@ export class DepartmentService {
     const code = input.code.trim();
 
     return this.runner.run(async (tx) => {
-      // Lock order (T-11): the cost center, the new department, then the people it names.
-      const costCenter = await this.costCenters.lockForDepartment(tx, input.costCenterId);
-      if (!costCenter) throw new DepartmentCostCenterError('NOT_FOUND');
-      if (costCenter.kind !== 'UNIT') throw new DepartmentCostCenterError('NOT_UNIT');
-      if (costCenter.status !== 'ACTIVE') throw new DepartmentCostCenterError('INACTIVE');
-      if (costCenter.department) throw new DepartmentCostCenterError('TAKEN');
+      if (!(await this.costCenters.isDirectionActivated(tx))) {
+        throw new DepartmentCreationAwaitingActivationError();
+      }
       if (input.itAdminEmployeeId) await this.assertUsableItAdmin(tx, input.itAdminEmployeeId);
 
       const created = await this.repo.insert(tx, {
@@ -80,7 +81,6 @@ export class DepartmentService {
         code,
         name,
         functionDescription,
-        costCenterId: costCenter.id,
         itAdminEmployeeId: input.itAdminEmployeeId ?? null,
       });
       await this.audit.record(
@@ -89,8 +89,8 @@ export class DepartmentService {
           code,
           name,
           function: functionDescription,
-          costCenter: costCenter.code,
           itAdminEmployeeId: input.itAdminEmployeeId ?? null,
+          hrBasis: { ...input.hrBasis },
         }),
       );
 

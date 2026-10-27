@@ -8,6 +8,8 @@ import { COST_CENTER_NAME_MAX_LENGTH, displayCostCenterName, isReservedCostCente
 import { CostCenterRepo } from './cost-center.repo';
 import { CostCenterKind, CostCenterRecord, CostCenterStatus } from './cost-center.types';
 import {
+  CostCenterDepartmentAlreadyLinkedError,
+  CostCenterDepartmentNotActiveError,
   CostCenterInUseError,
   CostCenterKindNotSupportedError,
   CostCenterNameInvalidError,
@@ -34,12 +36,9 @@ export class CostCenterService {
     private readonly runner: TransactionRunner,
   ) {}
 
-  /**
-   * `FOR SHARE` on the cost center a new department takes (it must stay as it is until the department commits;
-   * lock order T-11: the cost center first), then its row; null when it does not exist. The department judges it.
-   */
-  lockForDepartment(tx: DbTx, costCenterId: string): Promise<CostCenterRecord | null> {
-    return this.repo.lock(tx, costCenterId, 'SHARE');
+  /** Whether the Cost Center link is activated: a department is created only after it (spec L.11). */
+  isDirectionActivated(tx?: DbTx): Promise<boolean> {
+    return this.repo.isDirectionActivated(tx);
   }
 
   async list(query: {
@@ -61,10 +60,16 @@ export class CostCenterService {
     return pageOf(items, total, query.page, query.pageSize);
   }
 
-  /** Throws CostCenterKindNotSupportedError, CostCenterNameInvalidError, CostCenterNameReservedError or CostCenterCodeTakenError. */
+  /**
+   * Creates the Cost Center for a department that exists and is in use, and links it in the same insert (`QĐ-87d(1)`,
+   * `QĐ-87d(3)`: it is the department's current one from this moment, nothing before is charged to it). The department row is
+   * locked first, so two creations for one department meet there. Throws CostCenterKindNotSupportedError,
+   * CostCenterNameInvalidError, CostCenterNameReservedError, CostCenterDepartmentNotActiveError,
+   * CostCenterDepartmentAlreadyLinkedError or CostCenterCodeTakenError.
+   */
   async create(
     actor: AuthenticatedPrincipal,
-    input: { code: string; name: string; kind: string },
+    input: { code: string; name: string; kind: string; departmentId: string },
   ): Promise<CostCenterRecord> {
     const kind = this.requireKind(input.kind);
     const name = this.requireName(input.name);
@@ -73,7 +78,17 @@ export class CostCenterService {
     const organization = await this.requireOrganization();
 
     return this.runner.run(async (tx) => {
-      const created = await this.repo.insert(tx, { organizationId: organization.id, code, name, kind });
+      const department = await this.repo.lockDepartmentForCostCenter(tx, organization.id, input.departmentId);
+      if (!department || !department.active) throw new CostCenterDepartmentNotActiveError();
+      if (department.hasCostCenterInUse) throw new CostCenterDepartmentAlreadyLinkedError(department.id);
+
+      const created = await this.repo.insert(tx, {
+        organizationId: organization.id,
+        code,
+        name,
+        kind,
+        departmentId: department.id,
+      });
       await this.audit.record(
         tx,
         organizationAuditEvent(actor, organization.id, 'COST_CENTER.CREATED', 'CostCenter', created.id, null, {
@@ -81,6 +96,7 @@ export class CostCenterService {
           name: created.name,
           kind: created.kind,
           status: created.status,
+          departmentId: department.id,
         }),
       );
 

@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
+import { TransactionRunner } from '../../src/infrastructure/database/transaction-runner';
+import { OrganizationService } from '../../src/modules/organization/organization.service';
 import { ApiAccount, adminToken, createActivatedAccount } from './api-accounts';
 import {
   HttpTestApp,
@@ -187,16 +189,24 @@ export class SeatHarness {
 
   /**
    * A complete subscription of a new plan, with the seats bought. Without a quantity it is a flat-rate one, which is
-   * complete with none: the seats are then not known (INV-01), whereas a per-seat subscription without them is a draft.
+   * complete with none: the seats are then not known (INV-01), whereas a per-seat subscription without them is a draft. It is
+   * owned by the seed department unless a department is named (a service account sits on a subscription of its own department),
+   * or `null`: a subscription nobody owns yet, the one state in which a service account of any department may sit on it (F20),
+   * for the suites whose subject is not the owning department.
    */
-  async subscription(quantity: number | null = 100, type: 'K1' | 'K2' | 'K4' = 'K2'): Promise<string> {
+  async subscription(
+    quantity: number | null = 100,
+    type: 'K1' | 'K2' | 'K4' = 'K2',
+    ownerDepartmentId: string | null = this.seed.departmentId,
+  ): Promise<string> {
     const planId = await this.plan(type, quantity === null ? 'FLAT_RATE' : 'PER_SEAT');
 
-    return this.dataOf<{ id: string }>(
+    const id = this.dataOf<{ id: string }>(
       await request(this.server())
         .post('/api/v1/subscriptions')
         .set(this.as(this.it1))
         .send({
+          ownerDepartmentId: ownerDepartmentId ?? this.seed.departmentId,
           planId,
           kind: 'TERM',
           unitPrice: { amount: '1000000', currency: 'VND' },
@@ -206,6 +216,11 @@ export class SeatHarness {
         })
         .expect(201),
     ).id;
+    if (ownerDepartmentId === null) {
+      await this.ctx.sql.query(`UPDATE subscriptions SET owner_department_id = NULL WHERE id = $1`, [id]);
+    }
+
+    return id;
   }
 
   /** A subscription that still lacks data (no price, start, cycle): a draft, which takes no seat (US-04-03 AC-6). */
@@ -216,21 +231,53 @@ export class SeatHarness {
       await request(this.server())
         .post('/api/v1/subscriptions')
         .set(this.as(this.it1))
-        .send({ planId, kind: 'TERM', purchasedQuantity: 10 })
+        .send({ ownerDepartmentId: this.seed.departmentId, planId, kind: 'TERM', purchasedQuantity: 10 })
         .expect(201),
     ).id;
   }
 
-  async costCenter(kind: 'UNIT' = 'UNIT'): Promise<{ id: string; code: string }> {
+  /** Records, once, that the installation runs the compatibility release (`ops:cost-center-direction activate`, spec L.11). */
+  async activateCostCenterLink(): Promise<void> {
+    await this.ctx.sql.query(
+      `INSERT INTO cost_center_direction_activations (id, organization_id, release_evidence, approver_ref, operator_ref, environment)
+       VALUES (gen_random_uuid(), $1, 'test harness', 'test', 'test', 'LOCAL_TEST')
+       ON CONFLICT (organization_id) DO NOTHING`,
+      [this.seed.organizationId],
+    );
+  }
+
+  /** A department with no Cost Center, written the way the installation writes one (`QĐ-87d(1)`). */
+  async bareDepartment(): Promise<{ id: string; code: string }> {
+    const code = `P-${(this.counter += 1)}-${randomUUID().slice(0, 4)}`.toUpperCase();
+    const { id } = await this.ctx.app
+      .get(TransactionRunner)
+      .run((tx) =>
+        this.ctx.app
+          .get(OrganizationService)
+          .createDepartment(tx, { organizationId: this.seed.organizationId, code, name: `Department ${code}` }),
+      );
+
+    return { id, code };
+  }
+
+  /** What Finance sends to create the Cost Center of a department (`QĐ-87d(1)`). */
+  async costCenterFor(departmentId: string, kind: 'UNIT' = 'UNIT'): Promise<{ id: string; code: string }> {
     const code = `CC-${(this.counter += 1)}-${randomUUID().slice(0, 4)}`.toUpperCase();
 
     return this.dataOf<{ id: string; code: string }>(
       await request(this.server())
         .post('/api/v1/cost-centers')
         .set(this.as(this.finance))
-        .send({ code, name: `Name of ${code}`, kind })
+        .send({ code, name: `Name of ${code}`, kind, departmentId })
         .expect(201),
     );
+  }
+
+  /** A Cost Center of its own: Finance creates it for a new department that has none (`QĐ-87d(1)`). */
+  async costCenter(kind: 'UNIT' = 'UNIT'): Promise<{ id: string; code: string; departmentId: string }> {
+    const department = await this.bareDepartment();
+
+    return { ...(await this.costCenterFor(department.id, kind)), departmentId: department.id };
   }
 
   /** A CSV file from a header and rows of cells. */

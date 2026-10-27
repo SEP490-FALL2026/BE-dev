@@ -56,7 +56,6 @@ export interface Department {
 
 export interface Directory {
   departments: Department[];
-  jobTitles: EmployeeImportLookupData['jobTitles'];
   employees: EmployeeImportLookupData['employees'];
 }
 
@@ -65,10 +64,6 @@ export function directory(): Directory {
     departments: [
       { id: 'd-ops', code: 'P-OPS', name: 'Operations', active: true, costCenterActive: true, headed: true },
       { id: 'd-des', code: 'P-DES', name: 'Design', active: true, costCenterActive: true, headed: false },
-    ],
-    jobTitles: [
-      { id: 'j-adm', name: 'Administrator', normalizedName: 'administrator', status: 'ACTIVE' },
-      { id: 'j-des', name: 'Designer', normalizedName: 'designer', status: 'ACTIVE' },
     ],
     employees: [
       {
@@ -227,7 +222,6 @@ export function harness(start: Directory = directory()) {
         departments: dir.departments
           .filter((department) => names.departmentCodes.includes(department.code))
           .map(({ id, code, active, costCenterActive }) => ({ id, code, active, costCenterActive })),
-        jobTitles: dir.jobTitles.filter((title) => names.normalizedJobTitleNames.includes(title.normalizedName)),
         employees: dir.employees.filter((employee) => names.employeeCodes.includes(employee.employeeCode)),
         emailOwners: dir.employees
           .filter((employee) => employee.workEmail && names.normalizedEmails.includes(employee.workEmail))
@@ -243,9 +237,9 @@ export function harness(start: Directory = directory()) {
           : null,
       );
     },
-    lockForEmployeeImport(tx: DbTx, departmentIds: string[], jobTitleIds: string[]) {
+    lockForEmployeeImport(tx: DbTx, departmentIds: string[]) {
       calls.push(`org.lockForEmployeeImport(${where(tx)})`);
-      locks.push({ departmentIds, jobTitleIds });
+      locks.push({ departmentIds });
       return Promise.resolve();
     },
     businessToday() {

@@ -67,18 +67,18 @@ export class RenewalRequestsController {
         RENEWAL_ERROR_EXAMPLES.APPLICATION_RETIRED,
         RENEWAL_ERROR_EXAMPLES.ALREADY_HOLDS_ACCESS,
         RENEWAL_ERROR_EXAMPLES.NO_DEPARTMENT,
+        RENEWAL_ERROR_EXAMPLES.FINANCE_SETUP_INCOMPLETE,
       ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The form is incomplete or invalid (VALIDATION_ERROR). The end is not after the end the right has, or after today (RENEWAL_REQUEST.END_NOT_AFTER), the term is too long (RENEWAL_REQUEST.END_TOO_FAR), a head who sends it for more than twelve months gives no confirmation (RENEWAL_REQUEST.TERM_CONFIRMATION_REQUIRED), or a request sent after the end for a tool outside the standard toolset gives no reason (ACCESS_REQUEST.OUTSIDE_STANDARD_REASON_REQUIRED). Nothing is written.',
+        'The form is incomplete or invalid (VALIDATION_ERROR). The end is not after the end the right has, or after today (RENEWAL_REQUEST.END_NOT_AFTER), the term is too long (RENEWAL_REQUEST.END_TOO_FAR), a head who sends it for more than twelve months gives no confirmation (RENEWAL_REQUEST.TERM_CONFIRMATION_REQUIRED). Nothing is written.',
       examples: [
         VALIDATION_EXAMPLE,
         RENEWAL_ERROR_EXAMPLES.END_NOT_AFTER,
         RENEWAL_ERROR_EXAMPLES.END_TOO_FAR,
         RENEWAL_ERROR_EXAMPLES.TERM_CONFIRMATION_REQUIRED,
-        RENEWAL_ERROR_EXAMPLES.OUTSIDE_STANDARD_REASON_REQUIRED,
         RENEWAL_ERROR_EXAMPLES.NO_SPEND_FOR_FREE_SOFTWARE,
       ],
     },

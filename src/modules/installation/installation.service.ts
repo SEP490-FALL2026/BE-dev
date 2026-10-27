@@ -20,7 +20,7 @@ export interface InstallationResult {
 /**
  * First-run installation (FR-9.8, QĐ-67a/b). Runs outside HTTP, once, before anything else.
  * Creates the minimum real data in one transaction: the organization, one UNIT cost center, one
- * department, one job title, the Super Admin's employee and an IT employee (no account), and the
+ * department, the Super Admin's employee and an IT employee (no account; both with the job title as free text), and the
  * activated Super Admin account. A second run finds the organization and changes nothing.
  * It never edits an existing account: recovery is a separate, approved procedure (FR-8.10(d)).
  */
@@ -86,29 +86,27 @@ export class InstallationService {
         environment: input.environment,
       });
 
-      const costCenter = await this.organization.createUnitCostCenter(tx, {
-        organizationId: org.id,
-        code: input.costCenterCode,
-        name: input.costCenterName,
-      });
-      await record(org.id, 'INSTALLATION.COST_CENTER_CREATED', 'CostCenter', costCenter.id, {
-        code: input.costCenterCode,
-        kind: 'UNIT',
-      });
-
+      // The department first, then the Cost Center created for it (`QĐ-87d(1)`): there is no Cost Center without a department.
       const department = await this.organization.createDepartment(tx, {
         organizationId: org.id,
         code: input.departmentCode,
         name: input.departmentName,
-        costCenterId: costCenter.id,
       });
       await record(org.id, 'INSTALLATION.DEPARTMENT_CREATED', 'Department', department.id, {
         code: input.departmentCode,
-        costCenterCode: input.costCenterCode,
       });
 
-      const jobTitle = await this.organization.createJobTitle(tx, org.id, input.jobTitleName);
-      await record(org.id, 'INSTALLATION.JOB_TITLE_CREATED', 'JobTitle', jobTitle.id, { name: input.jobTitleName });
+      const costCenter = await this.organization.createUnitCostCenter(tx, {
+        organizationId: org.id,
+        code: input.costCenterCode,
+        name: input.costCenterName,
+        departmentId: department.id,
+      });
+      await record(org.id, 'INSTALLATION.COST_CENTER_CREATED', 'CostCenter', costCenter.id, {
+        code: input.costCenterCode,
+        kind: 'UNIT',
+        departmentCode: input.departmentCode,
+      });
 
       const employeeIds: string[] = [];
       for (const person of [input.superAdmin, input.itAdmin]) {
@@ -120,7 +118,7 @@ export class InstallationService {
           employmentType: person.employmentType,
           hireDate: person.hireDate,
           departmentId: department.id,
-          jobTitleId: jobTitle.id,
+          jobTitle: input.jobTitleName,
         });
         employeeIds.push(employee.id);
         await record(org.id, 'INSTALLATION.EMPLOYEE_CREATED', 'Employee', employee.id, {
@@ -128,6 +126,7 @@ export class InstallationService {
           employmentType: person.employmentType,
           hireDate: person.hireDate,
           departmentCode: input.departmentCode,
+          jobTitle: input.jobTitleName,
         });
       }
 

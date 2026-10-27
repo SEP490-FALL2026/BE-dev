@@ -6,10 +6,21 @@
  * own field or column, and adds the reasons of its own workflow (taken keys, duplicates in a file, other cells).
  */
 
-/** What the caller found for the department and the job title a row names. `found` is read only when `named`. */
+/** A job title is free text on the person (`QĐ-87e`): at most this many characters once its display form is made. */
+export const JOB_TITLE_MAX_LENGTH = 255;
+
+/** Counts characters, not UTF-16 units, as the database does (`employees_job_title_shape`). */
+export function isJobTitleTooLong(displayForm: string): boolean {
+  return [...displayForm].length > JOB_TITLE_MAX_LENGTH;
+}
+
+/**
+ * What the caller found for the department and the job title a row names. `found` is read only when `named`. The title is
+ * only asked for and bounded, never looked up; a caller with no title to judge leaves it out and no reason about one is given.
+ */
 export interface PlacementFacts {
   department: { named: boolean; found: { active: boolean; costCenterActive: boolean } | null };
-  jobTitle: { named: boolean; found: { active: boolean } | null };
+  jobTitle?: { named: boolean; tooLong: boolean };
 }
 
 export type PlacementSubject = 'DEPARTMENT' | 'JOB_TITLE';
@@ -20,8 +31,7 @@ export type PlacementReasonCode =
   | 'DEPARTMENT_INACTIVE'
   | 'DEPARTMENT_COST_CENTER_INACTIVE'
   | 'JOB_TITLE_REQUIRED'
-  | 'JOB_TITLE_NOT_FOUND'
-  | 'JOB_TITLE_INACTIVE';
+  | 'JOB_TITLE_TOO_LONG';
 
 export interface PlacementReason {
   subject: PlacementSubject;
@@ -29,9 +39,9 @@ export interface PlacementReason {
 }
 
 /**
- * At most one reason per subject, the department first. Within a subject the first that holds wins: not named, not
- * found, retired, then (department only) charged to a retired cost center — a retired cost center has no people
- * (`US-04-09` AC-3), so a department charged to one cannot take anyone in.
+ * At most one reason per subject, the department first. Within the department the first that holds wins: not named, not
+ * found, retired, then charged to a retired cost center — a retired cost center has no people (`US-04-09` AC-3), so a
+ * department charged to one cannot take anyone in. A title is required (this release still asks for it) and bounded.
  */
 export function placementReasons(facts: PlacementFacts): PlacementReason[] {
   const reasons: PlacementReason[] = [];
@@ -44,9 +54,10 @@ export function placementReasons(facts: PlacementFacts): PlacementReason[] {
     reasons.push({ subject: 'DEPARTMENT', code: 'DEPARTMENT_COST_CENTER_INACTIVE' });
   }
 
-  if (!jobTitle.named) reasons.push({ subject: 'JOB_TITLE', code: 'JOB_TITLE_REQUIRED' });
-  else if (jobTitle.found === null) reasons.push({ subject: 'JOB_TITLE', code: 'JOB_TITLE_NOT_FOUND' });
-  else if (!jobTitle.found.active) reasons.push({ subject: 'JOB_TITLE', code: 'JOB_TITLE_INACTIVE' });
+  if (jobTitle) {
+    if (!jobTitle.named) reasons.push({ subject: 'JOB_TITLE', code: 'JOB_TITLE_REQUIRED' });
+    else if (jobTitle.tooLong) reasons.push({ subject: 'JOB_TITLE', code: 'JOB_TITLE_TOO_LONG' });
+  }
 
   return reasons;
 }

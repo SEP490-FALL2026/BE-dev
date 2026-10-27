@@ -61,7 +61,7 @@ describe('EmployeeImportService: confirm (H8 Phase 0 characterization)', () => {
         'COMMIT',
         'repo.find()',
       ]);
-      expect(h.locks).toEqual([{ departmentIds: ['d-ops', 'd-des'], jobTitleIds: ['j-adm', 'j-des'] }]);
+      expect(h.locks).toEqual([{ departmentIds: ['d-ops', 'd-des'] }]);
       expect(h.created).toEqual([
         {
           organizationId: 'org-1',
@@ -72,7 +72,7 @@ describe('EmployeeImportService: confirm (H8 Phase 0 characterization)', () => {
           hireDate: '2026-10-01',
           memberSince: TODAY,
           departmentId: 'd-ops',
-          jobTitleId: 'j-adm',
+          jobTitle: 'Administrator',
         },
         {
           organizationId: 'org-1',
@@ -83,7 +83,7 @@ describe('EmployeeImportService: confirm (H8 Phase 0 characterization)', () => {
           hireDate: '2026-10-02',
           memberSince: TODAY,
           departmentId: 'd-des',
-          jobTitleId: 'j-des',
+          jobTitle: 'designer',
         },
       ]);
       const result = {
@@ -117,7 +117,7 @@ describe('EmployeeImportService: confirm (H8 Phase 0 characterization)', () => {
           after: {
             employeeCode,
             department: index === 0 ? 'P-OPS' : 'P-DES',
-            jobTitle: index === 0 ? 'Administrator' : 'Designer',
+            jobTitle: index === 0 ? 'Administrator' : 'designer',
             importId: id,
             hrBasis: HR_BASIS,
           },
@@ -260,7 +260,7 @@ describe('EmployeeImportService: confirm (H8 Phase 0 characterization)', () => {
       const h = harness();
       const { id } = await upload(h, FILE);
       h.reset();
-      h.dir.jobTitles[1].status = 'INACTIVE';
+      h.dir.departments[1].active = false;
 
       const error = await h.service.confirm(ACTOR, id, confirmBody()).catch((e: unknown) => e);
 

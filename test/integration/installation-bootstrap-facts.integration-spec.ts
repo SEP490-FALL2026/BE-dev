@@ -84,7 +84,6 @@ describe('installation bootstrap facts (integration, real PostgreSQL)', () => {
       { action: 'INSTALLATION.COST_CENTER_CREATED', count: 1 },
       { action: 'INSTALLATION.DEPARTMENT_CREATED', count: 1 },
       { action: 'INSTALLATION.EMPLOYEE_CREATED', count: 2 },
-      { action: 'INSTALLATION.JOB_TITLE_CREATED', count: 1 },
       { action: 'INSTALLATION.ORGANIZATION_CREATED', count: 1 },
       { action: 'INSTALLATION.SUPER_ADMIN_CREATED', count: 1 },
       { action: 'ROLE.GRANTED', count: 1 },
@@ -154,7 +153,6 @@ describe('installation bootstrap facts (integration, real PostgreSQL)', () => {
       const lookup = await organization.lookupForEmployeeImport(
         {
           departmentCodes: ['P-ENG'],
-          normalizedJobTitleNames: ['software engineer'],
           employeeCodes: [],
           normalizedEmails: [],
         },
@@ -168,7 +166,7 @@ describe('installation bootstrap facts (integration, real PostgreSQL)', () => {
         employmentType: 'STAFF',
         hireDate: '2024-04-01',
         departmentId: lookup.departments[0].id,
-        jobTitleId: lookup.jobTitles[0].id,
+        jobTitle: 'Software Engineer',
       });
       const user = await app.get(AccountDirectoryService).createAppUser(tx, {
         organizationId: org!.id,

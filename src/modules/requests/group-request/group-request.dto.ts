@@ -36,7 +36,6 @@ export const groupBodySchema = z.strictObject({
   businessReason: reason,
   termMonths: z.number().int().min(1).max(TERM_MONTHS_MAX),
   projectLabel: z.string().trim().min(1).max(PROJECT_LABEL_MAX_LENGTH).optional(),
-  outsideStandardReason: reason.optional(),
   expectedSpendOn: businessDate.optional(),
   termConfirmation: z.strictObject({ reason }).optional(),
 });
@@ -68,8 +67,6 @@ const checkSchema = z.strictObject({
   ),
   lineCount: z.number().int().nonnegative(),
   hasSpendStep: z.boolean(),
-  /** At least one person has the plan outside the standard toolset: a reason is asked of the sender once for all. */
-  outsideStandard: z.boolean(),
   pricing: pricingSchema,
   /** The unit price for the whole term, for one person; null when the plan has no price. */
   amountPerPerson: moneySchema.nullable(),
@@ -122,7 +119,7 @@ const lineSchema = z.strictObject({
   endedBy: employeeRef.nullable(),
   endReason: z.string().nullable(),
   /** Why the IT Admin closed the line, when it ended as cancelled. */
-  cancelCause: z.enum(['BENEFICIARY_LEFT']).nullable(),
+  cancelCause: z.enum(['BENEFICIARY_LEFT', 'BENEFICIARY_TRANSFERRED']).nullable(),
 });
 
 export class GroupBodyDto extends createZodDto(groupBodySchema) {}

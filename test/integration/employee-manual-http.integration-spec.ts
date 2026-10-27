@@ -32,7 +32,7 @@ interface EmployeeWire {
   status: string;
   memberSince: string;
   department: { id: string; code: string; name: string };
-  jobTitle: { id: string; name: string };
+  jobTitle: string | null;
 }
 
 describe('manual employee entry over HTTP (integration, real PostgreSQL)', () => {
@@ -81,7 +81,7 @@ describe('manual employee entry over HTTP (integration, real PostgreSQL)', () =>
       employmentType: 'STAFF',
       hireDate: '2026-10-01',
       departmentCode: 'P-OPS',
-      jobTitleId: seed.jobTitleId,
+      jobTitle: 'Administrator',
       hrBasis: HR_BASIS,
       ...overrides,
     };
@@ -106,13 +106,6 @@ describe('manual employee entry over HTTP (integration, real PostgreSQL)', () =>
       )
     ).rows[0] as Record<string, number>;
 
-  const createTitle = async (name: string): Promise<string> =>
-    (
-      (await request(server()).post('/api/v1/job-titles').set(asIt()).send({ name }).expect(201)).body as {
-        data: { id: string };
-      }
-    ).data.id;
-
   describe('a valid entry (US-02-02 AC-14)', () => {
     it('creates one employee with one placement, and no account, role, link or mail', async () => {
       const before = await sideTables();
@@ -131,7 +124,7 @@ describe('manual employee entry over HTTP (integration, real PostgreSQL)', () =>
         hireDate: '2026-10-01',
         status: 'ACTIVE',
         department: { code: 'P-OPS', name: 'Operations' },
-        jobTitle: { id: seed.jobTitleId, name: 'Administrator' },
+        jobTitle: 'Administrator',
       });
       expect(Object.keys(dataOf(response)).sort()).toEqual(
         [
@@ -153,13 +146,18 @@ describe('manual employee entry over HTTP (integration, real PostgreSQL)', () =>
       expect((await ctx.sql.query('SELECT count(*)::int AS n FROM employee_placements')).rows[0]).toEqual({
         n: placements.n + 1,
       });
-      // The department's own cost center is what the person is charged to; the client never sends one.
+      // The department's own cost center is what the person is charged to; the client never sends one. The title is the
+      // free text of the person; the placement names no catalogue entry of its own: the database does, for the release before.
       const placement = await ctx.sql.query(
-        `SELECT d.code, p.valid_to, p.job_title_id FROM employee_placements p JOIN departments d ON d.id = p.department_id
+        `SELECT d.code, p.valid_to, e.job_title, j.name AS catalogue_name
+           FROM employee_placements p JOIN departments d ON d.id = p.department_id JOIN employees e ON e.id = p.employee_id
+           LEFT JOIN job_titles j ON j.id = p.job_title_id
           WHERE p.employee_id = $1`,
         [dataOf(response).id],
       );
-      expect(placement.rows).toEqual([{ code: 'P-OPS', valid_to: null, job_title_id: seed.jobTitleId }]);
+      expect(placement.rows).toEqual([
+        { code: 'P-OPS', valid_to: null, job_title: 'Administrator', catalogue_name: 'Administrator' },
+      ]);
     });
 
     it('allows no work email, and records who entered the person (FR-8.3)', async () => {
@@ -212,7 +210,7 @@ describe('manual employee entry over HTTP (integration, real PostgreSQL)', () =>
             employmentType: data.employmentType,
             hireDate: data.hireDate,
             department: data.department.code,
-            jobTitle: data.jobTitle.name,
+            jobTitle: data.jobTitle,
             memberSince: data.memberSince,
             hrBasis: HR_BASIS,
           },
@@ -236,16 +234,12 @@ describe('manual employee entry over HTTP (integration, real PostgreSQL)', () =>
         { departmentCode: 'P-NOPE' },
         [{ field: 'departmentCode', code: 'DEPARTMENT_NOT_FOUND' }],
       ],
-      ['no job title', { jobTitleId: undefined }, [{ field: 'jobTitleId', code: 'JOB_TITLE_REQUIRED' }]],
+      ['no job title', { jobTitle: undefined }, [{ field: 'jobTitle', code: 'JOB_TITLE_REQUIRED' }]],
+      ['a blank job title', { jobTitle: '   ' }, [{ field: 'jobTitle', code: 'JOB_TITLE_REQUIRED' }]],
       [
-        'a job title that does not exist',
-        { jobTitleId: '4f24d10d-63ad-49b1-a7a1-c988765990ae' },
-        [{ field: 'jobTitleId', code: 'JOB_TITLE_NOT_FOUND' }],
-      ],
-      [
-        'a job title id that is not an id',
-        { jobTitleId: 'not-an-id' },
-        [{ field: 'jobTitleId', code: 'JOB_TITLE_NOT_FOUND' }],
+        'a job title longer than 255 characters',
+        { jobTitle: 'x'.repeat(256) },
+        [{ field: 'jobTitle', code: 'JOB_TITLE_TOO_LONG' }],
       ],
     ])('answers %s with 422 EMPLOYEE.ROW_INVALID', async (_name, overrides, reasons) => {
       const before = await sideTables();
@@ -259,15 +253,43 @@ describe('manual employee entry over HTTP (integration, real PostgreSQL)', () =>
       expect((await ctx.sql.query('SELECT count(*)::int AS n FROM employees')).rows[0]).toEqual(people);
     });
 
-    it('refuses a deactivated job title, and takes the person once it is reactivated (US-02-07 AC-7, AC-8)', async () => {
-      const titleId = await createTitle('Seasonal Hire');
-      await request(server()).post(`/api/v1/job-titles/${titleId}/deactivate`).set(asIt()).expect(200);
+    it('takes any job title that fits as free text, keeps it in its display form, and needs no catalogue (QĐ-87e)', async () => {
+      const entered = dataOf(await enter(row({ jobTitle: '  Chief \u00a0 Happiness\tOfficer ' })).expect(201));
+      const sameAgain = dataOf(await enter(row({ jobTitle: 'chief happiness officer' })).expect(201));
 
-      const refused = await enter(row({ jobTitleId: titleId })).expect(422);
+      expect([entered.jobTitle, sameAgain.jobTitle]).toEqual(['Chief Happiness Officer', 'chief happiness officer']);
+      // The two spellings are one title for the release before this one, which reads it through the catalogue.
+      const entries = await ctx.sql.query(
+        `SELECT name FROM job_titles WHERE normalized_name = 'chief happiness officer'`,
+      );
+      expect(entries.rows).toEqual([{ name: 'Chief Happiness Officer' }]);
+    });
 
-      expect(reasonsOf(refused)).toEqual([{ field: 'jobTitleId', code: 'JOB_TITLE_INACTIVE' }]);
-      await request(server()).post(`/api/v1/job-titles/${titleId}/reactivate`).set(asIt()).expect(200);
-      await enter(row({ jobTitleId: titleId })).expect(201);
+    it.each([
+      ['GET', '/api/v1/job-titles'],
+      ['POST', '/api/v1/job-titles'],
+      ['PATCH', '/api/v1/job-titles/3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11'],
+      ['POST', '/api/v1/job-titles/3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11/deactivate'],
+      ['POST', '/api/v1/job-titles/3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11/reactivate'],
+    ] as const)(
+      'has no job title catalogue to keep: %s %s answers 404 like a route that does not exist (QĐ-87e)',
+      async (method, path) => {
+        const response = await request(server())
+          [method === 'GET' ? 'get' : method === 'POST' ? 'post' : 'patch'](path)
+          .set(asIt())
+          .send({});
+
+        expect(response.status).toBe(404);
+      },
+    );
+
+    it('does not take the old body that names a catalogue entry: jobTitleId is a field the form no longer has (QĐ-87e)', async () => {
+      const people = (await ctx.sql.query<{ n: number }>('SELECT count(*)::int AS n FROM employees')).rows[0];
+
+      const response = await enter(row({ jobTitle: undefined, jobTitleId: seed.jobTitleId })).expect(422);
+
+      expect(errorCodeOf(response)).toBe('VALIDATION_ERROR');
+      expect((await ctx.sql.query('SELECT count(*)::int AS n FROM employees')).rows[0]).toEqual(people);
     });
 
     it('refuses an employee code that is taken, and a work email that is taken however it is written', async () => {
@@ -285,12 +307,12 @@ describe('manual employee entry over HTTP (integration, real PostgreSQL)', () =>
       await enter(row({ employeeCode: 'E-TWICE', workEmail: 'twice@acme.vn' })).expect(201);
 
       const response = await enter(
-        row({ employeeCode: 'E-TWICE', workEmail: 'twice@acme.vn', departmentCode: 'P-NOPE', jobTitleId: undefined }),
+        row({ employeeCode: 'E-TWICE', workEmail: 'twice@acme.vn', departmentCode: 'P-NOPE', jobTitle: undefined }),
       ).expect(422);
 
       expect(reasonsOf(response)).toEqual([
         { field: 'departmentCode', code: 'DEPARTMENT_NOT_FOUND' },
-        { field: 'jobTitleId', code: 'JOB_TITLE_REQUIRED' },
+        { field: 'jobTitle', code: 'JOB_TITLE_REQUIRED' },
         { field: 'employeeCode', code: 'EMPLOYEE_CODE_TAKEN' },
         { field: 'workEmail', code: 'WORK_EMAIL_TAKEN' },
       ]);

@@ -23,6 +23,8 @@
     "ops:recover": "node dist/recovery-cli",
     "ops:inspect": "node dist/inspect-cli",
     "ops:preflight": "node dist/migration-preflight-cli",
+    "ops:assign-subscription-owner": "node dist/subscription-owner-assignment-cli",
+    "ops:cost-center-direction": "node dist/cost-center-direction-cli",
     "ops:db-roles": "node dist/database-roles-cli",
     "dev:seed": "node dist/dev-seed-cli",
     "lint": "eslint \"{src,test,scripts}/**/*.ts\"",

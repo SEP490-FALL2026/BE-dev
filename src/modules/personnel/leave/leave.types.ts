@@ -16,7 +16,8 @@ export interface LeaveRecord {
   endKind: LeaveEndKind | null;
   resumesLeaveId: string | null;
   grounds: Grounds;
-  startedByAppUserId: string;
+  /** Null only for an event the controlled procedure of the release after this one recorded (spec L.2); this release always writes its account. */
+  startedByAppUserId: string | null;
   startedAt: Date;
   selfExecuted: boolean;
   returnOverdueNoticedFor: BusinessDate | null;
@@ -40,7 +41,8 @@ export interface LeaveChangeRecord {
   returnedOn: BusinessDate | null;
   onSchedule: boolean | null;
   grounds: Grounds | null;
-  recordedByAppUserId: string;
+  /** Null only for an event the controlled procedure of the release after this one recorded (spec L.2); this release always writes its account. */
+  recordedByAppUserId: string | null;
   recordedAt: Date;
   selfExecuted: boolean;
 }

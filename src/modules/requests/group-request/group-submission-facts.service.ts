@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { CatalogService } from '../../catalog/catalog.service';
 import { LicensingService } from '../../licensing/licensing.service';
 import { OrganizationService } from '../../organization/organization.service';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
@@ -52,8 +51,6 @@ export interface GroupJudgement {
   refused: RefusedLine[];
   /** The people named, each once, in the order they were named. */
   lines: GroupLineInput[];
-  /** At least one person has the plan outside the standard toolset of their department and job title (`US-05-04` AC-7). */
-  outsideStandard: boolean;
   /** What the request costs for the people named. */
   pricing: PricingRecord;
 }
@@ -61,14 +58,13 @@ export interface GroupJudgement {
 /**
  * Reads what a request for a group is judged by (`US-05-17` AC-2, AC-8, AC-12 to AC-15): the plan and the department of the
  * sender as for a request of one person, then each person named: where they are, whether they work here, their email and end day,
- * whether they hold the plan or have a request for it open, and whether the plan is in their standard toolset. It writes nothing
+ * whether they hold the plan or have a request for it open. It writes nothing
  * and decides nothing: `POST /group-requests/check` shows it, and the sending refuses or records.
  */
 @Injectable()
 export class GroupSubmissionFactsService {
   constructor(
     private readonly organization: OrganizationService,
-    private readonly catalog: CatalogService,
     private readonly licensing: LicensingService,
     private readonly assessment: RequestAssessmentService,
     private readonly requests: AccessRequestRepo,
@@ -102,7 +98,6 @@ export class GroupSubmissionFactsService {
     ]);
     const known = new Map(people.map((person) => [person.id, person]));
     const facts: LineFacts[] = [];
-    let outsideStandard = false;
     for (const line of lines) {
       const person = known.get(line.employeeId);
       const own = units.get(line.employeeId);
@@ -119,13 +114,6 @@ export class GroupSubmissionFactsService {
         hasOpenRequest: open.has(line.employeeId),
         isHeadOwnLine: senderIsHead && line.employeeId === input.senderEmployeeId,
       });
-      if (
-        person &&
-        own?.departmentId === unit.departmentId &&
-        !(await this.inToolset(tx, line.employeeId, unit.departmentId, input.planId, today))
-      ) {
-        outsideStandard = true;
-      }
     }
 
     // The price is of the people named, and only a plan a group may take is priced as one (`AC-5`).
@@ -151,7 +139,6 @@ export class GroupSubmissionFactsService {
       count,
       refused: checkLines(unit.departmentId, facts, today),
       lines,
-      outsideStandard,
       pricing,
     };
   }
@@ -160,19 +147,5 @@ export class GroupSubmissionFactsService {
     const { total } = await this.licensing.getSeatsHeldInPlans(employeeId, [planId], { skip: 0, take: 1 });
 
     return total > 0;
-  }
-
-  private async inToolset(
-    tx: DbTx,
-    employeeId: string,
-    departmentId: string,
-    planId: string,
-    today: BusinessDate,
-  ): Promise<boolean> {
-    const placement = await this.organization.getEmployeePlacement(employeeId, today, tx);
-
-    return (
-      placement !== null && (await this.catalog.isPlanInStandardToolset(departmentId, placement.jobTitleId, planId, tx))
-    );
   }
 }

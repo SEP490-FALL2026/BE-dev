@@ -457,7 +457,7 @@ describe('the status of a request told to the people it concerns, over PostgreSQ
           .sendDelegated(
             {
               beneficiaryEmployeeIds: [colleague.employeeId],
-              items: [{ planId: plan, outsideStandardReason: 'Not standard' }],
+              items: [{ planId: plan }],
               businessReason: 'The new designer needs the tool',
               termMonths: 1,
             },

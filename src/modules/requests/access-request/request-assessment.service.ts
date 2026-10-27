@@ -36,17 +36,16 @@ export interface HeldAccess {
   validUntil: BusinessDate | null;
 }
 
-type OwningUnit = Awaited<ReturnType<OrganizationService['getOwningUnits']>> extends Map<string, infer U> ? U : never;
+/** The unit of the day with the Cost Center the request is charged to (`OrganizationService.requireUnitCostCenter`). */
+type OwningUnit = ReturnType<OrganizationService['requireUnitCostCenter']>;
 type SeatTarget = NonNullable<Awaited<ReturnType<CatalogService['findPlanSeatTargets']>>[number]>;
 
 /** Everything a request is decided by, read for one person asking for one plan on one day. */
 export interface Assessment {
   today: BusinessDate;
   unit: OwningUnit;
-  jobTitleId: string | null;
   target: SeatTarget;
   policy: RequestPolicy;
-  outsideStandard: boolean;
   pricing: PricingRecord;
   routing: GatheredRouting & { decision: RoutingDecision };
   heldAccess: HeldAccess | null;
@@ -101,23 +100,20 @@ export class RequestAssessmentService {
   }
 
   /**
-   * Throws AccessRequestNoDepartmentError, AccessRequestPlanNotFoundError, AccessRequestApplicationRetiredError and
-   * AccessRequestSpendDateNotAllowedError.
+   * Throws AccessRequestNoDepartmentError, FinanceSetupIncompleteError (the department has no Cost Center yet),
+   * AccessRequestPlanNotFoundError, AccessRequestApplicationRetiredError and AccessRequestSpendDateNotAllowedError.
    */
   async assess(tx: DbTx, input: AssessmentInput): Promise<Assessment> {
     const today = await this.organization.businessToday(input.now, tx);
-    const unit = (await this.organization.getOwningUnits([input.employeeId], today, tx)).get(input.employeeId);
-    if (!unit) throw new AccessRequestNoDepartmentError();
+    const found = (await this.organization.getOwningUnits([input.employeeId], today, tx)).get(input.employeeId);
+    if (!found) throw new AccessRequestNoDepartmentError();
+    const unit = this.organization.requireUnitCostCenter(found);
     if (input.lockDepartment) await this.organization.lockDepartmentShared(tx, unit.departmentId);
 
-    const placement = await this.organization.getEmployeePlacement(input.employeeId, today);
     const [target] = await this.catalog.findPlanSeatTargets([input.planId], tx);
     if (!target) throw new AccessRequestPlanNotFoundError();
     if (target.applicationStatus === 'RETIRED') throw new AccessRequestApplicationRetiredError();
 
-    const outsideStandard =
-      !placement ||
-      !(await this.catalog.isPlanInStandardToolset(unit.departmentId, placement.jobTitleId, input.planId, tx));
     const policy = policyFor(target.applicationKind, input.settings.slaWorkingDays);
     const pricing = await this.priceFor(tx, {
       planId: input.planId,
@@ -138,10 +134,8 @@ export class RequestAssessmentService {
     return {
       today,
       unit,
-      jobTitleId: placement?.jobTitleId ?? null,
       target,
       policy,
-      outsideStandard,
       pricing,
       routing: { ...gathered, decision: routeNeedStep(gathered.facts) },
       heldAccess: await this.heldAccess(input.employeeId, input.planId),
@@ -158,8 +152,9 @@ export class RequestAssessmentService {
     input: Pick<AssessmentInput, 'employeeId' | 'expectedSpendOn' | 'now' | 'settings' | 'lockDepartment'>,
   ): Promise<ProposalAssessment> {
     const today = await this.organization.businessToday(input.now, tx);
-    const unit = (await this.organization.getOwningUnits([input.employeeId], today, tx)).get(input.employeeId);
-    if (!unit) throw new AccessRequestNoDepartmentError();
+    const found = (await this.organization.getOwningUnits([input.employeeId], today, tx)).get(input.employeeId);
+    if (!found) throw new AccessRequestNoDepartmentError();
+    const unit = this.organization.requireUnitCostCenter(found);
     if (input.lockDepartment) await this.organization.lockDepartmentShared(tx, unit.departmentId);
 
     const policy = proposalPolicy(input.settings.slaWorkingDays);

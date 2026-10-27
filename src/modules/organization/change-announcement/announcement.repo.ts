@@ -80,14 +80,11 @@ export class AnnouncementRepo {
         id: string;
         employee_id: string;
         department_id: string;
-        job_title_id: string;
         valid_from: Date;
         from_department_id: string | null;
-        from_job_title_id: string | null;
       }[]
     >`
-      SELECT p.id, p.employee_id, p.department_id, p.job_title_id, p.valid_from,
-             q.department_id AS from_department_id, q.job_title_id AS from_job_title_id
+      SELECT p.id, p.employee_id, p.department_id, p.valid_from, q.department_id AS from_department_id
         FROM employee_placements p
         JOIN employee_placements q ON q.employee_id = p.employee_id AND q.valid_to = p.valid_from
        WHERE p.id = ${id}::uuid AND p.valid_from <= ${today}::date
@@ -101,8 +98,6 @@ export class AnnouncementRepo {
       employeeId: row.employee_id,
       fromDepartmentId: row.from_department_id,
       toDepartmentId: row.department_id,
-      fromJobTitleId: row.from_job_title_id,
-      toJobTitleId: row.job_title_id,
       effectiveOn: fromDateColumn(row.valid_from),
     };
   }

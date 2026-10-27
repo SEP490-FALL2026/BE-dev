@@ -18,11 +18,17 @@ const COMMAND_ENTRIES = [
   'dev-seed-cli.ts',
   'migration-preflight-cli.ts',
   'database-roles-cli.ts',
+  // F02 (g0-g6-final-business-baseline-remediation): the one way an existing subscription gets its owner department.
+  'subscription-owner-assignment-cli.ts',
+  // F01 (g0-g6-final-business-baseline-remediation, Task 1.1a): the activation and the link of a Cost Center to its department.
+  'cost-center-direction-cli.ts',
 ];
 const COMMAND_FOLDERS = [
   'modules/installation/inspect',
   'modules/installation/dev-seed',
   'modules/installation/migration-preflight',
+  'modules/catalog/subscription-owner-assignment',
+  'modules/organization/cost-center-direction',
   // H7: `pnpm ops:db-roles` administers PostgreSQL roles; the API and the worker share only the pure judgement beside
   // their start-up check (infrastructure/database/database-role-judgement.ts), never the provisioning.
   'infrastructure/database/roles',
@@ -35,6 +41,10 @@ const COMMAND_ONLY_FILES = [
   'modules/identity-access/identity-access-local-seed-facade.module.ts',
   'modules/installation/dev-seed/dev-seed.module.ts',
   'modules/installation/migration-preflight/migration-preflight.module.ts',
+  'subscription-owner-assignment-cli.module.ts',
+  'modules/catalog/subscription-owner-assignment/subscription-owner-assignment.module.ts',
+  'cost-center-direction-cli.module.ts',
+  'modules/organization/cost-center-direction/cost-center-direction.module.ts',
 ];
 /** Known weak defaults that must never appear in product code, scripts or the environment template (rule 5). */
 const WEAK_DEFAULTS = [/Password123/i, /changeme/i, /admin123/i, /P@ssw0rd/i, /correct horse battery staple/i];

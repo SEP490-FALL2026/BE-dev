@@ -41,7 +41,8 @@ export type SeatRowErrorCode =
   | 'COST_CENTER_NOT_FOUND'
   | 'COST_CENTER_INACTIVE'
   | 'COST_CENTER_NOT_OWNING_UNIT'
-  | 'COST_CENTER_NOT_ALLOWED';
+  | 'COST_CENTER_NOT_ALLOWED'
+  | 'SUBSCRIPTION_DEPARTMENT_MISMATCH';
 
 export interface SeatRowError {
   code: SeatRowErrorCode;

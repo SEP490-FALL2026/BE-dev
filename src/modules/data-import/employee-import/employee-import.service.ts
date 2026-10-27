@@ -253,7 +253,7 @@ export class EmployeeImportService {
     const cells = stored.map((row) => ({ lineNumber: row.lineNumber, cells: row.cells }));
     const before = await this.lookup(cells, own, tx);
     const wanted = idsUsedByValidRows(stored, before);
-    await this.organization.lockForEmployeeImport(tx, wanted.departmentIds, wanted.jobTitleIds);
+    await this.organization.lockForEmployeeImport(tx, wanted.departmentIds);
     const fresh = judgeEmployeeRows(cells, await this.lookup(cells, own, tx));
     const changed = fresh.filter((row, index) => !sameJudgement(row, stored[index])).map((row) => row.lineNumber);
     if (changed.length > 0) throw new ImportPreviewStaleError(changed);
@@ -282,7 +282,7 @@ export class EmployeeImportService {
           hireDate: row.parsed.hireDate,
           memberSince: today,
           departmentId: row.parsed.departmentId,
-          jobTitleId: row.parsed.jobTitleId,
+          jobTitle: row.parsed.jobTitleName,
         });
         await this.audit.record(
           tx,

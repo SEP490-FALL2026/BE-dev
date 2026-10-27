@@ -33,11 +33,10 @@ export interface NewTransferFacts {
   effectiveOn: BusinessDate;
   employee: { status: 'ACTIVE' | 'TERMINATED'; workState: 'WORKING' | 'ON_LONG_LEAVE' | 'HANDING_OVER' | 'LEFT' };
   /** The placement in force: where the person is, and since when. */
-  current: { departmentId: string; jobTitleId: string; validFrom: BusinessDate };
+  current: { departmentId: string; validFrom: BusinessDate };
   /** Where the person is to be; what the caller did not name stays as it is. */
-  target: { departmentId: string; jobTitleId: string };
+  target: { departmentId: string };
   destinationDepartment: { active: boolean; costCenterActive: boolean } | null;
-  destinationJobTitle: { active: boolean } | null;
   grounds: GroundsInput | undefined;
   pending: { effectiveOn: BusinessDate } | null;
   /** Another waiting transfer names this person to follow the head of its department: they stay until it is settled. */
@@ -51,10 +50,7 @@ export interface NewTransferFacts {
  * the same refusal the policy gives when it sees the department retired.
  */
 export function retiredDestinationRefusal(): TransferRefusal {
-  const [reason] = placementReasons({
-    department: { named: true, found: { active: false, costCenterActive: true } },
-    jobTitle: { named: true, found: { active: true } },
-  });
+  const [reason] = placementReasons({ department: { named: true, found: { active: false, costCenterActive: true } } });
 
   return { code: reason.code, details: { subject: reason.subject } };
 }
@@ -98,25 +94,17 @@ function dateRefusal(today: BusinessDate, day: BusinessDate, periodStart: Busine
 
 /**
  * Whether a transfer may be recorded (`US-03-01` AC-14 -> AC-18, AC-21, AC-22): the person works for the organization and has no
- * other event waiting, something changes, the day is today or later, the destination can take people and the title can be
- * given, the basis is whole, nobody else has to act in their place, and the head of the department they leave is provided for.
+ * other event waiting, the department changes, the day is today or later, the destination can take people, the basis is whole,
+ * nobody else has to act in their place, and the head of the department they leave is provided for.
  */
 export function newTransferRefusal(facts: NewTransferFacts): TransferRefusal | null {
   const { employee, current, target } = facts;
   if (employee.status === 'TERMINATED' || employee.workState === 'LEFT') return { code: 'EMPLOYEE_LEFT' };
-  const departmentChanges = target.departmentId !== current.departmentId;
-  const titleChanges = target.jobTitleId !== current.jobTitleId;
-  if (!departmentChanges && !titleChanges) return { code: 'NO_CHANGE' };
+  if (target.departmentId === current.departmentId) return { code: 'NO_CHANGE' };
   const late = dateRefusal(facts.today, facts.effectiveOn, current.validFrom);
   if (late) return late;
 
-  const reasons = placementReasons({
-    department: {
-      named: true,
-      found: departmentChanges ? facts.destinationDepartment : { active: true, costCenterActive: true },
-    },
-    jobTitle: { named: true, found: titleChanges ? facts.destinationJobTitle : { active: true } },
-  });
+  const reasons = placementReasons({ department: { named: true, found: facts.destinationDepartment } });
   const reason = reasons[0];
   // The code the shared policy gives is the code on the wire (`DEPARTMENT_TRANSFER.<code>`): this file writes none of them.
   if (reason) return { code: reason.code, details: { subject: reason.subject } };

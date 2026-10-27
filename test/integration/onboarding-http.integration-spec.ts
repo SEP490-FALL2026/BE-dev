@@ -16,7 +16,7 @@ interface Step {
   facts?: {
     activeDepartments: number;
     activeEmployees: number;
-    freeCostCenters: number;
+    departmentsWithoutCostCenter: number;
     latestImport: { id: string; status: string; errorRows: number } | null;
     applications?: number;
     plans?: number;
@@ -27,15 +27,6 @@ interface Step {
   };
   createDepartmentBlockedBy?: string | null;
   warnings?: { code: string; departmentCode: string }[];
-}
-
-interface Suggestion {
-  key: string;
-  afterStep: number;
-  story: string;
-  available: boolean;
-  configuredPairs: number;
-  blocksStep: boolean;
 }
 
 const ORG_TIME_ZONE = 'Asia/Ho_Chi_Minh';
@@ -84,12 +75,14 @@ describe('the onboarding checklist over HTTP (integration, real PostgreSQL)', ()
         data: { steps: Step[] };
       }
     ).data.steps;
-  const suggestions = async (): Promise<Suggestion[]> =>
-    (
-      (await request(server()).get('/api/v1/onboarding-checklist').set(as(it1)).expect(200)).body as {
-        data: { suggestions: Suggestion[] };
-      }
-    ).data.suggestions;
+  const checklistKeys = async (): Promise<string[]> =>
+    Object.keys(
+      (
+        (await request(server()).get('/api/v1/onboarding-checklist').set(as(it1)).expect(200)).body as {
+          data: object;
+        }
+      ).data,
+    );
   const upload = (content: string) =>
     request(server())
       .post('/api/v1/employee-imports')
@@ -115,18 +108,45 @@ describe('the onboarding checklist over HTTP (integration, real PostgreSQL)', ()
     ]);
   });
 
-  it('says a new department is blocked until Finance makes a cost center, and unblocks when it does (AC-4)', async () => {
-    expect((await steps())[0].createDepartmentBlockedBy).toBe('NO_FREE_COST_CENTER');
+  it('says a new department is blocked until the operator activates the Cost Center link, and unblocks when it does (spec L.11)', async () => {
+    expect((await steps())[0].createDepartmentBlockedBy).toBe('AWAITING_ACTIVATION');
+
+    await ctx.sql.query(
+      `INSERT INTO cost_center_direction_activations (id, organization_id, release_evidence, approver_ref, operator_ref, environment)
+       VALUES (gen_random_uuid(), $1, 'onboarding-http', 'test', 'test', 'LOCAL_TEST')`,
+      [seed.organizationId],
+    );
+
+    const [first] = await steps();
+    expect(first.createDepartmentBlockedBy).toBeNull();
+  });
+
+  it('shows a department with no Cost Center as a warning that stops nothing, and drops it once Finance creates one for it (QĐ-87d(1))', async () => {
+    const bare = await ctx.sql.query<{ id: string }>(
+      `INSERT INTO departments (id, organization_id, code, name) VALUES (gen_random_uuid(), $1, 'P-ZBARE', 'No cost center yet') RETURNING id`,
+      [seed.organizationId],
+    );
+    const withWarning = (await steps())[0];
+    expect(withWarning.status).toBe('DONE');
+    expect(withWarning.warnings).toContainEqual({
+      code: 'MISSING_COST_CENTER',
+      departmentCode: 'P-ZBARE',
+      departmentName: 'No cost center yet',
+    });
+    expect(withWarning.facts?.departmentsWithoutCostCenter).toBe(1);
 
     await request(server())
       .post('/api/v1/cost-centers')
       .set(as(finance))
-      .send({ code: 'CC-NEW', name: 'New cost center', kind: 'UNIT' })
+      .send({ code: 'CC-BARE', name: 'For the bare one', kind: 'UNIT', departmentId: bare.rows[0].id })
       .expect(201);
 
     const [first] = await steps();
-    expect(first.createDepartmentBlockedBy).toBeNull();
-    expect(first.facts?.freeCostCenters).toBe(1);
+    expect(first.warnings?.map((warning) => warning.code)).not.toContain('MISSING_COST_CENTER');
+    expect(first.facts?.departmentsWithoutCostCenter).toBe(0);
+
+    // Retired, so the later cases still see only the department they were written for.
+    await ctx.sql.query(`UPDATE departments SET status = 'INACTIVE', deactivated_at = now() WHERE code = 'P-ZBARE'`);
   });
 
   it('stops warning about a department once it has a head and an IT Admin in charge', async () => {
@@ -219,16 +239,7 @@ describe('the onboarding checklist over HTTP (integration, real PostgreSQL)', ()
     });
     expect(seats).toMatchObject({ step: 4, status: 'BLOCKED', reasons: ['STEP_3_INCOMPLETE'] });
     expect(usage).toEqual({ step: 5, key: 'USAGE', status: 'NOT_AVAILABLE', reasons: ['NOT_BUILT_YET'] });
-    expect(await suggestions()).toEqual([
-      {
-        key: 'STANDARD_TOOLSET',
-        afterStep: 3,
-        story: 'US-04-10',
-        available: false,
-        configuredPairs: 0,
-        blocksStep: false,
-      },
-    ]);
+    expect(await checklistKeys()).toEqual(['steps']);
   });
 
   it('follows the data: an application, a plan and a subscription make steps 2 and 3 done and the seat step ready (AC-1)', async () => {
@@ -265,7 +276,12 @@ describe('the onboarding checklist over HTTP (integration, real PostgreSQL)', ()
     await request(server())
       .post('/api/v1/subscriptions')
       .set(as(it1))
-      .send({ planId: (plan.body as { data: { id: string } }).data.id, kind: 'TERM', purchasedQuantity: 100 })
+      .send({
+        ownerDepartmentId: seed.departmentId,
+        planId: (plan.body as { data: { id: string } }).data.id,
+        kind: 'TERM',
+        purchasedQuantity: 100,
+      })
       .expect(201);
 
     const [, , contracts, seats] = await steps();
@@ -277,44 +293,6 @@ describe('the onboarding checklist over HTTP (integration, real PostgreSQL)', ()
       reasons: [],
       facts: { assignments: 0, closed: false, closedAt: null },
     });
-  });
-
-  it('suggests the standard toolsets after step 3 once it is done, and never blocks a step by them (US-02-04 AC-5, US-04-10)', async () => {
-    const [toolsets] = await suggestions();
-
-    expect(toolsets).toEqual({
-      key: 'STANDARD_TOOLSET',
-      afterStep: 3,
-      story: 'US-04-10',
-      available: true,
-      configuredPairs: 0,
-      blocksStep: false,
-    });
-    expect((await steps())[3].status).toBe('INCOMPLETE');
-
-    const departmentId = (
-      (await request(server()).get('/api/v1/departments').set(as(it1)).expect(200)).body as {
-        data: { items: { id: string }[] };
-      }
-    ).data.items[0].id;
-    const jobTitleId = (
-      (await request(server()).post('/api/v1/job-titles').set(as(it1)).send({ name: 'Designer' }).expect(201)).body as {
-        data: { id: string };
-      }
-    ).data.id;
-    const planId = (
-      (await request(server()).get('/api/v1/plans').set(as(it1)).expect(200)).body as {
-        data: { items: { id: string }[] };
-      }
-    ).data.items[0].id;
-    await request(server())
-      .put(`/api/v1/standard-toolsets/${departmentId}/${jobTitleId}`)
-      .set(as(it1))
-      .send({ planIds: [planId], reason: 'bộ chuẩn đầu tiên' })
-      .expect(200);
-
-    expect((await suggestions())[0]).toMatchObject({ available: true, configuredPairs: 1, blocksStep: false });
-    expect((await steps())[3].status).toBe('INCOMPLETE');
   });
 
   it('gives no empty state once a subscription and an application exist, even when a filter matches nothing', async () => {

@@ -1,6 +1,6 @@
 import request from 'supertest';
 import { bodyOf } from '../support/api-body';
-import { ApiAccount, adminToken, createActivatedAccount } from '../support/api-accounts';
+import { adminToken } from '../support/api-accounts';
 import { HttpTestApp, SeededInstallation, createHttpTestApp, seedInstallation } from '../support/http-test-app';
 import { PgRelay } from '../support/pg-relay';
 import { HR_BASIS } from '../support/hr-basis';
@@ -9,16 +9,14 @@ const QUERY_TIMEOUT_MS = 2000;
 const SLACK_MS = 1500;
 
 /**
- * The database stops answering in the middle of the transaction that writes a job title or an employee: the
- * caller gets a retryable 503 and nothing is half-written (no person without a placement, no change without audit).
+ * The database stops answering in the middle of the transaction that writes an employee: the caller gets a retryable
+ * 503 and nothing is half-written (no person without a placement, no change without audit).
  */
-describe('job titles and manual entry when the database stops answering mid-transaction (integration)', () => {
+describe('manual entry when the database stops answering mid-transaction (integration)', () => {
   let ctx: HttpTestApp;
   let relay: PgRelay;
   let seed: SeededInstallation;
-  let it1: ApiAccount;
   const server = () => ctx.app.getHttpServer();
-  const asIt = () => ({ Authorization: `Bearer ${it1.accessToken}` });
   let superAdmin: string;
 
   beforeAll(async () => {
@@ -39,7 +37,6 @@ describe('job titles and manual entry when the database stops answering mid-tran
     seed = await seedInstallation(ctx.app);
     const admin = await adminToken(ctx, seed);
     superAdmin = admin;
-    it1 = await createActivatedAccount(ctx, seed, { code: 'E-IT1', email: 'it1@acme.vn', roles: ['IT_ADMIN'], admin });
   }, 120000);
 
   afterAll(async () => {
@@ -87,7 +84,7 @@ describe('job titles and manual entry when the database stops answering mid-tran
         employmentType: 'STAFF',
         hireDate: '2026-10-01',
         departmentCode: 'P-OPS',
-        jobTitleId: seed.jobTitleId,
+        jobTitle: 'Administrator',
       });
     const elapsed = Date.now() - started;
     expect(relay.holding).toBe(true);
@@ -100,41 +97,20 @@ describe('job titles and manual entry when the database stops answering mid-tran
     expect(await footprint()).toEqual(before);
   }, 60000);
 
-  it('answers a job title addition 503 and writes neither the title nor its audit event', async () => {
-    const before = await footprint();
-
-    relay.holdWhen(/INSERT INTO "public"\."job_titles"/);
-    const stalled = await request(server()).post('/api/v1/job-titles').set(asIt()).send({ name: 'Stalled Title' });
-    expect(relay.holding).toBe(true);
-    relay.releaseHeld();
-
-    expect(stalled.status).toBe(503);
-    expect(bodyOf(stalled).error.code).toBe('SERVICE_UNAVAILABLE');
-    await noBackendLeftIdleInTransaction();
-    expect(await footprint()).toEqual(before);
-  }, 60000);
-
-  it('answers a deactivation 503 and leaves the title as it was', async () => {
-    const title = (
-      (await request(server()).post('/api/v1/job-titles').set(asIt()).send({ name: 'Keeps Status' }).expect(201))
-        .body as { data: { id: string } }
-    ).data.id;
-    const before = await footprint();
-
-    relay.holdWhen(/UPDATE "public"\."job_titles"/);
-    const stalled = await request(server()).post(`/api/v1/job-titles/${title}/deactivate`).set(asIt());
-    expect(relay.holding).toBe(true);
-    relay.releaseHeld();
-
-    expect(stalled.status).toBe(503);
-    await noBackendLeftIdleInTransaction();
-    expect(await footprint()).toEqual(before);
-    expect((await ctx.sql.query('SELECT status, version FROM job_titles WHERE id = $1', [title])).rows).toEqual([
-      { status: 'ACTIVE', version: 1 },
-    ]);
-  }, 60000);
-
   it('works again once the database answers', async () => {
-    await request(server()).post('/api/v1/job-titles').set(asIt()).send({ name: 'After The Stall' }).expect(201);
+    await request(server())
+      .post('/api/v1/employees')
+      .set({ Authorization: `Bearer ${superAdmin}` })
+      .send({
+        hrBasis: HR_BASIS,
+        employeeCode: 'E-AFTER',
+        fullName: 'After The Stall',
+        workEmail: 'after@acme.vn',
+        employmentType: 'STAFF',
+        hireDate: '2026-10-01',
+        departmentCode: 'P-OPS',
+        jobTitle: 'Administrator',
+      })
+      .expect(201);
   });
 });

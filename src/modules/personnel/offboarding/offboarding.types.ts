@@ -53,7 +53,8 @@ export interface OffboardingRecord {
   closedAt: Date | null;
   closedByAppUserId: string | null;
   selfExecuted: boolean;
-  recordedByAppUserId: string;
+  /** Null only for an event the controlled procedure of the release after this one recorded (spec L.2); this release always writes its account. */
+  recordedByAppUserId: string | null;
   recordedAt: Date;
 }
 
@@ -78,7 +79,8 @@ export interface OffboardingChangeRecord {
   newLastWorkingDay: BusinessDate | null;
   reason: string | null;
   detail: Record<string, unknown> | null;
-  changedByAppUserId: string;
+  /** Null only for an event the controlled procedure of the release after this one recorded (spec L.2); this release always writes its account. */
+  changedByAppUserId: string | null;
   changedAt: Date;
   selfExecuted: boolean;
 }

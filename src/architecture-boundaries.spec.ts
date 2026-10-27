@@ -24,6 +24,7 @@ const PRISMA_MODEL_OWNER: Readonly<Record<string, string>> = {
   Application: 'catalog',
   ApplicationBusinessOwner: 'catalog',
   Subscription: 'catalog',
+  SubscriptionOwnerAssignment: 'catalog',
   Plan: 'catalog',
   PlanTerms: 'catalog',
   PlanTermOpinion: 'catalog',
@@ -98,6 +99,8 @@ const PRISMA_MODEL_OWNER: Readonly<Record<string, string>> = {
   ExchangeRate: 'finance',
   Organization: 'organization',
   CostCenter: 'organization',
+  CostCenterDepartmentLink: 'organization',
+  CostCenterDirectionActivation: 'organization',
   Department: 'organization',
   DepartmentHeadPeriod: 'organization',
   Project: 'organization',
@@ -515,6 +518,17 @@ const CLI_ENTRY_FILES: ReadonlySet<string> = new Set([
   'modules/installation/migration-preflight/migration-preflight.arguments.ts',
   'modules/installation/migration-preflight/migration-preflight.module.ts',
   'modules/installation/migration-preflight/migration-preflight.service.ts',
+  // F02 (g0-g6-final-business-baseline-remediation, Task 1.2a): `pnpm ops:assign-subscription-owner` reaches its graph,
+  // its service, its arguments and its errors.
+  'modules/catalog/subscription-owner-assignment/subscription-owner-assignment.arguments.ts',
+  'modules/catalog/subscription-owner-assignment/subscription-owner-assignment.errors.ts',
+  'modules/catalog/subscription-owner-assignment/subscription-owner-assignment.module.ts',
+  'modules/catalog/subscription-owner-assignment/subscription-owner-assignment.service.ts',
+  // F01 (Task 1.1a): `pnpm ops:cost-center-direction` and the organization facade reach its graph, its service and its arguments.
+  'modules/organization/cost-center-direction/cost-center-direction.arguments.ts',
+  'modules/organization/cost-center-direction/cost-center-direction.errors.ts',
+  'modules/organization/cost-center-direction/cost-center-direction.module.ts',
+  'modules/organization/cost-center-direction/cost-center-direction.service.ts',
 ]);
 
 /**

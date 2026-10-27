@@ -1,7 +1,7 @@
 import { isBusinessDate } from '../../../core/business-date';
 import { normalizeDisplayName } from '../../../core/display-name';
 import { InvalidEmailError, normalizeEmail } from '../../../core/email';
-import { PlacementSubject, placementReasons } from '../../organization/employee-placement.policy';
+import { PlacementSubject, isJobTitleTooLong, placementReasons } from '../../organization/employee-placement.policy';
 import type { EmployeeImportLookupData } from '../../organization/organization.types';
 
 export const EMPLOYEE_COLUMNS = [
@@ -75,11 +75,9 @@ export interface ExistingEmployee {
   jobTitleName: string | null;
 }
 
-/** What the database says about the codes, emails, departments and job titles the file names. */
+/** What the database says about the codes, emails and departments the file names. */
 export interface EmployeeImportLookup {
   departments: ReadonlyMap<string, { id: string; active: boolean; costCenterActive: boolean }>;
-  /** Keyed by the normalized name of the job title. */
-  jobTitles: ReadonlyMap<string, { id: string; name: string; status: 'ACTIVE' | 'INACTIVE' }>;
   existing: ReadonlyMap<string, ExistingEmployee>;
   /** Normalized work email of an employee ⟹ that employee's code. */
   emailOwners: ReadonlyMap<string, string>;
@@ -96,7 +94,6 @@ export interface ParsedEmployeeRow {
   departmentCode: string;
   jobTitleName: string;
   departmentId: string;
-  jobTitleId: string;
 }
 
 export type EmployeeRowOutcome = 'VALID' | 'ERROR' | 'EXISTS_SAME' | 'EXISTS_DIFFERENT';
@@ -133,8 +130,8 @@ export type EmployeeCells = Partial<Record<EmployeeColumn, string>>;
 export const clean = (value: string | undefined): string => normalizeDisplayName(value ?? '');
 
 /**
- * The key a job title is looked up and compared by: the display form in lower case, the same rule as the
- * catalogue's stored `normalized_name` (T-12, US-02-07 AC-2), so case and stray spaces do not matter but accents do.
+ * The key two job titles are compared by when a person that exists is reported as the same or different: the display form
+ * in lower case, so case and stray spaces do not matter but accents do. The title itself is free text (`QĐ-87e`).
  */
 export const jobTitleKey = (text: string): string => normalizeDisplayName(text).toLowerCase();
 
@@ -209,18 +206,14 @@ export class EmployeeRowClassifier {
 
     // Only a person to create is placed (H8 D-2); the placement reasons come after this file's own (D-3, D-4).
     const department = departmentCode === '' ? undefined : this.lookup.departments.get(departmentCode);
-    const jobTitle = jobTitleText === '' ? undefined : this.lookup.jobTitles.get(jobTitleKey(jobTitleText));
     for (const { subject, code } of placementReasons({
       department: { named: departmentCode !== '', found: department ?? null },
-      jobTitle: {
-        named: jobTitleText !== '',
-        found: jobTitle === undefined ? null : { active: jobTitle.status !== 'INACTIVE' },
-      },
+      jobTitle: { named: jobTitleText !== '', tooLong: isJobTitleTooLong(jobTitleText) },
     })) {
       errors.push({ column: FILE_COLUMN[subject], code });
     }
 
-    if (errors.length > 0 || !department || !jobTitle) return { outcome: 'ERROR', errors };
+    if (errors.length > 0 || !department) return { outcome: 'ERROR', errors };
 
     return {
       outcome: 'VALID',
@@ -232,9 +225,8 @@ export class EmployeeRowClassifier {
         employmentType: typeText as EmploymentTypeName,
         hireDate,
         departmentCode,
-        jobTitleName: jobTitle.name,
+        jobTitleName: jobTitleText,
         departmentId: department.id,
-        jobTitleId: jobTitle.id,
       },
     };
   }
@@ -287,10 +279,9 @@ function safeNormalize(email: string): string | null {
 
 // --- judging the rows of a preview, and judging them again --------------------------------------------------------
 
-/** The codes, job title keys and emails the rows name, each once and without blanks: what to look up for them. */
+/** The codes and emails the rows name, each once and without blanks: what to look up for them. */
 export function lookupNamesOf(rows: readonly { cells: EmployeeCells }[]): {
   departmentCodes: string[];
-  normalizedJobTitleNames: string[];
   employeeCodes: string[];
   normalizedEmails: string[];
 } {
@@ -299,7 +290,6 @@ export function lookupNamesOf(rows: readonly { cells: EmployeeCells }[]): {
 
   return {
     departmentCodes: unique(cells.map((cell) => clean(cell.department_code))),
-    normalizedJobTitleNames: unique(cells.map((cell) => jobTitleKey(clean(cell.job_title)))),
     employeeCodes: unique(cells.map((cell) => clean(cell.employee_code))),
     normalizedEmails: unique(cells.map((cell) => safeNormalize(clean(cell.work_email)) ?? '')),
   };
@@ -309,7 +299,6 @@ export function lookupNamesOf(rows: readonly { cells: EmployeeCells }[]): {
 export function toEmployeeImportLookup(data: EmployeeImportLookupData): EmployeeImportLookup {
   return {
     departments: new Map(data.departments.map((row) => [row.code, row])),
-    jobTitles: new Map(data.jobTitles.map((row) => [row.normalizedName, row])),
     existing: new Map<string, ExistingEmployee>(data.employees.map((row) => [row.employeeCode, row])),
     emailOwners: new Map(data.emailOwners.map((row) => [row.normalizedEmail, row.employeeCode])),
   };
@@ -325,22 +314,19 @@ export function judgeEmployeeRows<Row extends { lineNumber: number; cells: Emplo
   return rows.map((row) => ({ lineNumber: row.lineNumber, cells: row.cells, ...classifier.classify(row.cells) }));
 }
 
-/** The departments and job titles the rows judged valid rely on: what the confirmation locks before judging again. */
+/** The departments the rows judged valid rely on: what the confirmation locks before judging again. */
 export function idsUsedByValidRows(
   rows: readonly { outcome: EmployeeRowOutcome; cells: EmployeeCells }[],
   lookup: EmployeeImportLookup,
-): { departmentIds: string[]; jobTitleIds: string[] } {
+): { departmentIds: string[] } {
   const departmentIds = new Set<string>();
-  const jobTitleIds = new Set<string>();
   for (const row of rows) {
     if (row.outcome !== 'VALID') continue;
     const department = lookup.departments.get(clean(row.cells.department_code));
-    const title = lookup.jobTitles.get(jobTitleKey(clean(row.cells.job_title)));
     if (department) departmentIds.add(department.id);
-    if (title) jobTitleIds.add(title.id);
   }
 
-  return { departmentIds: [...departmentIds], jobTitleIds: [...jobTitleIds] };
+  return { departmentIds: [...departmentIds] };
 }
 
 /** The same text for the same data whatever order the keys came in: PostgreSQL stores `jsonb` with its own key order. */

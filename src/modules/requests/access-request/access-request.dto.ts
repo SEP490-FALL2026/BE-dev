@@ -19,7 +19,6 @@ export const submitBodySchema = z.strictObject({
   businessReason: z.string().trim().min(1).max(REASON_MAX_LENGTH),
   termMonths: z.number().int().min(1).max(TERM_MONTHS_MAX),
   projectLabel: z.string().trim().min(1).max(PROJECT_LABEL_MAX_LENGTH).optional(),
-  outsideStandardReason: z.string().trim().min(1).max(REASON_MAX_LENGTH).optional(),
   /** The day the money is expected to go out (paid software only); it fixes the budget year. Today when left out. */
   expectedSpendOn: z.string().refine(isBusinessDate, { message: 'Must be a real date as YYYY-MM-DD.' }).optional(),
 });
@@ -189,9 +188,6 @@ export const requestSchema = z.strictObject({
   businessReason: z.string(),
   termMonths: z.number().int().positive(),
   projectLabel: z.string().nullable(),
-  outsideStandardReason: z.string().nullable(),
-  /** Whether the plan was outside the standard toolset of the sender on the day it was sent: a flag, never a stop. */
-  outsideStandard: z.boolean(),
   /** The head chose "outside the plan": a flag for Finance and the approver, never a stop. */
   offPlan: z.boolean(),
   /** The code the requests a head sent for people of the department in one go share; null for any other request. */
@@ -282,7 +278,7 @@ export const requestSchema = z.strictObject({
     .strictObject({
       cancelledBy: employeeRef,
       cancelledAt: z.iso.datetime(),
-      cause: z.enum(['BENEFICIARY_LEFT']),
+      cause: z.enum(['BENEFICIARY_LEFT', 'BENEFICIARY_TRANSFERRED']),
       note: z.string().nullable(),
     })
     .nullable(),

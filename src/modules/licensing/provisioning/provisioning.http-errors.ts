@@ -191,5 +191,6 @@ export const PROVISIONING_GRANT_EXAMPLES = {
     example(new AssignmentConflictError('OVERLAP', 0)),
     example(new AssignmentConflictError('IDENTIFIER_IN_USE', 0)),
     example(new AssignmentConflictError('EXPECTED_END_REQUIRED', 0)),
+    example(new AssignmentConflictError('SUBSCRIPTION_DEPARTMENT_MISMATCH', 0)),
   ],
 } as const;

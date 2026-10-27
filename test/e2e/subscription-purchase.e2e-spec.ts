@@ -10,6 +10,7 @@ import { bodyOf } from '../support/api-body';
 const ID = '3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11';
 const VALID_SUBSCRIPTION = {
   planId: ID,
+  ownerDepartmentId: ID,
   kind: 'TERM',
   purchasedQuantity: 100,
   unitPrice: { amount: '1200.00', currency: 'USD' },
@@ -113,6 +114,12 @@ describe('subscription routes (e2e, no database)', () => {
     it.each([
       ['no plan', without(VALID_SUBSCRIPTION, 'planId')],
       ['a plan that is not a uuid', { ...VALID_SUBSCRIPTION, planId: 'P' }],
+      [
+        'no owner department (F02: the department that owns the purchase is required)',
+        without(VALID_SUBSCRIPTION, 'ownerDepartmentId'),
+      ],
+      ['an owner department that is not a uuid', { ...VALID_SUBSCRIPTION, ownerDepartmentId: 'D' }],
+      ['an owner department that is null', { ...VALID_SUBSCRIPTION, ownerDepartmentId: null }],
       ['no kind', without(VALID_SUBSCRIPTION, 'kind')],
       ['a kind that is not one', { ...VALID_SUBSCRIPTION, kind: 'LEASE' }],
       ['a negative quantity', { ...VALID_SUBSCRIPTION, purchasedQuantity: -1 }],
@@ -143,6 +150,7 @@ describe('subscription routes (e2e, no database)', () => {
 
     it.each([
       ['a plan', { planId: ID }],
+      ['an owner department, which never changes once the subscription has it', { ownerDepartmentId: ID }],
       ['a kind', { kind: 'PERPETUAL' }],
       ['a status', { status: 'ACTIVE' }],
       ['a null price', { unitPrice: null }],

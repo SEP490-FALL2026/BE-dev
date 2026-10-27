@@ -113,31 +113,51 @@ export class ProvisioningHarness extends SeatHarness {
     return response;
   };
 
-  async jobTitle(name: string): Promise<string> {
-    return this.dataOf<{ id: string }>(
-      await request(this.server()).post('/api/v1/job-titles').set(this.as(this.it1)).send({ name }).then(this.created),
-    ).id;
+  /** A job title is free text on the person (`QĐ-87e`): there is nothing to create, so the name is the title. */
+  jobTitle(name: string): Promise<string> {
+    return Promise.resolve(name);
   }
 
-  async department(code: string, itAdminEmployeeId?: string): Promise<{ id: string; code: string }> {
-    const costCenter = await this.costCenter('UNIT');
+  /**
+   * The catalogue entry of a title the database names on the placement of everybody who has it (spec L.10), made when no one has
+   * it yet: for the suites that write placements or transfers by SQL, which still name it (the final release drops it).
+   */
+  async catalogueId(name: string): Promise<string> {
+    const { rows } = await this.ctx.sql.query<{ id: string }>(
+      `INSERT INTO job_titles (id, organization_id, name, normalized_name, updated_at)
+       VALUES (gen_random_uuid(), $1, $2, lower($2), now())
+       ON CONFLICT (organization_id, normalized_name) DO UPDATE SET name = job_titles.name RETURNING id`,
+      [this.seed.organizationId, name],
+    );
 
-    return this.dataOf<{ id: string; code: string }>(
+    return rows[0].id;
+  }
+
+  /**
+   * A department the Super Admin creates (with no Cost Center) and the Cost Center Finance creates for it (`QĐ-87d(1)`); the
+   * Cost Center link is activated for the installation first, as the operator does after the release is ready.
+   */
+  async department(code: string, itAdminEmployeeId?: string): Promise<{ id: string; code: string }> {
+    await this.activateCostCenterLink();
+    const department = this.dataOf<{ id: string; code: string }>(
       await request(this.server())
         .post('/api/v1/departments')
-        .set(this.as(this.it1))
+        .set({ Authorization: `Bearer ${this.admin}` })
         .send({
           code,
           name: `Department ${code}`,
-          costCenterId: costCenter.id,
+          hrBasis: HR_BASIS,
           ...(itAdminEmployeeId ? { itAdminEmployeeId } : {}),
         })
         .then(this.created),
     );
+    await this.costCenterFor(department.id);
+
+    return department;
   }
 
   /** A person of the company in this department, with the work email `code@acme.vn`. */
-  async member(departmentCode: string, code: string, jobTitleId: string): Promise<string> {
+  async member(departmentCode: string, code: string, jobTitle: string): Promise<string> {
     return this.dataOf<{ id: string }>(
       await request(this.server())
         .post('/api/v1/employees')
@@ -150,7 +170,7 @@ export class ProvisioningHarness extends SeatHarness {
           employmentType: 'STAFF',
           hireDate: '2026-10-01',
           departmentCode,
-          jobTitleId,
+          jobTitle,
         })
         .then(this.created),
     ).id;

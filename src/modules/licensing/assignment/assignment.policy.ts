@@ -1,6 +1,7 @@
 import type { BusinessDate } from '../../../core/business-date';
 import type { EmployeeWorkState } from '../../organization/organization.types';
 import {
+  AssignmentConflictError,
   AssignmentEffectiveDateInvalidError,
   AssignmentExpectedEndRequiredError,
   AssignmentNotOpenError,
@@ -21,6 +22,23 @@ export const assignmentCreatedSnapshot = (record: AssignmentRecord, importId: st
   effectiveFromBasis: record.effectiveFromBasis,
   importId,
 });
+
+/**
+ * A seat that carries an owning department sits on a subscription of that department (`QĐ-89a`, F20): a subscription that has an
+ * owner takes no seat of another department, and a seat without an owning department (a personal one) or a subscription nobody
+ * has assigned are not checked. Throws AssignmentConflictError (`SUBSCRIPTION_DEPARTMENT_MISMATCH`) before anything is written;
+ * `index` is the row of a baseline, 0 for a request.
+ */
+export function assertSubscriptionDepartment(
+  target: { ownerDepartmentId: string | null },
+  owningDepartmentId: string | null,
+  index: number,
+): void {
+  if (target.ownerDepartmentId === null || owningDepartmentId === null) return;
+  if (target.ownerDepartmentId !== owningDepartmentId) {
+    throw new AssignmentConflictError('SUBSCRIPTION_DEPARTMENT_MISMATCH', index);
+  }
+}
 
 /** `2026-10-01` as `01/10/2026`. */
 const dayMonthYear = (date: BusinessDate): string => `${date.slice(8, 10)}/${date.slice(5, 7)}/${date.slice(0, 4)}`;

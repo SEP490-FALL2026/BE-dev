@@ -69,8 +69,6 @@ export class OrganizationHistoryService {
         employeeId: input.employeeId,
         fromDepartmentId: scheduled.from.departmentId,
         toDepartmentId: input.departmentId,
-        fromJobTitleId: scheduled.from.jobTitleId,
-        toJobTitleId: input.jobTitleId,
         effectiveOn: input.effectiveOn,
       });
     }

@@ -187,16 +187,19 @@ describe('cost attribution to Units only (integration, BBI-D04 → BBI-D08, BBI-
 
       return response;
     };
+    // A department the Super Admin creates and a Cost Center Finance creates for it (`QĐ-87d(1)`).
     const department = async (code: string) => {
-      const unit = await h.costCenter('UNIT');
-
-      return h.dataOf<{ id: string; code: string }>(
+      await h.activateCostCenterLink();
+      const made = h.dataOf<{ id: string; code: string }>(
         await request(h.server())
           .post('/api/v1/departments')
-          .set(h.as(h.it1))
-          .send({ code, name: `Department ${code}`, costCenterId: unit.id })
+          .set({ Authorization: `Bearer ${h.admin}` })
+          .send({ code, name: `Department ${code}`, hrBasis: HR_BASIS })
           .then(created),
       );
+      await h.costCenterFor(made.id);
+
+      return made;
     };
     const enter = async (departmentCode: string, code: string): Promise<string> =>
       h.dataOf<{ id: string }>(
@@ -211,7 +214,7 @@ describe('cost attribution to Units only (integration, BBI-D04 → BBI-D08, BBI-
             employmentType: 'STAFF',
             hireDate: '2024-06-01',
             departmentCode,
-            jobTitleId: h.seed.jobTitleId,
+            jobTitle: 'Administrator',
           })
           .then(created),
       ).id;
@@ -228,8 +231,8 @@ describe('cost attribution to Units only (integration, BBI-D04 → BBI-D08, BBI-
 
     it('keeps a service account in the department that owns it: the person who takes over must be in that department', async () => {
       today('2026-12-01');
-      const subscriptionId = await h.subscription(10);
       const ops = await department('P-UO1');
+      const subscriptionId = await h.subscription(10, 'K2', ops.id);
       const other = await department('P-UO2');
       const owner = await enter(ops.code, 'UO-OWN');
       const colleague = await enter(ops.code, 'UO-COL');
@@ -254,8 +257,8 @@ describe('cost attribution to Units only (integration, BBI-D04 → BBI-D08, BBI-
 
     it('refuses to retire a department while it owns an open service account, naming it, and retires it once the account has ended', async () => {
       today('2026-12-01');
-      const subscriptionId = await h.subscription(10);
       const ops = await department('P-UO3');
+      const subscriptionId = await h.subscription(10, 'K2', ops.id);
       const owner = await enter(ops.code, 'UO-OWN3');
       await h.written({ subscriptionId }, [bot('UO-OWN3', 'uo3-bot')]);
       const service = (await h.assignmentsOf({ subscriptionId, kind: 'SERVICE' }))[0];
@@ -277,8 +280,8 @@ describe('cost attribution to Units only (integration, BBI-D04 → BBI-D08, BBI-
 
     it('takes no new service account into a department that was retired meanwhile', async () => {
       today('2026-12-01');
-      const subscriptionId = await h.subscription(10);
       const ops = await department('P-UO4');
+      const subscriptionId = await h.subscription(10, 'K2', ops.id);
       const owner = await enter(ops.code, 'UO-OWN4');
       await h.ctx.sql.query(`UPDATE employee_placements SET valid_to = valid_from + 1 WHERE employee_id = $1`, [owner]);
       await h.ctx.sql.query(`UPDATE departments SET status = 'INACTIVE', deactivated_at = now() WHERE id = $1`, [

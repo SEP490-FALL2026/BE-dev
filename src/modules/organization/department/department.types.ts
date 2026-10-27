@@ -17,7 +17,8 @@ export interface DepartmentRecord {
   name: string;
   functionDescription: string | null;
   status: DepartmentStatus;
-  costCenter: { id: string; code: string; name: string; status: CostCenterStatus };
+  /** The Cost Center Finance created for the department and that is in use; null while it has none (`QĐ-87d(1)`). */
+  costCenter: { id: string; code: string; name: string; status: CostCenterStatus } | null;
   itAdmin: { employeeId: string; employeeCode: string; fullName: string; employeeStatus: EmployeeStatus } | null;
   createdAt: Date;
   updatedAt: Date;

@@ -380,7 +380,6 @@ describe('API inventory (e2e)', () => {
       'reportingCurrencyGet',
       'seatBaselineClose',
       'seatBaselineGet',
-      'standardToolsetMine',
       'superAdminWatchGet',
     ];
     const NEW_422 = [
@@ -444,7 +443,7 @@ describe('API inventory (e2e)', () => {
         })
         .map((operation) => operation.key);
 
-      expect(operations).toHaveLength(296);
+      expect(operations).toHaveLength(279);
       expect(missing).toEqual([]);
     });
 

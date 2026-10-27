@@ -2,6 +2,7 @@ import request from 'supertest';
 import { OrganizationService } from '../../src/modules/organization/organization.service';
 import { PgRelay } from '../support/pg-relay';
 import { QueryCounter, tablesOf } from '../support/query-count';
+import { HR_BASIS } from '../support/hr-basis';
 import { SeatHarness } from '../support/seat-baseline-harness';
 
 const h = new SeatHarness();
@@ -242,12 +243,12 @@ describe('organization and identity read contracts (integration, real PostgreSQL
 
   describe('LD-15: the department warnings are a page', () => {
     it('pages the warnings by code then kind, with the total, and refuses a page size over 100', async () => {
+      await h.activateCostCenterLink();
       for (const code of ['P-LD15A', 'P-LD15B', 'P-LD15C']) {
-        const unit = await h.costCenter('UNIT');
         await request(h.server())
           .post('/api/v1/departments')
-          .set(h.as(h.it1))
-          .send({ code, name: code, costCenterId: unit.id })
+          .set({ Authorization: `Bearer ${h.admin}` })
+          .send({ code, name: code, hrBasis: HR_BASIS })
           .expect(201);
       }
 

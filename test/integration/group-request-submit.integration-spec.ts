@@ -13,7 +13,6 @@ interface RequestWire {
   lineCount: number;
   pricing: { status: string; amount: { amount: string } | null; unitPrice: { amount: string } | null };
   needStep: { state: string; routingRow: number; assignee: { employeeId: string } | null };
-  outsideStandard: boolean;
 }
 interface CheckWire {
   plan: { eligible: boolean; reason: string | null };
@@ -21,7 +20,6 @@ interface CheckWire {
   lines: Array<{ employeeId: string; ok: boolean; reason: string | null }>;
   lineCount: number;
   hasSpendStep: boolean;
-  outsideStandard: boolean;
   pricing: { status: string; amount: { amount: string } | null };
   amountPerPerson: { amount: string; currency: string } | null;
 }
@@ -358,29 +356,21 @@ describe('a request for a group of people, sent and checked over PostgreSQL (US-
       ]);
     });
 
-    it('shows the cost for one person and for all, whether it has a spend step, and whether a tool outside the toolset needs a reason', async () => {
+    it('shows the cost for one person and for all and whether it has a spend step, and says nothing of a toolset (QĐ-87h)', async () => {
       const u = await unit();
       const [e1, e2] = await h.colleagues(u, 2);
-      await h.setToolset(u.department, [paid]);
 
-      const inside = h.dataOf<CheckWire>(await h.checkGroup(h.groupBody(paid, [e1, e2]), u.head.account).expect(200));
-      const toolset = await h.planOf(await h.subscription(10));
-      const outside = h.dataOf<CheckWire>(
-        await h.checkGroup(h.groupBody(toolset, [e1, e2]), u.head.account).expect(200),
-      );
+      const checked = h.dataOf<CheckWire>(await h.checkGroup(h.groupBody(paid, [e1, e2]), u.head.account).expect(200));
+      const old = await h.submitGroup(h.groupBody(paid, [e1, e2], { outsideStandardReason: 'old' }), u.head.account);
 
-      expect(inside).toMatchObject({
+      expect(checked).toMatchObject({
         hasSpendStep: true,
         lineCount: 2,
-        outsideStandard: false,
         amountPerPerson: { amount: '12000000' },
         pricing: { status: 'PRICED', amount: { amount: '24000000' } },
       });
-      expect(outside.outsideStandard).toBe(true);
-      const unexplained = await h
-        .submitGroup(h.groupBody(toolset, [e1, e2], { outsideStandardReason: undefined }), u.head.account)
-        .expect(422);
-      expect(h.codeOf(unexplained)).toBe('ACCESS_REQUEST.OUTSIDE_STANDARD_REASON_REQUIRED');
+      expect(Object.keys(checked)).not.toContain('outsideStandard');
+      expect([old.status, h.codeOf(old)]).toEqual([422, 'VALIDATION_ERROR']);
     });
   });
 

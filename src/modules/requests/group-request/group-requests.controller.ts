@@ -59,8 +59,12 @@ export class GroupRequestsController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The application of the plan is retired (ACCESS_REQUEST.APPLICATION_RETIRED) or the caller belongs to no department (ACCESS_REQUEST.NO_DEPARTMENT).',
-      examples: [GROUP_REQUEST_ERROR_EXAMPLES.APPLICATION_RETIRED, GROUP_REQUEST_ERROR_EXAMPLES.NO_DEPARTMENT],
+        'The application of the plan is retired (ACCESS_REQUEST.APPLICATION_RETIRED), the caller belongs to no department (ACCESS_REQUEST.NO_DEPARTMENT) or the department has no Cost Center in use yet (FINANCE.SETUP_INCOMPLETE).',
+      examples: [
+        GROUP_REQUEST_ERROR_EXAMPLES.APPLICATION_RETIRED,
+        GROUP_REQUEST_ERROR_EXAMPLES.NO_DEPARTMENT,
+        GROUP_REQUEST_ERROR_EXAMPLES.FINANCE_SETUP_INCOMPLETE,
+      ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -86,7 +90,6 @@ export class GroupRequestsController {
         lines: checked.lines,
         lineCount: checked.lineCount,
         hasSpendStep: true,
-        outsideStandard: checked.outsideStandard,
         pricing: await this.money.view(pricing),
         amountPerPerson: perPerson,
       };
@@ -114,20 +117,23 @@ export class GroupRequestsController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The application of the plan is retired (ACCESS_REQUEST.APPLICATION_RETIRED) or the sender belongs to no department (ACCESS_REQUEST.NO_DEPARTMENT).',
-      examples: [GROUP_REQUEST_ERROR_EXAMPLES.APPLICATION_RETIRED, GROUP_REQUEST_ERROR_EXAMPLES.NO_DEPARTMENT],
+        'The application of the plan is retired (ACCESS_REQUEST.APPLICATION_RETIRED), the sender belongs to no department (ACCESS_REQUEST.NO_DEPARTMENT) or the department has no Cost Center in use yet (FINANCE.SETUP_INCOMPLETE).',
+      examples: [
+        GROUP_REQUEST_ERROR_EXAMPLES.APPLICATION_RETIRED,
+        GROUP_REQUEST_ERROR_EXAMPLES.NO_DEPARTMENT,
+        GROUP_REQUEST_ERROR_EXAMPLES.FINANCE_SETUP_INCOMPLETE,
+      ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The body is invalid (VALIDATION_ERROR); the plan does not take a group (GROUP_REQUEST.PLAN_NOT_ELIGIBLE); too many people are named (GROUP_REQUEST.TOO_MANY_LINES) or a person twice (GROUP_REQUEST.DUPLICATE_LINE); a person cannot be in it (GROUP_REQUEST.LINES_REFUSED, with each person and the reason); a tool outside the standard toolset has no reason (ACCESS_REQUEST.OUTSIDE_STANDARD_REASON_REQUIRED); a head sends a term over twelve months without confirming it (GROUP_REQUEST.TERM_CONFIRMATION_REQUIRED). Nothing is written.',
+        'The body is invalid (VALIDATION_ERROR); the plan does not take a group (GROUP_REQUEST.PLAN_NOT_ELIGIBLE); too many people are named (GROUP_REQUEST.TOO_MANY_LINES) or a person twice (GROUP_REQUEST.DUPLICATE_LINE); a person cannot be in it (GROUP_REQUEST.LINES_REFUSED, with each person and the reason); a head sends a term over twelve months without confirming it (GROUP_REQUEST.TERM_CONFIRMATION_REQUIRED). Nothing is written.',
       examples: [
         VALIDATION_EXAMPLE,
         GROUP_REQUEST_ERROR_EXAMPLES.PLAN_NOT_ELIGIBLE,
         GROUP_REQUEST_ERROR_EXAMPLES.TOO_MANY_LINES,
         GROUP_REQUEST_ERROR_EXAMPLES.DUPLICATE_LINE,
         GROUP_REQUEST_ERROR_EXAMPLES.LINES_REFUSED,
-        GROUP_REQUEST_ERROR_EXAMPLES.OUTSIDE_STANDARD_REASON_REQUIRED,
         GROUP_REQUEST_ERROR_EXAMPLES.TERM_CONFIRMATION_REQUIRED,
         GROUP_REQUEST_ERROR_EXAMPLES.NO_SPEND_FOR_FREE_SOFTWARE,
       ],

@@ -10,8 +10,6 @@ import { EmployeeDirectoryService } from '../../src/modules/organization/employe
 import { EmployeeDepartureRepo } from '../../src/modules/organization/employee/employee-departure.repo';
 import { EmployeeRepo } from '../../src/modules/organization/employee/employee.repo';
 import { ImportLookupRepo } from '../../src/modules/organization/employee/import-lookup.repo';
-import { JobTitleCatalogueService } from '../../src/modules/organization/job-title/job-title-catalogue.service';
-import { JobTitleRepo } from '../../src/modules/organization/job-title/job-title.repo';
 import { OrganizationRepo } from '../../src/modules/organization/organization.repo';
 import {
   EmployeeCodeTakenError,
@@ -55,7 +53,6 @@ describe('organization foundation (integration)', () => {
       new DepartmentDirectoryService(new DepartmentRepo(prisma), new DepartmentHeadRepo(prisma)),
       new EmployeeDirectoryService(new EmployeeRepo(prisma), new ImportLookupRepo(prisma), new EmployeeDepartureRepo()),
       new CostCenterCatalogueService(new CostCenterRepo(prisma)),
-      new JobTitleCatalogueService(new JobTitleRepo(prisma)),
       new DepartmentServiceAccountRegistry(),
       new OrganizationChangeService(new OrganizationChangeRegistry(), new AnnouncementRepo(prisma), runner),
     );
@@ -69,17 +66,19 @@ describe('organization foundation (integration)', () => {
         reportingCurrency: 'VND',
       });
       organizationId = org.id;
-      unitCostCenterId = (await organization.createUnitCostCenter(tx, { organizationId, code: 'CC-1', name: 'Eng' }))
+      // The department first, then the Cost Center created for it (`QĐ-87d(1)`).
+      departmentId = (await organization.createDepartment(tx, { organizationId, code: 'P-ENG', name: 'Engineering' }))
         .id;
-      departmentId = (
-        await organization.createDepartment(tx, {
-          organizationId,
-          code: 'P-ENG',
-          name: 'Engineering',
-          costCenterId: unitCostCenterId,
-        })
+      unitCostCenterId = (
+        await organization.createUnitCostCenter(tx, { organizationId, code: 'CC-1', name: 'Eng', departmentId })
       ).id;
-      jobTitleId = (await organization.createJobTitle(tx, organizationId, 'Developer')).id;
+      // The catalogue entry the SQL of these cases names on a placement; a placement written through the facade finds it by
+      // the normalized name of the title the person has (spec L.10).
+      jobTitleId = (
+        await tx.$queryRaw<{ id: string }[]>`
+          INSERT INTO job_titles (id, organization_id, name, normalized_name, updated_at)
+          VALUES (gen_random_uuid(), ${organizationId}::uuid, 'Developer', 'developer', now()) RETURNING id::text AS id`
+      )[0].id;
     });
   }, 60000);
 
@@ -99,7 +98,7 @@ describe('organization foundation (integration)', () => {
         employmentType: 'STAFF',
         hireDate: date,
         departmentId,
-        jobTitleId,
+        jobTitle: 'Developer',
       }),
     );
 
@@ -187,20 +186,52 @@ describe('organization foundation (integration)', () => {
     await sql.query(`DELETE FROM employees WHERE id = $1`, [id]);
   });
 
-  it('creates a job title under the one name rule, so the installation path cannot disagree with the API (T-12)', async () => {
-    const created = await runner.run((tx) => organization.createJobTitle(tx, organizationId, '  Senior   Designer\t'));
+  it('stores the title of a person as free text in its display form (T-12, QĐ-87e), and the database names the catalogue entry on the placement', async () => {
+    const make = (code: string, jobTitle: string) =>
+      runner.run((tx) =>
+        organization.createEmployeeWithPlacement(tx, {
+          organizationId,
+          employeeCode: code,
+          fullName: `Person ${code}`,
+          workEmail: null,
+          employmentType: 'STAFF',
+          hireDate: '2026-01-05',
+          departmentId,
+          jobTitle,
+        }),
+      );
+    const first = await make('E-T1', '  Senior   Designer\t');
+    const second = await make('E-T2', 'SENIOR designer');
 
-    const stored = await sql.query<{ name: string; normalized_name: string; status: string; version: number }>(
-      'SELECT name, normalized_name, status, version FROM job_titles WHERE id = $1',
-      [created.id],
+    const stored = await sql.query<{
+      code: string;
+      job_title: string;
+      name: string;
+      normalized_name: string;
+      status: string;
+    }>(
+      `SELECT e.employee_code AS code, e.job_title, j.name, j.normalized_name, j.status::text AS status
+         FROM employees e JOIN employee_placements p ON p.employee_id = e.id JOIN job_titles j ON j.id = p.job_title_id
+        WHERE e.id = ANY($1::uuid[]) ORDER BY e.employee_code`,
+      [[first.id, second.id]],
     );
+    // What the person has is what was typed, in its display form; the entry is the one the first spelling made, found by the second.
     expect(stored.rows).toEqual([
-      { name: 'Senior Designer', normalized_name: 'senior designer', status: 'ACTIVE', version: 1 },
+      {
+        code: 'E-T1',
+        job_title: 'Senior Designer',
+        name: 'Senior Designer',
+        normalized_name: 'senior designer',
+        status: 'ACTIVE',
+      },
+      {
+        code: 'E-T2',
+        job_title: 'SENIOR designer',
+        name: 'Senior Designer',
+        normalized_name: 'senior designer',
+        status: 'ACTIVE',
+      },
     ]);
-    // The same title typed another way is the same title.
-    await expect(
-      runner.run((tx) => organization.createJobTitle(tx, organizationId, 'SENIOR designer')),
-    ).rejects.toThrow();
     const count = await sql.query(`SELECT 1 FROM job_titles WHERE normalized_name = 'senior designer'`);
     expect(count.rows).toHaveLength(1);
   });
@@ -248,23 +279,35 @@ describe('organization foundation (integration)', () => {
     ]);
   });
 
-  it('creates the installation cost center as a UNIT, and counts as free only active UNITs no department has', async () => {
-    const free = async () => (await organization.getOnboardingFacts()).freeCostCenters;
-    const before = await free();
+  it('creates the installation cost center as a UNIT for its department, and lists as without one only the active departments that have none in use', async () => {
+    const without = async () => (await organization.getOnboardingFacts()).departmentsWithoutCostCenter;
+    const before = await without();
+
+    const bare = await runner.run((tx) =>
+      organization.createDepartment(tx, { organizationId, code: 'P-BARE', name: 'No cost center yet' }),
+    );
+    expect((await without()).map((department) => department.code)).toContain('P-BARE');
+    expect(await without()).toHaveLength(before.length + 1);
 
     const unit = await runner.run((tx) =>
-      organization.createUnitCostCenter(tx, { organizationId, code: 'CC-FREE', name: 'Free unit' }),
+      organization.createUnitCostCenter(tx, {
+        organizationId,
+        code: 'CC-BARE',
+        name: 'Unit for the bare department',
+        departmentId: bare.id,
+      }),
     );
-    expect((await sql.query('SELECT kind, status FROM cost_centers WHERE id = $1', [unit.id])).rows).toEqual([
-      { kind: 'UNIT', status: 'ACTIVE' },
-    ]);
-    expect(await free()).toBe(before + 1);
+    expect(
+      (await sql.query('SELECT kind, status, department_id FROM cost_centers WHERE id = $1', [unit.id])).rows,
+    ).toEqual([{ kind: 'UNIT', status: 'ACTIVE', department_id: bare.id }]);
+    expect(await without()).toHaveLength(before.length);
 
-    await sql.query(
-      `UPDATE cost_centers SET kind = 'UNIT', status = 'INACTIVE', deactivated_at = now() WHERE id = $1`,
-      [unit.id],
-    );
-    expect(await free()).toBe(before);
+    // Retired, it is no Cost Center in use: the department is without one again.
+    await sql.query(`UPDATE cost_centers SET status = 'INACTIVE', deactivated_at = now() WHERE id = $1`, [unit.id]);
+    expect((await without()).map((department) => department.code)).toContain('P-BARE');
+
+    // Retired too, so the later cases still see the departments they were written for.
+    await sql.query(`UPDATE departments SET status = 'INACTIVE', deactivated_at = now() WHERE id = $1`, [bare.id]);
   });
 
   // Wave 3 characterization: the department and head answers of the facade, pinned before the department capability left
@@ -277,13 +320,17 @@ describe('organization foundation (integration)', () => {
         [organizationId, departmentId, employeeId, from, to],
       );
     const newDepartment = async (code: string, name: string) => {
-      const costCenter = await runner.run((tx) =>
-        organization.createUnitCostCenter(tx, { organizationId, code: `CC-${code}`, name: `Unit ${code}` }),
+      const department = await runner.run((tx) => organization.createDepartment(tx, { organizationId, code, name }));
+      await runner.run((tx) =>
+        organization.createUnitCostCenter(tx, {
+          organizationId,
+          code: `CC-${code}`,
+          name: `Unit ${code}`,
+          departmentId: department.id,
+        }),
       );
 
-      return runner.run((tx) =>
-        organization.createDepartment(tx, { organizationId, code, name, costCenterId: costCenter.id }),
-      );
+      return department;
     };
 
     it('tells who heads a department, on a date and from today on, including a period that begins later', async () => {

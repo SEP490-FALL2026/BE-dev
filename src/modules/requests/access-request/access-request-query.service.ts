@@ -10,6 +10,7 @@ import { AccessRequestNotFoundError } from './access-request.errors';
 import { canViewRequest, viewFactsOf, hasSpendStep } from './access-request.policy';
 import { AccessRequestRepo } from './access-request.repo';
 import type { AccessRequestRecord, ApprovalRecordRecord, NeedStepRecord } from './access-request.types';
+import type { ReadableCancelCause } from '../group-request/group-request.types';
 
 export interface EmployeeRefView {
   employeeId: string;
@@ -114,7 +115,7 @@ export interface WithdrawalView {
 export interface CancellationView {
   cancelledBy: EmployeeRefView;
   cancelledAt: Date;
-  cause: 'BENEFICIARY_LEFT';
+  cause: ReadableCancelCause;
   note: string | null;
 }
 
@@ -204,8 +205,6 @@ export class AccessRequestQueryService {
       businessReason: record.businessReason,
       termMonths: record.termMonths,
       projectLabel: record.projectLabel,
-      outsideStandardReason: record.outsideStandardReason,
-      outsideStandard: record.outsideStandard,
       offPlan: record.offPlan,
       delegatedBatchId: record.delegatedBatchId,
       expectedEndDate: record.expectedEndDate,

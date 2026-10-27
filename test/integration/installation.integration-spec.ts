@@ -99,7 +99,7 @@ describe('installation command use case (integration, real PostgreSQL)', () => {
       placements: 2,
       app_users: 1,
       role_grants: 1,
-      audit_events: 8,
+      audit_events: 7,
     });
 
     const placements = await sql.query(
@@ -171,9 +171,9 @@ describe('installation command use case (integration, real PostgreSQL)', () => {
     let calls = 0;
     const spy = jest.spyOn(audit, 'record').mockImplementation(async (tx, event) => {
       calls += 1;
-      // The Super Admin account's own audit event is the 7th write; failing there means the
+      // The Super Admin account's own audit event is the 6th write; failing there means the
       // organization, people and the account itself already exist inside the transaction.
-      if (calls === 7) throw new Error('audit unavailable');
+      if (calls === 6) throw new Error('audit unavailable');
       return original(tx, event);
     });
     try {

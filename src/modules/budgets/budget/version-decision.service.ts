@@ -84,15 +84,10 @@ export class VersionDecisionService {
         decidedAt: now,
       });
 
-      if (outcome.decision === 'REJECTED' && version.proposalId) {
-        // A first version that is refused gives the proposal back to the head with the reason, so that they can correct
-        // it and send it again; otherwise the Cost Center would wait for ever behind a proposal nobody can move.
-        await this.proposals.setReturned(tx, version.proposalId, {
-          reason: body.reason ?? '',
-          byEmployeeId: actor.employeeId,
-          now,
-        });
-      }
+      // A refused version leaves its proposal as it is, `REVIEWED` (F63, `QĐ-92c`): the proposal is no longer given back to the head
+      // with the refusal as its reason. What follows a refusal (a new version from the same proposal, a new proposal that points
+      // back at it) is the work of the release after this one; here a resubmission or a second proposal is refused with the 409
+      // that already answers a proposal that is still open.
       await this.audit.record(
         tx,
         budgetAuditEvent(actor, version.organizationId, `BUDGET_VERSION.${outcome.decision}`, 'BUDGET_VERSION', id, {

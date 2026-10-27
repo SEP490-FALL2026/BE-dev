@@ -82,7 +82,13 @@ const reviewSummarySchema = z.strictObject({
 const checkSchema = z.strictObject({
   id: z.uuid(),
   number: z.number().int().positive(),
-  trigger: z.enum(['SUBMISSION', 'PLAN_LINE_MOVED', 'BUDGET_VERSION_APPROVED', 'SPEND_DECISION']),
+  trigger: z.enum([
+    'SUBMISSION',
+    'PLAN_LINE_MOVED',
+    'BUDGET_VERSION_APPROVED',
+    'SPEND_DECISION',
+    'FINANCE_OUTCOME_WHILE_WAITING',
+  ]),
   route: z.enum(['BLOCKED', 'FINANCE_REVIEW', 'SPEND_APPROVAL']),
   primaryCode: codeSchema.nullable(),
   staleCostEvidence: z.boolean(),

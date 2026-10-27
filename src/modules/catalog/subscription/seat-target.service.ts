@@ -20,6 +20,7 @@ const ofPlan = (plan: PlanLookup): SeatTarget => ({
   status: null,
   missing: [],
   purchasedQuantity: null,
+  ownerDepartmentId: null,
 });
 
 const ofSubscription = (subscription: SubscriptionRecord, plan: PlanLookup): SeatTarget => ({
@@ -37,6 +38,7 @@ const ofSubscription = (subscription: SubscriptionRecord, plan: PlanLookup): Sea
     hasSnapshot: subscription.priceSnapshot !== null,
   }),
   purchasedQuantity: subscription.purchasedQuantity,
+  ownerDepartmentId: subscription.ownerDepartmentId,
 });
 
 /**

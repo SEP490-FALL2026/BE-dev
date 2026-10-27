@@ -76,10 +76,6 @@ function harness(options: { installed?: boolean } = {}) {
       calls.push(`org.createDepartment(${inTx(tx)})`);
       return Promise.resolve({ id: 'dep-1' });
     },
-    createJobTitle: (tx: unknown) => {
-      calls.push(`org.createJobTitle(${inTx(tx)})`);
-      return Promise.resolve({ id: 'jt-1' });
-    },
     createEmployeeWithPlacement: (tx: unknown, input: { employeeCode: string }) => {
       calls.push(`org.createEmployeeWithPlacement(${inTx(tx)}, ${input.employeeCode})`);
       return Promise.resolve({ id: id('emp') });
@@ -137,12 +133,10 @@ describe('InstallationService (H6.3 Phase 0 characterization)', () => {
       'org.getOrganization(tx)',
       'org.createOrganization(tx)',
       'audit.record(tx, INSTALLATION.ORGANIZATION_CREATED)',
-      'org.createUnitCostCenter(tx)',
-      'audit.record(tx, INSTALLATION.COST_CENTER_CREATED)',
       'org.createDepartment(tx)',
       'audit.record(tx, INSTALLATION.DEPARTMENT_CREATED)',
-      'org.createJobTitle(tx)',
-      'audit.record(tx, INSTALLATION.JOB_TITLE_CREATED)',
+      'org.createUnitCostCenter(tx)',
+      'audit.record(tx, INSTALLATION.COST_CENTER_CREATED)',
       'org.createEmployeeWithPlacement(tx, SA001)',
       'audit.record(tx, INSTALLATION.EMPLOYEE_CREATED)',
       'org.createEmployeeWithPlacement(tx, IT001)',
@@ -178,33 +172,17 @@ describe('InstallationService (H6.3 Phase 0 characterization)', () => {
         organizationId: 'org-1',
       },
       {
-        action: 'INSTALLATION.COST_CENTER_CREATED',
-        resourceType: 'CostCenter',
-        after: { code: 'CC-IT', kind: 'UNIT' },
-        actorKind: 'OPERATOR',
-        operatorReference: 'TICKET-1',
-        organizationId: 'org-1',
-      },
-      {
         action: 'INSTALLATION.DEPARTMENT_CREATED',
         resourceType: 'Department',
-        after: { code: 'IT', costCenterCode: 'CC-IT' },
+        after: { code: 'IT' },
         actorKind: 'OPERATOR',
         operatorReference: 'TICKET-1',
         organizationId: 'org-1',
       },
       {
-        action: 'INSTALLATION.JOB_TITLE_CREATED',
-        resourceType: 'JobTitle',
-        after: { name: 'Chuyen vien' },
-        actorKind: 'OPERATOR',
-        operatorReference: 'TICKET-1',
-        organizationId: 'org-1',
-      },
-      {
-        action: 'INSTALLATION.EMPLOYEE_CREATED',
-        resourceType: 'Employee',
-        after: { employeeCode: 'SA001', employmentType: 'STAFF', hireDate: '2026-01-05', departmentCode: 'IT' },
+        action: 'INSTALLATION.COST_CENTER_CREATED',
+        resourceType: 'CostCenter',
+        after: { code: 'CC-IT', kind: 'UNIT', departmentCode: 'IT' },
         actorKind: 'OPERATOR',
         operatorReference: 'TICKET-1',
         organizationId: 'org-1',
@@ -212,7 +190,27 @@ describe('InstallationService (H6.3 Phase 0 characterization)', () => {
       {
         action: 'INSTALLATION.EMPLOYEE_CREATED',
         resourceType: 'Employee',
-        after: { employeeCode: 'IT001', employmentType: 'STAFF', hireDate: '2026-02-02', departmentCode: 'IT' },
+        after: {
+          employeeCode: 'SA001',
+          employmentType: 'STAFF',
+          hireDate: '2026-01-05',
+          departmentCode: 'IT',
+          jobTitle: 'Chuyen vien',
+        },
+        actorKind: 'OPERATOR',
+        operatorReference: 'TICKET-1',
+        organizationId: 'org-1',
+      },
+      {
+        action: 'INSTALLATION.EMPLOYEE_CREATED',
+        resourceType: 'Employee',
+        after: {
+          employeeCode: 'IT001',
+          employmentType: 'STAFF',
+          hireDate: '2026-02-02',
+          departmentCode: 'IT',
+          jobTitle: 'Chuyen vien',
+        },
         actorKind: 'OPERATOR',
         operatorReference: 'TICKET-1',
         organizationId: 'org-1',

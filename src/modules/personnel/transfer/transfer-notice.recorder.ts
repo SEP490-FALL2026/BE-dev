@@ -38,7 +38,6 @@ export class TransferNoticeRecorder implements OnModuleInit, NoticeEventRecorder
       const transfer = await this.transfers.recordInTx(tx, request.actor, {
         employeeId: notice.employeeId,
         toDepartmentId: event.toDepartmentId ?? notice.targetDepartmentId ?? undefined,
-        toJobTitleId: event.toJobTitleId,
         effectiveOn: event.effectiveOn,
         grounds: request.grounds,
         successor: event.successor,

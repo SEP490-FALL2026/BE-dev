@@ -10,8 +10,6 @@ import { EmployeeDirectoryService } from './employee/employee-directory.service'
 import { EmployeeDepartureRepo } from './employee/employee-departure.repo';
 import { EmployeeRepo } from './employee/employee.repo';
 import { ImportLookupRepo } from './employee/import-lookup.repo';
-import { JobTitleCatalogueService } from './job-title/job-title-catalogue.service';
-import { JobTitleRepo } from './job-title/job-title.repo';
 import { AnnouncementRepo } from './change-announcement/announcement.repo';
 import { OrganizationChangeRegistry } from './change-announcement/organization-change.registry';
 import { OrganizationChangeService } from './change-announcement/organization-change.service';
@@ -38,10 +36,8 @@ import { OrganizationService } from './organization.service';
     EmployeeDirectoryService,
     EmployeeRepo,
     EmployeeDepartureRepo,
-    JobTitleCatalogueService,
-    JobTitleRepo,
   ],
-  // OrganizationService is the facade other modules use. JobTitleRepo, EmployeeRepo, ImportLookupRepo and
+  // OrganizationService is the facade other modules use. EmployeeRepo, ImportLookupRepo and
   // DepartmentHeadRepo stay private behind their capability services, which only the facade injects. The three exported
   // repos stay exported under Owner decision E4 (a scoped legacy exception, reviewed at G3), so `OrganizationHttpModule`
   // in the same folder shares one instance: CostCenterService injects CostCenterRepo; DepartmentService,

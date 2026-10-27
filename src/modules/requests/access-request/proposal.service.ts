@@ -63,8 +63,6 @@ export class ProposalService {
         businessReason: body.purpose,
         termMonths: body.termMonths,
         projectLabel: body.projectLabel ?? null,
-        outsideStandardReason: null,
-        outsideStandard: false,
         pricing,
         policy,
         createdByAppUserId: actor.appUserId,

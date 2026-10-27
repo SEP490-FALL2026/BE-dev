@@ -1,14 +1,14 @@
-import { PlacementFacts, placementReasons } from './employee-placement.policy';
+import { JOB_TITLE_MAX_LENGTH, PlacementFacts, isJobTitleTooLong, placementReasons } from './employee-placement.policy';
 
 /*
  * BEH.1 (A4-11): the one decision the manual form and the import preview share — whether the department (with its
- * cost center) and the job title a row names can take a person in. Every expectation is a literal: nothing here is
- * computed by the policy or by an adapter.
+ * cost center) a row names can take a person in, and whether the job title (free text since QĐ-87e) is given and fits.
+ * Every expectation is a literal: nothing here is computed by the policy or by an adapter.
  */
 
 const usable: PlacementFacts = {
   department: { named: true, found: { active: true, costCenterActive: true } },
-  jobTitle: { named: true, found: { active: true } },
+  jobTitle: { named: true, tooLong: false },
 };
 
 describe('placementReasons (BEH.1, T-16)', () => {
@@ -43,19 +43,22 @@ describe('placementReasons (BEH.1, T-16)', () => {
     });
   });
 
-  describe('the job title (US-02-07 AC-7)', () => {
-    it.each<[string, PlacementFacts['jobTitle'], string]>([
-      ['not named', { named: false, found: null }, 'JOB_TITLE_REQUIRED'],
-      ['named but not found', { named: true, found: null }, 'JOB_TITLE_NOT_FOUND'],
-      ['retired', { named: true, found: { active: false } }, 'JOB_TITLE_INACTIVE'],
+  describe('the job title: free text, still asked for in this release (QĐ-87e)', () => {
+    it.each<[string, { named: boolean; tooLong: boolean }, string]>([
+      ['not named', { named: false, tooLong: false }, 'JOB_TITLE_REQUIRED'],
+      ['named but too long', { named: true, tooLong: true }, 'JOB_TITLE_TOO_LONG'],
     ])('%s', (_name, jobTitle, code) => {
       expect(placementReasons({ ...usable, jobTitle })).toEqual([{ subject: 'JOB_TITLE', code }]);
     });
 
-    it('is required even when something was found for it', () => {
-      expect(placementReasons({ ...usable, jobTitle: { named: false, found: { active: false } } })).toEqual([
+    it('is required before it is judged too long, and one reason is given', () => {
+      expect(placementReasons({ ...usable, jobTitle: { named: false, tooLong: true } })).toEqual([
         { subject: 'JOB_TITLE', code: 'JOB_TITLE_REQUIRED' },
       ]);
+    });
+
+    it('is not judged at all by a caller that has no title to judge (a transfer changes the department only)', () => {
+      expect(placementReasons({ department: usable.department })).toEqual([]);
     });
   });
 
@@ -63,14 +66,14 @@ describe('placementReasons (BEH.1, T-16)', () => {
     expect(
       placementReasons({
         department: { named: true, found: null },
-        jobTitle: { named: true, found: { active: false } },
+        jobTitle: { named: true, tooLong: true },
       }),
     ).toEqual([
       { subject: 'DEPARTMENT', code: 'DEPARTMENT_NOT_FOUND' },
-      { subject: 'JOB_TITLE', code: 'JOB_TITLE_INACTIVE' },
+      { subject: 'JOB_TITLE', code: 'JOB_TITLE_TOO_LONG' },
     ]);
     expect(
-      placementReasons({ department: { named: false, found: null }, jobTitle: { named: false, found: null } }),
+      placementReasons({ department: { named: false, found: null }, jobTitle: { named: false, tooLong: false } }),
     ).toEqual([
       { subject: 'DEPARTMENT', code: 'DEPARTMENT_REQUIRED' },
       { subject: 'JOB_TITLE', code: 'JOB_TITLE_REQUIRED' },
@@ -80,12 +83,25 @@ describe('placementReasons (BEH.1, T-16)', () => {
   it('names no field or column: where a reason is shown belongs to each adapter', () => {
     const reasons = placementReasons({
       department: { named: false, found: null },
-      jobTitle: { named: true, found: null },
+      jobTitle: { named: true, tooLong: true },
     });
 
     expect(reasons.map((reason) => Object.keys(reason).sort())).toEqual([
       ['code', 'subject'],
       ['code', 'subject'],
     ]);
+  });
+});
+
+describe('isJobTitleTooLong (employees_job_title_shape: 255 characters, not UTF-16 units)', () => {
+  it('accepts exactly the limit and refuses one more', () => {
+    expect(JOB_TITLE_MAX_LENGTH).toBe(255);
+    expect(isJobTitleTooLong('x'.repeat(255))).toBe(false);
+    expect(isJobTitleTooLong('x'.repeat(256))).toBe(true);
+  });
+
+  it('counts a character outside the basic plane once, as the database does', () => {
+    expect(isJobTitleTooLong('😀'.repeat(255))).toBe(false);
+    expect(isJobTitleTooLong('😀'.repeat(256))).toBe(true);
   });
 });

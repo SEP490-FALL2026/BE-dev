@@ -3,9 +3,9 @@ import type { BusinessDate } from '../../../core/business-date';
 import type { HeadDecision, ReviewStatus, WaitingReason } from './transfer-review.types';
 
 /**
- * The rules of the review a new head makes of the tools outside the standard toolset after a transfer (`US-03-07`). Pure: the
- * service reads the seats, the toolset, the calendar and the head, and asks here what follows. Nothing here takes a seat away or
- * decides for anybody: a review that is late is only told.
+ * The rules of the review a new head makes of the tools a person brought from another department after a transfer (`US-03-07`,
+ * `QĐ-89b`: every personal seat they hold). Pure: the service reads the seats, the calendar and the head, and asks here what
+ * follows. Nothing here takes a seat away or decides for anybody: a review that is late is only told.
  */
 
 /** What the head may decide about a tool, in the order the wire lists them. */
@@ -13,20 +13,6 @@ export const HEAD_DECISIONS: readonly HeadDecision[] = ['STILL_NEEDED', 'NOT_NEE
 
 /** The longest note about a new tool the head may leave (`US-03-07` AC-5). */
 export const NEW_TOOL_NOTE_MAX = 500;
-
-/**
- * The seats outside the standard toolset of the department and job title the person came to, by plan (`OQ-A-17` (d): another plan
- * of the same application is outside it). A pair that has no toolset has an empty one, so every tool is outside it. The order of the
- * seats is kept.
- */
-export function toolsOutsideStandard<T extends { planId: string }>(
-  seats: readonly T[],
-  standardPlanIds: readonly string[],
-): T[] {
-  const standard = new Set(standardPlanIds);
-
-  return seats.filter((seat) => !standard.has(seat.planId));
-}
 
 /**
  * The last day to decide: the working days after the day the transfer took effect, which itself does not count (`OQ-A-17` (b)). A

@@ -374,6 +374,7 @@ describe('the vault of license keys over HTTP (integration, real PostgreSQL)', (
         .post('/api/v1/subscriptions')
         .set(h.as(h.it1))
         .send({
+          ownerDepartmentId: h.seed.departmentId,
           planId,
           kind: 'PERPETUAL',
           purchasedQuantity: 3,

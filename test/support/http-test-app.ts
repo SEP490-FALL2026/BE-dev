@@ -119,18 +119,18 @@ export async function seedInstallation(app: INestApplication): Promise<SeededIns
       timeZone: 'Asia/Ho_Chi_Minh',
       reportingCurrency: 'VND',
     });
-    const costCenter = await organization.createUnitCostCenter(tx, {
-      organizationId: org.id,
-      code: 'CC-1',
-      name: 'Ops',
-    });
+    // The department first, then the Cost Center created for it (`QĐ-87d(1)`), as the installation command does.
     const department = await organization.createDepartment(tx, {
       organizationId: org.id,
       code: 'P-OPS',
       name: 'Operations',
-      costCenterId: costCenter.id,
     });
-    const jobTitle = await organization.createJobTitle(tx, org.id, 'Administrator');
+    await organization.createUnitCostCenter(tx, {
+      organizationId: org.id,
+      code: 'CC-1',
+      name: 'Ops',
+      departmentId: department.id,
+    });
     const employee = await organization.createEmployeeWithPlacement(tx, {
       organizationId: org.id,
       employeeCode: 'E-ADMIN',
@@ -139,8 +139,12 @@ export async function seedInstallation(app: INestApplication): Promise<SeededIns
       employmentType: 'STAFF',
       hireDate: '2026-01-05',
       departmentId: department.id,
-      jobTitleId: jobTitle.id,
+      jobTitle: 'Administrator',
     });
+    // The title is free text on the person; the database names the catalogue entry on the placement (spec L.10), which
+    // the suites that write placements by SQL still use.
+    const [jobTitle] = await tx.$queryRaw<{ id: string }[]>`
+      SELECT id::text AS id FROM job_titles WHERE organization_id = ${org.id}::uuid AND normalized_name = 'administrator'`;
     const account = await identity.createBootstrapSuperAdmin(tx, {
       organizationId: org.id,
       employeeId: employee.id,
@@ -183,7 +187,7 @@ export async function insertAccountFixture(
       employmentType: 'STAFF',
       hireDate: '2026-01-05',
       departmentId: seed.departmentId,
-      jobTitleId: seed.jobTitleId,
+      jobTitle: 'Administrator',
     });
     const rows = await tx.$queryRaw<{ id: string }[]>`
       INSERT INTO app_users (id, organization_id, employee_id, login_email, normalized_login_email, status,
@@ -225,7 +229,7 @@ export async function insertEmployeeFixture(
       employmentType: 'STAFF',
       hireDate: '2026-01-05',
       departmentId: seed.departmentId,
-      jobTitleId: seed.jobTitleId,
+      jobTitle: 'Administrator',
     });
     if (options.terminated) {
       await tx.$executeRaw`UPDATE employees SET status = 'TERMINATED' WHERE id = ${employee.id}::uuid`;

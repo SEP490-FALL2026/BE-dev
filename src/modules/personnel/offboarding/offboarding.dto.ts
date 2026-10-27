@@ -2,7 +2,7 @@ import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { z } from 'zod';
 import { isBusinessDate } from '../../../core/business-date';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
-import { REVOCATION_SOURCES } from '../../licensing/licensing.types';
+import { READABLE_REVOCATION_SOURCES } from '../../licensing/licensing.types';
 import { ROLE_FLAGS } from '../personnel.types';
 
 const businessDate = z.string().refine(isBusinessDate, { message: 'The day must be a real date as YYYY-MM-DD.' });
@@ -140,7 +140,8 @@ export const offboardingDetailSchema = offboardingSummarySchema.extend({
   /** Who follows the head of the department the person leaves; null when they did not head it. */
   headSuccessor: z.strictObject({ kind: z.enum(['EMPLOYEE', 'NONE']), employee: employeeBrief.nullable() }).nullable(),
   selfExecuted: z.boolean(),
-  recordedByAppUserId: z.uuid(),
+  /** Null only for an event the controlled procedure of the release after this one recorded (spec L.2); this release always writes its account. */
+  recordedByAppUserId: z.uuid().nullable(),
   recordedAt: z.iso.datetime(),
   left: z.strictObject({ leftOn: z.string(), leftAt: z.iso.datetime(), leftByAppUserId: z.uuid() }).nullable(),
   cancellation: z
@@ -177,7 +178,7 @@ const rightSchema = z.strictObject({
     .strictObject({
       taskId: z.uuid(),
       status: z.enum(['QUEUED', 'RETRY_SCHEDULED', 'IN_PROGRESS', 'COMPLETED', 'FAILED', 'CLOSED_FAILED', 'CANCELLED']),
-      source: z.enum(REVOCATION_SOURCES),
+      source: z.enum(READABLE_REVOCATION_SOURCES),
     })
     .nullable(),
   /** The day the access ends when the renewal is cancelled and the access runs on to the end of the paid period. */
@@ -212,7 +213,8 @@ const changeSchema = z.strictObject({
   reason: z.string().nullable(),
   /** For the revocations opened: how many rights were asked for. */
   count: z.number().int().nonnegative().nullable(),
-  changedByAppUserId: z.uuid(),
+  /** Null only for an event the controlled procedure of the release after this one recorded (spec L.2); this release always writes its account. */
+  changedByAppUserId: z.uuid().nullable(),
   changedAt: z.iso.datetime(),
   selfExecuted: z.boolean(),
 });

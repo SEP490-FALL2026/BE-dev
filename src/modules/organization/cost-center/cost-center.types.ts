@@ -12,7 +12,10 @@ export interface CostCenterRecord {
   createdAt: Date;
   updatedAt: Date;
   deactivatedAt: Date | null;
+  /** The department the Cost Center belongs to for its whole life (`QĐ-87d(1)`); null only on a row not linked yet. */
   department: { id: string; code: string; name: string } | null;
+  /** When Finance created it for the department: its current one from then on, nothing before is charged to it (`QĐ-87d(3)`). */
+  linkedAt: Date | null;
 }
 
 /**

@@ -130,9 +130,12 @@ export class DepartmentQueryService {
     return pageOf(items.slice(start, start + query.pageSize), items.length, query.page, query.pageSize);
   }
 
-  /** IT Admin sees any department; a department head sees only the one they head (AC-17). */
+  /**
+   * IT Admin sees any department, and so does the Super Admin who owns the organization data (`QĐ-87b`) — the answer to the
+   * department they have just created; a department head sees only the one they head (AC-17).
+   */
   private async assertMayRead(principal: AuthenticatedPrincipal, departmentId: string): Promise<void> {
-    if (principal.roles.includes('IT_ADMIN')) return;
+    if (principal.roles.includes('IT_ADMIN') || principal.roles.includes('SUPER_ADMIN')) return;
 
     const today = await this.organization.businessToday();
     const headed = await this.organization.getHeadedDepartment(principal.employeeId, today);

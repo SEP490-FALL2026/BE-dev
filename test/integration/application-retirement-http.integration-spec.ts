@@ -45,6 +45,7 @@ describe('the retirement of an application over HTTP (integration, real PostgreS
         .post('/api/v1/subscriptions')
         .set(h.as(h.it1))
         .send({
+          ownerDepartmentId: h.seed.departmentId,
           planId,
           kind: 'TERM',
           purchasedQuantity: 5,
@@ -280,6 +281,7 @@ describe('the retirement of an application over HTTP (integration, real PostgreS
       .post('/api/v1/subscriptions')
       .set(h.as(h.it1))
       .send({
+        ownerDepartmentId: h.seed.departmentId,
         planId,
         kind: 'PERPETUAL',
         purchasedQuantity: 50,

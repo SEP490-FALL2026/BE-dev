@@ -58,11 +58,7 @@ const previewSchema = z.strictObject({
   department: z.strictObject({ id: z.uuid(), code: z.string(), name: z.string() }),
   /** Read only: the Unit of the department of the day; nothing the sender or a project changes (`US-05-01` AC-7). */
   costCenter: z.strictObject({ id: z.uuid(), code: z.string(), name: z.string() }),
-  /** Whether the plan is outside the standard toolset of the sender, which is why a reason must go with the request. */
-  outsideStandard: z.boolean(),
   requirements: z.strictObject({
-    /** The request is sent with `outsideStandardReason` or refused. */
-    outsideStandardReason: z.boolean(),
     /** The head must confirm the term in so many words with a reason; the chain gains no step. */
     termConfirmationByHead: z.boolean(),
   }),

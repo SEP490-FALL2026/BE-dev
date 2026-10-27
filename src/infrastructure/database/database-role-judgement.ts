@@ -14,6 +14,11 @@ const RUNTIME_DML = ['DELETE', 'INSERT', 'SELECT', 'UPDATE'];
 export const RUNTIME_TABLE_EXCEPTIONS: Readonly<Record<string, readonly string[]>> = {
   _prisma_migrations: [],
   audit_events: ['INSERT', 'SELECT'],
+  // The basis of an owner assignment is evidence added by a command and never changed (its triggers refuse it first).
+  subscription_owner_assignments: ['INSERT', 'SELECT'],
+  // The same for the two records of QĐ-87d(1): the basis of a link made by procedure, and the one activation row.
+  cost_center_department_links: ['INSERT', 'SELECT'],
+  cost_center_direction_activations: ['INSERT', 'SELECT'],
 };
 
 export interface RoleFacts {

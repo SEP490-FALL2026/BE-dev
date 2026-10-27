@@ -36,7 +36,6 @@ export class TransferQueryService {
       items.map((item) => ({
         employeeIds: [item.employeeId],
         departmentIds: [item.fromDepartmentId, item.toDepartmentId],
-        jobTitleIds: [item.fromJobTitleId, item.toJobTitleId],
       })),
     );
 
@@ -77,25 +76,20 @@ export class TransferQueryService {
           ...(record.headHandover?.successorEmployeeId ? [record.headHandover.successorEmployeeId] : []),
         ],
         departmentIds: [record.fromDepartmentId, record.toDepartmentId],
-        jobTitleIds: [record.fromJobTitleId, record.toJobTitleId],
       },
     ]);
   }
 
-  private async namesOf(
-    rows: { employeeIds: string[]; departmentIds: string[]; jobTitleIds: string[] }[],
-  ): Promise<TransferNames> {
+  private async namesOf(rows: { employeeIds: string[]; departmentIds: string[] }[]): Promise<TransferNames> {
     const unique = (pick: (row: (typeof rows)[number]) => string[]) => [...new Set(rows.flatMap(pick))];
-    const [employees, departments, jobTitles] = await Promise.all([
+    const [employees, departments] = await Promise.all([
       this.organization.getEmployees(unique((row) => row.employeeIds)),
       this.organization.getDepartmentBriefs(unique((row) => row.departmentIds)),
-      this.organization.getJobTitles(unique((row) => row.jobTitleIds)),
     ]);
 
     return {
       employees: new Map(employees.map((employee) => [employee.id, employee])),
       departments: new Map(departments.map((department) => [department.id, department])),
-      jobTitles: new Map(jobTitles.map((jobTitle) => [jobTitle.id, jobTitle])),
     };
   }
 }

@@ -23,6 +23,12 @@ export type LineStage = 'NEED' | 'SPEND';
 /** Why a line was cancelled: the one cause of a request cancelled by the IT Admin, which the line shares. */
 export type LineCancelCause = 'BENEFICIARY_LEFT';
 
+/**
+ * What a row can carry as the cause of such a closing. `BENEFICIARY_TRANSFERRED` is written by the release after this one (spec
+ * L.10): this release reads it and never accepts it, so `LineCancelCause` above (the input) does not have it.
+ */
+export type ReadableCancelCause = LineCancelCause | 'BENEFICIARY_TRANSFERRED';
+
 /** The states in which a line has ended: nothing happens to it again. */
 export const ENDED_LINE_STATES: readonly LineState[] = [
   'NEED_REJECTED',
@@ -49,7 +55,7 @@ export interface LineRecord {
   endedByEmployeeId: string | null;
   endReason: string | null;
   /** Why the IT Admin closed the line, when its state is `CANCELLED`; null for every other state. */
-  cancelCause: LineCancelCause | null;
+  cancelCause: ReadableCancelCause | null;
   withdrawalRequestedAt: Date | null;
 }
 

@@ -70,7 +70,12 @@ describe('the reporting currency over HTTP (integration, real PostgreSQL)', () =
     await request(h.server())
       .post('/api/v1/subscriptions')
       .set(h.as(h.it1))
-      .send({ planId, kind: 'TERM', unitPrice: { amount: '1000000', currency: 'VND' } })
+      .send({
+        ownerDepartmentId: h.seed.departmentId,
+        planId,
+        kind: 'TERM',
+        unitPrice: { amount: '1000000', currency: 'VND' },
+      })
       .expect(201);
 
     const response = await put({ currency: 'USD' }).expect(409);

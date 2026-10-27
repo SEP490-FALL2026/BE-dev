@@ -1,4 +1,5 @@
 import {
+  AssignmentConflictError,
   AssignmentEffectiveDateInvalidError,
   AssignmentExpectedEndRequiredError,
   AssignmentNotOpenError,
@@ -7,7 +8,12 @@ import {
 } from '../licensing.errors';
 import type { AssignmentRecord } from '../licensing.types';
 import { AssignmentResponsibleAfterDeadlineError } from './service-account.errors';
-import { assertResponsibleChange, effectiveFromLabel, toAssignmentView } from './assignment.policy';
+import {
+  assertResponsibleChange,
+  assertSubscriptionDepartment,
+  effectiveFromLabel,
+  toAssignmentView,
+} from './assignment.policy';
 
 const bot: AssignmentRecord = {
   id: 'a1',
@@ -172,5 +178,29 @@ describe('assertResponsibleChange (AC-10)', () => {
     expect(() => assertResponsibleChange(bot, { ...change, effectiveFrom: '2026-10-01' }, null, '2026-09-01')).toThrow(
       AssignmentEffectiveDateInvalidError,
     );
+  });
+});
+
+describe('assertSubscriptionDepartment (F20, QĐ-89a: a seat of a department sits on a subscription of that department)', () => {
+  it('lets a seat of the owning department through', () => {
+    expect(() => assertSubscriptionDepartment({ ownerDepartmentId: 'd-des' }, 'd-des', 0)).not.toThrow();
+  });
+
+  it('refuses a seat of another department before anything is written, with the index of its row', () => {
+    let thrown: unknown;
+    try {
+      assertSubscriptionDepartment({ ownerDepartmentId: 'd-des' }, 'd-fin', 3);
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBeInstanceOf(AssignmentConflictError);
+    expect(thrown).toMatchObject({ conflict: 'SUBSCRIPTION_DEPARTMENT_MISMATCH', index: 3 });
+  });
+
+  it('does not check a subscription nobody owns yet, nor a seat that carries no owning department (a personal one)', () => {
+    expect(() => assertSubscriptionDepartment({ ownerDepartmentId: null }, 'd-fin', 0)).not.toThrow();
+    expect(() => assertSubscriptionDepartment({ ownerDepartmentId: 'd-des' }, null, 0)).not.toThrow();
+    expect(() => assertSubscriptionDepartment({ ownerDepartmentId: null }, null, 0)).not.toThrow();
   });
 });

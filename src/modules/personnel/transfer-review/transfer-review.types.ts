@@ -16,7 +16,6 @@ export interface ReviewRecord {
   transferId: string | null;
   placementId: string;
   departmentId: string;
-  jobTitleId: string;
   effectiveOn: BusinessDate;
   dueOn: BusinessDate;
   status: ReviewStatus;
@@ -57,7 +56,6 @@ export interface NewReview {
   transferId: string | null;
   placementId: string;
   departmentId: string;
-  jobTitleId: string;
   effectiveOn: BusinessDate;
   dueOn: BusinessDate;
   items: NewReviewItem[];

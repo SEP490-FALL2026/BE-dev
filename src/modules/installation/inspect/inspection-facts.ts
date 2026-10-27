@@ -3,13 +3,14 @@ import { AppliedMigrationRow, InspectionProblem, MigrationReport } from './inspe
 
 /**
  * The audit actions a completed installation leaves, with how many of each (installation.service.ts, pinned by
- * installation-bootstrap-facts.integration-spec.ts). The trail is append-only, so these are the canonical record.
+ * installation-bootstrap-facts.integration-spec.ts). The trail is append-only, so these are the canonical record. An
+ * installation made before the job title became free text (`QĐ-87e`) also has an `INSTALLATION.JOB_TITLE_CREATED`: it is
+ * history, no longer expected.
  */
 export const BOOTSTRAP_ACTIONS: readonly { action: string; expected: number }[] = [
   { action: 'INSTALLATION.ORGANIZATION_CREATED', expected: 1 },
   { action: 'INSTALLATION.COST_CENTER_CREATED', expected: 1 },
   { action: 'INSTALLATION.DEPARTMENT_CREATED', expected: 1 },
-  { action: 'INSTALLATION.JOB_TITLE_CREATED', expected: 1 },
   { action: 'INSTALLATION.EMPLOYEE_CREATED', expected: 2 },
   { action: 'INSTALLATION.SUPER_ADMIN_CREATED', expected: 1 },
 ];

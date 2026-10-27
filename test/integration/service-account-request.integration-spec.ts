@@ -53,9 +53,10 @@ describe('a request for a service account after the installation over PostgreSQL
     await h.start();
     await h.withApprover();
     // The seats are set up while the baseline is open: three free of ten on one subscription, none free on the other.
-    subscriptionId = await h.subscription(10);
+    // The accounts of this suite belong to many departments: the subscriptions are ones nobody owns yet, which no seat is checked against.
+    subscriptionId = await h.subscription(10, 'K2', null);
     paidPlan = await h.planOf(subscriptionId);
-    fullSubscription = await h.subscription(1);
+    fullSubscription = await h.subscription(1, 'K2', null);
     fullPlan = await h.planOf(fullSubscription);
     await h.person('SA-HOLDER');
     await h.written({ subscriptionId: fullSubscription }, [
@@ -211,7 +212,6 @@ describe('a request for a service account after the installation over PostgreSQL
         costCenter: { id: u.department.unitId },
         requester: { employeeId: u.member.employeeId },
         beneficiary: { employeeId: u.member.employeeId },
-        outsideStandard: false,
         policy: { hasSpendStep: true },
         pricing: { status: 'PRICED', amount: { currency: 'VND' } },
         needStep: { state: 'PENDING', routingRow: 1, assignee: { employeeId: u.head.employeeId } },

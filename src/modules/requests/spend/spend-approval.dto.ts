@@ -162,7 +162,6 @@ const approvalDetailSchema = z.strictObject({
     budgetYear: z.number().int().nullable(),
     offPlan: z.boolean(),
     planLineAttached: z.boolean(),
-    outsideStandard: z.boolean(),
   }),
   /** The need the head confirmed. */
   need: z

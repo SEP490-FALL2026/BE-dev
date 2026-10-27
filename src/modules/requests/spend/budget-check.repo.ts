@@ -4,7 +4,9 @@ import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { CheckRoute, YearResult } from './budget-check.policy';
 
-export type CheckTrigger = 'SUBMISSION' | 'PLAN_LINE_MOVED' | 'BUDGET_VERSION_APPROVED' | 'SPEND_DECISION';
+/** `FINANCE_OUTCOME_WHILE_WAITING` is written by the release after this one (spec L.10): this release reads it and writes none. */
+export type CheckTrigger =
+  'SUBMISSION' | 'PLAN_LINE_MOVED' | 'BUDGET_VERSION_APPROVED' | 'SPEND_DECISION' | 'FINANCE_OUTCOME_WHILE_WAITING';
 
 export interface CheckRecord {
   id: string;

@@ -230,7 +230,7 @@ describe('budgets over HTTP: the decision of the spending approver (integration,
       expect(await stateOf(version.id)).toBe('SENT');
     });
 
-    it('leaves the Cost Center without a budget, tells the head why, and gives the proposal back to be sent again', async () => {
+    it('leaves the Cost Center without a budget and tells the head why; the proposal stays reviewed and is neither given back nor open to another (F63)', async () => {
       const { version, head, department, proposal } = await sent();
 
       await h
@@ -247,12 +247,18 @@ describe('budgets over HTTP: the decision of the spending approver (integration,
         decision: 'REJECTED',
         reason: 'The reserve is too high',
       });
-      const given = await h.proposalOf(proposal.id, head.account).expect(200);
-      expect(h.dataOf<{ proposal: { state: string; returned: { reason: string } } }>(given).proposal).toMatchObject({
-        state: 'RETURNED',
-        returned: { reason: 'The reserve is too high' },
+      const kept = await h.proposalOf(proposal.id, head.account).expect(200);
+      expect(h.dataOf<{ proposal: { state: string; returned: unknown } }>(kept).proposal).toMatchObject({
+        state: 'REVIEWED',
+        returned: null,
       });
-      await h.resubmit(proposal.id, { lines: [h.line()] }, head.account).expect(201);
+      // What follows a refusal is the work of the release after this one: here both ways are refused with the 409s that exist.
+      expect(h.codeOf(await h.resubmit(proposal.id, { lines: [h.line()] }, head.account).expect(409))).toBe(
+        'BUDGET.PROPOSAL_CANNOT_RESUBMIT',
+      );
+      expect(h.codeOf(await h.submitProposal(h.proposalBody(department.unitId), head.account).expect(409))).toBe(
+        'BUDGET.PROPOSAL_ALREADY_OPEN',
+      );
     });
   });
 

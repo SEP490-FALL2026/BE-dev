@@ -226,7 +226,6 @@ describe('the rights that ended and the IT Admin queue (integration, real Postgr
         assignmentId,
         newExpectedEndDate: h.inDays(60),
         businessReason: 'The work goes on',
-        outsideStandardReason: 'Not in the standard toolset',
       });
 
       expect(late.outcome).toBe('NEW_REQUEST');

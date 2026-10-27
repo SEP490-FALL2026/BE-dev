@@ -23,7 +23,8 @@ function principal(direct: string[], derived: string[] = []) {
 
 type Call = (server: App) => request.Test;
 
-const NEW_COST_CENTER = { code: 'CC-DES', name: 'Design', kind: 'UNIT' };
+/** A Cost Center is created FOR a department (`QĐ-87d(1)`): the department is part of the body. */
+const NEW_COST_CENTER = { code: 'CC-DES', name: 'Design', kind: 'UNIT', departmentId: ID };
 
 /** Routes only Finance may use (US-04-09 AC-2) and the one the IT Admin may also read. */
 const FINANCE_ROUTES: Array<[string, Call]> = [
@@ -100,14 +101,16 @@ describe('cost center catalogue routes (e2e, no database)', () => {
     const asFinance = () => ({ Authorization: 'Bearer any' });
 
     it.each([
-      ['no code', { name: 'Design', kind: 'UNIT' }],
-      ['a code with a space', { code: 'CC DES', name: 'Design', kind: 'UNIT' }],
-      ['a code that starts with a hyphen', { code: '-CC', name: 'Design', kind: 'UNIT' }],
-      ['a code longer than 50 characters', { code: 'C'.repeat(51), name: 'Design', kind: 'UNIT' }],
-      ['no name', { code: 'CC-DES', kind: 'UNIT' }],
-      ['no kind', { code: 'CC-DES', name: 'Design' }],
-      ['a name that is not text', { code: 'CC-DES', name: 42, kind: 'UNIT' }],
-      ['an unknown field', { code: 'CC-DES', name: 'Design', kind: 'UNIT', status: 'INACTIVE' }],
+      ['no code', { name: 'Design', kind: 'UNIT', departmentId: ID }],
+      ['a code with a space', { code: 'CC DES', name: 'Design', kind: 'UNIT', departmentId: ID }],
+      ['a code that starts with a hyphen', { code: '-CC', name: 'Design', kind: 'UNIT', departmentId: ID }],
+      ['a code longer than 50 characters', { code: 'C'.repeat(51), name: 'Design', kind: 'UNIT', departmentId: ID }],
+      ['no name', { code: 'CC-DES', kind: 'UNIT', departmentId: ID }],
+      ['no kind', { code: 'CC-DES', name: 'Design', departmentId: ID }],
+      ['no department (QĐ-87d(1))', { code: 'CC-DES', name: 'Design', kind: 'UNIT' }],
+      ['a department that is not an id', { code: 'CC-DES', name: 'Design', kind: 'UNIT', departmentId: 'P-OPS' }],
+      ['a name that is not text', { code: 'CC-DES', name: 42, kind: 'UNIT', departmentId: ID }],
+      ['an unknown field', { code: 'CC-DES', name: 'Design', kind: 'UNIT', departmentId: ID, status: 'INACTIVE' }],
     ])('turns away a new cost center with %s, 422 VALIDATION_ERROR', async (_name, body) => {
       app = await appFor(principal(['FINANCE']));
 

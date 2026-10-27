@@ -1,7 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '../../../generated/prisma/client';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { ConversionFacts, FORWARD_MIGRATION, MigrationRecord, UNIT_ONLY_MIGRATION } from './migration-preflight.types';
+import {
+  ContractGateFacts,
+  ConversionFacts,
+  FORWARD_MIGRATION,
+  LegacyReturnFacts,
+  MigrationRecord,
+  SubscriptionOwnerSchema,
+  UNIT_ONLY_MIGRATION,
+} from './migration-preflight.types';
 
 /**
  * Reads the data the unit-only conversion touches, in the schema the database has **now** — before the merged migration
@@ -94,6 +102,195 @@ export class MigrationPreflightRepo {
       : [];
 
     return { serviceAccounts, companyAllocations, companyDepartments, companyCostCenters };
+  }
+
+  /**
+   * The facts of the contract gates (spec L.10), in the schema the database has now. Each gate probes `information_schema`
+   * and `to_regclass` first and names an object only after the probe saw it, so the same read serves a database before
+   * the expansion migration, after it, and an empty one.
+   */
+  async contractGateFacts(tx: DbTx): Promise<ContractGateFacts> {
+    return {
+      subscriptionOwner: await this.subscriptionOwnerFacts(tx),
+      costCenterDirection: await this.costCenterDirectionFacts(tx),
+      retiredKinds: await this.retiredKindFacts(tx),
+      legacyReturns: await this.legacyReturnFacts(tx),
+    };
+  }
+
+  /**
+   * The proposals `7c28e75` gave back because the first version made from them was refused (F63, spec J.2): the three tables exist
+   * from the budgets migration on, so they are probed (an empty or older database has none). Only ids and flags are read; the reason
+   * of a refusal is compared in the database and never leaves it.
+   */
+  private async legacyReturnFacts(tx: DbTx): Promise<LegacyReturnFacts> {
+    const [probe] = await tx.$queryRaw<{ present: boolean }[]>`
+      SELECT to_regclass('public.budget_proposals') IS NOT NULL AND to_regclass('public.budget_versions') IS NOT NULL
+             AND to_regclass('public.budget_version_decisions') IS NOT NULL AS "present"`;
+    if (!probe.present) return { candidates: [], neighbours: [] };
+
+    const candidates = await tx.$queryRaw<LegacyReturnFacts['candidates']>`
+      SELECT p."id"::text AS "proposalId",
+             array_agg(DISTINCT v."id"::text ORDER BY v."id"::text) AS "versionIds",
+             array_agg(DISTINCT d."id"::text ORDER BY d."id"::text) AS "decisionIds",
+             (count(*) = 1 AND bool_and(v."kind"::text = 'INITIAL' AND v."state"::text = 'REJECTED'
+                AND d."decided_by_employee_id" = p."returned_by_employee_id"
+                AND d."reason" IS NOT DISTINCT FROM p."returned_reason"
+                AND d."decided_at" = p."returned_at")) AS "traced"
+        FROM "budget_proposals" p
+        JOIN "budget_versions" v ON v."proposal_id" = p."id"
+        JOIN "budget_version_decisions" d ON d."version_id" = v."id" AND d."decision"::text = 'REJECTED'
+       WHERE p."state"::text = 'RETURNED'
+       GROUP BY p."id"
+       ORDER BY p."id"`;
+    if (candidates.length === 0) return { candidates, neighbours: [] };
+
+    const neighbours = await tx.$queryRaw<LegacyReturnFacts['neighbours']>`
+      SELECT p."id"::text AS "proposalId", q."id"::text AS "id", q."previous_proposal_id"::text AS "previousProposalId",
+             (q."submitted_at" > p."returned_at") AS "submittedAfter"
+        FROM "budget_proposals" p
+        JOIN "budget_proposals" q
+          ON q."organization_id" = p."organization_id" AND q."cost_center_id" = p."cost_center_id" AND q."year" = p."year"
+         AND q."id" <> p."id" AND (q."submitted_at" > p."returned_at" OR q."previous_proposal_id" = p."id")
+       WHERE p."id" = ANY(${candidates.map((row) => row.proposalId)}::uuid[])
+       ORDER BY p."id", q."id"`;
+
+    return { candidates, neighbours };
+  }
+
+  /**
+   * The waiting rows of the kinds the release after this one no longer takes (F41, F06, spec L.4, L.5): a `BM-09` notice of a
+   * change of job title that still waits, a transfer that waits and changes the job title only (the department stays), and a
+   * proposal to move a service account that still waits. Their columns exist in every history, so only the tables are probed
+   * (an empty database has none). The IT Admin rejects the notice, cancels the transfer and cancels the proposal with the fixed
+   * reasons of the spec, on the release that is running, before the deploy.
+   */
+  private async retiredKindFacts(tx: DbTx): Promise<ContractGateFacts['retiredKinds']> {
+    const [probe] = await tx.$queryRaw<{ hasNotices: boolean; hasTransfers: boolean; hasMoves: boolean }[]>`
+      SELECT to_regclass('public.personnel_notices') IS NOT NULL AS "hasNotices",
+             to_regclass('public.department_transfers') IS NOT NULL AS "hasTransfers",
+             to_regclass('public.service_account_moves') IS NOT NULL AS "hasMoves"`;
+    const notices = probe.hasNotices
+      ? await tx.$queryRaw<{ id: string }[]>`
+          SELECT "id"::text AS "id" FROM "personnel_notices"
+           WHERE "kind"::text = 'JOB_TITLE_CHANGE' AND "status"::text = 'PENDING_VERIFICATION' ORDER BY "id"`
+      : [];
+    const transfers = probe.hasTransfers
+      ? await tx.$queryRaw<{ id: string }[]>`
+          SELECT "id"::text AS "id" FROM "department_transfers"
+           WHERE "status"::text = 'PENDING' AND "from_department_id" = "to_department_id" ORDER BY "id"`
+      : [];
+
+    const moves = probe.hasMoves
+      ? await tx.$queryRaw<{ id: string }[]>`
+          SELECT "id"::text AS "id" FROM "service_account_moves" WHERE "status"::text = 'PENDING' ORDER BY "id"`
+      : [];
+
+    return {
+      pendingNoticeIds: notices.map((row) => row.id),
+      pendingTransferIds: transfers.map((row) => row.id),
+      pendingMoveIds: moves.map((row) => row.id),
+    };
+  }
+
+  /**
+   * The Cost Center link (F01, spec L.11). Probed first like every gate. Before the compatibility migration the Cost
+   * Centers no department's column names are rows to link later; after it, every Cost Center with no department — computed
+   * on every run, so a row the previous release writes after the migration or after a recovery is listed — a department
+   * whose own column contradicts the link (when that column still exists), and the organizations not yet activated.
+   */
+  private async costCenterDirectionFacts(tx: DbTx): Promise<ContractGateFacts['costCenterDirection']> {
+    const [probe] = await tx.$queryRaw<
+      {
+        hasCostCenters: boolean;
+        hasColumn: boolean;
+        hasLinks: boolean;
+        hasActivations: boolean;
+        hasOldColumn: boolean;
+      }[]
+    >`
+      SELECT to_regclass('public.cost_centers') IS NOT NULL AS "hasCostCenters",
+             EXISTS (SELECT 1 FROM information_schema.columns
+                      WHERE table_schema = 'public' AND table_name = 'cost_centers'
+                        AND column_name = 'department_id') AS "hasColumn",
+             to_regclass('public.cost_center_department_links') IS NOT NULL AS "hasLinks",
+             to_regclass('public.cost_center_direction_activations') IS NOT NULL AS "hasActivations",
+             EXISTS (SELECT 1 FROM information_schema.columns
+                      WHERE table_schema = 'public' AND table_name = 'departments'
+                        AND column_name = 'cost_center_id') AS "hasOldColumn"`;
+    const none = { costCenterIds: [], mismatches: [], notActivated: [] };
+    if (!probe.hasCostCenters) return { schema: 'NO_TABLE', ...none };
+
+    const present = [probe.hasColumn, probe.hasLinks, probe.hasActivations];
+    if (present.every((seen) => !seen)) {
+      // Before the migration the link is the department's own column.
+      const rows = probe.hasOldColumn
+        ? await tx.$queryRaw<{ id: string }[]>`
+            SELECT c."id"::text AS "id" FROM "cost_centers" c
+             WHERE NOT EXISTS (SELECT 1 FROM "departments" d WHERE d."cost_center_id" = c."id") ORDER BY c."id"`
+        : [];
+
+      return { schema: 'ABSENT', ...none, costCenterIds: rows.map((row) => row.id) };
+    }
+    if (!present.every(Boolean)) return { schema: 'PARTIAL', ...none };
+
+    const unlinked = await tx.$queryRaw<{ id: string }[]>`
+      SELECT "id"::text AS "id" FROM "cost_centers" WHERE "department_id" IS NULL ORDER BY "id"`;
+    const mismatches = probe.hasOldColumn
+      ? await tx.$queryRaw<{ costCenterId: string; departmentId: string }[]>`
+          SELECT c."id"::text AS "costCenterId", d."id"::text AS "departmentId"
+            FROM "departments" d JOIN "cost_centers" c ON c."id" = d."cost_center_id"
+           WHERE c."department_id" IS DISTINCT FROM d."id" ORDER BY c."id"`
+      : [];
+    const notActivated = await tx.$queryRaw<{ id: string }[]>`
+      SELECT o."id"::text AS "id" FROM "organizations" o
+       WHERE NOT EXISTS (SELECT 1 FROM "cost_center_direction_activations" a WHERE a."organization_id" = o."id")
+       ORDER BY o."id"`;
+
+    return {
+      schema: 'READY',
+      costCenterIds: unlinked.map((row) => row.id),
+      mismatches,
+      notActivated: notActivated.map((row) => row.id),
+    };
+  }
+
+  /**
+   * The owner department of a subscription (F02, spec L.3). Valid assignment: exactly one row for the subscription, of
+   * the same organization, to a department of that organization. Open: no owner department and no valid assignment, or
+   * an owner department the assignment contradicts. The ids come out sorted and nothing else is read.
+   */
+  private async subscriptionOwnerFacts(tx: DbTx): Promise<ContractGateFacts['subscriptionOwner']> {
+    const [probe] = await tx.$queryRaw<{ hasSubscriptions: boolean; hasColumn: boolean; hasTable: boolean }[]>`
+      SELECT to_regclass('public.subscriptions') IS NOT NULL AS "hasSubscriptions",
+             EXISTS (SELECT 1 FROM information_schema.columns
+                      WHERE table_schema = 'public' AND table_name = 'subscriptions'
+                        AND column_name = 'owner_department_id') AS "hasColumn",
+             to_regclass('public.subscription_owner_assignments') IS NOT NULL AS "hasTable"`;
+    if (!probe.hasSubscriptions) return { schema: 'NO_TABLE', subscriptionIds: [] };
+
+    const schema: SubscriptionOwnerSchema =
+      probe.hasColumn && probe.hasTable ? 'READY' : !probe.hasColumn && !probe.hasTable ? 'ABSENT' : 'PARTIAL';
+    if (schema === 'PARTIAL') return { schema, subscriptionIds: [] };
+    if (schema === 'ABSENT') {
+      const rows = await tx.$queryRaw<{ id: string }[]>`SELECT "id"::text AS "id" FROM "subscriptions" ORDER BY "id"`;
+
+      return { schema, subscriptionIds: rows.map((row) => row.id) };
+    }
+
+    const rows = await tx.$queryRaw<{ id: string }[]>`
+      SELECT s."id"::text AS "id"
+        FROM "subscriptions" s
+        LEFT JOIN "subscription_owner_assignments" a ON a."subscription_id" = s."id"
+        LEFT JOIN "departments" d ON d."id" = a."department_id"
+       WHERE (s."owner_department_id" IS NULL
+              AND (a."id" IS NULL OR d."id" IS NULL
+                   OR a."organization_id" <> s."organization_id" OR d."organization_id" <> s."organization_id"))
+          OR (s."owner_department_id" IS NOT NULL AND a."id" IS NOT NULL
+              AND a."department_id" <> s."owner_department_id")
+       ORDER BY s."id"`;
+
+    return { schema, subscriptionIds: rows.map((row) => row.id) };
   }
 
   /** The facts after the merged migration: every service account has the owning department it stored. */

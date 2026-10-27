@@ -4,7 +4,8 @@ import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { lineData, type VersionLineRecord } from './version-line.repo';
 
-export type VersionState = 'DRAFT' | 'SENT' | 'APPROVED' | 'REJECTED' | 'CHANGES_REQUESTED' | 'SUPERSEDED';
+/** `EXPIRED` is written by the release after this one (spec L.10): this release reads it and writes none. */
+export type VersionState = 'DRAFT' | 'SENT' | 'APPROVED' | 'REJECTED' | 'CHANGES_REQUESTED' | 'SUPERSEDED' | 'EXPIRED';
 
 export interface VersionRecord {
   id: string;
@@ -226,6 +227,19 @@ export class VersionRepo {
 
   async setState(tx: DbTx, id: string, state: VersionState): Promise<void> {
     await tx.budgetVersion.update({ where: { id }, data: { state } });
+  }
+
+  /**
+   * Marks the drafts of a proposal that was withdrawn or given back as detached from it (F36, `QĐ-91a`): they stay `DRAFT`, are
+   * not deleted, and are written in the transaction of the withdrawal or of the return. Nothing is read of the column here.
+   */
+  async detachDraftsOf(tx: DbTx, proposalId: string, now: Date): Promise<number> {
+    const { count } = await tx.budgetVersion.updateMany({
+      where: { proposalId, state: 'DRAFT', detachedAt: null },
+      data: { detachedAt: now },
+    });
+
+    return count;
   }
 
   /** The total of each of these versions, for the views that say what a revision changes. */

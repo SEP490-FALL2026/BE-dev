@@ -6,6 +6,7 @@ import { TransactionRunner } from '../../src/infrastructure/database/transaction
 import { OrganizationService } from '../../src/modules/organization/organization.service';
 import { findPlacementCoverageViolations } from '../support/placement-coverage';
 import { HR_BASIS } from '../support/hr-basis';
+import { waitForLockWaiters } from '../support/lock-wait';
 
 const ROUNDS = 6;
 
@@ -22,14 +23,16 @@ async function waitForWaiters(observer: Client, count: number, timeoutMs = 10000
   }
 }
 
-describe('lock protocol: job titles and manual entry races (integration, real PostgreSQL)', () => {
+describe('lock protocol: manual entry races (integration, real PostgreSQL)', () => {
   let ctx: HttpTestApp;
   let seed: SeededInstallation;
   let it1: ApiAccount;
+  let fin1: ApiAccount;
   let holder: Client;
   let counter = 0;
   const server = () => ctx.app.getHttpServer();
   const asIt = () => ({ Authorization: `Bearer ${it1.accessToken}` });
+  const asFinance = () => ({ Authorization: `Bearer ${fin1.accessToken}` });
   let superAdmin: string;
 
   beforeAll(async () => {
@@ -38,6 +41,12 @@ describe('lock protocol: job titles and manual entry races (integration, real Po
     const admin = await adminToken(ctx, seed);
     superAdmin = admin;
     it1 = await createActivatedAccount(ctx, seed, { code: 'E-IT1', email: 'it1@acme.vn', roles: ['IT_ADMIN'], admin });
+    fin1 = await createActivatedAccount(ctx, seed, {
+      code: 'E-FIN1',
+      email: 'fin1@acme.vn',
+      roles: ['FINANCE'],
+      admin,
+    });
     holder = new Client({ connectionString: ctx.database.url });
     await holder.connect();
   }, 120000);
@@ -57,13 +66,6 @@ describe('lock protocol: job titles and manual entry races (integration, real Po
     return `${prefix} ${counter}`;
   };
 
-  const createTitle = async (name: string): Promise<string> =>
-    (
-      (await request(server()).post('/api/v1/job-titles').set(asIt()).send({ name }).expect(201)).body as {
-        data: { id: string };
-      }
-    ).data.id;
-
   const entry = (overrides: Record<string, unknown>) => {
     counter += 1;
 
@@ -74,7 +76,7 @@ describe('lock protocol: job titles and manual entry races (integration, real Po
       employmentType: 'STAFF',
       hireDate: '2026-10-01',
       departmentCode: 'P-OPS',
-      jobTitleId: seed.jobTitleId,
+      jobTitle: 'Administrator',
       hrBasis: HR_BASIS,
       ...overrides,
     };
@@ -114,49 +116,6 @@ describe('lock protocol: job titles and manual entry races (integration, real Po
   const rowsWith = async (sql: string, params: unknown[]) =>
     (await ctx.sql.query<Record<string, unknown>>(sql, params)).rows;
 
-  it('deactivating a title racing an entry that uses it: one wins cleanly, in either order (AC-6)', async () => {
-    const deadlocksBefore = await deadlocks();
-    let entered = 0;
-    let refused = 0;
-    for (let round = 0; round < ROUNDS; round += 1) {
-      const titleId = await createTitle(unique('Race Title'));
-      const body = entry({ jobTitleId: titleId });
-
-      const [deactivation, entryAnswer] = await raceBehindLock(
-        'SELECT id FROM job_titles WHERE id = $1 FOR UPDATE',
-        [titleId],
-        [
-          () =>
-            request(server())
-              .post(`/api/v1/job-titles/${titleId}/deactivate`)
-              .set(asIt())
-              .then((r) => r),
-          () => enter(body).then((r) => r),
-        ],
-      );
-
-      expect(deactivation.status).toBe(200);
-      expect([201, 422]).toContain(entryAnswer.status);
-      const title = await rowsWith('SELECT status FROM job_titles WHERE id = $1', [titleId]);
-      expect(title).toEqual([{ status: 'INACTIVE' }]);
-      const people = await rowsWith('SELECT id FROM employees WHERE employee_code = $1', [body.employeeCode]);
-      if (entryAnswer.status === 201) {
-        // The entry took the title before it went inactive: the person keeps it (AC-6).
-        entered += 1;
-        expect(await rowsWith('SELECT 1 FROM employee_placements WHERE job_title_id = $1', [titleId])).toHaveLength(1);
-      } else {
-        refused += 1;
-        expect((entryAnswer.body as { error: { details: { reasons: unknown } } }).error.details.reasons).toEqual([
-          { field: 'jobTitleId', code: 'JOB_TITLE_INACTIVE' },
-        ]);
-        expect(people).toEqual([]);
-        expect(await rowsWith('SELECT 1 FROM employee_placements WHERE job_title_id = $1', [titleId])).toEqual([]);
-      }
-    }
-    expect(entered + refused).toBe(ROUNDS);
-    expect(await deadlocks()).toBe(deadlocksBefore);
-  }, 120000);
-
   it.each([
     ['employee code', (n: number) => ({ employeeCode: 'E-SAMECODE-' + n }), 'EMPLOYEE_CODE_TAKEN', 'employeeCode'],
     ['work email', (n: number) => ({ workEmail: `same.email.${n}@acme.vn` }), 'WORK_EMAIL_TAKEN', 'workEmail'],
@@ -188,98 +147,6 @@ describe('lock protocol: job titles and manual entry races (integration, real Po
     120000,
   );
 
-  it('two title additions with the same name: exactly one is created, the other is a 409', async () => {
-    for (let round = 0; round < ROUNDS; round += 1) {
-      counter += 1;
-      const name = `Same Name ${counter}`;
-
-      const answers = await Promise.all([
-        request(server())
-          .post('/api/v1/job-titles')
-          .set(asIt())
-          .send({ name })
-          .then((r) => r),
-        request(server())
-          .post('/api/v1/job-titles')
-          .set(asIt())
-          .send({ name: name.toUpperCase() })
-          .then((r) => r),
-      ]);
-
-      expect(answers.map((answer) => answer.status).sort()).toEqual([201, 409]);
-      expect(await rowsWith('SELECT 1 FROM job_titles WHERE normalized_name = $1', [name.toLowerCase()])).toHaveLength(
-        1,
-      );
-      const created = await rowsWith(
-        `SELECT 1 FROM audit_events WHERE action = 'JOB_TITLE.CREATED' AND after->>'name' ILIKE $1`,
-        [name],
-      );
-      expect(created).toHaveLength(1);
-    }
-  }, 120000);
-
-  it('two titles renamed to the same name: exactly one is renamed, the other is a 409 and keeps its name', async () => {
-    for (let round = 0; round < ROUNDS; round += 1) {
-      const first = await createTitle(unique('Rename A'));
-      const second = await createTitle(unique('Rename B'));
-      counter += 1;
-      const target = `Contested ${counter}`;
-
-      const answers = await Promise.all([
-        request(server())
-          .patch(`/api/v1/job-titles/${first}`)
-          .set(asIt())
-          .send({ name: target })
-          .then((r) => r),
-        request(server())
-          .patch(`/api/v1/job-titles/${second}`)
-          .set(asIt())
-          .send({ name: target })
-          .then((r) => r),
-      ]);
-
-      expect(answers.map((answer) => answer.status).sort()).toEqual([200, 409]);
-      expect(await rowsWith('SELECT 1 FROM job_titles WHERE name = $1', [target])).toHaveLength(1);
-      const renamed = await rowsWith(
-        `SELECT 1 FROM audit_events WHERE action = 'JOB_TITLE.RENAMED' AND after->>'name' = $1`,
-        [target],
-      );
-      expect(renamed).toHaveLength(1);
-    }
-  }, 120000);
-
-  it('a rename racing a deactivation of the same title: both apply, none is lost', async () => {
-    const deadlocksBefore = await deadlocks();
-    for (let round = 0; round < ROUNDS; round += 1) {
-      const titleId = await createTitle(unique('Both Ways'));
-      const newName = unique('Both Ways Renamed');
-
-      const answers = await raceBehindLock(
-        'SELECT id FROM job_titles WHERE id = $1 FOR UPDATE',
-        [titleId],
-        [
-          () =>
-            request(server())
-              .patch(`/api/v1/job-titles/${titleId}`)
-              .set(asIt())
-              .send({ name: newName })
-              .then((r) => r),
-          () =>
-            request(server())
-              .post(`/api/v1/job-titles/${titleId}/deactivate`)
-              .set(asIt())
-              .then((r) => r),
-        ],
-      );
-
-      expect(answers.map((answer) => answer.status)).toEqual([200, 200]);
-      expect(await rowsWith('SELECT name, status, version FROM job_titles WHERE id = $1', [titleId])).toEqual([
-        { name: newName, status: 'INACTIVE', version: 3 },
-      ]);
-    }
-    expect(await deadlocks()).toBe(deadlocksBefore);
-  }, 120000);
-
   const SETTLE_MS = 5000;
 
   /** Settles while the holder still holds its `FOR SHARE` lock, or fails naming the path that waited. */
@@ -297,9 +164,10 @@ describe('lock protocol: job titles and manual entry races (integration, real Po
     }
   }
 
-  const freeUnitCostCenter = async (): Promise<string> => {
+  /** A department with no Cost Center yet, written the way the installation writes one (`QĐ-87d(1)`). */
+  const bareDepartment = async (): Promise<string> => {
     counter += 1;
-    const code = `CC-LM${counter}`;
+    const code = `P-LM${counter}`;
 
     return (
       await ctx.app
@@ -307,18 +175,30 @@ describe('lock protocol: job titles and manual entry races (integration, real Po
         .run((tx) =>
           ctx.app
             .get(OrganizationService)
-            .createUnitCostCenter(tx, { organizationId: seed.organizationId, code, name: `Lock ${code}` }),
+            .createDepartment(tx, { organizationId: seed.organizationId, code, name: `Lock Department ${counter}` }),
         )
     ).id;
   };
 
-  const createDepartment = (costCenterId: string) => {
+  /** What Finance sends to create the Cost Center of a department. */
+  const createCostCenterFor = (departmentId: string) => {
+    counter += 1;
+
+    return request(server())
+      .post('/api/v1/cost-centers')
+      .set(asFinance())
+      .send({ code: `CC-LM${counter}`, name: `Lock Cost Center ${counter}`, kind: 'UNIT', departmentId })
+      .then((response) => response);
+  };
+
+  /** What the Super Admin sends to create a department (after the operator activated the Cost Center link). */
+  const createDepartment = () => {
     counter += 1;
 
     return request(server())
       .post('/api/v1/departments')
-      .set(asIt())
-      .send({ code: `P-LM${counter}`, name: `Lock Department ${counter}`, costCenterId })
+      .set({ Authorization: `Bearer ${superAdmin}` })
+      .send({ code: `P-LM${counter}`, name: `Lock Department ${counter}`, hrBasis: HR_BASIS })
       .then((response) => response);
   };
 
@@ -328,54 +208,77 @@ describe('lock protocol: job titles and manual entry races (integration, real Po
    * takes `FOR SHARE` goes past a held `FOR SHARE`; a path that takes `FOR UPDATE` waits for it.
    */
   describe('lock modes kept by the Wave 2 move', () => {
-    it('a manual entry shares the job title it names; a rename of that title waits', async () => {
-      const titleId = await createTitle(unique('Shared Title'));
-      await holder.query('BEGIN');
-      await holder.query('SELECT id FROM job_titles WHERE id = $1 FOR SHARE', [titleId]);
-
-      const entered = await settlesWhileShared(
-        enter(entry({ jobTitleId: titleId })).then((response) => response),
-        'the manual entry',
+    // F01 (QĐ-87d(1)): a Cost Center is created FOR a department, so what the creation of a department used to share — a
+    // Cost Center — is gone, and the department row is what Finance's creation locks. The old case (a department shares its
+    // Cost Center) is replaced by these three; every wait is a pg_locks wait observed through the canonical helper.
+    it('creating a department touches no Cost Center: it passes a FOR UPDATE holder of one', async () => {
+      const [{ id: costCenterId }] = (
+        await ctx.sql.query<{ id: string }>('SELECT id FROM cost_centers ORDER BY code LIMIT 1')
+      ).rows;
+      await ctx.sql.query(
+        `INSERT INTO cost_center_direction_activations (id, organization_id, release_evidence, approver_ref, operator_ref, environment)
+         VALUES (gen_random_uuid(), $1, 'concurrency test', 'test', 'test', 'LOCAL_TEST') ON CONFLICT DO NOTHING`,
+        [seed.organizationId],
       );
-      expect(entered.status).toBe(201);
+      await holder.query('BEGIN');
+      await holder.query('SELECT id FROM cost_centers WHERE id = $1 FOR UPDATE', [costCenterId]);
 
-      const rename = request(server())
-        .patch(`/api/v1/job-titles/${titleId}`)
-        .set(asIt())
-        .send({ name: unique('Shared Title Renamed') })
-        .then((response) => response);
-      await waitForWaiters(ctx.sql, 1);
+      expect((await settlesWhileShared(createDepartment(), 'the department creation')).status).toBe(201);
       await holder.query('COMMIT');
-      expect((await rename).status).toBe(200);
     });
 
-    it('creating a department shares its cost center: it passes a FOR SHARE holder and waits for a FOR UPDATE one', async () => {
-      const shared = await freeUnitCostCenter();
+    it('creating the Cost Center of a department locks that department FOR UPDATE: it waits for a FOR SHARE holder (a placement)', async () => {
+      const departmentId = await bareDepartment();
       await holder.query('BEGIN');
-      await holder.query('SELECT id FROM cost_centers WHERE id = $1 FOR SHARE', [shared]);
-      expect((await settlesWhileShared(createDepartment(shared), 'the department creation')).status).toBe(201);
+      await holder.query('SELECT id FROM departments WHERE id = $1 FOR SHARE', [departmentId]);
+
+      let settled = false;
+      const creating = createCostCenterFor(departmentId).then((response) => {
+        settled = true;
+
+        return response;
+      });
+      await waitForLockWaiters(ctx.sql, 1);
+      // It reached the lock wait and is still waiting while the holder keeps its lock.
+      expect(settled).toBe(false);
       await holder.query('COMMIT');
 
-      const updated = await freeUnitCostCenter();
-      await holder.query('BEGIN');
-      await holder.query('SELECT id FROM cost_centers WHERE id = $1 FOR UPDATE', [updated]);
-      const waiting = createDepartment(updated);
-      await waitForWaiters(ctx.sql, 1);
-      await holder.query('COMMIT');
-      expect((await waiting).status).toBe(201);
+      expect((await creating).status).toBe(201);
+      expect(settled).toBe(true);
     });
 
-    it('the import locks departments and job titles FOR SHARE; the employee locks keep their two modes', async () => {
+    it('two creations of a Cost Center for one department, queued one behind the other: the first is created, the second is a 409', async () => {
+      const departmentId = await bareDepartment();
+      await holder.query('BEGIN');
+      await holder.query('SELECT id FROM departments WHERE id = $1 FOR UPDATE', [departmentId]);
+
+      const first = createCostCenterFor(departmentId);
+      await waitForLockWaiters(ctx.sql, 1);
+      const second = createCostCenterFor(departmentId);
+      await waitForLockWaiters(ctx.sql, 2);
+      await holder.query('COMMIT');
+
+      const [one, two] = await Promise.all([first, second]);
+      // Which one the database serves first is its choice; one is created and the other is refused cleanly.
+      expect([one.status, two.status].sort()).toEqual([201, 409]);
+      const refused = one.status === 409 ? one : two;
+      expect((refused.body as { error: { code: string } }).error.code).toBe('COST_CENTER.DEPARTMENT_ALREADY_LINKED');
+      expect(
+        (await ctx.sql.query('SELECT count(*)::int AS n FROM cost_centers WHERE department_id = $1', [departmentId]))
+          .rows[0],
+      ).toEqual({ n: 1 });
+    });
+
+    it('the import locks departments FOR SHARE (a job title is free text: nothing else to lock); the employee locks keep their two modes', async () => {
       const organization = ctx.app.get(OrganizationService);
       const runner = ctx.app.get(TransactionRunner);
       const employeeId = seed.superAdmin.employeeId;
       await holder.query('BEGIN');
       await holder.query('SELECT id FROM departments WHERE id = $1 FOR SHARE', [seed.departmentId]);
-      await holder.query('SELECT id FROM job_titles WHERE id = $1 FOR SHARE', [seed.jobTitleId]);
       await holder.query('SELECT id FROM employees WHERE id = $1 FOR SHARE', [employeeId]);
 
       await settlesWhileShared(
-        runner.run((tx) => organization.lockForEmployeeImport(tx, [seed.departmentId], [seed.jobTitleId])),
+        runner.run((tx) => organization.lockForEmployeeImport(tx, [seed.departmentId])),
         'the import locks',
       );
       await settlesWhileShared(
@@ -395,12 +298,15 @@ describe('lock protocol: job titles and manual entry races (integration, real Po
    * key-share lock a foreign key check takes, so a wait proves the explicit lock and not the write itself.
    */
   describe('lock modes kept by the Wave 3 move', () => {
+    // A department with its Cost Center (a department with none takes nobody in), and one person in it.
     const departmentWithMember = async (): Promise<{ id: string; employeeId: string }> => {
-      const created = await createDepartment(await freeUnitCostCenter());
-      const department = (created.body as { data: { id: string; code: string } }).data;
-      const member = await enter(entry({ departmentCode: department.code })).expect(201);
+      const id = await bareDepartment();
+      expect((await createCostCenterFor(id)).status).toBe(201);
+      const { code } = (await ctx.sql.query<{ code: string }>('SELECT code FROM departments WHERE id = $1', [id]))
+        .rows[0];
+      const member = await enter(entry({ departmentCode: code })).expect(201);
 
-      return { id: department.id, employeeId: (member.body as { data: { id: string } }).data.id };
+      return { id, employeeId: (member.body as { data: { id: string } }).data.id };
     };
     const assignHead = (departmentId: string, employeeId: string) =>
       request(server())
@@ -429,11 +335,7 @@ describe('lock protocol: job titles and manual entry races (integration, real Po
 
     it('changing, retiring or heading a department takes it FOR UPDATE: each waits for a FOR KEY SHARE holder', async () => {
       const department = await departmentWithMember();
-      const empty = (
-        (await createDepartment(await freeUnitCostCenter())).body as {
-          data: { id: string };
-        }
-      ).data;
+      const empty = { id: await bareDepartment() };
       await holder.query('BEGIN');
       await holder.query('SELECT id FROM departments WHERE id = ANY($1::uuid[]) FOR KEY SHARE', [
         [department.id, empty.id],

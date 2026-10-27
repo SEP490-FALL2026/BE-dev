@@ -73,6 +73,9 @@ export function toLicensingApiException(error: unknown): unknown {
     if (error.conflict === 'EXPECTED_END_REQUIRED') {
       return refuse(UNPROCESSABLE, 'LICENSE_ASSIGNMENT.EXPECTED_END_REQUIRED', error.message);
     }
+    if (error.conflict === 'SUBSCRIPTION_DEPARTMENT_MISMATCH') {
+      return refuse(UNPROCESSABLE, 'LICENSE_ASSIGNMENT.SUBSCRIPTION_DEPARTMENT_MISMATCH', error.message);
+    }
 
     return refuse(
       UNPROCESSABLE,

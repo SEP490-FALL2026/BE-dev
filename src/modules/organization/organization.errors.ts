@@ -63,6 +63,17 @@ export class HeadHandoverRefusedError extends Error {
   }
 }
 
+/**
+ * Thrown when something needs the Cost Center of a department that has none yet (`QĐ-87d(1)`: Finance creates it for the
+ * department). Callers outside the module map it to 409 `FINANCE.SETUP_INCOMPLETE`; nothing was written.
+ */
+export class FinanceSetupIncompleteError extends Error {
+  constructor(readonly departmentId: string) {
+    super('The department has no Cost Center in use yet: Finance has to create one for it first.');
+    this.name = 'FinanceSetupIncompleteError';
+  }
+}
+
 /** Thrown when a placement is to begin in a department that is retired (the database refuses it, `US-03-06` AC-19). */
 export class PlacementDepartmentInactiveError extends Error {
   constructor() {

@@ -81,7 +81,8 @@ export const leaveDetailSchema = leaveSummarySchema.extend({
   grounds: groundsSchema,
   endKind: z.enum(['RETURNED', 'DEPARTURE_STARTED']).nullable(),
   resumesLeaveId: z.uuid().nullable(),
-  startedByAppUserId: z.uuid(),
+  /** Null only for an event the controlled procedure of the release after this one recorded (spec L.2); this release always writes its account. */
+  startedByAppUserId: z.uuid().nullable(),
   startedAt: z.iso.datetime(),
   selfExecuted: z.boolean(),
 });
@@ -94,7 +95,8 @@ const changeSchema = z.strictObject({
   returnedOn: z.string().nullable(),
   onSchedule: z.boolean().nullable(),
   grounds: groundsSchema.nullable(),
-  recordedByAppUserId: z.uuid(),
+  /** Null only for an event the controlled procedure of the release after this one recorded (spec L.2); this release always writes its account. */
+  recordedByAppUserId: z.uuid().nullable(),
   recordedAt: z.iso.datetime(),
   selfExecuted: z.boolean(),
 });

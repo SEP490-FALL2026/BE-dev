@@ -20,9 +20,10 @@ function canBeNormalized(email: string): boolean {
 const employmentType = z.enum(['STAFF', 'CONTRACTOR', 'FREELANCER', 'INTERN']);
 
 /**
- * The department and the job title are only bounded here, and may be missing: a missing or unknown one is a
- * reason of the row (`DEPARTMENT_REQUIRED`, `JOB_TITLE_NOT_FOUND`, ...), reported with the others, not a malformed
- * request. The Cost Center is never sent: it follows from the department.
+ * The department and the job title are only bounded here, and may be missing: a missing or unknown department, a missing or
+ * too long title is a reason of the row (`DEPARTMENT_REQUIRED`, `JOB_TITLE_REQUIRED`, ...), reported with the others, not a
+ * malformed request. The job title is free text (`QĐ-87e`); this release still asks for it. The Cost Center is never sent: it
+ * follows from the department.
  */
 export const createEmployeeBodySchema = z.strictObject({
   employeeCode: z.string().trim().min(1).max(50),
@@ -37,7 +38,7 @@ export const createEmployeeBodySchema = z.strictObject({
   employmentType,
   hireDate: z.string().refine(isBusinessDate, { message: 'hireDate must be a real date as YYYY-MM-DD.' }),
   departmentCode: z.string().max(50).nullish(),
-  jobTitleId: z.string().max(64).nullish(),
+  jobTitle: z.string().max(1000).nullish(),
   /** The HR document the record is entered on (`US-02-02` AC-16): required. */
   hrBasis: hrBasisSchema,
 });
@@ -75,7 +76,7 @@ const employeeSchema = z.strictObject({
   workState: z.literal('WORKING'),
   memberSince: z.string(),
   department: z.strictObject({ id: z.uuid(), code: z.string(), name: z.string() }),
-  jobTitle: z.strictObject({ id: z.uuid(), name: z.string() }),
+  jobTitle: z.string().nullable(),
 });
 
 export class CreateEmployeeBodyDto extends createZodDto(createEmployeeBodySchema) {}

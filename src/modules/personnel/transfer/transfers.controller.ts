@@ -64,7 +64,7 @@ const GROUNDS_REFUSALS =
   'the basis is empty or lacks a part (DEPARTMENT_TRANSFER.GROUNDS_REQUIRED, GROUNDS_INCOMPLETE) or is the code of a notice and not a document (GROUNDS_IS_NOTICE)';
 
 /**
- * Transfers of a person to another department or job title with the day they take effect and the basis they rest on. IT Admin
+ * Transfers of a person to another department with the day they take effect and the basis they rest on. IT Admin
  * only: Finance, a department head and an employee are refused, and the Super Admin does no business work.
  */
 @ApiTags('department-transfers')
@@ -109,13 +109,11 @@ export class TransfersController {
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
-      description: `The body is invalid (VALIDATION_ERROR), the day is in the past or not after the first day of the current placement (DEPARTMENT_TRANSFER.EFFECTIVE_DATE_IN_PAST, EFFECTIVE_DATE_NOT_AFTER_CURRENT_PERIOD), nothing changes (NO_CHANGE), the department or the title is unknown or retired (DEPARTMENT_NOT_FOUND, JOB_TITLE_NOT_FOUND, JOB_TITLE_INACTIVE), ${GROUNDS_REFUSALS}, or the head of the department they leave is not provided for (HEAD_SUCCESSOR_REQUIRED, SUCCESSOR_NOT_A_MEMBER_ON_DATE).`,
+      description: `The body is invalid (VALIDATION_ERROR), the day is in the past or not after the first day of the current placement (DEPARTMENT_TRANSFER.EFFECTIVE_DATE_IN_PAST, EFFECTIVE_DATE_NOT_AFTER_CURRENT_PERIOD), the department does not change (NO_CHANGE), the department is unknown (DEPARTMENT_NOT_FOUND), ${GROUNDS_REFUSALS}, or the head of the department they leave is not provided for (HEAD_SUCCESSOR_REQUIRED, SUCCESSOR_NOT_A_MEMBER_ON_DATE).`,
       examples: [
         VALIDATION_EXAMPLE,
         ...DAY_EXAMPLES,
         EXAMPLES.DEPARTMENT_NOT_FOUND,
-        EXAMPLES.JOB_TITLE_NOT_FOUND,
-        EXAMPLES.JOB_TITLE_INACTIVE,
         ...GROUNDS_EXAMPLES,
         EXAMPLES.HEAD_SUCCESSOR_REQUIRED,
         EXAMPLES.SUCCESSOR_NOT_A_MEMBER_ON_DATE,

@@ -46,16 +46,19 @@ describe('the tools a department uses (US-03-06 AC-13, AC-17, integration, real 
 
     return response;
   };
+  /** The Super Admin creates the department (with no Cost Center) and Finance the Cost Center for it (`QĐ-87d(1)`). */
   const department = async (code: string) => {
-    const costCenter = await h.costCenter('UNIT');
-
-    return h.dataOf<{ id: string; code: string }>(
+    await h.activateCostCenterLink();
+    const made = h.dataOf<{ id: string; code: string }>(
       await request(h.server())
         .post('/api/v1/departments')
-        .set(h.as(h.it1))
-        .send({ code, name: `Department ${code}`, costCenterId: costCenter.id })
+        .set({ Authorization: `Bearer ${h.admin}` })
+        .send({ code, name: `Department ${code}`, hrBasis: HR_BASIS })
         .then(created),
     );
+    await h.costCenterFor(made.id);
+
+    return made;
   };
   const enter = async (departmentCode: string, code: string): Promise<string> =>
     h.dataOf<{ id: string }>(
@@ -71,7 +74,7 @@ describe('the tools a department uses (US-03-06 AC-13, AC-17, integration, real 
           // Long before any seat of the baseline: a seat never starts before the person does.
           hireDate: '2024-06-01',
           departmentCode,
-          jobTitleId: h.seed.jobTitleId,
+          jobTitle: 'Administrator',
         })
         .then(created),
     ).id;
@@ -102,8 +105,9 @@ describe('the tools a department uses (US-03-06 AC-13, AC-17, integration, real 
     for (const code of ['D1', 'D2', 'D3', 'D4', 'D5', 'D6']) await enter(design.code, code);
     await enter(finance.code, 'F1');
 
-    figmaSubscription = await h.subscription(10, 'K2');
-    const githubSubscription = await h.subscription(10, 'K1');
+    // Service accounts of several departments sit on these: subscriptions nobody owns yet, which no seat is checked against (F20).
+    figmaSubscription = await h.subscription(10, 'K2', null);
+    const githubSubscription = await h.subscription(10, 'K1', null);
     const person = (code: string) => ({ employee_code: code, account_identifier: `${code.toLowerCase()}@acme.vn` });
     await h.written({ subscriptionId: figmaSubscription }, [
       person('D1'),

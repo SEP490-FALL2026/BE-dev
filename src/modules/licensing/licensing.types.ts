@@ -268,7 +268,12 @@ export const REVOCATION_SOURCES = [
   'NOT_LEGALIZED',
   'RE_EXECUTION',
 ] as const;
-export type RevocationSource = (typeof REVOCATION_SOURCES)[number];
+/**
+ * What a row can say of where a revocation came from. `POST_SETUP_REVIEW` is written by the release after this one (spec L.10): this
+ * release reads it and never accepts it as an input, so `REVOCATION_SOURCES` above (the inputs) does not have it.
+ */
+export const READABLE_REVOCATION_SOURCES = [...REVOCATION_SOURCES, 'POST_SETUP_REVIEW'] as const;
+export type RevocationSource = (typeof READABLE_REVOCATION_SOURCES)[number];
 
 /** How a revocation was completed: the account removed (K2), already gone, the renewal cancelled (K1), revoked off the system (K5). */
 export type RevocationCompletion = 'ACCOUNT_REMOVED' | 'ALREADY_GONE' | 'RENEWAL_CANCELLED' | 'OFF_SYSTEM_REVOKED';

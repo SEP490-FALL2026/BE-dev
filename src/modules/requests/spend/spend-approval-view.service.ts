@@ -209,7 +209,6 @@ export class SpendApprovalViewService {
       budgetYear: request.pricing.budgetYear,
       offPlan: request.offPlan,
       planLineAttached: request.planLine !== null,
-      outsideStandard: request.outsideStandard,
     };
   }
 }

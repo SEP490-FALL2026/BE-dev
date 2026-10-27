@@ -51,11 +51,7 @@ export class EmployeeDirectoryService {
     return this.repo.findEmployees(employeeIds, tx);
   }
 
-  placementOn(
-    employeeId: string,
-    onDate: BusinessDate,
-    tx?: DbTx,
-  ): Promise<{ departmentId: string; jobTitleId: string } | null> {
+  placementOn(employeeId: string, onDate: BusinessDate, tx?: DbTx): Promise<{ departmentId: string } | null> {
     return this.repo.placementIdsOn(employeeId, onDate, tx);
   }
 
@@ -105,7 +101,6 @@ export class EmployeeDirectoryService {
     tx: DbTx | undefined,
     names: {
       departmentCodes: string[];
-      normalizedJobTitleNames: string[];
       employeeCodes: string[];
       normalizedEmails: string[];
     },
@@ -153,7 +148,7 @@ export class EmployeeDirectoryService {
     return this.departures.markLeft(tx, employeeId);
   }
 
-  lockForImport(tx: DbTx, departmentIds: string[], jobTitleIds: string[]): Promise<void> {
-    return this.importLookup.lockForImport(tx, departmentIds, jobTitleIds);
+  lockForImport(tx: DbTx, departmentIds: string[]): Promise<void> {
+    return this.importLookup.lockForImport(tx, departmentIds);
   }
 }

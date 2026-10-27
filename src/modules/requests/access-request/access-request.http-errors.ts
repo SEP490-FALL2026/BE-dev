@@ -1,6 +1,7 @@
 import { HttpStatus } from '@nestjs/common';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import { toUnavailableApiException } from '../../../infrastructure/http/errors/service-unavailable';
+import { FinanceSetupIncompleteError } from '../../organization/organization.errors';
 import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
 import {
   AccessRequestAlreadyHoldsAccessError,
@@ -16,7 +17,6 @@ import {
   AccessRequestNoDepartmentError,
   AccessRequestNotFoundError,
   AccessRequestNotPriceableError,
-  AccessRequestOutsideStandardReasonRequiredError,
   AccessRequestPlanLineRefusedError,
   AccessRequestPlanNotFoundError,
 } from './access-request.errors';
@@ -40,6 +40,10 @@ export function toAccessRequestApiException(error: unknown): unknown {
   if (error instanceof AccessRequestNoDepartmentError) {
     return refuse(HttpStatus.CONFLICT, 'ACCESS_REQUEST.NO_DEPARTMENT', error.message);
   }
+  // The department has no Cost Center in use yet (`QĐ-87d(1)`): Finance creates it first. Nothing was written.
+  if (error instanceof FinanceSetupIncompleteError) {
+    return refuse(HttpStatus.CONFLICT, 'FINANCE.SETUP_INCOMPLETE', error.message);
+  }
 
   if (error instanceof DelegatedRequestRefusedError) {
     const status =
@@ -61,9 +65,6 @@ export function toAccessRequestApiException(error: unknown): unknown {
       message: error.message,
       details: { assignment: error.held },
     });
-  }
-  if (error instanceof AccessRequestOutsideStandardReasonRequiredError) {
-    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'ACCESS_REQUEST.OUTSIDE_STANDARD_REASON_REQUIRED', error.message);
   }
   if (error instanceof AccessRequestSpendDateNotAllowedError) {
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'ACCESS_REQUEST.NO_SPEND_FOR_FREE_SOFTWARE', error.message);
@@ -134,6 +135,7 @@ export const ACCESS_REQUEST_ERROR_EXAMPLES = {
   PLAN_NOT_FOUND: example(new AccessRequestPlanNotFoundError()),
   APPLICATION_RETIRED: example(new AccessRequestApplicationRetiredError()),
   NO_DEPARTMENT: example(new AccessRequestNoDepartmentError()),
+  FINANCE_SETUP_INCOMPLETE: example(new FinanceSetupIncompleteError('<department-id>')),
   ALREADY_HOLDS_ACCESS: example(
     new AccessRequestAlreadyHoldsAccessError({
       assignmentId: '<assignment-id>',
@@ -141,7 +143,6 @@ export const ACCESS_REQUEST_ERROR_EXAMPLES = {
       validUntil: null,
     }),
   ),
-  OUTSIDE_STANDARD_REASON_REQUIRED: example(new AccessRequestOutsideStandardReasonRequiredError()),
   NO_SPEND_FOR_FREE_SOFTWARE: example(new AccessRequestSpendDateNotAllowedError()),
   NOT_ASSIGNEE: example(new AccessRequestNotAssigneeError()),
   EMPLOYEE_REQUIRED: example(new AccessRequestEmployeeRequiredError()),

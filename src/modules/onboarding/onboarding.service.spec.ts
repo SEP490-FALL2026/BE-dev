@@ -12,7 +12,8 @@ import { OnboardingService } from './onboarding.service';
 const facts = (overrides: Partial<OnboardingFacts> = {}): OnboardingFacts => ({
   activeDepartments: 3,
   activeEmployees: 40,
-  freeCostCenters: 1,
+  costCenterDirectionActivated: true,
+  departmentsWithoutCostCenter: [],
   departmentsWithoutHead: [],
   departmentsByItAdmin: [],
   ...overrides,
@@ -22,7 +23,6 @@ const catalogFacts = (overrides: Partial<CatalogOnboardingFacts> = {}): CatalogO
   applications: 4,
   plans: 6,
   subscriptions: 5,
-  standardToolsets: 0,
   ...overrides,
 });
 const progress = (overrides: Partial<BaselineProgress> = {}): BaselineProgress => ({
@@ -120,10 +120,27 @@ describe('onboarding checklist (US-02-04)', () => {
     ]);
   });
 
-  it('says that creating a department waits for Finance when no cost center is free (AC-4)', async () => {
-    const { steps } = await serviceWith(facts({ freeCostCenters: 0 }), null).checklist();
+  it('says that creating a department waits for the activation of the Cost Center link, not for a free Cost Center (spec L.11)', async () => {
+    const waiting = await serviceWith(facts({ costCenterDirectionActivated: false }), null).checklist();
+    const active = await serviceWith(facts({ costCenterDirectionActivated: true }), null).checklist();
 
-    expect(steps[0].createDepartmentBlockedBy).toBe('NO_FREE_COST_CENTER');
+    expect(waiting.steps[0].createDepartmentBlockedBy).toBe('AWAITING_ACTIVATION');
+    expect(active.steps[0].createDepartmentBlockedBy).toBeNull();
+  });
+
+  it('shows a department with no Cost Center as a warning that stops nothing (QĐ-87d(1))', async () => {
+    const { steps } = await serviceWith(
+      facts({ departmentsWithoutCostCenter: [{ code: 'P-OPS', name: 'Operations' }] }),
+      null,
+    ).checklist();
+
+    expect(steps[0].status).toBe('DONE');
+    expect(steps[0].warnings).toContainEqual({
+      code: 'MISSING_COST_CENTER',
+      departmentCode: 'P-OPS',
+      departmentName: 'Operations',
+    });
+    expect(steps[0].facts.departmentsWithoutCostCenter).toBe(1);
   });
 
   describe('step 2, the applications (US-02-04, FR-9.1)', () => {
@@ -225,39 +242,10 @@ describe('onboarding checklist (US-02-04)', () => {
     expect(steps[4]).toEqual({ step: 5, key: 'USAGE', status: 'NOT_AVAILABLE', reasons: ['NOT_BUILT_YET'] });
   });
 
-  describe('standard toolset suggestion (US-02-04 AC-5, US-04-10)', () => {
-    it('is available once step 3 is done, counts the configured pairs and blocks nothing', async () => {
-      const { suggestions, steps } = await serviceWith(
-        facts(),
-        null,
-        [],
-        catalogFacts({ standardToolsets: 7 }),
-      ).checklist();
+  it('has five steps and nothing else: the standard toolset is not suggested any more (QĐ-87h)', async () => {
+    const checklist = await serviceWith(facts(), null).checklist();
 
-      expect(suggestions).toEqual([
-        {
-          key: 'STANDARD_TOOLSET',
-          afterStep: 3,
-          story: 'US-04-10',
-          available: true,
-          configuredPairs: 7,
-          blocksStep: false,
-        },
-      ]);
-      expect(steps[3].status).toBe('INCOMPLETE');
-    });
-
-    it('is not available before step 3 is done, and having no toolset never changes a step', async () => {
-      const without = await serviceWith(facts(), null, [], catalogFacts({ subscriptions: 0 })).checklist();
-      const withSome = await serviceWith(
-        facts(),
-        null,
-        [],
-        catalogFacts({ subscriptions: 0, standardToolsets: 3 }),
-      ).checklist();
-
-      expect(without.suggestions[0]).toMatchObject({ available: false, configuredPairs: 0 });
-      expect(withSome.steps).toEqual(without.steps);
-    });
+    expect(Object.keys(checklist)).toEqual(['steps']);
+    expect(checklist.steps).toHaveLength(5);
   });
 });

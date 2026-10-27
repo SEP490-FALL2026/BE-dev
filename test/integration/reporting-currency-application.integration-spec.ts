@@ -106,7 +106,12 @@ describe('the reporting currency under the application (integration, DB-01 and D
       const response = await request(server())
         .post('/api/v1/subscriptions')
         .set(as(it1))
-        .send({ planId: plan, kind: 'TERM', unitPrice: { amount: '1200.00', currency: 'USD' } });
+        .send({
+          ownerDepartmentId: seed.departmentId,
+          planId: plan,
+          kind: 'TERM',
+          unitPrice: { amount: '1200.00', currency: 'USD' },
+        });
 
       expect(response.status).toBe(409);
       expect(response.body).toMatchObject({

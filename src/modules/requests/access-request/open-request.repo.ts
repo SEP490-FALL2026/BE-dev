@@ -33,6 +33,8 @@ export class OpenRequestRepo {
     const db = tx ?? this.prisma;
     const where = {
       beneficiaries: { some: { employeeId } },
+      // A request being drafted is written by the release after this one and is not read here (spec L.1).
+      state: { not: 'DRAFT' as const },
       OR: [
         { type: { not: 'GROUP_GRANT' as const }, state: { notIn: [...NOT_OPEN_FOR_LEAVER] } },
         { type: 'GROUP_GRANT' as const, lines: { some: { employeeId, state: { in: [...OPEN_LINE_STATES] } } } },

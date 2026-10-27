@@ -12,6 +12,25 @@ export class CostCenterCodeTakenError extends Error {
   }
 }
 
+/**
+ * The department a Cost Center is created for does not exist in the organization or is no longer in use (`QĐ-87d(1)`:
+ * Finance creates the Cost Center for a department that exists, and a retired department gets none).
+ */
+export class CostCenterDepartmentNotActiveError extends Error {
+  constructor() {
+    super('A cost center is created for a department that exists and is in use.');
+    this.name = 'CostCenterDepartmentNotActiveError';
+  }
+}
+
+/** The department already has a Cost Center in use: it has at most one, and a new one comes only after that is retired. */
+export class CostCenterDepartmentAlreadyLinkedError extends Error {
+  constructor(readonly departmentId: string) {
+    super('The department already has a cost center in use.');
+    this.name = 'CostCenterDepartmentAlreadyLinkedError';
+  }
+}
+
 /** The kind is not the one the catalogue holds (US-04-09 AC-4, `QĐ-86b`: no Company, no project kind, no placeholder). */
 export class CostCenterKindNotSupportedError extends Error {
   constructor() {

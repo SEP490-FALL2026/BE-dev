@@ -28,7 +28,7 @@ const checklistSchema = z.strictObject({
           z.strictObject({
             activeDepartments: z.number().int().nonnegative(),
             activeEmployees: z.number().int().nonnegative(),
-            freeCostCenters: z.number().int().nonnegative(),
+            departmentsWithoutCostCenter: z.number().int().nonnegative(),
             latestImport: z
               .strictObject({
                 id: z.uuid(),
@@ -46,26 +46,16 @@ const checklistSchema = z.strictObject({
           }),
         ])
         .optional(),
-      createDepartmentBlockedBy: z.enum(['NO_FREE_COST_CENTER']).nullable().optional(),
+      createDepartmentBlockedBy: z.enum(['AWAITING_ACTIVATION']).nullable().optional(),
       warnings: z
         .array(
           z.strictObject({
-            code: z.enum(['MISSING_HEAD', 'MISSING_IT_ADMIN']),
+            code: z.enum(['MISSING_HEAD', 'MISSING_IT_ADMIN', 'MISSING_COST_CENTER']),
             departmentCode: z.string(),
             departmentName: z.string(),
           }),
         )
         .optional(),
-    }),
-  ),
-  suggestions: z.array(
-    z.strictObject({
-      key: z.enum(['STANDARD_TOOLSET']),
-      afterStep: z.literal(3),
-      story: z.string(),
-      available: z.boolean(),
-      configuredPairs: z.number().int().nonnegative(),
-      blocksStep: z.literal(false),
     }),
   ),
 });
@@ -84,7 +74,7 @@ export class OnboardingController {
   @ApiSuccessResponse(OnboardingChecklistResponseDto, {
     message: 'ONBOARDING.CHECKLIST_FETCHED',
     description:
-      'The five steps and where each stands, judged from the data that exists. Step 1 says what is missing and which departments lack a head or an IT Admin; step 2 (applications) and step 3 (subscriptions) are done when the catalog holds one; step 4 (seat baseline) is blocked until steps 1 and 3 are done, then ready, and done once closed; step 5 (usage) is not built yet and says so. The suggestions name what is worth doing next without requiring it: the standard toolsets, after step 3.',
+      'The five steps and where each stands, judged from the data that exists. Step 1 says what is missing and which departments lack a head or an IT Admin; step 2 (applications) and step 3 (subscriptions) are done when the catalog holds one; step 4 (seat baseline) is blocked until steps 1 and 3 are done, then ready, and done once closed; step 5 (usage) is not built yet and says so.',
   })
   @ApiErrorResponses(
     UNAUTHENTICATED_RESPONSE,

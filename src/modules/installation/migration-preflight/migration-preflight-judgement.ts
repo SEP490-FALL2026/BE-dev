@@ -1,10 +1,12 @@
 import {
+  ContractGateFacts,
   ConversionFacts,
   FORWARD_MIGRATION,
   MigrationRecord,
   PreflightBlocker,
   PreflightCorrection,
   PreflightHistory,
+  PreflightInformation,
   PreflightReport,
   UNIT_ONLY_MIGRATION,
 } from './migration-preflight.types';
@@ -78,6 +80,169 @@ export function judgeConversion(history: PreflightHistory, facts: ConversionFact
     blockers: blockers.sort(byCodeThenRow),
     corrections: corrections.sort((a, b) => compare(a.assignmentId, b.assignmentId)),
     companyCostCentersRemoved: legacy ? [...facts.companyCostCenters].sort((a, b) => compare(a.code, b.code)) : [],
+    information: [],
+  };
+}
+
+/**
+ * The contract gates (spec L.10), judged beside the conversion. Subscription owner department (F02, spec L.3): before
+ * the expansion migration every subscription is information — the deploy that adds the column may run, and the rows are
+ * assigned after it; after it, a subscription with no owner department and no valid assignment blocks, whatever
+ * created it (the operator, a recovered old image, a late row), because the next release would refuse to deploy over it.
+ */
+export function judgeContractGates(facts: ContractGateFacts): {
+  blockers: PreflightBlocker[];
+  information: PreflightInformation[];
+} {
+  const owner = judgeSubscriptionOwner(facts.subscriptionOwner);
+  const direction = judgeCostCenterDirection(facts.costCenterDirection);
+  const returns = judgeLegacyReturns(facts.legacyReturns);
+
+  return {
+    blockers: [...owner.blockers, ...direction.blockers, ...judgeRetiredKinds(facts.retiredKinds), ...returns.blockers],
+    information: [...owner.information, ...direction.information, ...returns.information],
+  };
+}
+
+/**
+ * The proposals `7c28e75` gave back because their first version was refused (F63, spec J.2). A proposal given back with no refusal on
+ * its versions was given back by Finance and is left alone. One whose refusal matches the return exactly (`traced`) is reconciled by the
+ * migration of the release after this one: R1 when nothing was sent after the return, R2 when exactly one proposal sends it again and every
+ * proposal sent after the return belongs to the chain of that one; both are information. Every other case (a refusal that does not match,
+ * several refusals, a proposal sent after the return that does not point back at it, two resubmissions) blocks, and nothing is guessed.
+ */
+export function judgeLegacyReturns(facts: ContractGateFacts['legacyReturns']): {
+  blockers: PreflightBlocker[];
+  information: PreflightInformation[];
+} {
+  const blockers: PreflightBlocker[] = [];
+  const information: PreflightInformation[] = [];
+  for (const candidate of [...facts.candidates].sort((a, b) => compare(a.proposalId, b.proposalId))) {
+    const around = facts.neighbours.filter((row) => row.proposalId === candidate.proposalId);
+    const later = around.filter((row) => row.submittedAfter);
+    const resending = around.filter((row) => row.previousProposalId === candidate.proposalId);
+    const rule = candidate.traced ? ruleOf(candidate.proposalId, later, resending) : null;
+    if (rule === null) {
+      blockers.push({
+        code: 'BUDGET_PROPOSAL_LEGACY_RETURN_AMBIGUOUS',
+        proposalId: candidate.proposalId,
+        versionIds: [...candidate.versionIds].sort(compare),
+        decisionIds: [...candidate.decisionIds].sort(compare),
+        relatedProposalIds: [...new Set(around.map((row) => row.id))].sort(compare),
+      });
+    } else {
+      information.push({ code: 'BUDGET_PROPOSAL_LEGACY_RETURN_RECONCILE', proposalId: candidate.proposalId, rule });
+    }
+  }
+
+  return { blockers, information };
+}
+
+type Neighbour = ContractGateFacts['legacyReturns']['neighbours'][number];
+
+function ruleOf(proposalId: string, later: Neighbour[], resending: Neighbour[]): 'R1' | 'R2' | null {
+  if (later.length === 0) return resending.length === 0 ? 'R1' : null;
+  if (resending.length !== 1) return null;
+  // The chain that starts at the one proposal that sends it again: every proposal sent after the return must be in it.
+  const chain = new Set<string>([resending[0].id]);
+  let grew = true;
+  while (grew) {
+    grew = false;
+    for (const row of later) {
+      if (!chain.has(row.id) && row.previousProposalId !== null && chain.has(row.previousProposalId)) {
+        chain.add(row.id);
+        grew = true;
+      }
+    }
+  }
+
+  return later.every((row) => chain.has(row.id)) && proposalId !== resending[0].id ? 'R2' : null;
+}
+
+/**
+ * A notice of a change of job title, a transfer of the job title only and a proposal to move a service account are not taken any
+ * more (`QĐ-87e`, `QĐ-89c`, spec L.4, L.5). One that still waits blocks, whatever the schema, because the release after this one
+ * refuses to deploy over it: it is rejected or cancelled on the running release with the fixed reasons, never converted into
+ * something it was not. Ids only.
+ */
+function judgeRetiredKinds(facts: ContractGateFacts['retiredKinds']): PreflightBlocker[] {
+  return [
+    ...[...facts.pendingNoticeIds]
+      .sort(compare)
+      .map((noticeId): PreflightBlocker => ({ code: 'PERSONNEL_NOTICE_RETIRED_KIND_PENDING', noticeId })),
+    ...[...facts.pendingTransferIds]
+      .sort(compare)
+      .map((transferId): PreflightBlocker => ({ code: 'DEPARTMENT_TRANSFER_TITLE_ONLY_PENDING', transferId })),
+    ...[...facts.pendingMoveIds]
+      .sort(compare)
+      .map((moveId): PreflightBlocker => ({ code: 'SERVICE_ACCOUNT_MOVE_PENDING', moveId })),
+  ];
+}
+
+function judgeSubscriptionOwner(facts: ContractGateFacts['subscriptionOwner']): {
+  blockers: PreflightBlocker[];
+  information: PreflightInformation[];
+} {
+  const { schema, subscriptionIds } = facts;
+  const ids = [...subscriptionIds].sort(compare);
+  const blockers: PreflightBlocker[] = [];
+  const information: PreflightInformation[] = [];
+  if (schema === 'ABSENT') {
+    for (const subscriptionId of ids) information.push({ code: 'SUBSCRIPTION_OWNER_TO_ASSIGN', subscriptionId });
+  } else if (schema === 'READY') {
+    for (const subscriptionId of ids) blockers.push({ code: 'SUBSCRIPTION_OWNER_UNASSIGNED', subscriptionId });
+  } else if (schema === 'PARTIAL') {
+    blockers.push({ code: 'SUBSCRIPTION_OWNER_SCHEMA_PARTIAL' });
+  }
+
+  return { blockers, information };
+}
+
+/**
+ * Every Cost Center belongs to one department (F01, `QĐ-87d(1)`, spec L.11). Before the compatibility migration the Cost
+ * Centers no department names are rows to link later (the deploy that adds the link may run). After it, a Cost Center
+ * with no department blocks — whoever created it, a recovered old image included — and so does a department whose own
+ * column contradicts the link; a link that is not activated is information in this release (it blocks in the final one).
+ */
+function judgeCostCenterDirection(facts: ContractGateFacts['costCenterDirection']): {
+  blockers: PreflightBlocker[];
+  information: PreflightInformation[];
+} {
+  const blockers: PreflightBlocker[] = [];
+  const information: PreflightInformation[] = [];
+  if (facts.schema === 'ABSENT') {
+    for (const costCenterId of [...facts.costCenterIds].sort(compare)) {
+      information.push({ code: 'COST_CENTER_TO_LINK', costCenterId });
+    }
+  } else if (facts.schema === 'READY') {
+    for (const costCenterId of [...facts.costCenterIds].sort(compare)) {
+      blockers.push({ code: 'COST_CENTER_UNLINKED', costCenterId });
+    }
+    for (const mismatch of [...facts.mismatches].sort((a, b) => compare(a.costCenterId, b.costCenterId))) {
+      blockers.push({ code: 'COST_CENTER_LINK_MISMATCH', ...mismatch });
+    }
+    for (const organizationId of [...facts.notActivated].sort(compare)) {
+      information.push({ code: 'COST_CENTER_DIRECTION_NOT_ACTIVATED', organizationId });
+    }
+  } else if (facts.schema === 'PARTIAL') {
+    blockers.push({ code: 'COST_CENTER_DIRECTION_SCHEMA_PARTIAL' });
+  }
+
+  return { blockers, information };
+}
+
+/** The conversion report with the gates added: blocked as soon as one gate blocks. */
+export function withContractGates(
+  report: PreflightReport,
+  gates: { blockers: PreflightBlocker[]; information: PreflightInformation[] },
+): PreflightReport {
+  const blockers = [...report.blockers, ...gates.blockers].sort(byCodeThenRow);
+
+  return {
+    ...report,
+    status: blockers.length === 0 ? 'READY' : 'BLOCKED',
+    blockers,
+    information: [...report.information, ...gates.information],
   };
 }
 
@@ -96,6 +261,23 @@ function rowOf(blocker: PreflightBlocker): string {
       return `${blocker.versionId} ${blocker.costCenter}`;
     case 'DEPARTMENT_CHARGED_TO_COMPANY':
       return blocker.department;
+    case 'SUBSCRIPTION_OWNER_UNASSIGNED':
+      return blocker.subscriptionId;
+    case 'SUBSCRIPTION_OWNER_SCHEMA_PARTIAL':
+    case 'COST_CENTER_DIRECTION_SCHEMA_PARTIAL':
+      return '';
+    case 'COST_CENTER_UNLINKED':
+      return blocker.costCenterId;
+    case 'COST_CENTER_LINK_MISMATCH':
+      return `${blocker.costCenterId} ${blocker.departmentId}`;
+    case 'PERSONNEL_NOTICE_RETIRED_KIND_PENDING':
+      return blocker.noticeId;
+    case 'DEPARTMENT_TRANSFER_TITLE_ONLY_PENDING':
+      return blocker.transferId;
+    case 'SERVICE_ACCOUNT_MOVE_PENDING':
+      return blocker.moveId;
+    case 'BUDGET_PROPOSAL_LEGACY_RETURN_AMBIGUOUS':
+      return blocker.proposalId;
     default:
       return blocker.assignmentId;
   }

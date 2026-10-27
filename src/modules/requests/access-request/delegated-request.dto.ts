@@ -26,8 +26,6 @@ export const delegatedBodySchema = z
       .array(
         z.strictObject({
           planId: z.uuid(),
-          /** The reason of a tool outside the standard toolset of the person (`AC-7`); the tools of the toolset need none. */
-          outsideStandardReason: reason.optional(),
           expectedSpendOn: businessDate.optional(),
         }),
       )

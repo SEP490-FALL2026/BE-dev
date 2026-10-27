@@ -5,10 +5,7 @@ import { AuditService } from '../../audit/audit.service';
 import { OrganizationService } from '../../organization/organization.service';
 import { SpendEntryService } from '../spend/spend-entry.service';
 import { accessRequestAuditEvent } from '../access-request/access-request-audit-event';
-import {
-  AccessRequestNoDepartmentError,
-  AccessRequestOutsideStandardReasonRequiredError,
-} from '../access-request/access-request.errors';
+import { AccessRequestNoDepartmentError } from '../access-request/access-request.errors';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord, PricingRecord } from '../access-request/access-request.types';
 import { LONG_TERM_MONTHS, nextRequestState } from '../access-request/need-decision.policy';
@@ -37,7 +34,6 @@ export interface GroupBody {
   businessReason: string;
   termMonths: number;
   projectLabel?: string;
-  outsideStandardReason?: string;
   expectedSpendOn?: string;
   termConfirmation?: { reason: string };
 }
@@ -47,7 +43,6 @@ export interface GroupCheck {
   plan: { eligible: boolean; reason: PlanRefusal | null };
   tooManyLines: { max: number } | null;
   lines: { employeeId: string; ok: boolean; reason: LineReason | 'DUPLICATE_LINE' | null }[];
-  outsideStandard: boolean;
   pricing: PricingRecord;
   lineCount: number;
 }
@@ -91,7 +86,6 @@ export class GroupRequestService {
 
           return { employeeId: line.employeeId, ok: reason === null, reason };
         }),
-        outsideStandard: judged.outsideStandard,
         pricing: judged.pricing,
         lineCount: judged.lines.length,
       };
@@ -100,8 +94,7 @@ export class GroupRequestService {
 
   /**
    * Throws GroupRequestPlanNotEligibleError, GroupRequestTooManyLinesError, GroupRequestDuplicateLineError,
-   * GroupRequestLinesRefusedError, AccessRequestOutsideStandardReasonRequiredError,
-   * GroupRequestTermConfirmationRequiredError, AccessRequestNoDepartmentError and the errors of assessing a plan.
+   * GroupRequestLinesRefusedError, GroupRequestTermConfirmationRequiredError, AccessRequestNoDepartmentError and the errors of assessing a plan.
    */
   async submit(actor: AuthenticatedPrincipal, body: GroupBody): Promise<AccessRequestRecord> {
     const settings = await this.assessment.settings();
@@ -157,9 +150,6 @@ export class GroupRequestService {
     if (judged.count.tooMany !== null) throw new GroupRequestTooManyLinesError(judged.count.tooMany.max);
     if (judged.count.duplicates.length > 0) throw new GroupRequestDuplicateLineError(judged.count.duplicates);
     if (judged.refused.length > 0) throw new GroupRequestLinesRefusedError(judged.refused);
-    if (judged.outsideStandard && !body.outsideStandardReason) {
-      throw new AccessRequestOutsideStandardReasonRequiredError();
-    }
     if (
       needsTermConfirmation({
         senderIsHead: judged.senderIsHead,
@@ -201,8 +191,6 @@ export class GroupRequestService {
       businessReason: body.businessReason,
       termMonths: body.termMonths,
       projectLabel: body.projectLabel ?? null,
-      outsideStandardReason: body.outsideStandardReason ?? null,
-      outsideStandard: judged.outsideStandard,
       pricing: judged.pricing,
       policy,
       createdByAppUserId: actor.appUserId,

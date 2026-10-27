@@ -62,7 +62,6 @@ export class RenewalRequestTrail {
         amountCurrency: pricing.amount?.currency ?? null,
         budgetYear: pricing.budgetYear,
         expectedSpendOn: pricing.expectedSpendOn,
-        outsideStandard: assessed.outsideStandard,
         delegated: byHead,
         assignmentId: facts.assignmentId,
         previousExpectedEndDate: input.input.previousEnd,

@@ -137,7 +137,7 @@ export class TransferReviewViewService {
     return headed ? { kind: 'DEPARTMENT', departmentId: headed.departmentId } : { kind: 'NONE' };
   }
 
-  /** The people, departments, titles, plans and heads of a page, one statement each. */
+  /** The people, departments, plans and heads of a page, one statement each. */
   private async namesOf(
     reviews: readonly ReviewSummaryRecord[],
     items: readonly ReviewItemRecord[],
@@ -153,19 +153,16 @@ export class TransferReviewViewService {
       ...items.map((item) => item.decidedByEmployeeId),
       ...[...heads.values()].map((head) => head.employeeId),
     ]);
-    const jobTitleIds = unique(reviews.map((review) => review.jobTitleId));
     const planIds = unique(items.map((item) => item.planId));
-    const [employees, departments, jobTitles, plans] = await Promise.all([
+    const [employees, departments, plans] = await Promise.all([
       employeeIds.length > 0 ? this.organization.getEmployees(employeeIds) : [],
       departmentIds.length > 0 ? this.organization.getDepartmentBriefs(departmentIds) : [],
-      jobTitleIds.length > 0 ? this.organization.getJobTitles(jobTitleIds) : [],
       planIds.length > 0 ? this.catalog.getPlanRevocationInfo(planIds) : [],
     ]);
 
     return {
       employees: new Map(employees.map((employee) => [employee.id, employee])),
       departments: new Map(departments.map((department) => [department.id, department])),
-      jobTitles: new Map(jobTitles.map((jobTitle) => [jobTitle.id, jobTitle])),
       plans: new Map(plans.map((plan) => [plan.planId, plan])),
       heads: new Map([...heads].map(([departmentId, head]) => [departmentId, head.employeeId])),
     };

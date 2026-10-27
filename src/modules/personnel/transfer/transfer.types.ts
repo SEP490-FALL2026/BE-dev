@@ -21,8 +21,6 @@ export interface TransferRecord {
   employeeId: string;
   fromDepartmentId: string;
   toDepartmentId: string;
-  fromJobTitleId: string;
-  toJobTitleId: string;
   effectiveOn: BusinessDate;
   status: TransferStatus;
   closesPlacementId: string;
@@ -30,7 +28,8 @@ export interface TransferRecord {
   headHandover: HeadHandoverFacts | null;
   grounds: Grounds;
   selfExecuted: boolean;
-  recordedByAppUserId: string;
+  /** Null only for an event the controlled procedure of the release after this one recorded (spec L.2); this release always writes its account. */
+  recordedByAppUserId: string | null;
   recordedAt: Date;
   effectiveAt: Date | null;
   cancelledAt: Date | null;
@@ -46,8 +45,6 @@ export interface TransferSummaryRecord {
   employeeId: string;
   fromDepartmentId: string;
   toDepartmentId: string;
-  fromJobTitleId: string;
-  toJobTitleId: string;
   effectiveOn: BusinessDate;
   status: TransferStatus;
   selfExecuted: boolean;
@@ -60,7 +57,8 @@ export interface TransferChangeRecord {
   newEffectiveOn: BusinessDate | null;
   reason: string;
   grounds: Grounds;
-  changedByAppUserId: string;
+  /** Null only for an event the controlled procedure of the release after this one recorded (spec L.2); this release always writes its account. */
+  changedByAppUserId: string | null;
   changedAt: Date;
 }
 
@@ -75,8 +73,8 @@ export interface TransferListFilter {
 
 export interface RecordTransferInput {
   employeeId: string;
+  /** Left out, nothing changes and the policy says so (a notice that names no department). */
   toDepartmentId?: string;
-  toJobTitleId?: string;
   effectiveOn: BusinessDate;
   grounds?: GroundsInput;
   successor?: SuccessorChoice;

@@ -2,7 +2,7 @@ import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { z } from 'zod';
 import { isBusinessDate } from '../../../core/business-date';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
-import { NOTICE_KINDS, VERIFICATION_METHODS } from './notice.types';
+import { NOTICE_KINDS, SENDABLE_NOTICE_KINDS, VERIFICATION_METHODS } from './notice.types';
 
 const businessDate = z.string().refine(isBusinessDate, { message: 'The day must be a real date as YYYY-MM-DD.' });
 const flag = z.enum(['true', 'false']).transform((value) => value === 'true');
@@ -28,7 +28,8 @@ const verificationBodySchema = z.strictObject({
 /** Strict: a field the route does not know, such as a reason for leaving, is refused and never kept. */
 const sendBodySchema = z.strictObject({
   employeeId: z.uuid(),
-  kind: kindSchema,
+  /** A change of job title is not told any more: that kind is refused as a malformed body (`QĐ-87e`). */
+  kind: z.enum(SENDABLE_NOTICE_KINDS),
   proposedOn: businessDate,
   targetDepartmentId: z.uuid().optional(),
   note: z.string().max(500).optional(),
@@ -42,7 +43,6 @@ const successorSchema = z.discriminatedUnion('kind', [
 /** The event the notice is recorded as; which fields it needs depends on the kind of the notice and is judged after. */
 const eventBodySchema = z.strictObject({
   toDepartmentId: z.uuid().optional(),
-  toJobTitleId: z.uuid().optional(),
   effectiveOn: businessDate.optional(),
   lastWorkingDay: businessDate.optional(),
   successor: successorSchema.optional(),
@@ -113,7 +113,8 @@ export const noticeDetailSchema = noticeSummarySchema.extend({
     .strictObject({
       method: z.enum(VERIFICATION_METHODS),
       reference: z.string(),
-      verifiedByAppUserId: z.uuid(),
+      /** Null only for a verification the controlled procedure of the release after this one recorded (spec L.2). */
+      verifiedByAppUserId: z.uuid().nullable(),
       verifiedAt: z.iso.datetime(),
     })
     .nullable(),

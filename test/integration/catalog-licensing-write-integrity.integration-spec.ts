@@ -366,80 +366,6 @@ describe('write integrity of catalog, finance and licensing (integration, DB-03,
       expect(h.detailsOf(response)).toEqual({ reason: 'LICENSE_KEYS' });
       expect(await sqlState(sql(), `UPDATE plans SET provisioning_type = 'K1' WHERE id = $1`, [plan])).toBe('23514');
     }, 60_000);
-
-    it('does not block per-seat on a cost allocation: US-04-08 keeps it and reports that it no longer applies', async () => {
-      const planId = await h.plan('K2', 'FLAT_RATE');
-      const subscription = h.dataOf<{ id: string }>(
-        await request(h.server())
-          .post('/api/v1/subscriptions')
-          .set(as())
-          .send({
-            planId,
-            kind: 'TERM',
-            unitPrice: { amount: '1000000', currency: 'VND' },
-            billingCycle: 'MONTHLY',
-            startDate: '2026-01-05',
-            purchasedQuantity: 5,
-          })
-          .expect(201),
-      ).id;
-      const unit = await h.costCenter('UNIT');
-      await request(h.server())
-        .put(`/api/v1/subscriptions/${subscription}/cost-allocation`)
-        .set(as(h.finance))
-        .send({ lines: [{ costCenterId: unit.id, ratioPercent: '100' }] })
-        .expect(200);
-
-      await patchPlan(planId, { pricingModel: 'PER_SEAT' }).expect(200);
-
-      const view = await request(h.server())
-        .get(`/api/v1/subscriptions/${subscription}/cost-allocation`)
-        .set(as(h.finance))
-        .expect(200);
-      expect(h.dataOf<{ applicability: string; status: string }>(view)).toMatchObject({
-        applicability: 'PER_SEAT',
-        status: 'DECLARED',
-      });
-    }, 60_000);
-  });
-
-  describe('DB-10: a cost allocation is declared under the pricing model it was checked against', () => {
-    it('waits for a change of the pricing model in flight and then refuses a per-seat plan', async () => {
-      const planId = await h.plan('K2', 'FLAT_RATE');
-      const subscription = h.dataOf<{ id: string }>(
-        await request(h.server())
-          .post('/api/v1/subscriptions')
-          .set(as())
-          .send({
-            planId,
-            kind: 'TERM',
-            unitPrice: { amount: '1000000', currency: 'VND' },
-            billingCycle: 'MONTHLY',
-            startDate: '2026-01-05',
-            purchasedQuantity: 5,
-          })
-          .expect(201),
-      ).id;
-      const unit = await h.costCenter('UNIT');
-      await holder.query('BEGIN');
-      await holder.query(`UPDATE plans SET pricing_model = 'PER_SEAT' WHERE id = $1`, [planId]);
-
-      const declaring = request(h.server())
-        .put(`/api/v1/subscriptions/${subscription}/cost-allocation`)
-        .set(as(h.finance))
-        .send({ lines: [{ costCenterId: unit.id, ratioPercent: '100' }] })
-        .then((response) => response);
-      await waitForLockWaiters(sql(), 1, 5_000);
-      await holder.query('COMMIT');
-
-      const response = await declaring;
-      expect(response.status).toBe(409);
-      expect(h.codeOf(response)).toBe('SUBSCRIPTION.COST_ALLOCATION_NOT_APPLICABLE');
-      expect(
-        (await sql().query(`SELECT 1 FROM subscription_cost_allocations WHERE subscription_id = $1`, [subscription]))
-          .rowCount,
-      ).toBe(0);
-    }, 60_000);
   });
 
   describe('DB-14: the head of a version history moves up by one, to a version that exists', () => {
@@ -477,40 +403,6 @@ describe('write integrity of catalog, finance and licensing (integration, DB-03,
           )
         ).rows[0].current_version,
       ).toBe(1);
-    }, 60_000);
-
-    it('refuses the same for the head of a cost allocation', async () => {
-      const subscription = await h.subscription(null, 'K2');
-      const unit = await h.costCenter('UNIT');
-      await request(h.server())
-        .put(`/api/v1/subscriptions/${subscription}/cost-allocation`)
-        .set(as(h.finance))
-        .send({ lines: [{ costCenterId: unit.id, ratioPercent: '100' }] })
-        .expect(200);
-
-      expect(
-        await sqlState(
-          sql(),
-          `UPDATE subscription_cost_allocations SET current_version = 3 WHERE subscription_id = $1`,
-          [subscription],
-        ),
-      ).toBe('55000');
-      expect(
-        await sqlState(
-          sql(),
-          `UPDATE subscription_cost_allocations SET current_version = 0 WHERE subscription_id = $1`,
-          [subscription],
-        ),
-      ).toBe('55000');
-      await holder.query('BEGIN');
-      expect(
-        await sqlState(
-          holder,
-          `INSERT INTO subscription_cost_allocation_versions (id, subscription_id, version, declared_by_app_user_id)
-           VALUES ($1, $2, 3, $3)`,
-          [randomUUID(), subscription, randomUUID()],
-        ),
-      ).toBe('55000');
     }, 60_000);
   });
 

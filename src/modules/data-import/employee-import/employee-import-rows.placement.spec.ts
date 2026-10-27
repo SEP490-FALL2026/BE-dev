@@ -12,10 +12,6 @@ const lookup: EmployeeImportLookup = {
     ['P-OFF', { id: 'd-off', active: false, costCenterActive: true }],
     ['P-CCX', { id: 'd-ccx', active: true, costCenterActive: false }],
   ]),
-  jobTitles: new Map([
-    ['designer', { id: 'j-1', name: 'Designer', status: 'ACTIVE' as const }],
-    ['retired', { id: 'j-2', name: 'Retired', status: 'INACTIVE' as const }],
-  ]),
   existing: new Map([
     [
       'E-OLD',
@@ -61,13 +57,16 @@ describe('import adapter of the placement policy (BEH.1)', () => {
       { column: 'department_code', code: 'DEPARTMENT_COST_CENTER_INACTIVE' },
     ],
     ['a blank job title', { job_title: '' }, { column: 'job_title', code: 'JOB_TITLE_REQUIRED' }],
-    ['an unknown job title', { job_title: 'Nope' }, { column: 'job_title', code: 'JOB_TITLE_NOT_FOUND' }],
-    ['a retired job title', { job_title: 'Retired' }, { column: 'job_title', code: 'JOB_TITLE_INACTIVE' }],
+    [
+      'a job title longer than 255 characters',
+      { job_title: 'x'.repeat(256) },
+      { column: 'job_title', code: 'JOB_TITLE_TOO_LONG' },
+    ],
   ])('D-1: shows %s on its file column', (_name, cells, issue) => {
     expect(judge(cells)).toEqual({ outcome: 'ERROR', errors: [issue] });
   });
 
-  it('D-2: compares a person already there and does not place them, even on a retired department and title', () => {
+  it('D-2: compares a person already there and does not place them, even on a retired department', () => {
     expect(judge({ employee_code: 'E-OLD', department_code: 'P-OFF', job_title: 'Retired' })).toEqual({
       outcome: 'EXISTS_DIFFERENT',
       errors: [],
@@ -88,7 +87,7 @@ describe('import adapter of the placement policy (BEH.1)', () => {
         employment_type: 'BOSS',
         hire_date: '2026-02-30',
         department_code: 'P-NONE',
-        job_title: 'Retired',
+        job_title: '',
       }).errors,
     ).toEqual([
       { column: 'full_name', code: 'FULL_NAME_REQUIRED' },
@@ -96,7 +95,7 @@ describe('import adapter of the placement policy (BEH.1)', () => {
       { column: 'employment_type', code: 'EMPLOYMENT_TYPE_INVALID' },
       { column: 'hire_date', code: 'HIRE_DATE_INVALID' },
       { column: 'department_code', code: 'DEPARTMENT_NOT_FOUND' },
-      { column: 'job_title', code: 'JOB_TITLE_INACTIVE' },
+      { column: 'job_title', code: 'JOB_TITLE_REQUIRED' },
     ]);
   });
 
@@ -119,11 +118,11 @@ describe('import adapter of the placement policy (BEH.1)', () => {
     ]);
   });
 
-  it('places a usable row with the ids the lookup found', () => {
-    expect(judge({ job_title: ' designer ' })).toMatchObject({
+  it('places a usable row in the department the lookup found, with the title as typed', () => {
+    expect(judge({ job_title: ' senior  designer ' })).toMatchObject({
       outcome: 'VALID',
       errors: [],
-      parsed: { departmentId: 'd-ops', jobTitleId: 'j-1', jobTitleName: 'Designer' },
+      parsed: { departmentId: 'd-ops', jobTitleName: 'senior designer' },
     });
   });
 });

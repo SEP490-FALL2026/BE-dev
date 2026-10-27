@@ -27,6 +27,9 @@ import { InstallationModule } from './modules/installation/installation.module';
 import { InspectionModule } from './modules/installation/inspect/inspection.module';
 import { DevSeedModule } from './modules/installation/dev-seed/dev-seed.module';
 import { MigrationPreflightModule } from './modules/installation/migration-preflight/migration-preflight.module';
+import { SubscriptionOwnerAssignmentModule } from './modules/catalog/subscription-owner-assignment/subscription-owner-assignment.module';
+import { SubscriptionOwnerAssignmentCliModule } from './subscription-owner-assignment-cli.module';
+import { CostCenterDirectionCliModule } from './cost-center-direction-cli.module';
 import { IdentityAccessLocalSeedFacadeModule } from './modules/identity-access/identity-access-local-seed-facade.module';
 import { IdentityAccessInspectionFacadeModule } from './modules/identity-access/identity-access-inspection-facade.module';
 import { DATABASE_SESSION_OPTIONS } from './infrastructure/database/read-only-session.module';
@@ -80,6 +83,10 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   'InspectionModule: InstallationInspectionService',
   // P28-01 (Prompt 29): the entry service of `pnpm ops:preflight`.
   'MigrationPreflightModule: MigrationPreflightService',
+  // F02: the entry service of `pnpm ops:assign-subscription-owner`.
+  'SubscriptionOwnerAssignmentModule: SubscriptionOwnerAssignmentService',
+  // F01: the service `pnpm ops:cost-center-direction` runs and the organization facade asks (whether the link is activated).
+  'CostCenterDirectionModule: CostCenterDirectionService',
   'NotificationsModule: NotificationsService',
   // ROOT.1: the delivery contract the worker's mail loop (composition root, ADR-0012) calls; EmailDispatcher stays private.
   'NotificationsModule: EmailDeliveryService',
@@ -568,6 +575,9 @@ describe('operational command graphs (H6.1, docs/rules/operational-commands.md)'
           DevSeedModule,
           IdentityAccessLocalSeedFacadeModule,
           MigrationPreflightModule,
+          SubscriptionOwnerAssignmentModule,
+          SubscriptionOwnerAssignmentCliModule,
+          CostCenterDirectionCliModule,
         ]
           .filter((module) => modules.includes(module))
           .map((module) => module.name),
@@ -584,6 +594,8 @@ describe('operational command graphs (H6.1, docs/rules/operational-commands.md)'
       ['InspectionModule', InspectionModule, 1],
       ['DevSeedModule', DevSeedModule, 0],
       ['MigrationPreflightModule', MigrationPreflightModule, 1],
+      ['SubscriptionOwnerAssignmentCliModule', SubscriptionOwnerAssignmentCliModule, 0],
+      ['CostCenterDirectionCliModule', CostCenterDirectionCliModule, 0],
     ];
     for (const [name, root, expected] of graphs) {
       expect({ name, readOnly: declarationsOf(collectGraph(root), DATABASE_SESSION_OPTIONS).length }).toEqual({
@@ -607,6 +619,37 @@ describe('operational command graphs (H6.1, docs/rules/operational-commands.md)'
     expect(moduleNames(graph)).not.toContain('JwtModule');
     expect(moduleNames(graph)).not.toContain('ConfigurationModule');
     expect(moduleNames(graph)).toContain('InstallationConfigurationModule');
+    expect(declarationsOf(graph, MailTransport)).toHaveLength(0);
+  });
+
+  it('rule 1: the Cost Center link graph (F01) loads the database settings and the audit facade only: no controller, no mail, no queue', () => {
+    const graph = collectGraph(CostCenterDirectionCliModule);
+
+    expect(controllersOf(graph)).toEqual([]);
+    for (const forbidden of [NotificationsModule, IdentityAccessModule, RecoveryModule, QueueInfrastructureModule]) {
+      expect({ forbidden: forbidden.name, mounted: graph.map((node) => node.module).includes(forbidden) }).toEqual({
+        forbidden: forbidden.name,
+        mounted: false,
+      });
+    }
+    expect(moduleNames(graph)).toContain('InstallationConfigurationModule');
+    expect(moduleNames(graph)).not.toContain('ConfigurationModule');
+    expect(declarationsOf(graph, MailTransport)).toHaveLength(0);
+  });
+
+  it('rule 1: the owner-assignment graph (F02) loads the database settings, the organization and the audit facades only', () => {
+    const graph = collectGraph(SubscriptionOwnerAssignmentCliModule);
+
+    expect(controllersOf(graph)).toEqual([]);
+    for (const forbidden of [NotificationsModule, IdentityAccessModule, RecoveryModule, QueueInfrastructureModule]) {
+      expect({ forbidden: forbidden.name, mounted: graph.map((node) => node.module).includes(forbidden) }).toEqual({
+        forbidden: forbidden.name,
+        mounted: false,
+      });
+    }
+    expect(moduleNames(graph)).toContain('InstallationConfigurationModule');
+    expect(moduleNames(graph)).not.toContain('ConfigurationModule');
+    expect(moduleNames(graph)).not.toContain('CatalogModule');
     expect(declarationsOf(graph, MailTransport)).toHaveLength(0);
   });
 
@@ -636,6 +679,8 @@ describe('the local seed graph (H6.2)', () => {
       ['InspectionModule', InspectionModule, 0],
       ['DevSeedModule', DevSeedModule, 1],
       ['MigrationPreflightModule', MigrationPreflightModule, 0],
+      ['SubscriptionOwnerAssignmentCliModule', SubscriptionOwnerAssignmentCliModule, 0],
+      ['CostCenterDirectionCliModule', CostCenterDirectionCliModule, 0],
     ];
     for (const [name, root, expected] of graphs) {
       const modules = collectGraph(root).map((node) => node.module);

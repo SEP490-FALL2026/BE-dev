@@ -8,6 +8,7 @@ const ready: PreflightReport = {
   blockers: [],
   corrections: [{ assignmentId: 'a-1', recordedOn: '2026-10-12', fromDepartment: 'OPS', toDepartment: 'ENG' }],
   companyCostCentersRemoved: [{ code: 'CC-CORP', status: 'ACTIVE' }],
+  information: [],
 };
 
 describe('migration preflight arguments', () => {
@@ -57,6 +58,7 @@ describe('migration preflight report', () => {
       ],
       corrections: [],
       companyCostCentersRemoved: [],
+      information: [],
     });
 
     expect(text).toMatch(/^Preflight: BLOCKED \(UNIT_ONLY_FAILED\)/);

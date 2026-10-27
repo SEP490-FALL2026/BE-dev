@@ -11,6 +11,8 @@ export const createCostCenterBodySchema = z.strictObject({
   code: z.string().trim().min(1).max(COST_CENTER_CODE_MAX_LENGTH).regex(COST_CENTER_CODE_PATTERN),
   name: z.string().max(1000),
   kind: z.string().max(40),
+  /** The department the Cost Center is created for (`QĐ-87d(1)`): there is no Cost Center without one. */
+  departmentId: z.uuid(),
 });
 
 export const renameCostCenterBodySchema = z.strictObject({ name: z.string().max(1000) });
@@ -44,6 +46,8 @@ const costCenterSchema = z.strictObject({
   kind: z.enum(['UNIT']),
   status: z.enum(['ACTIVE', 'INACTIVE']),
   department: z.strictObject({ id: z.uuid(), code: z.string(), name: z.string() }).nullable(),
+  /** When Finance created it for the department; costs before that are not charged to it (`QĐ-87d(3)`). */
+  linkedAt: z.iso.datetime().nullable(),
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
   deactivatedAt: z.iso.datetime().nullable(),

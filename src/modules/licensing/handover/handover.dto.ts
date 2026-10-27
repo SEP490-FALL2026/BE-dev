@@ -1,7 +1,7 @@
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { z } from 'zod';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
-import { REVOCATION_SOURCES } from '../licensing.types';
+import { READABLE_REVOCATION_SOURCES } from '../licensing.types';
 
 const idParamSchema = z.strictObject({ id: z.uuid() });
 
@@ -35,7 +35,7 @@ export const handoverDutySummarySchema = z.strictObject({
   application: nameBrief,
   plan: nameBrief,
   employee: employeeBrief,
-  source: z.enum(REVOCATION_SOURCES),
+  source: z.enum(READABLE_REVOCATION_SOURCES),
   role: z.enum(['DEPARTMENT_HEAD', 'REQUESTER', 'IT_ADMIN']),
   status: z.enum(['OPEN', 'CONFIRMED', 'CANCELLED']),
   dataLoss: z.boolean(),

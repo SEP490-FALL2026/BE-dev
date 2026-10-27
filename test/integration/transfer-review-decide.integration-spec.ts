@@ -10,7 +10,6 @@ describe('deciding about the tools of a review after a transfer (integration, re
   let fin: Department;
   let h1: Person;
   let h2: Person;
-  let excel: string;
   let figma: string;
   let canva: string;
   let notes: string;
@@ -25,12 +24,10 @@ describe('deciding about the tools of a review after a transfer (integration, re
     h2 = await h.veteran(fin, 'H2-TRD');
     await h.makeHead(des, h1);
     await h.makeHead(fin, h2);
-    excel = await h.subscription(80, 'K2');
     figma = await h.subscription(80, 'K2');
     canva = await h.subscription(80, 'K2');
     notes = await h.subscription(80, 'K2');
     portal = await h.plan('K5');
-    await h.setToolset(fin, [await h.planOf(excel)]);
     await h.describePlan(figma, true, SAVE);
     await h.describePlan(canva, false, 'Tên miền riêng sẽ mất liên kết');
   }, 300000);
@@ -47,29 +44,29 @@ describe('deciding about the tools of a review after a transfer (integration, re
   const requests = () => h.count('access_requests');
 
   it('US-03-07 AC-3: "still needed" leaves the seat as it is, records who decided what and when, and completes the review when no tool waits', async () => {
-    const { seats, review } = await h.movedWith(des, fin, [{ subscriptionId: excel }, { subscriptionId: notes }]);
+    const { seats, review } = await h.movedWith(des, fin, [{ subscriptionId: notes }]);
     const reviewId = review?.id ?? '';
     const before = await requests();
 
     const answer = h.dataOf<{ review: ReviewWire; item: ReviewItemWire }>(
-      await say(reviewId, seats[1], 'STILL_NEEDED').expect(201),
+      await say(reviewId, seats[0], 'STILL_NEEDED').expect(201),
     );
 
     expect(answer.item).toMatchObject({
-      assignmentId: seats[1],
+      assignmentId: seats[0],
       decision: 'STILL_NEEDED',
       decidedBy: { id: h2.employeeId },
       revocationTaskId: null,
     });
     expect(answer.review).toMatchObject({ status: 'COMPLETED', pendingItems: 0, canDecide: false });
-    expect(await itemOf(reviewId, seats[1])).toMatchObject({
+    expect(await itemOf(reviewId, seats[0])).toMatchObject({
       decision: 'STILL_NEEDED',
       decided_by_employee_id: h2.employeeId,
     });
-    expect((await itemOf(reviewId, seats[1]))?.decided_at).not.toBeNull();
+    expect((await itemOf(reviewId, seats[0]))?.decided_at).not.toBeNull();
     expect((await rowOf(reviewId))?.completed_at).not.toBeNull();
-    expect(await h.liveTaskOf(seats[1])).toBeNull();
-    expect((await h.assignmentRow(seats[1])).valid_until).toBeNull();
+    expect(await h.liveTaskOf(seats[0])).toBeNull();
+    expect((await h.assignmentRow(seats[0])).valid_until).toBeNull();
     expect(await h.auditActions(reviewId)).toEqual([
       'TRANSFER_REVIEW.OPENED',
       'TRANSFER_REVIEW.DECIDED',

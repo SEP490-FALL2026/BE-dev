@@ -17,7 +17,8 @@ interface DepartmentWire {
   name: string;
   function: string | null;
   status: string;
-  costCenter: { id: string; code: string; name: string; status: string };
+  /** The Cost Center Finance created for the department; null while it has none (`QĐ-87d(1)`). */
+  costCenter: { id: string; code: string; name: string; status: string } | null;
   itAdmin: { employeeId: string; employeeCode: string; fullName: string; usable: boolean } | null;
   head: { employeeId: string; employeeCode: string; fullName: string; since: string } | null;
   memberCount: number;
@@ -79,6 +80,13 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
     });
     it1 = await createActivatedAccount(ctx, seed, { code: 'E-IT1', email: 'it1@acme.vn', roles: ['IT_ADMIN'], admin });
     it2 = await createActivatedAccount(ctx, seed, { code: 'E-IT2', email: 'it2@acme.vn', roles: ['IT_ADMIN'], admin });
+    // The operator has activated the Cost Center link: a department can be created (spec L.11; the 409 before it is in
+    // `cost-center-direction-http`).
+    await ctx.sql.query(
+      `INSERT INTO cost_center_direction_activations (id, organization_id, release_evidence, approver_ref, operator_ref, environment)
+       VALUES (gen_random_uuid(), $1, 'departments-http', 'test', 'test', 'LOCAL_TEST')`,
+      [seed.organizationId],
+    );
   }, 120000);
 
   afterAll(async () => {
@@ -94,29 +102,33 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
   const dataOf = (response: request.Response) => (response.body as { data: DepartmentWire }).data;
   const messageOf = (response: request.Response) => (response.body as { message: string }).message;
 
-  const createCostCenter = async (kind = 'UNIT'): Promise<{ id: string; code: string }> => {
+  /** What Finance sends to create the Cost Center of a department. */
+  const createCostCenterFor = async (departmentId: string, kind = 'UNIT'): Promise<{ id: string; code: string }> => {
     const code = unique('CCX');
     const response = await request(server())
       .post('/api/v1/cost-centers')
       .set(asFinance())
-      .send({ code, name: `Name of ${code}`, kind })
+      .send({ code, name: `Name of ${code}`, kind, departmentId })
       .expect(201);
 
     return { id: (response.body as { data: { id: string } }).data.id, code };
   };
 
-  const departmentBody = (costCenterId: string, overrides: Record<string, unknown> = {}) => ({
+  /** What the Super Admin sends to create a department: no Cost Center, and the HR basis it is created from. */
+  const departmentBody = (overrides: Record<string, unknown> = {}) => ({
     code: unique('P'),
     name: 'Design',
-    costCenterId,
+    hrBasis: HR_BASIS,
     ...overrides,
   });
-  const createDepartment = (body: object, headers: Record<string, string> = asIt()) =>
+  const createDepartment = (body: object, headers: Record<string, string> = asAdmin()) =>
     request(server()).post('/api/v1/departments').set(headers).send(body);
+  /** A department with the Cost Center Finance created for it, as the profile shows it. */
   const newDepartment = async (overrides: Record<string, unknown> = {}): Promise<DepartmentWire> => {
-    const costCenter = await createCostCenter();
+    const created = dataOf(await createDepartment(departmentBody(overrides)).expect(201));
+    await createCostCenterFor(created.id);
 
-    return dataOf(await createDepartment(departmentBody(costCenter.id, overrides)).expect(201));
+    return getDepartment(created.id);
   };
   const getDepartment = async (id: string, headers: Record<string, string> = asIt()): Promise<DepartmentWire> =>
     dataOf(await request(server()).get(`/api/v1/departments/${id}`).set(headers).expect(200));
@@ -131,7 +143,7 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
       employmentType: 'STAFF',
       hireDate: '2026-10-01',
       departmentCode,
-      jobTitleId: seed.jobTitleId,
+      jobTitle: 'Administrator',
       hrBasis: HR_BASIS,
       ...overrides,
     };
@@ -185,10 +197,9 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
   const rowCount = async (table: string): Promise<number> =>
     (await ctx.sql.query<{ n: number }>(`SELECT count(*)::int AS n FROM ${table}`)).rows[0].n;
 
-  describe('creating a department (US-03-06 AC-1 → AC-3)', () => {
-    it('creates one on a free UNIT cost center, with who is in charge, and records the values after (AC-1)', async () => {
-      const costCenter = await createCostCenter();
-      const body = departmentBody(costCenter.id, {
+  describe('creating a department (US-03-06 AC-1 → AC-3, QĐ-87d(1))', () => {
+    it('creates one with no Cost Center, with who is in charge, records the HR basis, and shows the Cost Center Finance then creates for it (AC-1)', async () => {
+      const body = departmentBody({
         name: '  Thiết kế ',
         function: 'thiết kế sản phẩm',
         itAdminEmployeeId: it1.employeeId,
@@ -202,7 +213,7 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
         name: 'Thiết kế',
         function: 'thiết kế sản phẩm',
         status: 'ACTIVE',
-        costCenter: { id: costCenter.id, code: costCenter.code, status: 'ACTIVE' },
+        costCenter: null,
         itAdmin: { employeeId: it1.employeeId, usable: true },
         head: null,
         memberCount: 0,
@@ -220,11 +231,19 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
             code: body.code,
             name: 'Thiết kế',
             function: 'thiết kế sản phẩm',
-            costCenter: costCenter.code,
             itAdminEmployeeId: it1.employeeId,
+            hrBasis: HR_BASIS,
           },
         },
       ]);
+
+      // Finance creates the Cost Center FOR the department: it is the department's current one from then on.
+      const costCenter = await createCostCenterFor(dataOf(response).id);
+      expect((await getDepartment(dataOf(response).id)).costCenter).toMatchObject({
+        id: costCenter.id,
+        code: costCenter.code,
+        status: 'ACTIVE',
+      });
       const centers = await request(server())
         .get(`/api/v1/cost-centers?search=${costCenter.code}`)
         .set(asFinance())
@@ -234,47 +253,42 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
       ).toMatchObject({ code: body.code });
     });
 
-    it('turns back the cost centers that cannot be used, each with its own reason, and creates nothing (AC-2)', async () => {
+    it("is the Super Admin's, takes the HR basis, and takes no Cost Center: anything else is turned back and nothing is created (QĐ-87b, QĐ-87d(1))", async () => {
       const before = await rowCount('departments');
-      const retired = await createCostCenter();
-      await request(server()).post(`/api/v1/cost-centers/${retired.id}/deactivate`).set(asFinance()).expect(200);
-      const inUse = (await ctx.sql.query<{ id: string }>(`SELECT id FROM cost_centers WHERE code = 'CC-1'`)).rows[0];
 
-      const cases: [string, string, number, string][] = [
-        ['one that does not exist', '3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11', 422, 'DEPARTMENT.COST_CENTER_NOT_FOUND'],
-        ['one that is retired', retired.id, 422, 'DEPARTMENT.COST_CENTER_INACTIVE'],
-        ['one that already has a department', inUse.id, 409, 'DEPARTMENT.COST_CENTER_TAKEN'],
-      ];
-      for (const [, costCenterId, status, code] of cases) {
-        const response = await createDepartment(departmentBody(costCenterId)).expect(status);
-        expect(errorOf(response).code).toBe(code);
-      }
+      // A body that names a Cost Center, or has no HR basis, is not a body of this operation.
+      const named = await createDepartment({
+        ...departmentBody(),
+        costCenterId: '3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11',
+      });
+      const withoutBasis = await createDepartment({ code: unique('P'), name: 'Design' });
+      expect([named.status, withoutBasis.status]).toEqual([422, 422]);
+      expect([errorOf(named).code, errorOf(withoutBasis).code]).toEqual(['VALIDATION_ERROR', 'VALIDATION_ERROR']);
+
+      // Only the Super Admin creates a department: not the IT Admin, not Finance.
+      expect((await createDepartment(departmentBody(), asIt())).status).toBe(403);
+      expect((await createDepartment(departmentBody(), asFinance())).status).toBe(403);
 
       expect(await rowCount('departments')).toBe(before);
     });
 
     it('keeps the code unique and refuses a name that is empty or too long', async () => {
       const first = await newDepartment();
-      const costCenter = await createCostCenter();
 
-      const taken = await createDepartment(departmentBody(costCenter.id, { code: first.code })).expect(409);
-      const blank = await createDepartment(departmentBody(costCenter.id, { name: '   ' })).expect(422);
-      const long = await createDepartment(departmentBody(costCenter.id, { name: 'N'.repeat(201) })).expect(422);
+      const taken = await createDepartment(departmentBody({ code: first.code })).expect(409);
+      const blank = await createDepartment(departmentBody({ name: '   ' })).expect(422);
+      const long = await createDepartment(departmentBody({ name: 'N'.repeat(201) })).expect(422);
 
       expect(errorOf(taken).code).toBe('DEPARTMENT.CODE_TAKEN');
       expect(errorOf(blank).code).toBe('DEPARTMENT.NAME_INVALID');
       expect(errorOf(long).code).toBe('DEPARTMENT.NAME_INVALID');
-      expect(
-        (await ctx.sql.query('SELECT 1 FROM departments WHERE cost_center_id = $1', [costCenter.id])).rows,
-      ).toEqual([]);
     });
 
     it('refuses an IT Admin in charge who is not an IT Admin who can sign in (US-01-11)', async () => {
       const noAccount = await enter('P-OPS');
-      const costCenter = await createCostCenter();
 
       for (const itAdminEmployeeId of [noAccount.employeeId, finance.employeeId, seed.superAdmin.employeeId]) {
-        const response = await createDepartment(departmentBody(costCenter.id, { itAdminEmployeeId })).expect(422);
+        const response = await createDepartment(departmentBody({ itAdminEmployeeId })).expect(422);
         expect(errorOf(response).code).toBe('DEPARTMENT.IT_ADMIN_INVALID');
       }
       const left = await insertEmployeeFixture(ctx.app, seed, {
@@ -283,9 +297,7 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
         terminated: true,
       });
       await closePlacements(left.employeeId);
-      const response = await createDepartment(
-        departmentBody(costCenter.id, { itAdminEmployeeId: left.employeeId }),
-      ).expect(422);
+      const response = await createDepartment(departmentBody({ itAdminEmployeeId: left.employeeId })).expect(422);
       expect(errorOf(response).code).toBe('DEPARTMENT.IT_ADMIN_INVALID');
     });
 
@@ -313,7 +325,7 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
         name: 'Sáng tạo',
         function: 'new duty',
         itAdmin: { employeeId: it2.employeeId },
-        costCenter: { id: department.costCenter.id },
+        costCenter: { id: department.costCenter?.id },
         memberCount: 1,
       });
       expect(
@@ -392,8 +404,11 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
           .set(headers)
           .send({ name: 'Hacked' })
           .expect(403);
-        await createDepartment(departmentBody((await createCostCenter()).id), headers).expect(403);
         await assignHead(department.id, employee.employeeId, today(), headers).expect(403);
+      }
+      // Creating a department is the Super Admin's (QĐ-87b): everyone else is refused, the IT Admin included.
+      for (const headers of [asFinance(), as(employee), as(head), asIt()]) {
+        await createDepartment(departmentBody(), headers).expect(403);
       }
 
       expect((await getDepartment(department.id)).name).toBe('Design');
@@ -515,7 +530,7 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
           employmentType: 'STAFF',
           hireDate: '2026-10-01',
           departmentCode: department.code,
-          jobTitleId: seed.jobTitleId,
+          jobTitle: 'Administrator',
         })
         .expect(422);
       expect((errorOf(entry).details as { reasons: unknown }).reasons).toEqual([
@@ -1174,8 +1189,7 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
       request(server()).post(`/api/v1/departments/${departmentId}/head-vacancies`).set(asIt()).send({ effectiveFrom });
 
     it('answers a new department with the exact profile wire', async () => {
-      const costCenter = await createCostCenter();
-      const body = departmentBody(costCenter.id, {
+      const body = departmentBody({
         function: '  line one\nline two  ',
         itAdminEmployeeId: it2.employeeId,
       });
@@ -1191,7 +1205,7 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
         name: 'Design',
         function: 'line one\nline two',
         status: 'ACTIVE',
-        costCenter: { id: costCenter.id, code: costCenter.code, name: `Name of ${costCenter.code}`, status: 'ACTIVE' },
+        costCenter: null,
         itAdmin: {
           employeeId: it2.employeeId,
           employeeCode: 'E-IT2',

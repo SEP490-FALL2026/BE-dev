@@ -60,11 +60,15 @@ enum AccessRequestState {
   WITHDRAWN
   // The IT Admin closed it because the person it was for left: it ends, neither refused, failed nor withdrawn (US-03-04 AC-25).
   CANCELLED
+  // Written by the release after this one: a paid request being drafted. Never shown, never written by this release (spec L.1, L.10).
+  DRAFT
 }
 
 // Why the IT Admin cancelled a request. One cause today.
 enum AccessRequestCancelCause {
   BENEFICIARY_LEFT
+  // The IT Admin closed what was left of it because the beneficiary was transferred (spec L.10). Read only here.
+  BENEFICIARY_TRANSFERRED
 }
 
 // Whether the request has an amount: internal software has none; paid software is priced from its plan in the catalog, or
@@ -146,9 +150,9 @@ model AccessRequest {
   termMonths            Int                        @map("term_months")
   // Context only: it changes neither the Cost Center nor the chain (US-05-02 AC-7).
   projectLabel          String?                    @map("project_label")
-  outsideStandardReason String?                    @map("outside_standard_reason")
+  outsideStandardReason String?                    @map("outside_standard_reason") @ignore
   // Whether the plan was outside the standard toolset of the sender on the day it was sent (US-05-04 AC-7).
-  outsideStandard       Boolean                    @default(false) @map("outside_standard")
+  outsideStandard       Boolean                    @default(false) @map("outside_standard") @ignore
   pricingStatus         AccessRequestPricingStatus @default(NOT_APPLICABLE) @map("pricing_status")
   // Why the price is missing (NO_PRICED_SUBSCRIPTION, CYCLE_UNKNOWN, AMOUNT_TOO_LARGE); null when it is not.
   priceMissingReason    String?                    @map("price_missing_reason")
@@ -525,6 +529,8 @@ enum BudgetCheckTrigger {
   BUDGET_VERSION_APPROVED
   // The check made again when the spending approver decides, which is the snapshot the decision keeps (US-06-01 AC-2, AC-18).
   SPEND_DECISION
+  // Finance gave an outcome while the request waited (spec L.10). Read only here.
+  FINANCE_OUTCOME_WHILE_WAITING
 }
 
 // Where a check sends the request: nowhere (a problem with the data that only the head or the IT Admin can mend), to

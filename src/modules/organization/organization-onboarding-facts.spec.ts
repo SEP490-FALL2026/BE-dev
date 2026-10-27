@@ -2,7 +2,6 @@ import { DbTx } from '../../infrastructure/database/transaction-runner';
 import { CostCenterCatalogueService } from './cost-center/cost-center-catalogue.service';
 import { DepartmentDirectoryService } from './department/department-directory.service';
 import { EmployeeDirectoryService } from './employee/employee-directory.service';
-import { JobTitleCatalogueService } from './job-title/job-title-catalogue.service';
 import { OrganizationRepo } from './organization.repo';
 import { DepartmentServiceAccountRegistry } from './department/service-account-registry';
 import { AnnouncementRepo } from './change-announcement/announcement.repo';
@@ -29,14 +28,19 @@ describe('OrganizationService.getOnboardingFacts', () => {
       activeWithoutHead: jest.fn(recorded('activeWithoutHead', [{ id: 'd-1', code: 'P', name: 'P' }])),
       activeWithItAdmin: jest.fn(recorded('activeWithItAdmin', [])),
     };
+    // The Cost Center side of the facts: the departments with none yet, and whether the link is activated.
+    const costCenters = {
+      departmentsWithoutCostCenter: jest.fn(
+        recorded('departmentsWithoutCostCenter', [{ id: 'd-1', code: 'P', name: 'P' }]),
+      ),
+      isDirectionActivated: jest.fn(recorded('isDirectionActivated', true)),
+    };
     const employees = { countActive: jest.fn(recorded('employeesCountActive', 2)) };
-    const costCenters = { countFreeUnits: jest.fn(recorded('countFreeUnits', 0)) };
     const service = new OrganizationService(
       repo as unknown as OrganizationRepo,
       departments as unknown as DepartmentDirectoryService,
       employees as unknown as EmployeeDirectoryService,
       costCenters as unknown as CostCenterCatalogueService,
-      {} as JobTitleCatalogueService,
       new DepartmentServiceAccountRegistry(),
       new OrganizationChangeService(new OrganizationChangeRegistry(), {} as AnnouncementRepo, {} as TransactionRunner),
     );
@@ -49,15 +53,18 @@ describe('OrganizationService.getOnboardingFacts', () => {
     await expect(service.getOnboardingFacts(TX)).resolves.toMatchObject({
       activeDepartments: 1,
       activeEmployees: 2,
+      costCenterDirectionActivated: true,
+      departmentsWithoutCostCenter: [{ code: 'P', name: 'P' }],
       departmentsWithoutHead: [{ code: 'P', name: 'P' }],
     });
     expect(calls.map(({ read }) => read)).toEqual([
       'findOrganization',
       'countActive',
       'employeesCountActive',
-      'countFreeUnits',
+      'departmentsWithoutCostCenter',
       'activeWithoutHead',
       'activeWithItAdmin',
+      'isDirectionActivated',
     ]);
     expect(calls.filter(({ client }) => client !== TX)).toEqual([]);
   });

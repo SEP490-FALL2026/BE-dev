@@ -1,6 +1,7 @@
 import { HttpStatus } from '@nestjs/common';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
+import { FinanceSetupIncompleteError } from '../../organization/organization.errors';
 import {
   AccessRequestApplicationRetiredError,
   AccessRequestCancellationRefusedError,
@@ -8,7 +9,6 @@ import {
   AccessRequestNoDepartmentError,
   AccessRequestNotFoundError,
   AccessRequestNotPriceableError,
-  AccessRequestOutsideStandardReasonRequiredError,
   AccessRequestPlanLineRefusedError,
   AccessRequestPlanNotFoundError,
   AccessRequestSpendDateNotAllowedError,
@@ -108,8 +108,8 @@ export const GROUP_REQUEST_ERROR_EXAMPLES = {
   PLAN_NOT_FOUND: example(new AccessRequestPlanNotFoundError()),
   APPLICATION_RETIRED: example(new AccessRequestApplicationRetiredError()),
   NO_DEPARTMENT: example(new AccessRequestNoDepartmentError()),
+  FINANCE_SETUP_INCOMPLETE: example(new FinanceSetupIncompleteError('<department-id>')),
   NO_SPEND_FOR_FREE_SOFTWARE: example(new AccessRequestSpendDateNotAllowedError()),
-  OUTSIDE_STANDARD_REASON_REQUIRED: example(new AccessRequestOutsideStandardReasonRequiredError()),
   PLAN_NOT_ELIGIBLE: example(new GroupRequestPlanNotEligibleError('KIND_NOT_MULTI_SEAT')),
   TOO_MANY_LINES: example(new GroupRequestTooManyLinesError(GROUP_EMPLOYEE_MAX)),
   DUPLICATE_LINE: example(new GroupRequestDuplicateLineError([PERSON])),

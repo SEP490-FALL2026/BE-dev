@@ -44,8 +44,6 @@ export interface AccessRequestWire {
   businessReason: string;
   termMonths: number;
   projectLabel: string | null;
-  outsideStandardReason: string | null;
-  outsideStandard: boolean;
   expectedSpendOn: string | null;
   budgetYear: number | null;
   pricing: {
@@ -100,29 +98,30 @@ export interface Department {
  * approval roles, and the calls of the request routes. No assertion lives here: the specs make them.
  */
 export class RequestHarness extends ProvisioningHarness {
-  private titleId: string | null = null;
+  private titleName: string | null = null;
 
   /** Starts the application with the real gate of the module of requests: the fake gate of the provisioning harness is not used. */
   override start(options: Parameters<SeatHarness['start']>[0] = {}): Promise<void> {
     return SeatHarness.prototype.start.call(this, options);
   }
 
-  /** One job title for everybody a spec makes. */
+  /** One job title (free text) for everybody a spec makes. */
   async title(): Promise<string> {
-    this.titleId ??= await this.jobTitle(this.unique('Title'));
+    this.titleName ??= await this.jobTitle(this.unique('Title'));
 
-    return this.titleId;
+    return this.titleName;
   }
 
   /** A department with its own Unit Cost Center. */
   async departmentWithUnit(code: string): Promise<Department> {
     const created = await this.department(code);
-    const { rows } = await this.ctx.sql.query<{ cost_center_id: string }>(
-      `SELECT cost_center_id FROM departments WHERE id = $1`,
+    // The Cost Center Finance created for the department, read through its own link (`QĐ-87d(1)`).
+    const { rows } = await this.ctx.sql.query<{ id: string }>(
+      `SELECT id FROM cost_centers WHERE department_id = $1 AND status = 'ACTIVE'`,
       [created.id],
     );
 
-    return { id: created.id, code: created.code, unitId: rows[0].cost_center_id };
+    return { id: created.id, code: created.code, unitId: rows[0].id };
   }
 
   /** A person of the department with an activated account holding `roles`; a head or an approver is made one by the calls below. */
@@ -291,16 +290,11 @@ export class RequestHarness extends ProvisioningHarness {
       .set(this.as(this.finance))
       .send({ group: 'T2', lines });
 
-  /**
-   * A form of `BM-01` for the plan, complete. It always carries a reason for a tool outside the standard toolset, which
-   * the request needs whenever the sender has no toolset with the plan in it (a test that is about that reason passes
-   * `outsideStandardReason: undefined`).
-   */
+  /** A form of `BM-01` for the plan, complete. */
   form = (planId: string, extra: Record<string, unknown> = {}) => ({
     planId,
     businessReason: 'Design the new brand',
     termMonths: 6,
-    outsideStandardReason: 'Not in the standard toolset',
     ...extra,
   });
 
@@ -352,15 +346,6 @@ export class RequestHarness extends ProvisioningHarness {
         .send({ functionalGroupId: rows[0].functional_group_id })
         .expect(200);
     }
-  }
-
-  /** The standard toolset of the department for the one job title everybody has. */
-  async setToolset(department: Department, planIds: string[]): Promise<void> {
-    await request(this.server())
-      .put(`/api/v1/standard-toolsets/${department.id}/${await this.title()}`)
-      .set(this.as(this.it1))
-      .send({ planIds, reason: 'Standard tools of the department' })
-      .expect(200);
   }
 
   /** The person (by employee code) holds a seat of the internal plan, as a baseline records it. */

@@ -89,7 +89,6 @@ describe('requests over HTTP: the preview before sending (integration, real Post
           'projectLabel',
           'department',
           'costCenter',
-          'outsideStandard',
           'requirements',
           'existingAccess',
           'canSubmit',
@@ -195,47 +194,36 @@ describe('requests over HTTP: the preview before sending (integration, real Post
     });
   });
 
-  describe('the standard toolset (AC-6, AC-1)', () => {
-    let slack: string;
-    beforeAll(async () => {
-      slack = await h.planOf(await h.subscription(10));
-      await h.setToolset(design, [slack]);
-    });
-    afterAll(async () => {
-      await h.setToolset(design, []);
-    });
-
-    it('is shown first, and a tool outside it is flagged and needs its reason', async () => {
-      const mine = await request(h.server())
-        .get('/api/v1/standard-toolsets/mine')
-        .set(h.as(designer.account))
-        .expect(200);
-      const inside = await h.previewed(designer, slack);
-      const outside = await h.previewed(designer, paidPlan);
-
-      expect(JSON.stringify(h.dataOf(mine))).toContain(slack);
-      expect(inside).toMatchObject({ outsideStandard: false, requirements: { outsideStandardReason: false } });
-      expect(outside).toMatchObject({ outsideStandard: true, requirements: { outsideStandardReason: true } });
-    });
-
-    it('cannot be sent without the reason, and is then flagged for the head', async () => {
+  describe('no standard toolset any more (QĐ-87h): the reason of the request is the one reason, and it is always required', () => {
+    it('shows no flag about a toolset, asks only for the term to be confirmed, and refuses the old field as a malformed body', async () => {
+      const preview = await h.previewed(designer, paidPlan);
       const rows = await h.requestRows();
-      const refused = await h
-        .submit(h.form(paidPlan, { outsideStandardReason: undefined }), designer.account)
-        .expect(422);
-      const blank = await h.submit(h.form(paidPlan, { outsideStandardReason: '  ' }), designer.account).expect(422);
-      const sent = await h.sent(designer, paidPlan, { outsideStandardReason: 'The wiki is needed' });
 
-      expect(h.codeOf(refused)).toBe('ACCESS_REQUEST.OUTSIDE_STANDARD_REASON_REQUIRED');
-      expect(h.codeOf(blank)).toBe('VALIDATION_ERROR');
+      const old = await h.submit(h.form(paidPlan, { outsideStandardReason: 'The wiki is needed' }), designer.account);
+      const bare = await h.submit(h.form(paidPlan, { businessReason: undefined }), designer.account);
+      const sent = await h.sent(designer, paidPlan);
+
+      expect(Object.keys(preview)).not.toContain('outsideStandard');
+      expect(preview.requirements).toEqual({ termConfirmationByHead: false });
+      expect([old.status, h.codeOf(old)]).toEqual([422, 'VALIDATION_ERROR']);
+      expect([bare.status, h.codeOf(bare)]).toEqual([422, 'VALIDATION_ERROR']);
       expect(await h.requestRows()).toBe(rows + 1);
-      expect(sent).toMatchObject({ outsideStandard: true, outsideStandardReason: 'The wiki is needed' });
+      expect(Object.keys(sent)).not.toContain('outsideStandard');
+      expect(Object.keys(sent)).not.toContain('outsideStandardReason');
     });
 
-    it('is sent without a reason when it is in the toolset', async () => {
-      const sent = await h.sent(designer, slack, { outsideStandardReason: undefined });
+    it('answers 404 to every route of the standard toolset, as to a route that does not exist', async () => {
+      const department = design.id;
+      const title = '3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11';
+      const answers = await Promise.all([
+        request(h.server()).get('/api/v1/standard-toolsets').set(h.as(designer.account)),
+        request(h.server()).get('/api/v1/standard-toolsets/mine').set(h.as(designer.account)),
+        request(h.server()).get(`/api/v1/standard-toolsets/${department}/${title}`).set(h.as(designer.account)),
+        request(h.server()).put(`/api/v1/standard-toolsets/${department}/${title}`).set(h.as(h.it1)).send({}),
+        request(h.server()).get(`/api/v1/standard-toolsets/${department}/${title}/history`).set(h.as(designer.account)),
+      ]);
 
-      expect(sent).toMatchObject({ outsideStandard: false, outsideStandardReason: null });
+      expect(answers.map((answer) => answer.status)).toEqual([404, 404, 404, 404, 404]);
     });
   });
 
@@ -388,7 +376,6 @@ describe('requests over HTTP: the preview before sending (integration, real Post
         pricing: preview.pricing,
         expectedSpendOn: preview.expectedSpendOn,
         budgetYear: preview.budgetYear,
-        outsideStandard: preview.outsideStandard,
         costCenter: { id: preview.costCenter.id, code: preview.costCenter.code },
         policy: {
           hasSpendStep: kinds(preview).includes('SPEND_APPROVAL'),

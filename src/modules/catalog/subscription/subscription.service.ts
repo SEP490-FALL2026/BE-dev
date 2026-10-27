@@ -1,18 +1,16 @@
 import { Injectable } from '@nestjs/common';
 import { Page, pageOf } from '../../../core/application/pagination';
 import type { BusinessDate } from '../../../core/business-date';
-import type { Money } from '../../../core/money/money';
-import { MoneyOutOfRangeError } from '../../../core/money/money.errors';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditService } from '../../audit/audit.service';
-import { FinanceService } from '../../finance/finance.service';
 import { OrganizationService } from '../../organization/organization.service';
 import type { EmptyState } from '../catalog.types';
 import { catalogAuditEvent } from '../mappers/catalog-audit-event';
 import { PlanLookupService, type LockedPlan } from '../plan/plan-lookup.service';
 import {
   SubscriptionNotFoundError,
+  SubscriptionOwnerDepartmentInactiveError,
   SubscriptionPlanNotFoundError,
   SubscriptionStillDraftError,
   SubscriptionUpdateEmptyError,
@@ -21,21 +19,22 @@ import { assertQuantityNotBelowOccupied } from './seat-guard.policy';
 import { SeatOccupancyRegistry } from './seat-occupancy.registry';
 import { assertSubscriptionShape, deriveNotice, missingData, noticeInputOf } from './subscription.policy';
 import { SubscriptionRepo } from './subscription.repo';
-import { sameState, snapshotOf, stateOf, toSnapshot } from './subscription.state';
+import { sameState, snapshotOf, stateOf } from './subscription.state';
+import { SubscriptionPricingService } from './subscription-pricing.service';
 import { SubscriptionViewService } from './subscription-view.service';
 import type {
   BillingCycle,
-  PriceSnapshotRecord,
   SubscriptionKind,
   SubscriptionListFilter,
   SubscriptionState,
   SubscriptionStatus,
   SubscriptionView,
-  UnitPriceRecord,
 } from './subscription.types';
 
 export interface DeclareSubscriptionInput {
   planId: string;
+  /** The department that owns the purchase; required, active, and never changed afterwards (F02). */
+  ownerDepartmentId: string;
   kind: SubscriptionKind;
   purchasedQuantity?: number;
   unitPrice?: { amount: string; currency: string };
@@ -74,7 +73,7 @@ export class SubscriptionService {
   constructor(
     private readonly subscriptions: SubscriptionRepo,
     private readonly plans: PlanLookupService,
-    private readonly finance: FinanceService,
+    private readonly pricing: SubscriptionPricingService,
     private readonly views: SubscriptionViewService,
     private readonly organization: OrganizationService,
     private readonly occupancy: SeatOccupancyRegistry,
@@ -125,12 +124,15 @@ export class SubscriptionService {
    * `assertSubscriptionShape`, and the money errors of the finance facade for the unit price.
    */
   async declare(actor: AuthenticatedPrincipal, input: DeclareSubscriptionInput): Promise<SubscriptionView> {
-    const money = input.unitPrice ? await this.readPrice(input.unitPrice) : null;
+    const money = input.unitPrice ? await this.pricing.read(input.unitPrice) : null;
     const organizationId = await this.requireOrganizationId();
 
     const record = await this.runner.run(async (tx) => {
       const plan = await this.plans.lockShared(tx, input.planId);
       if (!plan) throw new SubscriptionPlanNotFoundError();
+      // Held FOR SHARE until commit, so the department cannot be stopped between this check and the row (QĐ-89a).
+      const owner = await this.organization.lockDepartmentShared(tx, input.ownerDepartmentId);
+      if (!owner?.active) throw new SubscriptionOwnerDepartmentInactiveError();
       const state = {
         purchasedQuantity: input.purchasedQuantity ?? null,
         billingCycle: input.billingCycle ?? null,
@@ -144,11 +146,12 @@ export class SubscriptionService {
       };
       this.assertShape(plan, input.kind, state);
 
-      const priced = money ? await this.priceOf(tx, money) : { unitPrice: null, priceSnapshot: null };
+      const priced = await this.pricing.priceToday(tx, money);
       const complete = this.statusOf(plan, input.kind, { ...state, ...priced });
       const created = await this.subscriptions.insert(tx, {
         organizationId,
         planId: plan.id,
+        ownerDepartmentId: owner.id,
         kind: input.kind,
         ...state,
         ...priced,
@@ -181,7 +184,7 @@ export class SubscriptionService {
    */
   async update(actor: AuthenticatedPrincipal, id: string, input: UpdateSubscriptionInput): Promise<SubscriptionView> {
     if (Object.values(input).every((value) => value === undefined)) throw new SubscriptionUpdateEmptyError();
-    const money = input.unitPrice ? await this.readPrice(input.unitPrice) : null;
+    const money = input.unitPrice ? await this.pricing.read(input.unitPrice) : null;
     const organizationId = await this.requireOrganizationId();
 
     const record = await this.runner.run(async (tx) => {
@@ -211,7 +214,7 @@ export class SubscriptionService {
           current.unitPrice.currency === money.currency);
       const priced = samePrice
         ? { unitPrice: current.unitPrice, priceSnapshot: current.priceSnapshot }
-        : await this.priceOf(tx, money);
+        : await this.pricing.priceToday(tx, money);
       if (!samePrice && current.status === 'ACTIVE' && priced.priceSnapshot === null) {
         throw new SubscriptionStillDraftError(['EXCHANGE_RATE']);
       }
@@ -274,15 +277,10 @@ export class SubscriptionService {
       const plan = await this.plans.lockShared(tx, current.planId);
       if (!plan) throw new SubscriptionPlanNotFoundError();
 
-      let priceSnapshot = current.priceSnapshot;
-      if (current.unitPrice && !priceSnapshot) {
-        const result = await this.finance.snapshotMoney(
-          tx,
-          { amountMinor: current.unitPrice.amountMinor, currency: current.unitPrice.currency },
-          current.unitPrice.recordedOn,
-        );
-        priceSnapshot = result.status === 'CONVERTED' ? toSnapshot(result.snapshot) : null;
-      }
+      const priceSnapshot =
+        current.unitPrice && !current.priceSnapshot
+          ? await this.pricing.snapshotOfRecorded(tx, current.unitPrice)
+          : current.priceSnapshot;
       const state = { ...stateOf(current), priceSnapshot };
       const missing = this.missingOf(plan, current.kind, state);
       if (missing.length > 0) throw new SubscriptionStillDraftError(missing);
@@ -363,32 +361,6 @@ export class SubscriptionService {
     state: Omit<SubscriptionState, 'status'>,
   ): SubscriptionStatus {
     return this.missingOf(plan, kind, { ...state, status: 'DRAFT' }).length === 0 ? 'ACTIVE' : 'DRAFT';
-  }
-
-  /** Reads the unit price in the minor units of its currency; a negative price is out of range. */
-  private async readPrice(unitPrice: { amount: string; currency: string }): Promise<Money> {
-    const money = await this.finance.parseMoney(unitPrice);
-    if (money.amountMinor < 0n) throw new MoneyOutOfRangeError();
-
-    return money;
-  }
-
-  /**
-   * The unit price recorded today and converted at the rate of today, frozen. No rate for today leaves the price with no
-   * snapshot (a draft), never a converted value from another day (`QĐ-42b`).
-   */
-  private async priceOf(
-    tx: DbTx,
-    money: Money | null,
-  ): Promise<{ unitPrice: UnitPriceRecord | null; priceSnapshot: PriceSnapshotRecord | null }> {
-    if (money === null) return { unitPrice: null, priceSnapshot: null };
-    const recordedOn = await this.organization.businessToday(undefined, tx);
-    const result = await this.finance.snapshotMoney(tx, money, recordedOn);
-
-    return {
-      unitPrice: { amountMinor: money.amountMinor, currency: money.currency, recordedOn },
-      priceSnapshot: result.status === 'CONVERTED' ? toSnapshot(result.snapshot) : null,
-    };
   }
 
   private async requireOrganizationId(): Promise<string> {

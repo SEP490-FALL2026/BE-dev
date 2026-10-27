@@ -77,14 +77,6 @@ export class AccessRequestAlreadyHoldsAccessError extends Error {
   }
 }
 
-/** A tool outside the standard toolset of the sender is asked for without the reason that must go with it (`US-05-01` AC-6, `FR-3.18`). */
-export class AccessRequestOutsideStandardReasonRequiredError extends Error {
-  constructor() {
-    super('A tool outside the standard toolset needs the reason it is asked for.');
-    this.name = 'AccessRequestOutsideStandardReasonRequiredError';
-  }
-}
-
 /** The line a request is attached to cannot be kept (`US-05-04` AC-12, AC-13, `US-06-14` AC-5). */
 export class AccessRequestPlanLineRefusedError extends Error {
   constructor(

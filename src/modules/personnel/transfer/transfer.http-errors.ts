@@ -31,12 +31,12 @@ const STATUS: Readonly<Record<string, HttpStatus>> = {
 
 /**
  * The refusals of the shared placement policy keep the code it gives: the department and its Cost Center that cannot take people
- * answer 409 (the state of the destination), a department or a title that is unknown or retired answers 422 (the choice).
+ * answer 409 (the state of the destination), a department that is unknown answers 422 (the choice).
  */
 function statusOf(code: string): HttpStatus | undefined {
   const known = STATUS[code];
   if (known) return known;
-  if (code.startsWith('JOB_TITLE_') || code.endsWith('_NOT_FOUND')) return HttpStatus.UNPROCESSABLE_ENTITY;
+  if (code.endsWith('_NOT_FOUND')) return HttpStatus.UNPROCESSABLE_ENTITY;
   if (code.startsWith('DEPARTMENT_')) return HttpStatus.CONFLICT;
 
   return undefined;
@@ -48,7 +48,7 @@ const MESSAGES: Readonly<Record<string, string>> = {
   EMPLOYEE_LEFT: 'The employee has left the organization.',
   EFFECTIVE_DATE_IN_PAST: 'The day a change takes effect is today or later.',
   EFFECTIVE_DATE_NOT_AFTER_CURRENT_PERIOD: 'The day must come after the first day of the placement the person has now.',
-  NO_CHANGE: 'The change leaves the department, the job title and the day as they are.',
+  NO_CHANGE: 'The change leaves the department as it is.',
   GROUNDS_REQUIRED: 'The basis of the change is required.',
   GROUNDS_INCOMPLETE: 'The basis lacks a part: its type, number, issuer or day of issue.',
   GROUNDS_IS_NOTICE: 'The code of a notice is not the document the change rests on.',
@@ -85,15 +85,14 @@ export function toTransferApiException(error: unknown): unknown {
 const example = (error: Error) => errorExampleOf(toTransferApiException(error));
 
 /** The answers above as OpenAPI examples, each produced by the mapper that gives it at runtime (OPENAPI-EXAMPLE.1). */
-/** A transfer to another department and job title that nothing refuses; each example below changes one fact of it. */
+/** A transfer to another department that nothing refuses; each example below changes one fact of it. */
 const ACCEPTED_TRANSFER: NewTransferFacts = {
   today: '2026-01-01',
   effectiveOn: '2026-01-02',
   employee: { status: 'ACTIVE', workState: 'WORKING' },
-  current: { departmentId: '<department-id>', jobTitleId: '<job-title-id>', validFrom: '2025-01-01' },
-  target: { departmentId: '<other-department-id>', jobTitleId: '<other-job-title-id>' },
+  current: { departmentId: '<department-id>', validFrom: '2025-01-01' },
+  target: { departmentId: '<other-department-id>' },
   destinationDepartment: { active: true, costCenterActive: true },
-  destinationJobTitle: { active: true },
   grounds: undefined,
   pending: null,
   namedAsSuccessor: false,
@@ -105,14 +104,12 @@ const ACCEPTED_TRANSFER: NewTransferFacts = {
  * A refusal of the destination as the policy of a new transfer gives it: its code and subject come from the shared placement
  * policy through `newTransferRefusal` (BEH.1), never written here.
  */
-const destinationExample = (destination: Pick<NewTransferFacts, 'destinationDepartment' | 'destinationJobTitle'>) => {
+const destinationExample = (destination: Pick<NewTransferFacts, 'destinationDepartment'>) => {
   const refusal = newTransferRefusal({ ...ACCEPTED_TRANSFER, ...destination });
   if (!refusal) throw new Error('The facts of a refusal example must be refused');
 
   return example(new TransferRefusedError(refusal.code, refusal.details));
 };
-const ACTIVE_DEPARTMENT = { active: true, costCenterActive: true } as const;
-const ACTIVE_TITLE = { active: true } as const;
 
 export const TRANSFER_ERROR_EXAMPLES = {
   NOT_FOUND: example(new TransferRefusedError('NOT_FOUND')),
@@ -120,13 +117,9 @@ export const TRANSFER_ERROR_EXAMPLES = {
   EMPLOYEE_LEFT: example(new TransferRefusedError('EMPLOYEE_LEFT')),
   PLACEMENT_OVERLAP: example(new TransferRefusedError('PLACEMENT_OVERLAP')),
   CONCURRENT_CHANGE: example(new TransferRefusedError('CONCURRENT_CHANGE')),
-  DEPARTMENT_INACTIVE: destinationExample({
-    destinationDepartment: { active: false, costCenterActive: true },
-    destinationJobTitle: ACTIVE_TITLE,
-  }),
+  DEPARTMENT_INACTIVE: destinationExample({ destinationDepartment: { active: false, costCenterActive: true } }),
   DEPARTMENT_COST_CENTER_INACTIVE: destinationExample({
     destinationDepartment: { active: true, costCenterActive: false },
-    destinationJobTitle: ACTIVE_TITLE,
   }),
   PENDING_EVENT_EXISTS: example(
     new TransferRefusedError('PENDING_EVENT_EXISTS', { kind: 'TRANSFER', effectiveOn: '2026-01-01' }),
@@ -137,12 +130,7 @@ export const TRANSFER_ERROR_EXAMPLES = {
   EFFECTIVE_DATE_NOT_AFTER_CURRENT_PERIOD: example(
     new TransferRefusedError('EFFECTIVE_DATE_NOT_AFTER_CURRENT_PERIOD', { currentPeriodFrom: '2026-01-01' }),
   ),
-  DEPARTMENT_NOT_FOUND: destinationExample({ destinationDepartment: null, destinationJobTitle: ACTIVE_TITLE }),
-  JOB_TITLE_NOT_FOUND: destinationExample({ destinationDepartment: ACTIVE_DEPARTMENT, destinationJobTitle: null }),
-  JOB_TITLE_INACTIVE: destinationExample({
-    destinationDepartment: ACTIVE_DEPARTMENT,
-    destinationJobTitle: { active: false },
-  }),
+  DEPARTMENT_NOT_FOUND: destinationExample({ destinationDepartment: null }),
   GROUNDS_REQUIRED: example(new TransferRefusedError('GROUNDS_REQUIRED')),
   GROUNDS_INCOMPLETE: example(new TransferRefusedError('GROUNDS_INCOMPLETE', { missing: ['issuer'] })),
   GROUNDS_IS_NOTICE: example(new TransferRefusedError('GROUNDS_IS_NOTICE')),

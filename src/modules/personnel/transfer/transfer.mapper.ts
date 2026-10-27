@@ -1,5 +1,4 @@
 import type { DepartmentBrief, EmployeeRecord } from '../../organization/organization.types';
-import type { OrganizationService } from '../../organization/organization.service';
 import type { TransferChangeWire, TransferDetailWire, TransferRecordedWire, TransferSummaryWire } from './transfer.dto';
 import type { TransferChangeRecord, TransferRecord, TransferSummaryRecord, TransferWarning } from './transfer.types';
 
@@ -7,21 +6,14 @@ import type { TransferChangeRecord, TransferRecord, TransferSummaryRecord, Trans
 export interface TransferNames {
   employees: Map<string, EmployeeRecord>;
   departments: Map<string, DepartmentBrief>;
-  jobTitles: Map<string, JobTitleRecord>;
 }
-
-type JobTitleRecord = Awaited<ReturnType<OrganizationService['getJobTitles']>>[number];
 
 const UNKNOWN = '';
 
-function placeOf(names: TransferNames, departmentId: string, jobTitleId: string) {
+function placeOf(names: TransferNames, departmentId: string) {
   const department = names.departments.get(departmentId);
-  const jobTitle = names.jobTitles.get(jobTitleId);
 
-  return {
-    department: { id: departmentId, code: department?.code ?? UNKNOWN, name: department?.name ?? UNKNOWN },
-    jobTitle: { id: jobTitleId, name: jobTitle?.name ?? UNKNOWN },
-  };
+  return { department: { id: departmentId, code: department?.code ?? UNKNOWN, name: department?.name ?? UNKNOWN } };
 }
 
 const employeeBrief = (names: TransferNames, employeeId: string) => {
@@ -31,15 +23,11 @@ const employeeBrief = (names: TransferNames, employeeId: string) => {
 };
 
 export function toSummary(record: TransferSummaryRecord, names: TransferNames): TransferSummaryWire {
-  const department = record.fromDepartmentId !== record.toDepartmentId;
-  const jobTitle = record.fromJobTitleId !== record.toJobTitleId;
-
   return {
     id: record.id,
     employee: employeeBrief(names, record.employeeId),
-    changes: department ? (jobTitle ? 'DEPARTMENT_AND_JOB_TITLE' : 'DEPARTMENT') : 'JOB_TITLE',
-    from: placeOf(names, record.fromDepartmentId, record.fromJobTitleId),
-    to: placeOf(names, record.toDepartmentId, record.toJobTitleId),
+    from: placeOf(names, record.fromDepartmentId),
+    to: placeOf(names, record.toDepartmentId),
     effectiveOn: record.effectiveOn,
     status: record.status,
     selfExecuted: record.selfExecuted,

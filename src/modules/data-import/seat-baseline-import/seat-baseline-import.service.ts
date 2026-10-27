@@ -232,7 +232,11 @@ export class SeatBaselineImportService {
     );
 
     return {
-      target: { kind: base.target.kind, purchasedQuantity: base.target.purchasedQuantity },
+      target: {
+        kind: base.target.kind,
+        purchasedQuantity: base.target.purchasedQuantity,
+        ownerDepartmentId: base.target.ownerDepartmentId,
+      },
       recordedOn: base.recordedOn,
       employees: new Map(
         employees.map((employee) => [
@@ -266,7 +270,7 @@ export class SeatBaselineImportService {
     // The Cost Centers the rows name and the Unit of each person's department, held so none is retired meanwhile.
     const costCenterIds = [
       ...names.costCenterCodes.flatMap((code) => before.costCenters.get(code)?.id ?? []),
-      ...[...before.employees.values()].flatMap((employee) => employee.owningUnit?.costCenter.id ?? []),
+      ...[...before.employees.values()].flatMap((employee) => employee.owningUnit?.costCenter?.id ?? []),
     ];
     await this.organization.lockCostCentersShared(tx, [...new Set(costCenterIds)]);
 

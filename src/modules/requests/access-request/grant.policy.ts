@@ -59,6 +59,8 @@ export function grantAnswerFor(
         },
       };
     }
+    // `DRAFT` is not readable in this release (spec L.1) and never reaches here; if it did, nothing about it is approved.
+    case 'DRAFT':
     case 'PENDING':
     case 'WAITING_CONTROLLED':
     case 'AWAITING_IT_ASSESSMENT':

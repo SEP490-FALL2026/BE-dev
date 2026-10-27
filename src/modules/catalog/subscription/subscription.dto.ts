@@ -19,6 +19,8 @@ const money = z.strictObject({ amount: z.string().max(40), currency: z.string().
 
 export const declareSubscriptionBodySchema = z.strictObject({
   planId: z.uuid(),
+  // The department that owns the purchase (QĐ-89a). Required, and never part of a change: it is not a field of PATCH.
+  ownerDepartmentId: z.uuid(),
   kind,
   purchasedQuantity: quantity.optional(),
   unitPrice: money.optional(),
@@ -69,6 +71,8 @@ const subscriptionSchema = z.strictObject({
   id: z.uuid(),
   planId: z.uuid(),
   planName: z.string(),
+  // Null only for a subscription made before the owner existed; an operator records its basis (`ops:assign-subscription-owner`).
+  ownerDepartmentId: z.uuid().nullable(),
   applicationId: z.uuid(),
   applicationName: z.string(),
   vendor: z.strictObject({ id: z.uuid(), name: z.string() }),

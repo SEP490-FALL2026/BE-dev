@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { Client } from 'pg';
-import { normalizeJobTitleName } from '../../src/modules/organization/job-title/job-title-name';
+import { normalizeDisplayName } from '../../src/core/display-name';
 import {
   DisposableDatabase,
   dropDisposableDatabase,
@@ -11,6 +11,9 @@ import {
 
 const MIGRATIONS = join(process.cwd(), 'prisma', 'migrations');
 const LIFECYCLE = '_job_title_lifecycle';
+
+/** The comparison form of a title as the code gives it today: the display name in lower case. */
+const normalizeJobTitleName = (name: string): string => normalizeDisplayName(name).toLowerCase();
 
 /** How the code normalized a name before this slice: trim, NFC, lower case. */
 const legacyNormalize = (name: string): string => name.trim().normalize('NFC').toLowerCase();

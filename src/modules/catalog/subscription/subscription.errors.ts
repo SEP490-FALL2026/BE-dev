@@ -12,6 +12,14 @@ export class SubscriptionPlanNotFoundError extends Error {
   }
 }
 
+/** The department named as the owner of a purchase does not exist or is no longer active (`QĐ-89a`). */
+export class SubscriptionOwnerDepartmentInactiveError extends Error {
+  constructor() {
+    super('The department that would own the subscription does not exist or is not active.');
+    this.name = 'SubscriptionOwnerDepartmentInactiveError';
+  }
+}
+
 export class SubscriptionPlanHasNoSubscriptionError extends Error {
   constructor() {
     super('A K5 plan of an internal application has no subscription.');
@@ -62,17 +70,5 @@ export class SubscriptionStillDraftError extends Error {
   constructor(readonly missing: string[]) {
     super('The subscription still lacks data to be complete.');
     this.name = 'SubscriptionStillDraftError';
-  }
-}
-
-/** A subscription whose plan is billed per seat takes no allocation, and neither does one whose pricing model is unknown. */
-export class SubscriptionCostAllocationNotApplicableError extends Error {
-  constructor(readonly reason: 'PER_SEAT' | 'PRICING_MODEL_UNDECLARED') {
-    super(
-      reason === 'PER_SEAT'
-        ? 'The cost of a per-seat plan follows the people who hold the seats: it takes no allocation.'
-        : 'The pricing model of the plan is not declared, so it is not known to take an allocation.',
-    );
-    this.name = 'SubscriptionCostAllocationNotApplicableError';
   }
 }

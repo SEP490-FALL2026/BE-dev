@@ -95,6 +95,12 @@ describe('importing people from a file over HTTP (integration, real PostgreSQL)'
       roles: ['FINANCE'],
       admin,
     });
+    // The operator has activated the Cost Center link: the Super Admin can create a department (spec L.11).
+    await ctx.sql.query(
+      `INSERT INTO cost_center_direction_activations (id, organization_id, release_evidence, approver_ref, operator_ref, environment)
+       VALUES (gen_random_uuid(), $1, 'employee-imports-http', 'test', 'test', 'LOCAL_TEST')`,
+      [seed.organizationId],
+    );
   }, 120000);
 
   afterAll(async () => {
@@ -109,29 +115,33 @@ describe('importing people from a file over HTTP (integration, real PostgreSQL)'
   const errorOf = (response: request.Response) => (response.body as ErrorBody).error;
   const importOf = (response: request.Response) => (response.body as { data: ImportWire }).data;
 
-  /** A department with its own cost center, made through the API the way the two roles do it. */
+  /** A department the Super Admin creates and the Cost Center Finance creates for it, through the API the way the two roles do it. */
   const newDepartment = async (): Promise<string> => {
+    const code = unique('PI-');
+    const created = await request(server())
+      .post('/api/v1/departments')
+      .set(asSuper())
+      .send({ code, name: `Department ${code}`, hrBasis: HR_BASIS })
+      .expect(201);
     const centerCode = unique('CCI-');
-    const center = await request(server())
+    await request(server())
       .post('/api/v1/cost-centers')
       .set(as(finance))
-      .send({ code: centerCode, name: `Center ${centerCode}`, kind: 'UNIT' })
-      .expect(201);
-    const code = unique('PI-');
-    await request(server())
-      .post('/api/v1/departments')
-      .set(asIt())
-      .send({ code, name: `Department ${code}`, costCenterId: (center.body as { data: { id: string } }).data.id })
+      .send({
+        code: centerCode,
+        name: `Center ${centerCode}`,
+        kind: 'UNIT',
+        departmentId: (created.body as { data: { id: string } }).data.id,
+      })
       .expect(201);
 
     return code;
   };
-  const newTitle = async (name: string): Promise<string> =>
-    (
-      (await request(server()).post('/api/v1/job-titles').set(asIt()).send({ name }).expect(201)).body as {
-        data: { id: string };
-      }
-    ).data.id;
+  /** The IT Admin retires a department that has no member yet: what a row of a preview that names it finds changed. */
+  const retireDepartment = async (code: string): Promise<void> => {
+    const id = (await ctx.sql.query<{ id: string }>('SELECT id FROM departments WHERE code = $1', [code])).rows[0].id;
+    await request(server()).post(`/api/v1/departments/${id}/deactivate`).set(asIt()).expect(200);
+  };
 
   const personRow = (overrides: Partial<Record<string, string>> = {}): string => {
     counter += 1;
@@ -200,7 +210,7 @@ describe('importing people from a file over HTTP (integration, real PostgreSQL)'
           employmentType: 'STAFF',
           hireDate: '2026-09-01',
           departmentCode: department,
-          jobTitleId: seed.jobTitleId,
+          jobTitle: 'Administrator',
         })
         .expect(201);
       const rows = [
@@ -367,40 +377,27 @@ describe('importing people from a file over HTTP (integration, real PostgreSQL)'
       expect(await count('cost_centers')).toBe(centers);
     });
 
-    it('takes the job title from the catalogue, never makes one up, and refuses a retired one for a new person (AC-13)', async () => {
-      const retiredId = await newTitle(unique('Intern '));
-      const retiredName = (
-        await ctx.sql.query<{ name: string }>('SELECT name FROM job_titles WHERE id = $1', [retiredId])
-      ).rows[0].name;
-      await request(server()).post(`/api/v1/job-titles/${retiredId}/deactivate`).set(asIt()).expect(200);
+    it('takes the job title as free text: any title that fits is accepted without a catalogue, and one that is too long is refused (QĐ-87e)', async () => {
       const titles = await count('job_titles');
 
       const data = importOf(
         await upload(
           csv([
             personRow({ job_title: 'Desginer' }),
-            personRow({ job_title: retiredName }),
+            personRow({ job_title: 'x'.repeat(256) }),
             personRow({ job_title: '  ADMINISTRATOR ' }),
           ]),
         ).expect(201),
       );
 
       expect((await rowsOf(data.id)).map((row) => row.errors)).toEqual([
-        [{ column: 'job_title', code: 'JOB_TITLE_NOT_FOUND' }],
-        [{ column: 'job_title', code: 'JOB_TITLE_INACTIVE' }],
+        [],
+        [{ column: 'job_title', code: 'JOB_TITLE_TOO_LONG' }],
         [],
       ]);
+      expect(data.summary.valid).toBe(2);
+      // The preview writes nothing, the catalogue included.
       expect(await count('job_titles')).toBe(titles);
-      // Adding the title to the catalogue makes the same file work: the preview is judged again.
-      await newTitle('Desginer');
-      const refreshed = importOf(
-        await request(server())
-          .post(`/api/v1/employee-imports/${data.id}/preview-refreshes`)
-          .set(asSuper())
-          .expect(200),
-      );
-      expect(refreshed.previewVersion).toBe(2);
-      expect(refreshed.summary.valid).toBe(2);
     });
 
     it('refuses a second row with the same work email after normalization, and keeps the first (AC-8)', async () => {
@@ -465,7 +462,7 @@ describe('importing people from a file over HTTP (integration, real PostgreSQL)'
           employmentType: 'STAFF',
           hireDate: '2026-09-01',
           departmentCode: department,
-          jobTitleId: seed.jobTitleId,
+          jobTitle: 'Administrator',
         })
         .expect(201);
       const before = await ctx.sql.query('SELECT * FROM employees WHERE employee_code = $1', [code]);
@@ -507,36 +504,6 @@ describe('importing people from a file over HTTP (integration, real PostgreSQL)'
           )
         ).rows,
       ).toEqual(placementsBefore.rows);
-    });
-
-    it('does not make a person already there an error because their job title was retired since', async () => {
-      const titleName = unique('Retiring ');
-      const titleId = await newTitle(titleName);
-      const code = unique('EI-RET-');
-      await request(server())
-        .post('/api/v1/employees')
-        .set(asSuper())
-        .send({
-          hrBasis: HR_BASIS,
-          employeeCode: code,
-          fullName: 'Retired Title Person',
-          employmentType: 'STAFF',
-          hireDate: '2026-09-01',
-          departmentCode: 'P-OPS',
-          jobTitleId: titleId,
-        })
-        .expect(201);
-      await request(server()).post(`/api/v1/job-titles/${titleId}/deactivate`).set(asIt()).expect(200);
-
-      const data = importOf(
-        await upload(
-          csv([
-            personRow({ employee_code: code, full_name: 'Retired Title Person', work_email: '', job_title: titleName }),
-          ]),
-        ).expect(201),
-      );
-
-      expect(data.summary).toMatchObject({ existingSame: 1, errors: 0 });
     });
   });
 
@@ -709,7 +676,7 @@ describe('importing people from a file over HTTP (integration, real PostgreSQL)'
           employmentType: 'STAFF',
           hireDate: '2026-09-01',
           departmentCode: 'P-OPS',
-          jobTitleId: seed.jobTitleId,
+          jobTitle: 'Administrator',
         })
         .expect(201);
       const people = await count('employees');
@@ -730,14 +697,10 @@ describe('importing people from a file over HTTP (integration, real PostgreSQL)'
       expect((written.body as { data: { import: ImportWire } }).data.import.result).toMatchObject({ created: 1 });
     });
 
-    it('is refused when the job title or the department of a row is retired in the meantime', async () => {
+    it('is refused when the department of a row is retired in the meantime', async () => {
       const department = await newDepartment();
-      const titleName = unique('Fleeting ');
-      const titleId = await newTitle(titleName);
-      const uploaded = importOf(
-        await upload(csv([personRow({ department_code: department, job_title: titleName })])).expect(201),
-      );
-      await request(server()).post(`/api/v1/job-titles/${titleId}/deactivate`).set(asIt()).expect(200);
+      const uploaded = importOf(await upload(csv([personRow({ department_code: department })])).expect(201));
+      await retireDepartment(department);
       const people = await count('employees');
 
       const stale = await confirm(uploaded.id, { previewVersion: 1, idempotencyKey: unique('key-0000') }).expect(409);
@@ -1076,15 +1039,14 @@ describe('importing people from a file over HTTP (integration, real PostgreSQL)'
 
     it('rolls a stale confirmation back whole: the preview, its rows and the Audit Trail stay as they were', async () => {
       const department = await newDepartment();
-      const titleName = unique('Passing ');
-      const titleId = await newTitle(titleName);
+      const retiring = await newDepartment();
       const id = importOf(
-        await upload(csv([personRow({ department_code: department }), personRow({ job_title: titleName })])).expect(
-          201,
-        ),
+        await upload(
+          csv([personRow({ department_code: department }), personRow({ department_code: retiring })]),
+        ).expect(201),
       ).id;
       const rowsBefore = await rowsOf(id);
-      await request(server()).post(`/api/v1/job-titles/${titleId}/deactivate`).set(asIt()).expect(200);
+      await retireDepartment(retiring);
       const people = await count('employees');
 
       const stale = await confirm(id, { previewVersion: 1, idempotencyKey: unique('key-wire-') }).expect(409);

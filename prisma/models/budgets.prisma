@@ -11,6 +11,8 @@ enum BudgetProposalState {
   RETURNED
   // Finance has built a review version from it and sent that on.
   REVIEWED
+  // Closed because its fiscal year ended (spec L.10). Read only here.
+  CLOSED_FISCAL_YEAR_ENDED
 }
 
 // How a line repeats (QĐ-82d): the purchase window and the service period are what Finance reads the year from.
@@ -39,6 +41,8 @@ enum BudgetVersionState {
   CHANGES_REQUESTED
   // A later version was approved in its place.
   SUPERSEDED
+  // Expired with its fiscal year (spec L.10). Read only here.
+  EXPIRED
 }
 
 // What a head of department asks for one Cost Center and one fiscal year (BM-10, US-06-10). A proposal is never edited
@@ -129,6 +133,9 @@ model BudgetVersion {
   createdAt            DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
   sentByEmployeeId     String?            @map("sent_by_employee_id") @db.Uuid
   sentAt               DateTime?          @map("sent_at") @db.Timestamptz(3)
+  // The draft of a proposal that was withdrawn or given back, set in the transaction of that move (F36, QĐ-91a). It stays a draft, is
+  // never deleted, and nothing reads it yet: the constraints and the wire that use it belong to the release after this one.
+  detachedAt           DateTime?          @map("detached_at") @db.Timestamptz(3)
   updatedAt            DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   organization        Organization            @relation(fields: [organizationId], references: [id])

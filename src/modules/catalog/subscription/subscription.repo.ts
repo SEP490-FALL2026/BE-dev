@@ -63,6 +63,7 @@ function toRecord(row: Row): SubscriptionRecord {
     planId: row.planId,
     planName: row.plan.name,
     planPricingModel: row.plan.pricingModel,
+    ownerDepartmentId: row.ownerDepartmentId,
     applicationId: application.id,
     applicationName: application.name,
     applicationKind: application.kind,
@@ -116,9 +117,9 @@ export class SubscriptionRepo {
   constructor(private readonly prisma: PrismaService) {}
 
   async insert(tx: DbTx, input: NewSubscription): Promise<SubscriptionRecord> {
-    const { organizationId, planId, kind, ...state } = input;
+    const { organizationId, planId, ownerDepartmentId, kind, ...state } = input;
     const row = await tx.subscription.create({
-      data: { organizationId, planId, kind, ...columnsOf(state) },
+      data: { organizationId, planId, ownerDepartmentId, kind, ...columnsOf(state) },
       include: WITH_PLAN,
     });
 

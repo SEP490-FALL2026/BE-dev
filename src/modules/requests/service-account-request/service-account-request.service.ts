@@ -85,8 +85,6 @@ export class ServiceAccountRequestService {
         businessReason: body.businessReason,
         termMonths: body.termMonths,
         projectLabel: body.projectLabel ?? null,
-        outsideStandardReason: null,
-        outsideStandard: false,
         pricing,
         policy,
         createdByAppUserId: actor.appUserId,
@@ -133,7 +131,6 @@ export class ServiceAccountRequestService {
             amountCurrency: pricing.amount?.currency ?? null,
             budgetYear: pricing.budgetYear,
             expectedSpendOn: pricing.expectedSpendOn,
-            outsideStandard: false,
           },
         ),
       );

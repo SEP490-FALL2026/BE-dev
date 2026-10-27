@@ -2,8 +2,6 @@ import { Module } from '@nestjs/common';
 import { AuditModule } from '../audit/audit.module';
 import { DatabaseModule } from '../../infrastructure/database/database.module';
 import { OrganizationModule } from '../organization/organization.module';
-import { CostAllocationRepo } from './cost-allocation/cost-allocation.repo';
-import { CostAllocationService } from './cost-allocation/cost-allocation.service';
 import { CurrencyRepo } from './currency/currency.repo';
 import { CurrencyService } from './currency/currency.service';
 import { ExchangeRateLedgerService } from './exchange-rate/exchange-rate-ledger.service';
@@ -14,7 +12,7 @@ import { TaxProfileRepo } from './tax-profile/tax-profile.repo';
 import { TaxProfileService } from './tax-profile/tax-profile.service';
 
 /**
- * The finance context (C7, G3 part): currencies, exchange rates, vendor tax profiles, subscription cost allocations and the money contract. Only the facade and the audited
+ * The finance context (C7, G3 part): currencies, exchange rates, vendor tax profiles and the money contract. Only the facade and the audited
  * rate use case are exported; the repos and the raw ledger stay behind them (a rate is never written without its audit event). The HTTP side is `FinanceHttpModule`, which only the API mounts.
  */
 @Module({
@@ -28,8 +26,6 @@ import { TaxProfileService } from './tax-profile/tax-profile.service';
     ExchangeRateService,
     TaxProfileRepo,
     TaxProfileService,
-    CostAllocationRepo,
-    CostAllocationService,
   ],
   exports: [FinanceService, ExchangeRateService],
 })

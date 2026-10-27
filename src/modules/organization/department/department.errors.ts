@@ -19,13 +19,14 @@ export class DepartmentNameInvalidError extends Error {
   }
 }
 
-export type DepartmentCostCenterProblem = 'NOT_FOUND' | 'NOT_UNIT' | 'TAKEN' | 'INACTIVE';
-
-/** The Cost Center chosen for a new department cannot be used (US-04-09 AC-5, AC-7; US-03-06 AC-2). */
-export class DepartmentCostCenterError extends Error {
-  constructor(readonly problem: DepartmentCostCenterProblem) {
-    super(`The cost center cannot be used for a department: ${problem}.`);
-    this.name = 'DepartmentCostCenterError';
+/**
+ * A department is created with no Cost Center (`QĐ-87d(1)`), but the release that can still be recovered cannot read one:
+ * until the operator has activated the direction of the link (`pnpm ops:cost-center-direction activate`) nothing is created.
+ */
+export class DepartmentCreationAwaitingActivationError extends Error {
+  constructor() {
+    super('A department cannot be created yet: the Cost Center link of this installation is not activated.');
+    this.name = 'DepartmentCreationAwaitingActivationError';
   }
 }
 

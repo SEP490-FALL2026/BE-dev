@@ -14,6 +14,7 @@ import {
 interface SubscriptionWire {
   id: string;
   planId: string;
+  ownerDepartmentId: string | null;
   vendor: { id: string; name: string };
   kind: string;
   status: string;
@@ -157,8 +158,12 @@ describe('subscriptions and perpetual purchases over HTTP (integration, real Pos
 
     return { planId: created.id, vendorId: application.vendor?.id ?? null, applicationId: application.id };
   };
+  /** Declares a subscription owned by the seeded department unless the body names another (or `undefined`: none, F02). */
   const create = (body: object, account: ApiAccount = it1) =>
-    request(server()).post('/api/v1/subscriptions').set(as(account)).send(body);
+    request(server())
+      .post('/api/v1/subscriptions')
+      .set(as(account))
+      .send({ ownerDepartmentId: seed.departmentId, ...body });
   const patch = (id: string, body: object, account: ApiAccount = it1) =>
     request(server()).patch(`/api/v1/subscriptions/${id}`).set(as(account)).send(body);
   const get = (id: string, account: ApiAccount = it1) =>
@@ -178,6 +183,88 @@ describe('subscriptions and perpetual purchases over HTTP (integration, real Pos
     ).rows;
   const declareProfile = (vendorId: string, body: object) =>
     request(server()).put(`/api/v1/vendors/${vendorId}/tax-profile`).set(as(finance)).send(body);
+
+  describe('the owner department (F02, QĐ-89a)', () => {
+    /** A department of the organization that is no longer active, made the way the organization stops one. */
+    const stoppedDepartment = async (): Promise<string> => {
+      const costCenterId = randomUUID();
+      const departmentId = randomUUID();
+      await ctx.sql.query(
+        `INSERT INTO cost_centers (id, organization_id, code, name, kind, status)
+         VALUES ($1, $2, $3, 'Old unit', 'UNIT', 'ACTIVE')`,
+        [costCenterId, seed.organizationId, unique('CC-OLD').replace(' ', '-')],
+      );
+      await ctx.sql.query(
+        `INSERT INTO departments (id, organization_id, code, name, cost_center_id, status, deactivated_at, updated_at)
+         VALUES ($1, $2, $3, 'Old department', $4, 'INACTIVE', now(), now())`,
+        [departmentId, seed.organizationId, unique('OLD').replace(' ', '-'), costCenterId],
+      );
+
+      return departmentId;
+    };
+
+    it('declares a subscription for an active department: the wire and the audit event carry the owner', async () => {
+      const { planId } = await plan();
+
+      const created = await subscription(planId);
+
+      expect(created.ownerDepartmentId).toBe(seed.departmentId);
+      const stored = await ctx.sql.query<{ owner_department_id: string }>(
+        'SELECT owner_department_id FROM subscriptions WHERE id = $1',
+        [created.id],
+      );
+      expect(stored.rows[0].owner_department_id).toBe(seed.departmentId);
+      const [event] = await auditOf(created.id);
+      expect(event).toEqual(
+        expect.objectContaining({
+          action: 'SUBSCRIPTION.CREATED',
+          after: expect.objectContaining({ ownerDepartmentId: seed.departmentId }) as unknown,
+        }),
+      );
+    });
+
+    it('refuses a declaration with no owner department: 422 VALIDATION_ERROR and nothing is written', async () => {
+      const { planId } = await plan();
+      const before = { subscriptions: await n('subscriptions'), audit: await n('audit_events') };
+
+      const response = await create({ planId, kind: 'TERM', ownerDepartmentId: undefined }).expect(422);
+
+      expect(codeOf(response)).toBe('VALIDATION_ERROR');
+      expect({ subscriptions: await n('subscriptions'), audit: await n('audit_events') }).toEqual(before);
+    });
+
+    it.each([
+      ['a department that does not exist', () => Promise.resolve(randomUUID())],
+      ['a department that has been stopped', async () => stoppedDepartment()],
+    ])('refuses %s: 422 SUBSCRIPTION.OWNER_DEPARTMENT_INACTIVE and nothing is written', async (_name, owner) => {
+      const { planId } = await plan();
+      const ownerDepartmentId = await owner();
+      const before = { subscriptions: await n('subscriptions'), audit: await n('audit_events') };
+
+      const response = await create({ planId, kind: 'TERM', ownerDepartmentId }).expect(422);
+
+      expect(codeOf(response)).toBe('SUBSCRIPTION.OWNER_DEPARTMENT_INACTIVE');
+      expect({ subscriptions: await n('subscriptions'), audit: await n('audit_events') }).toEqual(before);
+    });
+
+    it('reads a subscription made before the owner existed with a null owner, and a change never gives or alters one', async () => {
+      const { planId } = await plan();
+      const legacy = randomUUID();
+      await ctx.sql.query(
+        `INSERT INTO subscriptions (id, organization_id, plan_id, kind, status, auto_renew, allows_mid_term_reduction)
+         VALUES ($1, $2, $3, 'TERM', 'DRAFT', false, false)`,
+        [legacy, seed.organizationId, planId],
+      );
+
+      expect(dataOf<SubscriptionWire>(await get(legacy).expect(200)).ownerDepartmentId).toBeNull();
+      const changed = dataOf<SubscriptionWire>(await patch(legacy, { purchasedQuantity: 3 }).expect(200));
+      expect(changed.ownerDepartmentId).toBeNull();
+      const listed = dataOf<{ items: SubscriptionWire[] }>(
+        await request(server()).get('/api/v1/subscriptions').query({ planId }).set(as(it1)).expect(200),
+      );
+      expect(listed.items.map((item) => item.ownerDepartmentId)).toEqual([null]);
+    });
+  });
 
   describe('the milestone for a cancellation (US-04-03)', () => {
     it('AC-1: Figma, 100 seats, renewing 31/12, deadline 01/12, auto renewal: the deadline is used, the alerts count back from it', async () => {

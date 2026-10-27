@@ -56,14 +56,6 @@ export class ServiceAccountHandoverHarness extends OffboardingHarness {
       .post(`/api/v1/license-assignments/${id}/responsible-changes`)
       .set(this.as(account))
       .send(body);
-  proposeMove = (id: string, body: object, account: ApiAccount = this.it1) =>
-    request(this.server()).post(`/api/v1/license-assignments/${id}/department-moves`).set(this.as(account)).send(body);
-  confirmMove = (id: string, account: ApiAccount) =>
-    request(this.server()).post(`/api/v1/service-account-moves/${id}/confirmations`).set(this.as(account));
-  cancelMove = (id: string, body: object, account: ApiAccount = this.it1) =>
-    request(this.server()).post(`/api/v1/service-account-moves/${id}/cancellation`).set(this.as(account)).send(body);
-  listMoves = (query = '', account: ApiAccount = this.it1) =>
-    request(this.server()).get(`/api/v1/service-account-moves${query}`).set(this.as(account));
   listServiceDuties = (query = '', account: ApiAccount = this.it1) =>
     request(this.server()).get(`/api/v1/service-account-duties${query}`).set(this.as(account));
   closeTransfer = (id: string, account: ApiAccount = this.it1) =>

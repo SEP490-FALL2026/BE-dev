@@ -25,6 +25,7 @@ import {
 } from './budget.policy';
 import { budgetAuditEvent, BudgetSupportService } from './budget-support.service';
 import { ProposalRepo, type ProposalLineRecord, type ProposalRecord } from './proposal.repo';
+import { VersionRepo } from './version.repo';
 import type { BudgetProposalBodyDto, ProposalLineWire, ProposalSummaryWire, ProposalWire } from './budget.dto';
 
 type LineBody = BudgetProposalBodyDto['lines'][number];
@@ -39,6 +40,7 @@ export class ProposalService {
   constructor(
     private readonly runner: TransactionRunner,
     private readonly proposals: ProposalRepo,
+    private readonly versions: VersionRepo,
     private readonly support: BudgetSupportService,
     private readonly organization: OrganizationService,
     private readonly audit: AuditService,
@@ -89,7 +91,9 @@ export class ProposalService {
       const proposal = await this.ownedLocked(tx, actor, id);
       if (!canWithdraw(proposal.state)) throw new BudgetProposalStateError('WITHDRAW', proposal.state);
 
-      await this.proposals.setWithdrawn(tx, id, new Date());
+      const now = new Date();
+      await this.proposals.setWithdrawn(tx, id, now);
+      await this.versions.detachDraftsOf(tx, id, now);
       await this.audit.record(
         tx,
         budgetAuditEvent(actor, proposal.organizationId, 'BUDGET_PROPOSAL.WITHDRAWN', 'BUDGET_PROPOSAL', id, {
@@ -109,7 +113,9 @@ export class ProposalService {
       if (!proposal) throw new BudgetProposalNotFoundError();
       if (!canReturn(proposal.state)) throw new BudgetProposalStateError('RETURN', proposal.state);
 
-      await this.proposals.setReturned(tx, id, { reason, byEmployeeId: actor.employeeId, now: new Date() });
+      const now = new Date();
+      await this.proposals.setReturned(tx, id, { reason, byEmployeeId: actor.employeeId, now });
+      await this.versions.detachDraftsOf(tx, id, now);
       await this.audit.record(
         tx,
         budgetAuditEvent(actor, proposal.organizationId, 'BUDGET_PROPOSAL.RETURNED', 'BUDGET_PROPOSAL', id, {

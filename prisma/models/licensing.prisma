@@ -61,8 +61,8 @@ model LicenseAssignment {
   provisioningTasks   ProvisioningTask[]
   returnRequests      ReturnRequest[]
   handoverDuties      HandoverDuty[]
-  serviceAccountMoves ServiceAccountMove[]       @relation("MoveOfAssignment")
-  resultOfMove        ServiceAccountMove?        @relation("MoveResultAssignment")
+  serviceAccountMoves ServiceAccountMove[]       @relation("MoveOfAssignment") @ignore
+  resultOfMove        ServiceAccountMove?        @relation("MoveResultAssignment") @ignore
   dutyNotices         ServiceAccountDutyNotice[]
   expiryReminders     AssignmentExpiryReminder[]
   saasIssues          SaasIssue[]
@@ -198,6 +198,8 @@ enum RevocationSource {
   SUBSCRIPTION_EXPIRED
   NOT_LEGALIZED
   RE_EXECUTION
+  // The review the new head makes after a transfer took the seat away (spec L.10). Read only here.
+  POST_SETUP_REVIEW
 }
 
 enum RevocationCompletion {
@@ -389,6 +391,7 @@ model ServiceAccountMove {
   @@index([toDepartmentId, status])
   @@index([effectiveFrom, id])
   @@map("service_account_moves")
+  @@ignore
 }
 
 // The reminder that a service account still has no new person after the day of the file that moves its person, written once for each

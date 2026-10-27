@@ -146,8 +146,13 @@ export const ROUTE_ERROR_CODES_A_TO_L: Readonly<Record<string, Partial<Record<Ro
       '404': ['CONTRACT.NOT_FOUND'],
     },
     costCenterCreate: {
-      '409': ['COST_CENTER.CODE_TAKEN'],
-      '422': ['COST_CENTER.KIND_NOT_SUPPORTED', 'COST_CENTER.NAME_INVALID', 'COST_CENTER.NAME_RESERVED'],
+      '409': ['COST_CENTER.CODE_TAKEN', 'COST_CENTER.DEPARTMENT_ALREADY_LINKED'],
+      '422': [
+        'COST_CENTER.DEPARTMENT_NOT_ACTIVE',
+        'COST_CENTER.KIND_NOT_SUPPORTED',
+        'COST_CENTER.NAME_INVALID',
+        'COST_CENTER.NAME_RESERVED',
+      ],
     },
     costCenterDeactivate: {
       '404': ['COST_CENTER.NOT_FOUND'],
@@ -161,13 +166,8 @@ export const ROUTE_ERROR_CODES_A_TO_L: Readonly<Record<string, Partial<Record<Ro
       '422': ['COST_CENTER.NAME_INVALID', 'COST_CENTER.NAME_RESERVED'],
     },
     departmentCreate: {
-      '409': ['DEPARTMENT.CODE_TAKEN', 'DEPARTMENT.COST_CENTER_TAKEN'],
-      '422': [
-        'DEPARTMENT.COST_CENTER_INACTIVE',
-        'DEPARTMENT.COST_CENTER_NOT_FOUND',
-        'DEPARTMENT.IT_ADMIN_INVALID',
-        'DEPARTMENT.NAME_INVALID',
-      ],
+      '409': ['DEPARTMENT.CODE_TAKEN', 'DEPARTMENT.CREATION_AWAITING_ACTIVATION'],
+      '422': ['DEPARTMENT.IT_ADMIN_INVALID', 'DEPARTMENT.NAME_INVALID'],
     },
     departmentDeactivate: {
       '404': ['DEPARTMENT.NOT_FOUND'],
@@ -293,21 +293,6 @@ export const ROUTE_ERROR_CODES_A_TO_L: Readonly<Record<string, Partial<Record<Ro
     healthGetReadiness: {
       '500': ['INTERNAL_SERVER_ERROR'],
       '503': ['SERVICE_UNAVAILABLE'],
-    },
-    jobTitleCreate: {
-      '409': ['JOB_TITLE.NAME_TAKEN'],
-      '422': ['JOB_TITLE.NAME_REQUIRED', 'JOB_TITLE.NAME_TOO_LONG'],
-    },
-    jobTitleDeactivate: {
-      '404': ['JOB_TITLE.NOT_FOUND'],
-    },
-    jobTitleReactivate: {
-      '404': ['JOB_TITLE.NOT_FOUND'],
-    },
-    jobTitleRename: {
-      '404': ['JOB_TITLE.NOT_FOUND'],
-      '409': ['JOB_TITLE.NAME_TAKEN'],
-      '422': ['JOB_TITLE.NAME_REQUIRED', 'JOB_TITLE.NAME_TOO_LONG'],
     },
     licenseAssignmentChangeResponsible: {
       '404': ['LICENSE_ASSIGNMENT.NOT_FOUND'],

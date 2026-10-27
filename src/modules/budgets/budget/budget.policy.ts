@@ -78,7 +78,8 @@ export function quartersMatch(totalMinor: bigint, quarters: readonly [bigint, bi
   );
 }
 
-export type ProposalState = 'SUBMITTED' | 'WITHDRAWN' | 'RETURNED' | 'REVIEWED';
+/** `CLOSED_FISCAL_YEAR_ENDED` is written by the release after this one (spec L.10): this release reads it and writes none. */
+export type ProposalState = 'SUBMITTED' | 'WITHDRAWN' | 'RETURNED' | 'REVIEWED' | 'CLOSED_FISCAL_YEAR_ENDED';
 
 /** A proposal can be taken back until Finance has sent a version made from it (`US-06-10` AC-4). */
 export const canWithdraw = (state: ProposalState): boolean => state === 'SUBMITTED';
@@ -91,7 +92,7 @@ export const canResubmit = (state: ProposalState): boolean => state === 'RETURNE
 
 /** Whether a version can still be changed by Finance: while it is a draft or was sent back to them. */
 export const isEditable = (
-  state: 'DRAFT' | 'SENT' | 'APPROVED' | 'REJECTED' | 'CHANGES_REQUESTED' | 'SUPERSEDED',
+  state: 'DRAFT' | 'SENT' | 'APPROVED' | 'REJECTED' | 'CHANGES_REQUESTED' | 'SUPERSEDED' | 'EXPIRED',
 ): boolean => state === 'DRAFT' || state === 'CHANGES_REQUESTED';
 
 export interface LineChange {
@@ -130,7 +131,7 @@ export function checkVersionDecision(facts: {
   actorEmployeeId: string;
   createdByEmployeeId: string;
   sentByEmployeeId: string | null;
-  state: 'DRAFT' | 'SENT' | 'APPROVED' | 'REJECTED' | 'CHANGES_REQUESTED' | 'SUPERSEDED';
+  state: 'DRAFT' | 'SENT' | 'APPROVED' | 'REJECTED' | 'CHANGES_REQUESTED' | 'SUPERSEDED' | 'EXPIRED';
 }): DecisionRefusal | null {
   if (!facts.actorIsDecider) return facts.actorHasConflict ? 'CONFLICT_OF_INTEREST' : 'NOT_SPENDING_APPROVER';
   if (facts.actorEmployeeId === facts.createdByEmployeeId || facts.actorEmployeeId === facts.sentByEmployeeId) {

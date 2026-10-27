@@ -2,13 +2,12 @@ import { Injectable } from '@nestjs/common';
 import { addDays } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { AuditService } from '../../audit/audit.service';
-import { CatalogService } from '../../catalog/catalog.service';
 import { LicensingService } from '../../licensing/licensing.service';
 import { OperatingParametersService } from '../../operating-parameters/operating-parameters.service';
 import { OrganizationService } from '../../organization/organization.service';
 import type { OrganizationChange } from '../../organization/organization.types';
 import { personnelSystemAuditEvent } from '../mappers/personnel-audit-event';
-import { reviewDueOn, toolsOutsideStandard } from './transfer-review.policy';
+import { reviewDueOn } from './transfer-review.policy';
 import { TransferReviewRepo } from './transfer-review.repo';
 
 const WORKING_DAYS = 'TRANSFER_REVIEW_WORKING_DAYS';
@@ -16,17 +15,16 @@ const WORKING_DAYS = 'TRANSFER_REVIEW_WORKING_DAYS';
 const CALENDAR_WINDOW_DAYS = 90;
 
 /**
- * Opens the review of the tools outside the standard toolset when a person is moved to another department (`US-03-07` AC-1, AC-2,
- * AC-8). It runs in the transaction of the change, once for each placement: a person whose tools are all in the toolset of the
- * department they came to, or who only changed job title in the same department, gets no review and their head no work. The seats
- * are never touched here: they stay as they were until the head decides.
+ * Opens the review of the tools a person brought when they are moved to another department (`US-03-07` AC-1, AC-2, `QĐ-89b`,
+ * `QĐ-90b`): one line for every personal seat they hold, paid or internal, whatever any list says. It runs in the transaction of the
+ * change, once for each placement: a person who holds no seat gets no review and their head no work. The seats are never touched
+ * here: they stay as they were until the head decides.
  */
 @Injectable()
 export class TransferReviewService {
   constructor(
     private readonly reviews: TransferReviewRepo,
     private readonly licensing: LicensingService,
-    private readonly catalog: CatalogService,
     private readonly parameters: OperatingParametersService,
     private readonly organization: OrganizationService,
     private readonly audit: AuditService,
@@ -35,8 +33,7 @@ export class TransferReviewService {
   /** Idempotent: a placement that has a review has no second one, however many times the change is told. */
   async openFor(tx: DbTx, change: OrganizationChange): Promise<void> {
     if (change.kind !== 'PLACEMENT_START') return;
-    // The first placement of a person is not a transfer, and a change of job title inside the department does not change what the
-    // department's toolset says about the tools the person holds (`AC-8`).
+    // The first placement of a person is not a transfer, and staying in the department is none either (`AC-8`).
     if (change.fromDepartmentId === null || change.fromDepartmentId === change.toDepartmentId) return;
     if (await this.reviews.findByPlacement(tx, change.placementId)) return;
 
@@ -48,9 +45,7 @@ export class TransferReviewService {
       // A seat already being taken away is not a tool the new head is asked about.
       (seat) => seat.revocation === null,
     );
-    const standard = await this.catalog.getStandardToolsetPlanIds(change.toDepartmentId, change.toJobTitleId, tx);
-    const outside = toolsOutsideStandard(seats, standard);
-    if (outside.length === 0) return;
+    if (seats.length === 0) return;
 
     const review = await this.reviews.insert(tx, {
       organizationId: employee.organizationId,
@@ -58,10 +53,9 @@ export class TransferReviewService {
       transferId: await this.reviews.transferIdOfPlacement(tx, change.placementId),
       placementId: change.placementId,
       departmentId: change.toDepartmentId,
-      jobTitleId: change.toJobTitleId,
       effectiveOn: change.effectiveOn,
       dueOn: await this.dueOn(change.effectiveOn),
-      items: outside.map((seat) => ({
+      items: seats.map((seat) => ({
         assignmentId: seat.assignmentId,
         planId: seat.planId,
         grantReason: seat.grantReason,
@@ -82,7 +76,7 @@ export class TransferReviewService {
           departmentId: review.departmentId,
           effectiveOn: review.effectiveOn,
           dueOn: review.dueOn,
-          tools: outside.length,
+          tools: seats.length,
           transferId: review.transferId,
         },
       ),

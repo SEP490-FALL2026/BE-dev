@@ -21,10 +21,10 @@ const successorBodySchema = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('NONE') }),
 ]);
 
+/** A transfer changes the department only (`QĐ-87e`): a body that names a job title is a malformed body. */
 const recordBodySchema = z.strictObject({
   employeeId: z.uuid(),
-  toDepartmentId: z.uuid().optional(),
-  toJobTitleId: z.uuid().optional(),
+  toDepartmentId: z.uuid(),
   effectiveOn: businessDate,
   grounds: groundsBodySchema.optional(),
   successor: successorBodySchema.optional(),
@@ -67,8 +67,7 @@ const pagination = z.strictObject({
 
 const employeeBrief = z.strictObject({ id: z.uuid(), employeeCode: z.string(), fullName: z.string() });
 const departmentBrief = z.strictObject({ id: z.uuid(), code: z.string(), name: z.string() });
-const jobTitleBrief = z.strictObject({ id: z.uuid(), name: z.string() });
-const place = z.strictObject({ department: departmentBrief, jobTitle: jobTitleBrief });
+const place = z.strictObject({ department: departmentBrief });
 const groundsSchema = z.strictObject({
   type: z.string(),
   reference: z.string(),
@@ -76,11 +75,10 @@ const groundsSchema = z.strictObject({
   issuedOn: z.string(),
 });
 
-/** The row of the list: who, what changes, from where to where, when, and where it stands. */
+/** The row of the list: who, from where to where, when, and where it stands. */
 export const transferSummarySchema = z.strictObject({
   id: z.uuid(),
   employee: employeeBrief,
-  changes: z.enum(['DEPARTMENT', 'JOB_TITLE', 'DEPARTMENT_AND_JOB_TITLE']),
   from: place,
   to: place,
   effectiveOn: z.string(),
@@ -92,7 +90,8 @@ export const transferDetailSchema = transferSummarySchema.extend({
   grounds: groundsSchema,
   /** Who follows the head of the old department; null when the person did not head the department they leave. */
   headSuccessor: z.strictObject({ kind: z.enum(['EMPLOYEE', 'NONE']), employee: employeeBrief.nullable() }).nullable(),
-  recordedByAppUserId: z.uuid(),
+  /** Null only for an event the controlled procedure of the release after this one recorded (spec L.2); this release always writes its account. */
+  recordedByAppUserId: z.uuid().nullable(),
   recordedAt: z.iso.datetime(),
   effectiveAt: z.iso.datetime().nullable(),
   cancellation: z
@@ -117,7 +116,8 @@ const changeSchema = z.strictObject({
   newEffectiveOn: z.string().nullable(),
   reason: z.string(),
   grounds: groundsSchema,
-  changedByAppUserId: z.uuid(),
+  /** Null only for an event the controlled procedure of the release after this one recorded (spec L.2); this release always writes its account. */
+  changedByAppUserId: z.uuid().nullable(),
   changedAt: z.iso.datetime(),
 });
 

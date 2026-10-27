@@ -5,11 +5,7 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { AuditService } from '../../audit/audit.service';
 import { OrganizationService } from '../../organization/organization.service';
 import { accessRequestAuditEvent } from './access-request-audit-event';
-import {
-  AccessRequestAlreadyHoldsAccessError,
-  AccessRequestNoDepartmentError,
-  AccessRequestOutsideStandardReasonRequiredError,
-} from './access-request.errors';
+import { AccessRequestAlreadyHoldsAccessError, AccessRequestNoDepartmentError } from './access-request.errors';
 import { hasSpendStep } from './access-request.policy';
 import { AccessRequestRepo } from './access-request.repo';
 import type { AccessRequestRecord } from './access-request.types';
@@ -81,12 +77,11 @@ export class AccessRequestService {
       settings,
       lockDepartment: true,
     });
-    const { unit, policy, pricing, outsideStandard, routing } = assessed;
+    const { unit, policy, pricing, routing } = assessed;
     const { decision, departmentHeadEmployeeId } = routing;
     if (assessed.heldAccess && assessed.heldAccess.assignmentId !== options.toleratedSeatId) {
       throw new AccessRequestAlreadyHoldsAccessError(assessed.heldAccess);
     }
-    if (outsideStandard && !body.outsideStandardReason) throw new AccessRequestOutsideStandardReasonRequiredError();
 
     const assigned = decision.outcome === 'ASSIGNED';
     const created = await this.repo.insert(tx, {
@@ -101,8 +96,6 @@ export class AccessRequestService {
       businessReason: body.businessReason,
       termMonths: body.termMonths,
       projectLabel: body.projectLabel ?? null,
-      outsideStandardReason: body.outsideStandardReason ?? null,
-      outsideStandard,
       expectedEndDate: options.expectedEndDate ?? null,
       pricing,
       policy,
@@ -143,7 +136,6 @@ export class AccessRequestService {
           amountCurrency: pricing.amount?.currency ?? null,
           budgetYear: pricing.budgetYear,
           expectedSpendOn: pricing.expectedSpendOn,
-          outsideStandard,
         },
       ),
     );

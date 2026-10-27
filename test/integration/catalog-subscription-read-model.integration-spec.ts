@@ -156,53 +156,6 @@ describe('catalog subscription read model (integration, real PostgreSQL)', () =>
     }, 180_000);
   });
 
-  describe('LD-03: the history of an allocation reads its Cost Centers once', () => {
-    it('reads the Cost Centers of 30 versions in one statement', async () => {
-      const planId = await h.plan('K2', 'FLAT_RATE');
-      const subscriptionId = h.dataOf<{ id: string }>(
-        await request(h.server())
-          .post('/api/v1/subscriptions')
-          .set(as())
-          .send({
-            planId,
-            kind: 'TERM',
-            unitPrice: { amount: '1000000', currency: 'VND' },
-            billingCycle: 'MONTHLY',
-            startDate: '2026-01-05',
-            purchasedQuantity: 5,
-          })
-          .expect(201),
-      ).id;
-      const centers = [];
-      for (let index = 0; index < 5; index += 1) centers.push(await h.costCenter('UNIT'));
-      for (let version = 0; version < 30; version += 1) {
-        const first = centers[version % 5];
-        const second = centers[(version + 1) % 5];
-        await request(h.server())
-          .put(`/api/v1/subscriptions/${subscriptionId}/cost-allocation`)
-          .set(as(h.finance))
-          .send({
-            lines: [
-              { costCenterId: first.id, ratioPercent: `${50 + (version % 3)}` },
-              { costCenterId: second.id, ratioPercent: `${50 - (version % 3)}` },
-            ],
-          })
-          .expect(200);
-      }
-
-      const { result, statements } = await counter.run(() =>
-        request(h.server())
-          .get(`/api/v1/subscriptions/${subscriptionId}/cost-allocation/history?pageSize=30`)
-          .set(as(h.finance))
-          .expect(200),
-      );
-
-      expect(h.dataOf<{ items: unknown[] }>(result).items).toHaveLength(30);
-      const centerReads = dataStatements(statements).filter((statement) => tablesOf(statement)[0] === 'cost_centers');
-      expect(centerReads).toHaveLength(1);
-    }, 240_000);
-  });
-
   describe('LD-16: the warnings of one plan are bounded, with their total', () => {
     it('answers at most 50 warnings for a plan with 60 subscriptions due, and the total', async () => {
       const first = await h.subscription(5, 'K2');

@@ -192,9 +192,9 @@ describe('dev:seed (integration, real PostgreSQL)', () => {
       expect(audit.rows).toEqual([
         { action: 'DEV_SEED.ACCOUNT_CREATED', count: 3, runs: 1 },
         { action: 'DEV_SEED.COST_CENTER_CREATED', count: 1, runs: 1 },
+        { action: 'DEV_SEED.COST_CENTER_DIRECTION_ACTIVATED', count: 1, runs: 1 },
         { action: 'DEV_SEED.DEPARTMENT_CREATED', count: 1, runs: 1 },
         { action: 'DEV_SEED.EMPLOYEE_CREATED', count: 3, runs: 1 },
-        { action: 'DEV_SEED.JOB_TITLE_CREATED', count: 1, runs: 1 },
         { action: 'ROLE.GRANTED', count: 3, runs: 1 },
       ]);
       const trail = JSON.stringify((await sql.query(`SELECT * FROM audit_events`)).rows);
@@ -278,13 +278,9 @@ describe('dev:seed (integration, real PostgreSQL)', () => {
       }
     });
 
-    it('P23-RV-01: refuses a DEMO department charged to another Cost Center, and changes nothing', async () => {
-      const other = await sql.query<{ id: string }>(
-        `INSERT INTO cost_centers (id, organization_id, code, name, kind)
-         SELECT gen_random_uuid(), id, 'OTHER-CC', 'Other cost center', 'UNIT' FROM organizations RETURNING id`,
-      );
-      const demo = await sql.query<{ id: string }>(`SELECT cost_center_id AS id FROM departments WHERE code = 'DEMO'`);
-      await sql.query(`UPDATE departments SET cost_center_id = $1 WHERE code = 'DEMO'`, [other.rows[0].id]);
+    it('P23-RV-01: refuses a DEMO department whose Cost Center in use is another one, and changes nothing', async () => {
+      // The Cost Center the department answers to is not DEMO-CC (here: its code was changed by hand).
+      await sql.query(`UPDATE cost_centers SET code = 'OTHER-CC' WHERE code = 'DEMO-CC'`);
       try {
         const before = await fingerprint();
         const result = await seed.seed({ confirmLocal: true });
@@ -295,8 +291,7 @@ describe('dev:seed (integration, real PostgreSQL)', () => {
         ]);
         expect(await fingerprint()).toEqual(before);
       } finally {
-        await sql.query(`UPDATE departments SET cost_center_id = $1 WHERE code = 'DEMO'`, [demo.rows[0].id]);
-        await sql.query(`DELETE FROM cost_centers WHERE code = 'OTHER-CC'`);
+        await sql.query(`UPDATE cost_centers SET code = 'DEMO-CC' WHERE code = 'OTHER-CC'`);
       }
       // Back to the fixture: a rerun finds everything present again.
       await expect(seed.seed({ confirmLocal: true })).resolves.toMatchObject({ outcome: 'ALREADY_PRESENT' });

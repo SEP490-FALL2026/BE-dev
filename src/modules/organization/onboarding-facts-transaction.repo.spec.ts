@@ -24,20 +24,31 @@ describe('onboarding fact reads on the caller transaction', () => {
       $queryRaw: jest.fn(() => (used.push('$queryRaw'), Promise.resolve([{ total: 0 }]))),
       department: { count: jest.fn(() => (used.push('department.count'), Promise.resolve(1))) },
       employee: { count: jest.fn(() => (used.push('employee.count'), Promise.resolve(2))) },
+      costCenterDirectionActivation: {
+        count: jest.fn(() => (used.push('costCenterDirectionActivation.count'), Promise.resolve(0))),
+      },
     };
     return { tx: tx as unknown as DbTx, used };
   }
 
-  it('reads departments, employees and free cost centers through the transaction', async () => {
+  it('reads departments (with or without a Cost Center, head, IT Admin) and employees through the transaction', async () => {
     const { tx, used } = transaction();
     const departments = new DepartmentRepo(untouched);
 
     await expect(departments.countActiveDepartments(tx)).resolves.toBe(1);
     await departments.activeDepartmentsWithoutHead('2026-10-20', tx);
     await departments.activeDepartmentsWithItAdmin(tx);
+    await new CostCenterRepo(untouched).departmentsWithoutCostCenter(tx);
+    await expect(new CostCenterRepo(untouched).isDirectionActivated(tx)).resolves.toBe(false);
     await expect(new EmployeeRepo(untouched).countActive(tx)).resolves.toBe(2);
-    await expect(new CostCenterRepo(untouched).countFreeUnits(tx)).resolves.toBe(0);
 
-    expect(used).toEqual(['department.count', '$queryRaw', '$queryRaw', 'employee.count', '$queryRaw']);
+    expect(used).toEqual([
+      'department.count',
+      '$queryRaw',
+      '$queryRaw',
+      '$queryRaw',
+      'costCenterDirectionActivation.count',
+      'employee.count',
+    ]);
   });
 });

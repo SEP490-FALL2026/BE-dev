@@ -19,8 +19,6 @@ export const SELECT_REQUEST = {
   businessReason: true,
   termMonths: true,
   projectLabel: true,
-  outsideStandardReason: true,
-  outsideStandard: true,
   pricingStatus: true,
   priceMissingReason: true,
   expectedSpendOn: true,
@@ -146,8 +144,6 @@ export function toRecord(row: RequestRow): AccessRequestRecord {
     businessReason: row.businessReason,
     termMonths: row.termMonths,
     projectLabel: row.projectLabel,
-    outsideStandardReason: row.outsideStandardReason,
-    outsideStandard: row.outsideStandard,
     pricing: toPricing(row),
     planLine:
       row.planLineVersionId !== null && row.planLinePosition !== null

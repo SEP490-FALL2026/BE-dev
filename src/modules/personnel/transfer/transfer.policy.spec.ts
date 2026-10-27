@@ -17,10 +17,9 @@ const facts = (patch: Partial<NewTransferFacts> = {}): NewTransferFacts => ({
   today: '2026-10-15',
   effectiveOn: '2026-11-01',
   employee: { status: 'ACTIVE', workState: 'WORKING' },
-  current: { departmentId: 'dep-des', jobTitleId: 'title-designer', validFrom: '2026-01-01' },
-  target: { departmentId: 'dep-fin', jobTitleId: 'title-designer' },
+  current: { departmentId: 'dep-des', validFrom: '2026-01-01' },
+  target: { departmentId: 'dep-fin' },
   destinationDepartment: { active: true, costCenterActive: true },
-  destinationJobTitle: null,
   grounds: GROUNDS,
   pending: null,
   selfMode: 'ALLOW',
@@ -41,7 +40,7 @@ describe('whether a transfer may be recorded (US-03-01)', () => {
       { employee: { status: 'TERMINATED' as const, workState: 'LEFT' as const } },
       'EMPLOYEE_LEFT',
     ],
-    ['nothing changes', { target: { departmentId: 'dep-des', jobTitleId: 'title-designer' } }, 'NO_CHANGE'],
+    ['the department does not change', { target: { departmentId: 'dep-des' } }, 'NO_CHANGE'],
     ['the day is before today (AC-16)', { effectiveOn: '2026-10-01' }, 'EFFECTIVE_DATE_IN_PAST'],
     [
       'the day is the first day of the current placement',
@@ -82,21 +81,9 @@ describe('whether a transfer may be recorded (US-03-01)', () => {
     expect(code({ employee: { status: 'ACTIVE', workState: 'ON_LONG_LEAVE' } })).toBeUndefined();
   });
 
-  it('judges the title only when it changes: the title a person keeps is no error even when it is retired (AC-17)', () => {
-    expect(code({ destinationJobTitle: { active: false } })).toBeUndefined();
-    const same = { target: { departmentId: 'dep-des', jobTitleId: 'title-senior' }, destinationJobTitle: null };
-    expect(code(same)).toBe('JOB_TITLE_NOT_FOUND');
-    expect(code({ ...same, destinationJobTitle: { active: false } })).toBe('JOB_TITLE_INACTIVE');
-    expect(code({ ...same, destinationJobTitle: { active: true } })).toBeUndefined();
-  });
-
-  it('does not judge the department a person keeps while only the title changes', () => {
-    const titleOnly = {
-      target: { departmentId: 'dep-des', jobTitleId: 'title-senior' },
-      destinationDepartment: null,
-      destinationJobTitle: { active: true },
-    };
-    expect(code(titleOnly)).toBeUndefined();
+  it('changes the department only (QĐ-87e): a job title is not a fact of a transfer, and a department that stays is no transfer', () => {
+    expect('jobTitleId' in facts().target).toBe(false);
+    expect(code({ target: { departmentId: 'dep-des' }, destinationDepartment: null })).toBe('NO_CHANGE');
   });
 
   it('names the part of the basis that is missing', () => {

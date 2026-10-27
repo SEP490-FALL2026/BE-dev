@@ -27,7 +27,8 @@ describe('the integrity of the handover of service accounts (integration, real P
     await h.start();
     des = await h.departmentWithUnit('P-DES');
     fin = await h.departmentWithUnit('P-FIN');
-    subscription = await h.subscription(100, 'K2');
+    // Its accounts belong to many departments: a subscription nobody owns yet, which no seat is checked against (F20).
+    subscription = await h.subscription(100, 'K2', null);
   }, 300000);
 
   afterAll(async () => {

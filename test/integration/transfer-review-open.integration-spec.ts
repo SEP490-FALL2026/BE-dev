@@ -32,7 +32,6 @@ describe('opening the review of the tools after a transfer (integration, real Po
     excel = await h.subscription(80, 'K2');
     jira = await h.subscription(80, 'K2');
     figma = await h.subscription(80, 'K2');
-    await h.setToolset(fin, [await h.planOf(excel), await h.planOf(jira)]);
   }, 300000);
 
   afterAll(async () => {
@@ -52,21 +51,29 @@ describe('opening the review of the tools after a transfer (integration, real Po
   const itemsOf = async (id: string) =>
     h.dataOf<{ items: ReviewItemWire[] }>(await h.reviewItems(id).expect(200)).items;
 
-  it('US-03-07 AC-1: E1 moves to P-FIN holding exactly Excel and Jira, the toolset of P-FIN: no review, the head has no work, both seats stay', async () => {
+  it('US-03-07 AC-1 (QĐ-89b): E1 moves to P-FIN holding Excel and Jira: the head of P-FIN gets one review with both tools, and both seats stay', async () => {
     const { person, seats } = await holder([excel, jira]);
 
     await h.moveToday(person, fin);
 
-    expect(await reviewsFor(person.employeeId)).toEqual([]);
+    const rows = await reviewsFor(person.employeeId);
+    expect(rows).toHaveLength(1);
+    // One line for each seat the person holds, in the order the seats were listed (positions 1, 2).
+    const lines = await h.itemRows(rows[0].id);
+    expect(lines.map((line) => [line.position, line.decision])).toEqual([
+      [1, 'PENDING'],
+      [2, 'PENDING'],
+    ]);
+    expect(lines.map((line) => line.assignment_id).sort()).toEqual([...seats].sort());
     const forHead = h.dataOf<{ items: ReviewWire[] }>(
       await h.reviews(`?employeeId=${person.employeeId}`, h2.account).expect(200),
     );
-    expect(forHead.items).toEqual([]);
+    expect(forHead.items).toHaveLength(1);
     for (const seat of seats) expect(await h.liveTaskOf(seat)).toBeNull();
     expect((await h.assignmentRow(seats[0])).valid_until).toBeNull();
   });
 
-  it('US-03-07 AC-2: with Figma outside the toolset the head of P-FIN gets one review with Figma alone, due five working days after the day, and nothing is taken away', async () => {
+  it('US-03-07 AC-2 (QĐ-89b): the head of P-FIN gets one review with every tool the person holds, due five working days after the day, and nothing is taken away', async () => {
     const { person, seats } = await holder([excel, figma, jira]);
 
     const transfer = await h.moveToday(person, fin);
@@ -80,7 +87,10 @@ describe('opening the review of the tools after a transfer (integration, real Po
       due_on: addWorkingDays(h.today(), 5, NO_DAYS),
     });
     const items = await h.itemRows(rows[0].id);
-    expect(items).toEqual([expect.objectContaining({ assignment_id: seats[1], decision: 'PENDING', position: 1 })]);
+    expect(items.map((line) => [line.position, line.decision])).toEqual(
+      seats.map((_seat, index) => [index + 1, 'PENDING']),
+    );
+    expect(items.map((line) => line.assignment_id).sort()).toEqual([...seats].sort());
     for (const seat of seats) {
       expect(await h.liveTaskOf(seat)).toBeNull();
       expect((await h.assignmentRow(seat)).valid_until).toBeNull();
@@ -89,19 +99,19 @@ describe('opening the review of the tools after a transfer (integration, real Po
     const forHead = h.dataOf<ReviewWire>(await h.review(rows[0].id, h2.account).expect(200));
     expect(forHead).toMatchObject({
       status: 'OPEN',
-      totalItems: 1,
-      pendingItems: 1,
+      totalItems: 3,
+      pendingItems: 3,
       waitingReason: null,
       overdue: false,
       canDecide: true,
       reviewer: { id: h2.employeeId },
       transferId: transfer.id,
     });
-    expect((await itemsOf(rows[0].id))[0]).toMatchObject({
-      assignmentId: seats[1],
-      decision: 'PENDING',
-      provisioningType: 'K2',
-    });
+    expect((await itemsOf(rows[0].id)).map((item) => [item.decision, item.provisioningType])).toEqual([
+      ['PENDING', 'K2'],
+      ['PENDING', 'K2'],
+      ['PENDING', 'K2'],
+    ]);
   });
 
   it('US-03-07 AC-2: a transfer set for a day to come opens the review when the day arrives, from that day', async () => {
@@ -117,11 +127,24 @@ describe('opening the review of the tools after a transfer (integration, real Po
     expect(rows[0]).toMatchObject({ effective_on: day, due_on: addWorkingDays(day, 5, NO_DAYS) });
   });
 
-  it('US-03-07 AC-8: the title changes inside P-DES: no review, the seats stay', async () => {
+  it('US-03-07 AC-8 (QĐ-87e): a change inside P-DES is no transfer (a title is no part of one, the same department is NO_CHANGE): no review, the seats stay', async () => {
     const { person, seats } = await holder([figma]);
 
-    await h.moveToday(person, des, { toDepartmentId: undefined, toJobTitleId: await h.jobTitle('Senior Designer') });
+    const titleOnly = await h.recordTransfer({
+      employeeId: person.employeeId,
+      toJobTitleId: randomUUID(),
+      effectiveOn: h.today(),
+      grounds: h.grounds,
+    });
+    const sameDepartment = await h.recordTransfer({
+      employeeId: person.employeeId,
+      toDepartmentId: des.id,
+      effectiveOn: h.today(),
+      grounds: h.grounds,
+    });
 
+    expect([titleOnly.status, h.codeOf(titleOnly)]).toEqual([422, 'VALIDATION_ERROR']);
+    expect([sameDepartment.status, h.codeOf(sameDepartment)]).toEqual([422, 'DEPARTMENT_TRANSFER.NO_CHANGE']);
     expect(await reviewsFor(person.employeeId)).toEqual([]);
     expect(await h.liveTaskOf(seats[0])).toBeNull();
   });

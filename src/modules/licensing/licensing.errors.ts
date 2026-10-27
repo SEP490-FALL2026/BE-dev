@@ -40,7 +40,8 @@ export class SeatQuantityUnknownError extends Error {
   }
 }
 
-export type AssignmentConflict = 'OVERLAP' | 'IDENTIFIER_IN_USE' | 'SEAT_CAPACITY' | 'EXPECTED_END_REQUIRED';
+export type AssignmentConflict =
+  'OVERLAP' | 'IDENTIFIER_IN_USE' | 'SEAT_CAPACITY' | 'EXPECTED_END_REQUIRED' | 'SUBSCRIPTION_DEPARTMENT_MISMATCH';
 
 /** The database refused an assignment that the judgement had accepted: the data changed in between. */
 export class AssignmentConflictError extends Error {

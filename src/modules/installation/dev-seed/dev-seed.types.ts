@@ -1,7 +1,7 @@
 import type { DemoAccountRole } from '../../identity-access/identity-access.types';
 import type { LocalSeedRefusal } from './local-seed.guard';
 
-export type SeedItemKind = 'COST_CENTER' | 'DEPARTMENT' | 'JOB_TITLE' | 'EMPLOYEE' | 'ACCOUNT';
+export type SeedItemKind = 'DEPARTMENT' | 'COST_CENTER' | 'COST_CENTER_DIRECTION' | 'EMPLOYEE' | 'ACCOUNT';
 
 /** A fixture item that exists under its stable key but differs, and how (P23-RV-01). */
 export type SeedConflict =
@@ -9,11 +9,10 @@ export type SeedConflict =
   | 'COST_CENTER_NOT_UNIT'
   | 'COST_CENTER_INACTIVE'
   | 'COST_CENTER_IN_USE'
+  | 'COST_CENTER_UNLINKED'
   | 'DEPARTMENT_NAME_DIFFERS'
   | 'DEPARTMENT_INACTIVE'
   | 'DEPARTMENT_COST_CENTER_DIFFERS'
-  | 'JOB_TITLE_NAME_DIFFERS'
-  | 'JOB_TITLE_INACTIVE'
   | 'EMPLOYEE_DIFFERS'
   | 'WORK_EMAIL_TAKEN'
   | 'ACCOUNT_DIFFERS'
@@ -31,7 +30,6 @@ export interface SeedPlan {
   organizationId: string;
   costCenterId: string | null;
   departmentId: string | null;
-  jobTitleId: string | null;
   employeeIds: ReadonlyMap<string, string>;
   items: PlannedItem[];
 }

@@ -135,12 +135,12 @@ const pageQuery = {
   pageSize: z.coerce.number().int().positive().max(100).default(20),
 };
 export const proposalListQuerySchema = z.strictObject({
-  state: z.enum(['SUBMITTED', 'WITHDRAWN', 'RETURNED', 'REVIEWED']).optional(),
+  state: z.enum(['SUBMITTED', 'WITHDRAWN', 'RETURNED', 'REVIEWED', 'CLOSED_FISCAL_YEAR_ENDED']).optional(),
   year: z.coerce.number().int().min(2000).max(2200).optional(),
   ...pageQuery,
 });
 export const versionListQuerySchema = z.strictObject({
-  state: z.enum(['DRAFT', 'SENT', 'APPROVED', 'REJECTED', 'CHANGES_REQUESTED', 'SUPERSEDED']).optional(),
+  state: z.enum(['DRAFT', 'SENT', 'APPROVED', 'REJECTED', 'CHANGES_REQUESTED', 'SUPERSEDED', 'EXPIRED']).optional(),
   year: z.coerce.number().int().min(2000).max(2200).optional(),
   ...pageQuery,
 });
@@ -169,7 +169,7 @@ const proposalSchema = z.strictObject({
   id: z.uuid(),
   costCenter: costCenterRef,
   year: z.number().int(),
-  state: z.enum(['SUBMITTED', 'WITHDRAWN', 'RETURNED', 'REVIEWED']),
+  state: z.enum(['SUBMITTED', 'WITHDRAWN', 'RETURNED', 'REVIEWED', 'CLOSED_FISCAL_YEAR_ENDED']),
   previousProposalId: z.uuid().nullable(),
   total: moneyView,
   submittedBy: employeeRef.nullable(),
@@ -182,7 +182,7 @@ const proposalSummarySchema = z.strictObject({
   id: z.uuid(),
   costCenter: costCenterRef,
   year: z.number().int(),
-  state: z.enum(['SUBMITTED', 'WITHDRAWN', 'RETURNED', 'REVIEWED']),
+  state: z.enum(['SUBMITTED', 'WITHDRAWN', 'RETURNED', 'REVIEWED', 'CLOSED_FISCAL_YEAR_ENDED']),
   previousProposalId: z.uuid().nullable(),
   total: moneyView,
   submittedAt: z.iso.datetime(),
@@ -206,7 +206,7 @@ const versionSchema = z.strictObject({
   year: z.number().int(),
   number: z.number().int().positive(),
   kind: z.enum(['INITIAL', 'REVISION']),
-  state: z.enum(['DRAFT', 'SENT', 'APPROVED', 'REJECTED', 'CHANGES_REQUESTED', 'SUPERSEDED']),
+  state: z.enum(['DRAFT', 'SENT', 'APPROVED', 'REJECTED', 'CHANGES_REQUESTED', 'SUPERSEDED', 'EXPIRED']),
   proposalId: z.uuid().nullable(),
   basedOnVersionId: z.uuid().nullable(),
   base: moneyView,
@@ -238,7 +238,7 @@ const versionSummarySchema = z.strictObject({
   year: z.number().int(),
   number: z.number().int().positive(),
   kind: z.enum(['INITIAL', 'REVISION']),
-  state: z.enum(['DRAFT', 'SENT', 'APPROVED', 'REJECTED', 'CHANGES_REQUESTED', 'SUPERSEDED']),
+  state: z.enum(['DRAFT', 'SENT', 'APPROVED', 'REJECTED', 'CHANGES_REQUESTED', 'SUPERSEDED', 'EXPIRED']),
   total: moneyView,
   createdAt: z.iso.datetime(),
   sentAt: z.iso.datetime().nullable(),

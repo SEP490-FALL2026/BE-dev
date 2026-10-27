@@ -14,7 +14,6 @@ describe('reading the reviews after a transfer (integration, real PostgreSQL)', 
   let ops: Department;
   let h1: Person;
   let h2: Person;
-  let excel: string;
   let tools: string[];
 
   beforeAll(async () => {
@@ -35,9 +34,7 @@ describe('reading the reviews after a transfer (integration, real PostgreSQL)', 
     h2 = await h.veteran(fin, 'H2-TRR');
     await h.makeHead(des, h1);
     await h.makeHead(fin, h2);
-    excel = await h.subscription(80, 'K2');
     tools = [await h.subscription(80, 'K2'), await h.subscription(80, 'K2'), await h.subscription(80, 'K2')];
-    await h.setToolset(fin, [await h.planOf(excel)]);
   }, 300000);
 
   afterAll(async () => {

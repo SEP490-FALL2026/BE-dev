@@ -6,25 +6,10 @@ import {
   overdueDaysOf,
   reviewDueOn,
   statusAfterDecision,
-  toolsOutsideStandard,
   waitingReasonOf,
 } from './transfer-review.policy';
 
 const NONE: ReadonlySet<string> = new Set();
-
-describe('the tools a review is opened for (US-03-07 AC-1, AC-2)', () => {
-  const seat = (planId: string) => ({ planId, assignmentId: `a-${planId}` });
-
-  it.each([
-    ['all in the standard toolset: nothing to review', ['excel', 'jira'], ['excel', 'jira'], []],
-    ['one outside it: only that one, in the order held', ['excel', 'figma', 'jira'], ['excel', 'jira'], ['figma']],
-    ['another plan of the same application is outside it', ['figma-pro'], ['figma-starter'], ['figma-pro']],
-    ['a pair with no toolset: every tool is outside it', ['excel', 'jira'], [], ['excel', 'jira']],
-    ['no seats: nothing to review', [], ['excel'], []],
-  ])('%s', (_name, held, standard, outside) => {
-    expect(toolsOutsideStandard(held.map(seat), standard).map((item) => item.planId)).toEqual(outside);
-  });
-});
 
 describe('the deadline of a review (US-03-07 AC-2, OQ-A-17 b)', () => {
   it('does not count the day the transfer took effect: Friday 16/10 with five working days is due on Friday 23/10', () => {

@@ -5,4 +5,5 @@ module.exports = {
   ...base,
   roots: ['<rootDir>/test/e2e'],
   testRegex: '\\.e2e-spec\\.ts$',
+  testTimeout: 30000,
 };

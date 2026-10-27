@@ -60,6 +60,7 @@ describe('judgeConversion', () => {
       blockers: [],
       corrections: [{ assignmentId: 'moved', recordedOn: '2026-10-12', fromDepartment: 'OPS', toDepartment: 'ENG' }],
       companyCostCentersRemoved: [{ code: 'CC-CORP', status: 'ACTIVE' }],
+      information: [],
     });
   });
 

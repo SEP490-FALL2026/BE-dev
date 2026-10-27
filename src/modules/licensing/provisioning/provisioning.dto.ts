@@ -97,6 +97,8 @@ const REVOCATION_SOURCES = [
   'SUBSCRIPTION_EXPIRED',
   'NOT_LEGALIZED',
   'RE_EXECUTION',
+  // Read only here (spec L.10).
+  'POST_SETUP_REVIEW',
 ] as const;
 /** What a row of the list says of a revocation: no reasons, notes or evidence (the detail has those). */
 const revocationSummarySchema = z.strictObject({

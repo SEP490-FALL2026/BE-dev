@@ -13,6 +13,7 @@ import {
   AccessRequestNotFoundError,
   AccessRequestPlanNotFoundError,
 } from './access-request.errors';
+import { FinanceSetupIncompleteError } from '../../organization/organization.errors';
 import { toAccessRequestApiException } from './access-request.http-errors';
 import {
   AssessmentIncompleteError,
@@ -86,6 +87,7 @@ const quote = (reason: ConstructorParameters<typeof AssessmentQuoteRefusedError>
 export const ASSESSMENT_ERROR_EXAMPLES = {
   NOT_FOUND: example(new AccessRequestNotFoundError()),
   NO_DEPARTMENT: example(new AccessRequestNoDepartmentError()),
+  FINANCE_SETUP_INCOMPLETE: example(new FinanceSetupIncompleteError('<department-id>')),
   PLAN_NOT_FOUND: example(new AccessRequestPlanNotFoundError()),
   APPLICATION_RETIRED: example(new AccessRequestApplicationRetiredError()),
   OWN_REQUEST: example(new AssessmentRefusedError('OWN_REQUEST')),

@@ -38,6 +38,11 @@ const IT_ONLY = {
   description: 'Only an IT Admin changes department data.',
   examples: [FORBIDDEN_EXAMPLE],
 } as const;
+const SUPER_ADMIN_ONLY = {
+  status: HttpStatus.FORBIDDEN,
+  description: 'Only the Super Admin creates a department.',
+  examples: [FORBIDDEN_EXAMPLE],
+} as const;
 const VALIDATION_ERROR_DESCRIPTION =
   'The request is invalid (VALIDATION_ERROR) or a rule of the department refuses it; details name the reason.';
 /** The routes where no rule of the department applies: only the request itself can be invalid. */
@@ -51,8 +56,6 @@ const CREATE_INVALID = {
   description: VALIDATION_ERROR_DESCRIPTION,
   examples: [
     VALIDATION_EXAMPLE,
-    ORGANIZATION_ERROR_EXAMPLES.DEPARTMENT_COST_CENTER_INACTIVE,
-    ORGANIZATION_ERROR_EXAMPLES.DEPARTMENT_COST_CENTER_NOT_FOUND,
     ORGANIZATION_ERROR_EXAMPLES.DEPARTMENT_IT_ADMIN_INVALID,
     ORGANIZATION_ERROR_EXAMPLES.DEPARTMENT_NAME_INVALID,
   ],
@@ -129,21 +132,21 @@ export class DepartmentsController {
   }
 
   @Post('departments')
-  @RequireRoles('IT_ADMIN')
+  @RequireRoles('SUPER_ADMIN')
   @ApiOperation({ operationId: 'departmentCreate', summary: 'Create a department' })
   @ApiSuccessResponse(DepartmentResponseDto, {
     status: HttpStatus.CREATED,
     message: 'DEPARTMENT.CREATED',
     description:
-      'The department exists, charged to the UNIT Cost Center chosen, with nobody heading it yet. warnings says what is still missing.',
+      'The department exists with no Cost Center (Finance creates one for it) and nobody heading it yet. warnings says what is still missing.',
   })
-  @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, CREATE_INVALID, {
+  @ApiErrorResponses(...AUTH_ERRORS, SUPER_ADMIN_ONLY, CREATE_INVALID, {
     status: HttpStatus.CONFLICT,
     description:
-      'The code is taken (DEPARTMENT.CODE_TAKEN) or another department already has the Cost Center (DEPARTMENT.COST_CENTER_TAKEN).',
+      'The code is taken (DEPARTMENT.CODE_TAKEN), or this installation has not activated the Cost Center link yet (DEPARTMENT.CREATION_AWAITING_ACTIVATION): nothing is created until it has.',
     examples: [
       ORGANIZATION_ERROR_EXAMPLES.DEPARTMENT_CODE_TAKEN,
-      ORGANIZATION_ERROR_EXAMPLES.DEPARTMENT_COST_CENTER_TAKEN,
+      ORGANIZATION_ERROR_EXAMPLES.DEPARTMENT_CREATION_AWAITING_ACTIVATION,
     ],
   })
   async create(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: CreateDepartmentBodyDto) {
@@ -152,8 +155,8 @@ export class DepartmentsController {
         code: body.code,
         name: body.name,
         functionDescription: body.function,
-        costCenterId: body.costCenterId,
         itAdminEmployeeId: body.itAdminEmployeeId,
+        hrBasis: body.hrBasis,
       });
 
       return await this.profileAfter(actor, id);

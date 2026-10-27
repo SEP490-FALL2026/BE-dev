@@ -148,7 +148,7 @@ describe('installation command with only DATABASE_URL and NODE_ENV=production (i
       placements: 2,
       app_users: 1,
       role_grants: 1,
-      audit_events: 8,
+      audit_events: 7,
     });
 
     const account = await sql.query(
@@ -190,7 +190,7 @@ describe('installation command with only DATABASE_URL and NODE_ENV=production (i
     let calls = 0;
     const spy = jest.spyOn(audit, 'record').mockImplementation(async (tx, event) => {
       calls += 1;
-      if (calls === 7) throw new Error('audit unavailable');
+      if (calls === 6) throw new Error('audit unavailable');
       return original(tx, event);
     });
     try {

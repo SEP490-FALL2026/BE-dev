@@ -31,7 +31,7 @@ import {
 } from './transfer.types';
 
 /**
- * Records a change of department or job title with the day it takes effect and the basis it rests on (`US-03-01` AC-1, AC-2,
+ * Records a change of department with the day it takes effect and the basis it rests on (`US-03-01` AC-1, AC-2,
  * AC-4 -> AC-8, AC-11, AC-13 -> AC-18, AC-22). The periods are written ahead, in this transaction: the one the person has ends
  * on the day, the new one begins on it, and the head of the department they leave is handed over or left empty by choice. No
  * seat is touched and no step of a request is moved here: the listeners of the organization act on the day.
@@ -75,20 +75,17 @@ export class TransferService {
     const before = await this.history.getPlacementInForce(tx, input.employeeId, today);
     if (!before) throw new TransferRefusedError('PLACEMENT_OVERLAP');
     const toDepartmentId = input.toDepartmentId ?? before.departmentId;
-    const toJobTitleId = input.toJobTitleId ?? before.jobTitleId;
     const departmentChanges = toDepartmentId !== before.departmentId;
     const dayBefore = addDays(input.effectiveOn, -1);
     const leavesAsHead =
       departmentChanges &&
       (await this.organization.getHeadedDepartment(input.employeeId, dayBefore))?.departmentId === before.departmentId;
 
-    // Locks (T-11): the departments by id, then the job title, then the employee (and a chosen successor), then accounts.
+    // Locks (T-11): the departments by id, then the employee (and a chosen successor), then accounts.
     const departments = await this.history.lockDepartments(tx, {
       updateIds: leavesAsHead ? [before.departmentId] : [],
       shareIds: [before.departmentId, toDepartmentId],
     });
-    const destinationTitle =
-      toJobTitleId === before.jobTitleId ? null : await this.organization.lockJobTitleForShare(tx, toJobTitleId);
     await this.organization.lockEmployeeForUpdate(tx, input.employeeId);
     if (leavesAsHead && input.successor?.kind === 'EMPLOYEE') {
       await this.lockSuccessor(tx, input.successor.employeeId);
@@ -111,13 +108,12 @@ export class TransferService {
       today,
       effectiveOn: input.effectiveOn,
       employee: { status: employee.status, workState: employee.workState },
-      current: { departmentId: current.departmentId, jobTitleId: current.jobTitleId, validFrom: current.validFrom },
-      target: { departmentId: toDepartmentId, jobTitleId: toJobTitleId },
+      current: { departmentId: current.departmentId, validFrom: current.validFrom },
+      target: { departmentId: toDepartmentId },
       destinationDepartment: destination && {
         active: destination.active,
         costCenterActive: destination.costCenterActive,
       },
-      destinationJobTitle: destinationTitle && { active: destinationTitle.status === 'ACTIVE' },
       grounds: input.grounds,
       pending: await this.pendingOf(tx, input.employeeId),
       namedAsSuccessor: await this.transfers.isNamedSuccessorOfPending(tx, input.employeeId),
@@ -149,15 +145,12 @@ export class TransferService {
       employeeId: input.employeeId,
       effectiveOn: input.effectiveOn,
       departmentId: toDepartmentId,
-      jobTitleId: toJobTitleId,
     });
     const record = await this.insertTransfer(tx, {
       organizationId: organization.id,
       employeeId: input.employeeId,
       fromDepartmentId: before.departmentId,
       toDepartmentId,
-      fromJobTitleId: before.jobTitleId,
-      toJobTitleId,
       effectiveOn: input.effectiveOn,
       closesPlacementId: scheduled.closedPlacementId,
       opensPlacementId: scheduled.openedPlacementId,
@@ -168,8 +161,6 @@ export class TransferService {
       noticeId: input.noticeId ?? null,
     });
 
-    const titles = await this.organization.getJobTitles([before.jobTitleId, toJobTitleId], tx);
-    const titleName = (id: string) => titles.find((title) => title.id === id)?.name ?? null;
     await this.audit.record(
       tx,
       personnelAuditEvent(
@@ -181,11 +172,9 @@ export class TransferService {
         {
           employeeCode: employee.employeeCode,
           department: oldDepartment?.code ?? null,
-          jobTitle: titleName(before.jobTitleId),
         },
         {
           department: destination?.code ?? null,
-          jobTitle: titleName(toJobTitleId),
           effectiveOn: input.effectiveOn,
           grounds: groundsSnapshot(grounds),
           headSuccessor: handover ? (handover.successorEmployeeId ?? 'NONE') : null,

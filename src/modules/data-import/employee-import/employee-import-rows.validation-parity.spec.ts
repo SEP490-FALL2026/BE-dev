@@ -20,12 +20,17 @@ import { EmployeeImportLookup, EmployeeRowClassifier, RowIssue } from './employe
 
 interface Fixture {
   department: 'ok' | 'blank' | 'unknown' | 'inactive' | 'cost-center-inactive';
-  jobTitle: 'ok' | 'blank' | 'unknown' | 'inactive';
+  jobTitle: 'ok' | 'blank' | 'too-long';
   codeTaken?: boolean;
   emailTaken?: boolean;
 }
 
 const DEPARTMENT = { id: 'd-ops', active: true, costCenterActive: true };
+
+/** The job title cell the fixture stands for: free text, so it is only given or not, and fits or not (QĐ-87e). */
+function jobTitleText(fixture: Fixture): string {
+  return fixture.jobTitle === 'blank' ? '' : fixture.jobTitle === 'too-long' ? 'x'.repeat(256) : 'Designer';
+}
 
 function manual(fixture: Fixture): EmployeeRowReason[] {
   const lookup: EmployeeRowLookup = {
@@ -37,10 +42,6 @@ function manual(fixture: Fixture): EmployeeRowReason[] {
             active: fixture.department !== 'inactive',
             costCenterActive: fixture.department !== 'cost-center-inactive',
           },
-    jobTitle:
-      fixture.jobTitle === 'unknown' || fixture.jobTitle === 'blank'
-        ? null
-        : { status: fixture.jobTitle === 'inactive' ? 'INACTIVE' : 'ACTIVE' },
     employeeCodeTaken: fixture.codeTaken ?? false,
     workEmailTaken: fixture.emailTaken ?? false,
   };
@@ -48,7 +49,7 @@ function manual(fixture: Fixture): EmployeeRowReason[] {
   return validateEmployeeRow(
     {
       departmentCode: fixture.department === 'blank' ? '   ' : 'P-OPS',
-      jobTitleId: fixture.jobTitle === 'blank' ? '' : 'j-1',
+      jobTitle: jobTitleText(fixture),
     },
     lookup,
   );
@@ -67,16 +68,6 @@ function imported(fixture: Fixture): { outcome: string; errors: RowIssue[] } {
                 active: fixture.department !== 'inactive',
                 costCenterActive: fixture.department !== 'cost-center-inactive',
               },
-            ],
-          ],
-    ),
-    jobTitles: new Map(
-      fixture.jobTitle === 'unknown' || fixture.jobTitle === 'blank'
-        ? []
-        : [
-            [
-              'designer',
-              { id: 'j-1', name: 'Designer', status: fixture.jobTitle === 'inactive' ? 'INACTIVE' : 'ACTIVE' },
             ],
           ],
     ),
@@ -108,7 +99,7 @@ function imported(fixture: Fixture): { outcome: string; errors: RowIssue[] } {
     employment_type: 'STAFF',
     hire_date: '2026-10-01',
     department_code: fixture.department === 'blank' ? '   ' : 'P-OPS',
-    job_title: fixture.jobTitle === 'blank' ? '' : 'Designer',
+    job_title: jobTitleText(fixture),
   });
 
   return { outcome, errors };
@@ -127,12 +118,11 @@ describe('BEH.1 characterization: import classifier and manual-entry validator o
         ['DEPARTMENT_COST_CENTER_INACTIVE'],
       ],
       ['a blank job title', { department: 'ok', jobTitle: 'blank' }, ['JOB_TITLE_REQUIRED']],
-      ['an unknown job title', { department: 'ok', jobTitle: 'unknown' }, ['JOB_TITLE_NOT_FOUND']],
-      ['a retired job title', { department: 'ok', jobTitle: 'inactive' }, ['JOB_TITLE_INACTIVE']],
+      ['a job title longer than 255 characters', { department: 'ok', jobTitle: 'too-long' }, ['JOB_TITLE_TOO_LONG']],
       [
         'both wrong: the department reason comes first',
-        { department: 'unknown', jobTitle: 'inactive' },
-        ['DEPARTMENT_NOT_FOUND', 'JOB_TITLE_INACTIVE'],
+        { department: 'unknown', jobTitle: 'too-long' },
+        ['DEPARTMENT_NOT_FOUND', 'JOB_TITLE_TOO_LONG'],
       ],
     ])('%s', (_name, fixture, codes) => {
       expect(manual(fixture).map((reason) => reason.code)).toEqual(codes);
@@ -143,15 +133,15 @@ describe('BEH.1 characterization: import classifier and manual-entry validator o
 
   describe('where they differ today (kept as is in H8; aligned or accepted in BEH.1)', () => {
     it('D-1: names the place of a reason differently — a form field against a file column, under another key', () => {
-      const fixture: Fixture = { department: 'unknown', jobTitle: 'inactive' };
+      const fixture: Fixture = { department: 'unknown', jobTitle: 'too-long' };
 
       expect(manual(fixture)).toEqual([
         { field: 'departmentCode', code: 'DEPARTMENT_NOT_FOUND' },
-        { field: 'jobTitleId', code: 'JOB_TITLE_INACTIVE' },
+        { field: 'jobTitle', code: 'JOB_TITLE_TOO_LONG' },
       ]);
       expect(imported(fixture).errors).toEqual([
         { column: 'department_code', code: 'DEPARTMENT_NOT_FOUND' },
-        { column: 'job_title', code: 'JOB_TITLE_INACTIVE' },
+        { column: 'job_title', code: 'JOB_TITLE_TOO_LONG' },
       ]);
     });
 
@@ -179,7 +169,6 @@ describe('BEH.1 characterization: import classifier and manual-entry validator o
     it('D-4: the import has reasons of its own that the validator does not decide', () => {
       const lookup: EmployeeImportLookup = {
         departments: new Map([['P-OPS', DEPARTMENT]]),
-        jobTitles: new Map([['designer', { id: 'j-1', name: 'Designer', status: 'ACTIVE' }]]),
         existing: new Map(),
         emailOwners: new Map(),
       };

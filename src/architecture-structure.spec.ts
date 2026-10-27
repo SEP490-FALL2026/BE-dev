@@ -439,10 +439,6 @@ const INTRA_MODULE_CONTRACTS: ReadonlyMap<string, string> = new Map([
     'counts of applications, plans and subscriptions read through the catalog facade catalog.service.ts for the onboarding checklist',
   ],
   [
-    'modules/catalog/standard-toolset/standard-toolset.service.ts',
-    'count of the department and job title pairs that have a standard toolset, read through standard-toolset.service.ts for the onboarding checklist',
-  ],
-  [
     'modules/catalog/subscription/subscription-lookup.service.ts',
     'term and end of the subscriptions of some plans, read by the retirement of an application',
   ],
@@ -499,10 +495,6 @@ const INTRA_MODULE_CONTRACTS: ReadonlyMap<string, string> = new Map([
     'whether the baseline is closed and the shared lock a confirmation holds, reached through the licensing facade',
   ],
   ['modules/finance/tax-profile/tax-profile.service.ts', 'tax estimate of a vendor read through the finance facade'],
-  [
-    'modules/finance/cost-allocation/cost-allocation.service.ts',
-    'cost allocation of a subscription declared and read through the finance facade',
-  ],
   [
     'modules/finance/exchange-rate/exchange-rate-ledger.service.ts',
     'recorded exchange rates read by the finance facade; written only through the audited ExchangeRateService',
@@ -570,7 +562,10 @@ const INTRA_MODULE_CONTRACTS: ReadonlyMap<string, string> = new Map([
     'modules/organization/cost-center/cost-center.errors.ts',
     'Cost Center errors mapped by the shared mappers/organization.http-errors.ts',
   ],
-  ['modules/organization/cost-center/cost-center.service.ts', 'Cost Center lock taken by the department write'],
+  [
+    'modules/organization/cost-center/cost-center.service.ts',
+    'whether the Cost Center link is activated, asked by the department creation',
+  ],
   [
     'modules/organization/cost-center/cost-center.types.ts',
     'code format shared with departments; Cost Center views used by department records',
@@ -593,15 +588,6 @@ const INTRA_MODULE_CONTRACTS: ReadonlyMap<string, string> = new Map([
   [
     'modules/organization/employee/employee.errors.ts',
     'employee row errors mapped by the shared mappers/organization.http-errors.ts',
-  ],
-  ['modules/organization/job-title/job-title-catalogue.service.ts', 'job title catalogue behind the facade'],
-  [
-    'modules/organization/job-title/job-title.errors.ts',
-    'job title errors mapped by the shared mappers/organization.http-errors.ts',
-  ],
-  [
-    'modules/organization/job-title/job-title.types.ts',
-    'job title views for the facade, its public types and the employee row validator',
   ],
   [
     'modules/organization/project/project.errors.ts',
@@ -1118,7 +1104,6 @@ describe('gate rules on synthetic files (A4-01, A4-04, A4-05)', () => {
         'modules/identity-access/auth/password-reset-request.service.ts',
         'modules/identity-access/recovery/recovery-ticket.service.ts',
       ],
-      ['modules/organization/organization.service.ts', 'modules/organization/job-title/job-title-catalogue.service.ts'],
       ['modules/organization/department/department.types.ts', 'modules/organization/project/project.types.ts'],
     ];
 

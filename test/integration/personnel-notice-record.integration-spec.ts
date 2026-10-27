@@ -273,19 +273,30 @@ describe('verifying and recording the notices of the heads (integration, real Po
       expect(await h.auditEventsOf('PERSONNEL.EMPLOYEE_INFORMED', row.recorded_event_id as string)).toHaveLength(1);
     });
 
-    it('records a change of title with the title and the day, and refuses a field of another kind', async () => {
+    it('leaves a notice of a change of title that was sent before to be rejected: it can no longer be recorded as an event, and nothing is written (QĐ-87e)', async () => {
       const e1 = await h.worker(des, code());
-      const wire = h.dataOf<NoticeWire>(await notice(e1, 'JOB_TITLE_CHANGE'));
-      const title = await h.jobTitle(h.unique('Senior'));
+      // Sent by a release that still took this kind: the row is history now, and cannot be sent again.
+      const sent = await h.ctx.sql.query<{ id: string }>(
+        `INSERT INTO personnel_notices (id, code, organization_id, employee_id, kind, proposed_on, sender_employee_id,
+                                        sender_department_id, due_on)
+         VALUES (gen_random_uuid(), 'BM09-2026-900001', $1, $2, 'JOB_TITLE_CHANGE', $3, $4, $5, $6) RETURNING id`,
+        [h.seed.organizationId, e1.employeeId, h.day(5), h1.employeeId, des.id, h.day(8)],
+      );
+      const id = sent.rows[0].id;
 
-      const wrong = await h.recordNotice(wire.id, h.recording({ effectiveOn: h.day(4), lastWorkingDay: h.day(6) }));
-      const missing = await h.recordNotice(wire.id, h.recording({ effectiveOn: h.day(4) }));
-      const ok = await h.recordNotice(wire.id, h.recording({ effectiveOn: h.day(4), toJobTitleId: title }));
+      const asEvent = await h.recordNotice(id, h.recording({ effectiveOn: h.day(4) }));
+      const wrong = await h.recordNotice(id, h.recording({ effectiveOn: h.day(4), lastWorkingDay: h.day(6) }));
 
+      expect([asEvent.status, h.codeOf(asEvent)]).toEqual([422, 'DEPARTMENT_TRANSFER.NO_CHANGE']);
       expect([wrong.status, h.codeOf(wrong)]).toEqual([422, 'PERSONNEL_NOTICE.EVENT_INVALID']);
-      expect(h.detailsOf(wrong)).toEqual({ missing: ['toJobTitleId'], notAllowed: ['lastWorkingDay'] });
-      expect([missing.status, h.codeOf(missing)]).toEqual([422, 'PERSONNEL_NOTICE.EVENT_INVALID']);
-      expect(ok.status).toBe(201);
+      expect(h.detailsOf(wrong)).toEqual({ missing: [], notAllowed: ['lastWorkingDay'] });
+      expect(await h.eventCounts(e1.employeeId)).toEqual({ transfers: 0, leaves: 0, cases: 0 });
+      expect(await stillWaiting(e1)).toBe(true);
+
+      await h.rejectNotice(id, { reason: 'Loại BM-09 đã bỏ (QĐ-87e, D-1)' }).expect(200);
+
+      const [row] = await h.noticeRows(e1.employeeId);
+      expect(row).toMatchObject({ status: 'REJECTED', reject_reason: 'Loại BM-09 đã bỏ (QĐ-87e, D-1)' });
     });
 
     it('records a long leave from the notice and puts the person on leave', async () => {

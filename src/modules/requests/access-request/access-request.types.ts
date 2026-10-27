@@ -3,11 +3,16 @@ import type { BusinessDate } from '../../../core/business-date';
 import type { AccessRequestBranchCode, RequestPolicy } from './access-request.policy';
 import type { BillingCycleCode, MissingPriceReason, PaymentPeriod } from './pricing.policy';
 import type { WaitingReason } from './routing.policy';
-import type { LineRecord } from '../group-request/group-request.types';
+import type { LineRecord, ReadableCancelCause } from '../group-request/group-request.types';
 
 /** The shapes the repository of requests reads and writes; the repository re-exports them, so importers do not change. */
 
+/**
+ * `DRAFT` is written by the release after this one (spec L.1, L.10): a request being drafted is neither listed nor readable
+ * here, so every read filters it out and no wire carries it.
+ */
 export type AccessRequestState =
+  | 'DRAFT'
   | 'PENDING'
   | 'WAITING_CONTROLLED'
   | 'AWAITING_EXECUTION'
@@ -85,8 +90,6 @@ export interface NewAccessRequest {
   businessReason: string;
   termMonths: number;
   projectLabel: string | null;
-  outsideStandardReason: string | null;
-  outsideStandard: boolean;
   pricing: PricingRecord;
   policy: RequestPolicy;
   delegatedBatchId?: string | null;
@@ -155,7 +158,7 @@ export interface WithdrawalRecord {
 export interface CancellationRecord {
   cancelledAt: Date;
   cancelledByEmployeeId: string;
-  cause: 'BENEFICIARY_LEFT';
+  cause: ReadableCancelCause;
   note: string | null;
 }
 
@@ -172,8 +175,6 @@ export interface AccessRequestRecord {
   businessReason: string;
   termMonths: number;
   projectLabel: string | null;
-  outsideStandardReason: string | null;
-  outsideStandard: boolean;
   pricing: PricingRecord;
   /** The line of the plan of the budget it is attached to; null when it is attached to none. */
   planLine: { versionId: string; position: number; confirmed: boolean } | null;

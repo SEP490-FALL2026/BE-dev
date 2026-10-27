@@ -3,6 +3,8 @@ import { ApiException } from '../../../infrastructure/http/errors/api.exception'
 import { TransientDatabaseError } from '../../../infrastructure/database/transaction-runner';
 import {
   CostCenterCodeTakenError,
+  CostCenterDepartmentAlreadyLinkedError,
+  CostCenterDepartmentNotActiveError,
   CostCenterInUseError,
   CostCenterKindNotSupportedError,
   CostCenterNameInvalidError,
@@ -11,7 +13,7 @@ import {
 } from '../cost-center/cost-center.errors';
 import {
   DepartmentCodeTakenError,
-  DepartmentCostCenterError,
+  DepartmentCreationAwaitingActivationError,
   DepartmentInUseError,
   DepartmentInactiveError,
   DepartmentItAdminInvalidError,
@@ -26,12 +28,6 @@ import {
   EmployeeRowInvalidError,
   EmployeeUpdateEmptyError,
 } from '../employee/employee.errors';
-import {
-  JobTitleNameRequiredError,
-  JobTitleNameTakenError,
-  JobTitleNameTooLongError,
-  JobTitleNotFoundError,
-} from '../job-title/job-title.errors';
 import { ProjectInvalidError, ProjectNotFoundError } from '../project/project.errors';
 import { EmployeeCodeTakenError, EmployeeNotFoundError, OrganizationAlreadyExistsError } from '../organization.errors';
 import { toOrganizationApiException } from './organization.http-errors';
@@ -46,7 +42,6 @@ function answer(error: unknown): { status: number; body: unknown } {
 
 const department = { id: 'dep-1', code: 'DES', name: 'Design' };
 const people = [{ employeeCode: 'E-1', fullName: 'An Nguyen' }];
-const conflict = { id: 'jt-1', name: 'Designer', status: 'INACTIVE' as const };
 
 /**
  * Characterization of the organization error contract before the H4.1 refactor (wire contract: status, code, message,
@@ -55,39 +50,10 @@ const conflict = { id: 'jt-1', name: 'Designer', status: 'INACTIVE' as const };
 const CASES: [string, Error, HttpStatus, string, Record<string, unknown> | undefined][] = [
   [
     'EmployeeRowInvalidError',
-    new EmployeeRowInvalidError([{ field: 'jobTitle', code: 'JOB_TITLE_INACTIVE' }]),
+    new EmployeeRowInvalidError([{ field: 'jobTitle', code: 'JOB_TITLE_TOO_LONG' }]),
     HttpStatus.UNPROCESSABLE_ENTITY,
     'EMPLOYEE.ROW_INVALID',
-    { reasons: [{ field: 'jobTitle', code: 'JOB_TITLE_INACTIVE' }] },
-  ],
-  ['JobTitleNotFoundError', new JobTitleNotFoundError(), HttpStatus.NOT_FOUND, 'JOB_TITLE.NOT_FOUND', undefined],
-  [
-    'JobTitleNameRequiredError',
-    new JobTitleNameRequiredError(),
-    HttpStatus.UNPROCESSABLE_ENTITY,
-    'JOB_TITLE.NAME_REQUIRED',
-    undefined,
-  ],
-  [
-    'JobTitleNameTooLongError',
-    new JobTitleNameTooLongError(),
-    HttpStatus.UNPROCESSABLE_ENTITY,
-    'JOB_TITLE.NAME_TOO_LONG',
-    undefined,
-  ],
-  [
-    'JobTitleNameTakenError with a conflict',
-    new JobTitleNameTakenError(conflict),
-    HttpStatus.CONFLICT,
-    'JOB_TITLE.NAME_TAKEN',
-    { conflict },
-  ],
-  [
-    'JobTitleNameTakenError without a conflict',
-    new JobTitleNameTakenError(null),
-    HttpStatus.CONFLICT,
-    'JOB_TITLE.NAME_TAKEN',
-    undefined,
+    { reasons: [{ field: 'jobTitle', code: 'JOB_TITLE_TOO_LONG' }] },
   ],
   ['CostCenterNotFoundError', new CostCenterNotFoundError(), HttpStatus.NOT_FOUND, 'COST_CENTER.NOT_FOUND', undefined],
   [
@@ -95,6 +61,20 @@ const CASES: [string, Error, HttpStatus, string, Record<string, unknown> | undef
     new CostCenterCodeTakenError('CC-DES'),
     HttpStatus.CONFLICT,
     'COST_CENTER.CODE_TAKEN',
+    undefined,
+  ],
+  [
+    'CostCenterDepartmentNotActiveError',
+    new CostCenterDepartmentNotActiveError(),
+    HttpStatus.UNPROCESSABLE_ENTITY,
+    'COST_CENTER.DEPARTMENT_NOT_ACTIVE',
+    undefined,
+  ],
+  [
+    'CostCenterDepartmentAlreadyLinkedError',
+    new CostCenterDepartmentAlreadyLinkedError('<department-id>'),
+    HttpStatus.CONFLICT,
+    'COST_CENTER.DEPARTMENT_ALREADY_LINKED',
     undefined,
   ],
   [
@@ -141,31 +121,10 @@ const CASES: [string, Error, HttpStatus, string, Record<string, unknown> | undef
     undefined,
   ],
   [
-    'DepartmentCostCenterError TAKEN',
-    new DepartmentCostCenterError('TAKEN'),
+    'DepartmentCreationAwaitingActivationError',
+    new DepartmentCreationAwaitingActivationError(),
     HttpStatus.CONFLICT,
-    'DEPARTMENT.COST_CENTER_TAKEN',
-    undefined,
-  ],
-  [
-    'DepartmentCostCenterError NOT_FOUND',
-    new DepartmentCostCenterError('NOT_FOUND'),
-    HttpStatus.UNPROCESSABLE_ENTITY,
-    'DEPARTMENT.COST_CENTER_NOT_FOUND',
-    undefined,
-  ],
-  [
-    'DepartmentCostCenterError NOT_UNIT',
-    new DepartmentCostCenterError('NOT_UNIT'),
-    HttpStatus.UNPROCESSABLE_ENTITY,
-    'DEPARTMENT.COST_CENTER_NOT_UNIT',
-    undefined,
-  ],
-  [
-    'DepartmentCostCenterError INACTIVE',
-    new DepartmentCostCenterError('INACTIVE'),
-    HttpStatus.UNPROCESSABLE_ENTITY,
-    'DEPARTMENT.COST_CENTER_INACTIVE',
+    'DEPARTMENT.CREATION_AWAITING_ACTIVATION',
     undefined,
   ],
   [

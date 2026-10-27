@@ -74,9 +74,7 @@ export class RequestPreviewService {
       projectLabel: body.projectLabel ?? null,
       department: { id: department.id, code: department.code, name: department.name },
       costCenter: { id: costCenter.id, code: costCenter.code, name: costCenter.name },
-      outsideStandard: assessed.outsideStandard,
       requirements: {
-        outsideStandardReason: assessed.outsideStandard,
         termConfirmationByHead: termNeedsConfirmation(body.termMonths),
       },
       existingAccess: assessed.heldAccess,

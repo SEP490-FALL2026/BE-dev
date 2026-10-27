@@ -47,7 +47,7 @@ describe('the projection of the audit events into the inbox over PostgreSQL (US-
         .sendDelegated(
           {
             beneficiaryEmployeeIds: [colleague.employeeId],
-            items: [{ planId: plan, outsideStandardReason: 'Not standard' }],
+            items: [{ planId: plan }],
             businessReason: 'The new designer needs the tool',
             termMonths: 1,
           },

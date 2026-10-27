@@ -24,13 +24,11 @@ function principal(direct: string[], derived: string[] = []) {
 
 type Call = (server: App) => request.Test;
 
+/** The HR document a department is created from (`QĐ-87b`): every part is required. */
+const HR_BASIS_BODY = { type: 'DECISION', reference: 'QD-2026-001', issuer: 'HR Office', issuedOn: '2026-10-01' };
+
 const IT_ONLY: Array<[string, Call]> = [
   ['GET /departments', (server) => request(server).get('/api/v1/departments')],
-  [
-    'POST /departments',
-    (server) =>
-      request(server).post('/api/v1/departments').send({ code: 'P-DES', name: 'Design', costCenterId: OTHER }),
-  ],
   ['PATCH /departments/{id}', (server) => request(server).patch(`/api/v1/departments/${ID}`).send({ name: 'x' })],
   ['POST /departments/{id}/deactivate', (server) => request(server).post(`/api/v1/departments/${ID}/deactivate`)],
   [
@@ -140,22 +138,57 @@ describe('department routes (e2e, no database)', () => {
     );
   });
 
+  describe('creating a department belongs to the Super Admin (QĐ-87b, QĐ-87d(1))', () => {
+    const body = { code: 'P-DES', name: 'Design', hrBasis: HR_BASIS_BODY };
+
+    it.each([
+      ['the finance officer', ['FINANCE'], []],
+      ['the IT Admin, who keeps the technical work only', ['IT_ADMIN'], []],
+      ['an employee', ['EMPLOYEE'], []],
+      ['an account with no role', [], []],
+      ['a department head, whose role is derived', [], ['MANAGER']],
+      ['the spending approver, whose role is derived', [], ['SPENDING_APPROVER']],
+    ])('refuses %s with 403', async (_name, direct, derived) => {
+      app = await appFor(principal(direct, derived));
+
+      const response = await request(app.getHttpServer())
+        .post('/api/v1/departments')
+        .set('Authorization', 'Bearer any')
+        .send(body)
+        .expect(403);
+
+      expect(bodyOf(response).error.code).toBe('AUTHORIZATION.FORBIDDEN');
+    });
+
+    it('needs a token', async () => {
+      app = await appFor(principal(['SUPER_ADMIN']));
+
+      const response = await request(app.getHttpServer()).post('/api/v1/departments').send(body).expect(401);
+
+      expect(bodyOf(response).error.code).toBe('AUTHENTICATION_REQUIRED');
+    });
+  });
+
   describe('validation', () => {
     const asIt = () => ({ Authorization: 'Bearer any' });
 
     it.each([
-      ['no code', { name: 'Design', costCenterId: OTHER }],
-      ['a code with a space', { code: 'P DES', name: 'Design', costCenterId: OTHER }],
-      ['no name', { code: 'P-DES', costCenterId: OTHER }],
-      ['no cost center', { code: 'P-DES', name: 'Design' }],
-      ['a cost center that is not an id', { code: 'P-DES', name: 'Design', costCenterId: 'CC-1' }],
+      ['no code', { name: 'Design', hrBasis: HR_BASIS_BODY }],
+      ['a code with a space', { code: 'P DES', name: 'Design', hrBasis: HR_BASIS_BODY }],
+      ['no name', { code: 'P-DES', hrBasis: HR_BASIS_BODY }],
+      ['no HR basis', { code: 'P-DES', name: 'Design' }],
+      ['an HR basis with a missing part', { code: 'P-DES', name: 'Design', hrBasis: { type: 'DECISION' } }],
+      [
+        'a cost center, which a department is not created with (QĐ-87d(1))',
+        { code: 'P-DES', name: 'Design', hrBasis: HR_BASIS_BODY, costCenterId: OTHER },
+      ],
       [
         'a parent department, which does not exist (AC-3)',
-        { code: 'P-DES', name: 'Design', costCenterId: OTHER, parentId: ID },
+        { code: 'P-DES', name: 'Design', hrBasis: HR_BASIS_BODY, parentId: ID },
       ],
-      ['an unknown field', { code: 'P-DES', name: 'Design', costCenterId: OTHER, status: 'INACTIVE' }],
+      ['an unknown field', { code: 'P-DES', name: 'Design', hrBasis: HR_BASIS_BODY, status: 'INACTIVE' }],
     ])('turns away a new department with %s, 422 VALIDATION_ERROR', async (_name, body) => {
-      app = await appFor(principal(['IT_ADMIN']));
+      app = await appFor(principal(['SUPER_ADMIN']));
 
       const response = await request(app.getHttpServer())
         .post('/api/v1/departments')

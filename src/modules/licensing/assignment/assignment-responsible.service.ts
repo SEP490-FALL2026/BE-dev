@@ -164,7 +164,7 @@ export class AssignmentResponsibleService {
       workState: employee.workState,
       employmentType: employee.employmentType,
       departmentId: unit?.departmentId ?? null,
-      costCenterId: unit?.costCenter.id ?? null,
+      costCenterId: unit?.costCenter?.id ?? null,
     };
   }
 }

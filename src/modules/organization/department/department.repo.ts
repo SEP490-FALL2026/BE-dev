@@ -6,7 +6,7 @@ import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { isUniqueViolation } from '../../../infrastructure/database/unique-violation';
 import { CostCenterStatus } from '../cost-center/cost-center.types';
 import { CreateDepartmentInput, EmployeeStatus, EmployeeWorkState } from '../organization.types';
-import { DepartmentCodeTakenError, DepartmentCostCenterError } from './department.errors';
+import { DepartmentCodeTakenError } from './department.errors';
 import { DepartmentMemberRecord, DepartmentRecord, DepartmentStatus } from './department.types';
 
 interface DepartmentRow {
@@ -18,10 +18,10 @@ interface DepartmentRow {
   created_at: Date;
   updated_at: Date;
   deactivated_at: Date | null;
-  cc_id: string;
-  cc_code: string;
-  cc_name: string;
-  cc_status: CostCenterStatus;
+  cc_id: string | null;
+  cc_code: string | null;
+  cc_name: string | null;
+  cc_status: CostCenterStatus | null;
   it_id: string | null;
   it_code: string | null;
   it_name: string | null;
@@ -33,7 +33,7 @@ const SELECT_DEPARTMENT = Prisma.sql`
          c.id AS cc_id, c.code AS cc_code, c.name AS cc_name, c.status AS cc_status,
          e.id AS it_id, e.employee_code AS it_code, e.full_name AS it_name, e.status AS it_status
     FROM departments d
-    JOIN cost_centers c ON c.id = d.cost_center_id
+    LEFT JOIN cost_centers c ON c.department_id = d.id AND c.status = 'ACTIVE'
     LEFT JOIN employees e ON e.id = d.it_admin_employee_id`;
 
 function toRecord(row: DepartmentRow): DepartmentRecord {
@@ -43,7 +43,9 @@ function toRecord(row: DepartmentRow): DepartmentRecord {
     name: row.name,
     functionDescription: row.function_description,
     status: row.status,
-    costCenter: { id: row.cc_id, code: row.cc_code, name: row.cc_name, status: row.cc_status },
+    // The current Cost Center: the ACTIVE one that belongs to the department; none until Finance creates one.
+    costCenter:
+      row.cc_id === null ? null : { id: row.cc_id, code: row.cc_code ?? '', name: row.cc_name ?? '', status: 'ACTIVE' },
     itAdmin:
       row.it_id === null
         ? null
@@ -76,7 +78,7 @@ export class DepartmentRepo {
 
   // --- departments --------------------------------------------------------------------
 
-  /** Throws DepartmentCodeTakenError, or DepartmentCostCenterError('TAKEN') when another department already has the cost center. */
+  /** A department with no Cost Center: Finance creates it afterwards (`QĐ-87d(1)`). Throws DepartmentCodeTakenError. */
   async insert(
     tx: DbTx,
     input: {
@@ -84,7 +86,6 @@ export class DepartmentRepo {
       code: string;
       name: string;
       functionDescription: string | null;
-      costCenterId: string;
       itAdminEmployeeId: string | null;
     },
   ): Promise<string> {
@@ -93,7 +94,6 @@ export class DepartmentRepo {
 
       return created.id;
     } catch (error) {
-      if (isUniqueViolation(error, 'cost_center_id')) throw new DepartmentCostCenterError('TAKEN');
       if (isUniqueViolation(error, 'code')) throw new DepartmentCodeTakenError(input.code);
       throw error;
     }
@@ -121,10 +121,8 @@ export class DepartmentRepo {
     organizationId: string,
     code: string,
   ): Promise<{ id: string; code: string; name: string; active: boolean; costCenterActive: boolean } | null> {
-    const rows = await tx.$queryRaw<
-      { id: string; code: string; name: string; cost_center_id: string; status: string }[]
-    >`
-      SELECT id, code, name, cost_center_id, status::text AS status FROM departments
+    const rows = await tx.$queryRaw<{ id: string; code: string; name: string; status: string }[]>`
+      SELECT id, code, name, status::text AS status FROM departments
        WHERE organization_id = ${organizationId}::uuid AND code = ${code} FOR SHARE`;
     const department = rows[0];
     if (!department) return null;
@@ -132,7 +130,8 @@ export class DepartmentRepo {
     // Read after the lock, in a statement of its own (lock protocol rule 7): a retirement of the cost center that
     // committed while this waited for the department is seen here.
     const centers = await tx.$queryRaw<{ status: string }[]>`
-      SELECT status::text AS status FROM cost_centers WHERE id = ${department.cost_center_id}::uuid`;
+      SELECT status::text AS status FROM cost_centers
+       WHERE department_id = ${department.id}::uuid AND status = 'ACTIVE'`;
 
     return {
       id: department.id,

@@ -134,7 +134,8 @@ export class BudgetSupportService {
     if (!headed) return null;
     const unit = (await this.organization.getOwningUnits([employeeId], today, tx)).get(employeeId);
 
-    return unit && unit.departmentId === headed.departmentId ? unit.costCenter.id : null;
+    // A department with no Cost Center in use has nothing a head could answer for (`QĐ-87d(1)`).
+    return unit && unit.departmentId === headed.departmentId ? (unit.costCenter?.id ?? null) : null;
   }
 
   /** Throws BudgetNotYourCostCenterError. */

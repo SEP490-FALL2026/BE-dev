@@ -268,14 +268,7 @@ describe('the renewal of a right that ends on a day over PostgreSQL (US-05-14)',
       const plain = await h.submit(h.form(internalPlan, { termMonths: 2 }), unit.member.account);
       expect(h.codeOf(plain)).toBe('ACCESS_REQUEST.ALREADY_HOLDS_ACCESS');
 
-      // A tool outside the standard toolset of the person needs its reason, as for any request.
-      const unreasoned = await h.renew(body(assignmentId, newEnd), unit.member.account).expect(422);
-      expect(h.codeOf(unreasoned)).toBe('ACCESS_REQUEST.OUTSIDE_STANDARD_REASON_REQUIRED');
-
-      const { outcome, request } = await h.renewed(
-        unit.member.account,
-        body(assignmentId, newEnd, { outsideStandardReason: 'Not in the standard toolset' }),
-      );
+      const { outcome, request } = await h.renewed(unit.member.account, body(assignmentId, newEnd));
 
       expect(outcome).toBe('NEW_REQUEST');
       expect(request).toMatchObject({

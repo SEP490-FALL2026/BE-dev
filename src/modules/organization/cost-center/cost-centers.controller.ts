@@ -40,14 +40,15 @@ const NOT_FOUND = {
 } as const;
 
 const VALIDATION_ERROR_DESCRIPTION =
-  'The request is invalid (VALIDATION_ERROR), the kind is not UNIT (COST_CENTER.KIND_NOT_SUPPORTED), or the name is empty, too long (COST_CENTER.NAME_INVALID) or reserved (COST_CENTER.NAME_RESERVED).';
+  'The request is invalid (VALIDATION_ERROR), the kind is not UNIT (COST_CENTER.KIND_NOT_SUPPORTED), the name is empty, too long (COST_CENTER.NAME_INVALID) or reserved (COST_CENTER.NAME_RESERVED), or the department does not exist or is no longer in use (COST_CENTER.DEPARTMENT_NOT_ACTIVE).';
 
-/** A new cost center: the request, its kind or its name. */
+/** A new cost center: the request, its kind, its name or its department. */
 const CREATE_INVALID = {
   status: HttpStatus.UNPROCESSABLE_ENTITY,
   description: VALIDATION_ERROR_DESCRIPTION,
   examples: [
     VALIDATION_EXAMPLE,
+    ORGANIZATION_ERROR_EXAMPLES.COST_CENTER_DEPARTMENT_NOT_ACTIVE,
     ORGANIZATION_ERROR_EXAMPLES.COST_CENTER_KIND_NOT_SUPPORTED,
     ORGANIZATION_ERROR_EXAMPLES.COST_CENTER_NAME_INVALID,
     ORGANIZATION_ERROR_EXAMPLES.COST_CENTER_NAME_RESERVED,
@@ -80,6 +81,7 @@ function toWire(record: CostCenterRecord) {
     kind: record.kind,
     status: record.status,
     department: record.department,
+    linkedAt: record.linkedAt ? record.linkedAt.toISOString() : null,
     createdAt: record.createdAt.toISOString(),
     updatedAt: record.updatedAt.toISOString(),
     deactivatedAt: record.deactivatedAt ? record.deactivatedAt.toISOString() : null,
@@ -132,12 +134,17 @@ export class CostCentersController {
   @ApiSuccessResponse(CostCenterResponseDto, {
     status: HttpStatus.CREATED,
     message: 'COST_CENTER.CREATED',
-    description: 'The cost center is in the catalogue, in use, with no department yet.',
+    description:
+      "The cost center is in the catalogue, in use, created for the department: it is the department's current one from now on.",
   })
   @ApiErrorResponses(...AUTH_ERRORS, FINANCE_ONLY, CREATE_INVALID, {
     status: HttpStatus.CONFLICT,
-    description: 'The code is already taken (COST_CENTER.CODE_TAKEN).',
-    examples: [ORGANIZATION_ERROR_EXAMPLES.COST_CENTER_CODE_TAKEN],
+    description:
+      'The code is already taken (COST_CENTER.CODE_TAKEN), or the department already has a cost center in use (COST_CENTER.DEPARTMENT_ALREADY_LINKED).',
+    examples: [
+      ORGANIZATION_ERROR_EXAMPLES.COST_CENTER_CODE_TAKEN,
+      ORGANIZATION_ERROR_EXAMPLES.COST_CENTER_DEPARTMENT_ALREADY_LINKED,
+    ],
   })
   async create(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: CreateCostCenterBodyDto) {
     try {

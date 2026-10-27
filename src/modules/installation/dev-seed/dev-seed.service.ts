@@ -8,7 +8,7 @@ import { AuditService } from '../../audit/audit.service';
 import { IdentityAccessService } from '../../identity-access/identity-access.service';
 import { LocalDemoAccountService } from '../../identity-access/local-demo-account.service';
 import { OrganizationService } from '../../organization/organization.service';
-import { DEMO_FIXTURE_KEYS, DEMO_PEOPLE_LOOKUP, buildSeedPlan, samePlan } from './dev-seed-plan';
+import { DEMO_DIRECTION_KEY, DEMO_FIXTURE_KEYS, DEMO_PEOPLE_LOOKUP, buildSeedPlan, samePlan } from './dev-seed-plan';
 import { SeedStateChangedError } from './dev-seed.errors';
 import { DEMO_COST_CENTER, DEMO_DEPARTMENT, DEMO_HIRE_DATE, DEMO_JOB_TITLE, DEMO_PEOPLE } from './dev-seed.fixture';
 import { DevSeedRepo } from './dev-seed.repo';
@@ -132,34 +132,33 @@ export class DevSeedService {
         after,
       });
 
-    let costCenterId = plan.costCenterId;
-    if (creates('COST_CENTER', DEMO_COST_CENTER.code)) {
-      costCenterId = (await this.organization.createUnitCostCenter(tx, { organizationId, ...DEMO_COST_CENTER })).id;
-      await record('DEV_SEED.COST_CENTER_CREATED', 'CostCenter', costCenterId, {
-        code: DEMO_COST_CENTER.code,
-        kind: 'UNIT',
-      });
-    }
-
+    // The department first, then the Cost Center created for it (`QĐ-87d(1)`: there is no Cost Center without a department).
     let departmentId = plan.departmentId;
     if (creates('DEPARTMENT', DEMO_DEPARTMENT.code)) {
-      // On the Cost Center just created, or on the exact DEMO-CC that exists without its department (P23-RV-01).
-      const department = await this.organization.createDepartment(tx, {
-        organizationId,
-        ...DEMO_DEPARTMENT,
-        costCenterId: costCenterId as string,
-      });
+      const department = await this.organization.createDepartment(tx, { organizationId, ...DEMO_DEPARTMENT });
       departmentId = department.id;
-      await record('DEV_SEED.DEPARTMENT_CREATED', 'Department', department.id, {
-        code: DEMO_DEPARTMENT.code,
-        costCenterCode: DEMO_COST_CENTER.code,
+      await record('DEV_SEED.DEPARTMENT_CREATED', 'Department', department.id, { code: DEMO_DEPARTMENT.code });
+    }
+
+    if (creates('COST_CENTER', DEMO_COST_CENTER.code)) {
+      const costCenter = await this.organization.createUnitCostCenter(tx, {
+        organizationId,
+        ...DEMO_COST_CENTER,
+        departmentId: departmentId as string,
+      });
+      await record('DEV_SEED.COST_CENTER_CREATED', 'CostCenter', costCenter.id, {
+        code: DEMO_COST_CENTER.code,
+        kind: 'UNIT',
+        departmentCode: DEMO_DEPARTMENT.code,
       });
     }
 
-    let jobTitleId = plan.jobTitleId;
-    if (creates('JOB_TITLE', DEMO_JOB_TITLE)) {
-      jobTitleId = (await this.organization.createJobTitle(tx, organizationId, DEMO_JOB_TITLE)).id;
-      await record('DEV_SEED.JOB_TITLE_CREATED', 'JobTitle', jobTitleId, { name: DEMO_JOB_TITLE });
+    // A new local database has no previous release to recover, so nothing waits for the host (spec L.11).
+    if (creates('COST_CENTER_DIRECTION', DEMO_DIRECTION_KEY)) {
+      await this.organization.activateCostCenterDirectionForLocalSeed(tx, organizationId);
+      await record('DEV_SEED.COST_CENTER_DIRECTION_ACTIVATED', 'Organization', organizationId, {
+        environment: 'LOCAL_TEST',
+      });
     }
 
     for (const person of DEMO_PEOPLE) {
@@ -174,7 +173,7 @@ export class DevSeedService {
             employmentType: 'STAFF',
             hireDate: DEMO_HIRE_DATE,
             departmentId: departmentId as string,
-            jobTitleId: jobTitleId as string,
+            jobTitle: DEMO_JOB_TITLE,
           })
         ).id;
         await record('DEV_SEED.EMPLOYEE_CREATED', 'Employee', employeeId, {
