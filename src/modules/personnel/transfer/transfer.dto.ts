@@ -83,19 +83,27 @@ export const transferSummarySchema = z.strictObject({
   to: place,
   effectiveOn: z.string(),
   status: z.enum(['PENDING', 'EFFECTIVE', 'CANCELLED']),
-  selfExecuted: z.boolean(),
 });
 
 export const transferDetailSchema = transferSummarySchema.extend({
-  grounds: groundsSchema,
-  /** Who follows the head of the old department; null when the person did not head the department they leave. */
+  /** The basis of the transfer. Null in the minimal projection an IT Admin reads (F12). */
+  grounds: groundsSchema.nullable(),
+  /** Who follows the head of the old department; null when the person did not head the department they leave, and in the minimal projection. */
   headSuccessor: z.strictObject({ kind: z.enum(['EMPLOYEE', 'NONE']), employee: employeeBrief.nullable() }).nullable(),
-  /** Null only for an event the controlled procedure of the release after this one recorded (spec L.2); this release always writes its account. */
+  /** The account that recorded it; null when the controlled procedure did (`recordedByProcedure`, spec L.2). */
   recordedByAppUserId: z.uuid().nullable(),
+  /** True when the event was recorded by the controlled procedure `pnpm ops:record-super-admin-event` and not by an account. */
+  recordedByProcedure: z.boolean(),
   recordedAt: z.iso.datetime(),
   effectiveAt: z.iso.datetime().nullable(),
+  /** How it was cancelled; null while it was not, and in the minimal projection. */
   cancellation: z
-    .strictObject({ cancelledAt: z.iso.datetime(), cancelledByAppUserId: z.uuid(), reason: z.string() })
+    .strictObject({
+      cancelledAt: z.iso.datetime(),
+      cancelledByAppUserId: z.uuid().nullable(),
+      cancelledByProcedure: z.boolean(),
+      reason: z.string(),
+    })
     .nullable(),
   /** Set when the IT Admin closed the transfer after the people who answer for the service accounts of the person were named. */
   closure: z.strictObject({ closedAt: z.iso.datetime(), closedByAppUserId: z.uuid() }).nullable(),
@@ -116,8 +124,9 @@ const changeSchema = z.strictObject({
   newEffectiveOn: z.string().nullable(),
   reason: z.string(),
   grounds: groundsSchema,
-  /** Null only for an event the controlled procedure of the release after this one recorded (spec L.2); this release always writes its account. */
+  /** The account that changed it; null when the controlled procedure did (`changedByProcedure`, spec L.2). */
   changedByAppUserId: z.uuid().nullable(),
+  changedByProcedure: z.boolean(),
   changedAt: z.iso.datetime(),
 });
 

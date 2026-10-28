@@ -15,6 +15,7 @@ export type InspectionProblem =
   | 'MIGRATIONS_FAILED'
   | 'MIGRATIONS_UNKNOWN'
   | 'BOOTSTRAP_RECORDS_INCOMPLETE'
+  | 'CHANGE_ANNOUNCEMENTS_MISSING'
   | 'SUPER_ADMIN_MISSING'
   | 'SUPER_ADMIN_NOT_USABLE';
 
@@ -33,6 +34,12 @@ export interface MigrationReport {
   unknown: string[];
 }
 
+/** The changes of the organization that are told once to the modules that act on them (`FR-3.16`); the three a seed can miss. */
+export type ChangeAnnouncementKind = 'PLACEMENT_START' | 'HEAD_PERIOD_START' | 'HEAD_PERIOD_END';
+
+/** How many changes of each kind took effect and no announcement marks (F47). */
+export type ChangeAnnouncementGaps = Record<ChangeAnnouncementKind, number>;
+
 /**
  * What `ops:inspect` reports. Counts, states and one masked email; no id, name, code, hash, token or setting.
  * Sections after `organization` are null when there is no installation to inspect.
@@ -43,6 +50,11 @@ export interface InstallationInspection {
   migrations: MigrationReport;
   organization: { timeZone: string; reportingCurrency: string } | null;
   bootstrapRecords: { complete: boolean; mismatched: string[] } | null;
+  /**
+   * F47: the placements and head periods that had taken effect in their organization's calendar when the migration that
+   * seeded the announcements finished, and that nothing marks as told. 0 everywhere after `…_change_announcements_zone_…`.
+   */
+  changeAnnouncements: { complete: boolean; missing: ChangeAnnouncementGaps } | null;
   superAdmin: {
     holders: number;
     status: AppUserStatus;

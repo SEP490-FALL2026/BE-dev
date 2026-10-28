@@ -8,6 +8,7 @@ const notInstalled: InstallationInspection = {
   migrations: { committed: 2, applied: 0, pending: ['20261001_a', '20261002_b'], failed: [], unknown: [] },
   organization: null,
   bootstrapRecords: null,
+  changeAnnouncements: null,
   superAdmin: null,
   accounts: null,
   directRoles: null,
@@ -17,10 +18,11 @@ const notInstalled: InstallationInspection = {
 
 const incomplete: InstallationInspection = {
   status: 'INCOMPLETE',
-  problems: ['BOOTSTRAP_RECORDS_INCOMPLETE', 'SUPER_ADMIN_MISSING'],
+  problems: ['BOOTSTRAP_RECORDS_INCOMPLETE', 'CHANGE_ANNOUNCEMENTS_MISSING', 'SUPER_ADMIN_MISSING'],
   migrations: { committed: 2, applied: 2, pending: [], failed: [], unknown: [] },
   organization: { timeZone: 'Asia/Ho_Chi_Minh', reportingCurrency: 'VND' },
   bootstrapRecords: { complete: false, mismatched: ['INSTALLATION.SUPER_ADMIN_CREATED'] },
+  changeAnnouncements: { complete: false, missing: { PLACEMENT_START: 2, HEAD_PERIOD_START: 0, HEAD_PERIOD_END: 1 } },
   superAdmin: null,
   accounts: { total: 0, byState: { ACTIVE_ACTIVATED: 0, ACTIVE_INVITED: 0, LOCKED_ACTIVATED: 0, LOCKED_INVITED: 0 } },
   directRoles: { SUPER_ADMIN: 0, IT_ADMIN: 0, FINANCE: 0, EMPLOYEE: 0 },
@@ -47,10 +49,11 @@ describe('formatInspection', () => {
     expect(formatInspection(incomplete)).toBe(
       [
         'Installation: INCOMPLETE',
-        'Problems: BOOTSTRAP_RECORDS_INCOMPLETE, SUPER_ADMIN_MISSING',
+        'Problems: BOOTSTRAP_RECORDS_INCOMPLETE, CHANGE_ANNOUNCEMENTS_MISSING, SUPER_ADMIN_MISSING',
         'Migrations: 2 committed, 2 applied, 0 pending, 0 failed, 0 unknown',
         'Organization: present (Asia/Ho_Chi_Minh, VND)',
         'Bootstrap records: mismatched INSTALLATION.SUPER_ADMIN_CREATED',
+        'Change announcements: missing PLACEMENT_START 2, HEAD_PERIOD_START 0, HEAD_PERIOD_END 1',
         'Super Admin: none',
         'Accounts: 0 (ACTIVE_ACTIVATED 0, ACTIVE_INVITED 0, LOCKED_ACTIVATED 0, LOCKED_INVITED 0)',
         'Direct roles: SUPER_ADMIN 0, IT_ADMIN 0, FINANCE 0, EMPLOYEE 0',
@@ -59,6 +62,20 @@ describe('formatInspection', () => {
         '',
       ].join('\n'),
     );
+  });
+
+  it('says the announcements are complete when nothing was missed, and prints no id or name', () => {
+    const text = formatInspection({
+      ...incomplete,
+      problems: [],
+      status: 'INSTALLED',
+      changeAnnouncements: {
+        complete: true,
+        missing: { PLACEMENT_START: 0, HEAD_PERIOD_START: 0, HEAD_PERIOD_END: 0 },
+      },
+    });
+
+    expect(text).toContain('Change announcements: complete\n');
   });
 
   it('carries the same status and numbers in the JSON form', () => {

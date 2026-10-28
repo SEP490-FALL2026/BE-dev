@@ -30,6 +30,14 @@ export class AssignmentSeatOccupancy implements SeatOccupancyReader, OnModuleIni
     return this.repo.countHoldersOfPlans(planIds, day);
   }
 
+  subscriptionsWithOpenSeats(
+    subscriptionIds: readonly string[],
+    day: BusinessDate,
+    tx?: DbTx,
+  ): Promise<ReadonlySet<string>> {
+    return this.repo.subscriptionIdsHolding(subscriptionIds, day, tx);
+  }
+
   async openAssignmentsOfPlans(
     planIds: readonly string[],
     day: BusinessDate,

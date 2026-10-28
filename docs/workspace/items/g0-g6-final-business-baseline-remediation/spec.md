@@ -116,6 +116,11 @@ mở lại và finding.
   image tương thích đang chạy hoặc được H7 phục hồi; không có điểm dừng thứ hai. F01 (review `P03-RV-04`, [mục L.11](#l11-cost-center-luôn-thuộc-một-phòng-chuyển-tiếp-và-bước-kích-hoạt-review-p03-rv-04)): Cost Center luôn thuộc đúng một phòng ở schema cuối; Task 1.2b có thêm **một bước kích hoạt** của operator (Owner duyệt 27/10/2026) — không deploy boundary thứ hai.
 - F15, F20, F21, F22 phụ thuộc F02; F44 phụ thuộc F01; F42 phụ thuộc F04 (gỡ bộ chuẩn) và F29; F43 phụ thuộc F20.
 - Môi trường: PostgreSQL 17 cô lập theo `test/README.md`; diễn tập migration trên CSDL có dữ liệu dựng ở `7c28e75`.
+- **Làm rõ lịch trình (Owner, 27/10/2026, continuation §9.1 — không đổi thiết kế, disposition hay thứ tự deploy):** bản tương thích là commit
+  `fba4dfe0885f19e6a76a6e6e7e15d30223d124ab` (bất biến; chưa push, chưa CI). Mã và migration của bản cuối (Task 1.2c trở đi, gồm migration (B) của L.3) được viết
+  và diễn tập **cục bộ** trên PostgreSQL cô lập và các mốc gán tổng hợp được bảo vệ, không chờ Task 1.2b action 9. Action 9 (L.3, L.10, L.11) vẫn là điều
+  kiện **trước khi áp bản cuối trên CSDL thật có dữ liệu**: artifact tương thích dựng đúng từ `fba4dfe`, CI/release, các bước operator theo thứ tự, `READY` thật; diễn tập
+  cục bộ không thay hành động operator. Các cổng preflight và khối `RAISE` giữ nguyên để một CSDL thật bỏ qua mở rộng/gán/liên kết vẫn bị chặn trước migration.
 
 ## Ownership: module, data, API
 
@@ -312,7 +317,10 @@ mở lại và finding.
 - **Thông báo** (F67, `QĐ-92b`, `FR-5.14`): chỉ hộp thông báo; người nhận theo vai lúc gửi; khóa tham số không mang số tiền; ghi cùng giao
   dịch — dòng 18, 40, 41, 47, 48, 52, 53, 54, 55 như [impact matrix F67](impact-matrix.md#f67--không-có-thông-báo-vòng-ngân-sách-và-vòng-financetrưởng-phòng).
   Dòng 53 khi phòng chưa có trưởng phòng: lưu thông báo **giữ chờ** ở bảng `held_department_notifications` của capability `notifications` (`prisma/models/notifications.prisma`): `id`, `organization_id`, `department_id` (FK `RESTRICT`), `code`, `subject_type`, `subject_id`, `params` JSONB, `event_key` (`UNIQUE`), `held_at`, `delivered_at` NULL, `delivered_to_employee_id` NULL; CHECK `delivered_at` ⟺ `delivered_to_employee_id`; khi Super Admin gán trưởng phòng đầu tiên (F10), cùng
-  giao dịch chèn thông báo trong ứng dụng cho người đó và đặt `delivered_*`, không gửi ai khác (`T-11`). Dòng của Request (41, 47, 48)
+  giao dịch chèn thông báo trong ứng dụng cho người đó và đặt `delivered_*`, không gửi ai khác (`T-11`).
+  _Làm rõ trong Giai đoạn II (28/10/2026, F74, F75):_ "khi gán" nghĩa là **khi kỳ trưởng phòng bắt đầu** — cùng giao dịch lệnh gán khi `effectiveFrom` là hôm nay,
+  còn gán ngày tương lai thì ở lượt báo thay đổi `HEAD_PERIOD_START` tới ngày; người ghi thông báo giữ chờ đọc trưởng phòng **sau khi** khóa phòng `FOR SHARE`
+  (không còn hàng giữ chờ của phòng đã có trưởng phòng). Dòng của Request (41, 47, 48)
   phát qua bộ chiếu trạng thái từ sự kiện audit; dòng của đề xuất/phiên bản (18, 40, 52 → 55) gọi `notifyInApp` trực tiếp trong giao dịch
   của `budgets/budget`. Không đổi OpenAPI (`code` là chuỗi). Dòng 54: khi Finance trả lại đề xuất mà người nộp không còn là trưởng phòng, và khi
   trưởng phòng mới được gán lúc việc nộp lại/rút đang chờ. Không thêm dòng ngoài bảng (`US-12-15` AC-1).
@@ -513,6 +521,10 @@ NOT NULL`); `access_requests.submitted_at` bỏ NOT NULL (giữ default) + CHECK
     `ACCESS_REQUEST.DRAFT_DELETED`.
   - Với `{id}`: không phải nháp do người gọi tạo ⟹ 404 `ACCESS_REQUEST.NOT_FOUND` (không lộ tồn tại); Request của người gọi nhưng không
     còn `DRAFT` ⟹ 409 `ACCESS_REQUEST.NOT_DRAFT`. `accessRequestGet` trả nháp chỉ cho người tạo; `accessRequestTimingsGet` của nháp ⟹ 404.
+    _Độ lệch ghi trong Giai đoạn II (28/10/2026):_ nháp **không có wire "Request"** (không giá, bước, Cost Center) nên `accessRequestGet` trả 404 với mọi người, kể cả người tạo;
+    nháp đọc qua `accessRequestDraftList` (đủ `id`, `kind`, `departmentId`, `planId`, `beneficiaryCount`, `createdAt`). Chờ Owner xác nhận hoặc yêu cầu wire riêng.
+    _Làm rõ (F71):_ ghi "cột giá ở mặc định" buộc nới `access_requests_pricing_check` và `access_requests_group_check` thành "là nháp, hoặc điều đã có"
+    (migration `…100500` mục 4): nháp mang nhánh theo gói nhưng chưa có giá; nhóm nháp có thể nêu gói nội bộ (lúc trình mới bị từ chối).
     Sửa nháp = xóa rồi lưu lại (không có operation sửa).
 
 #### L.2 Thủ tục có kiểm soát khi Super Admin là đối tượng (P03-D02, F19)

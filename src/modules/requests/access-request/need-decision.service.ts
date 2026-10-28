@@ -18,6 +18,7 @@ import { AssessmentStepRepo } from './assessment-step.repo';
 import { checkNeedDecision, deciderRoleOf, nextRequestState, type DecisionInput } from './need-decision.policy';
 import { NeedSpendService } from './need-spend.service';
 import { RequestAssessmentService } from './request-assessment.service';
+import { RequestOutcomeListeners } from './request-outcome-listeners';
 
 /**
  * Deciding the need step (`US-05-04`, `US-01-12` AC-6): the person the routing table gave the step approves or refuses
@@ -42,6 +43,7 @@ export class NeedDecisionService {
     private readonly spendChoice: NeedSpendService,
     private readonly entry: SpendEntryService,
     private readonly renewals: RenewalApplyService,
+    private readonly outcomes: RequestOutcomeListeners,
   ) {}
 
   async decide(actor: AuthenticatedPrincipal, requestId: string, input: DecisionInput): Promise<AccessRequestRecord> {
@@ -119,6 +121,8 @@ export class NeedDecisionService {
           },
         ),
       );
+      // A refusal ends the request for the person it was for, without a grant (F43).
+      if (!approved) await this.outcomes.ended(tx, request, request.beneficiaryEmployeeIds, decidedAt);
 
       // A renewal needs nobody to carry it out: approved in full, it is applied here, in the transaction of the decision.
       if (approved && request.type === 'RENEWAL' && requestState === 'AWAITING_EXECUTION') {

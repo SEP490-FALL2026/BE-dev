@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
+import { HR_BASIS } from './hr-basis';
 import { TransactionRunner } from '../../src/infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../src/infrastructure/security/tokens/access-token-verifier.port';
 import { HandoverOverdueService } from '../../src/modules/licensing/handover/handover-overdue.service';
@@ -222,12 +223,12 @@ export class HandoverHarness extends TransferHarness {
     return rows.map((row) => row.action);
   }
 
-  /** Makes the person the head of the department from the day (the route of the IT Admin accepts a day to come). */
+  /** Makes the person the head of the department from the day (the route of the Super Admin accepts a day to come). */
   async makeHeadFrom(department: { id: string }, person: Person, day: string): Promise<void> {
     await request(this.server())
       .post(`/api/v1/departments/${department.id}/head-assignments`)
-      .set(this.as(this.it1))
-      .send({ employeeId: person.employeeId, effectiveFrom: day })
+      .set({ Authorization: `Bearer ${this.admin}` })
+      .send({ employeeId: person.employeeId, effectiveFrom: day, hrBasis: HR_BASIS })
       .expect(200);
   }
 }

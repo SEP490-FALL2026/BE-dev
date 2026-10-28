@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../infrastructure/database/transaction-runner';
 import { OpenRequestService } from './access-request/open-request.service';
-import type { OpenRequestOfBeneficiary } from './requests.types';
+import { RequestOutcomeListeners } from './access-request/request-outcome-listeners';
+import type { OpenRequestOfBeneficiary, RequestOutcomeListener } from './requests.types';
 
 /**
  * The facade of the requests context that other contexts call. It answers what the personnel context shows beside the record of a
@@ -10,7 +11,18 @@ import type { OpenRequestOfBeneficiary } from './requests.types';
  */
 @Injectable()
 export class RequestsService {
-  constructor(private readonly open: OpenRequestService) {}
+  constructor(
+    private readonly open: OpenRequestService,
+    private readonly outcomes: RequestOutcomeListeners,
+  ) {}
+
+  /**
+   * Tells requests who hears how a request ended (`RequestOutcomeListener`, F43): the listener is told in the transaction in which a grant
+   * completes, or a request, or one person of a request for a group, ends without one. The personnel context calls this when it starts.
+   */
+  registerOutcomeListener(listener: RequestOutcomeListener): void {
+    this.outcomes.register(listener);
+  }
 
   /**
    * The requests the person is the beneficiary of that are not over (a request of their own that has not ended, or the person's share of

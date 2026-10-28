@@ -28,6 +28,7 @@ describe('grantAnswerFor a request of a person (US-07-01 AC-3, AC-16)', () => {
       seat: 'PERSONAL',
       employeeId: 'e5',
       planId: 'plan-1',
+      departmentId: 'd-eng',
       expectedEndDate: null,
     });
   });
@@ -111,6 +112,7 @@ describe('grantAnswerFor a request for a group (US-05-17 AC-6)', () => {
       seat: 'PERSONAL',
       employeeId: 'e1',
       planId: 'plan-1',
+      departmentId: 'd-eng',
       expectedEndDate: null,
     });
     expect(grantAnswerFor(group('EXECUTING'), 'e2')).toMatchObject({ employeeId: 'e2', expectedEndDate: '2026-12-31' });

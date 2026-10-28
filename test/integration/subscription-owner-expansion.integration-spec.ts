@@ -17,7 +17,6 @@ import {
   deployMigrations,
   migrationBefore,
   migrationEndingWith,
-  schemaDrift,
 } from '../support/migration-history';
 import { stopCliProcesses } from '../support/cli-process';
 
@@ -26,7 +25,9 @@ import { stopCliProcesses } from '../support/cli-process';
  * (A) `…_subscription_owner_column` only **adds** — a nullable `owner_department_id` and the append-only table of owner
  * assignments. It puts no trigger, CHECK or NOT NULL on `subscriptions`, because H7 runs `migrate deploy` before it
  * recreates `api` and `worker` and recovers the previous image after a failed deploy: the `7c28e75` application, which
- * sends no owner department, must keep creating, updating and reading subscriptions on this schema.
+ * sends no owner department, must keep creating, updating and reading subscriptions on this schema. The history is deployed
+ * **through** (A): the migrations of the final release come after it and make the column required, so this is the boundary
+ * the compatibility image runs on, proved as long as that image can still be the target of a recovery.
  */
 const OWNER_COLUMN = migrationEndingWith('_subscription_owner_column');
 
@@ -56,7 +57,7 @@ describe('subscription owner department, expansion migration (A) (integration, P
       subscriptionId: await insertSubscriptionAs7c28e75(sql, world),
       triggers: await nonInternalTriggers(sql, 'subscriptions'),
     };
-    const deploy = await deployMigrations(database);
+    const deploy = await deployMigrations(database, { through: OWNER_COLUMN });
     if (deploy.code !== 0) throw new Error(`Deploying (A) failed: ${deploy.stdout}\n${deploy.stderr}`);
   }, DEPLOY_TIMEOUT_MS * 2);
 
@@ -174,7 +175,7 @@ describe('subscription owner department, expansion migration (A) (integration, P
   });
 
   it(
-    'leaves a clean migration history and the schema exactly as prisma/models describe it (DB-16)',
+    'leaves a clean migration history (the drift against the final models is proved on the whole history, not here)',
     async () => {
       const history = await sql.query<{
         migration_name: string;
@@ -183,7 +184,7 @@ describe('subscription owner department, expansion migration (A) (integration, P
       }>(`SELECT migration_name, finished_at, rolled_back_at FROM _prisma_migrations`);
       expect(history.rows.filter((row) => row.finished_at === null || row.rolled_back_at !== null)).toEqual([]);
       expect(history.rows.map((row) => row.migration_name)).toContain(OWNER_COLUMN);
-      expect((await schemaDrift(database)).code).toBe(0);
+      expect(history.rows.some((row) => row.migration_name > OWNER_COLUMN)).toBe(false);
     },
     DEPLOY_TIMEOUT_MS,
   );

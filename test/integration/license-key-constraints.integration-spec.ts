@@ -72,6 +72,12 @@ describe('license keys (integration, PostgreSQL constraints)', () => {
       `INSERT INTO organizations (id, name, time_zone, reporting_currency) VALUES ($1, 'Acme', 'UTC', 'VND')`,
       [organizationId],
     );
+    // A subscription always has the department that owns it (F02): one department stands for all of them.
+    await sql.query(
+      `INSERT INTO departments (id, organization_id, code, name, updated_at)
+       VALUES (gen_random_uuid(), $1, 'P-OWNER', 'The department that owns the subscriptions', now())`,
+      [organizationId],
+    );
     const employeeId = randomUUID();
     await sql.query(
       `INSERT INTO employees (id, organization_id, employee_code, full_name, employment_type, hire_date, updated_at)
@@ -98,14 +104,14 @@ describe('license keys (integration, PostgreSQL constraints)', () => {
     );
     subscriptionId = randomUUID();
     await sql.query(
-      `INSERT INTO subscriptions (id, organization_id, plan_id, kind, status, purchased_quantity)
-       VALUES ($1, $2, $3, 'PERPETUAL', 'DRAFT', 50)`,
+      `INSERT INTO subscriptions (id, organization_id, plan_id, owner_department_id, kind, status, purchased_quantity)
+       VALUES ($1, $2, $3, (SELECT id FROM departments WHERE organization_id = $2 LIMIT 1), 'PERPETUAL', 'DRAFT', 50)`,
       [subscriptionId, organizationId, planId],
     );
     otherSubscriptionId = randomUUID();
     await sql.query(
-      `INSERT INTO subscriptions (id, organization_id, plan_id, kind, status, purchased_quantity)
-       VALUES ($1, $2, $3, 'PERPETUAL', 'DRAFT', 10)`,
+      `INSERT INTO subscriptions (id, organization_id, plan_id, owner_department_id, kind, status, purchased_quantity)
+       VALUES ($1, $2, $3, (SELECT id FROM departments WHERE organization_id = $2 LIMIT 1), 'PERPETUAL', 'DRAFT', 10)`,
       [otherSubscriptionId, organizationId, planId],
     );
   }, 90000);

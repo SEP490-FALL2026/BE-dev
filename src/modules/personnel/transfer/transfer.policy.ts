@@ -1,7 +1,6 @@
 import { type BusinessDate } from '../../../core/business-date';
 import { placementReasons } from '../../organization/employee-placement.policy';
 import { groundsRefusal, type GroundsInput } from '../grounds/grounds.policy';
-import { type SelfActionMode } from '../personnel-self-action.policy';
 
 /**
  * What the policy of a transfer refuses, as a semantic code (`DEPARTMENT_TRANSFER.<code>` on the wire) and the facts a person
@@ -36,12 +35,12 @@ export interface NewTransferFacts {
   current: { departmentId: string; validFrom: BusinessDate };
   /** Where the person is to be; what the caller did not name stays as it is. */
   target: { departmentId: string };
-  destinationDepartment: { active: boolean; costCenterActive: boolean } | null;
+  /** The department the person is to join: whether it exists and takes people. Its Cost Center is not asked (`QĐ-87d`(3), F44). */
+  destinationDepartment: { active: boolean } | null;
   grounds: GroundsInput | undefined;
   pending: { effectiveOn: BusinessDate } | null;
   /** Another waiting transfer names this person to follow the head of its department: they stay until it is settled. */
   namedAsSuccessor: boolean;
-  selfMode: SelfActionMode;
   successor: SuccessorFacts;
 }
 
@@ -50,12 +49,10 @@ export interface NewTransferFacts {
  * the same refusal the policy gives when it sees the department retired.
  */
 export function retiredDestinationRefusal(): TransferRefusal {
-  const [reason] = placementReasons({ department: { named: true, found: { active: false, costCenterActive: true } } });
+  const [reason] = placementReasons({ department: { named: true, found: { active: false } } });
 
   return { code: reason.code, details: { subject: reason.subject } };
 }
-
-const SELF_REFUSAL: TransferRefusal = { code: 'SELF_EVENT_NEEDS_ANOTHER_IT_ADMIN' };
 
 /** The basis of a change of the day or a cancellation, which also needs a reason (`US-03-01` AC-19, AC-20). */
 function reasonAndGrounds(reason: string, grounds: GroundsInput | undefined): TransferRefusal | null {
@@ -104,7 +101,10 @@ export function newTransferRefusal(facts: NewTransferFacts): TransferRefusal | n
   const late = dateRefusal(facts.today, facts.effectiveOn, current.validFrom);
   if (late) return late;
 
-  const reasons = placementReasons({ department: { named: true, found: facts.destinationDepartment } });
+  const reasons = placementReasons({
+    // A transfer is a change of place, not a charge: a department with no Cost Center takes people like any other (`QĐ-87d`(3), F44).
+    department: { named: true, found: facts.destinationDepartment },
+  });
   const reason = reasons[0];
   // The code the shared policy gives is the code on the wire (`DEPARTMENT_TRANSFER.<code>`): this file writes none of them.
   if (reason) return { code: reason.code, details: { subject: reason.subject } };
@@ -116,7 +116,6 @@ export function newTransferRefusal(facts: NewTransferFacts): TransferRefusal | n
     return { code: 'PENDING_EVENT_EXISTS', details: { kind: 'TRANSFER', effectiveOn: facts.pending.effectiveOn } };
   if (facts.namedAsSuccessor) return { code: 'PENDING_EVENT_EXISTS', details: { kind: 'HEAD_HANDOVER' } };
   if (employee.workState === 'HANDING_OVER') return { code: 'PENDING_EVENT_EXISTS', details: { kind: 'OFFBOARDING' } };
-  if (facts.selfMode === 'NEEDS_ANOTHER_IT_ADMIN') return SELF_REFUSAL;
 
   return successorRefusal(facts.successor);
 }
@@ -129,7 +128,6 @@ export interface PendingTransferFacts {
   periodStart: BusinessDate;
   reason: string;
   grounds: GroundsInput | undefined;
-  selfMode: SelfActionMode;
 }
 
 /** A transfer can be moved or cancelled only while it has not taken effect (`US-03-01` AC-19, AC-20). */
@@ -151,7 +149,6 @@ export function rescheduleRefusal(
   if (facts.newEffectiveOn === facts.effectiveOn) return { code: 'NO_CHANGE' };
   const late = dateRefusal(facts.today, facts.newEffectiveOn, facts.periodStart);
   if (late) return late;
-  if (facts.selfMode === 'NEEDS_ANOTHER_IT_ADMIN') return SELF_REFUSAL;
 
   return successorRefusal(facts.successor);
 }
@@ -160,8 +157,5 @@ export function rescheduleRefusal(
 export function cancelRefusal(facts: PendingTransferFacts): TransferRefusal | null {
   const settled = notPendingRefusal(facts);
   if (settled) return settled;
-  const detail = reasonAndGrounds(facts.reason, facts.grounds);
-  if (detail) return detail;
-
-  return facts.selfMode === 'NEEDS_ANOTHER_IT_ADMIN' ? SELF_REFUSAL : null;
+  return reasonAndGrounds(facts.reason, facts.grounds);
 }

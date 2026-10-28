@@ -41,56 +41,36 @@ const employee = z.strictObject({
   hireDate: z.string().refine(isBusinessDate, 'must be a real date, YYYY-MM-DD'),
 });
 
+/**
+ * What the installation command is given (`QĐ-87f`(1)): the organization, its first department and the person who will
+ * hold the Super Admin role. There is no Cost Center (Finance creates it for a department that exists), no job title and no
+ * IT employee, so a key for any of them is refused like every other unknown key (strict object).
+ */
 export const installationInputSchema = z
   .strictObject({
     timeZone: z.string().refine(isValidTimeZone, 'must be an IANA zone such as Asia/Ho_Chi_Minh'),
     reportingCurrency: z.string().regex(/^[A-Z]{3}$/, 'must be an ISO 4217 code such as VND'),
     organizationName: name,
-    costCenterCode: code,
-    costCenterName: name,
     departmentCode: code,
     departmentName: name,
-    jobTitleName: name,
     superAdmin: employee,
     /** Defaults to the Super Admin's work email. */
     loginEmail: email.optional(),
-    itAdmin: employee,
     operatorReference: z.string().trim().min(1).max(100),
     environment: z.enum(['LOCAL_TEST', 'SHARED']),
   })
   .superRefine((input, context) => {
-    if (input.superAdmin.employeeCode.toLowerCase() === input.itAdmin.employeeCode.toLowerCase()) {
-      context.addIssue({
-        code: 'custom',
-        path: ['itAdmin', 'employeeCode'],
-        message: 'must differ from the Super Admin code',
-      });
-    }
-    if (isSameEmail(input.superAdmin.workEmail, input.itAdmin.workEmail)) {
-      context.addIssue({
-        code: 'custom',
-        path: ['itAdmin', 'workEmail'],
-        message: 'must differ from the Super Admin email',
-      });
-    }
-
     // A hire date must not be in the future in the organization's own calendar.
     if (isValidTimeZone(input.timeZone)) {
       const today = businessDateAt(new Date(), input.timeZone);
-      for (const key of ['superAdmin', 'itAdmin'] as const) {
-        if (isBusinessDate(input[key].hireDate) && input[key].hireDate > today) {
-          context.addIssue({ code: 'custom', path: [key, 'hireDate'], message: `must not be after today (${today})` });
-        }
+      if (isBusinessDate(input.superAdmin.hireDate) && input.superAdmin.hireDate > today) {
+        context.addIssue({
+          code: 'custom',
+          path: ['superAdmin', 'hireDate'],
+          message: `must not be after today (${today})`,
+        });
       }
     }
   });
 
 export type InstallationInput = z.infer<typeof installationInputSchema>;
-
-function isSameEmail(a: string, b: string): boolean {
-  try {
-    return normalizeEmail(a) === normalizeEmail(b);
-  } catch {
-    return false;
-  }
-}

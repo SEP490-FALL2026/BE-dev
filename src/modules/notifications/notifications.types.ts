@@ -42,7 +42,10 @@ export type TokenUsability = (actionTokenHash: string) => Promise<boolean>;
  * its code here, and its parameter keys to `PARAM_KEYS_BY_CODE` of `inbox/inbox.policy.ts`, in the same change. The first group
  * belongs to the notices of the status of a request (`g5-request-status-notifications`), the second to the reminders of a step
  * (`g5-step-sla-and-alerts`), the third to the alert of a step that waits (`g5-step-reassignment-and-controlled-wait`), the last
- * to the notices of the requests of return and renewal and the verdict on a service account.
+ * to the notices of the requests of return and renewal and the verdict on a service account. The notices of the organization
+ * and of personnel events (`F17`, `F24`: a profile, a recorded event, a `BM-09`, a role holder who leaves, a review that is due,
+ * an IT Admin who works on their own task) and those of the budget loops (`F67`: a version that waits for a decision, a proposal
+ * sent or given back, a request that waits for Finance or for a version) are the last two groups.
  */
 export const IN_APP_NOTIFICATION_CODES = [
   'REQUEST_SUBMITTED',
@@ -75,6 +78,29 @@ export const IN_APP_NOTIFICATION_CODES = [
   'RETURN_FAILED',
   'REQUEST_RENEWAL_APPLIED',
   'REQUEST_RENEWAL_NOT_APPLIED',
+  // Organization and personnel (F17, F24, spec K): ids and codes only.
+  'EMPLOYEE_PROFILE_CREATED',
+  'EMPLOYEE_PROFILE_UPDATED',
+  'PERSONNEL_EVENT_RECORDED',
+  'PERSONNEL_NOTICE_RECEIVED',
+  'PERSONNEL_NOTICE_OVERDUE',
+  'ABRUPT_DEPARTURE_RECORDED',
+  'ROLE_HOLDER_LEAVING',
+  'TRANSFER_REVIEW_DUE',
+  'IT_ADMIN_SELF_EXECUTED',
+  // The budget loops (F67, spec K, `US-12-15` AC-24): ids, years and the reason the people concerned already read; no figure.
+  'BUDGET_VERSION_AWAITING_DECISION',
+  'BUDGET_PROPOSAL_SUBMITTED',
+  'BUDGET_PROPOSAL_RETURNED',
+  'BUDGET_VERSION_DECIDED',
+  'REQUEST_FINANCE_REVIEW_OPENED',
+  'REQUEST_RETURNED_BY_FINANCE',
+  'REQUEST_AWAITING_BUDGET',
+  'REQUEST_BUDGET_VERSION_ENDED',
+  'BUDGET_VERSION_CLOSED_UNAPPROVED',
+  'BUDGET_PROPOSAL_CLOSED_YEAR_END',
+  'BUDGET_PROPOSAL_TASK_ASSIGNED',
+  'BUDGET_PROPOSAL_TASK_WAITING',
 ] as const;
 
 export type InAppNotificationCode = (typeof IN_APP_NOTIFICATION_CODES)[number];
@@ -91,6 +117,20 @@ export interface InAppNotificationInput {
   subject: { type: string; id: string } | null;
   params: Record<string, InAppParamValue>;
   /** Makes the notice once for the recipient: the same recipient and key again writes nothing. At most 200 characters. */
+  eventKey: string;
+}
+
+/**
+ * A notice kept for a department that has no head yet (F67, T-11): judged by the same table as an inbox notice, written in the
+ * transaction of the event, and handed to the first head the Super Admin names.
+ */
+export interface HeldDepartmentNotificationInput {
+  organizationId: string;
+  departmentId: string;
+  code: InAppNotificationCode;
+  subject: { type: string; id: string } | null;
+  params: Record<string, InAppParamValue>;
+  /** Keeps the notice once for the event: the same key again holds nothing. At most 200 characters. */
   eventKey: string;
 }
 

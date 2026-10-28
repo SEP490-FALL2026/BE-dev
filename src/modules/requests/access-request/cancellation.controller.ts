@@ -39,7 +39,7 @@ export class CancellationController {
   @ApiSuccessResponse(AccessRequestResponseDto, {
     message: 'ACCESS_REQUEST.CANCELLED',
     description:
-      'The request ends as cancelled, neither refused nor failed nor withdrawn, with who closed it, when and why. The open steps and the questions to Finance close, the request leaves the batch it was sent in, what was held for it goes back to the budget and the task of its grant is cancelled with its assignment so the seat is free (a task being worked only with the evidence that the work was undone). The people it concerns and Finance are told from the audit event.',
+      'The request ends as cancelled, neither refused nor failed nor withdrawn, with who closed it, when and why (the person it was for left, or was transferred to another department while it was still open: a paid request keeps the department it was sent from, and the IT Admin closes the part not yet granted with a reason). The open steps and the questions to Finance close, the request leaves the batch it was sent in, what was held for it and is not spent goes back to the budget and the task of its grant is cancelled with its assignment so the seat is free (a task being worked, or any open task when the person was transferred, only with the evidence that the work was undone, or that the vendor was checked and the invitation collected). A grant that is done is not closed here: the right goes to the held rights. The people it concerns and Finance are told from the audit event.',
   })
   @ApiErrorResponses(
     UNAUTHENTICATED_RESPONSE,
@@ -56,18 +56,19 @@ export class CancellationController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'Nothing is left to close (ACCESS_REQUEST.ALREADY_ENDED), the withdrawal waits for the IT Admin to close its task (WITHDRAWAL_PENDING), the request is for a group with more than one person still open (GROUP_REQUEST_UNSUPPORTED: remove each person who left on their own line) or the person it is for still works, handing over included (BENEFICIARY_NOT_LEFT). Nothing changes.',
+        'Nothing is left to close (ACCESS_REQUEST.ALREADY_ENDED), the withdrawal waits for the IT Admin to close its task (WITHDRAWAL_PENDING), the request is for a group with more than one person still open (GROUP_REQUEST_UNSUPPORTED: remove each person on their own line), the person it is for still works, handing over included (BENEFICIARY_NOT_LEFT), or the closing is for a transfer and the person was not transferred away from the department the request was sent from (BENEFICIARY_NOT_TRANSFERRED). Nothing changes.',
       examples: [
         EXAMPLES.CANCELLATION_ALREADY_ENDED,
         EXAMPLES.CANCELLATION_WITHDRAWAL_PENDING,
         EXAMPLES.GROUP_REQUEST_UNSUPPORTED,
         EXAMPLES.BENEFICIARY_NOT_LEFT,
+        EXAMPLES.BENEFICIARY_NOT_TRANSFERRED,
       ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The body is invalid (VALIDATION_ERROR), or the task of the grant is being worked and no evidence says the work was undone (ACCESS_REQUEST.EVIDENCE_REQUIRED). Nothing is saved.',
+        'The body is invalid (VALIDATION_ERROR: a closing for a transfer gives its reason), or the task of the grant is open and no evidence says the work was undone (for a transfer: that the vendor was checked and the invitation collected) (ACCESS_REQUEST.EVIDENCE_REQUIRED). Nothing is saved.',
       examples: [VALIDATION_EXAMPLE, EXAMPLES.EVIDENCE_REQUIRED],
     },
     GUARDED_SERVICE_UNAVAILABLE_RESPONSE,

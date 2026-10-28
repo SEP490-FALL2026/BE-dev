@@ -9,25 +9,23 @@ export class InstallationArgumentError extends Error {
 
 export const INSTALLATION_USAGE = `Usage: pnpm ops:bootstrap [options]
 
-Creates the first organization and the Super Admin account. Run once, by the person who will
-hold the Super Admin role: the password is typed at a hidden prompt, never passed as an option.
+Creates the first organization, its first department and the Super Admin account. Run once, by the person who will
+hold the Super Admin role: the password is typed at a hidden prompt, never passed as an option. The first department
+has no Cost Center, head or IT Admin in charge; nothing else is created (no Cost Center, no job title, no IT employee).
 
 Required
   --timezone <iana>            Organization time zone, e.g. Asia/Ho_Chi_Minh. Cannot be changed later.
   --organization-name <name>
-  --cost-center-code <code>    --cost-center-name <name>     The first (UNIT) cost center
   --department-code <code>     --department-name <name>      The first department
-  --job-title <name>           Job title for the two people below
   --admin-code <code>          --admin-name <name>           --admin-email <email>   Super Admin's employee record
-  --it-code <code>             --it-name <name>              --it-email <email>      An IT employee (no account yet)
-  --admin-hire-date <date>     --it-hire-date <date>         YYYY-MM-DD, not in the future
+  --admin-hire-date <date>     YYYY-MM-DD, not in the future
   --operator-reference <ref>   Ticket or approval reference, recorded in the audit trail
   --environment <env>          LOCAL_TEST or SHARED
 
 Optional
   --currency <iso4217>         Reporting currency (default VND)
   --login-email <email>        Sign-in email (default: the Super Admin's work email)
-  --admin-type <type>          --it-type <type>     STAFF (default), CONTRACTOR, FREELANCER, INTERN
+  --admin-type <type>          STAFF (default), CONTRACTOR, FREELANCER, INTERN
   --help
 
 Exit codes: 0 installed · 2 already installed (nothing changed) · 130 cancelled · 1 error.
@@ -39,22 +37,14 @@ const OPTIONS = {
   timezone: { type: 'string' },
   currency: { type: 'string' },
   'organization-name': { type: 'string' },
-  'cost-center-code': { type: 'string' },
-  'cost-center-name': { type: 'string' },
   'department-code': { type: 'string' },
   'department-name': { type: 'string' },
-  'job-title': { type: 'string' },
   'admin-code': { type: 'string' },
   'admin-name': { type: 'string' },
   'admin-email': { type: 'string' },
   'admin-type': { type: 'string' },
   'admin-hire-date': { type: 'string' },
   'login-email': { type: 'string' },
-  'it-code': { type: 'string' },
-  'it-name': { type: 'string' },
-  'it-email': { type: 'string' },
-  'it-type': { type: 'string' },
-  'it-hire-date': { type: 'string' },
   'operator-reference': { type: 'string' },
   environment: { type: 'string' },
   help: { type: 'boolean' },
@@ -64,7 +54,8 @@ export type ParsedInstallationArguments = { help: true } | { help: false; input:
 
 /**
  * Turns argv into the object the input schema validates. A password option is refused by name so
- * a secret cannot slip into shell history or the process list by accident.
+ * a secret cannot slip into shell history or the process list by accident. An option of the earlier command (a Cost Center,
+ * a job title, an IT employee) is not known any more and is refused like any other unknown option.
  */
 export function parseInstallationArguments(argv: readonly string[]): ParsedInstallationArguments {
   const forbidden = argv.find((arg) => /^--?(password|pass|pwd|secret)(=|$)/i.test(arg));
@@ -81,13 +72,6 @@ export function parseInstallationArguments(argv: readonly string[]): ParsedInsta
   if (values.help) return { help: true };
 
   const text = (key: string): string | undefined => values[key] as string | undefined;
-  const person = (prefix: 'admin' | 'it') => ({
-    employeeCode: text(`${prefix}-code`),
-    fullName: text(`${prefix}-name`),
-    workEmail: text(`${prefix}-email`),
-    employmentType: text(`${prefix}-type`) ?? 'STAFF',
-    hireDate: text(`${prefix}-hire-date`),
-  });
 
   return {
     help: false,
@@ -95,14 +79,16 @@ export function parseInstallationArguments(argv: readonly string[]): ParsedInsta
       timeZone: text('timezone'),
       reportingCurrency: text('currency') ?? 'VND',
       organizationName: text('organization-name'),
-      costCenterCode: text('cost-center-code'),
-      costCenterName: text('cost-center-name'),
       departmentCode: text('department-code'),
       departmentName: text('department-name'),
-      jobTitleName: text('job-title'),
-      superAdmin: person('admin'),
+      superAdmin: {
+        employeeCode: text('admin-code'),
+        fullName: text('admin-name'),
+        workEmail: text('admin-email'),
+        employmentType: text('admin-type') ?? 'STAFF',
+        hireDate: text('admin-hire-date'),
+      },
       ...(text('login-email') === undefined ? {} : { loginEmail: text('login-email') }),
-      itAdmin: person('it'),
       operatorReference: text('operator-reference'),
       environment: text('environment'),
     },

@@ -20,10 +20,10 @@ function canBeNormalized(email: string): boolean {
 const employmentType = z.enum(['STAFF', 'CONTRACTOR', 'FREELANCER', 'INTERN']);
 
 /**
- * The department and the job title are only bounded here, and may be missing: a missing or unknown department, a missing or
- * too long title is a reason of the row (`DEPARTMENT_REQUIRED`, `JOB_TITLE_REQUIRED`, ...), reported with the others, not a
- * malformed request. The job title is free text (`QĐ-87e`); this release still asks for it. The Cost Center is never sent: it
- * follows from the department.
+ * The department and the job title are only bounded here, and may be missing: a missing or unknown department, a too long title
+ * is a reason of the row (`DEPARTMENT_REQUIRED`, `JOB_TITLE_TOO_LONG`, ...), reported with the others, not a malformed request. The
+ * job title is optional free text (`QĐ-87e`): none is not a fault. The Cost Center is never sent: it follows from the department,
+ * and a department with none takes people in.
  */
 export const createEmployeeBodySchema = z.strictObject({
   employeeCode: z.string().trim().min(1).max(50),
@@ -44,8 +44,8 @@ export const createEmployeeBodySchema = z.strictObject({
 });
 
 /**
- * What an IT Admin may correct of a record that exists (`US-02-02` AC-19): the four official fields, always on an HR
- * basis. Any other field, among them the department, the title and the status, is refused as unknown.
+ * What the Super Admin may correct of a record that exists (`US-02-02` AC-19, `QĐ-87a`): the official fields, among them the free-text
+ * job title (`null` clears it), always on an HR basis. Any other field, among them the department and the status, is refused as unknown.
  */
 export const updateEmployeeBodySchema = z.strictObject({
   fullName: z.string().trim().min(1).max(200).optional(),
@@ -59,6 +59,7 @@ export const updateEmployeeBodySchema = z.strictObject({
     .optional(),
   employmentType: employmentType.optional(),
   hireDate: z.string().refine(isBusinessDate, { message: 'hireDate must be a real date as YYYY-MM-DD.' }).optional(),
+  jobTitle: z.string().max(1000).nullable().optional(),
   hrBasis: hrBasisSchema,
 });
 export const employeeIdParamSchema = z.strictObject({ id: z.uuid() });
@@ -91,6 +92,7 @@ const maintainedEmployeeSchema = z.strictObject({
   workEmail: z.string().nullable(),
   employmentType,
   hireDate: z.string(),
+  jobTitle: z.string().nullable(),
   status: z.enum(['ACTIVE', 'TERMINATED']),
   workState: employeeWorkState,
 });

@@ -88,6 +88,14 @@ describe('what is not priced (US-05-02 AC-4, QĐ-84e)', () => {
     });
   });
 
+  it('has no price when the plan has a subscription priced at nothing: a paid request never costs 0 (F34, FR-3.2)', () => {
+    expect(priceRequest(input({ unitPrice: { amountMinor: 0n, currency: 'USD' } }))).toEqual({
+      status: 'MISSING',
+      reason: 'NO_PRICED_SUBSCRIPTION',
+      budgetYear: 2026,
+    });
+  });
+
   it('has no price when the billing cycle is not one that has periods', () => {
     expect(priceRequest(input({ billingCycle: 'OTHER' }))).toMatchObject({
       status: 'MISSING',

@@ -6,6 +6,7 @@ import { TransactionRunner } from '../../src/infrastructure/database/transaction
 import { OrganizationService } from '../../src/modules/organization/organization.service';
 import { findPlacementCoverageViolations } from '../support/placement-coverage';
 import { HR_BASIS } from '../support/hr-basis';
+import { registerUseReaders } from '../support/organization-use-readers';
 import { waitForLockWaiters } from '../support/lock-wait';
 
 const ROUNDS = 6;
@@ -26,12 +27,12 @@ async function waitForWaiters(observer: Client, count: number, timeoutMs = 10000
 describe('lock protocol: manual entry races (integration, real PostgreSQL)', () => {
   let ctx: HttpTestApp;
   let seed: SeededInstallation;
-  let it1: ApiAccount;
   let fin1: ApiAccount;
   let holder: Client;
   let counter = 0;
   const server = () => ctx.app.getHttpServer();
-  const asIt = () => ({ Authorization: `Bearer ${it1.accessToken}` });
+  /** The Super Admin changes departments, names heads and retires them, each on an HR basis (`QĐ-87a`); the IT Admin does none. */
+  const asSuperAdminWriter = () => ({ Authorization: `Bearer ${superAdmin}` });
   const asFinance = () => ({ Authorization: `Bearer ${fin1.accessToken}` });
   let superAdmin: string;
 
@@ -40,7 +41,6 @@ describe('lock protocol: manual entry races (integration, real PostgreSQL)', () 
     seed = await seedInstallation(ctx.app);
     const admin = await adminToken(ctx, seed);
     superAdmin = admin;
-    it1 = await createActivatedAccount(ctx, seed, { code: 'E-IT1', email: 'it1@acme.vn', roles: ['IT_ADMIN'], admin });
     fin1 = await createActivatedAccount(ctx, seed, {
       code: 'E-FIN1',
       email: 'fin1@acme.vn',
@@ -49,6 +49,8 @@ describe('lock protocol: manual entry races (integration, real PostgreSQL)', () 
     });
     holder = new Client({ connectionString: ctx.database.url });
     await holder.connect();
+    // What keeps a department in use lives in other modules: nothing, unless a case says so.
+    registerUseReaders(ctx.app);
   }, 120000);
 
   afterAll(async () => {
@@ -215,11 +217,6 @@ describe('lock protocol: manual entry races (integration, real PostgreSQL)', () 
       const [{ id: costCenterId }] = (
         await ctx.sql.query<{ id: string }>('SELECT id FROM cost_centers ORDER BY code LIMIT 1')
       ).rows;
-      await ctx.sql.query(
-        `INSERT INTO cost_center_direction_activations (id, organization_id, release_evidence, approver_ref, operator_ref, environment)
-         VALUES (gen_random_uuid(), $1, 'concurrency test', 'test', 'test', 'LOCAL_TEST') ON CONFLICT DO NOTHING`,
-        [seed.organizationId],
-      );
       await holder.query('BEGIN');
       await holder.query('SELECT id FROM cost_centers WHERE id = $1 FOR UPDATE', [costCenterId]);
 
@@ -311,8 +308,8 @@ describe('lock protocol: manual entry races (integration, real PostgreSQL)', () 
     const assignHead = (departmentId: string, employeeId: string) =>
       request(server())
         .post(`/api/v1/departments/${departmentId}/head-assignments`)
-        .set(asIt())
-        .send({ employeeId, effectiveFrom: '2099-01-01' })
+        .set(asSuperAdminWriter())
+        .send({ employeeId, effectiveFrom: '2099-01-01', hrBasis: HR_BASIS })
         .then((response) => response);
 
     it('a manual entry takes its department FOR SHARE: it passes a FOR SHARE holder, waits for FOR NO KEY UPDATE', async () => {
@@ -344,12 +341,13 @@ describe('lock protocol: manual entry races (integration, real PostgreSQL)', () 
       const pending = [
         request(server())
           .patch(`/api/v1/departments/${department.id}`)
-          .set(asIt())
-          .send({ name: unique('Renamed While Held') })
+          .set(asSuperAdminWriter())
+          .send({ name: unique('Renamed While Held'), hrBasis: HR_BASIS })
           .then((response) => response),
         request(server())
           .post(`/api/v1/departments/${empty.id}/deactivate`)
-          .set(asIt())
+          .set(asSuperAdminWriter())
+          .send({ hrBasis: HR_BASIS })
           .then((response) => response),
         assignHead(department.id, department.employeeId),
       ];

@@ -19,13 +19,14 @@ import { EmployeeImportLookup, EmployeeRowClassifier, RowIssue } from './employe
  */
 
 interface Fixture {
-  department: 'ok' | 'blank' | 'unknown' | 'inactive' | 'cost-center-inactive';
+  department: 'ok' | 'blank' | 'unknown' | 'inactive';
   jobTitle: 'ok' | 'blank' | 'too-long';
   codeTaken?: boolean;
   emailTaken?: boolean;
 }
 
-const DEPARTMENT = { id: 'd-ops', active: true, costCenterActive: true };
+/** A department the lookup found: whether it has a Cost Center in use is not asked (`QĐ-87d(3)`, F44). */
+const DEPARTMENT = { id: 'd-ops', active: true };
 
 /** The job title cell the fixture stands for: free text, so it is only given or not, and fits or not (QĐ-87e). */
 function jobTitleText(fixture: Fixture): string {
@@ -37,11 +38,7 @@ function manual(fixture: Fixture): EmployeeRowReason[] {
     department:
       fixture.department === 'unknown' || fixture.department === 'blank'
         ? null
-        : {
-            ...DEPARTMENT,
-            active: fixture.department !== 'inactive',
-            costCenterActive: fixture.department !== 'cost-center-inactive',
-          },
+        : { ...DEPARTMENT, active: fixture.department !== 'inactive' },
     employeeCodeTaken: fixture.codeTaken ?? false,
     workEmailTaken: fixture.emailTaken ?? false,
   };
@@ -60,16 +57,7 @@ function imported(fixture: Fixture): { outcome: string; errors: RowIssue[] } {
     departments: new Map(
       fixture.department === 'unknown' || fixture.department === 'blank'
         ? []
-        : [
-            [
-              'P-OPS',
-              {
-                ...DEPARTMENT,
-                active: fixture.department !== 'inactive',
-                costCenterActive: fixture.department !== 'cost-center-inactive',
-              },
-            ],
-          ],
+        : [['P-OPS', { ...DEPARTMENT, active: fixture.department !== 'inactive' }]],
     ),
     existing: new Map(
       fixture.codeTaken
@@ -112,12 +100,7 @@ describe('BEH.1 characterization: import classifier and manual-entry validator o
       ['a blank department (whitespace only)', { department: 'blank', jobTitle: 'ok' }, ['DEPARTMENT_REQUIRED']],
       ['an unknown department', { department: 'unknown', jobTitle: 'ok' }, ['DEPARTMENT_NOT_FOUND']],
       ['a retired department', { department: 'inactive', jobTitle: 'ok' }, ['DEPARTMENT_INACTIVE']],
-      [
-        'a department on a retired cost center',
-        { department: 'cost-center-inactive', jobTitle: 'ok' },
-        ['DEPARTMENT_COST_CENTER_INACTIVE'],
-      ],
-      ['a blank job title', { department: 'ok', jobTitle: 'blank' }, ['JOB_TITLE_REQUIRED']],
+      ['a blank job title: optional free text, no reason (QĐ-87e)', { department: 'ok', jobTitle: 'blank' }, []],
       ['a job title longer than 255 characters', { department: 'ok', jobTitle: 'too-long' }, ['JOB_TITLE_TOO_LONG']],
       [
         'both wrong: the department reason comes first',

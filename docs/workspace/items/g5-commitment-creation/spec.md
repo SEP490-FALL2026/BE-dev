@@ -28,7 +28,7 @@ Khi Người duyệt chi duyệt một Request, hệ thống tự giữ một kh
 | -------- | --------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | US-06-04 | AC-1→AC-3, AC-5, AC-7→AC-13 | full     | —                                                                                                                                                           |
 | US-06-07 | AC-1, AC-2, AC-5, AC-7      | partial  | AC-3, AC-4, AC-6: `g5-budget-version-decision` (đã làm)                                                                                                     |
-| US-06-09 | AC-2, AC-4, AC-9            | partial  | AC-1, AC-3, AC-5→AC-8, AC-11, AC-13→AC-18: `g5-budget-proposal-and-review`; AC-10: `g5-budget-version-decision`; AC-12: `g3-downstream-finance-integration` |
+| US-06-09 | AC-2, AC-4, AC-9            | partial  | AC-1, AC-3, AC-5→AC-8, AC-11, AC-13→AC-20, AC-22, AC-23: `g5-budget-proposal-and-review`; AC-10, AC-21: `g5-budget-version-decision`; AC-12: `g3-downstream-finance-integration` |
 
 ## Supporting references
 

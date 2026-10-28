@@ -27,11 +27,14 @@ const PUBLIC_ROOT_POLICY_FILES: ReadonlyMap<string, PolicyContract> = new Map([
   [
     'organization/employee-placement.policy.ts',
     {
-      reason: 'manual entry and the import preview share whether a department and a job title can take a person in',
+      reason:
+        'manual entry, the import preview and the correction of a record (also the controlled procedure for the record of the Super Admin) share whether a department and a job title can take a person in',
       entry: 'placementReasons',
       consumers: [
         'data-import/employee-import/employee-import-rows.ts',
+        'organization/employee/employee-maintenance.service.ts',
         'organization/employee/employee-row.validator.ts',
+        'personnel/super-admin-event/profile-correction.policy.ts',
         'personnel/transfer/transfer.policy.ts',
       ],
     },
@@ -43,8 +46,6 @@ const PLACEMENT_REASON_CODES: ReadonlySet<string> = new Set([
   'DEPARTMENT_REQUIRED',
   'DEPARTMENT_NOT_FOUND',
   'DEPARTMENT_INACTIVE',
-  'DEPARTMENT_COST_CENTER_INACTIVE',
-  'JOB_TITLE_REQUIRED',
   'JOB_TITLE_TOO_LONG',
 ]);
 

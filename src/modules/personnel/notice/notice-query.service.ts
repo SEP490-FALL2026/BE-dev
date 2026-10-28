@@ -1,6 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
+import { IdentityAccessService } from '../../identity-access/identity-access.service';
 import { OrganizationService } from '../../organization/organization.service';
+import { PersonnelAccessRefusedError } from '../personnel.errors';
+import { readAccessOf, type ReadAccess } from '../personnel-self-action.policy';
 import { NoticeRefusedError } from './notice.errors';
 import type { NoticeDetailWire, NoticeSummaryWire } from './notice.dto';
 import { toDetail, toSummary } from './notice.mapper';
@@ -12,17 +15,19 @@ export interface NoticePage {
   pagination: { page: number; pageSize: number; totalItems: number; totalPages: number };
 }
 
-const isItAdmin = (actor: AuthenticatedPrincipal): boolean => actor.roles.includes('IT_ADMIN');
-
 /**
- * Reads notices (`SoD-2`): the IT Admin reads the queue of every notice with how it was verified; a department head reads only the
- * notices they sent, and one of another head does not exist for them. The names of a page are read in one statement whatever its size.
+ * Reads notices (`SoD-2`, F12): the Super Admin reads the queue of every notice with how it was verified; the IT Admin reads only the
+ * minimal projection (no record of the check) of the notices about people in the departments they are in charge of or stand in for
+ * (one with no usable IT Admin named is every IT Admin's); a department head
+ * reads only the notices they sent; one outside that does not exist for the reader. The names of a page are read in one statement
+ * whatever its size.
  */
 @Injectable()
 export class NoticeQueryService {
   constructor(
     private readonly notices: NoticeRepo,
     private readonly organization: OrganizationService,
+    private readonly identity: IdentityAccessService,
   ) {}
 
   async list(
@@ -38,9 +43,11 @@ export class NoticeQueryService {
     },
   ): Promise<NoticePage> {
     const today = await this.organization.businessToday();
+    const scope = await this.scopeOf(actor);
     const { items, total } = await this.notices.list({
       ...filter,
-      ...(isItAdmin(actor) ? {} : { senderEmployeeId: actor.employeeId }),
+      ...(scope.employeeIds ? { employeeIds: scope.employeeIds } : {}),
+      ...(scope.senderEmployeeId ? { senderEmployeeId: scope.senderEmployeeId } : {}),
       today,
     });
     const employees = await this.employeesOf(items.map((item) => item.employeeId));
@@ -57,8 +64,13 @@ export class NoticeQueryService {
   }
 
   async get(actor: AuthenticatedPrincipal, id: string): Promise<NoticeDetailWire> {
+    const scope = await this.scopeOf(actor);
     const record = await this.notices.find(id);
-    if (!record || (!isItAdmin(actor) && record.senderEmployeeId !== actor.employeeId))
+    if (
+      !record ||
+      (scope.senderEmployeeId && record.senderEmployeeId !== scope.senderEmployeeId) ||
+      (scope.employeeIds && !scope.employeeIds.includes(record.employeeId))
+    )
       throw new NoticeRefusedError('NOT_FOUND');
 
     return this.detailOf(actor, record);
@@ -69,10 +81,32 @@ export class NoticeQueryService {
     const [employees, target, verification] = await Promise.all([
       this.employeesOf([record.employeeId, record.senderEmployeeId]),
       record.targetDepartmentId ? this.organization.getDepartmentBrief(record.targetDepartmentId) : null,
-      isItAdmin(actor) ? this.notices.findVerification(record.id) : null,
+      readAccessOf(actor) === 'FULL' ? this.notices.findVerification(record.id) : null,
     ]);
 
     return toDetail(record, { employees, target, verification, today });
+  }
+
+  /**
+   * What the caller reads: everything (the Super Admin), the notices about people in the departments they are in charge of (the IT
+   * Admin, in charge of or standing in), or the notices they sent (a head); a caller with none of these is refused.
+   */
+  private async scopeOf(
+    actor: AuthenticatedPrincipal,
+  ): Promise<{ access: ReadAccess; employeeIds?: string[]; senderEmployeeId?: string }> {
+    const access = readAccessOf(actor);
+    if (access === 'FULL') return { access };
+    if (access === 'MINIMAL') {
+      const departments = await this.organization.getItAdminScope(actor.employeeId, (ids) =>
+        this.identity.findUsableItAdminEmployeeIds(ids),
+      );
+      const members = await Promise.all(departments.map((id) => this.organization.getDepartmentMemberIds(id)));
+
+      return { access, employeeIds: members.flatMap((ids) => ids ?? []) };
+    }
+    if (!actor.roles.includes('MANAGER')) throw new PersonnelAccessRefusedError('FORBIDDEN');
+
+    return { access, senderEmployeeId: actor.employeeId };
   }
 
   private async employeesOf(ids: string[]) {

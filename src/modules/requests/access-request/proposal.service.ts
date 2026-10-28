@@ -4,8 +4,8 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { AuditService } from '../../audit/audit.service';
 import { OrganizationService } from '../../organization/organization.service';
 import { accessRequestAuditEvent } from './access-request-audit-event';
-import { AccessRequestNoDepartmentError } from './access-request.errors';
-import { hasSpendStep } from './access-request.policy';
+import { AccessRequestNoDepartmentError, AccessRequestSuperAdminCannotRequestError } from './access-request.errors';
+import { hasSpendStep, mayRequest } from './access-request.policy';
 import { AccessRequestRepo } from './access-request.repo';
 import type { AccessRequestRecord } from './access-request.types';
 import { AssessmentRepo } from './assessment.repo';
@@ -30,7 +30,9 @@ export class ProposalService {
     private readonly audit: AuditService,
   ) {}
 
+  /** Throws AccessRequestSuperAdminCannotRequestError (F30), AccessRequestNoDepartmentError and FinanceSetupIncompleteError. */
   async submit(actor: AuthenticatedPrincipal, body: ProposalBodyDto): Promise<AccessRequestRecord> {
+    if (!mayRequest(actor.roles)) throw new AccessRequestSuperAdminCannotRequestError();
     const settings = await this.assessment.settings();
 
     return this.runner.run(async (tx) => {

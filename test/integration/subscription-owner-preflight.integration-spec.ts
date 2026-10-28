@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { Client } from 'pg';
 import { CLI_COLD_START_MS, cliWorkingDirectory, runCli, stopCliProcesses } from '../support/cli-process';
+import { activateCostCenterLink, lastCompatibilityMigration } from '../support/compat-release';
 import {
   DisposableDatabase,
   dropDisposableDatabase,
@@ -15,18 +16,20 @@ import {
 } from '../support/migration-history';
 
 /**
- * `g0-g6-final-business-baseline-remediation`, Task 1.2a (F02, spec L.3): the live inventory of `ops:preflight` for the
- * owner department of a subscription. Before the expansion migration it only **lists** what will need an owner (the
- * deploy that adds the column may run); after it, every subscription with no owner and no valid assignment — whoever
- * created it, including the previous release recovered by H7 — **blocks**, ids only, recomputed on every run. The
- * command is real (`migration-preflight-cli.ts` through ts-node) on a database whose history Prisma recorded itself.
+ * `g0-g6-final-business-baseline-remediation`, Task 1.2a and 1.2c (F02, spec L.3): the live inventory of `ops:preflight` for the
+ * owner department of a subscription, as the FINAL release reads it. A database that skipped the expansion and holds a
+ * subscription is blocked (`SUBSCRIPTION_OWNER_EXPANSION_REQUIRED`); on the compatibility schema every subscription with no owner
+ * and no valid assignment — whoever created it, including the previous release recovered by H7 — blocks
+ * (`SUBSCRIPTION_OWNER_UNASSIGNED`), ids only, recomputed on every run; an empty database and a fully migrated one are ready with
+ * nothing listed. The command is real (`migration-preflight-cli.ts` through ts-node) on a database whose history Prisma recorded
+ * itself.
  */
 const OWNER_COLUMN = migrationEndingWith('_subscription_owner_column');
 
 interface Report {
   status: 'READY' | 'BLOCKED';
   history: string;
-  blockers: Array<{ code: string; subscriptionId?: string }>;
+  blockers: Array<{ code: string; subscriptionId?: string; organizationId?: string }>;
   information: Array<{ code: string; subscriptionId?: string; organizationId?: string }>;
 }
 
@@ -52,6 +55,7 @@ describe('ops:preflight, the owner department of a subscription (integration, re
        VALUES ($1, $2, $3, $4, 'PO-2026-0042', 'ops-1', 'LOCAL_TEST')`,
       [randomUUID(), world.organizationId, subscriptionId, departmentId],
     );
+  const sorted = (ids: string[]) => [...ids].sort();
 
   beforeAll(async () => {
     database = await provisionDisposableDatabase();
@@ -77,42 +81,54 @@ describe('ops:preflight, the owner department of a subscription (integration, re
   );
 
   it(
-    'before the expansion migration: ready, with every subscription listed as a row to assign, ids sorted and nothing else',
+    'before the expansion migration with nothing in it (a new database): ready, nothing to list',
     async () => {
       const before = await deployMigrations(database, { through: migrationBefore(OWNER_COLUMN) });
       if (before.code !== 0) throw new Error(`Deploying the history before (A) failed: ${before.stdout}`);
-      world = await expansionWorld(sql);
-      old.push(await insertSubscriptionAs7c28e75(sql, world), await insertSubscriptionAs7c28e75(sql, world));
 
       const { code, report } = await preflight();
 
       expect(code).toBe(0);
-      expect(report.status).toBe('READY');
-      expect(report.blockers).toEqual([]);
-      expect(report.information).toEqual(
-        [...old].sort().map((subscriptionId) => ({ code: 'SUBSCRIPTION_OWNER_TO_ASSIGN', subscriptionId })),
-      );
+      expect(report).toMatchObject({ status: 'READY', blockers: [], information: [] });
     },
     DEPLOY_TIMEOUT_MS + CLI_COLD_START_MS,
   );
 
   it(
-    'after it: every subscription with no owner department and no assignment blocks, including one the previous release made late',
+    'before the expansion migration with subscriptions: BLOCKED, one row per subscription, ids sorted and nothing else (the organization has no link either)',
     async () => {
-      const deploy = await deployMigrations(database);
-      if (deploy.code !== 0) throw new Error(`Deploying (A) failed: ${deploy.stdout}`);
+      world = await expansionWorld(sql);
+      old.push(await insertSubscriptionAs7c28e75(sql, world), await insertSubscriptionAs7c28e75(sql, world));
+
+      const { code, report } = await preflight();
+
+      expect(code).toBe(2);
+      expect(report.status).toBe('BLOCKED');
+      expect(report.information).toEqual([]);
+      expect(report.blockers).toEqual([
+        { code: 'COST_CENTER_DIRECTION_EXPANSION_REQUIRED', organizationId: world.organizationId },
+        ...sorted(old).map((subscriptionId) => ({ code: 'SUBSCRIPTION_OWNER_EXPANSION_REQUIRED', subscriptionId })),
+      ]);
+    },
+    CLI_COLD_START_MS,
+  );
+
+  it(
+    'on the compatibility schema: every subscription with no owner department and no assignment blocks, including one the previous release made late',
+    async () => {
+      const deploy = await deployMigrations(database, { through: lastCompatibilityMigration() });
+      if (deploy.code !== 0) throw new Error(`Deploying the compatibility release failed: ${deploy.stdout}`);
+      // The Cost Center link is the operator's other step; it is done here so that this suite reads the subscriptions only.
+      await activateCostCenterLink(sql, world.organizationId);
       const late = await insertSubscriptionAs7c28e75(sql, world);
 
       const { code, report } = await preflight();
 
       expect(code).toBe(2);
       expect(report.status).toBe('BLOCKED');
-      // The only thing listed is the Cost Center link of this installation, which the operator has not activated yet (F01).
-      expect(report.information).toEqual([
-        { code: 'COST_CENTER_DIRECTION_NOT_ACTIVATED', organizationId: world.organizationId },
-      ]);
+      expect(report.information).toEqual([]);
       expect(report.blockers).toEqual(
-        [...old, late].sort().map((subscriptionId) => ({ code: 'SUBSCRIPTION_OWNER_UNASSIGNED', subscriptionId })),
+        sorted([...old, late]).map((subscriptionId) => ({ code: 'SUBSCRIPTION_OWNER_UNASSIGNED', subscriptionId })),
       );
       old.push(late);
     },
@@ -152,14 +168,36 @@ describe('ops:preflight, the owner department of a subscription (integration, re
 
       expect(code).toBe(2);
       expect(report.blockers).toEqual([{ code: 'SUBSCRIPTION_OWNER_UNASSIGNED', subscriptionId: contradicted }]);
+
+      // The contradiction is the operator's to resolve; here the owner is cleared so the assignment is the only record again.
+      await sql.query(`UPDATE subscriptions SET owner_department_id = NULL WHERE id = $1`, [contradicted]);
+      expect((await preflight()).report.blockers).toEqual([]);
     },
-    CLI_COLD_START_MS,
+    CLI_COLD_START_MS * 2,
+  );
+
+  it(
+    'after the migrations of the final release the column is required: nothing is open, nothing is listed, the history is converged',
+    async () => {
+      const deploy = await deployMigrations(database);
+      if (deploy.code !== 0) throw new Error(`Deploying the final release failed: ${deploy.stdout}\n${deploy.stderr}`);
+
+      const { code, report } = await preflight();
+
+      expect(code).toBe(0);
+      expect(report).toMatchObject({ status: 'READY', history: 'CONVERGED', blockers: [], information: [] });
+      const column = await sql.query<{ is_nullable: string }>(
+        `SELECT is_nullable FROM information_schema.columns WHERE table_name = 'subscriptions' AND column_name = 'owner_department_id'`,
+      );
+      expect(column.rows).toEqual([{ is_nullable: 'NO' }]);
+    },
+    DEPLOY_TIMEOUT_MS + CLI_COLD_START_MS,
   );
 
   it(
     'one of the two objects without the other cannot be trusted either way: blocked',
     async () => {
-      await sql.query(`ALTER TABLE subscriptions DROP COLUMN owner_department_id`);
+      await sql.query(`DROP TABLE subscription_owner_assignments CASCADE`);
 
       const { code, report } = await preflight();
 

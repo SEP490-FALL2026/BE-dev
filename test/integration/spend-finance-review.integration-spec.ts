@@ -240,15 +240,16 @@ describe('the review of Finance over PostgreSQL (US-06-13)', () => {
       expect(h.codeOf(refused)).toBe('SPEND.REVIEW_NOT_OPEN');
     });
 
-    it('is ended once: of two endings at once one is made and the other finds none open', async () => {
+    it('is ended once: of two endings at once the first in the queue ends it and the second finds none open', async () => {
       const { id } = await inReview();
 
-      const answers = await Promise.all([
-        h.completeReview(id, opinion()),
-        h.completeReview(id, opinion('RECOMMEND_APPROVE')),
+      const [first, second] = await h.queuedOnRequest(id, [
+        () => h.completeReview(id, opinion()),
+        () => h.completeReview(id, opinion('RECOMMEND_APPROVE')),
       ]);
 
-      expect(answers.map((answer) => answer.status).sort()).toEqual([200, 409]);
+      expect([first.status, second.status]).toEqual([200, 409]);
+      expect(h.codeOf(second)).toBe('SPEND.REVIEW_NOT_OPEN');
       expect(await h.steps(id, 'SPEND_APPROVAL')).toHaveLength(1);
     });
   });

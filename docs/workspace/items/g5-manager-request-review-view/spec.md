@@ -26,7 +26,7 @@ Trưởng phòng được giao bước nhu cầu xem yêu cầu kèm các seat n
 
 | Story    | AC         | Coverage | Phần còn lại thuộc                                                                                                                                  |
 | -------- | ---------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| US-05-04 | AC-3, AC-7 | partial  | AC-1, AC-2, AC-4→AC-6, AC-8→AC-10: `g5-manager-need-decision`; AC-11→AC-13, AC-15, AC-16: `g5-spend-submission-batches`; AC-14: `g5-group-requests` |
+| US-05-04 | AC-3       | partial  | AC-1, AC-2, AC-4→AC-6, AC-8→AC-10: `g5-manager-need-decision`; AC-11→AC-13, AC-15, AC-16: `g5-spend-submission-batches`; AC-14: `g5-group-requests` |
 
 ## Supporting references
 
@@ -89,3 +89,4 @@ Trưởng phòng được giao bước nhu cầu xem yêu cầu kèm các seat n
 
 - Audit G0–G6 trên Docs `769bb64` ↔ BE `7c28e75` mở lại hạng mục này: F04 — bỏ cờ _ngoài bộ chuẩn_.
 - Remediation duy nhất: [g0-g6-final-business-baseline-remediation](../g0-g6-final-business-baseline-remediation/spec.md) ([impact matrix](../g0-g6-final-business-baseline-remediation/impact-matrix.md#3-findings)). AC liên quan không còn được coi là thỏa nguồn hiện hành cho tới khi remediation xong; trạng thái triển khai ở roadmap. Phần đã ghi phía trên là lịch sử, giữ nguyên.
+- _27/10/2026 (Prompt 04, Task 0.1 của `g0-g6-final-business-baseline-remediation`, F60 — re-pin scope map [G5](../../../roadmap.md#work-item-decomposition-g5) Docs `e0cb5a0`, BE `7c28e75`):_ `US-05-04` AC-7 đã bỏ (cờ _ngoài bộ chuẩn_, F04); còn AC-3 ([impact matrix mục 9](../g0-g6-final-business-baseline-remediation/impact-matrix.md#9-phụ-lục-delta-user-stories-72e1480--769bb64)). Phần đã ghi phía trên là lịch sử, giữ nguyên.

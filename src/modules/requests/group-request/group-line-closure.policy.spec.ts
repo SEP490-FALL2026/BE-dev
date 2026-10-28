@@ -1,4 +1,4 @@
-import { checkLineClosure, soleLiveLine } from './group-line-closure.policy';
+import { checkLineClosure, checkLineTransferClosure, soleLiveLine } from './group-line-closure.policy';
 import { LINE_STATES, type LineState } from './group-request.types';
 
 describe('removing a person who left from a request for a group (US-03-04 AC-25, US-05-17)', () => {
@@ -47,5 +47,33 @@ describe('the person a whole-request closing means', () => {
     expect(soleLiveLine([line('a', 'WITHDRAWN'), line('b', 'CANCELLED')])).toBeNull();
     expect(soleLiveLine([line('a', 'APPROVED'), line('b', 'AWAITING_NEED')])).toBeNull();
     expect(soleLiveLine([])).toBeNull();
+  });
+});
+
+describe('removing a person who was transferred from a request for a group (F29, QĐ-90b)', () => {
+  it.each(['AWAITING_NEED', 'NEED_CONFIRMED', 'APPROVED', 'EXECUTING'] as const)(
+    'closes the line of a person who was transferred while it is %s',
+    (lineState) => {
+      expect(checkLineTransferClosure({ lineState, beneficiaryTransferred: true })).toBeNull();
+    },
+  );
+
+  it.each(['NEED_REJECTED', 'SPEND_REJECTED', 'COMPLETED', 'FAILED', 'WITHDRAWN', 'DROPPED', 'CANCELLED'] as const)(
+    'has nothing to close on a line that ended as %s: a seat that is real is not cancelled',
+    (lineState) => {
+      expect(checkLineTransferClosure({ lineState, beneficiaryTransferred: true })).toBe('ALREADY_ENDED');
+    },
+  );
+
+  it('leaves a line that waits for the IT Admin to close a withdrawal to that way', () => {
+    expect(checkLineTransferClosure({ lineState: 'AWAITING_IT_CLOSE', beneficiaryTransferred: true })).toBe(
+      'WITHDRAWAL_PENDING',
+    );
+  });
+
+  it('refuses a person who was not transferred away from the department the request was sent from', () => {
+    expect(checkLineTransferClosure({ lineState: 'APPROVED', beneficiaryTransferred: false })).toBe(
+      'BENEFICIARY_NOT_TRANSFERRED',
+    );
   });
 });

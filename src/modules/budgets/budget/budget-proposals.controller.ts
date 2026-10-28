@@ -24,6 +24,7 @@ import {
 } from './budget.dto';
 import { BUDGET_ERROR_EXAMPLES as EXAMPLES, toBudgetApiException } from './budget.http-errors';
 import { ProposalService } from './proposal.service';
+import { ProposalViewService } from './proposal-view.service';
 
 const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPONSE] as const;
 const NOT_FOUND = {
@@ -50,10 +51,17 @@ const HEAD_ROLE_ONLY = {
   description: HEAD_ONLY_DESCRIPTION,
   examples: [FORBIDDEN_EXAMPLE],
 } as const;
+/** What a change of a proposal of a year that has ended answers, whether or not the closure of the year has run (`QĐ-91c`). */
+const YEAR_ENDED = {
+  status: HttpStatus.UNPROCESSABLE_ENTITY,
+  description: 'The fiscal year of the proposal has ended (BUDGET.YEAR_ENDED): nothing is saved.',
+  examples: [VALIDATION_EXAMPLE, EXAMPLES.YEAR_ENDED],
+} as const;
 /** What sending the lines refuses after the request validation: a first proposal and one sent again alike. */
 const SEND_EXAMPLES = [
   EXAMPLES.PROPOSAL_INCOMPLETE,
   EXAMPLES.WINDOW_BACKWARDS,
+  EXAMPLES.PLAN_NOT_FOUND,
   EXAMPLES.YEAR_ENDED,
   EXAMPLES.CURRENCY_NOT_REPORTING,
   EXAMPLES.CURRENCY_NOT_SUPPORTED,
@@ -64,12 +72,17 @@ const SEND_EXAMPLES = [
 /**
  * The budget proposals of the heads of department (`US-06-10`): sent for the Cost Center of the department and a fiscal
  * year, withdrawn while Finance has not sent a version made from them, given back by Finance with a reason, and sent again
- * as a new proposal. A proposal sent is never edited in place. Finance reads them all; a head reads their own.
+ * as a new proposal. A proposal sent is never edited in place. A proposal whose version the spending approver refused stays
+ * reviewed: Finance makes another version from it, or the head sends a new proposal that follows it (`successorOfProposalId`, set by the
+ * system). Finance reads them all; a head reads their own.
  */
 @ApiTags('budget-proposals')
 @Controller({ path: 'budget-proposals', version: '1' })
 export class BudgetProposalsController {
-  constructor(private readonly proposals: ProposalService) {}
+  constructor(
+    private readonly proposals: ProposalService,
+    private readonly views: ProposalViewService,
+  ) {}
 
   @Post()
   @RequireRoles('MANAGER')
@@ -91,13 +104,13 @@ export class BudgetProposalsController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'A proposal for the Cost Center and the year already waits or is being reviewed (BUDGET.PROPOSAL_ALREADY_OPEN).',
-      examples: [EXAMPLES.PROPOSAL_ALREADY_OPEN],
+        'The department has no Cost Center in use yet (FINANCE.SETUP_INCOMPLETE), or a proposal for the Cost Center and the year already waits or is being reviewed and no refused version leaves room for a successor (BUDGET.PROPOSAL_ALREADY_OPEN).',
+      examples: [EXAMPLES.FINANCE_SETUP_INCOMPLETE, EXAMPLES.PROPOSAL_ALREADY_OPEN],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The form is invalid (VALIDATION_ERROR), a line lacks its window, service period or repeat cycle, with the line and the fields in details.lines (BUDGET.PROPOSAL_INCOMPLETE), a window runs backwards (BUDGET.WINDOW_BACKWARDS), the year has ended (BUDGET.YEAR_ENDED) or an amount is not in the reporting currency (BUDGET.CURRENCY_NOT_REPORTING).',
+        'The form is invalid (VALIDATION_ERROR), a line lacks its window, service period or repeat cycle, with the line and the fields in details.lines (BUDGET.PROPOSAL_INCOMPLETE), a window runs backwards (BUDGET.WINDOW_BACKWARDS), a line names a plan that does not exist (BUDGET.PLAN_NOT_FOUND), the year has ended (BUDGET.YEAR_ENDED) or an amount is not in the reporting currency (BUDGET.CURRENCY_NOT_REPORTING).',
       examples: [VALIDATION_EXAMPLE, ...SEND_EXAMPLES],
     },
   )
@@ -121,7 +134,7 @@ export class BudgetProposalsController {
   @ApiErrorResponses(...AUTH_ERRORS, INVALID)
   async list(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Query() query: ProposalListQueryDto) {
     try {
-      return await this.proposals.list(actor, query);
+      return await this.views.list(actor, query);
     } catch (error) {
       throw toBudgetApiException(error);
     }
@@ -137,7 +150,7 @@ export class BudgetProposalsController {
   @ApiErrorResponses(...AUTH_ERRORS, NOT_FOUND, INVALID)
   async get(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: IdParamDto) {
     try {
-      return { proposal: await this.proposals.get(actor, params.id) };
+      return { proposal: await this.views.get(actor, params.id) };
     } catch (error) {
       throw toBudgetApiException(error);
     }
@@ -157,7 +170,7 @@ export class BudgetProposalsController {
     @Query() query: PageQueryDto,
   ) {
     try {
-      return await this.proposals.lines(actor, params.id, query);
+      return await this.views.lines(actor, params.id, query);
     } catch (error) {
       throw toBudgetApiException(error);
     }
@@ -180,7 +193,7 @@ export class BudgetProposalsController {
       description: 'The proposal is no longer waiting for Finance (BUDGET.PROPOSAL_CANNOT_WITHDRAW).',
       examples: [EXAMPLES.PROPOSAL_CANNOT_WITHDRAW],
     },
-    INVALID,
+    YEAR_ENDED,
   )
   async withdraw(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: IdParamDto) {
     try {
@@ -209,8 +222,9 @@ export class BudgetProposalsController {
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
-      description: 'The reason is missing (VALIDATION_ERROR): nothing is saved.',
-      examples: [VALIDATION_EXAMPLE],
+      description:
+        'The reason is missing (VALIDATION_ERROR) or the fiscal year of the proposal has ended (BUDGET.YEAR_ENDED): nothing is saved.',
+      examples: [VALIDATION_EXAMPLE, EXAMPLES.YEAR_ENDED],
     },
   )
   async giveBack(
@@ -243,8 +257,8 @@ export class BudgetProposalsController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The proposal was not given back (BUDGET.PROPOSAL_CANNOT_RESUBMIT), or another waits (BUDGET.PROPOSAL_ALREADY_OPEN).',
-      examples: [EXAMPLES.PROPOSAL_CANNOT_RESUBMIT, EXAMPLES.PROPOSAL_ALREADY_OPEN],
+        'The proposal was not given back (BUDGET.PROPOSAL_CANNOT_RESUBMIT), another waits (BUDGET.PROPOSAL_ALREADY_OPEN), or the Cost Center of the department was retired and has none in use yet, though the head still owns the proposal given back (FINANCE.SETUP_INCOMPLETE).',
+      examples: [EXAMPLES.PROPOSAL_CANNOT_RESUBMIT, EXAMPLES.PROPOSAL_ALREADY_OPEN, EXAMPLES.FINANCE_SETUP_INCOMPLETE],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,

@@ -151,12 +151,11 @@ export class RevocationHarness extends ProvisioningHarness {
     return date.toISOString().slice(0, 10);
   };
 
-  /** A fingerprint of every table a revocation must not touch: subscriptions, contracts, allocations, budgets and commitments. */
+  /** A fingerprint of every table a revocation must not touch: subscriptions, contracts, budgets and commitments. */
   async untouched(): Promise<Record<string, string>> {
     const tables = [
       'subscriptions',
       'contracts',
-      'subscription_cost_allocations',
       'budget_versions',
       'budget_commitments',
       'budget_commitment_releases',

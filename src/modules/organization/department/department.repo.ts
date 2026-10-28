@@ -64,6 +64,8 @@ function toRecord(row: DepartmentRow): DepartmentRecord {
 export interface DepartmentListFilter {
   status?: DepartmentStatus;
   search?: string;
+  /** Only these departments: what an IT Admin may read (`F12`). An empty list matches none. */
+  ids?: readonly string[];
   skip: number;
   take: number;
 }
@@ -115,31 +117,22 @@ export class DepartmentRepo {
     return this.findById(id, tx);
   }
 
-  /** Takes the row lock (`FOR SHARE`: it must still exist, its cost center unchanged, until commit) and reads it. Null when absent. */
+  /**
+   * Takes the row lock (`FOR SHARE`: it must still exist and stay as read until commit) and reads it. Null when absent. Whether the
+   * department has a Cost Center is not asked: a department with none takes people in (`QĐ-87d(3)`).
+   */
   async lockByCode(
     tx: DbTx,
     organizationId: string,
     code: string,
-  ): Promise<{ id: string; code: string; name: string; active: boolean; costCenterActive: boolean } | null> {
+  ): Promise<{ id: string; code: string; name: string; active: boolean } | null> {
     const rows = await tx.$queryRaw<{ id: string; code: string; name: string; status: string }[]>`
       SELECT id, code, name, status::text AS status FROM departments
        WHERE organization_id = ${organizationId}::uuid AND code = ${code} FOR SHARE`;
     const department = rows[0];
     if (!department) return null;
 
-    // Read after the lock, in a statement of its own (lock protocol rule 7): a retirement of the cost center that
-    // committed while this waited for the department is seen here.
-    const centers = await tx.$queryRaw<{ status: string }[]>`
-      SELECT status::text AS status FROM cost_centers
-       WHERE department_id = ${department.id}::uuid AND status = 'ACTIVE'`;
-
-    return {
-      id: department.id,
-      code: department.code,
-      name: department.name,
-      active: department.status === 'ACTIVE',
-      costCenterActive: centers[0]?.status === 'ACTIVE',
-    };
+    return { id: department.id, code: department.code, name: department.name, active: department.status === 'ACTIVE' };
   }
 
   /** The department with this code, with its cost center (the local seed fixture, P23-RV-01). */
@@ -200,6 +193,7 @@ export class DepartmentRepo {
   /** One page in code order and the total for the same filter, from one snapshot. */
   async list(filter: DepartmentListFilter): Promise<{ items: DepartmentRecord[]; total: number }> {
     const conditions = [
+      ...(filter.ids ? [Prisma.sql`d.id = ANY(${[...filter.ids]}::uuid[])`] : []),
       ...(filter.status ? [Prisma.sql`d.status = ${filter.status}::"DepartmentStatus"`] : []),
       ...(filter.search
         ? [

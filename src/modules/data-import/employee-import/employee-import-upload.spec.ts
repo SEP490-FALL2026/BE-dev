@@ -281,7 +281,7 @@ describe('EmployeeImportService: upload (H8 Phase 0 characterization)', () => {
         (e) =>
           expect(e).toMatchObject({
             constructor: ImportFileMissingColumnsError,
-            missing: ['employment_type', 'hire_date', 'department_code', 'job_title'],
+            missing: ['employment_type', 'hire_date', 'department_code'],
           }),
       ],
       [

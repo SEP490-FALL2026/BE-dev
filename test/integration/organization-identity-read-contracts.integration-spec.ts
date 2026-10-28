@@ -243,7 +243,6 @@ describe('organization and identity read contracts (integration, real PostgreSQL
 
   describe('LD-15: the department warnings are a page', () => {
     it('pages the warnings by code then kind, with the total, and refuses a page size over 100', async () => {
-      await h.activateCostCenterLink();
       for (const code of ['P-LD15A', 'P-LD15B', 'P-LD15C']) {
         await request(h.server())
           .post('/api/v1/departments')

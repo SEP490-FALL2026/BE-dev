@@ -3,47 +3,37 @@ import { formatPreflight } from './migration-preflight-report';
 import type { ContractGateFacts, PreflightReport } from './migration-preflight.types';
 
 /**
- * The contract gates of `g0-g6-final-business-baseline-remediation`: what the release after this one needs from the data
- * before its migrations may run, judged beside the unit-only conversion. First gate (Task 1.2a, F02): every existing
- * subscription needs an owner department, recorded by an operator on a stated basis (`P03-D03`, spec L.3). Second gate
- * (Task 1.1a, F01): every Cost Center belongs to one department, linked by `ops:cost-center-direction` on a basis Finance
- * approved, and the operator has activated the link (`QĐ-87d(1)`, spec L.11).
+ * The contract gates of `g0-g6-final-business-baseline-remediation`, as the FINAL release judges them (spec L.3, L.10, L.11):
+ * what its migrations need from the data, judged beside the unit-only conversion. A database that skipped the expansion of the
+ * compatibility release, a subscription with no owner department, a Cost Center with no department or an organization whose
+ * link was not activated, and a waiting row of a kind that is gone, each block; only the proposals the migration can reconcile
+ * are information. An empty database and a fully migrated one are ready, with nothing listed.
  */
 const noReturns: ContractGateFacts['legacyReturns'] = { candidates: [], neighbours: [] };
+const noDirection: ContractGateFacts['costCenterDirection'] = {
+  schema: 'NO_TABLE',
+  organizationIds: [],
+  costCenterIds: [],
+  mismatches: [],
+  notActivated: [],
+};
 const gates = (overrides: Partial<ContractGateFacts['subscriptionOwner']> = {}): ContractGateFacts => ({
   subscriptionOwner: { schema: 'READY', subscriptionIds: [], ...overrides },
-  costCenterDirection: { schema: 'NO_TABLE', costCenterIds: [], mismatches: [], notActivated: [] },
+  costCenterDirection: noDirection,
   retiredKinds: { pendingNoticeIds: [], pendingTransferIds: [], pendingMoveIds: [] },
   legacyReturns: noReturns,
 });
 const direction = (overrides: Partial<ContractGateFacts['costCenterDirection']> = {}): ContractGateFacts => ({
   subscriptionOwner: { schema: 'NO_TABLE', subscriptionIds: [] },
-  costCenterDirection: { schema: 'READY', costCenterIds: [], mismatches: [], notActivated: [], ...overrides },
+  costCenterDirection: { ...noDirection, schema: 'READY', ...overrides },
   retiredKinds: { pendingNoticeIds: [], pendingTransferIds: [], pendingMoveIds: [] },
   legacyReturns: noReturns,
 });
 const retired = (overrides: Partial<ContractGateFacts['retiredKinds']> = {}): ContractGateFacts => ({
   subscriptionOwner: { schema: 'NO_TABLE', subscriptionIds: [] },
-  costCenterDirection: { schema: 'NO_TABLE', costCenterIds: [], mismatches: [], notActivated: [] },
+  costCenterDirection: noDirection,
   retiredKinds: { pendingNoticeIds: [], pendingTransferIds: [], pendingMoveIds: [], ...overrides },
   legacyReturns: noReturns,
-});
-const returns = (legacyReturns: ContractGateFacts['legacyReturns']): ContractGateFacts => ({
-  ...gates(),
-  subscriptionOwner: { schema: 'NO_TABLE', subscriptionIds: [] },
-  legacyReturns,
-});
-const candidate = (proposalId: string, traced = true) => ({
-  proposalId,
-  versionIds: [`${proposalId}-v`],
-  decisionIds: [`${proposalId}-d`],
-  traced,
-});
-const next = (proposalId: string, id: string, previousProposalId: string | null, submittedAfter = true) => ({
-  proposalId,
-  id,
-  previousProposalId,
-  submittedAfter,
 });
 const converged: PreflightReport = {
   status: 'READY',
@@ -55,13 +45,20 @@ const converged: PreflightReport = {
 };
 
 describe('judgeContractGates: the owner department of a subscription (F02, spec L.3)', () => {
-  it('before the expansion migration: every subscription is a row to assign later, and nothing blocks the deploy', () => {
+  it('before the expansion migration: each subscription blocks by its id, in order, and nothing is only information', () => {
     expect(judgeContractGates(gates({ schema: 'ABSENT', subscriptionIds: ['s-2', 's-1'] }))).toEqual({
-      blockers: [],
-      information: [
-        { code: 'SUBSCRIPTION_OWNER_TO_ASSIGN', subscriptionId: 's-1' },
-        { code: 'SUBSCRIPTION_OWNER_TO_ASSIGN', subscriptionId: 's-2' },
+      blockers: [
+        { code: 'SUBSCRIPTION_OWNER_EXPANSION_REQUIRED', subscriptionId: 's-1' },
+        { code: 'SUBSCRIPTION_OWNER_EXPANSION_REQUIRED', subscriptionId: 's-2' },
       ],
+      information: [],
+    });
+  });
+
+  it('before the expansion migration, with no subscription (an empty or new database): nothing to report', () => {
+    expect(judgeContractGates(gates({ schema: 'ABSENT', subscriptionIds: [] }))).toEqual({
+      blockers: [],
+      information: [],
     });
   });
 
@@ -75,7 +72,7 @@ describe('judgeContractGates: the owner department of a subscription (F02, spec 
     });
   });
 
-  it('after it, with every subscription owned or assigned: nothing to report', () => {
+  it('after it, with every subscription owned or assigned, or once the final migration made the column required: nothing to report', () => {
     expect(judgeContractGates(gates({ schema: 'READY', subscriptionIds: [] }))).toEqual({
       blockers: [],
       information: [],
@@ -95,17 +92,24 @@ describe('judgeContractGates: the owner department of a subscription (F02, spec 
 });
 
 describe('judgeContractGates: every Cost Center belongs to one department (F01, spec L.11)', () => {
-  it('before the compatibility migration: every Cost Center no department names is a row to link later, and nothing blocks', () => {
-    expect(judgeContractGates(direction({ schema: 'ABSENT', costCenterIds: ['c-2', 'c-1'] }))).toEqual({
-      blockers: [],
-      information: [
-        { code: 'COST_CENTER_TO_LINK', costCenterId: 'c-1' },
-        { code: 'COST_CENTER_TO_LINK', costCenterId: 'c-2' },
+  it('before the compatibility migration: each organization blocks by its id, in order (the release skipped the expansion)', () => {
+    expect(judgeContractGates(direction({ schema: 'ABSENT', organizationIds: ['o-2', 'o-1'] }))).toEqual({
+      blockers: [
+        { code: 'COST_CENTER_DIRECTION_EXPANSION_REQUIRED', organizationId: 'o-1' },
+        { code: 'COST_CENTER_DIRECTION_EXPANSION_REQUIRED', organizationId: 'o-2' },
       ],
+      information: [],
     });
   });
 
-  it('after it: each Cost Center with no department blocks by its id, whoever created it, in order', () => {
+  it('before the compatibility migration, with no organization (an empty or new database): nothing to report', () => {
+    expect(judgeContractGates(direction({ schema: 'ABSENT', organizationIds: [] }))).toEqual({
+      blockers: [],
+      information: [],
+    });
+  });
+
+  it('on the compatibility schema: each Cost Center with no department blocks by its id, whoever created it, in order', () => {
     expect(judgeContractGates(direction({ costCenterIds: ['c-9', 'c-3'] }))).toEqual({
       blockers: [
         { code: 'COST_CENTER_UNLINKED', costCenterId: 'c-3' },
@@ -115,16 +119,19 @@ describe('judgeContractGates: every Cost Center belongs to one department (F01, 
     });
   });
 
-  it('after it: a department whose old Cost Center belongs to another department blocks with both ids (the sync triggers should prevent it)', () => {
+  it('on the compatibility schema: a department whose old Cost Center belongs to another department blocks with both ids (the sync triggers should prevent it)', () => {
     expect(
       judgeContractGates(direction({ mismatches: [{ costCenterId: 'c-1', departmentId: 'd-2' }] })).blockers,
     ).toEqual([{ code: 'COST_CENTER_LINK_MISMATCH', costCenterId: 'c-1', departmentId: 'd-2' }]);
   });
 
-  it('after it: an organization whose link is not activated is information here (it blocks only in the final release)', () => {
-    expect(judgeContractGates(direction({ notActivated: ['o-1'] }))).toEqual({
-      blockers: [],
-      information: [{ code: 'COST_CENTER_DIRECTION_NOT_ACTIVATED', organizationId: 'o-1' }],
+  it('on the compatibility schema: an organization whose link is not activated BLOCKS (it was information in the compatibility release)', () => {
+    expect(judgeContractGates(direction({ notActivated: ['o-2', 'o-1'] }))).toEqual({
+      blockers: [
+        { code: 'COST_CENTER_DIRECTION_NOT_ACTIVATED', organizationId: 'o-1' },
+        { code: 'COST_CENTER_DIRECTION_NOT_ACTIVATED', organizationId: 'o-2' },
+      ],
+      information: [],
     });
   });
 
@@ -135,17 +142,23 @@ describe('judgeContractGates: every Cost Center belongs to one department (F01, 
     });
   });
 
-  it('with no Cost Centers table (an empty database), or everything linked and activated: nothing to report', () => {
+  it('with no Cost Centers table (an empty database), or on the final schema where the repository reads nothing open: nothing to report', () => {
     expect(judgeContractGates(direction({ schema: 'NO_TABLE' }))).toEqual({ blockers: [], information: [] });
     expect(judgeContractGates(direction())).toEqual({ blockers: [], information: [] });
   });
 
-  it('is blocked through partial linking until the last Cost Center is linked, then ready', () => {
+  it('is blocked through partial linking until the last Cost Center is linked and the link activated, then ready', () => {
     const open = withContractGates(converged, judgeContractGates(direction({ costCenterIds: ['c-1', 'c-2'] })));
     const partial = withContractGates(converged, judgeContractGates(direction({ costCenterIds: ['c-2'] })));
+    const linked = withContractGates(converged, judgeContractGates(direction({ notActivated: ['o-1'] })));
     const done = withContractGates(converged, judgeContractGates(direction()));
 
-    expect([open.status, partial.status, done.status]).toEqual(['BLOCKED', 'BLOCKED', 'READY']);
+    expect([open.status, partial.status, linked.status, done.status]).toEqual([
+      'BLOCKED',
+      'BLOCKED',
+      'BLOCKED',
+      'READY',
+    ]);
   });
 });
 
@@ -167,7 +180,7 @@ describe('judgeContractGates: the kinds that are gone (F41, F06, spec L.4, L.5)'
     });
   });
 
-  it('has nothing to say when none waits, in any schema', () => {
+  it('has nothing to say when none waits, in any schema (the tables and the rows are gone after the destructive migrations)', () => {
     expect(judgeContractGates(retired())).toEqual({ blockers: [], information: [] });
   });
 
@@ -199,14 +212,18 @@ describe('judgeContractGates: the kinds that are gone (F41, F06, spec L.4, L.5)'
 });
 
 describe('withContractGates', () => {
-  it('keeps a ready report ready and adds the rows to assign as information', () => {
+  it('keeps a ready report ready when no gate blocks, whatever the database holds on the final schema', () => {
     const report = withContractGates(
       converged,
-      judgeContractGates(gates({ schema: 'ABSENT', subscriptionIds: ['s-1'] })),
+      judgeContractGates({
+        subscriptionOwner: { schema: 'READY', subscriptionIds: [] },
+        costCenterDirection: { ...noDirection, schema: 'READY' },
+        retiredKinds: { pendingNoticeIds: [], pendingTransferIds: [], pendingMoveIds: [] },
+        legacyReturns: noReturns,
+      }),
     );
 
-    expect(report.status).toBe('READY');
-    expect(report.information).toEqual([{ code: 'SUBSCRIPTION_OWNER_TO_ASSIGN', subscriptionId: 's-1' }]);
+    expect(report).toEqual(converged);
   });
 
   it('turns a ready report into BLOCKED when a gate blocks, and keeps what the conversion found', () => {
@@ -232,32 +249,68 @@ describe('withContractGates', () => {
         status: 'BLOCKED',
         blockers: [{ code: 'DEPARTMENT_CHARGED_TO_COMPANY', department: 'HQ', costCenter: 'CC-CORP' }],
       },
-      judgeContractGates(gates({ schema: 'READY', subscriptionIds: ['s-1'] })),
+      judgeContractGates({
+        ...gates({ schema: 'ABSENT', subscriptionIds: ['s-1'] }),
+        costCenterDirection: { ...noDirection, schema: 'ABSENT', organizationIds: ['o-1'] },
+      }),
     );
 
     expect(report.blockers.map((blocker) => blocker.code)).toEqual([
+      'COST_CENTER_DIRECTION_EXPANSION_REQUIRED',
       'DEPARTMENT_CHARGED_TO_COMPANY',
-      'SUBSCRIPTION_OWNER_UNASSIGNED',
+      'SUBSCRIPTION_OWNER_EXPANSION_REQUIRED',
     ]);
+  });
+
+  it('is blocked for an installed database that skipped the compatibility release, and ready for an empty one', () => {
+    const skipped = withContractGates(
+      converged,
+      judgeContractGates({
+        ...gates({ schema: 'ABSENT', subscriptionIds: ['s-1'] }),
+        costCenterDirection: { ...noDirection, schema: 'ABSENT', organizationIds: ['o-1'] },
+      }),
+    );
+    const empty = withContractGates(
+      converged,
+      judgeContractGates({
+        ...gates({ schema: 'NO_TABLE' }),
+        costCenterDirection: { ...noDirection, schema: 'NO_TABLE' },
+      }),
+    );
+
+    expect([skipped.status, empty.status]).toEqual(['BLOCKED', 'READY']);
+    expect(empty.information).toEqual([]);
   });
 });
 
 describe('the text of the Cost Center gates (F01)', () => {
-  it('lists the Cost Centers to link and the organizations to activate, and says how, without blocking', () => {
+  it('names each organization of a database that skipped the compatibility release by its id, and says what to deploy and run first', () => {
     const text = formatPreflight({
       ...converged,
-      information: [
-        { code: 'COST_CENTER_TO_LINK', costCenterId: 'c-1' },
-        { code: 'COST_CENTER_DIRECTION_NOT_ACTIVATED', organizationId: 'o-1' },
-      ],
+      status: 'BLOCKED',
+      blockers: [{ code: 'COST_CENTER_DIRECTION_EXPANSION_REQUIRED', organizationId: 'o-1' }],
     });
 
-    expect(text).toMatch(/^Preflight: READY/);
-    expect(text).toContain('COST_CENTER_TO_LINK');
-    expect(text).toContain('c-1');
+    expect(text).toMatch(/do not run `prisma migrate deploy`/i);
+    expect(text).toContain('COST_CENTER_DIRECTION_EXPANSION_REQUIRED');
+    expect(text).toContain('organization o-1');
+    expect(text).toContain('compatibility release');
+    expect(text).toContain('ops:cost-center-direction activate');
+    expect(text).toContain('ops:cost-center-direction link');
+  });
+
+  it('names an organization whose link is not activated as a blocked row, with the activation command and no inferred evidence', () => {
+    const text = formatPreflight({
+      ...converged,
+      status: 'BLOCKED',
+      blockers: [{ code: 'COST_CENTER_DIRECTION_NOT_ACTIVATED', organizationId: 'o-1' }],
+    });
+
+    expect(text).toMatch(/do not run `prisma migrate deploy`/i);
     expect(text).toContain('COST_CENTER_DIRECTION_NOT_ACTIVATED');
-    expect(text).toContain('o-1');
-    expect(text).toContain('ops:cost-center-direction');
+    expect(text).toContain('organization o-1');
+    expect(text).toContain('ops:cost-center-direction activate');
+    expect(text).toContain('releases/current-image');
   });
 
   it('names each blocked Cost Center by its id and the procedure that resolves it, with no inferred department', () => {
@@ -280,16 +333,18 @@ describe('the text of the Cost Center gates (F01)', () => {
   });
 });
 
-describe('the text of the contract gates', () => {
-  it('lists the subscriptions that will need an owner department and says how they are assigned, without blocking', () => {
+describe('the text of the subscription owner gate (F02)', () => {
+  it('names each subscription of a database that skipped the expansion by its id, and says to deploy the compatibility release and assign first', () => {
     const text = formatPreflight({
       ...converged,
-      information: [{ code: 'SUBSCRIPTION_OWNER_TO_ASSIGN', subscriptionId: 's-1' }],
+      status: 'BLOCKED',
+      blockers: [{ code: 'SUBSCRIPTION_OWNER_EXPANSION_REQUIRED', subscriptionId: 's-1' }],
     });
 
-    expect(text).toMatch(/^Preflight: READY/);
-    expect(text).toContain('SUBSCRIPTION_OWNER_TO_ASSIGN');
-    expect(text).toContain('s-1');
+    expect(text).toMatch(/do not run `prisma migrate deploy`/i);
+    expect(text).toContain('SUBSCRIPTION_OWNER_EXPANSION_REQUIRED');
+    expect(text).toContain('subscription s-1');
+    expect(text).toContain('compatibility release');
     expect(text).toContain('ops:assign-subscription-owner');
   });
 
@@ -309,92 +364,8 @@ describe('the text of the contract gates', () => {
     expect(text).toContain('ops:assign-subscription-owner');
     expect(text).toContain('SUBSCRIPTION_OWNER_SCHEMA_PARTIAL');
   });
-});
 
-describe('judgeContractGates: the proposals given back because their first version was refused (F63, spec J.2)', () => {
-  it('leaves alone a proposal Finance gave back: no refusal on its versions makes it no candidate', () => {
-    expect(judgeContractGates(returns({ candidates: [], neighbours: [] }))).toEqual({ blockers: [], information: [] });
-  });
-
-  it('R1: nothing was sent after the return, so the proposal goes back to REVIEWED (information, ids and the rule only)', () => {
-    expect(judgeContractGates(returns({ candidates: [candidate('p-1')], neighbours: [] }))).toEqual({
-      blockers: [],
-      information: [{ code: 'BUDGET_PROPOSAL_LEGACY_RETURN_RECONCILE', proposalId: 'p-1', rule: 'R1' }],
-    });
-  });
-
-  it('R2: exactly one proposal sends it again and every proposal sent after the return is in the chain of that one', () => {
-    const facts = returns({
-      candidates: [candidate('p-1')],
-      neighbours: [next('p-1', 'c-1', 'p-1'), next('p-1', 'c-2', 'c-1'), next('p-1', 'c-3', 'c-2')],
-    });
-
-    expect(judgeContractGates(facts)).toEqual({
-      blockers: [],
-      information: [{ code: 'BUDGET_PROPOSAL_LEGACY_RETURN_RECONCILE', proposalId: 'p-1', rule: 'R2' }],
-    });
-  });
-
-  it('A: a proposal sent after the return that does not point back at it blocks, with every id it needs and nothing else', () => {
-    expect(
-      judgeContractGates(returns({ candidates: [candidate('p-1')], neighbours: [next('p-1', 'x-9', null)] })),
-    ).toEqual({
-      blockers: [
-        {
-          code: 'BUDGET_PROPOSAL_LEGACY_RETURN_AMBIGUOUS',
-          proposalId: 'p-1',
-          versionIds: ['p-1-v'],
-          decisionIds: ['p-1-d'],
-          relatedProposalIds: ['x-9'],
-        },
-      ],
-      information: [],
-    });
-  });
-
-  it('A: one chain and another proposal outside it, two proposals that send it again, or a resubmission that is not later', () => {
-    const outside = returns({
-      candidates: [candidate('p-1')],
-      neighbours: [next('p-1', 'c-1', 'p-1'), next('p-1', 'x-9', null)],
-    });
-    const two = returns({
-      candidates: [candidate('p-1')],
-      neighbours: [next('p-1', 'c-1', 'p-1'), next('p-1', 'c-2', 'p-1')],
-    });
-    const notLater = returns({ candidates: [candidate('p-1')], neighbours: [next('p-1', 'c-1', 'p-1', false)] });
-
-    for (const facts of [outside, two, notLater]) {
-      expect(judgeContractGates(facts).blockers.map((blocker) => blocker.code)).toEqual([
-        'BUDGET_PROPOSAL_LEGACY_RETURN_AMBIGUOUS',
-      ]);
-      expect(judgeContractGates(facts).information).toEqual([]);
-    }
-  });
-
-  it('A: a refusal that does not match the return exactly (several, another decider, reason or moment, not the first version) is never guessed', () => {
-    expect(judgeContractGates(returns({ candidates: [candidate('p-1', false)], neighbours: [] }))).toEqual({
-      blockers: [
-        {
-          code: 'BUDGET_PROPOSAL_LEGACY_RETURN_AMBIGUOUS',
-          proposalId: 'p-1',
-          versionIds: ['p-1-v'],
-          decisionIds: ['p-1-d'],
-          relatedProposalIds: [],
-        },
-      ],
-      information: [],
-    });
-  });
-
-  it('blocks the deploy and prints the decision, ids only, beside the information of the cases it can reconcile', () => {
-    const judged = judgeContractGates(
-      returns({ candidates: [candidate('p-1'), candidate('p-2', false)], neighbours: [] }),
-    );
-    const text = formatPreflight(withContractGates(converged, judged));
-
-    expect(text).toContain('BUDGET_PROPOSAL_LEGACY_RETURN_AMBIGUOUS');
-    expect(text).toContain('budget proposal p-2 (versions p-2-v; decisions p-2-d; related none)');
-    expect(text).toContain('BUDGET_PROPOSAL_LEGACY_RETURN_RECONCILE');
-    expect(text).toContain('budget proposal p-1 (R1)');
+  it('lists nothing as information for a ready database: the only information left is the proposals the migration reconciles', () => {
+    expect(formatPreflight(converged)).not.toMatch(/SUBSCRIPTION_OWNER|COST_CENTER/);
   });
 });

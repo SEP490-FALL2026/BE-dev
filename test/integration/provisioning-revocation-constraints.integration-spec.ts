@@ -79,6 +79,19 @@ describe('the tasks of a revocation (integration, PostgreSQL constraints)', () =
        VALUES (gen_random_uuid(), $1, $2, 'GRANT', 'MANUAL', $3, 4, $4)`,
       [organizationId, assignmentId, requestId, person()],
     );
+  /** The grant task with an id the test knows, so that it can be ended afterwards. */
+  const grantWithId = async (assignmentId: string): Promise<{ id: string; code: string | null }> => {
+    const id = randomUUID();
+    const code = await sqlState(
+      sql,
+      `INSERT INTO provisioning_tasks (id, organization_id, assignment_id, kind, channel, request_id, max_attempts,
+         created_by_app_user_id)
+       VALUES ($1, $2, $3, 'GRANT', 'MANUAL', $4, 4, $5)`,
+      [id, organizationId, assignmentId, randomUUID(), person()],
+    );
+
+    return { id, code };
+  };
   const claimed = async (assignmentId?: string) => {
     const made = await revocation({ ...(assignmentId ? { assignmentId } : {}) });
     await sql.query(
@@ -178,11 +191,64 @@ describe('the tasks of a revocation (integration, PostgreSQL constraints)', () =
   });
 
   describe('one grant and one live revocation for a seat (US-07-05 AC-11, AC-15)', () => {
-    it('keeps one grant for one assignment', async () => {
+    it('keeps one OPEN grant task for one assignment: a grant that ended no longer blocks the next one (F07)', async () => {
       const assignmentId = await newAssignment();
+
+      const first = await grantWithId(assignmentId);
+      expect(first.code).toBeNull();
+      expect(await grant(assignmentId)).toBe('23505');
+      expect(
+        await sqlState(
+          sql,
+          `UPDATE provisioning_tasks SET status = 'CANCELLED', closed_by_app_user_id = $2, closed_at = now(),
+             close_reason = 'REQUESTER_WITHDREW' WHERE id = $1`,
+          [first.id, person()],
+        ),
+      ).toBeNull();
 
       expect(await grant(assignmentId)).toBeNull();
       expect(await grant(assignmentId)).toBe('23505');
+    });
+
+    it('lets the next grant of an assignment follow one that was closed as failed or completed, and refuses it while one is open in any state (F07)', async () => {
+      const toInProgress = (id: string) =>
+        sql.query(
+          `UPDATE provisioning_tasks SET status = 'IN_PROGRESS', claimed_by_app_user_id = $2, claimed_at = now() WHERE id = $1`,
+          [id, person()],
+        );
+
+      // A grant that is being worked, and then one that failed and waits for the IT Admin, are both still open.
+      const closedAsFailed = await newAssignment();
+      const first = await grantWithId(closedAsFailed);
+      expect(first.code).toBeNull();
+      await toInProgress(first.id);
+      expect(await grant(closedAsFailed)).toBe('23505');
+      await sql.query(
+        `UPDATE provisioning_tasks SET status = 'FAILED', failed_by_app_user_id = $2, failed_at = now(),
+           failure_reason = 'không cấp được', failure_kind = 'NOT_DONE' WHERE id = $1`,
+        [first.id, person()],
+      );
+      expect(await grant(closedAsFailed)).toBe('23505');
+      // Closed as failed: it ended, so the next grant is allowed, and it is the one open grant from then on.
+      await sql.query(
+        `UPDATE provisioning_tasks SET status = 'CLOSED_FAILED', closed_by_app_user_id = $2, closed_at = now(),
+           close_reason = 'đóng' WHERE id = $1`,
+        [first.id, person()],
+      );
+      expect(await grant(closedAsFailed)).toBeNull();
+      expect(await grant(closedAsFailed)).toBe('23505');
+
+      // A completed grant ended as well: the next one is allowed, and the open one blocks a third.
+      const completed = await newAssignment();
+      const done = await grantWithId(completed);
+      await toInProgress(done.id);
+      await sql.query(
+        `UPDATE provisioning_tasks SET status = 'COMPLETED', completed_by_app_user_id = $2, completed_at = now(),
+           evidence = 'xong' WHERE id = $1`,
+        [done.id, person()],
+      );
+      expect(await grant(completed)).toBeNull();
+      expect(await grant(completed)).toBe('23505');
     });
 
     it('lets a seat have a grant and a revocation, but not two live revocations', async () => {

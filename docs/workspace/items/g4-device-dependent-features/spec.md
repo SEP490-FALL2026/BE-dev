@@ -26,11 +26,11 @@ Hoàn tất các AC của G3/G4 cần sổ thiết bị công ty đã đăng ký
 
 | Story    | AC        | Coverage | Phần còn lại thuộc                                                                                                                                                                  |
 | -------- | --------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| US-02-05 | AC-11     | partial  | AC-1→AC-14: `g4-seat-baseline-import`                                                                                                                                               |
+| US-02-05 | AC-11     | partial  | AC-1→AC-16: `g4-seat-baseline-import`                                                                                                                                               |
 | US-04-04 | AC-8      | partial  | AC-1→AC-3, AC-6, AC-9, AC-10: `g3-contract-documents`; AC-4→AC-7, AC-11: `g3-downstream-finance-integration`                                                                        |
 | US-04-11 | AC-10     | partial  | AC-1→AC-4, AC-6→AC-9: `g3-vendor-terms-checklist`                                                                                                                                   |
 | US-04-12 | AC-5→AC-8 | partial  | AC-1→AC-4, AC-9→AC-12: `g3-license-key-vault`                                                                                                                                       |
-| US-07-01 | AC-10     | partial  | AC-1, AC-2, AC-4→AC-9, AC-11→AC-13, AC-15, AC-17: `g4-provisioning-queue-manual`; AC-1, AC-3, AC-15, AC-16: `g4-request-and-transfer-integration`; AC-14: `g4-seat-baseline-import` |
+| US-07-01 | AC-10     | partial  | AC-1, AC-2, AC-4→AC-9, AC-11→AC-13, AC-15, AC-17, AC-18: `g4-provisioning-queue-manual`; AC-1, AC-3, AC-15, AC-16: `g4-request-and-transfer-integration`; AC-14: `g4-seat-baseline-import` |
 | US-07-02 | AC-4      | partial  | AC-1→AC-7: `g4-provisioning-queue-manual`; AC-1: `g4-notification-delivery`                                                                                                         |
 
 ## Size exception

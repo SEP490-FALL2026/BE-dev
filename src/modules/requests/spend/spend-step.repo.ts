@@ -96,6 +96,16 @@ export class SpendStepRepo {
     return row ? toRecord(row) : null;
   }
 
+  /** Whether any step of the request is open (held or waiting), whatever its kind. */
+  async hasOpenStep(requestId: string, tx?: DbTx): Promise<boolean> {
+    const row = await (tx ?? this.prisma).accessRequestStep.findFirst({
+      where: { requestId, state: { in: ['PENDING', 'WAITING'] } },
+      select: { id: true },
+    });
+
+    return row !== null;
+  }
+
   /** The newest step of this kind, open or not. */
   async findLatest(requestId: string, kind: SpendStepKind, tx?: DbTx): Promise<SpendStepRecord | null> {
     const row = await (tx ?? this.prisma).accessRequestStep.findFirst({

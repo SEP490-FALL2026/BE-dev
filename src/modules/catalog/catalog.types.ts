@@ -38,6 +38,12 @@ export interface SeatOccupancyReader {
     limit: number,
     tx?: DbTx,
   ): Promise<OpenSeatHoldings>;
+  /** Which of these subscriptions have an assignment that has not ended and has not failed as of `day`: one read for any number of them. */
+  subscriptionsWithOpenSeats(
+    subscriptionIds: readonly string[],
+    day: BusinessDate,
+    tx?: DbTx,
+  ): Promise<ReadonlySet<string>>;
 }
 
 /** The facts about a seat target that the assignments of seats (licensing) read. */
@@ -58,10 +64,7 @@ export interface SeatTarget {
   missing: string[];
   /** The seats bought; null while the subscription has no quantity, and always null for a plan with no subscription. */
   purchasedQuantity: number | null;
-  /**
-   * The department that owns the subscription (`QĐ-89a`); null for a plan that has no subscription and for a subscription nobody
-   * has assigned a department to yet, which no seat is checked against.
-   */
+  /** The department that owns the subscription (`QĐ-89a`); null only for a plan that has no subscription (an internal plan, K5). */
   ownerDepartmentId: string | null;
 }
 

@@ -3,10 +3,10 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditService } from '../../audit/audit.service';
 import { AssignmentService } from '../assignment/assignment.service';
-import { WITHDRAWAL_CANCEL_REASON, type GrantCancellation } from '../licensing.types';
-import { BENEFICIARY_LEFT_CANCEL_REASON, type GrantCancelCause } from '../licensing-open-grants.types';
+import type { GrantCancellation } from '../licensing.types';
+import type { GrantCancelCause } from '../licensing-open-grants.types';
 import { licensingAuditEvent } from '../mappers/licensing-audit-event';
-import { grantCancelAction } from './grant-cancellation.policy';
+import { cancelReasonOf, grantCancelAction } from './grant-cancellation.policy';
 import type { ProvisioningTaskRecord } from './provisioning-task.record';
 import { ProvisioningTaskRepo } from './provisioning-task.repo';
 
@@ -23,13 +23,14 @@ export interface GrantCancelInput {
 }
 
 /**
- * What becomes of the grant of a request that ends before it is done: its requester withdrew it (`US-05-08` AC-3, AC-5, AC-9) or the
- * person it was for left (`US-03-04` AC-25). A task nobody has worked (queued, or waiting for its retry) is cancelled with its
+ * What becomes of the grant of a request that ends before it is done: its requester withdrew it (`US-05-08` AC-3, AC-5, AC-9), the
+ * person it was for left (`US-03-04` AC-25) or was transferred to another department (F29: the part not yet granted is closed; a
+ * grant that is done is never undone by closing the request). A task nobody has worked (queued, or waiting for its retry) is cancelled with its
  * assignment at once: the seat is free again and the task ends as cancelled, never as failed (`FR-2.5`). A task being worked is not
- * cancelled by a withdrawal: the withdrawal waits for its result; for a beneficiary who left it is cancelled, only with the evidence
- * that the work was undone. A task that is done cannot be undone by closing the request: the way back is a revocation or a return,
+ * cancelled by a withdrawal: the withdrawal waits for its result; for a beneficiary who left or was transferred it is cancelled, only with
+ * the evidence that the work was undone. A task that is done cannot be undone by closing the request: the way back is a revocation or a return,
  * which names the assignment the grant made. A task that failed is left for the IT Admin when the requester withdrew, who closes it as
- * cancelled (`ProvisioningDecisionService.cancel`), and cancelled with the request when the beneficiary left. Everything runs in the
+ * cancelled (`ProvisioningDecisionService.cancel`), and cancelled with the request when the beneficiary left or was transferred. Everything runs in the
  * transaction of the request, which holds the lock of the request; the lock of the task is taken first (`lockGrantOf`) so the order
  * of locks is the one of the decisions of the IT Admin.
  */
@@ -87,7 +88,7 @@ export class ProvisioningCancellationService {
       case 'WAIT_FOR_IT_ADMIN':
         return { status: 'FAILED', taskId: task.id };
       case 'CANCEL': {
-        const reason = cause === 'BENEFICIARY_LEFT' ? BENEFICIARY_LEFT_CANCEL_REASON : WITHDRAWAL_CANCEL_REASON;
+        const reason = cancelReasonOf(cause);
         await this.assignments.cancel(tx, actor, {
           organizationId: input.organizationId,
           assignmentId: task.assignmentId,

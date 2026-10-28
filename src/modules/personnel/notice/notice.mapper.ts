@@ -57,6 +57,7 @@ export function toDetail(
       method: facts.verification.method,
       reference: facts.verification.reference,
       verifiedByAppUserId: facts.verification.verifiedByAppUserId,
+      verifiedByProcedure: facts.verification.verifiedByTicketId !== null,
       verifiedAt: facts.verification.verifiedAt.toISOString(),
     },
   };

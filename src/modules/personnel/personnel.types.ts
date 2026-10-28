@@ -1,4 +1,26 @@
 import type { BusinessDate } from '../../core/business-date';
+import type { AuthenticatedPrincipal } from '../../infrastructure/security/tokens/access-token-verifier.port';
+import type { AuditValue } from '../audit/audit.types';
+
+/**
+ * Who does an event of the personnel context (spec L.2): a person signed in to the application, or the ticket of the controlled
+ * procedure `pnpm ops:record-super-admin-event`, which records an event about the Super Admin when the application cannot. Only the
+ * HTTP controllers build `USER`; only the command builds `OPERATOR`, and the policy accepts it only when the person the event is
+ * about holds the `SUPER_ADMIN` role. `context` is what the Audit Trail adds to the `after` of every event the command writes
+ * (the ticket, the approver, the operator, the environment, the mode and the basis); it carries references, never a secret.
+ */
+export type PersonnelActor =
+  | { kind: 'USER'; principal: AuthenticatedPrincipal }
+  | { kind: 'OPERATOR'; ticketId: string; ticketRef: string; context?: { readonly [key: string]: AuditValue } };
+
+export const userActor = (principal: AuthenticatedPrincipal): PersonnelActor => ({ kind: 'USER', principal });
+
+/** The two columns that say who did an event: an application account or the ticket, exactly one of them set. */
+export function actorColumns(actor: PersonnelActor): { appUserId: string | null; ticketId: string | null } {
+  return actor.kind === 'USER'
+    ? { appUserId: actor.principal.appUserId, ticketId: null }
+    : { appUserId: null, ticketId: actor.ticketId };
+}
 
 /**
  * A long leave in the span a rule of the recommendations reads: the person is on leave from `startedOn` up to, and not including,
@@ -15,6 +37,9 @@ export interface LeaveInterval {
  * of closing a transfer (`US-03-08`).
  */
 export const SERVICE_ACCOUNT_UNASSIGNED = 'SERVICE_ACCOUNT_UNASSIGNED';
+
+/** The code the wire names for the review of the tools the new head has not finished: it keeps the record of a transfer from being closed. */
+export const TRANSFER_REVIEW_OPEN = 'TRANSFER_REVIEW_OPEN';
 
 /**
  * The code the wire names, under the warnings of a departure, for the requests and grants of the person that are still open: how many

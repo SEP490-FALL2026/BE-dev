@@ -4,12 +4,15 @@ import { DbTx } from '../../infrastructure/database/transaction-runner';
 import { CostCenterCatalogueService } from './cost-center/cost-center-catalogue.service';
 import { DepartmentDirectoryService } from './department/department-directory.service';
 import { DepartmentServiceAccountRegistry } from './department/service-account-registry';
+import { DepartmentUseRegistry } from './department/department-use-registry';
 import { OrganizationChangeService } from './change-announcement/organization-change.service';
 import { DepartmentHeadRecord, HeadPeriodChanges, HeadPeriodRecord } from './department/department.types';
 import { EmployeeDirectoryService } from './employee/employee-directory.service';
 import { toBrief, toLocalSeedFixtureFacts } from './mappers/local-seed-fixture.mapper';
 import { OrganizationRepo } from './organization.repo';
+import type { CostCenterUse, CostCenterUseReader, DepartmentUse, DepartmentUseReader } from './organization-use.types';
 import {
+  ClearedHeadSuccessor,
   CostCenterBrief,
   CostedOwningUnit,
   CreateCostCenterInput,
@@ -33,6 +36,9 @@ import {
   OrganizationChangeListener,
   OwningUnit,
   OrganizationRecord,
+  ProfileNotice,
+  ProfileNoticeRequest,
+  UsableItAdmins,
 } from './organization.types';
 
 /** Public facade of the organization module: other modules call it in their own transaction, never the tables. */
@@ -47,6 +53,7 @@ export class OrganizationService {
     private readonly employees: EmployeeDirectoryService,
     private readonly costCenters: CostCenterCatalogueService,
     private readonly serviceAccounts: DepartmentServiceAccountRegistry,
+    private readonly use: DepartmentUseRegistry,
     private readonly changes: OrganizationChangeService,
   ) {}
 
@@ -112,6 +119,11 @@ export class OrganizationService {
     return this.departments.idsInChargeOf(employeeId, tx);
   }
 
+  /** What an IT Admin reads and handles: the departments that name them and, while nobody usable is named, every active one (F12). */
+  getItAdminScope(employeeId: string, usableAmong: UsableItAdmins, tx?: DbTx): Promise<string[]> {
+    return this.departments.itAdminScopeOf(employeeId, usableAmong, tx);
+  }
+
   /** Everyone placed in the department on `onDate` (default today), by employee id; null when it does not exist. */
   async getDepartmentMemberIds(departmentId: string, onDate?: BusinessDate, tx?: DbTx): Promise<string[] | null> {
     return this.departments.memberIdsOn(departmentId, onDate ?? (await this.businessToday(new Date(), tx)), tx);
@@ -143,6 +155,14 @@ export class OrganizationService {
   /** A module that acts when the organization changes asks to be told in the transaction of the change (`FR-3.16`). */
   registerChangeListener(listener: OrganizationChangeListener): void {
     this.changes.register(listener);
+  }
+
+  /** F47 (`ops:inspect`, read only): how many changes of each kind had taken effect at `asOf` in their organization's calendar and were never marked as told. */
+  countUnmarkedChangesAsOf(
+    tx: DbTx,
+    asOf: Date,
+  ): Promise<Record<'PLACEMENT_START' | 'HEAD_PERIOD_START' | 'HEAD_PERIOD_END', number>> {
+    return this.changes.countUnmarkedAsOf(tx, asOf);
   }
 
   /** Tells the registered listeners of a change that has taken effect, in the caller's transaction; one that throws rolls it back. */
@@ -320,6 +340,39 @@ export class OrganizationService {
     return this.serviceAccounts.current().ownedBy(departmentId, onDate, limit, tx);
   }
 
+  /** The modules that hold what keeps a department in use (open work, subscriptions: `QĐ-90e`) register a reader when they start. */
+  registerDepartmentUseReader(reader: DepartmentUseReader): void {
+    this.use.registerDepartment(reader);
+  }
+
+  /** The first `limit` of each thing that keeps the department in use on `day` and how many there are: retiring waits for them. */
+  getDepartmentUse(departmentId: string, day: BusinessDate, limit: number, tx?: DbTx): Promise<DepartmentUse> {
+    return this.use.readDepartment(departmentId, day, limit, tx);
+  }
+
+  /** The same for a Cost Center: Requests with a cost not over and commitments held (`QĐ-87d(2)`), registered by their modules. */
+  registerCostCenterUseReader(reader: CostCenterUseReader): void {
+    this.use.registerCostCenter(reader);
+  }
+
+  getCostCenterUse(costCenterId: string, limit: number, tx?: DbTx): Promise<CostCenterUse> {
+    return this.use.readCostCenter(costCenterId, limit, tx);
+  }
+
+  /** The notices a created or corrected employee record owes, to write with `NotificationsService.notifyInApp` in the same transaction (`F17`). */
+  getProfileNotices(tx: DbTx, request: ProfileNoticeRequest): Promise<ProfileNotice[]> {
+    return this.employees.profileNotices(tx, request);
+  }
+
+  /** Takes back the successor named to take over the department from a day after `today`; the caller holds the department lock. */
+  clearDepartmentHeadSuccessor(
+    tx: DbTx,
+    departmentId: string,
+    today: BusinessDate,
+  ): Promise<ClearedHeadSuccessor | null> {
+    return this.departments.clearHeadSuccessor(tx, departmentId, today);
+  }
+
   /** The numbers and gaps of the onboarding checklist (US-02-04 AC-1, AC-6); with `tx`, in order in that transaction. */
   async getOnboardingFacts(tx?: DbTx): Promise<OnboardingFacts> {
     const today = await this.businessToday(new Date(), tx);
@@ -333,7 +386,6 @@ export class OrganizationService {
     return {
       activeDepartments,
       activeEmployees,
-      costCenterDirectionActivated: await this.costCenters.isDirectionActivated(tx),
       departmentsWithoutCostCenter: withoutCostCenter.map(({ code, name }) => ({ code, name })),
       departmentsWithoutHead: withoutHead.map((department) => ({ code: department.code, name: department.name })),
       departmentsByItAdmin: withItAdmin.map((department) => ({

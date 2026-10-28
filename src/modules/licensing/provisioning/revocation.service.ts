@@ -76,7 +76,7 @@ export class RevocationService {
       open: isOpenAssignment(assignment),
       provisioningType: plan.provisioningType,
     });
-    const selfExecuted = await this.selfExecuted(actor, assignment.employeeId);
+    const selfExecuted = await this.selfExecuted(tx, actor, assignment.employeeId);
     const organization = await this.organization.getOrganization(tx);
     if (!organization) throw new Error('A revocation was opened before installation');
 
@@ -112,6 +112,8 @@ export class RevocationService {
         },
       ),
     );
+    // An IT Admin who asks for their own seat to go because no other IT Admin can is told to the Super Admin (`SoD-5`, F24).
+    if (selfExecuted) await this.frame.tellSuperAdmin(tx, organization.id, task.id, actor.employeeId);
     const reasons = (await this.reasons.listOf([task.id], tx)).map(factsOf);
     await this.hook.onOpened(tx, toRevocationFacts(task), reasons, input.context ?? {}, actor, now);
 
@@ -145,9 +147,9 @@ export class RevocationService {
   }
 
   /** The rule of the IT Admin who is the one revoked (`QĐ-77m`); a person who is not an IT Admin is never restricted by it. */
-  private async selfExecuted(actor: AuthenticatedPrincipal, holderEmployeeId: string): Promise<boolean> {
+  private async selfExecuted(tx: DbTx, actor: AuthenticatedPrincipal, holderEmployeeId: string): Promise<boolean> {
     if (!actor.roles.includes('IT_ADMIN')) return false;
 
-    return (await this.frame.selfExecutionMode(actor, holderEmployeeId)) === 'ALLOW_SELF_EXECUTED';
+    return (await this.frame.selfExecutionMode(actor, holderEmployeeId, tx)) === 'ALLOW_SELF_EXECUTED';
   }
 }

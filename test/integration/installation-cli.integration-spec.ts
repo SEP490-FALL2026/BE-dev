@@ -23,13 +23,9 @@ const COLD_START_MS = CLI_COLD_START_MS;
 const REQUIRED_ARGUMENTS = [
   ...['--timezone', 'Asia/Ho_Chi_Minh', '--currency', 'VND'],
   ...['--organization-name', 'Cong ty Thu nghiem Review'],
-  ...['--cost-center-code', 'CC-IT', '--cost-center-name', 'Khoi Cong nghe'],
   ...['--department-code', 'IT', '--department-name', 'Phong Cong nghe Thong tin'],
-  ...['--job-title', 'Chuyen vien Cong nghe'],
   ...['--admin-code', 'SA001', '--admin-name', 'Quan tri Gia lap'],
   ...['--admin-email', 'sa.review@example.test', '--admin-hire-date', '2026-01-05'],
-  ...['--it-code', 'IT001', '--it-name', 'Ky thuat Gia lap'],
-  ...['--it-email', 'it.review@example.test', '--it-hire-date', '2026-02-02'],
   ...['--operator-reference', 'REVIEW-G0G1-20261014', '--environment', 'LOCAL_TEST'],
 ];
 
@@ -92,6 +88,22 @@ describe('installation command (integration, spawned process)', () => {
       expect(unknown).toEqual({ code: 1, stdout: '', stderr: `Unknown option '--bogus'\n\n${INSTALLATION_USAGE}\n` });
     },
     COLD_START_MS * 2,
+  );
+
+  it(
+    'refuses the options of the earlier command (a Cost Center, a job title, an IT employee) as unknown, before any database is read (QĐ-87f)',
+    async () => {
+      for (const option of ['--cost-center-code', '--job-title', '--it-code']) {
+        const result = await run([...REQUIRED_ARGUMENTS, option, 'X']);
+
+        expect(result).toEqual({
+          code: 1,
+          stdout: '',
+          stderr: `Unknown option '${option}'\n\n${INSTALLATION_USAGE}\n`,
+        });
+      }
+    },
+    COLD_START_MS * 3,
   );
 
   it(

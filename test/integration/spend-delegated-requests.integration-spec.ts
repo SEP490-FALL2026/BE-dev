@@ -389,7 +389,8 @@ describe('a head sends requests for the people of the department over PostgreSQL
 
     it('gives the spend step to the substitute when the approver is the head who sent, and the approver decides nothing on it', async () => {
       const row = await h.ctx.sql.query<{ id: string; cost_center_id: string }>(
-        `SELECT id, cost_center_id FROM departments WHERE code = 'P-EXE'`,
+        `SELECT d.id, c.id AS cost_center_id FROM departments d
+           JOIN cost_centers c ON c.department_id = d.id AND c.status = 'ACTIVE' WHERE d.code = 'P-EXE'`,
       );
       const department = { id: row.rows[0].id, code: 'P-EXE', unitId: row.rows[0].cost_center_id };
       const executive = { department, head: h.boss, member: await h.staff(department, 'EXE-D7') };

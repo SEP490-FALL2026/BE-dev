@@ -11,7 +11,7 @@ export const TERM_MONTHS_MAX = 120;
 
 /**
  * `BM-01` as the person sending it fills it (`US-01-12` AC-1, `US-05-02` AC-6): the plan, the reason and the term are
- * required, the project is context only, and a reason for a tool outside the standard toolset is optional here. Nothing
+ * required, and the project is context only. Nothing
  * here chooses the branch, the Cost Center or who decides: the system fixes them from the plan and the department.
  */
 export const submitBodySchema = z.strictObject({

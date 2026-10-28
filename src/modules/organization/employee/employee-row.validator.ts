@@ -31,7 +31,7 @@ export interface EmployeeRowReason {
 /** What was looked up for the row, under the locks the caller holds. */
 export interface EmployeeRowLookup {
   /** The department the row's code names; null when there is none. */
-  department: { id: string; active: boolean; costCenterActive: boolean } | null;
+  department: { id: string; active: boolean } | null;
   employeeCodeTaken: boolean;
   workEmailTaken: boolean;
   /** The code, or the normalized email, is the one of the person who is entering. */
@@ -44,9 +44,9 @@ const isBlank = (value: string | null | undefined): boolean =>
 
 /**
  * Why a row of the manual form cannot become an employee (T-16). Whether the department can take someone in and the job title
- * is asked for and bounded is the placement policy the import preview shares (BEH.1); this adapter reads blank fields the form's
- * way, shows each reason on its form field, then adds the taken code and email — after the placement reasons, and a
- * taken code is a reason here, not an existing person to compare (H8 D-2, D-3). It lists every reason at once, in a
+ * is bounded (it is optional free text, `QĐ-87e`) is the placement policy the import preview shares (BEH.1); this adapter reads
+ * blank fields the form's way, shows each reason on its form field, then adds the taken code and email — after the placement
+ * reasons, and a taken code is a reason here, not an existing person to compare (H8 D-2, D-3). It lists every reason at once, in a
  * fixed order, so one attempt shows everything to fix. It decides from what the caller looked up and nothing else.
  */
 export function validateEmployeeRow(
@@ -55,10 +55,7 @@ export function validateEmployeeRow(
 ): EmployeeRowReason[] {
   const reasons: EmployeeRowReason[] = placementReasons({
     department: { named: !isBlank(row.departmentCode), found: lookup.department },
-    jobTitle: {
-      named: !isBlank(row.jobTitle),
-      tooLong: isJobTitleTooLong(normalizeDisplayName(row.jobTitle ?? '')),
-    },
+    jobTitle: { tooLong: isJobTitleTooLong(normalizeDisplayName(row.jobTitle ?? '')) },
   }).map(({ subject, code }) => ({ field: FORM_FIELD[subject], code }));
 
   if (lookup.ownCode) reasons.push({ field: 'employeeCode', code: 'OWN_RECORD' });

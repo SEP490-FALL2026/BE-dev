@@ -54,7 +54,9 @@ export class QuoteService {
       fiscalYearStartMonth: context.fiscalYearStartMonth,
     });
     if (priced.status === 'REFUSED') {
-      if (priced.reason === 'SCHEDULE_REQUIRED') throw new AssessmentIncompleteError(priced.missing);
+      if (priced.reason === 'SCHEDULE_REQUIRED' || priced.reason === 'PRICE_REQUIRED') {
+        throw new AssessmentIncompleteError(priced.missing);
+      }
       throw new AssessmentQuoteRefusedError(priced.reason);
     }
 

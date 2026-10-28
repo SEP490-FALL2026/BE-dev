@@ -2,16 +2,12 @@ import { normalizeDisplayName } from '../../../core/display-name';
 import { normalizeEmail } from '../../../core/email';
 import type { DemoAccountState } from '../../identity-access/identity-access.types';
 import type { EmployeeImportLookupData, LocalSeedFixtureFacts } from '../../organization/organization.types';
-import { DEMO_COST_CENTER, DEMO_DEPARTMENT, DEMO_HIRE_DATE, DEMO_JOB_TITLE, DEMO_PEOPLE } from './dev-seed.fixture';
+import { DEMO_COST_CENTER, DEMO_DEPARTMENT, DEMO_HIRE_DATE, DEMO_PEOPLE } from './dev-seed.fixture';
 import { PlannedItem, SeedConflict, SeedPlan } from './dev-seed.types';
 
 /** The display name each fixture item is stored and compared with (T-12): accents composed, whitespace collapsed. */
 const COST_CENTER_NAME = normalizeDisplayName(DEMO_COST_CENTER.name);
 const DEPARTMENT_NAME = normalizeDisplayName(DEMO_DEPARTMENT.name);
-const JOB_TITLE_NAME = normalizeDisplayName(DEMO_JOB_TITLE);
-
-/** The key of the one activation row of the Cost Center link a new local database gets (spec L.11). */
-export const DEMO_DIRECTION_KEY = 'COST_CENTER_LINK';
 
 /** The stable keys of the two organization fixture items (OrganizationService.readLocalSeedFixture). */
 export const DEMO_FIXTURE_KEYS = {
@@ -71,7 +67,6 @@ export function buildSeedPlan(
   const items: PlannedItem[] = [
     item('DEPARTMENT', DEMO_DEPARTMENT.code, department && departmentConflict(department), department !== null),
     item('COST_CENTER', DEMO_COST_CENTER.code, costCenter && costCenterConflict(costCenter), costCenter !== null),
-    item('COST_CENTER_DIRECTION', DEMO_DIRECTION_KEY, null, fixture.costCenterDirectionActivated),
   ];
 
   const employeeIds = new Map<string, string>();
@@ -86,8 +81,7 @@ export function buildSeedPlan(
         normalizeEmail(existing.workEmail) === email &&
         existing.employmentType === 'STAFF' &&
         existing.hireDate === DEMO_HIRE_DATE &&
-        existing.departmentCode === DEMO_DEPARTMENT.code &&
-        existing.jobTitleName === JOB_TITLE_NAME;
+        existing.departmentCode === DEMO_DEPARTMENT.code;
       items.push(
         asWanted
           ? { kind: 'EMPLOYEE', key: person.employeeCode, action: 'present' }

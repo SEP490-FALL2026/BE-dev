@@ -8,8 +8,9 @@ import type { LineRecord, ReadableCancelCause } from '../group-request/group-req
 /** The shapes the repository of requests reads and writes; the repository re-exports them, so importers do not change. */
 
 /**
- * `DRAFT` is written by the release after this one (spec L.1, L.10): a request being drafted is neither listed nor readable
- * here, so every read filters it out and no wire carries it.
+ * `DRAFT` is a paid request saved before the finance gates (spec L.1): it has no Cost Center, no moment it was sent, no step, no check
+ * and no commitment. It is neither listed nor readable as a request (`AccessRequestRepo.findById` and every other read filter it out and
+ * no wire of a request carries it): only `RequestDraftRepo` and the four draft operations see it.
  */
 export type AccessRequestState =
   | 'DRAFT'
@@ -97,6 +98,11 @@ export interface NewAccessRequest {
   createdByAppUserId: string;
   now: Date;
   needStep: NewNeedStep;
+  /**
+   * The draft this request is made from (spec L.1): the row of the draft becomes the request, so it is the same request from the
+   * day it was saved. Absent for a request written new. The caller holds the lock of the draft (`RequestDraftRepo.lock`).
+   */
+  draftId?: string | null;
 }
 
 /** A need step as it is written: the first one with the request, the others after it (`addNeedStep`). */

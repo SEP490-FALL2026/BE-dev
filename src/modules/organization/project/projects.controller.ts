@@ -27,7 +27,7 @@ const AUTH_ERRORS = [
   UNAUTHENTICATED_RESPONSE,
   {
     status: HttpStatus.FORBIDDEN,
-    description: 'Only an IT Admin keeps the projects described on department profiles.',
+    description: 'Only the Super Admin keeps the projects described on department profiles.',
     examples: [FORBIDDEN_EXAMPLE],
   },
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
@@ -54,7 +54,8 @@ const PROJECT_INVALID = {
 
 /**
  * Projects described on department profiles (`US-03-06` AC-14). A project is text: not a Cost Center, no members
- * of its own and no step of any approval.
+ * of its own and no step of any approval. The Super Admin lists, reads, adds and changes them, on an HR basis; the IT Admin does
+ * not (`QĐ-87a`). Who may is decided by the policy of the service as well as by the role of the route (`F13`).
  */
 @ApiTags('projects')
 @Controller({ path: 'projects', version: '1' })
@@ -62,7 +63,7 @@ export class ProjectsController {
   constructor(private readonly projects: ProjectService) {}
 
   @Get()
-  @RequireRoles('IT_ADMIN')
+  @RequireRoles('SUPER_ADMIN')
   @ApiOperation({ operationId: 'projectList', summary: 'List projects' })
   @ApiSuccessResponse(ProjectListResponseDto, {
     message: 'PROJECT.LISTED',
@@ -70,9 +71,9 @@ export class ProjectsController {
       'A page of projects by name, optionally those a department takes part in. The description is read with GET /projects/{id}.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, VALIDATION_ERROR)
-  async list(@Query() query: ListProjectsQueryDto) {
+  async list(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Query() query: ListProjectsQueryDto) {
     try {
-      const page = await this.projects.list(query);
+      const page = await this.projects.list(actor, query);
 
       return { items: page.items.map(toProjectSummaryWire), pagination: page.pagination };
     } catch (error) {
@@ -81,7 +82,7 @@ export class ProjectsController {
   }
 
   @Get(':id')
-  @RequireRoles('IT_ADMIN')
+  @RequireRoles('SUPER_ADMIN')
   @ApiOperation({ operationId: 'projectGet', summary: 'Read one project' })
   @ApiSuccessResponse(ProjectResponseDto, {
     message: 'PROJECT.FETCHED',
@@ -92,16 +93,16 @@ export class ProjectsController {
     description: 'The project does not exist (PROJECT.NOT_FOUND).',
     examples: [ORGANIZATION_ERROR_EXAMPLES.PROJECT_NOT_FOUND],
   })
-  async get(@Param() params: ProjectIdParamDto) {
+  async get(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: ProjectIdParamDto) {
     try {
-      return toProjectWire(await this.projects.get(params.id));
+      return toProjectWire(await this.projects.get(actor, params.id));
     } catch (error) {
       throw toOrganizationApiException(error);
     }
   }
 
   @Post()
-  @RequireRoles('IT_ADMIN')
+  @RequireRoles('SUPER_ADMIN')
   @ApiOperation({ operationId: 'projectCreate', summary: 'Add a project to a department profile' })
   @ApiSuccessResponse(ProjectResponseDto, {
     status: HttpStatus.CREATED,
@@ -118,7 +119,7 @@ export class ProjectsController {
   }
 
   @Patch(':id')
-  @RequireRoles('IT_ADMIN')
+  @RequireRoles('SUPER_ADMIN')
   @ApiOperation({ operationId: 'projectUpdate', summary: 'Update a project' })
   @ApiSuccessResponse(ProjectResponseDto, {
     message: 'PROJECT.UPDATED',

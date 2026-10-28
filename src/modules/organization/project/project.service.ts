@@ -1,12 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { Page, pageOf } from '../../../core/application/pagination';
 import { normalizeDisplayName } from '../../../core/display-name';
+import type { HrBasis } from '../../../core/hr-basis';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditService } from '../../audit/audit.service';
 import { organizationAuditEvent } from '../mappers/audit-event.mapper';
 import { OrganizationService } from '../organization.service';
 import { ProjectInvalidError, ProjectNotFoundError } from './project.errors';
+import { assertMayKeepProjects } from './project.policy';
 import { ProjectRepo } from './project.repo';
 import { PROFILE_PROJECT_LIMIT, ProjectRecord, ProjectStatus, ProjectSummaryRecord } from './project.types';
 
@@ -15,7 +17,8 @@ export const PROJECT_DESCRIPTION_MAX_LENGTH = 2000;
 
 /**
  * Projects are text on department profiles (`US-03-06` AC-14): a name, what it is, which departments take part and
- * whether it is running. They are not cost centers, have no members and are no step of any approval.
+ * whether it is running. They are not cost centers, have no members and are no step of any approval. The Super Admin keeps them,
+ * on an HR basis (`QĐ-87a`); who may is `project.policy.ts`, run first in every use case a route reaches.
  */
 @Injectable()
 export class ProjectService {
@@ -26,8 +29,12 @@ export class ProjectService {
     private readonly runner: TransactionRunner,
   ) {}
 
-  /** One page of projects by name, the description left to `get` (`LD-12`). */
-  async list(query: { departmentId?: string; page: number; pageSize: number }): Promise<Page<ProjectSummaryRecord>> {
+  /** One page of projects by name, the description left to `get` (`LD-12`). Throws ProjectForbiddenError. */
+  async list(
+    actor: AuthenticatedPrincipal,
+    query: { departmentId?: string; page: number; pageSize: number },
+  ): Promise<Page<ProjectSummaryRecord>> {
+    assertMayKeepProjects(actor.roles);
     const { items, total } = await this.repo.page(
       query.departmentId,
       (query.page - 1) * query.pageSize,
@@ -37,8 +44,9 @@ export class ProjectService {
     return pageOf(items, total, query.page, query.pageSize);
   }
 
-  /** One project in full. Throws ProjectNotFoundError. */
-  async get(id: string): Promise<ProjectRecord> {
+  /** One project in full. Throws ProjectForbiddenError or ProjectNotFoundError. */
+  async get(actor: AuthenticatedPrincipal, id: string): Promise<ProjectRecord> {
+    assertMayKeepProjects(actor.roles);
     const project = await this.repo.findProject(id);
     if (!project) throw new ProjectNotFoundError();
 
@@ -52,8 +60,15 @@ export class ProjectService {
 
   async create(
     actor: AuthenticatedPrincipal,
-    input: { name: string; description?: string | null; status?: ProjectStatus; departmentIds: string[] },
+    input: {
+      name: string;
+      description?: string | null;
+      status?: ProjectStatus;
+      departmentIds: string[];
+      hrBasis: HrBasis;
+    },
   ): Promise<ProjectRecord> {
+    assertMayKeepProjects(actor.roles);
     const name = this.requireName(input.name);
     const description = this.normalizeDescription(input.description);
     const organization = await this.requireOrganization();
@@ -74,6 +89,7 @@ export class ProjectService {
           name,
           status: input.status ?? 'RUNNING',
           departmentIds,
+          hrBasis: { ...input.hrBasis },
         }),
       );
 
@@ -86,8 +102,15 @@ export class ProjectService {
   async update(
     actor: AuthenticatedPrincipal,
     id: string,
-    input: { name?: string; description?: string | null; status?: ProjectStatus; departmentIds?: string[] },
+    input: {
+      name?: string;
+      description?: string | null;
+      status?: ProjectStatus;
+      departmentIds?: string[];
+      hrBasis: HrBasis;
+    },
   ): Promise<ProjectRecord> {
+    assertMayKeepProjects(actor.roles);
     const organization = await this.requireOrganization();
     const name = input.name === undefined ? undefined : this.requireName(input.name);
     const description = input.description === undefined ? undefined : this.normalizeDescription(input.description);
@@ -128,7 +151,10 @@ export class ProjectService {
       await this.repo.updateProject(tx, id, changes, new Date());
       await this.audit.record(
         tx,
-        organizationAuditEvent(actor, organization.id, 'PROJECT.UPDATED', 'Project', id, before, after),
+        organizationAuditEvent(actor, organization.id, 'PROJECT.UPDATED', 'Project', id, before, {
+          ...after,
+          hrBasis: { ...input.hrBasis },
+        }),
       );
     });
 

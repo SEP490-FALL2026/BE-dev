@@ -27,24 +27,14 @@ const input = {
   timeZone: 'Asia/Ho_Chi_Minh',
   reportingCurrency: 'VND',
   organizationName: 'Acme Software',
-  costCenterCode: 'CC-ENG',
-  costCenterName: 'Engineering',
   departmentCode: 'P-ENG',
   departmentName: 'Engineering',
-  jobTitleName: 'Software Engineer',
   superAdmin: {
     employeeCode: 'E001',
     fullName: 'Pham Bao',
     workEmail: 'bao@acme.vn',
     employmentType: 'STAFF',
     hireDate: '2024-03-01',
-  },
-  itAdmin: {
-    employeeCode: 'E002',
-    fullName: 'Tran An',
-    workEmail: 'an@acme.vn',
-    employmentType: 'STAFF',
-    hireDate: '2024-03-05',
   },
   operatorReference: 'CHG-1234',
   environment: 'LOCAL_TEST',
@@ -75,31 +65,30 @@ describe('installation bootstrap facts (integration, real PostgreSQL)', () => {
     if (database) await dropDisposableDatabase(database);
   });
 
-  it('records exactly these audit actions, once each except the two employees', async () => {
+  it('records exactly these audit actions, once each (no Cost Center event, one employee: QĐ-87f(1))', async () => {
     const audit = await sql.query<{ action: string; count: number }>(
       `SELECT action, count(*)::int AS count FROM audit_events GROUP BY action ORDER BY action`,
     );
 
     expect(audit.rows).toEqual([
-      { action: 'INSTALLATION.COST_CENTER_CREATED', count: 1 },
       { action: 'INSTALLATION.DEPARTMENT_CREATED', count: 1 },
-      { action: 'INSTALLATION.EMPLOYEE_CREATED', count: 2 },
+      { action: 'INSTALLATION.EMPLOYEE_CREATED', count: 1 },
       { action: 'INSTALLATION.ORGANIZATION_CREATED', count: 1 },
       { action: 'INSTALLATION.SUPER_ADMIN_CREATED', count: 1 },
       { action: 'ROLE.GRANTED', count: 1 },
     ]);
   });
 
-  it('marks the organization bootstrapped and sets no head, IT Admin or approval role', async () => {
+  it('marks the organization bootstrapped and sets no Cost Center, head, IT Admin or approval role', async () => {
     const facts = await sql.query(`
       SELECT (SELECT bootstrap_completed_at IS NOT NULL FROM organizations) AS bootstrapped,
+             (SELECT count(*)::int FROM cost_centers) AS cost_centers,
              (SELECT count(*)::int FROM department_head_periods) AS head_periods,
              (SELECT count(*)::int FROM departments WHERE it_admin_employee_id IS NOT NULL) AS with_it_admin,
-             (SELECT count(*)::int FROM approval_role_holders) AS approval_holders,
-             (SELECT array_agg(DISTINCT kind::text) FROM cost_centers) AS kinds`);
+             (SELECT count(*)::int FROM approval_role_holders) AS approval_holders`);
 
     expect(facts.rows).toEqual([
-      { bootstrapped: true, head_periods: 0, with_it_admin: 0, approval_holders: 0, kinds: ['UNIT'] },
+      { bootstrapped: true, cost_centers: 0, head_periods: 0, with_it_admin: 0, approval_holders: 0 },
     ]);
   });
 
@@ -147,7 +136,8 @@ describe('installation bootstrap facts (integration, real PostgreSQL)', () => {
       return undefined;
     };
 
-    const newEmployee = async (tx: Parameters<Parameters<TransactionRunner['run']>[0]>[0], code: string) => {
+    /** A person in the first department, with no account yet (the installation creates only the Super Admin's). */
+    const newPerson = async (tx: Parameters<Parameters<TransactionRunner['run']>[0]>[0], code: string) => {
       const organization = app.get(OrganizationService);
       const org = await organization.getOrganization(tx);
       const lookup = await organization.lookupForEmployeeImport(
@@ -166,11 +156,17 @@ describe('installation bootstrap facts (integration, real PostgreSQL)', () => {
         employmentType: 'STAFF',
         hireDate: '2024-04-01',
         departmentId: lookup.departments[0].id,
-        jobTitle: 'Software Engineer',
+        jobTitle: null,
       });
+
+      return { organizationId: org!.id, employeeId: id };
+    };
+
+    const newEmployee = async (tx: Parameters<Parameters<TransactionRunner['run']>[0]>[0], code: string) => {
+      const { organizationId, employeeId } = await newPerson(tx, code);
       const user = await app.get(AccountDirectoryService).createAppUser(tx, {
-        organizationId: org!.id,
-        employeeId: id,
+        organizationId,
+        employeeId,
         loginEmail: `${code.toLowerCase()}@acme.vn`,
         normalizedLoginEmail: `${code.toLowerCase()}@acme.vn`,
         status: 'ACTIVE',
@@ -178,7 +174,7 @@ describe('installation bootstrap facts (integration, real PostgreSQL)', () => {
         emailVerificationSource: 'BOOTSTRAP_ASSERTED',
         emailVerifiedAt: new Date(),
       });
-      return { organizationId: org!.id, appUserId: user.id };
+      return { organizationId, appUserId: user.id };
     };
 
     it('lets an activated account with one direct role be written through the account contracts', async () => {
@@ -205,12 +201,10 @@ describe('installation bootstrap facts (integration, real PostgreSQL)', () => {
 
     it('refuses a second account for the same login email', async () => {
       const error = await attempt(async (tx) => {
-        const organization = app.get(OrganizationService);
-        const org = await organization.getOrganization(tx);
-        const it = await organization.getEmployeeByCode('E002', tx);
+        const { organizationId, employeeId } = await newPerson(tx, 'E104');
         await app.get(AccountDirectoryService).createAppUser(tx, {
-          organizationId: org!.id,
-          employeeId: it!.id,
+          organizationId,
+          employeeId,
           loginEmail: 'Bao@Acme.vn',
           normalizedLoginEmail: 'bao@acme.vn',
           status: 'ACTIVE',

@@ -22,10 +22,9 @@ export class ImportLookupRepo {
     const [departments, employees, emailOwners] = await Promise.all([
       names.departmentCodes.length === 0
         ? []
-        : // A department with no Cost Center in use yet still exists for the file (`QĐ-87d(1)`): it just takes nobody in.
-          db.$queryRaw<{ id: string; code: string; status: string; cc_active: boolean }[]>`
-            SELECT d.id, d.code, d.status::text AS status,
-                   EXISTS (SELECT 1 FROM cost_centers c WHERE c.department_id = d.id AND c.status = 'ACTIVE') AS cc_active
+        : // Whether the department has a Cost Center is not asked: a department with none takes people in (`QĐ-87d(3)`).
+          db.$queryRaw<{ id: string; code: string; status: string }[]>`
+            SELECT d.id, d.code, d.status::text AS status
               FROM departments d
              WHERE d.code = ANY(${names.departmentCodes}::text[])`,
       names.employeeCodes.length === 0
@@ -61,7 +60,6 @@ export class ImportLookupRepo {
         id: row.id,
         code: row.code,
         active: row.status === 'ACTIVE',
-        costCenterActive: row.cc_active,
       })),
       employees: employees.map((row) => ({
         id: row.id,

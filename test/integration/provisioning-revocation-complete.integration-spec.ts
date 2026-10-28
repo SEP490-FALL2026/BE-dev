@@ -430,7 +430,7 @@ describe('completing a revocation by the kind of grant, over HTTP (integration, 
       expect(failed).toMatchObject({ status: 'FAILED', availableDecisions: ['RETRY', 'CLOSE_FAILED'] });
       expect(await h.assignmentRow(assignmentId)).toMatchObject({ valid_until: null, failed_at: null });
       expect(await h.freeSeats(subscriptionId)).toBe(0);
-      expect(h.codeOf(await h.handOff(taskId, { evidence: 'x' }).expect(409))).toBe('PROVISIONING_TASK.ALREADY_MANUAL');
+      expect(h.codeOf(await h.handOff(taskId, {}).expect(409))).toBe('PROVISIONING_TASK.ALREADY_MANUAL');
       expect(h.codeOf(await h.cancelTask(taskId).expect(409))).toBe('PROVISIONING_TASK.NO_WITHDRAWAL');
       expect(taskOf(await h.retry(taskId).expect(200))).toMatchObject({
         status: 'QUEUED',

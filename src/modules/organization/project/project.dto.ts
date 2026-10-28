@@ -1,13 +1,16 @@
 import { z } from 'zod';
+import { hrBasisSchema } from '../../../infrastructure/http/dto/hr-basis.dto';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { projectSchema, projectSummarySchema } from '../dto/project-wire.dto';
 
+/** Every change cites the HR document it is made on (`QĐ-87b(1)`): a missing part is a validation error and nothing is written. */
 export const createProjectBodySchema = z.strictObject({
   name: z.string().max(1000),
   description: z.string().max(5000).nullish(),
   status: z.enum(['RUNNING', 'FINISHED']).optional(),
   departmentIds: z.array(z.uuid()).max(100),
+  hrBasis: hrBasisSchema,
 });
 
 export const updateProjectBodySchema = z.strictObject({
@@ -15,6 +18,7 @@ export const updateProjectBodySchema = z.strictObject({
   description: z.string().max(5000).nullable().optional(),
   status: z.enum(['RUNNING', 'FINISHED']).optional(),
   departmentIds: z.array(z.uuid()).max(100).optional(),
+  hrBasis: hrBasisSchema,
 });
 
 export const listProjectsQuerySchema = z.strictObject({

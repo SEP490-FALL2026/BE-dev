@@ -9,13 +9,15 @@ import {
 } from '../notice/notice-recorder.registry';
 import { TransferRefusedError } from './transfer.errors';
 import { toTransferApiException } from './transfer.http-errors';
+import { TransferGuardService } from './transfer-guard.service';
 import { TransferRepo } from './transfer.repo';
 import { TransferService } from './transfer.service';
 
 /**
  * Writes the transfer a notice of a head announces (`US-03-11` AC-1, AC-7): the rules of the transfer judge the day, the destination,
  * the head who goes with a person and the one event that waits, exactly as they do for a transfer recorded from a document, and what
- * they refuse comes back with their own codes. A transfer already waiting for the person answers as a duplicate event.
+ * they refuse comes back with their own codes. A transfer already waiting for the person answers as a duplicate event. A race the
+ * database refuses answers `CONCURRENT_CHANGE` (409), never a 500 (F37).
  */
 @Injectable()
 export class TransferNoticeRecorder implements OnModuleInit, NoticeEventRecorder {
@@ -25,6 +27,7 @@ export class TransferNoticeRecorder implements OnModuleInit, NoticeEventRecorder
     private readonly registry: NoticeRecorderRegistry,
     private readonly transfers: TransferService,
     private readonly repo: TransferRepo,
+    private readonly guard: TransferGuardService,
   ) {}
 
   onModuleInit(): void {
@@ -35,14 +38,17 @@ export class TransferNoticeRecorder implements OnModuleInit, NoticeEventRecorder
     const { notice, event } = request;
     if (event.effectiveOn === undefined) throw new Error('A transfer notice was recorded without a day');
     try {
-      const transfer = await this.transfers.recordInTx(tx, request.actor, {
-        employeeId: notice.employeeId,
-        toDepartmentId: event.toDepartmentId ?? notice.targetDepartmentId ?? undefined,
-        effectiveOn: event.effectiveOn,
-        grounds: request.grounds,
-        successor: event.successor,
-        noticeId: notice.id,
-      });
+      const effectiveOn = event.effectiveOn;
+      const transfer = await this.guard.guarded(() =>
+        this.transfers.recordInTx(tx, request.actor, {
+          employeeId: notice.employeeId,
+          toDepartmentId: event.toDepartmentId ?? notice.targetDepartmentId ?? undefined,
+          effectiveOn,
+          grounds: request.grounds,
+          successor: event.successor,
+          noticeId: notice.id,
+        }),
+      );
 
       return { kind: this.eventKind, id: transfer.id };
     } catch (error) {

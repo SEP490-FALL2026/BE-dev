@@ -48,8 +48,8 @@ describe('what the database refuses about the review after a transfer (integrati
 
     expect(
       await refused(
-        `INSERT INTO transfer_reviews (id, organization_id, employee_id, placement_id, department_id, job_title_id, effective_on, due_on)
-         SELECT $1, organization_id, employee_id, placement_id, department_id, job_title_id, effective_on, due_on FROM transfer_reviews WHERE id = $2`,
+        `INSERT INTO transfer_reviews (id, organization_id, employee_id, placement_id, department_id, effective_on, due_on)
+         SELECT $1, organization_id, employee_id, placement_id, department_id, effective_on, due_on FROM transfer_reviews WHERE id = $2`,
         [randomUUID(), reviewId],
       ),
     ).toMatchObject({ code: '23505', constraint: 'transfer_reviews_placement_id_key' });

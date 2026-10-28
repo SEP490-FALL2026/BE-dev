@@ -189,7 +189,6 @@ describe('cost attribution to Units only (integration, BBI-D04 → BBI-D08, BBI-
     };
     // A department the Super Admin creates and a Cost Center Finance creates for it (`QĐ-87d(1)`).
     const department = async (code: string) => {
-      await h.activateCostCenterLink();
       const made = h.dataOf<{ id: string; code: string }>(
         await request(h.server())
           .post('/api/v1/departments')

@@ -1,7 +1,12 @@
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import type { AuditEventInput, AuditValue } from '../../audit/audit.types';
+import type { OperatorAuditActor } from '../licensing-handover.types';
 
-/** The audit event for a change made by `actor` (a user acting as themselves), correlated by their session. */
+/**
+ * The audit event for a change made by `actor` (a user acting as themselves), correlated by their session. With `operator` (the
+ * controlled procedure, spec L.2) the event is `OPERATOR` instead: no account, the ticket code as the reference, the id of the
+ * ticket row as the correlation, and the context of the command added to what the event says after the change.
+ */
 export function licensingAuditEvent(
   actor: AuthenticatedPrincipal,
   organizationId: string,
@@ -10,7 +15,24 @@ export function licensingAuditEvent(
   resourceId: string,
   before: { [key: string]: AuditValue } | null,
   after: { [key: string]: AuditValue } | null,
+  operator?: OperatorAuditActor,
 ): AuditEventInput {
+  if (operator) {
+    return {
+      organizationId,
+      actorKind: 'OPERATOR',
+      actorAppUserId: null,
+      actorRoles: [],
+      action,
+      resourceType,
+      resourceId,
+      before,
+      after: operator.context ? { ...(after ?? {}), ...operator.context } : after,
+      correlationId: operator.ticketId,
+      operatorReference: operator.ticketRef,
+    };
+  }
+
   return {
     organizationId,
     actorKind: 'USER',

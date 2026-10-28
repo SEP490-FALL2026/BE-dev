@@ -6,6 +6,7 @@ import {
   migrateDisposableDatabase,
   provisionDisposableDatabase,
 } from '../support/disposable-database';
+import { waitForLockWaiters } from '../support/lock-wait';
 
 /** The SQLSTATE a rejected statement carries: the constraint, not the application, said no. */
 async function sqlState(sql: Client, text: string, values: unknown[] = []): Promise<string | null> {
@@ -17,8 +18,6 @@ async function sqlState(sql: Client, text: string, values: unknown[] = []): Prom
     return (error as { code?: string }).code ?? 'unknown';
   }
 }
-
-const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 interface AssignmentInput {
   kind?: 'PERSONAL' | 'SERVICE';
@@ -57,15 +56,40 @@ describe('license assignments (integration, PostgreSQL constraints)', () => {
   let department: string;
   let counter = 0;
 
-  const newSubscription = async (planId: string, quantity: number | null): Promise<string> => {
+  /** A subscription always has the department that owns it (F02): `department` unless the test names another. */
+  const newSubscription = async (
+    planId: string,
+    quantity: number | null,
+    ownerDepartmentId: string = department,
+  ): Promise<string> => {
     const id = randomUUID();
     await sql.query(
-      `INSERT INTO subscriptions (id, organization_id, plan_id, kind, status, purchased_quantity)
-       VALUES ($1, $2, $3, 'TERM', 'DRAFT', $4)`,
-      [id, organizationId, planId, quantity],
+      `INSERT INTO subscriptions (id, organization_id, plan_id, owner_department_id, kind, status, purchased_quantity)
+       VALUES ($1, $2, $3, $4, 'TERM', 'DRAFT', $5)`,
+      [id, organizationId, planId, ownerDepartmentId, quantity],
     );
 
     return id;
+  };
+  /** A department with no Cost Center, and the Unit Finance creates for it: the Cost Center belongs to its department for good. */
+  const newDepartmentWithUnit = async (
+    code: string,
+    status: 'ACTIVE' | 'INACTIVE' = 'ACTIVE',
+  ): Promise<{ department: string; unit: string }> => {
+    const departmentId = randomUUID();
+    const unit = randomUUID();
+    await sql.query(
+      `INSERT INTO departments (id, organization_id, code, name, status, deactivated_at, updated_at)
+       VALUES ($1, $2, $3, $3, $4::"DepartmentStatus", CASE WHEN $4 = 'INACTIVE' THEN now() END, now())`,
+      [departmentId, organizationId, code, status],
+    );
+    await sql.query(
+      `INSERT INTO cost_centers (id, organization_id, code, name, kind, department_id, linked_at)
+       VALUES ($1, $2, $3, $3, 'UNIT', $4, now())`,
+      [unit, organizationId, `CC-${code}`, departmentId],
+    );
+
+    return { department: departmentId, unit };
   };
   const newEmployee = async (code: string, type: string): Promise<string> => {
     const id = randomUUID();
@@ -136,7 +160,8 @@ describe('license assignments (integration, PostgreSQL constraints)', () => {
     );
   const personal = (subscriptionId: string, extra: AssignmentInput = {}) =>
     insert({ planId: flatPlan, subscriptionId, ...extra });
-  const fresh = async (quantity: number | null = 3): Promise<string> => newSubscription(flatPlan, quantity);
+  const fresh = async (quantity: number | null = 3, ownerDepartmentId?: string): Promise<string> =>
+    newSubscription(flatPlan, quantity, ownerDepartmentId);
 
   beforeAll(async () => {
     database = await provisionDisposableDatabase();
@@ -156,17 +181,7 @@ describe('license assignments (integration, PostgreSQL constraints)', () => {
     flatPlan = await newPlan('SAAS', 'K2', 'FLAT_RATE');
     otherPlan = await newPlan('SAAS', 'K2', 'PER_SEAT');
     internalPlan = await newPlan('INTERNAL', 'K5', null);
-    unitCenter = randomUUID();
-    await sql.query(
-      `INSERT INTO cost_centers (id, organization_id, code, name, kind) VALUES ($1, $2, 'CC-UNIT', 'CC-UNIT', 'UNIT')`,
-      [unitCenter, organizationId],
-    );
-    department = randomUUID();
-    await sql.query(
-      `INSERT INTO departments (id, organization_id, code, name, cost_center_id, updated_at)
-       VALUES ($1, $2, 'P-OPS', 'Operations', $3, now())`,
-      [department, organizationId, unitCenter],
-    );
+    ({ department, unit: unitCenter } = await newDepartmentWithUnit('P-OPS'));
     importId = randomUUID();
     await sql.query(
       `INSERT INTO seat_baseline_imports (id, organization_id, uploaded_by, file_name, content_hash, plan_id, status,
@@ -223,24 +238,11 @@ describe('license assignments (integration, PostgreSQL constraints)', () => {
     );
   });
 
-  it('owns a service account by a department and charges it to that department Unit, and a personal seat by none (QĐ-86c)', async () => {
+  it('owns a service account by a department and charges it to that department Unit; a personal seat may carry the department that owns its subscription (QĐ-86c, QĐ-89a)', async () => {
     const subscriptionId = await fresh();
-    const otherUnit = randomUUID();
-    await sql.query(
-      `INSERT INTO cost_centers (id, organization_id, code, name, kind) VALUES ($1, $2, 'CC-OTHER', 'CC-OTHER', 'UNIT')`,
-      [otherUnit, organizationId],
-    );
-    const retired = randomUUID();
-    const retiredUnit = randomUUID();
-    await sql.query(
-      `INSERT INTO cost_centers (id, organization_id, code, name, kind) VALUES ($1, $2, 'CC-OLD', 'CC-OLD', 'UNIT')`,
-      [retiredUnit, organizationId],
-    );
-    await sql.query(
-      `INSERT INTO departments (id, organization_id, code, name, cost_center_id, status, deactivated_at, updated_at)
-       VALUES ($1, $2, 'P-OLD', 'Old', $3, 'INACTIVE', now(), now())`,
-      [retired, organizationId, retiredUnit],
-    );
+    const { unit: otherUnit } = await newDepartmentWithUnit('P-OTHER');
+    const { department: retired, unit: retiredUnit } = await newDepartmentWithUnit('P-OLD', 'INACTIVE');
+    const retiredSubscription = await fresh(3, retired);
     const service = { kind: 'SERVICE', reason: 'CI' } as const;
 
     expect(
@@ -251,14 +253,18 @@ describe('license assignments (integration, PostgreSQL constraints)', () => {
         owningDepartmentId: null,
       }),
     ).toBe('23514');
+    // A personal seat carries the department that owns its subscription, or none; the trigger of the subscription refuses another one.
     expect(
       await personal(subscriptionId, { kind: 'PERSONAL', employeeId: other, owningDepartmentId: department }),
-    ).toBe('23514');
+    ).toBeNull();
+    expect(await personal(subscriptionId, { kind: 'PERSONAL', employeeId: staff, owningDepartmentId: retired })).toBe(
+      '23514',
+    );
     expect(await personal(subscriptionId, { ...service, identifier: 'wrong-unit', costCenterId: otherUnit })).toBe(
       '23514',
     );
     expect(
-      await personal(subscriptionId, {
+      await personal(retiredSubscription, {
         ...service,
         identifier: 'old-dept',
         costCenterId: retiredUnit,
@@ -482,17 +488,29 @@ describe('license assignments (integration, PostgreSQL constraints)', () => {
     it('lets only one of two writers take the last seat, however they interleave', async () => {
       const subscriptionId = await fresh(1);
       const second = new Client({ connectionString: database.url });
+      const observer = new Client({ connectionString: database.url });
       await second.connect();
+      await observer.connect();
+      let pending: Promise<string | null> | undefined;
       try {
+        // The first writer holds the row of the subscription until it commits: the capacity trigger locks it `FOR UPDATE`.
         await sql.query('BEGIN');
         expect(await personal(subscriptionId, { employeeId: staff })).toBeNull();
-        const pending = insert({ planId: flatPlan, subscriptionId, employeeId: other }, second);
-        await wait(400);
+        let settled = false;
+        pending = insert({ planId: flatPlan, subscriptionId, employeeId: other }, second).finally(() => {
+          settled = true;
+        });
+        // The second writer is waiting for that row, not answered yet, and only then does the first one commit.
+        await waitForLockWaiters(observer, 1);
+        expect(settled).toBe(false);
         await sql.query('COMMIT');
 
         expect(await pending).toBe('23514');
       } finally {
+        await sql.query('ROLLBACK').catch(() => undefined);
+        await pending;
         await second.end();
+        await observer.end();
       }
     });
 

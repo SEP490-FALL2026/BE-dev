@@ -1,7 +1,11 @@
 import { CallHandler, ExecutionContext } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { firstValueFrom, of } from 'rxjs';
-import { DEFAULT_SUCCESS_MESSAGE, SUCCESS_MESSAGE_METADATA } from '../decorators/api-success-response.decorator';
+import {
+  DEFAULT_SUCCESS_MESSAGE,
+  SUCCESS_MESSAGE_OVERRIDE,
+  SUCCESS_MESSAGE_METADATA,
+} from '../decorators/api-success-response.decorator';
 import { RAW_RESPONSE_METADATA } from '../decorators/raw-response.decorator';
 import { SuccessEnvelopeInterceptor } from './success-envelope.interceptor';
 
@@ -42,6 +46,21 @@ describe('SuccessEnvelopeInterceptor', () => {
     const result = await firstValueFrom(interceptor.intercept(context, handlerReturning({ id: 1 })));
 
     expect(result).toMatchObject({ message: 'CATALOG.APPLICATION_CREATED' });
+  });
+
+  it('answers with the message a handler put on the request for this call, over the one it declares', async () => {
+    const handler = (): void => undefined;
+    class ProbeController {}
+    Reflect.defineMetadata(SUCCESS_MESSAGE_METADATA, 'ACCESS_REQUEST.SUBMITTED', handler);
+    const context = {
+      getHandler: () => handler,
+      getClass: () => ProbeController,
+      switchToHttp: () => ({ getRequest: () => ({ [SUCCESS_MESSAGE_OVERRIDE]: 'GROUP_REQUEST.SUBMITTED' }) }),
+    } as unknown as ExecutionContext;
+
+    const result = await firstValueFrom(interceptor.intercept(context, handlerReturning({ id: 1 })));
+
+    expect(result).toMatchObject({ message: 'GROUP_REQUEST.SUBMITTED' });
   });
 
   it('represents an empty body as null rather than dropping the envelope', async () => {

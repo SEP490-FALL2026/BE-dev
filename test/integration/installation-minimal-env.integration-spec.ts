@@ -27,24 +27,14 @@ const input = () => ({
   timeZone: 'Asia/Ho_Chi_Minh',
   reportingCurrency: 'VND',
   organizationName: 'Acme Software',
-  costCenterCode: 'CC-ENG',
-  costCenterName: 'Engineering',
   departmentCode: 'P-ENG',
   departmentName: 'Engineering',
-  jobTitleName: 'Software Engineer',
   superAdmin: {
     employeeCode: 'E001',
     fullName: 'Pham Bao',
     workEmail: 'bao@acme.vn',
     employmentType: 'STAFF',
     hireDate: '2024-03-01',
-  },
-  itAdmin: {
-    employeeCode: 'E002',
-    fullName: 'Tran An',
-    workEmail: 'an@acme.vn',
-    employmentType: 'STAFF',
-    hireDate: '2024-03-05',
   },
   operatorReference: 'CHG-1234',
   environment: 'LOCAL_TEST',
@@ -54,7 +44,6 @@ const EMPTY_COUNTS = {
   organizations: 0,
   cost_centers: 0,
   departments: 0,
-  job_titles: 0,
   employees: 0,
   placements: 0,
   app_users: 0,
@@ -79,7 +68,6 @@ describe('installation command with only DATABASE_URL and NODE_ENV=production (i
         SELECT (SELECT count(*) FROM organizations)::int AS organizations,
                (SELECT count(*) FROM cost_centers)::int AS cost_centers,
                (SELECT count(*) FROM departments)::int AS departments,
-               (SELECT count(*) FROM job_titles)::int AS job_titles,
                (SELECT count(*) FROM employees)::int AS employees,
                (SELECT count(*) FROM employee_placements)::int AS placements,
                (SELECT count(*) FROM app_users)::int AS app_users,
@@ -141,14 +129,13 @@ describe('installation command with only DATABASE_URL and NODE_ENV=production (i
 
     expect(await counts()).toEqual({
       organizations: 1,
-      cost_centers: 1,
+      cost_centers: 0,
       departments: 1,
-      job_titles: 1,
-      employees: 2,
-      placements: 2,
+      employees: 1,
+      placements: 1,
       app_users: 1,
       role_grants: 1,
-      audit_events: 7,
+      audit_events: 5,
     });
 
     const account = await sql.query(
@@ -190,7 +177,8 @@ describe('installation command with only DATABASE_URL and NODE_ENV=production (i
     let calls = 0;
     const spy = jest.spyOn(audit, 'record').mockImplementation(async (tx, event) => {
       calls += 1;
-      if (calls === 6) throw new Error('audit unavailable');
+      // The 4th write is the Super Admin account's own event (organization, department, employee, account).
+      if (calls === 4) throw new Error('audit unavailable');
       return original(tx, event);
     });
     try {

@@ -354,4 +354,71 @@ describe('reporting an error in a SaaS right (integration, real PostgreSQL)', ()
       expect(large.statements).toBe(small.statements);
     });
   });
+
+  describe('the code of a report is numbered again every year (F48, spec K)', () => {
+    /** Reports one more right on `day` (a day of its own year, so no other test of the suite shares the counter). */
+    const reportedOn = async (day: string) => {
+      restoreToday?.();
+      restoreToday = h.pretendToday(day);
+      const { member, assignmentId } = await reporter();
+
+      return h.reported(member.account, assignmentId);
+    };
+    const counterOf = async (year: number): Promise<number | null> =>
+      (
+        await h.ctx.sql.query<{ last_value: number }>(`SELECT last_value FROM saas_issue_counters WHERE year = $1`, [
+          year,
+        ])
+      ).rows[0]?.last_value ?? null;
+    const sequence = async (): Promise<number> =>
+      Number(
+        (
+          await h.ctx.sql.query<{ n: string }>(
+            `SELECT (CASE WHEN is_called THEN last_value ELSE last_value - 1 END)::text AS n FROM saas_issue_seq`,
+          )
+        ).rows[0].n,
+      );
+
+    it('starts at 1 in a new year and keeps the counter of each year apart', async () => {
+      const first = await reportedOn('2027-02-01');
+      const second = await reportedOn('2027-02-02');
+      const next = await reportedOn('2028-02-01');
+
+      expect([first.code, second.code]).toEqual(['BM11-2027-000001', 'BM11-2027-000002']);
+      expect(next.code).toBe('BM11-2028-000001');
+      expect([await counterOf(2027), await counterOf(2028)]).toEqual([2, 1]);
+    });
+
+    it('never issues again a number that is already in a code of its year, even when the counter does not know it (the compatibility image drew it)', async () => {
+      const first = await reportedOn('2029-02-01');
+      expect(first.code).toBe('BM11-2029-000001');
+      // The image before this one draws its numbers from the old sequence and knows nothing of the counter: the counter is behind the codes.
+      await h.ctx.sql.query(`UPDATE saas_issue_counters SET last_value = 0 WHERE year = 2029`);
+
+      const again = await reportedOn('2029-02-02');
+
+      expect(again.code).toBe('BM11-2029-000002');
+      expect(await counterOf(2029)).toBe(2);
+    });
+
+    it('lifts the old sequence to the number it issued and never lowers it, so the compatibility image never draws a number the counter issued', async () => {
+      const issued = await reportedOn('2030-02-01');
+      expect(issued.code).toBe('BM11-2030-000001');
+      expect(await sequence()).toBeGreaterThanOrEqual(1);
+
+      // A sequence that is already far ahead stays where it is when a small number is issued.
+      await h.ctx.sql.query(`SELECT setval('saas_issue_seq', 5000, true)`);
+      const later = await reportedOn('2030-02-02');
+
+      expect(later.code).toBe('BM11-2030-000002');
+      expect(await sequence()).toBe(5000);
+      // And a counter that gets ahead of the sequence lifts it: the next draw of the old image is above every issued number.
+      await h.ctx.sql.query(`SELECT setval('saas_issue_seq', 1, false)`);
+      await h.ctx.sql.query(`UPDATE saas_issue_counters SET last_value = 41 WHERE year = 2030`);
+      const lifted = await reportedOn('2030-02-03');
+
+      expect(lifted.code).toBe('BM11-2030-000042');
+      expect(await sequence()).toBeGreaterThanOrEqual(42);
+    });
+  });
 });

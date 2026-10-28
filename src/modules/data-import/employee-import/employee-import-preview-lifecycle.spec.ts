@@ -7,7 +7,7 @@ import {
   harness,
   upload,
 } from '../../../../test/support/employee-import-service-harness';
-import { ImportNotFoundError, ImportStateError } from './employee-import.errors';
+import { ImportForbiddenError, ImportNotFoundError, ImportStateError } from './employee-import.errors';
 import type { ImportRecord } from './employee-import.repo';
 import { PREVIEW_TTL_MS } from './employee-import.service';
 
@@ -23,12 +23,35 @@ describe('EmployeeImportService: view, rows, refresh, cancel and latest import (
     jest.useRealTimers();
   });
 
+  describe('who may (F13): the Super Admin alone, whatever the route let through', () => {
+    const asIt = { ...ACTOR, roles: ['IT_ADMIN'], directRoles: ['IT_ADMIN'] };
+
+    it.each([
+      [
+        'upload',
+        (h: ReturnType<typeof harness>) => h.service.upload(asIt, { fileName: 'p.csv', bytes: Buffer.from(FILE) }),
+      ],
+      ['view', (h: ReturnType<typeof harness>) => h.service.view(asIt, 'any')],
+      ['rows', (h: ReturnType<typeof harness>) => h.service.rows(asIt, 'any', { page: 1, pageSize: 20 })],
+      ['refresh', (h: ReturnType<typeof harness>) => h.service.refresh(asIt, 'any')],
+      ['cancel', (h: ReturnType<typeof harness>) => h.service.cancel(asIt, 'any')],
+      ['confirm', (h: ReturnType<typeof harness>) => h.service.confirm(asIt, 'any', confirmBody())],
+    ])('refuses %s to an IT Admin before it reads or writes anything', async (_name, call) => {
+      const h = harness();
+
+      await expect(call(h)).rejects.toBeInstanceOf(ImportForbiddenError);
+      expect(h.calls).toEqual([]);
+    });
+  });
+
   describe('view and rows', () => {
     it('is not found for an import that does not exist', async () => {
       const h = harness();
 
-      await expect(h.service.view('nope')).rejects.toBeInstanceOf(ImportNotFoundError);
-      await expect(h.service.rows('nope', { page: 1, pageSize: 20 })).rejects.toBeInstanceOf(ImportNotFoundError);
+      await expect(h.service.view(ACTOR, 'nope')).rejects.toBeInstanceOf(ImportNotFoundError);
+      await expect(h.service.rows(ACTOR, 'nope', { page: 1, pageSize: 20 })).rejects.toBeInstanceOf(
+        ImportNotFoundError,
+      );
       expect(h.calls).toEqual(['repo.find()', 'repo.find()']);
     });
 
@@ -37,9 +60,9 @@ describe('EmployeeImportService: view, rows, refresh, cancel and latest import (
       const { id } = await upload(h, FILE);
       h.reset();
 
-      const last = await h.service.rows(id, { page: 3, pageSize: 2 });
-      const errors = await h.service.rows(id, { outcome: 'ERROR', page: 1, pageSize: 20 });
-      const beyond = await h.service.rows(id, { page: 9, pageSize: 2 });
+      const last = await h.service.rows(ACTOR, id, { page: 3, pageSize: 2 });
+      const errors = await h.service.rows(ACTOR, id, { outcome: 'ERROR', page: 1, pageSize: 20 });
+      const beyond = await h.service.rows(ACTOR, id, { page: 9, pageSize: 2 });
 
       expect(last).toEqual({
         items: [expect.objectContaining({ lineNumber: 6, outcome: 'ERROR' })],

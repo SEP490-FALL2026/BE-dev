@@ -9,6 +9,7 @@ import {
   AccessRequestNotFoundError,
   AccessRequestPlanNotFoundError,
   AccessRequestSpendDateNotAllowedError,
+  AccessRequestSuperAdminCannotRequestError,
 } from '../access-request/access-request.errors';
 import { toAccessRequestApiException } from '../access-request/access-request.http-errors';
 import { ServiceAccountReviewRefusedError, ServiceAccountSubmitRefusedError } from './service-account-request.errors';
@@ -53,5 +54,6 @@ export const SERVICE_ACCOUNT_ERROR_EXAMPLES = {
   APPLICATION_RETIRED: example(new AccessRequestApplicationRetiredError()),
   NO_DEPARTMENT: example(new AccessRequestNoDepartmentError()),
   FINANCE_SETUP_INCOMPLETE: example(new FinanceSetupIncompleteError('<department-id>')),
+  SUPER_ADMIN_CANNOT_REQUEST: example(new AccessRequestSuperAdminCannotRequestError()),
   NO_SPEND_FOR_FREE_SOFTWARE: example(new AccessRequestSpendDateNotAllowedError()),
 } as const;

@@ -36,7 +36,7 @@ hồ sơ mới mang căn cứ trong Audit Trail — kiểm bằng test HTTP.
 | Story    | AC                             | Coverage | Phần còn lại thuộc                                                                                                                                                                                                             |
 | -------- | ------------------------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | US-02-02 | AC-1, AC-9, AC-12→AC-16, AC-18 | partial  | AC-17: `g4-notification-delivery`; AC-19: `g2-employee-official-field-maintenance`; AC-2, AC-4, AC-6→AC-8, AC-10, AC-11: `g2-employee-import-preview-confirm`, `g2-job-title-catalogue-and-manual-employee` (giao trước GOV.1) |
-| US-02-03 | AC-1                           | partial  | AC-2→AC-6: `g2-employee-import-preview-confirm` (giao trước GOV.1)                                                                                                                                                             |
+| US-02-03 | AC-1                           | partial  | AC-2→AC-6: `g2-employee-import-preview-confirm` (giao trước GOV.1); AC-7: `g2-department-profile`                                                                                                                              |
 
 ## Supporting references
 

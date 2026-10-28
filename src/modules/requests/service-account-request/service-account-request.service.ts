@@ -5,9 +5,15 @@ import { AuditService } from '../../audit/audit.service';
 import { LicensingService } from '../../licensing/licensing.service';
 import { OrganizationService } from '../../organization/organization.service';
 import { accessRequestAuditEvent } from '../access-request/access-request-audit-event';
-import { AccessRequestNoDepartmentError } from '../access-request/access-request.errors';
-import { hasSpendStep } from '../access-request/access-request.policy';
+import {
+  AccessRequestNoDepartmentError,
+  AccessRequestNotDraftError,
+  AccessRequestNotFoundError,
+  AccessRequestSuperAdminCannotRequestError,
+} from '../access-request/access-request.errors';
+import { hasSpendStep, mayRequest } from '../access-request/access-request.policy';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
+import { RequestDraftRepo } from '../access-request/request-draft.repo';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
 import { RequestAssessmentService } from '../access-request/request-assessment.service';
 import type { ServiceAccountSubmitBodyDto } from './service-account-request.dto';
@@ -35,17 +41,30 @@ export class ServiceAccountRequestService {
     private readonly assessment: RequestAssessmentService,
     private readonly licensing: LicensingService,
     private readonly audit: AuditService,
+    private readonly drafts: RequestDraftRepo,
   ) {}
 
   /**
-   * Throws AccessRequestNoDepartmentError, AccessRequestPlanNotFoundError, AccessRequestApplicationRetiredError,
-   * AccessRequestSpendDateNotAllowedError and ServiceAccountSubmitRefusedError.
+   * Throws AccessRequestSuperAdminCannotRequestError, AccessRequestNoDepartmentError, AccessRequestPlanNotFoundError,
+   * AccessRequestApplicationRetiredError, AccessRequestSpendDateNotAllowedError and ServiceAccountSubmitRefusedError. A draft (draftId)
+   * is the request being sent: it is locked first, judged again under the lock, and its row becomes the request (spec L.1);
+   * AccessRequestNotFoundError and AccessRequestNotDraftError.
    */
-  async submit(actor: AuthenticatedPrincipal, body: ServiceAccountSubmitBodyDto): Promise<AccessRequestRecord> {
+  async submit(
+    actor: AuthenticatedPrincipal,
+    body: ServiceAccountSubmitBodyDto,
+    options: { draftId?: string } = {},
+  ): Promise<AccessRequestRecord> {
+    if (!mayRequest(actor.roles)) throw new AccessRequestSuperAdminCannotRequestError();
     const settings = await this.assessment.settings();
     const baseline = await this.licensing.getBaselineProgress();
 
     return this.runner.run(async (tx) => {
+      if (options.draftId) {
+        const verdict = await this.drafts.lockOwned(tx, options.draftId, actor.employeeId);
+        if (verdict === 'NOT_FOUND') throw new AccessRequestNotFoundError();
+        if (verdict === 'NOT_DRAFT') throw new AccessRequestNotDraftError();
+      }
       // The sender is relied on until commit: they cannot leave the company between the check and the write.
       await this.organization.lockEmployeeForShare(tx, actor.employeeId);
       const employee = await this.organization.getEmployee(actor.employeeId, tx);
@@ -97,6 +116,7 @@ export class ServiceAccountRequestService {
           samePersonAsSpend: assigned && decision.samePersonAsSpend,
           slaWorkingDays: policy.slaWorkingDays,
         },
+        draftId: options.draftId ?? null,
       });
       await this.details.insert(tx, {
         requestId: created.id,

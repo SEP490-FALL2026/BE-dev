@@ -1,10 +1,10 @@
 import { randomUUID } from 'node:crypto';
-import type { Department, Person } from '../support/request-harness';
+import type { Department } from '../support/request-harness';
 import { ServiceAccountHandoverHarness } from '../support/service-account-handover-harness';
 
 const h = new ServiceAccountHandoverHarness();
 
-/** US-03-08: what the database refuses about the moves of service accounts, their reminders and the closing of a transfer. */
+/** US-03-08: what the database refuses about the reminders of service accounts and the closing of a transfer. */
 describe('the integrity of the handover of service accounts (integration, real PostgreSQL)', () => {
   let des: Department;
   let fin: Department;
@@ -27,8 +27,9 @@ describe('the integrity of the handover of service accounts (integration, real P
     await h.start();
     des = await h.departmentWithUnit('P-DES');
     fin = await h.departmentWithUnit('P-FIN');
-    // Its accounts belong to many departments: a subscription nobody owns yet, which no seat is checked against (F20).
-    subscription = await h.subscription(100, 'K2', null);
+    // Every account of the suite answers to a person of P-DES, so the subscription is P-DES's: a seat sits only on a subscription
+    // of its own department (F20), and a subscription always has an owner department (F02).
+    subscription = await h.subscription(100, 'K2', des.id);
   }, 300000);
 
   afterAll(async () => {
@@ -41,96 +42,6 @@ describe('the integrity of the handover of service accounts (integration, real P
 
     return { person, assignmentId: await h.botOf(person, subscription, `bot-${employeeCode}`, employeeCode) };
   };
-  const insertMove = (assignmentId: string, to: Person, extra: { toDepartmentId?: string } = {}) =>
-    sqlState(
-      `INSERT INTO service_account_moves (id, organization_id, assignment_id, from_department_id, to_department_id,
-         new_responsible_employee_id, effective_from, proposed_by_app_user_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-      [
-        randomUUID(),
-        h.seed.organizationId,
-        assignmentId,
-        des.id,
-        extra.toDepartmentId ?? fin.id,
-        to.employeeId,
-        h.day(10),
-        randomUUID(),
-      ],
-    );
-
-  describe('a proposal to move an account', () => {
-    it('is one at a time for an assignment, and another may follow once it is decided (23505)', async () => {
-      const { assignmentId } = await bot();
-      const e6 = await h.worker(fin, code());
-
-      expect(await insertMove(assignmentId, e6)).toBeNull();
-      expect(await insertMove(assignmentId, e6)).toBe('23505');
-      await h.ctx.sql.query(
-        `UPDATE service_account_moves SET status = 'CANCELLED', cancelled_by_app_user_id = $2, cancelled_at = now(),
-           cancelled_reason = 'Nhầm' WHERE assignment_id = $1`,
-        [assignmentId, randomUUID()],
-      );
-      expect(await insertMove(assignmentId, e6)).toBeNull();
-    });
-
-    it('goes to another department, and never keeps a state without the columns that belong to it (23514)', async () => {
-      const { assignmentId } = await bot();
-      const e6 = await h.worker(fin, code());
-
-      expect(await insertMove(assignmentId, e6, { toDepartmentId: des.id })).toBe('23514');
-      expect(await insertMove(assignmentId, e6)).toBeNull();
-      expect(
-        await sqlState(`UPDATE service_account_moves SET status = 'CONFIRMED' WHERE assignment_id = $1`, [
-          assignmentId,
-        ]),
-      ).toBe('23514');
-      expect(
-        await sqlState(
-          `UPDATE service_account_moves SET status = 'CANCELLED', cancelled_by_app_user_id = $2, cancelled_at = now(),
-             cancelled_reason = '  ' WHERE assignment_id = $1`,
-          [assignmentId, randomUUID()],
-        ),
-      ).toBe('23514');
-      expect(
-        await sqlState(`UPDATE service_account_moves SET confirmed_at = now() WHERE assignment_id = $1`, [
-          assignmentId,
-        ]),
-      ).toBe('23514');
-    });
-
-    it('is decided once and kept: what was proposed never changes and nothing is deleted (55000)', async () => {
-      const { assignmentId } = await bot();
-      const e6 = await h.worker(fin, code());
-      await insertMove(assignmentId, e6);
-
-      expect(
-        await sqlState(
-          `UPDATE service_account_moves SET effective_from = effective_from + 1 WHERE assignment_id = $1`,
-          [assignmentId],
-        ),
-      ).toBe('55000');
-      expect(
-        await sqlState(`UPDATE service_account_moves SET to_department_id = $2 WHERE assignment_id = $1`, [
-          assignmentId,
-          h.seed.departmentId,
-        ]),
-      ).toBe('55000');
-      await h.ctx.sql.query(
-        `UPDATE service_account_moves SET status = 'CANCELLED', cancelled_by_app_user_id = $2, cancelled_at = now(),
-           cancelled_reason = 'Nhầm' WHERE assignment_id = $1`,
-        [assignmentId, randomUUID()],
-      );
-      expect(
-        await sqlState(`UPDATE service_account_moves SET cancelled_reason = 'Đổi' WHERE assignment_id = $1`, [
-          assignmentId,
-        ]),
-      ).toBe('55000');
-      expect(await sqlState(`DELETE FROM service_account_moves WHERE assignment_id = $1`, [assignmentId])).toBe(
-        '55000',
-      );
-    });
-  });
-
   describe('the reminder of an account that still waits', () => {
     it('is written once for an account and a day, and never changed or deleted (23505, 55000)', async () => {
       const { assignmentId } = await bot();

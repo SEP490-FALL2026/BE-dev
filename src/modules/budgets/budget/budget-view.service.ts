@@ -15,7 +15,8 @@ import type { MineWire, TableRowWire, VersionLineWire } from './budget.dto';
  * What is read of the budgets themselves (`US-06-09` AC-5, `US-06-10` AC-7). A head of department reads the budget of the
  * department they head: the proposal they sent and the lines of the current version, with the total, and nothing of what
  * is left, of the checks of the requests, of other departments or of the company. Finance reads the table of all the
- * current versions.
+ * current versions. For a year that has ended they read the reference budget, the version that was current when the year closed,
+ * and never a version that did not become current (F62, `QĐ-91c`).
  */
 @Injectable()
 export class BudgetViewService {
@@ -34,7 +35,7 @@ export class BudgetViewService {
     const costCenterId = await this.ownCostCenter(actor);
     const [costCenter, current, history, latest] = await Promise.all([
       this.support.costCenter(costCenterId),
-      this.versions.current(costCenterId, year),
+      this.versions.reference(costCenterId, year),
       this.proposals.chainOf(costCenterId, year),
       this.versions.latestOf(costCenterId, year),
     ]);
@@ -67,7 +68,7 @@ export class BudgetViewService {
     query: { page: number; pageSize: number },
   ): Promise<Page<VersionLineWire>> {
     const costCenterId = await this.ownCostCenter(actor);
-    const current = await this.versions.current(costCenterId, year);
+    const current = await this.versions.reference(costCenterId, year);
     if (!current) return pageOf([], 0, query.page, query.pageSize);
     const { items, total } = await this.lineRepo.pageLines(
       current.id,
@@ -85,10 +86,10 @@ export class BudgetViewService {
     );
   }
 
-  /** The current versions of all Cost Centers: for Finance only. */
+  /** The current versions of all Cost Centers, and the reference budget of the years that ended: for Finance only. */
   async table(query: { year?: number; page: number; pageSize: number }): Promise<Page<TableRowWire>> {
     const { items, total } = await this.versions.page({
-      state: 'APPROVED',
+      referenceOnly: true,
       ...(query.year ? { year: query.year } : {}),
       skip: (query.page - 1) * query.pageSize,
       take: query.pageSize,

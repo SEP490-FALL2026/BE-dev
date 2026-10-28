@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto';
 import { TransactionRunner } from '../../src/infrastructure/database/transaction-runner';
 import { PgRelay } from '../support/pg-relay';
 import { QueryCounter, dataStatements } from '../support/query-count';
@@ -54,7 +53,7 @@ describe('the history of a person and the list of transfers (integration, real P
   });
 
   describe('a placement that has been told is history (INV-20)', () => {
-    it('never changes the person, the department or the title of any placement, and never moves or loses a told one', async () => {
+    it('never changes the person or the department of any placement, and never moves or loses a told one', async () => {
       const person = await h.veteran(des, code('E'));
       const wire = await h.recorded(body(person.employeeId, { effectiveOn: h.today() }));
       const [closed, opened] = await h.placements(person.employeeId);
@@ -62,9 +61,6 @@ describe('the history of a person and the list of transfers (integration, real P
 
       expect(
         await sqlState(`UPDATE employee_placements SET department_id = $2 WHERE id = $1`, [closed.id, fin.id]),
-      ).toBe('55000');
-      expect(
-        await sqlState(`UPDATE employee_placements SET job_title_id = $2 WHERE id = $1`, [opened.id, randomUUID()]),
       ).toBe('55000');
       expect(
         await sqlState(`UPDATE employee_placements SET valid_from = valid_from + 1 WHERE id = $1`, [opened.id]),

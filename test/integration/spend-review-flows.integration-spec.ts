@@ -306,26 +306,27 @@ describe('what follows the review of Finance over PostgreSQL (US-06-13 AC-4, AC-
     it.each([
       ['refuses it', { decision: 'REJECT', reason: 'Too high for the year' }],
       ['sends it back to Finance', { decision: 'REQUEST_CHANGES', reason: 'Lower the reserve' }],
-    ])('goes back to Finance, who can choose again, when the approver %s', async (_name, decision) => {
-      const u = await unit();
-      const id = await waiting(u, 30 * M);
-      const version = await sentVersion(u);
+    ])(
+      'keeps waiting, with no new review, when the approver %s, and Finance moves it from there (F65, QĐ-92a)',
+      async (_name, decision) => {
+        const u = await unit();
+        const id = await waiting(u, 30 * M);
+        const version = await sentVersion(u);
 
-      await h.decideVersion(version.id, decision, h.boss.account).expect(200);
+        await h.decideVersion(version.id, decision, h.boss.account).expect(200);
 
-      expect(await h.state(id)).toBe('AWAITING_FINANCE_REVIEW');
-      expect(await h.steps(id, 'FINANCE_REVIEW')).toEqual([
-        expect.objectContaining({ state: 'COMPLETED' }),
-        expect.objectContaining({ state: 'PENDING', assignee_employee_id: h.finance.employeeId }),
-      ]);
-      expect(await checks(id)).toHaveLength(1); // the check is the same: the year still has no budget
-      await h
-        .completeReview(id, { outcome: 'RETURN_TO_HEAD', reason: 'No budget this year: carry it to the next' })
-        .expect(200);
-      expect(await h.state(id)).toBe('AWAITING_SPEND_SUBMISSION');
-    });
+        expect(await h.state(id)).toBe('AWAITING_BUDGET');
+        expect(await h.steps(id, 'FINANCE_REVIEW')).toEqual([expect.objectContaining({ state: 'COMPLETED' })]);
+        expect(await h.steps(id, 'SPEND_APPROVAL')).toEqual([]);
+        expect(await checks(id)).toHaveLength(1); // the check is the same: the year still has no budget
+        await h
+          .completeReview(id, { outcome: 'RETURN_TO_HEAD', reason: 'No budget this year: carry it to the next' })
+          .expect(200);
+        expect(await h.state(id)).toBe('AWAITING_SPEND_SUBMISSION');
+      },
+    );
 
-    it('can also be ended with an opinion after the refusal, and the approver can override', async () => {
+    it('can also be ended with an opinion after the refusal, as a check of its own, and the approver has the step', async () => {
       const u = await unit();
       const id = await waiting(u, 30 * M);
       const version = await sentVersion(u);
@@ -334,13 +335,30 @@ describe('what follows the review of Finance over PostgreSQL (US-06-13 AC-4, AC-
       await h.completeReview(id, opinion).expect(200);
 
       expect(await h.state(id)).toBe('AWAITING_SPEND_DECISION');
+      expect((await checks(id)).map((check) => [check.number, check.trigger])).toEqual([
+        [1, 'SUBMISSION'],
+        [2, 'FINANCE_OUTCOME_WHILE_WAITING'],
+      ]);
+      expect(await h.steps(id, 'SPEND_APPROVAL')).toEqual([expect.objectContaining({ state: 'PENDING' })]);
     });
 
-    it('is refused for a year that has a budget, and for a department with nobody at its head', async () => {
+    it('is chosen for a year with too little when somebody heads the department (F33), and refused for a year that is only of high value, and for a department with nobody at its head', async () => {
       const u = await unit();
       await h.budgetFor(u, { total: 100 * M, held: 20 * M, spent: 40 * M });
-      const covered = await h.paidRequest(u, plan, { amount: 45 * M });
-      await h.route(covered, u.head.account);
+      const short = await h.paidRequest(u, plan, { amount: 45 * M });
+      await h.route(short, u.head.account);
+
+      await h
+        .completeReview(short, { outcome: 'NEEDS_BUDGET', reason: 'A revision of the budget will cover it' })
+        .expect(200);
+
+      expect(await h.state(short)).toBe('AWAITING_BUDGET');
+
+      // Enough is left, and the request is only of high value: there is no budget to make.
+      const calm = await unit();
+      await h.budgetFor(calm, { total: 100 * M, held: 20 * M, spent: 40 * M, percent: 10 });
+      const covered = await h.paidRequest(calm, plan, { amount: 30 * M });
+      await h.route(covered, calm.head.account);
 
       const first = await h.completeReview(covered, { outcome: 'NEEDS_BUDGET', reason: 'Nothing to make' }).expect(409);
 

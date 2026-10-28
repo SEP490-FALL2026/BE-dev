@@ -16,6 +16,10 @@ import { DelegatedRequestsController } from './access-request/delegated-requests
 import { GrantQueueRepo } from './access-request/grant-queue.repo';
 import { GrantQueueService } from './access-request/grant-queue.service';
 import { RequestCommitmentReleaseGuard } from './spend/commitment-release.guard';
+import { RequestDraftService } from './access-request/request-draft.service';
+import { RequestDraftSubmitService } from './access-request/request-draft-submit.service';
+import { RequestDraftsController } from './access-request/request-drafts.controller';
+import { RequestOutcomeListeners } from './access-request/request-outcome-listeners';
 import { AssessmentRepo } from './access-request/assessment.repo';
 import { AssessmentService } from './access-request/assessment.service';
 import { AssessmentViewService } from './access-request/assessment-view.service';
@@ -36,6 +40,8 @@ import { CancellationController } from './access-request/cancellation.controller
 import { DepartureCancellationService } from './access-request/departure-cancellation.service';
 import { OpenRequestRepo } from './access-request/open-request.repo';
 import { OpenRequestService } from './access-request/open-request.service';
+import { CostCenterOpenRequestsReader, DepartmentOpenRequestsReader } from './access-request/request-use.reader';
+import { RequestUseRepo } from './access-request/request-use.repo';
 import { RequestEndService } from './access-request/request-end.service';
 import { RequestsService } from './requests.service';
 import { PricingViewService } from './access-request/pricing-view.service';
@@ -140,6 +146,8 @@ import { ServiceAccountRequestsController } from './service-account-request/serv
     RequestsWorkFacadeModule,
   ],
   controllers: [
+    // The path `access-requests/drafts` is declared before `access-requests/:id`, so that it is a route of its own and never an id.
+    RequestDraftsController,
     AccessRequestsController,
     CancellationController,
     ProposalsController,
@@ -166,6 +174,10 @@ import { ServiceAccountRequestsController } from './service-account-request/serv
     RequestAssessmentService,
     RequestPreviewService,
     AccessRequestService,
+    RequestDraftService,
+    RequestDraftSubmitService,
+    // The registry of the listeners of the outcome of a request (F43): a context registers through `RequestsService.registerOutcomeListener`.
+    RequestOutcomeListeners,
     ProposalService,
     QuoteService,
     AssessmentViewService,
@@ -180,6 +192,10 @@ import { ServiceAccountRequestsController } from './service-account-request/serv
     DepartureCancellationService,
     OpenRequestRepo,
     OpenRequestService,
+    // What the organization asks before it retires a department or a Cost Center (F15, F16): the requests that are not over.
+    RequestUseRepo,
+    DepartmentOpenRequestsReader,
+    CostCenterOpenRequestsReader,
     RequestsService,
     SimilarSeatsService,
     AccessRequestGrantGate,

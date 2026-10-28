@@ -54,7 +54,9 @@ export interface NoticeRecord {
   recordedEventId: string | null;
   defaultItAdminEmployeeId: string | null;
   dueOn: BusinessDate;
+  /** Who handled it: an account, or the ticket of the controlled procedure (spec L.2); neither while it waits. */
   handledByAppUserId: string | null;
+  handledByTicketId: string | null;
   handledAt: Date | null;
   overdueNoticedAt: Date | null;
   createdAt: Date;
@@ -75,8 +77,9 @@ export interface NoticeSummaryRecord {
 export interface NoticeVerificationRecord {
   method: VerificationMethod;
   reference: string;
-  /** Null only for an event the controlled procedure of the release after this one recorded (spec L.2); this release always writes its account. */
+  /** The account that checked it; null when the controlled procedure recorded it (`verifiedByTicketId`, spec L.2). */
   verifiedByAppUserId: string | null;
+  verifiedByTicketId: string | null;
   verifiedAt: Date;
 }
 
@@ -127,8 +130,10 @@ export interface NoticeEventRef {
 }
 
 export interface NoticeListFilter {
-  /** Set for a head: only the notices they sent. An IT Admin has none and reads the queue. */
+  /** Set for a head: only the notices they sent. The Super Admin has none and reads the queue. */
   senderEmployeeId?: string;
+  /** Set for an IT Admin: only the notices about these people (the members of the departments in their charge). Empty reads nothing. */
+  employeeIds?: readonly string[];
   status?: NoticeStatus;
   kind?: NoticeKind;
   employeeId?: string;

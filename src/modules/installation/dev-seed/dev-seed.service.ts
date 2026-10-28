@@ -8,9 +8,9 @@ import { AuditService } from '../../audit/audit.service';
 import { IdentityAccessService } from '../../identity-access/identity-access.service';
 import { LocalDemoAccountService } from '../../identity-access/local-demo-account.service';
 import { OrganizationService } from '../../organization/organization.service';
-import { DEMO_DIRECTION_KEY, DEMO_FIXTURE_KEYS, DEMO_PEOPLE_LOOKUP, buildSeedPlan, samePlan } from './dev-seed-plan';
+import { DEMO_FIXTURE_KEYS, DEMO_PEOPLE_LOOKUP, buildSeedPlan, samePlan } from './dev-seed-plan';
 import { SeedStateChangedError } from './dev-seed.errors';
-import { DEMO_COST_CENTER, DEMO_DEPARTMENT, DEMO_HIRE_DATE, DEMO_JOB_TITLE, DEMO_PEOPLE } from './dev-seed.fixture';
+import { DEMO_COST_CENTER, DEMO_DEPARTMENT, DEMO_HIRE_DATE, DEMO_PEOPLE } from './dev-seed.fixture';
 import { DevSeedRepo } from './dev-seed.repo';
 import { DevSeedResult, SeedPlan, SeedReportItem } from './dev-seed.types';
 import { checkLocalSeedGuards } from './local-seed.guard';
@@ -24,7 +24,9 @@ export const LOCAL_SEED_OPERATOR_REFERENCE = 'LOCAL_SEED';
 type Credentials = Map<string, { password: string; hash: string; hashPolicyVersion: number }>;
 
 /**
- * `pnpm dev:seed` (H6.2): the local demo data, through the owning services and the Audit Trail. The three local guards
+ * `pnpm dev:seed` (H6.2): the local demo data, through the owning services and the Audit Trail. The department is written
+ * before the Cost Center created for it (`QĐ-87d`(1)), the people carry no job title and no Cost Center activation row is
+ * written (the final code never reads one). The three local guards
  * are checked first; then a plan is read, the new passwords are hashed outside any transaction, and one transaction
  * takes the seed lock, reads the plan again and writes. All or nothing; a rerun writes nothing.
  */
@@ -153,14 +155,6 @@ export class DevSeedService {
       });
     }
 
-    // A new local database has no previous release to recover, so nothing waits for the host (spec L.11).
-    if (creates('COST_CENTER_DIRECTION', DEMO_DIRECTION_KEY)) {
-      await this.organization.activateCostCenterDirectionForLocalSeed(tx, organizationId);
-      await record('DEV_SEED.COST_CENTER_DIRECTION_ACTIVATED', 'Organization', organizationId, {
-        environment: 'LOCAL_TEST',
-      });
-    }
-
     for (const person of DEMO_PEOPLE) {
       let employeeId = plan.employeeIds.get(person.employeeCode) ?? null;
       if (creates('EMPLOYEE', person.employeeCode)) {
@@ -173,7 +167,7 @@ export class DevSeedService {
             employmentType: 'STAFF',
             hireDate: DEMO_HIRE_DATE,
             departmentId: departmentId as string,
-            jobTitle: DEMO_JOB_TITLE,
+            jobTitle: null,
           })
         ).id;
         await record('DEV_SEED.EMPLOYEE_CREATED', 'Employee', employeeId, {

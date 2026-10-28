@@ -160,7 +160,6 @@ export const ROUTE_ERROR_CODES_M_TO_Z: Readonly<Record<string, Partial<Record<Ro
       '403': ['PROVISIONING.ANOTHER_IT_ADMIN_NEEDED'],
       '404': ['PROVISIONING_TASK.NOT_FOUND'],
       '409': ['PROVISIONING_TASK.ALREADY_MANUAL', 'PROVISIONING_TASK.NOT_FAILED'],
-      '422': ['PROVISIONING_TASK.EVIDENCE_REQUIRED'],
     },
     provisioningTaskReportFailure: {
       '403': ['PROVISIONING.ANOTHER_IT_ADMIN_NEEDED'],
@@ -227,6 +226,7 @@ export const ROUTE_ERROR_CODES_M_TO_Z: Readonly<Record<string, Partial<Record<Ro
         'CURRENCY_NOT_SUPPORTED',
         'MONEY_OUT_OF_RANGE',
         'MONEY_SCALE_EXCEEDED',
+        'SUBSCRIPTION.APPLICATION_RETIRED',
         'SUBSCRIPTION.DATES_INVALID',
         'SUBSCRIPTION.OWNER_DEPARTMENT_INACTIVE',
         'SUBSCRIPTION.PERPETUAL_HAS_NO_TERM',
@@ -243,7 +243,7 @@ export const ROUTE_ERROR_CODES_M_TO_Z: Readonly<Record<string, Partial<Record<Ro
     },
     subscriptionUpdate: {
       '404': ['SUBSCRIPTION.NOT_FOUND'],
-      '409': ['REPORTING_CURRENCY_NOT_SUPPORTED'],
+      '409': ['FINANCE.SETUP_INCOMPLETE', 'REPORTING_CURRENCY_NOT_SUPPORTED'],
       '422': [
         'CURRENCY_NOT_SUPPORTED',
         'MONEY_OUT_OF_RANGE',

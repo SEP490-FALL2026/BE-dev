@@ -116,7 +116,17 @@ _18/10/2026 — contract sau [H3a](../h3a-r1-department-in-use-details/spec.md) 
 - _`US-01-02` AC-5:_ không còn chỉ "không có route". Test từ chối `MANAGER` có ở từng lát tài chính, hợp đồng và khóa bản quyền: `document.e2e-spec`, `license-key`, `subscription-purchase`, `exchange-rates`, `vendor-tax-profile`, `cost-allocation`.
 - _`US-01-11`:_ AC-1, AC-2, AC-4, AC-5, AC-6, AC-8 do hàng đợi tác vụ G4 giao; vế đuôi của AC-7 ("tác vụ tạo sau thay đổi đi về IT Admin mới") nay có test `provisioning-queue-http.integration-spec.ts` ‘US-01-11 AC-7: a change of the IT Admin in charge of a department reaches the tasks made after it…’. AC-3 (`SoD-5`) thuộc G5.
 
+## Primary Story/AC
+
+Chỉ ghi các AC mới của baseline `e0cb5a0` mà [scope map G2](../../../roadmap.md#work-item-decomposition-g2) giao cho hạng mục `legacy` này (27/10/2026, Task 0.1 của `g0-g6-final-business-baseline-remediation`); AC đã giao trước GOV.1 giữ `not affected` ở scope map và không lặp lại ở đây.
+
+| Story    | AC           | Coverage | Phần còn lại thuộc                                                                                                                                                                                                         |
+| -------- | ------------ | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| US-03-06 | AC-21, AC-22 | partial  | AC-2 và vế tài khoản dịch vụ của AC-19: `g2-g4-unit-only-cost-attribution`; AC-19 vế việc đang mở: `g2-downstream-integration`; AC-1, AC-3→AC-18, AC-20: chính hạng mục này (giao trước GOV.1, `not affected` ở scope map) |
+| US-02-03 | AC-7         | partial  | AC-1: `g2-employee-intake-by-super-admin`; AC-2→AC-6: `g2-employee-import-preview-confirm` (giao trước GOV.1)                                                                                                              |
+
 ## Mở lại theo baseline `769bb64` (Prompt 03, 26/10/2026)
 
 - Audit G0–G6 trên Docs `769bb64` ↔ BE `7c28e75` mở lại hạng mục này: F01, F10, F12, F15, F22 — phòng chưa có Cost Center; Super Admin ghi kèm căn cứ; đọc tối thiểu IT Admin; ngừng phòng còn thuê bao có nghĩa vụ.
 - Remediation duy nhất: [g0-g6-final-business-baseline-remediation](../g0-g6-final-business-baseline-remediation/spec.md) ([impact matrix](../g0-g6-final-business-baseline-remediation/impact-matrix.md#3-findings)). AC liên quan không còn được coi là thỏa nguồn hiện hành cho tới khi remediation xong; trạng thái triển khai ở roadmap. Phần đã ghi phía trên là lịch sử, giữ nguyên.
+- _27/10/2026 (Prompt 04, Task 0.1 của `g0-g6-final-business-baseline-remediation`, F60 — re-pin scope map [G2](../../../roadmap.md#work-item-decomposition-g2) Docs `e0cb5a0`, BE `7c28e75`):_ hạng mục `legacy` (không có bảng Primary) nhận làm chủ `US-03-06` AC-21, AC-22 (F01, F10) và `US-02-03` AC-7 (F01) theo dòng mục 4 của các finding đó; bảng _Primary Story/AC_ ở trên chỉ ghi các AC này ([impact matrix mục 9](../g0-g6-final-business-baseline-remediation/impact-matrix.md#9-phụ-lục-delta-user-stories-72e1480--769bb64)). Phần đã ghi phía trên là lịch sử, giữ nguyên.

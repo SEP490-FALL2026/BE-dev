@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
+import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditService } from '../../audit/audit.service';
 import { LicensingService } from '../../licensing/licensing.service';
@@ -7,25 +7,54 @@ import { OrganizationService } from '../../organization/organization.service';
 import { GroupLineClosureService } from '../group-request/group-line-closure.service';
 import { soleLiveLine } from '../group-request/group-line-closure.policy';
 import { accessRequestAuditEvent } from './access-request-audit-event';
-import { AccessRequestCancellationRefusedError, AccessRequestNotFoundError } from './access-request.errors';
+import {
+  AccessRequestCancellationRefusedError,
+  AccessRequestNotFoundError,
+  AccessRequestRoleRequiredError,
+} from './access-request.errors';
 import { AccessRequestRepo } from './access-request.repo';
 import type { AccessRequestRecord } from './access-request.types';
-import { checkCancellation } from './cancellation.policy';
+import {
+  checkCancellation,
+  checkTransferCancellation,
+  wasTransferredFrom,
+  type CancellationRefusal,
+} from './cancellation.policy';
 import { RequestEndService } from './request-end.service';
+import { RequestOutcomeListeners } from './request-outcome-listeners';
+
+/** Why the IT Admin closes the request: the person it is for left, or was transferred while it was still open (F29). */
+export type CancellationCause = 'BENEFICIARY_LEFT' | 'BENEFICIARY_TRANSFERRED';
 
 /**
- * The IT Admin closes a request because the person it was for left (`US-03-04` AC-25, `QĐ-77f`): the request ends as cancelled, neither
- * refused nor failed nor withdrawn. Nothing closes by itself and nothing closes more than one request: the list of what is open is for
+ * What the IT Admin says when they close a request: why, a note to keep (the reason of a closing for a transfer), and what they did to
+ * undo a grant that is open: for a person who left, the work they undid when it is being worked; for a person who was transferred,
+ * that they checked with the vendor and collected the invitation, which any open task of the grant needs.
+ */
+export interface CancellationInput {
+  cause: CancellationCause;
+  note?: string;
+  evidence?: string;
+}
+
+/**
+ * The IT Admin closes a request because the person it was for left (`US-03-04` AC-25, `QĐ-77f`), or was transferred while it was still
+ * open (`QĐ-90b`, F29): the request ends as cancelled, neither refused nor failed nor withdrawn. The role is judged here, not only by
+ * the guard of the route (F13). Nothing closes by itself and nothing closes more than one request: the list of what is open is for
  * the IT Admin to act on. One transaction, locked as the withdrawal is, the task of the grant first and then the request: a task nobody
  * has worked or that failed is cancelled with its assignment so the seat is free, a task being worked only with the evidence that the
  * IT Admin took the invitation back or stopped the work, and a task that is done is not closed here at all (the request is completed;
- * the right is taken away by the revocation of the departure). Then the steps still open and the questions to Finance are closed, the
- * request leaves its batch, what was held for it goes back to the budget and the audit event `ACCESS_REQUEST.CANCELLED` is written, which
- * is where the people concerned and Finance are told from. A refused closing changes nothing.
+ * the right is taken away by the revocation of the departure, or goes to the held rights of the transfer). Then the steps still open and
+ * the questions to Finance are closed, the request leaves its batch, what was held for it and is not spent goes back to the budget and
+ * the audit event `ACCESS_REQUEST.CANCELLED` is written, which is where the people concerned and Finance are told from. A refused
+ * closing changes nothing.
+ *
+ * A closing for a transfer needs the transfer to be real: the person still works and sits in a department other than the one the
+ * request was sent from, which a paid request keeps. It needs its reason, and the confirmation of the vendor check for any open task.
  *
  * A request for a group has one line for each person, and one person leaving is not the end of the request: when theirs is the only line
  * still live, closing the request is the removal of that line (`GroupLineClosureService`, which ends the request with it); with more than
- * one person live the IT Admin removes each person who left by name, and this refuses (`GROUP_REQUEST_UNSUPPORTED`).
+ * one person live the IT Admin removes each person by name, and this refuses (`GROUP_REQUEST_UNSUPPORTED`).
  */
 @Injectable()
 export class DepartureCancellationService {
@@ -37,14 +66,16 @@ export class DepartureCancellationService {
     private readonly organization: OrganizationService,
     private readonly audit: AuditService,
     private readonly groups: GroupLineClosureService,
+    private readonly outcomes: RequestOutcomeListeners,
   ) {}
 
-  /** Throws AccessRequestNotFoundError and AccessRequestCancellationRefusedError. */
+  /** Throws AccessRequestRoleRequiredError, AccessRequestNotFoundError and AccessRequestCancellationRefusedError. */
   async cancel(
     actor: AuthenticatedPrincipal,
     requestId: string,
-    input: { cause: 'BENEFICIARY_LEFT'; note?: string; evidence?: string },
+    input: CancellationInput,
   ): Promise<AccessRequestRecord> {
+    if (!actor.roles.includes('IT_ADMIN')) throw new AccessRequestRoleRequiredError('IT_ADMIN');
     const first = await this.repo.findById(requestId);
     const leaver = first?.type === 'GROUP_GRANT' ? soleLiveLine(first.lines) : null;
     if (leaver !== null) return this.groups.close(actor, requestId, leaver, input);
@@ -55,14 +86,13 @@ export class DepartureCancellationService {
       const request = await this.repo.lockById(tx, requestId);
       if (!request) throw new AccessRequestNotFoundError();
 
-      const people = await this.organization.getEmployees(request.beneficiaryEmployeeIds, tx);
-      const refusal = checkCancellation({
-        type: request.type,
-        state: request.state,
-        beneficiaryEmployeeIds: request.beneficiaryEmployeeIds,
-        beneficiaryLeft: new Map(people.map((person) => [person.id, person.status === 'TERMINATED'])),
-      });
+      const refusal = await this.refusal(tx, request, input.cause);
       if (refusal) throw new AccessRequestCancellationRefusedError(refusal);
+      // A task of the grant that is open, in any state, is cancelled for a transfer only on the confirmation of the check with the
+      // vendor: an early answer that is the rule licensing applies to the task (`grantCancelAction`), never a weaker one.
+      if (input.cause === 'BENEFICIARY_TRANSFERRED' && request.state === 'EXECUTING' && input.evidence === undefined) {
+        throw new AccessRequestCancellationRefusedError('EVIDENCE_REQUIRED');
+      }
 
       const now = new Date();
       const before = request.state;
@@ -70,7 +100,7 @@ export class DepartureCancellationService {
         organizationId: request.organizationId,
         requestId: request.id,
         now,
-        cause: 'BENEFICIARY_LEFT',
+        cause: input.cause,
         ...(input.evidence === undefined ? {} : { evidence: input.evidence }),
       });
       if (grant.status === 'EVIDENCE_REQUIRED') throw new AccessRequestCancellationRefusedError('EVIDENCE_REQUIRED');
@@ -79,6 +109,7 @@ export class DepartureCancellationService {
         throw new AccessRequestCancellationRefusedError('ALREADY_ENDED');
       }
 
+      // Only what is not spent goes back to the budget: the part that already became an expense stays (`QĐ-83a`).
       const released = await this.end.close(tx, actor, request, 'REQUEST_CANCELLED', now);
       const note = input.note?.trim() || null;
       await this.repo.setCancellation(tx, request.id, {
@@ -109,11 +140,49 @@ export class DepartureCancellationService {
           },
         ),
       );
+      await this.outcomes.ended(tx, request, request.beneficiaryEmployeeIds, now);
 
       const record = await this.repo.findById(request.id, tx);
       if (!record) throw new Error(`The request ${request.id} was not found after it was cancelled.`);
 
       return record;
+    });
+  }
+
+  /** The first reason the request is not closed for this cause, read under the lock of the request. */
+  private async refusal(
+    tx: DbTx,
+    request: AccessRequestRecord,
+    cause: CancellationCause,
+  ): Promise<CancellationRefusal | null> {
+    const people = await this.organization.getEmployees(request.beneficiaryEmployeeIds, tx);
+    if (cause === 'BENEFICIARY_LEFT') {
+      return checkCancellation({
+        type: request.type,
+        state: request.state,
+        beneficiaryEmployeeIds: request.beneficiaryEmployeeIds,
+        beneficiaryLeft: new Map(people.map((person) => [person.id, person.status === 'TERMINATED'])),
+      });
+    }
+    const today = await this.organization.businessToday(new Date(), tx);
+    const transferred = new Map<string, boolean>();
+    for (const person of people) {
+      const placement = await this.organization.getEmployeePlacement(person.id, today, tx);
+      transferred.set(
+        person.id,
+        wasTransferredFrom({
+          status: person.status,
+          currentDepartmentId: placement?.departmentId ?? null,
+          sentFromDepartmentId: request.departmentId,
+        }),
+      );
+    }
+
+    return checkTransferCancellation({
+      type: request.type,
+      state: request.state,
+      beneficiaryEmployeeIds: request.beneficiaryEmployeeIds,
+      beneficiaryTransferred: transferred,
     });
   }
 }

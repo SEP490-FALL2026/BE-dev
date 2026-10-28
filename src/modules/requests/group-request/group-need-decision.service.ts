@@ -23,6 +23,7 @@ import { GroupRequestLineHoldsAccessError, GroupRequestLinesMismatchError } from
 import { GroupResolutionService } from './group-resolution.service';
 import { LineDecisionRepo } from './line-decision.repo';
 import { RequestLineRepo } from './request-line.repo';
+import { RequestOutcomeListeners } from '../access-request/request-outcome-listeners';
 
 export interface LineNeedDecisionInput {
   lines: readonly LineVerdict[];
@@ -50,6 +51,7 @@ export class GroupNeedDecisionService {
     private readonly assessment: RequestAssessmentService,
     private readonly licensing: LicensingService,
     private readonly audit: AuditService,
+    private readonly outcomes: RequestOutcomeListeners,
   ) {}
 
   /**
@@ -164,6 +166,8 @@ export class GroupNeedDecisionService {
             },
           ),
         );
+        // The line of a person who was refused ended for them without a grant (F43).
+        if (rejected) await this.outcomes.ended(tx, request, [verdict.employeeId], now);
       }
 
       const { request: after } = await this.resolution.resolve(tx, actor, request.id, now);

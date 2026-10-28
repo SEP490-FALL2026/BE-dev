@@ -93,6 +93,7 @@ export class HandoverService {
         leaverIsHead: input.leaverIsHead,
         resolveOn: input.leaverIsHead ? addDays(input.lastWorkingDay, 1) : null,
         dueOn: input.dueOn,
+        operator: input.operator,
       });
       if (issued.outcome === 'OPENED') result.opened.push({ dutyId: issued.duty.id, assignmentId: seat.assignmentId });
       else if (issued.outcome === 'REUSED') result.reused += 1;
@@ -158,6 +159,7 @@ export class HandoverService {
           duty.id,
           { dueOn: duty.dueOn },
           { dueOn: input.dueOn, caseRefId: input.caseRefId },
+          input.operator,
         ),
       );
     }
@@ -181,6 +183,7 @@ export class HandoverService {
           duty.id,
           { dueOn: duty.dueOn },
           { caseRefId: input.caseRefId, assignmentId: duty.assignmentId },
+          input.operator,
         ),
       );
     }

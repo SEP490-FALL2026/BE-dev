@@ -20,7 +20,8 @@ describe('the substitute for a conflict of interest over PostgreSQL (US-06-08)',
     fallback = await h.staff(await h.departmentWithUnit('P-FB'), 'FB-R0');
     await h.setRole('FALLBACK_APPROVER', fallback);
     const row = await h.ctx.sql.query<{ id: string; cost_center_id: string }>(
-      `SELECT id, cost_center_id FROM departments WHERE code = 'P-EXE'`,
+      `SELECT d.id, c.id AS cost_center_id FROM departments d
+         JOIN cost_centers c ON c.department_id = d.id AND c.status = 'ACTIVE' WHERE d.code = 'P-EXE'`,
     );
     const department = { id: row.rows[0].id, code: 'P-EXE', unitId: row.rows[0].cost_center_id };
     executive = { department, head: h.boss, member: await h.staff(department, 'EXE-E1') };

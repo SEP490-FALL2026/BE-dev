@@ -7,6 +7,7 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { AuditService } from '../../audit/audit.service';
 import { EmployeeCodeTakenError, EmployeeEmailTakenError } from '../../organization/organization.errors';
 import { LicensingService } from '../../licensing/licensing.service';
+import { NotificationsService } from '../../notifications/notifications.service';
 import { OrganizationService } from '../../organization/organization.service';
 import {
   importCancelledEvent,
@@ -15,6 +16,7 @@ import {
   importUploadedEvent,
 } from './employee-import-audit';
 import { reviewQueueOf } from './employee-import-review-queue';
+import { outcomeCounts, toImportView } from './employee-import-view';
 import { OwnRecord, readOwnRecord } from './employee-import-own-record';
 import { EmployeeFileRow, readEmployeeFile } from './employee-import-file';
 import {
@@ -37,7 +39,8 @@ import {
   ImportPreviewStaleError,
   ImportStateError,
 } from './employee-import.errors';
-import { EmployeeImportRepo, ImportRecord, LatestImport, StoredRow } from './employee-import.repo';
+import { assertMayImportEmployees } from './employee-import.policy';
+import { EmployeeImportRepo, LatestImport, StoredRow } from './employee-import.repo';
 import { ImportResult, ImportSummary, ImportView } from './employee-import.types';
 
 /** A preview that is not confirmed goes stale on its own after this long. */
@@ -49,7 +52,9 @@ type JudgedRow = { lineNumber: number; cells: EmployeeCells } & EmployeeRowResul
  * Importing people from a file (`US-02-01`, `US-02-02`, `US-02-03`): upload reads the file into rows and judges each
  * one without writing anything; the person looks at the preview; only a confirmation of the preview that is still
  * current creates the people, once, in one transaction. A row that is a person already there is never changed by
- * an import: it is reported as the same or as different. Importing creates no account, role or invitation.
+ * an import: it is reported as the same or as different. Importing creates no account, role or invitation, and tells, for each
+ * person created, the head of their department and the IT Admin in charge, in the same transaction (`US-02-02` AC-17, `F17`).
+ * Only the Super Admin imports people: `employee-import.policy.ts` says so first in every use case.
  */
 @Injectable()
 export class EmployeeImportService {
@@ -59,6 +64,7 @@ export class EmployeeImportService {
     private readonly audit: AuditService,
     private readonly runner: TransactionRunner,
     private readonly licensing: LicensingService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   /**
@@ -69,9 +75,8 @@ export class EmployeeImportService {
     return this.repo.findLatestKept((await this.requireOrganization()).id);
   }
 
-  // --- upload and preview -------------------------------------------------------------
-
   async upload(actor: AuthenticatedPrincipal, file: { fileName: string; bytes: Buffer }): Promise<ImportView> {
+    assertMayImportEmployees(actor.roles);
     const organization = await this.requireOrganization();
     const { rows, ignored } = readEmployeeFile(file.bytes);
     const contentHash = createHash('sha256').update(file.bytes).digest('hex');
@@ -99,20 +104,29 @@ export class EmployeeImportService {
       return created;
     });
 
-    return this.view(id);
+    return this.read(id);
   }
 
-  async view(id: string): Promise<ImportView> {
+  /** One import as it stands. Throws ImportForbiddenError or ImportNotFoundError. */
+  async view(actor: AuthenticatedPrincipal, id: string): Promise<ImportView> {
+    assertMayImportEmployees(actor.roles);
+
+    return this.read(id);
+  }
+
+  private async read(id: string): Promise<ImportView> {
     const record = await this.repo.find(id);
     if (!record) throw new ImportNotFoundError();
 
-    return this.toView(record);
+    return toImportView(record);
   }
 
   async rows(
+    actor: AuthenticatedPrincipal,
     id: string,
     query: { outcome?: EmployeeRowOutcome; page: number; pageSize: number },
   ): Promise<Page<StoredRow>> {
+    assertMayImportEmployees(actor.roles);
     if (!(await this.repo.find(id))) throw new ImportNotFoundError();
     const { items, total } = await this.repo.page(id, {
       ...(query.outcome ? { outcome: query.outcome } : {}),
@@ -128,6 +142,7 @@ export class EmployeeImportService {
    * can no longer be confirmed (`US-02-01` AC-10). The file is not uploaded again.
    */
   async refresh(actor: AuthenticatedPrincipal, id: string): Promise<ImportView> {
+    assertMayImportEmployees(actor.roles);
     const organization = await this.requireOrganization();
     const stored = await this.repo.find(id);
     if (!stored) throw new ImportNotFoundError();
@@ -153,11 +168,12 @@ export class EmployeeImportService {
       });
     });
 
-    return this.view(id);
+    return this.read(id);
   }
 
   /** Throws the preview away: nothing was written, and nothing will be (AC-3). Cancelling twice is the same. */
   async cancel(actor: AuthenticatedPrincipal, id: string): Promise<ImportView> {
+    assertMayImportEmployees(actor.roles);
     const organization = await this.requireOrganization();
 
     await this.runner.run(async (tx) => {
@@ -170,10 +186,8 @@ export class EmployeeImportService {
       await this.audit.record(tx, importCancelledEvent(organization.id, actor, id));
     });
 
-    return this.view(id);
+    return this.read(id);
   }
-
-  // --- confirmation -------------------------------------------------------------------
 
   /**
    * Writes the people the preview promised, once. The import row is locked first, so two confirmations at the same
@@ -186,6 +200,7 @@ export class EmployeeImportService {
     id: string,
     input: { previewVersion: number; idempotencyKey: string; acknowledgeDuplicateFile: boolean; hrBasis: HrBasis },
   ): Promise<{ import: ImportView; replayed: boolean }> {
+    assertMayImportEmployees(actor.roles);
     const organization = await this.requireOrganization();
     let replayed = false;
 
@@ -221,11 +236,12 @@ export class EmployeeImportService {
         hrBasis: input.hrBasis,
       });
 
+      const { existingSame, existingDifferent, errors } = outcomeCounts(fresh);
       const result: ImportResult = {
         created: [...createdByDepartment.values()].reduce((sum, count) => sum + count, 0),
-        existingSame: fresh.filter((row) => row.outcome === 'EXISTS_SAME').length,
-        existingDifferent: fresh.filter((row) => row.outcome === 'EXISTS_DIFFERENT').length,
-        errors: fresh.filter((row) => row.outcome === 'ERROR').length,
+        existingSame,
+        existingDifferent,
+        errors,
         createdByDepartment: [...createdByDepartment].map(([departmentCode, count]) => ({ departmentCode, count })),
         departmentsWithoutHead: await this.withoutHead(before, [...createdByDepartment.keys()]),
       };
@@ -241,7 +257,7 @@ export class EmployeeImportService {
       );
     });
 
-    return { import: await this.view(id), replayed };
+    return { import: await this.read(id), replayed };
   }
 
   /**
@@ -294,6 +310,13 @@ export class EmployeeImportService {
             hrBasis: on.hrBasis,
           }),
         );
+        const notices = await this.organization.getProfileNotices(tx, {
+          kind: 'CREATED',
+          organizationId,
+          employeeId,
+          onDate: today,
+        });
+        for (const notice of notices) await this.notifications.notifyInApp(tx, notice);
       } catch (error) {
         // Someone entered the same code or email between the judgement and the write: the preview is stale.
         if (error instanceof EmployeeCodeTakenError || error instanceof EmployeeEmailTakenError) {
@@ -306,8 +329,6 @@ export class EmployeeImportService {
 
     return createdByDepartment;
   }
-
-  // --- helpers ------------------------------------------------------------------------
 
   private async lookup(
     rows: readonly { cells: EmployeeCells }[],
@@ -346,10 +367,7 @@ export class EmployeeImportService {
 
     return {
       totalRows: rows.length,
-      valid: rows.filter((row) => row.outcome === 'VALID').length,
-      errors: rows.filter((row) => row.outcome === 'ERROR').length,
-      existingSame: rows.filter((row) => row.outcome === 'EXISTS_SAME').length,
-      existingDifferent: rows.filter((row) => row.outcome === 'EXISTS_DIFFERENT').length,
+      ...outcomeCounts(rows),
       newPeopleByDepartment: [...byDepartment].map(([departmentCode, count]) => ({ departmentCode, count })),
       departmentsWithoutHead: await this.withoutHead(lookup, [...byDepartment.keys()]),
       reviewQueue: await reviewQueueOf(this.licensing, this.organization, rows),
@@ -368,26 +386,6 @@ export class EmployeeImportService {
     const without = await this.organization.departmentsWithoutHead(ids);
 
     return without.map((department) => ({ code: department.code, name: department.name }));
-  }
-
-  private toView(record: ImportRecord): ImportView {
-    return {
-      id: record.id,
-      fileName: record.fileName,
-      status: record.status,
-      previewVersion: record.previewVersion,
-      ignoredColumns: record.ignoredColumns,
-      // A preview kept before the review queue existed has none.
-      summary: {
-        ...(record.summary as ImportSummary),
-        reviewQueue: (record.summary as Partial<ImportSummary>).reviewQueue ?? { total: 0, items: [] },
-      },
-      result: (record.result ?? null) as ImportResult | null,
-      createdAt: record.createdAt,
-      expiresAt: record.expiresAt,
-      confirmedAt: record.confirmedAt,
-      cancelledAt: record.cancelledAt,
-    };
   }
 
   private async requireOrganization() {

@@ -26,7 +26,7 @@ IT Admin ghi một điều chuyển phòng và/hoặc chức vụ của một nh
 
 | Story    | AC                                        | Coverage | Phần còn lại thuộc                                                                                                                                                                                       |
 | -------- | ----------------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| US-03-01 | AC-1, AC-2, AC-4→AC-8, AC-11, AC-13→AC-22 | partial  | AC-9: `g6-service-account-handover`; AC-12: `g3-downstream-finance-integration`; vế báo cáo chi phí theo tháng của AC-1: `g6-downstream-integration`; vế ghi bàn giao của AC-21: `g6-offboarding-record` |
+| US-03-01 | AC-1, AC-2, AC-4→AC-8, AC-11, AC-13→AC-16, AC-18→AC-24 | partial  | AC-9: `g6-service-account-handover`; AC-12: `g3-downstream-finance-integration`; vế báo cáo chi phí theo tháng của AC-1: `g6-downstream-integration`; vế ghi bàn giao của AC-21: `g6-offboarding-record` |
 
 ## Supporting references
 
@@ -205,3 +205,4 @@ Cập nhật 24/10/2026 bởi người phụ trách (AI theo giao việc của n
 
 - Audit G0–G6 trên Docs `769bb64` ↔ BE `7c28e75` mở lại hạng mục này: F40, F41, F44, F45, F46 — Super Admin ghi; chức vụ không là sự kiện; phòng chưa có Cost Center; bỏ `selfExecuted`; đua sự kiện.
 - Remediation duy nhất: [g0-g6-final-business-baseline-remediation](../g0-g6-final-business-baseline-remediation/spec.md) ([impact matrix](../g0-g6-final-business-baseline-remediation/impact-matrix.md#3-findings)). AC liên quan không còn được coi là thỏa nguồn hiện hành cho tới khi remediation xong; trạng thái triển khai ở roadmap. Phần đã ghi phía trên là lịch sử, giữ nguyên.
+- _27/10/2026 (Prompt 04, Task 0.1 của `g0-g6-final-business-baseline-remediation`, F60 — re-pin scope map [G6](../../../roadmap.md#work-item-decomposition-g6) Docs `e0cb5a0`, BE `7c28e75`):_ `US-03-01` AC-17 đã bỏ; nhận thêm AC-23 (F44 — mục 4 nêu hạng mục này) và AC-24 (F12 — phạm vi đọc điều chuyển theo vai; mục 9 không có cột chủ đề xuất, gán theo hạng mục đang chủ chuỗi AC-13 → AC-22 của Story, chờ xác nhận) ([impact matrix mục 9](../g0-g6-final-business-baseline-remediation/impact-matrix.md#9-phụ-lục-delta-user-stories-72e1480--769bb64)). Phần đã ghi phía trên là lịch sử, giữ nguyên.

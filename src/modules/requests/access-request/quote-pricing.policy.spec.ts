@@ -146,6 +146,19 @@ describe('the amount of a request from a quote (US-05-06 AC-14, AC-15)', () => {
       expect(result).toEqual({ status: 'REFUSED', reason: 'PAYMENT_FREQUENCY_INVALID' });
     });
 
+    it('a quote of nothing, or whose binding payments come to nothing: the price data is incomplete (F34)', () => {
+      expect(priceFromQuote(input({ quote: quote({ unitPrice: usd(0) }) }))).toEqual({
+        status: 'REFUSED',
+        reason: 'PRICE_REQUIRED',
+        missing: ['quote.unitPrice'],
+      });
+      expect(
+        priceFromQuote(
+          input({ termMonths: 24, quote: quote({ paymentFrequency: 'ANNUAL', commitmentMonths: 0, validUntil: null }) }),
+        ),
+      ).toEqual({ status: 'REFUSED', reason: 'PRICE_REQUIRED', missing: ['quote.unitPrice'] });
+    });
+
     it('a total that does not fit', () => {
       const result = priceFromQuote(
         input({ quote: quote({ unitPrice: { amountMinor: 10n ** 30n, currency: 'USD' } }) }),

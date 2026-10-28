@@ -72,6 +72,8 @@ describe('closing a request because its beneficiary left (e2e, no database)', ()
     ['a cause the route does not know', { cause: 'REQUESTER_WITHDREW' }],
     ['a blank note', { cause: 'BENEFICIARY_LEFT', note: '   ' }],
     ['a blank evidence', { cause: 'BENEFICIARY_LEFT', evidence: ' ' }],
+    ['a closing for a transfer that gives no reason (F29)', { cause: 'BENEFICIARY_TRANSFERRED' }],
+    ['a closing for a transfer whose reason is blank (F29)', { cause: 'BENEFICIARY_TRANSFERRED', note: '  ' }],
     ['a field the route does not know', { cause: 'BENEFICIARY_LEFT', reason: 'x' }],
   ])('refuses %s with 422', async (_name, payload) => {
     app = await appFor(principal(['IT_ADMIN']));

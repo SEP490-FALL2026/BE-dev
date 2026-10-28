@@ -7,6 +7,7 @@ import {
   type StatusFacts,
   type StatusRule,
 } from './request-status.types';
+import { FINANCE_RULES } from './status-rules.finance';
 import { GROUP_RULES } from './status-rules.group';
 import { OUTCOME_RULES } from './status-rules.outcome';
 import { PROGRESS_RULES } from './status-rules.progress';
@@ -26,6 +27,7 @@ const RULES: Readonly<Record<string, StatusRule>> = {
   ...WITHDRAWAL_RULES,
   ...RELATED_RULES,
   ...GROUP_RULES,
+  ...FINANCE_RULES,
 };
 
 /** The actions the projection reads from the trail: those of the table, and no others. */

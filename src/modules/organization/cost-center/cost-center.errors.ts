@@ -1,3 +1,5 @@
+import type { UseItem } from '../organization-use.types';
+
 export class CostCenterNotFoundError extends Error {
   constructor() {
     super('Cost center not found.');
@@ -54,14 +56,31 @@ export class CostCenterNameInvalidError extends Error {
   }
 }
 
-/** The department still has people working in it, so its cost center cannot be retired yet (AC-3). */
+/**
+ * Open obligations still sit on the Cost Center, so Finance cannot retire it yet (`US-04-09` AC-3, `QĐ-87d(2)`): the Requests with a
+ * cost that are not over and the commitments still held, each the first of them and how many there are in all. The people in the
+ * department are not an obligation. Invoices and statements not yet reconciled are G8/G9 and join when their tables exist.
+ */
+export interface CostCenterInUseGroups {
+  requests: { items: UseItem[]; total: number };
+  commitments: { items: UseItem[]; total: number };
+}
+
 export class CostCenterInUseError extends Error {
   constructor(
-    readonly department: { id: string; code: string; name: string },
-    readonly employees: { employeeCode: string; fullName: string }[],
-    readonly totalEmployees: number,
+    /** The department the Cost Center belongs to, for the reader of the refusal. */
+    readonly department: { id: string; code: string; name: string } | null,
+    readonly groups: CostCenterInUseGroups,
   ) {
-    super('The cost center is still in use by a department with people in it.');
+    super('The cost center still has open obligations: Requests with a cost that are not over or commitments held.');
     this.name = 'CostCenterInUseError';
+  }
+}
+
+/** The caller is not Finance (nor, to read, the Super Admin): the catalogue is Finance's, decided in the service whatever the route let through (`F13`). */
+export class CostCenterForbiddenError extends Error {
+  constructor() {
+    super('You do not have permission to perform this action on cost centers.');
+    this.name = 'CostCenterForbiddenError';
   }
 }

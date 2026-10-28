@@ -42,6 +42,26 @@ export interface LineRow {
 export class GroupHarness extends StatusHarness {
   private colleagueNumber = 0;
 
+  constructor() {
+    super();
+    // A seat of a request is taken on the subscription its department owns (F20, `QĐ-89a`), as on a request made through `sent`:
+    // the department of a group request is learnt from the wire a spec reads back, and a grant made on the subscription of the
+    // seeded department is made on the one the department of the request owns.
+    const readData = this.dataOf;
+    this.dataOf = <T>(response: Parameters<typeof readData>[0]): T => {
+      const data = readData<T>(response);
+      const request = (data as { request?: { id?: unknown; department?: { id?: unknown } } } | null | undefined)
+        ?.request;
+      if (typeof request?.id === 'string' && typeof request.department?.id === 'string') {
+        this.owned.noteRequest(request.id, request.department.id);
+      }
+
+      return data;
+    };
+    const grantOnSeeded = this.grantLine;
+    this.grantLine = (body: object, account: ApiAccount) => grantOnSeeded(this.owned.grantBody(body), account);
+  }
+
   /** A colleague of the department who has a work email and starts today, until a test changes it. */
   async colleague(unit: Unit, prefix = 'G'): Promise<Colleague> {
     this.colleagueNumber += 1;

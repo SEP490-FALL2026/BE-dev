@@ -24,19 +24,25 @@ function principal(direct: string[], derived: string[] = []) {
 
 type Call = (server: App) => request.Test;
 
-const ROUTES: Array<[string, Call]> = [
+/** The roles the guard of each route lets through: the Super Admin writes (`QĐ-87a`), the IT Admin reads a minimal projection (F12). */
+const WRITERS = ['SUPER_ADMIN'] as const;
+const READERS = ['SUPER_ADMIN', 'IT_ADMIN'] as const;
+
+const ROUTES: Array<[string, Call, readonly string[]]> = [
   [
     'POST /department-transfers',
     (server) =>
       request(server)
         .post('/api/v1/department-transfers')
         .send({ employeeId: ID, toDepartmentId: ID, effectiveOn: '2026-12-01', grounds: GROUNDS }),
+    WRITERS,
   ],
-  ['GET /department-transfers', (server) => request(server).get('/api/v1/department-transfers')],
-  ['GET /department-transfers/{id}', (server) => request(server).get(`/api/v1/department-transfers/${ID}`)],
+  ['GET /department-transfers', (server) => request(server).get('/api/v1/department-transfers'), READERS],
+  ['GET /department-transfers/{id}', (server) => request(server).get(`/api/v1/department-transfers/${ID}`), READERS],
   [
     'GET /department-transfers/{id}/changes',
     (server) => request(server).get(`/api/v1/department-transfers/${ID}/changes`),
+    WRITERS,
   ],
   [
     'POST /department-transfers/{id}/rescheduling',
@@ -44,11 +50,18 @@ const ROUTES: Array<[string, Call]> = [
       request(server)
         .post(`/api/v1/department-transfers/${ID}/rescheduling`)
         .send({ newEffectiveOn: '2026-12-15', reason: 'Later', grounds: GROUNDS }),
+    WRITERS,
   ],
   [
     'POST /department-transfers/{id}/cancellation',
     (server) =>
       request(server).post(`/api/v1/department-transfers/${ID}/cancellation`).send({ reason: 'No', grounds: GROUNDS }),
+    WRITERS,
+  ],
+  [
+    'POST /department-transfers/{id}/closure',
+    (server) => request(server).post(`/api/v1/department-transfers/${ID}/closure`).send({}),
+    ['IT_ADMIN'],
   ],
 ];
 
@@ -71,9 +84,9 @@ describe('department transfer routes (e2e, no database)', () => {
     await app?.close();
   });
 
-  describe('every route needs a signed-in IT Admin (US-03-01 AC-14)', () => {
+  describe('every route needs a signed-in person of the role that may use it (US-03-01 AC-14; F40, F12)', () => {
     it.each(ROUTES)('%s without a token is 401', async (_name, call) => {
-      app = await appFor(principal(['IT_ADMIN']));
+      app = await appFor(principal(['SUPER_ADMIN']));
 
       const response = await call(app.getHttpServer()).expect(401);
 
@@ -81,18 +94,30 @@ describe('department transfer routes (e2e, no database)', () => {
     });
 
     it.each([
-      ['the Super Admin, who never does business work (SoD-1)', ['SUPER_ADMIN'], []],
+      ['the Super Admin', ['SUPER_ADMIN'], []],
+      ['the IT Admin', ['IT_ADMIN'], []],
       ['the finance officer', ['FINANCE'], []],
       ['an employee', ['EMPLOYEE'], []],
       ['an account with no role', [], []],
       ['a department head, whose role is derived', [], ['MANAGER']],
       ['the spending approver, whose role is derived', [], ['SPENDING_APPROVER']],
-    ])('refuses %s on every route with 403', async (_name, direct, derived) => {
+    ])('refuses %s on the routes it is not for with 403', async (_name, direct, derived) => {
       app = await appFor(principal(direct, derived));
 
-      for (const [route, call] of ROUTES) {
+      for (const [route, call, allowed] of ROUTES) {
+        if (allowed.some((role) => (direct as string[]).includes(role))) continue;
         const response = await call(app.getHttpServer()).set('Authorization', 'Bearer any').expect(403);
         expect({ route, code: bodyOf(response).error.code }).toEqual({ route, code: 'AUTHORIZATION.FORBIDDEN' });
+      }
+    });
+
+    it('refuses the IT Admin on record, move, cancel and the list of moves, and lets it through to read and to close (F40, F12)', async () => {
+      app = await appFor(principal(['IT_ADMIN']));
+
+      for (const [route, call, allowed] of ROUTES) {
+        const response = await call(app.getHttpServer()).set('Authorization', 'Bearer any');
+        const refused = response.status === 403 && bodyOf(response).error.code === 'AUTHORIZATION.FORBIDDEN';
+        expect({ route, refused }).toEqual({ route, refused: !allowed.includes('IT_ADMIN') });
       }
     });
   });
@@ -107,7 +132,7 @@ describe('department transfer routes (e2e, no database)', () => {
       ['a field the route does not know', { employeeId: ID, effectiveOn: '2026-12-01', note: 'x' }],
       ['a successor of no kind', { employeeId: ID, effectiveOn: '2026-12-01', successor: { kind: 'SOMEONE' } }],
     ])('refuses %s with 422', async (_name, payload) => {
-      app = await appFor(principal(['IT_ADMIN']));
+      app = await appFor(principal(['SUPER_ADMIN']));
 
       const response = await request(app.getHttpServer())
         .post('/api/v1/department-transfers')
@@ -131,7 +156,7 @@ describe('department transfer routes (e2e, no database)', () => {
           request(server).post(`/api/v1/department-transfers/${ID}/rescheduling`).send({ newEffectiveOn: 'tomorrow' }),
       ],
     ])('refuses %s with 422', async (_name, call) => {
-      app = await appFor(principal(['IT_ADMIN']));
+      app = await appFor(principal(['SUPER_ADMIN']));
 
       const response = await call(app.getHttpServer()).set(asAdmin()).expect(422);
 

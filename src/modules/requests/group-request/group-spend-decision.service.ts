@@ -67,6 +67,8 @@ export class GroupSpendDecisionService {
         stepState: step.state,
       });
       if (refusal) throw new SpendDecisionRefusedError(refusal);
+      // The person who completed the review of Finance of this request does not decide its spend step (`SoD-8`).
+      await this.effects.refuseReviewer(tx, request, actor.employeeId);
 
       const lines = await this.lines.lock(tx, request.id);
       const confirmed = lines.filter((line) => line.state === 'NEED_CONFIRMED');

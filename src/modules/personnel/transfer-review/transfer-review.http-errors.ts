@@ -13,7 +13,8 @@ const ANSWERS: Readonly<Record<TransferReviewProblem, { status: HttpStatus; mess
   ITEM_NOT_FOUND: { status: HttpStatus.NOT_FOUND, message: 'The tool is not part of this review.' },
   DECISION_ALREADY_RECORDED: {
     status: HttpStatus.CONFLICT,
-    message: 'A decision about this tool was written already and does not change.',
+    message:
+      'A decision about this tool was written already and is final. Only "still needed" can become "no longer needed", and only while the old seat is not being taken back.',
   },
   NOT_OPEN: { status: HttpStatus.CONFLICT, message: 'The review is not open: it was completed or replaced.' },
   EMPLOYEE_LEFT: {

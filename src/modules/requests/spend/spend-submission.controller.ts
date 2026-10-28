@@ -105,8 +105,8 @@ export class SpendSubmissionController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'A request chosen is not waiting in the queue: it was sent on, or does not cost money (SPEND.NOT_IN_QUEUE).',
-      examples: [SPEND_ERROR_EXAMPLES.NOT_IN_QUEUE],
+        'A request chosen is not waiting in the queue: it was sent on, or does not cost money (SPEND.NOT_IN_QUEUE), or the department has no Cost Center in use now, which stops the batch before any request is checked against a budget (FINANCE.SETUP_INCOMPLETE). Nothing is written.',
+      examples: [SPEND_ERROR_EXAMPLES.NOT_IN_QUEUE, SPEND_ERROR_EXAMPLES.FINANCE_SETUP_INCOMPLETE],
     },
     INVALID,
   )

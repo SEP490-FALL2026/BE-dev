@@ -13,10 +13,11 @@ const tx = { tx: true } as unknown as DbTx;
 
 type Lookup = Awaited<ReturnType<OrganizationService['lookupForEmployeeImport']>>;
 type Fixture = Awaited<ReturnType<OrganizationService['readLocalSeedFixture']>>;
-const noFixture: Fixture = { costCenterDirectionActivated: false, costCenter: null, department: null };
-/** The organization fixture items exactly as the seed writes them (P23-RV-01): the department, its Cost Center, the link activated. */
-const exactFixture: Fixture = {
-  costCenterDirectionActivated: true,
+/** The fixture facts as the seed reads them: the two items. The activation of the compatibility release is not read any more. */
+const fixtureOf = (parts: Pick<Fixture, 'costCenter' | 'department'>): Fixture => parts as Fixture;
+const noFixture = fixtureOf({ costCenter: null, department: null });
+/** The organization fixture items exactly as the seed writes them (P23-RV-01): the department and its Cost Center. */
+const exactFixture = fixtureOf({
   costCenter: {
     id: 'cc-1',
     code: 'DEMO-CC',
@@ -33,10 +34,10 @@ const exactFixture: Fixture = {
     costCenterId: 'cc-1',
     costCenterCode: 'DEMO-CC',
   },
-};
+});
 const empty: Lookup = { departments: [], employees: [], emailOwners: [] };
 const seeded: Lookup = {
-  departments: [{ id: 'd-1', code: 'DEMO', active: true, costCenterActive: true }],
+  departments: [{ id: 'd-1', code: 'DEMO', active: true }],
   employees: [
     ['DEMO-IT', 'Demo IT Admin', 'it.admin@demo.slm.test'],
     ['DEMO-FIN', 'Demo Finance', 'finance@demo.slm.test'],
@@ -49,7 +50,7 @@ const seeded: Lookup = {
     employmentType: 'STAFF' as const,
     hireDate: '2026-01-05',
     departmentCode: 'DEMO',
-    jobTitleName: 'Demo staff',
+    jobTitleName: null,
   })),
   emailOwners: [],
 };
@@ -86,9 +87,9 @@ function build(
       return Promise.resolve({ id: 'cc-1' });
     }),
     createDepartment: jest.fn(() => (events.push('department'), Promise.resolve({ id: 'd-1' }))),
-    activateCostCenterDirectionForLocalSeed: jest.fn(() => (events.push('activation'), Promise.resolve(true))),
-    createEmployeeWithPlacement: jest.fn((_tx: DbTx, input: { employeeCode: string }) => {
-      events.push(`employee ${input.employeeCode}`);
+    // No `activateCostCenterDirectionForLocalSeed` here: the seed writes no activation row, and a call to it would throw.
+    createEmployeeWithPlacement: jest.fn((_tx: DbTx, input: { employeeCode: string; jobTitle: string | null }) => {
+      events.push(`employee ${input.employeeCode} ${String(input.jobTitle)}`);
       return Promise.resolve({ id: `e-${input.employeeCode}` });
     }),
   };
@@ -166,14 +167,12 @@ describe('DevSeedService', () => {
       'audit DEV_SEED.DEPARTMENT_CREATED LOCAL_SEED',
       'costCenter for d-1',
       'audit DEV_SEED.COST_CENTER_CREATED LOCAL_SEED',
-      'activation',
-      'audit DEV_SEED.COST_CENTER_DIRECTION_ACTIVATED LOCAL_SEED',
       ...[
         ['DEMO-IT', 'IT_ADMIN', 1],
         ['DEMO-FIN', 'FINANCE', 2],
         ['DEMO-EMP', 'EMPLOYEE', 3],
       ].flatMap(([code, role, n]) => [
-        `employee ${code}`,
+        `employee ${code} null`,
         'audit DEV_SEED.EMPLOYEE_CREATED LOCAL_SEED',
         `account ${role} hash(generated-password-${n})`,
         'audit DEV_SEED.ACCOUNT_CREATED LOCAL_SEED',
@@ -239,50 +238,38 @@ describe('DevSeedService', () => {
   });
 
   it('P23-RV-01 / QĐ-87d(1): reuses a DEMO department that has no Cost Center and creates only the Cost Center for it', async () => {
-    const recovered: Fixture = {
-      ...exactFixture,
+    const recovered = fixtureOf({
       costCenter: null,
       department: { ...exactFixture.department!, costCenterId: null, costCenterCode: null },
-    };
+    });
     const { service, events } = build({ fixtures: [recovered, recovered] });
 
     const result = await service.seed({ confirmLocal: true });
 
     expect(result.outcome).toBe('CREATED');
-    expect(result.items.slice(0, 3).map((item) => `${item.kind} ${item.state}`)).toEqual([
+    expect(result.items.slice(0, 2).map((item) => `${item.kind} ${item.state}`)).toEqual([
       'DEPARTMENT already-present',
       'COST_CENTER created',
-      'COST_CENTER_DIRECTION already-present',
     ]);
     expect(events.slice(0, 3)).toEqual(['lock', 'costCenter for d-1', 'audit DEV_SEED.COST_CENTER_CREATED LOCAL_SEED']);
     expect(events).not.toContain('department');
-    expect(events).not.toContain('activation');
   });
 
-  it('records the activation of the Cost Center link on its own when the rest is already there', async () => {
-    const notActivated: Fixture = { ...exactFixture, costCenterDirectionActivated: false };
-    const { service, events } = build({ fixtures: [notActivated, notActivated] });
+  it('writes no activation of the Cost Center link and reports no item for it, however the data stands', async () => {
+    const { service, events, organization } = build();
 
     const result = await service.seed({ confirmLocal: true });
 
-    expect(result.items.slice(0, 3).map((item) => `${item.kind} ${item.state}`)).toEqual([
-      'DEPARTMENT already-present',
-      'COST_CENTER already-present',
-      'COST_CENTER_DIRECTION created',
-    ]);
-    expect(events.slice(0, 3)).toEqual([
-      'lock',
-      'activation',
-      'audit DEV_SEED.COST_CENTER_DIRECTION_ACTIVATED LOCAL_SEED',
-    ]);
+    expect(result.items.map((item) => item.kind)).not.toContain('COST_CENTER_DIRECTION');
+    expect(events.filter((event) => /activation|DIRECTION/i.test(event))).toEqual([]);
+    expect(organization).not.toHaveProperty('activateCostCenterDirectionForLocalSeed');
   });
 
   it('QĐ-87d(1): refuses a DEMO-CC that belongs to no department and writes nothing — only the link procedure links it', async () => {
-    const unlinked: Fixture = {
-      ...exactFixture,
+    const unlinked = fixtureOf({
       costCenter: { ...exactFixture.costCenter!, departmentCode: null },
       department: null,
-    };
+    });
     const { service, generate, events } = build({ fixtures: [unlinked] });
 
     const result = await service.seed({ confirmLocal: true });
@@ -299,11 +286,10 @@ describe('DevSeedService', () => {
   });
 
   it('P23-RV-01: refuses a DEMO department on another Cost Center and writes nothing', async () => {
-    const elsewhere: Fixture = {
-      ...exactFixture,
+    const elsewhere = fixtureOf({
       costCenter: null,
       department: { ...exactFixture.department!, costCenterId: 'cc-9', costCenterCode: 'OTHER-CC' },
-    };
+    });
     const { service, generate, events } = build({ fixtures: [elsewhere] });
 
     const result = await service.seed({ confirmLocal: true });

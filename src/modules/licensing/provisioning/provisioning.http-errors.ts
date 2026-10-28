@@ -1,4 +1,5 @@
 import { HttpStatus } from '@nestjs/common';
+import { FORBIDDEN_ERROR } from '../../../infrastructure/http/errors/access-errors';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
 import { EmployeeNotFoundError } from '../../organization/organization.errors';
@@ -29,6 +30,7 @@ import {
   SeatTargetNotFoundError,
 } from '../licensing.errors';
 import { toLicensingApiException } from '../mappers/licensing.http-errors';
+import { ProvisioningItAdminRequiredError } from './provisioning.errors';
 
 const refuse = (status: HttpStatus, code: string, message: string, details?: Record<string, unknown>): ApiException =>
   new ApiException(status, { code, message, ...(details ? { details } : {}) });
@@ -129,6 +131,8 @@ export function toProvisioningApiException(error: unknown): unknown {
   if (error instanceof ProvisioningAnotherItAdminNeededError) {
     return refuse(HttpStatus.FORBIDDEN, 'PROVISIONING.ANOTHER_IT_ADMIN_NEEDED', error.message);
   }
+  // The same answer as the role guard of the route: the policy of the work refuses what the guard would have refused.
+  if (error instanceof ProvisioningItAdminRequiredError) return new ApiException(HttpStatus.FORBIDDEN, FORBIDDEN_ERROR);
 
   return toLicensingApiException(error);
 }

@@ -13,16 +13,17 @@ export interface InstallationResult {
   organizationId: string;
   superAdminAppUserId: string;
   superAdminEmployeeId: string;
-  itAdminEmployeeId: string;
   correlationId: string;
 }
 
 /**
- * First-run installation (FR-9.8, QĐ-67a/b). Runs outside HTTP, once, before anything else.
- * Creates the minimum real data in one transaction: the organization, one UNIT cost center, one
- * department, the Super Admin's employee and an IT employee (no account; both with the job title as free text), and the
- * activated Super Admin account. A second run finds the organization and changes nothing.
- * It never edits an existing account: recovery is a separate, approved procedure (FR-8.10(d)).
+ * First-run installation (FR-9.8, `QĐ-87f`(1)). Runs outside HTTP, once, before anything else. Creates the minimum real
+ * data in one transaction: the organization, ONE first department with no Cost Center, head or IT Admin in charge, the
+ * Super Admin's employee in that department (no job title) and the activated Super Admin account. It creates no Cost Center
+ * (Finance creates one for a department that exists, `QĐ-87d`(1)), no job title and no IT employee. Every Audit Trail event
+ * it writes carries `installationException: true`: the one set of records written without an HR basis (`QĐ-87b`(1)). A
+ * second run finds the organization and changes nothing. It never edits an existing account: recovery is a separate,
+ * approved procedure (FR-8.10(d)).
  */
 @Injectable()
 export class InstallationService {
@@ -73,7 +74,14 @@ export class InstallationService {
         resourceId: string,
         after: Record<string, string | number | boolean>,
       ): Promise<void> =>
-        this.audit.record(tx, { ...operator, organizationId, action, resourceType, resourceId, after });
+        this.audit.record(tx, {
+          ...operator,
+          organizationId,
+          action,
+          resourceType,
+          resourceId,
+          after: { ...after, installationException: true },
+        });
 
       const org = await this.organization.createOrganization(tx, {
         name: input.organizationName,
@@ -86,7 +94,6 @@ export class InstallationService {
         environment: input.environment,
       });
 
-      // The department first, then the Cost Center created for it (`QĐ-87d(1)`): there is no Cost Center without a department.
       const department = await this.organization.createDepartment(tx, {
         organizationId: org.id,
         code: input.departmentCode,
@@ -96,49 +103,33 @@ export class InstallationService {
         code: input.departmentCode,
       });
 
-      const costCenter = await this.organization.createUnitCostCenter(tx, {
+      const person = input.superAdmin;
+      const employee = await this.organization.createEmployeeWithPlacement(tx, {
         organizationId: org.id,
-        code: input.costCenterCode,
-        name: input.costCenterName,
+        employeeCode: person.employeeCode,
+        fullName: person.fullName,
+        workEmail: person.workEmail,
+        employmentType: person.employmentType,
+        hireDate: person.hireDate,
         departmentId: department.id,
+        jobTitle: null,
       });
-      await record(org.id, 'INSTALLATION.COST_CENTER_CREATED', 'CostCenter', costCenter.id, {
-        code: input.costCenterCode,
-        kind: 'UNIT',
+      await record(org.id, 'INSTALLATION.EMPLOYEE_CREATED', 'Employee', employee.id, {
+        employeeCode: person.employeeCode,
+        employmentType: person.employmentType,
+        hireDate: person.hireDate,
         departmentCode: input.departmentCode,
       });
 
-      const employeeIds: string[] = [];
-      for (const person of [input.superAdmin, input.itAdmin]) {
-        const employee = await this.organization.createEmployeeWithPlacement(tx, {
-          organizationId: org.id,
-          employeeCode: person.employeeCode,
-          fullName: person.fullName,
-          workEmail: person.workEmail,
-          employmentType: person.employmentType,
-          hireDate: person.hireDate,
-          departmentId: department.id,
-          jobTitle: input.jobTitleName,
-        });
-        employeeIds.push(employee.id);
-        await record(org.id, 'INSTALLATION.EMPLOYEE_CREATED', 'Employee', employee.id, {
-          employeeCode: person.employeeCode,
-          employmentType: person.employmentType,
-          hireDate: person.hireDate,
-          departmentCode: input.departmentCode,
-          jobTitle: input.jobTitleName,
-        });
-      }
-
       const account = await this.identity.createBootstrapSuperAdmin(tx, {
         organizationId: org.id,
-        employeeId: employeeIds[0],
+        employeeId: employee.id,
         loginEmail,
         passwordHash: credential.hash,
         hashPolicyVersion: credential.hashPolicyVersion,
       });
       await record(org.id, 'INSTALLATION.SUPER_ADMIN_CREATED', 'AppUser', account.appUserId, {
-        employeeCode: input.superAdmin.employeeCode,
+        employeeCode: person.employeeCode,
         activationState: 'ACTIVATED',
         emailVerificationSource: 'BOOTSTRAP_ASSERTED',
       });
@@ -147,8 +138,7 @@ export class InstallationService {
       return {
         organizationId: org.id,
         superAdminAppUserId: account.appUserId,
-        superAdminEmployeeId: employeeIds[0],
-        itAdminEmployeeId: employeeIds[1],
+        superAdminEmployeeId: employee.id,
         correlationId,
       };
     });

@@ -1,9 +1,10 @@
+import { Client } from 'pg';
 import request from 'supertest';
 import { OrganizationService } from '../../src/modules/organization/organization.service';
+import { waitForLockWaiters } from '../support/lock-wait';
 import { SeatHarness } from '../support/seat-baseline-harness';
 
 const h = new SeatHarness();
-const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 describe('closing the seat baseline over HTTP (integration, real PostgreSQL)', () => {
   beforeAll(async () => {
@@ -20,9 +21,11 @@ describe('closing the seat baseline over HTTP (integration, real PostgreSQL)', (
     const before = await request(h.server()).get('/api/v1/seat-baseline').set(h.as(h.it1)).expect(200);
     expect(h.dataOf(before)).toEqual({ closed: false, closedAt: null });
 
-    await h.ctx.sql.query('BEGIN');
-    let closing!: Promise<request.Response>;
+    const observer = new Client({ connectionString: h.ctx.database.url });
+    await observer.connect();
+    let closing: Promise<request.Response> | undefined;
     try {
+      await h.ctx.sql.query('BEGIN');
       // What a confirmation holds while it writes: the state of the baseline FOR SHARE.
       await h.ctx.sql.query(`INSERT INTO seat_baseline_states (organization_id) VALUES ($1) ON CONFLICT DO NOTHING`, [
         h.seed.organizationId,
@@ -35,15 +38,20 @@ describe('closing the seat baseline over HTTP (integration, real PostgreSQL)', (
       await h.ctx.sql.query(`SELECT 1 FROM seat_baseline_states WHERE organization_id = $1 FOR SHARE`, [
         h.seed.organizationId,
       ]);
-      closing = h.closeBaseline().then((response) => response);
       let settled = false;
-      void closing.then(() => {
+      closing = h.closeBaseline().then((response) => {
         settled = true;
+
+        return response;
       });
-      await wait(500);
+      // The closing locks the state FOR UPDATE (`SeatBaselineRepo.lock`): it is waiting for the confirmation, not answered yet.
+      await waitForLockWaiters(observer, 1);
       expect(settled).toBe(false);
-    } finally {
       await h.ctx.sql.query('COMMIT');
+    } finally {
+      await h.ctx.sql.query('ROLLBACK').catch(() => undefined);
+      await closing?.catch(() => undefined);
+      await observer.end();
     }
 
     const response = await closing;

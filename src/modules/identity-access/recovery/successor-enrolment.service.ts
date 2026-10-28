@@ -13,7 +13,10 @@ import { RecoveryContext, RecoveryResult } from './recovery.types';
 
 /**
  * The successor's side of a role transfer (AC-12): first an account with no role and an invitation, then the wait until
- * they have activated it. Activating never grants the role; only the next run of the same ticket moves it.
+ * they have activated it. Activating never grants the role; only the next run of the same ticket moves it. Every invitation goes to
+ * the login email of the successor's account, never to the work email on the record as it is now (`P28-05`, `F18`): the work email
+ * can change while an invitation is on its way, the account's login email does not, so a link is never sent to an address the
+ * account does not have.
  */
 @Injectable()
 export class SuccessorEnrolment {
@@ -44,10 +47,12 @@ export class SuccessorEnrolment {
     if (await this.accounts.findAccountByLoginEmail(organizationId, normalized)) {
       throw new RecoveryRefusedError('SUCCESSOR_EMAIL_TAKEN');
     }
+    // The account is created with the work email as its login email, and the invitation goes to the login email it was given.
+    const loginEmail = successor.workEmail;
     const created = await this.accounts.createAppUser(tx, {
       organizationId,
       employeeId: successor.id,
-      loginEmail: successor.workEmail,
+      loginEmail,
       normalizedLoginEmail: normalized,
       status: 'ACTIVE',
       activationState: 'INVITED',
@@ -60,7 +65,7 @@ export class SuccessorEnrolment {
         organizationId,
         appUserId: created.id,
         ticketId: ticket.id,
-        recipient: successor.workEmail,
+        recipient: loginEmail,
         fullName: successor.fullName,
       },
       now,
@@ -78,7 +83,7 @@ export class SuccessorEnrolment {
       ticketRef: context.ticketRef,
       mode: 'TRANSFER_ROLE',
       outcome: 'ACCOUNT_CREATED',
-      sentTo: 'WORK_EMAIL',
+      sentTo: 'LOGIN_EMAIL',
     };
   }
 
@@ -105,13 +110,15 @@ export class SuccessorEnrolment {
         return { ticketRef: context.ticketRef, mode: 'TRANSFER_ROLE', outcome: 'INVITATION_ALREADY_SENT' };
       }
       await this.revocation.revokeUsable(tx, successorAccountId, 'SUPERSEDED', now);
+      // The login email of the account, whatever the work email on the record says now (`P28-05`): never the other, never empty.
+      const account = await this.accounts.findAccountById(successorAccountId);
       await this.links.sendInvitation(
         tx,
         {
           organizationId,
           appUserId: successorAccountId,
           ticketId: ticket.id,
-          recipient: successor.workEmail ?? '',
+          recipient: account?.loginEmail ?? '',
           fullName: successor.fullName,
         },
         now,
@@ -121,7 +128,7 @@ export class SuccessorEnrolment {
         ticketRef: context.ticketRef,
         mode: 'TRANSFER_ROLE',
         outcome: 'INVITATION_REISSUED',
-        sentTo: 'WORK_EMAIL',
+        sentTo: 'LOGIN_EMAIL',
       };
     }
     if (problem) throw new RecoveryRefusedError(problem);

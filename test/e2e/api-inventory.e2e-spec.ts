@@ -443,7 +443,7 @@ describe('API inventory (e2e)', () => {
         })
         .map((operation) => operation.key);
 
-      expect(operations).toHaveLength(279);
+      expect(operations).toHaveLength(287);
       expect(missing).toEqual([]);
     });
 

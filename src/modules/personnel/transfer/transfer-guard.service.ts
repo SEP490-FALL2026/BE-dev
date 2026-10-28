@@ -1,10 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
-import type { DbTx } from '../../../infrastructure/database/transaction-runner';
+import { readSqlState, type DbTx } from '../../../infrastructure/database/transaction-runner';
+import { isCheckViolation } from '../../../infrastructure/database/unique-violation';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { IdentityAccessService } from '../../identity-access/identity-access.service';
 import { OrganizationService } from '../../organization/organization.service';
-import { selfActionMode, type SelfActionMode } from '../personnel-self-action.policy';
+import { PersonnelAccessRefusedError } from '../personnel.errors';
+import { operatorSubjectRefusal, userWriterRefusal } from '../personnel-self-action.policy';
+import type { PersonnelActor } from '../personnel.types';
 import { TransferRefusedError } from './transfer.errors';
 import { TransferRepo } from './transfer.repo';
 import { successorRefusal, type SuccessorFacts, type TransferRefusal } from './transfer.policy';
@@ -27,14 +30,26 @@ export class TransferGuardService {
     return organization;
   }
 
-  /** Whether the actor may act on this person: an IT Admin acting on themselves needs another IT Admin unless they are the only one. */
-  async selfMode(actor: AuthenticatedPrincipal, employeeId: string): Promise<SelfActionMode> {
-    const isSelf = actor.employeeId === employeeId;
+  /**
+   * The first rule of every write of an event (F13, F19, F40): only the Super Admin writes, and never about themselves. It needs no
+   * database, so it is judged before any lock; a person who signed in is judged here in full. Throws PersonnelAccessRefusedError.
+   */
+  requireWriter(actor: PersonnelActor, subjectEmployeeId: string): void {
+    if (actor.kind !== 'USER') return;
+    const problem = userWriterRefusal(actor.principal, subjectEmployeeId);
+    if (problem) throw new PersonnelAccessRefusedError(problem);
+  }
 
-    return selfActionMode({
-      isSelf,
-      otherUsableItAdmins: isSelf ? await this.identity.countUsableItAdminsExcept(actor.employeeId) : 0,
-    });
+  /**
+   * The second rule, for the controlled procedure only: it serves a person who holds the `SUPER_ADMIN` role (spec L.2). The account is
+   * read `FOR SHARE`, so call it after the employee is locked (the lock protocol: the employee, then the account). Nothing for a
+   * person who signed in. Throws PersonnelAccessRefusedError.
+   */
+  async requireOperatorSubject(tx: DbTx, actor: PersonnelActor, subjectEmployeeId: string): Promise<void> {
+    if (actor.kind !== 'OPERATOR') return;
+    const account = await this.identity.inspectEmployeeAccount(tx, subjectEmployeeId);
+    const problem = operatorSubjectRefusal(account.roles.includes('SUPER_ADMIN'));
+    if (problem) throw new PersonnelAccessRefusedError(problem);
   }
 
   /**
@@ -91,6 +106,45 @@ export class TransferGuardService {
         day: input.day,
       }),
     );
+  }
+
+  /**
+   * The account a few columns and facades that demand a signed-in person see for the actor. A person who signed in is themselves.
+   * The controlled procedure has no account, yet `offboarding_cases.left_by_app_user_id` (a person who is `LEFT` says who marked it)
+   * and the handover confirmations `licensing` opens (`created_by_app_user_id`) are still NOT NULL: for the procedure the stand-in is
+   * the account of the Super Admin it serves, with the ticket as its session. It fills those columns and nothing else: who did the
+   * event is the ticket in its own column and in the Audit Trail (spec L.2), and the facade of the handover is told the ticket
+   * (`OperatorAuditActor`) so that what it audits is `OPERATOR` with no account, never this stand-in.
+   */
+  async standIn(tx: DbTx, actor: PersonnelActor): Promise<AuthenticatedPrincipal> {
+    if (actor.kind === 'USER') return actor.principal;
+    const holder = await this.identity.getSuperAdminHolder(tx);
+    if (!holder) throw new PersonnelAccessRefusedError('FORBIDDEN');
+
+    return {
+      subject: holder.appUserId,
+      appUserId: holder.appUserId,
+      sessionId: actor.ticketId,
+      employeeId: holder.employeeId,
+      directRoles: ['SUPER_ADMIN'],
+      derivedRoles: [],
+      roles: ['SUPER_ADMIN'],
+    };
+  }
+
+  /**
+   * The database has the last word on the periods a write puts back or the ones it opens: if someone changed the head of the
+   * department or the placements of the person meanwhile, they no longer fit and nothing is saved. A race the database refuses is a
+   * conflict the caller can read and retry (F37, F46), never a 500.
+   */
+  async guarded<T>(work: () => Promise<T>): Promise<T> {
+    try {
+      return await work();
+    } catch (error) {
+      if (readSqlState(error) === '23P01' || isCheckViolation(error))
+        throw new TransferRefusedError('CONCURRENT_CHANGE');
+      throw error;
+    }
   }
 
   /** Throws the refusal the policy gave, naming the department that would be left without a head when that is the reason. */

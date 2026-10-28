@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto';
+import { Client } from 'pg';
 import request from 'supertest';
 import { ApiAccount } from '../support/api-accounts';
+import { waitForLockWaiters } from '../support/lock-wait';
 import { ProvisioningHarness, type TaskWire } from '../support/provisioning-harness';
 
 const h = new ProvisioningHarness();
@@ -47,6 +49,35 @@ describe('what an IT Admin decides about a failed task, over HTTP (integration, 
     return { subscriptionId, id: made.id, assignmentId: made.assignmentId, requestId: made.requestId };
   };
 
+  /**
+   * What two IT Admins do to one task at the same moment, in a fixed order. Every action on a task locks the row of the task first
+   * (`ProvisioningTaskRepo.lock`, `FOR UPDATE`, in the frame of the task), so that row is held in another connection and the
+   * requests are sent one by one: each one is waiting for the lock (`waitForLockWaiters`) before the next is sent, the lock goes to
+   * them in the order they queued, and each answer is the answer of its place in the queue. The lock is always released.
+   */
+  const queuedOnTask = async (taskId: string, sends: (() => request.Test)[]): Promise<request.Response[]> => {
+    const holder = new Client({ connectionString: h.ctx.database.url });
+    const pending: Promise<request.Response>[] = [];
+    await holder.connect();
+    try {
+      await holder.query('BEGIN');
+      await holder.query('SELECT id FROM provisioning_tasks WHERE id = $1 FOR UPDATE', [taskId]);
+      for (const send of sends) {
+        pending.push(send().then((response) => response));
+        await waitForLockWaiters(h.ctx.sql, pending.length);
+      }
+      await holder.query('COMMIT');
+      const answers: request.Response[] = [];
+      for (const answer of pending) answers.push(await answer);
+
+      return answers;
+    } finally {
+      await holder.query('ROLLBACK').catch(() => undefined);
+      await holder.end();
+      await Promise.allSettled(pending);
+    }
+  };
+
   beforeAll(async () => {
     await h.start();
     const designer = await h.jobTitle('Designer');
@@ -89,33 +120,48 @@ describe('what an IT Admin decides about a failed task, over HTTP (integration, 
     });
   });
 
-  it('US-07-04 AC-9: nothing hands a failed task over by itself; the IT Admin does, with evidence, and a person then completes it', async () => {
+  it('US-07-04 AC-9, F08: nothing hands a failed task over by itself; the IT Admin does, with no evidence and the last error, failure kind and reason and tries kept, and the evidence is asked when the person completes it', async () => {
     const made = await failed('AUTHENTICATION');
     await h.ctx.sql.query(`UPDATE provisioning_tasks SET failed_at = now() - interval '30 days' WHERE id = $1`, [
       made.id,
     ]);
 
     expect(await task(made.id)).toMatchObject({ status: 'FAILED', channel: 'CONNECTOR', closedBy: null });
-    for (const body of [{}, { evidence: '  ' }]) {
-      expect(h.codeOf(await h.handOff(made.id, body).expect(422))).toBe('PROVISIONING_TASK.EVIDENCE_REQUIRED');
+    // The body of a hand-off is empty: a client that still sends evidence is refused, and nothing changes.
+    for (const body of [{ evidence: 'kết nối đã hết hạn' }, { note: 'x' }]) {
+      expect(h.codeOf(await h.handOff(made.id, body).expect(422))).toBe('VALIDATION_ERROR');
     }
     expect(await task(made.id)).toMatchObject({ status: 'FAILED', channel: 'CONNECTOR', handedOffBy: null });
+    const failure = await task(made.id);
 
-    const handed = wire(
-      await h.handOff(made.id, { evidence: ' kết nối đã hết hạn, làm tay theo hướng dẫn ' }).expect(200),
-    );
+    const handed = wire(await h.handOff(made.id, {}).expect(200));
 
     expect(handed).toMatchObject({
       status: 'QUEUED',
       channel: 'MANUAL',
-      failureKind: null,
       handedOffBy: h.it1.appUserId,
-      handOffEvidence: 'kết nối đã hết hạn, làm tay theo hướng dẫn',
+      handOffEvidence: null,
+      lastError: failure.lastError,
+      failureKind: 'AUTHENTICATION',
+      failureReason: failure.failureReason,
+      attempts: failure.attempts,
       availableDecisions: [],
     });
+    expect(failure.lastError).not.toBeNull();
+    expect(failure.failureReason).not.toBeNull();
     expect(handed.handedOffAt).not.toBeNull();
-    expect(JSON.stringify(await h.auditEvents('ProvisioningTask', made.id))).not.toContain('kết nối đã hết hạn');
-    await h.claim(made.id).expect(200);
+    // What the table allows a task that waits in the queue again: no taker, no failed day or person and no retry time.
+    expect(handed).toMatchObject({ claimedBy: null, failedAt: null, failedBy: null, nextRetryAt: null });
+    // A person takes it: the last error and the tries stay, the kind and the reason of the failure leave the task in progress.
+    const taken = wire(await h.claim(made.id).expect(200));
+    expect(taken).toMatchObject({
+      status: 'IN_PROGRESS',
+      lastError: failure.lastError,
+      attempts: failure.attempts,
+      failureKind: null,
+      failureReason: null,
+    });
+    expect(h.codeOf(await h.complete(made.id, {}).expect(422))).toBe('PROVISIONING_TASK.EVIDENCE_REQUIRED');
     expect(wire(await h.complete(made.id, { evidence: 'đã thêm tài khoản bằng tay' }).expect(200)).status).toBe(
       'COMPLETED',
     );
@@ -124,7 +170,7 @@ describe('what an IT Admin decides about a failed task, over HTTP (integration, 
   it('refuses to hand over a task that is by hand already, and nothing changes', async () => {
     const manual = await failed('PERMANENT', { connector: false });
 
-    const refused = await h.handOff(manual.id, { evidence: 'x' }).expect(409);
+    const refused = await h.handOff(manual.id, {}).expect(409);
 
     expect(h.codeOf(refused)).toBe('PROVISIONING_TASK.ALREADY_MANUAL');
     expect(await task(manual.id)).toMatchObject({ status: 'FAILED', channel: 'MANUAL', handedOffBy: null });
@@ -339,25 +385,82 @@ describe('what an IT Admin decides about a failed task, over HTTP (integration, 
   it('two IT Admins closing one failed task at once: one closes it, the other is told it is not failed, the assignment fails once', async () => {
     const made = await failed();
 
-    const answers = await Promise.all([
-      h.closeFailed(made.id, { reason: 'a' }),
-      h.closeFailed(made.id, { reason: 'b' }, a1),
+    const [first, second] = await queuedOnTask(made.id, [
+      () => h.closeFailed(made.id, { reason: 'a' }),
+      () => h.closeFailed(made.id, { reason: 'b' }, a1),
     ]);
 
-    expect(answers.map((answer) => answer.status).sort()).toEqual([200, 409]);
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(409);
+    expect(h.codeOf(second)).toBe('PROVISIONING_TASK.NOT_FAILED');
+    expect(await task(made.id)).toMatchObject({ status: 'CLOSED_FAILED', closedBy: h.it1.appUserId, closeReason: 'a' });
     expect(
       (await h.auditEvents('LicenseAssignment', made.assignmentId)).filter((event) => event.action.endsWith('FAILED')),
     ).toHaveLength(1);
   });
 
-  it('retry and close at once leave the task and its assignment consistent: closed if and only if the assignment failed', async () => {
+  it('retry and close at once, the retry first, leave the task and its assignment consistent: queued again, the assignment in force', async () => {
     const made = await failed();
 
-    await Promise.all([h.retry(made.id), h.closeFailed(made.id, { reason: 'đóng' }, a1)]);
+    const [retried, closed] = await queuedOnTask(made.id, [
+      () => h.retry(made.id),
+      () => h.closeFailed(made.id, { reason: 'đóng' }, a1),
+    ]);
 
-    const finalTask = await task(made.id);
-    const row = await assignment(made.assignmentId);
-    expect(finalTask.status === 'CLOSED_FAILED').toBe(row.failed_at !== null);
-    expect(['CLOSED_FAILED', 'QUEUED']).toContain(finalTask.status);
+    expect(retried.status).toBe(200);
+    expect(closed.status).toBe(409);
+    expect(h.codeOf(closed)).toBe('PROVISIONING_TASK.NOT_FAILED');
+    expect((await task(made.id)).status).toBe('QUEUED');
+    expect(await assignment(made.assignmentId)).toMatchObject({ valid_until: null, failed_at: null });
+  });
+
+  it('retry and close at once, the close first, leave the task and its assignment consistent: closed, the assignment failed', async () => {
+    const made = await failed();
+
+    const [closed, retried] = await queuedOnTask(made.id, [
+      () => h.closeFailed(made.id, { reason: 'đóng' }, a1),
+      () => h.retry(made.id),
+    ]);
+
+    expect(closed.status).toBe(200);
+    expect(retried.status).toBe(409);
+    expect(h.codeOf(retried)).toBe('PROVISIONING_TASK.NOT_FAILED');
+    expect((await task(made.id)).status).toBe('CLOSED_FAILED');
+    expect((await assignment(made.assignmentId)).failed_at).not.toBeNull();
+  });
+
+  it('F08: after a hand-off a GET of the task reads the last error, the kind and the reason of the failure and the tries that the table kept', async () => {
+    const made = await failed('AUTHENTICATION');
+    const before = await task(made.id);
+    expect(before).toMatchObject({ status: 'FAILED', failureKind: 'AUTHENTICATION' });
+    expect(before.lastError).not.toBeNull();
+    expect(before.failureReason).not.toBeNull();
+
+    await h.handOff(made.id, {}).expect(200);
+
+    // The task is read again, not the answer of the hand-off: what is shown is what was stored.
+    const read = await task(made.id);
+    expect(read).toMatchObject({
+      status: 'QUEUED',
+      channel: 'MANUAL',
+      lastError: before.lastError,
+      failureKind: 'AUTHENTICATION',
+      failureReason: before.failureReason,
+      attempts: before.attempts,
+    });
+    const { rows } = await h.ctx.sql.query<{
+      last_error: string | null;
+      failure_kind: string | null;
+      failure_reason: string | null;
+      attempts: number;
+    }>(`SELECT last_error, failure_kind::text, failure_reason, attempts FROM provisioning_tasks WHERE id = $1`, [
+      made.id,
+    ]);
+    expect(rows[0]).toEqual({
+      last_error: before.lastError,
+      failure_kind: 'AUTHENTICATION',
+      failure_reason: before.failureReason,
+      attempts: before.attempts,
+    });
   });
 });

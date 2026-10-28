@@ -8,6 +8,7 @@ import {
   SeatTargetNotFoundError,
 } from '../licensing.errors';
 import { toLicensingApiException } from '../mappers/licensing.http-errors';
+import { LicenseKeyApplicationRetiredError } from './license-key.errors';
 
 const refuse = (status: HttpStatus, code: string, message: string, details?: Record<string, unknown>): ApiException =>
   new ApiException(status, { code, message, ...(details ? { details } : {}) });
@@ -27,6 +28,9 @@ export function toLicenseKeyApiException(error: unknown): unknown {
     // The same code the global rate limit answers with: to a client it is one kind of refusal.
     return refuse(HttpStatus.TOO_MANY_REQUESTS, 'HTTP_TOO_MANY_REQUESTS', error.message);
   }
+  if (error instanceof LicenseKeyApplicationRetiredError) {
+    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'LICENSE_KEY.APPLICATION_RETIRED', error.message);
+  }
   if (error instanceof LicenseKeyPlanNotK4Error) {
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'LICENSE_KEY.PLAN_NOT_K4', error.message, {
       provisioningType: error.provisioningType,
@@ -42,6 +46,7 @@ const example = (error: Error) => errorExampleOf(toLicenseKeyApiException(error)
 export const LICENSE_KEY_ERROR_EXAMPLES = {
   NOT_FOUND: example(new LicenseKeyNotFoundError()),
   PLAN_NOT_K4: example(new LicenseKeyPlanNotK4Error('K1')),
+  APPLICATION_RETIRED: example(new LicenseKeyApplicationRetiredError()),
   REVEAL_LIMIT: example(new LicenseKeyRevealLimitError('MINUTE')),
   SUBSCRIPTION_NOT_FOUND: example(new SeatTargetNotFoundError('SUBSCRIPTION')),
 } as const;

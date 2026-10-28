@@ -1,18 +1,17 @@
-import { OffboardingRevocationService } from '../../src/modules/personnel/offboarding/offboarding-revocation.service';
 import { OffboardingHarness, type CaseWire } from '../support/offboarding-harness';
 import type { Department, Person } from '../support/request-harness';
 
 const h = new OffboardingHarness();
 
-/** US-03-04 AC-29, SoD-5, QĐ-77m: an IT Admin who records, moves, cancels or revokes for themselves, over HTTP, on real PostgreSQL. */
-describe('an IT Admin who leaves records their own departure (integration, real PostgreSQL)', () => {
+/**
+ * US-03-04 AC-29 as it stands after `QĐ-87a` (F40, F45, F19): the Super Admin writes the events of a departure, never about
+ * themselves; the IT Admin takes only the technical steps and has no flag of "done on oneself" any more. Over HTTP, on real PostgreSQL.
+ */
+describe('who writes the departure of a person, and the one about an IT Admin (integration, real PostgreSQL)', () => {
   let des: Department;
   let a1: Person;
   let subscription: string;
   let seat: string;
-
-  const setAccount = (status: 'ACTIVE' | 'LOCKED') =>
-    h.ctx.sql.query(`UPDATE app_users SET status = $2::"AppUserStatus" WHERE id = $1`, [h.it1.appUserId, status]);
 
   beforeAll(async () => {
     await h.start();
@@ -26,62 +25,60 @@ describe('an IT Admin who leaves records their own departure (integration, real 
     await h.stop();
   });
 
-  it('is allowed while they are the only IT Admin who can act, and is flagged for the Super Admin each time', async () => {
-    await setAccount('LOCKED');
-    try {
-      const wire = await h.recordedCase(a1, {}, a1.account);
-      expect(wire.selfExecuted).toBe(true);
-      expect((await h.auditEventsOf('PERSONNEL.SELF_EXECUTED', wire.id)).length).toBe(1);
+  it('is recorded, moved and cancelled by the Super Admin about an IT Admin, with no flag of "done on oneself" and no trace for it', async () => {
+    const wire = await h.recordedCase(a1);
+    expect(Object.keys(wire)).not.toContain('selfExecuted');
+    expect(wire).toMatchObject({ recordedByAppUserId: h.sa.appUserId, recordedByProcedure: false });
 
-      await h.changeLastDay(wire.id, { lastWorkingDay: h.day(20), reason: 'Dời ngày' }, a1.account).expect(200);
-      expect((await h.auditEventsOf('PERSONNEL.SELF_EXECUTED', wire.id)).length).toBe(2);
+    await h.changeLastDay(wire.id, { lastWorkingDay: h.day(20), reason: 'Dời ngày' }).expect(200);
+    const cancelled = h.dataOf<CaseWire>(await h.cancelCase(wire.id, { reason: 'Ở lại' }).expect(200));
 
-      const cancelled = h.dataOf<CaseWire>(await h.cancelCase(wire.id, { reason: 'Ở lại' }, a1.account).expect(200));
-      expect(cancelled.state).toBe('CANCELLED');
-      expect((await h.auditEventsOf('PERSONNEL.SELF_EXECUTED', wire.id)).length).toBe(3);
-    } finally {
-      await setAccount('ACTIVE');
-    }
+    expect(cancelled.state).toBe('CANCELLED');
+    expect(await h.auditEventsOf('PERSONNEL.SELF_EXECUTED', wire.id)).toEqual([]);
   });
 
-  it('is refused while another IT Admin can act, and accepted from the other one, without a flag', async () => {
-    const own = await h.recordCase(h.body(a1), a1.account);
-    expect([own.status, h.codeOf(own)]).toEqual([409, 'OFFBOARDING_CASE.SELF_EVENT_NEEDS_ANOTHER_IT_ADMIN']);
-    expect(await h.caseCount(a1.employeeId)).toBe(1);
-
+  it('refuses the IT Admin on every write of the events (403), and the Super Admin about themselves (403), and writes nothing', async () => {
     const wire = await h.recordedCase(a1);
-    expect(wire.selfExecuted).toBe(false);
-    const change = await h.changeLastDay(wire.id, { lastWorkingDay: h.day(20), reason: 'Dời' }, a1.account);
-    const cancel = await h.cancelCase(wire.id, { reason: 'Ở lại' }, a1.account);
-    expect([change, cancel].map((response) => [response.status, h.codeOf(response)])).toEqual([
-      [409, 'OFFBOARDING_CASE.SELF_EVENT_NEEDS_ANOTHER_IT_ADMIN'],
-      [409, 'OFFBOARDING_CASE.SELF_EVENT_NEEDS_ANOTHER_IT_ADMIN'],
-    ]);
-    expect(await h.auditEventsOf('PERSONNEL.SELF_EXECUTED', wire.id)).toEqual([]);
-    await h.changeLastDay(wire.id, { lastWorkingDay: h.day(20), reason: 'Dời' }).expect(200);
-    expect(await h.auditEventsOf('PERSONNEL.SELF_EXECUTED', wire.id)).toEqual([]);
+    const before = await h.caseCount(a1.employeeId);
 
-    // The person has left, so the account of a1 no longer acts: the command is the one of the service, called as them.
+    const byItAdmin = [
+      await h.recordCase(h.body(a1), h.it1),
+      await h.changeLastDay(wire.id, { lastWorkingDay: h.day(20), reason: 'Dời' }, h.it1),
+      await h.cancelCase(wire.id, { reason: 'Ở lại' }, h.it1),
+      await h.markLeft(wire.id, {}, h.it1),
+    ];
+    const aboutSelf = await h.recordCase({ ...h.body(a1), employeeId: h.sa.employeeId });
+
+    expect(byItAdmin.map((response) => [response.status, h.codeOf(response)])).toEqual(
+      Array(4).fill([403, 'AUTHORIZATION.FORBIDDEN']),
+    );
+    expect([aboutSelf.status, h.codeOf(aboutSelf)]).toEqual([403, 'PERSONNEL.SELF_CHANGE_FORBIDDEN']);
+    expect(await h.caseCount(a1.employeeId)).toBe(before);
+    expect(await h.caseCount(h.sa.employeeId)).toBe(0);
+    await h.cancelCase(wire.id, { reason: 'Ở lại' }).expect(200);
+  });
+
+  it('leaves the technical steps to the IT Admin: the lock of the account and the revocations go through after the Super Admin marks the person left', async () => {
+    const wire = await h.recordedCase(a1);
     await h.markLeft(wire.id).expect(200);
-    const revocations = h.ctx.app.get(OffboardingRevocationService);
-    const asSelf = await revocations
-      .openRevocations(h.actorOf(a1.account), wire.id, {
-        count: 1,
-        reason: 'Tự thu hồi',
-        accountLock: { note: 'khóa' },
-      })
-      .catch((error: { code?: string }) => error);
-    expect(asSelf).toMatchObject({ code: 'SELF_EVENT_NEEDS_ANOTHER_IT_ADMIN' });
+
+    const bySuperAdmin = await h.revokeRights(
+      wire.id,
+      { count: 1, reason: 'Thu hồi', accountLock: { note: 'khóa' } },
+      h.sa,
+    );
+    expect([bySuperAdmin.status, h.codeOf(bySuperAdmin)]).toEqual([403, 'AUTHORIZATION.FORBIDDEN']);
     expect(
       await h
-        .rightsOf(wire.id)
+        .rightsOf(wire.id, '', h.it1)
         .expect(200)
         .then((response) => h.dataOf<{ items: unknown[] }>(response).items),
     ).toHaveLength(1);
-    const byOther = h.dataOf<CaseWire>(
+    const byItAdmin = h.dataOf<CaseWire>(
       await h.revokeRights(wire.id, { count: 1, reason: 'Thu hồi', accountLock: { note: 'khóa' } }).expect(200),
     );
-    expect(byOther.revocations?.created).toBe(1);
+
+    expect(byItAdmin.revocations?.created).toBe(1);
     expect(await h.dutyRows(seat)).toHaveLength(2);
   });
 });

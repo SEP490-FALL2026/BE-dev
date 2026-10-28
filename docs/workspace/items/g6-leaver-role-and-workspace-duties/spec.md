@@ -26,7 +26,7 @@ Khi người giữ vai Super Admin, Finance, Người duyệt chi, người thay
 
 | Story    | AC                        | Coverage | Phần còn lại thuộc                                                                                                                                                                                                                                                       |
 | -------- | ------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| US-03-04 | AC-11→AC-13, AC-27, AC-28 | partial  | AC-1→AC-10, AC-14→AC-16, AC-18→AC-23, AC-26, AC-29: `g6-offboarding-record`; AC-17: `g6-service-account-handover`; AC-24, AC-25: `g6-leaver-request-closure`; vế khuyến nghị `G2` của AC-3, AC-21, vế tiết kiệm của AC-6 và vế K4 của AC-16: `g6-downstream-integration` |
+| US-03-04 | AC-11, AC-13, AC-27, AC-28 | partial  | AC-1→AC-10, AC-14→AC-16, AC-18→AC-23, AC-26, AC-29: `g6-offboarding-record`; AC-17: `g6-service-account-handover`; AC-24, AC-25: `g6-leaver-request-closure`; vế khuyến nghị `G2` của AC-3, AC-21, vế tiết kiệm của AC-6 và vế K4 của AC-16: `g6-downstream-integration` |
 
 ## Supporting references
 
@@ -141,3 +141,4 @@ Cập nhật 25/10/2026 bởi người phụ trách (AI theo giao việc của n
 
 - Audit G0–G6 trên Docs `769bb64` ↔ BE `7c28e75` mở lại hạng mục này: F17 — người nhận cảnh báo theo `D-7`.
 - Remediation duy nhất: [g0-g6-final-business-baseline-remediation](../g0-g6-final-business-baseline-remediation/spec.md) ([impact matrix](../g0-g6-final-business-baseline-remediation/impact-matrix.md#3-findings)). AC liên quan không còn được coi là thỏa nguồn hiện hành cho tới khi remediation xong; trạng thái triển khai ở roadmap. Phần đã ghi phía trên là lịch sử, giữ nguyên.
+- _27/10/2026 (Prompt 04, Task 0.1 của `g0-g6-final-business-baseline-remediation`, F60 — re-pin scope map [G6](../../../roadmap.md#work-item-decomposition-g6) Docs `e0cb5a0`, BE `7c28e75`):_ `US-03-04` AC-12 đã bỏ; còn AC-11, AC-13, AC-27, AC-28 ([impact matrix mục 9](../g0-g6-final-business-baseline-remediation/impact-matrix.md#9-phụ-lục-delta-user-stories-72e1480--769bb64)). Phần đã ghi phía trên là lịch sử, giữ nguyên.

@@ -113,7 +113,7 @@ export class EmployeeImportsController {
   @ApiErrorResponses(...COMMON_ERRORS, ...UPLOAD_LIMIT_ERRORS, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description:
-      'The file cannot be used as a whole: missing, empty, not text, unreadable, too many rows, or lacking a required column such as the department or the job title (IMPORT.FILE_*).',
+      'The file cannot be used as a whole: missing, empty, not text, unreadable, too many rows, or lacking a required column such as the department (IMPORT.FILE_*); the job title column is optional.',
     examples: [
       IMPORT_ERROR_EXAMPLES.FILE_REQUIRED,
       IMPORT_ERROR_EXAMPLES.FILE_EMPTY,
@@ -141,9 +141,9 @@ export class EmployeeImportsController {
     description: 'The import with its preview or its result.',
   })
   @ApiErrorResponses(...COMMON_ERRORS, NOT_FOUND, INVALID_ID)
-  async get(@Param() params: ImportIdParamDto) {
+  async get(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: ImportIdParamDto) {
     try {
-      return toWire(await this.imports.view(params.id));
+      return toWire(await this.imports.view(actor, params.id));
     } catch (error) {
       throw toImportApiException(error);
     }
@@ -162,9 +162,13 @@ export class EmployeeImportsController {
     description: 'The identifier is not a UUID, or the filter or paging query is invalid (VALIDATION_ERROR).',
     examples: [VALIDATION_EXAMPLE],
   })
-  async rows(@Param() params: ImportIdParamDto, @Query() query: ListImportRowsQueryDto) {
+  async rows(
+    @CurrentPrincipal() actor: AuthenticatedPrincipal,
+    @Param() params: ImportIdParamDto,
+    @Query() query: ListImportRowsQueryDto,
+  ) {
     try {
-      const page = await this.imports.rows(params.id, query);
+      const page = await this.imports.rows(actor, params.id, query);
 
       return {
         items: page.items.map((row) => ({

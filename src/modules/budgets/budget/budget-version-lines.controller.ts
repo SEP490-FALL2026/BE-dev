@@ -103,7 +103,7 @@ const INVALID = {
 const NOT_EDITABLE = {
   status: HttpStatus.CONFLICT,
   description:
-    'The version is not a draft nor sent back to Finance, so it is not changed (BUDGET.VERSION_NOT_EDITABLE).',
+    'The version is not a draft nor sent back to Finance, or is a draft left behind by a proposal that was withdrawn or given back, so it is not changed (BUDGET.VERSION_NOT_EDITABLE).',
   examples: [EXAMPLES.VERSION_NOT_EDITABLE],
 } as const;
 /** What an amount of a line refuses after the request validation: its currency and its range. */
@@ -159,8 +159,15 @@ export class BudgetVersionLinesController {
   @ApiErrorResponses(...AUTH_ERRORS, FINANCE_ONLY, NOT_FOUND, NOT_EDITABLE, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description:
-      'The body is invalid (VALIDATION_ERROR), the window runs backwards (BUDGET.WINDOW_BACKWARDS) or the reason of the adjustment is missing (BUDGET.ADJUSTMENT_REASON_REQUIRED).',
-    examples: [VALIDATION_EXAMPLE, EXAMPLES.WINDOW_BACKWARDS, EXAMPLES.ADJUSTMENT_REASON_REQUIRED, ...MONEY_EXAMPLES],
+      'The body is invalid (VALIDATION_ERROR), the window runs backwards (BUDGET.WINDOW_BACKWARDS), the reason of the adjustment is missing (BUDGET.ADJUSTMENT_REASON_REQUIRED), the line names a plan that does not exist (BUDGET.PLAN_NOT_FOUND) or the fiscal year of the version has ended (BUDGET.YEAR_ENDED).',
+    examples: [
+      VALIDATION_EXAMPLE,
+      EXAMPLES.WINDOW_BACKWARDS,
+      EXAMPLES.ADJUSTMENT_REASON_REQUIRED,
+      EXAMPLES.PLAN_NOT_FOUND,
+      EXAMPLES.YEAR_ENDED,
+      ...MONEY_EXAMPLES,
+    ],
   })
   async updateLine(
     @CurrentPrincipal() actor: AuthenticatedPrincipal,
@@ -185,8 +192,15 @@ export class BudgetVersionLinesController {
   @ApiErrorResponses(...AUTH_ERRORS, FINANCE_ONLY, VERSION_NOT_FOUND, NOT_EDITABLE, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description:
-      'The body is invalid (VALIDATION_ERROR), a line is incomplete (BUDGET.PROPOSAL_INCOMPLETE) or a window runs backwards (BUDGET.WINDOW_BACKWARDS).',
-    examples: [VALIDATION_EXAMPLE, EXAMPLES.PROPOSAL_INCOMPLETE, EXAMPLES.WINDOW_BACKWARDS, ...MONEY_EXAMPLES],
+      'The body is invalid (VALIDATION_ERROR), a line is incomplete (BUDGET.PROPOSAL_INCOMPLETE), a window runs backwards (BUDGET.WINDOW_BACKWARDS), a line names a plan that does not exist (BUDGET.PLAN_NOT_FOUND) or the fiscal year of the version has ended (BUDGET.YEAR_ENDED).',
+    examples: [
+      VALIDATION_EXAMPLE,
+      EXAMPLES.PROPOSAL_INCOMPLETE,
+      EXAMPLES.WINDOW_BACKWARDS,
+      EXAMPLES.PLAN_NOT_FOUND,
+      EXAMPLES.YEAR_ENDED,
+      ...MONEY_EXAMPLES,
+    ],
   })
   async addLines(
     @CurrentPrincipal() actor: AuthenticatedPrincipal,
@@ -223,8 +237,14 @@ export class BudgetVersionLinesController {
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The body is invalid (VALIDATION_ERROR), the reason is missing (BUDGET.WINDOW_REASON_REQUIRED) or the window runs backwards (BUDGET.WINDOW_BACKWARDS).',
-      examples: [VALIDATION_EXAMPLE, EXAMPLES.WINDOW_REASON_REQUIRED, EXAMPLES.WINDOW_BACKWARDS, ...MONEY_EXAMPLES],
+        'The body is invalid (VALIDATION_ERROR), the reason is missing (BUDGET.WINDOW_REASON_REQUIRED), the window runs backwards (BUDGET.WINDOW_BACKWARDS) or the fiscal year of the version has ended (BUDGET.YEAR_ENDED).',
+      examples: [
+        VALIDATION_EXAMPLE,
+        EXAMPLES.WINDOW_REASON_REQUIRED,
+        EXAMPLES.WINDOW_BACKWARDS,
+        EXAMPLES.YEAR_ENDED,
+        ...MONEY_EXAMPLES,
+      ],
     },
   )
   async changeWindow(
@@ -275,8 +295,9 @@ export class BudgetVersionLinesController {
   })
   @ApiErrorResponses(...AUTH_ERRORS, ...UPLOAD_LIMIT_ERRORS, FINANCE_ONLY, VERSION_NOT_FOUND, NOT_EDITABLE, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
-    description: 'The file cannot be read as a table, lacks a column, or is empty (BUDGET.IMPORT_FILE_INVALID).',
-    examples: [VALIDATION_EXAMPLE, EXAMPLES.IMPORT_FILE_INVALID],
+    description:
+      'The file cannot be read as a table, lacks a column, or is empty (BUDGET.IMPORT_FILE_INVALID), or the fiscal year of the version has ended (BUDGET.YEAR_ENDED).',
+    examples: [VALIDATION_EXAMPLE, EXAMPLES.IMPORT_FILE_INVALID, EXAMPLES.YEAR_ENDED],
   })
   async load(
     @CurrentPrincipal() actor: AuthenticatedPrincipal,

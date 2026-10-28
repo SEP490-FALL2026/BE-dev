@@ -7,7 +7,9 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { AuditService } from '../../audit/audit.service';
 import { OperatingParametersService } from '../../operating-parameters/operating-parameters.service';
 import { OrganizationService } from '../../organization/organization.service';
+import { PersonnelNotifier } from '../event-notice/personnel-notifier.service';
 import { personnelAuditEvent } from '../mappers/personnel-audit-event';
+import { userActor } from '../personnel.types';
 import { NoticeRefusedError } from './notice.errors';
 import { isPriorityKind, pendingRefusal, sendRefusal } from './notice.policy';
 import { NoticeRepo } from './notice.repo';
@@ -31,6 +33,7 @@ export class NoticeService {
     private readonly parameters: OperatingParametersService,
     private readonly notices: NoticeRepo,
     private readonly audit: AuditService,
+    private readonly notifier: PersonnelNotifier,
   ) {}
 
   /** Throws NoticeRefusedError for everything the policy or the database refuses. */
@@ -60,7 +63,7 @@ export class NoticeService {
       await this.audit.record(
         tx,
         personnelAuditEvent(
-          actor,
+          userActor(actor),
           held.organizationId,
           'PERSONNEL_NOTICE.WITHDRAWN',
           'PersonnelNotice',
@@ -127,14 +130,30 @@ export class NoticeService {
     };
     await this.audit.record(
       tx,
-      personnelAuditEvent(actor, organization.id, 'PERSONNEL_NOTICE.SENT', 'PersonnelNotice', notice.id, null, after),
+      personnelAuditEvent(
+        userActor(actor),
+        organization.id,
+        'PERSONNEL_NOTICE.SENT',
+        'PersonnelNotice',
+        notice.id,
+        null,
+        after,
+      ),
     );
+    // The Super Admin handles the notices (`QĐ-87a`): a new one is told to them in the transaction that sends it (F17).
+    await this.notifier.noticeReceived(tx, {
+      organizationId: organization.id,
+      employeeId: employee.id,
+      departmentId: senderHead.departmentId,
+      noticeId: notice.id,
+      kind: notice.kind,
+    });
     if (isPriorityKind(notice.kind)) {
       // The point the high-priority warning to the IT Admin and the Super Admin is taken from; the person is not changed by it.
       await this.audit.record(
         tx,
         personnelAuditEvent(
-          actor,
+          userActor(actor),
           organization.id,
           'PERSONNEL_NOTICE.ABRUPT_SENT',
           'PersonnelNotice',

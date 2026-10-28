@@ -4,7 +4,15 @@ import { TransactionRunner } from '../../../infrastructure/database/transaction-
 import { AuditService } from '../../audit/audit.service';
 import { IdentityAccessInspectionService } from '../../identity-access/identity-access-inspection.service';
 import { OrganizationService } from '../../organization/organization.service';
-import { BOOTSTRAP_ACTIONS, bootstrapMismatches, maskEmail, problemsOf, summarizeMigrations } from './inspection-facts';
+import {
+  BOOTSTRAP_ACTIONS,
+  NO_ANNOUNCEMENT_GAPS,
+  announcementGapTotal,
+  bootstrapMismatches,
+  maskEmail,
+  problemsOf,
+  summarizeMigrations,
+} from './inspection-facts';
 import { InstallationInspection, MigrationReport } from './inspection.types';
 import { MigrationStateRepo } from './migration-state.repo';
 
@@ -34,10 +42,7 @@ export class InstallationInspectionService {
       const organization = await this.findOrganization(() => this.organization.getOrganization(tx));
       if (organization === null) return { migrations, installed: null };
 
-      const counts = await this.audit.countByAction(
-        tx,
-        BOOTSTRAP_ACTIONS.map(({ action }) => action),
-      );
+      const counts = await this.audit.countByAction(tx, BOOTSTRAP_ACTIONS);
       const inventory = await this.identity.accountInventory(tx);
       const facts = await this.organization.getOnboardingFacts(tx);
       const named = facts.departmentsByItAdmin.flatMap((department) =>
@@ -45,15 +50,21 @@ export class InstallationInspectionService {
       );
       const usable = await this.identity.usableItAdminEmployeeIds(named, tx);
 
-      return { migrations, installed: { organization, counts, inventory, facts, usable } };
+      // F47: the changes the seeding migration missed. Read in the same transaction, only when that migration was recorded.
+      const seededAt = await this.migrations.changeAnnouncementsSeededAt(tx);
+      const announcements =
+        seededAt === null ? NO_ANNOUNCEMENT_GAPS : await this.organization.countUnmarkedChangesAsOf(tx, seededAt);
+
+      return { migrations, installed: { organization, counts, inventory, facts, usable, announcements } };
     });
     if (snapshot.installed === null) return notInstalled(snapshot.migrations);
 
-    const { organization, counts, inventory, facts, usable } = snapshot.installed;
+    const { organization, counts, inventory, facts, usable, announcements } = snapshot.installed;
     const mismatched = bootstrapMismatches(counts);
     const problems = problemsOf({
       migrations: snapshot.migrations,
       bootstrapMismatches: mismatched,
+      changeAnnouncements: announcements,
       superAdmin: inventory.superAdmin,
     });
 
@@ -63,6 +74,7 @@ export class InstallationInspectionService {
       migrations: snapshot.migrations,
       organization: { timeZone: organization.timeZone, reportingCurrency: organization.reportingCurrency },
       bootstrapRecords: { complete: mismatched.length === 0, mismatched },
+      changeAnnouncements: { complete: announcementGapTotal(announcements) === 0, missing: announcements },
       superAdmin:
         inventory.superAdmin === null
           ? null
@@ -109,6 +121,7 @@ function notInstalled(migrations: MigrationReport): InstallationInspection {
     migrations,
     organization: null,
     bootstrapRecords: null,
+    changeAnnouncements: null,
     superAdmin: null,
     accounts: null,
     directRoles: null,

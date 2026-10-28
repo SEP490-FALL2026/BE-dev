@@ -12,6 +12,8 @@ export interface ReviewNames {
   plans: ReadonlyMap<string, PlanRevocationInfo>;
   /** The head of each department today, by department id; absent while it has none. */
   heads: ReadonlyMap<string, string>;
+  /** The seats of the lines of the page whose old seat is already being taken back for this review (T-6, F43). */
+  revoking: ReadonlySet<string>;
 }
 
 export const employeeBriefOf = (employee: EmployeeRecord) => ({
@@ -38,6 +40,7 @@ export function toSummary(
 
   return {
     id: record.id,
+    origin: record.transferId === null ? 'POST_SETUP' : 'TRANSFER',
     employee: employeeBriefOf(required(names.employees.get(record.employeeId), 'person')),
     department: { id: department.id, code: department.code, name: department.name },
     effectiveOn: record.effectiveOn,
@@ -68,5 +71,7 @@ export function toItem(item: ReviewItemRecord, names: ReviewNames): TransferRevi
     decidedAt: item.decidedAt ? item.decidedAt.toISOString() : null,
     newToolNote: item.newToolNote,
     revocationTaskId: item.revocationTaskId,
+    // A new Request is still asked for only while the old seat stays: once its revocation is under way (the Request ended) it is not.
+    needsNewRequest: item.decision === 'STILL_NEEDED' && !names.revoking.has(item.assignmentId),
   };
 }

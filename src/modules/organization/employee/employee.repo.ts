@@ -36,6 +36,7 @@ function toEmployeeRecord(row: {
   status: EmployeeRecord['status'];
   workState: EmployeeWorkState;
   hireDate: Date;
+  jobTitle: string | null;
 }): EmployeeRecord {
   return {
     id: row.id,
@@ -47,6 +48,7 @@ function toEmployeeRecord(row: {
     status: row.status,
     workState: row.workState,
     hireDate: fromDateColumn(row.hireDate),
+    jobTitle: row.jobTitle,
   };
 }
 
@@ -140,6 +142,8 @@ export class EmployeeRepo {
             : {}),
           ...(patch.employmentType !== undefined ? { employmentType: patch.employmentType } : {}),
           ...(patch.hireDate !== undefined ? { hireDate: toDateColumn(patch.hireDate) } : {}),
+          // The display form (T-12) whoever calls; an empty one clears the title.
+          ...(patch.jobTitle !== undefined ? { jobTitle: normalizeDisplayName(patch.jobTitle ?? '') || null } : {}),
         },
       });
     } catch (error) {

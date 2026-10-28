@@ -48,12 +48,12 @@ describe('onboarding checklist route (e2e, no database)', () => {
 
   it.each([
     ['the finance officer', ['FINANCE'], []],
-    ['the Super Admin', ['SUPER_ADMIN'], []],
     ['an employee', ['EMPLOYEE'], []],
+    ['an account with no role', [], []],
     ['a department head, whose role is derived', [], ['MANAGER']],
     ['the spending approver, whose role is derived', [], ['SPENDING_APPROVER']],
   ])(
-    'is not shown to %s: 403 (US-02-04: the other roles do not see the onboarding checklist)',
+    'is not shown to %s: 403 (US-02-04: only the Super Admin, who does step 1, and the IT Admin, who does steps 2 to 5, see the onboarding checklist)',
     async (_name, direct, derived) => {
       app = await appFor(principal(direct, derived));
 

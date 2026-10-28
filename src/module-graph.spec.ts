@@ -30,6 +30,8 @@ import { MigrationPreflightModule } from './modules/installation/migration-prefl
 import { SubscriptionOwnerAssignmentModule } from './modules/catalog/subscription-owner-assignment/subscription-owner-assignment.module';
 import { SubscriptionOwnerAssignmentCliModule } from './subscription-owner-assignment-cli.module';
 import { CostCenterDirectionCliModule } from './cost-center-direction-cli.module';
+import { SuperAdminEventModule } from './modules/personnel/super-admin-event/super-admin-event.module';
+import { SuperAdminEventCliModule } from './super-admin-event-cli.module';
 import { IdentityAccessLocalSeedFacadeModule } from './modules/identity-access/identity-access-local-seed-facade.module';
 import { IdentityAccessInspectionFacadeModule } from './modules/identity-access/identity-access-inspection-facade.module';
 import { DATABASE_SESSION_OPTIONS } from './infrastructure/database/read-only-session.module';
@@ -87,6 +89,15 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   'SubscriptionOwnerAssignmentModule: SubscriptionOwnerAssignmentService',
   // F01: the service `pnpm ops:cost-center-direction` runs and the organization facade asks (whether the link is activated).
   'CostCenterDirectionModule: CostCenterDirectionService',
+  // F19 (Task 5.5): the controlled procedure for an event about the Super Admin, and the writes of the events it runs with an operator
+  // actor (spec L.2): the personnel services of the CLI entry graph, never reached by another module.
+  'SuperAdminEventModule: SuperAdminEventService',
+  'PersonnelModule: TransferService',
+  'PersonnelModule: TransferChangeService',
+  'PersonnelModule: LeaveService',
+  'PersonnelModule: OffboardingService',
+  'PersonnelModule: OffboardingChangeService',
+  'PersonnelModule: NoticeHandlingService',
   'NotificationsModule: NotificationsService',
   // ROOT.1: the delivery contract the worker's mail loop (composition root, ADR-0012) calls; EmailDispatcher stays private.
   'NotificationsModule: EmailDeliveryService',
@@ -113,6 +124,9 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   'RequestsWorkFacadeModule: StepTargetService',
   'RequestsWorkFacadeModule: RoutingFactsService',
   'RequestsWorkFacadeModule: ControlledWaitQueryService',
+  // Spec L.1 (F27): the repo of the drafts of paid requests, read and written by the draft operations of the API and deleted with the
+  // person who leaves by the listener of the worker graph, so it is declared once, here, for both.
+  'RequestsWorkFacadeModule: RequestDraftRepo',
   // G6 (US-03-04): the facade the personnel context reads the open requests of a person who leaves through.
   'RequestsModule: RequestsService',
   // The two entry services of `pnpm ops:recover` (Q6; E7): the holder's own account, and the role transfer.
@@ -578,6 +592,8 @@ describe('operational command graphs (H6.1, docs/rules/operational-commands.md)'
           SubscriptionOwnerAssignmentModule,
           SubscriptionOwnerAssignmentCliModule,
           CostCenterDirectionCliModule,
+          SuperAdminEventModule,
+          SuperAdminEventCliModule,
         ]
           .filter((module) => modules.includes(module))
           .map((module) => module.name),
@@ -596,6 +612,7 @@ describe('operational command graphs (H6.1, docs/rules/operational-commands.md)'
       ['MigrationPreflightModule', MigrationPreflightModule, 1],
       ['SubscriptionOwnerAssignmentCliModule', SubscriptionOwnerAssignmentCliModule, 0],
       ['CostCenterDirectionCliModule', CostCenterDirectionCliModule, 0],
+      ['SuperAdminEventCliModule', SuperAdminEventCliModule, 0],
     ];
     for (const [name, root, expected] of graphs) {
       expect({ name, readOnly: declarationsOf(collectGraph(root), DATABASE_SESSION_OPTIONS).length }).toEqual({
@@ -681,6 +698,7 @@ describe('the local seed graph (H6.2)', () => {
       ['MigrationPreflightModule', MigrationPreflightModule, 0],
       ['SubscriptionOwnerAssignmentCliModule', SubscriptionOwnerAssignmentCliModule, 0],
       ['CostCenterDirectionCliModule', CostCenterDirectionCliModule, 0],
+      ['SuperAdminEventCliModule', SuperAdminEventCliModule, 0],
     ];
     for (const [name, root, expected] of graphs) {
       const modules = collectGraph(root).map((node) => node.module);

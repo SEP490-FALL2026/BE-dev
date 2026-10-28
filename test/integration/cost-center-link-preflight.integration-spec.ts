@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { Client } from 'pg';
 import { CLI_COLD_START_MS, cliWorkingDirectory, runCli, stopCliProcesses } from '../support/cli-process';
+import { activateCostCenterLink, lastCompatibilityMigration } from '../support/compat-release';
 import {
   DisposableDatabase,
   dropDisposableDatabase,
@@ -15,19 +16,21 @@ import {
 } from '../support/migration-history';
 
 /**
- * `g0-g6-final-business-baseline-remediation`, Task 1.1a (F01, spec L.11): the live inventory of `ops:preflight` for the
- * Cost Center link. Before the compatibility migration it only **lists** the Cost Centers no department names; after it,
- * every Cost Center with no department — whoever created it, including the previous release recovered by H7 or still
- * running in the migrate → recreate window — **blocks**, ids only, recomputed on every run, through partial linking until
- * the last one is linked. The command is real (`migration-preflight-cli.ts` through ts-node) on a database whose history
- * Prisma recorded itself.
+ * `g0-g6-final-business-baseline-remediation`, Task 1.1a and 1.1 (F01, spec L.11): the live inventory of `ops:preflight` for the
+ * Cost Center link, as the FINAL release reads it. A database before the compatibility migration that holds an organization is
+ * blocked (`COST_CENTER_DIRECTION_EXPANSION_REQUIRED`); on the compatibility schema every Cost Center with no department —
+ * whoever created it, including the previous release recovered by H7 or still running in the migrate → recreate window — blocks,
+ * and so does an organization whose link the operator has not activated (`COST_CENTER_DIRECTION_NOT_ACTIVATED`, information in the
+ * compatibility release), ids only, recomputed on every run, through partial linking until the last one is linked. After the
+ * final migration the old column is gone and nothing about the direction can be open. The command is real
+ * (`migration-preflight-cli.ts` through ts-node) on a database whose history Prisma recorded itself.
  */
 const LINK_MIGRATION = migrationEndingWith('_cost_center_department_link');
 
 interface Report {
   status: 'READY' | 'BLOCKED';
   history: string;
-  blockers: Array<{ code: string; costCenterId?: string; departmentId?: string }>;
+  blockers: Array<{ code: string; costCenterId?: string; departmentId?: string; organizationId?: string }>;
   information: Array<{ code: string; costCenterId?: string; organizationId?: string; subscriptionId?: string }>;
 }
 
@@ -50,6 +53,10 @@ describe('ops:preflight, the Cost Center link (integration, real CLI and Postgre
     blockers: report.blockers.filter((blocker) => blocker.code.startsWith('COST_CENTER')),
     information: report.information.filter((item) => item.code.startsWith('COST_CENTER')),
   });
+  /** What the report lists for the unlinked Cost Centers, in the order of the report. */
+  const unlinked = (ids: string[]) =>
+    [...ids].sort().map((costCenterId) => ({ code: 'COST_CENTER_UNLINKED', costCenterId }));
+  const notActivated = () => ({ code: 'COST_CENTER_DIRECTION_NOT_ACTIVATED', organizationId: world.organizationId });
   /** A Cost Center as `7c28e75` writes one around no department: free. */
   const freeCostCenter = async (): Promise<string> => {
     const id = randomUUID();
@@ -62,7 +69,6 @@ describe('ops:preflight, the Cost Center link (integration, real CLI and Postgre
 
     return id;
   };
-  const sorted = (ids: string[]) => [...ids].sort();
 
   beforeAll(async () => {
     database = await provisionDisposableDatabase();
@@ -90,45 +96,51 @@ describe('ops:preflight, the Cost Center link (integration, real CLI and Postgre
   let free: string[] = [];
 
   it(
-    'before the compatibility migration: ready, with every Cost Center no department names listed as a row to link later, ids sorted',
+    'before the compatibility migration with no organization (a new database): ready, nothing to list',
     async () => {
       const before = await deployMigrations(database, { through: migrationBefore(LINK_MIGRATION) });
       if (before.code !== 0)
         throw new Error(`Deploying the history before the link migration failed: ${before.stdout}`);
-      world = await expansionWorld(sql);
-      free = [await freeCostCenter(), await freeCostCenter()];
 
       const { code, report } = await preflight();
 
       expect(code).toBe(0);
-      expect(report.status).toBe('READY');
-      expect(ofCostCenter(report)).toEqual({
-        blockers: [],
-        information: sorted(free).map((costCenterId) => ({ code: 'COST_CENTER_TO_LINK', costCenterId })),
-      });
+      expect(ofCostCenter(report)).toEqual({ blockers: [], information: [] });
     },
     DEPLOY_TIMEOUT_MS + CLI_COLD_START_MS,
   );
 
   it(
-    'after it: each Cost Center with no department blocks by its id — including one the previous release writes late — and the link not being activated is only information',
+    'before the compatibility migration with an organization: BLOCKED, the organization named by its id, no Cost Center listed (the release skipped the compatibility release)',
     async () => {
-      const deploy = await deployMigrations(database);
-      if (deploy.code !== 0) throw new Error(`Deploying the link migration failed: ${deploy.stdout}`);
-      // The previous release is still the running one in the migrate → recreate window, or recovered after a failed deploy.
-      const late = await freeCostCenter();
-      free.push(late);
+      world = await expansionWorld(sql);
+      free = [await freeCostCenter(), await freeCostCenter()];
 
       const { code, report } = await preflight();
 
       expect(code).toBe(2);
       expect(report.status).toBe('BLOCKED');
-      expect(ofCostCenter(report).blockers).toEqual(
-        sorted(free).map((costCenterId) => ({ code: 'COST_CENTER_UNLINKED', costCenterId })),
-      );
-      expect(ofCostCenter(report).information).toEqual([
-        { code: 'COST_CENTER_DIRECTION_NOT_ACTIVATED', organizationId: world.organizationId },
-      ]);
+      expect(ofCostCenter(report)).toEqual({
+        blockers: [{ code: 'COST_CENTER_DIRECTION_EXPANSION_REQUIRED', organizationId: world.organizationId }],
+        information: [],
+      });
+    },
+    CLI_COLD_START_MS,
+  );
+
+  it(
+    'on the compatibility schema: each Cost Center with no department blocks by its id — including one the previous release writes late — and so does the link not being activated',
+    async () => {
+      const deploy = await deployMigrations(database, { through: lastCompatibilityMigration() });
+      if (deploy.code !== 0) throw new Error(`Deploying the compatibility release failed: ${deploy.stdout}`);
+      // The previous release is still the running one in the migrate → recreate window, or recovered after a failed deploy.
+      free.push(await freeCostCenter());
+
+      const { code, report } = await preflight();
+
+      expect(code).toBe(2);
+      expect(report.status).toBe('BLOCKED');
+      expect(ofCostCenter(report)).toEqual({ blockers: [notActivated(), ...unlinked(free)], information: [] });
     },
     DEPLOY_TIMEOUT_MS + CLI_COLD_START_MS,
   );
@@ -155,16 +167,13 @@ describe('ops:preflight, the Cost Center link (integration, real CLI and Postgre
 
       const partial = await preflight();
       expect(partial.code).toBe(2);
-      expect(ofCostCenter(partial.report).blockers).toEqual(
-        sorted(open).map((costCenterId) => ({ code: 'COST_CENTER_UNLINKED', costCenterId })),
-      );
+      expect(ofCostCenter(partial.report).blockers).toEqual([notActivated(), ...unlinked(open)]);
 
       // The old runtime, recovered, creates a free Cost Center of its own: the next run lists it too.
-      const another = await freeCostCenter();
-      open.push(another);
+      open.push(await freeCostCenter());
       const afterRollback = await preflight();
       expect(afterRollback.code).toBe(2);
-      expect(ofCostCenter(afterRollback.report).blockers.map((blocker) => blocker.costCenterId)).toEqual(sorted(open));
+      expect(ofCostCenter(afterRollback.report).blockers).toEqual([notActivated(), ...unlinked(open)]);
       free = open;
     },
     CLI_COLD_START_MS * 2,
@@ -208,7 +217,7 @@ describe('ops:preflight, the Cost Center link (integration, real CLI and Postgre
   );
 
   it(
-    'is ready once every Cost Center is linked and the operator has activated the link, and the list is empty',
+    'is blocked once every Cost Center is linked until the operator has activated the link, then ready, and the list is empty',
     async () => {
       // Link what is left (the procedure, in SQL), then the activation the operator records.
       for (const costCenter of free) {
@@ -228,7 +237,7 @@ describe('ops:preflight, the Cost Center link (integration, real CLI and Postgre
           department,
         ]);
       }
-      // The control cases above left two Cost Centers without a department: link them too, so the list is whole.
+      // The control cases above left a Cost Center without a department: link it too, so the list is whole.
       const stragglers = await sql.query<{ id: string }>(`SELECT id FROM cost_centers WHERE department_id IS NULL`);
       for (const { id } of stragglers.rows) {
         const department = randomUUID();
@@ -242,22 +251,40 @@ describe('ops:preflight, the Cost Center link (integration, real CLI and Postgre
           department,
         ]);
       }
-      const notActivated = await preflight();
-      expect(ofCostCenter(notActivated.report)).toEqual({
-        blockers: [],
-        information: [{ code: 'COST_CENTER_DIRECTION_NOT_ACTIVATED', organizationId: world.organizationId }],
-      });
+      const before = await preflight();
+      expect(before.code).toBe(2);
+      expect(ofCostCenter(before.report)).toEqual({ blockers: [notActivated()], information: [] });
 
-      await sql.query(
-        `INSERT INTO cost_center_direction_activations (id, organization_id, release_evidence, approver_ref, operator_ref, environment)
-         VALUES (gen_random_uuid(), $1, 'deploy run 7, image sha256:abc', 'release-owner', 'ops', 'LOCAL_TEST')`,
-        [world.organizationId],
-      );
+      await activateCostCenterLink(sql, world.organizationId);
 
-      const { report } = await preflight();
+      const { code, report } = await preflight();
 
       expect(ofCostCenter(report)).toEqual({ blockers: [], information: [] });
+      expect({ code, status: report.status }).toEqual({ code: 0, status: 'READY' });
     },
-    CLI_COLD_START_MS * 2,
+    CLI_COLD_START_MS * 3,
+  );
+
+  it(
+    'after the final migration the old department column is gone: nothing about the direction is read, nothing is listed, the preflight is ready',
+    async () => {
+      const deploy = await deployMigrations(database);
+      if (deploy.code !== 0) throw new Error(`Deploying the final release failed: ${deploy.stdout}\n${deploy.stderr}`);
+
+      const { code, report } = await preflight();
+
+      expect(code).toBe(0);
+      expect(report).toMatchObject({ status: 'READY', history: 'CONVERGED', blockers: [], information: [] });
+      const columns = await sql.query<{ table_name: string; column_name: string; is_nullable: string }>(
+        `SELECT table_name, column_name, is_nullable FROM information_schema.columns
+          WHERE (table_name = 'cost_centers' AND column_name IN ('department_id', 'linked_at'))
+             OR (table_name = 'departments' AND column_name = 'cost_center_id') ORDER BY table_name, column_name`,
+      );
+      expect(columns.rows).toEqual([
+        { table_name: 'cost_centers', column_name: 'department_id', is_nullable: 'NO' },
+        { table_name: 'cost_centers', column_name: 'linked_at', is_nullable: 'NO' },
+      ]);
+    },
+    DEPLOY_TIMEOUT_MS + CLI_COLD_START_MS,
   );
 });

@@ -2,6 +2,7 @@ import { HttpStatus } from '@nestjs/common';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import { toUnavailableApiException } from '../../../infrastructure/http/errors/service-unavailable';
 import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
+import { toPersonnelAccessApiException } from '../mappers/personnel-access.http-errors';
 import { TransferRefusedError } from './transfer.errors';
 import { newTransferRefusal, type NewTransferFacts } from './transfer.policy';
 
@@ -26,12 +27,11 @@ const STATUS: Readonly<Record<string, HttpStatus>> = {
   ALREADY_CANCELLED: HttpStatus.CONFLICT,
   ALREADY_CLOSED: HttpStatus.CONFLICT,
   NOT_CLOSEABLE: HttpStatus.CONFLICT,
-  SELF_EVENT_NEEDS_ANOTHER_IT_ADMIN: HttpStatus.CONFLICT,
 };
 
 /**
- * The refusals of the shared placement policy keep the code it gives: the department and its Cost Center that cannot take people
- * answer 409 (the state of the destination), a department that is unknown answers 422 (the choice).
+ * The refusals of the shared placement policy keep the code it gives: a department that cannot take people answers 409 (the state of
+ * the destination), a department that is unknown answers 422 (the choice).
  */
 function statusOf(code: string): HttpStatus | undefined {
   const known = STATUS[code];
@@ -62,15 +62,16 @@ const MESSAGES: Readonly<Record<string, string>> = {
   ALREADY_CANCELLED: 'The transfer was cancelled.',
   ALREADY_CLOSED: 'The transfer was closed already.',
   NOT_CLOSEABLE: 'The transfer cannot be closed yet.',
-  SELF_EVENT_NEEDS_ANOTHER_IT_ADMIN: 'An IT Admin does not record this for themselves while another IT Admin can.',
 };
 
 /**
- * Maps a refusal of a transfer to its answer; a database that cannot answer is a 503, anything else
- * is returned unchanged for the global filter.
+ * Maps a refusal of a transfer to its answer (the actor that may not write it is a 403, the same as for every personnel write); a
+ * database that cannot answer is a 503, anything else is returned unchanged for the global filter.
  */
 export function toTransferApiException(error: unknown): unknown {
   if (error instanceof ApiException) return error;
+  const refused = toPersonnelAccessApiException(error);
+  if (refused) return refused;
   if (!(error instanceof TransferRefusedError)) return toUnavailableApiException(error) ?? error;
   const status = statusOf(error.code);
   if (status === undefined) return error;
@@ -92,11 +93,10 @@ const ACCEPTED_TRANSFER: NewTransferFacts = {
   employee: { status: 'ACTIVE', workState: 'WORKING' },
   current: { departmentId: '<department-id>', validFrom: '2025-01-01' },
   target: { departmentId: '<other-department-id>' },
-  destinationDepartment: { active: true, costCenterActive: true },
+  destinationDepartment: { active: true },
   grounds: undefined,
   pending: null,
   namedAsSuccessor: false,
-  selfMode: 'ALLOW',
   successor: { required: false, chosen: undefined, candidate: null },
 };
 
@@ -117,14 +117,10 @@ export const TRANSFER_ERROR_EXAMPLES = {
   EMPLOYEE_LEFT: example(new TransferRefusedError('EMPLOYEE_LEFT')),
   PLACEMENT_OVERLAP: example(new TransferRefusedError('PLACEMENT_OVERLAP')),
   CONCURRENT_CHANGE: example(new TransferRefusedError('CONCURRENT_CHANGE')),
-  DEPARTMENT_INACTIVE: destinationExample({ destinationDepartment: { active: false, costCenterActive: true } }),
-  DEPARTMENT_COST_CENTER_INACTIVE: destinationExample({
-    destinationDepartment: { active: true, costCenterActive: false },
-  }),
+  DEPARTMENT_INACTIVE: destinationExample({ destinationDepartment: { active: false } }),
   PENDING_EVENT_EXISTS: example(
     new TransferRefusedError('PENDING_EVENT_EXISTS', { kind: 'TRANSFER', effectiveOn: '2026-01-01' }),
   ),
-  SELF_EVENT_NEEDS_ANOTHER_IT_ADMIN: example(new TransferRefusedError('SELF_EVENT_NEEDS_ANOTHER_IT_ADMIN')),
   NO_CHANGE: example(new TransferRefusedError('NO_CHANGE')),
   EFFECTIVE_DATE_IN_PAST: example(new TransferRefusedError('EFFECTIVE_DATE_IN_PAST', { today: '2026-01-01' })),
   EFFECTIVE_DATE_NOT_AFTER_CURRENT_PERIOD: example(

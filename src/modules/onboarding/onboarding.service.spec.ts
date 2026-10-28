@@ -7,12 +7,12 @@ import { LicensingService } from '../licensing/licensing.service';
 import type { BaselineProgress } from '../licensing/licensing.types';
 import { OnboardingFacts } from '../organization/organization.types';
 import { OrganizationService } from '../organization/organization.service';
+import { OnboardingForbiddenError } from './onboarding.policy';
 import { OnboardingService } from './onboarding.service';
 
 const facts = (overrides: Partial<OnboardingFacts> = {}): OnboardingFacts => ({
   activeDepartments: 3,
   activeEmployees: 40,
-  costCenterDirectionActivated: true,
   departmentsWithoutCostCenter: [],
   departmentsWithoutHead: [],
   departmentsByItAdmin: [],
@@ -32,15 +32,23 @@ const progress = (overrides: Partial<BaselineProgress> = {}): BaselineProgress =
   ...overrides,
 });
 
+/** The service with in-memory collaborators; `checklist` is asked as an IT Admin unless the case names the roles. */
 function serviceWith(
   organizationFacts: OnboardingFacts,
   latest: LatestEmployeeImport | null,
   usableItAdmins: string[] = [],
   catalog: CatalogOnboardingFacts = catalogFacts(),
   baseline: BaselineProgress = progress(),
-): OnboardingService {
-  return new OnboardingService(
-    { getOnboardingFacts: () => Promise.resolve(organizationFacts) } as unknown as OrganizationService,
+) {
+  const reads: string[] = [];
+  const service = new OnboardingService(
+    {
+      getOnboardingFacts: () => {
+        reads.push('organization');
+
+        return Promise.resolve(organizationFacts);
+      },
+    } as unknown as OrganizationService,
     {
       findUsableItAdminEmployeeIds: () => Promise.resolve(new Set(usableItAdmins)),
     } as unknown as IdentityAccessService,
@@ -48,13 +56,33 @@ function serviceWith(
     { getOnboardingFacts: () => Promise.resolve(catalog) } as unknown as CatalogService,
     { getBaselineProgress: () => Promise.resolve(baseline) } as unknown as LicensingService,
   );
+
+  return { reads, checklist: (roles: readonly string[] = ['IT_ADMIN']) => service.checklist({ roles }) };
 }
 
 describe('onboarding checklist (US-02-04)', () => {
   it('has step 1 done when there are departments, people and no wrong row in the latest file (AC-1)', async () => {
     const { steps } = await serviceWith(facts(), null).checklist();
 
-    expect(steps[0]).toMatchObject({ step: 1, status: 'DONE', reasons: [], createDepartmentBlockedBy: null });
+    expect(steps[0]).toMatchObject({ step: 1, status: 'DONE', reasons: [] });
+  });
+
+  describe('who reads it (F13, US-02-04 phạm vi quyền)', () => {
+    it.each([['SUPER_ADMIN'], ['IT_ADMIN']])('lets the %s read it', async (role) => {
+      const { steps } = await serviceWith(facts(), null).checklist([role]);
+
+      expect(steps).toHaveLength(5);
+    });
+
+    it.each([['FINANCE'], ['MANAGER'], ['EMPLOYEE'], ['SPENDING_APPROVER']])(
+      'refuses the %s before anything is read, whatever the route let through',
+      async (role) => {
+        const h = serviceWith(facts(), null);
+
+        await expect(h.checklist([role])).rejects.toBeInstanceOf(OnboardingForbiddenError);
+        expect(h.reads).toEqual([]);
+      },
+    );
   });
 
   it.each([
@@ -120,12 +148,14 @@ describe('onboarding checklist (US-02-04)', () => {
     ]);
   });
 
-  it('says that creating a department waits for the activation of the Cost Center link, not for a free Cost Center (spec L.11)', async () => {
-    const waiting = await serviceWith(facts({ costCenterDirectionActivated: false }), null).checklist();
-    const active = await serviceWith(facts({ costCenterDirectionActivated: true }), null).checklist();
+  it('says nothing of an activation or a free Cost Center any more: a department is created before its Cost Center (F14, QĐ-87d(1))', async () => {
+    const { steps } = await serviceWith(
+      facts({ departmentsWithoutCostCenter: [{ code: 'P-OPS', name: 'Operations' }] }),
+      null,
+    ).checklist(['SUPER_ADMIN']);
 
-    expect(waiting.steps[0].createDepartmentBlockedBy).toBe('AWAITING_ACTIVATION');
-    expect(active.steps[0].createDepartmentBlockedBy).toBeNull();
+    expect(Object.keys(steps[0]).sort()).toEqual(['facts', 'key', 'reasons', 'status', 'step', 'warnings']);
+    expect(JSON.stringify(steps[0])).not.toMatch(/AWAITING_ACTIVATION|NO_FREE_COST_CENTER/);
   });
 
   it('shows a department with no Cost Center as a warning that stops nothing (QĐ-87d(1))', async () => {

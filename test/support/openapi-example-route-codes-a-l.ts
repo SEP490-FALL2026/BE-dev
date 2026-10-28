@@ -166,7 +166,7 @@ export const ROUTE_ERROR_CODES_A_TO_L: Readonly<Record<string, Partial<Record<Ro
       '422': ['COST_CENTER.NAME_INVALID', 'COST_CENTER.NAME_RESERVED'],
     },
     departmentCreate: {
-      '409': ['DEPARTMENT.CODE_TAKEN', 'DEPARTMENT.CREATION_AWAITING_ACTIVATION'],
+      '409': ['DEPARTMENT.CODE_TAKEN'],
       '422': ['DEPARTMENT.IT_ADMIN_INVALID', 'DEPARTMENT.NAME_INVALID'],
     },
     departmentDeactivate: {
@@ -194,6 +194,26 @@ export const ROUTE_ERROR_CODES_A_TO_L: Readonly<Record<string, Partial<Record<Ro
     },
     departmentMemberList: {
       '403': ['DEPARTMENT.OUT_OF_SCOPE'],
+      '404': ['DEPARTMENT.NOT_FOUND'],
+    },
+    departmentSuccessorClear: {
+      '404': ['DEPARTMENT.NOT_FOUND'],
+    },
+    departmentSuccessorDesignate: {
+      '404': ['DEPARTMENT.NOT_FOUND'],
+      '409': ['DEPARTMENT.HEAD_SUCCESSOR_ALREADY_NAMED'],
+      '422': [
+        'DEPARTMENT.HEAD_EMPLOYEE_NOT_ACTIVE',
+        'DEPARTMENT.HEAD_EMPLOYEE_NOT_FOUND',
+        'DEPARTMENT.HEAD_HEADS_ANOTHER_DEPARTMENT',
+        'DEPARTMENT.HEAD_NOT_A_MEMBER_ON_DATE',
+        'DEPARTMENT.HEAD_SUCCESSOR_DATE_NOT_FUTURE',
+        'DEPARTMENT.HEAD_SUCCESSOR_IS_THE_HEAD',
+        'DEPARTMENT.HEAD_SUCCESSOR_NEEDS_A_HEAD',
+        'DEPARTMENT.HEAD_SUPER_ADMIN_CANNOT_HEAD',
+      ],
+    },
+    departmentTechnicalMemberList: {
       '404': ['DEPARTMENT.NOT_FOUND'],
     },
     departmentToolsInUse: {
@@ -263,7 +283,7 @@ export const ROUTE_ERROR_CODES_A_TO_L: Readonly<Record<string, Partial<Record<Ro
       ],
     },
     employeeUpdateOfficialFields: {
-      '403': ['EMPLOYEE.ANOTHER_IT_ADMIN_NEEDED'],
+      '403': ['EMPLOYEE.SELF_CHANGE_FORBIDDEN'],
       '404': ['EMPLOYEE.NOT_FOUND'],
       '422': ['EMPLOYEE.ROW_INVALID', 'EMPLOYEE.UPDATE_EMPTY'],
     },
@@ -306,7 +326,7 @@ export const ROUTE_ERROR_CODES_A_TO_L: Readonly<Record<string, Partial<Record<Ro
     },
     licenseKeyImport: {
       '404': ['SUBSCRIPTION.NOT_FOUND'],
-      '422': ['LICENSE_KEY.PLAN_NOT_K4'],
+      '422': ['LICENSE_KEY.APPLICATION_RETIRED', 'LICENSE_KEY.PLAN_NOT_K4'],
     },
     licenseKeyList: {
       '404': ['SUBSCRIPTION.NOT_FOUND'],

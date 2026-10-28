@@ -1,9 +1,12 @@
+import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import type { AuthenticatedPrincipal } from '../../src/infrastructure/security/tokens/access-token-verifier.port';
+import { EmployeeForbiddenError } from '../../src/modules/organization/employee/employee.errors';
 import {
   EmployeeManualService,
   ManualEmployeeInput,
 } from '../../src/modules/organization/employee/employee-manual.service';
+import { NotificationsService } from '../../src/modules/notifications/notifications.service';
 import { bodyOf } from '../support/api-body';
 import {
   ACCOUNT_PASSWORD,
@@ -101,8 +104,7 @@ describe('manual employee entry over HTTP (integration, real PostgreSQL)', () =>
       await ctx.sql.query(
         `SELECT (SELECT count(*)::int FROM app_users) AS accounts, (SELECT count(*)::int FROM role_grants) AS grants,
                 (SELECT count(*)::int FROM account_action_tokens) AS tokens, (SELECT count(*)::int FROM email_outbox) AS mail,
-                (SELECT count(*)::int FROM departments) AS departments, (SELECT count(*)::int FROM cost_centers) AS cost_centers,
-                (SELECT count(*)::int FROM job_titles) AS job_titles`,
+                (SELECT count(*)::int FROM departments) AS departments, (SELECT count(*)::int FROM cost_centers) AS cost_centers`,
       )
     ).rows[0] as Record<string, number>;
 
@@ -146,18 +148,15 @@ describe('manual employee entry over HTTP (integration, real PostgreSQL)', () =>
       expect((await ctx.sql.query('SELECT count(*)::int AS n FROM employee_placements')).rows[0]).toEqual({
         n: placements.n + 1,
       });
-      // The department's own cost center is what the person is charged to; the client never sends one. The title is the
-      // free text of the person; the placement names no catalogue entry of its own: the database does, for the release before.
+      // The department's own cost center is what the person is charged to, when it has one; the client never sends one. The title
+      // is the free text of the person and nothing else: there is no catalogue to name (QĐ-87e).
       const placement = await ctx.sql.query(
-        `SELECT d.code, p.valid_to, e.job_title, j.name AS catalogue_name
+        `SELECT d.code, p.valid_to, e.job_title
            FROM employee_placements p JOIN departments d ON d.id = p.department_id JOIN employees e ON e.id = p.employee_id
-           LEFT JOIN job_titles j ON j.id = p.job_title_id
           WHERE p.employee_id = $1`,
         [dataOf(response).id],
       );
-      expect(placement.rows).toEqual([
-        { code: 'P-OPS', valid_to: null, job_title: 'Administrator', catalogue_name: 'Administrator' },
-      ]);
+      expect(placement.rows).toEqual([{ code: 'P-OPS', valid_to: null, job_title: 'Administrator' }]);
     });
 
     it('allows no work email, and records who entered the person (FR-8.3)', async () => {
@@ -234,8 +233,6 @@ describe('manual employee entry over HTTP (integration, real PostgreSQL)', () =>
         { departmentCode: 'P-NOPE' },
         [{ field: 'departmentCode', code: 'DEPARTMENT_NOT_FOUND' }],
       ],
-      ['no job title', { jobTitle: undefined }, [{ field: 'jobTitle', code: 'JOB_TITLE_REQUIRED' }]],
-      ['a blank job title', { jobTitle: '   ' }, [{ field: 'jobTitle', code: 'JOB_TITLE_REQUIRED' }]],
       [
         'a job title longer than 255 characters',
         { jobTitle: 'x'.repeat(256) },
@@ -258,12 +255,23 @@ describe('manual employee entry over HTTP (integration, real PostgreSQL)', () =>
       const sameAgain = dataOf(await enter(row({ jobTitle: 'chief happiness officer' })).expect(201));
 
       expect([entered.jobTitle, sameAgain.jobTitle]).toEqual(['Chief Happiness Officer', 'chief happiness officer']);
-      // The two spellings are one title for the release before this one, which reads it through the catalogue.
-      const entries = await ctx.sql.query(
-        `SELECT name FROM job_titles WHERE normalized_name = 'chief happiness officer'`,
-      );
-      expect(entries.rows).toEqual([{ name: 'Chief Happiness Officer' }]);
     });
+
+    it.each([
+      ['no job title', { jobTitle: undefined }],
+      ['a blank job title', { jobTitle: '   ' }],
+      ['a null job title', { jobTitle: null }],
+    ])(
+      'is not refused for %s: the title is optional, and the person has none (QĐ-87e, F03)',
+      async (_name, overrides) => {
+        const response = await enter(row(overrides)).expect(201);
+
+        expect(dataOf(response).jobTitle).toBeNull();
+        expect(
+          (await ctx.sql.query(`SELECT job_title FROM employees WHERE id = $1`, [dataOf(response).id])).rows,
+        ).toEqual([{ job_title: null }]);
+      },
+    );
 
     it.each([
       ['GET', '/api/v1/job-titles'],
@@ -286,7 +294,7 @@ describe('manual employee entry over HTTP (integration, real PostgreSQL)', () =>
     it('does not take the old body that names a catalogue entry: jobTitleId is a field the form no longer has (QĐ-87e)', async () => {
       const people = (await ctx.sql.query<{ n: number }>('SELECT count(*)::int AS n FROM employees')).rows[0];
 
-      const response = await enter(row({ jobTitle: undefined, jobTitleId: seed.jobTitleId })).expect(422);
+      const response = await enter(row({ jobTitle: undefined, jobTitleId: randomUUID() })).expect(422);
 
       expect(errorCodeOf(response)).toBe('VALIDATION_ERROR');
       expect((await ctx.sql.query('SELECT count(*)::int AS n FROM employees')).rows[0]).toEqual(people);
@@ -307,12 +315,17 @@ describe('manual employee entry over HTTP (integration, real PostgreSQL)', () =>
       await enter(row({ employeeCode: 'E-TWICE', workEmail: 'twice@acme.vn' })).expect(201);
 
       const response = await enter(
-        row({ employeeCode: 'E-TWICE', workEmail: 'twice@acme.vn', departmentCode: 'P-NOPE', jobTitle: undefined }),
+        row({
+          employeeCode: 'E-TWICE',
+          workEmail: 'twice@acme.vn',
+          departmentCode: 'P-NOPE',
+          jobTitle: 'x'.repeat(256),
+        }),
       ).expect(422);
 
       expect(reasonsOf(response)).toEqual([
         { field: 'departmentCode', code: 'DEPARTMENT_NOT_FOUND' },
-        { field: 'jobTitle', code: 'JOB_TITLE_REQUIRED' },
+        { field: 'jobTitle', code: 'JOB_TITLE_TOO_LONG' },
         { field: 'employeeCode', code: 'EMPLOYEE_CODE_TAKEN' },
         { field: 'workEmail', code: 'WORK_EMAIL_TAKEN' },
       ]);
@@ -454,6 +467,124 @@ describe('manual employee entry over HTTP (integration, real PostgreSQL)', () =>
 
       expect(await sideTables()).toEqual(before);
       expect((await ctx.sql.query('SELECT count(*)::int AS n FROM employees')).rows[0]).toEqual(people);
+    });
+
+    it('is told by the service, not only by the route: an actor that is not the Super Admin enters nobody (F13)', async () => {
+      const before = await sideTables();
+      const people = (await ctx.sql.query<{ n: number }>('SELECT count(*)::int AS n FROM employees')).rows[0];
+      const itAdmin: AuthenticatedPrincipal = {
+        subject: it1.appUserId,
+        appUserId: it1.appUserId,
+        sessionId: 'service-level-session',
+        employeeId: it1.employeeId,
+        directRoles: ['IT_ADMIN'],
+        derivedRoles: [],
+        roles: ['IT_ADMIN'],
+      };
+
+      await expect(ctx.app.get(EmployeeManualService, { strict: false }).create(itAdmin, row())).rejects.toBeInstanceOf(
+        EmployeeForbiddenError,
+      );
+
+      expect(await sideTables()).toEqual(before);
+      expect((await ctx.sql.query('SELECT count(*)::int AS n FROM employees')).rows[0]).toEqual(people);
+    });
+  });
+
+  describe('the in-app notices of a new record (US-02-02 AC-17, F17)', () => {
+    const noticesAbout = async (employeeId: string) =>
+      (
+        await ctx.sql.query<{ recipient_employee_id: string; params: Record<string, unknown> }>(
+          `SELECT recipient_employee_id, params FROM in_app_notifications
+            WHERE code = 'EMPLOYEE_PROFILE_CREATED' AND subject_id = $1 ORDER BY recipient_employee_id`,
+          [employeeId],
+        )
+      ).rows;
+
+    it('tells the head of the department and the IT Admin in charge, in the same transaction, with ids only', async () => {
+      const department = (await ctx.sql.query<{ id: string }>(`SELECT id FROM departments WHERE code = 'P-OPS'`))
+        .rows[0];
+      // The department has the IT Admin in charge it needs (a usable one) and a head for the days of the entry.
+      await ctx.sql.query(`UPDATE departments SET it_admin_employee_id = $2 WHERE id = $1`, [
+        department.id,
+        it1.employeeId,
+      ]);
+      const person = await ctx.sql.query<{ id: string }>(`SELECT id FROM employees WHERE employee_code = 'E-FIN'`);
+      await ctx.sql.query(
+        `INSERT INTO department_head_periods (id, organization_id, department_id, employee_id, valid_from)
+         VALUES (gen_random_uuid(), $1, $2, $3, '2026-01-05')`,
+        [seed.organizationId, department.id, person.rows[0].id],
+      );
+
+      const response = await enter(row({ employeeCode: 'E-NOTICED' })).expect(201);
+
+      const notices = await noticesAbout(dataOf(response).id);
+      expect(notices.map((notice) => notice.recipient_employee_id).sort()).toEqual(
+        [it1.employeeId, person.rows[0].id].sort(),
+      );
+      for (const notice of notices) {
+        expect(notice.params).toEqual({ employeeId: dataOf(response).id, departmentId: department.id });
+      }
+      await ctx.sql.query(`DELETE FROM department_head_periods WHERE department_id = $1`, [department.id]);
+      await ctx.sql.query(`UPDATE departments SET it_admin_employee_id = NULL WHERE id = $1`, [department.id]);
+    });
+
+    it('tells nobody of a department that has no head and no IT Admin in charge, and writes nothing for a refused entry', async () => {
+      const entered = await enter(row({ employeeCode: 'E-QUIET' })).expect(201);
+      await enter(row({ employeeCode: 'E-QUIET', departmentCode: 'P-NOPE' })).expect(422);
+
+      expect(await noticesAbout(dataOf(entered).id)).toEqual([]);
+      expect(
+        (
+          await ctx.sql.query(
+            `SELECT 1 FROM in_app_notifications WHERE code = 'EMPLOYEE_PROFILE_CREATED' AND subject_id IS NULL`,
+          )
+        ).rows,
+      ).toEqual([]);
+    });
+
+    // F17: the notices are written in the transaction of the record. The inbox refuses the SECOND notice, after the first was written:
+    // the record goes with it (nothing created, no audit) and the first notice goes too (a record that was rolled back tells nobody).
+    it('rolls the record back when a notice fails, and leaves no notice of a record that was rolled back', async () => {
+      const department = (await ctx.sql.query<{ id: string }>(`SELECT id FROM departments WHERE code = 'P-OPS'`))
+        .rows[0];
+      await ctx.sql.query(`UPDATE departments SET it_admin_employee_id = $2 WHERE id = $1`, [
+        department.id,
+        it1.employeeId,
+      ]);
+      const head = await ctx.sql.query<{ id: string }>(`SELECT id FROM employees WHERE employee_code = 'E-FIN'`);
+      await ctx.sql.query(
+        `INSERT INTO department_head_periods (id, organization_id, department_id, employee_id, valid_from)
+         VALUES (gen_random_uuid(), $1, $2, $3, '2026-01-05')`,
+        [seed.organizationId, department.id, head.rows[0].id],
+      );
+      const countOf = async (text: string) => (await ctx.sql.query<{ n: number }>(text)).rows[0].n;
+      const notices = () =>
+        countOf(`SELECT count(*)::int AS n FROM in_app_notifications WHERE code = 'EMPLOYEE_PROFILE_CREATED'`);
+      const audited = () => countOf(`SELECT count(*)::int AS n FROM audit_events WHERE action = 'EMPLOYEE.CREATED'`);
+      const [noticesBefore, auditedBefore] = [await notices(), await audited()];
+      const inbox = ctx.app.get(NotificationsService, { strict: false });
+      const written = inbox.notifyInApp.bind(inbox);
+      let calls = 0;
+      const failing = jest.spyOn(inbox, 'notifyInApp').mockImplementation((tx, input) => {
+        calls += 1;
+
+        return calls === 2 ? Promise.reject(new Error('the inbox refused the second notice')) : written(tx, input);
+      });
+      let status: number;
+      try {
+        status = (await enter(row({ employeeCode: 'E-ROLLED' }))).status;
+      } finally {
+        failing.mockRestore();
+        await ctx.sql.query(`DELETE FROM department_head_periods WHERE department_id = $1`, [department.id]);
+        await ctx.sql.query(`UPDATE departments SET it_admin_employee_id = NULL WHERE id = $1`, [department.id]);
+      }
+
+      expect(status).toBe(500);
+      expect(calls).toBe(2);
+      expect((await ctx.sql.query(`SELECT 1 FROM employees WHERE employee_code = 'E-ROLLED'`)).rows).toEqual([]);
+      expect(await audited()).toBe(auditedBefore);
+      expect(await notices()).toBe(noticesBefore);
     });
   });
 

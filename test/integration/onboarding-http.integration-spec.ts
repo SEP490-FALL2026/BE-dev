@@ -7,6 +7,7 @@ import {
   insertEmployeeFixture,
   seedInstallation,
 } from '../support/http-test-app';
+import { HR_BASIS } from '../support/hr-basis';
 
 interface Step {
   step: number;
@@ -25,7 +26,6 @@ interface Step {
     closed?: boolean;
     closedAt?: string | null;
   };
-  createDepartmentBlockedBy?: string | null;
   warnings?: { code: string; departmentCode: string }[];
 }
 
@@ -90,9 +90,12 @@ describe('the onboarding checklist over HTTP (integration, real PostgreSQL)', ()
       .attach('file', Buffer.from(content), 'people.csv');
   const HEADER = 'employee_code,full_name,work_email,employment_type,hire_date,department_code,job_title';
 
-  it('is for the IT Admin only', async () => {
-    for (const headers of [as(finance), { Authorization: `Bearer ${admin}` }]) {
-      await request(server()).get('/api/v1/onboarding-checklist').set(headers).expect(403);
+  it('is for the Super Admin, who does step 1, and the IT Admin, who does steps 2 to 5, and nobody else (US-02-04, F13)', async () => {
+    await request(server()).get('/api/v1/onboarding-checklist').set(as(finance)).expect(403);
+    for (const headers of [as(it1), { Authorization: `Bearer ${admin}` }]) {
+      const response = await request(server()).get('/api/v1/onboarding-checklist').set(headers).expect(200);
+
+      expect((response.body as { data: { steps: Step[] } }).data.steps).toHaveLength(5);
     }
   });
 
@@ -108,17 +111,12 @@ describe('the onboarding checklist over HTTP (integration, real PostgreSQL)', ()
     ]);
   });
 
-  it('says a new department is blocked until the operator activates the Cost Center link, and unblocks when it does (spec L.11)', async () => {
-    expect((await steps())[0].createDepartmentBlockedBy).toBe('AWAITING_ACTIVATION');
+  it('says nothing of an activation any more: a department is created before its Cost Center, and step 1 never waits for one (F14, QĐ-87d(1))', async () => {
+    const response = await request(server()).get('/api/v1/onboarding-checklist').set(as(it1)).expect(200);
+    const [first] = (response.body as { data: { steps: Step[] } }).data.steps;
 
-    await ctx.sql.query(
-      `INSERT INTO cost_center_direction_activations (id, organization_id, release_evidence, approver_ref, operator_ref, environment)
-       VALUES (gen_random_uuid(), $1, 'onboarding-http', 'test', 'test', 'LOCAL_TEST')`,
-      [seed.organizationId],
-    );
-
-    const [first] = await steps();
-    expect(first.createDepartmentBlockedBy).toBeNull();
+    expect(Object.keys(first)).not.toContain('createDepartmentBlockedBy');
+    expect(response.text).not.toMatch(/AWAITING_ACTIVATION|NO_FREE_COST_CENTER/);
   });
 
   it('shows a department with no Cost Center as a warning that stops nothing, and drops it once Finance creates one for it (QĐ-87d(1))', async () => {
@@ -153,13 +151,13 @@ describe('the onboarding checklist over HTTP (integration, real PostgreSQL)', ()
     const head = await createActivatedAccount(ctx, seed, { code: 'E-HEAD', email: 'head@acme.vn', roles: [], admin });
     await request(server())
       .post(`/api/v1/departments/${seed.departmentId}/head-assignments`)
-      .set(as(it1))
-      .send({ employeeId: head.employeeId, effectiveFrom: today() })
+      .set({ Authorization: `Bearer ${admin}` })
+      .send({ employeeId: head.employeeId, effectiveFrom: today(), hrBasis: HR_BASIS })
       .expect(200);
     await request(server())
       .patch(`/api/v1/departments/${seed.departmentId}`)
-      .set(as(it1))
-      .send({ itAdminEmployeeId: it1.employeeId })
+      .set({ Authorization: `Bearer ${admin}` })
+      .send({ itAdminEmployeeId: it1.employeeId, hrBasis: HR_BASIS })
       .expect(200);
 
     const [first] = await steps();

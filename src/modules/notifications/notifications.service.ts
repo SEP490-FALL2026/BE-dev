@@ -1,9 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { DbTx } from '../../infrastructure/database/transaction-runner';
+import { HeldNotificationService } from './inbox/held-notification.service';
 import { InboxService } from './inbox/inbox.service';
 import { NotificationsRepo } from './notifications.repo';
-import { DeliveryState, EnqueueEmailInput, InAppNotificationInput } from './notifications.types';
+import {
+  DeliveryState,
+  EnqueueEmailInput,
+  HeldDepartmentNotificationInput,
+  InAppNotificationInput,
+} from './notifications.types';
 import { PayloadCipher } from './payload-cipher';
 
 /** Public facade of the notifications module. */
@@ -13,6 +19,7 @@ export class NotificationsService {
     private readonly repo: NotificationsRepo,
     private readonly cipher: PayloadCipher,
     private readonly inbox: InboxService,
+    private readonly held: HeldNotificationService,
   ) {}
 
   /**
@@ -45,6 +52,26 @@ export class NotificationsService {
    */
   notifyInApp(tx: DbTx, input: InAppNotificationInput): Promise<boolean> {
     return this.inbox.deliver(tx, input);
+  }
+
+  /**
+   * Keeps a notice for a department that has no head yet, in the caller's transaction (F67, T-11); true when it was kept, false
+   * when this event key is already held. Nobody is told until the first head is named. Throws InvalidInAppNotificationError for a
+   * notice the closed table refuses.
+   */
+  holdForDepartment(tx: DbTx, input: HeldDepartmentNotificationInput): Promise<boolean> {
+    return this.held.hold(tx, input);
+  }
+
+  /**
+   * Hands every notice kept for the department to its first head, once, in the caller's transaction (the transaction in which
+   * the Super Admin names that head), and to nobody else; returns how many were handed over.
+   */
+  deliverHeldToHead(
+    tx: DbTx,
+    input: { organizationId: string; departmentId: string; headEmployeeId: string },
+  ): Promise<number> {
+    return this.held.deliverToHead(tx, input);
   }
 
   cancelPendingForTokens(tx: DbTx, actionTokenHashes: string[]): Promise<number> {

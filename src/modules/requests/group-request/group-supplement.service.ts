@@ -8,6 +8,7 @@ import { GroupSupplementDropRefusedError } from './group-request.errors';
 import { pricedPeople } from './group-request.types';
 import { GroupResolutionService } from './group-resolution.service';
 import { RequestLineRepo } from './request-line.repo';
+import { RequestOutcomeListeners } from '../access-request/request-outcome-listeners';
 import { SupplementDropRepo } from './supplement-drop.repo';
 
 /**
@@ -23,6 +24,7 @@ export class GroupSupplementService {
     private readonly drops: SupplementDropRepo,
     private readonly resolution: GroupResolutionService,
     private readonly audit: AuditService,
+    private readonly outcomes: RequestOutcomeListeners,
   ) {}
 
   /**
@@ -92,6 +94,8 @@ export class GroupSupplementService {
           },
         ),
       );
+      // The line of a person the head left out of the file ended for them without a grant (F43).
+      await this.outcomes.ended(tx, request, [employeeId], now);
     }
     await this.drops.insertMany(tx, request.id, number, employeeIds);
     await this.resolution.resolve(tx, actor, request.id, now);

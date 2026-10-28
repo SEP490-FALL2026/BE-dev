@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
-import { ApiAccount, createActivatedAccount } from '../support/api-accounts';
+import { NotificationsService } from '../../src/modules/notifications/notifications.service';
 import { HR_BASIS } from '../support/hr-basis';
 import { SeatHarness } from '../support/seat-baseline-harness';
 
@@ -13,16 +13,18 @@ interface MaintainedWire {
   workEmail: string | null;
   employmentType: string;
   hireDate: string;
+  jobTitle: string | null;
   status: string;
 }
 
-/** US-02-02 AC-19 (QĐ-82m INF-20): the IT Admin corrects the official fields of a record that exists, on an HR basis. */
+/**
+ * US-02-02 AC-19 (QĐ-82m INF-20, QĐ-87a): the Super Admin corrects the official fields of a record that exists, on an HR basis, and
+ * never their own (QĐ-87c, F19); the IT Admin does not (F11).
+ */
 describe('correcting the official fields of an employee over HTTP (integration, real PostgreSQL)', () => {
-  let it2: ApiAccount;
-
   beforeAll(async () => {
     await h.start();
-    // it1 is the IT Admin in charge of the seed department; it2 is another IT Admin who can stand in for them.
+    // it1 is the IT Admin in charge of the seed department: a role that may no longer correct a record.
     await h.ctx.sql.query(`UPDATE departments SET it_admin_employee_id = $1 WHERE id = $2`, [
       h.it1.employeeId,
       h.seed.departmentId,
@@ -34,7 +36,7 @@ describe('correcting the official fields of an employee over HTTP (integration, 
   });
 
   const superAdmin = () => ({ Authorization: `Bearer ${h.admin}` });
-  const patch = (id: string, body: object, headers: Record<string, string> = h.as(h.it1)) =>
+  const patch = (id: string, body: object, headers: Record<string, string> = superAdmin()) =>
     request(h.server()).patch(`/api/v1/employees/${id}`).set(headers).send(body);
   const withBasis = (body: object) => ({ ...body, hrBasis: HR_BASIS });
   const dataOf = (response: request.Response) => (response.body as { data: MaintainedWire }).data;
@@ -49,9 +51,11 @@ describe('correcting the official fields of an employee over HTTP (integration, 
         normalized_work_email: string | null;
         employment_type: string;
         hire_date: string;
+        job_title: string | null;
         status: string;
       }>(
-        `SELECT full_name, work_email, normalized_work_email, employment_type, to_char(hire_date, 'YYYY-MM-DD') AS hire_date, status
+        `SELECT full_name, work_email, normalized_work_email, employment_type, to_char(hire_date, 'YYYY-MM-DD') AS hire_date,
+                job_title, status
            FROM employees WHERE id = $1`,
         [id],
       )
@@ -70,7 +74,7 @@ describe('correcting the official fields of an employee over HTTP (integration, 
       )
     ).rows;
 
-  it('lets the IT Admin in charge change the name, and records who, the values before and after, and the HR basis (AC-19)', async () => {
+  it('lets the Super Admin change the name, and records who, the values before and after, and the HR basis (AC-19)', async () => {
     const id = await h.person('MNT1');
 
     const response = await patch(id, withBasis({ fullName: 'Nguyễn Văn A' })).expect(200);
@@ -80,30 +84,145 @@ describe('correcting the official fields of an employee over HTTP (integration, 
     expect((await rowOf(id)).full_name).toBe('Nguyễn Văn A');
     expect(await auditOf(id)).toEqual([
       {
-        actor_app_user_id: h.it1.appUserId,
-        actor_roles: ['IT_ADMIN'],
+        actor_app_user_id: h.seed.superAdmin.appUserId,
+        actor_roles: ['SUPER_ADMIN'],
         before: { employeeCode: 'MNT1', fullName: 'Person MNT1' },
-        after: { fullName: 'Nguyễn Văn A', hrBasis: HR_BASIS, byItAdminInCharge: true, selfExecuted: false },
+        after: { fullName: 'Nguyễn Văn A', hrBasis: HR_BASIS },
       },
     ]);
   });
 
-  it('lets another IT Admin do it, and says in the audit that they are not the one in charge', async () => {
-    it2 = await createActivatedAccount(h.ctx, h.seed, {
-      code: 'E-IT2',
-      email: 'it2@acme.vn',
-      roles: ['IT_ADMIN'],
-      admin: h.admin,
+  describe('the job title: optional free text, corrected with an HR basis (QĐ-87e, F11)', () => {
+    it('is set, changed and cleared as typed, with the display form stored and before and after in the audit', async () => {
+      const id = await h.person('MNT-T1');
+
+      const set = await patch(id, withBasis({ jobTitle: '  Chief   Happiness  Officer ' })).expect(200);
+      const changed = await patch(id, withBasis({ jobTitle: 'Head of Joy' })).expect(200);
+      const cleared = await patch(id, withBasis({ jobTitle: null })).expect(200);
+
+      expect(dataOf(set).jobTitle).toBe('Chief Happiness Officer');
+      expect(dataOf(changed).jobTitle).toBe('Head of Joy');
+      expect(dataOf(cleared).jobTitle).toBeNull();
+      expect((await rowOf(id)).job_title).toBeNull();
+      expect((await auditOf(id)).map((event) => [event.before.jobTitle, event.after.jobTitle])).toEqual([
+        ['Administrator', 'Chief Happiness Officer'],
+        ['Chief Happiness Officer', 'Head of Joy'],
+        ['Head of Joy', null],
+      ]);
     });
-    const id = await h.person('MNT2');
 
-    await patch(id, withBasis({ employmentType: 'CONTRACTOR' }), h.as(it2)).expect(200);
+    it('refuses a title longer than 255 characters as a reason of the row, and changes nothing', async () => {
+      const id = await h.person('MNT-T2');
+      const before = await rowOf(id);
 
-    expect((await rowOf(id)).employment_type).toBe('CONTRACTOR');
-    expect((await auditOf(id))[0]).toMatchObject({
-      actor_app_user_id: it2.appUserId,
-      before: { employmentType: 'STAFF' },
-      after: { employmentType: 'CONTRACTOR', byItAdminInCharge: false, selfExecuted: false },
+      const response = await patch(id, withBasis({ jobTitle: 'x'.repeat(256) })).expect(422);
+
+      expect(codeOf(response)).toBe('EMPLOYEE.ROW_INVALID');
+      expect(reasonsOf(response)).toEqual([{ field: 'jobTitle', code: 'JOB_TITLE_TOO_LONG' }]);
+      expect(await rowOf(id)).toEqual(before);
+    });
+
+    it('is not an event: no placement is added and no transfer is recorded for it', async () => {
+      const id = await h.person('MNT-T3');
+      const count = async () =>
+        (
+          await h.ctx.sql.query<{ n: number }>(
+            `SELECT count(*)::int AS n FROM employee_placements WHERE employee_id = $1`,
+            [id],
+          )
+        ).rows[0].n;
+      const placements = await count();
+
+      await patch(id, withBasis({ jobTitle: 'Brand new title' })).expect(200);
+
+      expect(await count()).toBe(placements);
+      expect((await h.ctx.sql.query(`SELECT 1 FROM department_transfers WHERE employee_id = $1`, [id])).rows).toEqual(
+        [],
+      );
+    });
+  });
+
+  describe('the in-app notices of a correction (QĐ-87b(3), F17)', () => {
+    const noticesFor = async (employeeIds: string[]) =>
+      (
+        await h.ctx.sql.query<{ recipient_employee_id: string; params: Record<string, unknown> }>(
+          `SELECT recipient_employee_id, params FROM in_app_notifications
+            WHERE code = 'EMPLOYEE_PROFILE_UPDATED' AND recipient_employee_id = ANY($1::uuid[])`,
+          [employeeIds],
+        )
+      ).rows;
+
+    it('tells the employee and the head of their department, in the same transaction, with ids only', async () => {
+      const subject = await h.person('MNT-N1');
+      const head = await h.person('MNT-N2');
+      await h.ctx.sql.query(
+        `INSERT INTO department_head_periods (id, organization_id, department_id, employee_id, valid_from)
+         VALUES (gen_random_uuid(), $1, $2, $3, '2026-01-05')`,
+        [h.seed.organizationId, h.seed.departmentId, head],
+      );
+
+      await patch(subject, withBasis({ fullName: 'Renamed Person' })).expect(200);
+
+      const notices = await noticesFor([subject, head]);
+      expect(notices.map((notice) => notice.recipient_employee_id).sort()).toEqual([head, subject].sort());
+      for (const notice of notices) {
+        expect(notice.params).toEqual({ employeeId: subject, departmentId: h.seed.departmentId });
+      }
+    });
+
+    it('tells nobody when nothing changed, and nothing is left behind when the correction is refused', async () => {
+      const subject = await h.person('MNT-N3');
+
+      await patch(subject, withBasis({ fullName: 'Person MNT-N3' })).expect(200);
+      await patch(subject, withBasis({ jobTitle: 'x'.repeat(256) })).expect(422);
+
+      expect(await noticesFor([subject])).toEqual([]);
+    });
+
+    // F17: the notices are written in the transaction of the correction. The inbox refuses the SECOND notice, after the first was
+    // written: the correction goes with it (the record as it was, no audit) and so does the first notice.
+    it('rolls the correction back when a notice fails, and leaves no notice of a correction that was rolled back', async () => {
+      const subject = await h.person('MNT-R1');
+      const heads = await h.ctx.sql.query<{ employee_id: string }>(
+        `SELECT employee_id FROM department_head_periods WHERE department_id = $1 AND valid_to IS NULL`,
+        [h.seed.departmentId],
+      );
+      if (heads.rows.length === 0) {
+        await h.ctx.sql.query(
+          `INSERT INTO department_head_periods (id, organization_id, department_id, employee_id, valid_from)
+           VALUES (gen_random_uuid(), $1, $2, $3, '2026-01-05')`,
+          [h.seed.organizationId, h.seed.departmentId, await h.person('MNT-R2')],
+        );
+      }
+      const noticesAbout = async (employeeId: string) =>
+        (
+          await h.ctx.sql.query<{ recipient_employee_id: string }>(
+            `SELECT recipient_employee_id FROM in_app_notifications
+              WHERE code = 'EMPLOYEE_PROFILE_UPDATED' AND params ->> 'employeeId' = $1`,
+            [employeeId],
+          )
+        ).rows;
+      const before = await rowOf(subject);
+      const inbox = h.ctx.app.get(NotificationsService, { strict: false });
+      const written = inbox.notifyInApp.bind(inbox);
+      let calls = 0;
+      const failing = jest.spyOn(inbox, 'notifyInApp').mockImplementation((tx, input) => {
+        calls += 1;
+
+        return calls === 2 ? Promise.reject(new Error('the inbox refused the second notice')) : written(tx, input);
+      });
+      let status: number;
+      try {
+        status = (await patch(subject, withBasis({ fullName: 'Rolled Back Name' }))).status;
+      } finally {
+        failing.mockRestore();
+      }
+
+      expect(status).toBe(500);
+      expect(calls).toBe(2);
+      expect(await rowOf(subject)).toEqual(before);
+      expect(await auditOf(subject)).toEqual([]);
+      expect(await noticesAbout(subject)).toEqual([]);
     });
   });
 
@@ -136,11 +255,11 @@ describe('correcting the official fields of an employee over HTTP (integration, 
   });
 
   describe('who may do it, and what may not be changed', () => {
-    it('is not an operation of the Super Admin, who only creates records, nor of Finance, an employee or a department head', async () => {
+    it('is not an operation of the IT Admin, not even the one in charge of the department, nor of Finance or an employee (F11, F13)', async () => {
       const id = await h.person('MNT4');
       const before = await rowOf(id);
 
-      for (const headers of [superAdmin(), h.as(h.finance), h.as(h.employee)]) {
+      for (const headers of [h.as(h.it1), h.as(h.finance), h.as(h.employee)]) {
         expect(codeOf(await patch(id, withBasis({ fullName: 'Nope' }), headers).expect(403))).toBe(
           'AUTHORIZATION.FORBIDDEN',
         );
@@ -151,7 +270,7 @@ describe('correcting the official fields of an employee over HTTP (integration, 
 
     it.each([
       ['a department', { departmentCode: 'P-OPS' }],
-      ['a job title', { jobTitleId: randomUUID() }],
+      ['a catalogue entry for the title', { jobTitleId: randomUUID() }],
       ['a status', { status: 'TERMINATED' }],
       ['the employee code', { employeeCode: 'E-NEW' }],
       ['a login email', { loginEmail: 'x@acme.vn' }],
@@ -238,24 +357,31 @@ describe('correcting the official fields of an employee over HTTP (integration, 
     });
   });
 
-  describe('the record of the IT Admin who is asking (SoD-5, QĐ-77m)', () => {
-    it('is changed by another IT Admin when one can act, and by the IT Admin themselves only when nobody else can, flagged as such', async () => {
-      // it2 exists and is usable: it1 may not change their own record.
-      const refused = await patch(h.it1.employeeId, withBasis({ fullName: 'Self Edit' })).expect(403);
-      expect(codeOf(refused)).toBe('EMPLOYEE.ANOTHER_IT_ADMIN_NEEDED');
-      expect((await rowOf(h.it1.employeeId)).full_name).not.toBe('Self Edit');
+  describe('the record of the Super Admin who is asking (QĐ-87c, F19)', () => {
+    it('is refused with 403 EMPLOYEE.SELF_CHANGE_FORBIDDEN, which points only to the controlled procedure, and writes nothing', async () => {
+      const own = h.seed.superAdmin.employeeId;
+      const before = await rowOf(own);
 
-      await patch(h.it1.employeeId, withBasis({ fullName: 'Edited By Other' }), h.as(it2)).expect(200);
-      expect((await rowOf(h.it1.employeeId)).full_name).toBe('Edited By Other');
+      const refused = await patch(own, withBasis({ fullName: 'Self Edit' })).expect(403);
 
-      // Only it1 is left: the IT Admin may change their own record, and the audit says it was self-executed.
-      await h.ctx.sql.query(`UPDATE app_users SET status = 'LOCKED' WHERE id = $1`, [it2.appUserId]);
-      await patch(h.it1.employeeId, withBasis({ fullName: 'Self Edit' })).expect(200);
+      expect(codeOf(refused)).toBe('EMPLOYEE.SELF_CHANGE_FORBIDDEN');
+      const message = (refused.body as { error: { message: string } }).error.message;
+      expect(message).toContain('pnpm ops:record-super-admin-event profile-correct');
+      expect(message).not.toMatch(/IT Admin|another/i);
+      expect(await rowOf(own)).toEqual(before);
+      expect(await auditOf(own)).toEqual([]);
+      // Even a body that would be refused for another reason is answered by the role first, not by the row.
+      expect(codeOf(await patch(own, withBasis({ jobTitle: 'x'.repeat(256) })).expect(403))).toBe(
+        'EMPLOYEE.SELF_CHANGE_FORBIDDEN',
+      );
+    });
 
-      const events = await auditOf(h.it1.employeeId);
-      expect(events.at(-1)).toMatchObject({
-        actor_app_user_id: h.it1.appUserId,
-        after: { fullName: 'Self Edit', selfExecuted: true, byItAdminInCharge: true },
+    it('lets the Super Admin correct anybody else, an IT Admin included, whatever the department says', async () => {
+      await patch(h.it1.employeeId, withBasis({ fullName: 'Edited By The Super Admin' })).expect(200);
+
+      expect((await rowOf(h.it1.employeeId)).full_name).toBe('Edited By The Super Admin');
+      expect((await auditOf(h.it1.employeeId)).at(-1)).toMatchObject({
+        actor_app_user_id: h.seed.superAdmin.appUserId,
       });
     });
   });

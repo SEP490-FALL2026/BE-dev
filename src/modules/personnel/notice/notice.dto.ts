@@ -108,13 +108,14 @@ export const noticeDetailSchema = noticeSummarySchema.extend({
     .nullable(),
   handledAt: z.iso.datetime().nullable(),
   overdueNoticedAt: z.iso.datetime().nullable(),
-  /** How the IT Admin checked the notice; only the IT Admin sees it, so a head reads null. */
+  /** How the Super Admin checked the notice; only the Super Admin sees it, so an IT Admin and a head read null. */
   verification: z
     .strictObject({
       method: z.enum(VERIFICATION_METHODS),
       reference: z.string(),
-      /** Null only for a verification the controlled procedure of the release after this one recorded (spec L.2). */
+      /** The account that checked it; null when the controlled procedure recorded it (`verifiedByProcedure`, spec L.2). */
       verifiedByAppUserId: z.uuid().nullable(),
+      verifiedByProcedure: z.boolean(),
       verifiedAt: z.iso.datetime(),
     })
     .nullable(),

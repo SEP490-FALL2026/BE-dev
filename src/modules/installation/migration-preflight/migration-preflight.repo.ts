@@ -107,7 +107,8 @@ export class MigrationPreflightRepo {
   /**
    * The facts of the contract gates (spec L.10), in the schema the database has now. Each gate probes `information_schema`
    * and `to_regclass` first and names an object only after the probe saw it, so the same read serves a database before
-   * the expansion migration, after it, and an empty one.
+   * the expansion migration, on the compatibility schema, on the final one (where the objects of the destructive migrations
+   * are gone) and an empty one.
    */
   async contractGateFacts(tx: DbTx): Promise<ContractGateFacts> {
     return {
@@ -121,13 +122,19 @@ export class MigrationPreflightRepo {
   /**
    * The proposals `7c28e75` gave back because the first version made from them was refused (F63, spec J.2): the three tables exist
    * from the budgets migration on, so they are probed (an empty or older database has none). Only ids and flags are read; the reason
-   * of a refusal is compared in the database and never leaves it.
+   * of a refusal is compared in the database and never leaves it. The same expressions as the first block of
+   * `20261029100600_budget_lifecycle_structure`. That migration reconciles these rows and adds `successor_of_proposal_id`; from then
+   * on a returned proposal that has a refusal on a version is an ordinary one (Finance returned it afterwards), not a row of the old
+   * path, so nothing is read once the column is there.
    */
   private async legacyReturnFacts(tx: DbTx): Promise<LegacyReturnFacts> {
-    const [probe] = await tx.$queryRaw<{ present: boolean }[]>`
+    const [probe] = await tx.$queryRaw<{ present: boolean; reconciled: boolean }[]>`
       SELECT to_regclass('public.budget_proposals') IS NOT NULL AND to_regclass('public.budget_versions') IS NOT NULL
-             AND to_regclass('public.budget_version_decisions') IS NOT NULL AS "present"`;
-    if (!probe.present) return { candidates: [], neighbours: [] };
+             AND to_regclass('public.budget_version_decisions') IS NOT NULL AS "present",
+             EXISTS (SELECT 1 FROM information_schema.columns
+                      WHERE table_schema = 'public' AND table_name = 'budget_proposals'
+                        AND column_name = 'successor_of_proposal_id') AS "reconciled"`;
+    if (!probe.present || probe.reconciled) return { candidates: [], neighbours: [] };
 
     const candidates = await tx.$queryRaw<LegacyReturnFacts['candidates']>`
       SELECT p."id"::text AS "proposalId",
@@ -194,10 +201,13 @@ export class MigrationPreflightRepo {
   }
 
   /**
-   * The Cost Center link (F01, spec L.11). Probed first like every gate. Before the compatibility migration the Cost
-   * Centers no department's column names are rows to link later; after it, every Cost Center with no department — computed
-   * on every run, so a row the previous release writes after the migration or after a recovery is listed — a department
-   * whose own column contradicts the link (when that column still exists), and the organizations not yet activated.
+   * The Cost Center link (F01, spec L.11), as the FINAL release reads it. Probed first like every gate. Before the compatibility
+   * migration the organizations of the database are listed: the release skipped the expansion. On the compatibility schema,
+   * while the old column `departments.cost_center_id` still exists, every Cost Center with no department — computed on every
+   * run, so a row the previous release writes after the migration or after a recovery is listed — a department whose own column
+   * contradicts the link, and the organizations not yet activated (the three the migration `…_cost_center_belongs_to_department`
+   * raises for). Once that migration has dropped the old column the schema requires the link and the final installation writes no
+   * activation row, so none of the three is read: nothing about the direction can be open.
    */
   private async costCenterDirectionFacts(tx: DbTx): Promise<ContractGateFacts['costCenterDirection']> {
     const [probe] = await tx.$queryRaw<
@@ -207,6 +217,7 @@ export class MigrationPreflightRepo {
         hasLinks: boolean;
         hasActivations: boolean;
         hasOldColumn: boolean;
+        hasOrganizations: boolean;
       }[]
     >`
       SELECT to_regclass('public.cost_centers') IS NOT NULL AS "hasCostCenters",
@@ -217,31 +228,29 @@ export class MigrationPreflightRepo {
              to_regclass('public.cost_center_direction_activations') IS NOT NULL AS "hasActivations",
              EXISTS (SELECT 1 FROM information_schema.columns
                       WHERE table_schema = 'public' AND table_name = 'departments'
-                        AND column_name = 'cost_center_id') AS "hasOldColumn"`;
-    const none = { costCenterIds: [], mismatches: [], notActivated: [] };
+                        AND column_name = 'cost_center_id') AS "hasOldColumn",
+             to_regclass('public.organizations') IS NOT NULL AS "hasOrganizations"`;
+    const none = { organizationIds: [], costCenterIds: [], mismatches: [], notActivated: [] };
     if (!probe.hasCostCenters) return { schema: 'NO_TABLE', ...none };
 
     const present = [probe.hasColumn, probe.hasLinks, probe.hasActivations];
     if (present.every((seen) => !seen)) {
-      // Before the migration the link is the department's own column.
-      const rows = probe.hasOldColumn
-        ? await tx.$queryRaw<{ id: string }[]>`
-            SELECT c."id"::text AS "id" FROM "cost_centers" c
-             WHERE NOT EXISTS (SELECT 1 FROM "departments" d WHERE d."cost_center_id" = c."id") ORDER BY c."id"`
+      const organizations = probe.hasOrganizations
+        ? await tx.$queryRaw<{ id: string }[]>`SELECT "id"::text AS "id" FROM "organizations" ORDER BY "id"`
         : [];
 
-      return { schema: 'ABSENT', ...none, costCenterIds: rows.map((row) => row.id) };
+      return { schema: 'ABSENT', ...none, organizationIds: organizations.map((row) => row.id) };
     }
     if (!present.every(Boolean)) return { schema: 'PARTIAL', ...none };
+    // The final schema: the link is a NOT NULL column, the old department column is gone and no activation is read.
+    if (!probe.hasOldColumn) return { schema: 'READY', ...none };
 
     const unlinked = await tx.$queryRaw<{ id: string }[]>`
       SELECT "id"::text AS "id" FROM "cost_centers" WHERE "department_id" IS NULL ORDER BY "id"`;
-    const mismatches = probe.hasOldColumn
-      ? await tx.$queryRaw<{ costCenterId: string; departmentId: string }[]>`
-          SELECT c."id"::text AS "costCenterId", d."id"::text AS "departmentId"
-            FROM "departments" d JOIN "cost_centers" c ON c."id" = d."cost_center_id"
-           WHERE c."department_id" IS DISTINCT FROM d."id" ORDER BY c."id"`
-      : [];
+    const mismatches = await tx.$queryRaw<{ costCenterId: string; departmentId: string }[]>`
+      SELECT c."id"::text AS "costCenterId", d."id"::text AS "departmentId"
+        FROM "departments" d JOIN "cost_centers" c ON c."id" = d."cost_center_id"
+       WHERE c."department_id" IS DISTINCT FROM d."id" ORDER BY c."id"`;
     const notActivated = await tx.$queryRaw<{ id: string }[]>`
       SELECT o."id"::text AS "id" FROM "organizations" o
        WHERE NOT EXISTS (SELECT 1 FROM "cost_center_direction_activations" a WHERE a."organization_id" = o."id")
@@ -249,6 +258,7 @@ export class MigrationPreflightRepo {
 
     return {
       schema: 'READY',
+      organizationIds: [],
       costCenterIds: unlinked.map((row) => row.id),
       mismatches,
       notActivated: notActivated.map((row) => row.id),
@@ -256,9 +266,10 @@ export class MigrationPreflightRepo {
   }
 
   /**
-   * The owner department of a subscription (F02, spec L.3). Valid assignment: exactly one row for the subscription, of
-   * the same organization, to a department of that organization. Open: no owner department and no valid assignment, or
-   * an owner department the assignment contradicts. The ids come out sorted and nothing else is read.
+   * The owner department of a subscription (F02, spec L.3). Before the expansion migration every subscription is listed (the
+   * database skipped the expansion). Valid assignment: exactly one row for the subscription, of the same organization, to a
+   * department of that organization. Open: no owner department and no valid assignment, or an owner department the assignment
+   * contradicts — none once the final migration made the column required. The ids come out sorted and nothing else is read.
    */
   private async subscriptionOwnerFacts(tx: DbTx): Promise<ContractGateFacts['subscriptionOwner']> {
     const [probe] = await tx.$queryRaw<{ hasSubscriptions: boolean; hasColumn: boolean; hasTable: boolean }[]>`
@@ -287,7 +298,8 @@ export class MigrationPreflightRepo {
               AND (a."id" IS NULL OR d."id" IS NULL
                    OR a."organization_id" <> s."organization_id" OR d."organization_id" <> s."organization_id"))
           OR (s."owner_department_id" IS NOT NULL AND a."id" IS NOT NULL
-              AND a."department_id" <> s."owner_department_id")
+              AND (a."department_id" <> s."owner_department_id"
+                   OR a."organization_id" <> s."organization_id" OR d."organization_id" <> s."organization_id"))
        ORDER BY s."id"`;
 
     return { schema, subscriptionIds: rows.map((row) => row.id) };

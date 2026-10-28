@@ -34,6 +34,9 @@ export class RequestTimingRepo {
       },
     });
     if (!row) return null;
+    // The filter above leaves drafts out, and only a draft has no moment it was sent.
+    if (row.submittedAt === null)
+      throw new Error(`The request ${requestId} is read for its time but has not been sent.`);
     const sentAt = row.batchItems.map((item) => item.batch.submittedAt.getTime());
 
     return {

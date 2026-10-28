@@ -8,8 +8,10 @@ import {
   insertEmployeeFixture,
   seedInstallation,
 } from '../support/http-test-app';
+import { OrganizationHistoryService } from '../../src/modules/organization/organization-history.service';
 import { findPlacementCoverageViolations } from '../support/placement-coverage';
 import { HR_BASIS } from '../support/hr-basis';
+import { UseFacts, registerUseReaders } from '../support/organization-use-readers';
 
 interface DepartmentWire {
   id: string;
@@ -25,6 +27,8 @@ interface DepartmentWire {
   warnings: string[];
   headHistory: { employeeCode: string; validFrom: string; validTo: string | null }[];
   projects: { id: string; name: string; description: string | null; status: string; departments: { code: string }[] }[];
+  /** The person named to take over from a day after today; null when nobody is (`QĐ-87` `D-5`). */
+  successor: { employeeId: string; employeeCode: string; since: string } | null;
   deactivatedAt: string | null;
 }
 
@@ -67,6 +71,25 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
   const asIt = () => ({ Authorization: `Bearer ${it1.accessToken}` });
   const asAdmin = () => ({ Authorization: `Bearer ${admin}` });
   const as = (account: ApiAccount) => ({ Authorization: `Bearer ${account.accessToken}` });
+  let useFacts: UseFacts;
+
+  /**
+   * Every change the Super Admin makes to a department or a project cites its HR basis (`QĐ-87b(1)`): the request carries one unless
+   * the case names `hrBasis` itself (`hrBasis: undefined` leaves it out). Reads and the other routes go as they are.
+   */
+  const api = () => {
+    const writes = (test: request.Test, path: string): request.Test =>
+      /^\/api\/v1\/(departments|projects)/.test(path) ? test.send({ hrBasis: HR_BASIS }) : test;
+
+    const agent = request(server());
+
+    return {
+      get: (path: string) => agent.get(path),
+      delete: (path: string) => agent.delete(path),
+      post: (path: string) => writes(agent.post(path), path),
+      patch: (path: string) => writes(agent.patch(path), path),
+    };
+  };
 
   beforeAll(async () => {
     ctx = await createHttpTestApp();
@@ -80,14 +103,14 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
     });
     it1 = await createActivatedAccount(ctx, seed, { code: 'E-IT1', email: 'it1@acme.vn', roles: ['IT_ADMIN'], admin });
     it2 = await createActivatedAccount(ctx, seed, { code: 'E-IT2', email: 'it2@acme.vn', roles: ['IT_ADMIN'], admin });
-    // The operator has activated the Cost Center link: a department can be created (spec L.11; the 409 before it is in
-    // `cost-center-direction-http`).
-    await ctx.sql.query(
-      `INSERT INTO cost_center_direction_activations (id, organization_id, release_evidence, approver_ref, operator_ref, environment)
-       VALUES (gen_random_uuid(), $1, 'departments-http', 'test', 'test', 'LOCAL_TEST')`,
-      [seed.organizationId],
-    );
+    // What keeps a department or a Cost Center in use lives in other modules: every group answers with nothing unless a case says so.
+    useFacts = registerUseReaders(ctx.app);
   }, 120000);
+
+  afterEach(() => {
+    useFacts.openWork = [];
+    useFacts.subscriptions = [];
+  });
 
   afterAll(async () => {
     await ctx?.close();
@@ -105,7 +128,7 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
   /** What Finance sends to create the Cost Center of a department. */
   const createCostCenterFor = async (departmentId: string, kind = 'UNIT'): Promise<{ id: string; code: string }> => {
     const code = unique('CCX');
-    const response = await request(server())
+    const response = await api()
       .post('/api/v1/cost-centers')
       .set(asFinance())
       .send({ code, name: `Name of ${code}`, kind, departmentId })
@@ -122,7 +145,7 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
     ...overrides,
   });
   const createDepartment = (body: object, headers: Record<string, string> = asAdmin()) =>
-    request(server()).post('/api/v1/departments').set(headers).send(body);
+    api().post('/api/v1/departments').set(headers).send(body);
   /** A department with the Cost Center Finance created for it, as the profile shows it. */
   const newDepartment = async (overrides: Record<string, unknown> = {}): Promise<DepartmentWire> => {
     const created = dataOf(await createDepartment(departmentBody(overrides)).expect(201));
@@ -130,8 +153,8 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
 
     return getDepartment(created.id);
   };
-  const getDepartment = async (id: string, headers: Record<string, string> = asIt()): Promise<DepartmentWire> =>
-    dataOf(await request(server()).get(`/api/v1/departments/${id}`).set(headers).expect(200));
+  const getDepartment = async (id: string, headers: Record<string, string> = asAdmin()): Promise<DepartmentWire> =>
+    dataOf(await api().get(`/api/v1/departments/${id}`).set(headers).expect(200));
 
   /** A person entered into a department the way the IT Admin does, through the form. */
   const enter = async (departmentCode: string, overrides: Record<string, unknown> = {}) => {
@@ -147,7 +170,7 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
       hrBasis: HR_BASIS,
       ...overrides,
     };
-    const response = await request(server()).post('/api/v1/employees').set(asAdmin()).send(body).expect(201);
+    const response = await api().post('/api/v1/employees').set(asAdmin()).send(body).expect(201);
 
     return { employeeId: (response.body as { data: { id: string } }).data.id, code, email: body.workEmail };
   };
@@ -166,15 +189,12 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
     return { ...account, code: person.code };
   };
 
-  const assignHead = (departmentId: string, employeeId: string, effectiveFrom = today(), headers = asIt()) =>
-    request(server())
-      .post(`/api/v1/departments/${departmentId}/head-assignments`)
-      .set(headers)
-      .send({ employeeId, effectiveFrom });
+  const assignHead = (departmentId: string, employeeId: string, effectiveFrom = today(), headers = asAdmin()) =>
+    api().post(`/api/v1/departments/${departmentId}/head-assignments`).set(headers).send({ employeeId, effectiveFrom });
 
   const rolesOf = async (account: ApiAccount): Promise<{ derived: string[]; effective: string[] }> =>
     (
-      (await request(server()).get('/api/v1/me').set(as(account)).expect(200)).body as {
+      (await api().get('/api/v1/me').set(as(account)).expect(200)).body as {
         data: { roles: { derived: string[]; effective: string[] } };
       }
     ).data.roles;
@@ -217,7 +237,8 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
         itAdmin: { employeeId: it1.employeeId, usable: true },
         head: null,
         memberCount: 0,
-        warnings: ['MISSING_HEAD'],
+        warnings: ['MISSING_HEAD', 'MISSING_COST_CENTER'],
+        successor: null,
         headHistory: [],
         headHistoryHasMore: false,
         projects: [],
@@ -244,10 +265,7 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
         code: costCenter.code,
         status: 'ACTIVE',
       });
-      const centers = await request(server())
-        .get(`/api/v1/cost-centers?search=${costCenter.code}`)
-        .set(asFinance())
-        .expect(200);
+      const centers = await api().get(`/api/v1/cost-centers?search=${costCenter.code}`).set(asFinance()).expect(200);
       expect(
         (centers.body as { data: { items: { department: { code: string } | null }[] } }).data.items[0].department,
       ).toMatchObject({ code: body.code });
@@ -261,7 +279,7 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
         ...departmentBody(),
         costCenterId: '3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11',
       });
-      const withoutBasis = await createDepartment({ code: unique('P'), name: 'Design' });
+      const withoutBasis = await createDepartment({ code: unique('P'), name: 'Design', hrBasis: undefined });
       expect([named.status, withoutBasis.status]).toEqual([422, 422]);
       expect([errorOf(named).code, errorOf(withoutBasis).code]).toEqual(['VALIDATION_ERROR', 'VALIDATION_ERROR']);
 
@@ -314,9 +332,9 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
       const department = await newDepartment({ function: 'old duty', itAdminEmployeeId: it1.employeeId });
       const member = await enter(department.code);
 
-      const response = await request(server())
+      const response = await api()
         .patch(`/api/v1/departments/${department.id}`)
-        .set(asIt())
+        .set(asAdmin())
         .send({ name: 'Sáng tạo', function: 'new duty', itAdminEmployeeId: it2.employeeId })
         .expect(200);
 
@@ -339,7 +357,7 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
       expect((await auditOf(department.id))[1]).toEqual({
         action: 'DEPARTMENT.UPDATED',
         before: { name: 'Design', function: 'old duty', itAdminEmployeeId: it1.employeeId },
-        after: { name: 'Sáng tạo', function: 'new duty', itAdminEmployeeId: it2.employeeId },
+        after: { name: 'Sáng tạo', function: 'new duty', itAdminEmployeeId: it2.employeeId, hrBasis: HR_BASIS },
       });
     });
 
@@ -347,9 +365,9 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
       const department = await newDepartment({ itAdminEmployeeId: it1.employeeId });
       expect(department.warnings).not.toContain('MISSING_IT_ADMIN');
 
-      const response = await request(server())
+      const response = await api()
         .patch(`/api/v1/departments/${department.id}`)
-        .set(asIt())
+        .set(asAdmin())
         .send({ itAdminEmployeeId: null })
         .expect(200);
 
@@ -360,9 +378,9 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
     it('answers a change that changes nothing with the profile and records nothing', async () => {
       const department = await newDepartment();
 
-      await request(server())
+      await api()
         .patch(`/api/v1/departments/${department.id}`)
-        .set(asIt())
+        .set(asAdmin())
         .send({ name: `  ${department.name} ` })
         .expect(200);
 
@@ -371,8 +389,7 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
 
     it('refuses an empty change, a name that is empty, and an IT Admin who cannot be one', async () => {
       const department = await newDepartment();
-      const patch = (body: object) =>
-        request(server()).patch(`/api/v1/departments/${department.id}`).set(asIt()).send(body);
+      const patch = (body: object) => api().patch(`/api/v1/departments/${department.id}`).set(asAdmin()).send(body);
 
       expect(errorOf(await patch({}).expect(422)).code).toBe('DEPARTMENT.UPDATE_EMPTY');
       expect(errorOf(await patch({ name: ' ' }).expect(422)).code).toBe('DEPARTMENT.NAME_INVALID');
@@ -383,27 +400,23 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
     });
 
     it('is 404 for a department that does not exist', async () => {
-      const response = await request(server())
+      const response = await api()
         .patch('/api/v1/departments/3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11')
-        .set(asIt())
+        .set(asAdmin())
         .send({ name: 'x' })
         .expect(404);
 
       expect(errorOf(response).code).toBe('DEPARTMENT.NOT_FOUND');
     });
 
-    it('refuses Finance, an employee, a department head and the Super Admin, and changes nothing (AC-16)', async () => {
+    it('refuses Finance, an employee, a department head and the IT Admin, and changes nothing (AC-16, F10)', async () => {
       const department = await newDepartment();
       const head = await accountIn(department.code);
       await assignHead(department.id, head.employeeId).expect(200);
       const employee = await accountIn('P-OPS');
 
-      for (const headers of [asFinance(), as(employee), as(head), asAdmin()]) {
-        await request(server())
-          .patch(`/api/v1/departments/${department.id}`)
-          .set(headers)
-          .send({ name: 'Hacked' })
-          .expect(403);
+      for (const headers of [asFinance(), as(employee), as(head), asIt()]) {
+        await api().patch(`/api/v1/departments/${department.id}`).set(headers).send({ name: 'Hacked' }).expect(403);
         await assignHead(department.id, employee.employeeId, today(), headers).expect(403);
       }
       // Creating a department is the Super Admin's (QĐ-87b): everyone else is refused, the IT Admin included.
@@ -413,13 +426,40 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
 
       expect((await getDepartment(department.id)).name).toBe('Design');
     });
+
+    it('takes no change without its HR basis, or with one that lacks a part: 422 and nothing written (QĐ-87b(1), F10)', async () => {
+      const department = await newDepartment();
+      const bases = [undefined, { ...HR_BASIS, reference: undefined }, { ...HR_BASIS, issuedOn: 'not a date' }];
+
+      for (const hrBasis of bases) {
+        const response = await api()
+          .patch(`/api/v1/departments/${department.id}`)
+          .set(asAdmin())
+          .send({ name: 'No basis', hrBasis })
+          .expect(422);
+        expect(errorOf(response).code).toBe('VALIDATION_ERROR');
+        await api()
+          .post(`/api/v1/departments/${department.id}/deactivate`)
+          .set(asAdmin())
+          .send({ hrBasis })
+          .expect(422);
+        await api()
+          .post(`/api/v1/departments/${department.id}/head-vacancies`)
+          .set(asAdmin())
+          .send({ effectiveFrom: today(), hrBasis })
+          .expect(422);
+      }
+
+      expect(await auditOf(department.id)).toHaveLength(1);
+      expect((await getDepartment(department.id)).name).toBe('Design');
+    });
   });
 
   describe('listing and warnings (AC-9, AC-15)', () => {
     it('lists in code order with the head, the people count and the warnings, and filters by status', async () => {
       const department = await newDepartment();
 
-      const response = await request(server())
+      const response = await api()
         .get(`/api/v1/departments?search=${department.code.toLowerCase()}`)
         .set(asIt())
         .expect(200);
@@ -429,7 +469,7 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
       expect(page.items[0]).toMatchObject({ id: department.id, head: null, memberCount: 0 });
       expect(page.pagination.totalItems).toBe(1);
       const retired = (
-        (await request(server()).get('/api/v1/departments?status=INACTIVE').set(asIt()).expect(200)).body as {
+        (await api().get('/api/v1/departments?status=INACTIVE').set(asIt()).expect(200)).body as {
           data: { items: DepartmentWire[] };
         }
       ).data.items;
@@ -440,7 +480,7 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
       const department = await newDepartment();
 
       for (const headers of [asIt(), asAdmin()]) {
-        const response = await request(server()).get('/api/v1/department-warnings').set(headers).expect(200);
+        const response = await api().get('/api/v1/department-warnings').set(headers).expect(200);
         const items = (response.body as { data: { items: { departmentId: string; warning: string }[] } }).data.items;
 
         expect(
@@ -451,7 +491,7 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
         ).toEqual(['MISSING_HEAD', 'MISSING_IT_ADMIN']);
         expect(Object.keys(items[0]).sort()).toEqual(['code', 'departmentId', 'name', 'warning']);
       }
-      await request(server()).get('/api/v1/department-warnings').set(asFinance()).expect(403);
+      await api().get('/api/v1/department-warnings').set(asFinance()).expect(403);
     });
 
     it('stops warning once the department has a head and an IT Admin in charge', async () => {
@@ -460,7 +500,7 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
 
       await assignHead(department.id, member.employeeId).expect(200);
 
-      const response = await request(server()).get('/api/v1/department-warnings').set(asIt()).expect(200);
+      const response = await api().get('/api/v1/department-warnings').set(asIt()).expect(200);
       const items = (response.body as { data: { items: { departmentId: string }[] } }).data.items;
       expect(items.some((item) => item.departmentId === department.id)).toBe(false);
     });
@@ -471,23 +511,25 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
       const department = await newDepartment();
       const member = await enter(department.code);
 
-      const response = await request(server())
-        .post(`/api/v1/departments/${department.id}/deactivate`)
-        .set(asIt())
-        .expect(409);
+      const response = await api().post(`/api/v1/departments/${department.id}/deactivate`).set(asAdmin()).expect(409);
 
       const error = (response.body as { error: { code: string; message: string; details: Record<string, unknown> } })
         .error;
       expect(error.code).toBe('DEPARTMENT.IN_USE');
-      expect(error.message).toBe('The department still has members or service accounts.');
-      // Members, the service accounts the department owns (QĐ-86c) and open work (US-03-06 AC-19). Shared accounts are out
-      // of scope since QĐ-75, so that key is absent — not empty, not null.
+      expect(error.message).toBe(
+        'The department still has members, service accounts, open work or subscriptions that owe a payment.',
+      );
+      // Members, the service accounts the department owns (QĐ-86c), open work and the subscriptions that owe a payment (US-03-06
+      // AC-19, QĐ-90e), each with its total. Shared accounts are out of scope since QĐ-75, so that key is absent.
       expect(Object.keys(error.details).sort()).toEqual([
         'members',
         'openWork',
         'serviceAccounts',
+        'subscriptions',
         'totalMembers',
+        'totalOpenWork',
         'totalServiceAccounts',
+        'totalSubscriptions',
       ]);
       expect(Object.hasOwn(error.details, 'sharedAccounts')).toBe(false);
       expect(response.text).not.toContain('sharedAccounts');
@@ -497,22 +539,44 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
         totalServiceAccounts: 0,
         serviceAccounts: [],
         openWork: [],
+        totalOpenWork: 0,
+        subscriptions: [],
+        totalSubscriptions: 0,
       });
       expect((await getDepartment(department.id)).status).toBe('ACTIVE');
       expect(await auditOf(department.id)).toHaveLength(1);
     });
 
+    it.each<[string, 'openWork' | 'subscriptions', string]>([
+      ['a Request that is not over, a personnel event waiting or an open task', 'openWork', 'ACCESS_REQUEST'],
+      ['a subscription or a purchase that still owes a payment', 'subscriptions', 'SUBSCRIPTION'],
+    ])('is refused while it has %s, listing it with its total (QĐ-90e, F15)', async (_name, group, kind) => {
+      const department = await newDepartment();
+      useFacts[group] = Array.from({ length: 21 }, (_unused, index) => ({ kind, id: `${kind}-${index}`, label: null }));
+
+      const error = errorOf(
+        await api().post(`/api/v1/departments/${department.id}/deactivate`).set(asAdmin()).expect(409),
+      );
+
+      const details = error.details as Record<string, unknown>;
+      const total = group === 'openWork' ? 'totalOpenWork' : 'totalSubscriptions';
+      expect(error.code).toBe('DEPARTMENT.IN_USE');
+      expect(details[total]).toBe(21);
+      expect(details[group]).toHaveLength(20);
+      expect((details[group] as { kind: string }[])[0]).toEqual({ kind, id: `${kind}-0`, label: null });
+      expect(details.totalMembers).toBe(0);
+      expect((await getDepartment(department.id)).status).toBe('ACTIVE');
+
+      // Once the work is done or the subscription is cancelled or has ended, the department can be retired.
+      useFacts[group] = [];
+      await api().post(`/api/v1/departments/${department.id}/deactivate`).set(asAdmin()).expect(200);
+    });
+
     it('retires an empty one, keeps its history, takes nobody in afterwards, and answers the same the second time', async () => {
       const department = await newDepartment();
 
-      const first = await request(server())
-        .post(`/api/v1/departments/${department.id}/deactivate`)
-        .set(asIt())
-        .expect(200);
-      const second = await request(server())
-        .post(`/api/v1/departments/${department.id}/deactivate`)
-        .set(asIt())
-        .expect(200);
+      const first = await api().post(`/api/v1/departments/${department.id}/deactivate`).set(asAdmin()).expect(200);
+      const second = await api().post(`/api/v1/departments/${department.id}/deactivate`).set(asAdmin()).expect(200);
 
       expect(dataOf(first)).toMatchObject({ status: 'INACTIVE', warnings: [] });
       expect(dataOf(second).deactivatedAt).toBe(dataOf(first).deactivatedAt);
@@ -520,7 +584,7 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
         'DEPARTMENT.CREATED',
         'DEPARTMENT.DEACTIVATED',
       ]);
-      const entry = await request(server())
+      const entry = await api()
         .post('/api/v1/employees')
         .set(asAdmin())
         .send({
@@ -536,23 +600,23 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
       expect((errorOf(entry).details as { reasons: unknown }).reasons).toEqual([
         { field: 'departmentCode', code: 'DEPARTMENT_INACTIVE' },
       ]);
-      await request(server())
+      await api()
         .patch(`/api/v1/departments/${department.id}`)
-        .set(asIt())
+        .set(asAdmin())
         .send({ name: 'Renamed after retirement' })
         .expect(409);
     });
 
     it('lets the database refuse a placement into a retired department, whatever the application does', async () => {
       const department = await newDepartment();
-      await request(server()).post(`/api/v1/departments/${department.id}/deactivate`).set(asIt()).expect(200);
+      await api().post(`/api/v1/departments/${department.id}/deactivate`).set(asAdmin()).expect(200);
       const person = await insertEmployeeFixture(ctx.app, seed, { code: unique('E-SQL'), email: null });
 
       await expect(
         ctx.sql.query(
-          `INSERT INTO employee_placements (id, organization_id, employee_id, department_id, job_title_id, valid_from)
-           VALUES (gen_random_uuid(), $1, $2, $3, $4, '2099-01-01')`,
-          [seed.organizationId, person.employeeId, department.id, seed.jobTitleId],
+          `INSERT INTO employee_placements (id, organization_id, employee_id, department_id, valid_from)
+           VALUES (gen_random_uuid(), $1, $2, $3, '2099-01-01')`,
+          [seed.organizationId, person.employeeId, department.id],
         ),
       ).rejects.toMatchObject({ code: '23514' });
     });
@@ -565,7 +629,7 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
         ['post', `/api/v1/departments/${department.id}/split`],
         ['delete', `/api/v1/departments/${department.id}`],
       ] as const) {
-        await request(server())[method](path).set(asIt()).send({}).expect(404);
+        await api()[method](path).set(asAdmin()).send({}).expect(404);
       }
     });
   });
@@ -699,7 +763,7 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
       expect(errorOf(await assignHead(department.id, '3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11').expect(422)).code).toBe(
         'DEPARTMENT.HEAD_EMPLOYEE_NOT_FOUND',
       );
-      await request(server()).post(`/api/v1/departments/${department.id}/deactivate`).set(asIt()).expect(200);
+      await api().post(`/api/v1/departments/${department.id}/deactivate`).set(asAdmin()).expect(200);
       const member = await insertEmployeeFixture(ctx.app, seed, { code: unique('E-OK'), email: null });
       expect(errorOf(await assignHead(department.id, member.employeeId).expect(409)).code).toBe('DEPARTMENT.INACTIVE');
     });
@@ -709,9 +773,9 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
       const head = await accountIn(department.code);
       await assignHead(department.id, head.employeeId).expect(200);
 
-      const response = await request(server())
+      const response = await api()
         .post(`/api/v1/departments/${department.id}/head-vacancies`)
-        .set(asIt())
+        .set(asAdmin())
         .send({ effectiveFrom: addDays(today(), 2) })
         .expect(200);
 
@@ -725,9 +789,9 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
         before: { head: head.code },
         after: { head: null, effectiveFrom: addDays(today(), 2) },
       });
-      const nobody = await request(server())
+      const nobody = await api()
         .post(`/api/v1/departments/${department.id}/head-vacancies`)
-        .set(asIt())
+        .set(asAdmin())
         .send({ effectiveFrom: today() })
         .expect(200);
       expect(dataOf(nobody).head).toBeNull();
@@ -738,13 +802,281 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
       const department = await newDepartment();
       const events = (await auditOf(department.id)).length;
 
-      await request(server())
+      await api()
         .post(`/api/v1/departments/${department.id}/head-vacancies`)
-        .set(asIt())
+        .set(asAdmin())
         .send({ effectiveFrom: today() })
         .expect(200);
 
       expect(await auditOf(department.id)).toHaveLength(events);
+    });
+  });
+
+  describe('the successor of the head (QĐ-87 D-5, AC-5, AC-22)', () => {
+    const designate = (departmentId: string, employeeId: string, effectiveFrom: string, headers = asAdmin()) =>
+      api()
+        .post(`/api/v1/departments/${departmentId}/successor-designations`)
+        .set(headers)
+        .send({ employeeId, effectiveFrom });
+    const clear = (departmentId: string, headers = asAdmin()) =>
+      api().post(`/api/v1/departments/${departmentId}/successor-clearances`).set(headers);
+
+    it('names the successor from a later day, ends the head the day before, shows it on the profile, and takes it back', async () => {
+      const department = await newDepartment();
+      const head = await accountIn(department.code);
+      const next = await accountIn(department.code);
+      const from = addDays(today(), 10);
+      await assignHead(department.id, head.employeeId).expect(200);
+
+      const named = await designate(department.id, next.employeeId, from).expect(200);
+
+      expect(messageOf(named)).toBe('DEPARTMENT.SUCCESSOR_DESIGNATED');
+      expect(dataOf(named).head).toMatchObject({ employeeId: head.employeeId });
+      expect(dataOf(named).successor).toMatchObject({
+        employeeId: next.employeeId,
+        employeeCode: next.code,
+        since: from,
+      });
+      expect(dataOf(named).headHistory).toEqual([
+        expect.objectContaining({ employeeCode: next.code, validFrom: from, validTo: null }),
+        expect.objectContaining({ employeeCode: head.code, validFrom: today(), validTo: from }),
+      ]);
+      expect((await auditOf(department.id)).at(-1)).toEqual({
+        action: 'DEPARTMENT.SUCCESSOR_DESIGNATED',
+        before: { head: head.code, successor: null },
+        after: { head: head.code, successor: next.code, effectiveFrom: from, hrBasis: HR_BASIS },
+      });
+
+      const cleared = await clear(department.id).expect(200);
+
+      expect(messageOf(cleared)).toBe('DEPARTMENT.SUCCESSOR_CLEARED');
+      expect(dataOf(cleared).successor).toBeNull();
+      expect(dataOf(cleared).headHistory).toEqual([
+        expect.objectContaining({ employeeCode: head.code, validFrom: today(), validTo: null }),
+      ]);
+      expect((await auditOf(department.id)).at(-1)).toEqual({
+        action: 'DEPARTMENT.SUCCESSOR_CLEARED',
+        before: { successor: next.code, effectiveFrom: from },
+        after: { successor: null, head: head.code, hrBasis: HR_BASIS },
+      });
+      // Nobody is named any more: clearing again changes and records nothing.
+      const count = (await auditOf(department.id)).length;
+      await clear(department.id).expect(200);
+      expect(await auditOf(department.id)).toHaveLength(count);
+    });
+
+    it.each([
+      ['today', () => today(), 'DEPARTMENT.HEAD_SUCCESSOR_DATE_NOT_FUTURE'],
+      ['a day in the past', () => addDays(today(), -3), 'DEPARTMENT.HEAD_SUCCESSOR_DATE_NOT_FUTURE'],
+    ])('refuses a successor from %s', async (_name, day, code) => {
+      const department = await newDepartment();
+      const head = await accountIn(department.code);
+      const next = await accountIn(department.code);
+      await assignHead(department.id, head.employeeId).expect(200);
+
+      const response = await designate(department.id, next.employeeId, day()).expect(422);
+
+      expect(errorOf(response).code).toBe(code);
+      expect((await getDepartment(department.id)).successor).toBeNull();
+    });
+
+    it('refuses when nobody heads the department, when it is the head themself, and when one is already named', async () => {
+      const department = await newDepartment();
+      const head = await accountIn(department.code);
+      const next = await accountIn(department.code);
+      const other = await accountIn(department.code);
+      const from = addDays(today(), 10);
+
+      expect(errorOf(await designate(department.id, next.employeeId, from).expect(422)).code).toBe(
+        'DEPARTMENT.HEAD_SUCCESSOR_NEEDS_A_HEAD',
+      );
+      await assignHead(department.id, head.employeeId).expect(200);
+      expect(errorOf(await designate(department.id, head.employeeId, from).expect(422)).code).toBe(
+        'DEPARTMENT.HEAD_SUCCESSOR_IS_THE_HEAD',
+      );
+      await designate(department.id, next.employeeId, from).expect(200);
+      expect(errorOf(await designate(department.id, other.employeeId, addDays(today(), 12)).expect(409)).code).toBe(
+        'DEPARTMENT.HEAD_SUCCESSOR_ALREADY_NAMED',
+      );
+    });
+
+    it('judges the successor like any head: a member that day, working, and not the Super Admin', async () => {
+      const department = await newDepartment();
+      const head = await accountIn(department.code);
+      const elsewhere = await accountIn('P-OPS');
+      await assignHead(department.id, head.employeeId).expect(200);
+      const from = addDays(today(), 10);
+
+      const notMember = await designate(department.id, elsewhere.employeeId, from).expect(422);
+      const superAdmin = await designate(department.id, seed.superAdmin.employeeId, from).expect(422);
+
+      expect(errorOf(notMember).code).toBe('DEPARTMENT.HEAD_NOT_A_MEMBER_ON_DATE');
+      expect(errorOf(superAdmin).code).toBe('DEPARTMENT.HEAD_SUPER_ADMIN_CANNOT_HEAD');
+      expect((await getDepartment(department.id)).successor).toBeNull();
+    });
+
+    it('is the Super Admin’s alone, with an HR basis, and 404 for a department that does not exist (F10, F13)', async () => {
+      const department = await newDepartment();
+      const head = await accountIn(department.code);
+      const next = await accountIn(department.code);
+      await assignHead(department.id, head.employeeId).expect(200);
+      const from = addDays(today(), 10);
+
+      for (const headers of [asIt(), asFinance(), as(head)]) {
+        await designate(department.id, next.employeeId, from, headers).expect(403);
+        await clear(department.id, headers).expect(403);
+      }
+      await designate(department.id, next.employeeId, from).send({ hrBasis: undefined }).expect(422);
+      await designate('3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11', next.employeeId, from).expect(404);
+      await clear('3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11').expect(404);
+      expect((await getDepartment(department.id)).successor).toBeNull();
+    });
+  });
+
+  describe('the notices kept for a department with no head are handed to its first head (T-11, F67)', () => {
+    const hold = (departmentId: string, key: string) =>
+      ctx.sql.query(
+        `INSERT INTO held_department_notifications (id, organization_id, department_id, code, subject_type, subject_id, params, event_key)
+         VALUES (gen_random_uuid(), $1, $2, 'BUDGET_PROPOSAL_TASK_ASSIGNED', NULL, NULL, '{}'::jsonb, $3)`,
+        [seed.organizationId, departmentId, key],
+      );
+
+    it('writes an in-app notice for the person named head, in the transaction that names them, and for nobody else', async () => {
+      const department = await newDepartment();
+      const head = await accountIn(department.code);
+      const other = await accountIn(department.code);
+      await hold(department.id, `held-${department.id}`);
+
+      await assignHead(department.id, head.employeeId).expect(200);
+
+      const notices = await ctx.sql.query<{ recipient_employee_id: string }>(
+        `SELECT recipient_employee_id FROM in_app_notifications
+          WHERE code = 'BUDGET_PROPOSAL_TASK_ASSIGNED' AND recipient_employee_id = ANY($1::uuid[])`,
+        [[head.employeeId, other.employeeId]],
+      );
+      expect(notices.rows.map((row) => row.recipient_employee_id)).toEqual([head.employeeId]);
+      const held = await ctx.sql.query<{ delivered_to_employee_id: string | null }>(
+        `SELECT delivered_to_employee_id FROM held_department_notifications WHERE department_id = $1`,
+        [department.id],
+      );
+      expect(held.rows).toEqual([{ delivered_to_employee_id: head.employeeId }]);
+
+      // Naming another head later hands over nothing more: what was kept was delivered once.
+      await assignHead(department.id, other.employeeId, addDays(today(), 2)).expect(200);
+      expect(
+        (
+          await ctx.sql.query(
+            `SELECT 1 FROM in_app_notifications WHERE recipient_employee_id = $1 AND code = 'BUDGET_PROPOSAL_TASK_ASSIGNED'`,
+            [other.employeeId],
+          )
+        ).rows,
+      ).toEqual([]);
+    });
+
+    /**
+     * T-11 (spec amendment): the notices kept for a department are handed to the head when their period STARTS: in the transaction of the
+     * assignment when it begins today, otherwise at the announcement of the day (the sweep). Nothing is handed to a head who heads nothing yet.
+     */
+    describe('when the head period starts (spec amendment of T-11)', () => {
+      const keptRows = async (key: string) =>
+        (
+          await ctx.sql.query<{ delivered_to_employee_id: string | null }>(
+            `SELECT delivered_to_employee_id FROM held_department_notifications WHERE event_key = $1`,
+            [key],
+          )
+        ).rows;
+      const receivers = async (key: string) =>
+        (
+          await ctx.sql.query<{ recipient_employee_id: string }>(
+            `SELECT recipient_employee_id FROM in_app_notifications WHERE event_key = $1 ORDER BY recipient_employee_id`,
+            [key],
+          )
+        ).rows.map((row) => row.recipient_employee_id);
+      /** The announcement pass of `day`, as the hourly sweep runs it when that day has come. */
+      const announce = (day: string) =>
+        ctx.app.get(OrganizationHistoryService, { strict: false }).announceDueChanges(day);
+
+      it('hands nothing over when the first head is named for a day that has not come, and hands it over at the announcement of that day', async () => {
+        const department = await newDepartment();
+        const head = await accountIn(department.code);
+        const from = addDays(today(), 3);
+        const before = `held-before-${department.id}`;
+        const between = `held-between-${department.id}`;
+        await hold(department.id, before);
+
+        await assignHead(department.id, head.employeeId, from).expect(200);
+        // A notice held on a day between the assignment and the start: nobody heads the department yet, so it is kept as well.
+        await hold(department.id, between);
+
+        expect(await keptRows(before)).toEqual([{ delivered_to_employee_id: null }]);
+        expect(await keptRows(between)).toEqual([{ delivered_to_employee_id: null }]);
+        expect(await receivers(before)).toEqual([]);
+        expect(await receivers(between)).toEqual([]);
+        await announce(addDays(today(), 2));
+        expect(await receivers(before)).toEqual([]);
+
+        await announce(from);
+
+        expect(await receivers(before)).toEqual([head.employeeId]);
+        expect(await receivers(between)).toEqual([head.employeeId]);
+        expect(await keptRows(before)).toEqual([{ delivered_to_employee_id: head.employeeId }]);
+        expect(await keptRows(between)).toEqual([{ delivered_to_employee_id: head.employeeId }]);
+        // Told again, the day hands over nothing more and tells nobody twice.
+        await announce(from);
+        expect(await receivers(before)).toEqual([head.employeeId]);
+      });
+
+      it('hands the kept notices to the head of a later assignment for today when the period of the first was to begin later and is taken back', async () => {
+        const department = await newDepartment();
+        const planned = await accountIn(department.code);
+        const real = await accountIn(department.code);
+        const from = addDays(today(), 5);
+        const key = `held-cancelled-${department.id}`;
+        await hold(department.id, key);
+        await assignHead(department.id, planned.employeeId, from).expect(200);
+        expect(await receivers(key)).toEqual([]);
+
+        // The later assignment, for today, takes the future period back: the person who really begins first is handed what was kept.
+        await assignHead(department.id, real.employeeId).expect(200);
+
+        expect(await receivers(key)).toEqual([real.employeeId]);
+        expect(await keptRows(key)).toEqual([{ delivered_to_employee_id: real.employeeId }]);
+        // The day of the period taken back comes: nobody is told, and the notice is not handed over a second time.
+        await announce(from);
+        expect(await receivers(key)).toEqual([real.employeeId]);
+        expect(
+          (
+            await ctx.sql.query(
+              `SELECT 1 FROM in_app_notifications WHERE recipient_employee_id = $1 AND event_key = $2`,
+              [planned.employeeId, key],
+            )
+          ).rows,
+        ).toEqual([]);
+      });
+
+      it('hands the kept notices over in the transaction of the assignment when the period begins today, not at a later pass', async () => {
+        const department = await newDepartment();
+        const head = await accountIn(department.code);
+        const key = `held-today-${department.id}`;
+        await hold(department.id, key);
+
+        await assignHead(department.id, head.employeeId).expect(200);
+
+        expect(await receivers(key)).toEqual([head.employeeId]);
+        expect(await keptRows(key)).toEqual([{ delivered_to_employee_id: head.employeeId }]);
+      });
+
+      it('leaves what was kept when the assignment is refused or rolled back: nobody is handed a notice for a head who is not named', async () => {
+        const department = await newDepartment();
+        const elsewhere = await accountIn('P-OPS');
+        const key = `held-refused-${department.id}`;
+        await hold(department.id, key);
+
+        await assignHead(department.id, elsewhere.employeeId).expect(422);
+
+        expect(await receivers(key)).toEqual([]);
+        expect(await keptRows(key)).toEqual([{ delivered_to_employee_id: null }]);
+      });
     });
   });
 
@@ -781,8 +1113,8 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
       // The members did not change when the head did.
       expect((await getDepartment(department.id)).memberCount).toBe(2);
       // The one who lost the role cannot use a Manager route (AC-3).
-      await request(server()).get(`/api/v1/departments/${department.id}`).set(as(first)).expect(403);
-      await request(server()).get(`/api/v1/departments/${department.id}`).set(as(second)).expect(200);
+      await api().get(`/api/v1/departments/${department.id}`).set(as(first)).expect(403);
+      await api().get(`/api/v1/departments/${department.id}`).set(as(second)).expect(200);
       // Put the members back as they were recorded, so the coverage check at the end still holds.
       await ctx.sql.query('DELETE FROM department_head_periods WHERE department_id = $1', [department.id]);
       await ctx.sql.query('UPDATE employee_placements SET valid_from = valid_from + 10 WHERE department_id = $1', [
@@ -793,12 +1125,12 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
     it('is no longer selfServiceOnly once the person heads a department', async () => {
       const department = await newDepartment();
       const member = await accountIn(department.code);
-      const before = (await request(server()).get('/api/v1/me').set(as(member)).expect(200)).body as {
+      const before = (await api().get('/api/v1/me').set(as(member)).expect(200)).body as {
         data: { selfServiceOnly: boolean };
       };
       await assignHead(department.id, member.employeeId).expect(200);
 
-      const after = (await request(server()).get('/api/v1/me').set(as(member)).expect(200)).body as {
+      const after = (await api().get('/api/v1/me').set(as(member)).expect(200)).body as {
         data: { selfServiceOnly: boolean; roles: { effective: string[] } };
       };
 
@@ -815,7 +1147,7 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
         [seed.organizationId, seed.departmentId, seed.superAdmin.employeeId],
       );
 
-      const me = await request(server()).get('/api/v1/me').set(asAdmin()).expect(200);
+      const me = await api().get('/api/v1/me').set(asAdmin()).expect(200);
 
       expect((me.body as { data: { roles: { derived: string[]; effective: string[] } } }).data.roles).toEqual({
         direct: ['SUPER_ADMIN'],
@@ -834,16 +1166,13 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
       await enter(other.code);
       await assignHead(department.id, head.employeeId).expect(200);
 
-      const own = await request(server()).get(`/api/v1/departments/${department.id}`).set(as(head)).expect(200);
-      const foreign = await request(server()).get(`/api/v1/departments/${other.id}`).set(as(head)).expect(403);
-      const list = await request(server())
+      const own = await api().get(`/api/v1/departments/${department.id}`).set(as(head)).expect(200);
+      const foreign = await api().get(`/api/v1/departments/${other.id}`).set(as(head)).expect(403);
+      const list = await api()
         .get(`/api/v1/departments/${department.id}/employees?pageSize=100`)
         .set(as(head))
         .expect(200);
-      const foreignList = await request(server())
-        .get(`/api/v1/departments/${other.id}/employees`)
-        .set(as(head))
-        .expect(403);
+      const foreignList = await api().get(`/api/v1/departments/${other.id}/employees`).set(as(head)).expect(403);
 
       expect(dataOf(own).memberCount).toBe(2);
       expect(errorOf(foreign).code).toBe('DEPARTMENT.OUT_OF_SCOPE');
@@ -869,26 +1198,98 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
       expect(items.some((item) => item.employeeCode === head.code)).toBe(true);
     });
 
-    it('does not let the Super Admin, Finance or an employee read a department’s people (AC-7)', async () => {
+    it('does not let Finance or an employee read a department or its people, nor the IT Admin read its people in full (AC-7, F12)', async () => {
       const department = await newDepartment();
       const employee = await accountIn('P-OPS');
 
-      for (const headers of [asAdmin(), asFinance(), as(employee)]) {
-        await request(server()).get(`/api/v1/departments/${department.id}/employees`).set(headers).expect(403);
-        await request(server()).get(`/api/v1/departments/${department.id}`).set(headers).expect(403);
+      for (const headers of [asFinance(), as(employee)]) {
+        await api().get(`/api/v1/departments/${department.id}/employees`).set(headers).expect(403);
+        await api().get(`/api/v1/departments/${department.id}`).set(headers).expect(403);
+        await api().get(`/api/v1/departments/${department.id}/technical-members`).set(headers).expect(403);
       }
+      await api().get(`/api/v1/departments/${department.id}/employees`).set(asIt()).expect(403);
     });
 
-    it('lets the IT Admin read any department and its people', async () => {
-      const department = await newDepartment();
-      await enter(department.code);
+    it('lets the Super Admin read any department and its people in full (QĐ-87b(4), F12)', async () => {
+      const department = await newDepartment({ itAdminEmployeeId: it2.employeeId });
+      const member = await enter(department.code);
 
-      const response = await request(server())
-        .get(`/api/v1/departments/${department.id}/employees`)
-        .set(asIt())
-        .expect(200);
+      const profile = await api().get(`/api/v1/departments/${department.id}`).set(asAdmin()).expect(200);
+      const people = await api().get(`/api/v1/departments/${department.id}/employees`).set(asAdmin()).expect(200);
 
-      expect((response.body as { data: { items: unknown[] } }).data.items).toHaveLength(1);
+      expect(dataOf(profile).id).toBe(department.id);
+      const items = (people.body as { data: { items: { employeeCode: string }[] } }).data.items;
+      expect(items.map((item) => item.employeeCode)).toEqual([member.code]);
+    });
+
+    describe('the IT Admin reads only the departments they are in charge of or stand in for, and only the minimum (F12)', () => {
+      it('reads the technical view of the people of a department they are in charge of: no grounds, email or hire date', async () => {
+        const department = await newDepartment({ itAdminEmployeeId: it1.employeeId });
+        const member = await enter(department.code);
+
+        const response = await api()
+          .get(`/api/v1/departments/${department.id}/technical-members`)
+          .set(asIt())
+          .expect(200);
+
+        const page = (
+          response.body as { message: string; data: { items: Record<string, unknown>[]; pagination: unknown } }
+        ).data;
+        expect((response.body as { message: string }).message).toBe('DEPARTMENT.TECHNICAL_MEMBERS_LISTED');
+        expect(page.items).toEqual([
+          {
+            id: member.employeeId,
+            code: member.code,
+            fullName: `Person ${member.code}`,
+            departmentId: department.id,
+            employmentStatus: 'WORKING',
+            effectiveOn: today(),
+          },
+        ]);
+        expect(page.pagination).toEqual({ page: 1, pageSize: 20, totalItems: 1, totalPages: 1 });
+        expect(response.text).not.toMatch(/workEmail|hasWorkEmail|hireDate|employmentType|grounds/);
+      });
+
+      it('answers 404 for a department another IT Admin is in charge of, as if it did not exist, in every read', async () => {
+        const theirs = await newDepartment({ itAdminEmployeeId: it2.employeeId });
+        await enter(theirs.code);
+
+        for (const path of [`/departments/${theirs.id}`, `/departments/${theirs.id}/technical-members`]) {
+          const response = await api().get(`/api/v1${path}`).set(asIt()).expect(404);
+          expect(errorOf(response).code).toBe('DEPARTMENT.NOT_FOUND');
+        }
+        // The list and the warnings do not name it either.
+        const list = await api().get(`/api/v1/departments?search=${theirs.code}`).set(asIt()).expect(200);
+        expect((list.body as { data: { items: unknown[] } }).data.items).toEqual([]);
+        // ...while the Super Admin and the IT Admin in charge read it.
+        await api().get(`/api/v1/departments/${theirs.id}`).set(asAdmin()).expect(200);
+        await api().get(`/api/v1/departments/${theirs.id}`).set(as(it2)).expect(200);
+      });
+
+      it('stands in for a department nobody usable is in charge of, so the shared queue can be worked', async () => {
+        const unattended = await newDepartment();
+        await enter(unattended.code);
+
+        await api().get(`/api/v1/departments/${unattended.id}`).set(asIt()).expect(200);
+        const people = await api()
+          .get(`/api/v1/departments/${unattended.id}/technical-members`)
+          .set(asIt())
+          .expect(200);
+
+        expect((people.body as { data: { items: unknown[] } }).data.items).toHaveLength(1);
+      });
+
+      it('is told by the service, not only by the route: a caller with no reading role gets the same 403 as the guard', async () => {
+        const department = await newDepartment();
+        const employee = await accountIn('P-OPS');
+
+        const response = await api()
+          .get(`/api/v1/departments/${department.id}/technical-members`)
+          .set(as(employee))
+          .expect(403);
+
+        expect(errorOf(response).code).toBe('AUTHORIZATION.FORBIDDEN');
+      });
     });
   });
 
@@ -897,9 +1298,9 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
       const design = await newDepartment();
       const finance2 = await newDepartment();
 
-      const created = await request(server())
+      const created = await api()
         .post('/api/v1/projects')
-        .set(asIt())
+        .set(asAdmin())
         .send({
           name: ' Alpha ',
           description: 'Rebuild the portal',
@@ -925,9 +1326,9 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
       const department = await newDepartment();
       const centersAfterDepartment = await rowCount('cost_centers');
 
-      await request(server())
+      await api()
         .post('/api/v1/projects')
-        .set(asIt())
+        .set(asAdmin())
         .send({ name: 'Beta', departmentIds: [department.id] })
         .expect(201);
 
@@ -940,16 +1341,16 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
     it('changes the status and the departments, records before and after, and filters the list by department', async () => {
       const first = await newDepartment();
       const second = await newDepartment();
-      const created = await request(server())
+      const created = await api()
         .post('/api/v1/projects')
-        .set(asIt())
+        .set(asAdmin())
         .send({ name: unique('Gamma'), departmentIds: [first.id] })
         .expect(201);
       const id = (created.body as { data: { id: string } }).data.id;
 
-      const updated = await request(server())
+      const updated = await api()
         .patch(`/api/v1/projects/${id}`)
-        .set(asIt())
+        .set(asAdmin())
         .send({ status: 'FINISHED', departmentIds: [second.id] })
         .expect(200);
 
@@ -957,11 +1358,8 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
         status: 'FINISHED',
         departments: [{ id: second.id }],
       });
-      const forSecond = await request(server())
-        .get(`/api/v1/projects?departmentId=${second.id}`)
-        .set(asIt())
-        .expect(200);
-      const forFirst = await request(server()).get(`/api/v1/projects?departmentId=${first.id}`).set(asIt()).expect(200);
+      const forSecond = await api().get(`/api/v1/projects?departmentId=${second.id}`).set(asAdmin()).expect(200);
+      const forFirst = await api().get(`/api/v1/projects?departmentId=${first.id}`).set(asAdmin()).expect(200);
       expect((forSecond.body as { data: { items: unknown[] } }).data.items).toHaveLength(1);
       expect((forFirst.body as { data: { items: unknown[] } }).data.items).toHaveLength(0);
       expect((await auditOf(id)).at(-1)).toMatchObject({
@@ -971,10 +1369,9 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
       });
     });
 
-    it('refuses a name that is empty, a department that does not exist, and everyone but the IT Admin', async () => {
+    it('refuses a name that is empty, a department that does not exist, and everyone but the Super Admin (F10)', async () => {
       const department = await newDepartment();
-      const post = (body: object, headers = asIt()) =>
-        request(server()).post('/api/v1/projects').set(headers).send(body);
+      const post = (body: object, headers = asAdmin()) => api().post('/api/v1/projects').set(headers).send(body);
 
       expect(errorOf(await post({ name: ' ', departmentIds: [department.id] }).expect(422)).code).toBe(
         'PROJECT.INVALID_NAME',
@@ -984,9 +1381,16 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
           .code,
       ).toBe('PROJECT.INVALID_DEPARTMENT_NOT_FOUND');
       await post({ name: 'Epsilon', departmentIds: [department.id] }, asFinance()).expect(403);
-      await request(server())
+      await post({ name: 'Epsilon', departmentIds: [department.id] }, asIt()).expect(403);
+      await api().get('/api/v1/projects').set(asIt()).expect(403);
+      await api()
+        .post('/api/v1/projects')
+        .set(asAdmin())
+        .send({ name: 'No basis', departmentIds: [], hrBasis: undefined })
+        .expect(422);
+      await api()
         .patch('/api/v1/projects/3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11')
-        .set(asIt())
+        .set(asAdmin())
         .send({ name: 'x' })
         .expect(404);
     });
@@ -1011,7 +1415,7 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
     const projectOf = (response: request.Response) => (response.body as { data: ProjectWire }).data;
     const itemsOf = (response: request.Response) => (response.body as { data: { items: ProjectWire[] } }).data.items;
     const createProject = async (body: object) =>
-      projectOf(await request(server()).post('/api/v1/projects').set(asIt()).send(body).expect(201));
+      projectOf(await api().post('/api/v1/projects').set(asAdmin()).send(body).expect(201));
     const byCode = (a: { code: string }, b: { code: string }) => (a.code < b.code ? -1 : a.code > b.code ? 1 : 0);
 
     const expectWire = (project: ProjectWire) => {
@@ -1051,7 +1455,7 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
       const later = await createProject({ name: `${prefix}-B`, departmentIds: [department.id] });
       const earlier = await createProject({ name: `${prefix}-A`, departmentIds: [] });
 
-      const items = itemsOf(await request(server()).get('/api/v1/projects').set(asIt()).expect(200));
+      const items = itemsOf(await api().get('/api/v1/projects').set(asAdmin()).expect(200));
       const ids = items.map((item) => item.id);
 
       for (const item of items) {
@@ -1062,9 +1466,9 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
       expect(ids.indexOf(earlier.id)).toBeLessThan(ids.indexOf(later.id));
       expect(items.find((item) => item.id === earlier.id)?.departments).toEqual([]);
       expect(
-        itemsOf(
-          await request(server()).get(`/api/v1/projects?departmentId=${department.id}`).set(asIt()).expect(200),
-        ).map((item) => item.id),
+        itemsOf(await api().get(`/api/v1/projects?departmentId=${department.id}`).set(asAdmin()).expect(200)).map(
+          (item) => item.id,
+        ),
       ).toEqual([later.id]);
     });
 
@@ -1095,9 +1499,9 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
       });
 
       const unchanged = projectOf(
-        await request(server())
+        await api()
           .patch(`/api/v1/projects/${project.id}`)
-          .set(asIt())
+          .set(asAdmin())
           .send({
             name: ` ${project.name} `,
             description: 'Same',
@@ -1116,9 +1520,9 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
       const project = await createProject({ name: unique('Change'), departmentIds: [department.id] });
 
       const renamed = projectOf(
-        await request(server())
+        await api()
           .patch(`/api/v1/projects/${project.id}`)
-          .set(asIt())
+          .set(asAdmin())
           .send({ name: `${project.name} v2`, status: 'RUNNING' })
           .expect(200),
       );
@@ -1132,18 +1536,18 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
       });
       expect(
         errorOf(
-          await request(server())
+          await api()
             .patch(`/api/v1/projects/${project.id}`)
-            .set(asIt())
+            .set(asAdmin())
             .send({ description: 'x'.repeat(2001) })
             .expect(422),
         ).code,
       ).toBe('PROJECT.INVALID_DESCRIPTION');
       expect(
         errorOf(
-          await request(server())
+          await api()
             .patch('/api/v1/projects/3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11')
-            .set(asIt())
+            .set(asAdmin())
             .send({ name: 'x' })
             .expect(404),
         ).code,
@@ -1184,9 +1588,16 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
       'updatedAt',
       'warnings',
     ];
-    const PROFILE_KEYS = [...LIST_KEYS, 'headHistory', 'headHistoryHasMore', 'projects', 'projectTotal'].sort();
+    const PROFILE_KEYS = [
+      ...LIST_KEYS,
+      'headHistory',
+      'headHistoryHasMore',
+      'projects',
+      'projectTotal',
+      'successor',
+    ].sort();
     const vacate = (departmentId: string, effectiveFrom: string) =>
-      request(server()).post(`/api/v1/departments/${departmentId}/head-vacancies`).set(asIt()).send({ effectiveFrom });
+      api().post(`/api/v1/departments/${departmentId}/head-vacancies`).set(asAdmin()).send({ effectiveFrom });
 
     it('answers a new department with the exact profile wire', async () => {
       const body = departmentBody({
@@ -1214,10 +1625,11 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
         },
         head: null,
         memberCount: 0,
-        warnings: ['MISSING_HEAD'],
+        warnings: ['MISSING_HEAD', 'MISSING_COST_CENTER'],
         createdAt: expect.stringMatching(ISO_INSTANT) as unknown,
         updatedAt: profile.createdAt,
         deactivatedAt: null,
+        successor: null,
         headHistory: [],
         headHistoryHasMore: false,
         projects: [],
@@ -1234,9 +1646,9 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
 
       const second = (
         (
-          await request(server())
+          await api()
             .get(`/api/v1/departments?search=${tag.toLowerCase()}&page=2&pageSize=2`)
-            .set(asIt())
+            .set(asAdmin())
             .expect(200)
         ).body as { message: string; data: { items: Record<string, unknown>[]; pagination: unknown } }
       ).data;
@@ -1245,8 +1657,7 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
       expect(Object.keys(second.items[0]).sort()).toEqual(LIST_KEYS);
 
       const byName = (
-        (await request(server()).get(`/api/v1/departments?search=${word.toUpperCase()}`).set(asIt()).expect(200))
-          .body as {
+        (await api().get(`/api/v1/departments?search=${word.toUpperCase()}`).set(asAdmin()).expect(200)).body as {
           data: { items: { code: string }[]; pagination: unknown };
         }
       ).data;
@@ -1261,10 +1672,7 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
       const [, second] = [withEmail, withoutEmail].sort((a, b) => (a.code < b.code ? -1 : 1));
 
       const page = (
-        await request(server())
-          .get(`/api/v1/departments/${department.id}/employees?page=2&pageSize=1`)
-          .set(asIt())
-          .expect(200)
+        await api().get(`/api/v1/departments/${department.id}/employees?page=2&pageSize=1`).set(asAdmin()).expect(200)
       ).body as { message: string; data: unknown };
 
       expect(page.message).toBe('DEPARTMENT.MEMBERS_LISTED');
@@ -1299,12 +1707,18 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
         {
           action: 'DEPARTMENT.HEAD_ASSIGNED',
           before: { head: null },
-          after: { head: first.code, effectiveFrom: today(), endedPeriods: 0, cancelledPeriods: [] },
+          after: { head: first.code, effectiveFrom: today(), endedPeriods: 0, cancelledPeriods: [], hrBasis: HR_BASIS },
         },
         {
           action: 'DEPARTMENT.HEAD_ASSIGNED',
           before: { head: first.code },
-          after: { head: planned.code, effectiveFrom: addDays(today(), 6), endedPeriods: 1, cancelledPeriods: [] },
+          after: {
+            head: planned.code,
+            effectiveFrom: addDays(today(), 6),
+            endedPeriods: 1,
+            cancelledPeriods: [],
+            hrBasis: HR_BASIS,
+          },
         },
         {
           action: 'DEPARTMENT.HEAD_ASSIGNED',
@@ -1314,12 +1728,13 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
             effectiveFrom: addDays(today(), 3),
             endedPeriods: 1,
             cancelledPeriods: [`${planned.code}@${addDays(today(), 6)}`],
+            hrBasis: HR_BASIS,
           },
         },
         {
           action: 'DEPARTMENT.HEAD_VACATED',
           before: { head: next.code },
-          after: { head: null, effectiveFrom: addDays(today(), 5), cancelledPeriods: [] },
+          after: { head: null, effectiveFrom: addDays(today(), 5), cancelledPeriods: [], hrBasis: HR_BASIS },
         },
       ]);
       expect((await getDepartment(department.id)).headHistory).toEqual([
@@ -1335,12 +1750,12 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
     it('records the exact retirement audit', async () => {
       const department = await newDepartment();
 
-      await request(server()).post(`/api/v1/departments/${department.id}/deactivate`).set(asIt()).expect(200);
+      await api().post(`/api/v1/departments/${department.id}/deactivate`).set(asAdmin()).expect(200);
 
       expect((await auditOf(department.id)).at(-1)).toEqual({
         action: 'DEPARTMENT.DEACTIVATED',
         before: { status: 'ACTIVE' },
-        after: { status: 'INACTIVE' },
+        after: { status: 'INACTIVE', hrBasis: HR_BASIS },
       });
     });
 
@@ -1350,7 +1765,7 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
       for (let index = 0; index < 21; index += 1) codes.push((await enter(department.code)).code);
 
       const error = errorOf(
-        await request(server()).post(`/api/v1/departments/${department.id}/deactivate`).set(asIt()).expect(409),
+        await api().post(`/api/v1/departments/${department.id}/deactivate`).set(asAdmin()).expect(409),
       );
 
       const listed = (error.details as { members: { employeeCode: string }[]; totalMembers: number }).members;
@@ -1363,7 +1778,7 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
       await newDepartment();
 
       const items = (
-        (await request(server()).get('/api/v1/department-warnings').set(asIt()).expect(200)).body as {
+        (await api().get('/api/v1/department-warnings').set(asIt()).expect(200)).body as {
           data: { items: { code: string; warning: string }[] };
         }
       ).data.items;
@@ -1412,9 +1827,9 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
         transfer,
       ]);
       await ctx.sql.query(
-        `INSERT INTO employee_placements (id, organization_id, employee_id, department_id, job_title_id, valid_from)
-         VALUES (gen_random_uuid(), $1, $2, $3, $4, $5)`,
-        [seed.organizationId, person.employeeId, second.id, seed.jobTitleId, transfer],
+        `INSERT INTO employee_placements (id, organization_id, employee_id, department_id, valid_from)
+         VALUES (gen_random_uuid(), $1, $2, $3, $4)`,
+        [seed.organizationId, person.employeeId, second.id, transfer],
       );
       await insertPeriod(first.id, person.employeeId, today(), transfer);
 

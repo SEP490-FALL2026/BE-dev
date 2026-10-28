@@ -3,8 +3,6 @@ import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
   FORBIDDEN_EXAMPLE,
-  GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
-  UNAUTHENTICATED_RESPONSE,
   VALIDATION_EXAMPLE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
@@ -12,45 +10,31 @@ import { RequireRoles } from '../../../infrastructure/security/decorators/access
 import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { ORGANIZATION_ERROR_EXAMPLES, toOrganizationApiException } from '../mappers/organization.http-errors';
-import { DepartmentHeadService } from './department-head.service';
 import { DepartmentQueryService } from './department-query.service';
 import { DepartmentService } from './department.service';
 import {
-  AssignHeadBodyDto,
   CreateDepartmentBodyDto,
+  DeactivateDepartmentBodyDto,
   DepartmentIdParamDto,
   DepartmentMembersResponseDto,
   DepartmentPageResponseDto,
   DepartmentResponseDto,
+  DepartmentTechnicalMembersResponseDto,
   DepartmentWarningsResponseDto,
   ListWarningsQueryDto,
   ListDepartmentsQueryDto,
   ListMembersQueryDto,
   UpdateDepartmentBodyDto,
-  VacateHeadBodyDto,
 } from './department.dto';
 import { toDepartmentProfileWire, toDepartmentWire } from './department.mapper';
+import {
+  AUTH_ERRORS,
+  NOT_FOUND,
+  SUPER_ADMIN_ONLY,
+  VALIDATION_ERROR,
+  VALIDATION_ERROR_DESCRIPTION,
+} from './department.responses';
 
-const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPONSE] as const;
-
-const IT_ONLY = {
-  status: HttpStatus.FORBIDDEN,
-  description: 'Only an IT Admin changes department data.',
-  examples: [FORBIDDEN_EXAMPLE],
-} as const;
-const SUPER_ADMIN_ONLY = {
-  status: HttpStatus.FORBIDDEN,
-  description: 'Only the Super Admin creates a department.',
-  examples: [FORBIDDEN_EXAMPLE],
-} as const;
-const VALIDATION_ERROR_DESCRIPTION =
-  'The request is invalid (VALIDATION_ERROR) or a rule of the department refuses it; details name the reason.';
-/** The routes where no rule of the department applies: only the request itself can be invalid. */
-const VALIDATION_ERROR = {
-  status: HttpStatus.UNPROCESSABLE_ENTITY,
-  description: VALIDATION_ERROR_DESCRIPTION,
-  examples: [VALIDATION_EXAMPLE],
-} as const;
 const CREATE_INVALID = {
   status: HttpStatus.UNPROCESSABLE_ENTITY,
   description: VALIDATION_ERROR_DESCRIPTION,
@@ -70,35 +54,12 @@ const UPDATE_INVALID = {
     ORGANIZATION_ERROR_EXAMPLES.DEPARTMENT_UPDATE_EMPTY,
   ],
 } as const;
-const HEAD_ASSIGN_INVALID = {
-  status: HttpStatus.UNPROCESSABLE_ENTITY,
-  description: VALIDATION_ERROR_DESCRIPTION,
-  examples: [
-    VALIDATION_EXAMPLE,
-    ORGANIZATION_ERROR_EXAMPLES.DEPARTMENT_HEAD_DATE_IN_PAST,
-    ORGANIZATION_ERROR_EXAMPLES.DEPARTMENT_HEAD_EMPLOYEE_NOT_ACTIVE,
-    ORGANIZATION_ERROR_EXAMPLES.DEPARTMENT_HEAD_EMPLOYEE_NOT_FOUND,
-    ORGANIZATION_ERROR_EXAMPLES.DEPARTMENT_HEAD_HEADS_ANOTHER_DEPARTMENT,
-    ORGANIZATION_ERROR_EXAMPLES.DEPARTMENT_HEAD_NOT_A_MEMBER_ON_DATE,
-    ORGANIZATION_ERROR_EXAMPLES.DEPARTMENT_HEAD_SUPER_ADMIN_CANNOT_HEAD,
-  ],
-} as const;
-const HEAD_VACATE_INVALID = {
-  status: HttpStatus.UNPROCESSABLE_ENTITY,
-  description: VALIDATION_ERROR_DESCRIPTION,
-  examples: [VALIDATION_EXAMPLE, ORGANIZATION_ERROR_EXAMPLES.DEPARTMENT_HEAD_DATE_IN_PAST],
-} as const;
-const NOT_FOUND = {
-  status: HttpStatus.NOT_FOUND,
-  description: 'The department does not exist.',
-  examples: [ORGANIZATION_ERROR_EXAMPLES.DEPARTMENT_NOT_FOUND],
-} as const;
-
 /**
- * Department profiles (`US-03-06`). The IT Admin keeps them; a department head reads the one they head and the
- * list of its people (`US-01-02` AC-7); Finance, employees and the Super Admin change nothing here (AC-16). The
- * Super Admin sees the warnings only (`SoD-1`). There is no route that merges or splits departments (AC-20) or
- * deletes one: a department is retired. Every change answers with the profile as it is after the change.
+ * Department profiles (`US-03-06`). The Super Admin keeps them, on an HR basis, and reads them in full (`QĐ-87a`); the IT Admin
+ * changes nothing and reads only the departments they are in charge of or stand in for; a department head reads the one they head
+ * and the list of its people (`US-01-02` AC-7); Finance and employees change nothing here (AC-16). Who may do what is decided
+ * by the policy of the services, not only by the roles of these routes (`F13`). There is no route that merges or splits departments
+ * (AC-20) or deletes one: a department is retired. Every change answers with the profile as it is after the change.
  */
 @ApiTags('departments')
 @Controller({ version: '1' })
@@ -106,7 +67,6 @@ export class DepartmentsController {
   constructor(
     private readonly queries: DepartmentQueryService,
     private readonly departments: DepartmentService,
-    private readonly heads: DepartmentHeadService,
   ) {}
 
   private async profileAfter(actor: AuthenticatedPrincipal, id: string) {
@@ -114,16 +74,17 @@ export class DepartmentsController {
   }
 
   @Get('departments')
-  @RequireRoles('IT_ADMIN')
+  @RequireRoles('SUPER_ADMIN', 'IT_ADMIN')
   @ApiOperation({ operationId: 'departmentList', summary: 'List departments' })
   @ApiSuccessResponse(DepartmentPageResponseDto, {
     message: 'DEPARTMENT.LISTED',
-    description: 'A page of departments in code order, each with its head today, its people count and its warnings.',
+    description:
+      'A page of departments in code order, each with its Cost Center (null while Finance has not created one: its warnings then say MISSING_COST_CENTER), its head today, its people count and its warnings. The Super Admin reads all; an IT Admin only the departments they are in charge of or stand in for.',
   })
-  @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, VALIDATION_ERROR)
-  async list(@Query() query: ListDepartmentsQueryDto) {
+  @ApiErrorResponses(...AUTH_ERRORS, SUPER_ADMIN_ONLY, VALIDATION_ERROR)
+  async list(@CurrentPrincipal() principal: AuthenticatedPrincipal, @Query() query: ListDepartmentsQueryDto) {
     try {
-      const page = await this.queries.list(query);
+      const page = await this.queries.list(principal, query);
 
       return { items: page.items.map(toDepartmentWire), pagination: page.pagination };
     } catch (error) {
@@ -138,16 +99,12 @@ export class DepartmentsController {
     status: HttpStatus.CREATED,
     message: 'DEPARTMENT.CREATED',
     description:
-      'The department exists with no Cost Center (Finance creates one for it) and nobody heading it yet. warnings says what is still missing.',
+      'The department exists with no Cost Center (Finance creates one for it) and nobody heading it yet. warnings says what is still missing, among them MISSING_COST_CENTER: the finance configuration is incomplete.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, SUPER_ADMIN_ONLY, CREATE_INVALID, {
     status: HttpStatus.CONFLICT,
-    description:
-      'The code is taken (DEPARTMENT.CODE_TAKEN), or this installation has not activated the Cost Center link yet (DEPARTMENT.CREATION_AWAITING_ACTIVATION): nothing is created until it has.',
-    examples: [
-      ORGANIZATION_ERROR_EXAMPLES.DEPARTMENT_CODE_TAKEN,
-      ORGANIZATION_ERROR_EXAMPLES.DEPARTMENT_CREATION_AWAITING_ACTIVATION,
-    ],
+    description: 'The code is taken (DEPARTMENT.CODE_TAKEN).',
+    examples: [ORGANIZATION_ERROR_EXAMPLES.DEPARTMENT_CODE_TAKEN],
   })
   async create(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: CreateDepartmentBodyDto) {
     try {
@@ -166,17 +123,17 @@ export class DepartmentsController {
   }
 
   @Get('departments/:id')
-  @RequireRoles('IT_ADMIN', 'MANAGER')
+  @RequireRoles('SUPER_ADMIN', 'IT_ADMIN', 'MANAGER')
   @ApiOperation({ operationId: 'departmentGet', summary: 'Get a department profile' })
   @ApiSuccessResponse(DepartmentResponseDto, {
     message: 'DEPARTMENT.FETCHED',
     description:
-      'The profile: Cost Center, IT Admin in charge, head today and before, people count, projects, warnings.',
+      'The profile: Cost Center (null while it has none), IT Admin in charge, head today and before, the successor named to take over, people count, projects, warnings.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, VALIDATION_ERROR, NOT_FOUND, {
     status: HttpStatus.FORBIDDEN,
     description:
-      'Not an IT Admin, or a department head asking about a department that is not theirs (DEPARTMENT.OUT_OF_SCOPE).',
+      'A department head asking about a department that is not theirs (DEPARTMENT.OUT_OF_SCOPE), or a role that reads none.',
     examples: [FORBIDDEN_EXAMPLE, ORGANIZATION_ERROR_EXAMPLES.DEPARTMENT_OUT_OF_SCOPE],
   })
   async get(@CurrentPrincipal() principal: AuthenticatedPrincipal, @Param() params: DepartmentIdParamDto) {
@@ -188,13 +145,14 @@ export class DepartmentsController {
   }
 
   @Patch('departments/:id')
-  @RequireRoles('IT_ADMIN')
+  @RequireRoles('SUPER_ADMIN')
   @ApiOperation({ operationId: 'departmentUpdate', summary: 'Update a department profile' })
   @ApiSuccessResponse(DepartmentResponseDto, {
     message: 'DEPARTMENT.UPDATED',
-    description: 'The name, the description or the IT Admin in charge changed. The Cost Center and the people do not.',
+    description:
+      'The name, the description or the IT Admin in charge changed, on the HR basis given. The Cost Center and the people do not.',
   })
-  @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, UPDATE_INVALID, NOT_FOUND)
+  @ApiErrorResponses(...AUTH_ERRORS, SUPER_ADMIN_ONLY, UPDATE_INVALID, NOT_FOUND)
   async update(
     @CurrentPrincipal() actor: AuthenticatedPrincipal,
     @Param() params: DepartmentIdParamDto,
@@ -205,6 +163,7 @@ export class DepartmentsController {
         name: body.name,
         functionDescription: body.function,
         itAdminEmployeeId: body.itAdminEmployeeId,
+        hrBasis: body.hrBasis,
       });
 
       return await this.profileAfter(actor, params.id);
@@ -214,67 +173,26 @@ export class DepartmentsController {
   }
 
   @Post('departments/:id/deactivate')
-  @RequireRoles('IT_ADMIN')
+  @RequireRoles('SUPER_ADMIN')
   @ApiOperation({ operationId: 'departmentDeactivate', summary: 'Retire a department' })
   @ApiSuccessResponse(DepartmentResponseDto, {
     message: 'DEPARTMENT.DEACTIVATED',
     description:
-      'The department is retired: it takes no new member or head. If it is already retired, the answer is the same.',
+      'The department is retired, on the HR basis given: it takes no new member or head. If it is already retired, the answer is the same.',
   })
-  @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, VALIDATION_ERROR, NOT_FOUND, {
+  @ApiErrorResponses(...AUTH_ERRORS, SUPER_ADMIN_ONLY, VALIDATION_ERROR, NOT_FOUND, {
     status: HttpStatus.CONFLICT,
-    description: 'It still has members or owns service accounts (DEPARTMENT.IN_USE; details lists them).',
+    description:
+      'Something still keeps it in use (DEPARTMENT.IN_USE; details lists each group with its first things and its total): the people in it, the service accounts it owns, open work (Requests not over, personnel events waiting, open tasks) and the subscriptions or purchases it owns that still owe a payment.',
     examples: [ORGANIZATION_ERROR_EXAMPLES.DEPARTMENT_IN_USE],
   })
-  async deactivate(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: DepartmentIdParamDto) {
-    try {
-      await this.departments.deactivate(actor, params.id);
-
-      return await this.profileAfter(actor, params.id);
-    } catch (error) {
-      throw toOrganizationApiException(error);
-    }
-  }
-
-  @Post('departments/:id/head-assignments')
-  @RequireRoles('IT_ADMIN')
-  @ApiOperation({ operationId: 'departmentHeadAssign', summary: 'Name the head of a department' })
-  @ApiSuccessResponse(DepartmentResponseDto, {
-    message: 'DEPARTMENT.HEAD_ASSIGNED',
-    description:
-      'The person heads the department from the date; the head before ends the day before. The person must be a member of the department that day.',
-  })
-  @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, HEAD_ASSIGN_INVALID, NOT_FOUND)
-  async assignHead(
+  async deactivate(
     @CurrentPrincipal() actor: AuthenticatedPrincipal,
     @Param() params: DepartmentIdParamDto,
-    @Body() body: AssignHeadBodyDto,
+    @Body() body: DeactivateDepartmentBodyDto,
   ) {
     try {
-      await this.heads.assign(actor, params.id, body);
-
-      return await this.profileAfter(actor, params.id);
-    } catch (error) {
-      throw toOrganizationApiException(error);
-    }
-  }
-
-  @Post('departments/:id/head-vacancies')
-  @RequireRoles('IT_ADMIN')
-  @ApiOperation({ operationId: 'departmentHeadVacate', summary: 'Leave a department without a head' })
-  @ApiSuccessResponse(DepartmentResponseDto, {
-    message: 'DEPARTMENT.HEAD_VACATED',
-    description:
-      'Nobody heads the department from the date; it shows as missing a head. If there is no head to end, nothing changes.',
-  })
-  @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, HEAD_VACATE_INVALID, NOT_FOUND)
-  async vacateHead(
-    @CurrentPrincipal() actor: AuthenticatedPrincipal,
-    @Param() params: DepartmentIdParamDto,
-    @Body() body: VacateHeadBodyDto,
-  ) {
-    try {
-      await this.heads.vacate(actor, params.id, body);
+      await this.departments.deactivate(actor, params.id, { hrBasis: body.hrBasis });
 
       return await this.profileAfter(actor, params.id);
     } catch (error) {
@@ -283,16 +201,16 @@ export class DepartmentsController {
   }
 
   @Get('departments/:id/employees')
-  @RequireRoles('IT_ADMIN', 'MANAGER')
+  @RequireRoles('SUPER_ADMIN', 'MANAGER')
   @ApiOperation({ operationId: 'departmentMemberList', summary: 'List the members of a department' })
   @ApiSuccessResponse(DepartmentMembersResponseDto, {
     message: 'DEPARTMENT.MEMBERS_LISTED',
     description:
-      'The people in the department today: code, name, status, work state (working, on long leave, handing over), whether they have a work email, and since when. No email, contract or finance data.',
+      'The people in the department today: code, name, status, work state (working, on long leave, handing over), whether they have a work email, and since when. No email, contract or finance data. For the Super Admin and for the head of that department; an IT Admin reads the technical minimum from GET /departments/{id}/technical-members.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, VALIDATION_ERROR, NOT_FOUND, {
     status: HttpStatus.FORBIDDEN,
-    description: 'Not an IT Admin, or a department head asking about a department that is not theirs.',
+    description: 'A department head asking about a department that is not theirs, or a role that reads none.',
     examples: [FORBIDDEN_EXAMPLE, ORGANIZATION_ERROR_EXAMPLES.DEPARTMENT_OUT_OF_SCOPE],
   })
   async members(
@@ -307,19 +225,47 @@ export class DepartmentsController {
     }
   }
 
+  @Get('departments/:id/technical-members')
+  @RequireRoles('IT_ADMIN')
+  @ApiOperation({
+    operationId: 'departmentTechnicalMemberList',
+    summary: 'List the people of a department for a technical task',
+  })
+  @ApiSuccessResponse(DepartmentTechnicalMembersResponseDto, {
+    message: 'DEPARTMENT.TECHNICAL_MEMBERS_LISTED',
+    description:
+      'What an IT Admin needs of the people in a department they are in charge of or stand in for: id, code, name, department, work state and the first day in the department. No email, kind of staff, hire date, basis or verification.',
+  })
+  @ApiErrorResponses(...AUTH_ERRORS, VALIDATION_ERROR, NOT_FOUND, {
+    status: HttpStatus.FORBIDDEN,
+    description: 'Only an IT Admin reads this.',
+    examples: [FORBIDDEN_EXAMPLE],
+  })
+  async technicalMembers(
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
+    @Param() params: DepartmentIdParamDto,
+    @Query() query: ListMembersQueryDto,
+  ) {
+    try {
+      return await this.queries.technicalMembers(principal, params.id, query);
+    } catch (error) {
+      throw toOrganizationApiException(error);
+    }
+  }
+
   @Get('department-warnings')
-  @RequireRoles('IT_ADMIN', 'SUPER_ADMIN')
+  @RequireRoles('SUPER_ADMIN', 'IT_ADMIN')
   @ApiOperation({ operationId: 'departmentWarningList', summary: 'List department warnings' })
   @ApiSuccessResponse(DepartmentWarningsResponseDto, {
     message: 'DEPARTMENT.WARNINGS_LISTED',
     description:
-      'One page of the active departments that miss a head or a usable IT Admin in charge, by department code then warning. The Super Admin sees these and nothing else of the departments. The list is paged: without page and pageSize the answer holds the first 20 only. pagination.totalItems counts every warning and pagination.totalPages the pages; ask for page 2 up to totalPages (pageSize up to 100) to read the rest.',
+      'One page of the active departments that miss a head or a usable IT Admin in charge, by department code then warning: all of them for the Super Admin, who gives them a head and an IT Admin; for an IT Admin, those they are in charge of or stand in for. The list is paged: without page and pageSize the answer holds the first 20 only. pagination.totalItems counts every warning and pagination.totalPages the pages; ask for page 2 up to totalPages (pageSize up to 100) to read the rest.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
     {
       status: HttpStatus.FORBIDDEN,
-      description: 'Only the IT Admin and the Super Admin see department warnings.',
+      description: 'Only the Super Admin and the IT Admin see department warnings.',
       examples: [FORBIDDEN_EXAMPLE],
     },
     {
@@ -328,9 +274,9 @@ export class DepartmentsController {
       examples: [VALIDATION_EXAMPLE],
     },
   )
-  async warnings(@Query() query: ListWarningsQueryDto) {
+  async warnings(@CurrentPrincipal() principal: AuthenticatedPrincipal, @Query() query: ListWarningsQueryDto) {
     try {
-      return await this.queries.warnings(query);
+      return await this.queries.warnings(principal, query);
     } catch (error) {
       throw toOrganizationApiException(error);
     }

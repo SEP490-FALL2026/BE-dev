@@ -2,6 +2,7 @@ import { HttpStatus } from '@nestjs/common';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import { toUnavailableApiException } from '../../../infrastructure/http/errors/service-unavailable';
 import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
+import { toPersonnelAccessApiException } from '../mappers/personnel-access.http-errors';
 import { OffboardingRefusedError } from './offboarding.errors';
 
 /** The answer of each refusal, by its semantic code. A code the table does not know is a programming error and stays a 500. */
@@ -32,7 +33,6 @@ const STATUS: Readonly<Record<string, HttpStatus>> = {
   ALREADY_RECORDED: HttpStatus.CONFLICT,
   REVOCATION_NOT_SUPPORTED: HttpStatus.CONFLICT,
   CASE_NOT_CLOSEABLE: HttpStatus.CONFLICT,
-  SELF_EVENT_NEEDS_ANOTHER_IT_ADMIN: HttpStatus.CONFLICT,
   PLACEMENT_OVERLAP: HttpStatus.CONFLICT,
   CONCURRENT_CHANGE: HttpStatus.CONFLICT,
 };
@@ -65,7 +65,6 @@ const MESSAGES: Readonly<Record<string, string>> = {
   ALREADY_RECORDED: 'The lock of the company account was recorded already.',
   REVOCATION_NOT_SUPPORTED: 'The kind of provisioning of the seat has no revocation yet.',
   CASE_NOT_CLOSEABLE: 'Something still keeps the case open.',
-  SELF_EVENT_NEEDS_ANOTHER_IT_ADMIN: 'An IT Admin does not do this for themselves while another IT Admin can.',
   PLACEMENT_OVERLAP: 'The placements of the person cannot take this change.',
   CONCURRENT_CHANGE: 'The person was changed by someone else meanwhile; read the case again.',
 };
@@ -76,6 +75,8 @@ const MESSAGES: Readonly<Record<string, string>> = {
  */
 export function toOffboardingApiException(error: unknown): unknown {
   if (error instanceof ApiException) return error;
+  const refused = toPersonnelAccessApiException(error);
+  if (refused) return refused;
   if (!(error instanceof OffboardingRefusedError)) return toUnavailableApiException(error) ?? error;
   const status = STATUS[error.code];
   if (status === undefined) return error;
@@ -141,7 +142,6 @@ export const OFFBOARDING_ERROR_EXAMPLES = {
       blockers: ['ACCOUNT_LOCK_NOT_RECORDED', 'PERSONAL_RIGHTS_OPEN'],
     }),
   ),
-  SELF_EVENT_NEEDS_ANOTHER_IT_ADMIN: example(new OffboardingRefusedError('SELF_EVENT_NEEDS_ANOTHER_IT_ADMIN')),
   PLACEMENT_OVERLAP: example(new OffboardingRefusedError('PLACEMENT_OVERLAP', { reason: 'NO_OPEN_PLACEMENT' })),
   CONCURRENT_CHANGE: example(new OffboardingRefusedError('CONCURRENT_CHANGE')),
 } as const;

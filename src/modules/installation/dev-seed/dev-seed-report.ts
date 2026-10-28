@@ -3,7 +3,6 @@ import { DevSeedResult, SeedItemKind, SeedRefusal, SeedReportItem } from './dev-
 const LABEL: Record<SeedItemKind, string> = {
   DEPARTMENT: 'department',
   COST_CENTER: 'cost center',
-  COST_CENTER_DIRECTION: 'cc direction',
   EMPLOYEE: 'employee',
   ACCOUNT: 'account',
 };

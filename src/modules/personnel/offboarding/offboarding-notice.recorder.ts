@@ -9,6 +9,7 @@ import {
 } from '../notice/notice-recorder.registry';
 import { OffboardingRefusedError } from './offboarding.errors';
 import { toOffboardingApiException } from './offboarding.http-errors';
+import { OffboardingFrame } from './offboarding-frame.service';
 import { OffboardingRepo } from './offboarding.repo';
 import { OffboardingService } from './offboarding.service';
 
@@ -16,7 +17,8 @@ import { OffboardingService } from './offboarding.service';
  * Writes the departure a notice of a head announces (`US-03-11` AC-1, AC-4, AC-6): a planned handover with the last working day, or
  * a sudden departure that is `LEFT` at once. The rules of the departure judge the day, the head who goes, the transfer that waits and
  * the handover, exactly as they do for a departure recorded from a document, and what they refuse comes back with their own codes.
- * A person already handing over answers as a duplicate event.
+ * A person already handing over answers as a duplicate event. A race the database refuses answers `CONCURRENT_CHANGE` (409), never a
+ * 500 (F37).
  */
 @Injectable()
 export class OffboardingNoticeRecorder implements OnModuleInit, NoticeEventRecorder {
@@ -26,6 +28,7 @@ export class OffboardingNoticeRecorder implements OnModuleInit, NoticeEventRecor
     private readonly registry: NoticeRecorderRegistry,
     private readonly offboarding: OffboardingService,
     private readonly repo: OffboardingRepo,
+    private readonly frame: OffboardingFrame,
   ) {}
 
   onModuleInit(): void {
@@ -35,15 +38,17 @@ export class OffboardingNoticeRecorder implements OnModuleInit, NoticeEventRecor
   async record(tx: DbTx, request: NoticeEventRequest): Promise<NoticeEventRef> {
     const { notice, event } = request;
     try {
-      const record = await this.offboarding.recordInTx(tx, request.actor, {
-        employeeId: notice.employeeId,
-        lastWorkingDay: event.lastWorkingDay,
-        abrupt: notice.kind === 'ABRUPT_DEPARTURE',
-        grounds: request.grounds,
-        successor: event.successor,
-        pendingTransferCancellation: event.pendingTransferCancellation,
-        noticeId: notice.id,
-      });
+      const record = await this.frame.guarded(() =>
+        this.offboarding.recordInTx(tx, request.actor, {
+          employeeId: notice.employeeId,
+          lastWorkingDay: event.lastWorkingDay,
+          abrupt: notice.kind === 'ABRUPT_DEPARTURE',
+          grounds: request.grounds,
+          successor: event.successor,
+          pendingTransferCancellation: event.pendingTransferCancellation,
+          noticeId: notice.id,
+        }),
+      );
 
       return { kind: this.eventKind, id: record.id };
     } catch (error) {

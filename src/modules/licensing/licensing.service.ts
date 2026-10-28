@@ -32,6 +32,7 @@ import type {
   PersonalSeat,
   ProvisioningFailureKind,
   RevocationHook,
+  RevocationSource,
   SeatHolder,
   SelfExecutionMode,
   TerminatingAccess,
@@ -46,6 +47,7 @@ import type {
   ReconcileHandoverInput,
 } from './licensing-handover.types';
 import type { OpenGrantTask } from './licensing-open-grants.types';
+import type { SeatBaselineClosedListener } from './licensing-seat-baseline.types';
 import type { ResponsibleDeadlineProvider, ServiceAccountDuty } from './licensing-service-account.types';
 import { SeatBaselineService } from './seat-baseline/seat-baseline.service';
 
@@ -184,6 +186,19 @@ export class LicensingService {
   }
 
   /**
+   * Which of these seats have a revocation under way or done that a source asked for with this reference (the record of its own
+   * decision, for example the review a head made), whatever else asked for it too: what tells a source whether the seat it decided
+   * about is already being taken back. A revocation that was cancelled or closed as failed does not count. One statement.
+   */
+  listRevocationsOpenedFor(
+    reference: { sources: readonly RevocationSource[]; referenceId: string },
+    assignmentIds: readonly string[],
+    tx?: DbTx,
+  ): Promise<Set<string>> {
+    return this.revocationReads.openedByReference(reference.sources, reference.referenceId, assignmentIds, tx);
+  }
+
+  /**
    * Where the handover confirmation of each of these seats stands (the latest duty of each, a live one before a cancelled one): who it
    * falls to now, until when, and whether the work went on without it. A fixed number of statements however many seats there are.
    */
@@ -201,11 +216,15 @@ export class LicensingService {
 
   /**
    * Whether the IT Admin may work for a person who is themselves (`QĐ-77m`): not while another usable IT Admin can, and then
-   * the act is marked as self-executed. The review of a service account and its grant both ask it. Throws
-   * ProvisioningAnotherItAdminNeededError.
+   * the act is marked as self-executed. The review of a service account and its grant both ask it; with `tx` the other IT Admins
+   * are counted in the transaction of the act (F24). Throws ProvisioningAnotherItAdminNeededError.
    */
-  selfExecutionMode(actor: AuthenticatedPrincipal, beneficiaryEmployeeId: string): Promise<SelfExecutionMode> {
-    return this.frame.selfExecutionMode(actor, beneficiaryEmployeeId);
+  selfExecutionMode(
+    actor: AuthenticatedPrincipal,
+    beneficiaryEmployeeId: string,
+    tx?: DbTx,
+  ): Promise<SelfExecutionMode> {
+    return this.frame.selfExecutionMode(actor, beneficiaryEmployeeId, tx);
   }
 
   /**
@@ -297,6 +316,14 @@ export class LicensingService {
   /** The module of requests tells licensing how to judge a request when it starts; licensing never imports it. */
   registerGrantRequestGate(gate: GrantRequestGate): void {
     this.gate.register(gate);
+  }
+
+  /**
+   * The module of personnel tells licensing it wants to hear when the seat baseline is closed, with the people who hold a seat on
+   * another department's subscription (F21); licensing never imports it. Called in the transaction of the closing.
+   */
+  registerSeatBaselineClosedListener(listener: SeatBaselineClosedListener): void {
+    this.baseline.registerClosedListener(listener);
   }
 
   /** Whether the baseline is closed and how many assignments it has produced, for the onboarding checklist. */

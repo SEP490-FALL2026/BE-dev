@@ -44,6 +44,13 @@ const FINANCE_ONLY = {
   description: 'Only Finance reviews (SPEND.NOT_FINANCE).',
   examples: [FORBIDDEN_EXAMPLE],
 } as const;
+/** Ending a review: Finance is a party to the request too (SPEND.OWN_REQUEST), judged in the service as well as by the guard. */
+const FINANCE_ENDS_REVIEW = {
+  status: HttpStatus.FORBIDDEN,
+  description:
+    'Only Finance ends a review (the guard), nobody else but the person who holds it (SPEND.NOT_FINANCE), and not the one who asked for the request or is given it (SPEND.OWN_REQUEST): nobody independent would review it.',
+  examples: [FORBIDDEN_EXAMPLE, SPEND_ERROR_EXAMPLES.NOT_FINANCE, SPEND_ERROR_EXAMPLES.REVIEW_OWN_REQUEST],
+} as const;
 
 /**
  * The check of the budget of a request and the review of Finance that follows it (`US-06-12`, `US-06-13`). Finance reads its
@@ -98,18 +105,20 @@ export class FinanceReviewsController {
   @ApiSuccessResponse(ReviewDetailResponseDto, {
     message: 'FINANCE_REVIEW.COMPLETED',
     description:
-      'Ends the open review in one of three ways: an opinion with the direction it advises (the spend step is then made for the approver), the request given back to its head with a reason, or a budget asked for with a reason. None approves or refuses the request.',
+      'Ends the open review in one of three ways: an opinion with the direction it advises (the spend step is then made for the approver), the request given back to its head with a reason, or a budget asked for with a reason. None approves or refuses the request. A request that waits for a version of the budget has no review open and Finance may still move it, in the same way, in one call: the request is given back to its head, or an opinion is given, which checks it again and makes the spend step (or sends it back to its head when its data is at fault); it never asks for a budget twice. The person who will decide the spend step of the request does not end its review.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
-    { ...FINANCE_ONLY, examples: [FORBIDDEN_EXAMPLE, SPEND_ERROR_EXAMPLES.NOT_FINANCE] },
+    FINANCE_ENDS_REVIEW,
     { ...NOT_FOUND, examples: [SPEND_ERROR_EXAMPLES.REQUEST_NOT_FOUND] },
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The request has no review open (SPEND.REVIEW_NOT_OPEN), the plan line is still overdue (SPEND.PLAN_LINE_NOT_UPDATED), the year has no budget to make or has one (SPEND.NO_BUDGET_TO_MAKE), or nobody heads the department to propose it (SPEND.NO_HEAD_TO_PROPOSE).',
+        'The request has no review open and does not wait for a version of the budget (SPEND.REVIEW_NOT_OPEN), it already waits for a budget (SPEND.ALREADY_AWAITING_BUDGET), the caller will decide its spend step (SPEND.REVIEWER_IS_APPROVER), the plan line is still overdue (SPEND.PLAN_LINE_NOT_UPDATED), no year has no budget or too little (SPEND.NO_BUDGET_TO_MAKE), or nobody heads the department to propose it, even when a version is current (SPEND.NO_HEAD_TO_PROPOSE).',
       examples: [
         SPEND_ERROR_EXAMPLES.REVIEW_NOT_OPEN,
+        SPEND_ERROR_EXAMPLES.ALREADY_AWAITING_BUDGET,
+        SPEND_ERROR_EXAMPLES.REVIEW_REVIEWER_IS_APPROVER,
         SPEND_ERROR_EXAMPLES.PLAN_LINE_NOT_UPDATED,
         SPEND_ERROR_EXAMPLES.NO_BUDGET_TO_MAKE,
         SPEND_ERROR_EXAMPLES.NO_HEAD_TO_PROPOSE,

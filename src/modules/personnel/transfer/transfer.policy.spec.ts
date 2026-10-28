@@ -19,10 +19,9 @@ const facts = (patch: Partial<NewTransferFacts> = {}): NewTransferFacts => ({
   employee: { status: 'ACTIVE', workState: 'WORKING' },
   current: { departmentId: 'dep-des', validFrom: '2026-01-01' },
   target: { departmentId: 'dep-fin' },
-  destinationDepartment: { active: true, costCenterActive: true },
+  destinationDepartment: { active: true },
   grounds: GROUNDS,
   pending: null,
-  selfMode: 'ALLOW',
   successor: NO_SUCCESSOR,
   ...patch,
 });
@@ -48,16 +47,7 @@ describe('whether a transfer may be recorded (US-03-01)', () => {
       'EFFECTIVE_DATE_NOT_AFTER_CURRENT_PERIOD',
     ],
     ['the destination does not exist', { destinationDepartment: null }, 'DEPARTMENT_NOT_FOUND'],
-    [
-      'the destination is retired',
-      { destinationDepartment: { active: false, costCenterActive: true } },
-      'DEPARTMENT_INACTIVE',
-    ],
-    [
-      'the Cost Center of the destination is retired',
-      { destinationDepartment: { active: true, costCenterActive: false } },
-      'DEPARTMENT_COST_CENTER_INACTIVE',
-    ],
+    ['the destination is retired', { destinationDepartment: { active: false } }, 'DEPARTMENT_INACTIVE'],
     ['the grounds are empty (AC-18)', { grounds: undefined }, 'GROUNDS_REQUIRED'],
     ['the grounds are a notice', { grounds: { ...GROUNDS, reference: 'BM09-2026-000001' } }, 'GROUNDS_IS_NOTICE'],
     ['another transfer waits (AC-21)', { pending: { effectiveOn: '2026-12-01' } }, 'PENDING_EVENT_EXISTS'],
@@ -67,13 +57,14 @@ describe('whether a transfer may be recorded (US-03-01)', () => {
       { employee: { status: 'ACTIVE' as const, workState: 'HANDING_OVER' as const } },
       'PENDING_EVENT_EXISTS',
     ],
-    [
-      'an IT Admin does it for themselves while another can (AC-22)',
-      { selfMode: 'NEEDS_ANOTHER_IT_ADMIN' as const },
-      'SELF_EVENT_NEEDS_ANOTHER_IT_ADMIN',
-    ],
   ])('refuses when %s', (_name, patch, expected) => {
     expect(code(patch)).toBe(expected);
+  });
+
+  it('records a transfer into a department that has no Cost Center like any other (QĐ-87d(3), F44)', () => {
+    // The destination is judged by whether it exists and takes people; the policy is not told of a Cost Center at all.
+    expect(Object.keys(facts().destinationDepartment ?? {})).toEqual(['active']);
+    expect(newTransferRefusal(facts({ destinationDepartment: { active: true } }))).toBeNull();
   });
 
   it('allows today, and a person on a long leave', () => {
@@ -95,7 +86,7 @@ describe('whether a transfer may be recorded (US-03-01)', () => {
 
   it('says the same as the policy does when the database finds the destination retired', () => {
     expect(retiredDestinationRefusal()).toEqual(
-      newTransferRefusal(facts({ destinationDepartment: { active: false, costCenterActive: true } })),
+      newTransferRefusal(facts({ destinationDepartment: { active: false } })),
     );
   });
 });
@@ -146,7 +137,6 @@ describe('moving or cancelling a transfer that has not taken effect (US-03-01 AC
     periodStart: '2026-01-01',
     reason: 'The department asked for later',
     grounds: GROUNDS,
-    selfMode: 'ALLOW',
     ...patch,
   });
   const move = (patch: Partial<PendingTransferFacts> = {}, newEffectiveOn = '2026-12-15') =>
@@ -162,11 +152,6 @@ describe('moving or cancelling a transfer that has not taken effect (US-03-01 AC
     ['was cancelled', { status: 'CANCELLED' as const }, 'ALREADY_CANCELLED'],
     ['has no reason', { reason: '  ' }, 'REASON_REQUIRED'],
     ['has no basis', { grounds: undefined }, 'GROUNDS_REQUIRED'],
-    [
-      'is moved by an IT Admin for themselves',
-      { selfMode: 'NEEDS_ANOTHER_IT_ADMIN' as const },
-      'SELF_EVENT_NEEDS_ANOTHER_IT_ADMIN',
-    ],
   ])('refuses a move of a transfer that %s', (_name, patch, expected) => {
     expect(move(patch)).toBe(expected);
   });
@@ -200,8 +185,5 @@ describe('moving or cancelling a transfer that has not taken effect (US-03-01 AC
     expect(cancelRefusal(pending({ effectiveOn: '2026-11-19' }))?.code).toBe('ALREADY_EFFECTIVE');
     expect(cancelRefusal(pending({ reason: '' }))?.code).toBe('REASON_REQUIRED');
     expect(cancelRefusal(pending({ grounds: { ...GROUNDS, type: '' } }))?.code).toBe('GROUNDS_INCOMPLETE');
-    expect(cancelRefusal(pending({ selfMode: 'NEEDS_ANOTHER_IT_ADMIN' }))?.code).toBe(
-      'SELF_EVENT_NEEDS_ANOTHER_IT_ADMIN',
-    );
   });
 });

@@ -69,6 +69,11 @@ export class AccessRequestsController {
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
+    {
+      status: HttpStatus.FORBIDDEN,
+      description: 'The Super Admin sends no request (ACCESS_REQUEST.SUPER_ADMIN_CANNOT_REQUEST).',
+      examples: [EXAMPLES.SUPER_ADMIN_CANNOT_REQUEST],
+    },
     PLAN_NOT_FOUND,
     {
       status: HttpStatus.CONFLICT,
@@ -104,7 +109,7 @@ export class AccessRequestsController {
   @ApiSuccessResponse(PreviewResponseDto, {
     message: 'ACCESS_REQUEST.PREVIEWED',
     description:
-      'What sending the request would fix, without writing anything: the cost with its estimated tax (labelled as an estimate), the chain of people who decide it with the time each step may take, whether the plan is outside the standard toolset of the sender, the seat the sender already holds of it, and whether the request can go on to be decided as spend. There is no budget figure and no field to give an amount.',
+      'What sending the request would fix, without writing anything: the cost with its estimated tax (labelled as an estimate), the chain of people who decide it with the time each step may take, the seat the sender already holds of it, and whether the request can go on to be decided as spend. There is no budget figure and no field to give an amount.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,

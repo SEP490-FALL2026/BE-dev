@@ -1,10 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { Client } from 'pg';
 import { CLI_COLD_START_MS, CliResult, cliWorkingDirectory, runCli, stopCliProcesses } from '../support/cli-process';
+import { lastCompatibilityMigration } from '../support/compat-release';
 import {
   DisposableDatabase,
   dropDisposableDatabase,
-  migrateDisposableDatabase,
   provisionDisposableDatabase,
 } from '../support/disposable-database';
 import { expansionWorld, ExpansionWorld } from '../support/expansion-world';
@@ -21,7 +21,8 @@ import {
  * records once that the installation runs the compatibility release; `link` gives ONE Cost Center that has no department its
  * department on the basis Finance approved. One record per run, in one transaction with its Audit Trail event; nothing
  * inferred, nothing printed but ids and the outcome. Every Cost Center here is written the way `7c28e75` writes one — no
- * department — by plain SQL.
+ * department — by plain SQL. The procedure belongs to the compatibility window, so the database is the schema of the compatibility
+ * release (the history **through** its last migration): from the final migration on a Cost Center cannot exist without its department.
  */
 const LINK_MIGRATION = migrationEndingWith('_cost_center_department_link');
 const EVIDENCE = 'deploy 2026-10-28 run 7, image sha256:abc123';
@@ -121,7 +122,8 @@ describe('ops:cost-center-direction (integration, real CLI and PostgreSQL)', () 
 
   beforeAll(async () => {
     database = await provisionDisposableDatabase();
-    await migrateDisposableDatabase(database);
+    const deploy = await deployMigrations(database, { through: lastCompatibilityMigration() });
+    if (deploy.code !== 0) throw new Error(`Deploying the compatibility release failed: ${deploy.stdout}`);
     sql = new Client({ connectionString: database.url });
     await sql.connect();
     world = await expansionWorld(sql);

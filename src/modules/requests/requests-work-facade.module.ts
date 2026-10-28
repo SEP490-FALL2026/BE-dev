@@ -7,6 +7,8 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { OperatingParametersModule } from '../operating-parameters/operating-parameters.module';
 import { OrganizationModule } from '../organization/organization.module';
 import { OrganizationService } from '../organization/organization.service';
+import { RequestDraftDepartureService } from './access-request/request-draft-departure.service';
+import { RequestDraftRepo } from './access-request/request-draft.repo';
 import { RoutingFactsService } from './access-request/routing-facts.service';
 import { ControlledWaitAlertService } from './reassignment/controlled-wait-alert.service';
 import { ControlledWaitQueryService } from './reassignment/controlled-wait-query.service';
@@ -56,6 +58,10 @@ import { StepSlaService } from './sla/step-sla.service';
   ],
   providers: [
     RoutingFactsService,
+    // The drafts of a person who leaves go with them, in the transaction of the change that says they left (spec L.1); the draft
+    // operations of the API read and write them through the same repo, so it is declared once, here, for both graphs.
+    RequestDraftRepo,
+    RequestDraftDepartureService,
     StepReassignmentRepo,
     StepTargetService,
     ControlledWaitRepo,
@@ -90,6 +96,7 @@ import { StepSlaService } from './sla/step-sla.service';
     StepTargetService,
     RoutingFactsService,
     ControlledWaitQueryService,
+    RequestDraftRepo,
   ],
 })
 export class RequestsWorkFacadeModule implements OnModuleInit {

@@ -1,14 +1,16 @@
 import { Injectable } from '@nestjs/common';
 import { BusinessDate } from '../../../core/business-date';
-import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
+import type { HrBasis } from '../../../core/hr-basis';
+import { DbTx, TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditService } from '../../audit/audit.service';
 import { IdentityAccessService } from '../../identity-access/identity-access.service';
 import { organizationAuditEvent } from '../mappers/audit-event.mapper';
 import { OrganizationService } from '../organization.service';
-import type { NewOrganizationChange } from '../organization.types';
+import type { EmployeeRecord, NewOrganizationChange } from '../organization.types';
 import { DepartmentInactiveError, DepartmentNotFoundError, HeadAssignmentError } from './department.errors';
 import { lockAndReadEmployee, requireOrganization } from './department-lookups';
+import { assertMayChangeOrganization, successorProblem } from './department.policy';
 import { DepartmentRepo } from './department.repo';
 import { DEPARTMENT_HEAD_HISTORY_LIMIT, HeadPeriodChanges, HeadPeriodRecord } from './department.types';
 
@@ -39,9 +41,10 @@ const endedAsChanges = (
   }));
 
 /**
- * Who heads a department (`US-03-06` AC-5 → AC-9, AC-18; `US-01-02`): naming the head from a day, or leaving the
- * department without one from a day. Both are operations of their own, so a later flow (transfer, leaving) can reuse
- * them; the head is the department's MANAGER for exactly the days of the period.
+ * Who heads a department (`US-03-06` AC-5 → AC-9, AC-18; `US-01-02`): the Super Admin names the head from a day, leaves the
+ * department without one from a day, or names who is to follow the head and takes that back (`QĐ-87` `D-5`), always on an HR
+ * basis. Each is an operation of its own, so a later flow (transfer, leaving) can reuse them; the head is the department's
+ * MANAGER for exactly the days of the period. Who may do it is `department.policy.ts`, run first.
  */
 @Injectable()
 export class DepartmentHeadService {
@@ -58,32 +61,24 @@ export class DepartmentHeadService {
    * so the two never overlap and on each day there is one head (AC-5). The person must be a member of this
    * department on that day (AC-18), must not hold the Super Admin role (AC-7), and must not have left (AC-8).
    * Naming the person who already heads it from that day changes nothing. A change for today takes effect in this
-   * transaction, so the listeners of the organization are told of it here and not on a later pass (`US-05-12` AC-2).
+   * transaction, so the listeners of the organization are told of it here and not on a later pass (`US-05-12` AC-2). The notices
+   * kept for the department while nobody headed it are handed over by the listener of `HEAD_PERIOD_START` when the period STARTS
+   * (`held-notice-handover.listener.ts`, `T-11`): in this transaction for today, at the announcement of the day for a later day.
    */
   async assign(
     actor: AuthenticatedPrincipal,
     departmentId: string,
-    input: { employeeId: string; effectiveFrom: BusinessDate },
+    input: { employeeId: string; effectiveFrom: BusinessDate; hrBasis: HrBasis },
   ): Promise<void> {
+    assertMayChangeOrganization(actor.roles);
     const organization = await requireOrganization(this.organization);
     const today = await this.organization.businessToday();
     if (input.effectiveFrom < today) throw new HeadAssignmentError('DATE_IN_PAST');
 
     await this.runner.run(async (tx) => {
       // Lock order (T-11, protocol): the department, then the employee, then the account.
-      const department = await this.repo.lock(tx, departmentId, 'UPDATE');
-      if (!department) throw new DepartmentNotFoundError();
-      if (department.status !== 'ACTIVE') throw new DepartmentInactiveError();
-
-      const employee = await lockAndReadEmployee(this.organization, tx, input.employeeId);
-      if (!employee) throw new HeadAssignmentError('EMPLOYEE_NOT_FOUND');
-      if (employee.status !== 'ACTIVE') throw new HeadAssignmentError('EMPLOYEE_NOT_ACTIVE');
-      const account = await this.identity.inspectEmployeeAccount(tx, input.employeeId);
-      if (account.roles.includes('SUPER_ADMIN')) throw new HeadAssignmentError('SUPER_ADMIN_CANNOT_HEAD');
-      const placement = await this.repo.placementOn(tx, input.employeeId, input.effectiveFrom);
-      if (!placement || placement.departmentId !== departmentId || placement.validTo !== null) {
-        throw new HeadAssignmentError('NOT_A_MEMBER_ON_DATE');
-      }
+      await this.lockActiveDepartment(tx, departmentId);
+      const employee = await this.requireCandidate(tx, departmentId, input.employeeId, input.effectiveFrom);
 
       const periods = await this.organization.getDepartmentHeadHistory(departmentId, DEPARTMENT_HEAD_HISTORY_LIMIT, tx);
       const inForce = inForceOn(periods, input.effectiveFrom);
@@ -112,6 +107,7 @@ export class DepartmentHeadService {
             effectiveFrom: input.effectiveFrom,
             endedPeriods: room.ended.length,
             cancelledPeriods: room.cancelled.map((period) => `${period.employeeCode}@${period.validFrom}`),
+            hrBasis: { ...input.hrBasis },
           },
         ),
       );
@@ -133,8 +129,9 @@ export class DepartmentHeadService {
   async vacate(
     actor: AuthenticatedPrincipal,
     departmentId: string,
-    input: { effectiveFrom: BusinessDate },
+    input: { effectiveFrom: BusinessDate; hrBasis: HrBasis },
   ): Promise<void> {
+    assertMayChangeOrganization(actor.roles);
     const organization = await requireOrganization(this.organization);
     const today = await this.organization.businessToday();
     if (input.effectiveFrom < today) throw new HeadAssignmentError('DATE_IN_PAST');
@@ -161,11 +158,136 @@ export class DepartmentHeadService {
             head: null,
             effectiveFrom: input.effectiveFrom,
             cancelledPeriods: room.cancelled.map((period) => `${period.employeeCode}@${period.validFrom}`),
+            hrBasis: { ...input.hrBasis },
           },
         ),
       );
       if (input.effectiveFrom !== today) return;
       for (const change of endedAsChanges(room, departmentId, today)) await this.organization.emitChange(tx, change);
     });
+  }
+
+  /**
+   * Names who is to follow the head of the department, from a day after today (`QĐ-87` `D-5`): the head in force now ends the day
+   * before and the person heads from that day, written ahead like a head named for a later day, so the successor is the one a
+   * hand-over of data may be confirmed by before they take office (`QĐ-83c`). Somebody has to head the department today and the
+   * person is not them; a successor already named is taken back first. The person must be a member that day, not hold the Super Admin
+   * role and not have left, like any head. Throws DepartmentForbiddenError, DepartmentNotFoundError, DepartmentInactiveError or
+   * HeadAssignmentError.
+   */
+  async designateSuccessor(
+    actor: AuthenticatedPrincipal,
+    departmentId: string,
+    input: { employeeId: string; effectiveFrom: BusinessDate; hrBasis: HrBasis },
+  ): Promise<void> {
+    assertMayChangeOrganization(actor.roles);
+    const organization = await requireOrganization(this.organization);
+    const today = await this.organization.businessToday();
+
+    await this.runner.run(async (tx) => {
+      await this.lockActiveDepartment(tx, departmentId);
+      const periods = await this.organization.getDepartmentHeadHistory(departmentId, DEPARTMENT_HEAD_HISTORY_LIMIT, tx);
+      const head = inForceOn(periods, today);
+      const problem = successorProblem({
+        today,
+        effectiveFrom: input.effectiveFrom,
+        currentHeadEmployeeId: head?.employeeId ?? null,
+        candidateEmployeeId: input.employeeId,
+      });
+      if (problem) throw new HeadAssignmentError(problem);
+      if (periods.some((period) => period.validFrom > today)) throw new HeadAssignmentError('SUCCESSOR_ALREADY_NAMED');
+      const employee = await this.requireCandidate(tx, departmentId, input.employeeId, input.effectiveFrom);
+
+      await this.organization.endDepartmentHeadPeriodsFrom(tx, departmentId, input.effectiveFrom);
+      await this.organization.startDepartmentHeadPeriod(tx, {
+        organizationId: organization.id,
+        departmentId,
+        employeeId: input.employeeId,
+        validFrom: input.effectiveFrom,
+      });
+      await this.audit.record(
+        tx,
+        organizationAuditEvent(
+          actor,
+          organization.id,
+          'DEPARTMENT.SUCCESSOR_DESIGNATED',
+          'Department',
+          departmentId,
+          { head: head?.employeeCode ?? null, successor: null },
+          {
+            head: head?.employeeCode ?? null,
+            successor: employee.employeeCode,
+            effectiveFrom: input.effectiveFrom,
+            hrBasis: { ...input.hrBasis },
+          },
+        ),
+      );
+    });
+  }
+
+  /**
+   * Takes back the successor named for the head: the head's period is open again and nobody follows them. Nobody named ⟹ nothing
+   * changes. Throws DepartmentForbiddenError or DepartmentNotFoundError.
+   */
+  async clearSuccessor(
+    actor: AuthenticatedPrincipal,
+    departmentId: string,
+    input: { hrBasis: HrBasis },
+  ): Promise<void> {
+    assertMayChangeOrganization(actor.roles);
+    const organization = await requireOrganization(this.organization);
+    const today = await this.organization.businessToday();
+
+    await this.runner.run(async (tx) => {
+      const department = await this.repo.lock(tx, departmentId, 'UPDATE');
+      if (!department) throw new DepartmentNotFoundError();
+
+      const cleared = await this.organization.clearDepartmentHeadSuccessor(tx, departmentId, today);
+      if (!cleared) return;
+
+      await this.audit.record(
+        tx,
+        organizationAuditEvent(
+          actor,
+          organization.id,
+          'DEPARTMENT.SUCCESSOR_CLEARED',
+          'Department',
+          departmentId,
+          { successor: cleared.successor.employeeCode, effectiveFrom: cleared.successor.validFrom },
+          {
+            successor: null,
+            head: cleared.restoredHead?.employeeCode ?? null,
+            hrBasis: { ...input.hrBasis },
+          },
+        ),
+      );
+    });
+  }
+
+  /** The department row `FOR UPDATE`, the first lock of every head change (T-11); it must exist and be in use. */
+  private async lockActiveDepartment(tx: DbTx, departmentId: string): Promise<void> {
+    const department = await this.repo.lock(tx, departmentId, 'UPDATE');
+    if (!department) throw new DepartmentNotFoundError();
+    if (department.status !== 'ACTIVE') throw new DepartmentInactiveError();
+  }
+
+  /** The person who is to head the department from `day`: the employee, then the account (the lock order), then the placement. */
+  private async requireCandidate(
+    tx: DbTx,
+    departmentId: string,
+    employeeId: string,
+    day: BusinessDate,
+  ): Promise<EmployeeRecord> {
+    const employee = await lockAndReadEmployee(this.organization, tx, employeeId);
+    if (!employee) throw new HeadAssignmentError('EMPLOYEE_NOT_FOUND');
+    if (employee.status !== 'ACTIVE') throw new HeadAssignmentError('EMPLOYEE_NOT_ACTIVE');
+    const account = await this.identity.inspectEmployeeAccount(tx, employeeId);
+    if (account.roles.includes('SUPER_ADMIN')) throw new HeadAssignmentError('SUPER_ADMIN_CANNOT_HEAD');
+    const placement = await this.repo.placementOn(tx, employeeId, day);
+    if (!placement || placement.departmentId !== departmentId || placement.validTo !== null) {
+      throw new HeadAssignmentError('NOT_A_MEMBER_ON_DATE');
+    }
+
+    return employee;
   }
 }

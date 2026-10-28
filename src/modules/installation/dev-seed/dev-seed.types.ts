@@ -1,7 +1,7 @@
 import type { DemoAccountRole } from '../../identity-access/identity-access.types';
 import type { LocalSeedRefusal } from './local-seed.guard';
 
-export type SeedItemKind = 'DEPARTMENT' | 'COST_CENTER' | 'COST_CENTER_DIRECTION' | 'EMPLOYEE' | 'ACCOUNT';
+export type SeedItemKind = 'DEPARTMENT' | 'COST_CENTER' | 'EMPLOYEE' | 'ACCOUNT';
 
 /** A fixture item that exists under its stable key but differs, and how (P23-RV-01). */
 export type SeedConflict =

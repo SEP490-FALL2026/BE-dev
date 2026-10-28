@@ -2,7 +2,7 @@ import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { z } from 'zod';
 import { isBusinessDate } from '../../../core/business-date';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
-import { READABLE_REVOCATION_SOURCES } from '../../licensing/licensing.types';
+import { REVOCATION_SOURCES } from '../../licensing/licensing.types';
 import { ROLE_FLAGS } from '../personnel.types';
 
 const businessDate = z.string().refine(isBusinessDate, { message: 'The day must be a real date as YYYY-MM-DD.' });
@@ -136,16 +136,32 @@ export const offboardingDetailSchema = offboardingSummarySchema.extend({
   department: z.strictObject({ id: z.uuid(), code: z.string(), name: z.string() }),
   priorWorkState: z.enum(['WORKING', 'ON_LONG_LEAVE']),
   departureEffectiveOn: z.string(),
-  grounds: groundsSchema,
-  /** Who follows the head of the department the person leaves; null when they did not head it. */
+  /** The basis of the departure. Null in the minimal projection an IT Admin reads (F12). */
+  grounds: groundsSchema.nullable(),
+  /** Who follows the head of the department the person leaves; null when they did not head it, and in the minimal projection. */
   headSuccessor: z.strictObject({ kind: z.enum(['EMPLOYEE', 'NONE']), employee: employeeBrief.nullable() }).nullable(),
-  selfExecuted: z.boolean(),
-  /** Null only for an event the controlled procedure of the release after this one recorded (spec L.2); this release always writes its account. */
+  /** The account that recorded it; null when the controlled procedure did (`recordedByProcedure`, spec L.2). */
   recordedByAppUserId: z.uuid().nullable(),
+  /** True when the departure was recorded by the controlled procedure `pnpm ops:record-super-admin-event` and not by an account. */
+  recordedByProcedure: z.boolean(),
   recordedAt: z.iso.datetime(),
-  left: z.strictObject({ leftOn: z.string(), leftAt: z.iso.datetime(), leftByAppUserId: z.uuid() }).nullable(),
+  left: z
+    .strictObject({
+      leftOn: z.string(),
+      leftAt: z.iso.datetime(),
+      /** The account that marked the person left; null when the controlled procedure recorded the sudden departure. */
+      leftByAppUserId: z.uuid().nullable(),
+      leftByProcedure: z.boolean(),
+    })
+    .nullable(),
+  /** How the handover was cancelled; null while it was not, and in the minimal projection. */
   cancellation: z
-    .strictObject({ cancelledAt: z.iso.datetime(), cancelledByAppUserId: z.uuid(), reason: z.string() })
+    .strictObject({
+      cancelledAt: z.iso.datetime(),
+      cancelledByAppUserId: z.uuid().nullable(),
+      cancelledByProcedure: z.boolean(),
+      reason: z.string(),
+    })
     .nullable(),
   accountLock: z
     .strictObject({ recordedAt: z.iso.datetime(), recordedByAppUserId: z.uuid(), note: z.string() })
@@ -178,7 +194,7 @@ const rightSchema = z.strictObject({
     .strictObject({
       taskId: z.uuid(),
       status: z.enum(['QUEUED', 'RETRY_SCHEDULED', 'IN_PROGRESS', 'COMPLETED', 'FAILED', 'CLOSED_FAILED', 'CANCELLED']),
-      source: z.enum(READABLE_REVOCATION_SOURCES),
+      source: z.enum(REVOCATION_SOURCES),
     })
     .nullable(),
   /** The day the access ends when the renewal is cancelled and the access runs on to the end of the paid period. */
@@ -213,10 +229,10 @@ const changeSchema = z.strictObject({
   reason: z.string().nullable(),
   /** For the revocations opened: how many rights were asked for. */
   count: z.number().int().nonnegative().nullable(),
-  /** Null only for an event the controlled procedure of the release after this one recorded (spec L.2); this release always writes its account. */
+  /** The account that did it; null when the controlled procedure did (`changedByProcedure`, spec L.2). */
   changedByAppUserId: z.uuid().nullable(),
+  changedByProcedure: z.boolean(),
   changedAt: z.iso.datetime(),
-  selfExecuted: z.boolean(),
 });
 
 export type OffboardingSummaryWire = z.infer<typeof offboardingSummarySchema>;

@@ -162,7 +162,7 @@ export class CostCenterRepo {
 
     return (tx ?? this.prisma).costCenter.findMany({
       where: { id: { in: [...ids] } },
-      select: { id: true, code: true, name: true, kind: true, status: true },
+      select: { id: true, code: true, name: true, kind: true, status: true, departmentId: true },
     });
   }
 
@@ -172,7 +172,7 @@ export class CostCenterRepo {
 
     return (tx ?? this.prisma).costCenter.findMany({
       where: { code: { in: [...codes] } },
-      select: { id: true, code: true, name: true, kind: true, status: true },
+      select: { id: true, code: true, name: true, kind: true, status: true, departmentId: true },
     });
   }
 
@@ -230,13 +230,6 @@ export class CostCenterRepo {
       },
       { isolationLevel: 'RepeatableRead' },
     );
-  }
-
-  /** Takes the row lock of the department this Cost Center belongs to (it is locked after the Cost Center, T-11). */
-  async lockDepartmentOf(tx: DbTx, costCenterId: string): Promise<void> {
-    await tx.$queryRaw`
-      SELECT d.id FROM departments d JOIN cost_centers c ON c.department_id = d.id
-       WHERE c.id = ${costCenterId}::uuid FOR UPDATE OF d`;
   }
 
   /**

@@ -25,11 +25,6 @@ enum EmploymentType {
   INTERN
 }
 
-enum JobTitleStatus {
-  ACTIVE
-  INACTIVE
-}
-
 enum EmployeeStatus {
   ACTIVE
   TERMINATED
@@ -64,7 +59,6 @@ model Organization {
   reportingCurrencyRecord            Currency                            @relation("OrganizationReportingCurrency", fields: [reportingCurrency], references: [code])
   costCenters                        CostCenter[]
   departments                        Department[]
-  jobTitles                          JobTitle[]                          @ignore
   employees                          Employee[]
   projects                           Project[]
   // Owned by finance: the rates entered for the reporting currency.
@@ -79,13 +73,11 @@ model Organization {
   subscriptionOwnerAssignments       SubscriptionOwnerAssignment[]
   costCenterDepartmentLinks          CostCenterDepartmentLink[]
   costCenterDirectionActivation      CostCenterDirectionActivation?
-  subscriptionCostAllocations        SubscriptionCostAllocation[]        @ignore
   seatBaselineImports                SeatBaselineImport[]
   licenseAssignments                 LicenseAssignment[]
   provisioningTasks                  ProvisioningTask[]
   returnRequests                     ReturnRequest[]
   handoverDuties                     HandoverDuty[]
-  serviceAccountMoves                ServiceAccountMove[]                @ignore
   accessRequests                     AccessRequest[]
   approvalRecords                    ApprovalRecord[]
   controlledWaitAlerts               ControlledWaitAlert[]
@@ -102,7 +94,9 @@ model Organization {
   documentAttachments                DocumentAttachment[]
   licenseKeys                        LicenseKey[]
   seatBaselineState                  SeatBaselineState?
-  standardToolsets                   StandardToolset[]                   @ignore
+  superAdminEventTickets             SuperAdminEventTicket[]
+  budgetVersionHistory               BudgetVersionHistoryEntry[]
+  heldDepartmentNotifications        HeldDepartmentNotification[]
   changeAnnouncements                OrganizationChangeAnnouncement[]
   departmentTransfers                DepartmentTransfer[]
   transferReviews                    TransferReview[]
@@ -123,21 +117,19 @@ model CostCenter {
   createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt      DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
   deactivatedAt  DateTime?        @map("deactivated_at") @db.Timestamptz(3)
-  // The department the Cost Center belongs to for its whole life (QĐ-87d(1)). Null only on a row `7c28e75` wrote and no
-  // one has linked yet (listed by `ops:preflight`, linked by `ops:cost-center-direction`); the final release forbids it.
-  departmentId   String?          @map("department_id") @db.Uuid
-  linkedAt       DateTime?        @map("linked_at") @db.Timestamptz(3)
+  // The department the Cost Center belongs to for its whole life, from the moment Finance created it for that department
+  // (QĐ-87d(1)); costs before `linkedAt` are not charged to it.
+  departmentId   String           @map("department_id") @db.Uuid
+  linkedAt       DateTime         @map("linked_at") @db.Timestamptz(3)
 
-  organization                    Organization                     @relation(fields: [organizationId], references: [id])
-  department                      Department?                      @relation("CostCenterDepartment", fields: [departmentId], references: [id], onDelete: Restrict)
-  chargedDepartment               Department?                      @relation("DepartmentChargedCostCenter") @ignore
-  departmentLink                  CostCenterDepartmentLink?
-  subscriptionCostAllocationLines SubscriptionCostAllocationLine[] @ignore
-  licenseAssignments              LicenseAssignment[]
-  accessRequests                  AccessRequest[]
-  budgetProposals                 BudgetProposal[]
-  budgetVersions                  BudgetVersion[]
-  budgetCommitments               BudgetCommitment[]
+  organization       Organization              @relation(fields: [organizationId], references: [id])
+  department         Department                @relation("CostCenterDepartment", fields: [departmentId], references: [id], onDelete: Restrict)
+  departmentLink     CostCenterDepartmentLink?
+  licenseAssignments LicenseAssignment[]
+  accessRequests     AccessRequest[]
+  budgetProposals    BudgetProposal[]
+  budgetVersions     BudgetVersion[]
+  budgetCommitments  BudgetCommitment[]
 
   @@unique([organizationId, code])
   @@map("cost_centers")
@@ -150,11 +142,6 @@ model Department {
   name                String
   functionDescription String?          @map("function_description")
   status              DepartmentStatus @default(ACTIVE)
-  // The Cost Center the previous release charges this department to. The schema keeps it equal to the link on
-  // `cost_centers.department_id` by two triggers while the previous release can still be recovered; the application no
-  // longer names it (the Cost Center of a department is read through `cost_centers.department_id`), so it is `@ignore`d
-  // here and the final release drops it.
-  costCenterId        String?          @unique @map("cost_center_id") @ignore @db.Uuid
   // The IT Admin who answers for the department's technical work (US-01-11); null until one is named.
   itAdminEmployeeId   String?          @map("it_admin_employee_id") @db.Uuid
   createdAt           DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
@@ -162,20 +149,16 @@ model Department {
   deactivatedAt       DateTime?        @map("deactivated_at") @db.Timestamptz(3)
 
   organization            Organization                  @relation(fields: [organizationId], references: [id])
-  costCenter              CostCenter?                   @relation("DepartmentChargedCostCenter", fields: [costCenterId], references: [id], onDelete: Restrict) @ignore
   costCenters             CostCenter[]                  @relation("CostCenterDepartment")
   costCenterLinks         CostCenterDepartmentLink[]
   itAdmin                 Employee?                     @relation("DepartmentItAdmin", fields: [itAdminEmployeeId], references: [id], onDelete: Restrict)
   placements              EmployeePlacement[]
   headPeriods             DepartmentHeadPeriod[]
   projects                ProjectDepartment[]
-  standardToolsets        StandardToolset[]             @ignore
   // The service accounts the department owns (QĐ-86c); the migration keeps each charged to this department's Cost Center.
   ownedServiceAssignments LicenseAssignment[]           @relation("AssignmentOwningDepartment")
   returnRequests          ReturnRequest[]
   handoverDuties          HandoverDuty[]
-  serviceAccountMovesFrom ServiceAccountMove[]          @relation("MoveFromDepartment") @ignore
-  serviceAccountMovesTo   ServiceAccountMove[]          @relation("MoveToDepartment") @ignore
   accessRequests          AccessRequest[]
   approvalRecords         ApprovalRecord[]
   spendBatches            SpendBatch[]
@@ -188,6 +171,7 @@ model Department {
   // The subscriptions the department owns (QĐ-89a) and the assignments that gave existing ones their owner.
   ownedSubscriptions      Subscription[]                @relation("SubscriptionOwnerDepartment")
   ownerAssignments        SubscriptionOwnerAssignment[]
+  heldNotifications       HeldDepartmentNotification[]
 
   @@unique([organizationId, code])
   @@index([itAdminEmployeeId])
@@ -242,29 +226,6 @@ model ProjectDepartment {
   @@map("project_departments")
 }
 
-model JobTitle {
-  id             String         @id @default(uuid()) @db.Uuid
-  organizationId String         @map("organization_id") @db.Uuid
-  name           String
-  normalizedName String         @map("normalized_name")
-  status         JobTitleStatus @default(ACTIVE)
-  // Raised by every rename, deactivation and reactivation, so a later import preview can tell it went stale.
-  version        Int            @default(1)
-  createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt      DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
-
-  organization     Organization         @relation(fields: [organizationId], references: [id])
-  placements       EmployeePlacement[]
-  standardToolsets StandardToolset[]
-  transfersFrom    DepartmentTransfer[] @relation("TransferFromJobTitle")
-  transfersTo      DepartmentTransfer[] @relation("TransferToJobTitle")
-  transferReviews  TransferReview[]
-
-  @@unique([organizationId, normalizedName])
-  @@map("job_titles")
-  @@ignore
-}
-
 // The record of a link made by procedure (`pnpm ops:cost-center-direction link`, QĐ-87d(1)): the basis Finance approved
 // for putting a Cost Center the previous release made into its department. Added to, never changed.
 model CostCenterDepartmentLink {
@@ -310,7 +271,7 @@ model Employee {
   fullName            String            @map("full_name")
   workEmail           String?           @map("work_email")
   normalizedWorkEmail String?           @map("normalized_work_email")
-  // The job title as free text (`QĐ-87e`, spec L.4): optional in the release that follows, still asked for in this one.
+  // The job title as free text (`QĐ-87e`, spec L.4): a description of the person, not a role; it grants nothing.
   jobTitle            String?           @map("job_title")
   employmentType      EmploymentType    @map("employment_type")
   hireDate            DateTime          @map("hire_date") @db.Date
@@ -346,8 +307,6 @@ model Employee {
   handoverDutiesAbout             HandoverDuty[]                      @relation("HandoverDutyEmployee")
   handoverDutiesFixedTo           HandoverDuty[]                      @relation("HandoverDutyConfirmer")
   handoverDutiesConfirmed         HandoverDuty[]                      @relation("HandoverDutyConfirmedBy")
-  serviceAccountMovesTaking       ServiceAccountMove[]                @relation("MoveNewResponsible") @ignore
-  serviceAccountMovesConfirmed    ServiceAccountMove[]                @relation("MoveConfirmedBy") @ignore
   accessRequestBeneficiaries      AccessRequestBeneficiary[]
   accessRequestLinesEnded         AccessRequestLine[]                 @relation("AccessRequestLineEnder")
   lineDecisionsGiven              AccessRequestLineDecision[]         @relation("LineDecisionDecider")
@@ -376,6 +335,7 @@ model Employee {
   offboardingCases                OffboardingCase[]
   noticesAbout                    PersonnelNotice[]                   @relation("NoticeAbout")
   noticesSent                     PersonnelNotice[]                   @relation("NoticeSender")
+  superAdminEventTicketsAbout     SuperAdminEventTicket[]             @relation("SuperAdminEventTicketSubject")
 
   @@unique([organizationId, employeeCode])
   @@unique([organizationId, normalizedWorkEmail])
@@ -388,14 +348,13 @@ model EmployeePlacement {
   organizationId String    @map("organization_id") @db.Uuid
   employeeId     String    @map("employee_id") @db.Uuid
   departmentId   String    @map("department_id") @db.Uuid
-  // Not written by this release any more: a trigger names the catalogue entry for the release before it (spec L.10); `@ignore` follows with the standard toolset that still keys on the catalogue.
-  jobTitleId     String?   @map("job_title_id") @ignore @db.Uuid
+  // The title the catalogue gave this period before it was removed: history only, read by nothing (`@ignore`).
+  jobTitleName   String?   @map("job_title_name") @ignore
   validFrom      DateTime  @map("valid_from") @db.Date
   validTo        DateTime? @map("valid_to") @db.Date
 
   employee       Employee        @relation(fields: [employeeId], references: [id])
   department     Department      @relation(fields: [departmentId], references: [id])
-  jobTitle       JobTitle?       @relation(fields: [jobTitleId], references: [id], onDelete: Restrict) @ignore
   transferReview TransferReview?
 
   @@unique([employeeId, validFrom])

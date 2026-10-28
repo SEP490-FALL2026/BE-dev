@@ -5,11 +5,18 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { AuditService } from '../../audit/audit.service';
 import { OrganizationService } from '../../organization/organization.service';
 import { accessRequestAuditEvent } from './access-request-audit-event';
-import { AccessRequestAlreadyHoldsAccessError, AccessRequestNoDepartmentError } from './access-request.errors';
-import { hasSpendStep } from './access-request.policy';
+import {
+  AccessRequestAlreadyHoldsAccessError,
+  AccessRequestNoDepartmentError,
+  AccessRequestNotDraftError,
+  AccessRequestNotFoundError,
+  AccessRequestSuperAdminCannotRequestError,
+} from './access-request.errors';
+import { hasSpendStep, mayRequest } from './access-request.policy';
 import { AccessRequestRepo } from './access-request.repo';
 import type { AccessRequestRecord } from './access-request.types';
 import { RequestAssessmentService, type RequestSettings } from './request-assessment.service';
+import { RequestDraftRepo } from './request-draft.repo';
 import type { SubmitBodyDto } from './access-request.dto';
 
 /**
@@ -29,6 +36,8 @@ export interface SubmitOptions {
   toleratedSeatId?: string;
   /** The day the access ends: the end the person asked for when a renewal was sent after the end of the right. */
   expectedEndDate?: BusinessDate;
+  /** The draft this request is sent from (spec L.1): it is locked first, judged again under the lock, and becomes the request. */
+  draftId?: string;
 }
 
 @Injectable()
@@ -39,6 +48,7 @@ export class AccessRequestService {
     private readonly organization: OrganizationService,
     private readonly assessment: RequestAssessmentService,
     private readonly audit: AuditService,
+    private readonly drafts: RequestDraftRepo,
   ) {}
 
   async submit(
@@ -46,6 +56,7 @@ export class AccessRequestService {
     body: SubmitBodyDto,
     options: SubmitOptions = {},
   ): Promise<AccessRequestRecord> {
+    if (!mayRequest(actor.roles)) throw new AccessRequestSuperAdminCannotRequestError();
     const settings = await this.assessment.settings();
 
     return this.runner.run((tx) => this.submitWithin(tx, actor, body, settings, options));
@@ -62,6 +73,14 @@ export class AccessRequestService {
     settings: RequestSettings,
     options: SubmitOptions = {},
   ): Promise<AccessRequestRecord> {
+    // The Super Admin sends no request, on any route that sends one, the renewal that is sent late included (F30).
+    if (!mayRequest(actor.roles)) throw new AccessRequestSuperAdminCannotRequestError();
+    // A draft is locked before anything is read for the sending, and judged again under the lock: two sendings of one draft leave one.
+    if (options.draftId) {
+      const verdict = await this.drafts.lockOwned(tx, options.draftId, actor.employeeId);
+      if (verdict === 'NOT_FOUND') throw new AccessRequestNotFoundError();
+      if (verdict === 'NOT_DRAFT') throw new AccessRequestNotDraftError();
+    }
     // The person sending is relied on until commit: they cannot be removed from the company between the check and the write.
     await this.organization.lockEmployeeForShare(tx, actor.employeeId);
     const employee = await this.organization.getEmployee(actor.employeeId, tx);
@@ -109,6 +128,7 @@ export class AccessRequestService {
         samePersonAsSpend: assigned && decision.samePersonAsSpend,
         slaWorkingDays: policy.slaWorkingDays,
       },
+      draftId: options.draftId ?? null,
     });
 
     await this.audit.record(

@@ -12,6 +12,7 @@ import { canViewRequest, viewFactsOf } from './access-request.policy';
 import { AccessRequestRepo } from './access-request.repo';
 import type { AccessRequestRecord } from './access-request.types';
 import { RequestEndService } from './request-end.service';
+import { RequestOutcomeListeners } from './request-outcome-listeners';
 import { checkWithdrawal } from './withdrawal.policy';
 
 /**
@@ -37,6 +38,7 @@ export class WithdrawalService {
     private readonly spendStatus: SpendStatusService,
     private readonly audit: AuditService,
     private readonly groups: GroupWithdrawalService,
+    private readonly outcomes: RequestOutcomeListeners,
   ) {}
 
   /** Throws AccessRequestNotFoundError and AccessRequestWithdrawalRefusedError. */
@@ -139,6 +141,7 @@ export class WithdrawalService {
           },
         ),
       );
+      await this.outcomes.ended(tx, request, request.beneficiaryEmployeeIds, now);
 
       return this.reread(tx, request.id);
     });

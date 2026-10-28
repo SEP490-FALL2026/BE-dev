@@ -48,8 +48,12 @@ export class RenewalRequestsController {
     {
       status: HttpStatus.FORBIDDEN,
       description:
-        'The caller is neither the holder nor the head of the department of the holder (RENEWAL_REQUEST.NOT_HOLDER), or heads another department (RENEWAL_REQUEST.OUTSIDE_DEPARTMENT).',
-      examples: [RENEWAL_ERROR_EXAMPLES.NOT_HOLDER, RENEWAL_ERROR_EXAMPLES.OUTSIDE_DEPARTMENT],
+        'The caller is neither the holder nor the head of the department of the holder (RENEWAL_REQUEST.NOT_HOLDER), heads another department (RENEWAL_REQUEST.OUTSIDE_DEPARTMENT), or is the Super Admin, who sends no request (ACCESS_REQUEST.SUPER_ADMIN_CANNOT_REQUEST).',
+      examples: [
+        RENEWAL_ERROR_EXAMPLES.NOT_HOLDER,
+        RENEWAL_ERROR_EXAMPLES.OUTSIDE_DEPARTMENT,
+        RENEWAL_ERROR_EXAMPLES.SUPER_ADMIN_CANNOT_REQUEST,
+      ],
     },
     {
       status: HttpStatus.NOT_FOUND,

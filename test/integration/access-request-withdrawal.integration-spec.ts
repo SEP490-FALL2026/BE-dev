@@ -391,7 +391,7 @@ describe('the requester withdraws a request that is still waiting over PostgreSQ
       // Nothing but cancelling is left to the IT Admin, and the requester cannot withdraw twice.
       for (const refused of [
         await h.retry(task.id).expect(409),
-        await h.handOff(task.id, { evidence: 'x' }).expect(409),
+        await h.handOff(task.id, {}).expect(409),
         await h.closeFailed(task.id, { reason: 'Closed as failed' }).expect(409),
         await h.withdrawRequest(id, {}, u.member.account).expect(409),
       ]) {

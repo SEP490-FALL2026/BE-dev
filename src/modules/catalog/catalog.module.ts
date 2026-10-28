@@ -41,8 +41,10 @@ import { PlansController } from './plan/plans.controller';
 import { OnboardingFactsService } from './subscription/onboarding-facts.service';
 import { SeatOccupancyRegistry } from './subscription/seat-occupancy.registry';
 import { SeatTargetService } from './subscription/seat-target.service';
+import { SubscriptionDepartmentUseReader } from './subscription/subscription-department-use.reader';
 import { SubscriptionLookupService } from './subscription/subscription-lookup.service';
 import { SubscriptionNoticeService } from './subscription/subscription-notice.service';
+import { SubscriptionObligationService } from './subscription/subscription-obligation.service';
 import { SubscriptionRepo } from './subscription/subscription.repo';
 import { SubscriptionService } from './subscription/subscription.service';
 import { SubscriptionPricingService } from './subscription/subscription-pricing.service';
@@ -122,6 +124,8 @@ import { VendorRepo } from './vendor/vendor.repo';
     PlanLookupService,
     SubscriptionService,
     SubscriptionPricingService,
+    SubscriptionObligationService,
+    SubscriptionDepartmentUseReader,
     SubscriptionRepo,
     SubscriptionViewService,
     SubscriptionNoticeService,

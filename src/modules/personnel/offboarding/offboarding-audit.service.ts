@@ -1,17 +1,17 @@
 import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditService } from '../../audit/audit.service';
 import type { AuditValue } from '../../audit/audit.types';
 import { personnelAuditEvent, personnelSystemAuditEvent } from '../mappers/personnel-audit-event';
+import type { PersonnelActor } from '../personnel.types';
 import type { OffboardingRecord } from './offboarding.types';
 
 type Snapshot = { [key: string]: AuditValue } | null;
 
 /**
- * The audit events of the record of a departure, written in the transaction of the command. Every change by a person names the case
- * and what it moved; a command an IT Admin did for themselves says so in a second event the Super Admin is told by (`US-03-04`
- * AC-29); what the system does for the person (the reminder to lock the account) is written as the system.
+ * The audit events of the record of a departure, written in the transaction of the command. Every change names the case and what it
+ * moved, and who did it: a person signed in, or the controlled procedure with its ticket (spec L.2); what the system does for the
+ * person (the reminder to lock the account) is written as the system.
  */
 @Injectable()
 export class OffboardingAuditService {
@@ -19,40 +19,20 @@ export class OffboardingAuditService {
 
   async changed(
     tx: DbTx,
-    actor: AuthenticatedPrincipal,
+    actor: PersonnelActor,
     record: Pick<OffboardingRecord, 'id' | 'organizationId'>,
     action: string,
     before: Snapshot,
     after: Snapshot,
-    selfExecuted: boolean,
   ): Promise<void> {
     await this.audit.record(
       tx,
-      personnelAuditEvent(actor, record.organizationId, action, 'OffboardingCase', record.id, before, {
-        ...(after ?? {}),
-        selfExecuted,
-      }),
+      personnelAuditEvent(actor, record.organizationId, action, 'OffboardingCase', record.id, before, after),
     );
-    if (selfExecuted) {
-      await this.audit.record(
-        tx,
-        personnelAuditEvent(
-          actor,
-          record.organizationId,
-          'PERSONNEL.SELF_EXECUTED',
-          'OffboardingCase',
-          record.id,
-          null,
-          {
-            event: action,
-          },
-        ),
-      );
-    }
   }
 
   /** The person was told a departure was recorded about them (the call point of the notification channel of `g4-notification-delivery`). */
-  async employeeInformed(tx: DbTx, actor: AuthenticatedPrincipal, record: OffboardingRecord): Promise<void> {
+  async employeeInformed(tx: DbTx, actor: PersonnelActor, record: OffboardingRecord): Promise<void> {
     await this.audit.record(
       tx,
       personnelAuditEvent(

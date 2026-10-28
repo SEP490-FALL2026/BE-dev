@@ -47,7 +47,7 @@ export class GroupRequestsController {
   @ApiSuccessResponse(GroupCheckResponseDto, {
     message: 'GROUP_REQUEST.CHECKED',
     description:
-      'What sending the request for the group would do, without writing anything: whether the plan takes a group, whether too many people were named, and, for every person, whether they can be in it and why not; the cost for one person and for all of them, whether it has a spend step, and whether a tool outside the standard toolset needs a reason. This is where a person who cannot be named is refused as they are added.',
+      'What sending the request for the group would do, without writing anything: whether the plan takes a group, whether too many people were named, and, for every person, whether they can be in it and why not; the cost for one person and for all of them, and whether it has a spend step. This is where a person who cannot be named is refused as they are added.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
@@ -109,6 +109,11 @@ export class GroupRequestsController {
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
+    {
+      status: HttpStatus.FORBIDDEN,
+      description: 'The Super Admin sends no request (ACCESS_REQUEST.SUPER_ADMIN_CANNOT_REQUEST).',
+      examples: [GROUP_REQUEST_ERROR_EXAMPLES.SUPER_ADMIN_CANNOT_REQUEST],
+    },
     {
       status: HttpStatus.NOT_FOUND,
       description: 'The plan does not exist (ACCESS_REQUEST.PLAN_NOT_FOUND).',

@@ -84,12 +84,12 @@ describe('the HTTP answer of each people-import error (US-02-01, US-02-02)', () 
     ],
     [
       'missing columns',
-      new ImportFileMissingColumnsError(['department_code', 'job_title']),
+      new ImportFileMissingColumnsError(['department_code', 'hire_date']),
       422,
       {
         code: 'IMPORT.FILE_MISSING_COLUMNS',
-        message: 'The file lacks required columns: department_code, job_title.',
-        details: { missing: ['department_code', 'job_title'] },
+        message: 'The file lacks required columns: department_code, hire_date.',
+        details: { missing: ['department_code', 'hire_date'] },
       },
     ],
     ['not found', new ImportNotFoundError(), 404, { code: 'IMPORT.NOT_FOUND', message: 'Import not found.' }],

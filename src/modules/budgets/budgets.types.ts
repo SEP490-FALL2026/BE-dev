@@ -65,6 +65,11 @@ export interface BudgetVersionEvent {
   versionId: string;
 }
 
+/** A version the spending approver did not approve: refused, or sent back to Finance to look again. */
+export interface BudgetRefusalEvent extends BudgetVersionEvent {
+  decision: 'REJECTED' | 'CHANGES_REQUESTED';
+}
+
 /** A purchase window of a plan line moved in place; `versionIds` are all the versions of that Cost Center and year. */
 export interface PlanLineMovedEvent {
   costCenterId: string;
@@ -81,9 +86,23 @@ export interface PlanLineMovedEvent {
  * that listens (ADR-0016): the listener registers itself when its module starts.
  */
 export interface BudgetChangeListener {
+  /**
+   * Takes, before the budget year lock, the locks of the rows this listener will change for the Cost Center and the year when a
+   * version is decided or the year is closed. The order of the whole system is the row of the request first, then the year (F31): a
+   * listener that locked its rows only after the year lock would wait for a writer that holds its row and waits for the year.
+   */
+  lockWaiting(tx: DbTx, scope: { costCenterId: string; year: number }): Promise<void>;
   versionApproved(tx: DbTx, actor: AuthenticatedPrincipal, event: BudgetVersionEvent): Promise<void>;
-  /** The spending approver refused a version or sent it back to Finance: the year still has no new budget. */
-  versionRefused(tx: DbTx, actor: AuthenticatedPrincipal, event: BudgetVersionEvent): Promise<void>;
+  /**
+   * The spending approver refused a version or sent it back to Finance: the year still has no new budget. `decision` is what
+   * the approver decided, so a request that waits for the version is told which of the two it was.
+   */
+  versionRefused(tx: DbTx, actor: AuthenticatedPrincipal, event: BudgetRefusalEvent): Promise<void>;
+  /**
+   * The year-end closure closed a version that never became current (`QĐ-91e`, F62): the system does it, so there is no actor.
+   * A version that was current stays as the reference budget of the year and is not told here.
+   */
+  versionExpired(tx: DbTx, event: BudgetVersionEvent): Promise<void>;
   planLineMoved(tx: DbTx, actor: AuthenticatedPrincipal, event: PlanLineMovedEvent): Promise<void>;
 }
 

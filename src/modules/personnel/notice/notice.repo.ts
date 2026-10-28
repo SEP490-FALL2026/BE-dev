@@ -46,10 +46,17 @@ function toRecord(row: NoticeRow): NoticeRecord {
     defaultItAdminEmployeeId: row.defaultItAdminEmployeeId,
     dueOn: fromDateColumn(row.dueOn),
     handledByAppUserId: row.handledByAppUserId,
+    handledByTicketId: row.handledByTicketId,
     handledAt: row.handledAt,
     overdueNoticedAt: row.overdueNoticedAt,
     createdAt: row.createdAt,
   };
+}
+
+/** Who handled a notice: an account, or the ticket of the controlled procedure; exactly one of the two. */
+export interface Handler {
+  appUserId: string | null;
+  ticketId: string | null;
 }
 
 export interface NewNotice {
@@ -73,11 +80,29 @@ export interface NewNotice {
 export class NoticeRepo {
   constructor(private readonly prisma: PrismaService) {}
 
-  /** The next number of a code for `year`: `BM09-<year>-<six digits>`. */
+  /**
+   * The next code for `year`: `BM09-<year>-<six digits>`, numbered again from 1 every year (F48, spec K and L.10). The number is
+   * taken under the lock of the row of the year in `personnel_notice_counters`: one more than the greater of the counter and the
+   * highest number already in a code of that year (so a number the compatibility image drew from the old sequence is never
+   * issued again), and the old sequence is lifted to it in the same transaction (never lowered), so that image never draws one the
+   * counter has issued either.
+   */
   async nextCode(tx: DbTx, year: string): Promise<string> {
-    const rows = await tx.$queryRaw<{ n: number }[]>`SELECT nextval('personnel_notice_seq')::int AS n`;
+    const yearNumber = Number(year);
+    await tx.$executeRaw`
+      INSERT INTO personnel_notice_counters (year, last_value) VALUES (${yearNumber}::int, 0) ON CONFLICT (year) DO NOTHING`;
+    const counter = await tx.$queryRaw<{ last_value: number }[]>`
+      SELECT last_value FROM personnel_notice_counters WHERE year = ${yearNumber}::int FOR UPDATE`;
+    const used = await tx.$queryRaw<{ highest: number }[]>`
+      SELECT COALESCE(MAX(substring(code FROM 11 FOR 6)::int), 0)::int AS highest
+        FROM personnel_notices WHERE code LIKE ${`BM09-${year}-%`}`;
+    const next = Math.max(counter[0].last_value, used[0].highest) + 1;
+    await tx.$executeRaw`UPDATE personnel_notice_counters SET last_value = ${next}::int WHERE year = ${yearNumber}::int`;
+    await tx.$executeRaw`
+      SELECT setval('personnel_notice_seq', ${next}::bigint, true)
+       WHERE (SELECT CASE WHEN is_called THEN last_value ELSE last_value - 1 END FROM personnel_notice_seq) < ${next}::bigint`;
 
-    return `BM09-${year}-${String(rows[0].n).padStart(6, '0')}`;
+    return `BM09-${year}-${String(next).padStart(6, '0')}`;
   }
 
   async insert(tx: DbTx, code: string, input: NewNotice): Promise<NoticeRecord> {
@@ -135,24 +160,31 @@ export class NoticeRepo {
     return toRecord(row);
   }
 
-  async markRejected(tx: DbTx, id: string, byAppUserId: string, reason: string): Promise<NoticeRecord> {
+  async markRejected(tx: DbTx, id: string, by: Handler, reason: string): Promise<NoticeRecord> {
     const row = await tx.personnelNotice.update({
       where: { id },
-      data: { status: 'REJECTED', rejectReason: reason, handledByAppUserId: byAppUserId, handledAt: new Date() },
+      data: {
+        status: 'REJECTED',
+        rejectReason: reason,
+        handledByAppUserId: by.appUserId,
+        handledByTicketId: by.ticketId,
+        handledAt: new Date(),
+      },
     });
 
     return toRecord(row);
   }
 
   /** The notice is recorded as the event it led to, which is a new one or one that was in force already. */
-  async markRecorded(tx: DbTx, id: string, byAppUserId: string, event: NoticeEventRef): Promise<NoticeRecord> {
+  async markRecorded(tx: DbTx, id: string, by: Handler, event: NoticeEventRef): Promise<NoticeRecord> {
     const row = await tx.personnelNotice.update({
       where: { id },
       data: {
         status: 'RECORDED',
         recordedEventKind: event.kind,
         recordedEventId: event.id,
-        handledByAppUserId: byAppUserId,
+        handledByAppUserId: by.appUserId,
+        handledByTicketId: by.ticketId,
         handledAt: new Date(),
       },
     });
@@ -164,7 +196,7 @@ export class NoticeRepo {
     tx: DbTx,
     noticeId: string,
     verification: VerificationInput,
-    byAppUserId: string,
+    by: Handler,
   ): Promise<NoticeVerificationRecord> {
     const created = await tx.personnelNoticeVerification.create({
       data: {
@@ -172,7 +204,8 @@ export class NoticeRepo {
         noticeId,
         method: verification.method,
         reference: verification.reference.trim(),
-        verifiedByAppUserId: byAppUserId,
+        verifiedByAppUserId: by.appUserId,
+        verifiedByTicketId: by.ticketId,
       },
     });
 
@@ -180,6 +213,7 @@ export class NoticeRepo {
       method: created.method,
       reference: created.reference,
       verifiedByAppUserId: created.verifiedByAppUserId,
+      verifiedByTicketId: created.verifiedByTicketId,
       verifiedAt: created.verifiedAt,
     };
   }
@@ -192,6 +226,7 @@ export class NoticeRepo {
         method: row.method,
         reference: row.reference,
         verifiedByAppUserId: row.verifiedByAppUserId,
+        verifiedByTicketId: row.verifiedByTicketId,
         verifiedAt: row.verifiedAt,
       }
     );
@@ -200,6 +235,7 @@ export class NoticeRepo {
   /** One page of notices by the day they are due, and the total for the same filter, from one snapshot. */
   async list(filter: NoticeListFilter): Promise<{ items: NoticeSummaryRecord[]; total: number }> {
     const where: Prisma.PersonnelNoticeWhereInput = {
+      ...(filter.employeeIds ? { AND: [{ employeeId: { in: [...filter.employeeIds] } }] } : {}),
       ...(filter.senderEmployeeId ? { senderEmployeeId: filter.senderEmployeeId } : {}),
       ...(filter.employeeId ? { employeeId: filter.employeeId } : {}),
       ...(filter.kind ? { kind: filter.kind } : {}),

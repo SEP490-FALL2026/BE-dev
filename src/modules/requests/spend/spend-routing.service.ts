@@ -62,6 +62,27 @@ export class SpendRoutingService {
     const state = moved?.state ?? 'AWAITING_SPEND_SUBMISSION';
 
     await this.requests.setState(tx, request.id, state);
+    await this.recordChecked(tx, actor, request, check, trigger, state, moved);
+
+    return {
+      status: 'ROUTED',
+      route: check.route,
+      check,
+      opened: moved?.opened ?? null,
+      substituted: moved?.substituted ?? false,
+    };
+  }
+
+  /** The audit event of a check and where it sent the request. */
+  private async recordChecked(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    request: AccessRequestRecord,
+    check: CheckRecord,
+    trigger: CheckTrigger,
+    state: AccessRequestState,
+    moved: Opened | null,
+  ): Promise<void> {
     await this.audit.record(
       tx,
       accessRequestAuditEvent(
@@ -85,14 +106,63 @@ export class SpendRoutingService {
         },
       ),
     );
+  }
 
-    return {
-      status: 'ROUTED',
-      route: check.route,
-      check,
-      opened: moved?.opened ?? null,
-      substituted: moved?.substituted ?? false,
-    };
+  /**
+   * Who holds, or would hold, the spend step of the request: the spending approver, or the substitute when the approver is a party to it,
+   * and nobody when nobody who still works can (the step then waits). Finance does not complete the review of a request they will decide
+   * (`SoD-8`, F32); the same table gave the spend step in the first place.
+   */
+  async spendDeciderOf(tx: DbTx, request: AccessRequestRecord): Promise<string | null> {
+    const holders = await this.targets.usableApprovalRoleHolders(tx);
+    const assignment = routeSpendStep(
+      { requesterEmployeeId: request.requesterEmployeeId, beneficiaryEmployeeIds: request.beneficiaryEmployeeIds },
+      holders,
+    );
+
+    return assignment.outcome === 'ASSIGNED' ? assignment.assigneeEmployeeId : null;
+  }
+
+  /**
+   * Finance gave an opinion to a request that waited for a version of the budget (J.3, F65): it is checked again, as a check of its own
+   * (`FINANCE_OUTCOME_WHILE_WAITING`). A request whose data is at fault (the year closed, a quote that is no longer in force) or that
+   * cannot be checked goes back to the queue of its head, where the check runs when they send it again, and no spend step is made
+   * (`QĐ-92a`). Otherwise the spend step is opened with the opinion in front of the approver: the review of Finance is not opened again,
+   * whatever the check found, since Finance has just looked. The caller holds the lock of the request and ended the review step.
+   */
+  async routeAfterOpinionWhileWaiting(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    request: AccessRequestRecord,
+    now: Date,
+  ): Promise<void> {
+    const outcome = await this.checks.run(tx, request, 'FINANCE_OUTCOME_WHILE_WAITING', actor, now);
+    if (outcome.status === 'NOT_CHECKABLE') {
+      await this.backToSubmission(tx, request);
+
+      return;
+    }
+    const { check } = outcome;
+    if (check.route === 'BLOCKED') {
+      await this.requests.setState(tx, request.id, 'AWAITING_SPEND_SUBMISSION');
+      await this.recordChecked(
+        tx,
+        actor,
+        request,
+        check,
+        'FINANCE_OUTCOME_WHILE_WAITING',
+        'AWAITING_SPEND_SUBMISSION',
+        null,
+      );
+
+      return;
+    }
+    const state = await this.openSpendAfterReview(tx, actor, request, now);
+    await this.recordChecked(tx, actor, request, check, 'FINANCE_OUTCOME_WHILE_WAITING', state, {
+      state,
+      opened: 'SPEND_APPROVAL',
+      substituted: false,
+    });
   }
 
   /**
@@ -103,13 +173,13 @@ export class SpendRoutingService {
     await this.requests.setState(tx, request.id, 'AWAITING_SPEND_SUBMISSION');
   }
 
-  /** Opens the spend step after Finance gave its opinion; the approver now has the opinion in front of them. */
+  /** Opens the spend step after Finance gave its opinion; the approver now has the opinion in front of them. Returns the state the request is in. */
   async openSpendAfterReview(
     tx: DbTx,
     actor: AuthenticatedPrincipal,
     request: AccessRequestRecord,
     now: Date,
-  ): Promise<void> {
+  ): Promise<AccessRequestState> {
     const { state } = await this.openSpend(tx, request, false, now);
     await this.requests.setState(tx, request.id, state);
     await this.audit.record(
@@ -126,9 +196,11 @@ export class SpendRoutingService {
         },
       ),
     );
+
+    return state;
   }
 
-  /** Opens a new review for a request that waited on a budget the spending approver did not approve (`US-06-13` AC-11). */
+  /** Opens a new review when the spending approver checks a request again and it is an exception Finance has not reviewed (`US-06-01` AC-18). */
   async reopenReview(tx: DbTx, actor: AuthenticatedPrincipal, request: AccessRequestRecord, now: Date): Promise<void> {
     const { state, opened } = await this.openReview(tx, request, now);
     await this.requests.setState(tx, request.id, state);

@@ -50,6 +50,8 @@ class DepartmentToolsResponseDto extends createZodDto(
           plan: z.strictObject({ id: z.uuid(), name: z.string() }),
           effectiveFrom: z.string(),
           effectiveFromLabel: z.string().nullable(),
+          terminating: z.boolean(),
+          terminatingUntil: z.string().nullable(),
         }),
       ),
       pagination: z.strictObject({
@@ -77,7 +79,7 @@ export class DepartmentToolsController {
   @ApiSuccessResponse(DepartmentToolsResponseDto, {
     message: 'DEPARTMENT_TOOLS.LISTED',
     description:
-      'One page of what the department uses today: the personal seats its people hold and the service accounts the department owns (kind SERVICE, shown with the employee the account is assigned to), one line per seat with the tool and plan, oldest start first, then by assignment id. The summary counts the seats of every page by plan, sorted by application then plan name; pagination gives the total. A start that is only the day of recording has a label and no grant date.',
+      'One page of what the department uses today: the seats on the subscriptions the department owns, whoever holds them, and the service accounts the department owns (kind SERVICE, shown with the employee the account is assigned to), one line per seat with the tool and plan, oldest start first, then by assignment id. A seat held only until the end of a paid period is terminating, with the day. The summary counts the seats of every page by plan, sorted by application then plan name; pagination gives the total. A start that is only the day of recording has a label and no grant date.',
   })
   @ApiErrorResponses(
     UNAUTHENTICATED_RESPONSE,

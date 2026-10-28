@@ -82,7 +82,7 @@ export class ProvisioningHolderService {
         ? new ProvisioningResponsibleNotInDepartmentError()
         : new ProvisioningResponsibleInvalidError(problem);
     }
-    const mode = await this.frame.selfExecutionMode(actor, employeeId);
+    const mode = await this.frame.selfExecutionMode(actor, employeeId, tx);
 
     return {
       employeeId,

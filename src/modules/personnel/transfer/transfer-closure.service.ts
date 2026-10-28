@@ -5,7 +5,10 @@ import { AuditService } from '../../audit/audit.service';
 import { LicensingService } from '../../licensing/licensing.service';
 import { OrganizationService } from '../../organization/organization.service';
 import { personnelAuditEvent } from '../mappers/personnel-audit-event';
-import { SERVICE_ACCOUNT_UNASSIGNED } from '../personnel.types';
+import { PersonnelAccessRefusedError } from '../personnel.errors';
+import { technicalStepRefusal } from '../personnel-self-action.policy';
+import { SERVICE_ACCOUNT_UNASSIGNED, TRANSFER_REVIEW_OPEN, userActor } from '../personnel.types';
+import { TransferGuardService } from './transfer-guard.service';
 import { TransferRefusedError } from './transfer.errors';
 import { TransferRepo } from './transfer.repo';
 import { TransferSettlementService } from './transfer-settlement.service';
@@ -25,9 +28,21 @@ export class TransferClosureService {
     private readonly organization: OrganizationService,
     private readonly licensing: LicensingService,
     private readonly audit: AuditService,
+    private readonly guard: TransferGuardService,
   ) {}
 
+  /**
+   * Closing is a technical step that follows the event (the people who answer for the service accounts are named): the IT Admin's,
+   * judged here and not only by the guard of the route (F13).
+   */
   close(actor: AuthenticatedPrincipal, id: string): Promise<TransferRecord> {
+    const refused = technicalStepRefusal(actor);
+    if (refused) throw new PersonnelAccessRefusedError(refused);
+
+    return this.guard.guarded(() => this.closeInTx(actor, id));
+  }
+
+  private closeInTx(actor: AuthenticatedPrincipal, id: string): Promise<TransferRecord> {
     return this.runner.run(async (tx) => {
       const today = await this.organization.businessToday(new Date(), tx);
       const probe = await this.transfers.find(id, tx);
@@ -40,18 +55,25 @@ export class TransferClosureService {
       if (held.closedAt !== null) throw new TransferRefusedError('ALREADY_CLOSED');
       if (held.status !== 'EFFECTIVE') throw new TransferRefusedError('NOT_CLOSEABLE', { blockers: ['NOT_EFFECTIVE'] });
 
+      // The parts of the record that are still open keep it open: a service account with nobody to answer for it, and the review of
+      // the tools the new head has not finished (`US-03-08` AC-5, `US-03-07`). Each is told by its code with how many there are.
       const open = await this.licensing.listServiceAccountDuties([held.employeeId], tx);
-      if (open.length > 0) {
+      const reviews = await this.transfers.countOpenReviews(tx, held.id);
+      if (open.length > 0 || reviews > 0) {
         throw new TransferRefusedError('NOT_CLOSEABLE', {
-          blockers: [SERVICE_ACCOUNT_UNASSIGNED],
-          serviceAccounts: open.length,
+          blockers: [
+            ...(open.length > 0 ? [SERVICE_ACCOUNT_UNASSIGNED] : []),
+            ...(reviews > 0 ? [TRANSFER_REVIEW_OPEN] : []),
+          ],
+          ...(open.length > 0 ? { serviceAccounts: open.length } : {}),
+          ...(reviews > 0 ? { openReviews: reviews } : {}),
         });
       }
       const closed = await this.transfers.close(tx, id, actor.appUserId);
       await this.audit.record(
         tx,
         personnelAuditEvent(
-          actor,
+          userActor(actor),
           held.organizationId,
           'DEPARTMENT_TRANSFER.CLOSED',
           'DepartmentTransfer',

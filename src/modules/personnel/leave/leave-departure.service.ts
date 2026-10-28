@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
+import { actorColumns, type PersonnelActor } from '../personnel.types';
 import { stateAfterCancelledDeparture } from './leave.policy';
 import { LeaveRepo } from './leave.repo';
 import type { LeaveRecord } from './leave.types';
@@ -20,7 +21,7 @@ export class LeaveDepartureService {
    */
   async endForDeparture(
     tx: DbTx,
-    recordedByAppUserId: string,
+    actor: PersonnelActor,
     employeeId: string,
     endedOn: BusinessDate,
   ): Promise<LeaveRecord | null> {
@@ -32,8 +33,8 @@ export class LeaveDepartureService {
       leaveId: leave.id,
       kind: 'ENDED_FOR_DEPARTURE',
       returnedOn: day,
-      recordedByAppUserId,
-      selfExecuted: false,
+      recordedByAppUserId: actorColumns(actor).appUserId,
+      recordedByTicketId: actorColumns(actor).ticketId,
     });
 
     return ended;
@@ -46,7 +47,7 @@ export class LeaveDepartureService {
    */
   async resumeAfterCancelledDeparture(
     tx: DbTx,
-    recordedByAppUserId: string,
+    actor: PersonnelActor,
     employeeId: string,
     today: BusinessDate,
   ): Promise<'ON_LONG_LEAVE' | 'WORKING'> {
@@ -61,16 +62,16 @@ export class LeaveDepartureService {
       approvedReturnOn: ended.approvedReturnOn,
       resumesLeaveId: ended.id,
       grounds: ended.grounds,
-      startedByAppUserId: recordedByAppUserId,
-      selfExecuted: false,
+      startedByAppUserId: actorColumns(actor).appUserId,
+      startedByTicketId: actorColumns(actor).ticketId,
     });
     await this.leaves.insertChange(tx, {
       leaveId: resumed.id,
       kind: 'RESUMED',
       newReturnOn: resumed.approvedReturnOn,
       returnedOn: today,
-      recordedByAppUserId,
-      selfExecuted: false,
+      recordedByAppUserId: actorColumns(actor).appUserId,
+      recordedByTicketId: actorColumns(actor).ticketId,
     });
 
     return 'ON_LONG_LEAVE';

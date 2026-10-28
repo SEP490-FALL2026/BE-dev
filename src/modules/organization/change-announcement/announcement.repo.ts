@@ -73,6 +73,45 @@ export class AnnouncementRepo {
     return { starts: starts.map((row) => row.id), ends: ends.map((row) => row.id) };
   }
 
+  /**
+   * F47 (`ops:inspect`, read only): how many changes of each kind had taken effect in the calendar of their own organization
+   * at `asOf` — the moment the migration that seeded this table finished — and are marked by no row of it. That seed used the
+   * date of the database session instead of the organization's calendar; the roll-forward migration marks the difference, so
+   * after it every count is 0. The three predicates are the ones of that migration. Counts only: no id, name or reason.
+   */
+  async countUnmarkedAsOf(
+    tx: DbTx,
+    asOf: Date,
+  ): Promise<Record<'PLACEMENT_START' | 'HEAD_PERIOD_START' | 'HEAD_PERIOD_END', number>> {
+    const at = asOf.toISOString();
+    const rows = await tx.$queryRaw<{ kind: string; n: number }[]>`
+      SELECT 'PLACEMENT_START' AS kind, count(*)::int AS n
+        FROM employee_placements p
+        JOIN organizations o ON o.id = p.organization_id
+       WHERE p.valid_from <= (${at}::timestamptz AT TIME ZONE o.time_zone)::date
+         AND EXISTS (SELECT 1 FROM employee_placements q WHERE q.employee_id = p.employee_id AND q.valid_to = p.valid_from)
+         AND NOT EXISTS (SELECT 1 FROM organization_change_announcements a WHERE a.kind = 'PLACEMENT_START' AND a.subject_id = p.id)
+      UNION ALL
+      SELECT 'HEAD_PERIOD_START', count(*)::int
+        FROM department_head_periods h
+        JOIN organizations o ON o.id = h.organization_id
+       WHERE h.valid_from <= (${at}::timestamptz AT TIME ZONE o.time_zone)::date
+         AND NOT EXISTS (SELECT 1 FROM organization_change_announcements a WHERE a.kind = 'HEAD_PERIOD_START' AND a.subject_id = h.id)
+      UNION ALL
+      SELECT 'HEAD_PERIOD_END', count(*)::int
+        FROM department_head_periods h
+        JOIN organizations o ON o.id = h.organization_id
+       WHERE h.valid_to IS NOT NULL AND h.valid_to <= (${at}::timestamptz AT TIME ZONE o.time_zone)::date
+         AND NOT EXISTS (SELECT 1 FROM organization_change_announcements a WHERE a.kind = 'HEAD_PERIOD_END' AND a.subject_id = h.id)`;
+    const count = (kind: string): number => rows.find((row) => row.kind === kind)?.n ?? 0;
+
+    return {
+      PLACEMENT_START: count('PLACEMENT_START'),
+      HEAD_PERIOD_START: count('HEAD_PERIOD_START'),
+      HEAD_PERIOD_END: count('HEAD_PERIOD_END'),
+    };
+  }
+
   /** The placement as a change, locked so it cannot move while it is told; null when it is gone, not yet begun or told. */
   async lockDuePlacement(tx: DbTx, id: string, today: BusinessDate): Promise<Change<'PLACEMENT_START'> | null> {
     const rows = await tx.$queryRaw<

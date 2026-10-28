@@ -1,8 +1,11 @@
+import type { HeadDecision } from './transfer-review.types';
 import {
   HEAD_DECISIONS,
+  isChangeOfMind,
   isNoteAllowed,
   isReviewOverdue,
   mayDecide,
+  mayRecordDecision,
   overdueDaysOf,
   reviewDueOn,
   statusAfterDecision,
@@ -51,6 +54,37 @@ describe('who decides (US-03-07 AC-7, AC-9)', () => {
     expect(waitingReasonOf('OPEN', null)).toBe('NO_HEAD');
     expect(waitingReasonOf('OPEN', 'h6')).toBeNull();
     expect(waitingReasonOf('COMPLETED', null)).toBeNull();
+  });
+});
+
+describe('the one decision that may be taken back (T-6, F43)', () => {
+  const ALL: HeadDecision[] = ['STILL_NEEDED', 'NOT_NEEDED', 'NEEDS_NEW_TOOL'];
+
+  it('lets a line that waits take any decision', () => {
+    for (const next of ALL) expect(mayRecordDecision('PENDING', next)).toBe(true);
+  });
+
+  it('lets "still needed" become "no longer needed" and nothing else', () => {
+    expect(isChangeOfMind('STILL_NEEDED', 'NOT_NEEDED')).toBe(true);
+    expect(mayRecordDecision('STILL_NEEDED', 'NOT_NEEDED')).toBe(true);
+    for (const next of ['STILL_NEEDED', 'NEEDS_NEW_TOOL'] as const) {
+      expect(isChangeOfMind('STILL_NEEDED', next)).toBe(false);
+      expect(mayRecordDecision('STILL_NEEDED', next)).toBe(false);
+    }
+  });
+
+  it.each(['NOT_NEEDED', 'NEEDS_NEW_TOOL'] as const)(
+    'keeps "%s" final: it is never taken back, not even to the same answer',
+    (current) => {
+      for (const next of ALL) {
+        expect(isChangeOfMind(current, next)).toBe(false);
+        expect(mayRecordDecision(current, next)).toBe(false);
+      }
+    },
+  );
+
+  it('is not a change when the line waits: the first decision of a line is not a change of mind', () => {
+    expect(isChangeOfMind('PENDING', 'NOT_NEEDED')).toBe(false);
   });
 });
 

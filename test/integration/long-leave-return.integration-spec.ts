@@ -45,7 +45,7 @@ describe('the return from a long leave (integration, real PostgreSQL)', () => {
         actor_kind: 'USER',
         after: { onSchedule: true, workState: 'WORKING', grounds: null },
       });
-      expect(event.actor_app_user_id).toBe(h.it1.appUserId);
+      expect(event.actor_app_user_id).toBe(h.sa.appUserId);
       const log = h.dataOf<{ items: LeaveChangeWire[] }>(await h.leaveChanges(leave.id)).items;
       expect(log.map((change) => [change.kind, change.onSchedule, change.grounds])).toEqual([
         ['STARTED', null, h.approval],

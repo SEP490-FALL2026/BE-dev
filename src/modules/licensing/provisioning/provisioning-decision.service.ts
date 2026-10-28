@@ -4,7 +4,7 @@ import { AssignmentService } from '../assignment/assignment.service';
 import { ProvisioningTaskStateError } from '../licensing.errors';
 import { GRANT_REQUEST_GATE, WITHDRAWAL_CANCEL_REASON, type GrantRequestGate } from '../licensing.types';
 import { assertDecidable, assertHandOffAllowed } from './failure.policy';
-import { cleanEvidence, cleanFailureReason } from './provisioning.policy';
+import { cleanFailureReason } from './provisioning.policy';
 import { RegisteredRevocationHook } from './registered-revocation-hook.service';
 import { toRevocationFacts, type ProvisioningTaskRecord } from './provisioning-task.record';
 import { ProvisioningTaskFrame } from './provisioning-task-frame.service';
@@ -17,7 +17,9 @@ import { ProvisioningTaskRepo } from './provisioning-task.repo';
  * only, and nothing decides for the IT Admin or by time. Closing is the end: a grant that is closed leaves its
  * assignment as a failed one and the seat free; a revocation that is closed leaves its assignment as it was. When the
  * requester withdrew the request while the grant had failed, none of those three is left: the task is closed as cancelled
- * (`cancel`), never as failed (`US-05-08` AC-9). Every decision is one transaction with its audit event.
+ * (`cancel`), never as failed (`US-05-08` AC-9). Every decision is one transaction with its audit event, by an IT Admin (the
+ * frame judges the role, F13). Locks: the task, then the request (its outcome), then the subscription and the assignment of the
+ * seat; the grant takes the request before the subscription, so no path takes the subscription before the request (F25).
  */
 @Injectable()
 export class ProvisioningDecisionService {
@@ -49,12 +51,12 @@ export class ProvisioningDecisionService {
   }
 
   /**
-   * Hands a failed connector task to a person, with the evidence that was given. The evidence is kept on the task and does
-   * not enter the audit event. Throws ProvisioningEvidenceRequiredError, ProvisioningTaskAlreadyManualError and the errors
-   * of `retry`.
+   * Hands a failed connector task to a person: only the channel changes, with who handed it and when; the last error, the failure
+   * kind and reason and the tries made stay with the task. The evidence is asked when the manual work completes, not here (F08,
+   * `QĐ-90a`). Throws
+   * ProvisioningTaskAlreadyManualError and the errors of `retry`.
    */
-  async handOff(actor: AuthenticatedPrincipal, id: string, input: { evidence: string }): Promise<TaskView> {
-    const evidence = cleanEvidence(input.evidence);
+  async handOff(actor: AuthenticatedPrincipal, id: string): Promise<TaskView> {
     const task = await this.frame.work(actor, id, {
       check: (locked) => {
         assertDecidable(locked.status);
@@ -62,7 +64,7 @@ export class ProvisioningDecisionService {
       },
       write: async ({ tx, task: locked, now }) => {
         await this.refuseWhileWithdrawing(tx, locked);
-        await this.repo.markHandedOff(tx, locked.id, actor.appUserId, evidence, now);
+        await this.repo.markHandedOff(tx, locked.id, actor.appUserId, now);
 
         return {
           action: 'HANDED_OFF',
@@ -86,13 +88,15 @@ export class ProvisioningDecisionService {
       write: async ({ tx, task: locked, organizationId, now }) => {
         await this.refuseWhileWithdrawing(tx, locked);
         if (locked.kind === 'GRANT' && locked.requestId !== null) {
+          // The request is locked (by its outcome) before the subscription and the assignment: the grant of another person of a
+          // request for a group takes the request and then the same subscription, so the other order is a cycle (F25).
+          await this.gate.reportOutcome(tx, locked.requestId, 'FAILED', locked.assignment.employeeId);
           await this.assignments.closeFailed(tx, actor, {
             organizationId,
             assignmentId: locked.assignmentId,
             requestId: locked.requestId,
             now,
           });
-          await this.gate.reportOutcome(tx, locked.requestId, 'FAILED', locked.assignment.employeeId);
         }
         await this.repo.markClosedFailed(tx, locked.id, actor.appUserId, reason, now);
         if (locked.kind === 'REVOKE') {

@@ -27,7 +27,7 @@ Người đang giữ bước nhu cầu (trưởng phòng, Người duyệt chi h
 | Story    | AC                                | Coverage | Phần còn lại thuộc                                                                                                                                                                                                                                              |
 | -------- | --------------------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | US-01-12 | AC-6, AC-7                        | partial  | AC-1: `g5-request-submission-and-routing`; AC-2: `g5-it-assessment-of-new-software`; AC-3: `g5-return-and-renewal-requests`; AC-4, AC-8, AC-9: `g4-request-and-transfer-integration`; AC-5: `g5-request-withdrawal`; AC-10: `g3-downstream-finance-integration` |
-| US-05-04 | AC-1, AC-2, AC-4→AC-6, AC-8→AC-10 | partial  | AC-3, AC-7: `g5-manager-request-review-view`; AC-11→AC-13, AC-15, AC-16: `g5-spend-submission-batches`; AC-14: `g5-group-requests`                                                                                                                              |
+| US-05-04 | AC-1, AC-2, AC-4→AC-6, AC-8→AC-10 | partial  | AC-3: `g5-manager-request-review-view`; AC-11→AC-13, AC-15, AC-16: `g5-spend-submission-batches`; AC-14: `g5-group-requests`                                                                                                                                    |
 
 ## Supporting references
 

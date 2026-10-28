@@ -168,10 +168,10 @@ describe('catalog subscription read model (integration, real PostgreSQL)', () =>
         addDays(day, 5),
       ]);
       await sql().query(
-        `INSERT INTO subscriptions (id, organization_id, plan_id, kind, status, purchased_quantity, unit_price_minor,
+        `INSERT INTO subscriptions (id, organization_id, plan_id, owner_department_id, kind, status, purchased_quantity, unit_price_minor,
            unit_price_currency, price_recorded_on, price_rate, price_rate_date, price_rate_source, price_reporting_minor,
            price_reporting_currency, billing_cycle, start_date, notice_deadline, auto_renew)
-         SELECT gen_random_uuid(), organization_id, plan_id, kind, status, purchased_quantity, unit_price_minor,
+         SELECT gen_random_uuid(), organization_id, plan_id, owner_department_id, kind, status, purchased_quantity, unit_price_minor,
                 unit_price_currency, price_recorded_on, price_rate, price_rate_date, price_rate_source, price_reporting_minor,
                 price_reporting_currency, billing_cycle, start_date, notice_deadline, auto_renew
            FROM subscriptions s, generate_series(1, 59) WHERE s.id = $1`,

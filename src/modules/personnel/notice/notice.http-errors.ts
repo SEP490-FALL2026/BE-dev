@@ -2,6 +2,7 @@ import { HttpStatus } from '@nestjs/common';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import { toUnavailableApiException } from '../../../infrastructure/http/errors/service-unavailable';
 import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
+import { toPersonnelAccessApiException } from '../mappers/personnel-access.http-errors';
 import { NoticeRefusedError } from './notice.errors';
 
 /** The answer of each refusal, by its semantic code. A code the table does not know is a programming error and stays a 500. */
@@ -53,6 +54,8 @@ const MESSAGES: Readonly<Record<string, string>> = {
  */
 export function toNoticeApiException(error: unknown): unknown {
   if (error instanceof ApiException) return error;
+  const refused = toPersonnelAccessApiException(error);
+  if (refused) return refused;
   if (!(error instanceof NoticeRefusedError)) return toUnavailableApiException(error) ?? error;
   const status = STATUS[error.code];
   if (status === undefined) return error;

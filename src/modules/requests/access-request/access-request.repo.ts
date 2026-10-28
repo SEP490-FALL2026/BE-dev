@@ -24,46 +24,60 @@ const NEED_SEQUENCE = 1;
 export class AccessRequestRepo {
   constructor(private readonly prisma: PrismaService) {}
 
-  /** Writes the request, the people it is for and its need step together, and returns its id and the id of its need step. */
+  /**
+   * Writes the request, the people it is for and its need step together, and returns its id and the id of its need step. A request
+   * made from a draft (`draftId`) is the draft row itself, given its Cost Center, its price, its policy and the moment it was sent in
+   * one statement (the checks of the table accept a row only with all of them), and then its people and its need step.
+   */
   async insert(tx: DbTx, input: NewAccessRequest): Promise<{ id: string; needStepId: string }> {
     const { needStep } = input;
+    const columns = {
+      organizationId: input.organizationId,
+      type: input.type ?? 'GRANT',
+      branch: input.branch,
+      state: input.state,
+      planId: input.planId,
+      requesterEmployeeId: input.requesterEmployeeId,
+      departmentId: input.departmentId,
+      costCenterId: input.costCenterId,
+      businessReason: input.businessReason,
+      termMonths: input.termMonths,
+      projectLabel: input.projectLabel,
+      delegatedBatchId: input.delegatedBatchId ?? null,
+      expectedEndDate: input.expectedEndDate ? toDateColumn(input.expectedEndDate) : null,
+      ...pricingColumns(input.pricing),
+      policy: input.policy as unknown as Prisma.InputJsonObject,
+      createdByAppUserId: input.createdByAppUserId,
+      submittedAt: input.now,
+    };
+    const step = {
+      kind: 'NEED' as const,
+      sequence: NEED_SEQUENCE,
+      state: needStep.state,
+      assigneeEmployeeId: needStep.assigneeEmployeeId,
+      routingRow: needStep.routingRow,
+      waitingReason: needStep.waitingReason,
+      samePersonAsSpend: needStep.samePersonAsSpend,
+      slaWorkingDays: needStep.slaWorkingDays,
+      createdAt: input.now,
+      assignedAt: needStep.state === 'PENDING' ? input.now : null,
+    };
+    const people = input.beneficiaryEmployeeIds.map((employeeId, index) => ({ employeeId, position: index + 1 }));
+
+    const draftId = input.draftId;
+    if (draftId) {
+      // The draft stops being one first: the table refuses a step of a request that is still a draft.
+      await tx.accessRequest.update({ where: { id: draftId, state: 'DRAFT' }, data: columns });
+      await tx.accessRequestBeneficiary.createMany({
+        data: people.map((person) => ({ requestId: draftId, ...person })),
+      });
+      const made = await tx.accessRequestStep.create({ data: { requestId: draftId, ...step }, select: { id: true } });
+
+      return { id: draftId, needStepId: made.id };
+    }
+
     const created = await tx.accessRequest.create({
-      data: {
-        organizationId: input.organizationId,
-        type: input.type ?? 'GRANT',
-        branch: input.branch,
-        state: input.state,
-        planId: input.planId,
-        requesterEmployeeId: input.requesterEmployeeId,
-        departmentId: input.departmentId,
-        costCenterId: input.costCenterId,
-        businessReason: input.businessReason,
-        termMonths: input.termMonths,
-        projectLabel: input.projectLabel,
-        delegatedBatchId: input.delegatedBatchId ?? null,
-        expectedEndDate: input.expectedEndDate ? toDateColumn(input.expectedEndDate) : null,
-        ...pricingColumns(input.pricing),
-        policy: input.policy as unknown as Prisma.InputJsonObject,
-        createdByAppUserId: input.createdByAppUserId,
-        submittedAt: input.now,
-        beneficiaries: {
-          create: input.beneficiaryEmployeeIds.map((employeeId, index) => ({ employeeId, position: index + 1 })),
-        },
-        steps: {
-          create: {
-            kind: 'NEED',
-            sequence: NEED_SEQUENCE,
-            state: needStep.state,
-            assigneeEmployeeId: needStep.assigneeEmployeeId,
-            routingRow: needStep.routingRow,
-            waitingReason: needStep.waitingReason,
-            samePersonAsSpend: needStep.samePersonAsSpend,
-            slaWorkingDays: needStep.slaWorkingDays,
-            createdAt: input.now,
-            assignedAt: needStep.state === 'PENDING' ? input.now : null,
-          },
-        },
-      },
+      data: { ...columns, beneficiaries: { create: people }, steps: { create: step } },
       select: { id: true, steps: { select: { id: true }, take: 1 } },
     });
 

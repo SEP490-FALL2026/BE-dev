@@ -389,6 +389,22 @@ describe('the vault of license keys over HTTP (integration, real PostgreSQL)', (
     });
   });
 
+  it('F23, US-04-01 AC-9: refuses to enter a key for a purchase whose application is retired: 422 LICENSE_KEY.APPLICATION_RETIRED, nothing is kept', async () => {
+    const subscriptionId = await h.subscription(5, 'K4');
+    await imported(subscriptionId, keys(2, 'LIVE'));
+    await h.ctx.sql.query(
+      `UPDATE applications SET catalog_status = 'RETIRED', retired_at = now()
+        WHERE id = (SELECT p.application_id FROM plans p JOIN subscriptions s ON s.plan_id = p.id WHERE s.id = $1)`,
+      [subscriptionId],
+    );
+    const before = await keyCount();
+
+    const refused = await importKeys(subscriptionId, keys(3, 'GONE')).expect(422);
+
+    expect(h.codeOf(refused)).toBe('LICENSE_KEY.APPLICATION_RETIRED');
+    expect(await keyCount()).toBe(before);
+  });
+
   it('US-04-12 AC-10: a purchase that does not exist is not found, for an import and for a list', async () => {
     const missing = randomUUID();
     const before = await keyCount();

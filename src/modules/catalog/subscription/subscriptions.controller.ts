@@ -44,11 +44,12 @@ const INVALID_UPDATE_NOTE =
 const INVALID = {
   status: HttpStatus.UNPROCESSABLE_ENTITY,
   description:
-    'The request is invalid (VALIDATION_ERROR) or a rule refuses it: SUBSCRIPTION.PLAN_NOT_FOUND, OWNER_DEPARTMENT_INACTIVE (declaring only), PLAN_HAS_NO_SUBSCRIPTION, PERPETUAL_NEEDS_LICENSED_APPLICATION, PERPETUAL_HAS_NO_TERM, DATES_INVALID or UPDATE_EMPTY; the price is refused with MONEY_SCALE_EXCEEDED, MONEY_OUT_OF_RANGE or CURRENCY_NOT_SUPPORTED.',
+    'The request is invalid (VALIDATION_ERROR) or a rule refuses it: SUBSCRIPTION.PLAN_NOT_FOUND, OWNER_DEPARTMENT_INACTIVE and APPLICATION_RETIRED (declaring only), PLAN_HAS_NO_SUBSCRIPTION, PERPETUAL_NEEDS_LICENSED_APPLICATION, PERPETUAL_HAS_NO_TERM, DATES_INVALID or UPDATE_EMPTY; the price is refused with MONEY_SCALE_EXCEEDED, MONEY_OUT_OF_RANGE or CURRENCY_NOT_SUPPORTED.',
   examples: [
     VALIDATION_EXAMPLE,
     SUBSCRIPTION_ERROR_EXAMPLES.PLAN_NOT_FOUND,
     SUBSCRIPTION_ERROR_EXAMPLES.OWNER_DEPARTMENT_INACTIVE,
+    SUBSCRIPTION_ERROR_EXAMPLES.APPLICATION_RETIRED,
     SUBSCRIPTION_ERROR_EXAMPLES.PLAN_HAS_NO_SUBSCRIPTION,
     SUBSCRIPTION_ERROR_EXAMPLES.PERPETUAL_NEEDS_LICENSED_APPLICATION,
     SUBSCRIPTION_ERROR_EXAMPLES.PERPETUAL_HAS_NO_TERM,
@@ -79,6 +80,17 @@ const REPORTING_CURRENCY_CONFLICT = {
   description:
     'A unit price was to be converted, but the reporting currency of the installation is not in the currency table (REPORTING_CURRENCY_NOT_SUPPORTED, details.currency). A fault of the configuration, not of the request: the database normally prevents it, and an operator has to correct the currency table.',
   examples: [SUBSCRIPTION_ERROR_EXAMPLES.REPORTING_CURRENCY_NOT_SUPPORTED],
+} as const;
+
+/** The update is the one route whose conflict is not only the configuration: a change that owes more needs a Cost Center (F26). */
+const UPDATE_CONFLICT = {
+  status: HttpStatus.CONFLICT,
+  description:
+    'The department that owns the subscription has no Cost Center in use yet and the change creates, raises or extends what is owed: a higher quantity, a later end or renewal date (or one where there was none), auto renewal switched on or a higher unit price (FINANCE.SETUP_INCOMPLETE, nothing is written). A price was to be converted, but the reporting currency of the installation is not in the currency table (REPORTING_CURRENCY_NOT_SUPPORTED, details.currency): a fault of the configuration, not of the request.',
+  examples: [
+    SUBSCRIPTION_ERROR_EXAMPLES.FINANCE_SETUP_INCOMPLETE,
+    SUBSCRIPTION_ERROR_EXAMPLES.REPORTING_CURRENCY_NOT_SUPPORTED,
+  ],
 } as const;
 
 const toWire = (view: SubscriptionView) => ({
@@ -167,9 +179,9 @@ export class SubscriptionsController {
   @ApiSuccessResponse(SubscriptionResponseDto, {
     message: 'SUBSCRIPTION.UPDATED',
     description:
-      'The subscription as it is after the change; a new unit price is converted again at the rate of today; a change of nothing is answered the same and not audited. The plan and the kind cannot change.',
+      'The subscription as it is after the change; a new unit price is converted again at the rate of today; a change of nothing is answered the same and not audited. The plan, the kind and the owner department cannot change.',
   })
-  @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, INVALID_UPDATE, NOT_FOUND, REPORTING_CURRENCY_CONFLICT)
+  @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, INVALID_UPDATE, NOT_FOUND, UPDATE_CONFLICT)
   async update(
     @CurrentPrincipal() actor: AuthenticatedPrincipal,
     @Param() params: SubscriptionIdParamDto,

@@ -121,8 +121,8 @@ describe('the departure of a person, the revocations and the closing (integratio
       const wire = await h.recordedCase(person);
       const placement = (await h.placements(person.employeeId))[0];
       await h.ctx.sql.query(
-        `INSERT INTO transfer_reviews (id, organization_id, employee_id, placement_id, department_id, job_title_id, effective_on, due_on)
-         SELECT gen_random_uuid(), e.organization_id, e.id, p.id, p.department_id, p.job_title_id, $2::date, $3::date
+        `INSERT INTO transfer_reviews (id, organization_id, employee_id, placement_id, department_id, effective_on, due_on)
+         SELECT gen_random_uuid(), e.organization_id, e.id, p.id, p.department_id, $2::date, $3::date
            FROM employees e JOIN employee_placements p ON p.id = $4 WHERE e.id = $1`,
         [person.employeeId, h.day(-5), h.day(-1), placement.id],
       );

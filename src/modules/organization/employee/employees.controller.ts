@@ -17,8 +17,9 @@ import { ORGANIZATION_ERROR_EXAMPLES, toOrganizationApiException } from '../mapp
 
 /**
  * Entering people by hand (`US-02-02` AC-14). Super Admin only, on an HR basis (`QĐ-82i`, `US-01-05` AC-14): the IT
- * Admin, a department head and Finance do not enter new records. It creates the person and their one placement; it
- * never creates a login, a role or an invitation.
+ * Admin, a department head and Finance do not enter new records, whatever the route lets through (`F13`). It creates the person
+ * and their one placement and tells the head of the department and the IT Admin in charge (`F17`); it never creates a login, a
+ * role or an invitation.
  */
 @ApiTags('employees')
 @Controller({ path: 'employees', version: '1' })

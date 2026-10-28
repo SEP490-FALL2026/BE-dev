@@ -1,5 +1,6 @@
 import request from 'supertest';
 import { BudgetHarness, Pageable, VersionLineWire, VersionWire } from '../support/budget-harness';
+import { waitForLockWaiters } from '../support/lock-wait';
 import type { Person } from '../support/request-harness';
 
 const h = new BudgetHarness();
@@ -35,6 +36,29 @@ describe('budgets over HTTP: the decision of the spending approver (integration,
   const stateOf = async (id: string) =>
     (await h.ctx.sql.query<{ state: string }>(`SELECT state FROM budget_versions WHERE id = $1`, [id])).rows[0].state;
   const approve = (id: string, account = boss.account) => h.decideVersion(id, { decision: 'APPROVE' }, account);
+  /**
+   * Sends the requests one by one behind the row of a version held in another connection. A decision locks the versions of the
+   * Cost Center and the year by id first (`VersionRepo.lockAllOfYear`, `FOR UPDATE`), so each request is waiting for that lock
+   * (`waitForLockWaiters`) before the next is sent, the lock goes to them in the order they queued, and each answer is the answer of
+   * its place in the queue. The row is always released.
+   */
+  const queuedOnVersion = async (id: string, sends: (() => request.Test)[]): Promise<request.Response[]> => {
+    const holder = await h.holdRow('budget_versions', id);
+    const pending: Promise<request.Response>[] = [];
+    try {
+      for (const send of sends) {
+        pending.push(send().then((response) => response));
+        await waitForLockWaiters(h.ctx.sql, pending.length);
+      }
+    } finally {
+      await holder.release();
+      await Promise.allSettled(pending);
+    }
+    const answers: request.Response[] = [];
+    for (const answer of pending) answers.push(await answer);
+
+    return answers;
+  };
   const wireOf = async (id: string, account = h.finance) =>
     h.dataOf<{ version: VersionWire }>(await h.versionOf(id, account).expect(200)).version;
   const commit = async (costCenterId: string, year: number, amount: number) =>
@@ -119,10 +143,16 @@ describe('budgets over HTTP: the decision of the spending approver (integration,
     it('is decided by one of two who ask at once', async () => {
       const { version } = await sent();
 
-      const answers = await Promise.all([approve(version.id), approve(version.id)]);
+      const [first, second] = await queuedOnVersion(version.id, [() => approve(version.id), () => approve(version.id)]);
 
-      expect(answers.map((answer) => answer.status).sort()).toEqual([200, 409]);
+      expect(first.status).toBe(200);
+      expect(second.status).toBe(409);
+      expect(h.codeOf(second)).toBe('BUDGET.VERSION_NOT_SENT');
       expect(await stateOf(version.id)).toBe('APPROVED');
+      const decisions = await h.ctx.sql.query(`SELECT 1 FROM budget_version_decisions WHERE version_id = $1`, [
+        version.id,
+      ]);
+      expect(decisions.rowCount).toBe(1);
     });
 
     it('does not decide a version that was not sent', async () => {
@@ -230,7 +260,7 @@ describe('budgets over HTTP: the decision of the spending approver (integration,
       expect(await stateOf(version.id)).toBe('SENT');
     });
 
-    it('leaves the Cost Center without a budget and tells the head why; the proposal stays reviewed and is neither given back nor open to another (F63)', async () => {
+    it('leaves the Cost Center without a budget and tells the head why; the proposal stays reviewed, is not given back, and a new proposal follows it (F63)', async () => {
       const { version, head, department, proposal } = await sent();
 
       await h
@@ -252,10 +282,17 @@ describe('budgets over HTTP: the decision of the spending approver (integration,
         state: 'REVIEWED',
         returned: null,
       });
-      // What follows a refusal is the work of the release after this one: here both ways are refused with the 409s that exist.
+      // The proposal was not given back, so it is not sent again; the need changed, so the head sends a new one that follows it.
       expect(h.codeOf(await h.resubmit(proposal.id, { lines: [h.line()] }, head.account).expect(409))).toBe(
         'BUDGET.PROPOSAL_CANNOT_RESUBMIT',
       );
+      const successor = await h.submitProposal(h.proposalBody(department.unitId), head.account).expect(201);
+      expect(
+        h.dataOf<{ proposal: { state: string; successorOfProposalId: string | null } }>(successor).proposal,
+      ).toMatchObject({
+        state: 'SUBMITTED',
+        successorOfProposalId: proposal.id,
+      });
       expect(h.codeOf(await h.submitProposal(h.proposalBody(department.unitId), head.account).expect(409))).toBe(
         'BUDGET.PROPOSAL_ALREADY_OPEN',
       );

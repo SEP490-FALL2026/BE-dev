@@ -283,6 +283,36 @@ const INTRA_MODULE_CONTRACTS: ReadonlyMap<string, string> = new Map([
     'modules/requests/reassignment/step-reassignment.service.ts',
     'the reassignment of steps, called from the module root by the sweep the worker runs (G5)',
   ],
+  // requests (spec L.1, F27): the draft of a paid request is saved by its own operations and becomes the request when it is sent.
+  [
+    'modules/requests/access-request/request-draft.repo.ts',
+    'locks the draft that is being sent and judges whose it is, called by group-request/group-request.service.ts and service-account-request/service-account-request.service.ts, which send a draft of their kind (spec L.1)',
+  ],
+  [
+    'modules/requests/access-request/request-draft-departure.service.ts',
+    'deletes the drafts of a person whose departure takes effect, called by reassignment/organization-change.listener.ts in the transaction of the change (spec L.1)',
+  ],
+  [
+    'modules/requests/group-request/group-request.service.ts',
+    'sends a request for a group, called by access-request/request-draft-submit.service.ts when a draft of a group is sent (spec L.1)',
+  ],
+  [
+    'modules/requests/group-request/group-request.dto.ts',
+    'the body of a request for a group, which a draft of a group is validated by when it is saved: the same schema as the route that sends it (spec L.1)',
+  ],
+  [
+    'modules/requests/service-account-request/service-account-request.service.ts',
+    'sends a request for a service account, called by access-request/request-draft-submit.service.ts when a draft of one is sent (spec L.1)',
+  ],
+  [
+    'modules/requests/service-account-request/service-account-request.dto.ts',
+    'the body of a request for a service account, which a draft of one is validated by when it is saved: the same schema as the route that sends it (spec L.1)',
+  ],
+  // requests (F43): the contexts that follow what became of a request hear it from one registry, in the transaction of the end.
+  [
+    'modules/requests/access-request/request-outcome-listeners.ts',
+    'tells the listeners (the personnel context, through the facade requests.service.ts) how a request or a line ended, called by the services that end one: the grant gate, the decisions, the withdrawals and the closings of the IT Admin (F43)',
+  ],
   // notifications (G5, FR-3.11): the facade gives an in-app notice through the inbox capability.
   [
     'modules/notifications/inbox/inbox.service.ts',
@@ -534,7 +564,7 @@ const INTRA_MODULE_CONTRACTS: ReadonlyMap<string, string> = new Map([
   ],
   [
     'modules/personnel/transfer/transfer-change.service.ts',
-    'the transfer that waits and its cancellation inside the transaction of the record of a departure that ends before its day (G6)',
+    'the transfer that waits and its cancellation inside the transaction of the record of a departure that ends before its day (G6), and the writes of the controlled procedure for the Super Admin (F19)',
   ],
   [
     'modules/personnel/transfer/transfer-guard.service.ts',
@@ -543,6 +573,42 @@ const INTRA_MODULE_CONTRACTS: ReadonlyMap<string, string> = new Map([
   [
     'modules/personnel/notice/notice-recorder.registry.ts',
     'the registry of the recorders of a notice of a head: the transfer, the long leave and the departure each register how the event a notice announces is written (G6)',
+  ],
+  [
+    'modules/personnel/event-notice/personnel-notifier.service.ts',
+    'who is told of an event of the personnel context, written in the transaction of the event by the transfer, the long leave, the departure, the notices, the review of tools and the roles of a person who leaves (F17)',
+  ],
+  [
+    'modules/personnel/transfer/transfer.service.ts',
+    'the record of a transfer in the transaction of the caller, which the controlled procedure for the Super Admin runs with an operator actor (F19)',
+  ],
+  [
+    'modules/personnel/transfer/transfer.errors.ts',
+    'the refusals of a transfer, read by the controlled procedure to name them as the application does (F19)',
+  ],
+  [
+    'modules/personnel/leave/leave.service.ts',
+    'the writes of a long leave in the transaction of the caller, which the controlled procedure for the Super Admin runs with an operator actor (F19)',
+  ],
+  [
+    'modules/personnel/leave/leave.errors.ts',
+    'the refusals of a long leave, read by the controlled procedure to name them as the application does (F19)',
+  ],
+  [
+    'modules/personnel/offboarding/offboarding.service.ts',
+    'the record of a departure in the transaction of the caller, which the controlled procedure for the Super Admin runs with an operator actor (F19)',
+  ],
+  [
+    'modules/personnel/offboarding/offboarding-change.service.ts',
+    'the move and the cancellation of a departure in the transaction of the caller, run by the controlled procedure for the Super Admin (F19)',
+  ],
+  [
+    'modules/personnel/offboarding/offboarding.errors.ts',
+    'the refusals of a departure, read by the controlled procedure to name them as the application does (F19)',
+  ],
+  [
+    'modules/personnel/notice/notice-handling.service.ts',
+    'the record of the event a notice of a head announces in the transaction of the caller, run by the controlled procedure for the Super Admin (F19)',
   ],
   [
     'modules/personnel/notice/notice.errors.ts',
@@ -563,10 +629,6 @@ const INTRA_MODULE_CONTRACTS: ReadonlyMap<string, string> = new Map([
     'Cost Center errors mapped by the shared mappers/organization.http-errors.ts',
   ],
   [
-    'modules/organization/cost-center/cost-center.service.ts',
-    'whether the Cost Center link is activated, asked by the department creation',
-  ],
-  [
     'modules/organization/cost-center/cost-center.types.ts',
     'code format shared with departments; Cost Center views used by department records',
   ],
@@ -578,6 +640,10 @@ const INTRA_MODULE_CONTRACTS: ReadonlyMap<string, string> = new Map([
   [
     'modules/organization/department/service-account-registry.ts',
     'registry where licensing hands in the reader of the service accounts a department owns (QĐ-86c), read by the facade',
+  ],
+  [
+    'modules/organization/department/department-use-registry.ts',
+    'registry where the modules that hold the facts hand in what keeps a department (QĐ-90e) or a Cost Center (QĐ-87d(2)) in use, read by the facade',
   ],
   [
     'modules/organization/department/department.errors.ts',

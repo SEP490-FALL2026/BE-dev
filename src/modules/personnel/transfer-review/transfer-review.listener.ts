@@ -5,9 +5,10 @@ import type { OrganizationChange, OrganizationChangeListener } from '../../organ
 import { TransferReviewService } from './transfer-review.service';
 
 /**
- * Listens to the changes of the organization for the one that moves a person to another department (`FR-3.8`): their head of the
- * department they came to reviews the tools outside its standard toolset, and the one that tells a person has left ends the review still open for them. Registered when the module starts, after the listener
- * that marks the transfer effective, and idempotent: the review is made once for a placement.
+ * Listens to the changes of the organization for the one that moves a person to another department (`FR-3.8`): the head of the
+ * department they came to reviews every personal seat the person holds, and the one that tells a person has left ends the review
+ * still open for them. Registered when the module starts, after the listener that marks the transfer effective, and idempotent: the
+ * review is made once for a placement.
  */
 @Injectable()
 export class TransferReviewListener implements OrganizationChangeListener, OnModuleInit {

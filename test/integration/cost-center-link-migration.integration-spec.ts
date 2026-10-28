@@ -12,7 +12,6 @@ import {
   deployMigrations,
   migrationBefore,
   migrationEndingWith,
-  schemaDrift,
 } from '../support/migration-history';
 
 /**
@@ -21,7 +20,9 @@ import {
  * exactly one department. It only adds and relaxes, so the `7c28e75` application — which charges a department to a Cost
  * Center through `departments.cost_center_id` and never writes the new columns — keeps working on the new schema: two
  * triggers keep the old column and the new link equal, and what `7c28e75` writes afterwards is either carried over or
- * listed by the live inventory of `ops:preflight`. Every statement that plays `7c28e75` is plain SQL on the old columns.
+ * listed by the live inventory of `ops:preflight`. Every statement that plays `7c28e75` is plain SQL on the old columns. The history
+ * is deployed **through** this migration: the final migration after it removes the old column and the two triggers, so this is the
+ * boundary the previous image runs on while it can still be the target of a recovery.
  */
 const LINK = migrationEndingWith('_cost_center_department_link');
 
@@ -93,7 +94,7 @@ describe('Cost Center ↔ department link, compatibility migration (integration,
     await sql.query(`UPDATE cost_centers SET status = 'INACTIVE', deactivated_at = now() WHERE id = $1`, [
       legacy.costCenter,
     ]);
-    const deploy = await deployMigrations(database);
+    const deploy = await deployMigrations(database, { through: LINK });
     if (deploy.code !== 0) throw new Error(`Deploying the link migration failed: ${deploy.stdout}\n${deploy.stderr}`);
   }, DEPLOY_TIMEOUT_MS * 2);
 
@@ -362,7 +363,7 @@ describe('Cost Center ↔ department link, compatibility migration (integration,
   });
 
   it(
-    'leaves a clean migration history and the schema exactly as prisma/models describe it (DB-16)',
+    'leaves a clean migration history that stops at the link migration (the drift against the final models is proved on the whole history, not here)',
     async () => {
       const history = await sql.query<{
         migration_name: string;
@@ -372,7 +373,7 @@ describe('Cost Center ↔ department link, compatibility migration (integration,
 
       expect(history.rows.filter((row) => row.finished_at === null || row.rolled_back_at !== null)).toEqual([]);
       expect(history.rows.map((row) => row.migration_name)).toContain(LINK);
-      expect((await schemaDrift(database)).code).toBe(0);
+      expect(history.rows.some((row) => row.migration_name > LINK)).toBe(false);
     },
     DEPLOY_TIMEOUT_MS,
   );

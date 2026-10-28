@@ -26,7 +26,7 @@ Request phần mềm trả phí mang số tiền do hệ thống tính từ giá
 
 | Story    | AC                | Coverage | Phần còn lại thuộc                                                                                                                     |
 | -------- | ----------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| US-05-02 | AC-1, AC-4, AC-11 | partial  | AC-2: `g5-group-requests`; AC-3, AC-5→AC-7, AC-9, AC-10: `g5-request-submission-and-routing`; AC-8: `g5-it-assessment-of-new-software` |
+| US-05-02 | AC-1, AC-4, AC-11 | partial  | AC-2: `g5-group-requests`; AC-3, AC-5→AC-7, AC-9, AC-10, AC-12: `g5-request-submission-and-routing`; AC-8: `g5-it-assessment-of-new-software` |
 
 ## Supporting references
 

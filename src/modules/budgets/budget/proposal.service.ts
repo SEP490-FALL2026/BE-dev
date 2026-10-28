@@ -1,11 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { Page, pageOf } from '../../../core/application/pagination';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditService } from '../../audit/audit.service';
-import { OrganizationService } from '../../organization/organization.service';
 import {
-  BudgetCostCenterNotFoundError,
+  BudgetNotYourCostCenterError,
   BudgetProposalIncompleteError,
   BudgetProposalNotFoundError,
   BudgetProposalOpenError,
@@ -19,21 +17,28 @@ import {
   canReturn,
   canWithdraw,
   incompleteLines,
+  proposalIsSucceedable,
   totalOf,
+  yearHasEnded,
   yearIsOpen,
   type LineDraft,
 } from './budget.policy';
+import { BudgetNotifierService } from './budget-notifier.service';
 import { budgetAuditEvent, BudgetSupportService } from './budget-support.service';
+import { BudgetYearLockRepo } from './budget-year-lock.repo';
 import { ProposalRepo, type ProposalLineRecord, type ProposalRecord } from './proposal.repo';
+import { ProposalViewService } from './proposal-view.service';
 import { VersionRepo } from './version.repo';
-import type { BudgetProposalBodyDto, ProposalLineWire, ProposalSummaryWire, ProposalWire } from './budget.dto';
+import type { BudgetProposalBodyDto, ProposalWire } from './budget.dto';
 
 type LineBody = BudgetProposalBodyDto['lines'][number];
 
 /**
  * The proposals a head of department sends for the Cost Center of the department and a fiscal year (`US-06-10`): sent,
  * taken back while Finance has not sent a version made from them, given back by Finance with a reason, and sent again as a
- * new proposal that keeps the one before in the history. A proposal sent is never edited in place (`QĐ-82a`).
+ * new proposal that keeps the one before in the history. A proposal sent is never edited in place (`QĐ-82a`). A refused version
+ * leaves its proposal reviewed; when the need changed the head sends a new proposal that follows it (F63). Once the fiscal
+ * year has ended nothing of it is written (`QĐ-91c`), whether or not the closure of the year has run.
  */
 @Injectable()
 export class ProposalService {
@@ -42,13 +47,16 @@ export class ProposalService {
     private readonly proposals: ProposalRepo,
     private readonly versions: VersionRepo,
     private readonly support: BudgetSupportService,
-    private readonly organization: OrganizationService,
+    private readonly notifier: BudgetNotifierService,
+    private readonly yearLock: BudgetYearLockRepo,
+    private readonly views: ProposalViewService,
     private readonly audit: AuditService,
   ) {}
 
   /**
-   * Throws BudgetCostCenterNotFoundError, BudgetNotYourCostCenterError, BudgetYearEndedError, BudgetProposalIncompleteError,
-   * BudgetWindowBackwardsError, BudgetProposalOpenError, BudgetCurrencyError and the money errors.
+   * Throws FinanceSetupIncompleteError, BudgetCostCenterNotFoundError, BudgetNotYourCostCenterError, BudgetYearEndedError,
+   * BudgetProposalIncompleteError, BudgetWindowBackwardsError, BudgetPlanNotFoundError, BudgetProposalOpenError,
+   * BudgetCurrencyError and the money errors.
    */
   async submit(actor: AuthenticatedPrincipal, body: BudgetProposalBodyDto): Promise<ProposalWire> {
     const fiscalStart = await this.support.fiscalYearStartMonth();
@@ -62,7 +70,7 @@ export class ProposalService {
         fiscalStart,
       });
 
-      return this.wire(await this.require(id, tx));
+      return this.views.wire(await this.require(id, tx));
     });
   }
 
@@ -72,6 +80,8 @@ export class ProposalService {
 
     return this.runner.run(async (tx) => {
       const previous = await this.ownedLocked(tx, actor, id);
+      const today = await this.support.today(new Date(), tx);
+      if (yearHasEnded(previous.year, today, fiscalStart)) throw new BudgetYearEndedError(previous.year);
       if (!canResubmit(previous.state)) throw new BudgetProposalStateError('RESUBMIT', previous.state);
       const created = await this.send(tx, actor, {
         costCenterId: previous.costCenterId,
@@ -81,14 +91,18 @@ export class ProposalService {
         fiscalStart,
       });
 
-      return this.wire(await this.require(created, tx));
+      return this.views.wire(await this.require(created, tx));
     });
   }
 
   /** The head takes the proposal back while Finance has not sent a version made from it (`US-06-10` AC-4). */
   async withdraw(actor: AuthenticatedPrincipal, id: string): Promise<ProposalWire> {
+    const fiscalStart = await this.support.fiscalYearStartMonth();
+
     return this.runner.run(async (tx) => {
       const proposal = await this.ownedLocked(tx, actor, id);
+      const today = await this.support.today(new Date(), tx);
+      if (yearHasEnded(proposal.year, today, fiscalStart)) throw new BudgetYearEndedError(proposal.year);
       if (!canWithdraw(proposal.state)) throw new BudgetProposalStateError('WITHDRAW', proposal.state);
 
       const now = new Date();
@@ -102,15 +116,20 @@ export class ProposalService {
         }),
       );
 
-      return this.wire(await this.require(id, tx));
+      return this.views.wire(await this.require(id, tx));
     });
   }
 
   /** Finance gives the proposal back with the reason that must go with it (`US-06-09` AC-15). */
   async giveBack(actor: AuthenticatedPrincipal, id: string, reason: string): Promise<ProposalWire> {
+    this.support.requireFinance(actor);
+    const fiscalStart = await this.support.fiscalYearStartMonth();
+
     return this.runner.run(async (tx) => {
       const proposal = await this.proposals.lockById(tx, id);
       if (!proposal) throw new BudgetProposalNotFoundError();
+      const today = await this.support.today(new Date(), tx);
+      if (yearHasEnded(proposal.year, today, fiscalStart)) throw new BudgetYearEndedError(proposal.year);
       if (!canReturn(proposal.state)) throw new BudgetProposalStateError('RETURN', proposal.state);
 
       const now = new Date();
@@ -124,50 +143,11 @@ export class ProposalService {
           reason,
         }),
       );
+      const returned = await this.require(id, tx);
+      await this.notifier.proposalReturned(tx, returned, today);
 
-      return this.wire(await this.require(id, tx));
+      return this.views.wire(returned);
     });
-  }
-
-  /** The proposals the caller reads: Finance all of them, a head those of the department they head. */
-  async list(
-    actor: AuthenticatedPrincipal,
-    query: { state?: ProposalRecord['state']; year?: number; page: number; pageSize: number },
-  ): Promise<Page<ProposalSummaryWire>> {
-    const scope = await this.scope(actor);
-    if (scope !== 'ALL' && scope.length === 0) return pageOf([], 0, query.page, query.pageSize);
-
-    const { items, total } = await this.proposals.page({
-      ...(scope === 'ALL' ? {} : { costCenterIds: scope }),
-      ...(query.state ? { state: query.state } : {}),
-      ...(query.year ? { year: query.year } : {}),
-      skip: (query.page - 1) * query.pageSize,
-      take: query.pageSize,
-    });
-    const wires = await this.wires(items);
-
-    return pageOf(wires.map(summaryOf), total, query.page, query.pageSize);
-  }
-
-  async get(actor: AuthenticatedPrincipal, id: string): Promise<ProposalWire> {
-    return this.wire(await this.readable(actor, id));
-  }
-
-  async lines(
-    actor: AuthenticatedPrincipal,
-    id: string,
-    query: { page: number; pageSize: number },
-  ): Promise<Page<ProposalLineWire>> {
-    const proposal = await this.readable(actor, id);
-    const { items, total } = await this.proposals.pageLines(id, (query.page - 1) * query.pageSize, query.pageSize);
-    const money = await this.support.formatter(proposal.currency);
-
-    return pageOf(
-      items.map((line) => toLineWire(line, money)),
-      total,
-      query.page,
-      query.pageSize,
-    );
   }
 
   private async send(
@@ -177,8 +157,10 @@ export class ProposalService {
   ): Promise<string> {
     const now = new Date();
     const today = await this.support.today(now, tx);
+    // The head's own department comes first: without a Cost Center in use there is nothing to propose for (F27).
+    const own = await this.support.requireHeadedCostCenter(actor.employeeId, today, tx);
     const costCenter = await this.support.costCenter(input.costCenterId, tx);
-    await this.support.requireHead(actor.employeeId, costCenter.id, today, tx);
+    if (costCenter.id !== own) throw new BudgetNotYourCostCenterError();
     if (!yearIsOpen(input.year, today, input.fiscalStart)) throw new BudgetYearEndedError(input.year);
 
     const drafts: LineDraft[] = input.lines.map((line) => ({
@@ -193,6 +175,7 @@ export class ProposalService {
     if (incomplete.length > 0) throw new BudgetProposalIncompleteError(incomplete);
     const backwards = backwardLines(drafts);
     if (backwards.length > 0) throw new BudgetWindowBackwardsError(backwards);
+    await this.support.requirePlans(input.lines.map((line) => line.planId));
 
     const reporting = await this.support.reportingCurrency(tx);
     const lines: Omit<ProposalLineRecord, 'position'>[] = [];
@@ -211,8 +194,14 @@ export class ProposalService {
       });
     }
 
+    // A new proposal may follow a reviewed one whose version was refused (F63): that proposal is locked before the year, as the
+    // decision of a version and the making of another version from it lock it, and is judged again once it is held.
+    const successorOf = input.previous === null ? await this.proposalToFollow(tx, costCenter.id, input.year) : null;
+    await this.yearLock.lock(tx, costCenter.id, [input.year]);
     const open = (await this.proposals.chainOf(costCenter.id, input.year, tx)).some(
-      (proposal) => proposal.state === 'SUBMITTED' || proposal.state === 'REVIEWED',
+      (proposal) =>
+        proposal.state === 'SUBMITTED' ||
+        (proposal.state === 'REVIEWED' && proposal.succeededAt === null && proposal.id !== successorOf),
     );
     if (open) throw new BudgetProposalOpenError();
 
@@ -223,6 +212,7 @@ export class ProposalService {
       costCenterId: costCenter.id,
       year: input.year,
       previousProposalId: input.previous,
+      successorOfProposalId: successorOf,
       currency: reporting,
       totalMinor: total,
       submittedByEmployeeId: actor.employeeId,
@@ -238,10 +228,23 @@ export class ProposalService {
         totalMinor: total.toString(),
         currency: reporting,
         previousProposalId: input.previous,
+        successorOfProposalId: successorOf,
       }),
     );
+    await this.notifier.proposalSubmitted(tx, await this.require(id, tx));
 
     return id;
+  }
+
+  /** The reviewed proposal of the Cost Center and year that the one being sent follows, locked, or null when there is none (F63). */
+  private async proposalToFollow(tx: DbTx, costCenterId: string, year: number): Promise<string | null> {
+    const candidate = await this.proposals.reviewedWithoutSuccessor(costCenterId, year, tx);
+    if (!candidate) return null;
+    const held = await this.proposals.lockById(tx, candidate.id);
+    if (!held) return null;
+    const latest = await this.versions.latestOfProposal(held.id, tx);
+
+    return proposalIsSucceedable(held, latest?.state ?? null) ? held.id : null;
   }
 
   private async require(id: string, tx?: DbTx): Promise<ProposalRecord> {
@@ -261,88 +264,4 @@ export class ProposalService {
 
     return proposal;
   }
-
-  /** Finance reads every proposal; a head reads those of their own Cost Center; anybody else finds nothing. */
-  private async readable(actor: AuthenticatedPrincipal, id: string): Promise<ProposalRecord> {
-    const proposal = await this.require(id);
-    const scope = await this.scope(actor);
-    if (scope !== 'ALL' && !scope.includes(proposal.costCenterId)) throw new BudgetProposalNotFoundError();
-
-    return proposal;
-  }
-
-  private async scope(actor: AuthenticatedPrincipal): Promise<'ALL' | string[]> {
-    if (actor.roles.includes('FINANCE') || (await this.support.isDecider(actor.employeeId))) return 'ALL';
-    const own = await this.support.headedCostCenter(actor.employeeId, await this.support.today(new Date()));
-
-    return own === null ? [] : [own];
-  }
-
-  private async wire(proposal: ProposalRecord): Promise<ProposalWire> {
-    const [wire] = await this.wires([proposal]);
-
-    return wire;
-  }
-
-  private async wires(proposals: readonly ProposalRecord[]): Promise<ProposalWire[]> {
-    const [people, centers] = await Promise.all([
-      this.support.people(proposals.flatMap((p) => [p.submittedByEmployeeId, p.returnedByEmployeeId])),
-      this.support.costCenters(proposals.map((p) => p.costCenterId)),
-    ]);
-
-    return Promise.all(
-      proposals.map(async (proposal) => {
-        const money = await this.support.formatter(proposal.currency);
-        const costCenter = centers.get(proposal.costCenterId);
-        if (!costCenter) throw new BudgetCostCenterNotFoundError();
-
-        return {
-          id: proposal.id,
-          costCenter,
-          year: proposal.year,
-          state: proposal.state,
-          previousProposalId: proposal.previousProposalId,
-          total: money(proposal.totalMinor),
-          submittedBy: people.get(proposal.submittedByEmployeeId) ?? null,
-          submittedAt: proposal.submittedAt.toISOString(),
-          returned:
-            proposal.returnedReason && proposal.returnedAt
-              ? {
-                  reason: proposal.returnedReason,
-                  by: proposal.returnedByEmployeeId ? (people.get(proposal.returnedByEmployeeId) ?? null) : null,
-                  at: proposal.returnedAt.toISOString(),
-                }
-              : null,
-          withdrawnAt: proposal.withdrawnAt?.toISOString() ?? null,
-        };
-      }),
-    );
-  }
 }
-
-const summaryOf = (proposal: ProposalWire): ProposalSummaryWire => ({
-  id: proposal.id,
-  costCenter: proposal.costCenter,
-  year: proposal.year,
-  state: proposal.state,
-  previousProposalId: proposal.previousProposalId,
-  total: proposal.total,
-  submittedAt: proposal.submittedAt,
-});
-
-export const toLineWire = (
-  line: ProposalLineRecord,
-  money: (minor: bigint) => { amount: string; currency: string },
-): ProposalLineWire => ({
-  position: line.position,
-  description: line.description,
-  planId: line.planId,
-  seats: line.seats,
-  amount: money(line.amountMinor),
-  windowFrom: line.windowFrom,
-  windowTo: line.windowTo,
-  servicePeriodMonths: line.servicePeriodMonths,
-  repeatCycle: line.repeatCycle,
-  quoteValidUntil: line.quoteValidUntil,
-  note: line.note,
-});

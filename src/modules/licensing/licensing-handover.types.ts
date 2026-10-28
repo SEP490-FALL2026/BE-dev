@@ -1,5 +1,18 @@
 import type { BusinessDate } from '../../core/business-date';
+import type { AuditValue } from '../audit/audit.types';
 import type { RevocationSource } from './licensing.types';
+
+/**
+ * Who the Audit Trail names for the handover events when the caller is the controlled procedure `ops:record-super-admin-event`
+ * (spec L.2): an operator working a ticket, never an account. The `actor` the facade is given then only fills the columns that
+ * still demand an account; the events say `OPERATOR`, no account, the ticket as the reference and as the correlation. `context`
+ * is what the command adds to the `after` of every event it writes (references only).
+ */
+export interface OperatorAuditActor {
+  ticketId: string;
+  ticketRef: string;
+  context?: { readonly [key: string]: AuditValue };
+}
 
 /**
  * What a source that knows the person who leaves ahead of time hands to `LicensingService.openHandoverDuties`: the planned
@@ -24,6 +37,8 @@ export interface OpenHandoverDutiesInput {
   /** The department the head is looked up for; the department of the person today when not given. */
   departmentId?: string;
   now?: Date;
+  /** Set when the departure is recorded by the controlled procedure: the events of the duties are audited as that operator. */
+  operator?: OperatorAuditActor;
 }
 
 /** What opening the duties of a person did: the duties made, and the seats whose duty was there already or needs none. */
@@ -55,6 +70,8 @@ export interface ReconcileHandoverInput {
   /** The new last working day, when the day a successor is looked up for moves with it. */
   lastWorkingDay?: BusinessDate;
   now?: Date;
+  /** Set when the change is made by the controlled procedure: the events are audited as that operator. */
+  operator?: OperatorAuditActor;
 }
 
 /** The cancellation of a case: the duties still waiting for a confirmation are cancelled with the reason (`US-03-04` AC-15). */
@@ -62,4 +79,6 @@ export interface CancelHandoverInput {
   caseRefId: string;
   reason: string;
   now?: Date;
+  /** Set when the cancellation is made by the controlled procedure: the events are audited as that operator. */
+  operator?: OperatorAuditActor;
 }

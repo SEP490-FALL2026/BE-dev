@@ -27,6 +27,7 @@ import {
 import { licensingAuditEvent } from '../mappers/licensing-audit-event';
 import {
   assertGrantableType,
+  assertItAdmin,
   assertSubscriptionChoice,
   chooseServiceIdentifier,
   cleanEvidence,
@@ -71,7 +72,8 @@ export class ProvisioningService {
    * Grants the seat of a request: the assignment (source REQUEST, from today) and a manual task in the queue of the IT
    * Admin in charge of the department of whoever holds it. A personal seat is the beneficiary's, under a company account; a
    * service account (`US-05-21`) is answered for by a person of the department that owns it, under the identifier the IT
-   * Admin enters. Throws GrantRequestRefusedError, SeatTargetNotFoundError, ProvisioningTypeNotSupportedError,
+   * Admin enters. The seat goes only on a subscription of the department of the request, which owns it and is charged for it
+   * (`QĐ-89a`, F20). Throws ProvisioningItAdminRequiredError, GrantRequestRefusedError, SeatTargetNotFoundError, ProvisioningTypeNotSupportedError,
    * ProvisioningSubscriptionError, SeatQuantityUnknownError, EmployeeNotFoundError, ProvisioningBeneficiaryDepartedError,
    * ProvisioningBeneficiaryNotStartedError, ProvisioningPersonalAccountError, ProvisioningAccountIdentifierRequiredError,
    * ProvisioningResponsibleNotInDepartmentError, ProvisioningResponsibleInvalidError, ProvisioningAnotherItAdminNeededError
@@ -89,6 +91,7 @@ export class ProvisioningService {
       beneficiaryEmployeeId?: string;
     },
   ): Promise<{ task: TaskView; warnings: 'DEPARTMENT_WITHOUT_IT_ADMIN'[] }> {
+    assertItAdmin(actor);
     const answer = await this.gate.check(input.requestId, input.beneficiaryEmployeeId);
     if (answer.status !== 'GRANTABLE') throw new GrantRequestRefusedError(answer.status);
     // Only a service account has a person to name, and its identifier is the IT Admin's to give: nothing is locked or written yet.
@@ -142,6 +145,7 @@ export class ProvisioningService {
       const assignment = await this.assignments.createFromRequest(tx, actor, {
         organizationId: organization.id,
         requestId: input.requestId,
+        departmentId: answer.seat === 'SERVICE' ? answer.serviceAccount.departmentId : answer.departmentId,
         target,
         holder,
         effectiveFrom: today,
@@ -167,6 +171,8 @@ export class ProvisioningService {
           ...(holder.selfExecuted === null ? {} : { selfExecuted: holder.selfExecuted }),
         }),
       );
+      // An IT Admin who answers for the account themselves because no other can is told to the Super Admin (`SoD-5`, F24).
+      if (holder.selfExecuted === true) await this.frame.tellSuperAdmin(tx, organization.id, task.id, actor.employeeId);
 
       return task;
     });

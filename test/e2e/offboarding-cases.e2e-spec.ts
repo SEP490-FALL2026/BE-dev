@@ -70,6 +70,23 @@ const ROUTES: Array<[string, Call]> = [
   ['POST /offboarding-cases/{id}/closure', (server) => request(server).post(`/api/v1/offboarding-cases/${ID}/closure`)],
 ];
 
+/** The roles the guard of each route lets through: the Super Admin writes the events, the IT Admin reads the technical case and takes the steps. */
+const ALLOWED: Record<string, readonly string[]> = {
+  'POST /offboarding-cases': ['SUPER_ADMIN'],
+  'GET /offboarding-cases': ['SUPER_ADMIN', 'IT_ADMIN'],
+  'GET /offboarding-cases/{id}': ['SUPER_ADMIN', 'IT_ADMIN'],
+  'GET /offboarding-cases/{id}/rights': ['SUPER_ADMIN', 'IT_ADMIN'],
+  'GET /offboarding-cases/{id}/changes': ['SUPER_ADMIN'],
+  'GET /offboarding-cases/{id}/open-requests': ['IT_ADMIN'],
+  'GET /offboarding-cases/{id}/open-grant-tasks': ['IT_ADMIN'],
+  'POST /offboarding-cases/{id}/last-day-changes': ['SUPER_ADMIN'],
+  'POST /offboarding-cases/{id}/cancellation': ['SUPER_ADMIN'],
+  'POST /offboarding-cases/{id}/departure': ['SUPER_ADMIN'],
+  'POST /offboarding-cases/{id}/account-lock': ['IT_ADMIN'],
+  'POST /offboarding-cases/{id}/revocations': ['IT_ADMIN'],
+  'POST /offboarding-cases/{id}/closure': ['IT_ADMIN'],
+};
+
 describe('offboarding case routes (e2e, no database)', () => {
   let app: INestApplication<App>;
 
@@ -89,9 +106,9 @@ describe('offboarding case routes (e2e, no database)', () => {
     await app?.close();
   });
 
-  describe('every route needs a signed-in IT Admin (US-03-04)', () => {
+  describe('every route needs a signed-in person of the role that may use it (US-03-04; F40, F12)', () => {
     it.each(ROUTES)('%s without a token is 401', async (_name, call) => {
-      app = await appFor(principal(['IT_ADMIN']));
+      app = await appFor(principal(['SUPER_ADMIN']));
 
       const response = await call(app.getHttpServer()).expect(401);
 
@@ -99,18 +116,30 @@ describe('offboarding case routes (e2e, no database)', () => {
     });
 
     it.each([
-      ['the Super Admin, who never does business work (SoD-1)', ['SUPER_ADMIN'], []],
+      ['the Super Admin', ['SUPER_ADMIN'], []],
+      ['the IT Admin', ['IT_ADMIN'], []],
       ['the finance officer', ['FINANCE'], []],
       ['an employee', ['EMPLOYEE'], []],
       ['an account with no role', [], []],
       ['a department head, whose role is derived', [], ['MANAGER']],
       ['the spending approver, whose role is derived', [], ['SPENDING_APPROVER']],
-    ])('refuses %s on every route with 403', async (_name, direct, derived) => {
+    ])('refuses %s on the routes it is not for with 403', async (_name, direct, derived) => {
       app = await appFor(principal(direct, derived));
 
       for (const [route, call] of ROUTES) {
+        if (ALLOWED[route].some((role) => (direct as string[]).includes(role))) continue;
         const response = await call(app.getHttpServer()).set('Authorization', 'Bearer any').expect(403);
         expect({ route, code: bodyOf(response).error.code }).toEqual({ route, code: 'AUTHORIZATION.FORBIDDEN' });
+      }
+    });
+
+    it('lets the IT Admin through only on what it reads or does technically: never on the events (F40, F12)', async () => {
+      app = await appFor(principal(['SUPER_ADMIN']));
+
+      for (const [route, call] of ROUTES) {
+        const response = await call(app.getHttpServer()).set('Authorization', 'Bearer any');
+        const refused = response.status === 403 && bodyOf(response).error.code === 'AUTHORIZATION.FORBIDDEN';
+        expect({ route, refused }).toEqual({ route, refused: !ALLOWED[route].includes('IT_ADMIN') });
       }
     });
   });
@@ -128,7 +157,7 @@ describe('offboarding case routes (e2e, no database)', () => {
       ['a field the route does not know', { ...RECORD, reasonForLeaving: 'x' }],
       ['a field inside the basis the route does not know', { ...RECORD, grounds: { ...GROUNDS, note: 'x' } }],
     ])('refuses %s with 422', async (_name, payload) => {
-      app = await appFor(principal(['IT_ADMIN']));
+      app = await appFor(principal(['SUPER_ADMIN']));
 
       const response = await request(app.getHttpServer())
         .post('/api/v1/offboarding-cases')
@@ -185,7 +214,7 @@ describe('offboarding case routes (e2e, no database)', () => {
           request(server).post(`/api/v1/offboarding-cases/${ID}/departure`).send({ departedOn: 'today' }),
       ],
     ])('refuses %s with 422', async (_name, call) => {
-      app = await appFor(principal(['IT_ADMIN']));
+      app = await appFor(principal(['SUPER_ADMIN']));
 
       const response = await call(app.getHttpServer()).set(asAdmin()).expect(422);
 

@@ -13,7 +13,9 @@ export type LineClosureRefusal =
   /** The requester withdrew the person while the grant had failed, and the IT Admin closes that task first: that has its own way. */
   | 'WITHDRAWAL_PENDING'
   /** The person still works, handing over included: the line is only listed until they have left. */
-  | 'BENEFICIARY_NOT_LEFT';
+  | 'BENEFICIARY_NOT_LEFT'
+  /** The line is closed because its person was transferred, and they were not: they still sit where the request was sent from, or left (F29). */
+  | 'BENEFICIARY_NOT_TRANSFERRED';
 
 export interface LineClosureFacts {
   lineState: LineState;
@@ -26,6 +28,21 @@ export function checkLineClosure(facts: LineClosureFacts): LineClosureRefusal | 
   if (isEnded(facts.lineState)) return 'ALREADY_ENDED';
   if (facts.lineState === 'AWAITING_IT_CLOSE') return 'WITHDRAWAL_PENDING';
   if (!facts.beneficiaryLeft) return 'BENEFICIARY_NOT_LEFT';
+
+  return null;
+}
+
+export interface LineTransferClosureFacts {
+  lineState: LineState;
+  /** Whether the person still works and sits in a department other than the one the request was sent from (a paid request keeps it). */
+  beneficiaryTransferred: boolean;
+}
+
+/** The first reason the line is not closed because its person was transferred, or null when it is (F29); the same order as above. */
+export function checkLineTransferClosure(facts: LineTransferClosureFacts): LineClosureRefusal | null {
+  if (isEnded(facts.lineState)) return 'ALREADY_ENDED';
+  if (facts.lineState === 'AWAITING_IT_CLOSE') return 'WITHDRAWAL_PENDING';
+  if (!facts.beneficiaryTransferred) return 'BENEFICIARY_NOT_TRANSFERRED';
 
   return null;
 }

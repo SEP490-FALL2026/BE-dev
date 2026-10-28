@@ -52,7 +52,7 @@ export interface SeatFacts {
   target: {
     kind: 'SUBSCRIPTION' | 'PLAN';
     purchasedQuantity: number | null;
-    /** The department that owns the subscription; null for a plan and for a subscription nobody has assigned (F20). */
+    /** The department that owns the subscription (`QĐ-89a`); null only for an internal plan, which has no subscription. */
     ownerDepartmentId?: string | null;
   };
   recordedOn: BusinessDate;
@@ -203,8 +203,11 @@ function judgeAlone(cells: SeatCells, facts: SeatFacts): { errors: SeatRowErrorC
       costCenterId = unit.costCenter?.id ?? null;
       owningDepartmentId = unit.departmentId;
     }
-  } else if (kind === 'PERSONAL' && costCenterCode !== '') {
-    errors.push('COST_CENTER_NOT_ALLOWED');
+  } else if (kind === 'PERSONAL') {
+    if (costCenterCode !== '') errors.push('COST_CENTER_NOT_ALLOWED');
+    // A personal seat is written on the subscription of its owner department whatever department the person is in; when they are in
+    // another one, closing the baseline opens the review of their own head (F21, `QĐ-89e`).
+    owningDepartmentId = facts.target.ownerDepartmentId ?? null;
   }
 
   if (errors.length > 0 || kind === null || !employee) return { errors, parsed: null };

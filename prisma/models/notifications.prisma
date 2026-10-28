@@ -56,3 +56,26 @@ model InAppNotification {
   @@index([recipientEmployeeId, createdAt(sort: Desc), id(sort: Desc)])
   @@map("in_app_notifications")
 }
+
+// A notice kept for a department that has no head yet (F67, T-11): written when the event happens, handed to the first head
+// the Super Admin names, once, in the transaction of that assignment. `event_key` makes writing it again a no-op.
+model HeldDepartmentNotification {
+  id                    String    @id @default(uuid(7)) @db.Uuid
+  organizationId        String    @map("organization_id") @db.Uuid
+  departmentId          String    @map("department_id") @db.Uuid
+  code                  String
+  subjectType           String?   @map("subject_type")
+  subjectId             String?   @map("subject_id") @db.Uuid
+  params                Json      @default("{}")
+  eventKey              String    @unique @map("event_key")
+  heldAt                DateTime  @default(now()) @map("held_at") @db.Timestamptz(3)
+  deliveredAt           DateTime? @map("delivered_at") @db.Timestamptz(3)
+  // A value: the head it was handed to (the history outlives the post).
+  deliveredToEmployeeId String?   @map("delivered_to_employee_id") @db.Uuid
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  department   Department   @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+
+  @@index([departmentId, deliveredAt])
+  @@map("held_department_notifications")
+}

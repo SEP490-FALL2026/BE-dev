@@ -2,7 +2,6 @@ import { Injectable } from '@nestjs/common';
 import { addDays, type BusinessDate } from '../../../core/business-date';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import { isUniqueViolation } from '../../../infrastructure/database/unique-violation';
-import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditService } from '../../audit/audit.service';
 import { CatalogService } from '../../catalog/catalog.service';
 import { OrganizationHistoryService } from '../../organization/organization-history.service';
@@ -13,9 +12,11 @@ import {
   PlacementOverlapError,
 } from '../../organization/organization.errors';
 import { OrganizationService } from '../../organization/organization.service';
+import { PersonnelNotifier } from '../event-notice/personnel-notifier.service';
 import { groundsSnapshot, normalizedGrounds } from '../grounds/grounds.policy';
 import { personnelAuditEvent } from '../mappers/personnel-audit-event';
 import { PersonnelFileHooks } from '../personnel-file-hooks';
+import { actorColumns, type PersonnelActor } from '../personnel.types';
 import { TransferRefusedError } from './transfer.errors';
 import { newTransferRefusal, retiredDestinationRefusal } from './transfer.policy';
 import { TransferGuardService } from './transfer-guard.service';
@@ -48,11 +49,13 @@ export class TransferService {
     private readonly audit: AuditService,
     private readonly hooks: PersonnelFileHooks,
     private readonly catalog: CatalogService,
+    private readonly notifier: PersonnelNotifier,
   ) {}
 
-  /** Throws TransferRefusedError for everything the policy or the database refuses. */
-  async record(actor: AuthenticatedPrincipal, input: RecordTransferInput): Promise<TransferOutcome> {
-    const transfer = await this.runner.run((tx) => this.recordInTx(tx, actor, input));
+  /** Throws TransferRefusedError for everything the policy or the database refuses, and PersonnelAccessRefusedError for the actor. */
+  async record(actor: PersonnelActor, input: RecordTransferInput): Promise<TransferOutcome> {
+    this.guard.requireWriter(actor, input.employeeId);
+    const transfer = await this.guard.guarded(() => this.runner.run((tx) => this.recordInTx(tx, actor, input)));
     const owned = await this.catalog.getApplicationsOwnedBy(input.employeeId, WARNING_APPLICATION_LIMIT);
     const warnings: TransferWarning[] =
       owned.total > 0
@@ -63,10 +66,10 @@ export class TransferService {
   }
 
   /** The same in the transaction of the caller (the writes that start from a notice of the head, later). */
-  async recordInTx(tx: DbTx, actor: AuthenticatedPrincipal, input: RecordTransferInput): Promise<TransferRecord> {
+  async recordInTx(tx: DbTx, actor: PersonnelActor, input: RecordTransferInput): Promise<TransferRecord> {
+    this.guard.requireWriter(actor, input.employeeId);
     const organization = await this.guard.requireOrganization();
     const today = await this.organization.businessToday(new Date(), tx);
-    const selfMode = await this.guard.selfMode(actor, input.employeeId);
 
     // What the person is now, read before the locks so they can be taken in the order of the protocol.
     const seen = await this.organization.getEmployee(input.employeeId, tx);
@@ -90,6 +93,7 @@ export class TransferService {
     if (leavesAsHead && input.successor?.kind === 'EMPLOYEE') {
       await this.lockSuccessor(tx, input.successor.employeeId);
     }
+    await this.guard.requireOperatorSubject(tx, actor, input.employeeId);
 
     const employee = await this.organization.getEmployee(input.employeeId, tx);
     const current = await this.history.getPlacementInForce(tx, input.employeeId, today);
@@ -110,14 +114,10 @@ export class TransferService {
       employee: { status: employee.status, workState: employee.workState },
       current: { departmentId: current.departmentId, validFrom: current.validFrom },
       target: { departmentId: toDepartmentId },
-      destinationDepartment: destination && {
-        active: destination.active,
-        costCenterActive: destination.costCenterActive,
-      },
+      destinationDepartment: destination && { active: destination.active },
       grounds: input.grounds,
       pending: await this.pendingOf(tx, input.employeeId),
       namedAsSuccessor: await this.transfers.isNamedSuccessorOfPending(tx, input.employeeId),
-      selfMode,
       successor: await this.guard.successorFacts(tx, {
         required: leavesAsHead,
         chosen: input.successor,
@@ -156,8 +156,8 @@ export class TransferService {
       opensPlacementId: scheduled.openedPlacementId,
       headHandover: handover,
       grounds,
-      selfExecuted: selfMode === 'ALLOW_SELF_EXECUTED',
-      recordedByAppUserId: actor.appUserId,
+      recordedByAppUserId: actorColumns(actor).appUserId,
+      recordedByTicketId: actorColumns(actor).ticketId,
       noticeId: input.noticeId ?? null,
     });
 
@@ -178,24 +178,24 @@ export class TransferService {
           effectiveOn: input.effectiveOn,
           grounds: groundsSnapshot(grounds),
           headSuccessor: handover ? (handover.successorEmployeeId ?? 'NONE') : null,
-          selfExecuted: record.selfExecuted,
         },
       ),
     );
-    if (record.selfExecuted) {
-      await this.audit.record(
-        tx,
-        personnelAuditEvent(actor, organization.id, 'PERSONNEL.SELF_EXECUTED', 'DepartmentTransfer', record.id, null, {
-          employeeCode: employee.employeeCode,
-          event: 'TRANSFER_RECORDED',
-        }),
-      );
-    }
     await this.hooks.onRecorded(tx, {
       fileKind: 'TRANSFER',
       fileId: record.id,
       employeeId: record.employeeId,
       dueOn: record.effectiveOn,
+    });
+    await this.notifier.eventRecorded(tx, {
+      organizationId: organization.id,
+      employeeId: record.employeeId,
+      departmentId: record.toDepartmentId,
+      alsoDepartmentIds: [record.fromDepartmentId],
+      eventKind: 'TRANSFER_RECORDED',
+      eventId: record.id,
+      subjectType: 'DEPARTMENT_TRANSFER',
+      effectiveOn: record.effectiveOn,
     });
     // A transfer for today has already taken effect: the placement began in this transaction and the listeners were told.
     if (input.effectiveOn <= today) await this.settlement.settleOne(tx, record.id, 'RECORDED_FOR_TODAY');

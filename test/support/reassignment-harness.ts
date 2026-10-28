@@ -65,16 +65,15 @@ export class ReassignmentHarness extends SpendHarness {
   async moveTo(employeeId: string, departmentId: string, options: { announce?: boolean } = {}): Promise<void> {
     const today = this.today();
     await this.runner().run(async (tx) => {
-      const [old] = await tx.$queryRaw<
-        { id: string; organization_id: string; department_id: string; job_title_id: string }[]
-      >`SELECT id, organization_id, department_id, job_title_id FROM employee_placements
+      const [old] = await tx.$queryRaw<{ id: string; organization_id: string; department_id: string }[]>`
+        SELECT id, organization_id, department_id FROM employee_placements
          WHERE employee_id = ${employeeId}::uuid AND valid_to IS NULL`;
       await tx.$executeRaw`UPDATE employee_placements SET valid_from = valid_from - 30 WHERE id = ${old.id}::uuid`;
       await tx.$executeRaw`UPDATE employee_placements SET valid_to = ${today}::date WHERE id = ${old.id}::uuid`;
       const [created] = await tx.$queryRaw<{ id: string }[]>`
-        INSERT INTO employee_placements (id, organization_id, employee_id, department_id, job_title_id, valid_from)
+        INSERT INTO employee_placements (id, organization_id, employee_id, department_id, valid_from)
         VALUES (gen_random_uuid(), ${old.organization_id}::uuid, ${employeeId}::uuid, ${departmentId}::uuid,
-                ${old.job_title_id}::uuid, ${today}::date)
+                ${today}::date)
         RETURNING id`;
       if (options.announce === false) return;
       await this.organization().emitChange(tx, {

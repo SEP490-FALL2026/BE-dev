@@ -26,7 +26,7 @@ type Call = (server: App) => request.Test;
 /** A Cost Center is created FOR a department (`QĐ-87d(1)`): the department is part of the body. */
 const NEW_COST_CENTER = { code: 'CC-DES', name: 'Design', kind: 'UNIT', departmentId: ID };
 
-/** Routes only Finance may use (US-04-09 AC-2) and the one the IT Admin may also read. */
+/** Routes only Finance may use (US-04-09 AC-2); the catalogue itself the Super Admin may also read, and the IT Admin may not (F12, QĐ-87a). */
 const FINANCE_ROUTES: Array<[string, Call]> = [
   ['POST /cost-centers', (server) => request(server).post('/api/v1/cost-centers').send(NEW_COST_CENTER)],
   ['PATCH /cost-centers/{id}', (server) => request(server).patch(`/api/v1/cost-centers/${ID}`).send({ name: 'x' })],
@@ -66,8 +66,8 @@ describe('cost center catalogue routes (e2e, no database)', () => {
 
   describe('who may change the catalogue (US-04-09 AC-2)', () => {
     it.each([
-      ['an IT Admin, who may read the catalogue but not change it', ['IT_ADMIN'], []],
-      ['the Super Admin, who never does business work (SoD-1)', ['SUPER_ADMIN'], []],
+      ['an IT Admin, who has no operation on the catalogue', ['IT_ADMIN'], []],
+      ['the Super Admin, who reads the catalogue but does not change it', ['SUPER_ADMIN'], []],
       ['an employee', ['EMPLOYEE'], []],
       ['an account with no role', [], []],
       ['a department head, whose role is derived', [], ['MANAGER']],
@@ -82,19 +82,24 @@ describe('cost center catalogue routes (e2e, no database)', () => {
     });
 
     it.each([
-      ['the Super Admin', ['SUPER_ADMIN'], []],
+      ['an IT Admin, whose scope is the technical work of departments (F12)', ['IT_ADMIN'], []],
       ['an employee', ['EMPLOYEE'], []],
+      ['an account with no role', [], []],
       ['a department head', [], ['MANAGER']],
-    ])('refuses %s the catalogue itself with 403', async (_name, direct, derived) => {
-      app = await appFor(principal(direct, derived));
+      ['the spending approver', [], ['SPENDING_APPROVER']],
+    ])(
+      'refuses %s the catalogue itself with 403: only Finance and the Super Admin read it',
+      async (_name, direct, derived) => {
+        app = await appFor(principal(direct, derived));
 
-      const response = await request(app.getHttpServer())
-        .get('/api/v1/cost-centers')
-        .set('Authorization', 'Bearer any')
-        .expect(403);
+        const response = await request(app.getHttpServer())
+          .get('/api/v1/cost-centers')
+          .set('Authorization', 'Bearer any')
+          .expect(403);
 
-      expect(bodyOf(response).error.code).toBe('AUTHORIZATION.FORBIDDEN');
-    });
+        expect(bodyOf(response).error.code).toBe('AUTHORIZATION.FORBIDDEN');
+      },
+    );
   });
 
   describe('validation', () => {

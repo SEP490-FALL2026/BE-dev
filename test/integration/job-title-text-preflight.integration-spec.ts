@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { Client } from 'pg';
 import { CLI_COLD_START_MS, cliWorkingDirectory, runCli, stopCliProcesses } from '../support/cli-process';
+import { activateCostCenterLink, lastCompatibilityMigration } from '../support/compat-release';
 import {
   DisposableDatabase,
   dropDisposableDatabase,
@@ -15,12 +16,13 @@ import {
 } from '../support/migration-history';
 
 /**
- * `g0-g6-final-business-baseline-remediation`, Task 1.3a (F41, spec L.4): the live inventory of `ops:preflight` for the two
- * kinds the release after this one no longer takes — a `BM-09` notice of a change of job title that still waits, and a
+ * `g0-g6-final-business-baseline-remediation`, Task 1.3a and 1.3 (F41, spec L.4): the live inventory of `ops:preflight` for the two
+ * kinds the final release no longer takes — a `BM-09` notice of a change of job title that still waits, and a
  * transfer of the job title only that still waits. They block before and after the compatibility migration, by id and
  * nothing else, through partial closing, until the last one is rejected or cancelled; the rows `7c28e75` writes after the
- * migration or after a recovery are listed the same way. The command is real (`migration-preflight-cli.ts` through
- * ts-node) on a database whose history Prisma recorded itself.
+ * migration or after a recovery are listed the same way. Once the final migrations have run (they refuse to run over such a row)
+ * nothing is listed. The command is real (`migration-preflight-cli.ts` through ts-node) on a database whose history Prisma
+ * recorded itself.
  */
 const TEXT = migrationEndingWith('_job_title_text');
 
@@ -166,10 +168,10 @@ describe('ops:preflight, the retired kinds of notice and transfer (integration, 
   );
 
   it(
-    'after the migration: the same rows still block, including one the previous release writes late',
+    'after the compatibility migration: the same rows still block, including one the previous release writes late',
     async () => {
-      const deploy = await deployMigrations(database);
-      if (deploy.code !== 0) throw new Error(`Deploying the title migration failed: ${deploy.stdout}`);
+      const deploy = await deployMigrations(database, { through: lastCompatibilityMigration() });
+      if (deploy.code !== 0) throw new Error(`Deploying the compatibility release failed: ${deploy.stdout}`);
       // The previous release is still the running one in the migrate → recreate window, or recovered after a failed deploy.
       const late = await titleNotice();
       notices.push(late);
@@ -211,5 +213,22 @@ describe('ops:preflight, the retired kinds of notice and transfer (integration, 
       ).toBe(true);
     },
     CLI_COLD_START_MS * 2,
+  );
+
+  it(
+    'after the migrations of the final release (the catalogue, the four columns and the other tables are gone): nothing is listed and the preflight is ready',
+    async () => {
+      // The operator's step on the compatibility release, so that only the kinds that are gone are read here.
+      await activateCostCenterLink(sql, world.organizationId);
+      const deploy = await deployMigrations(database);
+      if (deploy.code !== 0) throw new Error(`Deploying the final release failed: ${deploy.stdout}\n${deploy.stderr}`);
+
+      const { code, report } = await preflight();
+
+      expect(retired(report)).toEqual([]);
+      expect(code).toBe(0);
+      expect(report).toMatchObject({ status: 'READY', blockers: [] });
+    },
+    DEPLOY_TIMEOUT_MS + CLI_COLD_START_MS,
   );
 });

@@ -6,6 +6,9 @@ import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examp
 import {
   AccessRequestAlreadyHoldsAccessError,
   AccessRequestEmployeeRequiredError,
+  AccessRequestNotDraftError,
+  AccessRequestRoleRequiredError,
+  AccessRequestSuperAdminCannotRequestError,
   AccessRequestGroupUsesLinesError,
   DelegatedRequestRefusedError,
   AccessRequestApplicationRetiredError,
@@ -43,6 +46,23 @@ export function toAccessRequestApiException(error: unknown): unknown {
   // The department has no Cost Center in use yet (`QĐ-87d(1)`): Finance creates it first. Nothing was written.
   if (error instanceof FinanceSetupIncompleteError) {
     return refuse(HttpStatus.CONFLICT, 'FINANCE.SETUP_INCOMPLETE', error.message);
+  }
+
+  // The Super Admin does no business work: no request is sent in their name, whatever the route (F30).
+  if (error instanceof AccessRequestSuperAdminCannotRequestError) {
+    return refuse(HttpStatus.FORBIDDEN, 'ACCESS_REQUEST.SUPER_ADMIN_CANNOT_REQUEST', error.message);
+  }
+  // A draft that was already sent (or is not a draft) is not sent or deleted again (spec L.1).
+  if (error instanceof AccessRequestNotDraftError) {
+    return refuse(HttpStatus.CONFLICT, 'ACCESS_REQUEST.NOT_DRAFT', error.message);
+  }
+  // A service judged the role itself, as the guard of the route does (F13): the same answer.
+  if (error instanceof AccessRequestRoleRequiredError) {
+    return refuse(
+      HttpStatus.FORBIDDEN,
+      'AUTHORIZATION.FORBIDDEN',
+      'You do not have permission to perform this action.',
+    );
   }
 
   if (error instanceof DelegatedRequestRefusedError) {
@@ -136,6 +156,8 @@ export const ACCESS_REQUEST_ERROR_EXAMPLES = {
   APPLICATION_RETIRED: example(new AccessRequestApplicationRetiredError()),
   NO_DEPARTMENT: example(new AccessRequestNoDepartmentError()),
   FINANCE_SETUP_INCOMPLETE: example(new FinanceSetupIncompleteError('<department-id>')),
+  SUPER_ADMIN_CANNOT_REQUEST: example(new AccessRequestSuperAdminCannotRequestError()),
+  NOT_DRAFT: example(new AccessRequestNotDraftError()),
   ALREADY_HOLDS_ACCESS: example(
     new AccessRequestAlreadyHoldsAccessError({
       assignmentId: '<assignment-id>',
@@ -167,6 +189,7 @@ export const ACCESS_REQUEST_ERROR_EXAMPLES = {
   CANCELLATION_WITHDRAWAL_PENDING: cancellation('WITHDRAWAL_PENDING'),
   GROUP_REQUEST_UNSUPPORTED: cancellation('GROUP_REQUEST_UNSUPPORTED'),
   BENEFICIARY_NOT_LEFT: cancellation('BENEFICIARY_NOT_LEFT'),
+  BENEFICIARY_NOT_TRANSFERRED: cancellation('BENEFICIARY_NOT_TRANSFERRED'),
   EVIDENCE_REQUIRED: cancellation('EVIDENCE_REQUIRED'),
   NOT_HEAD: delegation('NOT_HEAD'),
   BENEFICIARY_NOT_ACTIVE: delegation('BENEFICIARY_NOT_ACTIVE'),

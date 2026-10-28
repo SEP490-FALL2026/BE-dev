@@ -9,8 +9,10 @@ const h = new BudgetHarness();
 /**
  * `g0-g6-final-business-baseline-remediation`, Task 4.7a (F63, F36, `QĐ-91a`, `QĐ-92c`, review `P03-RV-03`, spec J.2 and L.10): from the
  * compatibility release the refusal of the first version of a proposal leaves the proposal `REVIEWED` instead of giving it back to the head;
- * the withdrawal and the return of a proposal mark its drafts as detached in the same transaction; and `ops:preflight` tells the proposals that
- * `7c28e75` gave back for a refusal (R1, R2) from the ones it cannot tell (A) and from the ones Finance gave back.
+ * the withdrawal and the return of a proposal mark its drafts as detached in the same transaction; and `ops:preflight` reads the proposals that
+ * `7c28e75` gave back for a refusal (R1, R2, A) only until the migration of the budgets structure has reconciled them: on the final schema it
+ * reads none, so a proposal Finance gave back after a refusal does not block a deploy. The R1/R2/A classification itself is proved by the unit
+ * suite of `judgeLegacyReturns`; its agreement with the migration's own expressions is the reconciliation suite of the plan's Task 1.7 (`budget-legacy-return-reconciliation`).
  */
 describe('the refusal of a first version, the detached drafts and the preflight of the proposals given back (integration, real PostgreSQL)', () => {
   let boss: Person;
@@ -53,17 +55,26 @@ describe('the refusal of a first version, the detached drafts and the preflight 
         [id],
       )
     ).rows[0];
-  /** What `7c28e75` left after a refusal: the proposal given back with the reason, the decider and the moment of the refusal. */
-  const asTheOldReleaseLeftIt = async (proposalId: string) => {
-    const done = await sql(
-      `UPDATE budget_proposals p
-          SET state = 'RETURNED', returned_reason = d.reason, returned_by_employee_id = d.decided_by_employee_id,
-              returned_at = d.decided_at
-         FROM budget_version_decisions d JOIN budget_versions v ON v.id = d.version_id
-        WHERE p.id = $1 AND v.proposal_id = p.id AND d.decision = 'REJECTED'`,
-      [proposalId],
-    );
-    expect(done.rowCount).toBe(1);
+  /**
+   * A proposal given back that also has a refused version: the shape `7c28e75` left after a refusal, and the one a return of
+   * Finance leaves on a proposal a refusal touched. Written the way the next test needs it on the final schema: the triggers of the
+   * table are switched off for the statement (the rules of its own writes), a CHECK constraint is never bypassed.
+   */
+  const returnedAfterARefusal = async (proposalId: string) => {
+    await sql(`ALTER TABLE budget_proposals DISABLE TRIGGER USER`);
+    try {
+      const done = await sql(
+        `UPDATE budget_proposals p
+            SET state = 'RETURNED', returned_reason = d.reason, returned_by_employee_id = d.decided_by_employee_id,
+                returned_at = d.decided_at
+           FROM budget_version_decisions d JOIN budget_versions v ON v.id = d.version_id
+          WHERE p.id = $1 AND v.proposal_id = p.id AND d.decision = 'REJECTED'`,
+        [proposalId],
+      );
+      expect(done.rowCount).toBe(1);
+    } finally {
+      await sql(`ALTER TABLE budget_proposals ENABLE TRIGGER USER`);
+    }
   };
 
   describe('the refusal of the first version (F63)', () => {
@@ -148,26 +159,11 @@ describe('the refusal of a first version, the detached drafts and the preflight 
     });
   });
 
-  describe('ops:preflight on the proposals the old release gave back (spec J.2)', () => {
-    it('tells R1 and R2 from the cases it cannot tell, and leaves out what Finance gave back', async () => {
-      // R1: given back for a refusal, nothing sent after.
-      const r1 = await refused();
-      await asTheOldReleaseLeftIt(r1.proposal.id);
-      // R2: given back for a refusal, and sent again once (the one chain that follows).
-      const r2 = await refused();
-      await asTheOldReleaseLeftIt(r2.proposal.id);
-      await h.resubmit(r2.proposal.id, { lines: [h.line()] }, r2.head.account).expect(201);
-      // A: the reason on the proposal is no longer the one of the refusal.
-      const a1 = await refused();
-      await asTheOldReleaseLeftIt(a1.proposal.id);
-      await sql(`UPDATE budget_proposals SET returned_reason = 'Another reason' WHERE id = $1`, [a1.proposal.id]);
-      // A: a proposal sent after the return that does not point back at it.
-      const a2 = await refused();
-      await asTheOldReleaseLeftIt(a2.proposal.id);
-      const stranger = h.dataOf<{ proposal: ProposalWire }>(
-        await h.submitProposal(h.proposalBody(a2.department.unitId), a2.head.account).expect(201),
-      ).proposal;
-      // Not a candidate: Finance gave it back, no refusal on any version.
+  describe('ops:preflight on the final schema (spec J.2): the migration reconciled the old rows, so the old path is not read', () => {
+    it('lists no proposal given back after a refusal and reports nothing to reconcile: it is an ordinary one, and no ambiguous case blocks a deploy', async () => {
+      const returned = await refused();
+      await returnedAfterARefusal(returned.proposal.id);
+      // A proposal a refusal never touched, given back by Finance, is no candidate either.
       const given = await waiting();
       await h.giveBack(given.proposal.id, { reason: 'Add the quotes' }, h.finance).expect(200);
 
@@ -176,23 +172,9 @@ describe('the refusal of a first version, the detached drafts and the preflight 
         .run((tx) => new MigrationPreflightRepo().contractGateFacts(tx));
       const judged = judgeLegacyReturns(facts.legacyReturns);
 
-      const rules = new Map<string, string>();
-      for (const item of judged.information) {
-        if (item.code === 'BUDGET_PROPOSAL_LEGACY_RETURN_RECONCILE') rules.set(item.proposalId, item.rule);
-      }
-      expect(Object.fromEntries(rules)).toEqual({ [r1.proposal.id]: 'R1', [r2.proposal.id]: 'R2' });
-      const ambiguous = new Map<string, (typeof judged.blockers)[number]>();
-      for (const blocker of judged.blockers) {
-        if (blocker.code === 'BUDGET_PROPOSAL_LEGACY_RETURN_AMBIGUOUS') ambiguous.set(blocker.proposalId, blocker);
-      }
-      expect([...ambiguous.keys()].sort()).toEqual([a1.proposal.id, a2.proposal.id].sort());
-      expect(ambiguous.get(a1.proposal.id)).toMatchObject({ versionIds: [a1.version.id], relatedProposalIds: [] });
-      expect(ambiguous.get(a2.proposal.id)).toMatchObject({
-        versionIds: [a2.version.id],
-        relatedProposalIds: [stranger.id],
-      });
-      expect(JSON.stringify(judged)).not.toContain('Another reason');
-      expect(JSON.stringify(judged)).not.toContain(given.proposal.id);
+      expect(facts.legacyReturns).toEqual({ candidates: [], neighbours: [] });
+      expect(judged).toEqual({ blockers: [], information: [] });
+      expect(await proposalRow(returned.proposal.id)).toMatchObject({ state: 'RETURNED' });
     });
   });
 });

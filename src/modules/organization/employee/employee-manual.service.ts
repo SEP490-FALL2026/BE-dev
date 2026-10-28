@@ -6,14 +6,16 @@ import type { HrBasis } from '../../../core/hr-basis';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditService } from '../../audit/audit.service';
+import { NotificationsService } from '../../notifications/notifications.service';
 import { EmployeeCodeTakenError, EmployeeEmailTakenError } from '../organization.errors';
 import { EmployeeRowInvalidError } from './employee.errors';
+import { assertMayEnterEmployees } from './employee.policy';
 import { validateEmployeeRow } from './employee-row.validator';
 import { organizationAuditEvent } from '../mappers/audit-event.mapper';
 import { OrganizationService } from '../organization.service';
 import { EmploymentType } from '../organization.types';
 
-/** What the form sends. The department is named by its code, like the import file column (`FR-9.7`). */
+/** What the form sends. The department is named by its code, like the import file column (`FR-9.7`); the job title is optional free text. */
 export interface ManualEmployeeInput {
   employeeCode: string;
   fullName: string;
@@ -45,22 +47,26 @@ export interface ManualEmployeeView {
 
 /**
  * Entering one person by hand (`US-02-02` AC-14, `QĐ-67d`, `QĐ-82i`): the Employee and its single placement, in one
- * transaction, on the HR document the caller cites, and nothing else. It creates no account, role, invitation or
- * mail; giving the person a login is a separate step. Whoever enters is never the person entered (AC-18).
+ * transaction, on the HR document the caller cites, and nothing else but the in-app notices a new record owes (AC-17, `F17`): the head of
+ * the department and the IT Admin in charge are told, in the same transaction. It creates no account, role, invitation or mail; giving the
+ * person a login is a separate step. Whoever enters is never the person entered (AC-18). The Super Admin alone enters people:
+ * `employee.policy.ts` says so before anything is read.
  */
 @Injectable()
 export class EmployeeManualService {
   constructor(
     private readonly organization: OrganizationService,
     private readonly audit: AuditService,
+    private readonly notifications: NotificationsService,
     private readonly runner: TransactionRunner,
   ) {}
 
   /**
-   * Throws EmployeeRowInvalidError carrying every reason (T-16), or TransientDatabaseError. `now` is the moment of
+   * Throws EmployeeForbiddenError, EmployeeRowInvalidError carrying every reason (T-16), or TransientDatabaseError. `now` is the moment of
    * the entry; it is a parameter so a test can fix the clock, and it defaults to the database clock of the transaction.
    */
   async create(actor: AuthenticatedPrincipal, input: ManualEmployeeInput, now?: Date): Promise<ManualEmployeeView> {
+    assertMayEnterEmployees(actor.roles);
     const organization = await this.organization.getOrganization();
     if (!organization) throw new Error('An employee was entered before installation');
     try {
@@ -77,7 +83,7 @@ export class EmployeeManualService {
         const department = departmentCode
           ? await this.organization.lockDepartmentForEntry(tx, organization.id, departmentCode)
           : null;
-        const jobTitle = normalizeDisplayName(input.jobTitle ?? '');
+        const jobTitle = normalizeDisplayName(input.jobTitle ?? '') || null;
         const workEmail = input.workEmail?.trim() || null;
         const normalizedEmail = workEmail === null ? null : this.normalize(workEmail);
         // Nobody enters their own record (`US-02-02` AC-18): the one place the Super Admin's record is read.
@@ -125,6 +131,13 @@ export class EmployeeManualService {
             hrBasis: { ...input.hrBasis },
           }),
         );
+        const notices = await this.organization.getProfileNotices(tx, {
+          kind: 'CREATED',
+          organizationId: organization.id,
+          employeeId: id,
+          onDate: memberSince,
+        });
+        for (const notice of notices) await this.notifications.notifyInApp(tx, notice);
 
         return {
           id,

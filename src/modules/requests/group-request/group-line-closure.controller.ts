@@ -34,7 +34,7 @@ export class GroupLineClosureController {
   @Post(':id/lines/:employeeId/departure-closure')
   @ApiOperation({
     operationId: 'accessRequestLineCloseForDeparture',
-    summary: 'Remove one person who left from a request for a group',
+    summary: 'Remove one person who left or was transferred from a request for a group',
   })
   @ApiSuccessResponse(GroupResponseDto, {
     message: 'ACCESS_REQUEST.LINE_CANCELLED',
@@ -57,17 +57,18 @@ export class GroupLineClosureController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The line has ended already (ACCESS_REQUEST.ALREADY_ENDED), the withdrawal of the person waits for the IT Admin to close their task (ACCESS_REQUEST.WITHDRAWAL_PENDING), or the person still works, handing over included (ACCESS_REQUEST.BENEFICIARY_NOT_LEFT). Nothing changes.',
+        'The line has ended already (ACCESS_REQUEST.ALREADY_ENDED), the withdrawal of the person waits for the IT Admin to close their task (ACCESS_REQUEST.WITHDRAWAL_PENDING), the person still works, handing over included (ACCESS_REQUEST.BENEFICIARY_NOT_LEFT), or the closing is for a transfer and the person was not transferred away from the department the request was sent from (ACCESS_REQUEST.BENEFICIARY_NOT_TRANSFERRED). Nothing changes.',
       examples: [
         GROUP_REQUEST_ERROR_EXAMPLES.CLOSURE_ALREADY_ENDED,
         GROUP_REQUEST_ERROR_EXAMPLES.CLOSURE_WITHDRAWAL_PENDING,
         GROUP_REQUEST_ERROR_EXAMPLES.BENEFICIARY_NOT_LEFT,
+        GROUP_REQUEST_ERROR_EXAMPLES.BENEFICIARY_NOT_TRANSFERRED,
       ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The ids or the body are invalid (VALIDATION_ERROR), or the task of the grant is being worked and no evidence says the work was undone (ACCESS_REQUEST.EVIDENCE_REQUIRED). Nothing is saved.',
+        'The ids or the body are invalid (VALIDATION_ERROR: a closing for a transfer gives its reason), or the task of the grant is open and no evidence says the work was undone (for a transfer: that the vendor was checked and the invitation collected) (ACCESS_REQUEST.EVIDENCE_REQUIRED). Nothing is saved.',
       examples: [VALIDATION_EXAMPLE, GROUP_REQUEST_ERROR_EXAMPLES.EVIDENCE_REQUIRED],
     },
     GUARDED_SERVICE_UNAVAILABLE_RESPONSE,

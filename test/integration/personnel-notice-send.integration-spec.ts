@@ -2,6 +2,7 @@ import { addWorkingDays } from '../../src/core/working-days';
 import { ACCOUNT_PASSWORD, loginAs } from '../support/api-accounts';
 import { NoticeHarness, type NoticeWire } from '../support/notice-harness';
 import { PgRelay } from '../support/pg-relay';
+import { handOthersToSecondItAdmin } from '../support/second-it-admin';
 import { QueryCounter, dataStatements } from '../support/query-count';
 import type { Department, Person } from '../support/request-harness';
 
@@ -116,7 +117,7 @@ describe('the notices of the department heads (integration, real PostgreSQL)', (
       const e1 = await h.worker(des, code());
       const wire = await h.sentNotice(departure(e1), h1.account);
 
-      const queue = h.dataOf<{ items: NoticeWire[] }>(await h.listNotices(`?employeeId=${e1.employeeId}`, h.it1));
+      const queue = h.dataOf<{ items: NoticeWire[] }>(await h.listNotices(`?employeeId=${e1.employeeId}`, h.sa));
 
       expect(queue.items).toMatchObject([{ id: wire.id, overdue: false }]);
       const late = await h.noticeRows(e1.employeeId);
@@ -126,7 +127,7 @@ describe('the notices of the department heads (integration, real PostgreSQL)', (
       } finally {
         await h.ctx.sql.query(`ALTER TABLE personnel_notices ENABLE TRIGGER personnel_notices_no_rewrite`);
       }
-      const overdue = h.dataOf<{ items: NoticeWire[] }>(await h.listNotices('?overdue=true', h.it1));
+      const overdue = h.dataOf<{ items: NoticeWire[] }>(await h.listNotices('?overdue=true', h.sa));
       expect(overdue.items.map((item) => item.id)).toContain(wire.id);
       expect(overdue.items.every((item) => item.overdue && item.status === 'PENDING_VERIFICATION')).toBe(true);
     });
@@ -246,7 +247,7 @@ describe('the notices of the department heads (integration, real PostgreSQL)', (
       expect(await personFacts(e1)).toEqual(before);
       expect(before.state).toBe('ACTIVE/WORKING');
       await expect(loginAs(h.ctx.app, `${e1.account.email}`, ACCOUNT_PASSWORD)).resolves.toEqual(expect.any(String));
-      const priority = h.dataOf<{ items: NoticeWire[] }>(await h.listNotices('?priority=true', h.it1));
+      const priority = h.dataOf<{ items: NoticeWire[] }>(await h.listNotices('?priority=true', h.sa));
       expect(priority.items.map((item) => item.id)).toContain(wire.id);
       expect(priority.items.every((item) => item.priority)).toBe(true);
     });
@@ -298,7 +299,7 @@ describe('the notices of the department heads (integration, real PostgreSQL)', (
       expect(withdrawn.status).toBe('WITHDRAWN');
       expect(withdrawn.handledAt).not.toBeNull();
       const waiting = h.dataOf<{ items: NoticeWire[] }>(
-        await h.listNotices(`?employeeId=${e1.employeeId}&status=PENDING_VERIFICATION`, h.it1),
+        await h.listNotices(`?employeeId=${e1.employeeId}&status=PENDING_VERIFICATION`, h.sa),
       );
       expect(waiting.items).toEqual([]);
       expect(await h.auditEventsOf('PERSONNEL_NOTICE.WITHDRAWN', wire.id)).toHaveLength(1);
@@ -332,15 +333,15 @@ describe('the notices of the department heads (integration, real PostgreSQL)', (
       expect(await h.noticeCount()).toBe(before);
     });
 
-    it('shows a head only the notices they sent and the IT Admin all of them', async () => {
+    it('shows a head only the notices they sent and the Super Admin all of them, the IT Admin only the minimal projection of the departments in their charge (F12)', async () => {
       const own = await h.sentNotice(departure(await h.worker(des, code())), h1.account);
       const others = await h.sentNotice(departure(await h.worker(fin, code())), h2.account);
 
       const mine = h.dataOf<{ items: NoticeWire[] }>(await h.listNotices('?pageSize=100', h1.account)).items;
-      const queue = h.dataOf<{ items: NoticeWire[] }>(await h.listNotices('?pageSize=100', h.it1)).items;
+      const queue = h.dataOf<{ items: NoticeWire[] }>(await h.listNotices('?pageSize=100', h.sa)).items;
       const foreign = await h.readNotice(others.id, h1.account);
       const own1 = h.dataOf<NoticeWire>(await h.readNotice(own.id, h1.account).expect(200));
-      const itView = h.dataOf<NoticeWire>(await h.readNotice(own.id, h.it1).expect(200));
+      const itView = h.dataOf<NoticeWire>(await h.readNotice(own.id, h.sa).expect(200));
 
       expect(mine.map((item) => item.id)).toContain(own.id);
       expect(mine.map((item) => item.id)).not.toContain(others.id);
@@ -348,14 +349,23 @@ describe('the notices of the department heads (integration, real PostgreSQL)', (
       expect([foreign.status, h.codeOf(foreign)]).toEqual([404, 'PERSONNEL_NOTICE.NOT_FOUND']);
       expect(own1.verification).toBeNull();
       expect(itView.verification).toBeNull();
+
+      // The IT Admin of N-DES reads the notices about people of that department only, and what is outside it does not exist for them.
+      // A department nobody usable is in charge of would be theirs too (F12), so the others have a second IT Admin.
+      await handOthersToSecondItAdmin(h);
+      const inCharge = h.dataOf<{ items: NoticeWire[] }>(await h.listNotices('?pageSize=100', h.it1)).items;
+      const outside = await h.readNotice(others.id, h.it1);
+      expect(inCharge.map((item) => item.id)).toContain(own.id);
+      expect(inCharge.map((item) => item.id)).not.toContain(others.id);
+      expect([outside.status, h.codeOf(outside)]).toEqual([404, 'PERSONNEL_NOTICE.NOT_FOUND']);
     });
 
     it('orders the queue by the day to handle it and filters it', async () => {
-      const queue = h.dataOf<{ items: NoticeWire[] }>(await h.listNotices('?pageSize=100', h.it1)).items;
+      const queue = h.dataOf<{ items: NoticeWire[] }>(await h.listNotices('?pageSize=100', h.sa)).items;
       const ordered = [...queue].sort((a, b) =>
         a.dueOn === b.dueOn ? (a.id < b.id ? -1 : 1) : a.dueOn < b.dueOn ? -1 : 1,
       );
-      const byKind = h.dataOf<{ items: NoticeWire[] }>(await h.listNotices('?kind=LONG_LEAVE', h.it1)).items;
+      const byKind = h.dataOf<{ items: NoticeWire[] }>(await h.listNotices('?kind=LONG_LEAVE', h.sa)).items;
 
       expect(queue.map((item) => item.id)).toEqual(ordered.map((item) => item.id));
       expect(byKind.length).toBeGreaterThan(0);
@@ -365,9 +375,9 @@ describe('the notices of the department heads (integration, real PostgreSQL)', (
 
   it('reads a page in a fixed number of statements whatever its size (collection)', async () => {
     const page = (account: Person['account']) => counter.run(() => h.listNotices('?pageSize=100', account));
-    const small = await page(h.it1);
+    const small = await page(h.sa);
     for (let n = 0; n < 6; n += 1) await h.sentNotice(departure(await h.worker(des, code())), h1.account);
-    const large = await page(h.it1);
+    const large = await page(h.sa);
     const headPage = await page(h1.account);
 
     expect(large.result.status).toBe(200);

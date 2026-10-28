@@ -31,10 +31,20 @@ export function formatInspection(inspection: InstallationInspection): string {
     return `${lines.join('\n')}\n`;
   }
 
-  const { organization, bootstrapRecords, superAdmin, accounts, directRoles, approvalRoles, departments } = inspection;
+  const {
+    organization,
+    bootstrapRecords,
+    changeAnnouncements,
+    superAdmin,
+    accounts,
+    directRoles,
+    approvalRoles,
+    departments,
+  } = inspection;
   lines.push(
     `Organization: present (${organization.timeZone}, ${organization.reportingCurrency})`,
     `Bootstrap records: ${bootstrapRecords?.complete ? 'complete' : `mismatched ${bootstrapRecords?.mismatched.join(', ')}`}`,
+    `Change announcements: ${changeAnnouncements?.complete ? 'complete' : `missing ${counts(changeAnnouncements?.missing ?? {})}`}`,
     `Super Admin: ${
       superAdmin === null
         ? 'none'

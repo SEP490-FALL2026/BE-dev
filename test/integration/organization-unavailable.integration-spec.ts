@@ -51,7 +51,7 @@ describe('manual entry when the database stops answering mid-transaction (integr
     (
       await ctx.sql.query(
         `SELECT (SELECT count(*)::int FROM employees) AS employees, (SELECT count(*)::int FROM employee_placements) AS placements,
-                (SELECT count(*)::int FROM job_titles) AS job_titles, (SELECT count(*)::int FROM audit_events) AS audit_events`,
+                (SELECT count(*)::int FROM in_app_notifications) AS notices, (SELECT count(*)::int FROM audit_events) AS audit_events`,
       )
     ).rows[0] as Record<string, number>;
 

@@ -26,7 +26,7 @@ Khi một điều chuyển đổi phòng có hiệu lực, hệ thống so quy�
 
 | Story    | AC                     | Coverage | Phần còn lại thuộc                                                                                                                                                                                         |
 | -------- | ---------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| US-03-07 | AC-1→AC-9, AC-11→AC-14 | partial  | AC-10: `g3-downstream-finance-integration`; vế chi phí tính vào Cost Center của phòng nhận ở AC-3: `g6-downstream-integration`                                                                             |
+| US-03-07 | AC-1→AC-9, AC-11→AC-15 | partial  | AC-10: `g3-downstream-finance-integration`; vế chi phí tính vào Cost Center của phòng nhận ở AC-3: `g6-downstream-integration`                                                                             |
 | US-07-05 | AC-9                   | partial  | AC-1→AC-5, AC-8, AC-11, AC-12, AC-15, AC-17→AC-19: `g6-revocation-by-grant-kind`; AC-13, AC-16: `g6-handover-confirmation`; AC-6, AC-7: `g4-device-dependent-features`; AC-10: `g6-downstream-integration` |
 
 ## Supporting references
@@ -146,3 +146,4 @@ Cập nhật 24/10/2026 bởi người phụ trách (AI theo giao việc của n
 
 - Audit G0–G6 trên Docs `769bb64` ↔ BE `7c28e75` mở lại hạng mục này: F42, F43 — rà soát mọi quyền; `STILL_NEEDED` → Request mới, seat cũ thành `G1`.
 - Remediation duy nhất: [g0-g6-final-business-baseline-remediation](../g0-g6-final-business-baseline-remediation/spec.md) ([impact matrix](../g0-g6-final-business-baseline-remediation/impact-matrix.md#3-findings)). AC liên quan không còn được coi là thỏa nguồn hiện hành cho tới khi remediation xong; trạng thái triển khai ở roadmap. Phần đã ghi phía trên là lịch sử, giữ nguyên.
+- _27/10/2026 (Prompt 04, Task 0.1 của `g0-g6-final-business-baseline-remediation`, F60 — re-pin scope map [G6](../../../roadmap.md#work-item-decomposition-g6) Docs `e0cb5a0`, BE `7c28e75`):_ nhận thêm `US-03-07` AC-15 (F42, F43 — mục 4 nêu hạng mục này) ([impact matrix mục 9](../g0-g6-final-business-baseline-remediation/impact-matrix.md#9-phụ-lục-delta-user-stories-72e1480--769bb64)). Phần đã ghi phía trên là lịch sử, giữ nguyên.

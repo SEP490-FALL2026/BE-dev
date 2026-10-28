@@ -1,90 +1,78 @@
 import { JOB_TITLE_MAX_LENGTH, PlacementFacts, isJobTitleTooLong, placementReasons } from './employee-placement.policy';
 
 /*
- * BEH.1 (A4-11): the one decision the manual form and the import preview share — whether the department (with its
- * cost center) a row names can take a person in, and whether the job title (free text since QĐ-87e) is given and fits.
- * Every expectation is a literal: nothing here is computed by the policy or by an adapter.
+ * BEH.1 (A4-11): the one decision the manual form, the import preview, the correction of a record and the transfer share —
+ * whether the department a row names can take a person in (a department with no Cost Center does: QĐ-87d(3), F44), and whether the
+ * job title (optional free text since QĐ-87e) fits. Every expectation is a literal: nothing here is computed by the policy or by an
+ * adapter.
  */
 
 const usable: PlacementFacts = {
-  department: { named: true, found: { active: true, costCenterActive: true } },
-  jobTitle: { named: true, tooLong: false },
+  department: { named: true, found: { active: true } },
+  jobTitle: { tooLong: false },
 };
 
 describe('placementReasons (BEH.1, T-16)', () => {
-  it('has no reason when both are named, found and in use', () => {
+  it('has no reason when the department is named, found and in use and the title fits', () => {
     expect(placementReasons(usable)).toEqual([]);
   });
 
-  describe('the department (US-02-03 AC-1, AC-5; US-04-09 AC-3)', () => {
-    it.each<[string, PlacementFacts['department'], string]>([
+  describe('the department (US-02-03 AC-1, AC-5; US-04-09 AC-12)', () => {
+    it.each<[string, NonNullable<PlacementFacts['department']>, string]>([
       ['not named', { named: false, found: null }, 'DEPARTMENT_REQUIRED'],
       ['named but not found', { named: true, found: null }, 'DEPARTMENT_NOT_FOUND'],
-      ['retired', { named: true, found: { active: false, costCenterActive: true } }, 'DEPARTMENT_INACTIVE'],
-      [
-        'charged to a retired cost center',
-        { named: true, found: { active: true, costCenterActive: false } },
-        'DEPARTMENT_COST_CENTER_INACTIVE',
-      ],
+      ['retired', { named: true, found: { active: false } }, 'DEPARTMENT_INACTIVE'],
     ])('%s', (_name, department, code) => {
       expect(placementReasons({ ...usable, department })).toEqual([{ subject: 'DEPARTMENT', code }]);
     });
 
-    it('gives one reason only, the first in this order: required, not found, retired, retired cost center', () => {
-      expect(
-        placementReasons({
-          ...usable,
-          department: { named: false, found: { active: false, costCenterActive: false } },
-        }),
-      ).toEqual([{ subject: 'DEPARTMENT', code: 'DEPARTMENT_REQUIRED' }]);
-      expect(
-        placementReasons({ ...usable, department: { named: true, found: { active: false, costCenterActive: false } } }),
-      ).toEqual([{ subject: 'DEPARTMENT', code: 'DEPARTMENT_INACTIVE' }]);
+    it('takes a person in whether or not the department has a Cost Center: the fact is not asked (QĐ-87d(3), F44)', () => {
+      expect(placementReasons({ department: { named: true, found: { active: true } } })).toEqual([]);
+      // A caller that still passes the old fact is not refused for it.
+      const found = { active: true, costCenterActive: false };
+
+      expect(placementReasons({ department: { named: true, found } })).toEqual([]);
+    });
+
+    it('gives one reason only, the first in this order: required, not found, retired', () => {
+      expect(placementReasons({ ...usable, department: { named: false, found: { active: false } } })).toEqual([
+        { subject: 'DEPARTMENT', code: 'DEPARTMENT_REQUIRED' },
+      ]);
+      expect(placementReasons({ ...usable, department: { named: true, found: { active: false } } })).toEqual([
+        { subject: 'DEPARTMENT', code: 'DEPARTMENT_INACTIVE' },
+      ]);
     });
   });
 
-  describe('the job title: free text, still asked for in this release (QĐ-87e)', () => {
-    it.each<[string, { named: boolean; tooLong: boolean }, string]>([
-      ['not named', { named: false, tooLong: false }, 'JOB_TITLE_REQUIRED'],
-      ['named but too long', { named: true, tooLong: true }, 'JOB_TITLE_TOO_LONG'],
-    ])('%s', (_name, jobTitle, code) => {
-      expect(placementReasons({ ...usable, jobTitle })).toEqual([{ subject: 'JOB_TITLE', code }]);
+  describe('the job title: optional free text, only bounded (QĐ-87e)', () => {
+    it('gives no reason for a title that fits, and none is needed: a missing title is not asked about', () => {
+      expect(placementReasons({ ...usable, jobTitle: { tooLong: false } })).toEqual([]);
+      expect(placementReasons({ department: usable.department })).toEqual([]);
     });
 
-    it('is required before it is judged too long, and one reason is given', () => {
-      expect(placementReasons({ ...usable, jobTitle: { named: false, tooLong: true } })).toEqual([
-        { subject: 'JOB_TITLE', code: 'JOB_TITLE_REQUIRED' },
+    it('refuses a title that is too long', () => {
+      expect(placementReasons({ ...usable, jobTitle: { tooLong: true } })).toEqual([
+        { subject: 'JOB_TITLE', code: 'JOB_TITLE_TOO_LONG' },
       ]);
     });
 
-    it('is not judged at all by a caller that has no title to judge (a transfer changes the department only)', () => {
-      expect(placementReasons({ department: usable.department })).toEqual([]);
+    it('is judged alone by a caller that has no department to judge (the correction of a record that has one)', () => {
+      expect(placementReasons({ jobTitle: { tooLong: true } })).toEqual([
+        { subject: 'JOB_TITLE', code: 'JOB_TITLE_TOO_LONG' },
+      ]);
+      expect(placementReasons({ jobTitle: { tooLong: false } })).toEqual([]);
     });
   });
 
   it('lists the department reason before the job title reason', () => {
-    expect(
-      placementReasons({
-        department: { named: true, found: null },
-        jobTitle: { named: true, tooLong: true },
-      }),
-    ).toEqual([
+    expect(placementReasons({ department: { named: true, found: null }, jobTitle: { tooLong: true } })).toEqual([
       { subject: 'DEPARTMENT', code: 'DEPARTMENT_NOT_FOUND' },
       { subject: 'JOB_TITLE', code: 'JOB_TITLE_TOO_LONG' },
-    ]);
-    expect(
-      placementReasons({ department: { named: false, found: null }, jobTitle: { named: false, tooLong: false } }),
-    ).toEqual([
-      { subject: 'DEPARTMENT', code: 'DEPARTMENT_REQUIRED' },
-      { subject: 'JOB_TITLE', code: 'JOB_TITLE_REQUIRED' },
     ]);
   });
 
   it('names no field or column: where a reason is shown belongs to each adapter', () => {
-    const reasons = placementReasons({
-      department: { named: false, found: null },
-      jobTitle: { named: true, tooLong: true },
-    });
+    const reasons = placementReasons({ department: { named: false, found: null }, jobTitle: { tooLong: true } });
 
     expect(reasons.map((reason) => Object.keys(reason).sort())).toEqual([
       ['code', 'subject'],

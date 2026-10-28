@@ -4,11 +4,13 @@ import {
   MoneyOutOfRangeError,
   MoneyScaleExceededError,
 } from '../../../core/money/money.errors';
+import { FORBIDDEN_ERROR } from '../../../infrastructure/http/errors/access-errors';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import { toMoneyApiException } from '../../../infrastructure/http/errors/money-errors';
 import { toUnavailableApiException } from '../../../infrastructure/http/errors/service-unavailable';
 import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
-import { isUniqueViolation } from '../../../infrastructure/database/unique-violation';
+import { isCheckViolation, isUniqueViolation } from '../../../infrastructure/database/unique-violation';
+import { FinanceSetupIncompleteError } from '../../organization/organization.errors';
 import {
   BudgetCommitmentExistsError,
   BudgetCommitmentNotFoundError,
@@ -16,7 +18,12 @@ import {
   BudgetCostCenterNotFoundError,
   BudgetCurrencyError,
   BudgetDecisionRefusedError,
+  BudgetDepartmentHasNoHeadError,
+  BudgetNotAHistoryReaderError,
   BudgetNotAReaderError,
+  BudgetNotFinanceError,
+  BudgetPlanNotFoundError,
+  BudgetVersionNumberTakenError,
   BudgetCurrentExistsError,
   BudgetImportFileInvalidError,
   BudgetLineNotFoundError,
@@ -87,8 +94,27 @@ export function toBudgetApiException(error: unknown): unknown {
       ? refuse(HttpStatus.CONFLICT, 'BUDGET.VERSION_NOT_SENT', error.message)
       : refuse(HttpStatus.FORBIDDEN, `BUDGET.${error.reason}`, error.message);
   }
-  if (error instanceof BudgetNotAReaderError) {
+  if (error instanceof BudgetNotAReaderError || error instanceof BudgetNotAHistoryReaderError) {
     return refuse(HttpStatus.FORBIDDEN, 'AUTHORIZATION.FORBIDDEN', error.message);
+  }
+  // What the role guard of the route answers, for the change reached without it (F13): the same code and message.
+  if (error instanceof BudgetNotFinanceError) {
+    return refuse(HttpStatus.FORBIDDEN, FORBIDDEN_ERROR.code, FORBIDDEN_ERROR.message);
+  }
+  // The department has no Cost Center in use yet (`QĐ-87d(1)`): Finance makes one first. Nothing was written (F27).
+  if (error instanceof FinanceSetupIncompleteError) {
+    return refuse(HttpStatus.CONFLICT, 'FINANCE.SETUP_INCOMPLETE', error.message);
+  }
+  if (error instanceof BudgetDepartmentHasNoHeadError) {
+    return refuse(HttpStatus.CONFLICT, 'BUDGET.DEPARTMENT_HAS_NO_HEAD', error.message);
+  }
+  if (error instanceof BudgetVersionNumberTakenError) {
+    return refuse(HttpStatus.CONFLICT, 'BUDGET.VERSION_NUMBER_TAKEN', error.message);
+  }
+  if (error instanceof BudgetPlanNotFoundError) {
+    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'BUDGET.PLAN_NOT_FOUND', error.message, {
+      planIds: error.planIds,
+    });
   }
   if (error instanceof BudgetNotYourCostCenterError) {
     return refuse(HttpStatus.FORBIDDEN, 'BUDGET.NOT_YOUR_COST_CENTER', error.message);
@@ -144,6 +170,10 @@ export function toBudgetApiException(error: unknown): unknown {
   }
   // A race between two writers of the same Cost Center and year is stopped by the partial unique indexes. The loser
   // answers exactly what the check before the write answers: one code, one message (Owner, Prompt 02, 26/10/2026).
+  // A unique violation names the index (in the message of the driver) and, with the pg adapter, its columns. An index is recognised by
+  // its name, and by its columns only when no other index has them: `budget_proposals_open_key`, `budget_versions_current_key` and
+  // `budget_versions_in_flight_key` all have (cost_center_id, year), so those three are told apart by their names alone and the columns
+  // are never guessed from.
   if (isUniqueViolation(error, 'budget_proposals_open_key')) {
     return toBudgetApiException(new BudgetProposalOpenError());
   }
@@ -154,8 +184,36 @@ export function toBudgetApiException(error: unknown): unknown {
       'The Cost Center already has a current budget for this year.',
     );
   }
-  if (isUniqueViolation(error, 'budget_versions_in_flight_key', 'budget_versions_cost_center_id_year_number_key')) {
+  // Another writer took the number of the next version first (F39): its own code, not the one of a version in progress.
+  // The key is named in the error when Prisma has no columns to name, and its columns (the number is the one only it has) when it has.
+  if (isUniqueViolation(error, 'budget_versions_cost_center_id_year_number_key', '"number"')) {
+    return toBudgetApiException(new BudgetVersionNumberTakenError());
+  }
+  if (
+    isUniqueViolation(
+      error,
+      'budget_versions_in_flight_key',
+      'budget_versions_rejected_predecessor_id_key',
+      '"rejected_predecessor_id"',
+    )
+  ) {
     return toBudgetApiException(new BudgetVersionInFlightError());
+  }
+  // The rules of the successor of a proposal (spec J.1) that the database keeps when two writers meet: the loser answers what the
+  // check before the write answers.
+  if (
+    isUniqueViolation(error, 'budget_proposals_successor_of_proposal_id_key', '"successor_of_proposal_id"') ||
+    isCheckViolation(
+      error,
+      'budget_proposals_succession_guard',
+      'budget_proposals_succession_check',
+      'budget_proposals_succession_consistent',
+    )
+  ) {
+    return toBudgetApiException(new BudgetProposalOpenError());
+  }
+  if (isCheckViolation(error, 'budget_versions_rejected_predecessor_guard')) {
+    return toBudgetApiException(new BudgetProposalStateError('REVIEW', 'REVIEWED'));
   }
 
   const money = toMoneyApiException(error);
@@ -180,6 +238,12 @@ export const BUDGET_ERROR_EXAMPLES = {
   OWN_VERSION: example(new BudgetDecisionRefusedError('OWN_VERSION')),
   VERSION_NOT_SENT: example(new BudgetDecisionRefusedError('NOT_SENT')),
   NOT_A_READER: example(new BudgetNotAReaderError()),
+  NOT_A_HISTORY_READER: example(new BudgetNotAHistoryReaderError()),
+  FINANCE_SETUP_INCOMPLETE: example(new FinanceSetupIncompleteError('<department-id>')),
+  DEPARTMENT_HAS_NO_HEAD: example(new BudgetDepartmentHasNoHeadError('<department-id>')),
+  PLAN_NOT_FOUND: example(new BudgetPlanNotFoundError(['<plan-id>'])),
+  // Not shown in the routes: the year lock lets two writers of a Cost Center and year take the number one after the other.
+  VERSION_NUMBER_TAKEN: example(new BudgetVersionNumberTakenError()),
   NOT_YOUR_COST_CENTER: example(new BudgetNotYourCostCenterError()),
   YEAR_ENDED: example(new BudgetYearEndedError(2025)),
   PROPOSAL_INCOMPLETE: example(

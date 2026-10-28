@@ -25,6 +25,7 @@ import { AssessmentViewService } from './assessment-view.service';
 import type { Quote } from './quote-pricing.policy';
 import { QuoteService } from './quote.service';
 import { RequestAssessmentService } from './request-assessment.service';
+import { RequestOutcomeListeners } from './request-outcome-listeners';
 import type { AssessmentPatchDto, AssessmentRejectionBodyDto, AssessmentWire } from './assessment.dto';
 
 /**
@@ -49,6 +50,7 @@ export class AssessmentService {
     private readonly settings: RequestAssessmentService,
     private readonly entry: SpendEntryService,
     private readonly audit: AuditService,
+    private readonly outcomes: RequestOutcomeListeners,
   ) {}
 
   /** Throws AccessRequestNotFoundError: a request that is not a proposal, or one the caller has no part in. */
@@ -212,6 +214,7 @@ export class AssessmentService {
           },
         ),
       );
+      await this.outcomes.ended(tx, request, request.beneficiaryEmployeeIds, now);
 
       const record = await this.requests.findById(requestId, tx);
       if (!record) throw new Error(`The request ${requestId} was not found after its assessment was refused.`);

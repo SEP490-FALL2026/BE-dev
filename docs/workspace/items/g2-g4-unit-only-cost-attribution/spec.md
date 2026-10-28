@@ -40,9 +40,9 @@ không ngừng được — kiểm bằng test HTTP và ràng buộc CSDL.
 
 | Story    | AC          | Coverage | Phần còn lại thuộc                                                                                         |
 | -------- | ----------- | -------- | ---------------------------------------------------------------------------------------------------------- |
-| US-04-09 | AC-4, AC-7  | partial  | AC-1→AC-3, AC-5, AC-6, AC-8→AC-11: `g2-cost-center-catalogue` (giao trước GOV.1)                           |
+| US-04-09 | AC-4, AC-7, AC-12, AC-13 | partial  | AC-1→AC-3, AC-5, AC-6, AC-8→AC-11: `g2-cost-center-catalogue` (giao trước GOV.1)                           |
 | US-03-06 | AC-2, AC-19 | partial  | AC-19 vế việc đang mở: `g2-downstream-integration`; AC còn lại: `g2-department-profile` (giao trước GOV.1) |
-| US-02-05 | AC-7, AC-10 | partial  | các vế còn lại của AC-1→AC-14: `g4-seat-baseline-import`; AC-11 vế K4: `g4-device-dependent-features`      |
+| US-02-05 | AC-7, AC-10 | partial  | các vế còn lại của AC-1→AC-16: `g4-seat-baseline-import`; AC-11 vế K4: `g4-device-dependent-features`      |
 
 Vế sở hữu ở đây: `US-04-09` AC-4, AC-7 trọn AC; `US-03-06` AC-2 trọn AC, AC-19 vế _tài khoản dịch vụ thuộc phòng_;
 `US-02-05` AC-7 vế _thuộc phòng, Cost Center `Unit` tại ngày ghi nhận, `Company` là lỗi dòng_, AC-10 vế _người mới
@@ -165,3 +165,4 @@ Test đang ghim hành vi cũ phải đổi cùng lát (không xóa ca từ chố
 
 - Audit G0–G6 trên Docs `769bb64` ↔ BE `7c28e75` mở lại hạng mục này: F01, F20 — liên kết phía Cost Center; phòng sở hữu của Assignment theo thuê bao.
 - Remediation duy nhất: [g0-g6-final-business-baseline-remediation](../g0-g6-final-business-baseline-remediation/spec.md) ([impact matrix](../g0-g6-final-business-baseline-remediation/impact-matrix.md#3-findings)). AC liên quan không còn được coi là thỏa nguồn hiện hành cho tới khi remediation xong; trạng thái triển khai ở roadmap. Phần đã ghi phía trên là lịch sử, giữ nguyên.
+- _27/10/2026 (Prompt 04, Task 0.1 của `g0-g6-final-business-baseline-remediation`, F60 — re-pin scope map [G2](../../../roadmap.md#work-item-decomposition-g2) Docs `e0cb5a0`, BE `7c28e75`):_ nhận thêm `US-04-09` AC-12, AC-13 (F16, F01 — vòng đời Cost Center; mục 4 nêu hạng mục này cho `US-04-09` AC-7 → AC-13); các vế còn lại của `US-02-05` nay là `AC-1→AC-16` của `g4-seat-baseline-import` ([impact matrix mục 9](../g0-g6-final-business-baseline-remediation/impact-matrix.md#9-phụ-lục-delta-user-stories-72e1480--769bb64)). Phần đã ghi phía trên là lịch sử, giữ nguyên.

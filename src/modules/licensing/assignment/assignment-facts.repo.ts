@@ -28,13 +28,18 @@ export class AssignmentFactsRepo {
         expectedEndDate: true,
         failedAt: true,
         cancelledAt: true,
-        provisioningTasks: { select: { kind: true, status: true, requestId: true } },
+        provisioningTasks: { select: { kind: true, status: true, requestId: true }, orderBy: { createdAt: 'asc' } },
         successors: { select: { id: true }, take: 1 },
       },
     });
     if (!row) return null;
 
-    const grant = row.provisioningTasks.find((task) => task.kind === 'GRANT');
+    // A grant task can follow one that ended (completed, closed as failed or cancelled, F07): the one that counts is the one that
+    // is not over, and otherwise the latest.
+    const grants = row.provisioningTasks.filter((task) => task.kind === 'GRANT');
+    const grant =
+      grants.find((task) => task.status !== 'CLOSED_FAILED' && task.status !== 'CANCELLED') ??
+      grants[grants.length - 1];
 
     return {
       assignmentId: row.id,

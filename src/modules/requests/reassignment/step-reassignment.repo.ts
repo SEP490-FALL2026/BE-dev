@@ -23,9 +23,11 @@ export interface ReassignableRequest {
   id: string;
   organizationId: string;
   type: 'GRANT' | 'SERVICE_ACCOUNT' | 'RENEWAL' | 'GROUP_GRANT';
+  /** Only the need step of a request for internal software with no fee follows where its requester is now (`FR-3.16`, F28). */
+  branch: 'INTERNAL_FREE' | 'PAID_IN_CATALOG' | 'NEW_SOFTWARE';
   state: string;
   requesterEmployeeId: string;
-  /** The department the request was sent for: it keeps it whoever holds a step later (`US-05-02` AC-7). */
+  /** The department the request was sent for: a paid request keeps it whoever holds a step later (`US-05-02` AC-7, `QĐ-90b`). */
   departmentId: string;
   /** Whether the chain has a spend step: only then can one person hold both it and the need step. */
   chainHasSpendStep: boolean;
@@ -41,6 +43,7 @@ const SELECT_REQUEST = {
   id: true,
   organizationId: true,
   type: true,
+  branch: true,
   state: true,
   requesterEmployeeId: true,
   departmentId: true,
@@ -73,6 +76,7 @@ function toRequest(row: RequestRow): ReassignableRequest {
     id: row.id,
     organizationId: row.organizationId,
     type: row.type,
+    branch: row.branch,
     state: row.state,
     requesterEmployeeId: row.requesterEmployeeId,
     departmentId: row.departmentId,
@@ -118,26 +122,32 @@ export class StepReassignmentRepo {
   }
 
   /**
-   * The requests whose need step is held and whose requester is one of these people: the requests of those who change
-   * department. A service account does not follow the department of the person who answers for it (`QĐ-86c`), so it is not here.
+   * The requests whose need step is held and whose requester is one of these people, for internal software with no fee: the only
+   * requests that follow the requester when they change department (`FR-3.16`, `QĐ-90b`, F28). A paid request keeps the department
+   * it was sent from, and a service account does not follow the person who answers for it (`QĐ-86c`), so neither is here.
    */
   async needRequestIdsOfRequesters(employeeIds: readonly string[], client: DbTx = this.prisma): Promise<string[]> {
     if (employeeIds.length === 0) return [];
     const rows = await client.$queryRaw<{ request_id: string }[]>`
       SELECT DISTINCT s.request_id FROM access_request_steps s JOIN access_requests r ON r.id = s.request_id
        WHERE s.kind = 'NEED'::"AccessRequestStepKind" AND s.state = 'PENDING'::"AccessRequestStepState"
-         AND r.type <> 'SERVICE_ACCOUNT'::"AccessRequestType" AND r.requester_employee_id = ANY(${[...employeeIds]}::uuid[])
+         AND r.type <> 'SERVICE_ACCOUNT'::"AccessRequestType" AND r.branch = 'INTERNAL_FREE'::"AccessRequestBranch"
+         AND r.requester_employee_id = ANY(${[...employeeIds]}::uuid[])
        ORDER BY s.request_id`;
 
     return rows.map((row) => row.request_id);
   }
 
-  /** The requests for a service account sent for the department whose need step is held: they keep the department they were sent for. */
-  async serviceAccountNeedRequestIdsOf(departmentId: string, client: DbTx = this.prisma): Promise<string[]> {
+  /**
+   * The requests whose need step is held and that were sent for the department, whatever they are: a paid request, a proposal of new
+   * software and a service account keep the department they were sent for, so a change of its head is a change for them by
+   * `access_requests.department_id` and not by who sits in the department now (F28).
+   */
+  async needRequestIdsOfDepartment(departmentId: string, client: DbTx = this.prisma): Promise<string[]> {
     const rows = await client.$queryRaw<{ request_id: string }[]>`
       SELECT DISTINCT s.request_id FROM access_request_steps s JOIN access_requests r ON r.id = s.request_id
        WHERE s.kind = 'NEED'::"AccessRequestStepKind" AND s.state = 'PENDING'::"AccessRequestStepState"
-         AND r.type = 'SERVICE_ACCOUNT'::"AccessRequestType" AND r.department_id = ${departmentId}::uuid
+         AND r.department_id = ${departmentId}::uuid
        ORDER BY s.request_id`;
 
     return rows.map((row) => row.request_id);

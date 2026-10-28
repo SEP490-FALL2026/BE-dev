@@ -11,6 +11,8 @@ import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-
 import { RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
 import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
+import { PERSONNEL_ACCESS_ERROR_EXAMPLES } from '../mappers/personnel-access.http-errors';
+import { userActor } from '../personnel.types';
 import {
   CancelTransferBodyDto,
   ListTransferChangesQueryDto,
@@ -31,28 +33,29 @@ import { TransferService } from './transfer.service';
 
 const FORBIDDEN = {
   status: HttpStatus.FORBIDDEN,
-  description: 'Only an IT Admin records, moves, cancels or reads transfers.',
+  description:
+    'Only the Super Admin records, moves or cancels a transfer, and reads it in full; the IT Admin reads a minimal projection and closes it (AUTHORIZATION.FORBIDDEN).',
   examples: [FORBIDDEN_EXAMPLE],
 } as const;
+/** A write by the Super Admin is also refused about themselves (F19): the controlled procedure records that event. */
+const FORBIDDEN_WRITE = {
+  ...FORBIDDEN,
+  description: `${FORBIDDEN.description} The Super Admin does not record or change a transfer about themselves in the application (PERSONNEL.SELF_CHANGE_FORBIDDEN): the controlled procedure does.`,
+  examples: [FORBIDDEN_EXAMPLE, PERSONNEL_ACCESS_ERROR_EXAMPLES.SELF_CHANGE_FORBIDDEN],
+} as const;
 const COMMON = [UNAUTHENTICATED_RESPONSE, FORBIDDEN, GUARDED_SERVICE_UNAVAILABLE_RESPONSE] as const;
+const WRITE_COMMON = [UNAUTHENTICATED_RESPONSE, FORBIDDEN_WRITE, GUARDED_SERVICE_UNAVAILABLE_RESPONSE] as const;
 const NOT_FOUND = {
   status: HttpStatus.NOT_FOUND,
-  description: 'The transfer does not exist (DEPARTMENT_TRANSFER.NOT_FOUND).',
+  description:
+    'The transfer does not exist, or an IT Admin reads one of a department they are not in charge of (DEPARTMENT_TRANSFER.NOT_FOUND).',
   examples: [EXAMPLES.NOT_FOUND],
 } as const;
 
 /** The refusals of the basis of a change, the same on every write that needs one. */
 const GROUNDS_EXAMPLES = [EXAMPLES.GROUNDS_REQUIRED, EXAMPLES.GROUNDS_INCOMPLETE, EXAMPLES.GROUNDS_IS_NOTICE] as const;
-/**
- * The refusals of a change of a transfer that waits: it took effect or was cancelled, the actor is the person moved, or the head
- * or the placements were changed meanwhile.
- */
-const SETTLED_OR_SELF_EXAMPLES = [
-  EXAMPLES.ALREADY_EFFECTIVE,
-  EXAMPLES.ALREADY_CANCELLED,
-  EXAMPLES.SELF_EVENT_NEEDS_ANOTHER_IT_ADMIN,
-  EXAMPLES.CONCURRENT_CHANGE,
-] as const;
+/** The refusals of a change of a transfer that waits: it took effect or was cancelled, or the head or the placements were changed meanwhile. */
+const SETTLED_EXAMPLES = [EXAMPLES.ALREADY_EFFECTIVE, EXAMPLES.ALREADY_CANCELLED, EXAMPLES.CONCURRENT_CHANGE] as const;
 /** The refusals of the day of a change. */
 const DAY_EXAMPLES = [
   EXAMPLES.NO_CHANGE,
@@ -64,12 +67,13 @@ const GROUNDS_REFUSALS =
   'the basis is empty or lacks a part (DEPARTMENT_TRANSFER.GROUNDS_REQUIRED, GROUNDS_INCOMPLETE) or is the code of a notice and not a document (GROUNDS_IS_NOTICE)';
 
 /**
- * Transfers of a person to another department with the day they take effect and the basis they rest on. IT Admin
- * only: Finance, a department head and an employee are refused, and the Super Admin does no business work.
+ * Transfers of a person to another department with the day they take effect and the basis they rest on. The Super Admin records,
+ * moves and cancels them (`QĐ-87a`); the IT Admin reads a minimal projection of the departments in their charge and closes the
+ * record once the service accounts have a person to answer for them. Finance, a department head and an employee are refused. The role
+ * is judged again by the service, so this guard is only the outer layer.
  */
 @ApiTags('department-transfers')
 @Controller({ path: 'department-transfers', version: '1' })
-@RequireRoles('IT_ADMIN')
 export class TransfersController {
   constructor(
     private readonly transfers: TransferService,
@@ -79,6 +83,7 @@ export class TransfersController {
   ) {}
 
   @Post()
+  @RequireRoles('SUPER_ADMIN')
   @ApiOperation({ operationId: 'departmentTransferRecord', summary: 'Record a transfer of a person' })
   @ApiSuccessResponse(TransferRecordedResponseDto, {
     status: HttpStatus.CREATED,
@@ -87,7 +92,7 @@ export class TransfersController {
       'The transfer was recorded: the placement the person has ends on the day and the new one begins on it, and the head of the department they leave is handed over or left empty as chosen. A day of today takes effect at once. The seats the person holds are not touched. A warning lists the applications the person is Business Owner of, which need another owner.',
   })
   @ApiErrorResponses(
-    ...COMMON,
+    ...WRITE_COMMON,
     {
       status: HttpStatus.NOT_FOUND,
       description: 'The employee does not exist (DEPARTMENT_TRANSFER.EMPLOYEE_NOT_FOUND).',
@@ -96,13 +101,11 @@ export class TransfersController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The person has left (DEPARTMENT_TRANSFER.EMPLOYEE_LEFT) or has another event waiting (PENDING_EVENT_EXISTS), the destination cannot take people (DEPARTMENT_INACTIVE), an IT Admin records it for themselves while another can (SELF_EVENT_NEEDS_ANOTHER_IT_ADMIN), or the placements cannot take it (PLACEMENT_OVERLAP, CONCURRENT_CHANGE).',
+        'The person has left (DEPARTMENT_TRANSFER.EMPLOYEE_LEFT) or has another event waiting (PENDING_EVENT_EXISTS), the destination department cannot take people (DEPARTMENT_INACTIVE; a department with no Cost Center takes people like any other), or the placements cannot take it (PLACEMENT_OVERLAP, CONCURRENT_CHANGE).',
       examples: [
         EXAMPLES.EMPLOYEE_LEFT,
         EXAMPLES.PENDING_EVENT_EXISTS,
         EXAMPLES.DEPARTMENT_INACTIVE,
-        EXAMPLES.DEPARTMENT_COST_CENTER_INACTIVE,
-        EXAMPLES.SELF_EVENT_NEEDS_ANOTHER_IT_ADMIN,
         EXAMPLES.PLACEMENT_OVERLAP,
         EXAMPLES.CONCURRENT_CHANGE,
       ],
@@ -122,7 +125,7 @@ export class TransfersController {
   )
   async record(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: RecordTransferBodyDto) {
     try {
-      const outcome = await this.transfers.record(actor, body);
+      const outcome = await this.transfers.record(userActor(actor), body);
 
       return await this.query.recordedOf(outcome.transfer, outcome.warnings);
     } catch (error) {
@@ -131,46 +134,49 @@ export class TransfersController {
   }
 
   @Get()
+  @RequireRoles('SUPER_ADMIN', 'IT_ADMIN')
   @ApiOperation({ operationId: 'departmentTransferList', summary: 'List transfers of people' })
   @ApiSuccessResponse(TransferPageResponseDto, {
     message: 'DEPARTMENT_TRANSFER.LISTED',
     description:
-      'A page of transfers, the latest day first, optionally of one person, one state or a range of days. Each row says who, what changes, from where to where, the day and where it stands; the basis and the head handover are in the detail.',
+      'A page of transfers, the latest day first, optionally of one person, one state or a range of days. Each row says who, what changes, from where to where, the day and where it stands; the basis and the head handover are in the detail. An IT Admin reads only the transfers that leave or enter a department they are in charge of.',
   })
   @ApiErrorResponses(...COMMON, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description: 'A filter is invalid (VALIDATION_ERROR).',
     examples: [VALIDATION_EXAMPLE],
   })
-  async list(@Query() query: ListTransfersQueryDto) {
+  async list(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Query() query: ListTransfersQueryDto) {
     try {
-      return await this.query.list(query);
+      return await this.query.list(actor, query);
     } catch (error) {
       throw toTransferApiException(error);
     }
   }
 
   @Get(':id')
-  @ApiOperation({ operationId: 'departmentTransferGet', summary: 'Read a transfer in full' })
+  @RequireRoles('SUPER_ADMIN', 'IT_ADMIN')
+  @ApiOperation({ operationId: 'departmentTransferGet', summary: 'Read a transfer' })
   @ApiSuccessResponse(TransferDetailResponseDto, {
     message: 'DEPARTMENT_TRANSFER.RETRIEVED',
     description:
-      'The transfer with its basis, who follows the head of the old department, who recorded it and how it ended.',
+      'The transfer with its basis, who follows the head of the old department, who recorded it (an account, or the controlled procedure) and how it ended. The IT Admin reads a minimal projection: no basis, no head handover and no reason of a cancellation.',
   })
   @ApiErrorResponses(...COMMON, NOT_FOUND, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description: 'The id is not valid (VALIDATION_ERROR).',
     examples: [VALIDATION_EXAMPLE],
   })
-  async get(@Param() params: TransferIdParamDto) {
+  async get(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: TransferIdParamDto) {
     try {
-      return await this.query.get(params.id);
+      return await this.query.get(actor, params.id);
     } catch (error) {
       throw toTransferApiException(error);
     }
   }
 
   @Get(':id/changes')
+  @RequireRoles('SUPER_ADMIN')
   @ApiOperation({ operationId: 'departmentTransferChangeList', summary: 'List the moves of a transfer' })
   @ApiSuccessResponse(TransferChangePageResponseDto, {
     message: 'DEPARTMENT_TRANSFER.CHANGES_LISTED',
@@ -182,15 +188,20 @@ export class TransfersController {
     description: 'The id or a page parameter is not valid (VALIDATION_ERROR).',
     examples: [VALIDATION_EXAMPLE],
   })
-  async listChanges(@Param() params: TransferIdParamDto, @Query() query: ListTransferChangesQueryDto) {
+  async listChanges(
+    @CurrentPrincipal() actor: AuthenticatedPrincipal,
+    @Param() params: TransferIdParamDto,
+    @Query() query: ListTransferChangesQueryDto,
+  ) {
     try {
-      return await this.query.listChanges(params.id, query);
+      return await this.query.listChanges(actor, params.id, query);
     } catch (error) {
       throw toTransferApiException(error);
     }
   }
 
   @Post(':id/rescheduling')
+  @RequireRoles('SUPER_ADMIN')
   @ApiOperation({ operationId: 'departmentTransferReschedule', summary: 'Move the day of a waiting transfer' })
   @ApiSuccessResponse(TransferDetailResponseDto, {
     message: 'DEPARTMENT_TRANSFER.RESCHEDULED',
@@ -198,13 +209,13 @@ export class TransfersController {
       'The day of the transfer moved: the placement the person has now lasts to the day before the new one, and the handover of the head moved with it. A reason and a basis are required, and only a transfer that has not taken effect can move.',
   })
   @ApiErrorResponses(
-    ...COMMON,
+    ...WRITE_COMMON,
     NOT_FOUND,
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The transfer has taken effect (DEPARTMENT_TRANSFER.ALREADY_EFFECTIVE) or was cancelled (ALREADY_CANCELLED), or an IT Admin moves it for themselves while another can (SELF_EVENT_NEEDS_ANOTHER_IT_ADMIN).',
-      examples: [...SETTLED_OR_SELF_EXAMPLES, EXAMPLES.DEPARTMENT_INACTIVE],
+        'The transfer has taken effect (DEPARTMENT_TRANSFER.ALREADY_EFFECTIVE) or was cancelled (ALREADY_CANCELLED), or the head or the placements changed meanwhile (CONCURRENT_CHANGE).',
+      examples: [...SETTLED_EXAMPLES, EXAMPLES.DEPARTMENT_INACTIVE],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -224,7 +235,7 @@ export class TransfersController {
     @Body() body: RescheduleTransferBodyDto,
   ) {
     try {
-      const record = await this.changes.reschedule(actor, params.id, { ...body, reason: body.reason ?? '' });
+      const record = await this.changes.reschedule(userActor(actor), params.id, { ...body, reason: body.reason ?? '' });
 
       return await this.query.detailOf(record);
     } catch (error) {
@@ -233,20 +244,21 @@ export class TransfersController {
   }
 
   @Post(':id/cancellation')
+  @RequireRoles('SUPER_ADMIN')
   @ApiOperation({ operationId: 'departmentTransferCancel', summary: 'Cancel a waiting transfer' })
   @ApiSuccessResponse(TransferDetailResponseDto, {
     message: 'DEPARTMENT_TRANSFER.CANCELLED',
     description:
-      'The transfer was cancelled: the person keeps the department and the title, and the head of the department stays head. A reason and a basis are required, and only a transfer that has not taken effect can be cancelled.',
+      'The transfer was cancelled: the person keeps the department, and the head of the department stays head. A reason and a basis are required, and only a transfer that has not taken effect can be cancelled.',
   })
   @ApiErrorResponses(
-    ...COMMON,
+    ...WRITE_COMMON,
     NOT_FOUND,
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The transfer has taken effect (DEPARTMENT_TRANSFER.ALREADY_EFFECTIVE) or was cancelled already (ALREADY_CANCELLED), or an IT Admin cancels it for themselves while another can (SELF_EVENT_NEEDS_ANOTHER_IT_ADMIN).',
-      examples: [...SETTLED_OR_SELF_EXAMPLES],
+        'The transfer has taken effect (DEPARTMENT_TRANSFER.ALREADY_EFFECTIVE) or was cancelled already (ALREADY_CANCELLED), or the head or the placements changed meanwhile (CONCURRENT_CHANGE).',
+      examples: [...SETTLED_EXAMPLES],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -260,7 +272,7 @@ export class TransfersController {
     @Body() body: CancelTransferBodyDto,
   ) {
     try {
-      const record = await this.changes.cancel(actor, params.id, { ...body, reason: body.reason ?? '' });
+      const record = await this.changes.cancel(userActor(actor), params.id, { ...body, reason: body.reason ?? '' });
 
       return await this.query.detailOf(record);
     } catch (error) {
@@ -269,6 +281,7 @@ export class TransfersController {
   }
 
   @Post(':id/closure')
+  @RequireRoles('IT_ADMIN')
   @ApiOperation({ operationId: 'departmentTransferClose', summary: 'Close a transfer that has taken effect' })
   @ApiSuccessResponse(TransferDetailResponseDto, {
     message: 'DEPARTMENT_TRANSFER.CLOSED',

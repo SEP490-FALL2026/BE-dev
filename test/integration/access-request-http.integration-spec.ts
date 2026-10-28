@@ -72,8 +72,8 @@ describe('requests over HTTP: sending and routing the need step (integration, re
         [mover.employeeId, today],
       );
       await h.ctx.sql.query(
-        `INSERT INTO employee_placements (id, organization_id, employee_id, department_id, job_title_id, valid_from)
-         SELECT gen_random_uuid(), organization_id, employee_id, $2, job_title_id, $3::date
+        `INSERT INTO employee_placements (id, organization_id, employee_id, department_id, valid_from)
+         SELECT gen_random_uuid(), organization_id, employee_id, $2, $3::date
            FROM employee_placements WHERE employee_id = $1 ORDER BY valid_from LIMIT 1`,
         [mover.employeeId, design.id, today],
       );

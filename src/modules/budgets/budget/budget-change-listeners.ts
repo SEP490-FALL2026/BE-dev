@@ -1,7 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import type { BudgetChangeListener, BudgetVersionEvent, PlanLineMovedEvent } from '../budgets.types';
+import type {
+  BudgetChangeListener,
+  BudgetRefusalEvent,
+  BudgetVersionEvent,
+  PlanLineMovedEvent,
+} from '../budgets.types';
 import { VersionRepo } from './version.repo';
 
 /** The contexts that hear when a budget changes, told in the transaction of the change (`BudgetChangeListener`). */
@@ -15,12 +20,22 @@ export class BudgetChangeListeners {
     this.listeners.push(listener);
   }
 
+  /** Before the budget year lock: every listener takes its own locks first, in the order the system keeps (`BudgetChangeListener`). */
+  async lockWaiting(tx: DbTx, scope: { costCenterId: string; year: number }): Promise<void> {
+    for (const listener of this.listeners) await listener.lockWaiting(tx, scope);
+  }
+
   async versionApproved(tx: DbTx, actor: AuthenticatedPrincipal, event: BudgetVersionEvent): Promise<void> {
     for (const listener of this.listeners) await listener.versionApproved(tx, actor, event);
   }
 
-  async versionRefused(tx: DbTx, actor: AuthenticatedPrincipal, event: BudgetVersionEvent): Promise<void> {
+  async versionRefused(tx: DbTx, actor: AuthenticatedPrincipal, event: BudgetRefusalEvent): Promise<void> {
     for (const listener of this.listeners) await listener.versionRefused(tx, actor, event);
+  }
+
+  /** The closure of a year closed a version that never became current: the system tells, so there is no actor (F62). */
+  async versionExpired(tx: DbTx, event: BudgetVersionEvent): Promise<void> {
+    for (const listener of this.listeners) await listener.versionExpired(tx, event);
   }
 
   async planLineMoved(

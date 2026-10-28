@@ -50,6 +50,11 @@ export class ServiceAccountRequestsController {
   @ApiErrorResponses(
     ...AUTH_ERRORS,
     {
+      status: HttpStatus.FORBIDDEN,
+      description: 'The Super Admin sends no request (ACCESS_REQUEST.SUPER_ADMIN_CANNOT_REQUEST).',
+      examples: [SERVICE_ACCOUNT_ERROR_EXAMPLES.SUPER_ADMIN_CANNOT_REQUEST],
+    },
+    {
       status: HttpStatus.NOT_FOUND,
       description: 'The plan does not exist (ACCESS_REQUEST.PLAN_NOT_FOUND).',
       examples: [SERVICE_ACCOUNT_ERROR_EXAMPLES.PLAN_NOT_FOUND],

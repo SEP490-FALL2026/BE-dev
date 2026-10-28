@@ -1,8 +1,10 @@
 import type { RouteErrorStatus } from './openapi-example-manifest';
 
 /**
- * Part of ROUTE_ERROR_CODES (budgets (G5)), traced on BE `0da8f56` (Prompt 02, 26/10/2026):
- * see openapi-example-manifest.ts.
+ * Part of ROUTE_ERROR_CODES (budgets (G5)), traced on BE `0da8f56` (Prompt 02, 26/10/2026) and, for the budget lifecycle
+ * (`g0-g6-final-business-baseline-remediation`, Tasks 4.4 to 4.10, 27/10/2026), through each handler to the mapper of
+ * budget.http-errors.ts: see openapi-example-manifest.ts. `BUDGET.VERSION_NUMBER_TAKEN` is mapped but not listed: the year lock
+ * lets two writers of a Cost Center and year take the number one after the other, so no route can answer it.
  */
 export const ROUTE_ERROR_CODES_BUDGETS: Readonly<Record<string, Partial<Record<RouteErrorStatus, readonly string[]>>>> =
   {
@@ -27,9 +29,10 @@ export const ROUTE_ERROR_CODES_BUDGETS: Readonly<Record<string, Partial<Record<R
     },
     budgetProposalResubmit: {
       '404': ['BUDGET.PROPOSAL_NOT_FOUND'],
-      '409': ['BUDGET.PROPOSAL_ALREADY_OPEN', 'BUDGET.PROPOSAL_CANNOT_RESUBMIT'],
+      '409': ['BUDGET.PROPOSAL_ALREADY_OPEN', 'BUDGET.PROPOSAL_CANNOT_RESUBMIT', 'FINANCE.SETUP_INCOMPLETE'],
       '422': [
         'BUDGET.CURRENCY_NOT_REPORTING',
+        'BUDGET.PLAN_NOT_FOUND',
         'BUDGET.PROPOSAL_INCOMPLETE',
         'BUDGET.WINDOW_BACKWARDS',
         'BUDGET.YEAR_ENDED',
@@ -41,13 +44,15 @@ export const ROUTE_ERROR_CODES_BUDGETS: Readonly<Record<string, Partial<Record<R
     budgetProposalReturn: {
       '404': ['BUDGET.PROPOSAL_NOT_FOUND'],
       '409': ['BUDGET.PROPOSAL_CANNOT_RETURN'],
+      '422': ['BUDGET.YEAR_ENDED'],
     },
     budgetProposalSubmit: {
       '403': ['BUDGET.NOT_YOUR_COST_CENTER'],
       '404': ['BUDGET.COST_CENTER_NOT_FOUND'],
-      '409': ['BUDGET.PROPOSAL_ALREADY_OPEN'],
+      '409': ['BUDGET.PROPOSAL_ALREADY_OPEN', 'FINANCE.SETUP_INCOMPLETE'],
       '422': [
         'BUDGET.CURRENCY_NOT_REPORTING',
+        'BUDGET.PLAN_NOT_FOUND',
         'BUDGET.PROPOSAL_INCOMPLETE',
         'BUDGET.WINDOW_BACKWARDS',
         'BUDGET.YEAR_ENDED',
@@ -59,10 +64,11 @@ export const ROUTE_ERROR_CODES_BUDGETS: Readonly<Record<string, Partial<Record<R
     budgetProposalWithdraw: {
       '404': ['BUDGET.PROPOSAL_NOT_FOUND'],
       '409': ['BUDGET.PROPOSAL_CANNOT_WITHDRAW'],
+      '422': ['BUDGET.YEAR_ENDED'],
     },
     budgetVersionCreate: {
       '404': ['BUDGET.PROPOSAL_NOT_FOUND'],
-      '409': ['BUDGET.PROPOSAL_NOT_SUBMITTED', 'BUDGET.VERSION_IN_FLIGHT'],
+      '409': ['BUDGET.PROPOSAL_NOT_SUBMITTED', 'BUDGET.VERSION_IN_FLIGHT', 'FINANCE.SETUP_INCOMPLETE'],
       '422': [
         'BUDGET.CURRENCY_NOT_REPORTING',
         'BUDGET.QUARTERS_MISMATCH',
@@ -76,23 +82,30 @@ export const ROUTE_ERROR_CODES_BUDGETS: Readonly<Record<string, Partial<Record<R
       '403': ['BUDGET.CONFLICT_OF_INTEREST', 'BUDGET.NOT_SPENDING_APPROVER', 'BUDGET.OWN_VERSION'],
       '404': ['BUDGET.VERSION_NOT_FOUND'],
       '409': ['BUDGET.VERSION_NOT_SENT'],
+      '422': ['BUDGET.YEAR_ENDED'],
     },
     budgetVersionGet: {
+      '403': ['AUTHORIZATION.FORBIDDEN'],
+      '404': ['BUDGET.VERSION_NOT_FOUND'],
+    },
+    budgetVersionHistoryList: {
       '403': ['AUTHORIZATION.FORBIDDEN'],
       '404': ['BUDGET.VERSION_NOT_FOUND'],
     },
     budgetVersionImport: {
       '404': ['BUDGET.VERSION_NOT_FOUND'],
       '409': ['BUDGET.VERSION_NOT_EDITABLE'],
-      '422': ['BUDGET.IMPORT_FILE_INVALID'],
+      '422': ['BUDGET.IMPORT_FILE_INVALID', 'BUDGET.YEAR_ENDED'],
     },
     budgetVersionLineAdd: {
       '404': ['BUDGET.VERSION_NOT_FOUND'],
       '409': ['BUDGET.VERSION_NOT_EDITABLE'],
       '422': [
         'BUDGET.CURRENCY_NOT_REPORTING',
+        'BUDGET.PLAN_NOT_FOUND',
         'BUDGET.PROPOSAL_INCOMPLETE',
         'BUDGET.WINDOW_BACKWARDS',
+        'BUDGET.YEAR_ENDED',
         'CURRENCY_NOT_SUPPORTED',
         'MONEY_OUT_OF_RANGE',
         'MONEY_SCALE_EXCEEDED',
@@ -112,7 +125,9 @@ export const ROUTE_ERROR_CODES_BUDGETS: Readonly<Record<string, Partial<Record<R
       '422': [
         'BUDGET.ADJUSTMENT_REASON_REQUIRED',
         'BUDGET.CURRENCY_NOT_REPORTING',
+        'BUDGET.PLAN_NOT_FOUND',
         'BUDGET.WINDOW_BACKWARDS',
+        'BUDGET.YEAR_ENDED',
         'CURRENCY_NOT_SUPPORTED',
         'MONEY_OUT_OF_RANGE',
         'MONEY_SCALE_EXCEEDED',
@@ -125,6 +140,7 @@ export const ROUTE_ERROR_CODES_BUDGETS: Readonly<Record<string, Partial<Record<R
         'BUDGET.CURRENCY_NOT_REPORTING',
         'BUDGET.WINDOW_BACKWARDS',
         'BUDGET.WINDOW_REASON_REQUIRED',
+        'BUDGET.YEAR_ENDED',
         'CURRENCY_NOT_SUPPORTED',
         'MONEY_OUT_OF_RANGE',
         'MONEY_SCALE_EXCEEDED',
@@ -135,7 +151,12 @@ export const ROUTE_ERROR_CODES_BUDGETS: Readonly<Record<string, Partial<Record<R
     },
     budgetVersionRevise: {
       '404': ['BUDGET.COST_CENTER_NOT_FOUND'],
-      '409': ['BUDGET.NO_CURRENT_BUDGET', 'BUDGET.VERSION_IN_FLIGHT'],
+      '409': [
+        'BUDGET.DEPARTMENT_HAS_NO_HEAD',
+        'BUDGET.NO_CURRENT_BUDGET',
+        'BUDGET.VERSION_IN_FLIGHT',
+        'FINANCE.SETUP_INCOMPLETE',
+      ],
       '422': [
         'BUDGET.CURRENCY_NOT_REPORTING',
         'BUDGET.QUARTERS_MISMATCH',
@@ -156,6 +177,8 @@ export const ROUTE_ERROR_CODES_BUDGETS: Readonly<Record<string, Partial<Record<R
       '422': [
         'BUDGET.CURRENCY_NOT_REPORTING',
         'BUDGET.QUARTERS_MISMATCH',
+        'BUDGET.REVISION_REASON_REQUIRED',
+        'BUDGET.YEAR_ENDED',
         'CURRENCY_NOT_SUPPORTED',
         'MONEY_OUT_OF_RANGE',
         'MONEY_SCALE_EXCEEDED',

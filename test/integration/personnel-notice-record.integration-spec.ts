@@ -24,7 +24,7 @@ describe('verifying and recording the notices of the heads (integration, real Po
   const superAdmin = () => ({ accessToken: h.admin }) as ApiAccount;
   const notice = (person: Person, kind: string, extra: object = {}) =>
     h.sendNotice({ employeeId: person.employeeId, kind, proposedOn: h.day(5), ...extra }, h1.account);
-  const read = async (id: string, account: ApiAccount = h.it1) => h.dataOf<NoticeWire>(await h.readNotice(id, account));
+  const read = async (id: string, account: ApiAccount = h.sa) => h.dataOf<NoticeWire>(await h.readNotice(id, account));
   const stillWaiting = async (person: Person) =>
     (await h.noticeRows(person.employeeId)).every((row) => row.status === 'PENDING_VERIFICATION');
 
@@ -60,14 +60,14 @@ describe('verifying and recording the notices of the heads (integration, real Po
       expect(row).toMatchObject({
         status: 'RECORDED',
         recorded_event_kind: 'OFFBOARDING_CASE',
-        handled_by_app_user_id: h.it1.appUserId,
+        handled_by_app_user_id: h.sa.appUserId,
       });
       const caseId = row.recorded_event_id as string;
       expect(await h.eventsOfNotice(wire.id)).toEqual([`case:${caseId}`]);
       expect(await h.caseRow(caseId)).toMatchObject({ state: 'HANDING_OVER', last_working_day: h.day(6) });
       expect(await h.workState(e1.employeeId)).toBe('ACTIVE/HANDING_OVER');
       expect(await h.verificationRows(wire.id)).toEqual([
-        { method: 'ATTACHED_DOCUMENT', reference: h.verification.reference, verified_by_app_user_id: h.it1.appUserId },
+        { method: 'ATTACHED_DOCUMENT', reference: h.verification.reference, verified_by_app_user_id: h.sa.appUserId },
       ]);
       const [event] = await h.auditEventsOf('PERSONNEL_NOTICE.RECORDED', wire.id);
       expect(event.after).toMatchObject({
@@ -149,7 +149,7 @@ describe('verifying and recording the notices of the heads (integration, real Po
   describe('a document that arrives without a notice (AC-3)', () => {
     it('refuses the transfer with no basis and records the one with a decision number, leaving the queue as it was', async () => {
       const e1 = await h.worker(des, code());
-      const queue = async () => h.dataOf<{ items: NoticeWire[] }>(await h.listNotices('?pageSize=100', h.it1)).items;
+      const queue = async () => h.dataOf<{ items: NoticeWire[] }>(await h.listNotices('?pageSize=100', h.sa)).items;
       const before = {
         notices: await h.noticeCount(),
         verifications: await verificationTotal(),
@@ -273,16 +273,26 @@ describe('verifying and recording the notices of the heads (integration, real Po
       expect(await h.auditEventsOf('PERSONNEL.EMPLOYEE_INFORMED', row.recorded_event_id as string)).toHaveLength(1);
     });
 
-    it('leaves a notice of a change of title that was sent before to be rejected: it can no longer be recorded as an event, and nothing is written (QĐ-87e)', async () => {
+    it('takes no notice of a change of title any more, and one that an older release wrote cannot be recorded as an event, only rejected (QĐ-87e)', async () => {
       const e1 = await h.worker(des, code());
-      // Sent by a release that still took this kind: the row is history now, and cannot be sent again.
-      const sent = await h.ctx.sql.query<{ id: string }>(
-        `INSERT INTO personnel_notices (id, code, organization_id, employee_id, kind, proposed_on, sender_employee_id,
-                                        sender_department_id, due_on)
-         VALUES (gen_random_uuid(), 'BM09-2026-900001', $1, $2, 'JOB_TITLE_CHANGE', $3, $4, $5, $6) RETURNING id`,
-        [h.seed.organizationId, e1.employeeId, h.day(5), h1.employeeId, des.id, h.day(8)],
-      );
-      const id = sent.rows[0].id;
+      const write = () =>
+        h.ctx.sql.query<{ id: string }>(
+          `INSERT INTO personnel_notices (id, code, organization_id, employee_id, kind, proposed_on, sender_employee_id,
+                                          sender_department_id, due_on)
+           VALUES (gen_random_uuid(), 'BM09-2026-900001', $1, $2, 'JOB_TITLE_CHANGE', $3, $4, $5, $6) RETURNING id`,
+          [h.seed.organizationId, e1.employeeId, h.day(5), h1.employeeId, des.id, h.day(8)],
+        );
+      // The database refuses the kind: no notice of it can be written, so none can wait.
+      await expect(write()).rejects.toMatchObject({ code: '23514', constraint: 'personnel_notices_no_retired_kind' });
+      expect(await h.noticeRows(e1.employeeId)).toEqual([]);
+      // A row that a release which still took this kind had written is put in with that guard set aside for this one statement only.
+      await h.ctx.sql.query(`ALTER TABLE personnel_notices DISABLE TRIGGER personnel_notices_no_retired_kind`);
+      let id: string;
+      try {
+        id = (await write()).rows[0].id;
+      } finally {
+        await h.ctx.sql.query(`ALTER TABLE personnel_notices ENABLE TRIGGER personnel_notices_no_retired_kind`);
+      }
 
       const asEvent = await h.recordNotice(id, h.recording({ effectiveOn: h.day(4) }));
       const wrong = await h.recordNotice(id, h.recording({ effectiveOn: h.day(4), lastWorkingDay: h.day(6) }));
@@ -319,7 +329,7 @@ describe('verifying and recording the notices of the heads (integration, real Po
     it.each([
       ['the head who sent it', () => h1.account],
       ['Finance', () => h.finance],
-      ['the Super Admin', () => superAdmin()],
+      ['an IT Admin', () => h.it1],
       ['an employee', () => h.employee],
     ])('refuses %s with 403 on all three routes, and the notice keeps waiting', async (_name, who) => {
       const e1 = await h.worker(des, code());
@@ -339,30 +349,47 @@ describe('verifying and recording the notices of the heads (integration, real Po
       expect(await stillWaiting(e1)).toBe(true);
     });
 
-    it('lets A2, who is not in charge of R-DES, handle it for the IT Admin in charge, and names both', async () => {
+    it('lets the Super Admin handle it, whichever department it is about, and names who sent it and who was in charge', async () => {
       const e1 = await h.worker(des, code());
       const wire = h.dataOf<NoticeWire>(await notice(e1, 'DEPARTURE'));
 
-      await h.recordNotice(wire.id, h.recording({ lastWorkingDay: h.day(6) }), a2.account).expect(201);
+      await h.recordNotice(wire.id, h.recording({ lastWorkingDay: h.day(6) })).expect(201);
 
       const [event] = await h.auditEventsOf('PERSONNEL_NOTICE.RECORDED', wire.id);
-      expect(event.actor_app_user_id).toBe(a2.account.appUserId);
-      expect(event.after).toMatchObject({ handledByEmployeeId: a2.employeeId, defaultItAdmin: h.it1.employeeId });
-      expect((await h.noticeRows(e1.employeeId))[0].handled_by_app_user_id).toBe(a2.account.appUserId);
+      expect(event.actor_app_user_id).toBe(h.sa.appUserId);
+      expect(event.after).toMatchObject({ handledByEmployeeId: h.sa.employeeId, defaultItAdmin: h.it1.employeeId });
+      expect((await h.noticeRows(e1.employeeId))[0].handled_by_app_user_id).toBe(h.sa.appUserId);
     });
   });
 
-  describe('a notice about an IT Admin (the rule of the events)', () => {
-    it('is recorded by another IT Admin and refused to the IT Admin it is about, while another can', async () => {
+  describe('a notice about an IT Admin, and about the Super Admin (F40, F19)', () => {
+    it('is recorded by the Super Admin, and refused to the IT Admin it is about (403): no event of "done on oneself" any more', async () => {
       const wire = h.dataOf<NoticeWire>(
         await h.sendNotice({ employeeId: a2.employeeId, kind: 'DEPARTURE', proposedOn: h.day(5) }, h2.account),
       );
 
       const own = await h.recordNotice(wire.id, h.recording({ lastWorkingDay: h.day(6) }), a2.account);
 
-      expect([own.status, h.codeOf(own)]).toEqual([409, 'OFFBOARDING_CASE.SELF_EVENT_NEEDS_ANOTHER_IT_ADMIN']);
+      expect([own.status, h.codeOf(own)]).toEqual([403, 'AUTHORIZATION.FORBIDDEN']);
       expect(await stillWaiting(a2)).toBe(true);
       await h.recordNotice(wire.id, h.recording({ lastWorkingDay: h.day(6) })).expect(201);
+    });
+
+    it('is refused to the Super Admin when it is about themselves: 403 PERSONNEL.SELF_CHANGE_FORBIDDEN on all three routes, and the notice keeps waiting', async () => {
+      const wire = h.dataOf<NoticeWire>(
+        await h.sendNotice({ employeeId: h.sa.employeeId, kind: 'DEPARTURE', proposedOn: h.day(5) }, h1.account),
+      );
+
+      const attempts = [
+        await h.rejectNotice(wire.id, { reason: 'x' }),
+        await h.recordNotice(wire.id, h.recording({ lastWorkingDay: h.day(6) })),
+        await h.linkNotice(wire.id, { eventId: wire.id, verification: h.verification }),
+      ];
+
+      expect(attempts.map((response) => [response.status, h.codeOf(response)])).toEqual(
+        Array(3).fill([403, 'PERSONNEL.SELF_CHANGE_FORBIDDEN']),
+      );
+      expect((await h.noticeRows(h.sa.employeeId)).every((row) => row.status === 'PENDING_VERIFICATION')).toBe(true);
     });
   });
 

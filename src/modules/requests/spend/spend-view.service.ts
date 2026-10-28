@@ -55,7 +55,10 @@ export class SpendViewService {
     const [latest, people, centers] = await Promise.all([
       this.checks.latestOf(rows.map((row) => row.requestId)),
       this.people(rows.map((row) => row.request.requesterEmployeeId)),
-      this.organization.costCentersByIds([...new Set(rows.map((row) => row.request.costCenterId))]),
+      // A step is only ever opened for a request that was sent, so it has its Cost Center; a draft has none and has no step.
+      this.organization.costCentersByIds([
+        ...new Set(rows.flatMap((row) => (row.request.costCenterId === null ? [] : [row.request.costCenterId]))),
+      ]),
     ]);
     const units = new Map<string, number>();
     for (const row of rows) {

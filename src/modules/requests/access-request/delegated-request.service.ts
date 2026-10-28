@@ -9,9 +9,10 @@ import { accessRequestAuditEvent } from './access-request-audit-event';
 import {
   AccessRequestAlreadyHoldsAccessError,
   AccessRequestNoDepartmentError,
+  AccessRequestSuperAdminCannotRequestError,
   DelegatedRequestRefusedError,
 } from './access-request.errors';
-import { hasSpendStep } from './access-request.policy';
+import { hasSpendStep, mayRequest } from './access-request.policy';
 import { AccessRequestRepo } from './access-request.repo';
 import type { AccessRequestRecord } from './access-request.types';
 import type { DelegatedBodyDto } from './delegated-request.dto';
@@ -41,13 +42,14 @@ export class DelegatedRequestService {
   ) {}
 
   /**
-   * Throws DelegatedRequestRefusedError, AccessRequestNoDepartmentError, AccessRequestAlreadyHoldsAccessError and the errors of
-   * assessing a plan.
+   * Throws AccessRequestSuperAdminCannotRequestError, DelegatedRequestRefusedError, AccessRequestNoDepartmentError,
+   * AccessRequestAlreadyHoldsAccessError and the errors of assessing a plan.
    */
   async send(
     actor: AuthenticatedPrincipal,
     body: DelegatedBodyDto,
   ): Promise<{ batchId: string; records: AccessRequestRecord[] }> {
+    if (!mayRequest(actor.roles)) throw new AccessRequestSuperAdminCannotRequestError();
     const settings = await this.assessment.settings();
 
     return this.runner.run(async (tx) => {

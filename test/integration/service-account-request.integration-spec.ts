@@ -53,10 +53,11 @@ describe('a request for a service account after the installation over PostgreSQL
     await h.start();
     await h.withApprover();
     // The seats are set up while the baseline is open: three free of ten on one subscription, none free on the other.
-    // The accounts of this suite belong to many departments: the subscriptions are ones nobody owns yet, which no seat is checked against.
-    subscriptionId = await h.subscription(10, 'K2', null);
+    // The accounts of this suite belong to many departments, and a request is priced by the subscription of its own department (F38):
+    // the harness gives every department the suite makes a subscription of each plan the seeded department holds (owned-subscriptions.ts).
+    subscriptionId = await h.subscription(10, 'K2');
     paidPlan = await h.planOf(subscriptionId);
-    fullSubscription = await h.subscription(1, 'K2', null);
+    fullSubscription = await h.subscription(1, 'K2');
     fullPlan = await h.planOf(fullSubscription);
     await h.person('SA-HOLDER');
     await h.written({ subscriptionId: fullSubscription }, [
@@ -583,8 +584,8 @@ describe('a request for a service account after the installation over PostgreSQL
         [u.member.employeeId, h.today()],
       );
       await h.ctx.sql.query(
-        `INSERT INTO employee_placements (id, organization_id, employee_id, department_id, job_title_id, valid_from)
-         SELECT gen_random_uuid(), organization_id, employee_id, $2, job_title_id, $3::date
+        `INSERT INTO employee_placements (id, organization_id, employee_id, department_id, valid_from)
+         SELECT gen_random_uuid(), organization_id, employee_id, $2, $3::date
            FROM employee_placements WHERE employee_id = $1 ORDER BY valid_from LIMIT 1`,
         [u.member.employeeId, elsewhere.department.id, h.today()],
       );

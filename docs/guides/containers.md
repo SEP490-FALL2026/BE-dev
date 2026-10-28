@@ -323,6 +323,58 @@ and the runtime role first:
 (`DROP OWNED BY slm_deploy, slm_runtime` in one statement fails on PostgreSQL 17: _could not find tuple for default
 ACL_). `provision` can run again afterwards.
 
+## Releasing the final business baseline (expand → assign → contract)
+
+`g0-g6-final-business-baseline-remediation`, spec L.3, L.5, L.10, L.11. The final release makes a subscription's owning department
+and a Cost Center's department required and drops the objects of the job-title catalogue, the standard toolset, the cost allocation
+and the service-account move. `prisma migrate deploy` applies every pending migration in one pass, so the data an operator must
+assign or link cannot be placed between two migrations of one deploy: it is placed between two **releases**.
+
+1. **Previous release → compatibility release (additive only).** Before it is deployed, cancel every `PENDING` service-account move
+   on the running release (`serviceAccountMoveCancel`, reason `Chuyển phòng tài khoản dịch vụ đã bỏ (QĐ-89c)`); `pnpm ops:preflight`
+   is `BLOCKED` with `SERVICE_ACCOUNT_MOVE_PENDING` while one is left. The deploy follows the usual order (backup → preflight →
+   `migrate deploy` → `ops:db-roles reconcile` → recreate `api`/`worker`). The compatibility release adds columns and tables and
+   reads the new enum values but writes none of the final shapes.
+2. **Operator actions on the compatibility release (no code deploy).**
+   - Assign the owning department of every subscription from its approved purchase or contract basis:
+     `pnpm ops:assign-subscription-owner --subscription <id> --department <code> --basis <reference> --operator <reference> --environment LOCAL_TEST|SHARED`.
+     One subscription at a time; nothing is inferred and nothing is assigned in bulk.
+   - Give every Cost Center its department: `pnpm ops:cost-center-direction activate …` (once, with the release evidence and the
+     approver) and `pnpm ops:cost-center-direction link …` for each Cost Center.
+   - `pnpm ops:preflight` is `READY` when the data is in place. A row the previous release wrote after that (a rollback or a recovery)
+     is listed again by the next preflight and assigned like the others.
+3. **Compatibility release → final release.** The final release is deployed only while the running image is the compatibility image
+   **and** `ops:preflight` is `READY`. Its blockers, each naming ids only, are `SUBSCRIPTION_OWNER_UNASSIGNED`,
+   `SUBSCRIPTION_OWNER_EXPANSION_REQUIRED`, `COST_CENTER_UNLINKED`, `COST_CENTER_LINK_MISMATCH`,
+   `COST_CENTER_DIRECTION_NOT_ACTIVATED`, `COST_CENTER_DIRECTION_EXPANSION_REQUIRED`, `SUBSCRIPTION_OWNER_SCHEMA_PARTIAL`,
+   `COST_CENTER_DIRECTION_SCHEMA_PARTIAL`, `MIGRATION_FAILED`, `SERVICE_ACCOUNT_MOVE_PENDING`,
+   `PERSONNEL_NOTICE_RETIRED_KIND_PENDING`, `DEPARTMENT_TRANSFER_TITLE_ONLY_PENDING` and `BUDGET_PROPOSAL_LEGACY_RETURN_AMBIGUOUS`.
+   Each destructive migration also begins with a block that raises before it writes anything when the same condition holds, so a
+   preflight that was skipped still stops the deploy with the data untouched. Those migrations also take `ACCESS EXCLUSIVE` locks
+   on `employee_placements`, `department_transfers` and `transfer_reviews` (a column added, filled and dropped) while the
+   compatibility image still serves traffic: run `migrate deploy` in a quiet window and cap the wait with `lock_timeout` in the
+   deploy session, so a statement of the running image that holds one of those tables and wants another fails fast instead of
+   waiting in a circle; a migration that stops on the timeout leaves the image in place (H7) and is run again.
+4. **A failed final deploy** is recovered by H7 to the previous image, which is the compatibility image, and that image is valid on the
+   schema before and after every migration of the final release: the database is not restored. Restoring the pre-migrate backup into a
+   new database is the manual rollback across the destructive boundary and only an operator's decision (there is no `down`, `DB-05`).
+5. **A fresh or empty database** has nothing to assign: the preflight is `READY` and the whole chain is applied in one pass.
+6. **After the deploy** run `pnpm ops:inspect`: it accepts the old and the new installation sets and reports
+   `CHANGE_ANNOUNCEMENTS_MISSING` when a placement or head period that had already taken effect, by the calendar of its own
+   organization, when the seeding migration ran has no announcement mark (the migration
+   `…_change_announcements_zone_and_yearly_counters` writes the missing marks, so the finding is gone after the final deploy). The closure of an ended fiscal year (`BudgetYearEndSweeper`) runs in the API process every
+   hour and may run on several instances: the second run finds nothing left to do (ADR-0018).
+
+### The pre-migrate dump is a protected operational document
+
+It holds personal data. It is never committed (nothing under any working tree), never uploaded as a public or shared CI artifact
+(no `actions/upload-artifact`, no release attachment, no chat, issue or PR), and is kept only in the protected backup directory of
+the deploy (`<APP_DIR>/backups/postgres/slm-pre-migrate-<UTC yyyyMMddTHHmmssZ>-<short sha>.dump`, directory `0700`, written with
+`umask 077` by the deploy role, retained by `scripts/ops/postgres-backup-retention.sh`). Evidence of a release records only the
+SHA-256, the UTC time, the revision (the BE SHA and the last migration applied before) and the **name and host label** of the
+protected location, never a public URL or the content. A rehearsal keeps its dump outside every repository, readable by the person
+running it only, and deletes it when the resources are cleaned up. `git ls-files '*.dump' '*.backup' '*.sql.gz'` stays empty.
+
 ## Backup before production migrations
 
 `DB-05`, added 22/10/2026 by `delivery-gate-hardening`. The deploy (`scripts/ops/deploy-release.sh`, run by

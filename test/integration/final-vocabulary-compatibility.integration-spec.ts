@@ -249,7 +249,7 @@ describe('the vocabulary and the unnamed actors of the next release, read by the
         await request(h.server()).get(`/api/v1/long-leaves/${started.id}`).set(h.as(h.it1)).expect(200),
       );
       const listed = h.dataOf<Pageable<{ recordedByAppUserId: string | null }>>(
-        await request(h.server()).get(`/api/v1/long-leaves/${started.id}/changes`).set(h.as(h.it1)).expect(200),
+        await request(h.server()).get(`/api/v1/long-leaves/${started.id}/changes`).set(h.as(h.sa)).expect(200),
       );
 
       expect(read.startedByAppUserId).toBeNull();

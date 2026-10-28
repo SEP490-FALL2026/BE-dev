@@ -9,6 +9,13 @@ export type HeadDecision = Exclude<ReviewDecision, 'PENDING'>;
 /** Why nobody can decide a review yet: the department it was opened for has no head today. */
 export type WaitingReason = 'NO_HEAD';
 
+/**
+ * Where a review came from: the transfer of the person to another department, or the closing of the seat baseline at the setup, when
+ * a person holds a seat on a subscription another department owns (F21). Both are decided by the head of the department of the person
+ * today; only the source of the revocation a decision opens differs.
+ */
+export type ReviewOrigin = 'TRANSFER' | 'POST_SETUP';
+
 export interface ReviewRecord {
   id: string;
   organizationId: string;
@@ -43,7 +50,7 @@ export interface ReviewItemRecord {
   revocationTaskId: string | null;
 }
 
-/** A line the review is opened with: a tool the person holds that is outside the standard toolset. */
+/** A line the review is opened with: a personal right the person holds, whatever kind and whatever any list says (`QĐ-89b`). */
 export interface NewReviewItem {
   assignmentId: string;
   planId: string;
@@ -83,6 +90,19 @@ export interface ReviewListQuery {
   overdue?: boolean;
   page: number;
   pageSize: number;
+}
+
+/** A line a head said is still needed (`STILL_NEEDED`, T-6): the old seat waits for the new Request of the department of the person. */
+export interface StillNeededLine {
+  reviewId: string;
+  organizationId: string;
+  departmentId: string;
+  employeeId: string;
+  /** Null for a review that did not follow a transfer (the post-setup review). */
+  transferId: string | null;
+  assignmentId: string;
+  planId: string;
+  decidedByEmployeeId: string;
 }
 
 export interface DecisionInput {

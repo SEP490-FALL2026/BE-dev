@@ -136,16 +136,16 @@ export class SeatHarness {
            FROM generate_series(0, $3::int - 1) AS n
          RETURNING id, organization_id
        )
-       INSERT INTO employee_placements (id, organization_id, employee_id, department_id, job_title_id, valid_from)
-       SELECT gen_random_uuid(), organization_id, id, $4, $5, '2026-01-05' FROM made`,
-      [this.seed.organizationId, prefix, count, this.seed.departmentId, this.seed.jobTitleId],
+       INSERT INTO employee_placements (id, organization_id, employee_id, department_id, valid_from)
+       SELECT gen_random_uuid(), organization_id, id, $4, '2026-01-05' FROM made`,
+      [this.seed.organizationId, prefix, count, this.seed.departmentId],
     );
   }
 
   /** The Unit the seed department is charged to: where the service accounts of its people are charged (`QĐ-86c`). */
   async ownUnit(): Promise<{ id: string; departmentId: string }> {
     const { rows } = await this.ctx.sql.query<{ id: string }>(
-      `SELECT cost_center_id AS id FROM departments WHERE id = $1`,
+      `SELECT id FROM cost_centers WHERE department_id = $1 AND status = 'ACTIVE'`,
       [this.seed.departmentId],
     );
 
@@ -190,23 +190,22 @@ export class SeatHarness {
   /**
    * A complete subscription of a new plan, with the seats bought. Without a quantity it is a flat-rate one, which is
    * complete with none: the seats are then not known (INV-01), whereas a per-seat subscription without them is a draft. It is
-   * owned by the seed department unless a department is named (a service account sits on a subscription of its own department),
-   * or `null`: a subscription nobody owns yet, the one state in which a service account of any department may sit on it (F20),
-   * for the suites whose subject is not the owning department.
+   * owned by the seed department unless a department is named: a subscription always has an owner department, and a seat sits only
+   * on a subscription of its own department (`QĐ-89a`, F20), so a suite whose seats belong to another department names it.
    */
   async subscription(
     quantity: number | null = 100,
     type: 'K1' | 'K2' | 'K4' = 'K2',
-    ownerDepartmentId: string | null = this.seed.departmentId,
+    ownerDepartmentId: string = this.seed.departmentId,
   ): Promise<string> {
     const planId = await this.plan(type, quantity === null ? 'FLAT_RATE' : 'PER_SEAT');
 
-    const id = this.dataOf<{ id: string }>(
+    return this.dataOf<{ id: string }>(
       await request(this.server())
         .post('/api/v1/subscriptions')
         .set(this.as(this.it1))
         .send({
-          ownerDepartmentId: ownerDepartmentId ?? this.seed.departmentId,
+          ownerDepartmentId,
           planId,
           kind: 'TERM',
           unitPrice: { amount: '1000000', currency: 'VND' },
@@ -216,11 +215,6 @@ export class SeatHarness {
         })
         .expect(201),
     ).id;
-    if (ownerDepartmentId === null) {
-      await this.ctx.sql.query(`UPDATE subscriptions SET owner_department_id = NULL WHERE id = $1`, [id]);
-    }
-
-    return id;
   }
 
   /** A subscription that still lacks data (no price, start, cycle): a draft, which takes no seat (US-04-03 AC-6). */
@@ -234,16 +228,6 @@ export class SeatHarness {
         .send({ ownerDepartmentId: this.seed.departmentId, planId, kind: 'TERM', purchasedQuantity: 10 })
         .expect(201),
     ).id;
-  }
-
-  /** Records, once, that the installation runs the compatibility release (`ops:cost-center-direction activate`, spec L.11). */
-  async activateCostCenterLink(): Promise<void> {
-    await this.ctx.sql.query(
-      `INSERT INTO cost_center_direction_activations (id, organization_id, release_evidence, approver_ref, operator_ref, environment)
-       VALUES (gen_random_uuid(), $1, 'test harness', 'test', 'test', 'LOCAL_TEST')
-       ON CONFLICT (organization_id) DO NOTHING`,
-      [this.seed.organizationId],
-    );
   }
 
   /** A department with no Cost Center, written the way the installation writes one (`QĐ-87d(1)`). */

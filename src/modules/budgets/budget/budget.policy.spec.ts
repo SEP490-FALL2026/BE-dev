@@ -5,14 +5,22 @@ import {
   canResubmit,
   canReturn,
   canWithdraw,
+  closesAtYearEnd,
+  deciderOf,
   incompleteLines,
   isEditable,
   isOverdue,
   kindOfChange,
+  proposalIsSucceedable,
   quartersMatch,
   totalOf,
+  versionSourceOf,
+  yearEndOfVersion,
+  yearHasEnded,
   yearIsOpen,
   type LineDraft,
+  type ProposalState,
+  type VersionStateName,
 } from './budget.policy';
 
 const day = (value: string): BusinessDate => value;
@@ -84,8 +92,95 @@ describe('what can be done to a proposal that was sent (US-06-10 AC-4, AC-5, AC-
 
   it('a version is changed by Finance only while it is a draft or was sent back to them', () => {
     expect(
-      (['DRAFT', 'SENT', 'APPROVED', 'REJECTED', 'CHANGES_REQUESTED', 'SUPERSEDED'] as const).filter(isEditable),
+      (['DRAFT', 'SENT', 'APPROVED', 'REJECTED', 'CHANGES_REQUESTED', 'SUPERSEDED', 'EXPIRED'] as const).filter(
+        (state) => isEditable(state),
+      ),
     ).toEqual(['DRAFT', 'CHANGES_REQUESTED']);
+  });
+
+  it('a draft that a withdrawn or given-back proposal left behind is detached: it is neither changed nor sent (F36)', () => {
+    expect(isEditable('DRAFT', true)).toBe(false);
+    expect(isEditable('CHANGES_REQUESTED', true)).toBe(false);
+    expect(isEditable('DRAFT', false)).toBe(true);
+  });
+});
+
+describe('the year that has ended (F62, QĐ-91c)', () => {
+  it('has ended once the fiscal year after it has begun, whatever the month the fiscal year begins in', () => {
+    expect(yearHasEnded(2026, day('2027-01-01'), 1)).toBe(true);
+    expect(yearHasEnded(2026, day('2026-12-31'), 1)).toBe(false);
+    // With a year that begins in April, the fiscal year 2026 runs to the 31st of March 2027.
+    expect(yearHasEnded(2026, day('2027-03-31'), 4)).toBe(false);
+    expect(yearHasEnded(2026, day('2027-04-01'), 4)).toBe(true);
+    expect(yearHasEnded(2027, day('2027-04-01'), 4)).toBe(false);
+  });
+
+  it('keeps the current version as the reference budget and closes the ones that never became current', () => {
+    expect(yearEndOfVersion('APPROVED')).toEqual({ neverCurrent: false });
+    expect((['DRAFT', 'SENT', 'CHANGES_REQUESTED'] as const).map((state) => [state, yearEndOfVersion(state)])).toEqual([
+      ['DRAFT', { neverCurrent: true }],
+      ['SENT', { neverCurrent: true }],
+      ['CHANGES_REQUESTED', { neverCurrent: true }],
+    ]);
+    expect((['REJECTED', 'SUPERSEDED', 'EXPIRED'] as const).map((state) => yearEndOfVersion(state))).toEqual([
+      null,
+      null,
+      null,
+    ]);
+  });
+
+  it('closes the proposal that was sent or given back and never used, and no other', () => {
+    const states: ProposalState[] = ['SUBMITTED', 'WITHDRAWN', 'RETURNED', 'REVIEWED', 'CLOSED_FISCAL_YEAR_ENDED'];
+
+    expect(states.filter(closesAtYearEnd)).toEqual(['SUBMITTED', 'RETURNED']);
+  });
+});
+
+describe('who decides a version (US-06-08 AC-11)', () => {
+  const holders = { spendingApproverEmployeeId: 'approver', conflictSubstituteEmployeeId: 'substitute' };
+
+  it('is the spending approver, or the substitute when the approver sent the proposal behind the version', () => {
+    expect(deciderOf(holders, 'head')).toEqual({ employeeId: 'approver', approverIsParty: false });
+    expect(deciderOf(holders, null)).toEqual({ employeeId: 'approver', approverIsParty: false });
+    expect(deciderOf(holders, 'approver')).toEqual({ employeeId: 'substitute', approverIsParty: true });
+  });
+
+  it('is nobody while the role that decides has no holder', () => {
+    expect(deciderOf({ ...holders, spendingApproverEmployeeId: null }, 'head').employeeId).toBeNull();
+    expect(deciderOf({ ...holders, conflictSubstituteEmployeeId: null }, 'approver').employeeId).toBeNull();
+  });
+});
+
+describe('a version made from a proposal that a refusal left reviewed, and a successor of it (F63, spec J.1)', () => {
+  const reviewed = { state: 'REVIEWED', succeededAt: null } as const;
+  const sources = (state: ProposalState, succeededAt: Date | null, latest: VersionStateName | null) =>
+    versionSourceOf({ state, succeededAt }, latest);
+
+  it('is the first version of a proposal that waits, whatever else is there', () => {
+    expect(sources('SUBMITTED', null, null)).toBe('FIRST');
+    expect(sources('SUBMITTED', null, 'DRAFT')).toBe('FIRST');
+  });
+
+  it('is made again from a reviewed proposal only when the latest version made from it was refused and nobody follows it', () => {
+    expect(versionSourceOf(reviewed, 'REJECTED')).toBe('AFTER_REFUSAL');
+    expect(versionSourceOf(reviewed, 'CHANGES_REQUESTED')).toBeNull();
+    expect(versionSourceOf(reviewed, 'APPROVED')).toBeNull();
+    expect(versionSourceOf(reviewed, null)).toBeNull();
+    expect(sources('REVIEWED', new Date(), 'REJECTED')).toBeNull();
+  });
+
+  it.each(['WITHDRAWN', 'RETURNED', 'CLOSED_FISCAL_YEAR_ENDED'] as const)(
+    'is not made from a proposal that is %s',
+    (state) => {
+      expect(sources(state, null, 'REJECTED')).toBeNull();
+    },
+  );
+
+  it('a proposal is followed by a new one only while it is reviewed, has no successor and its latest version was refused', () => {
+    expect(proposalIsSucceedable(reviewed, 'REJECTED')).toBe(true);
+    expect(proposalIsSucceedable({ ...reviewed, succeededAt: new Date() }, 'REJECTED')).toBe(false);
+    expect(proposalIsSucceedable(reviewed, 'DRAFT')).toBe(false);
+    expect(proposalIsSucceedable({ state: 'SUBMITTED', succeededAt: null }, 'REJECTED')).toBe(false);
   });
 });
 

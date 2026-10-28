@@ -44,8 +44,8 @@ describe('the source of a revocation (US-07-05 AC-3, AC-11)', () => {
     expect(problemOf(() => assertRevocationSource(source))).toBe('SOURCE_REQUIRED');
   });
 
-  it('accepts each of the twelve sources and no other', () => {
-    expect(REVOCATION_SOURCES).toHaveLength(12);
+  it('accepts each of the thirteen sources and no other', () => {
+    expect(REVOCATION_SOURCES).toHaveLength(13);
     for (const source of REVOCATION_SOURCES) expect(assertRevocationSource(source)).toBe(source);
   });
 });

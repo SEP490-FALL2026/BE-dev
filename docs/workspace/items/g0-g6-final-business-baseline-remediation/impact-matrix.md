@@ -32,22 +32,22 @@
 
 | Nhãn chính                  | Số finding | Đổi do delta `769bb64..e0cb5a0`                                                  |
 | --------------------------- | ---------- | -------------------------------------------------------------------------------- |
-| implementation gap          | 35         | +6 (F62 → F67); +1 F33 (từ _business-source question_ — P03-D08 đóng theo nguồn) |
+| implementation gap          | 49         | +6 (F62 → F67); +1 F33 (từ _business-source question_ — P03-D08 đóng theo nguồn) |
 | contract change             | 9          | —                                                                                |
-| migration/backfill required | 7          | +1 F68 (Prompt 04, 27/10/2026 — drift `linked_at` của bản tương thích)           |
+| migration/backfill required | 9          | +1 F68 (Prompt 04, 27/10/2026 — drift `linked_at` của bản tương thích)           |
 | obsolete                    | 5          | —                                                                                |
-| documentation drift         | 5          | — (F61 mở rộng)                                                                  |
+| documentation drift         | 6          | — (F61 mở rộng)                                                                  |
 | ADR/Owner decision required | 4          | —                                                                                |
 | business-source question    | 3          | −1 (F33)                                                                         |
-| **Tổng finding**            | **68**     | 61 (pin `769bb64`) + 6 + F68 (Prompt 04)                                         |
+| **Tổng finding**            | **85**     | 61 (pin `769bb64`) + 6 + F68 (Prompt 04) + F69 → F85 (Giai đoạn II, 28/10/2026)  |
 | aligned (dòng trace, mục 4) | 43         | +5 dòng G5 của `QĐ-91`/`QĐ-92`                                                   |
 
-| Mức độ  | Số  | Finding                                                                                                                     |
-| ------- | --- | --------------------------------------------------------------------------------------------------------------------------- |
-| Blocker | 6   | F01, F02, F10, F27, F40, F42                                                                                                |
-| High    | 23  | F03, F04, F05, F06, F08, F09, F11, F15, F16, F17, F19, F20, F28, F29, F31, F36, F41, F43, F62, F63, F65, F67, F68           |
-| Medium  | 25  | F07, F12, F13, F14, F18, F21, F22, F24, F25, F26, F30, F32, F33, F34, F37, F44, F46, F49, F53, F54, F55, F58, F60, F64, F66 |
-| Low     | 14  | F23, F35, F38, F39, F45, F47, F48, F50, F51, F52, F56, F57, F59, F61                                                        |
+| Mức độ  | Số  | Finding                                                                                                                                                             |
+| ------- | --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Blocker | 6   | F01, F02, F10, F27, F40, F42                                                                                                                                        |
+| High    | 26  | F03, F04, F05, F06, F08, F09, F11, F15, F16, F17, F19, F20, F28, F29, F31, F36, F41, F43, F62, F63, F65, F67, F68, F69, F71, F73                                    |
+| Medium  | 33  | F07, F12, F13, F14, F18, F21, F22, F24, F25, F26, F30, F32, F33, F34, F37, F44, F46, F49, F53, F54, F55, F58, F60, F64, F66, F70, F72, F74, F75, F76, F78, F79, F80 |
+| Low     | 20  | F23, F35, F38, F39, F45, F47, F48, F50, F51, F52, F56, F57, F59, F61, F77, F81, F82, F83, F84, F85                                                                  |
 
 ## 3. Findings
 
@@ -56,76 +56,93 @@ contract/xuyên suốt. Tóm tắt một dòng ở mục 3.0; chi tiết ở m�
 
 ### 3.0 Tóm tắt
 
-| ID  | Mức     | Nhãn chính                  | G     | Lỗi                                                                                                                                                               | Phase      | Disposition           |
-| --- | ------- | --------------------------- | ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- | --------------------- |
-| F01 | Blocker | migration/backfill required | G2    | Phòng bắt buộc có Cost Center; liên kết nằm ở phòng; không có `linkedAt`                                                                                          | P1, P2     | —                     |
-| F02 | Blocker | migration/backfill required | G3    | Thuê bao không có phòng sở hữu                                                                                                                                    | P1, P3     | P03-D03 = A           |
-| F03 | High    | migration/backfill required | G2    | Danh mục chức vụ còn bắt buộc và còn API                                                                                                                          | P1, P2     | P03-D04, D05, D07 = A |
-| F04 | High    | obsolete                    | G3–G6 | Bộ công cụ chuẩn còn sống; mọi Request bị đòi lý do _ngoài bộ chuẩn_                                                                                              | P1–P5      | P03-D06, D07 = A      |
-| F05 | High    | obsolete                    | G3    | Phân bổ chi phí theo tỷ lệ còn sống                                                                                                                               | P1, P3     | P03-D06, D07 = A      |
-| F06 | High    | obsolete                    | G6    | Chuyển tài khoản dịch vụ sang phòng khác còn sống                                                                                                                 | P1, P5     | P03-D06, D07 = A      |
-| F07 | Medium  | migration/backfill required | G4    | Tác vụ cấp duy nhất trọn đời theo Assignment, không theo tác vụ đang mở                                                                                           | P1         | —                     |
-| F08 | High    | contract change             | G4    | Chuyển làm tay đòi bằng chứng; xóa lỗi gần nhất                                                                                                                   | P1, P3     | —                     |
-| F09 | High    | implementation gap          | G1    | Lệnh cài đặt tạo Cost Center, chức vụ, Employee IT                                                                                                                | P2         | —                     |
-| F10 | Blocker | contract change             | G2    | Ghi phòng/trưởng phòng/phân công/dự án chỉ IT Admin, không căn cứ                                                                                                 | P2         | —                     |
-| F11 | High    | contract change             | G2    | Sửa trường hồ sơ chính thức chỉ IT Admin                                                                                                                          | P2         | —                     |
-| F12 | Medium  | contract change             | G2/G6 | Super Admin không đọc được dữ liệu tổ chức; IT Admin đọc đầy đủ mọi phòng                                                                                         | P2, P5     | —                     |
-| F13 | Medium  | implementation gap          | G2–G6 | Quyền chỉ ở guard controller, service không giữ bất biến (gồm `budgets`)                                                                                          | P2–P5      | —                     |
-| F14 | Medium  | contract change             | G2    | Checklist bước 1 còn chặn _không có Cost Center trống_, gợi ý bộ chuẩn                                                                                            | P2         | —                     |
-| F15 | High    | implementation gap          | G2    | Ngừng phòng thiếu điều kiện việc đang mở và thuê bao còn nghĩa vụ (`QĐ-90e`)                                                                                      | P2         | —                     |
-| F16 | High    | implementation gap          | G2    | Cost Center chưa tạo cho phòng; ngừng Cost Center chỉ xét thành viên                                                                                              | P2         | —                     |
-| F17 | High    | implementation gap          | G2/G6 | Thiếu thông báo bù và người nhận `D-7` (gồm `P28-09`)                                                                                                             | P2, P5     | P03-D15               |
-| F18 | Medium  | implementation gap          | G1    | Lời mời khôi phục gửi email công việc hiện tại (`P28-05`)                                                                                                         | P2         | —                     |
-| F19 | High    | ADR/Owner decision required | G1/G6 | Super Admin là đối tượng (`QĐ-87c`, `QĐ-88b`) chưa có thủ tục                                                                                                     | P1, P2, P5 | P03-D02 = A           |
-| F20 | High    | implementation gap          | G4    | Phòng sở hữu của Assignment ≠ của thuê bao; đích cấp không theo phòng                                                                                             | P1, P3     | —                     |
-| F21 | Medium  | implementation gap          | G4/G6 | Bước 4 khởi tạo (`QĐ-89e`) không ghi phòng sở hữu, không rà soát người phòng khác                                                                                 | P3, P5     | —                     |
-| F22 | Medium  | implementation gap          | G2/G4 | Read model phần mềm phòng thiếu `K4`, nhãn `K1` đang chấm dứt, theo phòng người giữ                                                                               | P3         | —                     |
-| F23 | Low     | implementation gap          | G3    | Khai thuê bao/nhập khóa cho ứng dụng đã ngừng không bị chặn                                                                                                       | P3         | —                     |
-| F24 | Medium  | implementation gap          | G4    | Đếm IT Admin dùng được ngoài giao dịch; không báo Super Admin khi tự thực thi                                                                                     | P3         | P03-D15               |
-| F25 | Medium  | implementation gap          | G4    | Đảo thứ tự khóa giữa cấp và đóng thất bại (Request nhóm)                                                                                                          | P3         | —                     |
-| F26 | Medium  | business-source question    | G3    | PATCH thuê bao tăng số lượng/kéo dài kỳ khi phòng chưa có Cost Center                                                                                             | P3         | P03-D09 = A           |
-| F27 | Blocker | implementation gap          | G5    | Không có cổng _cấu hình tài chính chưa hoàn tất_; không có nháp Request trả phí                                                                                   | P1, P4     | P03-D01 = A           |
-| F28 | High    | implementation gap          | G5    | Request trả phí bị xác định lại bước nhu cầu khi điều chuyển                                                                                                      | P4         | —                     |
-| F29 | High    | contract change             | G5/G6 | Thiếu kết cục _bị hủy — người thụ hưởng điều chuyển_ và đường IT Admin đóng                                                                                       | P1, P4, P5 | —                     |
-| F30 | Medium  | contract change             | G5    | Super Admin gửi được Request                                                                                                                                      | P4         | —                     |
-| F31 | High    | implementation gap          | G5    | Duyệt chi song song cùng Cost Center/năm không được tuần tự hóa                                                                                                   | P4         | —                     |
-| F32 | Medium  | implementation gap          | G5    | `SoD-8` (người rà soát ≠ Người duyệt chi) không được chặn                                                                                                         | P4         | —                     |
-| F33 | Medium  | implementation gap          | G5    | _Cần sửa ngân sách_ chỉ cho `NO_ACTIVE_BUDGET`; kiểm lại chỉ bắt Request `NO_ACTIVE`                                                                              | P4         | — (D08 đóng)          |
-| F34 | Medium  | implementation gap          | G5    | Request trả phí giá 0 → 500 ở bước tạo khoản cam kết                                                                                                              | P4         | —                     |
-| F35 | Low     | business-source question    | G5    | Mọi kỳ có giá đều coi là ràng buộc (kỳ hủy được phải là dự báo)                                                                                                   | —          | P03-D10               |
-| F36 | High    | implementation gap          | G5    | Phiên bản ngân sách nháp của đề xuất đã rút/trả về kẹt vĩnh viễn (sửa trong tập trạng thái `QĐ-91a`)                                                              | P1, P4     | —                     |
-| F37 | Medium  | implementation gap          | G5/G6 | Ba đường 500 (lý do null, `planId` lạ, recorder không bọc `guarded`)                                                                                              | P4, P5     | —                     |
-| F38 | Low     | business-source question    | G5    | Giá Request lấy thuê bao mới nhất của gói ở mọi phòng                                                                                                             | P4         | P03-D11 = A           |
-| F39 | Low     | implementation gap          | G5    | Trùng số phiên bản ánh xạ thành `VERSION_IN_FLIGHT`                                                                                                               | P4         | —                     |
-| F40 | Blocker | contract change             | G6    | Ghi sự kiện nhân sự và xử lý `BM-09` chỉ IT Admin                                                                                                                 | P5         | —                     |
-| F41 | High    | migration/backfill required | G6    | Đổi chức vụ còn là sự kiện và loại `BM-09`                                                                                                                        | P1, P5     | P03-D05 = A           |
-| F42 | Blocker | implementation gap          | G6    | Rà soát sau điều chuyển chỉ phủ công cụ ngoài bộ chuẩn                                                                                                            | P5         | —                     |
-| F43 | High    | implementation gap          | G6    | _Còn cần_ không tạo Request mới, không thu hồi seat cũ                                                                                                            | P5         | —                     |
-| F44 | Medium  | implementation gap          | G6    | Điều chuyển vào phòng chưa có Cost Center bị từ chối                                                                                                              | P5         | —                     |
-| F45 | Low     | obsolete                    | G6    | Cờ _tự thực thi_ cho sự kiện nhân sự về chính IT Admin                                                                                                            | P5         | —                     |
-| F46 | Medium  | implementation gap          | G6    | Một sự kiện chờ xuyên bảng chỉ có kiểm dịch vụ, thiếu test đua có barrier                                                                                         | P5         | —                     |
-| F47 | Low     | migration/backfill required | G6    | Seed _đã báo_ dùng `CURRENT_DATE` của phiên CSDL thay múi giờ tổ chức                                                                                             | P5         | —                     |
-| F48 | Low     | implementation gap          | G6    | Sequence mã `BM09-`/báo lỗi `MAXVALUE 999999`, không reset theo năm                                                                                               | P5         | —                     |
-| F49 | Medium  | documentation drift         | All   | Mô tả OpenAPI lệch mã với tới được (`F1`, `F2`, `F4`, `F7`, `F8`, `F10`)                                                                                          | P6         | —                     |
-| F50 | Low     | obsolete                    | G5/G6 | Mapper lỗi không có nơi ném                                                                                                                                       | P6         | —                     |
-| F51 | Low     | documentation drift         | All   | Hai cặp migration cùng mốc thời gian; `DB-15` không có gate                                                                                                       | P6         | —                     |
-| F52 | Low     | implementation gap          | H7    | Suite vai runtime chưa chạy đường G5/G6                                                                                                                           | P6         | —                     |
-| F53 | Medium  | ADR/Owner decision required | All   | Chín sweeper chạy trong tiến trình API, tài liệu nói worker                                                                                                       | P6         | P03-D12               |
-| F54 | Medium  | ADR/Owner decision required | G5    | Allowlist nội module tăng ~75 mục cho repo xuyên capability                                                                                                       | —          | P03-D13               |
-| F55 | Medium  | ADR/Owner decision required | All   | Gate collection chỉ GET; `LD-13` bảy điểm còn mở                                                                                                                  | —          | P03-D14               |
-| F56 | Low     | contract change             | All   | Ngày/tiền trong OpenAPI không có `format`/`pattern`                                                                                                               | —          | P03-D14               |
-| F57 | Low     | documentation drift         | All   | Trộn `uuid()` v4 và `uuid(7)` không có rule                                                                                                                       | —          | —                     |
-| F58 | Medium  | implementation gap          | G4    | Cảnh báo license của `FR-5.14` không vào hộp thông báo                                                                                                            | —          | P03-D15               |
-| F59 | Low     | implementation gap          | G4–G6 | Test đồng thời dùng `Promise.all`/sleep thay barrier                                                                                                              | P6         | —                     |
-| F60 | Medium  | documentation drift         | All   | Roadmap/spec/scope map pin `72e1480`; trạng thái cũ                                                                                                               | P0, P6     | —                     |
-| F61 | Low     | documentation drift         | Docs  | Handoff Docs còn câu _chưa Owner review/commit_ (cả ở `e0cb5a0`); ghi chú Logical ERD                                                                             | —          | —                     |
-| F62 | High    | implementation gap          | G5    | Không có đóng cuối năm tài chính cho phiên bản/đề xuất (`QĐ-91c`, `QĐ-91e`)                                                                                       | P1, P4     | —                     |
-| F63 | High    | implementation gap          | G5    | Từ chối phiên bản trả đề xuất về trưởng phòng; không lập lại từ cùng đề xuất (`QĐ-92c`)                                                                           | P1, P4     | —                     |
-| F64 | Medium  | implementation gap          | G5    | Finance tạo được phiên bản sửa đổi khi phòng chưa có trưởng phòng (`QĐ-92d`(1))                                                                                   | P4         | —                     |
-| F65 | High    | implementation gap          | G5    | Request chờ phiên bản: rời trạng thái chờ khi bị từ chối; Finance không xử lý được (`QĐ-92a`)                                                                     | P1, P4     | —                     |
-| F66 | Medium  | implementation gap          | G5    | Sửa phiên bản không lưu trước/sau; không có lịch sử sửa (`QĐ-91d`)                                                                                                | P1, P4     | —                     |
-| F67 | High    | implementation gap          | G5    | Không có thông báo vòng ngân sách/Finance (`FR-5.14` dòng 18, 40, 41, 47, 48, 52 → 55)                                                                            | P1, P4     | —                     |
-| F68 | High    | migration/backfill required | G2    | `linked_at` của liên kết Cost Center → phòng chép mốc tạo **sớm** hơn của cặp: Cost Center hiện hành trước khi phòng tồn tại (`CostCenter.linkedAt`, `QĐ-87d`(3)) | P1         | —                     |
+| ID  | Mức     | Nhãn chính                  | G     | Lỗi                                                                                                                                                                                     | Phase        | Disposition           |
+| --- | ------- | --------------------------- | ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ | --------------------- |
+| F01 | Blocker | migration/backfill required | G2    | Phòng bắt buộc có Cost Center; liên kết nằm ở phòng; không có `linkedAt`                                                                                                                | P1, P2       | —                     |
+| F02 | Blocker | migration/backfill required | G3    | Thuê bao không có phòng sở hữu                                                                                                                                                          | P1, P3       | P03-D03 = A           |
+| F03 | High    | migration/backfill required | G2    | Danh mục chức vụ còn bắt buộc và còn API                                                                                                                                                | P1, P2       | P03-D04, D05, D07 = A |
+| F04 | High    | obsolete                    | G3–G6 | Bộ công cụ chuẩn còn sống; mọi Request bị đòi lý do _ngoài bộ chuẩn_                                                                                                                    | P1–P5        | P03-D06, D07 = A      |
+| F05 | High    | obsolete                    | G3    | Phân bổ chi phí theo tỷ lệ còn sống                                                                                                                                                     | P1, P3       | P03-D06, D07 = A      |
+| F06 | High    | obsolete                    | G6    | Chuyển tài khoản dịch vụ sang phòng khác còn sống                                                                                                                                       | P1, P5       | P03-D06, D07 = A      |
+| F07 | Medium  | migration/backfill required | G4    | Tác vụ cấp duy nhất trọn đời theo Assignment, không theo tác vụ đang mở                                                                                                                 | P1           | —                     |
+| F08 | High    | contract change             | G4    | Chuyển làm tay đòi bằng chứng; xóa lỗi gần nhất                                                                                                                                         | P1, P3       | —                     |
+| F09 | High    | implementation gap          | G1    | Lệnh cài đặt tạo Cost Center, chức vụ, Employee IT                                                                                                                                      | P2           | —                     |
+| F10 | Blocker | contract change             | G2    | Ghi phòng/trưởng phòng/phân công/dự án chỉ IT Admin, không căn cứ                                                                                                                       | P2           | —                     |
+| F11 | High    | contract change             | G2    | Sửa trường hồ sơ chính thức chỉ IT Admin                                                                                                                                                | P2           | —                     |
+| F12 | Medium  | contract change             | G2/G6 | Super Admin không đọc được dữ liệu tổ chức; IT Admin đọc đầy đủ mọi phòng                                                                                                               | P2, P5       | —                     |
+| F13 | Medium  | implementation gap          | G2–G6 | Quyền chỉ ở guard controller, service không giữ bất biến (gồm `budgets`)                                                                                                                | P2–P5        | —                     |
+| F14 | Medium  | contract change             | G2    | Checklist bước 1 còn chặn _không có Cost Center trống_, gợi ý bộ chuẩn                                                                                                                  | P2           | —                     |
+| F15 | High    | implementation gap          | G2    | Ngừng phòng thiếu điều kiện việc đang mở và thuê bao còn nghĩa vụ (`QĐ-90e`)                                                                                                            | P2           | —                     |
+| F16 | High    | implementation gap          | G2    | Cost Center chưa tạo cho phòng; ngừng Cost Center chỉ xét thành viên                                                                                                                    | P2           | —                     |
+| F17 | High    | implementation gap          | G2/G6 | Thiếu thông báo bù và người nhận `D-7` (gồm `P28-09`)                                                                                                                                   | P2, P5       | P03-D15               |
+| F18 | Medium  | implementation gap          | G1    | Lời mời khôi phục gửi email công việc hiện tại (`P28-05`)                                                                                                                               | P2           | —                     |
+| F19 | High    | ADR/Owner decision required | G1/G6 | Super Admin là đối tượng (`QĐ-87c`, `QĐ-88b`) chưa có thủ tục                                                                                                                           | P1, P2, P5   | P03-D02 = A           |
+| F20 | High    | implementation gap          | G4    | Phòng sở hữu của Assignment ≠ của thuê bao; đích cấp không theo phòng                                                                                                                   | P1, P3       | —                     |
+| F21 | Medium  | implementation gap          | G4/G6 | Bước 4 khởi tạo (`QĐ-89e`) không ghi phòng sở hữu, không rà soát người phòng khác                                                                                                       | P3, P5       | —                     |
+| F22 | Medium  | implementation gap          | G2/G4 | Read model phần mềm phòng thiếu `K4`, nhãn `K1` đang chấm dứt, theo phòng người giữ                                                                                                     | P3           | —                     |
+| F23 | Low     | implementation gap          | G3    | Khai thuê bao/nhập khóa cho ứng dụng đã ngừng không bị chặn                                                                                                                             | P3           | —                     |
+| F24 | Medium  | implementation gap          | G4    | Đếm IT Admin dùng được ngoài giao dịch; không báo Super Admin khi tự thực thi                                                                                                           | P3           | P03-D15               |
+| F25 | Medium  | implementation gap          | G4    | Đảo thứ tự khóa giữa cấp và đóng thất bại (Request nhóm)                                                                                                                                | P3           | —                     |
+| F26 | Medium  | business-source question    | G3    | PATCH thuê bao tăng số lượng/kéo dài kỳ khi phòng chưa có Cost Center                                                                                                                   | P3           | P03-D09 = A           |
+| F27 | Blocker | implementation gap          | G5    | Không có cổng _cấu hình tài chính chưa hoàn tất_; không có nháp Request trả phí                                                                                                         | P1, P4       | P03-D01 = A           |
+| F28 | High    | implementation gap          | G5    | Request trả phí bị xác định lại bước nhu cầu khi điều chuyển                                                                                                                            | P4           | —                     |
+| F29 | High    | contract change             | G5/G6 | Thiếu kết cục _bị hủy — người thụ hưởng điều chuyển_ và đường IT Admin đóng                                                                                                             | P1, P4, P5   | —                     |
+| F30 | Medium  | contract change             | G5    | Super Admin gửi được Request                                                                                                                                                            | P4           | —                     |
+| F31 | High    | implementation gap          | G5    | Duyệt chi song song cùng Cost Center/năm không được tuần tự hóa                                                                                                                         | P4           | —                     |
+| F32 | Medium  | implementation gap          | G5    | `SoD-8` (người rà soát ≠ Người duyệt chi) không được chặn                                                                                                                               | P4           | —                     |
+| F33 | Medium  | implementation gap          | G5    | _Cần sửa ngân sách_ chỉ cho `NO_ACTIVE_BUDGET`; kiểm lại chỉ bắt Request `NO_ACTIVE`                                                                                                    | P4           | — (D08 đóng)          |
+| F34 | Medium  | implementation gap          | G5    | Request trả phí giá 0 → 500 ở bước tạo khoản cam kết                                                                                                                                    | P4           | —                     |
+| F35 | Low     | business-source question    | G5    | Mọi kỳ có giá đều coi là ràng buộc (kỳ hủy được phải là dự báo)                                                                                                                         | —            | P03-D10               |
+| F36 | High    | implementation gap          | G5    | Phiên bản ngân sách nháp của đề xuất đã rút/trả về kẹt vĩnh viễn (sửa trong tập trạng thái `QĐ-91a`)                                                                                    | P1, P4       | —                     |
+| F37 | Medium  | implementation gap          | G5/G6 | Ba đường 500 (lý do null, `planId` lạ, recorder không bọc `guarded`)                                                                                                                    | P4, P5       | —                     |
+| F38 | Low     | business-source question    | G5    | Giá Request lấy thuê bao mới nhất của gói ở mọi phòng                                                                                                                                   | P4           | P03-D11 = A           |
+| F39 | Low     | implementation gap          | G5    | Trùng số phiên bản ánh xạ thành `VERSION_IN_FLIGHT`                                                                                                                                     | P4           | —                     |
+| F40 | Blocker | contract change             | G6    | Ghi sự kiện nhân sự và xử lý `BM-09` chỉ IT Admin                                                                                                                                       | P5           | —                     |
+| F41 | High    | migration/backfill required | G6    | Đổi chức vụ còn là sự kiện và loại `BM-09`                                                                                                                                              | P1, P5       | P03-D05 = A           |
+| F42 | Blocker | implementation gap          | G6    | Rà soát sau điều chuyển chỉ phủ công cụ ngoài bộ chuẩn                                                                                                                                  | P5           | —                     |
+| F43 | High    | implementation gap          | G6    | _Còn cần_ không tạo Request mới, không thu hồi seat cũ                                                                                                                                  | P5           | —                     |
+| F44 | Medium  | implementation gap          | G6    | Điều chuyển vào phòng chưa có Cost Center bị từ chối                                                                                                                                    | P5           | —                     |
+| F45 | Low     | obsolete                    | G6    | Cờ _tự thực thi_ cho sự kiện nhân sự về chính IT Admin                                                                                                                                  | P5           | —                     |
+| F46 | Medium  | implementation gap          | G6    | Một sự kiện chờ xuyên bảng chỉ có kiểm dịch vụ, thiếu test đua có barrier                                                                                                               | P5           | —                     |
+| F47 | Low     | migration/backfill required | G6    | Seed _đã báo_ dùng `CURRENT_DATE` của phiên CSDL thay múi giờ tổ chức                                                                                                                   | P5           | —                     |
+| F48 | Low     | implementation gap          | G6    | Sequence mã `BM09-`/báo lỗi `MAXVALUE 999999`, không reset theo năm                                                                                                                     | P5           | —                     |
+| F49 | Medium  | documentation drift         | All   | Mô tả OpenAPI lệch mã với tới được (`F1`, `F2`, `F4`, `F7`, `F8`, `F10`)                                                                                                                | P6           | —                     |
+| F50 | Low     | obsolete                    | G5/G6 | Mapper lỗi không có nơi ném                                                                                                                                                             | P6           | —                     |
+| F51 | Low     | documentation drift         | All   | Hai cặp migration cùng mốc thời gian; `DB-15` không có gate                                                                                                                             | P6           | —                     |
+| F52 | Low     | implementation gap          | H7    | Suite vai runtime chưa chạy đường G5/G6                                                                                                                                                 | P6           | —                     |
+| F53 | Medium  | ADR/Owner decision required | All   | Chín sweeper chạy trong tiến trình API, tài liệu nói worker                                                                                                                             | P6           | P03-D12               |
+| F54 | Medium  | ADR/Owner decision required | G5    | Allowlist nội module tăng ~75 mục cho repo xuyên capability                                                                                                                             | —            | P03-D13               |
+| F55 | Medium  | ADR/Owner decision required | All   | Gate collection chỉ GET; `LD-13` bảy điểm còn mở                                                                                                                                        | —            | P03-D14               |
+| F56 | Low     | contract change             | All   | Ngày/tiền trong OpenAPI không có `format`/`pattern`                                                                                                                                     | —            | P03-D14               |
+| F57 | Low     | documentation drift         | All   | Trộn `uuid()` v4 và `uuid(7)` không có rule                                                                                                                                             | —            | —                     |
+| F58 | Medium  | implementation gap          | G4    | Cảnh báo license của `FR-5.14` không vào hộp thông báo                                                                                                                                  | —            | P03-D15               |
+| F59 | Low     | implementation gap          | G4–G6 | Test đồng thời dùng `Promise.all`/sleep thay barrier                                                                                                                                    | P6           | —                     |
+| F60 | Medium  | documentation drift         | All   | Roadmap/spec/scope map pin `72e1480`; trạng thái cũ                                                                                                                                     | P0, P6       | —                     |
+| F61 | Low     | documentation drift         | Docs  | Handoff Docs còn câu _chưa Owner review/commit_ (cả ở `e0cb5a0`); ghi chú Logical ERD                                                                                                   | —            | —                     |
+| F62 | High    | implementation gap          | G5    | Không có đóng cuối năm tài chính cho phiên bản/đề xuất (`QĐ-91c`, `QĐ-91e`)                                                                                                             | P1, P4       | —                     |
+| F63 | High    | implementation gap          | G5    | Từ chối phiên bản trả đề xuất về trưởng phòng; không lập lại từ cùng đề xuất (`QĐ-92c`)                                                                                                 | P1, P4       | —                     |
+| F64 | Medium  | implementation gap          | G5    | Finance tạo được phiên bản sửa đổi khi phòng chưa có trưởng phòng (`QĐ-92d`(1))                                                                                                         | P4           | —                     |
+| F65 | High    | implementation gap          | G5    | Request chờ phiên bản: rời trạng thái chờ khi bị từ chối; Finance không xử lý được (`QĐ-92a`)                                                                                           | P1, P4       | —                     |
+| F66 | Medium  | implementation gap          | G5    | Sửa phiên bản không lưu trước/sau; không có lịch sử sửa (`QĐ-91d`)                                                                                                                      | P1, P4       | —                     |
+| F67 | High    | implementation gap          | G5    | Không có thông báo vòng ngân sách/Finance (`FR-5.14` dòng 18, 40, 41, 47, 48, 52 → 55)                                                                                                  | P1, P4       | —                     |
+| F68 | High    | migration/backfill required | G2    | `linked_at` của liên kết Cost Center → phòng chép mốc tạo **sớm** hơn của cặp: Cost Center hiện hành trước khi phòng tồn tại (`CostCenter.linkedAt`, `QĐ-87d`(3))                       | P1           | —                     |
+| F69 | High    | implementation gap          | G5    | Khóa dòng phiên bản/đề xuất `FOR UPDATE` xung đột `FOR KEY SHARE` của khóa ngoại cam kết ⟹ vòng chờ giữa quyết định phiên bản/đóng năm và duyệt chi (deadlock 40P01 ⟹ 503)              | Giai đoạn II |
+| F70 | Medium  | implementation gap          | G5    | `planLineMoved` khóa Request sau khóa năm: vòng chờ với người giữ Request chờ khóa năm                                                                                                  | Giai đoạn II |
+| F71 | High    | implementation gap          | G5    | Nháp Request trả phí (L.1) bị `access_requests_pricing_check`/`group_check` từ chối khi ghi (cột giá ở mặc định, nhánh trả phí): toàn bộ nháp không dùng được                           | Giai đoạn II |
+| F72 | Medium  | implementation gap          | G5    | Request nhiều năm chấm lại lấy khóa năm thấp hơn sau khóa năm của phiên bản: sai thứ tự "năm tăng dần" ⟹ vòng chờ                                                                       | Giai đoạn II |
+| F73 | High    | implementation gap          | G4    | Tác vụ cấp `IN_PROGRESS` đóng `BENEFICIARY_TRANSFERRED` bị trigger chuyển trạng thái từ chối (`55000`): chỉ cho lý do `BENEFICIARY_LEFT`                                                | Giai đoạn II |
+| F74 | Medium  | implementation gap          | G5–G6 | Thông báo giữ chờ (T-11): người ghi đọc trưởng phòng không khóa phòng ⟹ hàng giữ chờ mồ côi sau khi trưởng phòng đầu tiên được gán                                                      | Giai đoạn II |
+| F75 | Medium  | implementation gap          | G2    | Thông báo giữ chờ giao lúc gán thay vì lúc kỳ trưởng phòng bắt đầu: gán ngày tương lai giao sớm, hàng giữ chờ giữa chừng không bao giờ giao, kỳ bị hủy làm mất thông báo của người đúng | Giai đoạn II |
+| F76 | Medium  | implementation gap          | G4    | Công cụ của phòng: `terminating` suy từ mọi `valid_until` tương lai (gia hạn, đổi người chịu trách nhiệm) thay vì thu hồi K1 `UNTIL_PAID_END` (`US-07-05` AC-19)                        | Giai đoạn II |
+| F77 | Low     | implementation gap          | G4–G5 | Chính sách hủy tác vụ của license không đòi xác nhận đối chiếu cho tác vụ chưa chạy khi điều chuyển (spec E: mọi tác vụ cấp còn mở); chỉ service Request kiểm                           | Giai đoạn II |
+| F78 | Medium  | implementation gap          | G6    | Thủ tục Super Admin, chế độ nghỉ việc: Audit `HANDOVER_DUTY.*` mang tác nhân USER (Super Admin giả lập) thay vì OPERATOR + vé (L.2)                                                     | Giai đoạn II |
+| F79 | Medium  | implementation gap          | G6    | IT Admin đọc nhân sự chỉ theo phòng được giao, thiếu phòng "xử lý thay" (spec B/K-F12): làm kỹ thuật được mà không tìm thấy hồ sơ                                                       | Giai đoạn II |
+| F80 | Medium  | implementation gap          | G5–G6 | Quyền runtime H7: hai bảng chỉ ghi thêm mới (`super_admin_event_tickets`, `budget_version_history`) chưa vào `RUNTIME_TABLE_EXCEPTIONS`: runtime giữ `UPDATE`/`DELETE`                  | Giai đoạn II |
+| F81 | Low     | migration/backfill required | G5    | Audit đối soát `…100600`: `before.previousProposalId` sai (lấy của Request nộp lại) và Request nộp lại (R2) không có bản ghi riêng                                                      | Giai đoạn II |
+| F82 | Low     | migration/backfill required | G4    | `ops:preflight` (B): vị từ xung đột không phản chiếu đúng migration (thiếu lệch tổ chức khi thuê bao đã có phòng sở hữu)                                                                | Giai đoạn II |
+| F83 | Low     | implementation gap          | G5    | Ngân sách: lịch sử sửa chia theo số dòng có thể vượt CHECK 256 KiB ⟹ 500; ánh xạ lỗi đua theo tên chỉ mục không có cột; `FINANCE.SETUP_INCOMPLETE` của nộp lại chưa được tài liệu hóa   | Giai đoạn II |
+| F84 | Low     | implementation gap          | G6    | Rà soát sau điều chuyển: `needsNewRequest` còn `true` sau khi seat cũ đã được thu hồi bởi Request thay thế                                                                              | Giai đoạn II |
+| F85 | Low     | documentation drift         | All   | Dư lượng: token `REQUEST_OUTCOME_LISTENERS` chết, mô tả OpenAPI nhắc bộ chuẩn/chuyển phòng đã gỡ, thuộc tính `costCenterActive` chết, trường Prisma `selfExecuted` của personnel        | Giai đoạn II |
 
 ### 3.1 Nền schema và dữ liệu
 
@@ -971,6 +988,105 @@ chỉ từ đề xuất: `INITIAL` chỉ tạo qua `createFromProposal`, `REVISI
   khi việc đề xuất giao cho họ, kể cả lúc được gán khi việc đang chờ), 55 (Finance; Super Admin chỉ giữ dòng 9 hiện có). Ghi trong cùng giao
   dịch với sự kiện; khóa tham số không mang số tiền (`FIGURE_WORDS`). Ngoài P03-D15: các dòng này do `QĐ-92b` và AC xác định, không phải
   lựa chọn phạm vi.
+
+### 3.9 Phát hiện trong Giai đoạn II (Prompt 04, 28/10/2026)
+
+Một lượt rà soát nguồn độc lập theo từng capability (organization, catalog/licensing, requests, budgets, personnel, migration/rollout) trên cây
+Giai đoạn I, chỉ đọc, không chạy test. Mỗi phát hiện dưới đây đã được tác nhân chính đối chiếu với mã/cấu hình trước khi ghi; ID là số kế tiếp
+(`F69` → `F85`). Cách đóng và dòng kiểm ghi ở [plan](plan.md#phủ-finding) và [test matrix](test-matrix.md).
+
+#### F69 — Khóa dòng phiên bản và đề xuất xung đột khóa ngoại của cam kết
+
+- **Mức / nhãn:** High · implementation gap (lỗi đồng thời).
+- **Code:** `version.repo.ts` `lockById`/`lockAllOfYear` và `proposal.repo.ts` `lockById`/`lockAllOfYear` dùng `FOR UPDATE`. Giữ cam kết
+  (`commitment.repo.ts` `hold`) lấy khóa năm rồi `INSERT` cam kết có `attached_version_id` ⟹ khóa ngoại lấy `FOR KEY SHARE` trên dòng phiên bản hiện hành;
+  `decide` khóa mọi phiên bản `FOR UPDATE` rồi mới chờ khóa năm.
+- **Kịch bản:** phiên bản hiện hành V1 `APPROVED` + bản sửa R đã gửi; duyệt chi (giữ Request + khóa năm, chờ `KEY SHARE` trên V1) ↔ quyết định R (giữ V1 `FOR UPDATE`, chờ khóa năm) ⟹ 40P01 ⟹ 503.
+- **Đóng:** `FOR NO KEY UPDATE` (không xung đột `KEY SHARE`, vẫn xếp hàng giữa các bên ghi; mọi thay đổi của phiên bản là cột không khóa). Test: đua quyết định bản sửa ↔ duyệt chi (cần phiên bản hiện hành).
+
+#### F70 — `planLineMoved` khóa Request sau khóa năm
+
+- **Mức / nhãn:** Medium · implementation gap. `version-line.service.ts` đổi khoảng mua gọi `planLineMoved`; listener khóa Request thứ nhất, chấm lại (lấy khóa năm, giữ), rồi khóa Request thứ hai.
+- **Đóng:** khóa mọi Request theo id rồi mọi năm họ ràng buộc (tăng dần) trước Request đầu tiên được chấm lại.
+
+#### F71 — Nháp trả phí không ghi được
+
+- **Mức / nhãn:** High · implementation gap. Spec L.1 ghi nháp với "cột giá ở mặc định" (`pricing_status = NOT_APPLICABLE`) và nhánh theo gói (`PAID_IN_CATALOG`);
+  `access_requests_pricing_check` chỉ cho `NOT_APPLICABLE` với `INTERNAL_FREE`, `access_requests_group_check` đòi nhánh trả phí cho `GROUP_GRANT`.
+- **Đóng:** migration `…100500` mục 4 viết lại hai CHECK từ định nghĩa hiện tại thành "là nháp, hoặc điều đã có" (chỉ nới; bản tương thích không ghi nháp). Test SQL: nháp cá nhân trả phí và nháp nhóm gói nội bộ ghi được, Request không phải nháp vẫn bị chặn.
+
+#### F72 — Khóa năm của Request nhiều năm sai thứ tự
+
+- **Mức / nhãn:** Medium · implementation gap. Quyết định phiên bản giữ khóa năm Y rồi chấm lại Request ràng buộc cả năm thấp hơn ⟹ lấy năm thấp sau Y, ngược thứ tự "tăng dần" của người giữ cả hai.
+- **Đóng:** `BudgetChangeListener.lockWaiting` khóa Request chờ rồi hợp các năm họ ràng buộc với năm của phiên bản, tăng dần, trước khóa năm của ngân sách.
+
+#### F73 — Đóng tác vụ đang chạy khi điều chuyển bị trigger chặn
+
+- **Mức / nhãn:** High · implementation gap. `provisioning_task_transition_guard` cho `IN_PROGRESS → CANCELLED` chỉ khi `close_reason = 'BENEFICIARY_LEFT'`; nguyên nhân mới `BENEFICIARY_TRANSFERRED` ⟹ `55000`, cả giao dịch đóng bị hoàn tác.
+- **Đóng:** migration `20261029101000_provisioning_transfer_cancel_reason` (viết lại hàm từ định nghĩa hiện tại, chỉ nới). Test `beneficiary-transferred-closure` có ca `IN_PROGRESS` kèm xác nhận.
+
+#### F74 — Thông báo giữ chờ ghi sau khi trưởng phòng đã được gán
+
+- **Mức / nhãn:** Medium · implementation gap. Người ghi (`budget-notifier`, `personnel-notifier`) đọc trưởng phòng không khóa phòng; `assign` khóa phòng `FOR UPDATE`, giao các hàng đang giữ rồi commit; người ghi đọc "chưa có" trước đó chèn sau ⟹ hàng `delivered_at IS NULL` cho phòng đã có trưởng phòng, không bao giờ giao.
+- **Đóng:** khóa phòng `FOR SHARE` trước khi đọc trưởng phòng ở mọi nơi ghi thông báo giữ chờ. Test đua có rào.
+
+#### F75 — Giao thông báo giữ chờ lúc gán, không phải lúc kỳ trưởng phòng bắt đầu
+
+- **Mức / nhãn:** Medium · implementation gap (làm rõ `T-11`). `DepartmentHeadService.assign` giao trước khi kiểm `effectiveFrom`: trưởng phòng đầu tiên gán ngày tương lai nhận ngay, hàng giữ chờ ở các ngày giữa không bao giờ được giao (dòng 53 và `TRANSFER_REVIEW_DUE` không có cơ chế phát lại), kỳ tương lai bị hủy bởi lần gán sau làm trưởng phòng thực sự không nhận gì.
+- **Đóng:** giao ở `HEAD_PERIOD_START` — cùng giao dịch lệnh gán khi ngày là hôm nay, hoặc ở lượt báo thay đổi tới ngày. Spec `T-11` (mục I) làm rõ tương ứng.
+
+#### F76 — `terminating` của công cụ phòng
+
+- **Mức / nhãn:** Medium · implementation gap. `terminating = validUntil !== null` làm seat vừa gia hạn hoặc tài khoản dịch vụ đổi người chịu trách nhiệm có hẹn hiện "đang kết thúc". Đúng: seat K1 đã hủy gia hạn = tác vụ `REVOKE` hoàn tất với `UNTIL_PAID_END`.
+- **Đóng:** suy từ thu hồi (dùng lại `revocation-read.repo.terminatingOf`). Test: gia hạn, đổi người hẹn ngày, thu hồi K1 thật.
+
+#### F77 — Chính sách hủy tác vụ khi điều chuyển
+
+- **Mức / nhãn:** Low · implementation gap. Chính sách `grantCancelAction` cho `QUEUED`/`RETRY_SCHEDULED`/`FAILED` + `BENEFICIARY_TRANSFERRED` → `CANCEL` không cần xác nhận; spec E đòi xác nhận cho mọi tác vụ cấp còn mở. Chỉ service Request đang giữ luật.
+- **Đóng:** chính sách trả `EVIDENCE_REQUIRED` cho mọi trạng thái chưa kết thúc khi nguyên nhân là điều chuyển và chưa có xác nhận.
+
+#### F78 — Tác nhân Audit của bàn giao trong thủ tục Super Admin
+
+- **Mức / nhãn:** Medium · implementation gap. Chế độ nghỉ việc của `ops:record-super-admin-event` đưa Super Admin vào facade bàn giao của licensing như người dùng; `licensingAuditEvent` cứng `actorKind: 'USER'` ⟹ `HANDOVER_DUTY.*` mang Super Admin là tác nhân; L.2 đòi `OPERATOR`, `actorAppUserId` NULL, `operatorReference` = vé.
+- **Đóng:** facade bàn giao nhận tác nhân Audit; personnel truyền OPERATOR + vé. Test: mọi dòng `HANDOVER_DUTY.*` của chế độ nghỉ việc.
+
+#### F79 — Phạm vi đọc của IT Admin thiếu phòng xử lý thay
+
+- **Mức / nhãn:** Medium · implementation gap. Các truy vấn nhân sự dùng `getDepartmentIdsInChargeOf` (IT Admin được giao); spec B / K-F12 gồm cả phòng xử lý thay (không có IT Admin dùng được); `DepartmentQueryService.scopeOf` của organization đã tính cả hai.
+- **Đóng:** dùng chung phạm vi đó qua facade của organization trong bốn truy vấn nhân sự.
+
+#### F80 — Quyền runtime của hai bảng chỉ ghi thêm
+
+- **Mức / nhãn:** Medium · implementation gap. `RUNTIME_TABLE_EXCEPTIONS` thiếu `super_admin_event_tickets` và `budget_version_history` ⟹ sau `ops:db-roles reconcile` vai runtime giữ `UPDATE`/`DELETE`, `ops:db-roles verify` không báo.
+- **Đóng:** thêm cả hai với `INSERT, SELECT` và ca trong `database-role-judgement.spec`.
+
+#### F81 — Audit đối soát `…100600`
+
+- **Mức / nhãn:** Low · migration/backfill required. `before.previousProposalId` lấy của Request nộp lại; Request nộp lại (R2) chỉ nằm trong `after` của đề xuất bị trả.
+- **Đóng:** `before` lấy của đề xuất bị trả; thêm bản ghi riêng cho Request nộp lại. Test cập nhật.
+
+#### F82 — Preflight (B) không phản chiếu đúng migration
+
+- **Mức / nhãn:** Low · migration/backfill required. Migration (B) cũng `RAISE` khi thuê bao đã có phòng sở hữu mà dòng gán/phòng của tổ chức khác; preflight chỉ so phòng. **Đóng:** sao đúng vị từ.
+
+#### F83 — Độ bền của ngân sách
+
+- **Mức / nhãn:** Low · implementation gap. (a) Lịch sử sửa chia theo 200 dòng nhưng bảng từ chối `after` > 262 144 byte; dòng dài hoặc CSV không giới hạn ⟹ `23514` không ánh xạ ⟹ 500. (b) Mapper lỗi đua của `budget_proposals_open_key`, `budget_versions_in_flight_key`, `…rejected_predecessor_id_key`, `…successor_of_proposal_id_key` chỉ khớp tên chỉ mục (Prisma P2002 trả danh sách cột). (c) `budgetProposalResubmit` có thể trả 409 `FINANCE.SETUP_INCOMPLETE` nhưng chưa được ghi trong controller/registry ví dụ.
+- **Đóng:** chia theo byte; thêm mẫu cột; tài liệu hóa mã.
+
+#### F84 — `needsNewRequest` sau khi seat cũ đã thu hồi
+
+- **Mức / nhãn:** Low · implementation gap. Dòng `STILL_NEEDED` không thể mang `revocation_task_id`, nên sau khi Request thay thế kết thúc và seat cũ được thu hồi, wire vẫn `needsNewRequest: true` và đổi ý bị 409 không giải thích. **Đóng:** suy "đã mở thu hồi" từ licensing theo tham chiếu rà soát.
+
+#### F85 — Dư lượng
+
+- **Mức / nhãn:** Low · documentation drift. Token `REQUEST_OUTCOME_LISTENERS` chết; mô tả OpenAPI/chú thích còn nhắc bộ chuẩn và chuyển phòng tài khoản dịch vụ; thuộc tính chết `costCenterActive`; năm cột `selfExecuted` của personnel còn trong Prisma. **Đóng:** xóa/viết lại; `@ignore` các cột (cột DB giữ nguyên).
+
+**Phát hiện nhưng không sửa trong gói này (ghi để Owner quyết hoặc để dọn sau):**
+
+- `OD-INTERNAL-CC` — Request nội bộ không phí ở phòng chưa có Cost Center bị `FINANCE.SETUP_INCOMPLETE` (mã gate chạy trước khi biết gói nội bộ); spec F và `QĐ-87g(1)` nói Request này không bị chặn. Cho đi qua cần `access_requests.cost_center_id` NULL cho nhánh `INTERNAL_FREE`: nới CHECK `access_requests_cost_center_unless_draft` mà Owner đã chốt ở `P03-D01` (chỉ nháp) và đổi wire `costCenter` của Request thành nullable (bàn giao FE). Cần quyết định của Owner.
+- `accessRequestGet` trả nháp cho người tạo (spec L.1) — hiện 404 với mọi người; nháp đọc qua `accessRequestDraftList`. Ghi là độ lệch; spec L.1 sửa theo (không có wire "Request" cho nháp).
+- F24 `countUsableItAdminsExcept` là `count` thường, không khóa hàng; barrier test chưa có. Ứng viên dọn kiến trúc nguồn.
 
 ## 4. Trace Story/AC theo G
 

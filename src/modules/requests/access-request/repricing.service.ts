@@ -40,6 +40,7 @@ export class RepricingService {
     if (request.branch === 'PAID_IN_CATALOG' && request.planId !== null) {
       return this.assessment.priceFor(tx, {
         planId: request.planId,
+        departmentId: request.departmentId,
         free: false,
         termMonths: request.termMonths,
         beneficiaries: peopleOf(request),

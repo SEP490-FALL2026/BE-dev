@@ -24,7 +24,7 @@ function principal(direct: string[], derived: string[] = []) {
 }
 
 type Call = (server: App) => request.Test;
-type Who = 'HEAD' | 'IT_ADMIN' | 'EITHER';
+type Who = 'HEAD' | 'SUPER_ADMIN' | 'EITHER';
 
 const SEND = { employeeId: ID, kind: 'DEPARTURE', proposedOn: '2026-10-30' };
 
@@ -39,12 +39,12 @@ const ROUTES: Array<[string, Who, Call]> = [
   ],
   [
     'POST /personnel-notices/{id}/rejection',
-    'IT_ADMIN',
+    'SUPER_ADMIN',
     (server) => request(server).post(`/api/v1/personnel-notices/${ID}/rejection`).send({ reason: 'Duplicate event' }),
   ],
   [
     'POST /personnel-notices/{id}/recording',
-    'IT_ADMIN',
+    'SUPER_ADMIN',
     (server) =>
       request(server)
         .post(`/api/v1/personnel-notices/${ID}/recording`)
@@ -52,7 +52,7 @@ const ROUTES: Array<[string, Who, Call]> = [
   ],
   [
     'POST /personnel-notices/{id}/linking',
-    'IT_ADMIN',
+    'SUPER_ADMIN',
     (server) =>
       request(server).post(`/api/v1/personnel-notices/${ID}/linking`).send({ eventId: ID, verification: VERIFICATION }),
   ],
@@ -79,7 +79,7 @@ describe('personnel notice routes (e2e, no database)', () => {
 
   describe('who may call which route (US-03-10 AC-9, US-03-11 AC-8)', () => {
     it.each(ROUTES)('%s without a token is 401', async (_name, _who, call) => {
-      app = await appFor(principal(['IT_ADMIN']));
+      app = await appFor(principal(['SUPER_ADMIN']));
 
       const response = await call(app.getHttpServer()).expect(401);
 
@@ -87,12 +87,17 @@ describe('personnel notice routes (e2e, no database)', () => {
     });
 
     it.each([
-      ['the Super Admin, who never does business work', ['SUPER_ADMIN'], [], ['HEAD', 'IT_ADMIN', 'EITHER']],
-      ['the finance officer', ['FINANCE'], [], ['HEAD', 'IT_ADMIN', 'EITHER']],
-      ['an employee', ['EMPLOYEE'], [], ['HEAD', 'IT_ADMIN', 'EITHER']],
-      ['the spending approver, who is not a head', [], ['SPENDING_APPROVER'], ['HEAD', 'IT_ADMIN', 'EITHER']],
-      ['an IT Admin who heads no department', ['IT_ADMIN'], [], ['HEAD']],
-      ['a department head', [], ['MANAGER'], ['IT_ADMIN']],
+      ['the Super Admin, who handles notices but never sends one', ['SUPER_ADMIN'], [], ['HEAD']],
+      ['the finance officer', ['FINANCE'], [], ['HEAD', 'SUPER_ADMIN', 'EITHER']],
+      ['an employee', ['EMPLOYEE'], [], ['HEAD', 'SUPER_ADMIN', 'EITHER']],
+      ['the spending approver, who is not a head', [], ['SPENDING_APPROVER'], ['HEAD', 'SUPER_ADMIN', 'EITHER']],
+      [
+        'an IT Admin, who reads a minimal projection and handles nothing (F40, F12)',
+        ['IT_ADMIN'],
+        [],
+        ['HEAD', 'SUPER_ADMIN'],
+      ],
+      ['a department head', [], ['MANAGER'], ['SUPER_ADMIN']],
     ])('refuses %s on the routes it does not own with 403', async (_name, direct, derived, refusedOn) => {
       app = await appFor(principal(direct, derived));
 
@@ -142,7 +147,7 @@ describe('personnel notice routes (e2e, no database)', () => {
       ],
       ['a link with no event', '/linking', { verification: VERIFICATION }],
     ])('refuses %s with 422', async (_name, path, payload) => {
-      app = await appFor(principal(['IT_ADMIN']));
+      app = await appFor(principal(['SUPER_ADMIN']));
 
       const response = await request(app.getHttpServer())
         .post(`/api/v1/personnel-notices/${ID}${path}`)
@@ -159,7 +164,7 @@ describe('personnel notice routes (e2e, no database)', () => {
       ['a flag that is not true or false', (server: App) => request(server).get('/api/v1/personnel-notices?overdue=x')],
       ['a page size over the limit', (server: App) => request(server).get('/api/v1/personnel-notices?pageSize=101')],
     ])('refuses %s with 422', async (_name, call) => {
-      app = await appFor(principal(['IT_ADMIN']));
+      app = await appFor(principal(['SUPER_ADMIN']));
 
       const response = await call(app.getHttpServer()).set(asCaller()).expect(422);
 

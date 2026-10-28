@@ -87,7 +87,7 @@ describe('provisioning queue routes (e2e, no database)', () => {
       await as(request(server).post(`${BASE}/${ID}/complete`).send({ evidence: 'x' })),
       await as(request(server).post(`${BASE}/${ID}/report-failure`).send({ reason: 'x' })),
       await as(request(server).post(`${BASE}/${ID}/retry`)),
-      await as(request(server).post(`${BASE}/${ID}/hand-off`).send({ evidence: 'x' })),
+      await as(request(server).post(`${BASE}/${ID}/hand-off`).send({})),
       await as(request(server).post(`${BASE}/${ID}/close-failed`).send({ reason: 'x' })),
       await as(
         request(server)
@@ -116,13 +116,9 @@ describe('provisioning queue routes (e2e, no database)', () => {
     ['a completion with an unknown field', 'post', `${BASE}/${ID}/complete`, { evidence: 'x', done: true }],
     ['a reason of over a thousand characters', 'post', `${BASE}/${ID}/report-failure`, { reason: 'x'.repeat(1001) }],
     ['a status that does not exist', 'get', `${BASE}?status=DONE`, undefined],
-    [
-      'evidence of a hand-off over two thousand characters',
-      'post',
-      `${BASE}/${ID}/hand-off`,
-      { evidence: 'x'.repeat(2001) },
-    ],
-    ['a hand-off with an unknown field', 'post', `${BASE}/${ID}/hand-off`, { evidence: 'x', password: 'p' }],
+    // A hand-off changes only the channel: its body is an empty object, and the evidence is asked when the work by hand completes (F08).
+    ['a hand-off that still carries evidence', 'post', `${BASE}/${ID}/hand-off`, { evidence: 'x' }],
+    ['a hand-off with an unknown field', 'post', `${BASE}/${ID}/hand-off`, { password: 'p' }],
     [
       'a closing reason of over a thousand characters',
       'post',

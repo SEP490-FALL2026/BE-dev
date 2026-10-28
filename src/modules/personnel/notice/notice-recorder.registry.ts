@@ -1,12 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import type { Grounds } from '../grounds/grounds.policy';
+import type { PersonnelActor } from '../personnel.types';
 import type { NoticeEventInput, NoticeEventKind, NoticeEventRef, NoticeRecord } from './notice.types';
 
 /** What a recorder is given to write the official event a notice announces. The basis is whole; the notice only names itself. */
 export interface NoticeEventRequest {
-  actor: AuthenticatedPrincipal;
+  actor: PersonnelActor;
   notice: NoticeRecord;
   grounds: Grounds;
   event: NoticeEventInput;

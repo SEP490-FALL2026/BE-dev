@@ -1,6 +1,6 @@
 import { addWorkingDays, type NonWorkingDates } from '../../../core/working-days';
 import type { BusinessDate } from '../../../core/business-date';
-import type { HeadDecision, ReviewStatus, WaitingReason } from './transfer-review.types';
+import type { HeadDecision, ReviewDecision, ReviewStatus, WaitingReason } from './transfer-review.types';
 
 /**
  * The rules of the review a new head makes of the tools a person brought from another department after a transfer (`US-03-07`,
@@ -56,6 +56,20 @@ export function isNoteAllowed(decision: HeadDecision, note: string | undefined):
   if (note === undefined) return true;
 
   return decision === 'NEEDS_NEW_TOOL' && note.trim().length > 0 && note.length <= NEW_TOOL_NOTE_MAX;
+}
+
+/**
+ * The one decision a head may take back (T-6, F43): a tool they said is still needed, which waits for a new Request of the department,
+ * may become one no longer needed, and then the seat is taken back now. Nothing else changes once it is written: not "no longer
+ * needed", not "a new tool is needed", not "still needed" again.
+ */
+export function isChangeOfMind(current: ReviewDecision, next: HeadDecision): boolean {
+  return current === 'STILL_NEEDED' && next === 'NOT_NEEDED';
+}
+
+/** Whether a line in `current` may take the decision `next`: a line that waits takes any, a decided one only the change of mind. */
+export function mayRecordDecision(current: ReviewDecision, next: HeadDecision): boolean {
+  return current === 'PENDING' || isChangeOfMind(current, next);
 }
 
 /** The review is complete when no line waits. */

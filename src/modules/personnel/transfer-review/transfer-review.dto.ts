@@ -48,6 +48,8 @@ const departmentBrief = z.strictObject({ id: z.uuid(), code: z.string(), name: z
 /** The row of the list: who moved, where to, the deadline, how many tools still wait and whether anyone can decide yet. */
 export const transferReviewSummarySchema = z.strictObject({
   id: z.uuid(),
+  /** Where the review came from: the transfer of the person, or the closing of the seat baseline at the setup (F21). */
+  origin: z.enum(['TRANSFER', 'POST_SETUP']),
   employee: employeeBrief,
   department: departmentBrief,
   effectiveOn: z.string(),
@@ -64,6 +66,14 @@ export const transferReviewSummarySchema = z.strictObject({
   canDecide: z.boolean(),
 });
 
+/** A Request of the person that has not finished, listed for the head to read (F29): information only, nothing is decided here. */
+const unfinishedRequestSchema = z.strictObject({
+  requestId: z.uuid(),
+  type: z.enum(['GRANT', 'SERVICE_ACCOUNT', 'RENEWAL', 'GROUP_GRANT']),
+  state: z.string(),
+  plan: nameBrief.nullable(),
+});
+
 export const transferReviewDetailSchema = transferReviewSummarySchema.extend({
   /** The head of the department today, who decides; null while it has none. */
   reviewer: employeeBrief.nullable(),
@@ -72,9 +82,14 @@ export const transferReviewDetailSchema = transferReviewSummarySchema.extend({
   completedAt: z.iso.datetime().nullable(),
   /** When the reminder of a late review was written; null while none was. */
   overdueNoticedAt: z.iso.datetime().nullable(),
+  /**
+   * The Requests of the person that have not been granted yet, at most twenty (F29): what is still on its way beside the tools they
+   * hold. Information for the head; empty for the review after the setup.
+   */
+  unfinishedRequests: z.array(unfinishedRequestSchema).max(20),
 });
 
-/** A tool outside the standard toolset with what was decided about it. */
+/** A personal seat of the person who was transferred, with what was decided about it (F42: every personal seat is listed). */
 export const transferReviewItemSchema = z.strictObject({
   assignmentId: z.uuid(),
   position: z.number().int().positive(),
@@ -89,6 +104,13 @@ export const transferReviewItemSchema = z.strictObject({
   newToolNote: z.string().nullable(),
   /** The revocation task a "no longer needed" decision opened. */
   revocationTaskId: z.uuid().nullable(),
+  /**
+   * The head said the tool is still needed, so a new Request of this department is asked for (T-6): the old seat goes when that
+   * Request is granted or ends, or when the head changes the decision to "no longer needed". True only while that is still to come:
+   * false once the Request ended and the old seat is being taken back, though the decision stays "still needed" (the revocation
+   * is read from the seat, so `revocationTaskId` stays null for this decision).
+   */
+  needsNewRequest: z.boolean(),
 });
 
 const decisionResultSchema = z.strictObject({ review: transferReviewSummarySchema, item: transferReviewItemSchema });

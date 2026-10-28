@@ -2,7 +2,7 @@ import { DbTx, TransactionRunner } from '../../../infrastructure/database/transa
 import { AuditService } from '../../audit/audit.service';
 import { IdentityAccessInspectionService } from '../../identity-access/identity-access-inspection.service';
 import { OrganizationService } from '../../organization/organization.service';
-import { BOOTSTRAP_ACTIONS } from './inspection-facts';
+import { CURRENT_INSTALLATION_RECORDS } from './inspection-facts';
 import { InstallationInspectionService } from './inspection.service';
 
 /**
@@ -15,7 +15,7 @@ describe('InstallationInspectionService', () => {
   let inside = false;
   const record = (read: string, client: unknown) => reads.push({ read, client, inside });
 
-  function build() {
+  function build(options: { seededAt?: Date | null; gaps?: Record<string, number> } = {}) {
     reads.length = 0;
     const runner = {
       run: jest.fn(async (work: (tx: DbTx) => Promise<unknown>) => {
@@ -33,6 +33,10 @@ describe('InstallationInspectionService', () => {
         record('appliedMigrations', client);
         return Promise.resolve([{ name: '20261001_a', finished: true, rolledBack: false }]);
       }),
+      changeAnnouncementsSeededAt: jest.fn((client: DbTx) => {
+        record('changeAnnouncementsSeededAt', client);
+        return Promise.resolve(options.seededAt === undefined ? new Date('2026-10-24T15:00:00Z') : options.seededAt);
+      }),
     };
     const organization = {
       getOrganization: jest.fn((client?: DbTx) => {
@@ -44,7 +48,7 @@ describe('InstallationInspectionService', () => {
         return Promise.resolve({
           activeDepartments: 2,
           activeEmployees: 3,
-          freeCostCenters: 0,
+          costCenterDirectionActivated: false,
           departmentsWithoutHead: [{ code: 'P-ENG', name: 'Engineering' }],
           departmentsByItAdmin: [
             { code: 'P-ENG', name: 'Engineering', itAdminEmployeeId: 'e-1', itAdminStatus: 'ACTIVE' as const },
@@ -52,11 +56,15 @@ describe('InstallationInspectionService', () => {
           ],
         });
       }),
+      countUnmarkedChangesAsOf: jest.fn((client: DbTx, asOf: Date) => {
+        record(`countUnmarkedChangesAsOf(${asOf.toISOString()})`, client);
+        return Promise.resolve({ PLACEMENT_START: 0, HEAD_PERIOD_START: 0, HEAD_PERIOD_END: 0, ...options.gaps });
+      }),
     };
     const audit = {
       countByAction: jest.fn((client: DbTx) => {
         record('countByAction', client);
-        return Promise.resolve(new Map(BOOTSTRAP_ACTIONS.map(({ action, expected }) => [action, expected])));
+        return Promise.resolve(new Map(Object.entries(CURRENT_INSTALLATION_RECORDS)));
       }),
     };
     const identity = {
@@ -81,7 +89,7 @@ describe('InstallationInspectionService', () => {
       audit as unknown as AuditService,
       identity as unknown as IdentityAccessInspectionService,
     );
-    return { service, runner, identity };
+    return { service, runner, identity, organization };
   }
 
   it('reads everything in one transaction, each read given that transaction while it is open', async () => {
@@ -97,6 +105,8 @@ describe('InstallationInspectionService', () => {
       'accountInventory',
       'getOnboardingFacts',
       'usableItAdminEmployeeIds',
+      'changeAnnouncementsSeededAt',
+      'countUnmarkedChangesAsOf(2026-10-24T15:00:00.000Z)',
     ]);
     expect(reads.filter(({ client, inside: open }) => client !== TX || !open)).toEqual([]);
   });
@@ -110,5 +120,33 @@ describe('InstallationInspectionService', () => {
       departments: { active: 2, withoutCurrentHead: 1, withoutUsableItAdmin: 1 },
     });
     expect(identity.usableItAdminEmployeeIds).toHaveBeenCalledWith(['e-1'], TX);
+  });
+
+  it('reports no change announcement missing when the seeding migration was never recorded, and reads none', async () => {
+    const { service, organization } = build({ seededAt: null });
+
+    await expect(service.inspect()).resolves.toMatchObject({
+      status: 'INSTALLED',
+      problems: [],
+      changeAnnouncements: {
+        complete: true,
+        missing: { PLACEMENT_START: 0, HEAD_PERIOD_START: 0, HEAD_PERIOD_END: 0 },
+      },
+    });
+    expect(organization.countUnmarkedChangesAsOf).not.toHaveBeenCalled();
+  });
+
+  it('reports the changes the seeding migration missed as a problem with counts only, and the installation INCOMPLETE (F47)', async () => {
+    const { service, organization } = build({ gaps: { PLACEMENT_START: 2, HEAD_PERIOD_END: 1 } });
+
+    await expect(service.inspect()).resolves.toMatchObject({
+      status: 'INCOMPLETE',
+      problems: ['CHANGE_ANNOUNCEMENTS_MISSING'],
+      changeAnnouncements: {
+        complete: false,
+        missing: { PLACEMENT_START: 2, HEAD_PERIOD_START: 0, HEAD_PERIOD_END: 1 },
+      },
+    });
+    expect(organization.countUnmarkedChangesAsOf).toHaveBeenCalledWith(TX, new Date('2026-10-24T15:00:00Z'));
   });
 });

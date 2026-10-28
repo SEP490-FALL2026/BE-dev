@@ -62,8 +62,13 @@ export class LicenseKeysController {
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
-      description: 'The request is invalid (VALIDATION_ERROR) or the plan is not K4 (LICENSE_KEY.PLAN_NOT_K4).',
-      examples: [VALIDATION_EXAMPLE, LICENSE_KEY_ERROR_EXAMPLES.PLAN_NOT_K4],
+      description:
+        'The request is invalid (VALIDATION_ERROR), the plan is not K4 (LICENSE_KEY.PLAN_NOT_K4) or its application is retired (LICENSE_KEY.APPLICATION_RETIRED).',
+      examples: [
+        VALIDATION_EXAMPLE,
+        LICENSE_KEY_ERROR_EXAMPLES.PLAN_NOT_K4,
+        LICENSE_KEY_ERROR_EXAMPLES.APPLICATION_RETIRED,
+      ],
     },
   )
   async import(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: ImportBodyDto) {

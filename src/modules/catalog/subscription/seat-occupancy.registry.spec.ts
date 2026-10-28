@@ -5,6 +5,7 @@ const reader = (label: string): SeatOccupancyReader => ({
   occupiedBySubscription: () => Promise.resolve(label.length),
   openHolderCount: () => Promise.resolve(0),
   openAssignmentsOfPlans: () => Promise.resolve({ items: [], total: 0, byPlan: [] }),
+  subscriptionsWithOpenSeats: () => Promise.resolve(new Set<string>()),
 });
 
 describe('where licensing hands the catalog its reader of occupied seats (ADR-0013 item 4)', () => {

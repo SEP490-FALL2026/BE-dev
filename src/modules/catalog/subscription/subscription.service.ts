@@ -9,6 +9,7 @@ import type { EmptyState } from '../catalog.types';
 import { catalogAuditEvent } from '../mappers/catalog-audit-event';
 import { PlanLookupService, type LockedPlan } from '../plan/plan-lookup.service';
 import {
+  SubscriptionApplicationRetiredError,
   SubscriptionNotFoundError,
   SubscriptionOwnerDepartmentInactiveError,
   SubscriptionPlanNotFoundError,
@@ -20,6 +21,7 @@ import { SeatOccupancyRegistry } from './seat-occupancy.registry';
 import { assertSubscriptionShape, deriveNotice, missingData, noticeInputOf } from './subscription.policy';
 import { SubscriptionRepo } from './subscription.repo';
 import { sameState, snapshotOf, stateOf } from './subscription.state';
+import { SubscriptionObligationService } from './subscription-obligation.service';
 import { SubscriptionPricingService } from './subscription-pricing.service';
 import { SubscriptionViewService } from './subscription-view.service';
 import type {
@@ -74,6 +76,7 @@ export class SubscriptionService {
     private readonly subscriptions: SubscriptionRepo,
     private readonly plans: PlanLookupService,
     private readonly pricing: SubscriptionPricingService,
+    private readonly obligation: SubscriptionObligationService,
     private readonly views: SubscriptionViewService,
     private readonly organization: OrganizationService,
     private readonly occupancy: SeatOccupancyRegistry,
@@ -130,6 +133,7 @@ export class SubscriptionService {
     const record = await this.runner.run(async (tx) => {
       const plan = await this.plans.lockShared(tx, input.planId);
       if (!plan) throw new SubscriptionPlanNotFoundError();
+      if (plan.applicationStatus === 'RETIRED') throw new SubscriptionApplicationRetiredError();
       // Held FOR SHARE until commit, so the department cannot be stopped between this check and the row (QĐ-89a).
       const owner = await this.organization.lockDepartmentShared(tx, input.ownerDepartmentId);
       if (!owner?.active) throw new SubscriptionOwnerDepartmentInactiveError();
@@ -178,8 +182,9 @@ export class SubscriptionService {
 
   /**
    * Changes a subscription: a new unit price is converted again at the rate of today and recorded with today as its day;
-   * the other fields are stored as they are. Throws SubscriptionNotFoundError, SubscriptionUpdateEmptyError, the shape
-   * errors, and the money errors. A price edit that would leave an active subscription with no rate for its day is refused
+   * the other fields are stored as they are; the owner department is not a field of a change. Throws SubscriptionNotFoundError,
+   * SubscriptionUpdateEmptyError, the shape errors, the money errors and FinanceSetupIncompleteError (a change that creates, raises
+   * or extends what is owed while the owner department has no Cost Center in use). A price edit that would leave an active subscription with no rate for its day is refused
    * by the finance facade's missing rate, never silently turned back into a draft.
    */
   async update(actor: AuthenticatedPrincipal, id: string, input: UpdateSubscriptionInput): Promise<SubscriptionView> {
@@ -224,6 +229,8 @@ export class SubscriptionService {
         status: this.statusOf(plan, current.kind, { ...next, ...priced }),
       };
       if (sameState(state, stateOf(current))) return current;
+      // What is owed cannot be created, raised or extended for a department with no Cost Center in use (F26, spec L.7).
+      await this.obligation.assertChargeable(tx, current.ownerDepartmentId, stateOf(current), state);
 
       const updated = await this.subscriptions.update(tx, id, state);
       await this.audit.record(

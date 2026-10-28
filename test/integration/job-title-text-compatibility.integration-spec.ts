@@ -116,7 +116,8 @@ describe('free-text job title, compatibility migration (integration, PostgreSQL)
     await placement(olds.twoFuture, world.departments.eng, titles.designer, '2999-06-01');
     await placement(olds.twoFuture, world.departments.ops, titles.engineer, '2999-02-01', '2999-06-01');
     await placement(olds.single, world.departments.eng, titles.engineer, '2020-01-01');
-    const deploy = await deployMigrations(database);
+    // Through the compatibility migration: the migrations of the final release drop the catalogue and the four columns this suite reads.
+    const deploy = await deployMigrations(database, { through: TEXT });
     if (deploy.code !== 0) throw new Error(`Deploying the title migration failed: ${deploy.stdout}\n${deploy.stderr}`);
   }, DEPLOY_TIMEOUT_MS * 2);
 

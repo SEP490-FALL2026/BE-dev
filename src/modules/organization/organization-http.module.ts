@@ -2,10 +2,14 @@ import { Module } from '@nestjs/common';
 import { DatabaseModule } from '../../infrastructure/database/database.module';
 import { AuditModule } from '../audit/audit.module';
 import { IdentityAccessFacadeModule } from '../identity-access/identity-access-facade.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { OrganizationChangeSweeper } from './change-announcement/organization-change.sweeper';
 import { CostCenterService } from './cost-center/cost-center.service';
 import { CostCentersController } from './cost-center/cost-centers.controller';
 import { DepartmentHeadService } from './department/department-head.service';
+import { DepartmentHeadsController } from './department/department-heads.controller';
+import { DepartmentTechnicalMembersRepo } from './department/department-technical-members.repo';
+import { HeldNoticeHandoverListener } from './department/held-notice-handover.listener';
 import { DepartmentQueryService } from './department/department-query.service';
 import { DepartmentService } from './department/department.service';
 import { DepartmentsController } from './department/departments.controller';
@@ -24,12 +28,13 @@ import { ProjectsController } from './project/projects.controller';
  * facade and must not carry controllers with them.
  */
 @Module({
-  imports: [DatabaseModule, AuditModule, OrganizationModule, IdentityAccessFacadeModule],
+  imports: [DatabaseModule, AuditModule, OrganizationModule, IdentityAccessFacadeModule, NotificationsModule],
   controllers: [
     EmployeesController,
     EmployeeMaintenanceController,
     CostCentersController,
     DepartmentsController,
+    DepartmentHeadsController,
     ProjectsController,
   ],
   providers: [
@@ -39,6 +44,9 @@ import { ProjectsController } from './project/projects.controller';
     DepartmentQueryService,
     DepartmentService,
     DepartmentHeadService,
+    // Hands the notices kept for a department with no head to the head whose period starts (T-11), registered on the change registry.
+    HeldNoticeHandoverListener,
+    DepartmentTechnicalMembersRepo,
     ProjectService,
     ProjectRepo,
     // The hourly telling of the changes dated for a day that has come: in the API graph only, where every listener is registered.

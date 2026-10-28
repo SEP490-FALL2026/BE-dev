@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { OrganizationService } from '../../organization/organization.service';
 import type { OrganizationChange, OrganizationChangeListener } from '../../organization/organization.types';
+import { RequestDraftDepartureService } from '../access-request/request-draft-departure.service';
 import type { ReassignmentTrigger } from './reassignment.policy';
 import { StepReassignmentRepo } from './step-reassignment.repo';
 import { StepReassignmentService } from './step-reassignment.service';
@@ -19,9 +20,12 @@ export class RequestsOrganizationChangeListener implements OrganizationChangeLis
     private readonly repo: StepReassignmentRepo,
     private readonly reassignment: StepReassignmentService,
     private readonly organization: OrganizationService,
+    private readonly drafts: RequestDraftDepartureService,
   ) {}
 
   async onChange(tx: DbTx, change: OrganizationChange): Promise<void> {
+    // The drafts of a person who left are theirs alone and go with them, whoever else the change moves a step of (spec L.1).
+    if (change.kind === 'EMPLOYEE_LEFT') await this.drafts.deleteOf(tx, change.employeeId, change.id);
     const concerned = await this.concernedBy(tx, change);
     if (concerned === null) return;
 
@@ -57,8 +61,9 @@ export class RequestsOrganizationChangeListener implements OrganizationChangeLis
 
         return {
           requestIds: [
+            // The internal requests of the people who sit in the department now, and everything sent for the department (F28).
             ...(await this.repo.needRequestIdsOfRequesters(members, tx)),
-            ...(await this.repo.serviceAccountNeedRequestIdsOf(change.departmentId, tx)),
+            ...(await this.repo.needRequestIdsOfDepartment(change.departmentId, tx)),
           ],
           trigger: { kind: 'HEAD_CHANGED', employeeId: null },
         };

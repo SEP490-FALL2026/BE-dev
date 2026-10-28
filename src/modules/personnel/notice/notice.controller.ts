@@ -11,6 +11,8 @@ import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-
 import { RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
 import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
+import { PERSONNEL_ACCESS_ERROR_EXAMPLES } from '../mappers/personnel-access.http-errors';
+import { userActor } from '../personnel.types';
 import {
   LinkNoticeBodyDto,
   ListNoticesQueryDto,
@@ -32,11 +34,11 @@ const NOT_FOUND = {
   description: 'The notice does not exist, or is one that another head sent (PERSONNEL_NOTICE.NOT_FOUND).',
   examples: [EXAMPLES.NOT_FOUND],
 } as const;
-const IT_ADMIN_ONLY = {
+const SUPER_ADMIN_ONLY = {
   status: HttpStatus.FORBIDDEN,
   description:
-    'Only an IT Admin handles a notice: a department head, Finance, an approver and the Super Admin are refused.',
-  examples: [FORBIDDEN_EXAMPLE],
+    'Only the Super Admin handles a notice (AUTHORIZATION.FORBIDDEN): a department head, Finance, an approver and the IT Admin are refused. The Super Admin does not handle a notice about themselves in the application (PERSONNEL.SELF_CHANGE_FORBIDDEN): the controlled procedure records its event.',
+  examples: [FORBIDDEN_EXAMPLE, PERSONNEL_ACCESS_ERROR_EXAMPLES.SELF_CHANGE_FORBIDDEN],
 } as const;
 const NOT_PENDING = {
   status: HttpStatus.CONFLICT,
@@ -48,9 +50,11 @@ const GROUNDS_REFUSALS =
   'the basis of the event is empty or lacks a part (PERSONNEL_NOTICE.GROUNDS_REQUIRED, GROUNDS_INCOMPLETE) or is only the code of a notice (GROUNDS_IS_NOTICE)';
 
 /**
- * The notices of the heads of department about a change coming for one of their people, and what the IT Admin does with them. A
- * notice is information: it changes nothing of the person. The IT Admin rejects it with a reason, or checks it against an authoritative
- * basis outside the notice and records the official event through the rules of that event, or ties it to an event that exists.
+ * The notices of the heads of department about a change coming for one of their people, and what the Super Admin does with them. A
+ * notice is information: it changes nothing of the person. The Super Admin rejects it with a reason, or checks it against an
+ * authoritative basis outside the notice and records the official event through the rules of that event, or ties it to an event that
+ * exists. The IT Admin reads the minimal projection of the notices of the departments in their charge. The role is judged again by
+ * the service, so these guards are only the outer layer.
  */
 @ApiTags('personnel-notices')
 @Controller({ path: 'personnel-notices', version: '1' })
@@ -68,7 +72,7 @@ export class NoticesController {
     status: HttpStatus.CREATED,
     message: 'PERSONNEL_NOTICE.SENT',
     description:
-      'A notice with a code of the form BM09-year-number waits for the IT Admin in charge of the department, who has the working days of the operating parameter to handle it. The notice has no effect: the person, their place, their requests and their sign-in are not changed. A notice of a sudden departure is also told to the IT Admin and the Super Admin as a priority, and changes nothing either.',
+      'A notice with a code of the form BM09-year-number waits for the Super Admin, who is told in the inbox and has the working days of the operating parameter to handle it. The notice has no effect: the person, their place, their requests and their sign-in are not changed. A notice of a sudden departure is also marked as a priority, and changes nothing either.',
   })
   @ApiErrorResponses(
     ...COMMON,
@@ -110,18 +114,18 @@ export class NoticesController {
   }
 
   @Get()
-  @RequireRoles('IT_ADMIN', 'MANAGER')
+  @RequireRoles('SUPER_ADMIN', 'IT_ADMIN', 'MANAGER')
   @ApiOperation({ operationId: 'personnelNoticeList', summary: 'List notices of changes coming for people' })
   @ApiSuccessResponse(NoticePageResponseDto, {
     message: 'PERSONNEL_NOTICE.LISTED',
     description:
-      'A page of notices, the earliest day to handle first. An IT Admin reads the queue of every notice, optionally of one state, kind or person, those past their day, or those about a sudden departure. A department head reads only the notices they sent. Each row says whether the notice is late.',
+      'A page of notices, the earliest day to handle first. The Super Admin reads the queue of every notice, optionally of one state, kind or person, those past their day, or those about a sudden departure. An IT Admin reads only the notices about people of the departments they are in charge of, and a department head only the notices they sent. Each row says whether the notice is late.',
   })
   @ApiErrorResponses(
     ...COMMON,
     {
       status: HttpStatus.FORBIDDEN,
-      description: 'The caller is neither an IT Admin nor the head of a department.',
+      description: 'The caller is neither the Super Admin, an IT Admin nor the head of a department.',
       examples: [FORBIDDEN_EXAMPLE],
     },
     {
@@ -139,18 +143,18 @@ export class NoticesController {
   }
 
   @Get(':id')
-  @RequireRoles('IT_ADMIN', 'MANAGER')
+  @RequireRoles('SUPER_ADMIN', 'IT_ADMIN', 'MANAGER')
   @ApiOperation({ operationId: 'personnelNoticeGet', summary: 'Read a notice in full' })
   @ApiSuccessResponse(NoticeDetailResponseDto, {
     message: 'PERSONNEL_NOTICE.RETRIEVED',
     description:
-      'The notice with its note, the department it names, how it ended (the reason of a rejection, or the event it led to) and, for an IT Admin only, how it was verified.',
+      'The notice with its note, the department it names, how it ended (the reason of a rejection, or the event it led to) and, for the Super Admin only, how it was verified.',
   })
   @ApiErrorResponses(
     ...COMMON,
     {
       status: HttpStatus.FORBIDDEN,
-      description: 'The caller is neither an IT Admin nor the head of a department.',
+      description: 'The caller is neither the Super Admin, an IT Admin nor the head of a department.',
       examples: [FORBIDDEN_EXAMPLE],
     },
     NOT_FOUND,
@@ -173,7 +177,8 @@ export class NoticesController {
   @ApiOperation({ operationId: 'personnelNoticeWithdraw', summary: 'Withdraw a notice that waits' })
   @ApiSuccessResponse(NoticeDetailResponseDto, {
     message: 'PERSONNEL_NOTICE.WITHDRAWN',
-    description: 'The notice is withdrawn and leaves the queue of the IT Admin. Only the head who sent it can do this.',
+    description:
+      'The notice is withdrawn and leaves the queue of the Super Admin. Only the head who sent it can do this.',
   })
   @ApiErrorResponses(
     ...COMMON,
@@ -199,14 +204,14 @@ export class NoticesController {
   }
 
   @Post(':id/rejection')
-  @RequireRoles('IT_ADMIN')
+  @RequireRoles('SUPER_ADMIN')
   @ApiOperation({ operationId: 'personnelNoticeReject', summary: 'Reject a notice with a reason' })
   @ApiSuccessResponse(NoticeDetailResponseDto, {
     message: 'PERSONNEL_NOTICE.REJECTED',
     description:
       'The notice is rejected and no event is made. The head who sent it is told the reason. A notice the head withdrew cannot be rejected.',
   })
-  @ApiErrorResponses(...COMMON, IT_ADMIN_ONLY, NOT_FOUND, NOT_PENDING, {
+  @ApiErrorResponses(...COMMON, SUPER_ADMIN_ONLY, NOT_FOUND, NOT_PENDING, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description:
       'The reason is missing or empty, or the body is invalid (VALIDATION_ERROR, PERSONNEL_NOTICE.REASON_REQUIRED): nothing is saved.',
@@ -218,29 +223,29 @@ export class NoticesController {
     @Body() body: RejectNoticeBodyDto,
   ) {
     try {
-      return await this.query.detailOf(actor, await this.handling.reject(actor, params.id, body.reason));
+      return await this.query.detailOf(actor, await this.handling.reject(userActor(actor), params.id, body.reason));
     } catch (error) {
       throw toNoticeApiException(error);
     }
   }
 
   @Post(':id/recording')
-  @RequireRoles('IT_ADMIN')
+  @RequireRoles('SUPER_ADMIN')
   @ApiOperation({ operationId: 'personnelNoticeRecord', summary: 'Verify a notice and record the event it announces' })
   @ApiSuccessResponse(NoticeDetailResponseDto, {
     status: HttpStatus.CREATED,
     message: 'PERSONNEL_NOTICE.RECORDED',
     description:
-      'The IT Admin states how the notice was checked and gives the authoritative basis outside the notice; the transfer, the long leave or the departure it announces is recorded by its own rules in the same transaction, tied to the notice, and the person is told. The day of the event follows the basis and need not be the day the notice proposed.',
+      'The Super Admin states how the notice was checked and gives the authoritative basis outside the notice; the transfer, the long leave or the departure it announces is recorded by its own rules in the same transaction, tied to the notice, and the person is told. The day of the event follows the basis and need not be the day the notice proposed.',
   })
   @ApiErrorResponses(
     ...COMMON,
-    IT_ADMIN_ONLY,
+    SUPER_ADMIN_ONLY,
     NOT_FOUND,
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The notice is not waiting (PERSONNEL_NOTICE.NOT_PENDING), the person already has such an event: reject the notice or link it to that event (DUPLICATE_EVENT), or the event refuses with its own code, such as a person who has left or an IT Admin who records an event about themselves while another can. Nothing is saved and the notice keeps waiting.',
+        'The notice is not waiting (PERSONNEL_NOTICE.NOT_PENDING), the person already has such an event: reject the notice or link it to that event (DUPLICATE_EVENT), or the event refuses with its own code, such as a person who has left, or a race on the person (CONCURRENT_CHANGE). Nothing is saved and the notice keeps waiting.',
       examples: [EXAMPLES.NOT_PENDING, EXAMPLES.DUPLICATE_EVENT],
     },
     {
@@ -262,14 +267,14 @@ export class NoticesController {
     @Body() body: RecordNoticeBodyDto,
   ) {
     try {
-      return await this.query.detailOf(actor, await this.handling.record(actor, params.id, body));
+      return await this.query.detailOf(actor, await this.handling.record(userActor(actor), params.id, body));
     } catch (error) {
       throw toNoticeApiException(error);
     }
   }
 
   @Post(':id/linking')
-  @RequireRoles('IT_ADMIN')
+  @RequireRoles('SUPER_ADMIN')
   @ApiOperation({ operationId: 'personnelNoticeLinkEvent', summary: 'Tie a notice to an event that already exists' })
   @ApiSuccessResponse(NoticeDetailResponseDto, {
     message: 'PERSONNEL_NOTICE.LINKED',
@@ -278,7 +283,7 @@ export class NoticesController {
   })
   @ApiErrorResponses(
     ...COMMON,
-    IT_ADMIN_ONLY,
+    SUPER_ADMIN_ONLY,
     NOT_FOUND,
     {
       status: HttpStatus.CONFLICT,
@@ -299,7 +304,7 @@ export class NoticesController {
     @Body() body: LinkNoticeBodyDto,
   ) {
     try {
-      return await this.query.detailOf(actor, await this.handling.link(actor, params.id, body));
+      return await this.query.detailOf(actor, await this.handling.link(userActor(actor), params.id, body));
     } catch (error) {
       throw toNoticeApiException(error);
     }

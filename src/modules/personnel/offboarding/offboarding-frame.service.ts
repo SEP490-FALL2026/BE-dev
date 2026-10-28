@@ -6,7 +6,9 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { OrganizationHistoryService } from '../../organization/organization-history.service';
 import { EmployeeNotFoundError } from '../../organization/organization.errors';
 import { OrganizationService } from '../../organization/organization.service';
-import type { SelfActionMode } from '../personnel-self-action.policy';
+import { PersonnelAccessRefusedError } from '../personnel.errors';
+import { technicalStepRefusal } from '../personnel-self-action.policy';
+import type { PersonnelActor } from '../personnel.types';
 import { TransferGuardService } from '../transfer/transfer-guard.service';
 import { OffboardingRefusedError } from './offboarding.errors';
 import { OffboardingRepo } from './offboarding.repo';
@@ -18,14 +20,20 @@ export interface OffboardingCommandContext {
   today: BusinessDate;
   /** The day the case was written, in the calendar of the organization. */
   recordedOn: BusinessDate;
-  selfMode: SelfActionMode;
+}
+
+interface FrameOptions {
+  lockDepartment?: boolean;
+  successorEmployeeId?: string | null;
 }
 
 /**
  * The frame the commands on a case share (the lock protocol): the case is read, the department (when the command moves its head)
  * and the employee are locked, a chosen successor is locked shared, and the case is read again under the locks; the command then
  * works in the one transaction. The database has the last word on the periods put back: a change someone made between the record and
- * now answers `CONCURRENT_CHANGE`, and nothing is saved.
+ * now answers `CONCURRENT_CHANGE`, and nothing is saved. Two kinds of command: an event of the person (moving the last day,
+ * cancelling, becoming `LEFT`), which only the Super Admin writes and never about themselves, and a technical step that follows it (the
+ * lock of the account, the revocations, the closing), which is the IT Admin's (F13, F40).
  */
 @Injectable()
 export class OffboardingFrame {
@@ -37,34 +45,76 @@ export class OffboardingFrame {
     private readonly repo: OffboardingRepo,
   ) {}
 
-  async run<T>(
-    actor: AuthenticatedPrincipal,
+  /** An event of the person on a case. With `outer` it runs in the transaction of the caller (the controlled procedure). */
+  runEvent<T>(
+    actor: PersonnelActor,
     id: string,
-    options: { lockDepartment?: boolean; successorEmployeeId?: string | null },
+    options: FrameOptions & { outer?: DbTx | undefined },
     apply: (tx: DbTx, context: OffboardingCommandContext) => Promise<T>,
   ): Promise<T> {
-    const seen = await this.repo.find(id);
-    if (!seen) throw new OffboardingRefusedError('NOT_FOUND');
-    const selfMode = await this.guard.selfMode(actor, seen.employeeId);
-
-    return this.guarded(() =>
-      this.runner.run(async (tx) => {
-        const today = await this.organization.businessToday(new Date(), tx);
-        if (options.lockDepartment) {
-          await this.history.lockDepartments(tx, { updateIds: [seen.departmentId], shareIds: [] });
-        }
-        await this.organization.lockEmployeeForUpdate(tx, seen.employeeId);
-        const chosen = options.successorEmployeeId ?? null;
-        if (chosen) await this.lockShared(tx, chosen);
-        const held = await this.repo.lock(tx, id);
-        if (!held) throw new OffboardingRefusedError('NOT_FOUND');
-        const earlier = held.headHandover?.successorEmployeeId ?? null;
-        if (options.lockDepartment && earlier && earlier !== chosen) await this.lockShared(tx, earlier);
-        const zone = (await this.organization.getOrganization(tx))?.timeZone ?? 'UTC';
-
-        return apply(tx, { held, today, recordedOn: businessDateAt(held.recordedAt, zone), selfMode });
-      }),
+    return this.run(
+      id,
+      options,
+      {
+        beforeLocks: (seen) => this.guard.requireWriter(actor, seen.employeeId),
+        afterLocks: (tx, seen) => this.guard.requireOperatorSubject(tx, actor, seen.employeeId),
+      },
+      apply,
     );
+  }
+
+  /** A technical step that follows the event: the IT Admin's, judged here and not only by the guard of the route. */
+  runTechnical<T>(
+    actor: AuthenticatedPrincipal,
+    id: string,
+    options: FrameOptions,
+    apply: (tx: DbTx, context: OffboardingCommandContext) => Promise<T>,
+  ): Promise<T> {
+    return this.run(
+      id,
+      options,
+      {
+        beforeLocks: () => {
+          const refused = technicalStepRefusal(actor);
+          if (refused) throw new PersonnelAccessRefusedError(refused);
+        },
+      },
+      apply,
+    );
+  }
+
+  private async run<T>(
+    id: string,
+    options: FrameOptions & { outer?: DbTx | undefined },
+    rules: {
+      beforeLocks: (seen: OffboardingRecord) => void;
+      afterLocks?: (tx: DbTx, seen: OffboardingRecord) => Promise<void>;
+    },
+    apply: (tx: DbTx, context: OffboardingCommandContext) => Promise<T>,
+  ): Promise<T> {
+    const seen = await this.repo.find(id, options.outer);
+    if (!seen) throw new OffboardingRefusedError('NOT_FOUND');
+    rules.beforeLocks(seen);
+
+    const work = async (tx: DbTx): Promise<T> => {
+      const today = await this.organization.businessToday(new Date(), tx);
+      if (options.lockDepartment) {
+        await this.history.lockDepartments(tx, { updateIds: [seen.departmentId], shareIds: [] });
+      }
+      await this.organization.lockEmployeeForUpdate(tx, seen.employeeId);
+      const chosen = options.successorEmployeeId ?? null;
+      if (chosen) await this.lockShared(tx, chosen);
+      const held = await this.repo.lock(tx, id);
+      if (!held) throw new OffboardingRefusedError('NOT_FOUND');
+      const earlier = held.headHandover?.successorEmployeeId ?? null;
+      if (options.lockDepartment && earlier && earlier !== chosen) await this.lockShared(tx, earlier);
+      await rules.afterLocks?.(tx, seen);
+      const zone = (await this.organization.getOrganization(tx))?.timeZone ?? 'UTC';
+
+      return apply(tx, { held, today, recordedOn: businessDateAt(held.recordedAt, zone) });
+    };
+
+    return options.outer ? work(options.outer) : this.guarded(() => this.runner.run(work));
   }
 
   private async lockShared(tx: DbTx, employeeId: string): Promise<void> {

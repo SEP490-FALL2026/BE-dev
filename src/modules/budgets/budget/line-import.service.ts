@@ -1,20 +1,17 @@
 import { Injectable } from '@nestjs/common';
 import { CsvError, parseCsv } from '../../../core/csv';
 import { isBusinessDate } from '../../../core/business-date';
-import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
+import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditService } from '../../audit/audit.service';
 import { FinanceService } from '../../finance/finance.service';
 import { OrganizationService } from '../../organization/organization.service';
-import {
-  BudgetImportFileInvalidError,
-  BudgetVersionNotEditableError,
-  BudgetVersionNotFoundError,
-} from './budget.errors';
-import { isEditable, type RepeatCycle } from './budget.policy';
+import { BudgetImportFileInvalidError } from './budget.errors';
+import { LINE_DESCRIPTION_MAX, REASON_MAX, type RepeatCycle } from './budget.policy';
 import { budgetAuditEvent, BudgetSupportService } from './budget-support.service';
+import { VersionAccessService } from './version-access.service';
+import { VersionHistoryService } from './version-history.service';
 import { VersionLineRepo, type VersionLineRecord } from './version-line.repo';
-import { VersionRepo } from './version.repo';
 import type { ImportWire } from './budget.dto';
 
 const REQUIRED = [
@@ -35,13 +32,15 @@ const REPORTED_ERRORS = 50;
 /**
  * The lines of a version loaded from a file (`US-06-09` AC-3). Each row is judged on its own: the rows that are right are
  * added to the version, which is a draft and so is not the budget of anything until it is approved, and the others are
- * reported with the row and the reason. A file that cannot be read as a table refuses the whole of it.
+ * reported with the row and the reason. A file that cannot be read as a table refuses the whole of it. The lines added are kept
+ * in the history of the version, two hundred at a time at most (F66); a version of a year that has ended takes none (F62).
  */
 @Injectable()
 export class LineImportService {
   constructor(
     private readonly runner: TransactionRunner,
-    private readonly versions: VersionRepo,
+    private readonly access: VersionAccessService,
+    private readonly history: VersionHistoryService,
     private readonly lineRepo: VersionLineRepo,
     private readonly support: BudgetSupportService,
     private readonly organization: OrganizationService,
@@ -49,14 +48,17 @@ export class LineImportService {
     private readonly audit: AuditService,
   ) {}
 
-  /** Throws BudgetVersionNotFoundError, BudgetVersionNotEditableError and BudgetImportFileInvalidError. */
+  /**
+   * Throws BudgetNotFinanceError, BudgetImportFileInvalidError, BudgetVersionNotFoundError, BudgetYearEndedError and
+   * BudgetVersionNotEditableError.
+   */
   async load(actor: AuthenticatedPrincipal, id: string, text: string): Promise<ImportWire> {
+    this.support.requireFinance(actor);
     const table = this.read(text);
+    const fiscalStart = await this.support.fiscalYearStartMonth();
 
     return this.runner.run(async (tx) => {
-      const version = await this.versions.lockById(tx, id);
-      if (!version) throw new BudgetVersionNotFoundError();
-      if (!isEditable(version.state)) throw new BudgetVersionNotEditableError(version.state);
+      const version = await this.access.lockEditable(tx, id, fiscalStart);
 
       const own = await this.support.costCenter(version.costCenterId, tx);
       const codes = [...new Set(table.rows.map((row) => row.cost_center_code).filter((code) => code !== ''))];
@@ -70,13 +72,17 @@ export class LineImportService {
         if (typeof problem === 'string') errors.push({ row: fileRow, code: problem });
         else lines.push(problem);
       }
-      if (lines.length > 0) await this.lineRepo.addLines(tx, id, lines);
+      const first = lines.length > 0 ? await this.lineRepo.addLines(tx, id, lines) : null;
+      if (first !== null) {
+        await this.history.linesAdded(tx, actor, version, { kind: 'LINES_IMPORTED', firstPosition: first, lines });
+      }
 
       await this.audit.record(
         tx,
         budgetAuditEvent(actor, version.organizationId, 'BUDGET_VERSION.LINES_IMPORTED', 'BUDGET_VERSION', id, {
           added: lines.length,
           rejected: errors.length,
+          ...(first === null ? {} : { fromPosition: first, toPosition: first + lines.length - 1 }),
         }),
       );
 
@@ -115,11 +121,14 @@ export class LineImportService {
     ownCode: string,
     known: ReadonlySet<string>,
     currency: string,
-    tx: Parameters<VersionRepo['lockById']>[0],
+    tx: DbTx,
   ): Promise<Omit<VersionLineRecord, 'position'> | string> {
     if (row.cost_center_code === '' || !known.has(row.cost_center_code)) return 'COST_CENTER_NOT_FOUND';
     if (row.cost_center_code !== ownCode) return 'COST_CENTER_MISMATCH';
     if (row.description === '') return 'DESCRIPTION_REQUIRED';
+    // The texts are as long as the form takes and no longer, so that any line that is added can be kept in the history (F66).
+    if (row.description.length > LINE_DESCRIPTION_MAX) return 'DESCRIPTION_TOO_LONG';
+    if ((row.note ?? '').length > REASON_MAX) return 'NOTE_TOO_LONG';
     let amountMinor: bigint;
     try {
       amountMinor = (await this.finance.parseMoney({ amount: row.amount ?? '', currency }, tx)).amountMinor;

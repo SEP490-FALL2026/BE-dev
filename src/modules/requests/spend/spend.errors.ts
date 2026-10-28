@@ -78,7 +78,9 @@ export class SpendDecisionRefusedError extends Error {
       | 'OVERRIDE_MISMATCH'
       | 'OVERRIDE_NOT_NEEDED'
       /** The request cannot be checked now (no price, no rate), so it has no snapshot to be decided on. */
-      | 'NOT_CHECKABLE',
+      | 'NOT_CHECKABLE'
+      /** The approver is the person who completed the review of Finance of this request: the two are two people (`SoD-8`, F32). */
+      | 'REVIEWER_IS_APPROVER',
     readonly years: readonly number[] = [],
   ) {
     super(`The spend step cannot be decided: ${reason}.`);

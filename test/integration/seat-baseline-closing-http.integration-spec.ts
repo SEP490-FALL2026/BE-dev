@@ -1,10 +1,11 @@
 import { randomUUID } from 'node:crypto';
+import { Client } from 'pg';
 import request from 'supertest';
 import { OrganizationService } from '../../src/modules/organization/organization.service';
+import { waitForLockWaiters } from '../support/lock-wait';
 import { AssignmentWire, SeatHarness } from '../support/seat-baseline-harness';
 
 const h = new SeatHarness();
-const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 describe('a closed seat baseline over HTTP (integration, real PostgreSQL)', () => {
   let organization: OrganizationService;
@@ -54,9 +55,11 @@ describe('a closed seat baseline over HTTP (integration, real PostgreSQL)', () =
     const preview = await h.preview({ subscriptionId: targetId }, [row('RACE1')]);
     const before = await h.count('license_assignments');
 
-    await h.ctx.sql.query('BEGIN');
-    let pending!: Promise<request.Response>;
+    const observer = new Client({ connectionString: h.ctx.database.url });
+    await observer.connect();
+    let pending: Promise<request.Response> | undefined;
     try {
+      await h.ctx.sql.query('BEGIN');
       await h.ctx.sql.query(`INSERT INTO seat_baseline_states (organization_id) VALUES ($1) ON CONFLICT DO NOTHING`, [
         h.seed.organizationId,
       ]);
@@ -64,15 +67,20 @@ describe('a closed seat baseline over HTTP (integration, real PostgreSQL)', () =
         `UPDATE seat_baseline_states SET closed_at = now(), closed_by_app_user_id = $2 WHERE organization_id = $1`,
         [h.seed.organizationId, randomUUID()],
       );
-      pending = h.confirm(preview.id, 1).then((response) => response);
       let settled = false;
-      void pending.then(() => {
+      pending = h.confirm(preview.id, 1).then((response) => {
         settled = true;
+
+        return response;
       });
-      await wait(500);
+      // The confirmation holds the state FOR SHARE first (`SeatBaselineService.lockOpen`): it is waiting for the closing, not answered yet.
+      await waitForLockWaiters(observer, 1);
       expect(settled).toBe(false);
-    } finally {
       await h.ctx.sql.query('COMMIT');
+    } finally {
+      await h.ctx.sql.query('ROLLBACK').catch(() => undefined);
+      await pending?.catch(() => undefined);
+      await observer.end();
     }
 
     const response = await pending;

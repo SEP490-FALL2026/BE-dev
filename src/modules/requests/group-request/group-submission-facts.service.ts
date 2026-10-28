@@ -121,6 +121,7 @@ export class GroupSubmissionFactsService {
       planRefusal === null
         ? await this.assessment.priceFor(tx, {
             planId: input.planId,
+            departmentId: unit.departmentId,
             free: false,
             termMonths: input.termMonths,
             beneficiaries: lines.length,

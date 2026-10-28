@@ -32,8 +32,8 @@ export interface SubscriptionRecord {
   planId: string;
   planName: string;
   planPricingModel: PlanPricingModel | null;
-  /** Null only on a row made before the column existed or by the previous release (an operator assigns it). */
-  ownerDepartmentId: string | null;
+  /** The department that owns the purchase: always set, and never changed (`QĐ-89a`, F02). */
+  ownerDepartmentId: string;
   applicationId: string;
   applicationName: string;
   applicationKind: ApplicationKind;
@@ -104,7 +104,7 @@ export interface SubscriptionView {
   id: string;
   planId: string;
   planName: string;
-  ownerDepartmentId: string | null;
+  ownerDepartmentId: string;
   applicationId: string;
   applicationName: string;
   vendor: { id: string; name: string };

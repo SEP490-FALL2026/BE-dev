@@ -42,7 +42,7 @@ const HOLDING = (day: BusinessDate): Prisma.LicenseAssignmentWhereInput => ({
   OR: [{ validUntil: null }, { validUntil: { gt: toDateColumn(day) } }],
 });
 
-const toRecord = (row: Row): AssignmentRecord => ({
+export const toRecord = (row: Row): AssignmentRecord => ({
   id: row.id,
   source: row.source,
   kind: row.kind,
@@ -205,6 +205,18 @@ export class AssignmentRepo {
     return (tx ?? this.prisma).licenseAssignment.count({ where: { subscriptionId, ...HOLDING(day) } });
   }
 
+  /** Which of these subscriptions have an assignment that has not ended and has not failed as of `day`, in one statement. */
+  async subscriptionIdsHolding(ids: readonly string[], day: BusinessDate, tx?: DbTx): Promise<Set<string>> {
+    if (ids.length === 0) return new Set();
+    const rows = await (tx ?? this.prisma).licenseAssignment.findMany({
+      where: { subscriptionId: { in: [...ids] }, ...HOLDING(day) },
+      select: { subscriptionId: true },
+      distinct: ['subscriptionId'],
+    });
+
+    return new Set(rows.flatMap((row) => (row.subscriptionId === null ? [] : [row.subscriptionId])));
+  }
+
   /** The assignments of these plan ids that have not ended and have not failed as of `day`, by start then id. */
   async holdingOfPlans(
     planIds: readonly string[],
@@ -280,49 +292,6 @@ export class AssignmentRepo {
     });
 
     return groups.map((group) => ({ employeeId: group.employeeId, seats: group._count._all }));
-  }
-
-  /**
-   * One page of what a department uses on `day`, by start date then id, the total, and how many seats each plan holds, from
-   * one snapshot (`LD-09`): the personal seats its members hold and the service accounts it owns (`QĐ-86c`), whoever
-   * answers for them now. Only the page is read in full.
-   */
-  async toolsOfDepartment(
-    input: { memberIds: readonly string[]; departmentId: string },
-    day: BusinessDate,
-    skip: number,
-    take: number,
-  ): Promise<{ items: AssignmentRecord[]; total: number; byPlan: { planId: string; count: number }[] }> {
-    const date = toDateColumn(day);
-    const where: Prisma.LicenseAssignmentWhereInput = {
-      validFrom: { lte: date },
-      AND: [
-        { OR: [{ validUntil: null }, { validUntil: { gt: date } }] },
-        {
-          OR: [
-            { kind: 'PERSONAL', employeeId: { in: [...input.memberIds] } },
-            { kind: 'SERVICE', owningDepartmentId: input.departmentId },
-          ],
-        },
-      ],
-    };
-
-    return this.prisma.$transaction(
-      async (tx) => {
-        const [rows, total, groups] = await Promise.all([
-          tx.licenseAssignment.findMany({ where, orderBy: [{ validFrom: 'asc' }, { id: 'asc' }], skip, take }),
-          tx.licenseAssignment.count({ where }),
-          tx.licenseAssignment.groupBy({ by: ['planId'], where, _count: { _all: true }, orderBy: { planId: 'asc' } }),
-        ]);
-
-        return {
-          items: rows.map(toRecord),
-          total,
-          byPlan: groups.map((group) => ({ planId: group.planId, count: group._count._all })),
-        };
-      },
-      { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
-    );
   }
 
   /** The service accounts a department owns that are open on `day` or will be: the first `take` and how many in all. */

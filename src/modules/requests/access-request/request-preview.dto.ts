@@ -5,7 +5,7 @@ import { employeeRef, moneySchema, pricingSchema, submitBodySchema } from './acc
 
 /**
  * What is asked before a request is sent: the plan and the term, and the day the money is expected to go out when the
- * sender has one. The reason and the reason for a tool outside the standard toolset are for sending, not for looking.
+ * sender has one. The reason is for sending, not for looking.
  * There is no field for an amount, a price or a budget year: nobody gives the system a number (`US-05-01` AC-14).
  */
 export const previewBodySchema = submitBodySchema.pick({

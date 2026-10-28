@@ -473,9 +473,9 @@ const NESTED_ARRAYS: readonly NestedArrayEntry[] = [
     findings: [],
     owner: 'g2-department-profile',
     businessMaximum: {
-      maxItems: 2,
+      maxItems: 3,
       source:
-        'department-query.service.ts builds MISSING_HEAD and MISSING_IT_ADMIN, each at most once (DepartmentWarning)',
+        'department-query.service.ts builds MISSING_HEAD, MISSING_IT_ADMIN and MISSING_COST_CENTER, each at most once (DepartmentWarning)',
     },
     rationale: 'The warnings of one department.',
     removeWhen: 'Review when DepartmentWarning gains a kind or the warnings are built another way.',
@@ -486,9 +486,9 @@ const NESTED_ARRAYS: readonly NestedArrayEntry[] = [
     findings: [],
     owner: 'g2-department-profile',
     businessMaximum: {
-      maxItems: 2,
+      maxItems: 3,
       source:
-        'department-query.service.ts builds MISSING_HEAD and MISSING_IT_ADMIN, each at most once (DepartmentWarning)',
+        'department-query.service.ts builds MISSING_HEAD, MISSING_IT_ADMIN and MISSING_COST_CENTER, each at most once (DepartmentWarning)',
     },
     rationale: 'The warnings of the department.',
     removeWhen: 'Review when DepartmentWarning gains a kind or the warnings are built another way.',
@@ -1045,7 +1045,7 @@ const NESTED_ARRAYS: readonly NestedArrayEntry[] = [
     findings: ['LD-16'],
     owner: 'api-list-detail-contract-remediation',
     rationale:
-      'Step 1 lists MISSING_HEAD and MISSING_IT_ADMIN per active department, and the number of departments has no cap (the same bound as departmentWarningList, LD-15).',
+      'Step 1 lists MISSING_HEAD, MISSING_IT_ADMIN and MISSING_COST_CENTER per active department, and the number of departments has no cap (the same bound as departmentWarningList, LD-15).',
     removeWhen:
       'The warnings of the step get a proved maximum or a paginated form; the contract and the future package are not chosen here (LD-16).',
   },
@@ -1134,6 +1134,21 @@ const NESTED_ARRAYS: readonly NestedArrayEntry[] = [
     rationale:
       'One line per plan the department holds seats of, counted in SQL by one groupBy of the same snapshot as the page (LD-09 fixed the cost, not the number of plans).',
     removeWhen: 'The summary is capped with a total or paginated.',
+  },
+  {
+    key: 'budgetVersionHistoryList#changes',
+    classification: 'bounded',
+    findings: ['LD-14'],
+    owner: 'g0-g6-final-business-baseline-remediation',
+    businessMaximum: {
+      maxItems: 16,
+      source:
+        'HISTORY_CHANGES_MAX in version-history.policy.ts, the maxItems of the schema in budget-history.dto.ts: one entry of the history shows the fields one edit changed, and the widest edit is a line, which has eleven',
+    },
+    rationale:
+      'The fields one edit of a version changed, with their values before and after (F66, spec J.4); the history is paged.',
+    removeWhen:
+      'Review when a field is added to the figures or to a line of a version, or HISTORY_CHANGES_MAX changes.',
   },
 ];
 
@@ -1529,6 +1544,14 @@ const REGISTRY_EVENTS_SINCE_INITIAL: readonly RegistryEvent[] = [
     'LD-14',
     'organization-identity-read-contracts',
     'The account embeds the newest grants with roleHistoryHasMore.',
+  ),
+  boundedNested(
+    'budgetVersionHistoryList#changes',
+    'HISTORY_CHANGES_MAX',
+    'LD-14',
+    'g0-g6-final-business-baseline-remediation',
+    'The new history route of a version (F66, spec J.4): each entry shows the fields one edit changed, at most HISTORY_CHANGES_MAX.',
+    'added',
   ),
 ];
 

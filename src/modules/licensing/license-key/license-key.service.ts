@@ -15,6 +15,7 @@ import {
 } from '../licensing.errors';
 import { licensingAuditEvent } from '../mappers/licensing-audit-event';
 import { LicenseKeyCipher } from './license-key-cipher';
+import { LicenseKeyApplicationRetiredError } from './license-key.errors';
 import {
   capacityOf,
   judgeBatch,
@@ -61,7 +62,8 @@ export class LicenseKeyService {
 
   /**
    * Keeps every valid key of the batch and reports each line that was not kept; a wrong line never spoils the others.
-   * Throws SeatTargetNotFoundError (no such purchase) and LicenseKeyPlanNotK4Error; nothing is kept then.
+   * Throws SeatTargetNotFoundError (no such purchase), LicenseKeyPlanNotK4Error and LicenseKeyApplicationRetiredError; nothing
+   * is kept then.
    */
   async import(
     actor: AuthenticatedPrincipal,
@@ -90,6 +92,7 @@ export class LicenseKeyService {
       const held = await this.catalog.lockSeatTarget(tx, { subscriptionId: input.subscriptionId });
       if (!held) throw new SeatTargetNotFoundError('SUBSCRIPTION');
       if (held.provisioningType !== 'K4') throw new LicenseKeyPlanNotK4Error(held.provisioningType);
+      if (held.applicationStatus === 'RETIRED') throw new LicenseKeyApplicationRetiredError();
 
       // One statement for the whole batch (P28-13: a thousand round trips outlasted the transaction on a busy server).
       const keptIds = await this.repo.insertManyIfNew(
@@ -227,6 +230,7 @@ export class LicenseKeyService {
   private async requireK4Purchase(subscriptionId: string) {
     const target = await this.requireSubscription(subscriptionId);
     if (target.provisioningType !== 'K4') throw new LicenseKeyPlanNotK4Error(target.provisioningType);
+    if (target.applicationStatus === 'RETIRED') throw new LicenseKeyApplicationRetiredError();
 
     return target;
   }

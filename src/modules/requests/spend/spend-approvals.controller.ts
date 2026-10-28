@@ -106,9 +106,10 @@ export class SpendApprovalsController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The request has no spend step open (SPEND.NO_SPEND_STEP), the step is decided (SPEND.STEP_NOT_PENDING), the request cannot be checked now (SPEND.NOT_CHECKABLE), or it was checked again and went back to Finance (SPEND.RECHECKED_NEEDS_FINANCE_REVIEW) or to its head (SPEND.RECHECKED_RETURNED_TO_HEAD).',
+        'The request has no spend step open (SPEND.NO_SPEND_STEP), the step is decided (SPEND.STEP_NOT_PENDING), the request cannot be checked now (SPEND.NOT_CHECKABLE), the caller completed the review of Finance of this request, and the two are two people (SPEND.REVIEWER_IS_APPROVER), or it was checked again and went back to Finance (SPEND.RECHECKED_NEEDS_FINANCE_REVIEW) or to its head (SPEND.RECHECKED_RETURNED_TO_HEAD).',
       examples: [
         SPEND_ERROR_EXAMPLES.NO_SPEND_STEP,
+        SPEND_ERROR_EXAMPLES.REVIEWER_IS_APPROVER,
         SPEND_ERROR_EXAMPLES.NOT_CHECKABLE,
         SPEND_ERROR_EXAMPLES.RECHECKED_NEEDS_FINANCE_REVIEW,
         SPEND_ERROR_EXAMPLES.RECHECKED_RETURNED_TO_HEAD,

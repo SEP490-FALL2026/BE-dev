@@ -27,13 +27,14 @@ export interface TransferRecord {
   opensPlacementId: string;
   headHandover: HeadHandoverFacts | null;
   grounds: Grounds;
-  selfExecuted: boolean;
-  /** Null only for an event the controlled procedure of the release after this one recorded (spec L.2); this release always writes its account. */
+  /** Who recorded it: an account, or the ticket of the controlled procedure (spec L.2): exactly one of the two is set. */
   recordedByAppUserId: string | null;
+  recordedByTicketId: string | null;
   recordedAt: Date;
   effectiveAt: Date | null;
   cancelledAt: Date | null;
   cancelledByAppUserId: string | null;
+  cancelledByTicketId: string | null;
   cancelledReason: string | null;
   closedAt: Date | null;
   closedByAppUserId: string | null;
@@ -47,7 +48,6 @@ export interface TransferSummaryRecord {
   toDepartmentId: string;
   effectiveOn: BusinessDate;
   status: TransferStatus;
-  selfExecuted: boolean;
 }
 
 export interface TransferChangeRecord {
@@ -57,12 +57,15 @@ export interface TransferChangeRecord {
   newEffectiveOn: BusinessDate | null;
   reason: string;
   grounds: Grounds;
-  /** Null only for an event the controlled procedure of the release after this one recorded (spec L.2); this release always writes its account. */
+  /** The account, or the ticket of the controlled procedure (spec L.2). */
   changedByAppUserId: string | null;
+  changedByTicketId: string | null;
   changedAt: Date;
 }
 
 export interface TransferListFilter {
+  /** Set for an IT Admin: only the transfers that leave or enter these departments. Empty reads nothing. */
+  departmentIds?: readonly string[];
   employeeId?: string;
   status?: TransferStatus;
   effectiveFrom?: BusinessDate;

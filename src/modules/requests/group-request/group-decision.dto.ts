@@ -89,14 +89,22 @@ export const lineSpendDecisionBodySchema = z
   });
 
 /**
- * The body of removing a person who left from a request for a group: `cause` is the one cause there is; `note` is what the IT Admin keeps
- * with the closing; `evidence` is what they did to undo a grant that is being worked, needed only for such a task.
+ * The body of removing a person who left, or was transferred, from a request for a group: `cause` says which; `note` is what the IT
+ * Admin keeps with the closing, and the reason of a closing for a transfer; `evidence` is what they did to undo a grant that is being
+ * worked, and, for a transfer, the confirmation that they checked with the vendor and collected the invitation.
  */
-export const lineClosureBodySchema = z.strictObject({
-  cause: z.enum(['BENEFICIARY_LEFT']),
-  note: reason.optional(),
-  evidence: reason.optional(),
-});
+export const lineClosureBodySchema = z
+  .strictObject({
+    cause: z.enum(['BENEFICIARY_LEFT', 'BENEFICIARY_TRANSFERRED']),
+    note: reason.optional(),
+    evidence: reason.optional(),
+  })
+  .superRefine((body, ctx) => {
+    // A closing for a transfer gives its reason (F29); `evidence` is the confirmation of the check with the vendor (spec F).
+    if (body.cause === 'BENEFICIARY_TRANSFERRED' && body.note === undefined) {
+      ctx.addIssue({ code: 'custom', path: ['note'], message: 'A closing for a transfer gives its reason.' });
+    }
+  });
 
 export class LineNeedDecisionBodyDto extends createZodDto(lineNeedDecisionBodySchema) {}
 export class LineSpendDecisionBodyDto extends createZodDto(lineSpendDecisionBodySchema) {}

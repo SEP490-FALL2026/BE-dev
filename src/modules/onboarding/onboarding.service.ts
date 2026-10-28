@@ -1,9 +1,11 @@
 import { Injectable } from '@nestjs/common';
+import type { AuthenticatedPrincipal } from '../../infrastructure/security/tokens/access-token-verifier.port';
 import { CatalogService } from '../catalog/catalog.service';
 import { DataImportService } from '../data-import/data-import.service';
 import { IdentityAccessService } from '../identity-access/identity-access.service';
 import { LicensingService } from '../licensing/licensing.service';
 import { OrganizationService } from '../organization/organization.service';
+import { assertMayReadChecklist } from './onboarding.policy';
 
 export type StepStatus = 'DONE' | 'INCOMPLETE' | 'BLOCKED' | 'NOT_AVAILABLE';
 
@@ -21,11 +23,6 @@ export interface OrganizationStep {
     departmentsWithoutCostCenter: number;
     latestImport: { id: string; status: 'PREVIEW' | 'COMPLETED'; errorRows: number } | null;
   };
-  /**
-   * Set when a department cannot be created yet: the release that can still be recovered cannot read one without a Cost
-   * Center, so the operator activates the Cost Center link first (`pnpm ops:cost-center-direction activate`, spec L.11).
-   */
-  createDepartmentBlockedBy: 'AWAITING_ACTIVATION' | null;
   /** Gaps that never stop the step, only show in it (US-02-04 AC-6). */
   warnings: {
     code: 'MISSING_HEAD' | 'MISSING_IT_ADMIN' | 'MISSING_COST_CENTER';
@@ -61,7 +58,8 @@ export interface OnboardingChecklist {
 /**
  * The onboarding checklist (`US-02-04`). Each step is judged from the data that exists, not from how it was entered.
  * Step 1 is done when there is a department and a person and the latest people file has no wrong row; a department
- * without a head or without an IT Admin in charge is a warning inside it and stops nothing (`QĐ-66d`). Step 2 is done
+ * without a head, without an IT Admin in charge or without a Cost Center is a warning inside it and stops nothing (`QĐ-87f(2)`:
+ * Finance creates the Cost Center for a department that exists, after it). Step 2 is done
  * when the catalog holds an application, step 3 when it holds a subscription; step 4, the seat baseline, is blocked
  * until steps 1 and 3 are done (`BR-01.1`), ready after, and done when the IT Admin closes it (`OI-10`). Step 5, the
  * usage, is not built yet and says so. Nothing is only suggested any more: the standard toolset is gone (`QĐ-87h`).
@@ -76,7 +74,9 @@ export class OnboardingService {
     private readonly licensing: LicensingService,
   ) {}
 
-  async checklist(): Promise<OnboardingChecklist> {
+  /** The Super Admin and the IT Admin read it, and nobody else: OnboardingForbiddenError. */
+  async checklist(actor: Pick<AuthenticatedPrincipal, 'roles'>): Promise<OnboardingChecklist> {
+    assertMayReadChecklist(actor.roles);
     const [facts, latest, catalog, baseline] = await Promise.all([
       this.organization.getOnboardingFacts(),
       this.imports.latestEmployeeImport(),
@@ -105,7 +105,6 @@ export class OnboardingService {
         departmentsWithoutCostCenter: facts.departmentsWithoutCostCenter.length,
         latestImport: latest ? { id: latest.id, status: latest.status, errorRows: latest.errorRows } : null,
       },
-      createDepartmentBlockedBy: facts.costCenterDirectionActivated ? null : 'AWAITING_ACTIVATION',
       warnings: [
         ...facts.departmentsWithoutCostCenter.map((department) => ({
           code: 'MISSING_COST_CENTER' as const,

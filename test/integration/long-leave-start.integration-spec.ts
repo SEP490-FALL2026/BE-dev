@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { LeaveHarness, type LeaveWire } from '../support/leave-harness';
 import type { Department, Person } from '../support/request-harness';
+import { handOthersToSecondItAdmin } from '../support/second-it-admin';
 
 const h = new LeaveHarness();
 
@@ -43,7 +44,8 @@ describe('recording the start of a long leave (integration, real PostgreSQL)', (
       endedOn: null,
       overdueReturn: false,
       grounds: h.approval,
-      selfExecuted: false,
+      startedByAppUserId: h.sa.appUserId,
+      startedByProcedure: false,
       employee: { id: person.employeeId },
     });
     expect(await h.workState(person.employeeId)).toBe('ON_LONG_LEAVE');
@@ -198,40 +200,69 @@ describe('recording the start of a long leave (integration, real PostgreSQL)', (
       expect((await h.leavesOf(gone.employeeId)).length).toBe(0);
     });
 
-    it('lets only one of two concurrent starts of the same person through', async () => {
+    it('lets only one of two concurrent starts of the same person through: the first to reach the row is recorded, the second is refused as already on leave', async () => {
       const person = await h.worker(des, code('E'));
 
-      const responses = await Promise.all([
-        h.startLeave(body(person.employeeId)),
-        h.startLeave(body(person.employeeId)),
+      // The row of the person is held in another connection; each start reaches its lock before the next is sent, and they run in that order.
+      const responses = await h.queuedOnEmployee(person.employeeId, [
+        () => h.startLeave(body(person.employeeId)),
+        () => h.startLeave(body(person.employeeId)),
       ]);
 
-      expect(responses.map((response) => response.status).sort()).toEqual([201, 409]);
+      expect(
+        responses.map((response) => [response.status, response.status === 201 ? null : h.codeOf(response)]),
+      ).toEqual([
+        [201, null],
+        [409, 'LONG_LEAVE.ALREADY_ON_LEAVE'],
+      ]);
       expect((await h.leavesOf(person.employeeId)).length).toBe(1);
+      expect(await h.workState(person.employeeId)).toBe('ON_LONG_LEAVE');
     });
   });
 
-  describe('an IT Admin recording a leave about themselves (SoD-5)', () => {
-    it('is accepted and flagged for the Super Admin while they are the only one, as is their return', async () => {
+  describe('who writes a long leave, and about whom (F40, F45, F19)', () => {
+    it('is recorded by the Super Admin about an IT Admin with no flag of "done on oneself", and the return as well', async () => {
       const wire = await h.started(body(h.it1.employeeId, { startedOn: h.today() }));
 
-      expect(wire.selfExecuted).toBe(true);
-      expect((await h.auditEventsOf('PERSONNEL.SELF_EXECUTED', wire.id)).length).toBe(1);
+      expect(Object.keys(wire)).not.toContain('selfExecuted');
+      expect(await h.auditEventsOf('PERSONNEL.SELF_EXECUTED', wire.id)).toEqual([]);
 
       await h.confirmReturn(wire.id, { returnedOn: h.today(), grounds: h.extension }).expect(200);
-      expect((await h.auditEventsOf('PERSONNEL.SELF_EXECUTED', wire.id)).length).toBe(2);
       expect(await h.workState(h.it1.employeeId)).toBe('WORKING');
     });
 
-    it('is refused while another IT Admin can act, accepted from the other one, and never flagged then', async () => {
-      const it2 = await h.worker(des, 'E-IT2L', ['IT_ADMIN']);
+    it('is refused to the IT Admin on every write (403), and to the Super Admin about themselves (403 PERSONNEL.SELF_CHANGE_FORBIDDEN), and writes nothing', async () => {
+      const person = await h.worker(des, code('E'));
 
-      const own = await h.startLeave(body(h.it1.employeeId));
-      expect([own.status, h.codeOf(own)]).toEqual([409, 'LONG_LEAVE.SELF_EVENT_NEEDS_ANOTHER_IT_ADMIN']);
-      const wire = await h.started(body(h.it1.employeeId), it2.account);
+      const byItAdmin = await h.startLeave(body(person.employeeId), h.it1);
+      const bySelf = await h.startLeave(body(h.sa.employeeId));
 
-      expect(wire.selfExecuted).toBe(false);
-      expect(await h.auditEventsOf('PERSONNEL.SELF_EXECUTED', wire.id)).toEqual([]);
+      expect([byItAdmin.status, h.codeOf(byItAdmin)]).toEqual([403, 'AUTHORIZATION.FORBIDDEN']);
+      expect([bySelf.status, h.codeOf(bySelf)]).toEqual([403, 'PERSONNEL.SELF_CHANGE_FORBIDDEN']);
+      expect(await h.leavesOf(person.employeeId)).toEqual([]);
+      expect(await h.leavesOf(h.sa.employeeId)).toEqual([]);
+    });
+
+    it('gives the IT Admin only the minimal projection (no basis) of the people in the departments in their charge, 404 for the rest (F12)', async () => {
+      const outside = await h.departmentWithUnit('P-OUT');
+      await h.ctx.sql.query(`UPDATE departments SET it_admin_employee_id = $2 WHERE id = $1`, [
+        des.id,
+        h.it1.employeeId,
+      ]);
+      // The departments nobody usable is in charge of are the work of every IT Admin (F12): the others have a second IT Admin.
+      await handOthersToSecondItAdmin(h);
+      const mine = await h.started(body((await h.worker(des, code('E'))).employeeId));
+      const other = await h.started(body((await h.worker(outside, code('E'))).employeeId));
+
+      const seen = h.dataOf<LeaveWire>(await h.readLeave(mine.id, h.it1).expect(200));
+      const hidden = await h.readLeave(other.id, h.it1);
+      const listed = h.dataOf<{ items: LeaveWire[] }>(await h.listLeaves('', h.it1).expect(200));
+
+      expect(seen).toMatchObject({ id: mine.id, grounds: null });
+      expect([hidden.status, h.codeOf(hidden)]).toEqual([404, 'LONG_LEAVE.NOT_FOUND']);
+      expect(listed.items.map((item) => item.id)).toContain(mine.id);
+      expect(listed.items.map((item) => item.id)).not.toContain(other.id);
+      expect((await h.leaveChanges(mine.id, '', h.it1)).status).toBe(403);
     });
   });
 });

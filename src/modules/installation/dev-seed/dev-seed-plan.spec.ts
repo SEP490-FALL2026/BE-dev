@@ -22,12 +22,14 @@ const department = {
   costCenterId: 'cc-1' as string | null,
   costCenterCode: 'DEMO-CC' as string | null,
 };
-const exact: LocalSeedFixtureFacts = { costCenterDirectionActivated: true, costCenter, department };
-const none: LocalSeedFixtureFacts = {
-  costCenterDirectionActivated: false,
-  costCenter: null,
-  department: null,
-};
+/**
+ * The facts the plan reads are the two fixture items: the activation of the compatibility release is not read any more (the final
+ * code never reads it), so a fixture is built from those two only.
+ */
+const fixtureOf = (parts: Pick<LocalSeedFixtureFacts, 'costCenter' | 'department'>): LocalSeedFixtureFacts =>
+  parts as LocalSeedFixtureFacts;
+const exact = fixtureOf({ costCenter, department });
+const none = fixtureOf({ costCenter: null, department: null });
 const people = { departments: [], employees: [], emailOwners: [] };
 
 const items = (fixture: LocalSeedFixtureFacts) =>
@@ -37,34 +39,32 @@ const items = (fixture: LocalSeedFixtureFacts) =>
       item.action === 'conflict' ? `${item.kind} conflict ${item.reason}` : `${item.kind} ${item.action}`,
     );
 
-describe('buildSeedPlan: Department, its Cost Center and the Cost Center link by stable key', () => {
-  it('creates all of them, the department before its Cost Center, when none exists', () => {
-    expect(items(none)).toEqual(['DEPARTMENT create', 'COST_CENTER create', 'COST_CENTER_DIRECTION create']);
+describe('buildSeedPlan: Department and its Cost Center by stable key', () => {
+  it('creates both, the department before its Cost Center, when none exists; no activation of the link is planned', () => {
+    expect(items(none)).toEqual(['DEPARTMENT create', 'COST_CENTER create']);
   });
 
-  it('finds all present only when every fixed field matches', () => {
-    expect(items(exact)).toEqual(['DEPARTMENT present', 'COST_CENTER present', 'COST_CENTER_DIRECTION present']);
+  it('finds both present only when every fixed field matches', () => {
+    expect(items(exact)).toEqual(['DEPARTMENT present', 'COST_CENTER present']);
   });
 
   it('creates only the Cost Center for a DEMO department that exists without one (`QĐ-87d(1)`)', () => {
-    const fixture = {
-      ...exact,
+    const fixture = fixtureOf({
       costCenter: null,
       department: { ...department, costCenterId: null, costCenterCode: null },
-    };
+    });
     const plan = buildSeedPlan('org-1', fixture, people, new Map());
 
-    expect(items(fixture)).toEqual(['DEPARTMENT present', 'COST_CENTER create', 'COST_CENTER_DIRECTION present']);
+    expect(items(fixture)).toEqual(['DEPARTMENT present', 'COST_CENTER create']);
     expect(plan.departmentId).toBe('d-1');
     expect(plan.costCenterId).toBeNull();
   });
 
-  it('plans the activation of the Cost Center link on its own when everything else is there', () => {
-    expect(items({ ...exact, costCenterDirectionActivated: false })).toEqual([
-      'DEPARTMENT present',
-      'COST_CENTER present',
-      'COST_CENTER_DIRECTION create',
-    ]);
+  it('never plans an activation of the Cost Center link: no item of the plan is about it', () => {
+    const plan = buildSeedPlan('org-1', none, people, new Map());
+
+    expect(plan.items.map((item) => item.kind)).not.toContain('COST_CENTER_DIRECTION');
+    expect(plan.items.slice(0, 2).map((item) => item.kind)).toEqual(['DEPARTMENT', 'COST_CENTER']);
   });
 
   it.each([
@@ -72,22 +72,22 @@ describe('buildSeedPlan: Department, its Cost Center and the Cost Center link by
     ['a COMPANY kind (no longer a possible kind)', { kind: 'COMPANY' as unknown as 'UNIT' }, 'COST_CENTER_NOT_UNIT'],
     ['an inactive state', { status: 'INACTIVE' as const }, 'COST_CENTER_INACTIVE'],
   ])('refuses a DEMO-CC with %s', (_case, change, reason) => {
-    expect(items({ ...exact, costCenter: { ...costCenter, ...change } })[1]).toBe(`COST_CENTER conflict ${reason}`);
+    expect(items(fixtureOf({ costCenter: { ...costCenter, ...change }, department }))[1]).toBe(
+      `COST_CENTER conflict ${reason}`,
+    );
   });
 
   it('refuses a DEMO-CC that belongs to another department, so DEMO cannot be created on it', () => {
-    expect(items({ ...exact, costCenter: { ...costCenter, departmentCode: 'OTHER' }, department: null })).toEqual([
+    expect(items(fixtureOf({ costCenter: { ...costCenter, departmentCode: 'OTHER' }, department: null }))).toEqual([
       'DEPARTMENT create',
       'COST_CENTER conflict COST_CENTER_IN_USE',
-      'COST_CENTER_DIRECTION present',
     ]);
   });
 
   it('refuses a DEMO-CC that belongs to no department: it is not repaired here, only `ops:cost-center-direction link` links it', () => {
-    expect(items({ ...exact, costCenter: { ...costCenter, departmentCode: null }, department: null })).toEqual([
+    expect(items(fixtureOf({ costCenter: { ...costCenter, departmentCode: null }, department: null }))).toEqual([
       'DEPARTMENT create',
       'COST_CENTER conflict COST_CENTER_UNLINKED',
-      'COST_CENTER_DIRECTION present',
     ]);
   });
 
@@ -100,21 +100,20 @@ describe('buildSeedPlan: Department, its Cost Center and the Cost Center link by
       'DEPARTMENT_COST_CENTER_DIFFERS',
     ],
   ])('refuses a DEMO department with %s', (_case, change, reason) => {
-    expect(items({ ...exact, department: { ...department, ...change } })[0]).toBe(`DEPARTMENT conflict ${reason}`);
+    expect(items(fixtureOf({ costCenter, department: { ...department, ...change } }))[0]).toBe(
+      `DEPARTMENT conflict ${reason}`,
+    );
   });
 
   it('refuses a DEMO department on another Cost Center while DEMO-CC is missing', () => {
     expect(
-      items({
-        ...exact,
-        costCenter: null,
-        department: { ...department, costCenterId: 'cc-9', costCenterCode: 'OTHER-CC' },
-      }),
-    ).toEqual([
-      'DEPARTMENT conflict DEPARTMENT_COST_CENTER_DIFFERS',
-      'COST_CENTER create',
-      'COST_CENTER_DIRECTION present',
-    ]);
+      items(
+        fixtureOf({
+          costCenter: null,
+          department: { ...department, costCenterId: 'cc-9', costCenterCode: 'OTHER-CC' },
+        }),
+      ),
+    ).toEqual(['DEPARTMENT conflict DEPARTMENT_COST_CENTER_DIFFERS', 'COST_CENTER create']);
   });
 
   it('keeps the ids it can write against: the existing Cost Center and Department', () => {

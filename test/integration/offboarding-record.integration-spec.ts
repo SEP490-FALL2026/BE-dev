@@ -61,7 +61,7 @@ describe('recording a departure (integration, real PostgreSQL)', () => {
       handoverDueOn: h.dueBefore(h.day(10)),
       heldRights: 4,
       priorWorkState: 'WORKING',
-      selfExecuted: false,
+      recordedByProcedure: false,
       grounds: h.grounds,
       employee: { id: person.employeeId },
       department: { id: des.id },

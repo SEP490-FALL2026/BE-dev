@@ -26,7 +26,7 @@ IT Admin khai báo thuê bao có thời hạn hoặc khoản mua vĩnh viễn c�
 
 | Story    | AC                     | Coverage | Phần còn lại thuộc                              |
 | -------- | ---------------------- | -------- | ----------------------------------------------- |
-| US-04-03 | AC-1→AC-4, AC-7→AC-12  | partial  | AC-5, AC-6: `g3-subscription-seat-guards`       |
+| US-04-03 | AC-1→AC-4, AC-7→AC-13  | partial  | AC-5, AC-6: `g3-subscription-seat-guards`       |
 | US-04-05 | AC-1, AC-2, AC-5, AC-7 | partial  | AC-3, AC-4, AC-6: `g3-money-and-exchange-rates` |
 
 ## Supporting references
@@ -149,3 +149,4 @@ Audit cùng giao dịch: `SUBSCRIPTION.CREATED`, `SUBSCRIPTION.UPDATED` (trướ
 
 - Audit G0–G6 trên Docs `769bb64` ↔ BE `7c28e75` mở lại hạng mục này: F02, F23, F26 — phòng sở hữu bắt buộc; ứng dụng đã ngừng; PATCH khi phòng chưa có Cost Center.
 - Remediation duy nhất: [g0-g6-final-business-baseline-remediation](../g0-g6-final-business-baseline-remediation/spec.md) ([impact matrix](../g0-g6-final-business-baseline-remediation/impact-matrix.md#3-findings)). AC liên quan không còn được coi là thỏa nguồn hiện hành cho tới khi remediation xong; trạng thái triển khai ở roadmap. Phần đã ghi phía trên là lịch sử, giữ nguyên.
+- _27/10/2026 (Prompt 04, Task 0.1 của `g0-g6-final-business-baseline-remediation`, F60 — re-pin scope map [G3](../../../roadmap.md#work-item-decomposition-g3) Docs `e0cb5a0`, BE `7c28e75`):_ nhận thêm `US-04-03` AC-13 (F02 — phòng sở hữu của thuê bao; mục 4 nêu hạng mục này) ([impact matrix mục 9](../g0-g6-final-business-baseline-remediation/impact-matrix.md#9-phụ-lục-delta-user-stories-72e1480--769bb64)). Phần đã ghi phía trên là lịch sử, giữ nguyên.

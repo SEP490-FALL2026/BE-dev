@@ -239,7 +239,7 @@ describe('the return of a seat over PostgreSQL (US-05-13)', () => {
       const wire = await sent(assignmentId, unit.member.account);
       const taskId = await claimed(await taskOfReturn(wire));
       const freeBefore = await h.freeSeats(plain.subscriptionId);
-      const budgetBefore = [await h.count('budget_commitments'), await h.count('subscription_cost_allocations')];
+      const commitmentsBefore = await h.count('budget_commitments');
 
       await h.revoked(taskId, { completion: 'ACCOUNT_REMOVED', evidence: 'Removed from the workspace' }).expect(200);
 
@@ -255,10 +255,8 @@ describe('the return of a seat over PostgreSQL (US-05-13)', () => {
         holderEmployeeId: unit.member.employeeId,
         handoverFlagged: false,
       });
-      // It saves nothing: no commitment, allocation or invoice moves.
-      expect([await h.count('budget_commitments'), await h.count('subscription_cost_allocations')]).toEqual(
-        budgetBefore,
-      );
+      // It saves nothing: no commitment or invoice moves.
+      expect(await h.count('budget_commitments')).toEqual(commitmentsBefore);
     });
 
     it('returns a K5 right off the system, taking no seat and changing no subscription (AC-10)', async () => {

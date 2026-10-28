@@ -51,7 +51,7 @@ export interface Assessment {
   heldAccess: HeldAccess | null;
 }
 
-/** What a proposal of software that is not in the catalog is judged by: there is no plan, so no toolset, price or seat. */
+/** What a proposal of software that is not in the catalog is judged by: there is no plan, so no price or seat. */
 export interface ProposalAssessment {
   today: BusinessDate;
   unit: OwningUnit;
@@ -62,7 +62,7 @@ export interface ProposalAssessment {
 }
 
 export interface AssessmentInput {
-  /** The person the request is for: their department, toolset and seat are what it is judged by. */
+  /** The person the request is for: their department and seat are what it is judged by. */
   employeeId: string;
   /** Who sends it, when it is not the person it is for (`US-03-02`); the need step is routed from them. */
   requesterEmployeeId?: string;
@@ -77,8 +77,8 @@ export interface AssessmentInput {
 
 /**
  * The facts a request is judged by, read in one place so that what a person is shown before sending and what is fixed
- * when they send are the same (`US-05-01` AC-11): the department and Unit of the day, the plan and its price, whether the
- * plan is in the standard toolset, the seat the person already holds, and who the routing table gives the need step to.
+ * when they send are the same (`US-05-01` AC-11): the department and Unit of the day, the plan and its price, the seat the
+ * person already holds, and who the routing table gives the need step to.
  * It writes nothing and decides nothing: the callers refuse or record.
  */
 @Injectable()
@@ -117,6 +117,7 @@ export class RequestAssessmentService {
     const policy = policyFor(target.applicationKind, input.settings.slaWorkingDays);
     const pricing = await this.priceFor(tx, {
       planId: input.planId,
+      departmentId: unit.departmentId,
       free: policy.branch === 'INTERNAL_FREE',
       termMonths: input.termMonths,
       beneficiaries: 1,
@@ -204,6 +205,8 @@ export class RequestAssessmentService {
     tx: DbTx,
     input: {
       planId: string;
+      /** The department of the request: only an active subscription it owns gives a price (F38, spec L.8); never another department's. */
+      departmentId: string;
       free: boolean;
       termMonths: number;
       beneficiaries: number;
@@ -227,7 +230,7 @@ export class RequestAssessmentService {
       };
     }
     const expectedSpendOn = input.expectedSpendOn ?? input.today;
-    const price = await this.catalog.getPlanPrice(input.planId, tx);
+    const price = await this.catalog.getPlanPrice(input.planId, input.departmentId, tx);
     const priced = priceRequest({
       unitPrice: price?.unitPrice ?? null,
       billingCycle: price?.billingCycle ?? null,

@@ -1,6 +1,5 @@
 import type { BusinessDate } from '../../../core/business-date';
 import { groundsRefusal, type GroundsInput } from '../grounds/grounds.policy';
-import type { SelfActionMode } from '../personnel-self-action.policy';
 
 /**
  * What the policy of a long leave refuses, as a semantic code (`LONG_LEAVE.<code>` on the wire) and the facts a person needs to
@@ -28,7 +27,6 @@ export interface StartLeaveFacts {
   hireDate: BusinessDate;
   employee: { status: 'ACTIVE' | 'TERMINATED'; workState: WorkStateFact };
   grounds: GroundsInput | undefined;
-  selfMode: SelfActionMode;
 }
 
 /**
@@ -45,7 +43,7 @@ export function startLeaveRefusal(facts: StartLeaveFacts): LeaveRefusal | null {
     return { code: 'RETURN_DATE_INVALID', details: { reason: 'NOT_AFTER_START' } };
   }
 
-  return leaveGroundsRefusal(facts.grounds) ?? selfRefusal(facts.selfMode);
+  return leaveGroundsRefusal(facts.grounds);
 }
 
 export interface LeaveFacts {
@@ -53,7 +51,6 @@ export interface LeaveFacts {
   status: 'ACTIVE' | 'ENDED';
   startedOn: BusinessDate;
   approvedReturnOn: BusinessDate;
-  selfMode: SelfActionMode;
 }
 
 export interface ChangeReturnDateFacts extends LeaveFacts {
@@ -72,7 +69,7 @@ export function changeReturnDateRefusal(facts: ChangeReturnDateFacts): LeaveRefu
   }
   if (facts.newApprovedReturnOn < facts.today) return { code: 'RETURN_DATE_IN_PAST' };
 
-  return leaveGroundsRefusal(facts.grounds) ?? selfRefusal(facts.selfMode);
+  return leaveGroundsRefusal(facts.grounds);
 }
 
 export interface ConfirmReturnFacts extends LeaveFacts {
@@ -92,9 +89,8 @@ export function confirmReturnRefusal(facts: ConfirmReturnFacts): LeaveRefusal | 
   if (facts.status !== 'ACTIVE') return { code: 'NOT_ACTIVE' };
   if (facts.returnedOn < facts.startedOn) return { code: 'RETURN_DATE_INVALID', details: { reason: 'BEFORE_START' } };
   if (facts.returnedOn > facts.today) return { code: 'RETURN_DATE_INVALID', details: { reason: 'IN_FUTURE' } };
-  const grounds = isOnSchedule(facts.returnedOn, facts.approvedReturnOn) ? null : leaveGroundsRefusal(facts.grounds);
 
-  return grounds ?? selfRefusal(facts.selfMode);
+  return isOnSchedule(facts.returnedOn, facts.approvedReturnOn) ? null : leaveGroundsRefusal(facts.grounds);
 }
 
 /** A leave past the day it was due back is only to be reminded about; the state of the person never moves by the calendar (`AC-4`). */
@@ -111,7 +107,3 @@ export const stateAfterCancelledDeparture = (
   endedLeave: { approvedReturnOn: BusinessDate } | null,
   today: BusinessDate,
 ): 'ON_LONG_LEAVE' | 'WORKING' => (endedLeave && endedLeave.approvedReturnOn > today ? 'ON_LONG_LEAVE' : 'WORKING');
-
-function selfRefusal(mode: SelfActionMode): LeaveRefusal | null {
-  return mode === 'NEEDS_ANOTHER_IT_ADMIN' ? { code: 'SELF_EVENT_NEEDS_ANOTHER_IT_ADMIN' } : null;
-}

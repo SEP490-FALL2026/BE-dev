@@ -18,22 +18,6 @@ export interface DutyWire {
   overdue: boolean;
 }
 
-export interface MoveWire {
-  id: string;
-  status: 'PENDING' | 'CONFIRMED' | 'CANCELLED';
-  assignmentId: string;
-  accountIdentifier: string;
-  currentResponsible: { employeeId: string };
-  fromDepartment: { id: string; code: string };
-  toDepartment: { id: string; code: string };
-  newResponsible: { employeeId: string };
-  effectiveFrom: string;
-  expectedEndDate: string | null;
-  confirmation: { confirmedByEmployeeId: string; role: string; confirmedAt: string } | null;
-  cancellation: { cancelledByAppUserId: string; reason: string } | null;
-  resultingAssignmentId: string | null;
-}
-
 export interface AssignmentRow {
   id: string;
   employee_id: string;
@@ -47,8 +31,8 @@ export interface AssignmentRow {
 
 /**
  * The offboarding harness with what the tests of the handover of service accounts need: a service account written through the
- * baseline import, the calls of the six routes and the reading of the assignments, the moves and the seats taken as the database keeps
- * them. No assertion lives here.
+ * baseline import, the calls of the routes and the reading of the assignments and the seats taken as the database keeps them. No
+ * assertion lives here.
  */
 export class ServiceAccountHandoverHarness extends OffboardingHarness {
   changeResponsibleOf = (id: string, body: object, account: ApiAccount = this.it1) =>
@@ -109,34 +93,14 @@ export class ServiceAccountHandoverHarness extends OffboardingHarness {
     return rows[0].n;
   }
 
-  /** The Cost Center of the Unit of the department. */
+  /** The Cost Center of the Unit of the department: the one in use that Finance created for it. */
   async unitOf(department: Department): Promise<string> {
-    const { rows } = await this.ctx.sql.query<{ cost_center_id: string }>(
-      `SELECT cost_center_id FROM departments WHERE id = $1`,
+    const { rows } = await this.ctx.sql.query<{ id: string }>(
+      `SELECT id FROM cost_centers WHERE department_id = $1 AND status = 'ACTIVE'`,
       [department.id],
     );
 
-    return rows[0].cost_center_id;
-  }
-
-  async moveRow(id: string): Promise<{
-    status: string;
-    resulting_assignment_id: string | null;
-    confirmed_by_role: string | null;
-    confirmed_by_employee_id: string | null;
-  }> {
-    const { rows } = await this.ctx.sql.query<{
-      status: string;
-      resulting_assignment_id: string | null;
-      confirmed_by_role: string | null;
-      confirmed_by_employee_id: string | null;
-    }>(
-      `SELECT status::text AS status, resulting_assignment_id, confirmed_by_role::text AS confirmed_by_role, confirmed_by_employee_id
-         FROM service_account_moves WHERE id = $1`,
-      [id],
-    );
-
-    return rows[0];
+    return rows[0].id;
   }
 
   async noticeCount(assignmentId: string): Promise<number> {
@@ -162,9 +126,5 @@ export class ServiceAccountHandoverHarness extends OffboardingHarness {
 
   async serviceDuties(query = '', account: ApiAccount = this.it1): Promise<DutyWire[]> {
     return this.dataOf<{ items: DutyWire[] }>(await this.listServiceDuties(query, account).expect(200)).items;
-  }
-
-  moveOf(response: request.Response): MoveWire {
-    return this.dataOf<MoveWire>(response);
   }
 }

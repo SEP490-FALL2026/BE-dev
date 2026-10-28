@@ -144,8 +144,8 @@ describe('who holds a step when the organization or a role changes, over Postgre
         [member, h.tomorrow()],
       );
       await h.ctx.sql.query(
-        `INSERT INTO employee_placements (id, organization_id, employee_id, department_id, job_title_id, valid_from)
-         SELECT gen_random_uuid(), organization_id, employee_id, $2, job_title_id, $3
+        `INSERT INTO employee_placements (id, organization_id, employee_id, department_id, valid_from)
+         SELECT gen_random_uuid(), organization_id, employee_id, $2, $3
            FROM employee_placements WHERE employee_id = $1 AND valid_to = $3`,
         [member, to.department.id, h.tomorrow()],
       );
@@ -384,7 +384,8 @@ describe('who holds a step when the organization or a role changes, over Postgre
     it('flags both steps when one person ends up holding the need step and the spend step, and clears it when they do not', async () => {
       // The head of the department of the approver is the approver: the check ran when the head approved the need.
       const { rows } = await h.ctx.sql.query<{ id: string; cost_center_id: string }>(
-        `SELECT id, cost_center_id FROM departments WHERE code = 'P-EXE'`,
+        `SELECT d.id, c.id AS cost_center_id FROM departments d
+           JOIN cost_centers c ON c.department_id = d.id AND c.status = 'ACTIVE' WHERE d.code = 'P-EXE'`,
       );
       const executive = { id: rows[0].id, code: 'P-EXE', unitId: rows[0].cost_center_id };
       const unit: Unit = {

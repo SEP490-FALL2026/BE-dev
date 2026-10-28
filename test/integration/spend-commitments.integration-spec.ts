@@ -157,13 +157,13 @@ describe('the commitment held when a request is approved over PostgreSQL (US-06-
       expect(await held(id)).toHaveLength(1);
     });
 
-    it('is held once when two approvals come at the same time', async () => {
+    it('is held once when two approvals come at the same time: the first in the queue approves, the second finds the step decided', async () => {
       const { u } = await example();
       const id = await h.waitingForApprover(u, plan, { amount: 15 * M });
 
-      const answers = await Promise.all([approve(id), approve(id)]);
+      const [first, second] = await h.queuedOnRequest(id, [() => approve(id), () => approve(id)]);
 
-      expect(answers.map((answer) => answer.status).sort()).toEqual([200, 409]);
+      expect([first.status, second.status]).toEqual([200, 409]);
       expect(await held(id)).toHaveLength(1);
     });
   });

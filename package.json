@@ -21,6 +21,7 @@
     "start:worker:prod": "node dist/worker",
     "ops:bootstrap": "node dist/installation-cli",
     "ops:recover": "node dist/recovery-cli",
+    "ops:record-super-admin-event": "node dist/super-admin-event-cli",
     "ops:inspect": "node dist/inspect-cli",
     "ops:preflight": "node dist/migration-preflight-cli",
     "ops:assign-subscription-owner": "node dist/subscription-owner-assignment-cli",

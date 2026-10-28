@@ -7,11 +7,11 @@ const M = 1_000_000;
 const MISMATCH = 'LICENSE_ASSIGNMENT.SUBSCRIPTION_DEPARTMENT_MISMATCH';
 
 /**
- * `g0-g6-final-business-baseline-remediation`, Task 3.2a (F20, `QĐ-89a`, review `P03-RV-03`, spec K and L.10): a seat that carries an
- * owning department (a service account) sits on a subscription of that department. From the compatibility release the service
- * refuses another department's subscription with 422 `LICENSE_ASSIGNMENT.SUBSCRIPTION_DEPARTMENT_MISMATCH` before it writes, a
- * subscription nobody owns yet is not checked, a row of a seat baseline file that would break it is an `ERROR` of the same code,
- * and the trigger of the final schema, when it answers first, is told in the same 422 and never as a 500.
+ * `g0-g6-final-business-baseline-remediation`, Tasks 3.2a and 3.2 (F20, `QĐ-89a`, spec K and L.10): a seat sits on a subscription of its
+ * own department. The service refuses another department's subscription with 422 `LICENSE_ASSIGNMENT.SUBSCRIPTION_DEPARTMENT_MISMATCH`
+ * before it writes, a row of a seat baseline file that would break it is an `ERROR` of the same code, and the trigger
+ * `license_assignments_owner_department_guard` of the final schema, when it answers first, is told in the same 422 and never as a 500
+ * (the Prisma driver adapter hands over the code and the message of a trigger's refusal, and the message begins with the constraint).
  */
 describe('a seat of a department sits on a subscription of that department (integration, real PostgreSQL)', () => {
   let counter = 0;
@@ -67,7 +67,7 @@ describe('a seat of a department sits on a subscription of that department (inte
     await h.withApprover();
     foreign = await subscriptionOf(h.seed.departmentId);
     // The file of a seat baseline, judged while the baseline is open: a service account of another department than the owner of
-    // the subscription, and a personal seat of the same person, which carries no owning department.
+    // the subscription, and a personal seat of a person of another department, which is written with the department of the owner.
     const u = await unit();
     const preview = await h.preview({ subscriptionId: foreign.id }, [
       {
@@ -115,51 +115,43 @@ describe('a seat of a department sits on a subscription of that department (inte
       expect(await seatOf(id)).toEqual({ owning_department_id: u.department.id, subscription_id: own.id });
     });
 
-    it('does not check a subscription nobody owns yet', async () => {
-      const u = await unit();
-      const ownerless = await subscriptionOf(h.seed.departmentId);
-      await h.ctx.sql.query(`UPDATE subscriptions SET owner_department_id = NULL WHERE id = $1`, [ownerless.id]);
-      const id = await waiting(u, ownerless.plan);
-
-      await h.grant({ requestId: id, subscriptionId: ownerless.id, accountIdentifier: 'ci-bot' }).expect(201);
-
-      expect(await seatOf(id)).toMatchObject({ owning_department_id: u.department.id, subscription_id: ownerless.id });
-    });
-
     // The Prisma driver adapter hands the application the message and the code of a trigger's refusal, not its CONSTRAINT field: the
     // trigger of the final schema therefore names its constraint at the start of its message, and the mapper reads it there.
     it('answers 422, never 500, when only the trigger of the final schema refuses it (the guard of the service turned off)', async () => {
       const u = await unit();
       const guarded = await subscriptionOf(h.seed.departmentId);
       const id = await waiting(u, guarded.plan);
-      await h.ctx.sql.query(`
-        CREATE FUNCTION test_owner_department_guard() RETURNS trigger LANGUAGE plpgsql AS $$
-        BEGIN
-          IF NEW.subscription_id IS NOT NULL AND NEW.owning_department_id IS NOT NULL
-             AND NEW.owning_department_id IS DISTINCT FROM (SELECT owner_department_id FROM subscriptions WHERE id = NEW.subscription_id) THEN
-            RAISE EXCEPTION 'license_assignments_owner_department_guard: the department of the seat is not the owner of the subscription'
-              USING ERRCODE = '23514', CONSTRAINT = 'license_assignments_owner_department_guard';
-          END IF;
-          RETURN NEW;
-        END $$`);
-      await h.ctx.sql.query(`
-        CREATE TRIGGER license_assignments_owner_department_guard BEFORE INSERT ON license_assignments
-          FOR EACH ROW EXECUTE FUNCTION test_owner_department_guard()`);
       const before = await rows();
-      try {
-        jest.spyOn(policy, 'assertSubscriptionDepartment').mockImplementation(() => undefined);
+      jest.spyOn(policy, 'assertSubscriptionDepartment').mockImplementation(() => undefined);
 
-        const refused = await h
-          .grant({ requestId: id, subscriptionId: guarded.id, accountIdentifier: 'ci-bot' })
-          .expect(422);
+      const refused = await h
+        .grant({ requestId: id, subscriptionId: guarded.id, accountIdentifier: 'ci-bot' })
+        .expect(422);
 
-        expect(h.codeOf(refused)).toBe(MISMATCH);
-        expect(await rows()).toEqual(before);
-        expect(await h.state(id)).toBe('AWAITING_EXECUTION');
-      } finally {
-        await h.ctx.sql.query(`DROP TRIGGER license_assignments_owner_department_guard ON license_assignments`);
-        await h.ctx.sql.query(`DROP FUNCTION test_owner_department_guard()`);
-      }
+      expect(h.codeOf(refused)).toBe(MISMATCH);
+      expect(await rows()).toEqual(before);
+      expect(await h.state(id)).toBe('AWAITING_EXECUTION');
+    });
+
+    it('is also refused by the database itself: the trigger names its constraint and the seat of another department is not stored', async () => {
+      const u = await unit();
+      const guarded = await subscriptionOf(h.seed.departmentId);
+      const before = await rows();
+
+      await expect(
+        h.ctx.sql.query(
+          `INSERT INTO license_assignments (id, organization_id, kind, source, plan_id, subscription_id, employee_id, account_identifier,
+             normalized_account_identifier, reason, cost_center_id, owning_department_id, valid_from, valid_from_basis, created_by_app_user_id)
+           SELECT gen_random_uuid(), s.organization_id, 'SERVICE', 'BASELINE', s.plan_id, s.id, e.id, 'direct-sql', 'direct-sql', 'x',
+                  (SELECT id FROM cost_centers WHERE department_id = $2 AND status = 'ACTIVE'), $2, '2026-01-05', 'RECORDED', gen_random_uuid()
+             FROM subscriptions s, employees e WHERE s.id = $1 AND e.id = $3`,
+          [guarded.id, u.department.id, u.member.employeeId],
+        ),
+      ).rejects.toMatchObject({
+        code: '23514',
+        message: expect.stringContaining('license_assignments_owner_department_guard') as unknown,
+      });
+      expect(await rows()).toEqual(before);
     });
   });
 

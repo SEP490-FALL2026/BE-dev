@@ -4,6 +4,7 @@ import { DepartmentDirectoryService } from './department/department-directory.se
 import { EmployeeDirectoryService } from './employee/employee-directory.service';
 import { OrganizationRepo } from './organization.repo';
 import { DepartmentServiceAccountRegistry } from './department/service-account-registry';
+import { DepartmentUseRegistry } from './department/department-use-registry';
 import { AnnouncementRepo } from './change-announcement/announcement.repo';
 import { OrganizationChangeRegistry } from './change-announcement/organization-change.registry';
 import { OrganizationChangeService } from './change-announcement/organization-change.service';
@@ -28,12 +29,11 @@ describe('OrganizationService.getOnboardingFacts', () => {
       activeWithoutHead: jest.fn(recorded('activeWithoutHead', [{ id: 'd-1', code: 'P', name: 'P' }])),
       activeWithItAdmin: jest.fn(recorded('activeWithItAdmin', [])),
     };
-    // The Cost Center side of the facts: the departments with none yet, and whether the link is activated.
+    // The Cost Center side of the facts: the departments with none yet (the link's activation is not read any more, F14).
     const costCenters = {
       departmentsWithoutCostCenter: jest.fn(
         recorded('departmentsWithoutCostCenter', [{ id: 'd-1', code: 'P', name: 'P' }]),
       ),
-      isDirectionActivated: jest.fn(recorded('isDirectionActivated', true)),
     };
     const employees = { countActive: jest.fn(recorded('employeesCountActive', 2)) };
     const service = new OrganizationService(
@@ -42,6 +42,7 @@ describe('OrganizationService.getOnboardingFacts', () => {
       employees as unknown as EmployeeDirectoryService,
       costCenters as unknown as CostCenterCatalogueService,
       new DepartmentServiceAccountRegistry(),
+      new DepartmentUseRegistry(),
       new OrganizationChangeService(new OrganizationChangeRegistry(), {} as AnnouncementRepo, {} as TransactionRunner),
     );
     return { service, calls };
@@ -53,7 +54,6 @@ describe('OrganizationService.getOnboardingFacts', () => {
     await expect(service.getOnboardingFacts(TX)).resolves.toMatchObject({
       activeDepartments: 1,
       activeEmployees: 2,
-      costCenterDirectionActivated: true,
       departmentsWithoutCostCenter: [{ code: 'P', name: 'P' }],
       departmentsWithoutHead: [{ code: 'P', name: 'P' }],
     });
@@ -64,9 +64,20 @@ describe('OrganizationService.getOnboardingFacts', () => {
       'departmentsWithoutCostCenter',
       'activeWithoutHead',
       'activeWithItAdmin',
-      'isDirectionActivated',
     ]);
     expect(calls.filter(({ client }) => client !== TX)).toEqual([]);
+  });
+
+  it('does not say whether the Cost Center link was activated: the final code never reads it', async () => {
+    const { service } = build();
+
+    expect(Object.keys(await service.getOnboardingFacts()).sort()).toEqual([
+      'activeDepartments',
+      'activeEmployees',
+      'departmentsByItAdmin',
+      'departmentsWithoutCostCenter',
+      'departmentsWithoutHead',
+    ]);
   });
 
   it('passes no transaction for the onboarding checklist, which reads without one', async () => {

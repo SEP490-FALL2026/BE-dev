@@ -295,7 +295,7 @@ export class ProvisioningTasksController {
   @ApiSuccessResponse(TaskResponseDto, {
     message: 'PROVISIONING_TASK.HANDED_OFF',
     description:
-      'The failed connector task is queued again as a task by hand, with who handed it over and the evidence given. Nothing hands a task over by itself. The evidence is never a password or a key.',
+      'The failed connector task is queued again as a task by hand, with who handed it over and when; the body is empty ({}) and the last error, the failure kind and reason and the tries made stay on the task until a person takes it. No evidence is given here: it is asked when the work by hand is completed. Nothing hands a task over by itself.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
@@ -309,17 +309,18 @@ export class ProvisioningTasksController {
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The request is invalid (VALIDATION_ERROR) or has no evidence (PROVISIONING_TASK.EVIDENCE_REQUIRED): the task is unchanged.',
-      examples: [VALIDATION_EXAMPLE, PROVISIONING_ERROR_EXAMPLES.EVIDENCE_REQUIRED],
+        'The request is invalid (VALIDATION_ERROR): the body is not an empty object, or the id is not a UUID.',
+      examples: [VALIDATION_EXAMPLE],
     },
   )
   async handOff(
+    // Validated only: the body is a strict empty object, so a client that still sends `evidence` is refused (F08).
+    @Body() _body: HandOffBodyDto,
     @CurrentPrincipal() actor: AuthenticatedPrincipal,
     @Param() params: TaskIdParamDto,
-    @Body() body: HandOffBodyDto,
   ) {
     try {
-      return { task: toWire(await this.decisions.handOff(actor, params.id, body)) };
+      return { task: toWire(await this.decisions.handOff(actor, params.id)) };
     } catch (error) {
       throw toProvisioningApiException(error);
     }

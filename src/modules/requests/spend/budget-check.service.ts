@@ -44,7 +44,11 @@ export class BudgetCheckService {
     private readonly assessments: AssessmentRepo,
   ) {}
 
-  /** Makes a check of the request and keeps it. */
+  /**
+   * Makes a check of the request and keeps it. The caller holds the lock of the request; this takes the lock of the Cost Center and
+   * each year the request binds in, in ascending order, before it reads a figure of the budget, and keeps it to the end of the
+   * transaction, which is also where the commitment of an approval is written (F31).
+   */
   async run(
     tx: DbTx,
     request: AccessRequestRecord,
@@ -53,6 +57,7 @@ export class BudgetCheckService {
     now: Date,
     scope?: CheckScope,
   ): Promise<CheckOutcome> {
+    await this.checks.lockBudgetYears(tx, request.costCenterId, this.bindingYears(request, scope));
     const computed = await this.compute(tx, request, now, scope);
     if (computed.status === 'NOT_CHECKABLE') return computed;
 
@@ -74,6 +79,15 @@ export class BudgetCheckService {
     });
 
     return { status: 'CHECKED', check };
+  }
+
+  /** The years the payments that bind fall in, whichever of them are open: what the check reads and what a commitment holds. */
+  private bindingYears(request: AccessRequestRecord, scope?: CheckScope): number[] {
+    const { pricing } = request;
+    if (pricing.status !== 'PRICED' || pricing.schedule === null) return [];
+    const schedule = scope ? scaleSchedule(pricing.schedule, scope.priced, scope.scoped) : pricing.schedule;
+
+    return [...new Set((schedule ?? []).filter((period) => period.binding).map((period) => period.budgetYear))];
   }
 
   /**

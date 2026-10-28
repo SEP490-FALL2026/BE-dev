@@ -6,8 +6,9 @@ import { CatalogService } from '../../catalog/catalog.service';
 import { OrganizationService } from '../../organization/organization.service';
 import { ToolsDepartmentNotFoundError, ToolsDepartmentOutOfScopeError } from '../licensing.errors';
 import type { AssignmentKind, AssignmentSource } from '../licensing.types';
+import { RevocationReadService } from '../provisioning/revocation-read.service';
 import { effectiveFromLabel } from './assignment.policy';
-import { AssignmentRepo } from './assignment.repo';
+import { AssignmentDepartmentRepo } from './assignment-department.repo';
 
 export interface ToolInUse {
   assignmentId: string;
@@ -20,6 +21,9 @@ export interface ToolInUse {
   plan: { id: string; name: string };
   effectiveFrom: BusinessDate;
   effectiveFromLabel: string | null;
+  /** The seat is on its way out: it is held until the end of a paid period (a K1 seat whose renewal was cancelled, `US-07-05` AC-19). */
+  terminating: boolean;
+  terminatingUntil: BusinessDate | null;
 }
 
 export interface ToolsSummaryLine {
@@ -31,17 +35,22 @@ export interface ToolsSummaryLine {
 }
 
 /**
- * The tools a department uses (`US-03-06` AC-13): an aggregate read of the seats its people hold today and the service
- * accounts it owns, never a list that is typed in or edited; one page by start date, with the counts of all (`LD-09`). The IT Admin reads any department; a department head reads the one they head (AC-17, `SoD-2`).
- * The account identifier of a seat is not shown here: a head sees which tool each person has, not how they sign in.
- * Licence keys (K4) join the list when the key vault exists.
+ * The tools a department uses (`US-03-06` AC-13): an aggregate read of the seats on the subscriptions the department owns (whoever
+ * holds them, `QĐ-89a`) and the service accounts it owns, never a list that is typed in or edited, and not a recommendation; one page
+ * by start date, with the counts of all (`LD-09`). A seat that ends at the end of a paid period says so (`terminating`): that is a K1
+ * seat whose renewal was cancelled, found by the one read of the revocations that says so, and never a seat that merely has an end
+ * day (a renewed seat and a service account passed to another person end on a day and go on in the next record). The IT Admin
+ * reads any department; a department head reads the one they head (AC-17, `SoD-2`). The account identifier of a seat is not shown
+ * here: a head sees which tool each person has, not how they sign in. Keys of K4 purchases do not join the list: a key has no holder
+ * to group by yet (`US-04-12` AC-5 to AC-8 are blocked), and none is invented.
  */
 @Injectable()
 export class DepartmentToolsService {
   constructor(
-    private readonly repo: AssignmentRepo,
+    private readonly repo: AssignmentDepartmentRepo,
     private readonly organization: OrganizationService,
     private readonly catalog: CatalogService,
+    private readonly revocations: RevocationReadService,
   ) {}
 
   /** Throws ToolsDepartmentNotFoundError and ToolsDepartmentOutOfScopeError. `summary` counts every seat, `items` is one page. */
@@ -74,6 +83,14 @@ export class DepartmentToolsService {
         (person) => [person.id, person],
       ),
     );
+    // A seat is on its way out only when its renewal was cancelled and its access runs on to the end of the paid period (AC-19): the
+    // read of the revocations says which of these people hold one, and the seats of this page are picked from it.
+    const terminating = new Map(
+      (await this.revocations.terminatingAccess([...new Set(assignments.map((a) => a.employeeId))])).map((access) => [
+        access.assignmentId,
+        access.accessUntil,
+      ]),
+    );
 
     const items = assignments.flatMap((assignment): ToolInUse[] => {
       const plan = plans.get(assignment.planId);
@@ -92,6 +109,8 @@ export class DepartmentToolsService {
           plan: { id: plan.planId, name: plan.planName },
           effectiveFrom: assignment.effectiveFrom,
           effectiveFromLabel: effectiveFromLabel(assignment.effectiveFromBasis, assignment.effectiveFrom),
+          terminating: terminating.has(assignment.id),
+          terminatingUntil: terminating.get(assignment.id) ?? null,
         },
       ];
     });

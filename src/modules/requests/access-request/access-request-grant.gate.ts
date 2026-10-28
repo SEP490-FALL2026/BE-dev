@@ -6,6 +6,7 @@ import type { GrantOutcome, GrantRequestAnswer, GrantRequestGate } from '../../l
 import { GroupGrantService } from '../group-request/group-grant.service';
 import { AccessRequestRepo } from './access-request.repo';
 import { grantAnswerFor } from './grant.policy';
+import { RequestOutcomeListeners } from './request-outcome-listeners';
 
 /**
  * What the grant of a seat asks of the module of requests (`GrantRequestGate`, registered with licensing when the module
@@ -22,6 +23,7 @@ export class AccessRequestGrantGate implements GrantRequestGate {
     private readonly audit: AuditService,
     private readonly budgets: BudgetsService,
     private readonly group: GroupGrantService,
+    private readonly outcomes: RequestOutcomeListeners,
   ) {}
 
   async check(requestId: string, employeeId?: string): Promise<GrantRequestAnswer> {
@@ -62,7 +64,8 @@ export class AccessRequestGrantGate implements GrantRequestGate {
     // A task whose request is not being carried out (an older grant, or a request of another kind) changes nothing here.
     if (!request || request.state !== 'EXECUTING') return;
 
-    await this.repo.setGrantOutcome(tx, request.id, outcome, new Date());
+    const now = new Date();
+    await this.repo.setGrantOutcome(tx, request.id, outcome, now);
     await this.record(
       tx,
       request.organizationId,
@@ -73,8 +76,11 @@ export class AccessRequestGrantGate implements GrantRequestGate {
     // A grant the IT Admin closed as failed spends nothing: what was held goes back to the budget in the same transaction
     // (US-06-06 AC-3). A grant that is only retrying is not reported here, so its commitment stays held (AC-7).
     if (outcome === 'FAILED') {
-      await this.budgets.releaseForRequest(tx, { requestId: request.id, reason: 'GRANT_FAILED', now: new Date() });
+      await this.budgets.releaseForRequest(tx, { requestId: request.id, reason: 'GRANT_FAILED', now });
     }
+    // The seat is real, or the request ended without one: the contexts that follow what became of it hear it here (F43).
+    if (outcome === 'COMPLETED') await this.outcomes.granted(tx, request, request.beneficiaryEmployeeIds, now);
+    else await this.outcomes.ended(tx, request, request.beneficiaryEmployeeIds, now);
   }
 
   async isWithdrawing(tx: DbTx, requestId: string, employeeId?: string): Promise<boolean> {
@@ -103,6 +109,7 @@ export class AccessRequestGrantGate implements GrantRequestGate {
     });
     // The grant is cancelled and spends nothing: what was held for the request goes back (US-05-08 AC-9).
     await this.budgets.releaseForRequest(tx, { requestId: request.id, reason: 'REQUEST_WITHDRAWN', now });
+    await this.outcomes.ended(tx, request, request.beneficiaryEmployeeIds, now);
 
     return true;
   }

@@ -73,6 +73,7 @@ describe('removing a person who left from a request for a group (e2e, no databas
     ['a cause the route does not know', { cause: 'REQUESTER_WITHDREW' }],
     ['a blank note', { cause: 'BENEFICIARY_LEFT', note: '   ' }],
     ['a blank evidence', { cause: 'BENEFICIARY_LEFT', evidence: ' ' }],
+    ['a closing for a transfer that gives no reason (F29)', { cause: 'BENEFICIARY_TRANSFERRED' }],
     ['a field the route does not know', { cause: 'BENEFICIARY_LEFT', reason: 'x' }],
   ])('refuses %s with 422', async (_name, payload) => {
     app = await appFor(principal(['IT_ADMIN']));

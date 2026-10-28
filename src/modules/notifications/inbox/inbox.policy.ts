@@ -58,6 +58,30 @@ export const PARAM_KEYS_BY_CODE: Readonly<Record<InAppNotificationCode, readonly
   RETURN_FAILED: ['returnRequestId'],
   REQUEST_RENEWAL_APPLIED: ['requestId', 'newExpectedEndDate'],
   REQUEST_RENEWAL_NOT_APPLIED: ['requestId', 'problem'],
+  // Organization and personnel (F17, F24): who it is about, where, what kind of event and from when; the ids of the notice or task.
+  EMPLOYEE_PROFILE_CREATED: ['employeeId', 'departmentId'],
+  EMPLOYEE_PROFILE_UPDATED: ['employeeId', 'departmentId'],
+  PERSONNEL_EVENT_RECORDED: ['employeeId', 'departmentId', 'eventKind', 'effectiveOn'],
+  PERSONNEL_NOTICE_RECEIVED: ['noticeId', 'employeeId', 'departmentId', 'eventKind'],
+  PERSONNEL_NOTICE_OVERDUE: ['noticeId', 'employeeId', 'departmentId', 'eventKind'],
+  ABRUPT_DEPARTURE_RECORDED: ['employeeId', 'departmentId', 'effectiveOn'],
+  ROLE_HOLDER_LEAVING: ['employeeId', 'departmentId', 'roleFlag', 'effectiveOn'],
+  TRANSFER_REVIEW_DUE: ['employeeId', 'departmentId', 'dueOn'],
+  IT_ADMIN_SELF_EXECUTED: ['taskId', 'employeeId'],
+  // The budget loops (F67): ids, the fiscal year, the decision and the reason already shown on the version or the request.
+  // No key says a figure (the words of FIGURE_WORDS are refused for every code).
+  BUDGET_VERSION_AWAITING_DECISION: ['versionId', 'costCenterId', 'year'],
+  BUDGET_PROPOSAL_SUBMITTED: ['proposalId', 'costCenterId', 'year'],
+  BUDGET_PROPOSAL_RETURNED: ['proposalId', 'costCenterId', 'year', 'reason'],
+  BUDGET_VERSION_DECIDED: ['versionId', 'costCenterId', 'year', 'decision', 'reason'],
+  REQUEST_FINANCE_REVIEW_OPENED: ['requestId', 'stepKind'],
+  REQUEST_RETURNED_BY_FINANCE: ['requestId', 'reason'],
+  REQUEST_AWAITING_BUDGET: ['requestId', 'costCenterId', 'year'],
+  REQUEST_BUDGET_VERSION_ENDED: ['requestId', 'versionId', 'costCenterId', 'year', 'decision'],
+  BUDGET_VERSION_CLOSED_UNAPPROVED: ['versionId', 'costCenterId', 'year'],
+  BUDGET_PROPOSAL_CLOSED_YEAR_END: ['proposalId', 'costCenterId', 'year'],
+  BUDGET_PROPOSAL_TASK_ASSIGNED: ['costCenterId', 'departmentId', 'year'],
+  BUDGET_PROPOSAL_TASK_WAITING: ['proposalId', 'costCenterId', 'year'],
 };
 
 /** Whether the code is one of the closed table. */

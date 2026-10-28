@@ -11,8 +11,7 @@ import { RequestAssessmentService } from './request-assessment.service';
 
 /**
  * What a person is shown before they send a request (`US-05-01`): the cost with its estimated tax, the chain of people who
- * will decide it with the time each step may take, whether the plan is outside their standard toolset, and whether they
- * already hold it. It is a read: it takes no lock, writes no request, no audit event and no row of any kind, and it reads
+ * will decide it with the time each step may take, and whether they already hold it. It is a read: it takes no lock, writes no request, no audit event and no row of any kind, and it reads
  * the facts through the same assessment that sending uses, so the answer is what sending would fix on the same day.
  */
 @Injectable()

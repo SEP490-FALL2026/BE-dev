@@ -4,22 +4,12 @@ const valid = (): InstallationInput => ({
   timeZone: 'Asia/Ho_Chi_Minh',
   reportingCurrency: 'VND',
   organizationName: 'Acme Software',
-  costCenterCode: 'CC-ENG',
-  costCenterName: 'Engineering',
   departmentCode: 'P-ENG',
   departmentName: 'Engineering',
-  jobTitleName: 'Software Engineer',
   superAdmin: {
     employeeCode: 'E001',
     fullName: 'Pham Bao',
     workEmail: 'bao@acme.vn',
-    employmentType: 'STAFF',
-    hireDate: '2024-03-01',
-  },
-  itAdmin: {
-    employeeCode: 'E002',
-    fullName: 'Tran An',
-    workEmail: 'an@acme.vn',
     employmentType: 'STAFF',
     hireDate: '2024-03-01',
   },
@@ -50,16 +40,6 @@ describe('installationInputSchema', () => {
     },
   );
 
-  it('rejects two employees sharing a code or an email, even by +tag alias', () => {
-    const base = valid();
-    expect(issues({ ...base, itAdmin: { ...base.itAdmin, employeeCode: 'e001' } })).toEqual([
-      expect.stringContaining('itAdmin.employeeCode'),
-    ]);
-    expect(issues({ ...base, itAdmin: { ...base.itAdmin, workEmail: 'Bao+it@Acme.vn' } })).toEqual([
-      expect.stringContaining('itAdmin.workEmail'),
-    ]);
-  });
-
   it('rejects a hire date in the future and an impossible date', () => {
     const base = valid();
     expect(issues({ ...base, superAdmin: { ...base.superAdmin, hireDate: '2999-01-01' } })).toEqual([
@@ -72,5 +52,23 @@ describe('installationInputSchema', () => {
 
   it('rejects unknown keys so a mistyped option is not silently ignored', () => {
     expect(issues({ ...valid(), password: 'hunter2hunter2' })).not.toEqual([]);
+  });
+
+  it.each([
+    ['costCenterCode', 'CC-ENG'],
+    ['costCenterName', 'Engineering'],
+    ['jobTitleName', 'Software Engineer'],
+    [
+      'itAdmin',
+      {
+        employeeCode: 'E002',
+        fullName: 'Tran An',
+        workEmail: 'an@acme.vn',
+        employmentType: 'STAFF',
+        hireDate: '2024-03-01',
+      },
+    ],
+  ])('refuses the key %s of the earlier command: no Cost Center, job title or IT employee (QĐ-87f)', (key, value) => {
+    expect(issues({ ...valid(), [key]: value })).toEqual([expect.stringContaining(key)]);
   });
 });

@@ -1,4 +1,4 @@
-import { CURRENT_POLICY_VERSION, canViewRequest, policyFor } from './access-request.policy';
+import { CURRENT_POLICY_VERSION, canViewRequest, mayRequest, policyFor } from './access-request.policy';
 
 describe('who may see a request (BM-01: the requester, the people who decide, the IT Admin)', () => {
   const request = {
@@ -58,5 +58,19 @@ describe('the policy fixed when a request is sent (US-05-02)', () => {
     first.chain.push('NEED');
 
     expect(policyFor('SAAS', 2).chain).toEqual(['NEED', 'SPEND_APPROVAL', 'IT_EXECUTION']);
+  });
+});
+
+describe('who may send a request (QĐ-87a, SoD-1, F30)', () => {
+  it('lets everybody but the Super Admin send one', () => {
+    expect(mayRequest(['EMPLOYEE'])).toBe(true);
+    expect(mayRequest(['EMPLOYEE', 'MANAGER'])).toBe(true);
+    expect(mayRequest(['IT_ADMIN'])).toBe(true);
+    expect(mayRequest([])).toBe(true);
+  });
+
+  it('refuses the Super Admin whatever else they hold', () => {
+    expect(mayRequest(['SUPER_ADMIN'])).toBe(false);
+    expect(mayRequest(['EMPLOYEE', 'SUPER_ADMIN'])).toBe(false);
   });
 });

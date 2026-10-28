@@ -161,12 +161,19 @@ export type TaskDoneWhen =
   | 'REVOKED_OFF_SYSTEM_WITH_EVIDENCE';
 
 /**
- * What the module that owns requests says when asked to grant one: it may be granted (for whom, and the plan asked for),
- * or it is not known, not approved enough yet, or already ended. The grant of a seat trusts this answer for the state of
- * the request; the seat itself it judges alone.
+ * What the module that owns requests says when asked to grant one: it may be granted (for whom, which plan), or it is
+ * not known, not approved enough yet, or already ended. The grant trusts this answer for the request; the seat it judges alone.
  */
 export type GrantRequestAnswer =
-  | { status: 'GRANTABLE'; seat: 'PERSONAL'; employeeId: string; planId: string; expectedEndDate: string | null }
+  | {
+      status: 'GRANTABLE';
+      seat: 'PERSONAL';
+      employeeId: string;
+      planId: string;
+      /** The department of the request: its seat is granted only on a subscription this department owns (`QĐ-89a`, F20). */
+      departmentId: string;
+      expectedEndDate: string | null;
+    }
   | {
       status: 'GRANTABLE';
       seat: 'SERVICE';
@@ -189,8 +196,7 @@ export type GrantRequestAnswer =
 
 /**
  * What the request of a service account says to the grant (`US-05-21`): why the account exists, the identifier its sender
- * expects (only a hint for the IT Admin, who enters the real one), and the department that owns it with the Unit Cost Center
- * the request was charged to.
+ * expects (a hint: the IT Admin enters the real one), and the department and Unit Cost Center that own it.
  */
 export interface ServiceAccountGrant {
   purpose: string;
@@ -203,9 +209,8 @@ export interface ServiceAccountGrant {
 export type SelfExecutionMode = 'ALLOW' | 'ALLOW_SELF_EXECUTED';
 
 /**
- * What became of the grant of a request that its requester withdrew (`US-05-08`): there was none, it was cancelled with its
- * assignment, it is being worked (so the withdrawal waits), it is done (so the way back is a return), it failed and waits for
- * the IT Admin to close it as cancelled, or it had ended already.
+ * What became of the grant of a request its requester withdrew (`US-05-08`): none, cancelled with its assignment, being worked
+ * (the withdrawal waits), done (the way back is a return), failed (the IT Admin closes it as cancelled) or already ended.
  */
 export type GrantCancellation =
   | { status: 'NO_TASK' | 'RUNNING' | 'ENDED' }
@@ -230,14 +235,12 @@ export type GrantOutcome = 'COMPLETED' | 'FAILED';
 export interface GrantRequestGate {
   /**
    * The state of the request as a read without a lock: to find the plan and the person before the grant begins. A request for a
-   * group is granted one person at a time, so every call about its grant names the person (`employeeId`); a request for one
-   * person ignores it.
+   * group is granted one person at a time, so every call names the person (`employeeId`); a request for one person ignores it.
    */
   check(requestId: string, employeeId?: string): Promise<GrantRequestAnswer>;
   /**
    * Inside the transaction of the grant: locks the request, judges it again and, only if it may be granted, moves it to
-   * the state of a request being carried out. The move is what lets a request be granted once: a second grant finds it
-   * no longer grantable. Any answer but `GRANTABLE` leaves the request as it was.
+   * the state of a request being carried out (what lets it be granted once). Any answer but `GRANTABLE` leaves it as it was.
    */
   claimForGrant(tx: DbTx, requestId: string, employeeId?: string): Promise<GrantRequestAnswer>;
   /** Inside the transaction that completes or closes as failed the task of a grant: says how the request ended. */
@@ -267,13 +270,10 @@ export const REVOCATION_SOURCES = [
   'SUBSCRIPTION_EXPIRED',
   'NOT_LEGALIZED',
   'RE_EXECUTION',
+  // The head of the holder's department decided, after the installation, that a seat on another department's subscription goes (F21).
+  'POST_SETUP_REVIEW',
 ] as const;
-/**
- * What a row can say of where a revocation came from. `POST_SETUP_REVIEW` is written by the release after this one (spec L.10): this
- * release reads it and never accepts it as an input, so `REVOCATION_SOURCES` above (the inputs) does not have it.
- */
-export const READABLE_REVOCATION_SOURCES = [...REVOCATION_SOURCES, 'POST_SETUP_REVIEW'] as const;
-export type RevocationSource = (typeof READABLE_REVOCATION_SOURCES)[number];
+export type RevocationSource = (typeof REVOCATION_SOURCES)[number];
 
 /** How a revocation was completed: the account removed (K2), already gone, the renewal cancelled (K1), revoked off the system (K5). */
 export type RevocationCompletion = 'ACCOUNT_REMOVED' | 'ALREADY_GONE' | 'RENEWAL_CANCELLED' | 'OFF_SYSTEM_REVOKED';

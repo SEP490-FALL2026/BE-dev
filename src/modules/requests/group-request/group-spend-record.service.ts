@@ -16,6 +16,7 @@ import { scaleSchedule, sharesOf } from './line-allocation.policy';
 import { LineAmountRepo } from './line-amount.repo';
 import { LineDecisionRepo } from './line-decision.repo';
 import { RequestLineRepo } from './request-line.repo';
+import { RequestOutcomeListeners } from '../access-request/request-outcome-listeners';
 
 export interface SpendRecordInput {
   step: SpendStepRecord;
@@ -42,6 +43,7 @@ export class GroupSpendRecordService {
     private readonly resolution: GroupResolutionService,
     private readonly identity: IdentityAccessService,
     private readonly audit: AuditService,
+    private readonly outcomes: RequestOutcomeListeners,
   ) {}
 
   /** Records the decision: approved when somebody goes on, refused, with no commitment, when nobody does. */
@@ -176,6 +178,8 @@ export class GroupSpendRecordService {
           },
         ),
       );
+      // The line of a person whose spend was refused ended for them without a grant (F43).
+      if (rejected) await this.outcomes.ended(tx, request, [verdict.employeeId], input.now);
     }
     await this.audit.record(
       tx,

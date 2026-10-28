@@ -4,9 +4,13 @@ import { AuditModule } from '../audit/audit.module';
 import { CatalogModule } from '../catalog/catalog.module';
 import { IdentityAccessFacadeModule } from '../identity-access/identity-access-facade.module';
 import { LicensingModule } from '../licensing/licensing.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { OperatingParametersModule } from '../operating-parameters/operating-parameters.module';
 import { OrganizationModule } from '../organization/organization.module';
 import { RequestsModule } from '../requests/requests.module';
+import { DepartmentOpenWorkReader } from './event-notice/department-open-work.reader';
+import { DepartmentOpenWorkRepo } from './event-notice/department-open-work.repo';
+import { PersonnelNotifier } from './event-notice/personnel-notifier.service';
 import { LeaveDepartureService } from './leave/leave-departure.service';
 import { LeaveOverdueService } from './leave/leave-overdue.service';
 import { LeaveNoticeRecorder } from './leave/leave-notice.recorder';
@@ -34,6 +38,7 @@ import { OffboardingPeriodsService } from './offboarding/offboarding-periods.ser
 import { OffboardingRevocationService } from './offboarding/offboarding-revocation.service';
 import { OffboardingViewService } from './offboarding/offboarding-view.service';
 import { OffboardingController } from './offboarding/offboarding.controller';
+import { OffboardingStepsController } from './offboarding/offboarding-steps.controller';
 import { OffboardingNoticeRecorder } from './offboarding/offboarding-notice.recorder';
 import { OffboardingRepo } from './offboarding/offboarding.repo';
 import { OpenRequestsController } from './offboarding/open-requests.controller';
@@ -65,9 +70,11 @@ import { TransferRepo } from './transfer/transfer.repo';
 import { TransferService } from './transfer/transfer.service';
 import { TransfersController } from './transfer/transfers.controller';
 import { TransferReviewDecisionService } from './transfer-review/transfer-review-decision.service';
+import { PostSetupReviewService } from './transfer-review/post-setup-review.service';
 import { TransferReviewListRepo } from './transfer-review/transfer-review-list.repo';
 import { TransferReviewListener } from './transfer-review/transfer-review.listener';
 import { TransferReviewOverdueService } from './transfer-review/transfer-review-overdue.service';
+import { TransferReviewReplacementService } from './transfer-review/transfer-review-replacement.service';
 import { TransferReviewRepo } from './transfer-review/transfer-review.repo';
 import { TransferReviewService } from './transfer-review/transfer-review.service';
 import { TransferReviewSweeper } from './transfer-review/transfer-review.sweeper';
@@ -79,8 +86,8 @@ import { TransferReviewsController } from './transfer-review/transfer-reviews.co
  * now, the long leave and the leaving of a person next. It writes history through the organization and never touches the
  * tables of another module. Only the API loads it: its listener of the organization settles a transfer on its day, and the
  * hourly telling of the organization runs in the same graph. The one thing it exports is the registry of hooks that the flows
- * which follow a personnel file (the owner of a service account) register with. It also holds the review of the tools outside the
- * standard toolset that the new head of a department makes after a transfer: opened by its listener when a person changes
+ * which follow a personnel file (the owner of a service account) register with. It also holds the review of the tools of a
+ * person (every personal seat they hold) that the new head of a department makes after a transfer: opened by its listener when a person changes
  * department, decided by the head, and told as late by an hourly sweep; a decision to take a tool away goes through the licensing
  * gate in the same transaction. The long leave of a person (the day they are due back, the basis of it, the return) is kept here too:
  * a late return is only told by an hourly sweep, never acted on, and the facade `PersonnelService` gives the days of leave to the rules
@@ -90,6 +97,11 @@ import { TransferReviewsController } from './transfer-review/transfer-reviews.co
  * The notice a head of department sends about a change coming for one of their people is kept here too: information with no effect, which
  * the IT Admin rejects or verifies and records through the transfer, the long leave or the departure (each registers its own recorder
  * with `NoticeRecorderRegistry`), told as late by an hourly sweep and never acted on.
+ *
+ * Who writes an event is the Super Admin (`QĐ-87a`), judged by the policy of each service; about the Super Admin themselves only the
+ * controlled procedure `pnpm ops:record-super-admin-event` writes it, with a ticket (spec L.2). The command lives in `super-admin-event/`
+ * with a module of its own that the API and the worker never load; it reaches the writes below through the services this module
+ * exports for it. Everyone concerned by an event is told in the inbox in the same transaction (`PersonnelNotifier`, F17).
  */
 @Module({
   imports: [
@@ -101,12 +113,14 @@ import { TransferReviewsController } from './transfer-review/transfer-reviews.co
     LicensingModule,
     OperatingParametersModule,
     RequestsModule,
+    NotificationsModule,
   ],
   controllers: [
     TransfersController,
     TransferReviewsController,
     LongLeavesController,
     OffboardingController,
+    OffboardingStepsController,
     OpenRequestsController,
     MeDepartureNoticeController,
     SuperAdminWatchController,
@@ -115,6 +129,9 @@ import { TransferReviewsController } from './transfer-review/transfer-reviews.co
   providers: [
     PersonnelFileHooks,
     TransferRepo,
+    DepartmentOpenWorkRepo,
+    DepartmentOpenWorkReader,
+    PersonnelNotifier,
     TransferGuardService,
     TransferSettlementService,
     TransferEffectiveListener,
@@ -126,6 +143,8 @@ import { TransferReviewsController } from './transfer-review/transfer-reviews.co
     TransferReviewListRepo,
     TransferReviewService,
     TransferReviewListener,
+    TransferReviewReplacementService,
+    PostSetupReviewService,
     TransferReviewDecisionService,
     TransferReviewViewService,
     TransferReviewOverdueService,
@@ -172,6 +191,16 @@ import { TransferReviewsController } from './transfer-review/transfer-reviews.co
     OffboardingNoticeRecorder,
     PersonnelService,
   ],
-  exports: [PersonnelFileHooks, PersonnelService],
+  // The facade and the registry of hooks, and the services of the writes the controlled procedure runs with an operator actor (spec L.2).
+  exports: [
+    PersonnelFileHooks,
+    PersonnelService,
+    TransferService,
+    TransferChangeService,
+    LeaveService,
+    OffboardingService,
+    OffboardingChangeService,
+    NoticeHandlingService,
+  ],
 })
 export class PersonnelModule {}

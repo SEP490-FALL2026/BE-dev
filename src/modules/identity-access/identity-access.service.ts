@@ -128,14 +128,29 @@ export class IdentityAccessService {
     return this.accounts.findUsableSuperAdminEmployeeId(tx);
   }
 
+  /**
+   * The account of this employee, or null when they have none: what a flow that carries out a decision a person took earlier needs, to
+   * act in their name (a transfer review that revokes a seat when the new Request ends, `STILL_NEEDED`) (an unlocked read).
+   */
+  findAccountIdOfEmployee(tx: DbTx, employeeId: string): Promise<string | null> {
+    return this.accounts.findAccountIdByEmployee(tx, employeeId);
+  }
+
+  /** The login email of the account of this employee, or null when they have none (an unlocked read): what a command compares a reference with. */
+  async findLoginEmailOfEmployee(tx: DbTx, employeeId: string): Promise<string | null> {
+    const appUserId = await this.accounts.findAccountIdByEmployee(tx, employeeId);
+
+    return appUserId === null ? null : this.accounts.findLoginEmail(appUserId);
+  }
+
   /** The employee behind each of these accounts, by account id; for a consumer that reads who acted from an audit event (an unlocked read). */
   employeeIdsOfAccounts(appUserIds: readonly string[], tx?: DbTx): Promise<Map<string, string>> {
     return this.accounts.employeeIdsOfAccounts(appUserIds, tx);
   }
 
-  /** How many IT Admins other than this employee can act (an unlocked read, `QĐ-77m`). */
-  countUsableItAdminsExcept(employeeId: string): Promise<number> {
-    return this.accounts.countUsableItAdminsExcept(employeeId);
+  /** How many IT Admins other than this employee can act (an unlocked read, `QĐ-77m`); with `tx`, in the transaction of the act (F24). */
+  countUsableItAdminsExcept(employeeId: string, tx?: DbTx): Promise<number> {
+    return this.accounts.countUsableItAdminsExcept(employeeId, tx);
   }
 
   /**

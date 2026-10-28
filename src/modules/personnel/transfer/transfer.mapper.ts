@@ -1,4 +1,5 @@
 import type { DepartmentBrief, EmployeeRecord } from '../../organization/organization.types';
+import type { ReadAccess } from '../personnel-self-action.policy';
 import type { TransferChangeWire, TransferDetailWire, TransferRecordedWire, TransferSummaryWire } from './transfer.dto';
 import type { TransferChangeRecord, TransferRecord, TransferSummaryRecord, TransferWarning } from './transfer.types';
 
@@ -30,28 +31,41 @@ export function toSummary(record: TransferSummaryRecord, names: TransferNames): 
     to: placeOf(names, record.toDepartmentId),
     effectiveOn: record.effectiveOn,
     status: record.status,
-    selfExecuted: record.selfExecuted,
   };
 }
 
-export function toDetail(record: TransferRecord, names: TransferNames): TransferDetailWire {
+/**
+ * The transfer in full for the Super Admin; for the IT Admin only the minimal projection (F12): the people, the departments, the day
+ * and the state the technical work needs, without the basis, the handover of the head or the reason of a cancellation.
+ */
+export function toDetail(
+  record: TransferRecord,
+  names: TransferNames,
+  access: ReadAccess = 'FULL',
+): TransferDetailWire {
   const handover = record.headHandover;
+  const full = access === 'FULL';
 
   return {
     ...toSummary(record, names),
-    grounds: { ...record.grounds },
-    headSuccessor: handover && {
-      kind: handover.successor,
-      employee: handover.successorEmployeeId ? employeeBrief(names, handover.successorEmployeeId) : null,
-    },
+    grounds: full ? { ...record.grounds } : null,
+    headSuccessor:
+      full && handover
+        ? {
+            kind: handover.successor,
+            employee: handover.successorEmployeeId ? employeeBrief(names, handover.successorEmployeeId) : null,
+          }
+        : null,
     recordedByAppUserId: record.recordedByAppUserId,
+    recordedByProcedure: record.recordedByTicketId !== null,
     recordedAt: record.recordedAt.toISOString(),
     effectiveAt: record.effectiveAt?.toISOString() ?? null,
     cancellation:
-      record.cancelledAt && record.cancelledByAppUserId && record.cancelledReason !== null
+      full && record.cancelledAt && record.cancelledReason !== null
         ? {
             cancelledAt: record.cancelledAt.toISOString(),
             cancelledByAppUserId: record.cancelledByAppUserId,
+            cancelledByProcedure: record.cancelledByTicketId !== null,
             reason: record.cancelledReason,
           }
         : null,
@@ -76,5 +90,6 @@ export const toChange = (change: TransferChangeRecord): TransferChangeWire => ({
   reason: change.reason,
   grounds: { ...change.grounds },
   changedByAppUserId: change.changedByAppUserId,
+  changedByProcedure: change.changedByTicketId !== null,
   changedAt: change.changedAt.toISOString(),
 });

@@ -23,6 +23,7 @@ export class OffboardingListRepo {
 
   async list(filter: OffboardingListFilter): Promise<{ items: OffboardingSummaryRecord[]; total: number }> {
     const where: Prisma.OffboardingCaseWhereInput = {
+      ...(filter.departmentIds ? { departmentId: { in: [...filter.departmentIds] } } : {}),
       ...(filter.employeeId ? { employeeId: filter.employeeId } : {}),
       ...(filter.state ? { state: filter.state } : {}),
       // A handover that has gone past its last working day and has not become the departure (`US-03-04` AC-10).

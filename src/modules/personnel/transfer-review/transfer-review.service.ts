@@ -6,6 +6,7 @@ import { LicensingService } from '../../licensing/licensing.service';
 import { OperatingParametersService } from '../../operating-parameters/operating-parameters.service';
 import { OrganizationService } from '../../organization/organization.service';
 import type { OrganizationChange } from '../../organization/organization.types';
+import { PersonnelNotifier } from '../event-notice/personnel-notifier.service';
 import { personnelSystemAuditEvent } from '../mappers/personnel-audit-event';
 import { reviewDueOn } from './transfer-review.policy';
 import { TransferReviewRepo } from './transfer-review.repo';
@@ -18,7 +19,8 @@ const CALENDAR_WINDOW_DAYS = 90;
  * Opens the review of the tools a person brought when they are moved to another department (`US-03-07` AC-1, AC-2, `QĐ-89b`,
  * `QĐ-90b`): one line for every personal seat they hold, paid or internal, whatever any list says. It runs in the transaction of the
  * change, once for each placement: a person who holds no seat gets no review and their head no work. The seats are never touched
- * here: they stay as they were until the head decides.
+ * here: they stay as they were until the head decides. The head of the department the person came to is told the deadline in the same
+ * transaction; a department that has no head yet keeps the notice for the first one (`QĐ-62c`, F17).
  */
 @Injectable()
 export class TransferReviewService {
@@ -28,6 +30,7 @@ export class TransferReviewService {
     private readonly parameters: OperatingParametersService,
     private readonly organization: OrganizationService,
     private readonly audit: AuditService,
+    private readonly notifier: PersonnelNotifier,
   ) {}
 
   /** Idempotent: a placement that has a review has no second one, however many times the change is told. */
@@ -54,7 +57,7 @@ export class TransferReviewService {
       placementId: change.placementId,
       departmentId: change.toDepartmentId,
       effectiveOn: change.effectiveOn,
-      dueOn: await this.dueOn(change.effectiveOn),
+      dueOn: await this.dueOnAfter(change.effectiveOn),
       items: seats.map((seat) => ({
         assignmentId: seat.assignmentId,
         planId: seat.planId,
@@ -81,6 +84,29 @@ export class TransferReviewService {
         },
       ),
     );
+    await this.tellHead(tx, review);
+  }
+
+  /** The head of the department of the review (or the first head it gets) is told the deadline, in the transaction that opened it. */
+  async tellHead(
+    tx: DbTx,
+    review: { id: string; organizationId: string; employeeId: string; departmentId: string; dueOn: string },
+  ): Promise<void> {
+    const today = await this.organization.businessToday(new Date(), tx);
+    // The department is taken FOR SHARE before its head is read (T-11): the assignment of a first head holds it FOR UPDATE and hands
+    // over the notices kept before it commits, so a notice is never kept for a department that has a head by then.
+    await this.organization.lockDepartmentShared(tx, review.departmentId);
+    const head = (await this.organization.getDepartmentHeads([review.departmentId], today, tx)).get(
+      review.departmentId,
+    );
+    await this.notifier.reviewDue(tx, {
+      organizationId: review.organizationId,
+      employeeId: review.employeeId,
+      departmentId: review.departmentId,
+      reviewId: review.id,
+      dueOn: review.dueOn,
+      headEmployeeId: head?.employeeId ?? null,
+    });
   }
 
   /**
@@ -122,7 +148,8 @@ export class TransferReviewService {
     }
   }
 
-  private async dueOn(effectiveOn: string): Promise<string> {
+  /** The last day to decide a review that opens on `effectiveOn`: the working days of the parameter after it, the day itself not counted. */
+  async dueOnAfter(effectiveOn: string): Promise<string> {
     const days = Number(await this.parameters.getValue(WORKING_DAYS));
     const nonWorking = await this.parameters.getNonWorkingDates(
       effectiveOn,

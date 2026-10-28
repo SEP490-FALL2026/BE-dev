@@ -1,9 +1,11 @@
+import { Client } from 'pg';
 import request from 'supertest';
 import { addDays } from '../../src/core/business-date';
 import { OrganizationHistoryService } from '../../src/modules/organization/organization-history.service';
 import { OrganizationService } from '../../src/modules/organization/organization.service';
 import type { OrganizationChange, OrganizationChangeListener } from '../../src/modules/organization/organization.types';
 import type { ApiAccount } from './api-accounts';
+import { waitForLockWaiters } from './lock-wait';
 import type { Person } from './request-harness';
 import { ReassignmentHarness } from './reassignment-harness';
 import type { Department } from './request-harness';
@@ -15,26 +17,71 @@ export interface TransferWire {
   to: { department: { id: string; code: string; name: string } };
   effectiveOn: string;
   status: 'PENDING' | 'EFFECTIVE' | 'CANCELLED';
-  selfExecuted: boolean;
-  grounds: { type: string; reference: string; issuer: string; issuedOn: string };
+  grounds: { type: string; reference: string; issuer: string; issuedOn: string } | null;
   headSuccessor: { kind: 'EMPLOYEE' | 'NONE'; employee: { id: string } | null } | null;
-  recordedByAppUserId: string;
+  recordedByAppUserId: string | null;
+  recordedByProcedure: boolean;
   effectiveAt: string | null;
-  cancellation: { cancelledAt: string; cancelledByAppUserId: string; reason: string } | null;
+  cancellation: {
+    cancelledAt: string;
+    cancelledByAppUserId: string | null;
+    cancelledByProcedure: boolean;
+    reason: string;
+  } | null;
   warnings?: { code: string; applications: { id: string; name: string }[]; totalApplications: number }[];
 }
 
 export interface PlacementRow {
   id: string;
   department_id: string;
-  job_title_id: string;
   valid_from: string;
   valid_to: string | null;
 }
 
 /** The people and departments a transfer is about, the calls of its routes and what it leaves in the database. No assertion lives here. */
 export class TransferHarness extends ReassignmentHarness {
+  /** The Super Admin as an account: the one who records, moves and cancels the events of the personnel context (`QĐ-87a`). */
+  get sa(): ApiAccount {
+    return {
+      appUserId: this.seed.superAdmin.appUserId,
+      employeeId: this.seed.superAdmin.employeeId,
+      email: this.seed.superAdmin.email,
+      accessToken: this.admin,
+    };
+  }
+
   readonly grounds = { type: 'DECISION', reference: 'QD-12/2026', issuer: 'HR Department', issuedOn: '2026-10-01' };
+
+  /**
+   * The row of the employee is held `FOR UPDATE` in a separate connection, the calls are sent one by one, each only after the one
+   * before has reached a lock wait (`waitForLockWaiters`), and the row is then released: the lock goes to the calls in the order
+   * they queued, so the answer of each is the answer of its place. The lock is always released and the calls always settled.
+   */
+  async queuedOnEmployee(
+    employeeId: string,
+    sends: Array<() => PromiseLike<request.Response>>,
+  ): Promise<request.Response[]> {
+    const holder = new Client({ connectionString: this.ctx.database.url });
+    const pending: Array<Promise<request.Response>> = [];
+    await holder.connect();
+    try {
+      await holder.query('BEGIN');
+      await holder.query('SELECT 1 FROM employees WHERE id = $1 FOR UPDATE', [employeeId]);
+      for (const send of sends) {
+        pending.push(Promise.resolve(send()));
+        await waitForLockWaiters(this.ctx.sql, pending.length);
+      }
+      await holder.query('COMMIT');
+      const answers: request.Response[] = [];
+      for (const answer of pending) answers.push(await answer);
+
+      return answers;
+    } finally {
+      await holder.query('ROLLBACK').catch(() => undefined);
+      await holder.end();
+      await Promise.allSettled(pending);
+    }
+  }
 
   /** The day `offset` days from today in the calendar of the organization. */
   day = (offset: number): string => addDays(this.today(), offset);
@@ -49,21 +96,21 @@ export class TransferHarness extends ReassignmentHarness {
     return person;
   }
 
-  recordTransfer = (body: object, account: ApiAccount = this.it1) =>
+  recordTransfer = (body: object, account: ApiAccount = this.sa) =>
     request(this.server()).post('/api/v1/department-transfers').set(this.as(account)).send(body);
-  rescheduleTransfer = (id: string, body: object, account: ApiAccount = this.it1) =>
+  rescheduleTransfer = (id: string, body: object, account: ApiAccount = this.sa) =>
     request(this.server()).post(`/api/v1/department-transfers/${id}/rescheduling`).set(this.as(account)).send(body);
-  cancelTransfer = (id: string, body: object, account: ApiAccount = this.it1) =>
+  cancelTransfer = (id: string, body: object, account: ApiAccount = this.sa) =>
     request(this.server()).post(`/api/v1/department-transfers/${id}/cancellation`).set(this.as(account)).send(body);
-  readTransfer = (id: string, account: ApiAccount = this.it1) =>
+  readTransfer = (id: string, account: ApiAccount = this.sa) =>
     request(this.server()).get(`/api/v1/department-transfers/${id}`).set(this.as(account));
-  listTransfers = (query = '', account: ApiAccount = this.it1) =>
+  listTransfers = (query = '', account: ApiAccount = this.sa) =>
     request(this.server()).get(`/api/v1/department-transfers${query}`).set(this.as(account));
-  transferChanges = (id: string, query = '', account: ApiAccount = this.it1) =>
+  transferChanges = (id: string, query = '', account: ApiAccount = this.sa) =>
     request(this.server()).get(`/api/v1/department-transfers/${id}/changes${query}`).set(this.as(account));
 
   /** A transfer recorded and expected to succeed (201). */
-  async recorded(body: object, account: ApiAccount = this.it1): Promise<TransferWire> {
+  async recorded(body: object, account: ApiAccount = this.sa): Promise<TransferWire> {
     const response = await this.recordTransfer(body, account);
     if (response.status !== 201) throw new Error(`record: ${response.status} ${JSON.stringify(response.body)}`);
 
@@ -73,7 +120,7 @@ export class TransferHarness extends ReassignmentHarness {
   /** The placements of the person, oldest first, as the database keeps them (dates as `YYYY-MM-DD`). */
   async placements(employeeId: string): Promise<PlacementRow[]> {
     const { rows } = await this.ctx.sql.query<PlacementRow>(
-      `SELECT id, department_id, job_title_id, to_char(valid_from, 'YYYY-MM-DD') AS valid_from,
+      `SELECT id, department_id, to_char(valid_from, 'YYYY-MM-DD') AS valid_from,
               to_char(valid_to, 'YYYY-MM-DD') AS valid_to
          FROM employee_placements WHERE employee_id = $1 ORDER BY valid_from`,
       [employeeId],

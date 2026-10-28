@@ -8,6 +8,7 @@ import { accessRequestAuditEvent } from '../access-request/access-request-audit-
 import { AccessRequestNotFoundError } from '../access-request/access-request.errors';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
+import { RequestOutcomeListeners } from '../access-request/request-outcome-listeners';
 import { ServiceAccountReviewRefusedError } from './service-account-request.errors';
 import { reviewRefusal, verdictOf, type ReviewDecision } from './service-account-request.policy';
 import { ServiceAccountRequestRepo } from './service-account-request.repo';
@@ -30,6 +31,7 @@ export class ServiceAccountBoundaryService {
     private readonly budgets: BudgetsService,
     private readonly licensing: LicensingService,
     private readonly audit: AuditService,
+    private readonly outcomes: RequestOutcomeListeners,
   ) {}
 
   /** Throws AccessRequestNotFoundError, ServiceAccountReviewRefusedError and ProvisioningAnotherItAdminNeededError. */
@@ -83,6 +85,8 @@ export class ServiceAccountBoundaryService {
           },
         ),
       );
+      // The refusal of the IT Admin ends the request for the person who answers for the account, without a grant (F43).
+      if (verdict.state === 'REJECTED') await this.outcomes.ended(tx, request, request.beneficiaryEmployeeIds, now);
 
       const record = await this.requests.findById(request.id, tx);
       if (!record) throw new Error(`The request ${request.id} was not found after its boundary was decided.`);

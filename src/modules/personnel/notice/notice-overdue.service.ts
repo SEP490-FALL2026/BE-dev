@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import { AuditService } from '../../audit/audit.service';
 import { OrganizationService } from '../../organization/organization.service';
+import { PersonnelNotifier } from '../event-notice/personnel-notifier.service';
 import { personnelSystemAuditEvent } from '../mappers/personnel-audit-event';
 import { NoticeRepo } from './notice.repo';
 
@@ -9,8 +10,8 @@ import { NoticeRepo } from './notice.repo';
 const BATCH = 200;
 
 /**
- * Tells, once for each notice, that the IT Admin has let its day pass without handling it (`US-03-10` AC-2, `US-03-11` AC-5): the audit
- * event is the point the reminder to the IT Admin is taken from. It only tells. The notice is never recorded or rejected by the
+ * Tells, once for each notice, that its day has passed without the Super Admin handling it (`US-03-10` AC-2, `US-03-11` AC-5): the Super
+ * Admin is told in the inbox in the same transaction (F17) and the audit event keeps the fact. It only tells. The notice is never recorded or rejected by the
  * calendar and the person it is about is never changed. The mark and the event are written together, so a notice is told once however
  * many instances run the sweep.
  */
@@ -21,6 +22,7 @@ export class NoticeOverdueService {
     private readonly notices: NoticeRepo,
     private readonly organization: OrganizationService,
     private readonly audit: AuditService,
+    private readonly notifier: PersonnelNotifier,
   ) {}
 
   /** Returns how many notices were told in this pass. */
@@ -49,6 +51,13 @@ export class NoticeOverdueService {
             },
           ),
         );
+        await this.notifier.noticeOverdue(tx, {
+          organizationId: notice.organizationId,
+          employeeId: notice.employeeId,
+          departmentId: notice.senderDepartmentId,
+          noticeId: notice.id,
+          kind: notice.kind,
+        });
 
         return true;
       });

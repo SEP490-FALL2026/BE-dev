@@ -36,8 +36,7 @@ Hoàn tất các AC của G3/G4 cần Request hoặc sự kiện điều chuyể
 
 | Story    | AC                       | Coverage | Phần còn lại thuộc                                                                                                                                         |
 | -------- | ------------------------ | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| US-04-10 | AC-5, AC-6, AC-11        | partial  | AC-1→AC-4, AC-7→AC-10, AC-12: `g3-standard-toolset`; AC-1, AC-3: `g4-notification-delivery`                                                                |
-| US-07-01 | AC-1, AC-3, AC-15, AC-16 | partial  | AC-1, AC-2, AC-4→AC-9, AC-11→AC-13, AC-15, AC-17: `g4-provisioning-queue-manual`; AC-14: `g4-seat-baseline-import`; AC-10: `g4-device-dependent-features`  |
+| US-07-01 | AC-1, AC-3, AC-15, AC-16 | partial  | AC-1, AC-2, AC-4→AC-9, AC-11→AC-13, AC-15, AC-17, AC-18: `g4-provisioning-queue-manual`; AC-14: `g4-seat-baseline-import`; AC-10: `g4-device-dependent-features` |
 | US-07-04 | AC-4, AC-6, AC-12, AC-15 | partial  | AC-1→AC-3, AC-6→AC-14: `g4-provisioning-failure-handling`; AC-3, AC-6, AC-12, AC-13: `g4-notification-delivery`; AC-5: `g3-downstream-finance-integration` |
 
 ## Supporting references
@@ -95,3 +94,4 @@ Ma trận trên là khung từ tiêu đề AC; tình huống cụ thể (từ ch
 
 - Audit G0–G6 trên Docs `769bb64` ↔ BE `7c28e75` mở lại hạng mục này: F28, F29 — Request trả phí khi người thụ hưởng điều chuyển (`QĐ-90b`).
 - Remediation duy nhất: [g0-g6-final-business-baseline-remediation](../g0-g6-final-business-baseline-remediation/spec.md) ([impact matrix](../g0-g6-final-business-baseline-remediation/impact-matrix.md#3-findings)). AC liên quan không còn được coi là thỏa nguồn hiện hành cho tới khi remediation xong; trạng thái triển khai ở roadmap. Phần đã ghi phía trên là lịch sử, giữ nguyên.
+- _27/10/2026 (Prompt 04, Task 0.1 của `g0-g6-final-business-baseline-remediation`, F60 — re-pin scope map [G3](../../../roadmap.md#work-item-decomposition-g3) Docs `e0cb5a0`, BE `7c28e75`):_ `US-04-10` `RETIRED` nên bỏ dòng `US-04-10` AC-5, AC-6, AC-11 khỏi bảng _Primary Story/AC_ (lịch sử: từng `partial` — phân loại _ngoài bộ chuẩn_, hiện bộ chuẩn trong form yêu cầu, không mở rà soát khi đổi chức vụ; chờ G5/G6) ([impact matrix mục 9](../g0-g6-final-business-baseline-remediation/impact-matrix.md#9-phụ-lục-delta-user-stories-72e1480--769bb64)). Phần đã ghi phía trên là lịch sử, giữ nguyên.

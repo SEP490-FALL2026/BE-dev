@@ -4,6 +4,7 @@ import { ApiAccount, adminToken, createActivatedAccount } from '../support/api-a
 import { HttpTestApp, SeededInstallation, createHttpTestApp, seedInstallation } from '../support/http-test-app';
 import { findPlacementCoverageViolations } from '../support/placement-coverage';
 import { HR_BASIS } from '../support/hr-basis';
+import { UseFacts, registerUseReaders } from '../support/organization-use-readers';
 
 interface CostCenterWire {
   id: string;
@@ -33,6 +34,7 @@ describe('the Cost Center catalogue over HTTP (integration, real PostgreSQL)', (
   const asIt = () => ({ Authorization: `Bearer ${it1.accessToken}` });
   let superAdmin: string;
   const asSuperAdmin = () => ({ Authorization: `Bearer ${superAdmin}` });
+  let useFacts: UseFacts;
 
   beforeAll(async () => {
     ctx = await createHttpTestApp();
@@ -47,7 +49,14 @@ describe('the Cost Center catalogue over HTTP (integration, real PostgreSQL)', (
       admin,
     });
     it1 = await createActivatedAccount(ctx, seed, { code: 'E-IT1', email: 'it1@acme.vn', roles: ['IT_ADMIN'], admin });
+    // The open obligations of a Cost Center are held by other modules (Requests, commitments): nothing, unless a case says so.
+    useFacts = registerUseReaders(ctx.app);
   }, 120000);
+
+  afterEach(() => {
+    useFacts.requests = [];
+    useFacts.commitments = [];
+  });
 
   afterAll(async () => {
     await ctx?.close();
@@ -246,19 +255,20 @@ describe('the Cost Center catalogue over HTTP (integration, real PostgreSQL)', (
       await deactivate(first.id).expect(200);
       const second = await createUnit(unique('CC-2ND'), departmentId);
 
-      // The first stays with the department as history; the department's current Cost Center is the second, which the
-      // previous release reads through the department's old column (the sync trigger keeps them equal).
+      // The first stays with the department as history; the department's current Cost Center is the second, the only one
+      // of the department in use.
       expect(second.department).toMatchObject({ id: departmentId });
       expect(new Date(second.linkedAt as string).getTime()).toBeGreaterThanOrEqual(
         new Date(first.deactivatedAt ?? first.createdAt).getTime(),
       );
       expect(
         (
-          await ctx.sql.query<{ cost_center_id: string }>('SELECT cost_center_id FROM departments WHERE id = $1', [
-            departmentId,
-          ])
+          await ctx.sql.query<{ id: string }>(
+            `SELECT id FROM cost_centers WHERE department_id = $1 AND status = 'ACTIVE'`,
+            [departmentId],
+          )
         ).rows,
-      ).toEqual([{ cost_center_id: second.id }]);
+      ).toEqual([{ id: second.id }]);
       const linked = (
         await ctx.sql.query<{ id: string; department_id: string }>(
           'SELECT id, department_id FROM cost_centers WHERE department_id = $1 ORDER BY created_at',
@@ -299,11 +309,12 @@ describe('the Cost Center catalogue over HTTP (integration, real PostgreSQL)', (
   });
 
   describe('reading the catalogue', () => {
-    it('lets Finance and the IT Admin read it, with the department charged to each', async () => {
+    it('lets Finance and the Super Admin read it, with the department each belongs to, and turns the IT Admin away (QĐ-87a)', async () => {
       const costCenter = await createUnit(unique('CC-READ'));
       const departmentId = (costCenter.department as { id: string }).id;
 
-      for (const headers of [asFinance(), asIt()]) {
+      await request(server()).get('/api/v1/cost-centers').set(asIt()).expect(403);
+      for (const headers of [asFinance(), asSuperAdmin()]) {
         const response = await request(server())
           .get(`/api/v1/cost-centers?search=${costCenter.code.toLowerCase()}`)
           .set(headers)
@@ -397,28 +408,69 @@ describe('the Cost Center catalogue over HTTP (integration, real PostgreSQL)', (
   });
 
   describe('retiring a cost center (AC-3, AC-5, AC-10, AC-11)', () => {
-    it('is refused while the department charged to it has people, naming the department and the people (AC-3)', async () => {
-      // The seeded P-OPS has the Super Admin and the accounts above in it.
-      const seeded = (await ctx.sql.query<{ id: string }>(`SELECT id FROM cost_centers WHERE code = 'CC-1'`)).rows[0];
+    it.each<[string, 'requests' | 'commitments', string, string]>([
+      ['a Request with a cost that is not over', 'requests', 'ACCESS_REQUEST', 'totalRequests'],
+      ['a commitment still held', 'commitments', 'BUDGET_COMMITMENT', 'totalCommitments'],
+    ])(
+      'is refused while %s sits on it, listing the obligation with its total (AC-3, F16)',
+      async (_name, group, kind, total) => {
+        const costCenter = await createUnit();
+        useFacts[group] = Array.from({ length: 21 }, (_unused, index) => ({
+          kind,
+          id: `${kind}-${index}`,
+          label: null,
+        }));
 
-      const response = await deactivate(seeded.id).expect(409);
+        const response = await deactivate(costCenter.id).expect(409);
 
-      expect(errorOf(response).code).toBe('COST_CENTER.IN_USE');
-      const details = errorOf(response).details as {
-        department: { code: string; name: string };
-        employees: { employeeCode: string; fullName: string }[];
-        totalEmployees: number;
-      };
-      expect(details.department).toMatchObject({ code: 'P-OPS', name: 'Operations' });
-      expect(details.totalEmployees).toBeGreaterThanOrEqual(3);
-      expect(details.employees.map((employee) => employee.employeeCode)).toEqual(
-        expect.arrayContaining(['E-ADMIN', 'E-FIN', 'E-IT1']),
-      );
-      expect(Object.keys(details.employees[0]).sort()).toEqual(['employeeCode', 'fullName']);
-      expect((await ctx.sql.query('SELECT status FROM cost_centers WHERE id = $1', [seeded.id])).rows).toEqual([
+        expect(errorOf(response).code).toBe('COST_CENTER.IN_USE');
+        const details = errorOf(response).details as Record<string, unknown>;
+        expect(Object.keys(details).sort()).toEqual([
+          'commitments',
+          'department',
+          'requests',
+          'totalCommitments',
+          'totalRequests',
+        ]);
+        expect(details.department).toMatchObject({ id: (costCenter.department as { id: string }).id });
+        expect(details[total]).toBe(21);
+        expect(details[group]).toHaveLength(20);
+        expect((details[group] as unknown[])[0]).toEqual({ kind, id: `${kind}-0`, label: null });
+        expect((await ctx.sql.query('SELECT status FROM cost_centers WHERE id = $1', [costCenter.id])).rows).toEqual([
+          { status: 'ACTIVE' },
+        ]);
+        expect(await auditActions(costCenter.id)).toEqual([expect.objectContaining({ action: 'COST_CENTER.CREATED' })]);
+
+        // Once the obligation is cleared, the same Cost Center is retired.
+        useFacts[group] = [];
+        await deactivate(costCenter.id).expect(200);
+      },
+    );
+
+    it('is not held back by the people in its department: employees working there are not an obligation (AC-3, QĐ-87d(2))', async () => {
+      const costCenter = await createUnit();
+      const department = costCenter.department as { id: string; code: string };
+      await request(server())
+        .post('/api/v1/employees')
+        .set(asSuperAdmin())
+        .send({
+          hrBasis: HR_BASIS,
+          employeeCode: unique('E-STAY'),
+          fullName: 'Stays In',
+          employmentType: 'STAFF',
+          hireDate: '2026-10-01',
+          departmentCode: department.code,
+          jobTitle: 'Administrator',
+        })
+        .expect(201);
+
+      const response = await deactivate(costCenter.id).expect(200);
+
+      expect(dataOf(response).status).toBe('INACTIVE');
+      // The department goes back to an incomplete finance configuration: nothing but its Cost Center changed.
+      expect((await ctx.sql.query('SELECT status FROM departments WHERE id = $1', [department.id])).rows).toEqual([
         { status: 'ACTIVE' },
       ]);
-      expect(await auditActions(seeded.id)).toEqual([]);
     });
 
     it('retires one whose department has nobody in it, and answers the same the second time without a second record', async () => {
@@ -467,42 +519,48 @@ describe('the Cost Center catalogue over HTTP (integration, real PostgreSQL)', (
       expect(errorOf(response).code).toBe('COST_CENTER.NOT_FOUND');
     });
 
-    it('cannot be chosen again for a department the way the previous release did (the old column): the database refuses it (AC-5)', async () => {
-      const costCenter = await createUnit();
-      await deactivate(costCenter.id).expect(200);
+    it('is never moved to another department once made, and is not brought back beside the one that replaced it: the database refuses both (AC-5)', async () => {
+      const first = await createUnit();
+      const departmentId = (first.department as { id: string }).id;
+      const elsewhere = await createUnit();
+      await deactivate(first.id).expect(200);
+      await createUnit(unique('CC-NEXT'), departmentId);
 
       await expect(
-        ctx.sql.query(
-          `INSERT INTO departments (id, organization_id, code, name, cost_center_id)
-           VALUES (gen_random_uuid(), $1, $2, 'Around a retired one', $3)`,
-          [seed.organizationId, unique('P-OLD'), costCenter.id],
-        ),
+        ctx.sql.query(`UPDATE cost_centers SET department_id = $2 WHERE id = $1`, [
+          first.id,
+          (elsewhere.department as { id: string }).id,
+        ]),
       ).rejects.toMatchObject({ code: '23514' });
+      await expect(
+        ctx.sql.query(`UPDATE cost_centers SET status = 'ACTIVE', deactivated_at = NULL WHERE id = $1`, [first.id]),
+      ).rejects.toMatchObject({ code: '23505' });
     });
 
-    it('keeps people out of a department whose cost center is retired: the entry is refused with a reason', async () => {
-      const department = await insertDepartment(unique('P-GONE'));
-      const departmentCode = department.code;
-      const costCenter = await createUnit(unique('CC'), department.id);
-      await deactivate(costCenter.id).expect(200);
+    it('takes people into a department whose cost center is retired, or that has none: no reason, a person with no cost center (QĐ-87d(3), F44)', async () => {
+      const retiredCenter = await insertDepartment(unique('P-GONE'));
+      const none = await insertDepartment(unique('P-NONE'));
+      await deactivate((await createUnit(unique('CC'), retiredCenter.id)).id).expect(200);
 
-      const response = await request(server())
-        .post('/api/v1/employees')
-        .set(asSuperAdmin())
-        .send({
-          hrBasis: HR_BASIS,
-          employeeCode: unique('E-GONE'),
-          fullName: 'Late Joiner',
-          employmentType: 'STAFF',
-          hireDate: '2026-10-01',
-          departmentCode,
-          jobTitle: 'Administrator',
-        })
-        .expect(422);
+      for (const department of [retiredCenter, none]) {
+        const response = await request(server())
+          .post('/api/v1/employees')
+          .set(asSuperAdmin())
+          .send({
+            hrBasis: HR_BASIS,
+            employeeCode: unique('E-LATE'),
+            fullName: 'Late Joiner',
+            employmentType: 'STAFF',
+            hireDate: '2026-10-01',
+            departmentCode: department.code,
+            jobTitle: 'Administrator',
+          })
+          .expect(201);
 
-      expect((errorOf(response).details as { reasons: unknown }).reasons).toEqual([
-        { field: 'departmentCode', code: 'DEPARTMENT_COST_CENTER_INACTIVE' },
-      ]);
+        expect((response.body as { data: { department: { code: string } } }).data.department.code).toBe(
+          department.code,
+        );
+      }
     });
   });
 
@@ -535,21 +593,15 @@ describe('the Cost Center catalogue over HTTP (integration, real PostgreSQL)', (
       }
     });
 
-    it('is empty for a cost center with no department (a row the previous release wrote, not yet linked), and refused to everyone but Finance', async () => {
-      const code = unique('CC-FREE');
-      const company = (
-        await ctx.sql.query<{ id: string }>(
-          `INSERT INTO cost_centers (id, organization_id, code, name, kind, status)
-           VALUES (gen_random_uuid(), $1, $2, 'Free', 'UNIT', 'ACTIVE') RETURNING id`,
-          [seed.organizationId, code],
-        )
-      ).rows[0];
+    it('is empty for a cost center whose department has nobody in it, and refused to everyone but Finance', async () => {
+      const empty = await createUnit(unique('CC-EMPTY'));
 
       const response = await request(server())
-        .get(`/api/v1/cost-centers/${company.id}/employees`)
+        .get(`/api/v1/cost-centers/${empty.id}/employees`)
         .set(asFinance())
         .expect(200);
-      await request(server()).get(`/api/v1/cost-centers/${company.id}/employees`).set(asIt()).expect(403);
+      await request(server()).get(`/api/v1/cost-centers/${empty.id}/employees`).set(asIt()).expect(403);
+      await request(server()).get(`/api/v1/cost-centers/${empty.id}/employees`).set(asSuperAdmin()).expect(403);
 
       expect((response.body as { data: { items: unknown[] } }).data.items).toEqual([]);
     });
@@ -562,7 +614,7 @@ describe('the Cost Center catalogue over HTTP (integration, real PostgreSQL)', (
     });
   });
 
-  describe('the lock protocol: retiring a cost center racing a person entering its department', () => {
+  describe('the lock protocol: retiring a cost center racing a Request that holds it (T-11, F16)', () => {
     let holder: Client;
 
     beforeAll(async () => {
@@ -590,64 +642,32 @@ describe('the Cost Center catalogue over HTTP (integration, real PostgreSQL)', (
       }
     }
 
-    it('never leaves a person in a department whose cost center was retired, in either order', async () => {
-      const deadlocksBefore = (
-        await ctx.sql.query<{ n: number }>(
-          'SELECT deadlocks::int AS n FROM pg_stat_database WHERE datname = current_database()',
-        )
-      ).rows[0].n;
-      let entered = 0;
-      let refused = 0;
-      for (let round = 0; round < 6; round += 1) {
-        const department = await insertDepartment(unique('P-RACE'));
-        const departmentCode = department.code;
-        const departmentId = department.id;
-        const costCenter = await createUnit(unique('CC'), departmentId);
-        const employeeCode = unique('E-RACE');
+    it('reads the obligations after it holds the Cost Center, so what the Request that held it first adds is seen', async () => {
+      const costCenter = await createUnit();
 
-        await holder.query('BEGIN');
-        await holder.query('SELECT id FROM departments WHERE id = $1 FOR UPDATE', [departmentId]);
-        const retiring = deactivate(costCenter.id).then((r) => r);
-        const entering = request(server())
-          .post('/api/v1/employees')
-          .set(asSuperAdmin())
-          .send({
-            hrBasis: HR_BASIS,
-            employeeCode,
-            fullName: 'Racing Person',
-            employmentType: 'STAFF',
-            hireDate: '2026-10-01',
-            departmentCode,
-            jobTitle: 'Administrator',
-          })
-          .then((r) => r);
-        await waitForWaiters(ctx.sql, 2);
-        await holder.query('COMMIT');
-        const [retirement, entry] = await Promise.all([retiring, entering]);
+      // A Request that charges the Cost Center holds it `FOR SHARE` until it commits; the retirement queues behind it.
+      await holder.query('BEGIN');
+      await holder.query('SELECT id FROM cost_centers WHERE id = $1 FOR SHARE', [costCenter.id]);
+      const retiring = deactivate(costCenter.id).then((r) => r);
+      await waitForWaiters(ctx.sql, 1);
+      useFacts.requests = [{ kind: 'ACCESS_REQUEST', id: 'request-1', label: null }];
+      await holder.query('COMMIT');
 
-        const placed = (await ctx.sql.query('SELECT 1 FROM employees WHERE employee_code = $1', [employeeCode])).rows
-          .length;
-        if (entry.status === 201) {
-          // The person got in first, so the cost center still has someone in it: it cannot be retired.
-          entered += 1;
-          expect(retirement.status).toBe(409);
-          expect(placed).toBe(1);
-        } else {
-          // The retirement went first: nobody enters a department whose cost center is retired.
-          refused += 1;
-          expect(retirement.status).toBe(200);
-          expect(entry.status).toBe(422);
-          expect(placed).toBe(0);
-        }
-      }
-      // Both orders are legal; one must not be the only one that ever happens by accident of the harness.
-      expect(entered + refused).toBe(6);
-      const deadlocksAfter = (
-        await ctx.sql.query<{ n: number }>(
-          'SELECT deadlocks::int AS n FROM pg_stat_database WHERE datname = current_database()',
-        )
-      ).rows[0].n;
-      expect(deadlocksAfter).toBe(deadlocksBefore);
+      const refused = await retiring;
+      expect(refused.status).toBe(409);
+      expect(errorOf(refused).code).toBe('COST_CENTER.IN_USE');
+      expect((await ctx.sql.query('SELECT status FROM cost_centers WHERE id = $1', [costCenter.id])).rows).toEqual([
+        { status: 'ACTIVE' },
+      ]);
+
+      // With nothing left on it, the same wait ends in the retirement.
+      useFacts.requests = [];
+      await holder.query('BEGIN');
+      await holder.query('SELECT id FROM cost_centers WHERE id = $1 FOR SHARE', [costCenter.id]);
+      const again = deactivate(costCenter.id).then((r) => r);
+      await waitForWaiters(ctx.sql, 1);
+      await holder.query('COMMIT');
+      expect((await again).status).toBe(200);
     });
   });
 

@@ -65,9 +65,9 @@ async function main(): Promise<number> {
         'Installation complete.',
         `  organizationId:        ${result.organizationId}`,
         `  superAdminAppUserId:   ${result.superAdminAppUserId}`,
-        `  itEmployeeId:          ${result.itAdminEmployeeId}`,
         `  correlationId:         ${result.correlationId}`,
-        'Next: sign in as the Super Admin; the IT employee has no account yet.',
+        'Next: sign in as the Super Admin. The first department has no Cost Center, head or IT Admin in charge yet: ' +
+          'create the other departments, people and accounts in the application; Finance creates a Cost Center for each department.',
         '',
       ].join('\n'),
     );

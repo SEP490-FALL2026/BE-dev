@@ -30,9 +30,10 @@ describe('cell text (T-12)', () => {
 
 const lookup = (overrides: Partial<EmployeeImportLookup> = {}): EmployeeImportLookup => ({
   departments: new Map([
-    ['P-DES', { id: 'd-des', active: true, costCenterActive: true }],
-    ['P-OLD', { id: 'd-old', active: false, costCenterActive: true }],
-    ['P-DEAD', { id: 'd-dead', active: true, costCenterActive: false }],
+    ['P-DES', { id: 'd-des', active: true }],
+    ['P-OLD', { id: 'd-old', active: false }],
+    // A department with no Cost Center in use is a department like any other for a people file (`QĐ-87d(3)`, F44).
+    ['P-NOCC', { id: 'd-nocc', active: true }],
   ]),
   existing: new Map<string, ExistingEmployee>(),
   emailOwners: new Map<string, string>(),
@@ -75,13 +76,13 @@ describe('mapEmployeeColumns (US-02-02 AC-2)', () => {
     });
   });
 
-  it('names the columns that are missing: without a department or a job title the whole file is unusable', () => {
+  it('names the columns that are missing: without a department the whole file is unusable, and the job title is optional (QĐ-87e)', () => {
     const mapped = mapEmployeeColumns(['employee_code', 'full_name', 'employment_type', 'hire_date', 'work_email']);
 
-    expect(mapped.missing).toEqual(['department_code', 'job_title']);
+    expect(mapped.missing).toEqual(['department_code']);
   });
 
-  it('lets the work email column be absent, and lists the columns it does not know instead of using them', () => {
+  it('lets the work email and the job title columns be absent, and lists the columns it does not know instead of using them', () => {
     const mapped = mapEmployeeColumns([
       'employee_code',
       'full_name',
@@ -95,6 +96,9 @@ describe('mapEmployeeColumns (US-02-02 AC-2)', () => {
 
     expect(mapped.missing).toEqual([]);
     expect(mapped.ignored).toEqual(['manager', 'cost_center']);
+    expect(
+      mapEmployeeColumns(['employee_code', 'full_name', 'employment_type', 'hire_date', 'department_code']).missing,
+    ).toEqual([]);
   });
 
   it('counts a column named twice as missing nothing but ignores the second', () => {
@@ -168,8 +172,6 @@ describe('EmployeeRowClassifier', () => {
     ['department_code', '', 'DEPARTMENT_REQUIRED'],
     ['department_code', 'P-XYZ', 'DEPARTMENT_NOT_FOUND'],
     ['department_code', 'P-OLD', 'DEPARTMENT_INACTIVE'],
-    ['department_code', 'P-DEAD', 'DEPARTMENT_COST_CENTER_INACTIVE'],
-    ['job_title', '', 'JOB_TITLE_REQUIRED'],
     ['job_title', 'x'.repeat(256), 'JOB_TITLE_TOO_LONG'],
   ])('refuses a new person whose %s is %j with %s, naming the column (US-02-03)', (column, value, code) => {
     const result = new EmployeeRowClassifier(lookup()).classify(row({ [column]: value }));
@@ -180,14 +182,26 @@ describe('EmployeeRowClassifier', () => {
 
   it('reports every problem of one row at once', () => {
     const result = new EmployeeRowClassifier(lookup()).classify(
-      row({ department_code: '', job_title: '', hire_date: 'x' }),
+      row({ department_code: '', job_title: 'x'.repeat(256), hire_date: 'x' }),
     );
 
     expect(result.errors).toEqual([
       { column: 'hire_date', code: 'HIRE_DATE_INVALID' },
       { column: 'department_code', code: 'DEPARTMENT_REQUIRED' },
-      { column: 'job_title', code: 'JOB_TITLE_REQUIRED' },
+      { column: 'job_title', code: 'JOB_TITLE_TOO_LONG' },
     ]);
+  });
+
+  it('lets a person with no job title in: the title is optional free text and a blank cell is not an error (QĐ-87e)', () => {
+    const result = new EmployeeRowClassifier(lookup()).classify(row({ job_title: '' }));
+
+    expect(result).toMatchObject({ outcome: 'VALID', errors: [], parsed: { jobTitleName: null } });
+  });
+
+  it('lets a person in a department with no Cost Center in (QĐ-87d(3), F44: no DEPARTMENT_COST_CENTER_INACTIVE)', () => {
+    const result = new EmployeeRowClassifier(lookup()).classify(row({ department_code: 'P-NOCC' }));
+
+    expect(result).toMatchObject({ outcome: 'VALID', parsed: { departmentId: 'd-nocc' } });
   });
 
   it('lets a person with no work email in (the record is kept, requests are refused later)', () => {
@@ -306,7 +320,7 @@ describe('judging the rows of a preview again (US-02-01 AC-9)', () => {
 
   it('keys what the organization answered the way the classifier reads it', () => {
     const lookup = toEmployeeImportLookup({
-      departments: [{ id: 'd1', code: 'P-OPS', active: true, costCenterActive: true }],
+      departments: [{ id: 'd1', code: 'P-OPS', active: true }],
       employees: [],
       emailOwners: [{ normalizedEmail: 'a@acme.vn', employeeCode: 'E1' }],
     });
@@ -318,8 +332,8 @@ describe('judging the rows of a preview again (US-02-01 AC-9)', () => {
   it('locks only what the valid rows use, each once', () => {
     const lookup = toEmployeeImportLookup({
       departments: [
-        { id: 'd1', code: 'P-OPS', active: true, costCenterActive: true },
-        { id: 'd2', code: 'P-DES', active: true, costCenterActive: true },
+        { id: 'd1', code: 'P-OPS', active: true },
+        { id: 'd2', code: 'P-DES', active: true },
       ],
       employees: [],
       emailOwners: [],
@@ -342,7 +356,7 @@ describe('judging the rows of a preview again (US-02-01 AC-9)', () => {
       outcome: 'ERROR' as const,
       errors: [
         { code: 'HIRE_DATE_INVALID', column: 'hire_date' },
-        { code: 'JOB_TITLE_REQUIRED', column: 'job_title' },
+        { code: 'JOB_TITLE_TOO_LONG', column: 'job_title' },
       ],
       differences: null,
     };
@@ -350,7 +364,7 @@ describe('judging the rows of a preview again (US-02-01 AC-9)', () => {
       outcome: 'ERROR' as const,
       errors: [
         { column: 'hire_date', code: 'HIRE_DATE_INVALID' },
-        { column: 'job_title', code: 'JOB_TITLE_REQUIRED' },
+        { column: 'job_title', code: 'JOB_TITLE_TOO_LONG' },
       ],
     };
 

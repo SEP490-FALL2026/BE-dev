@@ -40,6 +40,7 @@ export function grantAnswerFor(
           seat: 'PERSONAL',
           employeeId: request.beneficiaryEmployeeIds[0],
           planId,
+          departmentId: request.departmentId,
           expectedEndDate,
         };
       }
@@ -85,6 +86,7 @@ function groupAnswerFor(
   request: {
     state: AccessRequestState;
     planId: string | null;
+    departmentId: string;
     lines?: readonly { employeeId: string; state: LineState; expectedEndDate: string | null }[];
   },
   employeeId: string | undefined,
@@ -105,6 +107,7 @@ function groupAnswerFor(
         seat: 'PERSONAL',
         employeeId: line.employeeId,
         planId: request.planId,
+        departmentId: request.departmentId,
         expectedEndDate: line.expectedEndDate,
       };
     default:

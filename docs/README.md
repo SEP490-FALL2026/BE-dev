@@ -35,6 +35,7 @@ trong docs/architecture. Các gói triển khai auth/US cũ đã được dọn 
 - [Ngữ cảnh `requests` (C4) cho Request, bước duyệt và định tuyến](decisions/0015-requests-context.md) — Proposed; chờ Owner review/Accepted.
 - [Ngữ cảnh `budgets` (C5) cho đề xuất và phiên bản ngân sách](decisions/0016-budgets-context.md) — Proposed; chờ Owner review/Accepted.
 - [Ngữ cảnh `personnel` (C2) cho vòng đời nhân sự](decisions/0017-personnel-context.md) — Proposed; chờ Owner review/Accepted.
+- [Các sweeper theo giờ vẫn chạy trong tiến trình API](decisions/0018-sweepers-stay-in-the-api-process.md) — Proposed; chờ Owner review/Accepted.
 
 Trạng thái triển khai của các lát dùng hai ADR trên nằm ở [roadmap](roadmap.md). Số ADR bị khuyết không cần đánh lại.
 Định hướng tài khoản/mật khẩu + JWT hiện ghi ở ARCHITECTURE; spec/plan từng lát ở [workspace](workspace/README.md).

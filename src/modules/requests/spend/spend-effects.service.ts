@@ -10,6 +10,7 @@ import { BudgetCheckRepo, type CheckRecord } from './budget-check.repo';
 import { BudgetInformationService } from './budget-information.service';
 import { FinanceReviewRepo } from './finance-review.repo';
 import type { BlockedReason } from './spend-decision.policy';
+import { SpendDecisionRefusedError } from './spend.errors';
 import { SpendStepRepo, type SpendStepRecord } from './spend-step.repo';
 
 /**
@@ -29,6 +30,16 @@ export class SpendEffectsService {
     private readonly information: BudgetInformationService,
     private readonly audit: AuditService,
   ) {}
+
+  /**
+   * The person who completed a review of Finance of this request does not decide its spend step (`SoD-8`, F32). Throws
+   * SpendDecisionRefusedError; one place, so the decision on one person's request and the decision on the lines of a group agree.
+   */
+  async refuseReviewer(tx: DbTx, request: AccessRequestRecord, employeeId: string): Promise<void> {
+    if (await this.reviews.completedBy(tx, request.id, employeeId)) {
+      throw new SpendDecisionRefusedError('REVIEWER_IS_APPROVER');
+    }
+  }
 
   /** Whether Finance has looked at what is out of the ordinary in this request, or there is nobody independent to (`AC-17`). */
   async reviewed(tx: DbTx, request: AccessRequestRecord, step: SpendStepRecord): Promise<boolean> {

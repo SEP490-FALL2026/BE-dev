@@ -7,6 +7,7 @@ import type {
   OffboardingRightWire,
   OffboardingSummaryWire,
 } from './offboarding.dto';
+import type { ReadAccess } from '../personnel-self-action.policy';
 import { ROLE_FLAGS, type RoleFlagMap } from '../personnel.types';
 import type { Checklist } from './offboarding.policy';
 import type { OffboardingChangeRecord, OffboardingRecord, OffboardingSummaryRecord } from './offboarding.types';
@@ -55,14 +56,32 @@ export interface DetailFacts {
   registeredWarnings: Record<string, number>;
 }
 
+/**
+ * Who marked the person left. A sudden departure the controlled procedure recorded is `LEFT` at once, and the column that says who
+ * marked it holds the stand-in account the database demands (see `TransferGuardService.standIn`): it is never shown, the answer
+ * says it was the procedure.
+ */
+function leftOf(leftOn: string, leftAt: Date, record: OffboardingRecord) {
+  const byProcedure = record.recordedByTicketId !== null && record.abrupt;
+
+  return {
+    leftOn,
+    leftAt: leftAt.toISOString(),
+    leftByAppUserId: byProcedure ? null : record.leftByAppUserId,
+    leftByProcedure: byProcedure,
+  };
+}
+
 export function toDetail(
   record: OffboardingRecord,
   employees: ReadonlyMap<string, EmployeeRecord>,
   department: DepartmentBrief | undefined,
   facts: DetailFacts,
+  access: ReadAccess = 'FULL',
 ): OffboardingDetailWire {
   const handover = record.headHandover;
   const locked = record.accountLockAt !== null;
+  const full = access === 'FULL';
 
   return {
     ...toSummary(
@@ -87,23 +106,24 @@ export function toDetail(
     },
     priorWorkState: record.priorWorkState,
     departureEffectiveOn: record.departureEffectiveOn,
-    grounds: { ...record.grounds },
-    headSuccessor: handover && {
-      kind: handover.successor,
-      employee: handover.successorEmployeeId ? brief(employees, handover.successorEmployeeId) : null,
-    },
-    selfExecuted: record.selfExecuted,
-    recordedByAppUserId: record.recordedByAppUserId,
-    recordedAt: record.recordedAt.toISOString(),
-    left:
-      record.leftOn && record.leftAt && record.leftByAppUserId
-        ? { leftOn: record.leftOn, leftAt: record.leftAt.toISOString(), leftByAppUserId: record.leftByAppUserId }
+    grounds: full ? { ...record.grounds } : null,
+    headSuccessor:
+      full && handover
+        ? {
+            kind: handover.successor,
+            employee: handover.successorEmployeeId ? brief(employees, handover.successorEmployeeId) : null,
+          }
         : null,
+    recordedByAppUserId: record.recordedByAppUserId,
+    recordedByProcedure: record.recordedByTicketId !== null,
+    recordedAt: record.recordedAt.toISOString(),
+    left: record.leftOn && record.leftAt ? leftOf(record.leftOn, record.leftAt, record) : null,
     cancellation:
-      record.cancelledAt && record.cancelledByAppUserId && record.cancelReason !== null
+      full && record.cancelledAt && record.cancelReason !== null
         ? {
             cancelledAt: record.cancelledAt.toISOString(),
             cancelledByAppUserId: record.cancelledByAppUserId,
+            cancelledByProcedure: record.cancelledByTicketId !== null,
             reason: record.cancelReason,
           }
         : null,
@@ -185,7 +205,7 @@ export function toChange(change: OffboardingChangeRecord): OffboardingChangeWire
     reason: change.reason,
     count: change.kind === 'REVOCATIONS_OPENED' && typeof count === 'number' ? count : null,
     changedByAppUserId: change.changedByAppUserId,
+    changedByProcedure: change.changedByTicketId !== null,
     changedAt: change.changedAt.toISOString(),
-    selfExecuted: change.selfExecuted,
   };
 }

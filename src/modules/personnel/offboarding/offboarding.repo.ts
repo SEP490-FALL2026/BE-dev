@@ -42,14 +42,15 @@ export function toRecord(row: CaseRow): OffboardingRecord {
     leftByAppUserId: row.leftByAppUserId,
     cancelledAt: row.cancelledAt,
     cancelledByAppUserId: row.cancelledByAppUserId,
+    cancelledByTicketId: row.cancelledByTicketId,
     cancelReason: row.cancelReason,
     accountLockByAppUserId: row.accountLockByAppUserId,
     accountLockAt: row.accountLockAt,
     accountLockNote: row.accountLockNote,
     closedAt: row.closedAt,
     closedByAppUserId: row.closedByAppUserId,
-    selfExecuted: row.selfExecuted,
     recordedByAppUserId: row.recordedByAppUserId,
+    recordedByTicketId: row.recordedByTicketId,
     recordedAt: row.recordedAt,
   };
 }
@@ -68,8 +69,8 @@ export interface NewOffboarding {
   grounds: Grounds;
   headHandover: HeadHandoverFacts | null;
   placementClosedId: string;
-  selfExecuted: boolean;
-  recordedByAppUserId: string;
+  recordedByAppUserId: string | null;
+  recordedByTicketId: string | null;
   noticeId?: string | null;
 }
 
@@ -107,8 +108,8 @@ export class OffboardingRepo {
         headHandover: json(input.headHandover),
         placementClosedId: input.placementClosedId,
         ...(left ? { leftOn: toDateColumn(left.on), leftAt: new Date(), leftByAppUserId: left.by } : {}),
-        selfExecuted: input.selfExecuted,
         recordedByAppUserId: input.recordedByAppUserId,
+        recordedByTicketId: input.recordedByTicketId,
         noticeId: input.noticeId ?? null,
       },
     });
@@ -175,13 +176,18 @@ export class OffboardingRepo {
     return toRecord(row);
   }
 
-  async cancel(tx: DbTx, id: string, by: { appUserId: string; reason: string }): Promise<OffboardingRecord> {
+  async cancel(
+    tx: DbTx,
+    id: string,
+    by: { appUserId: string | null; ticketId: string | null; reason: string },
+  ): Promise<OffboardingRecord> {
     const row = await tx.offboardingCase.update({
       where: { id },
       data: {
         state: 'CANCELLED',
         cancelledAt: new Date(),
         cancelledByAppUserId: by.appUserId,
+        cancelledByTicketId: by.ticketId,
         cancelReason: by.reason,
       },
     });
@@ -227,8 +233,8 @@ export class OffboardingRepo {
       newLastWorkingDay?: BusinessDate | null;
       reason?: string | null;
       detail?: Record<string, unknown> | null;
-      changedByAppUserId: string;
-      selfExecuted: boolean;
+      changedByAppUserId: string | null;
+      changedByTicketId: string | null;
     },
   ): Promise<void> {
     await tx.offboardingCaseChange.create({
@@ -241,7 +247,7 @@ export class OffboardingRepo {
         reason: input.reason ?? null,
         detail: input.detail ? (input.detail as unknown as Prisma.InputJsonValue) : Prisma.DbNull,
         changedByAppUserId: input.changedByAppUserId,
-        selfExecuted: input.selfExecuted,
+        changedByTicketId: input.changedByTicketId,
       },
     });
   }
@@ -278,8 +284,8 @@ export class OffboardingRepo {
             reason: row.reason,
             detail: (row.detail as Record<string, unknown> | null) ?? null,
             changedByAppUserId: row.changedByAppUserId,
+            changedByTicketId: row.changedByTicketId,
             changedAt: row.changedAt,
-            selfExecuted: row.selfExecuted,
           })),
           total: await tx.offboardingCaseChange.count({ where: { caseId } }),
         };

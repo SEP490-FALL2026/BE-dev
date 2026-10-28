@@ -15,24 +15,14 @@ const INPUT = {
   timeZone: 'Asia/Ho_Chi_Minh',
   reportingCurrency: 'VND',
   organizationName: 'Cong ty Thu nghiem',
-  costCenterCode: 'CC-IT',
-  costCenterName: 'Khoi Cong nghe',
   departmentCode: 'IT',
   departmentName: 'Phong Cong nghe Thong tin',
-  jobTitleName: 'Chuyen vien',
   superAdmin: {
     employeeCode: 'SA001',
     fullName: 'Quan tri Gia lap',
     workEmail: 'sa@example.test',
     employmentType: 'STAFF',
     hireDate: '2026-01-05',
-  },
-  itAdmin: {
-    employeeCode: 'IT001',
-    fullName: 'Ky thuat Gia lap',
-    workEmail: 'it@example.test',
-    employmentType: 'STAFF',
-    hireDate: '2026-02-02',
   },
   operatorReference: 'TICKET-1',
   environment: 'LOCAL_TEST',
@@ -68,6 +58,7 @@ function harness(options: { installed?: boolean } = {}) {
       calls.push(`org.createOrganization(${inTx(tx)})`);
       return Promise.resolve({ id: 'org-1' });
     },
+    // The command writes no Cost Center any more: a call to this one would be a regression (`QĐ-87f`(1)).
     createUnitCostCenter: (tx: unknown) => {
       calls.push(`org.createUnitCostCenter(${inTx(tx)})`);
       return Promise.resolve({ id: 'cc-1' });
@@ -76,8 +67,8 @@ function harness(options: { installed?: boolean } = {}) {
       calls.push(`org.createDepartment(${inTx(tx)})`);
       return Promise.resolve({ id: 'dep-1' });
     },
-    createEmployeeWithPlacement: (tx: unknown, input: { employeeCode: string }) => {
-      calls.push(`org.createEmployeeWithPlacement(${inTx(tx)}, ${input.employeeCode})`);
+    createEmployeeWithPlacement: (tx: unknown, input: { employeeCode: string; jobTitle: string | null }) => {
+      calls.push(`org.createEmployeeWithPlacement(${inTx(tx)}, ${input.employeeCode}, ${String(input.jobTitle)})`);
       return Promise.resolve({ id: id('emp') });
     },
   };
@@ -120,7 +111,7 @@ function harness(options: { installed?: boolean } = {}) {
   return { service, calls, audits };
 }
 
-describe('InstallationService (H6.3 Phase 0 characterization)', () => {
+describe('InstallationService (QĐ-87f(1): organization, one department, the Super Admin)', () => {
   it('hashes before the transaction, locks before it reads, then writes and records everything in one transaction', async () => {
     const h = harness();
 
@@ -135,11 +126,7 @@ describe('InstallationService (H6.3 Phase 0 characterization)', () => {
       'audit.record(tx, INSTALLATION.ORGANIZATION_CREATED)',
       'org.createDepartment(tx)',
       'audit.record(tx, INSTALLATION.DEPARTMENT_CREATED)',
-      'org.createUnitCostCenter(tx)',
-      'audit.record(tx, INSTALLATION.COST_CENTER_CREATED)',
-      'org.createEmployeeWithPlacement(tx, SA001)',
-      'audit.record(tx, INSTALLATION.EMPLOYEE_CREATED)',
-      'org.createEmployeeWithPlacement(tx, IT001)',
+      'org.createEmployeeWithPlacement(tx, SA001, null)',
       'audit.record(tx, INSTALLATION.EMPLOYEE_CREATED)',
       'identity.createBootstrapSuperAdmin(tx)',
       'audit.record(tx, INSTALLATION.SUPER_ADMIN_CREATED)',
@@ -150,7 +137,6 @@ describe('InstallationService (H6.3 Phase 0 characterization)', () => {
       organizationId: 'org-1',
       superAdminAppUserId: 'user-1',
       superAdminEmployeeId: 'emp-1',
-      itAdminEmployeeId: 'emp-2',
       correlationId: expect.stringMatching(/^[0-9a-f-]{36}$/) as unknown,
     });
     expect(
@@ -166,7 +152,12 @@ describe('InstallationService (H6.3 Phase 0 characterization)', () => {
       {
         action: 'INSTALLATION.ORGANIZATION_CREATED',
         resourceType: 'Organization',
-        after: { timeZone: 'Asia/Ho_Chi_Minh', reportingCurrency: 'VND', environment: 'LOCAL_TEST' },
+        after: {
+          timeZone: 'Asia/Ho_Chi_Minh',
+          reportingCurrency: 'VND',
+          environment: 'LOCAL_TEST',
+          installationException: true,
+        },
         actorKind: 'OPERATOR',
         operatorReference: 'TICKET-1',
         organizationId: 'org-1',
@@ -174,15 +165,7 @@ describe('InstallationService (H6.3 Phase 0 characterization)', () => {
       {
         action: 'INSTALLATION.DEPARTMENT_CREATED',
         resourceType: 'Department',
-        after: { code: 'IT' },
-        actorKind: 'OPERATOR',
-        operatorReference: 'TICKET-1',
-        organizationId: 'org-1',
-      },
-      {
-        action: 'INSTALLATION.COST_CENTER_CREATED',
-        resourceType: 'CostCenter',
-        after: { code: 'CC-IT', kind: 'UNIT', departmentCode: 'IT' },
+        after: { code: 'IT', installationException: true },
         actorKind: 'OPERATOR',
         operatorReference: 'TICKET-1',
         organizationId: 'org-1',
@@ -195,21 +178,7 @@ describe('InstallationService (H6.3 Phase 0 characterization)', () => {
           employmentType: 'STAFF',
           hireDate: '2026-01-05',
           departmentCode: 'IT',
-          jobTitle: 'Chuyen vien',
-        },
-        actorKind: 'OPERATOR',
-        operatorReference: 'TICKET-1',
-        organizationId: 'org-1',
-      },
-      {
-        action: 'INSTALLATION.EMPLOYEE_CREATED',
-        resourceType: 'Employee',
-        after: {
-          employeeCode: 'IT001',
-          employmentType: 'STAFF',
-          hireDate: '2026-02-02',
-          departmentCode: 'IT',
-          jobTitle: 'Chuyen vien',
+          installationException: true,
         },
         actorKind: 'OPERATOR',
         operatorReference: 'TICKET-1',
@@ -218,7 +187,12 @@ describe('InstallationService (H6.3 Phase 0 characterization)', () => {
       {
         action: 'INSTALLATION.SUPER_ADMIN_CREATED',
         resourceType: 'AppUser',
-        after: { employeeCode: 'SA001', activationState: 'ACTIVATED', emailVerificationSource: 'BOOTSTRAP_ASSERTED' },
+        after: {
+          employeeCode: 'SA001',
+          activationState: 'ACTIVATED',
+          emailVerificationSource: 'BOOTSTRAP_ASSERTED',
+          installationException: true,
+        },
         actorKind: 'OPERATOR',
         operatorReference: 'TICKET-1',
         organizationId: 'org-1',
@@ -226,7 +200,7 @@ describe('InstallationService (H6.3 Phase 0 characterization)', () => {
       {
         action: 'ROLE.GRANTED',
         resourceType: 'AppUser',
-        after: { role: 'SUPER_ADMIN' },
+        after: { role: 'SUPER_ADMIN', installationException: true },
         actorKind: 'OPERATOR',
         operatorReference: 'TICKET-1',
         organizationId: 'org-1',
@@ -234,6 +208,32 @@ describe('InstallationService (H6.3 Phase 0 characterization)', () => {
     ]);
     const correlations = new Set(h.audits.map((event) => event.correlationId));
     expect([...correlations]).toEqual([result.correlationId]);
+  });
+
+  it('creates no Cost Center, no job title and no IT employee, and marks every event as the installation exception', async () => {
+    const h = harness();
+
+    await h.service.install(INPUT, 'a-long-enough-password');
+
+    expect(h.calls.some((call) => call.includes('createUnitCostCenter'))).toBe(false);
+    expect(h.calls.filter((call) => call.startsWith('org.createEmployeeWithPlacement'))).toEqual([
+      'org.createEmployeeWithPlacement(tx, SA001, null)',
+    ]);
+    expect(h.audits.map((event) => (event.after as Record<string, unknown>).installationException)).toEqual(
+      h.audits.map(() => true),
+    );
+    expect(h.audits.map((event) => event.action)).not.toContain('INSTALLATION.COST_CENTER_CREATED');
+  });
+
+  it('refuses the earlier input shape (a Cost Center, a job title) before hashing or locking anything', async () => {
+    const h = harness();
+
+    const error = await h.service
+      .install({ ...INPUT, costCenterCode: 'CC-IT', jobTitleName: 'Chuyen vien' }, 'a-long-enough-password')
+      .catch((thrown: unknown) => thrown);
+
+    expect(error).toBeInstanceOf(InstallationInputError);
+    expect(h.calls).toEqual([]);
   });
 
   it('finds the organization under the lock and changes nothing when it is already installed', async () => {

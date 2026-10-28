@@ -2,6 +2,7 @@ import { Injectable, OnModuleInit } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { AuditService } from '../../audit/audit.service';
 import { OrganizationService } from '../../organization/organization.service';
+import { PersonnelNotifier } from '../event-notice/personnel-notifier.service';
 import { personnelSystemAuditEvent } from '../mappers/personnel-audit-event';
 import { PersonnelFileHooks, type PersonnelFileEvent } from '../personnel-file-hooks';
 import { isHighPriority, sameFlags } from './role-duties.policy';
@@ -17,7 +18,9 @@ type Stage = 'RECORDED' | 'DUE_CHANGED' | 'LEFT';
  * if the roles changed. When the person has left, a Super Admin role or a workspace that still has no one to take over is told again with
  * the highest priority (the workspace will lose its owner: change the owner or use the emergency account the plan names). It never holds
  * a record, a lock or a revocation back: nothing here changes a role, a step or an account, and no password or key is read or written.
- * The event is the point the notification channel takes the alert from (`g4-notification-delivery`).
+ * The event is the point the notification channel takes the alert from (`g4-notification-delivery`), and the Super Admin is told in the
+ * inbox in the same transaction, once for each role the person holds that nobody takes over (F17): a department head who has a
+ * successor is replaced and is not told.
  */
 @Injectable()
 export class RoleDutiesHook implements OnModuleInit {
@@ -27,6 +30,7 @@ export class RoleDutiesHook implements OnModuleInit {
     private readonly roles: RoleDutiesService,
     private readonly organization: OrganizationService,
     private readonly audit: AuditService,
+    private readonly notifier: PersonnelNotifier,
   ) {}
 
   onModuleInit(): void {
@@ -87,5 +91,17 @@ export class RoleDutiesHook implements OnModuleInit {
         },
       ),
     );
+    for (const flag of view.flags) {
+      if (flag === 'DEPARTMENT_HEAD' && found.headSuccessor === 'EMPLOYEE') continue;
+      await this.notifier.roleHolderLeaving(tx, {
+        organizationId: organization.id,
+        employeeId: found.employeeId,
+        departmentId: found.departmentId,
+        caseId: found.id,
+        roleFlag: flag,
+        effectiveOn: event.dueOn,
+        stage,
+      });
+    }
   }
 }

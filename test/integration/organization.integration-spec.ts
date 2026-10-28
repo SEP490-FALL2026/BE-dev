@@ -18,6 +18,7 @@ import {
   OrganizationAlreadyExistsError,
 } from '../../src/modules/organization/organization.errors';
 import { DepartmentServiceAccountRegistry } from '../../src/modules/organization/department/service-account-registry';
+import { DepartmentUseRegistry } from '../../src/modules/organization/department/department-use-registry';
 import { AnnouncementRepo } from '../../src/modules/organization/change-announcement/announcement.repo';
 import { OrganizationChangeRegistry } from '../../src/modules/organization/change-announcement/organization-change.registry';
 import { OrganizationChangeService } from '../../src/modules/organization/change-announcement/organization-change.service';
@@ -40,7 +41,6 @@ describe('organization foundation (integration)', () => {
   let organizationId: string;
   let unitCostCenterId: string;
   let departmentId: string;
-  let jobTitleId: string;
 
   beforeAll(async () => {
     database = await provisionDisposableDatabase();
@@ -48,12 +48,19 @@ describe('organization foundation (integration)', () => {
     const config = testConfig({ DATABASE_URL: database.url });
     prisma = new PrismaService(config);
     runner = new TransactionRunner(prisma, config);
+    const departments = new DepartmentDirectoryService(new DepartmentRepo(prisma), new DepartmentHeadRepo(prisma));
     organization = new OrganizationService(
       new OrganizationRepo(prisma),
-      new DepartmentDirectoryService(new DepartmentRepo(prisma), new DepartmentHeadRepo(prisma)),
-      new EmployeeDirectoryService(new EmployeeRepo(prisma), new ImportLookupRepo(prisma), new EmployeeDepartureRepo()),
+      departments,
+      new EmployeeDirectoryService(
+        new EmployeeRepo(prisma),
+        new ImportLookupRepo(prisma),
+        new EmployeeDepartureRepo(),
+        departments,
+      ),
       new CostCenterCatalogueService(new CostCenterRepo(prisma)),
       new DepartmentServiceAccountRegistry(),
+      new DepartmentUseRegistry(),
       new OrganizationChangeService(new OrganizationChangeRegistry(), new AnnouncementRepo(prisma), runner),
     );
     sql = new Client({ connectionString: database.url });
@@ -72,13 +79,6 @@ describe('organization foundation (integration)', () => {
       unitCostCenterId = (
         await organization.createUnitCostCenter(tx, { organizationId, code: 'CC-1', name: 'Eng', departmentId })
       ).id;
-      // The catalogue entry the SQL of these cases names on a placement; a placement written through the facade finds it by
-      // the normalized name of the title the person has (spec L.10).
-      jobTitleId = (
-        await tx.$queryRaw<{ id: string }[]>`
-          INSERT INTO job_titles (id, organization_id, name, normalized_name, updated_at)
-          VALUES (gen_random_uuid(), ${organizationId}::uuid, 'Developer', 'developer', now()) RETURNING id::text AS id`
-      )[0].id;
     });
   }, 60000);
 
@@ -115,14 +115,15 @@ describe('organization foundation (integration)', () => {
     await expect(sql.query(`UPDATE organizations SET name = 'Renamed'`)).resolves.toBeDefined();
   });
 
-  it('rejects a second department on the same cost center', async () => {
+  it('rejects a second Cost Center in use for the same department, at the database (QĐ-87d(1))', async () => {
     await expect(
       sql.query(
-        `INSERT INTO departments (id, organization_id, code, name, cost_center_id)
-         VALUES (gen_random_uuid(), $1, 'P-TWO', 'Two', $2)`,
-        [organizationId, unitCostCenterId],
+        `INSERT INTO cost_centers (id, organization_id, code, name, kind, department_id, linked_at)
+         VALUES (gen_random_uuid(), $1, 'CC-TWO', 'Two', 'UNIT', $2, now())`,
+        [organizationId, departmentId],
       ),
     ).rejects.toThrow(/unique|duplicate/i);
+    expect(unitCostCenterId).toBeDefined();
   });
 
   it('creates an employee with exactly one open placement from the hire date', async () => {
@@ -151,17 +152,17 @@ describe('organization foundation (integration)', () => {
 
     await expect(
       sql.query(
-        `INSERT INTO employee_placements (id, organization_id, employee_id, department_id, job_title_id, valid_from)
-         VALUES (gen_random_uuid(), $1, $2, $3, $4, '2026-06-01')`,
-        [organizationId, id, departmentId, jobTitleId],
+        `INSERT INTO employee_placements (id, organization_id, employee_id, department_id, valid_from)
+         VALUES (gen_random_uuid(), $1, $2, $3, '2026-06-01')`,
+        [organizationId, id, departmentId],
       ),
     ).rejects.toThrow(/no_overlap|conflicting key/);
 
     await expect(
       sql.query(
-        `INSERT INTO employee_placements (id, organization_id, employee_id, department_id, job_title_id, valid_from, valid_to)
-         VALUES (gen_random_uuid(), $1, $2, $3, $4, '2020-01-02', '2020-01-02')`,
-        [organizationId, id, departmentId, jobTitleId],
+        `INSERT INTO employee_placements (id, organization_id, employee_id, department_id, valid_from, valid_to)
+         VALUES (gen_random_uuid(), $1, $2, $3, '2020-01-02', '2020-01-02')`,
+        [organizationId, id, departmentId],
       ),
     ).rejects.toThrow(/valid_range_check/);
   });
@@ -174,9 +175,9 @@ describe('organization foundation (integration)', () => {
     const { id } = await hire('E7', 'e7@acme.vn', '2026-04-01');
     await sql.query(`UPDATE employee_placements SET valid_to = '2026-05-01' WHERE employee_id = $1`, [id]);
     await sql.query(
-      `INSERT INTO employee_placements (id, organization_id, employee_id, department_id, job_title_id, valid_from)
-       VALUES (gen_random_uuid(), $1, $2, $3, $4, '2026-05-10')`,
-      [organizationId, id, departmentId, jobTitleId],
+      `INSERT INTO employee_placements (id, organization_id, employee_id, department_id, valid_from)
+       VALUES (gen_random_uuid(), $1, $2, $3, '2026-05-10')`,
+      [organizationId, id, departmentId],
     );
 
     const violations = await findPlacementCoverageViolations(sql);
@@ -186,8 +187,8 @@ describe('organization foundation (integration)', () => {
     await sql.query(`DELETE FROM employees WHERE id = $1`, [id]);
   });
 
-  it('stores the title of a person as free text in its display form (T-12, QĐ-87e), and the database names the catalogue entry on the placement', async () => {
-    const make = (code: string, jobTitle: string) =>
+  it('stores the title of a person as free text in its display form (T-12, QĐ-87e): no catalogue, and none at all is allowed', async () => {
+    const make = (code: string, jobTitle: string | null) =>
       runner.run((tx) =>
         organization.createEmployeeWithPlacement(tx, {
           organizationId,
@@ -200,40 +201,22 @@ describe('organization foundation (integration)', () => {
           jobTitle,
         }),
       );
-    const first = await make('E-T1', '  Senior   Designer\t');
+    const first = await make('E-T1', '  Senior   Designer\t');
     const second = await make('E-T2', 'SENIOR designer');
+    const none = await make('E-T3', null);
+    const blank = await make('E-T4', '   ');
 
-    const stored = await sql.query<{
-      code: string;
-      job_title: string;
-      name: string;
-      normalized_name: string;
-      status: string;
-    }>(
-      `SELECT e.employee_code AS code, e.job_title, j.name, j.normalized_name, j.status::text AS status
-         FROM employees e JOIN employee_placements p ON p.employee_id = e.id JOIN job_titles j ON j.id = p.job_title_id
-        WHERE e.id = ANY($1::uuid[]) ORDER BY e.employee_code`,
-      [[first.id, second.id]],
+    const stored = await sql.query<{ code: string; job_title: string | null }>(
+      `SELECT employee_code AS code, job_title FROM employees WHERE id = ANY($1::uuid[]) ORDER BY employee_code`,
+      [[first.id, second.id, none.id, blank.id]],
     );
-    // What the person has is what was typed, in its display form; the entry is the one the first spelling made, found by the second.
+    // What the person has is what was typed, in its display form; a blank title is none.
     expect(stored.rows).toEqual([
-      {
-        code: 'E-T1',
-        job_title: 'Senior Designer',
-        name: 'Senior Designer',
-        normalized_name: 'senior designer',
-        status: 'ACTIVE',
-      },
-      {
-        code: 'E-T2',
-        job_title: 'SENIOR designer',
-        name: 'Senior Designer',
-        normalized_name: 'senior designer',
-        status: 'ACTIVE',
-      },
+      { code: 'E-T1', job_title: 'Senior Designer' },
+      { code: 'E-T2', job_title: 'SENIOR designer' },
+      { code: 'E-T3', job_title: null },
+      { code: 'E-T4', job_title: null },
     ]);
-    const count = await sql.query(`SELECT 1 FROM job_titles WHERE normalized_name = 'senior designer'`);
-    expect(count.rows).toHaveLength(1);
   });
 
   it('locks an employee through the facade and reports a missing one', async () => {
@@ -361,7 +344,7 @@ describe('organization foundation (integration)', () => {
         (
           await sql.query(
             `SELECT d.code, d.name, d.status, d.function_description, d.it_admin_employee_id, c.code AS cost_center
-               FROM departments d JOIN cost_centers c ON c.id = d.cost_center_id WHERE d.id = $1`,
+               FROM departments d JOIN cost_centers c ON c.department_id = d.id WHERE d.id = $1`,
             [created.id],
           )
         ).rows,
@@ -381,14 +364,12 @@ describe('organization foundation (integration)', () => {
         code: 'P-NOHEAD',
         name: 'No head',
         active: true,
-        costCenterActive: true,
       });
       await expect(lock('P-RETIRED')).resolves.toEqual({
         id: retired.id,
         code: 'P-RETIRED',
         name: 'Retired',
         active: false,
-        costCenterActive: true,
       });
       await expect(lock('P-NONE')).resolves.toBeNull();
     });

@@ -26,7 +26,7 @@ Khi ghi bàn giao cho một nhân viên, IT Admin thấy thêm hai mục: các R
 
 | Story    | AC           | Coverage | Phần còn lại thuộc                                                                                                                                                                                                                                                                              |
 | -------- | ------------ | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| US-03-04 | AC-24, AC-25 | partial  | AC-1→AC-10, AC-14→AC-16, AC-18→AC-23, AC-26, AC-29: `g6-offboarding-record`; AC-11→AC-13, AC-27, AC-28: `g6-leaver-role-and-workspace-duties`; AC-17: `g6-service-account-handover`; vế khuyến nghị `G2` của AC-3, AC-21, vế tiết kiệm của AC-6 và vế K4 của AC-16: `g6-downstream-integration` |
+| US-03-04 | AC-24, AC-25 | partial  | AC-1→AC-10, AC-14→AC-16, AC-18→AC-23, AC-26, AC-29: `g6-offboarding-record`; AC-11, AC-13, AC-27, AC-28: `g6-leaver-role-and-workspace-duties`; AC-17: `g6-service-account-handover`; vế khuyến nghị `G2` của AC-3, AC-21, vế tiết kiệm của AC-6 và vế K4 của AC-16: `g6-downstream-integration` |
 
 ## Supporting references
 

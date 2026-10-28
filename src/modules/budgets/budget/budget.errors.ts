@@ -120,7 +120,10 @@ export class BudgetProposalStateError extends Error {
   }
 }
 
-/** The version cannot be changed now: only a draft, or one sent back to Finance, is (`US-06-09`, `US-06-11`). */
+/**
+ * The version cannot be changed now: only a draft, or one sent back to Finance, is (`US-06-09`, `US-06-11`); a draft that a
+ * withdrawn or given-back proposal left behind is detached and is neither changed nor sent (F36, `QĐ-91a`).
+ */
 export class BudgetVersionNotEditableError extends Error {
   constructor(readonly state: string) {
     super(`The version is ${state}, so it is not changed.`);
@@ -197,6 +200,46 @@ export class BudgetNotAReaderError extends Error {
   constructor() {
     super('Only Finance and the spending approver read the versions of a budget.');
     this.name = 'BudgetNotAReaderError';
+  }
+}
+
+/** What Finance builds is not built by anybody else: the service refuses as well as the route (F13, `US-06-09`). */
+export class BudgetNotFinanceError extends Error {
+  constructor() {
+    super('Only Finance does this.');
+    this.name = 'BudgetNotFinanceError';
+  }
+}
+
+/** Only Finance and the person who decides a version read the history of its edits (F66, `QĐ-91d`). */
+export class BudgetNotAHistoryReaderError extends Error {
+  constructor() {
+    super('Only Finance and the person who decides the version read the history of its edits.');
+    this.name = 'BudgetNotAHistoryReaderError';
+  }
+}
+
+/** A line names a plan the catalog does not have (F37): nothing was written. */
+export class BudgetPlanNotFoundError extends Error {
+  constructor(readonly planIds: readonly string[]) {
+    super('A line names a plan that does not exist.');
+    this.name = 'BudgetPlanNotFoundError';
+  }
+}
+
+/** Another writer took the number of the next version of the Cost Center and year first (F39): read again and send again. */
+export class BudgetVersionNumberTakenError extends Error {
+  constructor() {
+    super('Another version took the number of this one first; read the versions again and send it again.');
+    this.name = 'BudgetVersionNumberTakenError';
+  }
+}
+
+/** A revision is begun while nobody heads the department of the Cost Center (F64, `QĐ-92d(1)`): nothing was written. */
+export class BudgetDepartmentHasNoHeadError extends Error {
+  constructor(readonly departmentId: string) {
+    super('The department of the Cost Center has no head today, so a revision is not begun.');
+    this.name = 'BudgetDepartmentHasNoHeadError';
   }
 }
 

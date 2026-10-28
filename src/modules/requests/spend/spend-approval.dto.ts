@@ -187,6 +187,8 @@ const resultSchema = z.strictObject({
       'GROUP_NEEDS_LINES',
       'NOT_THE_ASSIGNEE',
       'OWN_REQUEST',
+      /** The approver completed the review of Finance of this request: the two are two people (`SoD-8`). */
+      'REVIEWER_IS_APPROVER',
       'STEP_NOT_PENDING',
       'NO_SPEND_STEP',
       'OVERRIDE_REQUIRED',

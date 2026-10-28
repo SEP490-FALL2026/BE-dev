@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto';
+import { Client } from 'pg';
 import request from 'supertest';
 import { ApiAccount } from '../support/api-accounts';
+import { waitForLockWaiters } from '../support/lock-wait';
 import { ProvisioningHarness, type TaskWire } from '../support/provisioning-harness';
 
 const h = new ProvisioningHarness();
@@ -32,6 +34,35 @@ describe('the queue of provisioning tasks over HTTP (integration, real PostgreSQ
     await h.claim(made.task.id).expect(200);
 
     return made;
+  };
+
+  /**
+   * What two IT Admins do to one task at the same moment, in a fixed order. Every action on a task locks the row of the task first
+   * (`ProvisioningTaskRepo.lock`, `FOR UPDATE`, in the frame of the task), so that row is held in another connection and the
+   * requests are sent one by one: each one is waiting for the lock (`waitForLockWaiters`) before the next is sent, the lock goes to
+   * them in the order they queued, and each answer is the answer of its place in the queue. The lock is always released.
+   */
+  const queuedOnTask = async (taskId: string, sends: (() => request.Test)[]): Promise<request.Response[]> => {
+    const holder = new Client({ connectionString: h.ctx.database.url });
+    const pending: Promise<request.Response>[] = [];
+    await holder.connect();
+    try {
+      await holder.query('BEGIN');
+      await holder.query('SELECT id FROM provisioning_tasks WHERE id = $1 FOR UPDATE', [taskId]);
+      for (const send of sends) {
+        pending.push(send().then((response) => response));
+        await waitForLockWaiters(h.ctx.sql, pending.length);
+      }
+      await holder.query('COMMIT');
+      const answers: request.Response[] = [];
+      for (const answer of pending) answers.push(await answer);
+
+      return answers;
+    } finally {
+      await holder.query('ROLLBACK').catch(() => undefined);
+      await holder.end();
+      await Promise.allSettled(pending);
+    }
   };
 
   beforeAll(async () => {
@@ -289,12 +320,15 @@ describe('the queue of provisioning tasks over HTTP (integration, real PostgreSQ
   it('two IT Admins completing one task at once: one completes it, the other is told it is not in progress', async () => {
     const { task: made } = await taken();
 
-    const answers = await Promise.all([
-      h.complete(made.id, { evidence: 'a' }, h.it1),
-      h.complete(made.id, { evidence: 'b' }, a3),
+    const [first, second] = await queuedOnTask(made.id, [
+      () => h.complete(made.id, { evidence: 'a' }, h.it1),
+      () => h.complete(made.id, { evidence: 'b' }, a3),
     ]);
 
-    expect(answers.map((answer) => answer.status).sort()).toEqual([200, 409]);
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(409);
+    expect(h.codeOf(second)).toBe('PROVISIONING_TASK.NOT_IN_PROGRESS');
+    expect(await task(made.id)).toMatchObject({ status: 'COMPLETED', completedBy: h.it1.appUserId, evidence: 'a' });
     expect(
       (await h.auditEvents('ProvisioningTask', made.id)).filter((event) => event.action.endsWith('COMPLETED')),
     ).toHaveLength(1);
@@ -303,12 +337,21 @@ describe('the queue of provisioning tasks over HTTP (integration, real PostgreSQ
   it('two IT Admins taking one task at once: both are answered, the second takes it over, and both are recorded', async () => {
     const { task: made } = await fresh();
 
-    const answers = await Promise.all([h.claim(made.id, h.it1), h.claim(made.id, a3)]);
+    const answers = await queuedOnTask(made.id, [() => h.claim(made.id, h.it1), () => h.claim(made.id, a3)]);
 
     expect(answers.map((answer) => answer.status)).toEqual([200, 200]);
-    expect(
-      (await h.auditEvents('ProvisioningTask', made.id)).filter((event) => event.action.endsWith('CLAIMED')),
-    ).toHaveLength(2);
+    expect(await task(made.id)).toMatchObject({ status: 'IN_PROGRESS', claimedBy: a3.appUserId });
+    const claims = (await h.auditEvents('ProvisioningTask', made.id)).filter((event) =>
+      event.action.endsWith('CLAIMED'),
+    );
+    expect(claims).toHaveLength(2);
+    // The order of the queue, not the clock of two events, says who was first: the first found nobody, the second took it over.
+    expect(claims.find((event) => event.actor_app_user_id === h.it1.appUserId)?.before).toMatchObject({
+      claimedBy: null,
+    });
+    expect(claims.find((event) => event.actor_app_user_id === a3.appUserId)?.before).toMatchObject({
+      claimedBy: h.it1.appUserId,
+    });
   });
 
   it('answers 404 for a task that does not exist, and 422 for an id that is not one', async () => {

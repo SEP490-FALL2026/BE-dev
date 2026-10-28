@@ -1,7 +1,10 @@
 /**
  * `pnpm ops:preflight` (P28-01, `P29-MIGRATION=B-FORWARD`): whether `prisma migrate deploy` can carry this database
  * through the merged migration `20261022120000_cost_centers_unit_only`, which stays byte for byte, and the forward
- * migration that brings every history to the rule of the application.
+ * migration that brings every history to the rule of the application. In the final release of
+ * `g0-g6-final-business-baseline-remediation` it also judges the contract gates (spec L.3, L.10, L.11): the expansion of the
+ * compatibility release, the data an operator assigns or links, and the rows of the kinds that are gone must be in place before
+ * the migrations of this release run, and each one that is not is a blocker.
  */
 
 /** The merged migration that moves Cost Centers to Units only; applied with this checksum on deployed databases. */
@@ -52,16 +55,18 @@ export interface ConversionFacts {
 /**
  * Whether the database has the two objects of the owner-department expansion (`…_subscription_owner_column`): the
  * `subscriptions.owner_department_id` column and the `subscription_owner_assignments` table. `ABSENT`: neither (the
- * database is before the expansion). `READY`: both. `PARTIAL`: one without the other, which no migration of this
- * repository produces. `NO_TABLE`: there is no `subscriptions` table at all (an empty database).
+ * database is before the expansion: it blocks when it holds a subscription). `READY`: both (the compatibility schema and the
+ * final one). `PARTIAL`: one without the other, which no migration of this repository produces. `NO_TABLE`: there is no
+ * `subscriptions` table at all (an empty database).
  */
 export type SubscriptionOwnerSchema = 'NO_TABLE' | 'ABSENT' | 'READY' | 'PARTIAL';
 
 /**
  * Whether the database has the objects of the Cost Center link (`…_cost_center_department_link`): the
  * `cost_centers.department_id` column and the two tables of the record of a link and of the activation. `ABSENT`: none of
- * them (before the compatibility migration). `READY`: all. `PARTIAL`: some, which no migration of this repository
- * produces. `NO_TABLE`: there is no `cost_centers` table at all (an empty database).
+ * them (before the compatibility migration: it blocks when it holds an organization). `READY`: all (the compatibility schema
+ * and the final one, which keeps both tables). `PARTIAL`: some, which no migration of this repository produces. `NO_TABLE`:
+ * there is no `cost_centers` table at all (an empty database).
  */
 export type CostCenterDirectionSchema = 'NO_TABLE' | 'ABSENT' | 'READY' | 'PARTIAL';
 
@@ -73,23 +78,29 @@ export interface ContractGateFacts {
   subscriptionOwner: {
     schema: SubscriptionOwnerSchema;
     /**
-     * `ABSENT`: every subscription (each will need an owner department). `READY`: the subscriptions that still have
-     * none — no owner department and no valid assignment, or an assignment that conflicts with the owner department
-     * (spec L.3, _dòng gán hợp lệ_). Empty for the other schemas.
+     * `ABSENT`: every subscription (the database skipped the expansion: each is a reason to stop). `READY`: the subscriptions
+     * that still have none — no owner department and no valid assignment, or an assignment that conflicts with the owner
+     * department (spec L.3, _dòng gán hợp lệ_); none once the final migration made the column required. Empty for the
+     * other schemas.
      */
     subscriptionIds: string[];
   };
   /** Every Cost Center belongs to exactly one department (F01, `QĐ-87d(1)`, spec L.11). */
   costCenterDirection: {
     schema: CostCenterDirectionSchema;
+    /** `ABSENT`: the organizations of the database (it skipped the compatibility release: each is a reason to stop). */
+    organizationIds: string[];
     /**
-     * `ABSENT`: the Cost Centers no department names (each will need a department). `READY`: every Cost Center with no
-     * department — the rows `7c28e75` wrote, **including the ones it writes after the migration or after a recovery**.
+     * The three lists below are read only while the old column `departments.cost_center_id` still exists, that is until the
+     * final migration of F01 has run: from then on the schema itself requires the link and no activation row is read
+     * (the final installation writes none), so nothing about the direction can be open and they stay empty.
+     * `READY`: every Cost Center with no department — the rows `7c28e75` wrote, **including the ones it writes after the
+     * migration or after a recovery**.
      */
     costCenterIds: string[];
     /** `READY`: a department whose own column names a Cost Center that belongs to another department (the sync triggers prevent it). */
     mismatches: Array<{ costCenterId: string; departmentId: string }>;
-    /** `READY`: the organizations whose link has not been activated by the operator. */
+    /** `READY`: the organizations whose link has not been activated by the operator (the final migration of F01 refuses them). */
     notActivated: string[];
   };
   /** The waiting rows of the kinds that are gone: the migration of the release after this one refuses to run over them. */
@@ -124,18 +135,21 @@ export interface RetiredKindFacts {
 }
 
 /** A row that needs attention later but does not stop the deploy. Ids only: no name, no amount, no basis. */
-export type PreflightInformation =
-  | { code: 'BUDGET_PROPOSAL_LEGACY_RETURN_RECONCILE'; proposalId: string; rule: 'R1' | 'R2' }
-  | { code: 'SUBSCRIPTION_OWNER_TO_ASSIGN'; subscriptionId: string }
-  | { code: 'COST_CENTER_TO_LINK'; costCenterId: string }
-  | { code: 'COST_CENTER_DIRECTION_NOT_ACTIVATED'; organizationId: string };
+export type PreflightInformation = {
+  code: 'BUDGET_PROPOSAL_LEGACY_RETURN_RECONCILE';
+  proposalId: string;
+  rule: 'R1' | 'R2';
+};
 
 export type PreflightBlocker =
   | { code: 'MIGRATION_FAILED'; migration: string }
+  | { code: 'SUBSCRIPTION_OWNER_EXPANSION_REQUIRED'; subscriptionId: string }
   | { code: 'SUBSCRIPTION_OWNER_UNASSIGNED'; subscriptionId: string }
   | { code: 'SUBSCRIPTION_OWNER_SCHEMA_PARTIAL' }
+  | { code: 'COST_CENTER_DIRECTION_EXPANSION_REQUIRED'; organizationId: string }
   | { code: 'COST_CENTER_UNLINKED'; costCenterId: string }
   | { code: 'COST_CENTER_LINK_MISMATCH'; costCenterId: string; departmentId: string }
+  | { code: 'COST_CENTER_DIRECTION_NOT_ACTIVATED'; organizationId: string }
   | { code: 'COST_CENTER_DIRECTION_SCHEMA_PARTIAL' }
   | { code: 'PERSONNEL_NOTICE_RETIRED_KIND_PENDING'; noticeId: string }
   | { code: 'DEPARTMENT_TRANSFER_TITLE_ONLY_PENDING'; transferId: string }
@@ -177,6 +191,6 @@ export interface PreflightReport {
   blockers: PreflightBlocker[];
   corrections: PreflightCorrection[];
   companyCostCentersRemoved: Array<{ code: string; status: string }>;
-  /** What the contract gates list without blocking: the rows an operator will have to give a decision on (spec L.10). */
+  /** What the contract gates list without blocking: the rows the migrations of this release reconcile by themselves (spec J.2). */
   information: PreflightInformation[];
 }

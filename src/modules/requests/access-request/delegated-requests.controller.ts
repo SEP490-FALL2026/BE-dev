@@ -51,8 +51,9 @@ export class DelegatedRequestsController {
     ...AUTH_ERRORS,
     {
       status: HttpStatus.FORBIDDEN,
-      description: 'The caller does not head the department (DELEGATED_REQUEST.NOT_HEAD).',
-      examples: [EXAMPLES.NOT_HEAD],
+      description:
+        'The caller does not head the department (DELEGATED_REQUEST.NOT_HEAD), or is the Super Admin, who sends no request (ACCESS_REQUEST.SUPER_ADMIN_CANNOT_REQUEST).',
+      examples: [EXAMPLES.NOT_HEAD, EXAMPLES.SUPER_ADMIN_CANNOT_REQUEST],
     },
     {
       status: HttpStatus.NOT_FOUND,

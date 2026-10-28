@@ -49,6 +49,12 @@ export function proposalPolicy(slaWorkingDays: number): RequestPolicy {
   };
 }
 
+/**
+ * Whether a person who holds these roles may send a request. The Super Admin files and decides no business record (`QĐ-87a`, `SoD-1`,
+ * F30): whatever else they hold, they send none, on any route that sends one, and every service that sends judges it itself.
+ */
+export const mayRequest = (roles: readonly string[]): boolean => !roles.includes('SUPER_ADMIN');
+
 /** Whether the chain has a spend step: only then can one person hold both the need step and the spend step. */
 export const hasSpendStep = (policy: Pick<RequestPolicy, 'chain'>): boolean => policy.chain.includes('SPEND_APPROVAL');
 

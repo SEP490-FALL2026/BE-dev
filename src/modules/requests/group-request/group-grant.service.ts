@@ -4,6 +4,7 @@ import { AuditService } from '../../audit/audit.service';
 import { BudgetsService } from '../../budgets/budgets.service';
 import type { GrantOutcome } from '../../licensing/licensing.types';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
+import { RequestOutcomeListeners } from '../access-request/request-outcome-listeners';
 import { GroupResolutionService } from './group-resolution.service';
 import { shareToRelease } from './line-allocation.policy';
 import { LineAmountRepo } from './line-amount.repo';
@@ -24,6 +25,7 @@ export class GroupGrantService {
     private readonly resolution: GroupResolutionService,
     private readonly budgets: BudgetsService,
     private readonly audit: AuditService,
+    private readonly outcomes: RequestOutcomeListeners,
   ) {}
 
   /** The person's line, approved, becomes the one being carried out; the request is being carried out from the first. */
@@ -55,6 +57,9 @@ export class GroupGrantService {
     );
     // A grant the IT Admin closed as failed spends nothing: the share of that person goes back, and nobody else's does (`AC-6`).
     if (outcome === 'FAILED') await this.release(tx, request.id, employeeId, 'GRANT_FAILED', now);
+    // The line of this person reached its own end: a seat that is real, or the request ended for them without one (F43).
+    if (outcome === 'COMPLETED') await this.outcomes.granted(tx, request, [employeeId], now);
+    else await this.outcomes.ended(tx, request, [employeeId], now);
     await this.resolution.resolve(tx, null, request.id, now);
   }
 
@@ -79,6 +84,7 @@ export class GroupGrantService {
     });
     // The grant is cancelled and spends nothing: what was held for the person goes back (`US-05-08` AC-9).
     await this.release(tx, request.id, employeeId, 'PARTICIPANT_WITHDRAWN', now);
+    await this.outcomes.ended(tx, request, [employeeId], now);
     await this.resolution.resolve(tx, null, request.id, now);
 
     return true;

@@ -124,11 +124,12 @@ export class StepTargetService {
   }
 
   /**
-   * The department the need step is routed for: where the requester is now, or the one the request was sent for when they
-   * have none; a service account keeps the department it was sent for whoever answers for it moves (`QĐ-86c`).
+   * The department the need step is routed for. Only a request for internal software with no fee follows where its requester is now,
+   * or keeps the one it was sent for when they have none (`FR-3.16`); a paid request, a proposal of new software and a service account
+   * keep the department they were sent for whoever moves (`QĐ-90b`, `QĐ-86c`, F28).
    */
   private async needDepartment(tx: DbTx, request: ReassignableRequest, today: BusinessDate): Promise<string> {
-    if (request.type === 'SERVICE_ACCOUNT') return request.departmentId;
+    if (request.type === 'SERVICE_ACCOUNT' || request.branch !== 'INTERNAL_FREE') return request.departmentId;
     const placement = await this.organization.getEmployeePlacement(request.requesterEmployeeId, today, tx);
 
     return placement?.departmentId ?? request.departmentId;

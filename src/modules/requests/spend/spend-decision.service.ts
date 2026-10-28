@@ -7,6 +7,7 @@ import { accessRequestAuditEvent } from '../access-request/access-request-audit-
 import { AccessRequestGroupUsesLinesError, AccessRequestNotFoundError } from '../access-request/access-request.errors';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
+import { RequestOutcomeListeners } from '../access-request/request-outcome-listeners';
 import { RenewalApplyService } from '../renewal-request/renewal-apply.service';
 import { BudgetCheckService } from './budget-check.service';
 import { SpendDecisionRepo } from './spend-decision.repo';
@@ -52,6 +53,7 @@ export class SpendDecisionService {
     private readonly identity: IdentityAccessService,
     private readonly audit: AuditService,
     private readonly renewals: RenewalApplyService,
+    private readonly outcomes: RequestOutcomeListeners,
   ) {}
 
   /** Throws AccessRequestNotFoundError and SpendDecisionRefusedError. */
@@ -75,6 +77,8 @@ export class SpendDecisionService {
         stepState: step.state,
       });
       if (refusal) throw new SpendDecisionRefusedError(refusal);
+      // The person who completed the review of Finance of this request does not decide its spend step (`SoD-8`).
+      await this.effects.refuseReviewer(tx, request, actor.employeeId);
 
       const now = new Date();
       const outcome = await this.checks.run(tx, request, 'SPEND_DECISION', actor, now);
@@ -170,6 +174,9 @@ export class SpendDecisionService {
         },
       ),
     );
+
+    // A refusal ends the request for the person it was for, without a grant (F43).
+    if (decided.decision === 'REJECTED') await this.outcomes.ended(tx, request, request.beneficiaryEmployeeIds, now);
 
     // A renewal needs nobody to carry it out: approved in full, it is applied here, in the transaction of the decision.
     if (decided.decision === 'APPROVED' && request.type === 'RENEWAL') {

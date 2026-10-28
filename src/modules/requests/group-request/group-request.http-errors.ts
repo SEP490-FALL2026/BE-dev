@@ -12,6 +12,7 @@ import {
   AccessRequestPlanLineRefusedError,
   AccessRequestPlanNotFoundError,
   AccessRequestSpendDateNotAllowedError,
+  AccessRequestSuperAdminCannotRequestError,
   AccessRequestWithdrawalRefusedError,
 } from '../access-request/access-request.errors';
 import { SpendDecisionRefusedError, SpendSupplementRefusedError } from '../spend/spend.errors';
@@ -109,6 +110,7 @@ export const GROUP_REQUEST_ERROR_EXAMPLES = {
   APPLICATION_RETIRED: example(new AccessRequestApplicationRetiredError()),
   NO_DEPARTMENT: example(new AccessRequestNoDepartmentError()),
   FINANCE_SETUP_INCOMPLETE: example(new FinanceSetupIncompleteError('<department-id>')),
+  SUPER_ADMIN_CANNOT_REQUEST: example(new AccessRequestSuperAdminCannotRequestError()),
   NO_SPEND_FOR_FREE_SOFTWARE: example(new AccessRequestSpendDateNotAllowedError()),
   PLAN_NOT_ELIGIBLE: example(new GroupRequestPlanNotEligibleError('KIND_NOT_MULTI_SEAT')),
   TOO_MANY_LINES: example(new GroupRequestTooManyLinesError(GROUP_EMPLOYEE_MAX)),
@@ -119,6 +121,7 @@ export const GROUP_REQUEST_ERROR_EXAMPLES = {
   CLOSURE_ALREADY_ENDED: example(new AccessRequestCancellationRefusedError('ALREADY_ENDED')),
   CLOSURE_WITHDRAWAL_PENDING: example(new AccessRequestCancellationRefusedError('WITHDRAWAL_PENDING')),
   BENEFICIARY_NOT_LEFT: example(new AccessRequestCancellationRefusedError('BENEFICIARY_NOT_LEFT')),
+  BENEFICIARY_NOT_TRANSFERRED: example(new AccessRequestCancellationRefusedError('BENEFICIARY_NOT_TRANSFERRED')),
   EVIDENCE_REQUIRED: example(new AccessRequestCancellationRefusedError('EVIDENCE_REQUIRED')),
   NEED_OWN_REQUEST: example(new AccessRequestDecisionRefusedError('OWN_REQUEST')),
   NEED_NOT_THE_ASSIGNEE: example(new AccessRequestDecisionRefusedError('NOT_THE_ASSIGNEE')),
@@ -134,6 +137,7 @@ export const GROUP_REQUEST_ERROR_EXAMPLES = {
   SPEND_OWN_REQUEST: example(new SpendDecisionRefusedError('OWN_REQUEST')),
   NO_SPEND_STEP: example(new SpendDecisionRefusedError('NO_SPEND_STEP')),
   NOT_CHECKABLE: example(new SpendDecisionRefusedError('NOT_CHECKABLE')),
+  REVIEWER_IS_APPROVER: example(new SpendDecisionRefusedError('REVIEWER_IS_APPROVER')),
   OVERRIDE_REQUIRED: example(new SpendDecisionRefusedError('OVERRIDE_REQUIRED', [2026])),
   OVERRIDE_MISMATCH: example(new SpendDecisionRefusedError('OVERRIDE_MISMATCH', [2026])),
   OVERRIDE_NOT_NEEDED: example(new SpendDecisionRefusedError('OVERRIDE_NOT_NEEDED')),

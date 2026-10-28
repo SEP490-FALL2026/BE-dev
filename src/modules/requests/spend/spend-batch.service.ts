@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditService } from '../../audit/audit.service';
+import { OrganizationService } from '../../organization/organization.service';
 import { accessRequestAuditEvent } from '../access-request/access-request-audit-event';
 import { AccessRequestNotFoundError } from '../access-request/access-request.errors';
 import { hasSpendStep } from '../access-request/access-request.policy';
@@ -37,9 +38,13 @@ export class SpendBatchService {
     private readonly head: SpendHeadService,
     private readonly routing: SpendRoutingService,
     private readonly audit: AuditService,
+    private readonly organization: OrganizationService,
   ) {}
 
-  /** Throws SpendNotHeadError, AccessRequestNotFoundError and SpendNotInQueueError; returns the id of the batch. */
+  /**
+   * Throws SpendNotHeadError, AccessRequestNotFoundError, SpendNotInQueueError and FinanceSetupIncompleteError (the department has no
+   * Cost Center in use now, `QĐ-87g`); returns the id of the batch.
+   */
   async submit(actor: AuthenticatedPrincipal, requestIds: readonly string[]): Promise<string> {
     const departmentId = await this.head.departmentOf(actor);
 
@@ -54,6 +59,11 @@ export class SpendBatchService {
         }
         locked.set(id, request);
       }
+      // A department with no Cost Center in use is stopped before anything is checked against a budget (F27): not the answer of a year
+      // with no budget, and nothing is written.
+      const today = await this.organization.businessToday(new Date(), tx);
+      const unit = (await this.organization.getOwningUnits([actor.employeeId], today, tx)).get(actor.employeeId);
+      if (unit) this.organization.requireUnitCostCenter(unit);
 
       const organizationId = (locked.get(requestIds[0]) as AccessRequestRecord).organizationId;
       const now = new Date();

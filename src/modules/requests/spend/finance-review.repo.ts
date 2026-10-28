@@ -46,6 +46,16 @@ export class FinanceReviewRepo {
     return new Map(rows.map((row) => [row.requestId, row]));
   }
 
+  /** Whether the person completed any review of Finance of the request, whatever the way it ended (`SoD-8`, F32). */
+  async completedBy(tx: DbTx, requestId: string, employeeId: string): Promise<boolean> {
+    const row = await tx.requestFinanceReview.findFirst({
+      where: { requestId, decidedByEmployeeId: employeeId },
+      select: { stepId: true },
+    });
+
+    return row !== null;
+  }
+
   async ofStep(stepId: string, tx?: DbTx): Promise<FinanceReviewRecord | null> {
     return (tx ?? this.prisma).requestFinanceReview.findUnique({ where: { stepId } });
   }

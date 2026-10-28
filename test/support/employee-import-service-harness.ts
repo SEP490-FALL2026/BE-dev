@@ -2,6 +2,8 @@ import type { DbTx, TransactionRunner } from '../../src/infrastructure/database/
 import type { AuthenticatedPrincipal } from '../../src/infrastructure/security/tokens/access-token-verifier.port';
 import type { AuditService } from '../../src/modules/audit/audit.service';
 import type { LicensingService } from '../../src/modules/licensing/licensing.service';
+import type { NotificationsService } from '../../src/modules/notifications/notifications.service';
+import type { InAppNotificationInput } from '../../src/modules/notifications/notifications.types';
 import type { OrganizationService } from '../../src/modules/organization/organization.service';
 import type { EmployeeImportLookupData } from '../../src/modules/organization/organization.types';
 import type {
@@ -50,7 +52,6 @@ export interface Department {
   code: string;
   name: string;
   active: boolean;
-  costCenterActive: boolean;
   headed: boolean;
 }
 
@@ -62,8 +63,8 @@ export interface Directory {
 export function directory(): Directory {
   return {
     departments: [
-      { id: 'd-ops', code: 'P-OPS', name: 'Operations', active: true, costCenterActive: true, headed: true },
-      { id: 'd-des', code: 'P-DES', name: 'Design', active: true, costCenterActive: true, headed: false },
+      { id: 'd-ops', code: 'P-OPS', name: 'Operations', active: true, headed: true },
+      { id: 'd-des', code: 'P-DES', name: 'Design', active: true, headed: false },
     ],
     employees: [
       {
@@ -112,6 +113,7 @@ export function harness(start: Directory = directory()) {
   const audits: unknown[] = [];
   const lookups: unknown[] = [];
   const locks: unknown[] = [];
+  const notices: InAppNotificationInput[] = [];
   let sequence = 0;
   let organization: { id: string } | null = { id: 'org-1' };
   let failCreate: ((code: string) => Error | undefined) | undefined;
@@ -221,7 +223,7 @@ export function harness(start: Directory = directory()) {
       const data: EmployeeImportLookupData = {
         departments: dir.departments
           .filter((department) => names.departmentCodes.includes(department.code))
-          .map(({ id, code, active, costCenterActive }) => ({ id, code, active, costCenterActive })),
+          .map(({ id, code, active }) => ({ id, code, active })),
         employees: dir.employees.filter((employee) => names.employeeCodes.includes(employee.employeeCode)),
         emailOwners: dir.employees
           .filter((employee) => employee.workEmail && names.normalizedEmails.includes(employee.workEmail))
@@ -253,6 +255,20 @@ export function harness(start: Directory = directory()) {
       created.push(input);
       return Promise.resolve({ id: `new-${input.employeeCode}` });
     },
+    /** The notices a created record owes, as the organization builds them: one, to the head of the department (`F17`). */
+    getProfileNotices(tx: DbTx, request: { kind: string; organizationId: string; employeeId: string }) {
+      calls.push(`org.getProfileNotices(${where(tx)}, ${request.kind}, ${request.employeeId})`);
+      const notice: InAppNotificationInput = {
+        organizationId: request.organizationId,
+        recipientEmployeeId: 'e-head',
+        code: 'EMPLOYEE_PROFILE_CREATED',
+        subject: { type: 'EMPLOYEE', id: request.employeeId },
+        params: { employeeId: request.employeeId, departmentId: null },
+        eventKey: `employee_profile_created:${request.employeeId}`,
+      };
+
+      return Promise.resolve([notice]);
+    },
     departmentsWithoutHead(ids: string[]) {
       calls.push(`org.departmentsWithoutHead(${ids.join(',')})`);
       return Promise.resolve(
@@ -268,6 +284,16 @@ export function harness(start: Directory = directory()) {
       calls.push(`audit.record(${where(tx)})`);
       audits.push(clone(event));
       return Promise.resolve();
+    },
+  };
+
+  /** The inbox: a notice is written in the transaction of the record it is about, or not at all (`F17`). */
+  const notifications = {
+    notifyInApp(tx: DbTx, input: InAppNotificationInput) {
+      calls.push(`notifications.notifyInApp(${where(tx)}, ${input.recipientEmployeeId})`);
+      notices.push(clone(input));
+
+      return Promise.resolve(true);
     },
   };
 
@@ -291,6 +317,7 @@ export function harness(start: Directory = directory()) {
     audit as unknown as AuditService,
     runner as unknown as TransactionRunner,
     { openSeatHolders: () => Promise.resolve([]) } as unknown as LicensingService,
+    notifications as unknown as NotificationsService,
   );
 
   return {
@@ -303,12 +330,14 @@ export function harness(start: Directory = directory()) {
     audits,
     lookups,
     locks,
+    notices,
     reset() {
       calls.length = 0;
       created.length = 0;
       audits.length = 0;
       lookups.length = 0;
       locks.length = 0;
+      notices.length = 0;
     },
     withoutOrganization() {
       organization = null;

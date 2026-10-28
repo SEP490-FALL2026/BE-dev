@@ -10,6 +10,7 @@ import {
   ProvisioningTaskStateError,
   ProvisioningTypeNotSupportedError,
 } from '../licensing.errors';
+import { ProvisioningItAdminRequiredError } from './provisioning.errors';
 import type {
   ProvisioningAction,
   ProvisioningChannel,
@@ -19,6 +20,11 @@ import type {
   TaskDoneWhen,
   TaskStep,
 } from '../licensing.types';
+
+/** Only an IT Admin works the provisioning queue (`QĐ-87a`, `SoD-1`, F13): the route guard is not the only place this is judged. */
+export function assertItAdmin(actor: { roles: readonly string[] }): void {
+  if (!actor.roles.includes('IT_ADMIN')) throw new ProvisioningItAdminRequiredError();
+}
 
 /** The longest note of evidence and reason a task keeps; the DTO bounds the request with them. */
 export const EVIDENCE_MAX_LENGTH = 2000;

@@ -117,8 +117,13 @@ jobs:
           NODE_OPTIONS: --max-old-space-size=4096
         run: pnpm check
 
+      # HTTP-E2E-DEFERRED-BY-OWNER (27/10/2026, Prompt 04 continuation section 9.6): the HTTP E2E suite is paused until the Owner's
+      # redesign. This step alone is disabled; unit, rules, schema-drift, integration, security, build and deploy controls stay.
+      # Original condition: `if: github.ref == 'refs/heads/main'`. To re-enable: restore that condition, delete this comment and
+      # record it in the BE tracker. `pnpm test:e2e` and the suite stay in the repository; nothing here replaces the run with a
+      # fake pass (no continue-on-error, no `|| true`).
       - name: Run API E2E tests
-        if: github.ref == 'refs/heads/main'
+        if: ${{ false }}
         run: pnpm test:e2e
 
       - name: Provision ordinary integration role

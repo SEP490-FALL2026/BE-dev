@@ -6,6 +6,7 @@ import { DepartmentDirectoryService } from './department/department-directory.se
 import { DepartmentHeadRepo } from './department/department-head.repo';
 import { DepartmentRepo } from './department/department.repo';
 import { DepartmentServiceAccountRegistry } from './department/service-account-registry';
+import { DepartmentUseRegistry } from './department/department-use-registry';
 import { EmployeeDirectoryService } from './employee/employee-directory.service';
 import { EmployeeDepartureRepo } from './employee/employee-departure.repo';
 import { EmployeeRepo } from './employee/employee.repo';
@@ -28,6 +29,7 @@ import { OrganizationService } from './organization.service';
     DepartmentHeadRepo,
     DepartmentDirectoryService,
     DepartmentServiceAccountRegistry,
+    DepartmentUseRegistry,
     OrganizationChangeRegistry,
     OrganizationChangeService,
     AnnouncementRepo,

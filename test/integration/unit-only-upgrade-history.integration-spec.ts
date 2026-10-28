@@ -1,5 +1,6 @@
 import { Client } from 'pg';
 import { CLI_COLD_START_MS, cliWorkingDirectory, runCli, stopCliProcesses } from '../support/cli-process';
+import { activateCostCenterLink, lastCompatibilityMigration } from '../support/compat-release';
 import {
   DisposableDatabase,
   dropDisposableDatabase,
@@ -25,7 +26,10 @@ import {
  * byte, a read-only preflight (`pnpm ops:preflight`) prepares or refuses a database that has not run it yet, and a new
  * forward migration brings every history to the rule of the application — a service account is owned by the department
  * its responsible person is in on the day it was recorded (`QĐ-86c`, `seat-baseline-import.service.ts`), and charged to
- * that department's Unit. Each history is real: `prisma migrate deploy` writes `_prisma_migrations` with the checksums.
+ * that department's Unit. Each history is real: `prisma migrate deploy` writes `_prisma_migrations` with the checksums. The preflight is
+ * the one of the FINAL release: a database before the compatibility migration that holds an organization is `BLOCKED` by
+ * `COST_CENTER_DIRECTION_EXPANSION_REQUIRED` beside whatever the conversion finds (the conversion's rows are still reported), and the
+ * upgrade to the final schema goes through the compatibility release and the operator's activation (spec L.10, L.11).
  */
 const UNIT_ONLY = migrationEndingWith('_cost_centers_unit_only');
 const LAST_MERGED = migrationEndingWith('_license_key_reveal_quota');
@@ -89,6 +93,25 @@ async function legacyFixture(cases: readonly Case[], options: { companyAllocatio
 
   return { database, sql, world, accounts };
 }
+
+/**
+ * The deploy of the final release over a database the compatibility release can run on: the history through the compatibility
+ * release, the operator's activation of the Cost Center link, then the migrations of the final release. Returns the first non-zero exit
+ * code, else 0.
+ */
+async function deployThroughFinal(fixture: Fixture): Promise<number | null> {
+  const compatibility = await deployMigrations(fixture.database, { through: lastCompatibilityMigration() });
+  if (compatibility.code !== 0) return compatibility.code;
+  await activateCostCenterLink(fixture.sql, fixture.world.organizationId);
+
+  return (await deployMigrations(fixture.database)).code;
+}
+
+/** What the final preflight adds on a database that skipped the compatibility release: the organization, by id. */
+const expansionRequired = (fixture: Fixture) => ({
+  code: 'COST_CENTER_DIRECTION_EXPANSION_REQUIRED',
+  organizationId: fixture.world.organizationId,
+});
 
 async function finish(fixture: Fixture | undefined): Promise<void> {
   await fixture?.sql.end();
@@ -182,7 +205,7 @@ describe('cost attribution to Units: every migration history converges (integrat
 
   describe('a database that has not run the unit-only migration', () => {
     it(
-      'is reported ready with what will move, then upgrades to the recorded-day owner with an audit of the correction',
+      'is reported with what will move and blocked until the compatibility release ran, then upgrades to the recorded-day owner with an audit of the correction',
       async () => {
         let fixture: Fixture | undefined;
         try {
@@ -190,10 +213,10 @@ describe('cost attribution to Units: every migration history converges (integrat
           const untouched = await fingerprint(fixture.sql);
           const { code, report } = await preflight(fixture.database);
 
-          expect(code).toBe(0);
-          expect(report.status).toBe('READY');
+          expect(code).toBe(2);
+          expect(report.status).toBe('BLOCKED');
           expect(report.history).toBe('BEFORE_UNIT_ONLY');
-          expect(report.blockers).toEqual([]);
+          expect(report.blockers).toEqual([expansionRequired(fixture)]);
           expect(report.corrections).toEqual([
             { assignmentId: fixture.accounts.B, recordedOn: '2026-10-12', fromDepartment: 'OPS', toDepartment: 'ENG' },
           ]);
@@ -203,7 +226,7 @@ describe('cost attribution to Units: every migration history converges (integrat
           ]);
           expect(await fingerprint(fixture.sql)).toBe(untouched);
 
-          expect((await deployMigrations(fixture.database)).code).toBe(0);
+          expect(await deployThroughFinal(fixture)).toBe(0);
           expect(await attribution(fixture.sql)).toEqual({
             accounts: { 'bot-a': 'ENG/CC-ENG', 'bot-b': 'ENG/CC-ENG' },
             costCenters: ['CC-ENG', 'CC-OPS'],
@@ -232,7 +255,7 @@ describe('cost attribution to Units: every migration history converges (integrat
           await finish(fixture);
         }
       },
-      3 * DEPLOY_TIMEOUT_MS + 2 * CLI_COLD_START_MS,
+      4 * DEPLOY_TIMEOUT_MS + 2 * CLI_COLD_START_MS,
     );
 
     it(
@@ -253,6 +276,7 @@ describe('cost attribution to Units: every migration history converges (integrat
               version: 1,
               costCenter: 'CC-CORP',
             },
+            expansionRequired(fixture),
             {
               code: 'SERVICE_ACCOUNT_WITHOUT_DEPARTMENT_ON_RECORDED_DAY',
               assignmentId: fixture.accounts.D,
@@ -264,6 +288,11 @@ describe('cost attribution to Units: every migration history converges (integrat
               assignmentId: fixture.accounts.C,
               employeeCode: 'E-C',
               validFrom: '2026-10-01',
+            },
+            // The flat-rate subscription of the allocation: a database that skipped the expansion cannot give it an owner department.
+            {
+              code: 'SUBSCRIPTION_OWNER_EXPANSION_REQUIRED',
+              subscriptionId: (await fixture.sql.query<{ id: string }>('SELECT id FROM subscriptions')).rows[0].id,
             },
           ]);
           expect(await fingerprint(fixture.sql)).toBe(untouched);
@@ -302,7 +331,7 @@ describe('cost attribution to Units: every migration history converges (integrat
 
   describe('a database that already ran the unit-only migration with its original checksum (the test VPS)', () => {
     it(
-      'is reported ready, then the forward migration moves it to the same state as the other history',
+      'is reported with what will move and blocked until the compatibility release ran, then the forward migration moves it to the same state as the other history',
       async () => {
         let legacy: Fixture | undefined;
         let applied: Fixture | undefined;
@@ -313,27 +342,28 @@ describe('cost attribution to Units: every migration history converges (integrat
           expect((await attribution(applied.sql)).accounts['bot-b']).toBe('OPS/CC-OPS');
 
           const { code, report } = await preflight(applied.database);
-          expect(code).toBe(0);
-          expect(report).toMatchObject({ status: 'READY', history: 'UNIT_ONLY_APPLIED', blockers: [] });
+          expect(code).toBe(2);
+          expect(report).toMatchObject({ status: 'BLOCKED', history: 'UNIT_ONLY_APPLIED' });
+          expect(report.blockers).toEqual([expansionRequired(applied)]);
           expect(report.corrections).toEqual([
             { assignmentId: applied.accounts.B, recordedOn: '2026-10-12', fromDepartment: 'OPS', toDepartment: 'ENG' },
           ]);
 
-          expect((await deployMigrations(applied.database)).code).toBe(0);
+          expect(await deployThroughFinal(applied)).toBe(0);
           expect(await finished(applied.sql)).toEqual(
             expect.arrayContaining([UNIT_ONLY, expect.stringContaining(FORWARD)]),
           );
           expect((await schemaDrift(applied.database)).code).toBe(0);
 
           legacy = await legacyFixture(['A', 'B']);
-          expect((await deployMigrations(legacy.database)).code).toBe(0);
+          expect(await deployThroughFinal(legacy)).toBe(0);
           expect(await attribution(applied.sql)).toEqual(await attribution(legacy.sql));
         } finally {
           await finish(applied);
           await finish(legacy);
         }
       },
-      5 * DEPLOY_TIMEOUT_MS + CLI_COLD_START_MS,
+      7 * DEPLOY_TIMEOUT_MS + CLI_COLD_START_MS,
     );
 
     it(
@@ -346,6 +376,7 @@ describe('cost attribution to Units: every migration history converges (integrat
           const { code, report } = await preflight(fixture.database);
           expect(code).toBe(2);
           expect(report.blockers).toEqual([
+            expansionRequired(fixture),
             {
               code: 'SERVICE_ACCOUNT_WITHOUT_DEPARTMENT_ON_RECORDED_DAY',
               assignmentId: fixture.accounts.D,

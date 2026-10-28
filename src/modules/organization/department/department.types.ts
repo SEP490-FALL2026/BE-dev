@@ -5,8 +5,11 @@ import { ProjectRecord } from '../project/project.types';
 
 export type DepartmentStatus = 'ACTIVE' | 'INACTIVE';
 
-/** Why a department needs attention (US-03-06 AC-9, AC-15). */
-export type DepartmentWarning = 'MISSING_HEAD' | 'MISSING_IT_ADMIN';
+/**
+ * Why a department needs attention (US-03-06 AC-9, AC-15): it has no head, no usable IT Admin in charge, or no Cost Center in use yet
+ * (its finance configuration is incomplete, `QĐ-87d(1)`; Finance creates the Cost Center for it).
+ */
+export type DepartmentWarning = 'MISSING_HEAD' | 'MISSING_IT_ADMIN' | 'MISSING_COST_CENTER';
 
 /** How many head periods a profile shows, and how many a head change reads back to find the one in force. */
 export const DEPARTMENT_HEAD_HISTORY_LIMIT = 50;
@@ -59,6 +62,8 @@ export interface DepartmentView extends DepartmentRecord {
 }
 
 export interface DepartmentProfileView extends DepartmentView {
+  /** The person named to take over from a day after today, with that day in `since`; null when nobody is (`QĐ-87` `D-5`). */
+  successor: DepartmentHeadRecord | null;
   headHistory: HeadPeriodRecord[];
   /** The department had more head periods than the {@link DEPARTMENT_HEAD_HISTORY_LIMIT} shown. */
   headHistoryHasMore: boolean;

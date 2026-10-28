@@ -46,15 +46,16 @@ export interface OffboardingRecord {
   leftByAppUserId: string | null;
   cancelledAt: Date | null;
   cancelledByAppUserId: string | null;
+  cancelledByTicketId: string | null;
   cancelReason: string | null;
   accountLockByAppUserId: string | null;
   accountLockAt: Date | null;
   accountLockNote: string | null;
   closedAt: Date | null;
   closedByAppUserId: string | null;
-  selfExecuted: boolean;
-  /** Null only for an event the controlled procedure of the release after this one recorded (spec L.2); this release always writes its account. */
+  /** Who recorded it: an account, or the ticket of the controlled procedure (spec L.2): exactly one of the two is set. */
   recordedByAppUserId: string | null;
+  recordedByTicketId: string | null;
   recordedAt: Date;
 }
 
@@ -79,13 +80,15 @@ export interface OffboardingChangeRecord {
   newLastWorkingDay: BusinessDate | null;
   reason: string | null;
   detail: Record<string, unknown> | null;
-  /** Null only for an event the controlled procedure of the release after this one recorded (spec L.2); this release always writes its account. */
+  /** The account, or the ticket of the controlled procedure (spec L.2). */
   changedByAppUserId: string | null;
+  changedByTicketId: string | null;
   changedAt: Date;
-  selfExecuted: boolean;
 }
 
 export interface OffboardingListFilter {
+  /** Set for an IT Admin: only the cases of these departments. Empty reads nothing. */
+  departmentIds?: readonly string[];
   employeeId?: string;
   state?: OffboardingState;
   pastLastDay?: boolean;

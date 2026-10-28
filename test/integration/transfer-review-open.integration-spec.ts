@@ -8,7 +8,7 @@ import { TransferReviewHarness, type ReviewItemWire, type ReviewWire } from '../
 const h = new TransferReviewHarness();
 const NO_DAYS: ReadonlySet<string> = new Set();
 
-/** US-03-07 AC-1, AC-2, AC-7, AC-8: when a transfer takes effect the new head is given the tools outside the standard toolset to review. */
+/** US-03-07 AC-1, AC-2, AC-7, AC-8, F42: when a transfer takes effect the new head is given every personal seat of the person to review. */
 describe('opening the review of the tools after a transfer (integration, real PostgreSQL)', () => {
   let des: Department;
   let fin: Department;
@@ -196,7 +196,6 @@ describe('opening the review of the tools after a transfer (integration, real Po
     const { person } = await holder([figma]);
     await h.moveToday(person, fin);
     const [row] = await reviewsFor(person.employeeId);
-    const placements = await h.placements(person.employeeId);
     const change = {
       id: randomUUID(),
       kind: 'PLACEMENT_START' as const,
@@ -204,8 +203,6 @@ describe('opening the review of the tools after a transfer (integration, real Po
       employeeId: person.employeeId,
       fromDepartmentId: des.id,
       toDepartmentId: fin.id,
-      fromJobTitleId: placements[0].job_title_id,
-      toJobTitleId: placements[1].job_title_id,
       effectiveOn: h.today(),
     };
 

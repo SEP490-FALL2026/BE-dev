@@ -2,6 +2,8 @@ import type { AssessmentWire } from '../../src/modules/requests/access-request/a
 import type { PreviewWire } from '../../src/modules/requests/access-request/request-preview.dto';
 import request from 'supertest';
 import { ApiAccount } from './api-accounts';
+import { HR_BASIS } from './hr-basis';
+import { OwnedSubscriptions } from './owned-subscriptions';
 import { ProvisioningHarness } from './provisioning-harness';
 import { SeatHarness } from './seat-baseline-harness';
 
@@ -100,6 +102,32 @@ export interface Department {
 export class RequestHarness extends ProvisioningHarness {
   private titleName: string | null = null;
 
+  /** A request is priced, and a seat taken, by the subscription of its own department (F38, F20): see owned-subscriptions.ts. */
+  readonly owned = new OwnedSubscriptions(
+    async (body) =>
+      this.dataOf<{ id: string }>(
+        await request(this.server()).post('/api/v1/subscriptions').set(this.as(this.it1)).send(body).expect(201),
+      ).id,
+  );
+
+  constructor() {
+    super();
+    // A grant of a request made through the harness is made on the subscription its department owns.
+    const grantOnSeeded = this.grant;
+    this.grant = (body: object, account?: ApiAccount) => grantOnSeeded(this.owned.grantBody(body), account);
+  }
+
+  override async subscription(
+    quantity: number | null = 100,
+    type: 'K1' | 'K2' | 'K4' = 'K2',
+    ownerDepartmentId: string = this.seed.departmentId,
+  ): Promise<string> {
+    const id = await super.subscription(quantity, type, ownerDepartmentId);
+    if (ownerDepartmentId === this.seed.departmentId) await this.owned.recordSeed(id, await this.planOf(id), quantity);
+
+    return id;
+  }
+
   /** Starts the application with the real gate of the module of requests: the fake gate of the provisioning harness is not used. */
   override start(options: Parameters<SeatHarness['start']>[0] = {}): Promise<void> {
     return SeatHarness.prototype.start.call(this, options);
@@ -112,9 +140,10 @@ export class RequestHarness extends ProvisioningHarness {
     return this.titleName;
   }
 
-  /** A department with its own Unit Cost Center. */
+  /** A department with its own Unit Cost Center, and a subscription of every plan the seeded department holds. */
   async departmentWithUnit(code: string): Promise<Department> {
     const created = await this.department(code);
+    await this.owned.give(created.id);
     // The Cost Center Finance created for the department, read through its own link (`QĐ-87d(1)`).
     const { rows } = await this.ctx.sql.query<{ id: string }>(
       `SELECT id FROM cost_centers WHERE department_id = $1 AND status = 'ACTIVE'`,
@@ -131,12 +160,12 @@ export class RequestHarness extends ProvisioningHarness {
     return { employeeId, account: await this.account(code, employeeId, roles) };
   }
 
-  /** Makes the person the head of the department from today (as the IT Admin does). */
+  /** Makes the person the head of the department from today (as the Super Admin does: the IT Admin has no right to, `QĐ-87`). */
   async makeHead(department: Department, person: Person): Promise<void> {
     await request(this.server())
       .post(`/api/v1/departments/${department.id}/head-assignments`)
-      .set(this.as(this.it1))
-      .send({ employeeId: person.employeeId, effectiveFrom: this.today() })
+      .set({ Authorization: `Bearer ${this.admin}` })
+      .send({ employeeId: person.employeeId, effectiveFrom: this.today(), hrBasis: HR_BASIS })
       .expect(200);
   }
 
@@ -168,6 +197,7 @@ export class RequestHarness extends ProvisioningHarness {
   private remember(wire: AccessRequestWire): AccessRequestWire {
     // Only a head who holds the need step (row 1 of the routing table) chooses a line; the others have none to choose.
     if (wire.policy.hasSpendStep && wire.needStep.routingRow === 1) this.costing.add(wire.id);
+    this.owned.noteRequest(wire.id, wire.department.id);
 
     return wire;
   }

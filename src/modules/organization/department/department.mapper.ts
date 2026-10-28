@@ -31,6 +31,7 @@ export function toDepartmentWire(view: DepartmentView) {
 export function toDepartmentProfileWire(view: DepartmentProfileView) {
   return {
     ...toDepartmentWire(view),
+    successor: view.successor,
     headHistory: view.headHistory,
     headHistoryHasMore: view.headHistoryHasMore,
     projects: view.projects.map(toProjectWire),

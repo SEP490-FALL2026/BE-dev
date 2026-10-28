@@ -1,27 +1,28 @@
 import { Injectable } from '@nestjs/common';
 import { BusinessDate } from '../../../core/business-date';
+import { normalizeDisplayName } from '../../../core/display-name';
 import { InvalidEmailError, normalizeEmail } from '../../../core/email';
 import type { HrBasis } from '../../../core/hr-basis';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditService } from '../../audit/audit.service';
-import { IdentityAccessService } from '../../identity-access/identity-access.service';
+import { NotificationsService } from '../../notifications/notifications.service';
 import { organizationAuditEvent } from '../mappers/audit-event.mapper';
 import { EmployeeEmailTakenError, EmployeeNotFoundError, EmployeeOpenSeatNeedsEndError } from '../organization.errors';
+import { isJobTitleTooLong, placementReasons } from '../employee-placement.policy';
 import { OrganizationService } from '../organization.service';
 import { EmployeeWorkState, EmploymentType } from '../organization.types';
-import {
-  EmployeeAnotherItAdminNeededError,
-  EmployeeRowInvalidError,
-  EmployeeUpdateEmptyError,
-} from './employee.errors';
+import { EmployeeRowInvalidError, EmployeeUpdateEmptyError } from './employee.errors';
+import { assertMayCorrectEmployee } from './employee.policy';
 
-/** The official fields of a record that an IT Admin may correct on an HR basis (`QĐ-82m`); nothing else is here. */
+/** The official fields of a record that the Super Admin may correct on an HR basis (`QĐ-82m`, `QĐ-87a`); nothing else is here. */
 export interface OfficialFieldsInput {
   fullName?: string;
   workEmail?: string | null;
   employmentType?: EmploymentType;
   hireDate?: BusinessDate;
+  /** Free text (`QĐ-87e`); null or blank clears it. */
+  jobTitle?: string | null;
   hrBasis: HrBasis;
 }
 
@@ -32,44 +33,46 @@ export interface MaintainedEmployeeView {
   workEmail: string | null;
   employmentType: EmploymentType;
   hireDate: BusinessDate;
+  jobTitle: string | null;
   status: 'ACTIVE' | 'TERMINATED';
   workState: EmployeeWorkState;
 }
 
-const OFFICIAL = ['fullName', 'workEmail', 'employmentType', 'hireDate'] as const;
+const OFFICIAL = ['fullName', 'workEmail', 'employmentType', 'hireDate', 'jobTitle'] as const;
 type Official = (typeof OFFICIAL)[number];
 
 /**
- * Correcting the official fields of a record that exists (`US-02-02` AC-19, `QĐ-82m` `INF-20`): name, work email, kind
- * of staff and a hire date that has not come yet, always on an HR basis. The department, the title and the status are
- * events with a day they take effect (`US-03-01`) and are never changed here; neither are the account, its roles or the
- * login email (`FR-8.6`). Any IT Admin may do it; the audit says whether they are the one in charge of the person's
- * department. A record that is the IT Admin's own goes to another IT Admin when one can act (`SoD-5`, `QĐ-77m`).
+ * Correcting the official fields of a record that exists (`US-02-02` AC-19, `QĐ-82m` `INF-20`, `QĐ-87a`): name, work email, kind
+ * of staff, free-text job title and a hire date that has not come yet, always on an HR basis, by the Super Admin alone and never on
+ * the Super Admin's own record (`QĐ-87c`, `F19`: that goes through the controlled procedure, so this refuses with 403 and writes
+ * nothing). The department and the status are events with a day they take effect (`US-03-01`) and are never changed here; neither
+ * are the account, its roles or the login email (`FR-8.6`). The person, and the head of their department, are told in the same
+ * transaction (`QĐ-87b(3)`, `F17`). Who may is `employee.policy.ts`, run first.
  */
 @Injectable()
 export class EmployeeMaintenanceService {
   constructor(
     private readonly organization: OrganizationService,
-    private readonly identity: IdentityAccessService,
     private readonly audit: AuditService,
+    private readonly notifications: NotificationsService,
     private readonly runner: TransactionRunner,
   ) {}
 
-  /** Throws EmployeeNotFoundError, EmployeeUpdateEmptyError, EmployeeAnotherItAdminNeededError or EmployeeRowInvalidError. */
+  /**
+   * Throws EmployeeForbiddenError, EmployeeSelfChangeForbiddenError, EmployeeNotFoundError, EmployeeUpdateEmptyError or
+   * EmployeeRowInvalidError. `actor` is a plain principal: the controlled procedure of the Super Admin as subject calls the same
+   * correction with an actor of its own, and the policy is the one place that says who may.
+   */
   async update(
     actor: AuthenticatedPrincipal,
     employeeId: string,
     input: OfficialFieldsInput,
   ): Promise<MaintainedEmployeeView> {
+    assertMayCorrectEmployee(actor, employeeId);
     if (OFFICIAL.every((field) => input[field] === undefined)) throw new EmployeeUpdateEmptyError();
     const organization = await this.organization.getOrganization();
     if (!organization) throw new Error('An employee was changed before installation');
     const today = await this.organization.businessToday();
-    const self = actor.employeeId === employeeId;
-    if (self && (await this.identity.countUsableItAdminsExcept(actor.employeeId)) > 0) {
-      throw new EmployeeAnotherItAdminNeededError();
-    }
-    const inCharge = await this.organization.getItAdminInCharge(employeeId, today);
 
     try {
       return await this.runner.run(async (tx) => {
@@ -78,6 +81,7 @@ export class EmployeeMaintenanceService {
         if (!current) throw new EmployeeNotFoundError(employeeId);
 
         const workEmail = input.workEmail === undefined ? undefined : input.workEmail?.trim() || null;
+        const jobTitle = input.jobTitle === undefined ? undefined : normalizeDisplayName(input.jobTitle ?? '') || null;
         const reasons: { field: string; code: string }[] = [];
         const changes: Partial<Record<Official, unknown>> = {};
         const before: Partial<Record<Official, unknown>> = {};
@@ -104,6 +108,14 @@ export class EmployeeMaintenanceService {
           else if (input.hireDate < today) reasons.push({ field: 'hireDate', code: 'HIRE_DATE_IN_PAST' });
           else note('hireDate', current.hireDate, input.hireDate);
         }
+        if (jobTitle !== undefined && jobTitle !== (current.jobTitle ?? null)) {
+          // The same bound the form and the people file keep (BEH.1): the title is optional free text, only bounded.
+          const [refused] = placementReasons({
+            jobTitle: { tooLong: jobTitle !== null && isJobTitleTooLong(jobTitle) },
+          });
+          if (refused) reasons.push({ field: 'jobTitle', code: refused.code });
+          else note('jobTitle', current.jobTitle ?? null, jobTitle);
+        }
         if (reasons.length > 0) throw new EmployeeRowInvalidError(reasons);
 
         if (Object.keys(changes).length > 0) {
@@ -114,6 +126,7 @@ export class EmployeeMaintenanceService {
               ? { employmentType: changes.employmentType as EmploymentType }
               : {}),
             ...(changes.hireDate !== undefined ? { hireDate: changes.hireDate as BusinessDate } : {}),
+            ...('jobTitle' in changes ? { jobTitle: changes.jobTitle as string | null } : {}),
           });
           await this.audit.record(
             tx,
@@ -124,15 +137,16 @@ export class EmployeeMaintenanceService {
               'Employee',
               employeeId,
               { employeeCode: current.employeeCode, ...(before as Record<string, string | null>) },
-              {
-                ...(changes as Record<string, string | null>),
-                hrBasis: { ...input.hrBasis },
-                // Whether the person who did it is the IT Admin in charge of the department, or stood in for them.
-                byItAdminInCharge: inCharge?.itAdminEmployeeId === actor.employeeId,
-                selfExecuted: self,
-              },
+              { ...(changes as Record<string, string | null>), hrBasis: { ...input.hrBasis } },
             ),
           );
+          const notices = await this.organization.getProfileNotices(tx, {
+            kind: 'UPDATED',
+            organizationId: organization.id,
+            employeeId,
+            onDate: today,
+          });
+          for (const notice of notices) await this.notifications.notifyInApp(tx, notice);
         }
 
         return {
@@ -142,6 +156,7 @@ export class EmployeeMaintenanceService {
           workEmail: workEmail === undefined ? current.workEmail : workEmail,
           employmentType: input.employmentType ?? current.employmentType,
           hireDate: 'hireDate' in changes ? (changes.hireDate as BusinessDate) : current.hireDate,
+          jobTitle: 'jobTitle' in changes ? (changes.jobTitle as string | null) : (current.jobTitle ?? null),
           status: current.status,
           workState: current.workState,
         };

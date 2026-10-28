@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import { AuditService } from '../../audit/audit.service';
 import { OrganizationService } from '../../organization/organization.service';
+import { PersonnelNotifier } from '../event-notice/personnel-notifier.service';
 import { personnelSystemAuditEvent } from '../mappers/personnel-audit-event';
 import { overdueDaysOf } from './transfer-review.policy';
 import { TransferReviewRepo } from './transfer-review.repo';
@@ -24,6 +25,7 @@ export class TransferReviewOverdueService {
     private readonly reviews: TransferReviewRepo,
     private readonly organization: OrganizationService,
     private readonly audit: AuditService,
+    private readonly notifier: PersonnelNotifier,
   ) {}
 
   /** Returns how many reviews were told in this pass. */
@@ -59,6 +61,15 @@ export class TransferReviewOverdueService {
             },
           ),
         );
+        await this.notifier.reviewDue(tx, {
+          organizationId: review.organizationId,
+          employeeId: review.employeeId,
+          departmentId: review.departmentId,
+          reviewId: review.id,
+          dueOn: review.dueOn,
+          headEmployeeId: head.employeeId,
+          reminder: true,
+        });
 
         return true;
       });

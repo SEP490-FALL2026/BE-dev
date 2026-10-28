@@ -65,9 +65,17 @@ export class CatalogService {
     return this.onboarding.planSummaries(ids);
   }
 
-  /** What a plan is bought at (unit price and billing cycle), from its newest priced active subscription; null when none. */
-  getPlanPrice(planId: string, tx?: DbTx) {
-    return this.subscriptions.priceOfPlan(planId, tx);
+  /**
+   * What a plan is bought at for a department (unit price and billing cycle), from the newest priced active subscription that
+   * department owns; null when it has none. The price of another department's subscription is never used (F38).
+   */
+  getPlanPrice(planId: string, ownerDepartmentId: string, tx?: DbTx) {
+    return this.subscriptions.priceOfPlan(planId, ownerDepartmentId, tx);
+  }
+
+  /** The ids of every subscription and purchase a department owns, by id: for a module that finds what belongs to the department through them. */
+  getSubscriptionIdsOwnedBy(departmentId: string, tx?: DbTx): Promise<string[]> {
+    return this.subscriptions.idsOwnedBy(departmentId, tx);
   }
 
   /** The vendor of the application of the plan, null for internal software: whose tax profile estimates its price. */

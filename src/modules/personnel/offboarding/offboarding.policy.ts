@@ -1,7 +1,6 @@
 import { addDays, type BusinessDate } from '../../../core/business-date';
 import { addWorkingDays, type NonWorkingDates } from '../../../core/working-days';
 import { groundsRefusal, type GroundsInput } from '../grounds/grounds.policy';
-import type { SelfActionMode } from '../personnel-self-action.policy';
 import type { OffboardingState } from './offboarding.types';
 
 /** What the policy refuses, as a semantic code (`OFFBOARDING_CASE.<code>` on the wire) and the facts a person needs to put it right. */
@@ -9,8 +8,6 @@ export interface OffboardingRefusal {
   code: string;
   details?: Record<string, unknown>;
 }
-
-const SELF_REFUSAL: OffboardingRefusal = { code: 'SELF_EVENT_NEEDS_ANOTHER_IT_ADMIN' };
 
 /**
  * The first day the person is no longer a member of the department (and no longer its head). A planned handover ends the day after
@@ -83,7 +80,6 @@ export interface RecordFacts extends LastDayFacts {
   transferCancellationReason: string | undefined;
   /** Another waiting transfer names this person to follow the head of its department. */
   namedAsSuccessor: boolean;
-  selfMode: SelfActionMode;
   /** How the head of the department the person leaves is provided for on the day they stop being its head; null when it is fine or not needed. */
   successor: OffboardingRefusal | null;
 }
@@ -91,7 +87,7 @@ export interface RecordFacts extends LastDayFacts {
 /**
  * Whether a departure may be recorded (`US-03-04` AC-2, AC-8, AC-18, AC-23, AC-29, `US-03-01` AC-21), the first thing that is wrong
  * winning in the order a person would fix it: the person works for the organization and has no handover yet, the last working day,
- * the basis, the transfer that waits, who acts, and who follows the head.
+ * the basis, the transfer that waits, and who follows the head. Who may act is the service's (F13), not asked here.
  */
 export function recordRefusal(facts: RecordFacts): OffboardingRefusal | null {
   const { employee } = facts;
@@ -114,7 +110,6 @@ export function recordRefusal(facts: RecordFacts): OffboardingRefusal | null {
       return { code: 'TRANSFER_CANCELLATION_REASON_REQUIRED' };
   }
   if (facts.namedAsSuccessor) return { code: 'PENDING_EVENT_EXISTS', details: { kind: 'HEAD_HANDOVER' } };
-  if (facts.selfMode === 'NEEDS_ANOTHER_IT_ADMIN') return SELF_REFUSAL;
 
   return facts.successor;
 }
@@ -124,7 +119,6 @@ export interface ChangeLastDayFacts extends LastDayFacts {
   currentLastWorkingDay: BusinessDate;
   newLastWorkingDay: BusinessDate;
   reason: string;
-  selfMode: SelfActionMode;
   successor: OffboardingRefusal | null;
 }
 
@@ -150,22 +144,16 @@ export function changeLastDayRefusal(facts: ChangeLastDayFacts): OffboardingRefu
   const day = plannedDayRefusal(facts.newLastWorkingDay, facts);
   if (day) return day;
   if (facts.newLastWorkingDay === facts.currentLastWorkingDay) return { code: 'NO_CHANGE' };
-  if (facts.selfMode === 'NEEDS_ANOTHER_IT_ADMIN') return SELF_REFUSAL;
 
   return facts.successor;
 }
 
-/** Whether a handover under way may be cancelled (`US-03-04` AC-15, AC-29): a reason, and not for oneself while another IT Admin can. */
-export function cancelRefusal(facts: {
-  state: OffboardingState;
-  reason: string;
-  selfMode: SelfActionMode;
-}): OffboardingRefusal | null {
+/** Whether a handover under way may be cancelled (`US-03-04` AC-15): a reason. */
+export function cancelRefusal(facts: { state: OffboardingState; reason: string }): OffboardingRefusal | null {
   const state = notHandingOverRefusal(facts.state);
   if (state) return state;
-  if (facts.reason.trim() === '') return { code: 'REASON_REQUIRED' };
 
-  return facts.selfMode === 'NEEDS_ANOTHER_IT_ADMIN' ? SELF_REFUSAL : null;
+  return facts.reason.trim() === '' ? { code: 'REASON_REQUIRED' } : null;
 }
 
 /** Whether the handover may become the departure (`US-03-04` AC-3, AC-10): any day, also after the last working day, never a day ahead. */
@@ -215,7 +203,6 @@ export interface RevocationFacts {
   rights: readonly RightFacts[];
   lockRecorded: boolean;
   lockGiven: boolean;
-  selfMode: SelfActionMode;
 }
 
 /** The rights a command selects, and the refusal when it cannot; `selected` is meaningful only without a refusal. */
@@ -227,7 +214,6 @@ export function revocationSelection(facts: RevocationFacts): {
   if (facts.state !== 'LEFT') return none({ code: 'CASE_NOT_LEFT' });
   if (facts.closed) return none({ code: 'CASE_CLOSED' });
   if (facts.reason.trim() === '') return none({ code: 'REASON_REQUIRED' });
-  if (facts.selfMode === 'NEEDS_ANOTHER_IT_ADMIN') return none(SELF_REFUSAL);
 
   const byId = new Map(facts.rights.map((right) => [right.assignmentId, right]));
   let selected: string[];

@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { DatabaseModule } from '../../infrastructure/database/database.module';
 import { AuditModule } from '../audit/audit.module';
 import { LicensingModule } from '../licensing/licensing.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { OrganizationModule } from '../organization/organization.module';
 import { DataImportService } from './data-import.service';
 import { EmployeeImportRepo } from './employee-import/employee-import.repo';
@@ -17,7 +18,7 @@ import { SeatBaselineImportsController } from './seat-baseline-import/seat-basel
  * only through the facade of the `organization` module and assignments only through that of `licensing`.
  */
 @Module({
-  imports: [DatabaseModule, AuditModule, OrganizationModule, LicensingModule],
+  imports: [DatabaseModule, AuditModule, OrganizationModule, LicensingModule, NotificationsModule],
   controllers: [EmployeeImportsController, SeatBaselineImportsController],
   providers: [
     EmployeeImportRepo,

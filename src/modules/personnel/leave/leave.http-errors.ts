@@ -2,6 +2,7 @@ import { HttpStatus } from '@nestjs/common';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import { toUnavailableApiException } from '../../../infrastructure/http/errors/service-unavailable';
 import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
+import { toPersonnelAccessApiException } from '../mappers/personnel-access.http-errors';
 import { LeaveRefusedError } from './leave.errors';
 
 /** The answer of each refusal, by its semantic code. A code the table does not know is a programming error and stays a 500. */
@@ -12,7 +13,6 @@ const STATUS: Readonly<Record<string, HttpStatus>> = {
   ALREADY_ON_LEAVE: HttpStatus.CONFLICT,
   NOT_ACTIVE: HttpStatus.CONFLICT,
   CONCURRENT_CHANGE: HttpStatus.CONFLICT,
-  SELF_EVENT_NEEDS_ANOTHER_IT_ADMIN: HttpStatus.CONFLICT,
   START_DATE_INVALID: HttpStatus.UNPROCESSABLE_ENTITY,
   RETURN_DATE_INVALID: HttpStatus.UNPROCESSABLE_ENTITY,
   RETURN_DATE_IN_PAST: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -28,7 +28,6 @@ const MESSAGES: Readonly<Record<string, string>> = {
   ALREADY_ON_LEAVE: 'The employee is on a long leave already.',
   NOT_ACTIVE: 'The long leave has ended.',
   CONCURRENT_CHANGE: 'The person was changed by someone else meanwhile; read them again.',
-  SELF_EVENT_NEEDS_ANOTHER_IT_ADMIN: 'An IT Admin does not record this for themselves while another IT Admin can.',
   START_DATE_INVALID: 'The leave begins today or earlier, and not before the person joined.',
   RETURN_DATE_INVALID: 'The day is not valid for this leave.',
   RETURN_DATE_IN_PAST: 'The new day of return is today or later.',
@@ -38,11 +37,13 @@ const MESSAGES: Readonly<Record<string, string>> = {
 };
 
 /**
- * Maps a refusal of a long leave to its answer; a database that cannot answer is a 503, anything else
- * is returned unchanged for the global filter.
+ * Maps a refusal of a long leave to its answer (the actor that may not write it is a 403, the same as for every personnel write); a
+ * database that cannot answer is a 503, anything else is returned unchanged for the global filter.
  */
 export function toLeaveApiException(error: unknown): unknown {
   if (error instanceof ApiException) return error;
+  const refused = toPersonnelAccessApiException(error);
+  if (refused) return refused;
   if (!(error instanceof LeaveRefusedError)) return toUnavailableApiException(error) ?? error;
   const status = STATUS[error.code];
   if (status === undefined) return error;
@@ -63,7 +64,6 @@ export const LEAVE_ERROR_EXAMPLES = {
   ALREADY_ON_LEAVE: example(new LeaveRefusedError('ALREADY_ON_LEAVE')),
   EMPLOYEE_NOT_WORKING: example(new LeaveRefusedError('EMPLOYEE_NOT_WORKING', { workState: 'HANDING_OVER' })),
   NOT_ACTIVE: example(new LeaveRefusedError('NOT_ACTIVE')),
-  SELF_EVENT_NEEDS_ANOTHER_IT_ADMIN: example(new LeaveRefusedError('SELF_EVENT_NEEDS_ANOTHER_IT_ADMIN')),
   START_DATE_INVALID: example(new LeaveRefusedError('START_DATE_INVALID', { reason: 'IN_FUTURE' })),
   RETURN_DATE_NOT_AFTER_START: example(new LeaveRefusedError('RETURN_DATE_INVALID', { reason: 'NOT_AFTER_START' })),
   RETURN_DATE_IN_FUTURE: example(new LeaveRefusedError('RETURN_DATE_INVALID', { reason: 'IN_FUTURE' })),

@@ -99,6 +99,12 @@ describe('failed provisioning tasks and failed assignments (integration, Postgre
       `INSERT INTO organizations (id, name, time_zone, reporting_currency) VALUES ($1, 'Acme', 'UTC', 'VND')`,
       [organizationId],
     );
+    // A subscription always has the department that owns it (F02): one department stands for all of them.
+    await sql.query(
+      `INSERT INTO departments (id, organization_id, code, name, updated_at)
+       VALUES (gen_random_uuid(), $1, 'P-OWNER', 'The department that owns the subscriptions', now())`,
+      [organizationId],
+    );
     const owner = await newEmployee();
     const vendorId = randomUUID();
     await sql.query(`INSERT INTO vendors (id, organization_id, name, normalized_name) VALUES ($1, $2, 'v', 'v')`, [
@@ -190,10 +196,25 @@ describe('failed provisioning tasks and failed assignments (integration, Postgre
       ).toBe('23514');
     });
 
-    it('does not start from nothing: a task that is queued cannot carry a failure', async () => {
+    it('does not start from nothing: a task that is queued carries a failure only as a whole, kind and reason together, and never a failed day (F08)', async () => {
       const id = await newTask();
 
       expect(await update(id, `failure_kind = 'PERMANENT'`)).toBe('23514');
+      expect(await update(id, `failure_reason = 'x'`)).toBe('23514');
+      expect(await update(id, `failed_at = now()`)).toBe('23514');
+      expect(
+        await update(id, `failure_kind = 'PERMANENT', failure_reason = 'x', last_error = 'e', attempts = 1`),
+      ).toBeNull();
+    });
+
+    it('sheds the failure kind and reason when a person takes the task: a task in progress carries neither (F08)', async () => {
+      const id = await newTask('MANUAL');
+      await update(id, `failure_kind = 'PERMANENT', failure_reason = 'x', last_error = 'e', attempts = 1`);
+      const take = (more: string) =>
+        update(id, `status = 'IN_PROGRESS', claimed_by_app_user_id = $2, claimed_at = now()${more}`, [person()]);
+
+      expect(await take('')).toBe('23514');
+      expect(await take(`, failure_kind = NULL, failure_reason = NULL`)).toBeNull();
     });
   });
 
@@ -242,15 +263,18 @@ describe('failed provisioning tasks and failed assignments (integration, Postgre
     });
   });
 
-  describe('a hand-off to a person (US-07-04 AC-9)', () => {
-    it('keeps who, when and the evidence together, and the evidence is not blank', async () => {
+  describe('a hand-off to a person (US-07-04 AC-9, F08)', () => {
+    it('keeps who and when together and asks for no evidence: the evidence is asked when the work by hand completes', async () => {
       const id = await newTask();
 
       expect(await update(id, `handed_off_by_app_user_id = $2`, [person()])).toBe('23514');
-      expect(await update(id, `handed_off_at = now(), hand_off_evidence = 'x'`)).toBe('23514');
-      expect(
-        await update(id, `handed_off_by_app_user_id = $2, handed_off_at = now(), hand_off_evidence = '  '`, [person()]),
-      ).toBe('23514');
+      expect(await update(id, `handed_off_at = now()`)).toBe('23514');
+      expect(await update(id, `handed_off_by_app_user_id = $2, handed_off_at = now()`, [person()])).toBeNull();
+    });
+
+    it('still holds the evidence of a hand-off made before the change (the column stays, nullable, for the history)', async () => {
+      const id = await newTask();
+
       expect(
         await update(id, `handed_off_by_app_user_id = $2, handed_off_at = now(), hand_off_evidence = 'làm tay'`, [
           person(),
@@ -292,8 +316,8 @@ describe('failed provisioning tasks and failed assignments (integration, Postgre
     it('takes no seat on any day: the seat can be given to another person, and to the same one again', async () => {
       const subscriptionId = randomUUID();
       await sql.query(
-        `INSERT INTO subscriptions (id, organization_id, plan_id, kind, status, purchased_quantity)
-         VALUES ($1, $2, $3, 'TERM', 'DRAFT', 1)`,
+        `INSERT INTO subscriptions (id, organization_id, plan_id, owner_department_id, kind, status, purchased_quantity)
+         VALUES ($1, $2, $3, (SELECT id FROM departments WHERE organization_id = $2 LIMIT 1), 'TERM', 'DRAFT', 1)`,
         [subscriptionId, organizationId, paidPlanId],
       );
       const employee = await newEmployee();
@@ -311,8 +335,8 @@ describe('failed provisioning tasks and failed assignments (integration, Postgre
     it('does not make the same person overlap themselves: after failing, they can hold a seat on that day again', async () => {
       const subscriptionId = randomUUID();
       await sql.query(
-        `INSERT INTO subscriptions (id, organization_id, plan_id, kind, status, purchased_quantity)
-         VALUES ($1, $2, $3, 'TERM', 'DRAFT', 5)`,
+        `INSERT INTO subscriptions (id, organization_id, plan_id, owner_department_id, kind, status, purchased_quantity)
+         VALUES ($1, $2, $3, (SELECT id FROM departments WHERE organization_id = $2 LIMIT 1), 'TERM', 'DRAFT', 5)`,
         [subscriptionId, organizationId, paidPlanId],
       );
       const employee = await newEmployee();

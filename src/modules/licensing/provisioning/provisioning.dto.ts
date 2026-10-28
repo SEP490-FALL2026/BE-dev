@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { isBusinessDate } from '../../../core/business-date';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
+import { REVOCATION_SOURCES } from '../licensing.types';
 import { EVIDENCE_MAX_LENGTH, FAILURE_REASON_MAX_LENGTH } from './provisioning.policy';
 import { REVOCATION_NOTE_MAX_LENGTH } from './revocation.policy';
 
@@ -25,7 +26,8 @@ export const grantBodySchema = z.strictObject({
 });
 export const completeBodySchema = z.strictObject({ evidence: z.string().max(EVIDENCE_MAX_LENGTH).default('') });
 export const failureBodySchema = z.strictObject({ reason: z.string().max(FAILURE_REASON_MAX_LENGTH).default('') });
-export const handOffBodySchema = completeBodySchema;
+/** A hand-off carries nothing: it changes only the channel, and the evidence is asked when the manual work completes (F08, `QĐ-90a`). */
+export const handOffBodySchema = z.strictObject({});
 export const closeFailedBodySchema = failureBodySchema;
 /**
  * How a revocation was completed. Which way fits which kind of provisioning, which of the fields it needs (a K1 completion
@@ -84,22 +86,6 @@ const stepSchema = z.strictObject({
   accountIdentifier: z.string().optional(),
   adminIdentity: z.enum(['ACTING_IT_ADMIN']).optional(),
 });
-const REVOCATION_SOURCES = [
-  'RETURN',
-  'MANAGER_NOT_NEEDED',
-  'TRANSFER_REVIEW',
-  'GHOST_SEAT',
-  'DEPARTURE',
-  'ABRUPT_DEPARTURE',
-  'TIME_LIMITED_EXPIRY',
-  'SUBSCRIPTION_REDUCTION',
-  'SUBSCRIPTION_CANCELLATION',
-  'SUBSCRIPTION_EXPIRED',
-  'NOT_LEGALIZED',
-  'RE_EXECUTION',
-  // Read only here (spec L.10).
-  'POST_SETUP_REVIEW',
-] as const;
 /** What a row of the list says of a revocation: no reasons, notes or evidence (the detail has those). */
 const revocationSummarySchema = z.strictObject({
   source: z.enum(REVOCATION_SOURCES),

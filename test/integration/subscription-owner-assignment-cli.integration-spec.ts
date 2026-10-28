@@ -1,10 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { Client } from 'pg';
 import { CLI_COLD_START_MS, CliResult, cliWorkingDirectory, runCli, stopCliProcesses } from '../support/cli-process';
+import { lastCompatibilityMigration } from '../support/compat-release';
 import {
   DisposableDatabase,
   dropDisposableDatabase,
-  migrateDisposableDatabase,
   provisionDisposableDatabase,
 } from '../support/disposable-database';
 import { expansionWorld, ExpansionWorld, insertSubscriptionAs7c28e75 } from '../support/expansion-world';
@@ -19,7 +19,9 @@ import {
 /**
  * `g0-g6-final-business-baseline-remediation`, Task 1.2a (F02, spec L.3): `pnpm ops:assign-subscription-owner`, the one
  * way an existing subscription gets its owner department. One subscription, one department and one stated basis per run,
- * in one transaction with its Audit Trail event; nothing inferred, nothing printed but two ids and the outcome.
+ * in one transaction with its Audit Trail event; nothing inferred, nothing printed but two ids and the outcome. The procedure
+ * belongs to the compatibility window, so the database is the schema of the compatibility release (the history **through** its
+ * last migration): from the first migration of the final release on, a subscription cannot exist without its owner department.
  */
 const OWNER_COLUMN = migrationEndingWith('_subscription_owner_column');
 const BASIS = 'PO-2026-0042 (Figma, 12 months)';
@@ -67,7 +69,8 @@ describe('ops:assign-subscription-owner (integration, real CLI and PostgreSQL)',
 
   beforeAll(async () => {
     database = await provisionDisposableDatabase();
-    await migrateDisposableDatabase(database);
+    const deploy = await deployMigrations(database, { through: lastCompatibilityMigration() });
+    if (deploy.code !== 0) throw new Error(`Deploying the compatibility release failed: ${deploy.stdout}`);
     sql = new Client({ connectionString: database.url });
     await sql.connect();
     world = await expansionWorld(sql);

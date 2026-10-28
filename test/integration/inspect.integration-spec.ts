@@ -23,11 +23,8 @@ const input = {
   timeZone: 'Asia/Ho_Chi_Minh',
   reportingCurrency: 'VND',
   organizationName: 'Acme Software',
-  costCenterCode: 'CC-ENG',
-  costCenterName: 'Engineering',
   departmentCode: 'P-ENG',
   departmentName: 'Engineering',
-  jobTitleName: 'Software Engineer',
   superAdmin: {
     employeeCode: 'E001',
     fullName: 'Pham Bao',
@@ -35,18 +32,11 @@ const input = {
     employmentType: 'STAFF',
     hireDate: '2024-03-01',
   },
-  itAdmin: {
-    employeeCode: 'E002',
-    fullName: 'Tran An',
-    workEmail: 'an@acme.vn',
-    employmentType: 'STAFF',
-    hireDate: '2024-03-05',
-  },
   operatorReference: 'CHG-1234',
   environment: 'LOCAL_TEST',
 };
 /** Everything the report must never contain: identities, names, codes and the secret-shaped values. */
-const NEVER_PRINTED = ['bao@acme.vn', 'an@acme.vn', 'Pham Bao', 'Tran An', 'E001', 'E002', 'Acme Software', 'argon2'];
+const NEVER_PRINTED = ['bao@acme.vn', 'Pham Bao', 'E001', 'Acme Software', 'argon2'];
 
 describe('ops:inspect (integration, real PostgreSQL)', () => {
   let database: DisposableDatabase;
@@ -164,6 +154,7 @@ describe('ops:inspect (integration, real PostgreSQL)', () => {
           'Problems: none',
           'Organization: present (Asia/Ho_Chi_Minh, VND)',
           'Bootstrap records: complete',
+          'Change announcements: complete',
           'Super Admin: 1 holder, ACTIVE, ACTIVATED, b***@a***.vn',
           'Accounts: 1 (ACTIVE_ACTIVATED 1, ACTIVE_INVITED 0, LOCKED_ACTIVATED 0, LOCKED_INVITED 0)',
           'Direct roles: SUPER_ADMIN 1, IT_ADMIN 0, FINANCE 0, EMPLOYEE 0',
@@ -182,6 +173,95 @@ describe('ops:inspect (integration, real PostgreSQL)', () => {
           for (const secret of [...NEVER_PRINTED, database.url]) expect(output).not.toContain(secret);
         }
         expect(await fingerprint()).toEqual(before);
+      },
+      CLI_COLD_START_MS * 3,
+    );
+
+    it(
+      'accepts the records of an earlier installation (a Cost Center event and the IT employee beside the Super Admin) as complete (QĐ-87f)',
+      async () => {
+        const organization = (await sql.query<{ id: string }>(`SELECT id FROM organizations`)).rows[0].id;
+        // What the command wrote before QĐ-87f, in addition to the current set: appended to the trail like any other event.
+        for (const [action, resource] of [
+          ['INSTALLATION.COST_CENTER_CREATED', 'CostCenter'],
+          ['INSTALLATION.EMPLOYEE_CREATED', 'Employee'],
+        ]) {
+          await sql.query(
+            `INSERT INTO audit_events (id, organization_id, actor_kind, actor_roles, action, resource_type, resource_id,
+                                       correlation_id, operator_reference)
+             VALUES (gen_random_uuid(), $1, 'OPERATOR', '{}', $2, $3, gen_random_uuid()::text, 'earlier-installation', 'CHG-0001')`,
+            [organization, action, resource],
+          );
+        }
+
+        const result = await inspect(['--json']);
+
+        expect(result.code).toBe(0);
+        expect(JSON.parse(result.stdout)).toMatchObject({
+          status: 'INSTALLED',
+          problems: [],
+          bootstrapRecords: { complete: true, mismatched: [] },
+        });
+      },
+      CLI_COLD_START_MS,
+    );
+
+    it(
+      'reports the changes of the organization the seeding migration missed, as counts, and is complete again once they are marked (F47)',
+      async () => {
+        const [{ organization, department, employee }] = (
+          await sql.query<{ organization: string; department: string; employee: string }>(
+            `SELECT o.id AS organization, d.id AS department, e.id AS employee
+               FROM organizations o, departments d, employees e LIMIT 1`,
+          )
+        ).rows;
+        // A person who moves on 2025-01-01, a day long before the migration ran: the new placement began after another one and
+        // no announcement marks it.
+        await sql.query(`UPDATE employee_placements SET valid_to = '2025-01-01' WHERE employee_id = $1`, [employee]);
+        const placement = (
+          await sql.query<{ id: string }>(
+            `INSERT INTO employee_placements (id, organization_id, employee_id, department_id, valid_from)
+             VALUES (gen_random_uuid(), $1, $2, $3, '2025-01-01') RETURNING id`,
+            [organization, employee, department],
+          )
+        ).rows[0].id;
+        const before = await fingerprint();
+
+        const missing = await inspect(['--json']);
+
+        expect(missing.code).toBe(2);
+        expect(JSON.parse(missing.stdout)).toMatchObject({
+          status: 'INCOMPLETE',
+          problems: ['CHANGE_ANNOUNCEMENTS_MISSING'],
+          changeAnnouncements: {
+            complete: false,
+            missing: { PLACEMENT_START: 1, HEAD_PERIOD_START: 0, HEAD_PERIOD_END: 0 },
+          },
+        });
+        expect((await inspect()).stdout).toContain(
+          'Change announcements: missing PLACEMENT_START 1, HEAD_PERIOD_START 0, HEAD_PERIOD_END 0\n',
+        );
+        // Nothing but counts: no id of the placement, the person or the department is printed.
+        for (const id of [placement, employee, department]) expect(missing.stdout).not.toContain(id);
+        expect(await fingerprint()).toEqual(before);
+
+        // What the roll-forward migration does for such a row: the mark of the day it had taken effect.
+        await sql.query(
+          `INSERT INTO organization_change_announcements (id, organization_id, kind, subject_id, effective_on)
+           VALUES (gen_random_uuid(), $1, 'PLACEMENT_START', $2, '2025-01-01')`,
+          [organization, placement],
+        );
+        const complete = await inspect(['--json']);
+
+        expect(complete.code).toBe(0);
+        expect(JSON.parse(complete.stdout)).toMatchObject({
+          status: 'INSTALLED',
+          problems: [],
+          changeAnnouncements: {
+            complete: true,
+            missing: { PLACEMENT_START: 0, HEAD_PERIOD_START: 0, HEAD_PERIOD_END: 0 },
+          },
+        });
       },
       CLI_COLD_START_MS * 3,
     );

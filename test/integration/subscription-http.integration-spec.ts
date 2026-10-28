@@ -14,7 +14,7 @@ import {
 interface SubscriptionWire {
   id: string;
   planId: string;
-  ownerDepartmentId: string | null;
+  ownerDepartmentId: string;
   vendor: { id: string; name: string };
   kind: string;
   status: string;
@@ -187,17 +187,11 @@ describe('subscriptions and perpetual purchases over HTTP (integration, real Pos
   describe('the owner department (F02, QĐ-89a)', () => {
     /** A department of the organization that is no longer active, made the way the organization stops one. */
     const stoppedDepartment = async (): Promise<string> => {
-      const costCenterId = randomUUID();
       const departmentId = randomUUID();
       await ctx.sql.query(
-        `INSERT INTO cost_centers (id, organization_id, code, name, kind, status)
-         VALUES ($1, $2, $3, 'Old unit', 'UNIT', 'ACTIVE')`,
-        [costCenterId, seed.organizationId, unique('CC-OLD').replace(' ', '-')],
-      );
-      await ctx.sql.query(
-        `INSERT INTO departments (id, organization_id, code, name, cost_center_id, status, deactivated_at, updated_at)
-         VALUES ($1, $2, $3, 'Old department', $4, 'INACTIVE', now(), now())`,
-        [departmentId, seed.organizationId, unique('OLD').replace(' ', '-'), costCenterId],
+        `INSERT INTO departments (id, organization_id, code, name, status, deactivated_at, updated_at)
+         VALUES ($1, $2, $3, 'Old department', 'INACTIVE', now(), now())`,
+        [departmentId, seed.organizationId, unique('OLD').replace(' ', '-')],
       );
 
       return departmentId;
@@ -247,22 +241,43 @@ describe('subscriptions and perpetual purchases over HTTP (integration, real Pos
       expect({ subscriptions: await n('subscriptions'), audit: await n('audit_events') }).toEqual(before);
     });
 
-    it('reads a subscription made before the owner existed with a null owner, and a change never gives or alters one', async () => {
+    it('reads the owner on every subscription (never null), and a change neither gives nor alters it: the body and the database both refuse', async () => {
       const { planId } = await plan();
-      const legacy = randomUUID();
-      await ctx.sql.query(
-        `INSERT INTO subscriptions (id, organization_id, plan_id, kind, status, auto_renew, allows_mid_term_reduction)
-         VALUES ($1, $2, $3, 'TERM', 'DRAFT', false, false)`,
-        [legacy, seed.organizationId, planId],
-      );
+      const created = await subscription(planId);
 
-      expect(dataOf<SubscriptionWire>(await get(legacy).expect(200)).ownerDepartmentId).toBeNull();
-      const changed = dataOf<SubscriptionWire>(await patch(legacy, { purchasedQuantity: 3 }).expect(200));
-      expect(changed.ownerDepartmentId).toBeNull();
+      expect(dataOf<SubscriptionWire>(await get(created.id).expect(200)).ownerDepartmentId).toBe(seed.departmentId);
+      const changed = dataOf<SubscriptionWire>(await patch(created.id, { purchasedQuantity: 3 }).expect(200));
+      expect(changed.ownerDepartmentId).toBe(seed.departmentId);
       const listed = dataOf<{ items: SubscriptionWire[] }>(
         await request(server()).get('/api/v1/subscriptions').query({ planId }).set(as(it1)).expect(200),
       );
-      expect(listed.items.map((item) => item.ownerDepartmentId)).toEqual([null]);
+      expect(listed.items.map((item) => item.ownerDepartmentId)).toEqual([seed.departmentId]);
+      // The owner is not a field of a change; and even by SQL it cannot change or be cleared.
+      const refused = await patch(created.id, { ownerDepartmentId: await stoppedDepartment() }).expect(422);
+      expect(codeOf(refused)).toBe('VALIDATION_ERROR');
+      await expect(
+        ctx.sql.query(`UPDATE subscriptions SET owner_department_id = $2 WHERE id = $1`, [
+          created.id,
+          await stoppedDepartment(),
+        ]),
+      ).rejects.toMatchObject({ code: '23514' });
+      await expect(
+        ctx.sql.query(`UPDATE subscriptions SET owner_department_id = NULL WHERE id = $1`, [created.id]),
+      ).rejects.toMatchObject({ code: '23502' });
+      expect(dataOf<SubscriptionWire>(await get(created.id).expect(200)).ownerDepartmentId).toBe(seed.departmentId);
+    });
+
+    it('F23: refuses to declare a subscription for a plan whose application is retired: 422 SUBSCRIPTION.APPLICATION_RETIRED, nothing is written', async () => {
+      const { planId, applicationId } = await plan();
+      await ctx.sql.query(`UPDATE applications SET catalog_status = 'RETIRED', retired_at = now() WHERE id = $1`, [
+        applicationId,
+      ]);
+      const before = { subscriptions: await n('subscriptions'), audit: await n('audit_events') };
+
+      const response = await create({ planId, kind: 'TERM' }).expect(422);
+
+      expect(codeOf(response)).toBe('SUBSCRIPTION.APPLICATION_RETIRED');
+      expect({ subscriptions: await n('subscriptions'), audit: await n('audit_events') }).toEqual(before);
     });
   });
 

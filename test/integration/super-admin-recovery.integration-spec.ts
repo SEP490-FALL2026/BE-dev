@@ -878,7 +878,7 @@ describe('recovering the Super Admin role outside the application (integration, 
 
       const first = await recovery.transferRole(ticket, input);
 
-      expect(first).toMatchObject({ outcome: 'ACCOUNT_CREATED', sentTo: 'WORK_EMAIL' });
+      expect(first).toMatchObject({ outcome: 'ACCOUNT_CREATED', sentTo: 'LOGIN_EMAIL' });
       const account = (
         await ctx.sql.query<{ id: string; activation_state: string; status: string }>(
           `SELECT a.id, a.activation_state, a.status FROM app_users a JOIN employees e ON e.id = a.employee_id WHERE e.employee_code = 'E-RS1'`,
@@ -927,6 +927,42 @@ describe('recovering the Super Admin role outside the application (integration, 
       expect(await recovery.transferRole(ticket, input)).toMatchObject({ outcome: 'ALREADY_COMPLETED' });
       // The new holder signs in as Super Admin.
       expect((await login('e-rs1@acme.vn', ACCOUNT_PASSWORD)).status).toBe(200);
+    });
+
+    it('sends the invitation, and every reissue of it, to the login email of the account, even when the work email on the record changed meanwhile (F18)', async () => {
+      await successorEmployee('E-RS11');
+      await holderLeaves();
+      const ticket = context();
+      const input = { successorEmployeeCode: 'E-RS11', holderEmail: seed.superAdmin.email };
+
+      expect(await recovery.transferRole(ticket, input)).toMatchObject({
+        outcome: 'ACCOUNT_CREATED',
+        sentTo: 'LOGIN_EMAIL',
+      });
+      const account = (
+        await ctx.sql.query<{ id: string; login_email: string }>(
+          `SELECT a.id, a.login_email FROM app_users a JOIN employees e ON e.id = a.employee_id WHERE e.employee_code = 'E-RS11'`,
+        )
+      ).rows[0];
+      // The record's work email is corrected after the invitation went out; the login email of the account stays what it was.
+      await ctx.sql.query(
+        `UPDATE employees SET work_email = 'moved-rs11@acme.vn', normalized_work_email = 'moved-rs11@acme.vn' WHERE employee_code = 'E-RS11'`,
+      );
+      await ctx.sql.query(
+        `UPDATE account_action_tokens SET expires_at = now() - interval '1 minute' WHERE app_user_id = $1`,
+        [account.id],
+      );
+
+      expect(await recovery.transferRole(ticket, input)).toMatchObject({
+        outcome: 'INVITATION_REISSUED',
+        sentTo: 'LOGIN_EMAIL',
+      });
+
+      expect((await mailsFor(ticket.ticketRef)).map((mail) => [mail.recipient, mail.template])).toEqual([
+        [account.login_email, 'ACCOUNT_INVITATION'],
+        [account.login_email, 'ACCOUNT_INVITATION'],
+      ]);
+      expect(account.login_email).toBe('e-rs11@acme.vn');
     });
 
     it('gives the role to someone who already has a working account, in one step, when nobody holds it', async () => {

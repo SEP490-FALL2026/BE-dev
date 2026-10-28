@@ -64,7 +64,10 @@ export class SpendApprovalViewService {
         ]),
       ),
       this.support.units(rows.map((row) => row.request.amountCurrency)),
-      this.organization.costCentersByIds([...new Set(rows.map((row) => row.request.costCenterId))]),
+      // A step is only ever opened for a request that was sent, so it has its Cost Center; a draft has none and has no step.
+      this.organization.costCentersByIds([
+        ...new Set(rows.flatMap((row) => (row.request.costCenterId === null ? [] : [row.request.costCenterId]))),
+      ]),
     ]);
     const items = rows.map((row): ApprovalSummaryWire => {
       const { request } = row;

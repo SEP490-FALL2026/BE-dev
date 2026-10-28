@@ -1,11 +1,15 @@
-import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import type { AuditEventInput, AuditValue } from '../../audit/audit.types';
+import type { PersonnelActor } from '../personnel.types';
 
 type Snapshot = { [key: string]: AuditValue } | null;
 
-/** The audit event for a change made by `actor` (an IT Admin acting as themselves), correlated by their session. */
+/**
+ * The audit event for a change made by `actor`. A person signed in is `USER`, correlated by their session. The controlled procedure
+ * is `OPERATOR` (spec L.2): no account, the ticket code as the operator reference, the id of the ticket row as the correlation, and
+ * the context of the command (ticket, approver, operator, environment, mode, basis) added to what the event says after the change.
+ */
 export function personnelAuditEvent(
-  actor: AuthenticatedPrincipal,
+  actor: PersonnelActor,
   organizationId: string,
   action: string,
   resourceType: string,
@@ -13,17 +17,33 @@ export function personnelAuditEvent(
   before: Snapshot,
   after: Snapshot,
 ): AuditEventInput {
+  if (actor.kind === 'USER') {
+    return {
+      organizationId,
+      actorKind: 'USER',
+      actorAppUserId: actor.principal.appUserId,
+      actorRoles: actor.principal.roles,
+      action,
+      resourceType,
+      resourceId,
+      before,
+      after,
+      correlationId: actor.principal.sessionId,
+    };
+  }
+
   return {
     organizationId,
-    actorKind: 'USER',
-    actorAppUserId: actor.appUserId,
-    actorRoles: actor.roles,
+    actorKind: 'OPERATOR',
+    actorAppUserId: null,
+    actorRoles: [],
     action,
     resourceType,
     resourceId,
     before,
-    after,
-    correlationId: actor.sessionId,
+    after: actor.context ? { ...(after ?? {}), ...actor.context } : after,
+    correlationId: actor.ticketId,
+    operatorReference: actor.ticketRef,
   };
 }
 

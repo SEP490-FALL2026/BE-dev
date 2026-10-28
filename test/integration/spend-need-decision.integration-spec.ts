@@ -339,7 +339,8 @@ describe('the need step of a request that costs money over PostgreSQL (US-05-04 
 
     it('goes straight to the approver when the check is in order and the head who approved it is the approver', async () => {
       const executive = await h.ctx.sql.query<{ id: string; cost_center_id: string }>(
-        `SELECT id, cost_center_id FROM departments WHERE code = 'P-EXE'`,
+        `SELECT d.id, c.id AS cost_center_id FROM departments d
+           JOIN cost_centers c ON c.department_id = d.id AND c.status = 'ACTIVE' WHERE d.code = 'P-EXE'`,
       );
       const department = { id: executive.rows[0].id, code: 'P-EXE', unitId: executive.rows[0].cost_center_id };
       const unit: Unit = { department, head: h.boss, member: await h.staff(department, 'EXE-E7') };

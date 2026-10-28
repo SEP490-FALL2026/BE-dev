@@ -149,3 +149,30 @@ export class AccessRequestEmployeeRequiredError extends Error {
     this.name = 'AccessRequestEmployeeRequiredError';
   }
 }
+
+/** The Super Admin does no business work and sends no request (`QĐ-87a`, `SoD-1`, F30); checked by every service that sends one. */
+export class AccessRequestSuperAdminCannotRequestError extends Error {
+  constructor() {
+    super('The Super Admin does not send requests for access.');
+    this.name = 'AccessRequestSuperAdminCannotRequestError';
+  }
+}
+
+/** The request is the caller's but is no longer a draft: a draft is sent or deleted once (spec L.1). */
+export class AccessRequestNotDraftError extends Error {
+  constructor() {
+    super('The request is not a draft any more.');
+    this.name = 'AccessRequestNotDraftError';
+  }
+}
+
+/**
+ * The caller does not hold the role the act needs: a service that closes a request for the IT Admin judges it itself, so the
+ * guard of a route is never the only invariant (F13). Answered as the guard answers: 403 `AUTHORIZATION.FORBIDDEN`.
+ */
+export class AccessRequestRoleRequiredError extends Error {
+  constructor(readonly role: 'IT_ADMIN') {
+    super(`Only the role ${role} may do this.`);
+    this.name = 'AccessRequestRoleRequiredError';
+  }
+}

@@ -214,13 +214,16 @@ describe('deciding about the tools of a review after a transfer (integration, re
     expect(await rowOf(reviewId)).toMatchObject({ status: 'OPEN' });
   });
 
-  it('writes a decision once: a second one for the tool, and a tool that is not in the review, are refused', async () => {
+  it('writes a decision once: a second one for the tool, and a tool that is not in the review, are refused (the one change of "still needed" is in transfer-review-change-of-mind)', async () => {
     const { seats, review } = await h.movedWith(des, fin, [{ subscriptionId: notes }, { subscriptionId: canva }]);
     const other = await h.movedWith(des, fin, [{ subscriptionId: notes }]);
     const reviewId = review?.id ?? '';
     await say(reviewId, seats[0], 'STILL_NEEDED').expect(201);
 
-    expect(h.codeOf(await say(reviewId, seats[0], 'NOT_NEEDED').expect(409))).toBe(
+    expect(h.codeOf(await say(reviewId, seats[0], 'STILL_NEEDED').expect(409))).toBe(
+      'TRANSFER_REVIEW.DECISION_ALREADY_RECORDED',
+    );
+    expect(h.codeOf(await say(reviewId, seats[0], 'NEEDS_NEW_TOOL', { newToolNote: 'x' }).expect(409))).toBe(
       'TRANSFER_REVIEW.DECISION_ALREADY_RECORDED',
     );
     expect(h.codeOf(await say(reviewId, other.seats[0], 'STILL_NEEDED').expect(404))).toBe(

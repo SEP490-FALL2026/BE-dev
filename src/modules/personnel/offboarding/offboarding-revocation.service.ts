@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { LicensingService } from '../../licensing/licensing.service';
+import { userActor } from '../personnel.types';
 import { RevocationRefusedError, AssignmentNotOpenError } from '../../licensing/licensing.errors';
 import { OffboardingAuditService } from './offboarding-audit.service';
 import { OffboardingBlockerRegistry } from './offboarding-blocker.registry';
@@ -40,7 +41,7 @@ export class OffboardingRevocationService {
 
   /** Opens the revocations the IT Admin chose. Throws OffboardingRefusedError. */
   openRevocations(actor: AuthenticatedPrincipal, id: string, input: OpenRevocationsInput): Promise<RevocationsOpened> {
-    return this.frame.run(actor, id, {}, async (tx, { held, today, selfMode }) => {
+    return this.frame.runTechnical(actor, id, {}, async (tx, { held, today }) => {
       const seats = held.state === 'LEFT' ? await this.licensing.listPersonalSeatsOf(held.employeeId, today, tx) : [];
       const rights: RightFacts[] = seats.map((seat) => ({
         assignmentId: seat.assignmentId,
@@ -57,13 +58,11 @@ export class OffboardingRevocationService {
         rights,
         lockRecorded: held.accountLockAt !== null,
         lockGiven: input.accountLock !== undefined,
-        selfMode,
       });
       if (refusal) throw new OffboardingRefusedError(refusal.code, refusal.details);
 
-      const selfExecuted = selfMode === 'ALLOW_SELF_EXECUTED';
       // The lock of the company account goes first, or with the revocations, in the same transaction (`QĐ-77i`).
-      if (input.accountLock) await this.left.writeAccountLock(tx, actor, held, input.accountLock, selfExecuted);
+      if (input.accountLock) await this.left.writeAccountLock(tx, actor, held, input.accountLock);
       const reason = input.reason.trim();
       let created = 0;
       let reasonAdded = 0;
@@ -78,17 +77,15 @@ export class OffboardingRevocationService {
         reason,
         detail: { assignmentIds: selected, count: selected.length, created, reasonAdded, source: this.sourceOf(held) },
         changedByAppUserId: actor.appUserId,
-        selfExecuted,
+        changedByTicketId: null,
       });
-      await this.audit.changed(
-        tx,
-        actor,
-        held,
-        'OFFBOARDING_CASE.REVOCATIONS_OPENED',
-        null,
-        { count: selected.length, created, reasonAdded, reason, source: this.sourceOf(held) },
-        selfExecuted,
-      );
+      await this.audit.changed(tx, userActor(actor), held, 'OFFBOARDING_CASE.REVOCATIONS_OPENED', null, {
+        count: selected.length,
+        created,
+        reasonAdded,
+        reason,
+        source: this.sourceOf(held),
+      });
 
       return { record: (await this.repo.find(held.id, tx)) ?? held, created, reasonAdded };
     });
@@ -96,7 +93,7 @@ export class OffboardingRevocationService {
 
   /** Closes the case when nothing keeps it open (`US-03-04` AC-20). Throws OffboardingRefusedError with the blockers. */
   close(actor: AuthenticatedPrincipal, id: string): Promise<OffboardingRecord> {
-    return this.frame.run(actor, id, {}, async (tx, { held, today }) => {
+    return this.frame.runTechnical(actor, id, {}, async (tx, { held, today }) => {
       const seats = held.state === 'LEFT' ? await this.licensing.listPersonalSeatsOf(held.employeeId, today, tx) : [];
       const terminating = new Set(
         held.state === 'LEFT'
@@ -118,17 +115,11 @@ export class OffboardingRevocationService {
         caseId: held.id,
         kind: 'CLOSED',
         changedByAppUserId: actor.appUserId,
-        selfExecuted: false,
+        changedByTicketId: null,
       });
-      await this.audit.changed(
-        tx,
-        actor,
-        held,
-        'OFFBOARDING_CASE.CLOSED',
-        null,
-        { employeeId: held.employeeId },
-        false,
-      );
+      await this.audit.changed(tx, userActor(actor), held, 'OFFBOARDING_CASE.CLOSED', null, {
+        employeeId: held.employeeId,
+      });
 
       return (await this.repo.find(held.id, tx)) ?? held;
     });

@@ -99,7 +99,6 @@ export async function createHttpTestApp(
 export interface SeededInstallation {
   organizationId: string;
   departmentId: string;
-  jobTitleId: string;
   superAdmin: { appUserId: string; employeeId: string; email: string; password: string };
 }
 
@@ -141,10 +140,6 @@ export async function seedInstallation(app: INestApplication): Promise<SeededIns
       departmentId: department.id,
       jobTitle: 'Administrator',
     });
-    // The title is free text on the person; the database names the catalogue entry on the placement (spec L.10), which
-    // the suites that write placements by SQL still use.
-    const [jobTitle] = await tx.$queryRaw<{ id: string }[]>`
-      SELECT id::text AS id FROM job_titles WHERE organization_id = ${org.id}::uuid AND normalized_name = 'administrator'`;
     const account = await identity.createBootstrapSuperAdmin(tx, {
       organizationId: org.id,
       employeeId: employee.id,
@@ -156,7 +151,6 @@ export async function seedInstallation(app: INestApplication): Promise<SeededIns
     return {
       organizationId: org.id,
       departmentId: department.id,
-      jobTitleId: jobTitle.id,
       superAdmin: { appUserId: account.appUserId, employeeId: employee.id, email, password: SEED_PASSWORD },
     };
   });

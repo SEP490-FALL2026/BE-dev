@@ -51,6 +51,14 @@ export class OpenRequestRepo {
       db.accessRequest.count({ where }),
     ]);
 
-    return { items: rows, total };
+    return {
+      items: rows.map((row) => {
+        // The filter above leaves drafts out, and only a draft has no moment it was sent.
+        if (row.submittedAt === null) throw new Error(`The request ${row.id} is listed as open but has not been sent.`);
+
+        return { ...row, submittedAt: row.submittedAt };
+      }),
+      total,
+    };
   }
 }

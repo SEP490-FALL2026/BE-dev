@@ -6,6 +6,7 @@ import { AuditService } from '../../audit/audit.service';
 import { OrganizationService } from '../../organization/organization.service';
 import { AssignmentEndService } from '../assignment/assignment-end.service';
 import { licensingAuditEvent } from '../mappers/licensing-audit-event';
+import type { OperatorAuditActor } from '../licensing-handover.types';
 import { confirmationCovers, requirementOf, takesOver, type SourceFact } from './handover-confirmer.policy';
 import { HandoverRepo, type DutyRecord } from './handover.repo';
 
@@ -21,6 +22,8 @@ export interface IssueInput {
   leaverIsHead: boolean;
   resolveOn: BusinessDate | null;
   dueOn: BusinessDate;
+  /** The controlled procedure, when it is who asks: the events are audited as that operator and not as `actor`. */
+  operator?: OperatorAuditActor;
 }
 
 export type Issued =
@@ -72,6 +75,7 @@ export class HandoverIssueService {
           open.id,
           { role: open.confirmerRole, source: open.source },
           { role: required.role, source: required.source, confirmerEmployeeId: required.fixedEmployeeId },
+          input.operator,
         ),
       );
 
@@ -105,17 +109,26 @@ export class HandoverIssueService {
     // The audit event says who owes what and until when, never the notice text.
     await this.audit.record(
       tx,
-      licensingAuditEvent(actor, organization.id, 'HANDOVER_DUTY.OPENED', 'HandoverDuty', duty.id, null, {
-        assignmentId: duty.assignmentId,
-        employeeId: duty.employeeId,
-        source: duty.source,
-        role: duty.confirmerRole,
-        confirmerEmployeeId: duty.confirmerEmployeeId,
-        departmentId: duty.departmentId,
-        dueOn: duty.dueOn,
-        dataLoss: duty.dataLoss,
-        caseRefId: duty.caseRefId,
-      }),
+      licensingAuditEvent(
+        actor,
+        organization.id,
+        'HANDOVER_DUTY.OPENED',
+        'HandoverDuty',
+        duty.id,
+        null,
+        {
+          assignmentId: duty.assignmentId,
+          employeeId: duty.employeeId,
+          source: duty.source,
+          role: duty.confirmerRole,
+          confirmerEmployeeId: duty.confirmerEmployeeId,
+          departmentId: duty.departmentId,
+          dueOn: duty.dueOn,
+          dataLoss: duty.dataLoss,
+          caseRefId: duty.caseRefId,
+        },
+        input.operator,
+      ),
     );
 
     return { outcome: 'OPENED', duty };

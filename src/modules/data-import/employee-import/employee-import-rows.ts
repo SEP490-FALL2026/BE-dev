@@ -15,8 +15,14 @@ export const EMPLOYEE_COLUMNS = [
 ] as const;
 export type EmployeeColumn = (typeof EMPLOYEE_COLUMNS)[number];
 
-/** Without these the file cannot become people (US-02-02 AC-2); the work email may be left out of the file. */
-const REQUIRED_COLUMNS: readonly EmployeeColumn[] = EMPLOYEE_COLUMNS.filter((column) => column !== 'work_email');
+/**
+ * Without these the file cannot become people (US-02-02 AC-2); the work email and the job title may be left out of the file: the
+ * title is optional free text (`QĐ-87e`) and a row without one is a person like any other.
+ */
+const OPTIONAL_COLUMNS: readonly EmployeeColumn[] = ['work_email', 'job_title'];
+const REQUIRED_COLUMNS: readonly EmployeeColumn[] = EMPLOYEE_COLUMNS.filter(
+  (column) => !OPTIONAL_COLUMNS.includes(column),
+);
 
 /** What each column may be called, folded: no accents, lower case, words joined by `_`. */
 const COLUMN_ALIASES: Record<EmployeeColumn, readonly string[]> = {
@@ -77,7 +83,7 @@ export interface ExistingEmployee {
 
 /** What the database says about the codes, emails and departments the file names. */
 export interface EmployeeImportLookup {
-  departments: ReadonlyMap<string, { id: string; active: boolean; costCenterActive: boolean }>;
+  departments: ReadonlyMap<string, { id: string; active: boolean }>;
   existing: ReadonlyMap<string, ExistingEmployee>;
   /** Normalized work email of an employee ⟹ that employee's code. */
   emailOwners: ReadonlyMap<string, string>;
@@ -92,7 +98,8 @@ export interface ParsedEmployeeRow {
   employmentType: EmploymentTypeName;
   hireDate: string;
   departmentCode: string;
-  jobTitleName: string;
+  /** The free-text title of the row, or null when the cell is blank. */
+  jobTitleName: string | null;
   departmentId: string;
 }
 
@@ -208,7 +215,7 @@ export class EmployeeRowClassifier {
     const department = departmentCode === '' ? undefined : this.lookup.departments.get(departmentCode);
     for (const { subject, code } of placementReasons({
       department: { named: departmentCode !== '', found: department ?? null },
-      jobTitle: { named: jobTitleText !== '', tooLong: isJobTitleTooLong(jobTitleText) },
+      jobTitle: { tooLong: isJobTitleTooLong(jobTitleText) },
     })) {
       errors.push({ column: FILE_COLUMN[subject], code });
     }
@@ -225,7 +232,7 @@ export class EmployeeRowClassifier {
         employmentType: typeText as EmploymentTypeName,
         hireDate,
         departmentCode,
-        jobTitleName: jobTitleText,
+        jobTitleName: jobTitleText === '' ? null : jobTitleText,
         departmentId: department.id,
       },
     };

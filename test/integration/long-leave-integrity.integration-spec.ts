@@ -248,10 +248,10 @@ describe('long leave data, list and contracts for the leaving flow (integration,
       const working = await h.worker(des, code('W'));
 
       const ended = await departure(person, (tx) =>
-        h.departure().endForDeparture(tx, h.it1.appUserId, person.employeeId, h.today()),
+        h.departure().endForDeparture(tx, h.saActor(), person.employeeId, h.today()),
       );
       const none = await departure(working, (tx) =>
-        h.departure().endForDeparture(tx, h.it1.appUserId, working.employeeId, h.today()),
+        h.departure().endForDeparture(tx, h.saActor(), working.employeeId, h.today()),
       );
 
       expect(ended).toMatchObject({ id: leave.id, status: 'ENDED', endKind: 'DEPARTURE_STARTED', endedOn: h.today() });
@@ -267,10 +267,10 @@ describe('long leave data, list and contracts for the leaving flow (integration,
 
     it('opens a new leave with the approved day kept when the handover is cancelled before that day', async () => {
       const { person, leave } = await onLeave(h.day(-30), h.day(30));
-      await departure(person, (tx) => h.departure().endForDeparture(tx, h.it1.appUserId, person.employeeId, h.day(-5)));
+      await departure(person, (tx) => h.departure().endForDeparture(tx, h.saActor(), person.employeeId, h.day(-5)));
 
       const state = await departure(person, (tx) =>
-        h.departure().resumeAfterCancelledDeparture(tx, h.it1.appUserId, person.employeeId, h.today()),
+        h.departure().resumeAfterCancelledDeparture(tx, h.saActor(), person.employeeId, h.today()),
       );
 
       expect(state).toBe('ON_LONG_LEAVE');
@@ -285,7 +285,7 @@ describe('long leave data, list and contracts for the leaving flow (integration,
       expect(await h.changeRows(resumed.id)).toEqual([{ kind: 'RESUMED' }]);
       // The handover days are in no leave; asking again does not resume the same leave twice.
       const again = await departure(person, (tx) =>
-        h.departure().resumeAfterCancelledDeparture(tx, h.it1.appUserId, person.employeeId, h.today()),
+        h.departure().resumeAfterCancelledDeparture(tx, h.saActor(), person.employeeId, h.today()),
       );
       expect(again).toBe('ON_LONG_LEAVE');
       expect((await h.leavesOf(person.employeeId)).filter((row) => row.status === 'ACTIVE')).toHaveLength(1);
@@ -297,10 +297,10 @@ describe('long leave data, list and contracts for the leaving flow (integration,
     ])('says the person works when the handover is cancelled %s, and opens no leave', async (_name, days) => {
       const [startedOn, approvedReturnOn] = days();
       const { person } = await onLeave(h.day(-30), approvedReturnOn);
-      await departure(person, (tx) => h.departure().endForDeparture(tx, h.it1.appUserId, person.employeeId, startedOn));
+      await departure(person, (tx) => h.departure().endForDeparture(tx, h.saActor(), person.employeeId, startedOn));
 
       const state = await departure(person, (tx) =>
-        h.departure().resumeAfterCancelledDeparture(tx, h.it1.appUserId, person.employeeId, h.today()),
+        h.departure().resumeAfterCancelledDeparture(tx, h.saActor(), person.employeeId, h.today()),
       );
 
       expect(state).toBe('WORKING');

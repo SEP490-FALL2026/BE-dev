@@ -43,6 +43,8 @@ export type QuoteRefusal =
   | { reason: 'QUOTE_NOT_IN_FORCE' }
   /** The term has more than one billing cycle and the quote does not say how it is paid: the fields still to give. */
   | { reason: 'SCHEDULE_REQUIRED'; missing: string[] }
+  /** The payments that bind come to nothing: a paid request never costs 0, so the price data is incomplete (F34). */
+  | { reason: 'PRICE_REQUIRED'; missing: string[] }
   /** The payment frequency is shorter than the billing cycle of the price, so a payment would be a fraction of a price. */
   | { reason: 'PAYMENT_FREQUENCY_INVALID' }
   | { reason: 'AMOUNT_TOO_LARGE' };
@@ -106,6 +108,7 @@ export function priceFromQuote(input: QuotePricingInput): QuotePricing {
     };
   });
   if (totalMinor > MAX_AMOUNT_MINOR) return { status: 'REFUSED', reason: 'AMOUNT_TOO_LARGE' };
+  if (amountMinor <= 0n) return { status: 'REFUSED', reason: 'PRICE_REQUIRED', missing: ['quote.unitPrice'] };
 
   return {
     status: 'PRICED',

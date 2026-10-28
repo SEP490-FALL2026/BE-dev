@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { CommitmentHoldInput, CommitmentReleaseReason, HeldCommitment } from '../budgets.types';
+import { BudgetYearLockRepo } from './budget-year-lock.repo';
 import type { CommitmentRow } from './commitment-release.policy';
 
 export interface AttachedCommitment {
@@ -18,7 +19,10 @@ export interface AttachedCommitment {
  */
 @Injectable()
 export class CommitmentRepo {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly yearLock: BudgetYearLockRepo,
+  ) {}
 
   /**
    * Attaches to `versionId` the commitments of the Cost Center and the year that wait for a budget (US-06-07 AC-3). Only
@@ -47,8 +51,17 @@ export class CommitmentRepo {
    * Holds the amount of each year for the request, one commitment for each year (`INV-16`): attached to the current budget of
    * the year when there is one, and waiting for one with the reason *no budget* when there is not (`US-06-07` AC-1). The
    * database refuses a second commitment for the same request and year.
+   *
+   * The budget of each Cost Center and year is locked first, the earliest year first, after the row of the request the caller
+   * holds (F31): what the decision of a version attaches and what is held here never read the current budget at the same moment,
+   * so a commitment never waits for a budget that was approved while it was being made.
    */
   async hold(tx: DbTx, input: CommitmentHoldInput): Promise<HeldCommitment[]> {
+    await this.yearLock.lock(
+      tx,
+      input.costCenterId,
+      input.items.map((item) => item.year),
+    );
     const held: HeldCommitment[] = [];
     for (const item of input.items) {
       const current = await tx.budgetVersion.findFirst({
@@ -250,6 +263,28 @@ export class CommitmentRepo {
     }
 
     return totals;
+  }
+
+  /**
+   * The first `limit` commitments of the Cost Center that are still held, by id, and how many there are: a Cost Center with one
+   * cannot be retired (`QĐ-87d(2)`). A commitment is held until nothing of it is left; one that became an expense or was released
+   * keeps nothing in use.
+   */
+  async heldOn(
+    costCenterId: string,
+    limit: number,
+    tx?: DbTx,
+  ): Promise<{ rows: { id: string; year: number }[]; total: number }> {
+    const db = tx ?? this.prisma;
+    const where = { costCenterId, state: 'HELD' as const };
+    const rows = await db.budgetCommitment.findMany({
+      where,
+      orderBy: { id: 'asc' },
+      take: limit,
+      select: { id: true, year: true },
+    });
+
+    return { rows, total: await db.budgetCommitment.count({ where }) };
   }
 }
 

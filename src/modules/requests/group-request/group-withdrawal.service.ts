@@ -22,6 +22,7 @@ import { GroupResolutionService } from './group-resolution.service';
 import { shareToRelease } from './line-allocation.policy';
 import { LineAmountRepo } from './line-amount.repo';
 import { RequestLineRepo } from './request-line.repo';
+import { RequestOutcomeListeners } from '../access-request/request-outcome-listeners';
 
 /** What the withdrawal of one line did: it ended, or it waits for the IT Admin to close the task of a grant that had failed. */
 type Withdrawn = { kind: 'ENDED'; released: boolean } | { kind: 'WAITING_FOR_IT'; taskId: string };
@@ -48,6 +49,7 @@ export class GroupWithdrawalService {
     private readonly spendStatus: SpendStatusService,
     private readonly budgets: BudgetsService,
     private readonly audit: AuditService,
+    private readonly outcomes: RequestOutcomeListeners,
   ) {}
 
   /** Throws AccessRequestNotFoundError and AccessRequestWithdrawalRefusedError. */
@@ -231,6 +233,8 @@ export class GroupWithdrawalService {
           },
         ),
       );
+      // The line of a person who was withdrawn ended for them without a grant; one that waits for the IT Admin has not ended yet (F43).
+      if (done.kind === 'ENDED') await this.outcomes.ended(tx, request, [line.employeeId], now);
     }
     await this.resolution.resolve(tx, actor, request.id, now);
   }

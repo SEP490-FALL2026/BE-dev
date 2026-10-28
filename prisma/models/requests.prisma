@@ -145,14 +145,12 @@ model AccessRequest {
   // Who sent it. Who it is for are the beneficiaries; the two differ when a department head sends for someone else.
   requesterEmployeeId   String                     @map("requester_employee_id") @db.Uuid
   departmentId          String                     @map("department_id") @db.Uuid
-  costCenterId          String                     @map("cost_center_id") @db.Uuid
+  // Null only while the request is a DRAFT (a paid request of a department that has no Cost Center yet; spec L.1).
+  costCenterId          String?                    @map("cost_center_id") @db.Uuid
   businessReason        String                     @map("business_reason")
   termMonths            Int                        @map("term_months")
   // Context only: it changes neither the Cost Center nor the chain (US-05-02 AC-7).
   projectLabel          String?                    @map("project_label")
-  outsideStandardReason String?                    @map("outside_standard_reason") @ignore
-  // Whether the plan was outside the standard toolset of the sender on the day it was sent (US-05-04 AC-7).
-  outsideStandard       Boolean                    @default(false) @map("outside_standard") @ignore
   pricingStatus         AccessRequestPricingStatus @default(NOT_APPLICABLE) @map("pricing_status")
   // Why the price is missing (NO_PRICED_SUBSCRIPTION, CYCLE_UNKNOWN, AMOUNT_TOO_LARGE); null when it is not.
   priceMissingReason    String?                    @map("price_missing_reason")
@@ -197,7 +195,8 @@ model AccessRequest {
   spendQueuedAt         DateTime?                  @map("spend_queued_at") @db.Timestamptz(3)
   // A value, not a foreign key: the history outlives the account (as the audit trail does).
   createdByAppUserId    String                     @map("created_by_app_user_id") @db.Uuid
-  submittedAt           DateTime                   @default(now()) @map("submitted_at") @db.Timestamptz(3)
+  // Null only while the request is a DRAFT; the moment it is sent otherwise.
+  submittedAt           DateTime?                  @default(now()) @map("submitted_at") @db.Timestamptz(3)
   updatedAt             DateTime                   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   organization         Organization                 @relation(fields: [organizationId], references: [id])
@@ -206,7 +205,7 @@ model AccessRequest {
   withdrawnBy          Employee?                    @relation("AccessRequestWithdrawer", fields: [withdrawnByEmployeeId], references: [id], onDelete: Restrict)
   cancelledBy          Employee?                    @relation("AccessRequestCanceller", fields: [cancelledByEmployeeId], references: [id], onDelete: Restrict)
   department           Department                   @relation(fields: [departmentId], references: [id], onDelete: Restrict)
-  costCenter           CostCenter                   @relation(fields: [costCenterId], references: [id], onDelete: Restrict)
+  costCenter           CostCenter?                  @relation(fields: [costCenterId], references: [id], onDelete: Restrict)
   amountCurrencyRecord Currency?                    @relation("AccessRequestAmountCurrency", fields: [amountCurrency], references: [code], onDelete: Restrict)
   beneficiaries        AccessRequestBeneficiary[]
   lines                AccessRequestLine[]

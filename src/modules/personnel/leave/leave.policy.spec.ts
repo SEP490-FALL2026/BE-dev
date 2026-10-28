@@ -19,7 +19,6 @@ const start = (over: Partial<StartLeaveFacts> = {}): StartLeaveFacts => ({
   hireDate: '2025-01-02',
   employee: { status: 'ACTIVE', workState: 'WORKING' },
   grounds: GROUNDS,
-  selfMode: 'ALLOW',
   ...over,
 });
 
@@ -27,7 +26,6 @@ describe('the start of a long leave (US-03-03 AC-5)', () => {
   it('accepts a person who works, a leave that has begun, a later day of return and a whole basis', () => {
     expect(startLeaveRefusal(start())).toBeNull();
     expect(startLeaveRefusal(start({ startedOn: '2026-06-02' }))).toBeNull();
-    expect(startLeaveRefusal(start({ selfMode: 'ALLOW_SELF_EXECUTED' }))).toBeNull();
   });
 
   it.each([
@@ -69,13 +67,9 @@ describe('the start of a long leave (US-03-03 AC-5)', () => {
     });
   });
 
-  it('refuses an IT Admin who records it for themselves while another can, after the rest was judged', () => {
-    expect(startLeaveRefusal(start({ selfMode: 'NEEDS_ANOTHER_IT_ADMIN' }))?.code).toBe(
-      'SELF_EVENT_NEEDS_ANOTHER_IT_ADMIN',
-    );
-    expect(startLeaveRefusal(start({ selfMode: 'NEEDS_ANOTHER_IT_ADMIN', grounds: undefined }))?.code).toBe(
-      'GROUNDS_REQUIRED',
-    );
+  it('judges only the facts of the leave: who may record it (the Super Admin, never about themselves) is the service policy, not asked here', () => {
+    expect(startLeaveRefusal(start({ grounds: undefined }))?.code).toBe('GROUNDS_REQUIRED');
+    expect(Object.keys(start())).not.toContain('selfMode');
   });
 });
 
@@ -86,7 +80,6 @@ const change = (over: Partial<ChangeReturnDateFacts> = {}): ChangeReturnDateFact
   approvedReturnOn: '2026-09-01',
   newApprovedReturnOn: '2026-09-30',
   grounds: GROUNDS,
-  selfMode: 'ALLOW',
   ...over,
 });
 
@@ -103,11 +96,6 @@ describe('a new day of return (US-03-03 AC-8)', () => {
     ['a day before today', { newApprovedReturnOn: '2026-08-19' }, 'RETURN_DATE_IN_PAST'],
     ['no new basis', { grounds: undefined }, 'GROUNDS_REQUIRED'],
     ['a notice as the basis', { grounds: { ...GROUNDS, reference: 'BM09-2026-000001' } }, 'GROUNDS_IS_NOTICE'],
-    [
-      'an IT Admin for themselves',
-      { selfMode: 'NEEDS_ANOTHER_IT_ADMIN' as const },
-      'SELF_EVENT_NEEDS_ANOTHER_IT_ADMIN',
-    ],
   ])('refuses %s', (_name, over, code) => {
     expect(changeReturnDateRefusal(change(over))?.code).toBe(code);
   });
@@ -120,7 +108,6 @@ const back = (over: Partial<ConfirmReturnFacts> = {}): ConfirmReturnFacts => ({
   approvedReturnOn: '2026-09-01',
   returnedOn: '2026-09-01',
   grounds: undefined,
-  selfMode: 'ALLOW',
   ...over,
 });
 
@@ -147,11 +134,6 @@ describe('the return of a person (US-03-03 AC-7, AC-8)', () => {
     ['a leave that has ended', { status: 'ENDED' as const }, 'NOT_ACTIVE'],
     ['a day before the leave began', { returnedOn: '2026-05-31' }, 'RETURN_DATE_INVALID'],
     ['a day to come', { returnedOn: '2026-09-02' }, 'RETURN_DATE_INVALID'],
-    [
-      'an IT Admin for themselves',
-      { selfMode: 'NEEDS_ANOTHER_IT_ADMIN' as const },
-      'SELF_EVENT_NEEDS_ANOTHER_IT_ADMIN',
-    ],
   ])('refuses %s', (_name, over, code) => {
     expect(confirmReturnRefusal(back(over))?.code).toBe(code);
   });

@@ -19,6 +19,10 @@ export const RUNTIME_TABLE_EXCEPTIONS: Readonly<Record<string, readonly string[]
   // The same for the two records of QĐ-87d(1): the basis of a link made by procedure, and the one activation row.
   cost_center_department_links: ['INSERT', 'SELECT'],
   cost_center_direction_activations: ['INSERT', 'SELECT'],
+  // The approval ticket of an event about the Super Admin (spec L.2) and the history of the edits of a budget version (F66) are
+  // added to and never changed or deleted (their triggers refuse it first).
+  super_admin_event_tickets: ['INSERT', 'SELECT'],
+  budget_version_history: ['INSERT', 'SELECT'],
 };
 
 export interface RoleFacts {

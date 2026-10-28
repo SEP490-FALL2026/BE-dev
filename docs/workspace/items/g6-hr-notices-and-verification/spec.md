@@ -26,8 +26,8 @@ Trưởng phòng gửi một thông báo `BM-09` có cấu trúc khi nhân viên
 
 | Story    | AC        | Coverage | Phần còn lại thuộc |
 | -------- | --------- | -------- | ------------------ |
-| US-03-10 | AC-1→AC-9 | full     | —                  |
-| US-03-11 | AC-1→AC-9 | full     | —                  |
+| US-03-10 | AC-1→AC-10 | full     | —                  |
+| US-03-11 | AC-1→AC-10 | full     | —                  |
 
 ## Supporting references
 
@@ -146,3 +146,4 @@ Cập nhật 25/10/2026 bởi người phụ trách (AI theo giao việc của n
 
 - Audit G0–G6 trên Docs `769bb64` ↔ BE `7c28e75` mở lại hạng mục này: F17, F40, F41, F48 — Super Admin xử lý `BM-09`; bốn loại; người nhận `D-7`; mã theo năm.
 - Remediation duy nhất: [g0-g6-final-business-baseline-remediation](../g0-g6-final-business-baseline-remediation/spec.md) ([impact matrix](../g0-g6-final-business-baseline-remediation/impact-matrix.md#3-findings)). AC liên quan không còn được coi là thỏa nguồn hiện hành cho tới khi remediation xong; trạng thái triển khai ở roadmap. Phần đã ghi phía trên là lịch sử, giữ nguyên.
+- _27/10/2026 (Prompt 04, Task 0.1 của `g0-g6-final-business-baseline-remediation`, F60 — re-pin scope map [G6](../../../roadmap.md#work-item-decomposition-g6) Docs `e0cb5a0`, BE `7c28e75`):_ nhận thêm `US-03-10` AC-10 (F41 — chức vụ không là sự kiện) và `US-03-11` AC-10 (F12 — phạm vi đọc `BM-09` theo vai; F17 — người nhận `D-7`); mục 9 không có cột chủ đề xuất, chủ theo dòng mục 4 của finding và hạng mục đang chủ cả Story ([impact matrix mục 9](../g0-g6-final-business-baseline-remediation/impact-matrix.md#9-phụ-lục-delta-user-stories-72e1480--769bb64)). Phần đã ghi phía trên là lịch sử, giữ nguyên.

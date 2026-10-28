@@ -1,3 +1,5 @@
+import type { UseItem } from '../organization-use.types';
+
 export class DepartmentNotFoundError extends Error {
   constructor() {
     super('Department not found.');
@@ -20,13 +22,14 @@ export class DepartmentNameInvalidError extends Error {
 }
 
 /**
- * A department is created with no Cost Center (`QĐ-87d(1)`), but the release that can still be recovered cannot read one:
- * until the operator has activated the direction of the link (`pnpm ops:cost-center-direction activate`) nothing is created.
+ * The caller does not hold the role the organization's data asks for (`QĐ-87a`): the Super Admin changes departments, heads,
+ * successors and the IT Admin in charge, and reads them all; the IT Admin reads the minimum, the head only their own. Raised by
+ * the policy in the service, whatever the controller let through (`F13`).
  */
-export class DepartmentCreationAwaitingActivationError extends Error {
+export class DepartmentForbiddenError extends Error {
   constructor() {
-    super('A department cannot be created yet: the Cost Center link of this installation is not activated.');
-    this.name = 'DepartmentCreationAwaitingActivationError';
+    super('You do not have permission to perform this action on departments.');
+    this.name = 'DepartmentForbiddenError';
   }
 }
 
@@ -45,16 +48,23 @@ export class DepartmentUpdateEmptyError extends Error {
   }
 }
 
-/** Still has people or service accounts, so it cannot be retired (US-03-06 AC-19). Open work arrives with its slice. */
+/**
+ * What still keeps a department in use, group by group: each holds the first of its things and how many there are in all
+ * (`US-03-06` AC-19, `QĐ-90e`, `QĐ-86c`). The first group is the people in it, the second the service accounts it owns, the third the
+ * open work (Requests not over, personnel events waiting, tasks open) and the last the subscriptions and purchases it owns that
+ * still owe a payment.
+ */
+export interface DepartmentInUseGroups {
+  members: { items: { employeeCode: string; fullName: string }[]; total: number };
+  serviceAccounts: { items: { assignmentId: string; accountIdentifier: string }[]; total: number };
+  openWork: { items: UseItem[]; total: number };
+  subscriptions: { items: UseItem[]; total: number };
+}
+
+/** Something still keeps the department in use, so it cannot be retired. */
 export class DepartmentInUseError extends Error {
-  constructor(
-    readonly members: { employeeCode: string; fullName: string }[],
-    readonly totalMembers: number,
-    /** The first of the service accounts the department owns, still open (`QĐ-86c`); the total counts them all. */
-    readonly serviceAccounts: { assignmentId: string; accountIdentifier: string }[] = [],
-    readonly totalServiceAccounts: number = 0,
-  ) {
-    super('The department still has members or service accounts.');
+  constructor(readonly groups: DepartmentInUseGroups) {
+    super('The department still has members, service accounts, open work or subscriptions that owe a payment.');
     this.name = 'DepartmentInUseError';
   }
 }
@@ -73,9 +83,17 @@ export type HeadAssignmentProblem =
   | 'NOT_A_MEMBER_ON_DATE'
   | 'SUPER_ADMIN_CANNOT_HEAD'
   | 'DATE_IN_PAST'
-  | 'HEADS_ANOTHER_DEPARTMENT';
+  | 'HEADS_ANOTHER_DEPARTMENT'
+  /** A successor takes over from a day after today. */
+  | 'SUCCESSOR_DATE_NOT_FUTURE'
+  /** A successor follows a head: nobody heads the department today, so the person is named its head instead. */
+  | 'SUCCESSOR_NEEDS_A_HEAD'
+  /** The person named successor already heads the department. */
+  | 'SUCCESSOR_IS_THE_HEAD'
+  /** A successor is already named: take them back first (a state of the department, so 409, not a fault of the request). */
+  | 'SUCCESSOR_ALREADY_NAMED';
 
-/** Why a person cannot head the department from the date asked (US-03-06 AC-5 → AC-8, AC-18). */
+/** Why a person cannot head the department from the date asked, or follow its head (US-03-06 AC-5 → AC-8, AC-18; `QĐ-87` `D-5`). */
 export class HeadAssignmentError extends Error {
   constructor(readonly problem: HeadAssignmentProblem) {
     super(`The head cannot be assigned: ${problem}.`);

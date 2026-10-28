@@ -2,10 +2,10 @@ import { Injectable } from '@nestjs/common';
 import type { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
+import type { VersionStateName } from './budget.policy';
 import { lineData, type VersionLineRecord } from './version-line.repo';
 
-/** `EXPIRED` is written by the release after this one (spec L.10): this release reads it and writes none. */
-export type VersionState = 'DRAFT' | 'SENT' | 'APPROVED' | 'REJECTED' | 'CHANGES_REQUESTED' | 'SUPERSEDED' | 'EXPIRED';
+export type VersionState = VersionStateName;
 
 export interface VersionRecord {
   id: string;
@@ -30,6 +30,13 @@ export interface VersionRecord {
   createdAt: Date;
   sentByEmployeeId: string | null;
   sentAt: Date | null;
+  /** When the draft was detached from the proposal that was withdrawn or given back (F36); null for any other version. */
+  detachedAt: Date | null;
+  /** Closed with its year without ever being the budget of the year (F62). */
+  neverCurrent: boolean;
+  expiredAt: Date | null;
+  /** The refused version this one follows, when it is made again from the same proposal (F63). */
+  rejectedPredecessorId: string | null;
 }
 
 export interface NewVersion {
@@ -39,6 +46,7 @@ export interface NewVersion {
   kind: 'INITIAL' | 'REVISION';
   proposalId: string | null;
   basedOnVersionId: string | null;
+  rejectedPredecessorId?: string | null;
   baseMinor: bigint;
   reserveMinor: bigint;
   currency: string;
@@ -86,6 +94,10 @@ const toRecord = (row: Prisma.BudgetVersionGetPayload<object>): VersionRecord =>
   createdAt: row.createdAt,
   sentByEmployeeId: row.sentByEmployeeId,
   sentAt: row.sentAt,
+  detachedAt: row.detachedAt,
+  neverCurrent: row.neverCurrent,
+  expiredAt: row.expiredAt,
+  rejectedPredecessorId: row.rejectedPredecessorId,
 });
 
 const quarterColumns = (quarters: [bigint, bigint, bigint, bigint] | null) => ({
@@ -95,9 +107,19 @@ const quarterColumns = (quarters: [bigint, bigint, bigint, bigint] | null) => ({
   q4Minor: quarters?.[3] ?? null,
 });
 
+/**
+ * The version that is the budget of a year as it is read: the current one, or the one that was current when the year ended
+ * (the reference budget, `QĐ-91c`). A version that never became current is never read as the budget (F62).
+ */
+export const REFERENCE_VERSION: Prisma.BudgetVersionWhereInput = {
+  OR: [{ state: 'APPROVED' }, { state: 'EXPIRED', neverCurrent: false }],
+};
+
 export interface VersionFilter {
   costCenterIds?: readonly string[];
   state?: VersionState;
+  /** Only the versions that are the budget of their year: current, or the reference budget of a year that ended. */
+  referenceOnly?: boolean;
   year?: number;
   skip: number;
   take: number;
@@ -128,6 +150,7 @@ export class VersionRepo {
         state: 'DRAFT',
         proposalId: input.proposalId,
         basedOnVersionId: input.basedOnVersionId,
+        rejectedPredecessorId: input.rejectedPredecessorId ?? null,
         baseMinor: input.baseMinor,
         reserveMinor: input.reserveMinor,
         totalMinor: total,
@@ -152,12 +175,31 @@ export class VersionRepo {
     return row ? toRecord(row) : null;
   }
 
+  /**
+   * `FOR NO KEY UPDATE`, not `FOR UPDATE` (F69): a commitment attached to the current version takes `FOR KEY SHARE` on its row through
+   * the foreign key while it holds the budget year lock, and this lock is taken before that one, so a lock that conflicts with
+   * `KEY SHARE` would wait for the year lock and the commitment would wait for the version in a circle. Two writers of a version
+   * still queue: this mode conflicts with itself, and every change of a version is a change of a non-key column.
+   */
   async lockById(tx: DbTx, id: string): Promise<VersionRecord | null> {
     const locked = await tx.$queryRaw<
       { id: string }[]
-    >`SELECT id FROM budget_versions WHERE id = ${id}::uuid FOR UPDATE`;
+    >`SELECT id FROM budget_versions WHERE id = ${id}::uuid FOR NO KEY UPDATE`;
 
     return locked.length === 0 ? null : this.findById(id, tx);
+  }
+
+  /**
+   * Locks every version the Cost Center has for the year, in the order of their ids, and reads them: what a decision or the
+   * closure of the year changes more than one of, so that two of them never wait for each other's rows in a circle.
+   */
+  async lockAllOfYear(tx: DbTx, costCenterId: string, year: number): Promise<VersionRecord[]> {
+    await tx.$queryRaw<
+      { id: string }[]
+    >`SELECT id FROM budget_versions WHERE cost_center_id = ${costCenterId}::uuid AND year = ${year} ORDER BY id FOR NO KEY UPDATE`;
+    const rows = await tx.budgetVersion.findMany({ where: { costCenterId, year }, orderBy: { id: 'asc' } });
+
+    return rows.map(toRecord);
   }
 
   /** The ids of every version the Cost Center has for the year, whatever their state. */
@@ -174,10 +216,33 @@ export class VersionRepo {
     return row ? toRecord(row) : null;
   }
 
-  /** The version of the Cost Center and year that is being built or waits for a decision, if any. */
+  /** The budget of the year as it is read: the current version, or the reference budget of a year that ended (F62). */
+  async reference(costCenterId: string, year: number, tx?: DbTx): Promise<VersionRecord | null> {
+    const row = await (tx ?? this.prisma).budgetVersion.findFirst({
+      where: { costCenterId, year, ...REFERENCE_VERSION },
+      orderBy: { number: 'desc' },
+    });
+
+    return row ? toRecord(row) : null;
+  }
+
+  /**
+   * The version of the Cost Center and year that is being built or waits for a decision, if any. A draft that a withdrawn or
+   * given-back proposal left behind is detached and does not count (F36).
+   */
   async inFlight(costCenterId: string, year: number, tx?: DbTx): Promise<VersionRecord | null> {
     const row = await (tx ?? this.prisma).budgetVersion.findFirst({
-      where: { costCenterId, year, state: { in: ['DRAFT', 'SENT', 'CHANGES_REQUESTED'] } },
+      where: { costCenterId, year, state: { in: ['DRAFT', 'SENT', 'CHANGES_REQUESTED'] }, detachedAt: null },
+    });
+
+    return row ? toRecord(row) : null;
+  }
+
+  /** The newest version made from the proposal, whatever its state: what says whether the proposal can be followed (F63). */
+  async latestOfProposal(proposalId: string, tx?: DbTx): Promise<VersionRecord | null> {
+    const row = await (tx ?? this.prisma).budgetVersion.findFirst({
+      where: { proposalId },
+      orderBy: { number: 'desc' },
     });
 
     return row ? toRecord(row) : null;
@@ -187,6 +252,7 @@ export class VersionRepo {
     const where: Prisma.BudgetVersionWhereInput = {
       ...(filter.costCenterIds ? { costCenterId: { in: [...filter.costCenterIds] } } : {}),
       ...(filter.state ? { state: filter.state } : {}),
+      ...(filter.referenceOnly ? REFERENCE_VERSION : {}),
       ...(filter.year ? { year: filter.year } : {}),
     };
     const [rows, total] = await this.prisma.$transaction([
@@ -230,8 +296,29 @@ export class VersionRepo {
   }
 
   /**
+   * Closes the version with its fiscal year (`QĐ-91c`): the current one stays the reference budget of the year, one that never
+   * became current says so. Only the closure of the year writes this, in the transaction of its Cost Center and year.
+   */
+  async expire(tx: DbTx, id: string, input: { neverCurrent: boolean; now: Date }): Promise<void> {
+    await tx.budgetVersion.update({
+      where: { id },
+      data: { state: 'EXPIRED', neverCurrent: input.neverCurrent, expiredAt: input.now },
+    });
+  }
+
+  /** The Cost Centers and years before `fiscalYear` that still hold a version the closure of the year changes. */
+  async endedYearsToClose(fiscalYear: number): Promise<{ costCenterId: string; year: number }[]> {
+    return this.prisma.budgetVersion.findMany({
+      where: { year: { lt: fiscalYear }, state: { in: ['DRAFT', 'SENT', 'CHANGES_REQUESTED', 'APPROVED'] } },
+      distinct: ['costCenterId', 'year'],
+      select: { costCenterId: true, year: true },
+      orderBy: [{ year: 'asc' }, { costCenterId: 'asc' }],
+    });
+  }
+
+  /**
    * Marks the drafts of a proposal that was withdrawn or given back as detached from it (F36, `QĐ-91a`): they stay `DRAFT`, are
-   * not deleted, and are written in the transaction of the withdrawal or of the return. Nothing is read of the column here.
+   * not deleted, and are written in the transaction of the withdrawal or of the return.
    */
   async detachDraftsOf(tx: DbTx, proposalId: string, now: Date): Promise<number> {
     const { count } = await tx.budgetVersion.updateMany({
@@ -253,10 +340,10 @@ export class VersionRepo {
     return new Map(rows.map((row) => [row.id, row.totalMinor]));
   }
 
-  /** The newest version of the Cost Center and year, whatever its state. */
+  /** The newest version of the Cost Center and year that is read as its budget or is not closed: what the head is told of. */
   async latestOf(costCenterId: string, year: number): Promise<VersionRecord | null> {
     const row = await this.prisma.budgetVersion.findFirst({
-      where: { costCenterId, year },
+      where: { costCenterId, year, neverCurrent: false },
       orderBy: { number: 'desc' },
     });
 

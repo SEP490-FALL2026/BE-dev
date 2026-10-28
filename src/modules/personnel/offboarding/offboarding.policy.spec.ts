@@ -29,7 +29,6 @@ const record = (extra: Partial<RecordFacts> = {}): RecordFacts => ({
   pendingTransfer: null,
   transferCancellationReason: undefined,
   namedAsSuccessor: false,
-  selfMode: 'ALLOW',
   successor: null,
   ...extra,
 });
@@ -105,11 +104,6 @@ describe('whether a departure may be recorded', () => {
     ],
     ['a person named to follow a head', { namedAsSuccessor: true }, 'PENDING_EVENT_EXISTS'],
     [
-      'an IT Admin for themselves while another can',
-      { selfMode: 'NEEDS_ANOTHER_IT_ADMIN' },
-      'SELF_EVENT_NEEDS_ANOTHER_IT_ADMIN',
-    ],
-    [
       'a successor who cannot follow',
       { successor: { code: 'SUCCESSOR_NOT_A_MEMBER_ON_DATE' } },
       'SUCCESSOR_NOT_A_MEMBER_ON_DATE',
@@ -118,13 +112,12 @@ describe('whether a departure may be recorded', () => {
     expect(code(recordRefusal(record(facts)))).toBe(expected);
   });
 
-  it('cancels the transfer that waits only with a reason, and a self record by the only IT Admin goes through', () => {
+  it('cancels the transfer that waits only with a reason', () => {
     expect(
       recordRefusal(
         record({ pendingTransfer: { effectiveOn: '2026-12-01' }, transferCancellationReason: 'Nghỉ việc' }),
       ),
     ).toBeNull();
-    expect(recordRefusal(record({ selfMode: 'ALLOW_SELF_EXECUTED' }))).toBeNull();
   });
 });
 
@@ -137,7 +130,6 @@ describe('moving, cancelling and leaving', () => {
     currentLastWorkingDay: '2026-11-03',
     newLastWorkingDay: '2026-11-20',
     reason: 'Dời ngày',
-    selfMode: 'ALLOW' as const,
     successor: null,
     ...extra,
   });
@@ -151,11 +143,6 @@ describe('moving, cancelling and leaving', () => {
     ['is not the same day', { newLastWorkingDay: '2026-11-03' }, 'NO_CHANGE'],
     ['is not in the past', { newLastWorkingDay: '2026-10-20' }, 'LAST_WORKING_DAY_INVALID'],
     [
-      'is not for oneself while another can',
-      { selfMode: 'NEEDS_ANOTHER_IT_ADMIN' },
-      'SELF_EVENT_NEEDS_ANOTHER_IT_ADMIN',
-    ],
-    [
       'judges the successor on the new day',
       { successor: { code: 'SUCCESSOR_NOT_A_MEMBER_ON_DATE' } },
       'SUCCESSOR_NOT_A_MEMBER_ON_DATE',
@@ -165,12 +152,9 @@ describe('moving, cancelling and leaving', () => {
   });
 
   it('cancels a handover under way with a reason, and only that', () => {
-    expect(cancelRefusal({ state: 'HANDING_OVER', reason: 'Rút', selfMode: 'ALLOW' })).toBeNull();
-    expect(code(cancelRefusal({ state: 'HANDING_OVER', reason: '', selfMode: 'ALLOW' }))).toBe('REASON_REQUIRED');
-    expect(code(cancelRefusal({ state: 'LEFT', reason: 'Rút', selfMode: 'ALLOW' }))).toBe('CASE_LEFT');
-    expect(code(cancelRefusal({ state: 'HANDING_OVER', reason: 'Rút', selfMode: 'NEEDS_ANOTHER_IT_ADMIN' }))).toBe(
-      'SELF_EVENT_NEEDS_ANOTHER_IT_ADMIN',
-    );
+    expect(cancelRefusal({ state: 'HANDING_OVER', reason: 'Rút' })).toBeNull();
+    expect(code(cancelRefusal({ state: 'HANDING_OVER', reason: '' }))).toBe('REASON_REQUIRED');
+    expect(code(cancelRefusal({ state: 'LEFT', reason: 'Rút' }))).toBe('CASE_LEFT');
   });
 
   it('lets the departure come on any day up to today, after the last working day too, and never ahead', () => {
@@ -209,7 +193,6 @@ describe('the revocations of the rights', () => {
       rights,
       lockRecorded: false,
       lockGiven: true,
-      selfMode: 'ALLOW',
       ...extra,
     });
 
@@ -240,11 +223,6 @@ describe('the revocations of the rights', () => {
     ['not left', { state: 'HANDING_OVER' as const }, 'CASE_NOT_LEFT'],
     ['closed', { closed: true }, 'CASE_CLOSED'],
     ['no reason', { reason: ' ' }, 'REASON_REQUIRED'],
-    [
-      'for oneself while another can',
-      { selfMode: 'NEEDS_ANOTHER_IT_ADMIN' as const },
-      'SELF_EVENT_NEEDS_ANOTHER_IT_ADMIN',
-    ],
     ['no lock recorded or given', { lockGiven: false }, 'ACCOUNT_LOCK_NOT_RECORDED'],
     ['the lock given when it was recorded', { lockRecorded: true }, 'ALREADY_RECORDED'],
   ])('refuses %s', (_name, extra, expected) => {

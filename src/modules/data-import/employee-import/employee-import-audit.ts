@@ -91,7 +91,7 @@ export function importEmployeeCreatedEvent(
   organizationId: string,
   actor: AuthenticatedPrincipal,
   employeeId: string,
-  created: { importId: string; employeeCode: string; department: string; jobTitle: string; hrBasis: HrBasis },
+  created: { importId: string; employeeCode: string; department: string; jobTitle: string | null; hrBasis: HrBasis },
 ): AuditEventInput {
   return {
     organizationId,

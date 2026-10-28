@@ -8,9 +8,10 @@ import { EmployeeCells, EmployeeImportLookup, EmployeeRowClassifier } from './em
 
 const lookup: EmployeeImportLookup = {
   departments: new Map([
-    ['P-OPS', { id: 'd-ops', active: true, costCenterActive: true }],
-    ['P-OFF', { id: 'd-off', active: false, costCenterActive: true }],
-    ['P-CCX', { id: 'd-ccx', active: true, costCenterActive: false }],
+    ['P-OPS', { id: 'd-ops', active: true }],
+    ['P-OFF', { id: 'd-off', active: false }],
+    // No Cost Center in use yet: the lookup does not even say (`QĐ-87d(3)`).
+    ['P-CCX', { id: 'd-ccx', active: true }],
   ]),
   existing: new Map([
     [
@@ -52,18 +53,20 @@ describe('import adapter of the placement policy (BEH.1)', () => {
     ],
     ['a retired department', { department_code: 'P-OFF' }, { column: 'department_code', code: 'DEPARTMENT_INACTIVE' }],
     [
-      'a department on a retired cost center',
-      { department_code: 'P-CCX' },
-      { column: 'department_code', code: 'DEPARTMENT_COST_CENTER_INACTIVE' },
-    ],
-    ['a blank job title', { job_title: '' }, { column: 'job_title', code: 'JOB_TITLE_REQUIRED' }],
-    [
       'a job title longer than 255 characters',
       { job_title: 'x'.repeat(256) },
       { column: 'job_title', code: 'JOB_TITLE_TOO_LONG' },
     ],
   ])('D-1: shows %s on its file column', (_name, cells, issue) => {
     expect(judge(cells)).toEqual({ outcome: 'ERROR', errors: [issue] });
+  });
+
+  it('takes a person into a department with no Cost Center, and a blank job title is not a reason (QĐ-87d(3), QĐ-87e)', () => {
+    expect(judge({ department_code: 'P-CCX', job_title: '' })).toMatchObject({
+      outcome: 'VALID',
+      errors: [],
+      parsed: { departmentId: 'd-ccx', jobTitleName: null },
+    });
   });
 
   it('D-2: compares a person already there and does not place them, even on a retired department', () => {
@@ -87,7 +90,7 @@ describe('import adapter of the placement policy (BEH.1)', () => {
         employment_type: 'BOSS',
         hire_date: '2026-02-30',
         department_code: 'P-NONE',
-        job_title: '',
+        job_title: 'x'.repeat(256),
       }).errors,
     ).toEqual([
       { column: 'full_name', code: 'FULL_NAME_REQUIRED' },
@@ -95,7 +98,7 @@ describe('import adapter of the placement policy (BEH.1)', () => {
       { column: 'employment_type', code: 'EMPLOYMENT_TYPE_INVALID' },
       { column: 'hire_date', code: 'HIRE_DATE_INVALID' },
       { column: 'department_code', code: 'DEPARTMENT_NOT_FOUND' },
-      { column: 'job_title', code: 'JOB_TITLE_REQUIRED' },
+      { column: 'job_title', code: 'JOB_TITLE_TOO_LONG' },
     ]);
   });
 
@@ -104,12 +107,13 @@ describe('import adapter of the placement policy (BEH.1)', () => {
     classifier.classify({ ...row, work_email: 'binh@acme.vn' });
 
     expect(
-      classifier.classify({ ...row, work_email: 'BINH@acme.vn', department_code: '', job_title: '' }).errors,
+      classifier.classify({ ...row, work_email: 'BINH@acme.vn', department_code: '', job_title: 'x'.repeat(256) })
+        .errors,
     ).toEqual([
       { column: 'employee_code', code: 'EMPLOYEE_CODE_DUPLICATE_IN_FILE' },
       { column: 'work_email', code: 'WORK_EMAIL_DUPLICATE_IN_FILE' },
       { column: 'department_code', code: 'DEPARTMENT_REQUIRED' },
-      { column: 'job_title', code: 'JOB_TITLE_REQUIRED' },
+      { column: 'job_title', code: 'JOB_TITLE_TOO_LONG' },
     ]);
     expect(judge({ employee_code: '', work_email: 'not an email', department_code: 'P-OFF' }).errors).toEqual([
       { column: 'employee_code', code: 'EMPLOYEE_CODE_REQUIRED' },

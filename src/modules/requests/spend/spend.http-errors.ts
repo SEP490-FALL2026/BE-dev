@@ -1,6 +1,7 @@
 import { HttpStatus } from '@nestjs/common';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
+import { FinanceSetupIncompleteError } from '../../organization/organization.errors';
 import {
   AccessRequestGroupUsesLinesError,
   AccessRequestNotFoundError,
@@ -35,7 +36,12 @@ export function toSpendApiException(error: unknown): unknown {
     return refuse(HttpStatus.CONFLICT, 'SPEND.REVIEW_NOT_OPEN', error.message);
   }
   if (error instanceof SpendReviewRefusedError) {
-    return refuse(HttpStatus.CONFLICT, `SPEND.${error.reason}`, error.message);
+    // Finance is a party to the request: the same code and status as the spending approver in that position (`SPEND.OWN_REQUEST`).
+    return refuse(
+      error.reason === 'OWN_REQUEST' ? HttpStatus.FORBIDDEN : HttpStatus.CONFLICT,
+      `SPEND.${error.reason}`,
+      error.message,
+    );
   }
 
   if (error instanceof SpendNotHeadError) return refuse(HttpStatus.FORBIDDEN, 'SPEND.NOT_HEAD', error.message);
@@ -104,6 +110,11 @@ export const SPEND_ERROR_EXAMPLES = {
   PLAN_LINE_NOT_UPDATED: example(new SpendReviewRefusedError('PLAN_LINE_NOT_UPDATED')),
   NO_BUDGET_TO_MAKE: example(new SpendReviewRefusedError('NO_BUDGET_TO_MAKE')),
   NO_HEAD_TO_PROPOSE: example(new SpendReviewRefusedError('NO_HEAD_TO_PROPOSE')),
+  ALREADY_AWAITING_BUDGET: example(new SpendReviewRefusedError('ALREADY_AWAITING_BUDGET')),
+  REVIEW_OWN_REQUEST: example(new SpendReviewRefusedError('OWN_REQUEST')),
+  REVIEW_REVIEWER_IS_APPROVER: example(new SpendReviewRefusedError('REVIEWER_IS_APPROVER')),
+  REVIEWER_IS_APPROVER: example(new SpendDecisionRefusedError('REVIEWER_IS_APPROVER')),
+  FINANCE_SETUP_INCOMPLETE: example(new FinanceSetupIncompleteError('<department-id>')),
   NOT_HEAD: example(new SpendNotHeadError()),
   NOT_IN_QUEUE: example(new SpendNotInQueueError('<request-id>')),
   BATCH_NOT_FOUND: example(new SpendBatchNotFoundError()),

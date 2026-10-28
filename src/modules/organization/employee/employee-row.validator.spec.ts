@@ -1,30 +1,26 @@
 import { EmployeeRowLookup, validateEmployeeRow } from './employee-row.validator';
 
 const clean: EmployeeRowLookup = {
-  department: { id: 'd1', active: true, costCenterActive: true },
+  department: { id: 'd1', active: true },
   employeeCodeTaken: false,
   workEmailTaken: false,
 };
 
 describe('validateEmployeeRow (T-16)', () => {
-  it('has no reason for a row whose department exists, whose title is given and whose code and email are free', () => {
+  it('has no reason for a row whose department exists, whose title fits and whose code and email are free', () => {
     expect(validateEmployeeRow({ departmentCode: 'P-OPS', jobTitle: 'Engineer' }, clean)).toEqual([]);
   });
 
-  describe('the department (US-02-03 AC-1, AC-4)', () => {
+  describe('the department (US-02-03 AC-1, AC-4; US-04-09 AC-12)', () => {
     it.each([[undefined], [null], [''], ['   ']])('is required when it is %j', (departmentCode) => {
       expect(validateEmployeeRow({ departmentCode, jobTitle: 'Engineer' }, { ...clean, department: null })).toEqual([
         { field: 'departmentCode', code: 'DEPARTMENT_REQUIRED' },
       ]);
     });
 
-    it('cannot take people in while its cost center is retired (US-04-09 AC-3)', () => {
-      expect(
-        validateEmployeeRow(
-          { departmentCode: 'P-OPS', jobTitle: 'Engineer' },
-          { ...clean, department: { id: 'd1', active: true, costCenterActive: false } },
-        ),
-      ).toEqual([{ field: 'departmentCode', code: 'DEPARTMENT_COST_CENTER_INACTIVE' }]);
+    it('takes people in whether or not it has a Cost Center: the fact is not asked (QĐ-87d(3), F44)', () => {
+      // The lookup carries no cost center fact at all: a department with none is a department like any other.
+      expect(validateEmployeeRow({ departmentCode: 'P-OPS', jobTitle: 'Engineer' }, clean)).toEqual([]);
     });
 
     it('must exist: an unknown code is not turned into a new department', () => {
@@ -34,11 +30,9 @@ describe('validateEmployeeRow (T-16)', () => {
     });
   });
 
-  describe('the job title: free text, still asked for in this release (QĐ-87e)', () => {
-    it.each([[undefined], [null], [''], ['  ']])('is required when it is %j', (jobTitle) => {
-      expect(validateEmployeeRow({ departmentCode: 'P-OPS', jobTitle }, clean)).toEqual([
-        { field: 'jobTitle', code: 'JOB_TITLE_REQUIRED' },
-      ]);
+  describe('the job title: optional free text, only bounded (QĐ-87e)', () => {
+    it.each([[undefined], [null], [''], ['  ']])('is not an error when it is %j', (jobTitle) => {
+      expect(validateEmployeeRow({ departmentCode: 'P-OPS', jobTitle }, clean)).toEqual([]);
     });
 
     it('is taken as typed: any title that fits needs no catalogue entry', () => {
@@ -106,21 +100,9 @@ describe('validateEmployeeRow (T-16)', () => {
       ],
       [
         'a retired department',
-        { department: { id: 'd1', active: false, costCenterActive: true } },
+        { department: { id: 'd1', active: false } },
         { departmentCode: 'P-OPS', jobTitle: 'Engineer' },
         { field: 'departmentCode', code: 'DEPARTMENT_INACTIVE' },
-      ],
-      [
-        'a department on a retired cost center',
-        { department: { id: 'd1', active: true, costCenterActive: false } },
-        { departmentCode: 'P-OPS', jobTitle: 'Engineer' },
-        { field: 'departmentCode', code: 'DEPARTMENT_COST_CENTER_INACTIVE' },
-      ],
-      [
-        'a blank job title',
-        {},
-        { departmentCode: 'P-OPS', jobTitle: '' },
-        { field: 'jobTitle', code: 'JOB_TITLE_REQUIRED' },
       ],
       [
         'a job title that is too long',
@@ -135,16 +117,16 @@ describe('validateEmployeeRow (T-16)', () => {
     it('D-2, D-3: a taken code is a reason of its own, after the department and job title, and before a taken email', () => {
       expect(
         validateEmployeeRow(
-          { departmentCode: 'P-OPS', jobTitle: '' },
+          { departmentCode: 'P-OPS', jobTitle: 'x'.repeat(300) },
           {
-            department: { id: 'd1', active: false, costCenterActive: false },
+            department: { id: 'd1', active: false },
             employeeCodeTaken: true,
             workEmailTaken: true,
           },
         ),
       ).toEqual([
         { field: 'departmentCode', code: 'DEPARTMENT_INACTIVE' },
-        { field: 'jobTitle', code: 'JOB_TITLE_REQUIRED' },
+        { field: 'jobTitle', code: 'JOB_TITLE_TOO_LONG' },
         { field: 'employeeCode', code: 'EMPLOYEE_CODE_TAKEN' },
         { field: 'workEmail', code: 'WORK_EMAIL_TAKEN' },
       ]);
@@ -154,12 +136,12 @@ describe('validateEmployeeRow (T-16)', () => {
   it('reports every reason at once, so one attempt shows everything to fix, in a fixed order', () => {
     expect(
       validateEmployeeRow(
-        { departmentCode: '', jobTitle: null },
+        { departmentCode: '', jobTitle: 'x'.repeat(300) },
         { department: null, employeeCodeTaken: true, workEmailTaken: true },
       ),
     ).toEqual([
       { field: 'departmentCode', code: 'DEPARTMENT_REQUIRED' },
-      { field: 'jobTitle', code: 'JOB_TITLE_REQUIRED' },
+      { field: 'jobTitle', code: 'JOB_TITLE_TOO_LONG' },
       { field: 'employeeCode', code: 'EMPLOYEE_CODE_TAKEN' },
       { field: 'workEmail', code: 'WORK_EMAIL_TAKEN' },
     ]);

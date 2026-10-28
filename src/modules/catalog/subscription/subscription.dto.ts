@@ -71,8 +71,8 @@ const subscriptionSchema = z.strictObject({
   id: z.uuid(),
   planId: z.uuid(),
   planName: z.string(),
-  // Null only for a subscription made before the owner existed; an operator records its basis (`ops:assign-subscription-owner`).
-  ownerDepartmentId: z.uuid().nullable(),
+  // The department that owns the purchase: always present (`QĐ-89a`, F02).
+  ownerDepartmentId: z.uuid(),
   applicationId: z.uuid(),
   applicationName: z.string(),
   vendor: z.strictObject({ id: z.uuid(), name: z.string() }),

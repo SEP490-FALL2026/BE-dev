@@ -8,13 +8,14 @@ import {
   BudgetReasonRequiredError,
   BudgetRevisionRequiredError,
   BudgetVersionNotCurrentError,
-  BudgetVersionNotEditableError,
   BudgetVersionNotFoundError,
   BudgetWindowBackwardsError,
 } from './budget.errors';
-import { backwardLines, incompleteLines, isEditable, kindOfChange } from './budget.policy';
+import { backwardLines, incompleteLines, kindOfChange } from './budget.policy';
 import { BudgetChangeListeners } from './budget-change-listeners';
 import { budgetAuditEvent, BudgetSupportService } from './budget-support.service';
+import { VersionAccessService } from './version-access.service';
+import { VersionHistoryService } from './version-history.service';
 import { VersionLineRepo, type LinePatch, type VersionLineRecord } from './version-line.repo';
 import { VersionRepo, type VersionRecord } from './version.repo';
 import { VersionViewService } from './version-view.service';
@@ -23,7 +24,9 @@ import type { AddLinesBodyDto, LinePatchDto, VersionLineWire, VersionWire, Windo
 /**
  * The lines of a version as Finance works them (`US-06-09`): a comment and an adjustment of a line that comes from the
  * proposal, lines of Finance's own, and the move of the purchase window of a line of the current budget. The line of the
- * proposal a line adjusts stays as it was, and an amount of the current budget is changed only by a revision.
+ * proposal a line adjusts stays as it was, and an amount of the current budget is changed only by a revision. Every edit leaves
+ * the Audit Trail with what the line was and is, and its entry of the history of the version (F66); a version of a year that has
+ * ended is not changed (F62).
  */
 @Injectable()
 export class VersionLineService {
@@ -33,6 +36,8 @@ export class VersionLineService {
     private readonly lines: VersionLineRepo,
     private readonly views: VersionViewService,
     private readonly support: BudgetSupportService,
+    private readonly access: VersionAccessService,
+    private readonly history: VersionHistoryService,
     private readonly listeners: BudgetChangeListeners,
     private readonly audit: AuditService,
   ) {}
@@ -47,8 +52,11 @@ export class VersionLineService {
     position: number,
     patch: LinePatchDto,
   ): Promise<VersionLineWire> {
+    this.support.requireFinance(actor);
+    const fiscalStart = await this.support.fiscalYearStartMonth();
+
     return this.runner.run(async (tx) => {
-      const version = await this.editable(tx, id);
+      const version = await this.access.lockEditable(tx, id, fiscalStart);
       const line = await this.lines.findLine(id, position, tx);
       if (!line) throw new BudgetLineNotFoundError();
 
@@ -59,24 +67,40 @@ export class VersionLineService {
       if (merged.windowTo < merged.windowFrom) throw new BudgetWindowBackwardsError([position]);
       const adjusts = line.proposalPosition !== null && changesTheLine(line, next);
       if (adjusts && !merged.adjustmentReason) throw new BudgetReasonRequiredError('ADJUSTMENT');
+      await this.support.requirePlans([next.planId]);
 
       await this.lines.patchLine(tx, id, position, next);
+      const edited = (await this.lines.findLine(id, position, tx)) as VersionLineRecord;
+      const change = await this.history.lineEdited(tx, actor, version, {
+        kind: 'LINE_UPDATED',
+        position,
+        before: line,
+        after: edited,
+      });
       await this.audit.record(
         tx,
-        budgetAuditEvent(actor, version.organizationId, 'BUDGET_VERSION.LINE_CHANGED', 'BUDGET_VERSION', id, {
-          position,
-          fields: Object.keys(patch).join(','),
-        }),
+        budgetAuditEvent(
+          actor,
+          version.organizationId,
+          'BUDGET_VERSION.LINE_CHANGED',
+          'BUDGET_VERSION',
+          id,
+          { position, ...(change?.after ?? {}) },
+          { ...(change?.before ?? {}) },
+        ),
       );
 
-      return this.views.lineWire(version, (await this.lines.findLine(id, position, tx)) as VersionLineRecord);
+      return this.views.lineWire(version, edited);
     });
   }
 
   /** Finance adds lines of their own to a version being built; they must say what every line says. */
   async addLines(actor: AuthenticatedPrincipal, id: string, body: AddLinesBodyDto): Promise<VersionWire> {
+    this.support.requireFinance(actor);
+    const fiscalStart = await this.support.fiscalYearStartMonth();
+
     return this.runner.run(async (tx) => {
-      const version = await this.editable(tx, id);
+      const version = await this.access.lockEditable(tx, id, fiscalStart);
       const drafts = body.lines.map((line) => ({
         description: line.description,
         amountMinor: 0n,
@@ -86,6 +110,7 @@ export class VersionLineService {
       if (incomplete.length > 0) throw new BudgetProposalIncompleteError(incomplete);
       const backwards = backwardLines(drafts);
       if (backwards.length > 0) throw new BudgetWindowBackwardsError(backwards);
+      await this.support.requirePlans(body.lines.map((line) => line.planId));
 
       const lines: Omit<VersionLineRecord, 'position'>[] = [];
       for (const line of body.lines) {
@@ -105,11 +130,14 @@ export class VersionLineService {
           adjustmentReason: null,
         });
       }
-      await this.lines.addLines(tx, id, lines);
+      const first = await this.lines.addLines(tx, id, lines);
+      await this.history.linesAdded(tx, actor, version, { kind: 'LINES_ADDED', firstPosition: first, lines });
       await this.audit.record(
         tx,
         budgetAuditEvent(actor, version.organizationId, 'BUDGET_VERSION.LINES_ADDED', 'BUDGET_VERSION', id, {
           lines: lines.length,
+          fromPosition: first,
+          toPosition: first + lines.length - 1,
         }),
       );
 
@@ -128,9 +156,11 @@ export class VersionLineService {
     position: number,
     body: WindowBodyDto,
   ): Promise<VersionLineWire> {
+    this.support.requireFinance(actor);
+    const fiscalStart = await this.support.fiscalYearStartMonth();
+
     return this.runner.run(async (tx) => {
-      const version = await this.versions.lockById(tx, id);
-      if (!version) throw new BudgetVersionNotFoundError();
+      const version = await this.access.lockOfOpenYear(tx, id, fiscalStart);
       if (version.state !== 'APPROVED') throw new BudgetVersionNotCurrentError();
       const line = await this.lines.findLine(id, position, tx);
       if (!line) throw new BudgetLineNotFoundError();
@@ -153,14 +183,23 @@ export class VersionLineService {
           changedByEmployeeId: actor.employeeId,
           now: new Date(),
         });
+        const change = await this.history.lineEdited(tx, actor, version, {
+          kind: 'WINDOW_MOVED',
+          position,
+          before: line,
+          after: { ...line, ...after },
+        });
         await this.audit.record(
           tx,
-          budgetAuditEvent(actor, version.organizationId, 'BUDGET_VERSION.WINDOW_MOVED', 'BUDGET_VERSION', id, {
-            position,
-            from: `${line.windowFrom}/${line.windowTo}`,
-            to: `${after.windowFrom}/${after.windowTo}`,
-            reason: body.reason,
-          }),
+          budgetAuditEvent(
+            actor,
+            version.organizationId,
+            'BUDGET_VERSION.WINDOW_MOVED',
+            'BUDGET_VERSION',
+            id,
+            { position, ...(change?.after ?? {}), reason: body.reason },
+            { ...(change?.before ?? {}) },
+          ),
         );
         // A request that waited for the window to move is checked again in this transaction (`US-06-09` AC-17).
         await this.listeners.planLineMoved(tx, actor, {
@@ -173,15 +212,6 @@ export class VersionLineService {
 
       return this.views.lineWire(version, (await this.lines.findLine(id, position, tx)) as VersionLineRecord);
     });
-  }
-
-  /** The version, locked, and only if Finance may still change it. */
-  private async editable(tx: Parameters<VersionRepo['lockById']>[0], id: string): Promise<VersionRecord> {
-    const version = await this.versions.lockById(tx, id);
-    if (!version) throw new BudgetVersionNotFoundError();
-    if (!isEditable(version.state)) throw new BudgetVersionNotEditableError(version.state);
-
-    return version;
   }
 
   private async requireIn(id: string, tx: Parameters<VersionRepo['lockById']>[0]): Promise<VersionRecord> {

@@ -1,9 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
-import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditService } from '../../audit/audit.service';
 import { groundsSnapshot, normalizedGrounds } from '../grounds/grounds.policy';
 import { personnelAuditEvent } from '../mappers/personnel-audit-event';
+import { PersonnelAccessRefusedError } from '../personnel.errors';
+import { actorColumns, type PersonnelActor } from '../personnel.types';
+import { TransferGuardService } from '../transfer/transfer-guard.service';
 import { NoticeRefusedError } from './notice.errors';
 import {
   eventKindOf,
@@ -29,10 +31,13 @@ function refuse(refusal: NoticeRefusal | null): void {
 }
 
 /**
- * What the IT Admin does with a notice that waits (`US-03-11`): rejects it with a reason, or checks it against an authoritative basis
- * outside the notice and records the official event through the capability that owns it, or links it to an event that already exists.
- * One transaction for each, the notice locked first: whatever the event refuses leaves the notice waiting and writes nothing. The
- * notice never changes a person by itself; the event it leads to does, by its own rules.
+ * What the Super Admin does with a notice that waits (`US-03-11`, F40): rejects it with a reason, or checks it against an
+ * authoritative basis outside the notice and records the official event through the capability that owns it, or links it to an event
+ * that already exists. One transaction for each, the notice locked first: whatever the event refuses leaves the notice waiting and
+ * writes nothing. The notice never changes a person by itself; the event it leads to does, by its own rules. Only the Super Admin
+ * handles a notice, and never one about themselves (`PERSONNEL.SELF_CHANGE_FORBIDDEN`); the controlled procedure records the event of
+ * such a notice with its ticket (`--from-notice`), which is the one thing it does with a notice. The record of how it was checked
+ * exists only on this path (T-7).
  */
 @Injectable()
 export class NoticeHandlingService {
@@ -41,15 +46,16 @@ export class NoticeHandlingService {
     private readonly notices: NoticeRepo,
     private readonly recorders: NoticeRecorderRegistry,
     private readonly audit: AuditService,
+    private readonly guard: TransferGuardService,
   ) {}
 
   /** The reason is required and nothing is kept without it; no event is made (`US-03-11` AC-2). */
-  reject(actor: AuthenticatedPrincipal, id: string, reason: string): Promise<NoticeRecord> {
+  reject(actor: PersonnelActor, id: string, reason: string): Promise<NoticeRecord> {
     return this.runner.run(async (tx) => {
-      const held = await this.waiting(tx, id);
+      const held = await this.waiting(tx, id, actor, { inApplicationOnly: true });
       refuse(rejectReasonRefusal(reason));
 
-      const rejected = await this.notices.markRejected(tx, id, actor.appUserId, reason.trim());
+      const rejected = await this.notices.markRejected(tx, id, actorColumns(actor), reason.trim());
       await this.audit.record(
         tx,
         personnelAuditEvent(
@@ -67,10 +73,13 @@ export class NoticeHandlingService {
     });
   }
 
-  /** Records the event the notice announces, on a basis outside the notice, with the check the IT Admin made (`US-03-11` AC-1). */
-  record(actor: AuthenticatedPrincipal, id: string, input: RecordNoticeInput): Promise<NoticeRecord> {
-    return this.runner.run(async (tx) => {
-      const held = await this.waiting(tx, id);
+  /**
+   * Records the event the notice announces, on a basis outside the notice, with the check made (`US-03-11` AC-1). With `outer` it runs
+   * in the transaction of the caller (the controlled procedure writes its ticket in the same one).
+   */
+  record(actor: PersonnelActor, id: string, input: RecordNoticeInput, outer?: DbTx): Promise<NoticeRecord> {
+    const body = async (tx: DbTx): Promise<NoticeRecord> => {
+      const held = await this.waiting(tx, id, actor);
       refuse(verificationRefusal(input.verification));
       refuse(noticeGroundsRefusal(input.grounds));
       refuse(eventShapeRefusal(held.kind, input.event));
@@ -101,13 +110,15 @@ export class NoticeHandlingService {
       await this.informEmployee(tx, actor, held, event);
 
       return recorded;
-    });
+    };
+
+    return outer ? body(outer) : this.runner.run(body);
   }
 
   /** The event is there already (a handover that began, a leave that runs): the notice is tied to it and no second one is made. */
-  link(actor: AuthenticatedPrincipal, id: string, input: LinkNoticeInput): Promise<NoticeRecord> {
+  link(actor: PersonnelActor, id: string, input: LinkNoticeInput): Promise<NoticeRecord> {
     return this.runner.run(async (tx) => {
-      const held = await this.waiting(tx, id);
+      const held = await this.waiting(tx, id, actor, { inApplicationOnly: true });
       refuse(verificationRefusal(input.verification));
       const kind = eventKindOf(held.kind);
       const eventId = await this.recorders.recorderFor(kind).findLinkable(tx, held, input.eventId);
@@ -137,10 +148,21 @@ export class NoticeHandlingService {
     });
   }
 
-  /** The notice, locked, when it exists and still waits. */
-  private async waiting(tx: DbTx, id: string): Promise<NoticeRecord> {
+  /**
+   * The notice, locked, when it exists and still waits, and the actor judged against the person it is about (F13, F19): only the
+   * Super Admin handles it and never about themselves. The controlled procedure may only record (`inApplicationOnly` refuses it for
+   * the others); the account of the subject is read by the event it records, after that event locks the employee.
+   */
+  private async waiting(
+    tx: DbTx,
+    id: string,
+    actor: PersonnelActor,
+    options: { inApplicationOnly?: boolean } = {},
+  ): Promise<NoticeRecord> {
     const held = await this.notices.lock(tx, id);
     if (!held) throw new NoticeRefusedError('NOT_FOUND');
+    if (options.inApplicationOnly && actor.kind !== 'USER') throw new PersonnelAccessRefusedError('FORBIDDEN');
+    this.guard.requireWriter(actor, held.employeeId);
     refuse(pendingRefusal(held.status));
 
     return held;
@@ -148,26 +170,27 @@ export class NoticeHandlingService {
 
   private async complete(
     tx: DbTx,
-    actor: AuthenticatedPrincipal,
+    actor: PersonnelActor,
     held: NoticeRecord,
     event: NoticeEventRef,
     verification: VerificationInput,
   ): Promise<NoticeRecord> {
-    const recorded = await this.notices.markRecorded(tx, held.id, actor.appUserId, event);
-    await this.notices.insertVerification(tx, held.id, verification, actor.appUserId);
+    const by = actorColumns(actor);
+    const recorded = await this.notices.markRecorded(tx, held.id, by, event);
+    await this.notices.insertVerification(tx, held.id, verification, by);
 
     return recorded;
   }
 
   /** Who sent it, who was in charge when it was sent and who handled it: what the notification of the sender is taken from. */
-  private outcomeFacts(actor: AuthenticatedPrincipal, held: NoticeRecord) {
+  private outcomeFacts(actor: PersonnelActor, held: NoticeRecord) {
     return {
       code: held.code,
       kind: held.kind,
       employeeId: held.employeeId,
       senderEmployeeId: held.senderEmployeeId,
       defaultItAdmin: held.defaultItAdminEmployeeId,
-      handledByEmployeeId: actor.employeeId,
+      handledByEmployeeId: actor.kind === 'USER' ? actor.principal.employeeId : null,
     };
   }
 
@@ -177,7 +200,7 @@ export class NoticeHandlingService {
    */
   private async informEmployee(
     tx: DbTx,
-    actor: AuthenticatedPrincipal,
+    actor: PersonnelActor,
     held: NoticeRecord,
     event: NoticeEventRef,
   ): Promise<void> {

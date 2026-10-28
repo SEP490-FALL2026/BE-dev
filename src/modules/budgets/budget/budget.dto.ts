@@ -2,6 +2,7 @@ import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { z } from 'zod';
 import { isBusinessDate } from '../../../core/business-date';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
+import { LINE_DESCRIPTION_MAX, REASON_MAX } from './budget.policy';
 
 const businessDate = z.string().refine(isBusinessDate, { message: 'Must be a real date as YYYY-MM-DD.' });
 const text = (max: number) => z.string().trim().min(1).max(max);
@@ -9,7 +10,6 @@ const money = z.strictObject({ amount: z.string().max(40), currency: z.string().
 const moneyView = z.strictObject({ amount: z.string(), currency: z.string() });
 const year = z.number().int().min(2000).max(2200);
 const cycle = z.enum(['MONTHLY', 'QUARTERLY', 'ANNUAL', 'ONE_TIME']);
-const REASON_MAX = 1000;
 export const LINES_MAX = 200;
 
 /**
@@ -18,7 +18,7 @@ export const LINES_MAX = 200;
  * lacks them is told which line and which fields (`US-06-10` AC-2), not simply refused.
  */
 const lineBody = z.strictObject({
-  description: text(200),
+  description: text(LINE_DESCRIPTION_MAX),
   planId: z.uuid().optional(),
   seats: z.number().int().min(1).max(100000).optional(),
   amount: money,
@@ -103,7 +103,7 @@ export const versionPatchSchema = z
   .refine((body) => Object.keys(body).length > 0, { message: 'Give at least one field.' });
 export const linePatchSchema = z
   .strictObject({
-    description: text(200),
+    description: text(LINE_DESCRIPTION_MAX),
     planId: z.uuid().nullable(),
     seats: z.number().int().min(1).max(100000).nullable(),
     amount: money,
@@ -162,7 +162,7 @@ const pagination = z.strictObject({
   totalItems: z.number().int().nonnegative(),
   totalPages: z.number().int().nonnegative(),
 });
-const page = <T extends z.ZodType>(item: T) =>
+export const page = <T extends z.ZodType>(item: T) =>
   successEnvelopeSchema(z.strictObject({ items: z.array(item), pagination }));
 
 const proposalSchema = z.strictObject({
@@ -171,11 +171,19 @@ const proposalSchema = z.strictObject({
   year: z.number().int(),
   state: z.enum(['SUBMITTED', 'WITHDRAWN', 'RETURNED', 'REVIEWED', 'CLOSED_FISCAL_YEAR_ENDED']),
   previousProposalId: z.uuid().nullable(),
+  /** The proposal this one follows, when the version made from that one was refused and the need changed; set by the system. */
+  successorOfProposalId: z.uuid().nullable(),
+  /** The proposal that follows this one, if any. */
+  successorProposalId: z.uuid().nullable(),
   total: moneyView,
   submittedBy: employeeRef.nullable(),
   submittedAt: z.iso.datetime(),
   returned: z.strictObject({ reason: z.string(), by: employeeRef.nullable(), at: z.iso.datetime() }).nullable(),
   withdrawnAt: z.iso.datetime().nullable(),
+  /** When a successor was sent, which is when this proposal stopped being the open one. */
+  succeededAt: z.iso.datetime().nullable(),
+  /** When the year ended on a proposal that was never used and closed it. */
+  closedAt: z.iso.datetime().nullable(),
 });
 /** What a list of proposals shows of each: enough to find it and to see where it stands; the rest is in the proposal itself. */
 const proposalSummarySchema = z.strictObject({
@@ -209,6 +217,8 @@ const versionSchema = z.strictObject({
   state: z.enum(['DRAFT', 'SENT', 'APPROVED', 'REJECTED', 'CHANGES_REQUESTED', 'SUPERSEDED', 'EXPIRED']),
   proposalId: z.uuid().nullable(),
   basedOnVersionId: z.uuid().nullable(),
+  /** The refused version this one follows when it is made again from the same proposal; set by the system. */
+  rejectedPredecessorId: z.uuid().nullable(),
   base: moneyView,
   reserve: moneyView,
   total: moneyView,
@@ -230,6 +240,12 @@ const versionSchema = z.strictObject({
   createdBy: employeeRef.nullable(),
   createdAt: z.iso.datetime(),
   sentAt: z.iso.datetime().nullable(),
+  /** When the draft was detached from the proposal that was withdrawn or given back: it stays a draft and is neither changed nor sent. */
+  detachedAt: z.iso.datetime().nullable(),
+  /** The year ended on this version before it ever became current. */
+  neverCurrent: z.boolean(),
+  /** When the year ended on the version: the current one stays as the reference budget of the year. */
+  expiredAt: z.iso.datetime().nullable(),
 });
 /** What a list of versions shows of each: where it stands and its total; the figures and the reason are in the version. */
 const versionSummarySchema = z.strictObject({

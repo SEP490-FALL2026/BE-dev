@@ -22,24 +22,14 @@ const input = {
   timeZone: 'Asia/Ho_Chi_Minh',
   reportingCurrency: 'VND',
   organizationName: 'Acme Software',
-  costCenterCode: 'CC-ENG',
-  costCenterName: 'Engineering',
   departmentCode: 'P-ENG',
   departmentName: 'Engineering',
-  jobTitleName: 'Software Engineer',
   superAdmin: {
     employeeCode: 'E001',
     fullName: 'Pham Bao',
     workEmail: 'bao@acme.vn',
     employmentType: 'STAFF',
     hireDate: '2024-03-01',
-  },
-  itAdmin: {
-    employeeCode: 'E002',
-    fullName: 'Tran An',
-    workEmail: 'an@acme.vn',
-    employmentType: 'STAFF',
-    hireDate: '2024-03-05',
   },
   operatorReference: 'CHG-1234',
   environment: 'LOCAL_TEST',
@@ -192,7 +182,6 @@ describe('dev:seed (integration, real PostgreSQL)', () => {
       expect(audit.rows).toEqual([
         { action: 'DEV_SEED.ACCOUNT_CREATED', count: 3, runs: 1 },
         { action: 'DEV_SEED.COST_CENTER_CREATED', count: 1, runs: 1 },
-        { action: 'DEV_SEED.COST_CENTER_DIRECTION_ACTIVATED', count: 1, runs: 1 },
         { action: 'DEV_SEED.DEPARTMENT_CREATED', count: 1, runs: 1 },
         { action: 'DEV_SEED.EMPLOYEE_CREATED', count: 3, runs: 1 },
         { action: 'ROLE.GRANTED', count: 3, runs: 1 },
@@ -200,6 +189,18 @@ describe('dev:seed (integration, real PostgreSQL)', () => {
       const trail = JSON.stringify((await sql.query(`SELECT * FROM audit_events`)).rows);
       for (const password of passwords.values()) expect(trail).not.toContain(password);
       expect(trail).not.toContain('$argon2');
+    });
+
+    it('writes the department first and the Cost Center for it, people with no job title and no activation row (QĐ-87d(1), QĐ-87e)', async () => {
+      const facts = await sql.query(`
+        SELECT d.code AS department, c.code AS cost_center, c.status::text AS status, c.linked_at IS NOT NULL AS linked,
+               (SELECT count(*)::int FROM cost_center_direction_activations) AS activations,
+               (SELECT count(*)::int FROM employees WHERE employee_code LIKE 'DEMO-%' AND job_title IS NOT NULL) AS titled
+          FROM cost_centers c JOIN departments d ON d.id = c.department_id`);
+
+      expect(facts.rows).toEqual([
+        { department: 'DEMO', cost_center: 'DEMO-CC', status: 'ACTIVE', linked: true, activations: 0, titled: 0 },
+      ]);
     });
 
     it('keeps the Super Admin, grants no derived role and creates no head period or approval holder', async () => {
@@ -230,7 +231,7 @@ describe('dev:seed (integration, real PostgreSQL)', () => {
       const result = await seed.seed({ confirmLocal: true });
 
       expect(result.outcome).toBe('ALREADY_PRESENT');
-      expect(result.items).toHaveLength(9);
+      expect(result.items).toHaveLength(8);
       expect(result.items.every((item) => item.state === 'already-present' && item.password === undefined)).toBe(true);
       expect(await fingerprint()).toEqual(before);
     });

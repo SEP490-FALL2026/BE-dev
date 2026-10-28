@@ -34,9 +34,9 @@ Trưởng phòng gửi yêu cầu thay cho người trong phòng (kể cả ngư
 
 | Story    | AC               | Coverage | Phần còn lại thuộc                                                                                                                                                                                   |
 | -------- | ---------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| US-03-02 | AC-1, AC-3→AC-13 | full     | —                                                                                                                                                                                                    |
+| US-03-02 | AC-1, AC-3→AC-14 | full     | —                                                                                                                                                                                                    |
 | US-05-03 | AC-6, AC-7       | partial  | AC-1→AC-5, AC-9→AC-13: `g5-request-submission-and-routing`; AC-8, AC-14: `g5-group-requests`                                                                                                         |
-| US-05-02 | AC-5             | partial  | AC-3, AC-6, AC-7, AC-9, AC-10: `g5-request-submission-and-routing`; AC-1, AC-4, AC-11: `g5-request-amount-and-payment-schedule`; AC-2: `g5-group-requests`; AC-8: `g5-it-assessment-of-new-software` |
+| US-05-02 | AC-5             | partial  | AC-3, AC-6, AC-7, AC-9, AC-10, AC-12: `g5-request-submission-and-routing`; AC-1, AC-4, AC-11: `g5-request-amount-and-payment-schedule`; AC-2: `g5-group-requests`; AC-8: `g5-it-assessment-of-new-software` |
 | US-06-08 | AC-2, AC-9       | partial  | AC-1, AC-3→AC-8, AC-11: `g5-spend-approval-decision`; AC-10: `g5-group-requests`                                                                                                                     |
 
 ## Supporting references
@@ -123,3 +123,4 @@ Trưởng phòng gửi yêu cầu thay cho người trong phòng (kể cả ngư
 
 - Audit G0–G6 trên Docs `769bb64` ↔ BE `7c28e75` mở lại hạng mục này: F04, F27 — bỏ _ngoài bộ chuẩn_; cổng tài chính.
 - Remediation duy nhất: [g0-g6-final-business-baseline-remediation](../g0-g6-final-business-baseline-remediation/spec.md) ([impact matrix](../g0-g6-final-business-baseline-remediation/impact-matrix.md#3-findings)). AC liên quan không còn được coi là thỏa nguồn hiện hành cho tới khi remediation xong; trạng thái triển khai ở roadmap. Phần đã ghi phía trên là lịch sử, giữ nguyên.
+- _27/10/2026 (Prompt 04, Task 0.1 của `g0-g6-final-business-baseline-remediation`, F60 — re-pin scope map [G5](../../../roadmap.md#work-item-decomposition-g5) Docs `e0cb5a0`, BE `7c28e75`):_ nhận thêm `US-03-02` AC-14 (F27 — cổng cấu hình tài chính khi trưởng phòng gửi thay; mục 9 không có cột chủ đề xuất, gán theo hạng mục đang chủ Story — chờ xác nhận) ([impact matrix mục 9](../g0-g6-final-business-baseline-remediation/impact-matrix.md#9-phụ-lục-delta-user-stories-72e1480--769bb64)). Phần đã ghi phía trên là lịch sử, giữ nguyên.

@@ -1,5 +1,16 @@
 import { EmployeeColumn } from './employee-import-rows';
 
+/**
+ * The caller is not the Super Admin: people are imported by the Super Admin alone, on an HR basis (`QĐ-87a`), decided in the service
+ * whatever the route let through (`F13`).
+ */
+export class ImportForbiddenError extends Error {
+  constructor() {
+    super('Only the Super Admin imports people.');
+    this.name = 'ImportForbiddenError';
+  }
+}
+
 export type FileProblem = 'FILE_REQUIRED' | 'FILE_NOT_TEXT' | 'FILE_EMPTY' | 'FILE_TOO_MANY_ROWS';
 
 /** The file cannot be used as a whole (US-02-02 AC-2): nothing was kept. */

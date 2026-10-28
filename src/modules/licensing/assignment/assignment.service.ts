@@ -8,6 +8,7 @@ import type { SeatTarget, SeatTargetRef } from '../../catalog/catalog.types';
 import { CatalogService } from '../../catalog/catalog.service';
 import { OrganizationService } from '../../organization/organization.service';
 import { AssignmentNotFoundError, AssignmentNotOpenError, SeatTargetNotFoundError } from '../licensing.errors';
+import type { SeatBaselineClosedHolder } from '../licensing-seat-baseline.types';
 import type {
   AssignmentHolder,
   AssignmentRecord,
@@ -18,7 +19,12 @@ import type {
 } from '../licensing.types';
 import { licensingAuditEvent } from '../mappers/licensing-audit-event';
 import { toAssignmentFailure } from './assignment-conflicts';
-import { assertSubscriptionDepartment, assignmentCreatedSnapshot } from './assignment.policy';
+import { AssignmentDepartmentRepo } from './assignment-department.repo';
+import {
+  assertSubscriptionDepartment,
+  assignmentCreatedSnapshot,
+  holdersOfOtherDepartments,
+} from './assignment.policy';
 import { assertBaselineTarget, assertSeatTargetUsable, toSeatTargetRef } from './baseline-target.policy';
 import { AssignmentRepo } from './assignment.repo';
 
@@ -40,6 +46,7 @@ interface EndWithoutSeatInput {
 export class AssignmentService {
   constructor(
     private readonly repo: AssignmentRepo,
+    private readonly byDepartment: AssignmentDepartmentRepo,
     private readonly organization: OrganizationService,
     private readonly catalog: CatalogService,
     private readonly audit: AuditService,
@@ -97,6 +104,35 @@ export class AssignmentService {
 
   countBaseline(): Promise<number> {
     return this.repo.countBaseline();
+  }
+
+  /**
+   * The people who hold, on `day`, a seat the baseline wrote on a subscription owned by another department than the one they are in
+   * (F21, `QĐ-89e`), read in the transaction that closes the baseline. A seat written before a personal seat carried its department
+   * is judged against the owner of its subscription.
+   */
+  async baselineHoldersOfOtherDepartments(tx: DbTx, day: BusinessDate): Promise<SeatBaselineClosedHolder[]> {
+    const rows = await this.byDepartment.openBaselineSeats(day, tx);
+    if (rows.length === 0) return [];
+    const unowned = [...new Set(rows.flatMap((row) => (row.owningDepartmentId === null ? [row.subscriptionId] : [])))];
+    const ownerOf = new Map<string, string>();
+    for (const subscriptionId of unowned.sort()) {
+      const target = await this.catalog.findSeatTarget({ subscriptionId }, tx);
+      if (target?.ownerDepartmentId) ownerOf.set(subscriptionId, target.ownerDepartmentId);
+    }
+    const seats = rows.flatMap((row) => {
+      const owner = row.owningDepartmentId ?? ownerOf.get(row.subscriptionId);
+
+      return owner === undefined
+        ? []
+        : [{ assignmentId: row.assignmentId, employeeId: row.employeeId, owningDepartmentId: owner }];
+    });
+    const units = await this.organization.getOwningUnits([...new Set(seats.map((seat) => seat.employeeId))], day, tx);
+
+    return holdersOfOtherDepartments(
+      seats,
+      new Map([...units].map(([employeeId, unit]) => [employeeId, unit.departmentId])),
+    );
   }
 
   existingOf(target: SeatTarget, tx?: DbTx): Promise<ExistingAssignment[]> {
@@ -160,10 +196,12 @@ export class AssignmentService {
 
   /**
    * Writes the seat a request is granted, in the caller transaction (which holds the lock of the seat target), with its
-   * audit event: a personal seat, or a service account with its reason, owning department and Cost Center (`US-05-21`).
-   * Throws AssignmentConflictError when a service account would sit on a subscription of another department (before anything is
-   * written), or when the database refuses it: an overlap, the seats all taken, the identifier in use, no expected end date for
-   * time-limited staff, or a rule of the baseline or of the owning department.
+   * audit event: a personal seat, or a service account with its reason, owning department and Cost Center (`US-05-21`). A seat
+   * on a subscription belongs to the department that owns it, and the request may be granted only on a subscription of its own
+   * department (`departmentId`): there is no pool of seats between departments (`QĐ-89a`, F20). Throws AssignmentConflictError
+   * when the subscription is another department's (before anything is written), or when the database refuses the seat: an
+   * overlap, the seats all taken, the identifier in use, no expected end date for time-limited staff, or a rule of the baseline or
+   * of the owning department.
    */
   async createFromRequest(
     tx: DbTx,
@@ -171,6 +209,8 @@ export class AssignmentService {
     input: {
       organizationId: string;
       requestId: string;
+      /** The department of the request. */
+      departmentId: string;
       target: SeatTarget;
       holder: AssignmentHolder;
       effectiveFrom: BusinessDate;
@@ -178,7 +218,9 @@ export class AssignmentService {
     },
   ): Promise<AssignmentRecord> {
     const { holder } = input;
-    assertSubscriptionDepartment(input.target, holder.owningDepartmentId, 0);
+    assertSubscriptionDepartment(input.target, input.departmentId, 0);
+    // A personal seat on a subscription carries the department that owns it, as a service account carries the one that owns it.
+    const owningDepartmentId = holder.kind === 'SERVICE' ? holder.owningDepartmentId : input.target.ownerDepartmentId;
     let record: AssignmentRecord;
     try {
       record = await this.repo.insert(tx, {
@@ -192,7 +234,7 @@ export class AssignmentService {
         normalizedAccountIdentifier: normalizeAccountIdentifier(holder.accountIdentifier),
         reason: holder.reason,
         costCenterId: holder.costCenterId,
-        owningDepartmentId: holder.owningDepartmentId,
+        owningDepartmentId,
         effectiveFrom: input.effectiveFrom,
         effectiveFromBasis: 'ACTUAL',
         expectedEndDate: input.expectedEndDate,

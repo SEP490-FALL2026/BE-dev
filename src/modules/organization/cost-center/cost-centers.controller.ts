@@ -29,7 +29,7 @@ const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPO
 
 const FINANCE_ONLY = {
   status: HttpStatus.FORBIDDEN,
-  description: 'Only Finance maintains the Cost Center catalogue.',
+  description: 'Only Finance maintains the Cost Center catalogue (the IT Admin and the Super Admin do not).',
   examples: [FORBIDDEN_EXAMPLE],
 } as const;
 
@@ -89,9 +89,10 @@ function toWire(record: CostCenterRecord) {
 }
 
 /**
- * The Cost Center catalogue (`US-04-09`). Finance creates, renames and retires; the IT Admin may read it (to pick a
- * free `UNIT` for a department) but not change it (AC-2). Every other role is refused, the Super Admin included
- * (`SoD-1`). There is no route that deletes a cost center: a code that has been used is kept.
+ * The Cost Center catalogue (`US-04-09`). Finance creates, renames and retires; the Super Admin, who owns the departments, may
+ * read it to see which still have none; the IT Admin has no operation on it (AC-2, `QĐ-87a`). Every other role is refused. Who may
+ * is decided by the policy of the service as well as by the role of the route (`F13`). There is no route that deletes a cost
+ * center: a code that has been used is kept.
  */
 @ApiTags('cost-centers')
 @Controller({ path: 'cost-centers', version: '1' })
@@ -99,17 +100,17 @@ export class CostCentersController {
   constructor(private readonly costCenters: CostCenterService) {}
 
   @Get()
-  @RequireRoles('FINANCE', 'IT_ADMIN')
+  @RequireRoles('FINANCE', 'SUPER_ADMIN')
   @ApiOperation({ operationId: 'costCenterList', summary: 'List cost centers' })
   @ApiSuccessResponse(CostCenterPageResponseDto, {
     message: 'COST_CENTER.LISTED',
-    description: 'A page of cost centers in code order, with the department charged to each.',
+    description: 'A page of cost centers in code order, with the department each belongs to and since when.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
     {
       status: HttpStatus.FORBIDDEN,
-      description: 'Only Finance and the IT Admin read the Cost Center catalogue.',
+      description: 'Only Finance and the Super Admin read the Cost Center catalogue.',
       examples: [FORBIDDEN_EXAMPLE],
     },
     {
@@ -118,9 +119,9 @@ export class CostCentersController {
       examples: [VALIDATION_EXAMPLE],
     },
   )
-  async list(@Query() query: ListCostCentersQueryDto) {
+  async list(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Query() query: ListCostCentersQueryDto) {
     try {
-      const page = await this.costCenters.list(query);
+      const page = await this.costCenters.list(actor, query);
 
       return { items: page.items.map(toWire), pagination: page.pagination };
     } catch (error) {
@@ -179,12 +180,13 @@ export class CostCentersController {
   @ApiOperation({ operationId: 'costCenterDeactivate', summary: 'Retire a cost center' })
   @ApiSuccessResponse(CostCenterResponseDto, {
     message: 'COST_CENTER.DEACTIVATED',
-    description: 'The cost center is no longer in use. If it is already retired, the answer is the same.',
+    description:
+      'The cost center is no longer in use and its department goes back to an incomplete finance configuration. If it is already retired, the answer is the same.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, FINANCE_ONLY, VALIDATION_ERROR, NOT_FOUND, {
     status: HttpStatus.CONFLICT,
     description:
-      'The department charged to it still has people (COST_CENTER.IN_USE; details lists the department and the people).',
+      'Open obligations sit on it (COST_CENTER.IN_USE; details lists the department and, with their totals, the Requests with a cost that are not over and the commitments still held). The people in the department do not block it.',
     examples: [ORGANIZATION_ERROR_EXAMPLES.COST_CENTER_IN_USE],
   })
   async deactivate(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: CostCenterIdParamDto) {
@@ -204,9 +206,13 @@ export class CostCentersController {
       'The people in the cost center today, reduced to code, name and that they are working: no email, contract, dates or manager.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, FINANCE_ONLY, VALIDATION_ERROR, NOT_FOUND)
-  async employees(@Param() params: CostCenterIdParamDto, @Query() query: ListCostCenterEmployeesQueryDto) {
+  async employees(
+    @CurrentPrincipal() actor: AuthenticatedPrincipal,
+    @Param() params: CostCenterIdParamDto,
+    @Query() query: ListCostCenterEmployeesQueryDto,
+  ) {
     try {
-      return await this.costCenters.employees(params.id, query);
+      return await this.costCenters.employees(actor, params.id, query);
     } catch (error) {
       throw toOrganizationApiException(error);
     }

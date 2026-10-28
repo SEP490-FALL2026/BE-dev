@@ -1,8 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
-import { TransactionRunner, readSqlState, type DbTx } from '../../../infrastructure/database/transaction-runner';
-import { isCheckViolation } from '../../../infrastructure/database/unique-violation';
-import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
+import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import { AuditService } from '../../audit/audit.service';
 import { OrganizationHistoryService } from '../../organization/organization-history.service';
 import {
@@ -12,9 +10,11 @@ import {
   PlacementOverlapError,
 } from '../../organization/organization.errors';
 import { OrganizationService } from '../../organization/organization.service';
+import { PersonnelNotifier } from '../event-notice/personnel-notifier.service';
 import { groundsSnapshot, normalizedGrounds } from '../grounds/grounds.policy';
 import { personnelAuditEvent } from '../mappers/personnel-audit-event';
 import { PersonnelFileHooks } from '../personnel-file-hooks';
+import { actorColumns, type PersonnelActor } from '../personnel.types';
 import { TransferRefusedError } from './transfer.errors';
 import {
   cancelRefusal,
@@ -49,14 +49,23 @@ export class TransferChangeService {
     private readonly settlement: TransferSettlementService,
     private readonly audit: AuditService,
     private readonly hooks: PersonnelFileHooks,
+    private readonly notifier: PersonnelNotifier,
   ) {}
 
-  /** Moves the day. Throws TransferRefusedError. */
-  async reschedule(actor: AuthenticatedPrincipal, id: string, input: ChangeTransferInput): Promise<TransferRecord> {
+  /**
+   * Moves the day. Throws TransferRefusedError and PersonnelAccessRefusedError. With `outer` it runs in the transaction of the
+   * caller (the controlled procedure writes its ticket in the same one) and the caller guards the race.
+   */
+  async reschedule(
+    actor: PersonnelActor,
+    id: string,
+    input: ChangeTransferInput,
+    outer?: DbTx,
+  ): Promise<TransferRecord> {
     const newEffectiveOn = input.newEffectiveOn;
     if (newEffectiveOn === undefined) throw new TransferRefusedError('NO_CHANGE');
 
-    return this.change(actor, id, input, async (tx, held, today, selfMode) => {
+    return this.change(actor, id, input, outer, async (tx, held, today) => {
       const periodStart = (await this.history.getPlacementStart(tx, held.closesPlacementId)) ?? today;
       const handover = held.headHandover;
       const chosen: SuccessorChoice | undefined =
@@ -67,7 +76,7 @@ export class TransferChangeService {
             : { kind: 'NONE' }
           : undefined);
       const refusal = rescheduleRefusal({
-        ...this.pendingFacts(held, today, periodStart, selfMode, input),
+        ...this.pendingFacts(held, today, periodStart, input),
         newEffectiveOn,
         successor: await this.guard.successorFacts(tx, {
           required: handover !== null,
@@ -98,9 +107,10 @@ export class TransferChangeService {
         newEffectiveOn,
         reason: input.reason.trim(),
         grounds,
-        changedByAppUserId: actor.appUserId,
+        changedByAppUserId: actorColumns(actor).appUserId,
+        changedByTicketId: actorColumns(actor).ticketId,
       });
-      await this.auditChange(tx, actor, 'DEPARTMENT_TRANSFER.RESCHEDULED', held, selfMode, {
+      await this.auditChange(tx, actor, 'DEPARTMENT_TRANSFER.RESCHEDULED', held, {
         before: { effectiveOn: held.effectiveOn },
         after: {
           effectiveOn: newEffectiveOn,
@@ -118,29 +128,32 @@ export class TransferChangeService {
       });
       // The new day is today: the placement began in this transaction, so the transfer has taken effect.
       if (newEffectiveOn <= today) await this.settlement.settleOne(tx, held.id, 'RESCHEDULED_TO_TODAY');
+      await this.tell(tx, held, 'TRANSFER_RESCHEDULED', newEffectiveOn);
 
       return (await this.transfers.find(record.id, tx)) ?? record;
     });
   }
 
-  /** Cancels the transfer: the person keeps the department and the title, the head of the department keeps being head. */
-  async cancel(actor: AuthenticatedPrincipal, id: string, input: ChangeTransferInput): Promise<TransferRecord> {
-    return this.change(actor, id, input, (tx, held, today, selfMode) =>
-      this.applyCancel(tx, actor, held, today, selfMode, input),
-    );
+  /** Cancels the transfer: the person keeps the department, the head of the department keeps being head. */
+  async cancel(actor: PersonnelActor, id: string, input: ChangeTransferInput, outer?: DbTx): Promise<TransferRecord> {
+    return this.change(actor, id, input, outer, async (tx, held, today) => {
+      const cancelled = await this.applyCancel(tx, actor, held, today, input);
+      await this.tell(tx, held, 'TRANSFER_CANCELLED', held.effectiveOn);
+
+      return cancelled;
+    });
   }
 
   /** What cancelling does, under the locks of whoever calls: the placements and the head period go back, the log and the audit are written. */
   private async applyCancel(
     tx: DbTx,
-    actor: AuthenticatedPrincipal,
+    actor: PersonnelActor,
     held: TransferRecord,
     today: BusinessDate,
-    selfMode: PendingTransferFacts['selfMode'],
     input: ChangeTransferInput,
   ): Promise<TransferRecord> {
     const periodStart = (await this.history.getPlacementStart(tx, held.closesPlacementId)) ?? today;
-    const refusal = cancelRefusal(this.pendingFacts(held, today, periodStart, selfMode, input));
+    const refusal = cancelRefusal(this.pendingFacts(held, today, periodStart, input));
     if (refusal) this.guard.refuse(refusal);
 
     await this.history.cancelStructureChange(tx, placementsOf(held));
@@ -149,7 +162,8 @@ export class TransferChangeService {
     }
     const grounds = normalizedGrounds(input.grounds ?? {});
     const reason = input.reason.trim();
-    const record = await this.transfers.cancel(tx, held.id, { appUserId: actor.appUserId, reason });
+    const { appUserId, ticketId } = actorColumns(actor);
+    const record = await this.transfers.cancel(tx, held.id, { appUserId, ticketId, reason });
     await this.transfers.insertChange(tx, {
       transferId: held.id,
       kind: 'CANCELLED',
@@ -157,9 +171,10 @@ export class TransferChangeService {
       newEffectiveOn: null,
       reason,
       grounds,
-      changedByAppUserId: actor.appUserId,
+      changedByAppUserId: appUserId,
+      changedByTicketId: ticketId,
     });
-    await this.auditChange(tx, actor, 'DEPARTMENT_TRANSFER.CANCELLED', held, selfMode, {
+    await this.auditChange(tx, actor, 'DEPARTMENT_TRANSFER.CANCELLED', held, {
       before: { effectiveOn: held.effectiveOn, status: 'PENDING' },
       after: { status: 'CANCELLED', reason, grounds: groundsSnapshot(grounds) },
     });
@@ -195,16 +210,15 @@ export class TransferChangeService {
    */
   async cancelForDeparture(
     tx: DbTx,
-    actor: AuthenticatedPrincipal,
+    actor: PersonnelActor,
     transferId: string,
     input: ChangeTransferInput,
     today: BusinessDate,
-    selfMode: PendingTransferFacts['selfMode'],
   ): Promise<{ refused: { code: string; details?: Record<string, unknown> } | null }> {
     try {
       const held = await this.transfers.lock(tx, transferId);
       if (!held) throw new TransferRefusedError('NOT_FOUND');
-      await this.applyCancel(tx, actor, held, today, selfMode, input);
+      await this.applyCancel(tx, actor, held, today, input);
 
       return { refused: null };
     } catch (error) {
@@ -218,60 +232,61 @@ export class TransferChangeService {
    * id, the employee, the successor), the transfer is read again under them, and `apply` does the rest in the transaction.
    */
   private async change(
-    actor: AuthenticatedPrincipal,
+    actor: PersonnelActor,
     id: string,
     input: ChangeTransferInput,
-    apply: (
-      tx: DbTx,
-      held: TransferRecord,
-      today: BusinessDate,
-      selfMode: Awaited<ReturnType<TransferGuardService['selfMode']>>,
-    ) => Promise<TransferRecord>,
+    outer: DbTx | undefined,
+    apply: (tx: DbTx, held: TransferRecord, today: BusinessDate) => Promise<TransferRecord>,
   ): Promise<TransferRecord> {
-    const seen = await this.transfers.find(id);
+    const seen = await this.transfers.find(id, outer);
     if (!seen) throw new TransferRefusedError('NOT_FOUND');
-    const selfMode = await this.guard.selfMode(actor, seen.employeeId);
+    this.guard.requireWriter(actor, seen.employeeId);
 
-    return this.guarded(() =>
-      this.runner.run(async (tx) => {
-        const today = await this.organization.businessToday(new Date(), tx);
-        await this.history.lockDepartments(tx, {
-          updateIds: seen.headHandover ? [seen.fromDepartmentId] : [],
-          shareIds: [seen.fromDepartmentId, seen.toDepartmentId],
-        });
-        await this.organization.lockEmployeeForUpdate(tx, seen.employeeId);
-        const chosenId = input.successor?.kind === 'EMPLOYEE' ? input.successor.employeeId : null;
-        if (chosenId) await this.lockSuccessor(tx, chosenId);
-        const held = await this.transfers.lock(tx, id);
-        if (!held) throw new TransferRefusedError('NOT_FOUND');
-        if (held.headHandover?.successorEmployeeId && held.headHandover.successorEmployeeId !== chosenId) {
-          await this.lockSuccessor(tx, held.headHandover.successorEmployeeId);
-        }
+    const work = async (tx: DbTx): Promise<TransferRecord> => {
+      const today = await this.organization.businessToday(new Date(), tx);
+      await this.history.lockDepartments(tx, {
+        updateIds: seen.headHandover ? [seen.fromDepartmentId] : [],
+        shareIds: [seen.fromDepartmentId, seen.toDepartmentId],
+      });
+      await this.organization.lockEmployeeForUpdate(tx, seen.employeeId);
+      const chosenId = input.successor?.kind === 'EMPLOYEE' ? input.successor.employeeId : null;
+      if (chosenId) await this.lockSuccessor(tx, chosenId);
+      const held = await this.transfers.lock(tx, id);
+      if (!held) throw new TransferRefusedError('NOT_FOUND');
+      if (held.headHandover?.successorEmployeeId && held.headHandover.successorEmployeeId !== chosenId) {
+        await this.lockSuccessor(tx, held.headHandover.successorEmployeeId);
+      }
+      await this.guard.requireOperatorSubject(tx, actor, seen.employeeId);
 
-        return apply(tx, held, today, selfMode);
-      }),
-    );
+      return apply(tx, held, today);
+    };
+
+    return outer ? work(outer) : this.guard.guarded(() => this.runner.run(work));
   }
 
-  /**
-   * The database has the last word on the periods put back: if someone changed the head of the department or the person's
-   * placements between the recording and now, they no longer fit, and nothing is saved.
-   */
-  private async guarded<T>(work: () => Promise<T>): Promise<T> {
-    try {
-      return await work();
-    } catch (error) {
-      if (readSqlState(error) === '23P01' || isCheckViolation(error))
-        throw new TransferRefusedError('CONCURRENT_CHANGE');
-      throw error;
-    }
+  /** Everyone concerned is told the transfer moved or was cancelled, in the same transaction. */
+  private tell(
+    tx: DbTx,
+    held: TransferRecord,
+    eventKind: 'TRANSFER_RESCHEDULED' | 'TRANSFER_CANCELLED',
+    on: BusinessDate,
+  ): Promise<void> {
+    return this.notifier.eventRecorded(tx, {
+      organizationId: held.organizationId,
+      employeeId: held.employeeId,
+      departmentId: held.toDepartmentId,
+      alsoDepartmentIds: [held.fromDepartmentId],
+      eventKind,
+      eventId: held.id,
+      subjectType: 'DEPARTMENT_TRANSFER',
+      effectiveOn: on,
+    });
   }
 
   private pendingFacts(
     held: TransferRecord,
     today: BusinessDate,
     periodStart: BusinessDate,
-    selfMode: PendingTransferFacts['selfMode'],
     input: ChangeTransferInput,
   ): PendingTransferFacts {
     return {
@@ -281,7 +296,6 @@ export class TransferChangeService {
       periodStart,
       reason: input.reason,
       grounds: input.grounds,
-      selfMode,
     };
   }
 
@@ -340,10 +354,9 @@ export class TransferChangeService {
 
   private async auditChange(
     tx: DbTx,
-    actor: AuthenticatedPrincipal,
+    actor: PersonnelActor,
     action: string,
     held: TransferRecord,
-    selfMode: PendingTransferFacts['selfMode'],
     snapshots: {
       before: { [key: string]: string | null };
       after: { [key: string]: string | null | { [key: string]: string } };
@@ -351,26 +364,15 @@ export class TransferChangeService {
   ): Promise<void> {
     await this.audit.record(
       tx,
-      personnelAuditEvent(actor, held.organizationId, action, 'DepartmentTransfer', held.id, snapshots.before, {
-        ...snapshots.after,
-        selfExecuted: selfMode === 'ALLOW_SELF_EXECUTED',
-      }),
+      personnelAuditEvent(
+        actor,
+        held.organizationId,
+        action,
+        'DepartmentTransfer',
+        held.id,
+        snapshots.before,
+        snapshots.after,
+      ),
     );
-    if (selfMode === 'ALLOW_SELF_EXECUTED') {
-      await this.audit.record(
-        tx,
-        personnelAuditEvent(
-          actor,
-          held.organizationId,
-          'PERSONNEL.SELF_EXECUTED',
-          'DepartmentTransfer',
-          held.id,
-          null,
-          {
-            event: action,
-          },
-        ),
-      );
-    }
   }
 }
