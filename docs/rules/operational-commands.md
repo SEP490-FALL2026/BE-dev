@@ -95,6 +95,15 @@ liệu mà runtime cũ không đọc được và trả lời image đó có ph�
 (`scripts/ops/deploy-release.sh`) và của rollback tay ([containers](../guides/containers.md#deploys-after-h7-h7-ops-02-h7-ops-rv-0107)).
 Danh mục dạng dữ liệu và nhãn Dockerfile là một (`recovery-target.spec.ts`); thêm dạng mới là thêm cả hai trong cùng thay đổi.
 
+**`--password-stdin` của `ops:bootstrap` (Prompt 06, Owner 28/10/2026):** mặc định mật khẩu Super Admin vẫn nhập hai lần ở prompt ẩn
+và lệnh từ chối mọi nguồn khác (đối số, môi trường, pipe). Chỉ khi cờ boolean `--password-stdin` được nêu tường minh, lệnh đọc đúng **một
+bản ghi** từ stdin: mật khẩu + một line feed rồi EOF, tối đa 1024 byte, UTF-8 hợp lệ, không ký tự điều khiển và không CR; khoảng
+trắng đầu/cuối thuộc mật khẩu; stdin là terminal, thiếu line feed (ghi bị cắt), dòng thứ hai, quá hạn 10 giây hay quá cỡ đều bị từ chối
+trước mọi ghi, thông báo lỗi không mang byte nào của bản ghi. Chính sách mật khẩu và service ghi giữ nguyên; `--password VALUE` và các
+biến thể literal vẫn bị từ chối theo tên. Hiện thực: `stdin-password.ts` (đọc có giới hạn), `installation.password.ts` (chọn nguồn),
+`installation-cli.ts` chỉ nối. Người dùng cờ này là [bootstrap wrapper](../../scripts/ops/bootstrap-installation.sh) trên VPS
+(`.env.bootstrap` riêng, owner-only, parse như dữ liệu): [containers](../guides/containers.md#bootstrap-wrapper-prompt-06).
+
 **Preflight chỉ kiểm, không sửa:** CSDL bị chặn (exit 2) giữ nguyên, deploy dừng trước migration; xem lịch sử được hỗ trợ và
 cách xử lý CSDL bị chặn ở [containers](../guides/containers.md#preflight-before-migrate-deploy-p28-01). Thiết kế:
 [g0-g4-checkpoint-fix-forward](../workspace/items/g0-g4-checkpoint-fix-forward/spec.md).

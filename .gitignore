@@ -47,6 +47,7 @@ lerna-debug.log*
 .env.local
 .env.*
 !.env.example
+!.env.bootstrap.example
 
 # Shared planning is versioned; only personal scratch is ignored.
 /docs/workspace/local/

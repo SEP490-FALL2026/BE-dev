@@ -294,7 +294,8 @@ fixture SQL không chứng minh workflow tạo tài khoản. Dùng `bodyOf(respo
 - `installation-minimal-env.integration-spec.ts` chạy lệnh khởi tạo trong tiến trình với môi trường chỉ có
   `DATABASE_URL` và `NODE_ENV=production` (R-13). `installation-cli.integration-spec.ts` khởi chạy (spawn) mã nguồn CLI thật (`src/installation-cli.ts` qua `ts-node`) với môi trường
   tối thiểu, không cần database: `--help` chạy khi chưa cấu hình gì, thiếu `DATABASE_URL` được báo thành một dòng trước
-  prompt mật khẩu và không có stack, URL bị từ chối không in lại mật khẩu. Nó chứng minh mã thoát và đầu ra của tiến trình,
+  prompt mật khẩu và không có stack, URL bị từ chối không in lại mật khẩu. Với `--password-stdin` (Prompt 06): stdin rỗng dừng
+  trước mọi ghi bằng một dòng, môi trường vẫn được kiểm trước, và giá trị đi kèm cờ không bị in lại. Nó chứng minh mã thoát và đầu ra của tiến trình,
   không chỉ của service.
 - Mọi test khởi chạy lệnh thành tiến trình con qua `support/cli-process.ts` (`runCli`, `cliWorkingDirectory`,
   `stopCliProcesses` trong `afterAll`): tiến trình và thư mục làm việc được ghi nhận trước khi dùng, bị dừng/xóa khi suite

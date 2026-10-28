@@ -1,4 +1,5 @@
 import type { Readable, Writable } from 'node:stream';
+import { readPasswordRecord } from './stdin-password';
 
 /** The parts of a TTY stream the prompt needs; `process.stdin` satisfies it. */
 export interface TtyInput extends Readable {
@@ -19,6 +20,13 @@ export class PromptCancelledError extends Error {
   constructor() {
     super('Cancelled.');
     this.name = 'PromptCancelledError';
+  }
+}
+
+export class PasswordMismatchError extends Error {
+  constructor() {
+    super('The two passwords do not match. Nothing was changed.');
+    this.name = 'PasswordMismatchError';
   }
 }
 
@@ -67,4 +75,31 @@ export function readHiddenLine(input: TtyInput, output: Writable, label: string)
     input.on('data', onData);
     input.on('error', onError);
   });
+}
+
+export interface SuperAdminPasswordSource {
+  /** `--password-stdin`: take the password from one record on standard input instead of the hidden prompt. */
+  passwordStdin: boolean;
+  input: TtyInput;
+  output: Writable;
+}
+
+/**
+ * How the Super Admin's password reaches the installation command (FR-8.11(b)). By default it is typed twice at a hidden
+ * prompt and never read from a pipe. An operator script that holds it in a private file opts in with `--password-stdin`,
+ * and the one record on standard input is the password (there is nothing to confirm). Either way it is held only in memory:
+ * the caller gives it straight to the installation service, whose password policy applies before anything is written.
+ */
+export async function readSuperAdminPassword({
+  passwordStdin,
+  input,
+  output,
+}: SuperAdminPasswordSource): Promise<string> {
+  if (passwordStdin) return readPasswordRecord(input);
+
+  output.write('You are creating the Super Admin account. Choose its password now.\n');
+  const password = await readHiddenLine(input, output, 'Password: ');
+  const confirmation = await readHiddenLine(input, output, 'Repeat password: ');
+  if (password !== confirmation) throw new PasswordMismatchError();
+  return password;
 }

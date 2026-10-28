@@ -6,13 +6,22 @@ import {
   writeCliFailure as fail,
 } from './infrastructure/cli/cli-runtime';
 import { PasswordPolicyError } from './modules/identity-access/identity-access.errors';
-import { NoTerminalError, PromptCancelledError, readHiddenLine } from './modules/installation/hidden-prompt';
+import {
+  NoTerminalError,
+  PasswordMismatchError,
+  PromptCancelledError,
+  readSuperAdminPassword,
+} from './modules/installation/hidden-prompt';
 import {
   INSTALLATION_USAGE,
   InstallationArgumentError,
   parseInstallationArguments,
 } from './modules/installation/installation.arguments';
-import { AlreadyInstalledError, InstallationInputError } from './modules/installation/installation.errors';
+import {
+  AlreadyInstalledError,
+  InstallationInputError,
+  StdinPasswordError,
+} from './modules/installation/installation.errors';
 import { InstallationService } from './modules/installation/installation.service';
 
 /** Exit codes are part of the command's contract (see --help). */
@@ -45,16 +54,19 @@ async function main(): Promise<number> {
       abortOnError: false,
     });
 
-    // The password is the Super Admin's own (FR-8.11(b)): typed twice at a hidden prompt, held only
-    // in memory, never logged. Without a terminal the command stops before touching anything.
+    // The password is the Super Admin's own (FR-8.11(b)): typed twice at a hidden prompt, or — only when the operator
+    // opts in with --password-stdin — one bounded record on standard input. Held only in memory, never logged.
+    // Without a terminal (and without the switch), or with a malformed record, the command stops before touching anything.
     let password: string;
     try {
-      process.stdout.write('You are creating the Super Admin account. Choose its password now.\n');
-      password = await readHiddenLine(process.stdin, process.stdout, 'Password: ');
-      const confirmation = await readHiddenLine(process.stdin, process.stdout, 'Repeat password: ');
-      if (password !== confirmation) return fail('The two passwords do not match. Nothing was changed.');
+      password = await readSuperAdminPassword({
+        passwordStdin: parsed.passwordStdin,
+        input: process.stdin,
+        output: process.stdout,
+      });
     } catch (error) {
-      if (error instanceof NoTerminalError) return fail(error.message);
+      if (error instanceof NoTerminalError || error instanceof PasswordMismatchError) return fail(error.message);
+      if (error instanceof StdinPasswordError) return fail(`${error.message} Nothing was changed.`);
       if (error instanceof PromptCancelledError) return EXIT.cancelled;
       throw error;
     }

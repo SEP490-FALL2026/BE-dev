@@ -125,6 +125,51 @@ describe('installation command (integration, spawned process)', () => {
   );
 
   it(
+    'with --password-stdin and nothing on standard input, stops before any write with one clean line, no prompt and no stack (Prompt 06)',
+    async () => {
+      const result = await run([...REQUIRED_ARGUMENTS, '--password-stdin'], {
+        NODE_ENV: 'development',
+        DATABASE_URL: 'postgresql://user:s3cr3t-pw@127.0.0.1:1/x',
+      });
+
+      expect(result).toEqual({
+        code: 1,
+        stdout: '',
+        stderr: 'No password was received on standard input (the input ended at once). Nothing was changed.\n',
+      });
+    },
+    COLD_START_MS,
+  );
+
+  it(
+    'with --password-stdin still validates the environment first and never reads standard input for it (Prompt 06)',
+    async () => {
+      const result = await run([...REQUIRED_ARGUMENTS, '--password-stdin']);
+
+      expect(result.code).toBe(1);
+      expect(result.stderr).toContain('Environment validation failed: "DATABASE_URL" is required');
+      expect(stackLines(result.stderr)).toEqual([]);
+      expect(result.stdout).toBe('');
+    },
+    COLD_START_MS,
+  );
+
+  it(
+    'refuses a value given to --password-stdin, attached or as the next word, with the usage and without echoing it (Prompt 06)',
+    async () => {
+      for (const extra of [['--password-stdin=never-printed-canary'], ['--password-stdin', 'never-printed-canary']]) {
+        const result = await run([...REQUIRED_ARGUMENTS, ...extra]);
+
+        expect(result.code).toBe(1);
+        expect(result.stdout).toBe('');
+        expect(result.stderr).toContain(INSTALLATION_USAGE);
+        expect(result.stderr).not.toContain('never-printed-canary');
+      }
+    },
+    COLD_START_MS * 2,
+  );
+
+  it(
     'rejects an unusable DATABASE_URL with a clean message that does not echo the password in it',
     async () => {
       const result = await run(REQUIRED_ARGUMENTS, { DATABASE_URL: 'mysql://user:s3cr3t-pw@127.0.0.1:1/x' });
