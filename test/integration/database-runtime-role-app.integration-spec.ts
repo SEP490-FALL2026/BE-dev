@@ -3,17 +3,9 @@ import { SMTPServer } from 'smtp-server';
 import { fakeSmtpEnvironment, listenOnLoopback } from '../support/fake-smtp';
 import request from 'supertest';
 import { PrismaService } from '../../src/infrastructure/database/prisma.service';
-import {
-  provisionDatabaseRoles,
-  reconcileDatabaseRoles,
-} from '../../src/infrastructure/database/roles/database-role-provisioning';
-import { readProvisionSettings } from '../../src/infrastructure/database/roles/database-role-settings';
 import { RuntimeDatabaseRoleGuard } from '../../src/infrastructure/database/runtime-role.guard';
 import { TransactionRunner } from '../../src/infrastructure/database/transaction-runner';
 import { bodyOf } from '../support/api-body';
-import { BudgetHarness, type VersionWire } from '../support/budget-harness';
-import { LeaveHarness } from '../support/leave-harness';
-import { migrateDisposableDatabase } from '../support/disposable-database';
 import {
   HttpTestApp,
   SEED_PASSWORD,
@@ -22,37 +14,14 @@ import {
   insertEmployeeFixture,
   seedInstallation,
 } from '../support/http-test-app';
+import { prepareRoleDatabase } from '../support/role-database-prepare';
 import {
   RoleSeparatedDatabase,
-  allowDeployToReadMarker,
-  createRoleSeparatedDatabase,
   dropRoleSeparatedDatabase,
   tableFingerprints,
   withClient,
 } from '../support/role-separated-database';
 import { testConfig } from '../support/test-config';
-
-/** A database with the three roles of H7 provisioned, migrated by the deploy role and reconciled for the runtime role. */
-async function prepareRoleDatabase(): Promise<RoleSeparatedDatabase> {
-  const database = await createRoleSeparatedDatabase();
-  await withClient(database.bootstrapUrl, (client) =>
-    provisionDatabaseRoles(client, readProvisionSettings(database.provisionEnvironment)),
-  );
-  await allowDeployToReadMarker(database);
-  await migrateDisposableDatabase(database.deployHandle);
-  await withClient(database.deploy.url, (client) => reconcileDatabaseRoles(client, database.runtime.role));
-
-  return database;
-}
-
-/** The role the application session really ran as: the runtime role, whatever the test harness uses to look at the rows. */
-async function sessionRoleOf(app: INestApplicationContext): Promise<string> {
-  const rows = await app
-    .get(TransactionRunner, { strict: false })
-    .run((tx) => tx.$queryRaw<{ who: string }[]>`SELECT current_user AS who`);
-
-  return rows[0].who;
-}
 
 /**
  * H7: the API and the worker do their work as the runtime role — the whole Nest application and the worker graph, not a
@@ -194,82 +163,5 @@ describe('the API and the worker run as the runtime role (integration, PostgreSQ
         );
       }
     });
-  });
-});
-
-/**
- * `g0-g6-final-business-baseline-remediation`, F52 (spec Task 6.3): the write paths of the two last groups run as the runtime
- * role too — it needs nothing beyond the data rights the default privileges give it (no CREATE, no ownership), so a table added
- * by a migration of G5 or G6 that the role cannot write would fail here and not at the first request of production.
- */
-describe('a write path of G5 runs as the runtime role: a budget proposal sent, built, sent on and approved (integration, PostgreSQL)', () => {
-  const h = new BudgetHarness();
-  let database: RoleSeparatedDatabase;
-
-  beforeAll(async () => {
-    database = await prepareRoleDatabase();
-    await h.start({ database: database.bootstrapHandle, appDatabaseUrl: () => database.runtime.url });
-  }, 240000);
-
-  afterAll(async () => {
-    await h.stop();
-    if (database) await dropRoleSeparatedDatabase(database);
-  });
-
-  it('writes the proposal, the version, the decision and the notices without any right beyond data', async () => {
-    const executive = await h.departmentWithUnit('P-RR-EXE');
-    const boss = await h.staff(executive, 'RR-BOSS');
-    await h.makeHead(executive, boss);
-    await h.setRole('SPENDING_APPROVER', boss);
-    const unit = await h.departmentWithHead('P-RR-D1');
-    const proposal = await h.budgetProposed(unit.head, unit.department.unitId);
-    const version = await h.built(proposal.id);
-    await h.sendVersion(version.id).expect(200);
-
-    const decided = await h.decideVersion(version.id, { decision: 'APPROVE' }, boss.account).expect(200);
-
-    expect(h.dataOf<{ version: VersionWire }>(decided).version).toMatchObject({ state: 'APPROVED' });
-    expect(await sessionRoleOf(h.ctx.app)).toBe(database.runtime.role);
-    const written = await h.ctx.sql.query<{ proposals: number; decisions: number; history: number }>(
-      `SELECT (SELECT count(*)::int FROM budget_proposals WHERE id = $1) AS proposals,
-              (SELECT count(*)::int FROM budget_version_decisions WHERE version_id = $2) AS decisions,
-              (SELECT count(*)::int FROM budget_version_history WHERE version_id = $2) AS history`,
-      [proposal.id, version.id],
-    );
-    expect(written.rows[0]).toMatchObject({ proposals: 1, decisions: 1 });
-    expect(written.rows[0].history).toBeGreaterThanOrEqual(1);
-  });
-});
-
-describe('a write path of G6 runs as the runtime role: a long leave recorded by the Super Admin (integration, PostgreSQL)', () => {
-  const h = new LeaveHarness();
-  let database: RoleSeparatedDatabase;
-
-  beforeAll(async () => {
-    database = await prepareRoleDatabase();
-    await h.start({ database: database.bootstrapHandle, appDatabaseUrl: () => database.runtime.url });
-  }, 240000);
-
-  afterAll(async () => {
-    await h.stop();
-    if (database) await dropRoleSeparatedDatabase(database);
-  });
-
-  it('writes the leave, its log, the work state and the Audit Trail without any right beyond data', async () => {
-    const department = await h.departmentWithUnit('P-RR-HR');
-    const person = await h.worker(department, 'RR-W1');
-
-    const leave = await h.started({
-      employeeId: person.employeeId,
-      startedOn: h.day(-30),
-      approvedReturnOn: h.day(60),
-      grounds: h.approval,
-    });
-
-    expect(leave).toMatchObject({ status: 'ACTIVE', employee: { id: person.employeeId } });
-    expect(await sessionRoleOf(h.ctx.app)).toBe(database.runtime.role);
-    expect(await h.workState(person.employeeId)).toBe('ON_LONG_LEAVE');
-    expect(await h.changeRows(leave.id)).toEqual([{ kind: 'STARTED' }]);
-    expect(await h.auditEventsOf('LONG_LEAVE.STARTED', leave.id)).toHaveLength(1);
   });
 });

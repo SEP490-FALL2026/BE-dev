@@ -376,8 +376,13 @@ describe('verifying and recording the notices of the heads (integration, real Po
     });
 
     it('is refused to the Super Admin when it is about themselves: 403 PERSONNEL.SELF_CHANGE_FORBIDDEN on all three routes, and the notice keeps waiting', async () => {
+      // The Super Admin works in the department of the installation: only the head of that department can send a notice about them.
+      const home = (
+        await h.ctx.sql.query<{ code: string }>(`SELECT code FROM departments WHERE id = $1`, [h.seed.departmentId])
+      ).rows[0];
+      const homeHead = await h.head({ id: h.seed.departmentId, code: home.code, unitId: '' }, code('HS'));
       const wire = h.dataOf<NoticeWire>(
-        await h.sendNotice({ employeeId: h.sa.employeeId, kind: 'DEPARTURE', proposedOn: h.day(5) }, h1.account),
+        await h.sendNotice({ employeeId: h.sa.employeeId, kind: 'DEPARTURE', proposedOn: h.day(5) }, homeHead.account),
       );
 
       const attempts = [

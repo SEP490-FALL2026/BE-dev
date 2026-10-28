@@ -481,10 +481,12 @@ describe('a request for a service account after the installation over PostgreSQL
     it('lets two IT Admins grant the same identifier at once to one request only, whatever its case and spaces', async () => {
       const second = await h.staff(await h.departmentWithUnit('P-S-IT2'), 'SA-IT2', ['IT_ADMIN']);
       otherItAdmins.push(second.account);
+      // An identifier is one under one subscription, and a request is granted on the subscription of its own department (F20): the
+      // two requests are of one department, so that they meet on one subscription.
       const first = await example();
-      const other = await example();
+      const colleague = await h.staff(first.department, `SA-IT2-M${counter}`);
       const a = await h.approvedService(first, first.member, paidPlan, 5 * M);
-      const b = await h.approvedService(other, other.member, paidPlan, 5 * M);
+      const b = await h.approvedService(first, colleague, paidPlan, 5 * M);
       await h.reviewService(a, { decision: 'ACCEPT' }).expect(200);
       await h.reviewService(b, { decision: 'ACCEPT' }).expect(200);
 

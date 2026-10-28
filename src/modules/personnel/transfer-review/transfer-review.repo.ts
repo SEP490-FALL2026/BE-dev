@@ -7,6 +7,25 @@ import type { NewReview, ReviewItemRecord, ReviewRecord, StillNeededLine } from 
 
 type ReviewRow = Prisma.TransferReviewGetPayload<Record<string, never>>;
 type ItemRow = Prisma.TransferReviewItemGetPayload<Record<string, never>>;
+type TransferReader = Pick<DbTx, 'departmentTransfer'>;
+
+/**
+ * The transfer that opened each of these placements, for the ones a transfer opened. A transfer for today is written after the
+ * placement that opens its review (the listeners are told when the placement begins) and the database keeps the transfer of a review
+ * from changing, so the row of a review may not name its transfer: the transfer that opened its placement is the one.
+ */
+export async function transfersOfPlacements(
+  client: TransferReader,
+  placementIds: readonly string[],
+): Promise<Map<string, string>> {
+  if (placementIds.length === 0) return new Map();
+  const rows = await client.departmentTransfer.findMany({
+    where: { opensPlacementId: { in: [...placementIds] } },
+    select: { id: true, opensPlacementId: true },
+  });
+
+  return new Map(rows.map((row) => [row.opensPlacementId, row.id]));
+}
 
 export function toReviewRecord(row: ReviewRow): ReviewRecord {
   return {
@@ -51,13 +70,25 @@ export class TransferReviewRepo {
   async findByPlacement(tx: DbTx, placementId: string): Promise<ReviewRecord | null> {
     const row = await tx.transferReview.findUnique({ where: { placementId } });
 
-    return row && toReviewRecord(row);
+    return row && (await this.withTransfer(tx, row));
   }
 
   async find(id: string, tx?: DbTx): Promise<ReviewRecord | null> {
-    const row = await (tx ?? this.prisma).transferReview.findUnique({ where: { id } });
+    const client = tx ?? this.prisma;
+    const row = await client.transferReview.findUnique({ where: { id } });
 
-    return row && toReviewRecord(row);
+    return row && (await this.withTransfer(client, row));
+  }
+
+  /** The review as the row says, with the transfer that opened its placement when the row does not name one (see `transfersOfPlacements`). */
+  private async withTransfer(client: TransferReader, row: ReviewRow): Promise<ReviewRecord> {
+    const record = toReviewRecord(row);
+    if (record.transferId !== null) return record;
+
+    return {
+      ...record,
+      transferId: (await transfersOfPlacements(client, [row.placementId])).get(row.placementId) ?? null,
+    };
   }
 
   /** The review held `FOR UPDATE` until the transaction ends, read after the lock; null when there is none. */
@@ -226,6 +257,10 @@ export class TransferReviewRepo {
       include: { review: true },
       orderBy: [{ reviewId: 'asc' }, { assignmentId: 'asc' }],
     });
+    const opened = await transfersOfPlacements(
+      tx,
+      rows.filter((row) => row.review.transferId === null).map((row) => row.review.placementId),
+    );
 
     return rows.flatMap((row) =>
       row.decidedByEmployeeId
@@ -235,7 +270,7 @@ export class TransferReviewRepo {
               organizationId: row.review.organizationId,
               departmentId: row.review.departmentId,
               employeeId: row.review.employeeId,
-              transferId: row.review.transferId,
+              transferId: row.review.transferId ?? opened.get(row.review.placementId) ?? null,
               assignmentId: row.assignmentId,
               planId: row.planId,
               decidedByEmployeeId: row.decidedByEmployeeId,

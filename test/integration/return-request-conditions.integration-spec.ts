@@ -32,7 +32,9 @@ describe('which seat may be returned, and what the return leaves behind over Pos
   /** A seat written straight into the table: what the routes of the baseline refuse to make (K4, a service account). */
   const written = async (person: Person, unit: Unit, shape: 'K4' | 'SERVICE') => {
     const id = randomUUID();
-    const target = shape === 'K4' ? await h.subscription(5, 'K4') : subscriptionId;
+    // A service seat sits on the subscription its own department owns (QĐ-89a).
+    const target =
+      shape === 'K4' ? await h.subscription(5, 'K4') : h.owned.subscriptionFor(subscriptionId, unit.department.id);
     const planId = await h.planOf(target);
     await h.ctx.sql.query(
       `INSERT INTO license_assignments (id, organization_id, kind, source, plan_id, subscription_id, employee_id,

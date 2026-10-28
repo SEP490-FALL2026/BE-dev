@@ -62,7 +62,8 @@ describe('the draft of a request (integration, PostgreSQL constraints)', () => {
       await h.ctx.sql.query<{ reporting_currency: string }>(`SELECT reporting_currency FROM organizations LIMIT 1`)
     ).rows[0].reporting_currency;
     checkTrigger = await firstLabel('BudgetCheckTrigger');
-    checkRoute = await firstLabel('BudgetCheckRoute');
+    // `BLOCKED` is the route of a check with a problem in the data (`request_budget_checks_blocked_check`); this one has none.
+    checkRoute = 'SPEND_APPROVAL';
   }, 240000);
 
   afterAll(async () => {
@@ -127,11 +128,34 @@ describe('the draft of a request (integration, PostgreSQL constraints)', () => {
       expect((await draft()).refused).toBeNull();
     });
 
-    it('refuses a request that has no Cost Center, by access_requests_cost_center_unless_draft', async () => {
-      expect((await insertRequest({ cost_center_id: null })).refused).toEqual(
+    it('refuses a request that costs money and has no Cost Center, by access_requests_cost_center_unless_draft', async () => {
+      const priced = {
+        branch: 'PAID_IN_CATALOG',
+        plan_id: paidPlan,
+        pricing_status: 'PRICED',
+        amount_minor: '100000',
+        amount_currency: reportingCurrency,
+        unit_price_minor: '100000',
+        billing_cycle: 'MONTHLY',
+        expected_spend_on: '2026-11-01',
+        budget_year: 2026,
+        payment_schedule: JSON.stringify([{ periodIndex: 1, amountMinor: '100000' }]),
+      };
+
+      expect((await insertRequest({ ...priced, cost_center_id: null })).refused).toEqual(
         refusedBy('access_requests_cost_center_unless_draft'),
       );
-      expect((await insertRequest()).refused).toBeNull();
+      expect((await insertRequest({ ...priced })).refused).toBeNull();
+    });
+
+    it('takes a free internal request that has no Cost Center, and refuses a service account that has none (F91, QĐ-87g(2))', async () => {
+      // Nothing is charged for it, so nothing is attributed: the department may have no Cost Center in use.
+      expect((await insertRequest({ cost_center_id: null })).refused).toBeNull();
+      // The seat of a service account is charged to the Unit of its department, free or not (QĐ-86a): the check answers before the
+      // detail row that the type needs at commit does.
+      expect((await insertRequest({ type: 'SERVICE_ACCOUNT', cost_center_id: null })).refused).toEqual(
+        refusedBy('access_requests_cost_center_unless_draft'),
+      );
     });
 
     it('refuses a draft that carries a submission moment and a request that has none, by access_requests_submitted_unless_draft', async () => {

@@ -9,6 +9,7 @@ const FOREIGN_KEY = '23503';
 const RESTRICT = '23001';
 const INVALID_ENUM = '22P02';
 const NOT_IN_STATE = '55000';
+const REFERENCED_BY_FOREIGN_KEY = '0A000';
 
 /** The SQLSTATE a rejected statement carries: the constraint, not the application, said no. */
 async function sqlState(text: string, values: unknown[] = []): Promise<string | null> {
@@ -119,7 +120,10 @@ describe('the approval tickets of Super Admin events (integration, PostgreSQL)',
         await sqlState(`UPDATE super_admin_event_tickets SET approver_ref = 'someone-else' WHERE id = $1`, [kept.id]),
       ).toBe(RESTRICT);
       expect(await sqlState(`DELETE FROM super_admin_event_tickets WHERE id = $1`, [kept.id])).toBe(RESTRICT);
-      expect(await sqlState(`TRUNCATE super_admin_event_tickets`)).toBe(RESTRICT);
+      // PostgreSQL itself refuses a TRUNCATE of a table that foreign keys point to unless CASCADE is named, before any trigger
+      // runs; with CASCADE the truncate trigger of the ticket table is the one that says no.
+      expect(await sqlState(`TRUNCATE super_admin_event_tickets`)).toBe(REFERENCED_BY_FOREIGN_KEY);
+      expect(await sqlState(`TRUNCATE super_admin_event_tickets CASCADE`)).toBe(RESTRICT);
     });
   });
 
@@ -403,10 +407,14 @@ describe('the approval tickets of Super Admin events (integration, PostgreSQL)',
         constraint: null,
       });
 
-      for (const row of [transfer, departure]) {
+      // The guard of a transfer refuses with restrict_violation, the guard of a departure with object_not_in_prerequisite_state.
+      for (const row of [
+        { ...transfer, code: RESTRICT },
+        { ...departure, code: NOT_IN_STATE },
+      ]) {
         expect(
           await sqlState(`UPDATE ${row.table} SET recorded_by_ticket_id = $2 WHERE id = $1`, [row.id, second.id]),
-        ).toBe(NOT_IN_STATE);
+        ).toBe(row.code);
       }
     });
   });

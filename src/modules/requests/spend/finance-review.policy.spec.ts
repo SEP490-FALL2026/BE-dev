@@ -15,9 +15,12 @@ const facts = (codes: (string | null)[], extra: Partial<ReviewFacts> = {}): Revi
 
 describe('how a review of Finance may end (US-06-13, F33)', () => {
   describe('a budget to be made', () => {
-    it.each(['NO_ACTIVE_BUDGET', 'INSUFFICIENT_BUDGET'])('is chosen for a year with %s when somebody heads the department', (code) => {
-      expect(checkReviewOutcome('NEEDS_BUDGET', facts([code]))).toBeNull();
-    });
+    it.each(['NO_ACTIVE_BUDGET', 'INSUFFICIENT_BUDGET'])(
+      'is chosen for a year with %s when somebody heads the department',
+      (code) => {
+        expect(checkReviewOutcome('NEEDS_BUDGET', facts([code]))).toBeNull();
+      },
+    );
 
     it('is chosen when only one of several years lacks a budget', () => {
       expect(checkReviewOutcome('NEEDS_BUDGET', facts(['BUDGET_OK', 'INSUFFICIENT_BUDGET']))).toBeNull();

@@ -3,6 +3,7 @@ import { DbTx, TransactionRunner } from '../../../infrastructure/database/transa
 import { historyOf, judgeContractGates, judgeConversion, withContractGates } from './migration-preflight-judgement';
 import { MigrationPreflightRepo } from './migration-preflight.repo';
 import { PreflightHistory, PreflightReport } from './migration-preflight.types';
+import { judgeRecoveryTarget, RecoveryTargetReport } from './recovery-target';
 
 /**
  * `ops:preflight` (P28-01, `P29-MIGRATION=B-FORWARD`): judges, before `prisma migrate deploy`, whether the migration
@@ -43,5 +44,13 @@ export class MigrationPreflightService {
 
       return withContractGates(conversion, gates);
     });
+  }
+
+  /**
+   * `--recovery-target` (P04-CPE-04, spec L.12): whether an image that declares `reads` (the label of its image) can serve
+   * this database as it is now. Read only, like the judgement above.
+   */
+  async recoveryTarget(reads: readonly string[]): Promise<RecoveryTargetReport> {
+    return this.runner.run(async (tx) => judgeRecoveryTarget(await this.repo.recoveryTargetFacts(tx), reads));
   }
 }

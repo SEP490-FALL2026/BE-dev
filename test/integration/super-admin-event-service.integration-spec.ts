@@ -335,7 +335,7 @@ describe('the controlled procedure for an event about the Super Admin (integrati
         ),
       ).toBe('NOTICE_NOT_ABOUT_SUBJECT');
       expect(await counts()).toBe(before);
-      expect((await h.noticeRows(someone.employeeId))[0].status).toBe('PENDING');
+      expect((await h.noticeRows(someone.employeeId))[0].status).toBe('PENDING_VERIFICATION');
     });
 
     it('a refusal of the event itself comes back with the code of the event and writes no ticket', async () => {
@@ -445,18 +445,6 @@ describe('the controlled procedure for an event about the Super Admin (integrati
         [recorded.recordId],
       );
       expect(rows[0]).toMatchObject({ by_user: null, cancelled_by_user: null, state: 'CANCELLED' });
-      expect(rows[0].by_ticket).not.toBeNull();
-    });
-
-    it('an abrupt departure already over is recorded the same way, as the last write about the person', async () => {
-      const abrupt = await run({ mode: 'abrupt-departure-record', lastWorkingDay: h.day(-2) });
-
-      expect(abrupt.outcome).toBe('RECORDED');
-      const { rows } = await h.ctx.sql.query<{ by_user: string | null; by_ticket: string | null; abrupt: boolean }>(
-        `SELECT recorded_by_app_user_id AS by_user, recorded_by_ticket_id AS by_ticket, abrupt FROM offboarding_cases WHERE id = $1`,
-        [abrupt.recordId],
-      );
-      expect(rows[0]).toMatchObject({ by_user: null, abrupt: true });
       expect(rows[0].by_ticket).not.toBeNull();
     });
   });
@@ -622,7 +610,11 @@ describe('the controlled procedure for an event about the Super Admin (integrati
 
     it('refuses a work email somebody else already has, however it is typed, and writes nothing', async () => {
       const other = await h.worker(des, 'S-TAKEN');
-      await h.ctx.sql.query(`UPDATE employees SET work_email = 'taken@acme.vn' WHERE id = $1`, [other.employeeId]);
+      // The address is kept as typed and, for the uniqueness check, normalized: a row written by hand carries both.
+      await h.ctx.sql.query(
+        `UPDATE employees SET work_email = 'taken@acme.vn', normalized_work_email = 'taken@acme.vn' WHERE id = $1`,
+        [other.employeeId],
+      );
       const before = await writes();
 
       expect(await problemOf(correct({ workEmail: ' Taken@ACME.vn ' }))).toBe('PROFILE.WORK_EMAIL_TAKEN');
@@ -661,6 +653,22 @@ describe('the controlled procedure for an event about the Super Admin (integrati
       );
 
       expect(await writes()).toBe(before);
+    });
+  });
+
+  // Last in the file: once the Super Admin has left, the application refuses their token (401) and a correction of their record
+  // tells them nothing, so nothing that needs a working Super Admin can follow it.
+  describe('an abrupt departure of the Super Admin', () => {
+    it('an abrupt departure already over is recorded the same way, as the last write about the person', async () => {
+      const abrupt = await run({ mode: 'abrupt-departure-record', lastWorkingDay: h.day(-2) });
+
+      expect(abrupt.outcome).toBe('RECORDED');
+      const { rows } = await h.ctx.sql.query<{ by_user: string | null; by_ticket: string | null; abrupt: boolean }>(
+        `SELECT recorded_by_app_user_id AS by_user, recorded_by_ticket_id AS by_ticket, abrupt FROM offboarding_cases WHERE id = $1`,
+        [abrupt.recordId],
+      );
+      expect(rows[0]).toMatchObject({ by_user: null, abrupt: true });
+      expect(rows[0].by_ticket).not.toBeNull();
     });
   });
 });

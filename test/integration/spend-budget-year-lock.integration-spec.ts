@@ -67,24 +67,33 @@ describe('the lock of the Cost Center and the year under the check of a request 
     const { u } = await unit();
     const first = await h.paidRequest(u, plan, { amount: 25 * M });
     const second = await h.paidRequest(u, plan, { amount: 25 * M });
+    // Only an approval holds money (the commitment is written in the transaction of the decision, under the lock): the first is
+    // checked and waits for the approver, nothing is held yet.
+    await h.route(first, u.head.account);
+    expect(await checks(first)).toEqual([{ number: 1, route: 'SPEND_APPROVAL' }]);
+    const approver = await h.deciderOf(u);
     const holder = await hold(u.department.unitId, h.year);
     const queued: Array<Promise<unknown>> = [];
     try {
-      queued.push(h.route(first, u.head.account));
+      queued.push(h.decideSpend(first, { decision: 'APPROVE' }, approver).then((response) => response));
       await waitForLockWaiters(h.ctx.sql, 1);
       queued.push(h.route(second, u.head.account));
       await waitForLockWaiters(h.ctx.sql, 2);
-      // Nothing is judged while the lock is held: both are at the lock, and neither has written its check.
-      expect([await checks(first), await checks(second)]).toEqual([[], []]);
+      // Nothing is judged while the lock is held: both are at the lock, and neither has written a check.
+      expect([await checks(first), await checks(second)]).toEqual([[{ number: 1, route: 'SPEND_APPROVAL' }], []]);
     } finally {
       await holder.release();
     }
-    await Promise.all(queued);
+    const [decision] = (await Promise.all(queued)) as [{ status: number }, unknown];
+    expect(decision.status).toBe(200);
 
-    // 25 of the 40 left is in order; the second finds 25 of the 15 that are left once the first is counted, and goes to Finance.
-    expect(await checks(first)).toEqual([{ number: 1, route: 'SPEND_APPROVAL' }]);
+    // The first is approved and holds 25 of the 40 left; the second is judged after it, finds 25 of the 15 that are left and goes to Finance.
+    expect(await checks(first)).toEqual([
+      { number: 1, route: 'SPEND_APPROVAL' },
+      { number: 2, route: 'SPEND_APPROVAL' },
+    ]);
     expect(await checks(second)).toEqual([{ number: 1, route: 'FINANCE_REVIEW' }]);
-    expect(await h.state(first)).toBe('AWAITING_SPEND_DECISION');
+    expect(await h.state(first)).toBe('AWAITING_EXECUTION');
     expect(await h.state(second)).toBe('AWAITING_FINANCE_REVIEW');
   });
 

@@ -49,6 +49,12 @@ const MALFORMED_CADDY = ':80 {\n  MALFORMED directive\n}\n';
 /** The `.env` of H7 (the live one in every case) and the one kept before the first H7 rollout. */
 const H7_ENV = `ENV_GENERATION=h7\nPOSTGRES_PASSWORD=${SECRET}\nDATABASE_DEPLOY_PASSWORD=${SECRET}\n`;
 const PRE_H7_ENV = `ENV_GENERATION=pre-h7\nPOSTGRES_PASSWORD=${SECRET}\nAUTH_ACCESS_TOKEN_SECRET=${SECRET}\n`;
+/**
+ * P04-CPE-04: the labels `docker image inspect --format '{{json .Config.Labels}}'` prints for an image that reads the
+ * representation the final release writes (the Dockerfile label, pinned in recovery-target.spec.ts). The previous image
+ * prints `null` by default: an image built before the label, as the compatibility image `fba4dfe`.
+ */
+const FINAL_LABELS = JSON.stringify({ 'io.github.baophipham.slm.data-reads': 'access-request-null-cost-center' });
 /** Short, still bounded, windows: the fake answers at once. */
 const QUICK = ['--ready-timeout', '2', '--stability-window', '0', '--poll-interval', '0'];
 const created = [];
@@ -107,6 +113,7 @@ state="$FAKE_STATE"
 if [ ! -f "$state/generation" ]; then
   mkdir -p "$state"
   echo 0 > "$state/generation"
+  echo "\${FAKE_NULL_ROWS:-0}" > "$state/null-rows"
   if [ -f "$project/Caddyfile" ]; then sha256sum "$project/Caddyfile" | cut -d ' ' -f 1 > "$state/caddy-0"; fi
 fi
 read -r generation < "$state/generation"
@@ -196,7 +203,40 @@ case "$*" in
     if behaves "$service" "$container" slowstart; then
       count "probes-$2"
       [ "$counted" -ge 3 ] || exit 1
+    fi
+    # P04-CPE-04: a ready API of the new image serves a request and writes a row its predecessor cannot read.
+    image_of "$container"
+    if [ -n "\${FAKE_CANDIDATE_WRITES:-}" ] && [ "$service" = api ] && [ "$generation_image" = "$FAKE_NEW_IMAGE" ] &&
+      [ ! -e "$state/stopped-$container" ]; then
+      count null-rows
     fi ;;
+  *" stop api worker")
+    : > "$state/stopped-$generation" ;;
+  "image inspect --format "*)
+    image="\${@: -1}"
+    if [ "$image" = "\${FAKE_ABSENT_IMAGE:-}" ]; then echo "Error: No such image: $image" >&2; exit 1; fi
+    if [ "$image" = "$FAKE_NEW_IMAGE" ]; then echo "$FAKE_NEW_LABELS"; else echo "\${FAKE_OLD_LABELS:-null}"; fi ;;
+  *"/migration-preflight-cli.js --recovery-target "*)
+    # A stand-in for the judgement of ops:preflight --recovery-target (unit-tested in recovery-target.spec.ts): the rows
+    # this fake database holds against what the labels declare. Exit 0 compatible, 2 incompatible, 3 no history.
+    if [ -n "\${FAKE_JUDGE_FAILS_AFTER_RECREATE:-}" ] && [ "$generation" -ge 1 ]; then echo 'The preflight failed: Error' >&2; exit 1; fi
+    if [ -n "\${FAKE_NO_HISTORY:-}" ]; then echo 'Recovery target: NO_HISTORY'; exit 3; fi
+    value_of "$state/null-rows" 0
+    rows="$value"
+    verdict=0
+    if [ "$rows" -gt 0 ] && [[ "\${@: -1}" != *access-request-null-cost-center* ]]; then verdict=2; fi
+    # A release still running while it is judged keeps writing: a row after the verdict is one the verdict missed.
+    image_of "$generation"
+    if [ -n "\${FAKE_WRITE_DURING_JUDGE:-}" ] && [ "$generation_image" = "$FAKE_NEW_IMAGE" ] && [ ! -e "$state/stopped-$generation" ]; then
+      count null-rows
+      : > "$state/write-after-judge"
+    fi
+    if [ "$verdict" -eq 2 ]; then
+      echo 'Recovery target: INCOMPATIBLE'
+      echo "  - access-request-null-cost-center: $rows row(s), NOT read by the image"
+      exit 2
+    fi
+    echo 'Recovery target: COMPATIBLE' ;;
   "exec "*" sha256sum /etc/caddy/Caddyfile")
     IFS=- read -r _ service container _ <<< "$2"
     value_of "$state/caddy-$container" ''
@@ -333,6 +373,9 @@ const argumentsFor = (target, { attempt = ATTEMPT, extra = [], release = RELEASE
 function environmentFor(target, options, log) {
   const { fail, failCode, once, mvFail, runningImage, badNew, badOld, oldNeedsPreH7, gen0Stopped } = options;
   const { pause, mvPause, barrier, linger } = options;
+  // P04-CPE-04: the labels of the previous image, what the fake database holds and how the release writes.
+  const { labelsOld, absentImage, nullRows, candidateWrites, writeDuringJudge, noHistory, judgeFailsAfterRecreate } =
+    options;
   const { bash } = setup;
   return {
     ...process.env,
@@ -356,6 +399,14 @@ function environmentFor(target, options, log) {
     ...(pause ? { FAKE_PAUSE: pause } : {}),
     ...(mvPause ? { FAKE_MV_PAUSE: mvPause } : {}),
     ...(linger ? { FAKE_LINGER: linger, FAKE_LINGERED: bash.path(join(target.root, 'lingered')) } : {}),
+    FAKE_NEW_LABELS: FINAL_LABELS,
+    ...(labelsOld ? { FAKE_OLD_LABELS: labelsOld } : {}),
+    ...(absentImage ? { FAKE_ABSENT_IMAGE: absentImage } : {}),
+    ...(nullRows ? { FAKE_NULL_ROWS: String(nullRows) } : {}),
+    ...(candidateWrites ? { FAKE_CANDIDATE_WRITES: '1' } : {}),
+    ...(writeDuringJudge ? { FAKE_WRITE_DURING_JUDGE: '1' } : {}),
+    ...(noHistory ? { FAKE_NO_HISTORY: '1' } : {}),
+    ...(judgeFailsAfterRecreate ? { FAKE_JUDGE_FAILS_AFTER_RECREATE: '1' } : {}),
   };
 }
 
@@ -553,6 +604,45 @@ const step = (result, pattern) => result.calls.findIndex((call) => pattern.test(
 const VALIDATE = / run --rm --no-deps -T caddy caddy validate --config \/etc\/caddy\/Caddyfile --adapter caddyfile$/;
 const PROBE = (generation) => new RegExp(`^exec fake-api-${generation} node -e `);
 
+/**
+ * Removes the registered fixture directories, newest first, each by its exact path. A directory leaves the registry only
+ * once its removal succeeded (P04-CPE-05): a removal that fails throws as it is — the error names the path — and leaves
+ * that directory, and every older one, registered for the next cleanup, never lost.
+ */
+function removeFixtures(
+  registry,
+  remove = (path) => rmSync(path, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 }),
+) {
+  while (registry.length > 0) {
+    remove(registry.at(-1));
+    registry.pop();
+  }
+}
+
+describe('fixture cleanup registry (P04-CPE-05)', () => {
+  it('keeps a fixture registered until its removal succeeds, so a failed removal is never lost', () => {
+    const registry = ['/tmp/fixture-a', '/tmp/fixture-b'];
+    const removed = [];
+    const denied = Object.assign(new Error('EPERM: operation not permitted, rm'), {
+      code: 'EPERM',
+      path: '/tmp/fixture-b',
+    });
+    const failB = (path) => {
+      if (path === '/tmp/fixture-b') throw denied;
+      removed.push(path);
+    };
+
+    assert.throws(() => removeFixtures(registry, failB), denied);
+    // The fixture that could not be removed is still registered, and so is the older one the loop did not reach.
+    assert.deepEqual(registry, ['/tmp/fixture-a', '/tmp/fixture-b']);
+    assert.deepEqual(removed, []);
+    // The next cleanup removes both; each leaves the registry only once removed.
+    removeFixtures(registry, (path) => removed.push(path));
+    assert.deepEqual(registry, []);
+    assert.deepEqual(removed, ['/tmp/fixture-b', '/tmp/fixture-a']);
+  });
+});
+
 describe('deploy-release.sh (H7-OPS-02, H7-OPS-RV-01..07)', () => {
   afterEach(async () => {
     // Processes first: a directory cannot go while a process of a run still holds a file of it. Each run is ended by its
@@ -563,7 +653,7 @@ describe('deploy-release.sh (H7-OPS-02, H7-OPS-RV-01..07)', () => {
       endTree(run);
       if (run.ended) await settled(run);
     }
-    while (created.length > 0) rmSync(created.pop(), { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
+    removeFixtures(created);
   });
 
   if (setup.error) {
@@ -856,6 +946,196 @@ describe('deploy-release.sh (H7-OPS-02, H7-OPS-RV-01..07)', () => {
         assert.equal(result.status, 2, `${extra.join(' ')}: ${result.output}`);
         assert.deepEqual(result.calls, []);
       }
+    });
+  });
+
+  // P04-CPE-04 (spec L.12). The judgement itself is a stand-in here (the fake docker compares the rows of its database with
+  // the labels it was given); ops:preflight --recovery-target is unit-tested in recovery-target.spec.ts. What these cases
+  // prove is the script: when it judges, with what, as whom, and what it does with each verdict — not that a real image
+  // reads a real row.
+  describe('the way back (P04-CPE-04)', () => {
+    const JUDGE = / migrate node dist\/migration-preflight-cli\.js --recovery-target /;
+    const INSPECT = new RegExp(
+      `^image inspect --format \\{\\{json \\.Config\\.Labels\\}\\} ${PREVIOUS_IMAGE.replace(/[.]/g, '\\.')}$`,
+    );
+    const STOP = / stop api worker$/;
+    const all = (result, pattern) => result.calls.flatMap((call, index) => (pattern.test(call) ? [index] : []));
+
+    it('judges the previous image against the database before migrate deploy, from the candidate as the deploy role', () => {
+      const target = host();
+      const result = deploy(target);
+
+      assert.equal(result.status, 0, result.output);
+      const order = [
+        step(result, / migrate node dist\/migration-preflight-cli\.js$/),
+        step(result, INSPECT),
+        step(result, JUDGE),
+        step(result, / migrate node node_modules\/prisma\/build\/index\.js migrate deploy$/),
+      ];
+      assert.ok(
+        order.every((index) => index >= 0),
+        result.calls.join('\n'),
+      );
+      assert.deepEqual(
+        order,
+        [...order].sort((a, b) => a - b),
+      );
+      const judge = order[2];
+      // The previous image has no label (built before it): its labels are `null`.
+      assert.match(result.calls[judge], /--recovery-target null$/);
+      assert.match(
+        result.calls[judge],
+        new RegExp(`-f \\S*releases/${RELEASE}/docker-compose\\.prod\\.yml run --rm --no-deps`),
+      );
+      assert.match(result.environments[judge], new RegExp(`API_IMAGE=${IMAGE} `));
+      assert.match(result.output, /a{40} reads every row this database holds: it is the way back of this deployment/);
+      assert.deepEqual(all(result, STOP), []);
+      assert.equal(result.output.includes(SECRET), false);
+    });
+
+    it('stops the failed release, judges again and brings the previous image back when nothing it cannot read was written', () => {
+      const target = host();
+      const result = deploy(target, { badNew: 'api:notready' });
+
+      assert.equal(result.status, 1, result.output);
+      const judges = all(result, JUDGE);
+      const stop = step(result, STOP);
+      const back = result.calls.findLastIndex((call) => call.includes('--force-recreate'));
+      assert.equal(judges.length, 2, result.calls.join('\n'));
+      assert.ok(stop > 0 && stop < judges[1] && judges[1] < back, result.calls.join('\n'));
+      // Both run from the candidate: its Compose file, its image (the previous image has no --recovery-target to run).
+      for (const index of [stop, judges[1]]) {
+        assert.match(result.calls[index], new RegExp(`-f \\S*releases/${RELEASE}/docker-compose\\.prod\\.yml `));
+        assert.match(
+          result.environments[index],
+          new RegExp(`API_IMAGE=${IMAGE} CADDYFILE_PATH=\\S*/app/releases/${RELEASE}/Caddyfile$`),
+        );
+      }
+      assert.match(result.environments[back], new RegExp(`API_IMAGE=${PREVIOUS_IMAGE} `));
+      assert.match(result.output, /RECOVERY: the previous release ghcr\.io\/example\/slm-api:a{40} is ready/);
+    });
+
+    it('zero rows before the deploy, one written by the release before its readiness fails: the previous image is NOT brought back', () => {
+      const target = host();
+      const result = deploy(target, { badNew: 'worker:crashloop', candidateWrites: true });
+
+      assert.equal(result.status, 1, result.output);
+      // Before migrate deploy the previous image was a way back: the database held no row it cannot read.
+      assert.match(result.output, /is the way back of this deployment until this release writes one it cannot read/);
+      assert.match(result.output, /RESULT: release [0-9a-f]{40} \(attempt 40177719652-2\) FAILED while checking/);
+      assert.match(
+        result.output,
+        /RECOVERY: REFUSED — ghcr\.io\/example\/slm-api:a{40} cannot read rows release [0-9a-f]{40} wrote/,
+      );
+      assert.ok(step(result, STOP) < all(result, JUDGE).at(-1), result.calls.join('\n'));
+      // Only the release itself was created; the previous image was not recreated nor checked, and nothing says ready.
+      assert.equal(recreations(result).length, 1, result.calls.join('\n'));
+      assert.equal(step(result, PROBE(2)), -1);
+      assert.doesNotMatch(
+        result.output,
+        /RECOVERY: the previous release|containers returned to the previous image|is live and ready/,
+      );
+      // The release state names the previous release again; the failed one is stopped, never marked.
+      assert.deepEqual(live(target), LIVE);
+      assert.equal(marker(target), null);
+      assert.ok(existsSync(join(target.state, 'stopped-1')));
+      assert.match(result.output, /No migration was rolled back/);
+      assert.equal(result.output.includes(SECRET), false);
+    });
+
+    it('covers a row the release writes up to the recovery: it is stopped before the way back is judged', () => {
+      const target = host();
+      // The release keeps writing while it runs: a judgement made before it stops would miss the row written after it.
+      const result = deploy(target, { badNew: 'api:notready', writeDuringJudge: true });
+
+      assert.equal(result.status, 1, result.output);
+      assert.equal(existsSync(join(target.state, 'write-after-judge')), false, 'a row was written after the verdict');
+      assert.match(result.output, /RECOVERY: the previous release ghcr\.io\/example\/slm-api:a{40} is ready/);
+    });
+
+    it('brings back a previous image that declares the representation, rows or not (a later deployment over the final release)', () => {
+      const target = host();
+      const result = deploy(target, { badNew: 'worker:crashloop', candidateWrites: true, labelsOld: FINAL_LABELS });
+
+      assert.equal(result.status, 1, result.output);
+      assert.match(result.calls[all(result, JUDGE).at(-1)], /access-request-null-cost-center/);
+      assert.equal(recreations(result).length, 2, result.calls.join('\n'));
+      assert.match(result.output, /RECOVERY: the previous release ghcr\.io\/example\/slm-api:a{40} is ready/);
+    });
+
+    it('stops before migrate deploy when the previous image is not on the host: its way back would be unknown', () => {
+      const target = host();
+      const result = deploy(target, { absentImage: PREVIOUS_IMAGE });
+
+      assert.equal(result.status, 1, result.output);
+      assert.match(
+        result.output,
+        /cannot be inspected on this host \(not pulled here\?\), so what it reads is unknown: 'docker pull ghcr\.io\/example\/slm-api:a{40}'/,
+      );
+      assert.match(result.output, /nothing was migrated/);
+      assert.equal(step(result, /migrate deploy$/), -1);
+      assert.equal(step(result, JUDGE), -1);
+      assert.deepEqual(live(target), LIVE);
+      assert.equal(recreations(result).length, 0);
+    });
+
+    it('stops before migrate deploy when an old release state names an image but the database has no migration history (reset)', () => {
+      const target = host();
+      const result = deploy(target, { noHistory: true });
+
+      assert.equal(result.status, 1, result.output);
+      assert.match(result.output, /this database has no migration history: no release ever ran on it/);
+      assert.match(result.output, /runbook: fresh installation/);
+      assert.equal(step(result, /migrate deploy$/), -1);
+      assert.deepEqual(live(target), LIVE);
+      assert.equal(recreations(result).length, 0);
+      assert.equal(marker(target), null);
+    });
+
+    it('still deploys a fixed release when the previous image already cannot read the database, and says it is no way back', () => {
+      const target = host();
+      const result = deploy(target, { nullRows: 1 });
+
+      assert.equal(result.status, 0, result.output);
+      assert.match(result.output, /cannot read rows this database already holds .* will NOT be brought back/);
+      assert.deepEqual(live(target), CANDIDATE);
+      assert.equal(marker(target), markerOf(ATTEMPT));
+    });
+
+    it('refuses the recovery when the way back can no longer be judged, or the failed release cannot be stopped', () => {
+      for (const [options, reason] of [
+        [
+          { badNew: 'api:notready', judgeFailsAfterRecreate: true },
+          /RECOVERY: REFUSED — the way back could not be judged \(exit 1\)/,
+        ],
+        [
+          { badNew: 'api:notready', fail: 'stop api worker' },
+          /RECOVERY: REFUSED — api and worker of the failed release could not be stopped/,
+        ],
+      ]) {
+        const target = host();
+        const result = deploy(target, options);
+
+        assert.equal(result.status, 1, result.output);
+        assert.match(result.output, reason);
+        assert.equal(recreations(result).length, 1, result.calls.join('\n'));
+        assert.doesNotMatch(result.output, /RECOVERY: the previous release/);
+        assert.deepEqual(live(target), LIVE);
+      }
+    });
+
+    it('on a host that never ran a release judges no way back, and a failure stays a failed installation', () => {
+      const target = host({ fresh: true });
+      const failed = deploy(target, { badNew: 'api:notready' });
+
+      assert.equal(failed.status, 1, failed.output);
+      assert.match(failed.output, /No previous release on this host/);
+      assert.equal(step(failed, JUDGE), -1);
+      assert.equal(step(failed, /^image inspect /), -1);
+      assert.match(failed.output, /RECOVERY: not possible/);
+      assert.equal(recreations(failed).length, 1);
+      assert.deepEqual(live(target), { compose: null, caddy: null, image: null });
+      assert.equal(marker(target), null);
     });
   });
 

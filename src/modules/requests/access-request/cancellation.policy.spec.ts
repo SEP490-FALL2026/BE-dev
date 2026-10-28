@@ -92,7 +92,9 @@ describe('which request the IT Admin closes because its beneficiary was transfer
   });
 
   it('leaves a request for a group to the closing of its lines', () => {
-    expect(checkTransferCancellation(transferred('PENDING', { type: 'GROUP_GRANT' }))).toBe('GROUP_REQUEST_UNSUPPORTED');
+    expect(checkTransferCancellation(transferred('PENDING', { type: 'GROUP_GRANT' }))).toBe(
+      'GROUP_REQUEST_UNSUPPORTED',
+    );
   });
 
   it.each(['SERVICE_ACCOUNT', 'RENEWAL'] as const)('does not close a request of the kind %s this way', (type) => {
@@ -109,11 +111,13 @@ describe('which request the IT Admin closes because its beneficiary was transfer
   it('judges a person as transferred only when they still work and sit elsewhere than where the request was sent from', () => {
     const from = 'dept-a';
 
-    expect(wasTransferredFrom({ status: 'ACTIVE', currentDepartmentId: 'dept-b', sentFromDepartmentId: from })).toBe(true);
+    expect(wasTransferredFrom({ status: 'ACTIVE', currentDepartmentId: 'dept-b', sentFromDepartmentId: from })).toBe(
+      true,
+    );
     expect(wasTransferredFrom({ status: 'ACTIVE', currentDepartmentId: from, sentFromDepartmentId: from })).toBe(false);
     expect(wasTransferredFrom({ status: 'ACTIVE', currentDepartmentId: null, sentFromDepartmentId: from })).toBe(false);
-    expect(wasTransferredFrom({ status: 'TERMINATED', currentDepartmentId: 'dept-b', sentFromDepartmentId: from })).toBe(
-      false,
-    );
+    expect(
+      wasTransferredFrom({ status: 'TERMINATED', currentDepartmentId: 'dept-b', sentFromDepartmentId: from }),
+    ).toBe(false);
   });
 });

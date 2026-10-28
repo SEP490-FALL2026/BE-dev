@@ -182,7 +182,7 @@ and the attempt id `<run id>-<run attempt>` of the job. The same script also run
 - **One release state.** The live `docker-compose.prod.yml`, `Caddyfile` and `releases/current-image` (the image of the
   live release) change together. The script keeps the previous ones — and `releases/current-attempt`, when there is one —
   in `releases/<sha>/attempts/<id>/replaced/`, replaces each by one rename and recreates `api`, `worker`, `caddy`.
-- **Ready before success (H7-OPS-RV-04).** `up -d` exiting 0 is not a success. The script then waits at most 120 s
+- **Ready before success (H7-OPS-RV-04).** `up -d` exiting 0 is not a success. The script then waits at most 300 s
   (`--ready-timeout`), looking every 2 s (`--poll-interval`), for one look where each of `api`, `worker`, `caddy` has
   exactly one container, running and not restarting; `api` and `worker` run exactly `<IMAGE>:<SHA>`; Caddy mounts the live
   `Caddyfile` (the sha256 of `/etc/caddy/Caddyfile` in the container is the one on disk); and `/api/v1/health/ready`,
@@ -195,8 +195,32 @@ and the attempt id `<run id>-<run attempt>` of the job. The same script also run
   that file existed), and checks the previous release exactly as above. It always exits 1 and prints two separate
   verdicts: `RESULT: release <sha> (attempt <id>) FAILED while <step>` and one of `RECOVERY: the previous release <image>
 is ready`, `RECOVERY: FAILED — …` (the previous release does not answer ready, or its containers or files could not be
-  brought back: finish by hand, below) or `RECOVERY: not possible — …` (no previous release on this host). No migration is
-  rolled back: the database keeps them and the dump taken before them is the way back for the data.
+  brought back: finish by hand, below), `RECOVERY: REFUSED — …` (the previous image cannot read the data, below) or
+  `RECOVERY: not possible — …` (no previous release on this host). No migration is rolled back: the database keeps them and
+  the dump taken before them is the way back for the data.
+- **The way back must read the data (P04-CPE-04).** A green readiness probe proves the database answers, not that an image
+  reads its rows. Each runtime image declares in its label `io.github.baophipham.slm.data-reads` the data representations
+  it reads that an older runtime cannot (Dockerfile, stage `runtime`); an image built before that label (the compatibility
+  image `fba4dfe` and every older one) declares none. `ops:preflight --recovery-target "<labels>"`, run read-only from the
+  candidate as the deploy role, counts the rows of each representation the database holds (today one:
+  `access-request-null-cost-center`, a sent internal free Request with no Cost Center) and says `COMPATIBLE` (exit 0),
+  `INCOMPATIBLE` (2) or `NO_HISTORY` (3: no migration ever ran here). The script judges the previous image twice:
+  - **before `migrate deploy`:** an image that is not on the host (its labels cannot be read) or a database with no
+    migration history while the host names a previous release (a reset database under an old release state) stops the
+    deploy there, exit 1, nothing migrated — `docker pull` the image, or follow _fresh installation_ below. An image that
+    already cannot read rows only prints a warning: the deploy goes on, because a fixed release is the way out;
+  - **in the recovery**, after the failed release's `api` and `worker` are **stopped** (they write nothing more): only
+    `COMPATIBLE` brings the previous image back. Any other verdict — rows the failed release wrote and the image cannot
+    read, an image no longer on the host, a judgement that fails, or `api`/`worker` that cannot be stopped — prints
+    `RECOVERY: REFUSED`, recreates nothing and exits 1. The previous release state files are back, `api` and `worker` stay
+    stopped and **no image serves the API**: an outage the output names, never a success.
+- **Way back refused.** Do not recreate the previous image by hand: it fails on the rows it cannot read. Deploy a fixed
+  release (or the same one again, once the cause of its failure is fixed) with a new `--attempt`; its pre-migrate judgement
+  warns that the previous image is no way back and goes on. Restoring the pre-migrate dump into a new database is the only
+  way back to the older image, an operator decision that loses every write since the dump. One case stops a release that
+  was healthy: it passed readiness and only the rename of `releases/current-attempt` failed (`FAILED while recording
+releases/current-attempt`). If the recovery is then refused, fix the cause of the rename (disk, permissions) and deploy
+  the same release again with a new `--attempt`.
 - **What moves when.** `releases/current-image` moves at the promotion, before the recreation, and is put back by a
   failure. `releases/current-attempt`, the successful-attempt marker, holds `releases/<sha>/attempts/<id>` and moves only
   after the readiness check, in one rename: it names the attempt whose `replaced/` holds the release before the live one
@@ -292,14 +316,40 @@ the check of step 8. The database keeps the migrations; the dump of step 7 is in
 
 On a **fresh** installation: steps 0, 2 (write the files from `.env.example`) and 3, `$C up -d postgres`, step 5 (the
 database is empty), step 7 without `--first-rollout-env` (there is no environment to go back to), then `ops:bootstrap`
-through `$C run --rm api node dist/installation-cli.js` with a terminal.
+through `$C run --rm api node dist/installation-cli.js` **with all required arguments** (see the bootstrap template under
+Path B below) and a terminal, and
+`$C run --rm --no-deps migrate node dist/inspect-cli.js` → exit 0 (installed and consistent). A deploy that answers ready
+is **not** an installation: readiness only pings the database, and until `ops:bootstrap` ran there is no organization
+(`ops:inspect` exits 2). A fresh installation has **no way back**: if step 7 fails after the promotion, the output says
+`RECOVERY: not possible`, the installation stays failed, `releases/current-attempt` is not written and `latest` does not
+move. **Fresh installation over an old release state** (the database was emptied on a host that ran a release before):
+the deploy refuses before `migrate deploy` while `releases/current-image` (or the old `api` container) names an image,
+because no release ever ran on the new database. Holding the host lock (above), stop `api`/`worker`
+(`docker compose -f docker-compose.prod.yml stop api worker`) and move the old release state aside — never delete it:
+`mkdir releases/archived-<UTC yyyyMMddTHHmmssZ>` then
+`mv docker-compose.prod.yml Caddyfile releases/current-image releases/current-attempt releases/archived-<…>/` (each that
+exists). Emptying the database itself is the Owner's decision on one named target, by the method the Owner approved; no
+command of this repository and no CI/CD step resets a database.
 
 **Rotate a password:** change `DATABASE_DEPLOY_PASSWORD` or `DATABASE_RUNTIME_PASSWORD` in `.env`, run step 5 again (it
 sets both passwords, nothing else changes on a consistent database), then `up -d --force-recreate api worker`. The
 superuser password is the image's own: change it with `ALTER ROLE` in the `postgres` container and in `.env` together.
 
 **Roll back a ready release** (no migration is undone), in `<APP_DIR>`, from the exact attempt that made it live — never a
-guess between attempts:
+guess between attempts. **First judge the way back (P04-CPE-04)**, holding the host lock: the release that is live may
+have written rows the previous image cannot read, at any time since it went live.
+
+0. `docker compose -f docker-compose.prod.yml stop api worker` (the service is down from here: nothing more is written);
+   `PREV="$(head -n 1 releases/<SHA>/attempts/<ATTEMPT>/replaced/current-image)"` (the attempt of step 1 below);
+   `L="$(docker image inspect --format '{{json .Config.Labels}}' "$PREV")"`; then, with the live image, which reads its
+   own rows:
+   `API_IMAGE="$(head -n 1 releases/current-image)" docker compose -f docker-compose.prod.yml run --rm --no-deps migrate node dist/migration-preflight-cli.js --recovery-target "$L"`.
+   Exit 0 `COMPATIBLE`: go on with step 1. Exit 2 `INCOMPATIBLE`: **do not roll back** — start the live release again
+   (`API_IMAGE="$(head -n 1 releases/current-image)" docker compose -f docker-compose.prod.yml up -d api worker`) and fix
+   forward (_Way back refused_ above). Exit 3 or 1: stop and investigate; nothing was judged as safe. The live image must
+   be the final release or later (`fba4dfe` and older have no `--recovery-target`): a rollback from the compatibility
+   release to `7c28e75` follows spec L.10/L.11 of `g0-g6-final-business-baseline-remediation` (only before the activation
+   step).
 
 1. `head -n 1 releases/current-attempt` prints `releases/<SHA>/attempts/<ATTEMPT>`; the way back is that directory's
    `replaced/`, and only it: `releases/<SHA>/attempts/<ATTEMPT>/replaced/`. (No `releases/current-attempt`, or one that
@@ -355,15 +405,91 @@ assign or link cannot be placed between two migrations of one deploy: it is plac
    compatibility image still serves traffic: run `migrate deploy` in a quiet window and cap the wait with `lock_timeout` in the
    deploy session, so a statement of the running image that holds one of those tables and wants another fails fast instead of
    waiting in a circle; a migration that stops on the timeout leaves the image in place (H7) and is run again.
-4. **A failed final deploy** is recovered by H7 to the previous image, which is the compatibility image, and that image is valid on the
-   schema before and after every migration of the final release: the database is not restored. Restoring the pre-migrate backup into a
-   new database is the manual rollback across the destructive boundary and only an operator's decision (there is no `down`, `DB-05`).
-5. **A fresh or empty database** has nothing to assign: the preflight is `READY` and the whole chain is applied in one pass.
+4. **A failed final deploy** is recovered by H7 to the previous image, the compatibility image, which is valid on the **schema** before
+   and after every migration of the final release — but not on every **row** the final release writes (P04-CPE-04): it types the Cost
+   Center of a sent Request as required, and the final release sends internal free Requests without one (F91, `QĐ-87g(2)`). So the
+   compatibility image is the way back only while the database holds no such row: the deploy judges it before `migrate deploy` and
+   again in the recovery, after stopping the final release's `api`/`worker` (_The way back must read the data_ above). Zero rows at the
+   preflight does not settle it: a row the final release writes before its readiness fails makes the recovery `REFUSED`. Once the final
+   release has served such a Request, a manual rollback to the compatibility image is refused the same way (_Roll back a ready release_,
+   step 0) and the way out is a fixed release. The database is never restored by the deploy; restoring the pre-migrate backup into a new
+   database is the manual rollback across the destructive boundary and only an operator's decision (there is no `down`, `DB-05`).
+   Supported way back per phase: on `7c28e75`, none needed; on the compatibility release, `7c28e75` until the activation step (L.11);
+   on the final release, the compatibility image while `ops:preflight --recovery-target` says `COMPATIBLE`, otherwise none (fix forward);
+   on a later release, the final release (it declares `access-request-null-cost-center`) or any image whose label covers the rows held.
+5. **A fresh or empty database** has nothing to assign: the preflight is `READY` and the whole chain is applied in one pass; it has no
+   way back (_fresh installation_ above).
 6. **After the deploy** run `pnpm ops:inspect`: it accepts the old and the new installation sets and reports
    `CHANGE_ANNOUNCEMENTS_MISSING` when a placement or head period that had already taken effect, by the calendar of its own
    organization, when the seeding migration ran has no announcement mark (the migration
    `…_change_announcements_zone_and_yearly_counters` writes the missing marks, so the finding is gone after the final deploy). The closure of an ended fiscal year (`BudgetYearEndSweeper`) runs in the API process every
    hour and may run on several instances: the second run finds nothing left to do (ADR-0018).
+
+### Task 1.2b action 9 on a real server (two paths)
+
+Action 9 records that **one named database** is ready to receive the final release. It is not a deploy of the final release and
+it **seeds no demo data** (the demo dataset stays deferred). The Owner/operator runs it on the host, per database, and records the
+evidence in the Task 1.2b template of the work item's plan; a local rehearsal or a CI run never counts as action 9, and nothing here
+runs in CI/CD. Placeholders: `<APP_DIR>`, `<IMAGE>` (`ghcr.io/<owner>/<repo>` in lower case), `<COMPAT_SHA>` =
+`fba4dfe0885f19e6a76a6e6e7e15d30223d124ab`, `<FINAL_SHA>` (the Owner's commit of the final release), `<ATTEMPT>`, `<REF>` (a
+reference, never a secret). On the host, in `<APP_DIR>`: `export API_IMAGE="$(head -n 1 releases/current-image)"` and
+`L="docker compose --project-directory <APP_DIR> -f <APP_DIR>/docker-compose.prod.yml"`. Read-only checks run in `migrate` (deploy
+role); commands that write data run in `api` (runtime role), with `--environment SHARED` (operator and approver are different
+references). Exit codes are those of each command's `--help`.
+
+**Path A — keep a populated database** (the approved compatibility sequence, spec L.3, L.5, L.10, L.11):
+
+| #   | Do (exact)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | Evidence still needed                                                                                                                      |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| A1  | On the release running now (`7c28e75` or older), as an IT Admin: `GET /api/v1/service-account-moves`, then for each `PENDING` one `POST /api/v1/service-account-moves/{id}/cancellation` with `{ "reason": "Chuyển phòng tài khoản dịch vụ đã bỏ (QĐ-89c)" }`                                                                                                                                                                                                                                                                                 | running image; ids cancelled (or `none`)                                                                                                   |
+| A2  | Owner pushes `<COMPAT_SHA>`; CI green; deploy it (workflow mode `deploy`; by hand only as runbook step 7)                                                                                                                                                                                                                                                                                                                                                                                                                                     | CI run id; attempt id; `Release … is live and ready`; `releases/current-image` = `<IMAGE>:<COMPAT_SHA>`; dump name, SHA-256 and host label |
+| A3  | Once A2 is ready and its record carries the image: `$L run --rm --no-deps api node dist/cost-center-direction-cli.js activate --release-evidence "<ATTEMPT> <IMAGE>:<COMPAT_SHA>" --approved-by <release owner REF> --operator <REF> --environment SHARED`                                                                                                                                                                                                                                                                                    | exit 0 (2 = already activated); organization id                                                                                            |
+| A4  | `$L run --rm --no-deps migrate node dist/migration-preflight-cli.js`                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | the blockers, ids only                                                                                                                     |
+| A5  | Each `COST_CENTER_UNLINKED`: Finance names its department from an authoritative basis (none yet ⟹ the Super Admin creates the real department first, `departmentCreate`), then `$L run --rm --no-deps api node dist/cost-center-direction-cli.js link --cost-center <id> --department <code> --basis <REF> --approved-by <Finance REF> --operator <REF> --environment SHARED`                                                                                                                                                                 | per id: basis, exit                                                                                                                        |
+| A6  | Each `SUBSCRIPTION_OWNER_UNASSIGNED`: `$L run --rm --no-deps api node dist/subscription-owner-assignment-cli.js --subscription <id> --department <code> --basis <purchase or contract REF> --operator <REF> --environment SHARED`                                                                                                                                                                                                                                                                                                             | per id: basis, exit                                                                                                                        |
+| A7  | Each `PERSONNEL_NOTICE_RETIRED_KIND_PENDING`: `POST /api/v1/personnel-notices/{id}/rejection` `{ "reason": "Loại BM-09 đã bỏ (QĐ-87e, D-1)" }`; each `DEPARTMENT_TRANSFER_TITLE_ONLY_PENDING`: `POST /api/v1/department-transfers/{id}/cancellation` with `reason` `Điều chuyển chỉ đổi chức vụ đã bỏ (QĐ-87e, D-1)` and the `grounds` the running API asks for; `SERVICE_ACCOUNT_MOVE_PENDING`: roll back to `7c28e75` (only before A3), cancel, deploy A2 again; `BUDGET_PROPOSAL_LEGACY_RETURN_AMBIGUOUS`: Owner/operator by id (spec J.2) | per id: outcome                                                                                                                            |
+| A8  | `$L run --rm --no-deps migrate node dist/migration-preflight-cli.js` while the compatibility image runs                                                                                                                                                                                                                                                                                                                                                                                                                                       | `Preflight: READY`, exit 0 — action 9 done for this database                                                                               |
+
+Never bulk-default, never infer a department, never record an approval nobody gave. Each other populated database needs its own A1–A8.
+Next, outside action 9: push `<FINAL_SHA>`, CI, deploy; record its `Way back:` line (`COMPATIBLE` expected before it serves a
+Request), then `$L run --rm --no-deps migrate node dist/inspect-cli.js`.
+
+**Path B — fresh installation on a disposable trial database** (an alternative: only once the Owner names the exact target and gives
+written permission to discard its data):
+
+| #   | Do (exact)                                                                                                                                                          | Evidence still needed                                                     |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| B1  | Owner decision: host, database, permission to discard (`<REF>`); a final dump of the old data first if the Owner wants one (protected location)                     | references; dump SHA-256 or `none by decision <REF>`                      |
+| B2  | Holding the host lock: stop `api`/`worker`, move the old release state aside (_fresh installation_ above); empty the database by the Owner-approved method          | archive directory name; method reference                                  |
+| B3  | `.env`/`.env.app` as step 2 (new role passwords), candidate of `<FINAL_SHA>` as step 3, `$C up -d postgres`, step 5 (`provision`), step 6 (`verify` → `CONSISTENT`) | outputs                                                                   |
+| B4  | Step 7 without `--first-rollout-env`                                                                                                                                | exit 0; `No previous release on this host`; preflight `READY`; attempt id |
+| B5  | Run `installation-cli.js --help`, then the bootstrap template below with all required arguments (interactive terminal; hidden password prompt)                      | exit 0                                                                    |
+| B6  | `$L run --rm --no-deps migrate node dist/inspect-cli.js` and `… migration-preflight-cli.js`                                                                         | exit 0 installed and consistent; `READY`                                  |
+| —   | A1, A3, A5–A7: `not-applicable — fresh install`, written only after B4–B6 are evidenced (no old row exists; the final runtime never reads the activation record)    | —                                                                         |
+
+Path B deploys the final release directly and has **no way back**; a failure stays a failed installation. Emptying a database alone
+never closes P04-CPE-04: once the final release serves an internal free Request without Cost Center there, no older image is its way
+back either.
+
+Bootstrap template (after B4 succeeds, in `<APP_DIR>`; replace every `<…>` with the agreed installation value). `--help` is read-only
+and does not connect to the database. Invoking the command without the required arguments does not perform a valid installation.
+Use the exact final image; type the password twice at the hidden terminal prompt, never as an option. The organization time zone
+cannot be changed later. `SHARED` applies to this VPS installation, including a shared trial/demo server.
+
+```sh
+export API_IMAGE='<IMAGE>:<FINAL_SHA>'
+docker compose -f docker-compose.prod.yml run --rm --no-deps api node dist/installation-cli.js --help
+docker compose -f docker-compose.prod.yml run --rm --no-deps api node dist/installation-cli.js \
+  --timezone Asia/Ho_Chi_Minh --currency VND \
+  --organization-name '<organization name>' \
+  --department-code '<first department code>' --department-name '<first department name>' \
+  --admin-code '<Super Admin employee code>' --admin-name '<Super Admin full name>' \
+  --admin-email '<Super Admin work email>' --admin-hire-date '<YYYY-MM-DD>' \
+  --operator-reference '<installation approval reference>' --environment SHARED
+```
+
+Bootstrap creates the organization, its first department and Super Admin; it creates no demo workforce/dataset. Then run B6 through
+the `migrate` service. Exit 2 (`already installed`) requires inspecting the existing installation; do not reset or overwrite it blindly.
 
 ### The pre-migrate dump is a protected operational document
 

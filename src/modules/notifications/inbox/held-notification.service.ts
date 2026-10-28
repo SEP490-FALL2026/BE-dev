@@ -43,7 +43,8 @@ export class HeldNotificationService {
         organizationId: row.organizationId,
         recipientEmployeeId: input.headEmployeeId,
         code: row.code,
-        subject: row.subjectType !== null && row.subjectId !== null ? { type: row.subjectType, id: row.subjectId } : null,
+        subject:
+          row.subjectType !== null && row.subjectId !== null ? { type: row.subjectType, id: row.subjectId } : null,
         params: row.params,
         eventKey: row.eventKey,
       });

@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { Client } from 'pg';
 import request from 'supertest';
 import { ApiAccount } from '../support/api-accounts';
+import { HR_BASIS } from '../support/hr-basis';
 import { waitForLockWaiters } from '../support/lock-wait';
 import { ProvisioningHarness, type TaskWire } from '../support/provisioning-harness';
 
@@ -297,10 +298,11 @@ describe('the queue of provisioning tasks over HTTP (integration, real PostgreSQ
     const { task: earlier } = await fresh(before);
     expect(earlier.defaultResponsibleEmployeeId).toBe(owner);
 
+    // The IT Admin in charge of a department is named by the Super Admin (QĐ-87): the IT Admin only reads it.
     await request(h.server())
       .patch(`/api/v1/departments/${department.id}`)
-      .set(h.as(h.it1))
-      .send({ itAdminEmployeeId: next })
+      .set({ Authorization: `Bearer ${h.admin}` })
+      .send({ itAdminEmployeeId: next, hrBasis: HR_BASIS })
       .expect(200);
     const { task: later } = await fresh(after);
 

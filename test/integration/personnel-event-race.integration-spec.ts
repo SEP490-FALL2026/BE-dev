@@ -86,7 +86,7 @@ describe('events about one person that meet at once (integration, real PostgreSQ
   const leaveRows = async (who: Person) =>
     (
       await h.ctx.sql.query<{ status: string; end_kind: string | null }>(
-        `SELECT status::text AS status, end_kind::text AS end_kind FROM employee_leaves WHERE employee_id = $1 ORDER BY created_at`,
+        `SELECT status::text AS status, end_kind::text AS end_kind FROM employee_leaves WHERE employee_id = $1 ORDER BY started_at`,
         [who.employeeId],
       )
     ).rows;
@@ -184,7 +184,9 @@ describe('events about one person that meet at once (integration, real PostgreSQ
   });
 
   it('the number of a notice is drawn from one counter of the year: notices sent at once never share a code (F48)', async () => {
-    const staff = await Promise.all([0, 1, 2].map(() => person()));
+    // The people are made one by one: the server of the test is opened and closed by each call, so calls that overlap are not a proof of anything but this.
+    const staff: Person[] = [];
+    for (let index = 0; index < 3; index += 1) staff.push(await person());
 
     const responses = await Promise.all(
       staff.map((who) =>

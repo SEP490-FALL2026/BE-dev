@@ -26,7 +26,10 @@ describe('kind of staff and the expected end of open seats (integration, P28-04,
   });
 
   const patch = (id: string, employmentType: string) =>
-    request(h.server()).patch(`/api/v1/employees/${id}`).set(h.as(h.it1)).send({ employmentType, hrBasis: HR_BASIS });
+    request(h.server())
+      .patch(`/api/v1/employees/${id}`)
+      .set({ Authorization: `Bearer ${h.admin}` })
+      .send({ employmentType, hrBasis: HR_BASIS });
   const reasonsOf = (response: request.Response) =>
     (response.body as { error: { details: { reasons: { field: string; code: string }[] } } }).error.details.reasons;
   const kindOf = async (id: string) =>

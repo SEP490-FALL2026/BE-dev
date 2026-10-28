@@ -1,10 +1,4 @@
-import {
-  PEOPLE,
-  REQUEST_ID,
-  event,
-  facts,
-  requestFacts,
-} from '../../../../test/support/request-status-facts';
+import { PEOPLE, REQUEST_ID, event, facts, requestFacts } from '../../../../test/support/request-status-facts';
 import { PROJECTED_ACTIONS, plan } from './request-status.policy';
 
 const told = (planned: ReturnType<typeof plan>) =>
@@ -109,7 +103,12 @@ describe('the loop between Finance and the head about the money of a request (F6
 
     it('tells Finance of a version that expired though nobody acted, the system being the actor', () => {
       const planned = plan(
-        event('ACCESS_REQUEST.BUDGET_VERSION_ENDED', { versionId: 'v-1', costCenterId: 'cc-1', year: 2026, decision: 'EXPIRED' }),
+        event('ACCESS_REQUEST.BUDGET_VERSION_ENDED', {
+          versionId: 'v-1',
+          costCenterId: 'cc-1',
+          year: 2026,
+          decision: 'EXPIRED',
+        }),
         facts({ ...holders, request: requestFacts() }),
       );
 

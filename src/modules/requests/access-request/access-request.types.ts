@@ -87,7 +87,8 @@ export interface NewAccessRequest {
   /** The people it is for, in order: one today. */
   beneficiaryEmployeeIds: readonly string[];
   departmentId: string;
-  costCenterId: string;
+  /** Null only for a free internal request of a department that has no Cost Center in use (`QĐ-87g(2)`, F91). */
+  costCenterId: string | null;
   businessReason: string;
   termMonths: number;
   projectLabel: string | null;
@@ -177,7 +178,8 @@ export interface AccessRequestRecord {
   planId: string | null;
   requesterEmployeeId: string;
   departmentId: string;
-  costCenterId: string;
+  /** Null only for a free internal request of a department that has no Cost Center in use (`QĐ-87g(2)`, F91): nothing is charged. */
+  costCenterId: string | null;
   businessReason: string;
   termMonths: number;
   projectLabel: string | null;

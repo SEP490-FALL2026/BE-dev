@@ -24,11 +24,11 @@ Trưởng phòng nộp đề xuất ngân sách phần mềm của phòng cho m�
 
 ## Primary Story/AC
 
-| Story    | AC                                        | Coverage | Phần còn lại thuộc                                                                                                                                                                                        |
-| -------- | ----------------------------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Story    | AC                                                      | Coverage | Phần còn lại thuộc                                                                                                                                                                                               |
+| -------- | ------------------------------------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | US-06-09 | AC-1, AC-3, AC-5→AC-8, AC-11, AC-13→AC-20, AC-22, AC-23 | partial  | AC-17 (vế chạy lại kiểm tra ngân sách): `g5-budget-check-and-finance-review`; AC-2, AC-4, AC-9: `g5-commitment-creation`; AC-10, AC-21: `g5-budget-version-decision`; AC-12: `g3-downstream-finance-integration` |
-| US-06-10 | AC-1→AC-13                                | full     | —                                                                                                                                                                                                         |
-| US-12-15 | AC-24                                     | partial  | vế danh mục cảnh báo và bảng điều khiển (G8): `g3-downstream-finance-integration`                                                                                                                         |
+| US-06-10 | AC-1→AC-13                                              | full     | —                                                                                                                                                                                                                |
+| US-12-15 | AC-24                                                   | partial  | vế danh mục cảnh báo và bảng điều khiển (G8): `g3-downstream-finance-integration`                                                                                                                                |
 
 ## Supporting references
 

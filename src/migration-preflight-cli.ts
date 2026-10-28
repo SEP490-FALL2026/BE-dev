@@ -12,8 +12,16 @@ import {
   PreflightArgumentError,
 } from './modules/installation/migration-preflight/migration-preflight.arguments';
 import { MigrationPreflightService } from './modules/installation/migration-preflight/migration-preflight.service';
+import {
+  formatRecoveryTarget,
+  RECOVERY_TARGET_EXIT,
+  recoveryTargetJson,
+} from './modules/installation/migration-preflight/recovery-target';
 
-/** Exit codes are part of the command's contract (see --help); the deploy workflow stops on anything but 0. */
+/**
+ * Exit codes are part of the command's contract (see --help); the deploy workflow stops on anything but 0. With
+ * --recovery-target they are those of RECOVERY_TARGET_EXIT (0, 2, 3), and 1 for an error.
+ */
 const EXIT = { ready: 0, failed: 1, blocked: 2 } as const;
 
 async function main(): Promise<number> {
@@ -38,6 +46,12 @@ async function main(): Promise<number> {
       logger: quietCliLogger,
       abortOnError: false,
     });
+    if ('recoveryTarget' in parsed) {
+      // P04-CPE-04 (spec L.12): the way back of a deploy or a rollback, not the judgement before `migrate deploy`.
+      const target = await app.get(MigrationPreflightService).recoveryTarget(parsed.recoveryTarget);
+      process.stdout.write(parsed.json ? recoveryTargetJson(target) : formatRecoveryTarget(target));
+      return RECOVERY_TARGET_EXIT[target.status];
+    }
     const report = await app.get(MigrationPreflightService).judge();
 
     process.stdout.write(parsed.json ? preflightJson(report) : formatPreflight(report));

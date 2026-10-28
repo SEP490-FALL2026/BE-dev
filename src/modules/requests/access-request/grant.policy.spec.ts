@@ -73,6 +73,27 @@ describe('grantAnswerFor a request of a service account (US-05-21 AC-3)', () => 
     });
   });
 
+  it('grants a personal seat of a free internal request that is charged to no Cost Center (F91, QĐ-87g(2))', () => {
+    expect(grantAnswerFor({ ...request('AWAITING_EXECUTION'), costCenterId: null })).toEqual({
+      status: 'GRANTABLE',
+      seat: 'PERSONAL',
+      employeeId: 'e5',
+      planId: 'plan-1',
+      departmentId: 'd-eng',
+      expectedEndDate: null,
+    });
+  });
+
+  it('never grants a service seat that has no Cost Center: the table gives the request of one its Cost Center, so it is a broken record', () => {
+    expect(() => grantAnswerFor({ ...request('AWAITING_EXECUTION', detail('ACCEPTED')), costCenterId: null })).toThrow(
+      'has no Cost Center',
+    );
+    // Before the boundary is accepted nothing is built from the Cost Center, so nothing is asked of it.
+    expect(grantAnswerFor({ ...request('AWAITING_EXECUTION', detail('PENDING')), costCenterId: null })).toEqual({
+      status: 'BOUNDARY_NOT_CHECKED',
+    });
+  });
+
   it('is judged by the state before the boundary: an open step is not approved, an ended request is ended', () => {
     expect(grantAnswerFor(request('AWAITING_SPEND_DECISION', detail('PENDING')))).toEqual({ status: 'NOT_APPROVED' });
     expect(grantAnswerFor(request('IT_REJECTED', detail('REJECTED')))).toEqual({ status: 'ENDED' });

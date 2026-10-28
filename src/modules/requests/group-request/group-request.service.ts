@@ -208,7 +208,7 @@ export class GroupRequestService {
       requesterEmployeeId: actor.employeeId,
       beneficiaryEmployeeIds: judged.lines.map((line) => line.employeeId),
       departmentId: unit.departmentId,
-      costCenterId: unit.costCenter.id,
+      costCenterId: unit.costCenter?.id ?? null,
       businessReason: body.businessReason,
       termMonths: body.termMonths,
       projectLabel: body.projectLabel ?? null,

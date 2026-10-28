@@ -295,11 +295,7 @@ describe('what an IT Admin decides about a failed task, over HTTP (integration, 
     await h.complete(done.id, { evidence: 'xong' }).expect(200);
 
     for (const { id } of [queued, scheduled, closed, done]) {
-      for (const response of [
-        await h.retry(id),
-        await h.handOff(id, { evidence: 'x' }),
-        await h.closeFailed(id, { reason: 'x' }),
-      ]) {
+      for (const response of [await h.retry(id), await h.handOff(id, {}), await h.closeFailed(id, { reason: 'x' })]) {
         expect(response.status).toBe(409);
         expect(h.codeOf(response)).toBe('PROVISIONING_TASK.NOT_FAILED');
       }
@@ -323,9 +319,7 @@ describe('what an IT Admin decides about a failed task, over HTTP (integration, 
 
     for (const account of [h.finance, h.employee, superAdmin]) {
       expect(h.codeOf(await h.retry(made.id, account).expect(403))).toBe('AUTHORIZATION.FORBIDDEN');
-      expect(h.codeOf(await h.handOff(made.id, { evidence: 'x' }, account).expect(403))).toBe(
-        'AUTHORIZATION.FORBIDDEN',
-      );
+      expect(h.codeOf(await h.handOff(made.id, {}, account).expect(403))).toBe('AUTHORIZATION.FORBIDDEN');
       expect(h.codeOf(await h.closeFailed(made.id, { reason: 'x' }, account).expect(403))).toBe(
         'AUTHORIZATION.FORBIDDEN',
       );
@@ -366,7 +360,7 @@ describe('what an IT Admin decides about a failed task, over HTTP (integration, 
     await h.ctx.sql.query(`UPDATE app_users SET status = 'LOCKED' WHERE id = $1`, [h.it1.appUserId]);
     try {
       expect(wire(await h.retry(toRetry, a1).expect(200)).status).toBe('QUEUED');
-      expect(wire(await h.handOff(toHandOff, { evidence: 'đã thử tay' }, a1).expect(200)).status).toBe('QUEUED');
+      expect(wire(await h.handOff(toHandOff, {}, a1).expect(200)).status).toBe('QUEUED');
       expect(wire(await h.closeFailed(toClose, { reason: 'bỏ' }, a1).expect(200)).status).toBe('CLOSED_FAILED');
     } finally {
       await h.ctx.sql.query(`UPDATE app_users SET status = 'ACTIVE' WHERE id = $1`, [h.it1.appUserId]);

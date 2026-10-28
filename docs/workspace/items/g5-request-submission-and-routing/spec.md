@@ -24,11 +24,11 @@ Employee gửi được một Request xin quyền dùng một gói phần mềm 
 
 ## Primary Story/AC
 
-| Story    | AC                                  | Coverage | Phần còn lại thuộc                                                                                                                                                                                                           |
-| -------- | ----------------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Story    | AC                                         | Coverage | Phần còn lại thuộc                                                                                                                                                                                                           |
+| -------- | ------------------------------------------ | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | US-05-02 | AC-3, AC-5, AC-6, AC-7, AC-9, AC-10, AC-12 | partial  | AC-1, AC-4, AC-11: `g5-request-amount-and-payment-schedule`; AC-2: `g5-group-requests`; AC-5 (người tạo khác người thụ hưởng): `g5-delegated-requests`; AC-8: `g5-it-assessment-of-new-software`                             |
-| US-05-03 | AC-1→AC-5, AC-9→AC-13               | partial  | AC-6, AC-7: `g5-delegated-requests`; AC-8, AC-14: `g5-group-requests`; AC-9 (bước duyệt chi): `g5-spend-submission-batches`; AC-13 (giao khi Người duyệt chi được cấu hình): `g5-step-reassignment-and-controlled-wait`      |
-| US-01-12 | AC-1                                | partial  | AC-2: `g5-it-assessment-of-new-software`; AC-3: `g5-return-and-renewal-requests`; AC-4, AC-8, AC-9: `g4-request-and-transfer-integration`; AC-5→AC-7: `g5-manager-need-decision`; AC-10: `g3-downstream-finance-integration` |
+| US-05-03 | AC-1→AC-5, AC-9→AC-13                      | partial  | AC-6, AC-7: `g5-delegated-requests`; AC-8, AC-14: `g5-group-requests`; AC-9 (bước duyệt chi): `g5-spend-submission-batches`; AC-13 (giao khi Người duyệt chi được cấu hình): `g5-step-reassignment-and-controlled-wait`      |
+| US-01-12 | AC-1                                       | partial  | AC-2: `g5-it-assessment-of-new-software`; AC-3: `g5-return-and-renewal-requests`; AC-4, AC-8, AC-9: `g4-request-and-transfer-integration`; AC-5→AC-7: `g5-manager-need-decision`; AC-10: `g3-downstream-finance-integration` |
 
 ## Supporting references
 

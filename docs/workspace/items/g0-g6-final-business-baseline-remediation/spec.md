@@ -216,7 +216,9 @@ mở lại và finding.
 - Chuyển làm tay: body rỗng (`{}`), không bằng chứng; giữ `lastError`, `failureKind`, `failureReason`, `attempts` cuối; CHECK
   `hand_off_whole` chỉ còn `handed_off_by` ↔ `handed_off_at`; cột `hand_off_evidence` giữ nullable cho lịch sử.
 - Tác vụ cấp: duy nhất **trong tác vụ đang mở** của (Assignment, `GRANT`).
-- `SoD-5` (F24): đếm IT Admin dùng được trong cùng giao dịch (facade nhận `tx`); tự thực thi ⟹ cờ audit **và** thông báo Super Admin.
+- `SoD-5` (F24): đếm IT Admin dùng được trong cùng giao dịch (facade nhận `tx`); tự thực thi ⟹ cờ audit **và** thông báo Super Admin trong **cùng** giao dịch.
+  _Tuyến tính hóa (28/10/2026, F24 — không thêm khóa):_ câu đếm là `READ COMMITTED` không khóa hàng và hành động được xếp tại thời điểm câu đếm; một IT Admin khác kích hoạt/khóa sau câu đếm không làm trái nguyên tắc
+  (nguyên tắc nói "còn IT Admin dùng được khác lúc làm"), khóa cùng lúc cho kết quả bảo thủ (từ chối). Kiểm đua trên PostgreSQL thật `deferred-by-owner-test-policy`.
 - Thứ tự khóa (F25): một thứ tự duy nhất Request → thuê bao → Assignment → tác vụ cho mọi đường; test đỏ có barrier trước.
 
 ### F. Request và ngân sách (F27–F39, T-1, T-3)
@@ -225,6 +227,7 @@ mở lại và finding.
   mục K, một mã một status, phân biệt `NO_ACTIVE_BUDGET` và _phòng chưa có trưởng phòng_) **trước** kiểm tra ngân sách, trên
   mọi đường trình Request trả phí (cá nhân, nhóm, ủy quyền, tài khoản dịch vụ trả phí, gia hạn có thời hạn, đề xuất phần mềm mới),
   lô trình duyệt chi, `BM-10`, tạo/sửa đổi phiên bản ngân sách. Request nội bộ không phí, báo lỗi SaaS, tác vụ kỹ thuật không bị chặn.
+  _Làm rõ (28/10/2026, F91, `QĐ-87g(2)`):_ cổng chạy **sau** khi biết nhánh của gói — nhánh `INTERNAL_FREE` đi tiếp với Cost Center `null`: `access_requests.cost_center_id` NULL cho nhánh đó (CHECK `access_requests_cost_center_unless_draft` = `DRAFT` hoặc có Cost Center hoặc `INTERNAL_FREE` không phải `SERVICE_ACCOUNT`, migration `20261029101100`), wire `costCenter` của Request và preview nullable, không Cost Center giữ chỗ, không tính vào phòng khác. **Owner chọn A cho `OD-SA-FREE-CC` ngày 28/10/2026: Request tài khoản dịch vụ giữ cổng ở mọi nhánh, kể cả phần mềm nội bộ không phí; phòng chưa có Cost Center bị chặn ngay khi gửi với 409 `FINANCE.SETUP_INCOMPLETE`, không ghi gì; chỉ cho gửi sau khi có Cost Center.** Seat dịch vụ phải quy về Unit của phòng (`QĐ-86a`, CHECK `license_assignments_service_has_reason_and_cost_center`). Ví dụ: tài khoản dịch vụ cho ứng dụng nội bộ miễn phí ở phòng chưa có Cost Center bị từ chối; không cho gửi/duyệt trước rồi gác ở bước IT cấp seat. Lựa chọn khớp code hiện tại, không cần đổi runtime. Hệ quả tương thích với image `fba4dfe` (đọc dòng NULL lỗi) ghi ở impact matrix mục 3.11, `P04-CPE-04`, vẫn mở riêng.
 - **Nháp** (T-1, P03-D01 = A — operation và schema ở [mục L.1](#l1-nháp-request-trả-phí-p03-d01-f27)): Request trả phí của phòng chưa có Cost Center lưu ở trạng thái `DRAFT` (cột Cost Center nullable chỉ khi
   `DRAFT`, CHECK); không bước, không kiểm tra, không khoản cam kết, không vào `KPI-2`; trình = chuyển `DRAFT → SUBMITTED` chạy lại mọi
   cổng; người tạo xóa được nháp của mình.
@@ -521,8 +524,8 @@ NOT NULL`); `access_requests.submitted_at` bỏ NOT NULL (giữ default) + CHECK
     `ACCESS_REQUEST.DRAFT_DELETED`.
   - Với `{id}`: không phải nháp do người gọi tạo ⟹ 404 `ACCESS_REQUEST.NOT_FOUND` (không lộ tồn tại); Request của người gọi nhưng không
     còn `DRAFT` ⟹ 409 `ACCESS_REQUEST.NOT_DRAFT`. `accessRequestGet` trả nháp chỉ cho người tạo; `accessRequestTimingsGet` của nháp ⟹ 404.
-    _Độ lệch ghi trong Giai đoạn II (28/10/2026):_ nháp **không có wire "Request"** (không giá, bước, Cost Center) nên `accessRequestGet` trả 404 với mọi người, kể cả người tạo;
-    nháp đọc qua `accessRequestDraftList` (đủ `id`, `kind`, `departmentId`, `planId`, `beneficiaryCount`, `createdAt`). Chờ Owner xác nhận hoặc yêu cầu wire riêng.
+    _Độ lệch ghi trong Giai đoạn II (28/10/2026) — đóng ở Giai đoạn II lần hai (F92):_ nháp **không có wire "Request"** (không giá, bước, Cost Center) nên `accessRequestGet` từng trả 404 với mọi người, kể cả người tạo.
+    Biểu diễn nhỏ nhất, không thêm operation: `data` của `accessRequestGet` là **hợp** `{ request }` | `{ draft }` (`AccessRequestOrDraftResponseDto`); `draft` dùng lại đúng `draftSchema` của `accessRequestDraftList` (`id`, `kind`, `departmentId`, `planId`, `beneficiaryCount`, `createdAt`), không điền giá/Cost Center/bước giả. Đọc Request như cũ; chỉ khi không thấy mới tra nháp **của người gọi** — nháp người khác, Request đã trình và id lạ cùng 404 `ACCESS_REQUEST.NOT_FOUND`. `accessRequestTimingsGet` của nháp 404; chi tiết Request đã trình không đổi.
     _Làm rõ (F71):_ ghi "cột giá ở mặc định" buộc nới `access_requests_pricing_check` và `access_requests_group_check` thành "là nháp, hoặc điều đã có"
     (migration `…100500` mục 4): nháp mang nhánh theo gói nhưng chưa có giá; nhóm nháp có thể nêu gói nội bộ (lúc trình mới bị từ chối).
     Sửa nháp = xóa rồi lưu lại (không có operation sửa).
@@ -806,6 +809,9 @@ tài khoản dịch vụ đã bỏ (QĐ-89c)` (CHECK `service_account_moves_stat
      migration, kể cả khi bản tương thích được phục hồi. Dòng dạng cũ chỉ còn từ `7c28e75` và được migration của bản cuối xử lý lúc chạy.
   4. **Phục hồi không cần CSDL:** lỗi sau `migrate deploy`, `reconcile`, promote hay kiểm sẵn sàng ⟹ H7 dựng lại image trước, mọi đọc/ghi được
      hỗ trợ của nó làm được, **không** khôi phục CSDL. `pg_dump` (L.5) chỉ dùng khi operator **chủ động** rollback qua ranh giới phá hủy (ví dụ về `7c28e75` sau khi bản cuối đã chạy). Rollback có chủ đích về `7c28e75` chỉ hợp lệ tới trước bước kích hoạt của L.11; sau đó cũng là đường khẩn cấp.
+     _Sửa 28/10/2026 (`P04-CPE-04`, [L.12](#l12-đích-quay-về-phải-đọc-được-dữ-liệu-p04-cpe-04-prompt-04-mục-910-28102026)):_ bất biến 2 và 4
+     không đúng vô điều kiện từ F91 — bản cuối ghi Request đã trình không Cost Center mà `fba4dfe` không đọc được; image trước chỉ được dựng
+     lại khi `ops:preflight --recovery-target` nói nó đọc được mọi dòng đang có.
 - **API/worker của bản tương thích không nhắc đối tượng sắp xóa:** cột → `@ignore`, model → `@@ignore` trong `prisma/models/*.prisma` của bản
   tương thích. Nguồn: tham chiếu schema Prisma — `@ignore`/`@@ignore`: _"Ignored fields are excluded from the generated Prisma Client"_,
   _"Ignored models are excluded from the generated Prisma Client"_, và `create` bị tắt nếu trường bắt buộc không có `@default`
@@ -1002,6 +1008,64 @@ ops:cost-center-direction activate` → với mỗi `COST_CENTER_UNLINKED`: Fina
   `7c28e75` là đường khẩn cấp; `activate` không tự kiểm được trạng thái host (operator xác nhận, bằng chứng ở Audit và tracker); bảng kích hoạt ở
   lại bản cuối tới khi image tương thích hết là đích phục hồi.
 
+#### L.12 Đích quay về phải đọc được dữ liệu (`P04-CPE-04`, Prompt 04 mục 9.10, 28/10/2026)
+
+- **Vì sao:** F91 (`QĐ-87g(2)`) cho bản cuối ghi Request nội bộ không phí **đã trình** với `cost_center_id` NULL; image tương thích
+  `fba4dfe` (bất biến) khai `costCenterId String` và đọc mọi Request không phải `DRAFT` ⟹ đọc dòng đó lỗi (impact matrix 3.11). Bất biến 2
+  và 4 của L.10 (_bản tương thích đọc được mọi dòng bản cuối có thể ghi trong cửa sổ sẵn sàng_; _phục hồi không cần CSDL_) **không còn đúng
+  vô điều kiện**. Readiness chỉ ping CSDL nên không chứng minh gì. Đếm dòng NULL lúc preflight cũng không đủ: một dòng ghi sau đó (trong
+  cửa sổ sẵn sàng, hay nhiều ngày sau khi bản cuối phục vụ) làm kết quả đếm sai.
+- **Chính sách** (nhỏ nhất, trong ranh giới đã duyệt — không thêm revision, điểm dừng, cờ hay migration):
+  1. **Dạng dữ liệu** = hình dạng dòng mã này ghi mà runtime trước không đọc được; danh mục `DATA_REPRESENTATIONS` ở
+     `src/modules/installation/migration-preflight/recovery-target.ts`; hiện có **một**: `access-request-null-cost-center` (Request không
+     `DRAFT` có `cost_center_id` NULL). Nháp không tính: không runtime nào đọc nháp nó không ghi — tại `fba4dfe` mọi đường đọc Request lọc
+     `DRAFT` (`access-request.repo.ts:276`, `open-request.repo.ts:37`, `request-status.repo.ts:15`, `request-timing.repo.ts:21`). Đã rà các
+     migration bản cuối sau `fba4dfe`: `close_reason = 'BENEFICIARY_TRANSFERRED'` (`…101000`) là TEXT mà `fba4dfe` đọc như chuỗi tự do,
+     `AccessRequestCancelCause.BENEFICIARY_TRANSFERRED` và `DRAFT` có sẵn trong enum của `fba4dfe` ⟹ không phải dạng mới.
+  2. **Khai báo:** image khai các dạng runtime của nó đọc ở nhãn `io.github.baophipham.slm.data-reads` (Dockerfile, stage `runtime` — chỉ nhãn
+     của stage cuối tới image; `recovery-target.spec.ts` ghim nhãn = danh mục). Image dựng trước nhãn (`fba4dfe`, `7c28e75`, …) khai không gì.
+     Nguồn: Docker — _"Labels included in base images … are inherited"_, nhãn stage khác chỉ tới image cuối khi stage cuối dựa trên nó
+     (<https://docs.docker.com/reference/dockerfile/#label>); đọc bằng `docker image inspect --format='{{json .Config.Labels}}'` (cùng trang);
+     khóa chữ thường, số, `.`, `-`, tiền tố DNS ngược (<https://docs.docker.com/engine/manage-resources/labels/>).
+  3. **Phán định** `pnpm ops:preflight --recovery-target <nhãn JSON>` (cùng graph chỉ đọc của preflight, deploy role; repository thêm một câu
+     probe và hai câu đếm `SELECT`): `COMPATIBLE` (exit 0) khi mọi dạng có dòng đều được khai; `INCOMPATIBLE` (2); `NO_HISTORY` (3) khi CSDL
+     chưa từng có migration hoàn tất — không release nào chạy trên nó nên không image nào là đường quay về; lỗi/nhãn không đọc được 1. Chỉ
+     in tên dạng và số dòng.
+  4. **Deploy H7** (`scripts/ops/deploy-release.sh`): (a) **trước `migrate deploy`** phán định image trước (nếu có): không đọc được nhãn
+     (image không có trên host) ⟹ dừng exit 1, chưa migrate (điều kiện operator: `docker pull`); `NO_HISTORY` trong khi host vẫn ghi một release
+     ⟹ dừng exit 1 (cài mới trên CSDL đã làm trống: dời trạng thái release cũ sang chỗ lưu — runbook); `INCOMPATIBLE` ⟹ chỉ cảnh báo, deploy
+     tiếp (bản sửa tiến là lối ra); (b) **khi phục hồi** mà container ứng viên đã được tạo: **dừng `api`/`worker` của ứng viên trước** (không
+     ghi thêm), rồi phán định lại trên CSDL như nó đang là; chỉ `COMPATIBLE` mới dựng lại image trước; mọi kết quả khác — có dòng không đọc
+     được, không dừng được ứng viên, image không còn trên host, phán định lỗi — ⟹ `RECOVERY: REFUSED`, không dựng lại, exit 1, tệp trạng thái
+     release về release trước, `api`/`worker` dừng: gián đoạn được nêu rõ, không phải phục hồi thành công, không marker, không `latest`.
+  5. **Rollback tay** (runbook _Roll back a ready release_ bước 0): giữ khóa host, dừng `api`/`worker`, phán định bằng image đang chạy (đọc
+     được dòng của chính nó); `INCOMPATIBLE` ⟹ không rollback, khởi động lại, sửa tiến. Không rollback bằng cách deploy commit cũ: script của
+     commit cũ không có phán định.
+  6. **Cài mới:** không có release trước ⟹ không đường quay về; lỗi ⟹ `RECOVERY: not possible`, không marker, không `latest`; không chọn
+     image cũ chỉ vì tệp release cũ còn trên host (4a, `NO_HISTORY`).
+- **Đích quay về được hỗ trợ theo pha:**
+
+| Deploy                         | Đích quay về                                                         | Điều kiện                                                                                                                                                                                      |
+| ------------------------------ | -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `7c28e75` → bản tương thích    | `7c28e75`                                                            | như L.10/L.11 (tới trước bước kích hoạt); script `fba4dfe` chưa có phán định — bản tương thích không ghi dạng mới nào                                                                          |
+| bản tương thích → bản cuối     | `fba4dfe`                                                            | `--recovery-target` = `COMPATIBLE` lúc phán định (ứng viên đã dừng); bản cuối đã ghi `access-request-null-cost-center` ⟹ **không có** (sửa tiến, hoặc khôi phục dump theo quyết định operator) |
+| bản cuối → bản sau             | bản cuối (khai `access-request-null-cost-center`) hoặc image khai đủ | như trên                                                                                                                                                                                       |
+| cài mới (CSDL chưa có lịch sử) | không có                                                             | lỗi sau promote = cài đặt lỗi                                                                                                                                                                  |
+
+- **Không làm:** sửa `fba4dfe` hay migration đã có, đổi NULL thành ID giả, Cost Center giữ chỗ, xóa/cắt bảng, sửa lịch sử, `db push`, cờ hạ
+  cấp, tắt phục hồi H7.
+- **Giới hạn còn lại (thật):** (a) phục hồi bị từ chối = gián đoạn tới khi có bản sửa tiến (hoặc khôi phục dump — mất mọi ghi sau dump);
+  (b) deploy bằng script của commit cũ (workflow chạy ở commit cũ) không có phán định — runbook cấm dùng để rollback; (c) chỉ kiểm bằng unit và
+  script với Docker giả; chưa chạy trên Docker/PostgreSQL thật (`deferred-by-owner-test-policy`): **không** được ghi `P04-CPE-04` đã kiểm vận
+  hành; (d) một dạng dữ liệu mới về sau phải thêm vào cả danh mục lẫn nhãn trong cùng thay đổi (spec test ghim); (e) lỗi duy nhất **sau**
+  readiness là đổi tên `releases/current-attempt`: khi đó phục hồi bị từ chối dừng một bản đã khỏe (runbook: sửa nguyên nhân, deploy lại
+  cùng bản với `--attempt` mới); (f) phán định chỉ đếm được các dạng mà image ứng viên biết — rollback tay về release cũ hơn dùng image đang
+  chạy để phán định (runbook bước 0). Phán định chạy tối đa ba lần, mỗi lần ≤ 120 s; dừng ứng viên ≤ 120 s.
+- **Owner đã chọn A ngày 28/10/2026 (`OD-CPE-04`, đã đóng):** chấp nhận chính sách trên, gồm hệ quả (a): từ chối phục hồi về image không
+  đọc được dữ liệu mới; deploy thất bại có thể khiến API tạm ngưng tới khi có bản sửa tiến. Chấp thuận này không phải bằng chứng Docker/DB
+  thật đã chạy, không hoàn tất action 9 và không cho phép tự deploy/xóa DB. Không hỏi lại A/B. Phương án thay thế — cờ hoãn ghi NULL —
+  không được chọn và không được hiện thực. `P04-CPE-04` giữ `mitigated-locally`, kiểm vận hành vẫn `deferred-by-owner-test-policy`.
+
 ## Test matrix
 
 Ma trận đầy đủ theo phase ở [test-matrix.md](test-matrix.md); tóm tắt rủi ro chính:
@@ -1061,6 +1125,11 @@ hỏi Owner mới: tên trạng thái/cờ, cách lưu lịch sử, thông báo 
 cách sửa F36 là cách duy nhất ở trong tập trạng thái `QĐ-91a`. _(Sửa 26/10/2026: câu cũ "dữ liệu cũ của F63 chỉ ở dev/demo và giữ làm lịch
 sử" bị thay — dòng `RETURNED` cũ được đối soát tất định theo J.2; chỉ ca mơ hồ cần Owner/operator xử lý theo **ID** do `ops:preflight` nêu, là
 việc vận hành trên dữ liệu, không phải lựa chọn thiết kế còn ngỏ.)_
+
+**Prompt 04 mục 9.10 (28/10/2026):** `OD-SA-FREE-CC` **đã đóng = A** (Owner 28/10/2026, giữ cổng 409 `FINANCE.SETUP_INCOMPLETE` ở mọi nhánh
+của Request tài khoản dịch vụ). **`OD-CPE-04` = A, Owner chấp thuận ngày 28/10/2026, đã đóng:** áp dụng chính sách của
+[L.12](#l12-đích-quay-về-phải-đọc-được-dữ-liệu-p04-cpe-04-prompt-04-mục-910-28102026), chấp nhận gián đoạn khi phục hồi không an toàn bị
+từ chối và phải sửa tiến. Phương án thay thế (cờ hoãn ghi NULL) không được chọn. Chấp thuận không thay bằng chứng vận hành và action 9.
 
 ## Definition of Done
 

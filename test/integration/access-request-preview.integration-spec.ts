@@ -232,7 +232,7 @@ describe('requests over HTTP: the preview before sending (integration, real Post
       const preview = await h.previewed(designer, paidPlan, { projectLabel: 'Brand 2027' });
       const other = await h.previewed(designer, paidPlan, { projectLabel: 'Another project' });
 
-      expect(preview.costCenter.id).toBe(design.unitId);
+      expect(preview.costCenter?.id).toBe(design.unitId);
       expect(preview.projectLabel).toBe('Brand 2027');
       expect(other.costCenter).toEqual(preview.costCenter);
       expect(other.chain).toEqual(preview.chain);
@@ -376,7 +376,7 @@ describe('requests over HTTP: the preview before sending (integration, real Post
         pricing: preview.pricing,
         expectedSpendOn: preview.expectedSpendOn,
         budgetYear: preview.budgetYear,
-        costCenter: { id: preview.costCenter.id, code: preview.costCenter.code },
+        costCenter: { id: preview.costCenter?.id, code: preview.costCenter?.code },
         policy: {
           hasSpendStep: kinds(preview).includes('SPEND_APPROVAL'),
           slaWorkingDays: preview.chain[0].expectedWorkingDays,

@@ -326,7 +326,7 @@ describe('a head sends requests for the people of the department over PostgreSQL
       const result = await sent(u.head.account, form([n1.employeeId], [internal]));
 
       const members = h.dataOf<{ items: Array<{ employeeCode: string }> }>(
-        await h.departmentEmployees(u.department.id, h.it1).expect(200),
+        await h.departmentEmployees(u.department.id, u.head.account).expect(200),
       );
       expect(members.items.map((item) => item.employeeCode)).toContain(n1.code);
       const early = await h.grant({ requestId: result.requests[0].id });

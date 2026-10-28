@@ -20,7 +20,7 @@ export function grantAnswerFor(
     planId: string | null;
     expectedEndDate: string | null;
     departmentId: string;
-    costCenterId: string;
+    costCenterId: string | null;
     serviceAccount: ServiceAccountRecord | null;
     lines?: readonly { employeeId: string; state: LineState; expectedEndDate: string | null }[];
   },
@@ -45,6 +45,8 @@ export function grantAnswerFor(
         };
       }
       if (serviceAccount.boundaryState !== 'ACCEPTED') return { status: 'BOUNDARY_NOT_CHECKED' };
+      // The seat of a service account is charged to the Unit of its department: the request of one always carries it (the table checks it, F91).
+      if (request.costCenterId === null) throw new Error('The request of a service account has no Cost Center.');
 
       return {
         status: 'GRANTABLE',

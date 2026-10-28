@@ -24,8 +24,8 @@ Request phần mềm nội bộ không phí đã có trong danh mục đi từ q
 
 ## Primary Story/AC
 
-| Story    | AC               | Coverage | Phần còn lại thuộc                                         |
-| -------- | ---------------- | -------- | ---------------------------------------------------------- |
+| Story    | AC                      | Coverage | Phần còn lại thuộc                                         |
+| -------- | ----------------------- | -------- | ---------------------------------------------------------- |
 | US-05-20 | AC-1, AC-2, AC-7, AC-11 | partial  | AC-3→AC-6, AC-8→AC-10: `g5-internal-software-registration` |
 
 ## Supporting references

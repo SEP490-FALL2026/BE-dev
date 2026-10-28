@@ -1,5 +1,6 @@
 import type { OrganizationService } from '../../organization/organization.service';
-import { CostCenterOpenRequestsReader, DepartmentOpenRequestsReader } from './request-use.reader';
+import { CostCenterOpenRequestsReader } from './cost-center-open-requests.reader';
+import { DepartmentOpenRequestsReader } from './department-open-requests.reader';
 import type { RequestUseRepo } from './request-use.repo';
 
 const A = '3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11';

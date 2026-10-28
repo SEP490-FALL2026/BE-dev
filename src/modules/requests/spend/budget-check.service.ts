@@ -7,6 +7,7 @@ import { CatalogService } from '../../catalog/catalog.service';
 import { FinanceService } from '../../finance/finance.service';
 import { OperatingParametersService } from '../../operating-parameters/operating-parameters.service';
 import { OrganizationService } from '../../organization/organization.service';
+import { chargedCostCenterId } from '../access-request/access-request.policy';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
 import { AssessmentRepo } from '../access-request/assessment.repo';
 import { scaleSchedule } from '../group-request/line-allocation.policy';
@@ -57,7 +58,7 @@ export class BudgetCheckService {
     now: Date,
     scope?: CheckScope,
   ): Promise<CheckOutcome> {
-    await this.checks.lockBudgetYears(tx, request.costCenterId, this.bindingYears(request, scope));
+    await this.checks.lockBudgetYears(tx, chargedCostCenterId(request), this.bindingYears(request, scope));
     const computed = await this.compute(tx, request, now, scope);
     if (computed.status === 'NOT_CHECKABLE') return computed;
 
@@ -137,10 +138,10 @@ export class BudgetCheckService {
     }
 
     const open = years.filter((year) => year >= currentYear);
-    const facts = await this.budgets.yearFacts(request.costCenterId, open, tx);
+    const facts = await this.budgets.yearFacts(chargedCostCenterId(request), open, tx);
     const pending = new Map<number, bigint>();
     for (const year of open)
-      pending.set(year, await this.checks.pendingFor(request.costCenterId, year, request.id, tx));
+      pending.set(year, await this.checks.pendingFor(chargedCostCenterId(request), year, request.id, tx));
     const slices: YearSlice[] = years.map((year) => {
       const found = facts.get(year);
       const budget: YearBudget | null = found

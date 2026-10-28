@@ -66,6 +66,9 @@ export const transferReviewSummarySchema = z.strictObject({
   canDecide: z.boolean(),
 });
 
+/** The most open Requests of the person that the review shows: the head reads them beside the tools, the rest are in the Request list. */
+export const UNFINISHED_REQUESTS_MAX = 20;
+
 /** A Request of the person that has not finished, listed for the head to read (F29): information only, nothing is decided here. */
 const unfinishedRequestSchema = z.strictObject({
   requestId: z.uuid(),
@@ -86,7 +89,7 @@ export const transferReviewDetailSchema = transferReviewSummarySchema.extend({
    * The Requests of the person that have not been granted yet, at most twenty (F29): what is still on its way beside the tools they
    * hold. Information for the head; empty for the review after the setup.
    */
-  unfinishedRequests: z.array(unfinishedRequestSchema).max(20),
+  unfinishedRequests: z.array(unfinishedRequestSchema).max(UNFINISHED_REQUESTS_MAX),
 });
 
 /** A personal seat of the person who was transferred, with what was decided about it (F42: every personal seat is listed). */

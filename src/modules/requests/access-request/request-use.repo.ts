@@ -1,8 +1,10 @@
 import { Injectable } from '@nestjs/common';
+import type { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AccessRequestState } from './access-request.types';
 import { ENDED_STATES } from './cancellation.policy';
+import type { UseGroup } from '../../organization/organization-use.types';
 
 /**
  * The requests that are not over, as what keeps a department or a Cost Center in use (`QĐ-90e`, `QĐ-87d(2)`, F15, F16): every state
@@ -31,16 +33,16 @@ export class RequestUseRepo {
     return this.read({ departmentId, state: NOT_OVER }, limit, tx);
   }
 
-  /** The requests charged to the Cost Center that are not over: a request with a cost has one, and a draft has none. */
+  /**
+   * The requests with a cost, charged to the Cost Center, that are not over (`QĐ-87d(2)`: _Request có chi phí chưa kết thúc_). A free
+   * internal request charges nothing, though it carries the Cost Center its department has (F91), so it does not keep it in use; a draft
+   * has none.
+   */
   ofCostCenter(costCenterId: string, limit: number, tx?: DbTx): Promise<RequestUse> {
-    return this.read({ costCenterId, state: NOT_OVER }, limit, tx);
+    return this.read({ costCenterId, state: NOT_OVER, branch: { not: 'INTERNAL_FREE' } }, limit, tx);
   }
 
-  private async read(
-    where: { departmentId: string; state: typeof NOT_OVER } | { costCenterId: string; state: typeof NOT_OVER },
-    limit: number,
-    tx?: DbTx,
-  ): Promise<RequestUse> {
+  private async read(where: Prisma.AccessRequestWhereInput, limit: number, tx?: DbTx): Promise<RequestUse> {
     const db = tx ?? this.prisma;
     const rows = await db.accessRequest.findMany({
       where,
@@ -53,3 +55,9 @@ export class RequestUseRepo {
     return { ids: rows.map((row) => row.id), total };
   }
 }
+
+/** The first requests a reader tells the organization, as items of one kind with no label (a request has no short code to show). */
+export const toUseGroup = (use: RequestUse): UseGroup => ({
+  items: use.ids.map((id) => ({ kind: 'ACCESS_REQUEST', id, label: null })),
+  total: use.total,
+});

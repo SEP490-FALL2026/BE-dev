@@ -259,6 +259,10 @@ const INTRA_MODULE_CONTRACTS: ReadonlyMap<string, string> = new Map([
     'the answers of the group routes, which the supplementary file of the head uses for the people left out of a group (G5)',
   ],
   [
+    'modules/requests/service-account-request/service-account-request.http-errors.ts',
+    'the answers of the service-account request routes, which the send of a draft of that kind uses so that it answers with the codes of the original operation (spec L.1)',
+  ],
+  [
     'modules/requests/renewal-request/renewal-apply.service.ts',
     'writes the record that follows when a renewal is approved in full, called by the approval of the need step and of the spend step (G5)',
   ],
@@ -314,6 +318,10 @@ const INTRA_MODULE_CONTRACTS: ReadonlyMap<string, string> = new Map([
     'tells the listeners (the personnel context, through the facade requests.service.ts) how a request or a line ended, called by the services that end one: the grant gate, the decisions, the withdrawals and the closings of the IT Admin (F43)',
   ],
   // notifications (G5, FR-3.11): the facade gives an in-app notice through the inbox capability.
+  [
+    'modules/notifications/inbox/held-notification.service.ts',
+    'the notices kept for a department without a head and handed to its first head (F67, T-11), reached through the facade notifications.service.ts',
+  ],
   [
     'modules/notifications/inbox/inbox.service.ts',
     'gives an in-app notice in the transaction of the caller, read by the facade notifications.service.ts (G5)',

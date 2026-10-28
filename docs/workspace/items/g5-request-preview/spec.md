@@ -24,8 +24,8 @@ Employee xem trước khi gửi: số tiền của Request, bốn con số ướ
 
 ## Primary Story/AC
 
-| Story    | AC                | Coverage | Phần còn lại thuộc |
-| -------- | ----------------- | -------- | ------------------ |
+| Story    | AC                                  | Coverage | Phần còn lại thuộc |
+| -------- | ----------------------------------- | -------- | ------------------ |
 | US-05-01 | AC-1→AC-5, AC-7→AC-12, AC-14, AC-15 | full     | —                  |
 
 ## Supporting references

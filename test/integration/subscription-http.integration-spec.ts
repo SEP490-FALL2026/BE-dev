@@ -261,9 +261,19 @@ describe('subscriptions and perpetual purchases over HTTP (integration, real Pos
           await stoppedDepartment(),
         ]),
       ).rejects.toMatchObject({ code: '23514' });
+      // The trigger that keeps the owner refuses a change to nothing before the NOT NULL of the column is looked at; the column is
+      // required all the same.
       await expect(
         ctx.sql.query(`UPDATE subscriptions SET owner_department_id = NULL WHERE id = $1`, [created.id]),
-      ).rejects.toMatchObject({ code: '23502' });
+      ).rejects.toMatchObject({ code: '23514' });
+      expect(
+        (
+          await ctx.sql.query<{ is_nullable: string }>(
+            `SELECT is_nullable FROM information_schema.columns
+              WHERE table_name = 'subscriptions' AND column_name = 'owner_department_id'`,
+          )
+        ).rows[0].is_nullable,
+      ).toBe('NO');
       expect(dataOf<SubscriptionWire>(await get(created.id).expect(200)).ownerDepartmentId).toBe(seed.departmentId);
     });
 

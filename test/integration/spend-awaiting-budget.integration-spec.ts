@@ -249,8 +249,13 @@ describe('the request that waits for a version of the budget (integration, real 
     it('refuses an opinion while the plan line is overdue, as on a review, and leaves it waiting', async () => {
       const u = await unit();
       const id = await waiting(u);
+      // The checks are append-only (INV-05): the newest check of the request is a new one, as a check made again is, with the line overdue.
       await h.ctx.sql.query(
-        `UPDATE request_budget_checks SET plan_line_overdue = true WHERE id = (SELECT id FROM request_budget_checks WHERE request_id = $1 ORDER BY number DESC LIMIT 1)`,
+        `INSERT INTO request_budget_checks (id, organization_id, request_id, number, trigger, route, stale_cost_evidence,
+                                            plan_line_overdue, period_closed, off_plan, currency, binding_total_minor)
+         SELECT gen_random_uuid(), organization_id, request_id, number + 1, 'PLAN_LINE_MOVED'::"BudgetCheckTrigger", route,
+                stale_cost_evidence, true, period_closed, off_plan, currency, binding_total_minor
+           FROM request_budget_checks WHERE request_id = $1 ORDER BY number DESC LIMIT 1`,
         [id],
       );
 

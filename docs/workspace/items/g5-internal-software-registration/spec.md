@@ -24,8 +24,8 @@ Khi IT Admin phân loại điều được đề xuất là phần mềm công t
 
 ## Primary Story/AC
 
-| Story    | AC                    | Coverage | Phần còn lại thuộc                            |
-| -------- | --------------------- | -------- | --------------------------------------------- |
+| Story    | AC                    | Coverage | Phần còn lại thuộc                                   |
+| -------- | --------------------- | -------- | ---------------------------------------------------- |
 | US-05-20 | AC-3→AC-6, AC-8→AC-10 | partial  | AC-1, AC-2, AC-7, AC-11: `g5-internal-software-path` |
 
 ## Supporting references

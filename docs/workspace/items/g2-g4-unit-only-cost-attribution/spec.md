@@ -38,11 +38,11 @@ không ngừng được — kiểm bằng test HTTP và ràng buộc CSDL.
 
 ## Primary Story/AC
 
-| Story    | AC          | Coverage | Phần còn lại thuộc                                                                                         |
-| -------- | ----------- | -------- | ---------------------------------------------------------------------------------------------------------- |
+| Story    | AC                       | Coverage | Phần còn lại thuộc                                                                                         |
+| -------- | ------------------------ | -------- | ---------------------------------------------------------------------------------------------------------- |
 | US-04-09 | AC-4, AC-7, AC-12, AC-13 | partial  | AC-1→AC-3, AC-5, AC-6, AC-8→AC-11: `g2-cost-center-catalogue` (giao trước GOV.1)                           |
-| US-03-06 | AC-2, AC-19 | partial  | AC-19 vế việc đang mở: `g2-downstream-integration`; AC còn lại: `g2-department-profile` (giao trước GOV.1) |
-| US-02-05 | AC-7, AC-10 | partial  | các vế còn lại của AC-1→AC-16: `g4-seat-baseline-import`; AC-11 vế K4: `g4-device-dependent-features`      |
+| US-03-06 | AC-2, AC-19              | partial  | AC-19 vế việc đang mở: `g2-downstream-integration`; AC còn lại: `g2-department-profile` (giao trước GOV.1) |
+| US-02-05 | AC-7, AC-10              | partial  | các vế còn lại của AC-1→AC-16: `g4-seat-baseline-import`; AC-11 vế K4: `g4-device-dependent-features`      |
 
 Vế sở hữu ở đây: `US-04-09` AC-4, AC-7 trọn AC; `US-03-06` AC-2 trọn AC, AC-19 vế _tài khoản dịch vụ thuộc phòng_;
 `US-02-05` AC-7 vế _thuộc phòng, Cost Center `Unit` tại ngày ghi nhận, `Company` là lỗi dòng_, AC-10 vế _người mới

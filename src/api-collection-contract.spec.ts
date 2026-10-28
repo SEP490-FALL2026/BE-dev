@@ -1150,6 +1150,20 @@ const NESTED_ARRAYS: readonly NestedArrayEntry[] = [
     removeWhen:
       'Review when a field is added to the figures or to a line of a version, or HISTORY_CHANGES_MAX changes.',
   },
+  {
+    key: 'transferReviewGet#unfinishedRequests',
+    classification: 'bounded',
+    findings: ['LD-14'],
+    owner: 'g0-g6-final-business-baseline-remediation',
+    businessMaximum: {
+      maxItems: 20,
+      source:
+        'UNFINISHED_REQUESTS_MAX in transfer-review.dto.ts, the maxItems of the schema, and the take of unfinishedRequestsOf in transfer-review-view.service.ts: the open Requests of the person who moved, for the head to read beside the tools (F29)',
+    },
+    rationale:
+      'The open Requests of the person who was transferred, information only (F29); the Request list has the rest.',
+    removeWhen: 'Review when UNFINISHED_REQUESTS_MAX changes or the review shows the Requests as a paged subresource.',
+  },
 ];
 
 /**
@@ -1551,6 +1565,14 @@ const REGISTRY_EVENTS_SINCE_INITIAL: readonly RegistryEvent[] = [
     'LD-14',
     'g0-g6-final-business-baseline-remediation',
     'The new history route of a version (F66, spec J.4): each entry shows the fields one edit changed, at most HISTORY_CHANGES_MAX.',
+    'added',
+  ),
+  boundedNested(
+    'transferReviewGet#unfinishedRequests',
+    'UNFINISHED_REQUESTS_MAX',
+    'LD-14',
+    'g0-g6-final-business-baseline-remediation',
+    'The review of a transfer lists the open Requests of the person beside the tools (F29), at most UNFINISHED_REQUESTS_MAX.',
     'added',
   ),
 ];

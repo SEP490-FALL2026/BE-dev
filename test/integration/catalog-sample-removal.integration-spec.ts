@@ -18,6 +18,18 @@ describe('legacy catalog sample removal (integration, g3-catalog-foundation)', (
     await sql.connect();
 
     try {
+      // `prisma migrate deploy` keeps `_prisma_migrations`, which a replay of the files does not make; a migration of G6 reads it
+      // (F47) and, for a database that recorded nothing, changes nothing. The same table, empty, as Prisma creates it.
+      await sql.query(`CREATE TABLE "_prisma_migrations" (
+        "id" VARCHAR(36) PRIMARY KEY NOT NULL,
+        "checksum" VARCHAR(64) NOT NULL,
+        "finished_at" TIMESTAMPTZ,
+        "migration_name" VARCHAR(255) NOT NULL,
+        "logs" TEXT,
+        "rolled_back_at" TIMESTAMPTZ,
+        "started_at" TIMESTAMPTZ NOT NULL DEFAULT now(),
+        "applied_steps_count" INTEGER NOT NULL DEFAULT 0
+      )`);
       for (const directory of migrationDirectories()) {
         await sql.query(readFileSync(join(MIGRATIONS, directory, 'migration.sql'), 'utf8'));
       }

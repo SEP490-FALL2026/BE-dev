@@ -4,6 +4,7 @@ import { PgRelay } from '../support/pg-relay';
 import type { ApiAccount } from '../support/api-accounts';
 import { dataStatements, QueryCounter } from '../support/query-count';
 import type { Department, Person } from '../support/request-harness';
+import { recordAsSuperAdmin } from '../support/super-admin-event-runner';
 
 const h = new OffboardingHarness();
 const M = 1_000_000;
@@ -390,8 +391,20 @@ describe('the roles of a person who leaves and the duties of a workspace (integr
     it('records the handover, warns the person with the last day, keeps the account working past it and tells the state', async () => {
       const person: Person = { employeeId: h.seed.superAdmin.employeeId, account: superAdmin() };
       await hired(person);
-
-      const wire = await h.recordedCase(person);
+      const subjectCode = (
+        await h.ctx.sql.query<{ employee_code: string }>(`SELECT employee_code FROM employees WHERE id = $1`, [
+          person.employeeId,
+        ])
+      ).rows[0].employee_code;
+      // The application refuses to record an event about the Super Admin themself (QĐ-87c): the handover is recorded by the controlled
+      // procedure, on a written ticket, and the Super Admin reads it through the application as anybody reads a case.
+      const refusedRecord = await h.recordCase(h.body(person), person.account).expect(403);
+      expect(h.codeOf(refusedRecord)).toBe('PERSONNEL.SELF_CHANGE_FORBIDDEN');
+      const recorded = await recordAsSuperAdmin(h.ctx.app, subjectCode, 'R-RD-001', {
+        mode: 'departure-record',
+        lastWorkingDay: h.day(10),
+      });
+      const wire = h.dataOf<CaseWire>(await h.readCase(recorded.recordId).expect(200));
 
       expect(flagsOf(wire as FlaggedCase)).toEqual(['SUPER_ADMIN_HOLDER']);
       const events = await flaggedEvents(wire.id);
@@ -435,14 +448,26 @@ describe('the roles of a person who leaves and the duties of a workspace (integr
         .expect(422);
       expect(h.codeOf(refusedGrant)).toBe('APP_USER.SUPER_ADMIN_TRANSFER_ONLY');
 
-      await h.markLeft(wire.id).expect(200);
+      // The Super Admin does not mark themself as left in the application either; the procedure ends the handover and records the
+      // departure that is already over, as the last write about the person.
+      const refusedLeft = await h.markLeft(wire.id, {}, person.account).expect(403);
+      expect(h.codeOf(refusedLeft)).toBe('PERSONNEL.SELF_CHANGE_FORBIDDEN');
+      await recordAsSuperAdmin(h.ctx.app, subjectCode, 'R-RD-002', {
+        mode: 'departure-cancel',
+        caseId: wire.id,
+        reason: 'The departure is recorded as already over',
+      });
+      const abrupt = await recordAsSuperAdmin(h.ctx.app, subjectCode, 'R-RD-003', {
+        mode: 'abrupt-departure-record',
+        lastWorkingDay: h.day(-2),
+      });
 
       expect(await watched()).toMatchObject({
         status: 'HOLDER_UNUSABLE',
         reasons: { LEFT: true },
         warnings: { HOLDER_LEAVING: false, HANDOVER_OVERDUE: false },
       });
-      expect((await flaggedEvents(wire.id)).map((event) => event.after.stage)).toEqual(['RECORDED', 'LEFT']);
+      expect((await flaggedEvents(abrupt.recordId)).map((event) => event.after.stage)).toEqual(['RECORDED', 'LEFT']);
       await request(h.server()).get('/api/v1/me').set(h.as(superAdmin())).expect(401);
       // Nobody can take the role in the application (US-01-01 AC-15): it comes back only through the recovery outside it.
       const grant = await request(h.server())

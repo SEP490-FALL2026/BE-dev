@@ -11,6 +11,7 @@ import type {
   TransferReviewItemWire,
   TransferReviewSummaryWire,
 } from './transfer-review.dto';
+import { UNFINISHED_REQUESTS_MAX } from './transfer-review.dto';
 import { TransferReviewError } from './transfer-review.errors';
 import { TransferReviewListRepo } from './transfer-review-list.repo';
 import { employeeBriefOf, toItem, toSummary, type ReviewNames } from './transfer-review.mapper';
@@ -100,7 +101,10 @@ export class TransferReviewViewService {
     record: ReviewSummaryRecord,
   ): Promise<TransferReviewDetailWire['unfinishedRequests']> {
     if (record.transferId === null) return [];
-    const { items } = await this.requests.listOpenOfBeneficiary(record.employeeId, { skip: 0, take: 20 });
+    const { items } = await this.requests.listOpenOfBeneficiary(record.employeeId, {
+      skip: 0,
+      take: UNFINISHED_REQUESTS_MAX,
+    });
 
     return items.map((item) => ({
       requestId: item.requestId,

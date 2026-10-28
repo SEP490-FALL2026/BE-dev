@@ -215,11 +215,20 @@ export class ProvisioningTaskRepo {
     return this.find(locked[0].id, tx);
   }
 
-  /** The cancellation of a task whose request was withdrawn: the end of it. A failure it had stays on the task. */
+  /**
+   * The cancellation of a task whose request was withdrawn: the end of it. A failure it had stays on the task, but a cancelled task
+   * waits for no try (`provisioning_tasks_status_columns`), so the moment of the next one goes.
+   */
   async markCancelled(tx: DbTx, id: string, appUserId: string, reason: string, now: Date): Promise<void> {
     await tx.provisioningTask.update({
       where: { id },
-      data: { status: 'CANCELLED', closedByAppUserId: appUserId, closedAt: now, closeReason: reason },
+      data: {
+        status: 'CANCELLED',
+        closedByAppUserId: appUserId,
+        closedAt: now,
+        closeReason: reason,
+        nextRetryAt: null,
+      },
     });
   }
 

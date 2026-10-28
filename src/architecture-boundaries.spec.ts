@@ -515,6 +515,8 @@ const CLI_ENTRY_FILES: ReadonlySet<string> = new Set([
   'modules/installation/migration-preflight/migration-preflight.arguments.ts',
   'modules/installation/migration-preflight/migration-preflight.module.ts',
   'modules/installation/migration-preflight/migration-preflight.service.ts',
+  // P04-CPE-04 (g0-g6-final-business-baseline-remediation, spec L.12): `--recovery-target` reaches its report and exit codes.
+  'modules/installation/migration-preflight/recovery-target.ts',
   // F02 (g0-g6-final-business-baseline-remediation, Task 1.2a): `pnpm ops:assign-subscription-owner` reaches its graph,
   // its service, its arguments and its errors.
   'modules/catalog/subscription-owner-assignment/subscription-owner-assignment.arguments.ts',

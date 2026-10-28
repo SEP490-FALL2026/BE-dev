@@ -1444,7 +1444,7 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
         {
           action: 'PROJECT.CREATED',
           before: null,
-          after: { name: project.name, status: 'RUNNING', departmentIds: [second.id, first.id] },
+          after: { name: project.name, status: 'RUNNING', departmentIds: [second.id, first.id], hrBasis: HR_BASIS },
         },
       ]);
     });
@@ -1532,7 +1532,7 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
       expect((await auditOf(project.id)).at(-1)).toEqual({
         action: 'PROJECT.UPDATED',
         before: { name: project.name },
-        after: { name: `${project.name} v2` },
+        after: { name: `${project.name} v2`, hrBasis: HR_BASIS },
       });
       expect(
         errorOf(

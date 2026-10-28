@@ -53,7 +53,7 @@ describe('the guards of the budget lifecycle (integration, real PostgreSQL)', ()
       const before = await count('budget_proposals');
 
       const bare = await h.submitProposal(
-        h.proposalBody(u.department.unitId, [{ description: 'incomplete' }]),
+        h.proposalBody(u.department.unitId, [{ description: 'incomplete', amount: h.money(1) }]),
         u.head.account,
       );
       const unknown = await h.submitProposal(h.proposalBody(randomUUID()), u.head.account);
@@ -104,17 +104,9 @@ describe('the guards of the budget lifecycle (integration, real PostgreSQL)', ()
     /** A request that exists and the check it was held on, which the database keeps the key of. */
     const heldFor = async (costCenterId: string) => {
       const requestId = await h.fixtureRequestId();
-      const [trigger, route] = await Promise.all(
-        ['BudgetCheckTrigger', 'BudgetCheckRoute'].map(
-          async (type) =>
-            (
-              await h.ctx.sql.query<{ enumlabel: string }>(
-                `SELECT e.enumlabel FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid WHERE t.typname = $1 ORDER BY e.enumsortorder LIMIT 1`,
-                [type],
-              )
-            ).rows[0].enumlabel,
-        ),
-      );
+      // A check with nothing out of the ordinary goes to the spending approver: `BLOCKED` needs a problem in the data of the request.
+      const trigger = 'SUBMISSION';
+      const route = 'SPEND_APPROVAL';
       const check = await h.ctx.sql.query<{ id: string }>(
         `INSERT INTO request_budget_checks (id, organization_id, request_id, number, trigger, route, stale_cost_evidence, plan_line_overdue,
                                             period_closed, off_plan, currency, binding_total_minor)

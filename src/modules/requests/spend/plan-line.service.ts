@@ -6,7 +6,7 @@ import { AuditService } from '../../audit/audit.service';
 import { BudgetsService } from '../../budgets/budgets.service';
 import { accessRequestAuditEvent } from '../access-request/access-request-audit-event';
 import { AccessRequestPlanLineRefusedError } from '../access-request/access-request.errors';
-import { hasSpendStep } from '../access-request/access-request.policy';
+import { chargedCostCenterId, hasSpendStep } from '../access-request/access-request.policy';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
 import { judgePlanLineChoice, type PlanLineChoice } from './spend-submission.policy';
@@ -38,7 +38,9 @@ export class PlanLineService {
     if (year === null || !hasSpendStep(request.policy)) throw new AccessRequestPlanLineRefusedError('NO_SPEND');
 
     const line =
-      choice.kind === 'LINE' ? await this.budgets.currentLine(request.costCenterId, year, choice.position, tx) : null;
+      choice.kind === 'LINE'
+        ? await this.budgets.currentLine(chargedCostCenterId(request), year, choice.position, tx)
+        : null;
     const verdict = judgePlanLineChoice(choice, { line, today });
     if (!verdict.ok) throw new AccessRequestPlanLineRefusedError(verdict.reason);
 

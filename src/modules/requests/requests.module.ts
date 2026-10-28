@@ -40,7 +40,8 @@ import { CancellationController } from './access-request/cancellation.controller
 import { DepartureCancellationService } from './access-request/departure-cancellation.service';
 import { OpenRequestRepo } from './access-request/open-request.repo';
 import { OpenRequestService } from './access-request/open-request.service';
-import { CostCenterOpenRequestsReader, DepartmentOpenRequestsReader } from './access-request/request-use.reader';
+import { CostCenterOpenRequestsReader } from './access-request/cost-center-open-requests.reader';
+import { DepartmentOpenRequestsReader } from './access-request/department-open-requests.reader';
 import { RequestUseRepo } from './access-request/request-use.repo';
 import { RequestEndService } from './access-request/request-end.service';
 import { RequestsService } from './requests.service';

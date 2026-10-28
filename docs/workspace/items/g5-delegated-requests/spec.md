@@ -32,12 +32,12 @@ Trưởng phòng gửi yêu cầu thay cho người trong phòng (kể cả ngư
 
 ## Primary Story/AC
 
-| Story    | AC               | Coverage | Phần còn lại thuộc                                                                                                                                                                                   |
-| -------- | ---------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| US-03-02 | AC-1, AC-3→AC-14 | full     | —                                                                                                                                                                                                    |
-| US-05-03 | AC-6, AC-7       | partial  | AC-1→AC-5, AC-9→AC-13: `g5-request-submission-and-routing`; AC-8, AC-14: `g5-group-requests`                                                                                                         |
+| Story    | AC               | Coverage | Phần còn lại thuộc                                                                                                                                                                                          |
+| -------- | ---------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| US-03-02 | AC-1, AC-3→AC-14 | full     | —                                                                                                                                                                                                           |
+| US-05-03 | AC-6, AC-7       | partial  | AC-1→AC-5, AC-9→AC-13: `g5-request-submission-and-routing`; AC-8, AC-14: `g5-group-requests`                                                                                                                |
 | US-05-02 | AC-5             | partial  | AC-3, AC-6, AC-7, AC-9, AC-10, AC-12: `g5-request-submission-and-routing`; AC-1, AC-4, AC-11: `g5-request-amount-and-payment-schedule`; AC-2: `g5-group-requests`; AC-8: `g5-it-assessment-of-new-software` |
-| US-06-08 | AC-2, AC-9       | partial  | AC-1, AC-3→AC-8, AC-11: `g5-spend-approval-decision`; AC-10: `g5-group-requests`                                                                                                                     |
+| US-06-08 | AC-2, AC-9       | partial  | AC-1, AC-3→AC-8, AC-11: `g5-spend-approval-decision`; AC-10: `g5-group-requests`                                                                                                                            |
 
 ## Supporting references
 

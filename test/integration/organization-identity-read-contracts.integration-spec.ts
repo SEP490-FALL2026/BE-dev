@@ -76,7 +76,11 @@ describe('organization and identity read contracts (integration, real PostgreSQL
     }, 60000);
 
     it('pages the list by name, leaves the description to the detail, and never reads it from the table', async () => {
-      const { result, statements } = await get(`/api/v1/projects?page=2&pageSize=10&departmentId=${departmentId}`);
+      // The projects are read by the Super Admin, who owns them (QĐ-87).
+      const { result, statements } = await get(
+        `/api/v1/projects?page=2&pageSize=10&departmentId=${departmentId}`,
+        asAdmin(),
+      );
 
       const page = dataOf<{
         items: Record<string, unknown>[];
@@ -96,12 +100,12 @@ describe('organization and identity read contracts (integration, real PostgreSQL
     });
 
     it('refuses a page size over 100, and gives the whole project, with its description, from the detail route', async () => {
-      await request(h.server()).get('/api/v1/projects?pageSize=101').set(h.as(h.it1)).expect(422);
+      await request(h.server()).get('/api/v1/projects?pageSize=101').set(asAdmin()).expect(422);
       const [{ id }] = (
         await h.ctx.sql.query<{ id: string }>(`SELECT id FROM projects WHERE name = 'LD12 project 001'`)
       ).rows;
 
-      const { result } = await get(`/api/v1/projects/${id}`);
+      const { result } = await get(`/api/v1/projects/${id}`, asAdmin());
 
       expect(dataOf<{ description: string; departments: unknown[] }>(result)).toMatchObject({
         description: expect.stringContaining('long text') as unknown,
@@ -111,7 +115,7 @@ describe('organization and identity read contracts (integration, real PostgreSQL
         (
           await request(h.server())
             .get('/api/v1/projects/3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11')
-            .set(h.as(h.it1))
+            .set(asAdmin())
             .expect(404)
         ).body,
       ).toMatchObject({ error: { code: 'PROJECT.NOT_FOUND' } });
@@ -131,7 +135,11 @@ describe('organization and identity read contracts (integration, real PostgreSQL
     it('counts and cuts the members in one repeatable-read snapshot, and reads whether there is an email, not the email', async () => {
       await h.crowd('LD11', 3);
 
-      const { result, statements } = await get(`/api/v1/departments/${h.seed.departmentId}/employees?pageSize=2`);
+      // The members with their work state are read by the Super Admin and the head of the department (the IT Admin reads a minimum).
+      const { result, statements } = await get(
+        `/api/v1/departments/${h.seed.departmentId}/employees?pageSize=2`,
+        asAdmin(),
+      );
 
       const page = dataOf<{ items: Record<string, unknown>[]; pagination: { totalItems: number } }>(result);
       expect(page.items).toHaveLength(2);

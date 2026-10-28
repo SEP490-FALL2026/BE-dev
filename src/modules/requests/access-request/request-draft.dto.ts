@@ -61,6 +61,13 @@ export class AccessRequestDraftResponseDto extends createZodDto(
 export class AccessRequestDraftPageResponseDto extends createZodDto(
   successEnvelopeSchema(z.strictObject({ items: z.array(draftSchema), pagination })),
 ) {}
+/**
+ * What reading a request answers (`accessRequestGet`, spec L.1, F92): the request, as always, or — to the person who saved it — the draft,
+ * which is not a request yet and so has no price, step or Cost Center to show: only what the list of drafts shows of it.
+ */
+export class AccessRequestOrDraftResponseDto extends createZodDto(
+  successEnvelopeSchema(z.union([z.strictObject({ request: requestSchema }), z.strictObject({ draft: draftSchema })])),
+) {}
 /** What sending a draft answers: the request that was made, as the operation that sends that kind of request answers it. */
 export class DraftSubmitResponseDto extends createZodDto(
   successEnvelopeSchema(z.strictObject({ request: requestSchema })),

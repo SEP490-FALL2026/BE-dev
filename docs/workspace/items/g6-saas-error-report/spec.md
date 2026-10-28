@@ -24,10 +24,10 @@ Employee báo lỗi cho một quyền đang được cấp cho chính mình bằ
 
 ## Primary Story/AC
 
-| Story    | AC        | Coverage | Phần còn lại thuộc |
-| -------- | --------- | -------- | ------------------ |
+| Story    | AC         | Coverage | Phần còn lại thuộc |
+| -------- | ---------- | -------- | ------------------ |
 | US-07-10 | AC-1→AC-10 | full     | —                  |
-| US-07-11 | AC-1→AC-9 | full     | —                  |
+| US-07-11 | AC-1→AC-9  | full     | —                  |
 
 ## Supporting references
 

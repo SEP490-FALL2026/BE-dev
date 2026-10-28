@@ -13,6 +13,8 @@ import {
 import { AuthenticatedOnly } from '../../../infrastructure/security/decorators/access.decorators';
 import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
+import { toGroupRequestApiException } from '../group-request/group-request.http-errors';
+import { toServiceAccountApiException } from '../service-account-request/service-account-request.http-errors';
 import { ACCESS_REQUEST_ERROR_EXAMPLES as EXAMPLES, toAccessRequestApiException } from './access-request.http-errors';
 import { AccessRequestQueryService } from './access-request-query.service';
 import { toWire } from './access-request.wire';
@@ -177,7 +179,9 @@ export class RequestDraftsController {
 
       return { request: toWire(await this.queries.view(sent.record)) };
     } catch (error) {
-      throw toAccessRequestApiException(error);
+      // The answer is the one of the operation that sends this kind of request: its own refusals (a group, a service account) keep
+      // their own codes, and every other error is mapped as the request routes map it (spec L.1).
+      throw toServiceAccountApiException(toGroupRequestApiException(error));
     }
   }
 

@@ -79,6 +79,8 @@ export class ServiceAccountRequestService {
         now,
         settings,
         lockDepartment: true,
+        // The seat it ends in is charged to the Unit of the department, free or not (`QĐ-86a`, F91).
+        chargedToUnit: true,
       });
       const refusal = submitRefusal({
         baselineClosed: baseline.closed,
@@ -100,7 +102,7 @@ export class ServiceAccountRequestService {
         requesterEmployeeId: actor.employeeId,
         beneficiaryEmployeeIds: [actor.employeeId],
         departmentId: unit.departmentId,
-        costCenterId: unit.costCenter.id,
+        costCenterId: unit.costCenter?.id ?? null,
         businessReason: body.businessReason,
         termMonths: body.termMonths,
         projectLabel: body.projectLabel ?? null,
@@ -142,7 +144,7 @@ export class ServiceAccountRequestService {
             requesterEmployeeId: actor.employeeId,
             beneficiaryEmployeeIds: [actor.employeeId],
             departmentId: unit.departmentId,
-            costCenterId: unit.costCenter.id,
+            costCenterId: unit.costCenter?.id ?? null,
             policyVersion: policy.version,
             hasSpendStep: hasSpendStep(policy),
             slaWorkingDays: policy.slaWorkingDays,

@@ -1,3 +1,4 @@
+import type { ApiAccount } from '../support/api-accounts';
 import { StatusHarness } from '../support/status-harness';
 import type { Unit } from '../support/spend-harness';
 
@@ -33,11 +34,11 @@ describe('the notices of the loop between Finance and the head (integration, rea
 
     return h.departmentWithHead(`P-FN${counter}`);
   };
-  /** A request of 45 million of a budget with 40 left: the check sends it to Finance. */
-  const inReview = async (u: Unit) => {
+  /** A request of 45 million of a budget with 40 left: the check sends it to Finance. Whoever made the check is not told of it. */
+  const inReview = async (u: Unit, by: ApiAccount = u.head.account) => {
     await h.budgetFor(u, { total: 100 * M, held: 20 * M, spent: 40 * M, percent: 95 });
     const id = await h.paidRequest(u, plan, { amount: 45 * M });
-    await h.route(id, u.head.account);
+    await h.route(id, by);
 
     return id;
   };
@@ -49,7 +50,8 @@ describe('the notices of the loop between Finance and the head (integration, rea
 
   it('tells Finance and the head that the review of Finance is open, and nobody when the request goes straight to the approver', async () => {
     const u = await unit();
-    const id = await inReview(u);
+    // The check is made by the requester's side, not by the head: the head is told of what somebody else did (an actor is never told of their own act).
+    const id = await inReview(u, u.member.account);
     const calm = await unit();
     await h.budgetFor(calm, { total: 100 * M, percent: 95 });
     const ordinary = await h.paidRequest(calm, plan, { amount: 5 * M });
@@ -131,7 +133,7 @@ describe('the notices of the loop between Finance and the head (integration, rea
     expect(await h.noticeCount()).toBe(count);
     const items = h.dataOf<{
       items: Array<{ code: string; params: Record<string, unknown>; subject: { id: string } | null }>;
-    }>(await h.inbox(u.head.account, { pageSize: 100 }).expect(200)).items;
+    }>(await h.inbox(u.head.account, { pageSize: 50 }).expect(200)).items;
     expect(items.filter((item) => item.code === 'REQUEST_RETURNED_BY_FINANCE')).toEqual([
       expect.objectContaining({
         params: { requestId: id, reason: 'Carry it to the next year' },

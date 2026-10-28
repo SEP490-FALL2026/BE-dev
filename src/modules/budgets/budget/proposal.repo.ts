@@ -180,7 +180,7 @@ export class ProposalRepo {
 
   /**
    * The proposals Finance gave back that nobody has sent again or withdrawn, of every Cost Center, by id: what waits for the head of
-   * a department. There is at most one for each Cost Center and year, so the list is as long as the departments with work to send.
+   * a department. There is at most one for each Cost Center and year, so the list is as long as the number of heads with work to send.
    */
   async returned(tx: DbTx): Promise<ProposalRecord[]> {
     const rows = await tx.budgetProposal.findMany({

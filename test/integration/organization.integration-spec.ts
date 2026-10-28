@@ -255,6 +255,7 @@ describe('organization foundation (integration)', () => {
       'fullName',
       'hireDate',
       'id',
+      'jobTitle',
       'organizationId',
       'status',
       'workEmail',

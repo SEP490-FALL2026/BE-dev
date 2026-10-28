@@ -5,7 +5,7 @@
 - Phụ trách: chưa phân công (Prompt 04). Thiết kế ban đầu bởi: AI theo giao việc Owner (Prompt 03, 26/10/2026).
 - Owner review: chưa review tài liệu; Owner đã trả lời mọi disposition chặn ngày 27/10/2026 (chín mục = A — [spec mục L](spec.md#l-hệ-quả-của-disposition-owner-27102026)).
   Peer review: tùy chọn.
-- Triển khai: `in-progress` (Prompt 04, từ 27/10/2026 trên `dev = origin/dev = e75f747`; chưa stage/commit/push). PR: chưa có. Trạng thái từng task: _Ghi chú triển khai_ ở cuối tệp.
+- Triển khai: `verified` cục bộ, reduced-verification (28/10/2026, mục 9.10 E: `P04-CPE-05` chẩn đoán — lỗi registry dọn fixture đã sửa, `EPERM` của review ghi là giới hạn môi trường review, nguyên nhân chưa xác định tới cùng). Báo cáo Prompt 04 là `correction-ready-local (reduced-verification)` (27 → 28/10/2026); kết quả PostgreSQL/Integration cũ chỉ áp dụng đúng cây đã chạy, không chứng minh cây cuối. **Rollout thật chưa làm** (Task 1.2b action 9 pending). Integration/HTTP E2E và diễn tập hoãn theo Owner. Review mục 9.10 ghi thêm `P04-CPE-05` (cleanup fixture Windows `EPERM`, chưa xác định nguyên nhân); không tuyên bố toàn bộ script test xanh từ lượt review đó. PR: chưa có. Trạng thái từng task: _Ghi chú triển khai_ ở cuối tệp.
 
 ## Before coding
 
@@ -213,6 +213,24 @@ cáo. Agent không commit, push, deploy hay chạm máy chủ thật. Tiếp t�
 - Verify: tracker ghi SHA commit mốc và CI run, từng CSDL đã deploy, image đang chạy (`releases/current-image`, SHA image) là image mở rộng,
   bằng chứng kích hoạt (lượt deploy H7, SHA image), số Cost Center đã liên kết, số ID đã gán, số dòng đã hủy/từ chối theo L.4/L.5, đầu ra `READY` (chỉ ID), SHA-256 bản sao lưu của deploy; hoặc Owner ghi rằng ngoài CSDL diễn tập local không có CSDL có dữ liệu nào.
   Agent đối chiếu ở preflight khi tiếp tục.
+- **Lệnh và hai đường (mục 9.10, 28/10/2026):** [containers — Task 1.2b action 9 on a real server](../../../guides/containers.md#task-12b-action-9-on-a-real-server-two-paths)
+  (đường A giữ CSDL có dữ liệu A1 → A8; đường B cài mới trên CSDL thử nghiệm bỏ được B1 → B6, chỉ khi Owner chọn đúng target và cho phép bỏ
+  dữ liệu). Action 9 ghi nhận sẵn sàng rollout thật của **một** CSDL; **không** seed dữ liệu demo. Trạng thái: `pending-operator` tới khi bằng
+  chứng thật về. Rehearsal local hay CI không bao giờ là action 9.
+- **Mẫu bằng chứng — một bảng cho mỗi CSDL đích** (operator điền; ô chưa có bằng chứng giữ `pending`; không ghi mật khẩu, URL có credential
+  hay nội dung dump):
+
+| Trường                          | Giá trị                                                                                                                                                                                                          |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Target (nhãn host, tên CSDL)    | pending                                                                                                                                                                                                          |
+| Đường đã chọn                   | `A — giữ dữ liệu` / `B — cài mới` (B cần tham chiếu quyết định Owner chọn target và cho phép bỏ dữ liệu)                                                                                                         |
+| Commit / CI                     | `fba4dfe…` (A) hoặc `<FINAL_SHA>` (B) · CI run id · kết quả                                                                                                                                                      |
+| Image đang chạy                 | `releases/current-image` sau bước deploy (`<IMAGE>:<SHA>`)                                                                                                                                                       |
+| Sao lưu / quyết định bỏ dữ liệu | tên dump + SHA-256 + nhãn host của nơi lưu bảo vệ; hoặc tham chiếu quyết định bỏ dữ liệu (B)                                                                                                                     |
+| Hành động và số lượng           | A1 số chuyển phòng tài khoản dịch vụ đã hủy · A3 kích hoạt · A5 số Cost Center đã liên kết · A6 số thuê bao đã gán · A7 số dòng đã từ chối/hủy, ca J.2 — hoặc `not-applicable — fresh install` (chỉ sau B4 → B6) |
+| Preflight                       | đầu ra `Preflight: READY` (A8 / B6) — chỉ ID                                                                                                                                                                     |
+| Đích quay về / chính sách       | dòng `Way back:` của deploy (L.12): A ⟹ `7c28e75` tới trước A3, rồi khi deploy bản cuối: `fba4dfe` chỉ khi `COMPATIBLE`; B ⟹ không có                                                                            |
+| Kiểm chứng còn thiếu            | ví dụ: deploy bản cuối, `ops:inspect` sau deploy, rollback/phục hồi thật chưa thử                                                                                                                                |
 
 ### Phase 0 — Khung tài liệu
 
@@ -663,7 +681,9 @@ Focused `personnel` (gồm `personnel/super-admin-event`), `licensing/handover`,
 ### Task 6.3: Gate tên migration và vai runtime (F51, F52)
 
 - Files: gate mới `src/migration-order.spec.ts` (chạy trong `pnpm check` cùng các gate `src/*.spec.ts`),
-  `test/integration/database-runtime-role-app.integration-spec.ts`.
+  `test/integration/database-runtime-role-app.integration-spec.ts` (đường đăng nhập/mail), `…-budget-write.integration-spec.ts` (G5: gửi → dựng → duyệt kèm một sửa để có
+  lịch sử) và `…-leave-write.integration-spec.ts` (G6: ghi nghỉ dài), mỗi file một ứng dụng vì module cấu hình đọc một lần cho mỗi registry Jest;
+  dùng chung `test/support/role-database-prepare.ts`.
 - Depends on: Checkpoint 1.
 - Acceptance: migration mới phải lớn hơn migration cuối đã merge (không đổi tên migration cũ); suite vai runtime chạy một đường ghi G5 và
   một G6.
@@ -822,9 +842,18 @@ mặc định_ chỉ còn cho mục không chặn (P03-D10, P03-D12 → P03-D15)
 | F83 | Low     | `fix` — phát hiện trong Giai đoạn II (28/10/2026)                                                                                      | 4.10                          | P4 F83                                                        | —                                                       | budgets: `version-history.service.ts`, `line-import.service.ts`, `budget.http-errors.ts`, controller                                                                                                                                                                                                                                                                |
 | F84 | Low     | `fix` — phát hiện trong Giai đoạn II (28/10/2026)                                                                                      | 5.3                           | P5 F84                                                        | —                                                       | personnel: `transfer-review.mapper.ts`                                                                                                                                                                                                                                                                                                                              |
 | F85 | Low     | `fix` — phát hiện trong Giai đoạn II (28/10/2026)                                                                                      | 6.2                           | P6 F85                                                        | —                                                       | dư lượng: token, mô tả OpenAPI, `transfer.policy.ts`, `personnel.prisma` (`@ignore`)                                                                                                                                                                                                                                                                                |
+| F86 | High    | `fix` — phát hiện trong Giai đoạn III (28/10/2026)                                                                                     | 1.6 / 4.1                     | P1 F86                                                        | —                                                       | requests: `request-draft.service.ts`                                                                                                                                                                                                                                                                                                                                |
+| F87 | Medium  | `fix` — phát hiện trong Giai đoạn III (28/10/2026)                                                                                     | 3.3                           | P3 F87                                                        | —                                                       | licensing: `provisioning-task.repo.ts`                                                                                                                                                                                                                                                                                                                              |
+| F88 | Medium  | `fix` — phát hiện trong Giai đoạn III (28/10/2026)                                                                                     | 5.3                           | P5 F88                                                        | —                                                       | personnel: `transfer-review.repo.ts`, `transfer-review-list.repo.ts`                                                                                                                                                                                                                                                                                                |
+| F89 | Medium  | `fix` — phát hiện trong Giai đoạn III (28/10/2026)                                                                                     | 4.1                           | P4 F89                                                        | —                                                       | requests: `request-drafts.controller.ts`                                                                                                                                                                                                                                                                                                                            |
+| F90 | Low     | `fix` — phát hiện trong Giai đoạn III (28/10/2026)                                                                                     | 6.3                           | P6 F90                                                        | —                                                       | `test/support/role-database-prepare.ts` + hai suite runtime                                                                                                                                                                                                                                                                                                         |
+| F91 | High    | `fix` — Giai đoạn II lần hai (28/10/2026, mục 9.8); đóng `OD-INTERNAL-CC`                                                              | 4.1                           | P4 F91                                                        | —                                                       | requests: `request-assessment.service.ts`, `access-request*.ts`, spend; migration `20261029101100`; wire `costCenter` nullable (`access-request.dto.ts`, `request-preview.dto.ts`)                                                                                                                                                                                  |
+| F92 | Medium  | `fix` — Giai đoạn II lần hai (28/10/2026, mục 9.8)                                                                                     | 4.1                           | P4 F92                                                        | —                                                       | requests: `access-requests.controller.ts`, `request-draft.service.ts`, `request-draft.dto.ts` (`AccessRequestOrDraftResponseDto`)                                                                                                                                                                                                                                   |
+| F93 | Medium  | `fix` — Giai đoạn II lần hai (28/10/2026, mục 9.8)                                                                                     | 6.3                           | P6 F93                                                        | —                                                       | `src/infrastructure/health/readiness-diagnostics.ts`, `health.controller.ts`, `scripts/ops/deploy-release.sh` (`READY_PROBE`)                                                                                                                                                                                                                                       |
+| F94 | Low     | `fix` — Giai đoạn II lần hai (28/10/2026, mục 9.8 → 9.9)                                                                               | 6.3                           | P6 F94                                                        | —                                                       | `.github/workflows/ci.yml` (nhãn hoãn, bỏ khẳng định 100%)                                                                                                                                                                                                                                                                                                          |
 
-Tổng: `fix` 59 (gồm F25 có thể thành `aligned-after-test`) · `documentation-only` 2 · `deferred-by-disposition` 5 · `Docs-owned` 1 ·
-`out-of-scope` 1 = 68 = số dòng của bảng chuẩn impact matrix mục 3.0; 0 finding không có chủ.
+Tổng (cập nhật 28/10/2026, đếm lại theo bảng): `fix` 85 (gồm F25 có thể thành `aligned-after-test`; F24 phân định ở impact matrix mục 3.11) · `documentation-only` 2 · `deferred-by-disposition` 5 · `Docs-owned` 1 ·
+`out-of-scope` 1 = 94 = số dòng của bảng chuẩn impact matrix mục 3.0; 0 finding không có chủ. (Dòng tổng cũ ghi 68 chưa tính F69 → F90.)
 
 ## Phân công trong cùng hạng mục
 
@@ -1104,12 +1133,228 @@ Theo chính sách thực thi của Owner (continuation §9): Giai đoạn I **vi
 `licensing.types.ts` chạm trần 400 dòng; `super-admin-event.arguments.ts` 398/400 dòng; `BUDGET.VERSION_NUMBER_TAKEN` được ánh xạ nhưng không liệt kê (không thể đến);
 đổi tên đối xứng `noticesOf` giữa các harness (đã đổi của ngân sách thành `budgetNoticesOf`).
 
+### Giai đoạn II — rà soát nguồn (Prompt 04, 28/10/2026)
+
+Sáu reviewer chỉ đọc (organization, catalog/licensing, requests, budgets, personnel, migration/rollout) theo [impact matrix mục 3.9](impact-matrix.md#39-phát-hiện-trong-giai-đoạn-ii-prompt-04-28102026);
+tác nhân chính đối chiếu từng phát hiện với mã trước khi ghi (F69 → F85) và sửa hết lỗi đã chứng minh. Không còn phát hiện mở trong phạm vi, **trừ** quyết định `OD-INTERNAL-CC` (Request nội bộ ở phòng chưa có
+Cost Center; cần Owner) và độ lệch `accessRequestGet` của nháp (nháp chỉ đọc qua danh sách).
+
+### Giai đoạn III — kiểm chứng (Prompt 04, 28/10/2026)
+
+Hai định danh cây, nêu rõ vì ba tệp bị sửa **ngoài gói này** giữa lúc chạy (xem ngay dưới bảng):
+
+- **Cây kiểm chứng integration và nhóm 3:** `HEAD 7569071` (Owner commit 28/10 10:30) cộng 108 đường dẫn chưa commit (79 mã/cấu hình/test, 29 tài liệu, 2 xóa); mã/cấu hình/test SHA-256
+  `85e05945f081d667eb16d2763e9491cab8ea1de4d088fa4d3a1890574812cd93`.
+- **Cây cuối (Unit, Scripts & Rules lượt cuối, và là cây giao Owner):** cùng `HEAD` cộng 111 đường dẫn (82 mã/cấu hình/test, 29 tài liệu, 2 xóa); mã/cấu hình/test SHA-256
+  `545b7119609538284c407f65f157f8660948d1a5979d8e08bd1d20b3a6906fb8`; tài liệu không ghim băm vì chính tệp này thuộc tập tài liệu (mỗi lần cập nhật ghi chú lại đổi băm). Khác cây trên đúng ba tệp
+  `.github/workflows/ci.yml`, `scripts/ops/deploy-release.sh`, `src/infrastructure/health/health.controller.ts`.
+
+Bốn nhóm theo chính sách Owner:
+
+| Nhóm               | Lệnh / bằng chứng                                                                                                                                                                                                                                                                                                                                                                                                                                                        | Kết quả                                                                                                            |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
+| 1. Unit            | `pnpm check` (gồm rules, format, prisma validate/generate, lint, typecheck, `pnpm test`, scripts, discovery, build) — lượt năm trên cây kiểm chứng, **lượt sáu trên cây cuối**                                                                                                                                                                                                                                                                                           | xanh: 253 suite / 3820 test; 38 + 85 test script/rules; discovery 253 unit · 45 e2e · 269 integration              |
+| 2. Scripts & Rules | nằm trong `pnpm check`; thêm `pnpm rules:check`, `pnpm rules:format`, `git diff --check`, quét thủ công gate `contract-objects-unused` và gate bảng SQL thô                                                                                                                                                                                                                                                                                                              | xanh; 0 lỗi khoảng trắng; `git ls-files '*.dump' '*.backup' '*.sql.gz'` rỗng; workflow không tải lên đường sao lưu |
+| 3. Prisma schema   | `prisma migrate deploy` → `migrate diff --from-config-datasource --to-schema prisma --exit-code` trên CSDL rỗng bằng role thường `ci_integration`; diễn tập: CSDL rỗng (preflight `READY` → deploy → inspect); dữ liệu có sẵn "mốc đã gán" (preflight `READY` kèm 4 đối soát R1/R2 → deploy → ràng buộc, 8 đối tượng bị gỡ, 5 bản Audit, checksum bản ghi từ chối không đổi); 6 ca âm (`RAISE`, checksum không đổi); image tương thích `fba4dfe` qua **11/11** migration | drift rỗng, 124 migration, 0 lỗi lịch sử; diễn tập đạt                                                             |
+| 4. Integration     | `pnpm test:integration` (`TEST_DATABASE_ADMIN_URL` role thường, `TEST_DATABASE_BOOTSTRAP_URL` superuser của container cô lập) — lượt cuối trên cây ổn định                                                                                                                                                                                                                                                                                                               | xanh: 268 suite đạt, 1 bỏ qua theo thiết kế (`object-storage-real`, cần S3 thật); 3453 test đạt, 4 bỏ qua; 46 phút |
+| OpenAPI            | `pnpm openapi:export` hai lượt + so `openapi.json`                                                                                                                                                                                                                                                                                                                                                                                                                       | trùng byte (3 tệp, 287 thao tác); qua cổng dialect                                                                 |
+
+**Lượt lỗi đã sửa (không che):** `pnpm check` lượt 2 đỏ ở lint (hai `require-await` trong test); lượt 3 đỏ ở 5 gate/spec (SQL thô trên bảng của module khác trong chú thích, hai `@Injectable` trong một file,
+hợp đồng nội module thiếu, mock rò trong spec đầu phòng, mảng lồng chưa đăng ký); lượt 4 đỏ ở một hợp đồng nội module (bộ ánh xạ lỗi tài khoản dịch vụ) — mỗi lần sửa rồi chạy lại toàn bộ.
+Lượt integration chẩn đoán đầu tiên (một phần) đỏ ở cả 37 suite đã chạy: lỗi hệ thống của suite cũ (quyền hạn `QĐ-87`, seat lệch phòng sở hữu, nháp, sự kiện về Super Admin) cộng lỗi sản phẩm thật
+F83(c), F86 → F90 ([impact matrix mục 3.10](impact-matrix.md#310-phát-hiện-trong-giai-đoạn-iii--lượt-chạy-integration-đầu-tiên-prompt-04-28102026)); sửa theo ba phần suite song song (mỗi phần một
+PostgreSQL riêng), rồi **một lượt đầy đủ trên cây ổn định** ở bảng trên. Một lỗi hạ tầng của chính tôi trên migration `…100600` (kiểu `'SYSTEM'` trong `UNION ALL`) bắt được ở lần áp chuỗi đầu tiên và sửa trước khi vào tree.
+
+**Ba tệp bị sửa ngoài gói này giữa lúc kiểm chứng (28/10/2026 13:50 → 13:52, không phải do tác nhân của gói; ghi vì làm đổi cây):**
+
+- `.github/workflows/ci.yml`: bước `Run API E2E tests` nay chỉ còn là **đoạn comment** kèm ghi chú tiếng Việt (mất chú thích `HTTP-E2E-DEFERRED-BY-OWNER`, điều kiện bật lại và dạng `if: ${{ false }}` của gói);
+  bước `Run isolated PostgreSQL integration tests` cũng bị comment (CI **không còn chạy integration**); `timeout-minutes` 65 → 15. Đây là quyết định CI của Owner, ngoài phạm vi và chính sách của gói (chính sách chỉ cho hoãn đúng bước E2E);
+  integration của gói đã chạy cục bộ ở trên. Việc bật lại hai bước: bỏ comment, khôi phục `if: github.ref == 'refs/heads/main'` và env của bước integration, đưa `timeout-minutes` về mức đủ cho integration (~50 phút chạy cục bộ).
+- `scripts/ops/deploy-release.sh`: thời hạn probe sẵn sàng của API 5000 → 10000 ms. `src/infrastructure/health/health.controller.ts`: `READINESS_TIMEOUT_MS` 1500 → 5000.
+  Không test nào ghim hai giá trị này; `pnpm check` lượt sáu (gồm `health.controller.spec`, `deploy-release.test.mjs`, `deployment-roles.spec`) xanh trên cây cuối; suite integration duy nhất chạm `/health/ready` kiểm đường thành công (200).
+  Integration **không** chạy lại trên cây cuối vì ba tệp này không nằm trên đường nào của suite integration; nếu Owner cần bằng chứng nghiêm ngặt, chạy lại `pnpm test:integration` trên cây cuối (~50 phút, máy rảnh).
+
+**Chưa thực hiện / không chứng minh:**
+
+- **HTTP E2E** (`pnpm test:e2e`): hoãn theo Owner — `HTTP-E2E-DEFERRED-BY-OWNER`; suite và lệnh giữ nguyên trong repo. Trạng thái bước CI: xem mục ngay trên (nay là comment của Owner).
+  Số thao tác OpenAPI trong `api-inventory.e2e-spec.ts` đã cập nhật 279 → 287 (chưa chạy).
+- **Diễn tập bước 5** (phục hồi H7 giả lập bằng `deploy-release.sh` với host giả lập và image): **không chạy**; logic phục hồi do suite H7 hiện có và cổng tĩnh phủ, ranh giới bản tương thích do bước 4 phủ.
+  Bước 6 chỉ chạy tới preflight → `migrate deploy` → kiểm ràng buộc; **chưa** chạy `ops:db-roles reconcile/verify` và vòng đóng năm tài chính hai lượt trên dữ liệu diễn tập (suite `budget-year-end`, `database-roles-*` phủ ở nhóm 4).
+- **Không chạy** trên máy chủ, CSDL hoặc `.env` thật; không stage/commit/push/deploy; `pnpm check` có `prisma validate/generate` nạp `.env` cục bộ theo cấu hình của chính lệnh (không kết nối CSDL).
+- **`P04-CPE-01`** (`password-self-service-mail` đỏ ở `beforeAll`): **vẫn mở** — không tái hiện trong lượt cuối (suite đạt), không có bằng chứng nguyên nhân; không ghi "đóng".
+- Rủi ro tải: ba suite spawn CLI (`cost-center-direction-cli`, `subscription-owner-assignment-cli`) và vài suite có cửa sổ thời gian đạt khi chạy riêng/máy rảnh, đỏ khi chạy song song nhiều tiến trình — chạy `pnpm test:integration` trên máy rảnh.
+
+**Ứng viên dọn kiến trúc nguồn (chỉ ghi):** thêm vào danh sách ở _Giai đoạn I_: `test/support/super-admin-event-runner.ts` dùng chung cho ba suite thủ tục (hai suite còn bản sao riêng); `kindOfType` của nháp không còn dùng trong mã sản phẩm; bước `Run API E2E tests` cần thiết kế lại cùng HTTP E2E.
+
+### Giai đoạn II lần hai và chính sách kiểm chứng thu hẹp (Prompt 04, 28/10/2026, mục 9.8 → 9.9)
+
+Cùng Prompt 04, cùng work item; không tạo prompt hay hạng mục mới. Review báo cáo cuối nêu bốn điểm sản phẩm (F91 → F94, [impact matrix mục 3.11](impact-matrix.md#311-phát-hiện-trong-giai-đoạn-ii-lần-hai--review-báo-cáo-cuối-prompt-04-28102026-mục-98--99));
+sau đó Owner (mục 9.9) hoãn cả Integration và HTTP E2E ở local và CI. **Chỉ sửa mã/test/tài liệu; không chạy Integration, E2E, diễn tập dữ liệu thật, H7 recovery, `ops:db-roles reconcile/verify` hay đóng năm hai lượt.**
+
+**Đã làm trong lượt này:**
+
+- F91: `assess` quyết cổng Cost Center theo nhánh; migration `20261029101100` nới CHECK; `AccessRequestRecord.costCenterId` và wire `costCenter` (Request, preview) nullable; `chargedCostCenterId` cho đường chi; tài khoản dịch vụ **tạm** giữ cổng ở mọi nhánh (`chargedToUnit`) — chờ Owner xác nhận `OD-SA-FREE-CC`; `RequestUseRepo.ofCostCenter` chỉ tính Request có chi phí; guard ở `AccessRequestRepo.insert`.
+- F92: `accessRequestGet` trả `{ draft }` cho người tạo nháp (`readOwn`), 404 như cũ cho người khác.
+- F93: `readinessDiagnostic` ở API; `READY_PROBE` chỉ in status/mã/request id; giữ nguyên các timeout Owner đã đổi (5 s / 10 s / 15 s).
+- F94: hai bước CI giữ tắt kèm nhãn `HTTP-E2E-DEFERRED-BY-OWNER`, `INTEGRATION-DEFERRED-BY-OWNER` (`if: ${{ false }}`), điều kiện gốc và cách bật lại trong comment; `timeout-minutes: 15` của Owner giữ nguyên, chưa đo thời gian thật của `pnpm check`.
+- F24: phân định (source + unit); kiểm đua DB thật hoãn.
+- Test viết/cập nhật (không chạy phần cần DB): unit `request-assessment.service.spec`, `request-draft.service.spec`, `provisioning-task-frame.service.spec`, `readiness-diagnostics.spec`, `health.controller.spec`, `grant.policy.spec`, `access-request.policy.spec`;
+  script `scripts/verify/ready-probe.test.mjs`; integration (nguồn) `finance-setup-gate`, `access-request-draft-constraints`, `final-vocabulary-compatibility`, `access-request-preview`.
+
+**Ba nhóm chạy (mục 9.9), trên một cây ổn định — kết quả ở bảng _Verification and handoff_ khi đã chạy:** (1) Unit = `pnpm check` (không gọi Integration/E2E — kiểm bằng đọc script `check`); (2) Scripts & Rules = `rules:test`/`test:scripts` bên trong `pnpm check`, tính một lần;
+(3) Prisma Schema Drift = một CSDL PostgreSQL 17 trống cô lập, `migrate deploy` tiến rồi `migrate diff --from-config-datasource --to-schema prisma --exit-code`. Cộng kiểm tra artifact: `pnpm openapi:export` hai lần so byte, kiểm kê ngữ nghĩa (thao tác/schema/status/security/ví dụ).
+Nhóm drift chỉ chứng minh migration tạo đúng schema Prisma trên CSDL **trống**: không chứng minh hành vi trên dữ liệu có sẵn, quyền runtime, đồng thời hay khả năng phục hồi.
+
+**`deferred-by-owner-test-policy` (chưa kiểm chứng — không phải xanh, không phải lỗi sản phẩm):** toàn bộ Integration (`pnpm test:integration`) kể cả ca mới F91/F92 và CHECK mới; HTTP E2E; diễn tập migration dữ liệu có sẵn (mục _Diễn tập_ bước 3 → 8) và walk image lưu trữ; H7 recovery thật sau migration cuối, bước 5; `ops:db-roles reconcile/verify` sau migration cuối;
+đóng năm hai lượt; barrier đồng thời F24 và mọi test đồng thời trên PostgreSQL. Lượt chạy lịch sử (Integration 268 suite · 3453 test, drift, diễn tập) gắn với **cây đã chạy** (HEAD `7569071` + 108 path), **không** là bằng chứng cho cây cuối này.
+
+**Chặn rollout thật (giữ, không phải chặn lượt local):** (1) Task 1.2b action 9 (`REAL-ROLLOUT-PENDING-ACTION-9`); (1b) **`OD-SA-FREE-CC`** (quyết định Owner, không chặn local): Request tài khoản dịch vụ của phần mềm nội bộ không phí ở phòng chưa có Cost Center — giữ cổng (hiện tại) hay cho gửi rồi gác ở bước cấp; (2) **`P04-CPE-04`** — image tương thích `fba4dfe` không đọc được Request nội bộ không phí có `cost_center_id` NULL do bản cuối ghi: chọn một trong ba phương án ở impact matrix 3.11 trước khi triển khai thật (đề xuất: guard rollback + sửa tiến);
+(3) `P04-CPE-01` vẫn mở (không tái hiện, nguyên nhân chưa biết).
+
+**Ghi cho lần sau (không làm ở đây):** thiết kế lại runner Integration và HTTP E2E (Owner); dọn kiến trúc nguồn — ứng viên: `RequestAssessmentService` (đang vừa đọc nhánh vừa gác Cost Center), `AccessRequestRecord.costCenterId` nullable lan ra các đọc đường chi (đã gom qua `chargedCostCenterId`; cân nhắc kiểu phân biệt Request trả phí/miễn phí), `access-requests.controller.ts` (nhánh dự phòng đọc nháp).
+
+**Kết quả ba nhóm (28/10/2026) — cây: HEAD `7569071` + 150 đường dẫn chưa commit (131 sửa, 2 xóa, 17 mới; index rỗng, 0 stash); định danh 118 đường dẫn mã/cấu hình/test (SHA-256 của danh sách `sha256(tệp)` đã sắp xếp) `4471b434ee2605613c7d8b3444a9530cd0e42fb3dfd40b4d71a09f1f2e5db852`. Mỗi nhóm một dòng:**
+
+| Nhóm                       | Lệnh / môi trường                                                                                                                                                                                                                                    | Kết quả                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1. Unit Tests              | `NODE_OPTIONS=--max-old-space-size=4096 pnpm check` (rules:check, rules:test, rules:format, format:check, prisma validate/generate, lint, typecheck, Jest, scripts, discovery, build)                                                                | **Lượt 1 đỏ:** Jest 258/259 suite, 3 848/3 849 test — `src/deployment-roles.spec.ts` (H7-OPS-RV-04, mẫu `r.ok?0:1` ghim điều kiện _chỉ 2xx_ của probe) đỏ vì probe mới của F93 đổi dạng; các bước sau Jest chưa chạy. Sửa probe giữ đúng dạng được ghim (không sửa gate). **Lượt 2 xanh, exit 0:** Jest **259 suite · 3 849 test**, discovery (unit 259 · e2e 45 · integration 269 tệp được liệt kê, **không thực thi**), build. Script `check` không gọi Integration/E2E (kiểm trong log: 0 lệnh `test:integration`/`test:e2e`). |
+| 2. Scripts & Rules Tests   | bên trong `pnpm check`, tính một lần                                                                                                                                                                                                                 | `rules:test` **38/38**; `test:scripts` **91/91** (gồm `ready-probe.test.mjs` 6 ca và `deploy-release.test.mjs` với `docker` giả — không Docker/CSDL thật); không chạy riêng lại.                                                                                                                                                                                                                                                                                                                                                  |
+| 3. Prisma Schema Drift     | PostgreSQL 17.11 trống, container tạm `slm-p04-final-drift-db` (127.0.0.1:55436), vai thường `ci_integration` (`CREATEDB`, không superuser), `DATABASE_URL` tường minh, `DOTENV_CONFIG_PATH` trỏ tệp không tồn tại (không đọc `.env` nhà phát triển) | `prisma migrate deploy` áp **125** migration (migration cuối là `20261029101100_access_request_internal_free_without_cost_center`; guard `DO $$` của nó chạy trên PostgreSQL thật), `prisma migrate diff --from-config-datasource --to-schema prisma --exit-code` ⟹ **"No difference detected", exit 0**; CHECK đọc lại đúng dạng. Container đã xóa đúng tên (0 container `slm-p04*` còn lại). Chỉ chứng minh migration tạo đúng schema Prisma trên CSDL **trống**.                                                               |
+| Artifact (không phải nhóm) | `pnpm openapi:export` rồi xuất lần hai ra tệp tạm, `cmp`; kiểm kê ngữ nghĩa so bản trước                                                                                                                                                             | hai lần **trùng byte** (SHA-256 `942eb45b1c512b7ecd98a2788360cc8d89bf7ac770f3e11c35a2ed565d91a228`); OpenAPI 3.0.0, **287 thao tác không đổi**, 0 đổi status/security, +1 schema `AccessRequestOrDraftResponseDto`, 6 schema đổi `costCenter` thành nullable (`AccessRequestResponseDto`, `PreviewResponseDto`, `DraftSubmitResponseDto`, `DelegatedResponseDto`, `RenewalResponseDto`, `GroupResponseDto`); validator dialect của exporter xanh.                                                                                 |
+
+**Rà soát nguồn độc lập (chỉ đọc) trước khi chạy:** một tác nhân review diff F91 → F94 và quét NULL của `cost_center_id`; kết luận quét NULL và đường đi của Request nội bộ không Cost Center **sạch**. Đã sửa theo review: probe in `request undefined` (lỗi thật, test của tôi đã bắt được), assertion log của `health.controller.spec`
+không thể đúng và spy rò, `readinessDiagnostic` không được ném trong `catch`, `docker exec` stderr gộp một dòng ≤ 200 ký tự, guard ở `AccessRequestRepo.insert`, test nhóm chặt (422 `GROUP_REQUEST.PLAN_NOT_ELIGIBLE`), unit cho nhánh nháp của controller và `save`, `RequestUseRepo.ofCostCenter` chỉ tính Request có chi phí. Ghi nhận không sửa: `kindOfType` chỉ còn spec dùng (có từ F86, không thuộc lượt này);
+lô ủy quyền là một giao dịch nên một mục trả phí ở phòng không Cost Center từ chối cả lô (khớp "Request bị từ chối không để lại gì"; cần Owner xác nhận nếu muốn tách mục nội bộ); tên CHECK `…_unless_draft` không còn mô tả đủ quy tắc (chỉ là tên); `timeout-minutes: 15` của Owner chưa được đo với `pnpm check` + build trên runner CI (log cục bộ: `pnpm check` ≈ 7 phút trên máy này).
+
+**Báo cáo giảm chuẩn:** trạng thái `correction-ready-local (reduced-verification)` **với điều kiện** Owner chấp nhận hai điểm còn mở dưới đây; **chưa** có bằng chứng DB/HTTP: Integration, E2E, diễn tập dữ liệu có sẵn, H7 recovery thật, `ops:db-roles reconcile/verify`, đóng năm hai lượt, đua đồng thời F24 — tất cả `deferred-by-owner-test-policy`.
+**Cập nhật quyết định Owner 28/10/2026:** `OD-SA-FREE-CC` = A, đã đóng: Request tài khoản dịch vụ, kể cả phần mềm nội bộ không phí, bị chặn ngay khi gửi nếu phòng chưa có Cost Center (409 `FINANCE.SETUP_INCOMPLETE`, không ghi); chỉ cho gửi sau khi có Cost Center. Khớp code hiện tại, không có thay đổi runtime hay lý do chạy lại full suite. Các câu "chờ Owner xác nhận" ở bằng chứng mục 9.9 phía trên ghi trạng thái trước quyết định này. Không hỏi lại A/B. `P04-CPE-04` + Task 1.2b action 9 vẫn mở riêng và chặn rollout thật (`REAL-ROLLOUT-PENDING-ACTION-9`); `P04-CPE-01` vẫn mở.
+
+### Mục 9.10 — `P04-CPE-04` và bàn giao action 9 (28/10/2026)
+
+**Đầu vào:** HEAD `7569071` + 150 đường dẫn (định danh mã/cấu hình/test `4471b434…f852` = mục 9.9, kiểm lại trước khi sửa); index rỗng,
+0 stash; Docs `578f442` (chỉ đọc). `OD-SA-FREE-CC` = A (Owner 28/10/2026), giữ mã. Skill: `using-superpowers`, `executing-plans`
+(quy trình), `source-driven-development` (tài liệu Docker chính thức về `LABEL`, `docker image inspect`, `compose stop`),
+`deprecation-and-migration`, `code-review-and-quality` (+ một tác nhân review chỉ đọc), `security-and-hardening`,
+`planning-and-task-breakdown` (ánh xạ: kế hoạch nằm trong plan này, không tạo `tasks/plan.md`), `verification-before-completion`.
+
+**Đã làm:** [spec L.12](spec.md#l12-đích-quay-về-phải-đọc-được-dữ-liệu-p04-cpe-04-prompt-04-mục-910-28102026) — nhãn image + `ops:preflight
+--recovery-target` + phán định trước migrate và khi phục hồi (dừng ứng viên trước) + bước 0 rollback tay + cài mới không đường quay về;
+runbook [Task 1.2b action 9](../../../guides/containers.md#task-12b-action-9-on-a-real-server-two-paths) hai đường; mẫu bằng chứng ở Task
+1.2b; impact matrix [3.12](impact-matrix.md#312-mục-910--p04-cpe-04-và-bàn-giao-action-9-prompt-04-28102026). Review chỉ đọc tìm thêm
+(đã sửa): đăng ký `recovery-target.ts` vào `CLI_ENTRY_FILES` của `architecture-boundaries`; Prettier; phán định tối đa ba lần, mỗi lần
+≤ 120 s; dừng ứng viên qua tệp Compose của ứng viên; spec Dockerfile chịu CRLF; test ghim phán định chạy từ ứng viên; giới hạn (e) lỗi đổi
+tên marker sau readiness ghi ở runbook/spec.
+
+**Sự cố giữa lượt (19:18–19:19):** tệp `scripts/ops/deploy-release.sh`, `.github/workflows/ci.yml`, `.github/workflows/deploy.yml` bị
+sửa ngoài phiên này (bản HEAD + `READY_TIMEOUT=300`; `ci.yml` về dạng comment có câu "100%"; `deploy.yml` thêm `--ready-timeout 300`),
+làm mất kiểm soát mới và phần F93 của script. Không tự hoàn tác; hỏi Owner, **Owner trả lời 28/10/2026:** (1) áp lại kiểm soát
+`P04-CPE-04` và probe F93 lên tệp hiện tại, giữ `READY_TIMEOUT=300`; (2) khôi phục nhãn F94 (`if: ${{ false }}`, không câu "100%"), giữ
+`timeout-minutes: 15`; (3) 300 là **mặc định của script**, workflow không ghi đè ⟹ bỏ `--ready-timeout 300` khỏi `deploy.yml` (nay trùng
+HEAD), sửa ghim `src/deployment-roles.spec.ts` thành `^READY_TIMEOUT=300$` và runbook "at most 300 s". Phần probe F93 dựng lại đúng văn
+bản mục 9.9 (mọi mốc khác của script lệch đúng 6 dòng = 2 dòng chú thích + 4 dòng khối probe).
+
+**Kiểm chứng (cây cuối: HEAD `7569071` + 162 đường dẫn — 141 sửa, 2 xóa, 19 mới; định danh 128 đường dẫn mã/cấu hình/test
+`a9de8dd58c7065b8e716214be24ee9fa4ef860dffe644d17b6af1cc70521cfe9`, trùng trước và sau lượt chạy):**
+
+| Nhóm                       | Lệnh / môi trường                                   | Kết quả                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| -------------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1. Unit Tests              | `NODE_OPTIONS=--max-old-space-size=4096 pnpm check` | **Lượt 1 đỏ (exit 1):** Jest 260 suite · 3 861 test xanh; `test:scripts` đỏ 4 ca mới — mẫu `case` của Docker giả thiếu `/` trước `migration-preflight-cli.js` nên stand-in phán định không bao giờ chạy (lỗi harness của tôi, không phải lỗi script). Sửa mẫu; khối mới 10/10; đột biến M1 (bỏ cổng phục hồi) đỏ 3 ca, M2 (bỏ dừng ứng viên) đỏ 4 ca, script khôi phục trùng byte. **Lượt 2 xanh, exit 0:** Jest **260 suite · 3 861 test**, discovery (unit 260 · e2e 45 · integration 269 tệp, chỉ liệt kê), build; log không có lệnh Integration/E2E nào. |
+| 2. Scripts & Rules Tests   | bên trong `pnpm check` lượt 2, tính một lần         | `rules:test` **38/38**; `test:scripts` **101/101** (gồm 10 ca _the way back_, Docker giả, phán định là stand-in)                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| 3. Prisma Schema Drift     | không chạy                                          | không đổi schema hay migration ⟹ không cần (mục 9.10 D)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| Artifact (không phải nhóm) | hash `openapi.json`                                 | không đổi nguồn OpenAPI ⟹ không export lại; SHA-256 `942eb45b1c512b7ecd98a2788360cc8d89bf7ac770f3e11c35a2ed565d91a228` (trùng mục 9.9)                                                                                                                                                                                                                                                                                                                                                                                                                       |
+
+**Chưa kiểm (`deferred-by-owner-test-policy`):** repository `recoveryTargetFacts` trên PostgreSQL thật; deploy/phục hồi/rollback trên Docker
+thật; image `fba4dfe` thật đọc dòng NULL. `P04-CPE-04` là `mitigated-locally`, **không** phải đã kiểm vận hành. **Cần Owner:**
+`OD-CPE-04` (đề xuất A — spec L.12) trước rollout thật. Action 9 `pending-operator` (không lệnh máy chủ nào được chạy). **Dọn:** không
+container/CSDL tạm; tệp tạm chỉ trong scratchpad của phiên; thư mục `%TEMP%\slm-deploy-release-dg9d4N` (tạo 19:15:42, trước mọi lượt
+test của tôi) không phải của phiên này nên **không** xóa.
+
 ## Verification and handoff
+
+### Review mục 9.10 và quyết định Owner — 28/10/2026
+
+- Skill review: `using-superpowers`, `source-driven-development`, `code-review-and-quality`, `deprecation-and-migration`,
+  `verification-before-completion`. Đọc source recovery/CLI/SQL, Dockerfile, workflow, spec L.12 và runbook; đối chiếu Docker Docs
+  về `LABEL`, `image inspect`, `compose stop`. Không audit lại toàn bộ G0–G6, không chạy Integration/E2E/diễn tập.
+- **`OD-CPE-04` = A, Owner đã chấp thuận trong lượt review này:** giữ cơ chế từ chối phục hồi không an toàn, chấp nhận API có thể tạm
+  ngưng tới bản sửa tiến. Quyết định đã đóng; ghi chú "cần Owner" ở báo cáo trước là lịch sử. Action 9 vẫn `pending-operator` và
+  `P04-CPE-04` chỉ `mitigated-locally`, chưa kiểm Docker/PostgreSQL thật.
+- Kiểm độc lập: `recovery-target.spec.ts` + `deployment-roles.spec.ts` **28/28 xanh**; rules **287 file / 2 544 link / 0 lỗi**;
+  hash OpenAPI `942eb45b1c512b7ecd98a2788360cc8d89bf7ac770f3e11c35a2ed565d91a228` khớp; `git diff --check` exit 0. HEAD vẫn
+  `7569071`, 162 path (141 sửa, 2 xóa, 19 mới), index rỗng. Không chạy lại full `pnpm check`/drift.
+- **`P04-CPE-05` — khoảng trống kiểm chứng cleanup Windows (nguyên nhân chưa xác định, không kết luận lỗi sản phẩm):**
+  `node --test --test-name-pattern="the way back" scripts/verify/deploy-release.test.mjs` lần đầu không vào logic vì sandbox chặn
+  thư mục TEMP. Chạy lại với quyền phù hợp và TEMP/TMP riêng trong workspace: **9/10 ca xanh**, ca fresh install đã qua assertion nhưng
+  `afterEach` tại `scripts/verify/deploy-release.test.mjs:617` lỗi `rmSync` với `EPERM`. Vì vậy lượt review này exit 1; không được đổi thành
+  10/10 hoặc gọi đây là hồi quy deploy. Chưa biết handle thuộc fixture, công cụ khác hay môi trường. Không retry suite để lấy xanh.
+  Chỉ chẩn đoán owner của handle/lifecycle và chạy lại đúng vùng bị ảnh hưởng khi có lý do; không tăng retries/timeouts, nuốt EPERM,
+  kill process theo tên, đổi production deploy hoặc chạy lại full audit/full suite vì lỗi cleanup này.
+- Dọn tài nguyên review: root tạm `.tmp-p04-review-910-20261028` và fixture `slm-deploy-release-m12s3u` đã xóa đúng tên sau khi xác minh
+  đường dẫn trong workspace và không có reparse point; kết quả `FixtureRemains=False`, `ReviewRootRemains=False`. Không container/DB
+  được tạo, không đụng thư mục tạm của session khác. Chỉ cập nhật tài liệu và prompt; không stage/commit/push/deploy.
+
+### Mục 9.10 E — chẩn đoán `P04-CPE-05` (28/10/2026, lượt tác giả, tách khỏi lượt review ở trên)
+
+**Đầu vào:** HEAD `7569071` + 162 đường dẫn, định danh mã/cấu hình/test `a9de8dd5…cfe9` (= cuối mục 9.10), index rỗng, 0 stash.
+`OD-CPE-04` = A đã đóng. Skill: `superpowers:systematic-debugging` (quy trình: bằng chứng trước sửa), `verification-before-completion`.
+Máy: Windows 11, Node 24.0.1, Git Bash 5.2.37 (MSYS), không có `flock` (dùng stand-in), Defender real-time **bật**; không có
+`handle.exe`, `openfiles` cần cờ toàn cục, phiên không phải admin ⟹ không liệt kê trực tiếp được chủ handle.
+
+**Bằng chứng (thu trước mọi lượt chạy lại):**
+
+1. **Fixture lạc `%TEMP%\slm-deploy-release-dg9d4N`** (tạo 19:15:42, không do phiên này): host không fresh; script đã lấy khóa
+   (`.deploy.lock` ghi `pid 2100 … attempt 40177719652-2 since 2026-10-28T12:15:42Z`) rồi dừng trước Docker (không `docker-*.log`, không
+   `docker-state`, không `attempts/`). Docker giả trong đó **trùng byte** với bản dựng từ `deploy-release.test.mjs` của HEAD `7569071`
+   (5 328 byte; cây làm việc 7 299 byte) ⟹ khớp Docker giả của **harness cũ**; byte equality không xác định được checkout/bản sao hay phiên
+   tạo nó. Không xác định được là bị dừng giữa chừng hay `rm` lỗi; harness cũ `pop()` trước `rm` nên một lần xóa lỗi cũng làm mất dấu thư mục. **Giữ nguyên** (không phải
+   của phiên này) — Owner xóa theo đúng đường dẫn nếu muốn.
+2. **Tự kiểm (`cpe05-selftest2`, thư mục tạm trong scratchpad, đã xóa):** tiến trình **MSYS** giữ cwd **và** fd mở trong thư mục ⟹ `rmSync`
+   **xóa được**; tiến trình Windows gốc mở tệp (chia sẻ xóa) ⟹ xóa được; tiến trình Windows gốc có **cwd** trong thư mục ⟹ `EPERM (rm)`.
+   libuv `src/win/error.c`: `EPERM` ⟸ `ERROR_ACCESS_DENIED` hoặc `ERROR_PRIVILEGE_NOT_HELD`; vi phạm chia sẻ là `EBUSY`
+   (<https://github.com/libuv/libuv/blob/v1.x/src/win/error.c>). ⟹ `EPERM` của review là **từ chối truy cập** (quyền/ACL sandbox, cwd của tiến
+   trình gốc, hoặc mục đang chờ xóa là các giả thuyết). Các tự kiểm chưa tái hiện lỗi bằng handle MSYS của fixture; không chứng minh loại trừ mọi tình huống MSYS.
+3. **Đường lệnh của script dưới PATH của harness:** `docker`, `flock` là bản giả trong `bin/` của fixture; mọi lệnh khác (`timeout`,
+   `sha256sum`, `perl`, …) là MSYS `/usr/bin`. Không có chương trình Windows gốc nào chạy với cwd trong fixture (launcher `bin/bash.exe`
+   giữ cwd của Node). Chưa thấy đường sinh tiến trình Windows gốc có cwd trong fixture; đây không phải bằng chứng xác định root cause của lượt review.
+4. **Lượt chẩn đoán R1** (cùng điều kiện review: root TEMP/TMP mới trong workspace `.tmp-p04-cpe05-diag-20261028T134640Z`, không sandbox; hook
+   chỉ đọc `cpe05-rm-probe.mjs` qua `--import` bọc `fs.rmSync`, ghi thời gian/bằng chứng rồi **ném lại** lỗi nguyên vẹn): khối _the way back_
+   **10/10**, 11 fixture xóa trong **8–14 ms** mỗi cái (không lần thử lại, không tranh chấp handle), root rỗng; đã xóa root đúng tên.
+
+**Kết luận:** nguyên nhân `EPERM` **chưa xác định được tới cùng** — không tái hiện ở lượt tác giả; sandbox/quyền, tiến trình bên ngoài và
+khác biệt môi trường là các giả thuyết, chưa phải kết luận nguyên nhân. Không suy ra chắc chắn fixture không thể gây EPERM chỉ từ các ca tự kiểm. Ghi
+`P04-CPE-05` là **giới hạn kiểm chứng của môi trường review**, không phải lỗi sản phẩm hay deploy. **Môi trường được hỗ trợ cho nhóm
+Scripts & Rules:** phiên Windows thường (không sandbox hạn chế quyền xóa), Git for Windows bash, `TEMP`/`TMP` là thư mục người chạy có quyền
+xóa đầy đủ (TEMP hệ thống, hoặc root mới trong workspace ghi lại đường dẫn); một `EPERM` khi dọn fixture là thất bại của lượt chạy, ghi
+nguyên văn, không lặp lại để lấy xanh.
+
+**Lỗi harness có thật (sửa, nhỏ nhất):** `afterEach` làm `rmSync(created.pop(), …)` — **lấy ra khỏi registry trước khi xóa**, nên một lần xóa lỗi
+làm mất dấu thư mục (đúng điều mục 9.10 E cấm). Sửa: `removeFixtures(registry)` xóa phần tử cuối **rồi mới** `pop()`; lỗi ném nguyên vẹn
+(nêu đường dẫn), thư mục đó và các thư mục cũ hơn còn trong registry cho lượt dọn sau. Không đổi `maxRetries`/`retryDelay`, thứ tự dừng tiến
+trình, không sleep, không nuốt `EPERM`, không kill theo tên, không đổi `deploy-release.sh`. Test thuần `fixture cleanup registry (P04-CPE-05)`:
+**đỏ trước** trên mã cũ (registry còn `['/tmp/fixture-a']`, mất `fixture-b`), **xanh sau**.
+
+**Kiểm chứng (một lượt, vùng bị ảnh hưởng):** `TEMP=TMP=…/.tmp-p04-cpe05-verify-20261028T135013Z node --test
+scripts/verify/deploy-release.test.mjs` (cả tệp — hook dọn dùng chung) ⟹ **66/66** (8 suite, gồm 10 ca _the way back_ và ca registry mới),
+0 fail/cancelled/skipped, không `EPERM`/`EBUSY`, exit 0, 4 phút 26 giây; root rỗng sau lượt, đã xóa đúng tên (không reparse point).
+`prettier --check` tệp đổi xanh, `node --check` xanh. Không chạy `pnpm check` (chỉ đổi một tệp test `.mjs`; ESLint chỉ quét `.ts`), không
+Integration/E2E/Docker/DB. **Cây cuối:** HEAD `7569071` + 162 đường dẫn (141 sửa, 2 xóa, 19 mới), định danh 128 đường dẫn mã/cấu hình/test
+`784072ddb099121c0a49b28800ce0d3a0e5ec7f1a14021a5c59e8f12091b8c36` (chỉ `deploy-release.test.mjs` đổi so với `a9de8dd5…`). Lượt `pnpm check`
+mục 9.10 gắn với cây `a9de8dd5…cfe9`, không chuyển sang cây này. **Dọn:** hai root workspace đã xóa đúng tên; hook và tự kiểm chỉ ở
+scratchpad của phiên; `%TEMP%\slm-deploy-release-dg9d4N` giữ nguyên (không của phiên này).
+
+**Review chốt local 28/10/2026:** đọc `removeFixtures` và test lỗi-xóa/giữ-registry; chạy độc lập
+`node --test --test-name-pattern="fixture cleanup registry" scripts/verify/deploy-release.test.mjs` ⟹ **1/1 xanh**, không tạo fixture
+Bash/Docker. `node --check`, Prettier, rules (287 file / 2 545 link / 0 lỗi), `git diff --check` sạch; hash OpenAPI vẫn `942eb45b…a228`.
+Không chạy lại toàn tệp 66 test hoặc full suite; kết quả 66/66 là của lượt tác giả ở trên. Chấp nhận bản sửa registry;
+`P04-CPE-05` khép ở mức local, EPERM không tái hiện giữ như giới hạn môi trường chưa rõ nguyên nhân, không cần thêm prompt điều tra.
+Giữ `correction-ready-local (reduced-verification)` / `REAL-ROLLOUT-PENDING-ACTION-9`, không có finding nghiệp vụ mới từ review hẹp này.
+Không coi kết luận này là toàn bộ G0–G6 đã nghiệm thu DB/HTTP hoặc các phần phụ thuộc G7–G10 đã implement.
 
 | Lệnh / kiểm tra AC                                                                                                                                                       | Revision / môi trường                                                                                 | Kết quả thực chạy                                                                                                                                                                                                                                                                                                              | Giới hạn / việc còn lại                                                                                                                                 |
 | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `pnpm typecheck`; `pnpm test` (unit, 224 suite); focused integration F02 (expansion 8, preflight 6, assignment CLI 10, subscription-http 43); F01 schema 13; e2e OpenAPI | `e75f747` + cây làm việc chưa commit; PostgreSQL 17.11 cô lập (container tạm)                         | typecheck 0 lỗi; unit 223 xanh + 1 (`api-collection-contract`) xanh sau làm mới snapshot; 29 suite tạo thuê bao xanh (380); suite tổ chức 436 xanh + 1 đỏ đã nêu; e2e OpenAPI/inventory/subscription 106 xanh; lint các tệp đổi sạch                                                                                           | chưa chạy `pnpm check`, full e2e, full integration, diễn tập migration — chờ hết phase (EXEC-DEC-01)                                                    |
 | Rà soát Checkpoint E (mục 8)                                                                                                                                             | `e75f747` + cây làm việc chưa commit (363 đường dẫn); PostgreSQL 17.11 cô lập (container tạm, đã xóa) | chẩn đoán hai lỗi integration (`migration-setup`: tài nguyên, tái hiện + đối chứng `tmpfs`; `password-self-service-mail`: **chưa xác định**); worker cũ `7c28e75` sau migration tương thích và worker tương thích trên mốc đã gán — outbox 16/25 `CANCELLED` + 1 `SENT`, con trỏ tiến, 0 marker lỗi; kiểm kê cây 277 + 43 + 43 | không có lượt integration đầy đủ xanh; worker chưa thấy sweeper **ghi** (không có Request mở); hai sửa đổi chưa có tác giả; chưa thử trên baseline cuối |
+| Giai đoạn II lần hai, mục 9.9: `pnpm check` (lượt 2) · `migrate deploy` + `migrate diff --exit-code` trên PostgreSQL 17.11 trống · OpenAPI hai lần so byte               | HEAD `7569071` + 150 đường dẫn (SHA-256 mã/cấu hình/test `4471b434…f852`); container tạm đã xóa       | xanh: 259 suite · 3 849 test, rules 38/38, scripts 91/91; drift "No difference detected"; 287 thao tác trùng byte. Chưa chạy: Integration, E2E, diễn tập DB — `deferred-by-owner-test-policy`                                                                                                                                  |
 
 - [ ] AC/finding trong scope có bằng chứng; lỗi đã xử lý hoặc ghi blocker.
 - [ ] Spec/plan/test matrix phản ánh implementation cuối; disposition Owner ghi đủ.

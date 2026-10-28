@@ -205,7 +205,7 @@ export class AssignmentRepo {
     return (tx ?? this.prisma).licenseAssignment.count({ where: { subscriptionId, ...HOLDING(day) } });
   }
 
-  /** Which of these subscriptions have an assignment that has not ended and has not failed as of `day`, in one statement. */
+  /** Which of these ids have an assignment that has not ended and has not failed as of `day`, in one statement. */
   async subscriptionIdsHolding(ids: readonly string[], day: BusinessDate, tx?: DbTx): Promise<Set<string>> {
     if (ids.length === 0) return new Set();
     const rows = await (tx ?? this.prisma).licenseAssignment.findMany({

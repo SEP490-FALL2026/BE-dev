@@ -54,7 +54,8 @@ export interface AccessRequestView extends Omit<
   /** What the Employee declared of software that is not in the catalog; null for any other request. */
   proposal: ProposalRecord | null;
   department: { id: string; code: string; name: string };
-  costCenter: { id: string; code: string };
+  /** Null for a free internal request of a department that has no Cost Center in use (`QĐ-87g(2)`). */
+  costCenter: { id: string; code: string } | null;
   requester: EmployeeRefView;
   /** The one person it is for; null for a request for a group, which reads its people from `GET /access-requests/{id}/lines`. */
   beneficiary: EmployeeRefView | null;
@@ -166,7 +167,7 @@ export class AccessRequestQueryService {
       this.organization.getEmployees(peopleIds),
       record.planId === null ? Promise.resolve([]) : this.catalog.getPlanSummaries([record.planId]),
       this.organization.getDepartmentBrief(record.departmentId),
-      this.organization.costCentersByIds([record.costCenterId]),
+      record.costCenterId === null ? Promise.resolve([]) : this.organization.costCentersByIds([record.costCenterId]),
       record.branch === 'NEW_SOFTWARE' ? this.assessments.findProposal(record.id) : Promise.resolve(null),
       this.spendStatus.of(record),
     ]);
@@ -177,8 +178,8 @@ export class AccessRequestQueryService {
       return { employeeId: found.id, employeeCode: found.employeeCode, fullName: found.fullName };
     };
     const plan = plans[0] ?? null;
-    const costCenter = costCenters[0];
-    if ((record.planId !== null && !plan) || !department || !costCenter) {
+    const costCenter = costCenters[0] ?? null;
+    if ((record.planId !== null && !plan) || !department || (record.costCenterId !== null && !costCenter)) {
       throw new Error(`The request ${record.id} points at a missing record.`);
     }
 
@@ -198,7 +199,7 @@ export class AccessRequestQueryService {
       },
       proposal,
       department: { id: department.id, code: department.code, name: department.name },
-      costCenter: { id: costCenter.id, code: costCenter.code },
+      costCenter: costCenter && { id: costCenter.id, code: costCenter.code },
       requester: person(record.requesterEmployeeId),
       beneficiary: beneficiaryId === null ? null : person(beneficiaryId),
       lineCount: record.beneficiaryEmployeeIds.length,

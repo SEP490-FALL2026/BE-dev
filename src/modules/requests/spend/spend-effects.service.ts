@@ -4,6 +4,7 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { AuditService } from '../../audit/audit.service';
 import { BudgetsService } from '../../budgets/budgets.service';
 import { accessRequestAuditEvent } from '../access-request/access-request-audit-event';
+import { chargedCostCenterId } from '../access-request/access-request.policy';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
 import { BudgetCheckRepo, type CheckRecord } from './budget-check.repo';
@@ -66,7 +67,7 @@ export class SpendEffectsService {
     await this.budgets.holdForRequest(tx, actor, {
       organizationId: request.organizationId,
       requestId: request.id,
-      costCenterId: request.costCenterId,
+      costCenterId: chargedCostCenterId(request),
       snapshotCheckId: check.id,
       currency: check.currency,
       now,

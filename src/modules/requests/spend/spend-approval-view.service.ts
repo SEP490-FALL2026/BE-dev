@@ -4,6 +4,7 @@ import { formatAmount } from '../../../core/money/money';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { CatalogService } from '../../catalog/catalog.service';
 import { OrganizationService } from '../../organization/organization.service';
+import { chargedCostCenterId } from '../access-request/access-request.policy';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
 import { AssessmentRepo } from '../access-request/assessment.repo';
@@ -137,7 +138,7 @@ export class SpendApprovalViewService {
         decision?.decidedByEmployeeId ?? null,
       ]),
       this.organization.getDepartmentBrief(request.departmentId),
-      this.organization.costCentersByIds([request.costCenterId]),
+      this.organization.costCentersByIds([chargedCostCenterId(request)]),
       this.pricing.costEstimate(request.pricing, vendorId),
     ]);
     const person = (id: string) => people.get(id) as NonNullable<ReturnType<typeof people.get>>;

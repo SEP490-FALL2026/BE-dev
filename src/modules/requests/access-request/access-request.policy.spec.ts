@@ -1,4 +1,10 @@
-import { CURRENT_POLICY_VERSION, canViewRequest, mayRequest, policyFor } from './access-request.policy';
+import {
+  CURRENT_POLICY_VERSION,
+  canViewRequest,
+  chargedCostCenterId,
+  mayRequest,
+  policyFor,
+} from './access-request.policy';
 
 describe('who may see a request (BM-01: the requester, the people who decide, the IT Admin)', () => {
   const request = {
@@ -72,5 +78,17 @@ describe('who may send a request (QĐ-87a, SoD-1, F30)', () => {
   it('refuses the Super Admin whatever else they hold', () => {
     expect(mayRequest(['SUPER_ADMIN'])).toBe(false);
     expect(mayRequest(['EMPLOYEE', 'SUPER_ADMIN'])).toBe(false);
+  });
+});
+
+describe('the Cost Center a request is charged to (F91, QĐ-87g)', () => {
+  it('is the one a request that costs money carries', () => {
+    expect(chargedCostCenterId({ id: 'r-1', costCenterId: 'cc-1' })).toBe('cc-1');
+  });
+
+  it('is refused, naming the request, for one that carries none: only a free internal request is without, and nothing is charged for it', () => {
+    expect(() => chargedCostCenterId({ id: 'r-9', costCenterId: null })).toThrow(
+      'The request r-9 is charged to no Cost Center.',
+    );
   });
 });

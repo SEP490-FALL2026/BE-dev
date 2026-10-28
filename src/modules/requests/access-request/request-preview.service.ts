@@ -47,13 +47,13 @@ export class RequestPreviewService {
 
     const [department, costCenters, people, priceView, costEstimate] = await Promise.all([
       this.organization.getDepartmentBrief(unit.departmentId),
-      this.organization.costCentersByIds([unit.costCenter.id]),
+      unit.costCenter ? this.organization.costCentersByIds([unit.costCenter.id]) : Promise.resolve([]),
       this.organization.getEmployees(peopleIds),
       this.pricing.view(pricing),
       this.pricing.costEstimate(pricing, vendorId),
     ]);
-    const costCenter = costCenters[0];
-    if (!department || !costCenter) throw new AccessRequestNoDepartmentError();
+    const costCenter = costCenters[0] ?? null;
+    if (!department || (unit.costCenter && !costCenter)) throw new AccessRequestNoDepartmentError();
     const person = (id: string | null) => {
       const found = id === null ? undefined : people.find((candidate) => candidate.id === id);
 
@@ -72,7 +72,7 @@ export class RequestPreviewService {
       termMonths: body.termMonths,
       projectLabel: body.projectLabel ?? null,
       department: { id: department.id, code: department.code, name: department.name },
-      costCenter: { id: costCenter.id, code: costCenter.code, name: costCenter.name },
+      costCenter: costCenter && { id: costCenter.id, code: costCenter.code, name: costCenter.name },
       requirements: {
         termConfirmationByHead: termNeedsConfirmation(body.termMonths),
       },

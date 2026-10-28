@@ -35,14 +35,17 @@ describe('the outcomes of a request told to the context that listens (integratio
       .expect(200);
     const requests = h.ctx.app.get(RequestsService, { strict: false });
     requests.registerOutcomeListener({
-      requestOutcome: async (_tx, event) => {
+      requestOutcome: (_tx, event) => {
         events.push(event);
+
+        return Promise.resolve();
       },
     });
     requests.registerOutcomeListener({
-      requestOutcome: async (_tx, event) => {
-        if (doomed.has(event.requestId)) throw new Error('The listener refuses this outcome.');
-      },
+      requestOutcome: (_tx, event) =>
+        doomed.has(event.requestId)
+          ? Promise.reject(new Error('The listener refuses this outcome.'))
+          : Promise.resolve(),
     });
   }, 240000);
 

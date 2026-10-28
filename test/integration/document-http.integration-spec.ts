@@ -3,6 +3,7 @@ import request from 'supertest';
 import { ApiAccount } from '../support/api-accounts';
 import { DocumentService } from '../../src/modules/catalog/contract/document.service';
 import { DocumentHarness, PDF, type DocumentWire } from '../support/document-harness';
+import { HR_BASIS } from '../support/hr-basis';
 
 const h = new DocumentHarness();
 const MB = 1024 * 1024;
@@ -29,8 +30,8 @@ describe('the contracts and the files kept for them over HTTP (integration, real
     head = await h.account('E-HEAD', headId, []);
     await request(h.server())
       .post(`/api/v1/departments/${department.id}/head-assignments`)
-      .set(h.as(h.it1))
-      .send({ employeeId: headId, effectiveFrom: h.today() })
+      .set({ Authorization: `Bearer ${h.admin}` })
+      .send({ employeeId: headId, effectiveFrom: h.today(), hrBasis: HR_BASIS })
       .expect(200);
   }, 300000);
 

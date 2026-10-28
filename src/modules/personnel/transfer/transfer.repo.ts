@@ -269,7 +269,7 @@ export class TransferRepo {
 
   /**
    * One page of transfers, newest effective day first, and the total for the same filter, from one snapshot. With
-   * `departmentIds` only the transfers that leave or enter one of those departments are listed (the scope of an IT Admin).
+   * `departmentIds` only the transfers that leave or enter one of those units are listed (the scope of an IT Admin).
    */
   async list(filter: TransferListFilter): Promise<{ items: TransferSummaryRecord[]; total: number }> {
     const where: Prisma.DepartmentTransferWhereInput = {

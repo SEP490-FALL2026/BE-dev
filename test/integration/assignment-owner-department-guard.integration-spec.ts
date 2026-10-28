@@ -1,3 +1,4 @@
+import request from 'supertest';
 import * as policy from '../../src/modules/licensing/assignment/assignment.policy';
 import { ServiceAccountHarness } from '../support/service-account-harness';
 import type { Unit } from '../support/spend-harness';
@@ -40,6 +41,11 @@ describe('a seat of a department sits on a subscription of that department (inte
 
     return id;
   };
+  /**
+   * The grant as the route takes it. The harness grant swaps in the subscription the department of the request owns
+   * (`owned-subscriptions.ts`); this suite sends another department's subscription on purpose, so it must reach the service as sent.
+   */
+  const grant = (body: object) => request(h.server()).post('/api/v1/provisioning-tasks').set(h.as(h.it1)).send(body);
   const rows = async () => ({
     assignments: await h.count('license_assignments'),
     tasks: await h.count('provisioning_tasks'),
@@ -96,9 +102,9 @@ describe('a seat of a department sits on a subscription of that department (inte
       const id = await waiting(u, foreign.plan);
       const before = await rows();
 
-      const refused = await h
-        .grant({ requestId: id, subscriptionId: foreign.id, accountIdentifier: 'ci-bot' })
-        .expect(422);
+      const refused = await grant({ requestId: id, subscriptionId: foreign.id, accountIdentifier: 'ci-bot' }).expect(
+        422,
+      );
 
       expect(h.codeOf(refused)).toBe(MISMATCH);
       expect(await rows()).toEqual(before);
@@ -110,7 +116,7 @@ describe('a seat of a department sits on a subscription of that department (inte
       const own = await subscriptionOf(u.department.id);
       const id = await waiting(u, own.plan);
 
-      await h.grant({ requestId: id, subscriptionId: own.id, accountIdentifier: 'ci-bot' }).expect(201);
+      await grant({ requestId: id, subscriptionId: own.id, accountIdentifier: 'ci-bot' }).expect(201);
 
       expect(await seatOf(id)).toEqual({ owning_department_id: u.department.id, subscription_id: own.id });
     });
@@ -124,9 +130,9 @@ describe('a seat of a department sits on a subscription of that department (inte
       const before = await rows();
       jest.spyOn(policy, 'assertSubscriptionDepartment').mockImplementation(() => undefined);
 
-      const refused = await h
-        .grant({ requestId: id, subscriptionId: guarded.id, accountIdentifier: 'ci-bot' })
-        .expect(422);
+      const refused = await grant({ requestId: id, subscriptionId: guarded.id, accountIdentifier: 'ci-bot' }).expect(
+        422,
+      );
 
       expect(h.codeOf(refused)).toBe(MISMATCH);
       expect(await rows()).toEqual(before);

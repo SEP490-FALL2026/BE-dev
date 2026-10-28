@@ -36,6 +36,21 @@ describe('the vocabulary and the unnamed actors of the next release, read by the
     }
   };
   const get = (path: string, person: Person) => request(h.server()).get(`/api/v1${path}`).set(h.as(person.account));
+  /**
+   * The approval ticket of a procedure run (spec L.2): the "who" of an event that no account did. The final schema asks for exactly
+   * one of the account and the ticket wherever the person is required, so an event the next release wrote by a ticket has the ticket
+   * and no account.
+   */
+  const ticketFor = async (subjectEmployeeId: string, mode: string): Promise<string> =>
+    (
+      await sql<{ id: string }>(
+        `INSERT INTO super_admin_event_tickets
+           (id, organization_id, ticket_ref, mode, subject_employee_id, parameters_digest, approver_ref, operator_ref, environment)
+         VALUES (gen_random_uuid(), $1, $2, $3::"SuperAdminEventMode", $4, 'digest-vc', 'approver-vc', 'operator-vc', 'LOCAL_TEST')
+         RETURNING id`,
+        [h.seed.organizationId, `VC-TICKET-${(sequence += 1)}`, mode, subjectEmployeeId],
+      )
+    ).rows[0].id;
 
   beforeAll(async () => {
     await h.start();
@@ -59,10 +74,11 @@ describe('the vocabulary and the unnamed actors of the next release, read by the
       const proposal = await h.budgetProposed(unit.head, unit.department.unitId);
       const version = await h.built(proposal.id);
       await h.sendVersion(version.id).expect(200);
-      await sql(`UPDATE budget_versions SET state = 'EXPIRED' WHERE id = $1`, [version.id]);
-      // The migration of the next release replaces the CHECK of the state of a proposal by one that allows its new state.
-      await sql(`ALTER TABLE budget_proposals DROP CONSTRAINT budget_proposals_state_check`);
-      await sql(`UPDATE budget_proposals SET state = 'CLOSED_FISCAL_YEAR_ENDED' WHERE id = $1`, [proposal.id]);
+      // The final schema asks for the moment each of the two states ended at (`expired_at`, `closed_at`).
+      await sql(`UPDATE budget_versions SET state = 'EXPIRED', expired_at = now() WHERE id = $1`, [version.id]);
+      await sql(`UPDATE budget_proposals SET state = 'CLOSED_FISCAL_YEAR_ENDED', closed_at = now() WHERE id = $1`, [
+        proposal.id,
+      ]);
 
       const closed = h.dataOf<{ proposal: ProposalWire }>(
         await h.proposalOf(proposal.id, unit.head.account).expect(200),
@@ -150,12 +166,25 @@ describe('the vocabulary and the unnamed actors of the next release, read by the
       expect(read.cancellation).toMatchObject({ cause: 'BENEFICIARY_TRANSFERRED' });
     });
 
-    it('does not see a request being drafted anywhere: 404 for the detail and the timings, no part in a duplicate (F27)', async () => {
+    it('shows a request being drafted only to its creator and as a draft: 404 to anybody else and for the timings, no part in a duplicate (F27, F92)', async () => {
       const unit = await h.departmentWithHead(`P-VC-${(sequence += 1)}`);
       const drafted = await h.sent(unit.member, internalPlan);
-      await sql(`UPDATE access_requests SET state = 'DRAFT' WHERE id = $1`, [drafted.id]);
+      // A draft has no moment it was sent (`access_requests_submitted_unless_draft`) and keeps what it is sent from in `policy.draft`.
+      await sql(
+        `UPDATE access_requests
+            SET state = 'DRAFT', submitted_at = NULL,
+                policy = jsonb_build_object('draft', jsonb_build_object(
+                  'kind', 'INDIVIDUAL', 'planId', plan_id::text, 'businessReason', business_reason, 'termMonths', term_months))
+          WHERE id = $1`,
+        [drafted.id],
+      );
 
-      await h.fetch(drafted.id, unit.member.account).expect(404);
+      const own = h.dataOf<{ draft?: { id: string; kind: string }; request?: unknown }>(
+        await h.fetch(drafted.id, unit.member.account).expect(200),
+      );
+      expect(own.request).toBeUndefined();
+      expect(own.draft).toMatchObject({ id: drafted.id, kind: 'INDIVIDUAL' });
+      await h.fetch(drafted.id, unit.head.account).expect(404);
       await get(`/access-requests/${drafted.id}/timings`, unit.member).expect(404);
       // It holds nobody's place: the same person may ask for the same software again, and that request is readable.
       const again = await h.sent(unit.member, internalPlan);
@@ -175,12 +204,16 @@ describe('the vocabulary and the unnamed actors of the next release, read by the
       await h
         .rescheduleTransfer(wire.id, { newEffectiveOn: h.day(45), reason: 'Another day', grounds: h.grounds })
         .expect(200);
-      await rewrite('department_transfers', 'recorded_by_app_user_id = NULL', 'id = $1', [wire.id]);
+      const ticket = await ticketFor(e1.employeeId, 'TRANSFER_RECORD');
+      await rewrite('department_transfers', 'recorded_by_app_user_id = NULL, recorded_by_ticket_id = $2', 'id = $1', [
+        wire.id,
+        ticket,
+      ]);
       const changes = await rewrite(
         'department_transfer_changes',
-        'changed_by_app_user_id = NULL',
+        'changed_by_app_user_id = NULL, changed_by_ticket_id = $2',
         'transfer_id = $1',
-        [wire.id],
+        [wire.id, ticket],
       );
       expect(changes.rowCount).toBeGreaterThan(0);
 
@@ -205,14 +238,27 @@ describe('the vocabulary and the unnamed actors of the next release, read by the
         await h.recordNotice(sent.id, h.recording({ lastWorkingDay: h.day(6) })).expect(201),
       );
       const caseId = (recorded.recordedEvent as unknown as { id: string }).id;
-      await rewrite('personnel_notice_verifications', 'verified_by_app_user_id = NULL', 'notice_id = $1', [sent.id]);
-      await rewrite('offboarding_cases', 'recorded_by_app_user_id = NULL', 'id = $1', [caseId]);
-      const changes = await rewrite('offboarding_case_changes', 'changed_by_app_user_id = NULL', 'case_id = $1', [
+      const ticket = await ticketFor(e1.employeeId, 'DEPARTURE_RECORD');
+      await rewrite(
+        'personnel_notice_verifications',
+        'verified_by_app_user_id = NULL, verified_by_ticket_id = $2',
+        'notice_id = $1',
+        [sent.id, ticket],
+      );
+      await rewrite('offboarding_cases', 'recorded_by_app_user_id = NULL, recorded_by_ticket_id = $2', 'id = $1', [
         caseId,
+        ticket,
       ]);
+      const changes = await rewrite(
+        'offboarding_case_changes',
+        'changed_by_app_user_id = NULL, changed_by_ticket_id = $2',
+        'case_id = $1',
+        [caseId, ticket],
+      );
       expect(changes.rowCount).toBeGreaterThan(0);
 
-      const notice = h.dataOf<NoticeWire>(await h.readNotice(sent.id, h.it1).expect(200));
+      // How a notice was checked is read by the Super Admin; the IT Admin reads a minimal view without it (F12).
+      const notice = h.dataOf<NoticeWire>(await h.readNotice(sent.id, h.sa).expect(200));
       const read = h.dataOf<{ recordedByAppUserId: string | null }>(await h.readCase(caseId).expect(200));
       const listed = h.dataOf<Pageable<{ changedByAppUserId: string | null }>>(await h.caseChanges(caseId).expect(200));
 
@@ -239,10 +285,17 @@ describe('the vocabulary and the unnamed actors of the next release, read by the
           })
           .expect(201),
       );
-      await rewrite('employee_leaves', 'started_by_app_user_id = NULL', 'id = $1', [started.id]);
-      const changes = await rewrite('employee_leave_changes', 'recorded_by_app_user_id = NULL', 'leave_id = $1', [
+      const ticket = await ticketFor(e1.employeeId, 'LEAVE_START');
+      await rewrite('employee_leaves', 'started_by_app_user_id = NULL, started_by_ticket_id = $2', 'id = $1', [
         started.id,
+        ticket,
       ]);
+      const changes = await rewrite(
+        'employee_leave_changes',
+        'recorded_by_app_user_id = NULL, recorded_by_ticket_id = $2',
+        'leave_id = $1',
+        [started.id, ticket],
+      );
       expect(changes.rowCount).toBeGreaterThan(0);
 
       const read = h.dataOf<{ startedByAppUserId: string | null }>(

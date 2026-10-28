@@ -24,8 +24,8 @@ Trưởng phòng gửi một thông báo `BM-09` có cấu trúc khi nhân viên
 
 ## Primary Story/AC
 
-| Story    | AC        | Coverage | Phần còn lại thuộc |
-| -------- | --------- | -------- | ------------------ |
+| Story    | AC         | Coverage | Phần còn lại thuộc |
+| -------- | ---------- | -------- | ------------------ |
 | US-03-10 | AC-1→AC-10 | full     | —                  |
 | US-03-11 | AC-1→AC-10 | full     | —                  |
 

@@ -56,8 +56,11 @@ const previewSchema = z.strictObject({
   termMonths: z.number().int().positive(),
   projectLabel: z.string().nullable(),
   department: z.strictObject({ id: z.uuid(), code: z.string(), name: z.string() }),
-  /** Read only: the Unit of the department of the day; nothing the sender or a project changes (`US-05-01` AC-7). */
-  costCenter: z.strictObject({ id: z.uuid(), code: z.string(), name: z.string() }),
+  /**
+   * Read only: the Unit of the department of the day; nothing the sender or a project changes (`US-05-01` AC-7). Null when the
+   * department has none in use and the request is free internal software, which is judged without it (`QĐ-87g(2)`).
+   */
+  costCenter: z.strictObject({ id: z.uuid(), code: z.string(), name: z.string() }).nullable(),
   requirements: z.strictObject({
     /** The head must confirm the term in so many words with a reason; the chain gains no step. */
     termConfirmationByHead: z.boolean(),

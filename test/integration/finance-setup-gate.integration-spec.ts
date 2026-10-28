@@ -26,7 +26,7 @@ interface SentWire {
   id: string;
   state: string;
   type: string;
-  costCenter: { id: string };
+  costCenter: { id: string } | null;
   submittedAt: string;
 }
 
@@ -150,6 +150,51 @@ describe('a department with no Cost Center, and the drafts of what it cannot sen
       expect(await footprint()).toEqual(before);
     });
 
+    it('does not stop a free internal request: it is sent, read, decided and charged to no Cost Center (F91, QĐ-87g(2))', async () => {
+      const internalPlan = await h.plan('K5');
+      const u = await bare();
+      const before = await sentRows();
+      const [checks, commitments] = [await table('request_budget_checks'), await table('budget_commitments')];
+
+      const response = await h.submit(h.form(internalPlan), u.member.account).expect(201);
+
+      const sentRequest = h.dataOf<{ request: SentWire }>(response).request;
+      expect(sentRequest).toMatchObject({ state: 'PENDING', type: 'GRANT', costCenter: null });
+      expect(await draftRow(sentRequest.id)).toMatchObject({ state: 'PENDING', cost_center_id: null });
+      expect(await sentRows()).toBe(before + 1);
+      // The sender and the head read it, and the head decides it as any other request of internal software.
+      const read = await h.fetch(sentRequest.id, u.member.account).expect(200);
+      expect(h.dataOf<{ request: SentWire }>(read).request.costCenter).toBeNull();
+      await h.decide(sentRequest.id, { decision: 'APPROVE' }, u.head.account).expect(200);
+      expect(await h.state(sentRequest.id)).toBe('AWAITING_EXECUTION');
+      // Nothing is charged: no budget check and no commitment, and no Cost Center is made up for it.
+      expect(await table('request_budget_checks')).toBe(checks);
+      expect(await table('budget_commitments')).toBe(commitments);
+    });
+
+    it('still refuses what ends in a service seat, even of internal software, because that seat is charged to the Unit (QĐ-86a)', async () => {
+      const internalPlan = await h.plan('K5');
+      const u = await bare();
+      const before = await footprint();
+
+      const refused = await submitService(serviceBody({ planId: internalPlan }), u.member.account).expect(409);
+
+      expect(h.codeOf(refused)).toBe('FINANCE.SETUP_INCOMPLETE');
+      expect(await footprint()).toEqual(before);
+    });
+
+    it('does not let the gate answer for a group of internal software: the group refuses that plan with its own answer', async () => {
+      const internalPlan = await h.plan('K5');
+      const u = await bare();
+      const [e1, e2] = await h.colleagues(u, 2);
+
+      const group = await h.submitGroup(h.groupBody(internalPlan, [e1, e2]), u.head.account);
+
+      // The plan is free, so the gate does not stop it: the group refuses it as it refuses any plan a group may not take.
+      expect(group.status).toBe(422);
+      expect(h.codeOf(group)).toBe('GROUP_REQUEST.PLAN_NOT_ELIGIBLE');
+    });
+
     it('stops the head who sends a request on to the approver, before anything is checked against a budget, and the request stays in the queue', async () => {
       const u = await unit();
       const id = await h.paidRequest(u, plan, { amount: 5_000_000 });
@@ -186,10 +231,11 @@ describe('a department with no Cost Center, and the drafts of what it cannot sen
       });
       expect(group).toMatchObject({ kind: 'GROUP', departmentId: u.department.id, planId: plan, beneficiaryCount: 2 });
       expect(service).toMatchObject({ kind: 'SERVICE_ACCOUNT', beneficiaryCount: 1 });
+      // A draft of a service account has no detail row yet, which a request of that type must have, so it is a plain request until it is sent.
       for (const [draft, type] of [
         [individual, 'GRANT'],
         [group, 'GROUP_GRANT'],
-        [service, 'SERVICE_ACCOUNT'],
+        [service, 'GRANT'],
       ] as const) {
         expect(await draftRow(draft.id)).toEqual({ state: 'DRAFT', type, cost_center_id: null, submitted_at: null });
         expect(await workOf(draft.id)).toEqual([0, 0, 0]);
@@ -245,18 +291,38 @@ describe('a department with no Cost Center, and the drafts of what it cannot sen
       expect(h.codeOf(refused)).toBe('VALIDATION_ERROR');
     });
 
-    it('is never a request: not read, not timed, not told of, and not counted among the requests that were sent', async () => {
+    it('is never a request: read only by its creator and as a draft, not timed, not told of, and not counted among the requests that were sent', async () => {
       const u = await bare();
       const before = await sentRows();
 
       const draft = await saved({ kind: 'INDIVIDUAL', ...h.form(plan) }, u.member.account);
       await h.project();
 
-      const read = await h.fetch(draft.id, u.member.account).expect(404);
+      // The creator reads it through the operation that reads a request (spec L.1, F92): as a draft, with no price, step or Cost Center.
+      const own = await h.fetch(draft.id, u.member.account).expect(200);
+      expect(h.dataOf<Record<string, unknown>>(own)).toEqual({ draft });
+      expect((own.body as { message: string }).message).toBe('ACCESS_REQUEST.FETCHED');
+      // Nobody else meets it, not even the head of the department or Finance: the answer of an id that is not there.
+      for (const account of [u.head.account, h.finance]) {
+        const other = await h.fetch(draft.id, account).expect(404);
+        expect(h.codeOf(other)).toBe('ACCESS_REQUEST.NOT_FOUND');
+      }
       await h.timings(draft.id, u.member.account).expect(404);
-      expect(h.codeOf(read)).toBe('ACCESS_REQUEST.NOT_FOUND');
       expect(await h.noticesAbout(draft.id)).toEqual([]);
       expect(await sentRows()).toBe(before);
+    });
+
+    it('reads a request that was sent as it always was, and a draft that was sent no longer as a draft (F92)', async () => {
+      const u = await bare();
+      const draft = await saved({ kind: 'INDIVIDUAL', ...h.form(plan) }, u.member.account);
+      await costCenterFor(u);
+      await sendDraft(draft.id, u.member.account).expect(201);
+
+      const read = await h.fetch(draft.id, u.member.account).expect(200);
+
+      const data = h.dataOf<{ request?: SentWire; draft?: unknown }>(read);
+      expect(data.draft).toBeUndefined();
+      expect(data.request).toMatchObject({ id: draft.id, state: 'PENDING', type: 'GRANT' });
     });
 
     it('rejects what the operation that sends that kind of request would reject, and a kind that is none of the three', async () => {
@@ -321,6 +387,11 @@ describe('a department with no Cost Center, and the drafts of what it cannot sen
       const group = await saved({ kind: 'GROUP', ...h.groupBody(plan, [e1, e2]) }, u.head.account);
       const service = await saved({ kind: 'SERVICE_ACCOUNT', ...serviceBody() }, u.member.account);
       await costCenterFor(u);
+      // A request for a service account is sent only once the seat baseline is closed (US-05-21): the draft answers as it does.
+      const early = await sendDraft(service.id, u.member.account).expect(409);
+      expect(h.codeOf(early)).toBe('SERVICE_ACCOUNT_REQUEST.BASELINE_NOT_CLOSED');
+      expect((await draftRow(service.id)).state).toBe('DRAFT');
+      await h.closeBaseline().expect(200);
 
       const groupSent = await sendDraft(group.id, u.head.account).expect(201);
       const serviceSent = await sendDraft(service.id, u.member.account).expect(201);
@@ -329,6 +400,7 @@ describe('a department with no Cost Center, and the drafts of what it cannot sen
       expect((serviceSent.body as { message: string }).message).toBe('ACCESS_REQUEST.SERVICE_ACCOUNT_SUBMITTED');
       expect(await draftRow(group.id)).toMatchObject({ type: 'GROUP_GRANT' });
       expect((await draftRow(group.id)).state).not.toBe('DRAFT');
+      expect(await draftRow(service.id)).toMatchObject({ type: 'SERVICE_ACCOUNT' });
       expect((await draftRow(service.id)).state).not.toBe('DRAFT');
       expect(await h.lineStates(group.id)).toHaveLength(2);
     });

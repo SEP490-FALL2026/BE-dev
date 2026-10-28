@@ -24,6 +24,11 @@
 # --first-rollout-env names the `.env` kept from before H7: it is restored before the previous image is recreated
 # (H7-OPS-RV-06). The database keeps the migrations either way: the dump taken before them is the way back for the data.
 #
+# The previous image is brought back only when it can read the database as it is (P04-CPE-04, spec L.12): before
+# `migrate deploy` the way back is judged once (an image that cannot be inspected, or a database no release ever ran on,
+# stops the deploy there), and again in the recovery, after the failed release's api and worker are stopped. An image
+# that cannot read rows the failed release wrote is not recreated: the recovery is REFUSED and says so, never a success.
+#
 # One deployment at a time on the host (H7-OPS-RV-07): before anything else, the script takes the lock
 # <dir>/releases/.deploy.lock without waiting and keeps it until it exits; a second deployment — from the workflow or by
 # hand — exits 2 at once and changes nothing. Needs util-linux `flock`.
@@ -56,7 +61,7 @@ ATTEMPT=''
 FIRST_ROLLOUT_ENV=''
 # Bounded readiness (H7-OPS-RV-04): wait at most READY_TIMEOUT seconds for the release to answer ready, then watch it for
 # STABILITY_WINDOW seconds, looking every POLL_INTERVAL seconds. The workflow uses these defaults.
-READY_TIMEOUT=120
+READY_TIMEOUT=300
 STABILITY_WINDOW=20
 POLL_INTERVAL=2
 while [ "$#" -gt 0 ]; do
@@ -228,6 +233,61 @@ for attempt in $(seq 1 3); do
 done
 [ "$PREFLIGHT_STATUS" -eq 0 ] || fail "ops:preflight blocks migrate deploy (exit $PREFLIGHT_STATUS); nothing was migrated."
 
+# P04-CPE-04 (spec L.12): an image is a way back only if it can read the database as it is. A green readiness probe does
+# not say it (readiness pings the database). The labels of the image declare the data representations its runtime reads
+# (an image built before that label declares none); the candidate's read-only `ops:preflight --recovery-target` counts the
+# rows of each one this database holds. Returns 0 it can, 2 it cannot read rows that are there, 3 no migration ever ran on
+# this database (no release ran on it, so no image is its way back), 4 the image cannot be inspected (not on this host:
+# what it reads is unknown), anything else the judgement failed. A failure that is neither 0, 2 nor 3 is tried three times,
+# each run bounded to 120 s. The judgement prints names and counts only.
+judge_way_back() {
+  local labels status=1 try
+  labels="$(timeout 30 docker image inspect --format '{{json .Config.Labels}}' "$PREVIOUS_IMAGE" 2> /dev/null)" || return 4
+  for try in 1 2 3; do
+    status=0
+    CADDYFILE_PATH="$RELEASE_DIR/Caddyfile" timeout 120 \
+      docker compose --project-directory "$APP_DIR" -f "$RELEASE_DIR/docker-compose.prod.yml" run --rm --no-deps \
+      -e DB_CONNECT_TIMEOUT_MS=15000 \
+      -e DB_TRANSACTION_MAX_WAIT_MS=10000 \
+      -e DB_LOCK_TIMEOUT_MS=10000 \
+      -e DB_STATEMENT_TIMEOUT_MS=15000 \
+      -e DB_QUERY_TIMEOUT_MS=20000 \
+      -e DB_TRANSACTION_TIMEOUT_MS=25000 \
+      migrate node dist/migration-preflight-cli.js --recovery-target "$labels" || status=$?
+    case "$status" in 0 | 2 | 3) return "$status" ;; esac
+    if [ "$try" -lt 3 ]; then
+      echo "⚠️ ops:preflight --recovery-target failed (exit $status), retrying in 3 s ($try/3)..."
+      sleep 3
+    fi
+  done
+  return "$status"
+}
+
+# The way back of this deployment: the release live now. None on a host that never ran a release — a failure after the
+# promotion then has nothing to bring back and the installation stays failed.
+PREVIOUS_IMAGE=''
+if [ -f "$CURRENT_IMAGE" ]; then
+  PREVIOUS_IMAGE="$(head -n 1 "$CURRENT_IMAGE")"
+elif [ -f "$APP_DIR/docker-compose.prod.yml" ]; then
+  # A host deployed before releases/current-image existed: the image of its API container, running or stopped.
+  API_CONTAINER="$(live ps -a -q api 2> /dev/null || true)"
+  if [ -n "$API_CONTAINER" ]; then PREVIOUS_IMAGE="$(docker inspect --format '{{.Config.Image}}' "$API_CONTAINER" 2> /dev/null || true)"; fi
+fi
+if [ -z "$PREVIOUS_IMAGE" ]; then
+  echo "ℹ️ No previous release on this host: if release $RELEASE fails after the promotion, nothing is brought back (the installation stays failed)."
+else
+  echo "🔎 Way back: can $PREVIOUS_IMAGE serve this database (ops:preflight --recovery-target, read-only, deploy role)?"
+  WAY_BACK=0
+  judge_way_back || WAY_BACK=$?
+  case "$WAY_BACK" in
+    0) echo "✅ $PREVIOUS_IMAGE reads every row this database holds: it is the way back of this deployment until this release writes one it cannot read." ;;
+    2) echo "⚠️ $PREVIOUS_IMAGE cannot read rows this database already holds (above): if this release fails after the promotion it will NOT be brought back; the way out is a fixed release (runbook: way back refused)." ;;
+    3) fail "releases/current-image (or the api container) names $PREVIOUS_IMAGE, but this database has no migration history: no release ever ran on it, so $PREVIOUS_IMAGE is not its way back. To install fresh over an old release state, move that state aside first (runbook: fresh installation); nothing was migrated." ;;
+    4) fail "the previous release $PREVIOUS_IMAGE, the way back of this deployment, cannot be inspected on this host (not pulled here?), so what it reads is unknown: 'docker pull $PREVIOUS_IMAGE', then deploy again with a new --attempt; nothing was migrated." ;;
+    *) fail "ops:preflight --recovery-target failed (exit $WAY_BACK): the way back cannot be judged; nothing was migrated." ;;
+  esac
+fi
+
 echo "🔄 prisma migrate deploy (deploy role)..."
 candidate run --rm --no-deps migrate node node_modules/prisma/build/index.js migrate deploy ||
   fail 'prisma migrate deploy failed; the live configuration and the running containers are unchanged.'
@@ -236,8 +296,10 @@ echo "🔐 ops:db-roles reconcile (deploy role)..."
 candidate run --rm --no-deps migrate node dist/database-roles-cli.js reconcile ||
   fail 'ops:db-roles reconcile failed or the role matrix does not hold; the live configuration and the running containers are unchanged.'
 
-# The readiness of the API from inside its container (no published port): its real endpoint, 2xx only, at most 5 s.
-READY_PROBE='fetch("http://127.0.0.1:"+(process.env.PORT||3000)+"/"+(process.env.API_PREFIX||"api")+"/v1/health/ready",{signal:AbortSignal.timeout(5000)}).then(r=>process.exit(r.ok?0:1),()=>process.exit(1))'
+# The readiness of the API from inside its container (no published port): its real endpoint, 2xx only, at most 10 s. What a failed
+# probe prints is the HTTP status and, from the error envelope of the API, its machine code and request id, or the class and code of a
+# failed fetch: never a body or a message, which can carry a host, a role or a secret (F93). The exec in `look` ends it at 15 s.
+READY_PROBE='const s=(v,r)=>typeof v==="string"&&r.test(v)?v:"";fetch("http://127.0.0.1:"+(process.env.PORT||3000)+"/"+(process.env.API_PREFIX||"api")+"/v1/health/ready",{signal:AbortSignal.timeout(10000)}).then(async r=>{if(!r.ok){let e={};try{e=JSON.parse(await r.text()).error||{}}catch(_){}const c=s(e.code,/^[A-Z][A-Z0-9_]*(\.[A-Z0-9_]+)*$/).slice(0,64);const q=s(e.requestId,/^[A-Za-z0-9-]{1,64}$/);console.error("HTTP "+r.status+(c?" "+c:"")+(q?" request "+q:""))}process.exit(r.ok?0:1)},e=>{const n=s(e&&e.name,/^[A-Za-z]{1,40}$/)||"Error";const k=s(e&&e.cause&&e.cause.code,/^[A-Z0-9_]{2,32}$/);console.error("fetch failed: "+n+(k?" "+k:""));process.exit(1)})'
 # Compose and Docker reads of the live release, each bounded so that no look can hang.
 live_ps() { CADDYFILE_PATH="$APP_DIR/Caddyfile" timeout 30 docker compose --project-directory "$APP_DIR" -f "$APP_DIR/docker-compose.prod.yml" ps -a -q "$1"; }
 
@@ -293,8 +355,12 @@ look() {
     [ "$service" = api ] && api="$ids"
     snapshot="$snapshot $service=$ids#$restarts"
   done
-  if ! timeout 15 docker exec "$api" node -e "$READY_PROBE" > /dev/null 2>&1; then
-    echo 'api: its readiness endpoint did not answer 2xx'
+  local probe_err=''
+  if ! probe_err="$(timeout 15 docker exec "$api" node -e "$READY_PROBE" 2>&1)"; then
+    # One short line: the probe prints a status and codes only, but the exec around it can print its own errors (F93).
+    probe_err="${probe_err//$'\n'/ }"
+    probe_err="${probe_err:0:200}"
+    echo "api: its readiness endpoint did not answer 2xx (${probe_err:-no output})"
     return 1
   fi
   echo "${snapshot# }"
@@ -378,6 +444,32 @@ restore_environment() {
   echo "↩️ .env restored from ${FIRST_ROLLOUT_ENV_PATH##*/}; the .env of H7 is kept as .env.h7-$ATTEMPT (0600)." >&2
 }
 
+# P04-CPE-04 (spec L.12): before the previous image is recreated. The failed release may have served requests, so the
+# database may hold rows the previous image cannot read — written before the readiness failed, or a moment before the
+# recovery. Its api and worker are stopped first, through the candidate's own Compose file (validated above; same project),
+# so they write nothing more; then the way back is judged on the database as it is. Returns 0 when the previous image can
+# serve it. Otherwise prints `RECOVERY: REFUSED` and why, and returns 1: the previous image is not recreated (an image that
+# fails on the data is no recovery), and the stopped release stays stopped.
+way_back_open() {
+  local status=0
+  if [ "$RECREATED" -eq 1 ]; then
+    echo "⏹️ stopping api and worker of the failed release before judging the way back (they write nothing more)..." >&2
+    if ! CADDYFILE_PATH="$RELEASE_DIR/Caddyfile" timeout 120 \
+      docker compose --project-directory "$APP_DIR" -f "$RELEASE_DIR/docker-compose.prod.yml" stop api worker; then
+      echo "⚠️ RECOVERY: REFUSED — api and worker of the failed release could not be stopped, so rows it may still write cannot be ruled out; $PREVIOUS_IMAGE was not recreated. Stop them by hand, then follow the runbook (way back)." >&2
+      return 1
+    fi
+  fi
+  judge_way_back >&2 || status=$?
+  case "$status" in
+    0) return 0 ;;
+    2) echo "⚠️ RECOVERY: REFUSED — $PREVIOUS_IMAGE cannot read rows release $RELEASE wrote (above), so it was not recreated: api and worker are stopped and no image serves the API. The way out is a fixed release deployed with a new --attempt (runbook: way back refused)." >&2 ;;
+    4) echo "⚠️ RECOVERY: REFUSED — $PREVIOUS_IMAGE cannot be inspected on this host, so what it reads is unknown; it was not recreated (runbook: way back refused)." >&2 ;;
+    *) echo "⚠️ RECOVERY: REFUSED — the way back could not be judged (exit $status), so $PREVIOUS_IMAGE was not recreated (runbook: way back refused)." >&2 ;;
+  esac
+  return 1
+}
+
 # A rename, the recreation, the readiness or the record of the attempt failed (H7-OPS-RV-02, RV-04, RV-05). Puts the
 # previous release state back whole. Brings the previous containers back when the new ones were created — and on the first
 # H7 rollout in any case (the runbook stopped the old api/worker), after restoring the old `.env` (RV-06). Then checks
@@ -406,6 +498,8 @@ recover() {
     else
       echo "⚠️ RECOVERY: FAILED — the previous release state is not back; restore it by hand (runbook)." >&2
     fi
+  elif [ "$recreate" -eq 1 ] && ! way_back_open; then
+    : # way_back_open said why: RECOVERY: REFUSED.
   elif [ -n "$FIRST_ROLLOUT_ENV_PATH" ] && ! restore_environment; then
     echo "⚠️ RECOVERY: FAILED — the .env from before H7 is not back, so the previous image was not recreated (runbook)." >&2
   else
@@ -440,14 +534,6 @@ for kept in docker-compose.prod.yml Caddyfile; do
 done
 if [ -f "$CURRENT_IMAGE" ]; then cp -p "$CURRENT_IMAGE" "$REPLACED/current-image" || fail 'cannot keep releases/current-image; nothing was promoted.'; fi
 if [ -f "$CURRENT_ATTEMPT" ]; then cp -p "$CURRENT_ATTEMPT" "$REPLACED/current-attempt" || fail 'cannot keep releases/current-attempt; nothing was promoted.'; fi
-PREVIOUS_IMAGE=''
-if [ -f "$CURRENT_IMAGE" ]; then
-  PREVIOUS_IMAGE="$(head -n 1 "$CURRENT_IMAGE")"
-elif [ -f "$APP_DIR/docker-compose.prod.yml" ]; then
-  # A host deployed before releases/current-image existed: the image of its API container, running or stopped.
-  API_CONTAINER="$(live ps -a -q api 2> /dev/null || true)"
-  if [ -n "$API_CONTAINER" ]; then PREVIOUS_IMAGE="$(docker inspect --format '{{.Config.Image}}' "$API_CONTAINER" 2> /dev/null || true)"; fi
-fi
 # H7-OPS-RV-05: once ready, releases/current-attempt names the attempt whose replaced/ holds the release before this one.
 # Deploying again the release already live replaces nothing worth going back to: the attempt that made it live stays.
 MARK="releases/$RELEASE/attempts/$ATTEMPT"

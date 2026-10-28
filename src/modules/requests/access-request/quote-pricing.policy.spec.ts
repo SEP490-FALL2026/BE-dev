@@ -154,7 +154,10 @@ describe('the amount of a request from a quote (US-05-06 AC-14, AC-15)', () => {
       });
       expect(
         priceFromQuote(
-          input({ termMonths: 24, quote: quote({ paymentFrequency: 'ANNUAL', commitmentMonths: 0, validUntil: null }) }),
+          input({
+            termMonths: 24,
+            quote: quote({ paymentFrequency: 'ANNUAL', commitmentMonths: 0, validUntil: null }),
+          }),
         ),
       ).toEqual({ status: 'REFUSED', reason: 'PRICE_REQUIRED', missing: ['quote.unitPrice'] });
     });

@@ -24,11 +24,11 @@ IT Admin chuyển nhân viên sang _đang bàn giao_ với ngày làm việc cu�
 
 ## Primary Story/AC
 
-| Story    | AC                                                 | Coverage | Phần còn lại thuộc                                                                                                                                                                                                                                            |
-| -------- | -------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Story    | AC                                                 | Coverage | Phần còn lại thuộc                                                                                                                                                                                                                                             |
+| -------- | -------------------------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | US-03-04 | AC-1→AC-10, AC-14→AC-16, AC-18→AC-23, AC-26, AC-29 | partial  | AC-11, AC-13, AC-27, AC-28: `g6-leaver-role-and-workspace-duties`; AC-17: `g6-service-account-handover`; AC-24, AC-25: `g6-leaver-request-closure`; vế khuyến nghị `G2` của AC-3, AC-21, vế tiết kiệm của AC-6 và vế K4 của AC-16: `g6-downstream-integration` |
-| US-03-03 | AC-6                                               | partial  | AC-1→AC-3: `g6-downstream-integration`; AC-4, AC-5, AC-7, AC-8: `g6-long-leave`                                                                                                                                                                               |
-| US-03-01 | AC-21                                              | partial  | AC-1, AC-2, AC-4→AC-8, AC-11, AC-13→AC-16, AC-18→AC-20, AC-22→AC-24 (và vế điều chuyển thứ hai của AC-21): `g6-transfer-record`; AC-9: `g6-service-account-handover`; AC-12: `g3-downstream-finance-integration`                                              |
+| US-03-03 | AC-6                                               | partial  | AC-1→AC-3: `g6-downstream-integration`; AC-4, AC-5, AC-7, AC-8: `g6-long-leave`                                                                                                                                                                                |
+| US-03-01 | AC-21                                              | partial  | AC-1, AC-2, AC-4→AC-8, AC-11, AC-13→AC-16, AC-18→AC-20, AC-22→AC-24 (và vế điều chuyển thứ hai của AC-21): `g6-transfer-record`; AC-9: `g6-service-account-handover`; AC-12: `g3-downstream-finance-integration`                                               |
 
 ## Supporting references
 

@@ -98,8 +98,8 @@ describe('the tools a department uses (US-03-06 AC-13, AC-17, F22, integration, 
     });
     await request(h.server())
       .post(`/api/v1/departments/${dept.id}/head-assignments`)
-      .set(h.as(h.it1))
-      .send({ employeeId, effectiveFrom: today() })
+      .set({ Authorization: `Bearer ${h.admin}` })
+      .send({ employeeId, effectiveFrom: today(), hrBasis: HR_BASIS })
       .expect(200);
 
     return account;

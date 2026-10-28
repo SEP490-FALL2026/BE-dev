@@ -10,6 +10,7 @@ import {
   SubscriptionOwnerSchema,
   UNIT_ONLY_MIGRATION,
 } from './migration-preflight.types';
+import { RecoveryTargetFacts } from './recovery-target';
 
 /**
  * Reads the data the unit-only conversion touches, in the schema the database has **now** — before the merged migration
@@ -48,6 +49,32 @@ export class MigrationPreflightRepo {
         FROM _prisma_migrations
        WHERE migration_name IN (${UNIT_ONLY_MIGRATION}, ${FORWARD_MIGRATION})
        ORDER BY migration_name, started_at`;
+  }
+
+  /**
+   * P04-CPE-04 (spec L.12): the facts `--recovery-target` judges, in the schema the database has now. Probed first: an empty
+   * database has no table at all (no history, no request). Before `…_access_request_draft` the column is `NOT NULL`, so the
+   * count is 0 there. A draft keeps no Cost Center too, but no release reads a draft it did not write (the compatibility image
+   * filters `DRAFT` out of every read), so only sent requests count.
+   */
+  async recoveryTargetFacts(tx: DbTx): Promise<RecoveryTargetFacts> {
+    const [probe] = await tx.$queryRaw<{ history: boolean; requests: boolean }[]>`
+      SELECT to_regclass('public._prisma_migrations') IS NOT NULL AS "history",
+             EXISTS (SELECT 1 FROM information_schema.columns
+                      WHERE table_schema = 'public' AND table_name = 'access_requests'
+                        AND column_name = 'cost_center_id') AS "requests"`;
+    const [history] = probe.history
+      ? await tx.$queryRaw<{ migrated: boolean }[]>`
+          SELECT EXISTS (SELECT 1 FROM _prisma_migrations
+                          WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL) AS "migrated"`
+      : [{ migrated: false }];
+    const [requests] = probe.requests
+      ? await tx.$queryRaw<{ rows: number }[]>`
+          SELECT count(*)::int AS "rows" FROM "access_requests"
+           WHERE "cost_center_id" IS NULL AND "state"::text <> 'DRAFT'`
+      : [{ rows: 0 }];
+
+    return { migrated: history.migrated, rows: { 'access-request-null-cost-center': requests.rows } };
   }
 
   /** The facts in the schema before the merged migration (or after a failed attempt, which left that schema). */

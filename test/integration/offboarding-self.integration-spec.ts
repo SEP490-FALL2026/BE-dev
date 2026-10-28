@@ -79,6 +79,9 @@ describe('who writes the departure of a person, and the one about an IT Admin (i
     );
 
     expect(byItAdmin.revocations?.created).toBe(1);
-    expect(await h.dutyRows(seat)).toHaveLength(2);
+    // One duty for each departure recorded on the seat in this suite: the two cancelled by the tests above, and the one of this case.
+    const duties = await h.dutyRows(seat);
+    expect(duties).toHaveLength(3);
+    expect(duties.filter((duty) => duty.cancelled_at === null)).toHaveLength(1);
   });
 });

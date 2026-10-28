@@ -208,7 +208,7 @@ export class RenewalRequestService {
       requesterEmployeeId: actor.employeeId,
       beneficiaryEmployeeIds: [facts.employeeId],
       departmentId: unit.departmentId,
-      costCenterId: unit.costCenter.id,
+      costCenterId: unit.costCenter?.id ?? null,
       businessReason: body.businessReason,
       termMonths,
       projectLabel: body.projectLabel ?? null,

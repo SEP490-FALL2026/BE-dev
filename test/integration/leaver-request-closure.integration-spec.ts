@@ -258,7 +258,9 @@ describe('the requests and grants of a person who left (integration, real Postgr
       const u = await example();
       const id = await approvedFor(u, u.leaver, 15 * M);
       const task = await granted(id);
-      const free = await h.freeSeats(plans[0].subscriptionId);
+      // The seat is on the subscription the department of the request owns (QĐ-89a), not on the one of the seeded department.
+      const ownSubscription = h.owned.subscriptionFor(plans[0].subscriptionId, u.department.id);
+      const free = await h.freeSeats(ownSubscription);
       expect(await commitmentOf(id)).toMatchObject({ state: 'HELD', released_minor: '0' });
       const wired = await left(u.leaver);
 
@@ -285,7 +287,7 @@ describe('the requests and grants of a person who left (integration, real Postgr
       const assignment = await assignmentOf(task);
       expect(assignment).toMatchObject({ failed_at: null, valid_until: assignment.valid_from });
       expect(assignment.cancelled_at).not.toBeNull();
-      expect(await h.freeSeats(plans[0].subscriptionId)).toBe((free ?? 0) + 1);
+      expect(await h.freeSeats(ownSubscription)).toBe((free ?? 0) + 1);
       expect(await commitmentOf(id)).toMatchObject({ state: 'RELEASED', released_minor: String(15 * M) });
       const [event] = await h.auditEventsOf('ACCESS_REQUEST.CANCELLED', id);
       expect(event.after).toMatchObject({

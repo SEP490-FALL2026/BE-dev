@@ -79,6 +79,8 @@ describe('DepartmentHeadService', () => {
     jest.clearAllMocks();
     organization.getOrganization.mockResolvedValue({ id: 'org-1' });
     organization.businessToday.mockResolvedValue(TODAY);
+    // `clearAllMocks` keeps an implementation: the case that makes the lock refuse must not make every case after it refuse.
+    organization.lockEmployeeForShare.mockResolvedValue(undefined);
     organization.getEmployee.mockResolvedValue({ id: 'emp-next', employeeCode: 'NEXT', status: 'ACTIVE' });
     organization.getDepartmentHeadHistory.mockResolvedValue([period('emp-head', '2026-01-01')]);
     organization.endDepartmentHeadPeriodsFrom.mockResolvedValue({

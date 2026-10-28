@@ -74,7 +74,8 @@ describe('the version after a refusal and the successor of a proposal (integrati
       const again = await h.createVersion(body(r.proposal.id)).expect(409);
       const edit = await h.updateVersion(r.version.id, { highValuePercent: 10 }).expect(409);
 
-      expect(h.codeOf(again)).toBe('BUDGET.VERSION_IN_FLIGHT');
+      // Spec J.1: a reviewed proposal takes a new version only while its latest one is refused, so the second is `PROPOSAL_NOT_SUBMITTED`.
+      expect(h.codeOf(again)).toBe('BUDGET.PROPOSAL_NOT_SUBMITTED');
       expect(h.codeOf(edit)).toBe('BUDGET.VERSION_NOT_EDITABLE');
       const kept = h.dataOf<{ version: VersionWire }>(await h.versionOf(r.version.id).expect(200)).version;
       expect(kept).toMatchObject({ state: 'REJECTED', decision: { decision: 'REJECTED' } });

@@ -42,7 +42,7 @@ describe('opening the revocation of a seat, the one gate of every source (integr
     await h.stop();
   });
 
-  it('US-07-05 AC-3: refuses a request with no source or one that is none of the twelve, and writes nothing', async () => {
+  it('US-07-05 AC-3: refuses a request with no source or one that is none of the thirteen, and writes nothing', async () => {
     const assignmentId = await h.seat({ subscriptionId: k2 }, code());
     const before = { tasks: await tasks(), reasons: await h.count('provisioning_task_reasons') };
 
@@ -54,7 +54,7 @@ describe('opening the revocation of a seat, the one gate of every source (integr
     expect(await h.liveTaskOf(assignmentId)).toBeNull();
   });
 
-  it('US-07-05 AC-11: every one of the twelve sources opens a task that names it, in the queue of the IT Admin, by hand', async () => {
+  it('US-07-05 AC-11: every one of the thirteen sources opens a task that names it, in the queue of the IT Admin, by hand', async () => {
     const opened: { source: string; assignmentId: string; taskId: string }[] = [];
     for (const source of REVOCATION_SOURCES) {
       const assignmentId = await h.seat({ subscriptionId: k2 }, code());
@@ -95,7 +95,7 @@ describe('opening the revocation of a seat, the one gate of every source (integr
       expect(JSON.stringify(events)).not.toContain('vì ');
       expect(JSON.stringify(events)).not.toContain('@acme.vn');
     }
-    expect(opened).toHaveLength(12);
+    expect(opened).toHaveLength(13);
   }, 300000);
 
   it('opens the task in the queue of the IT Admin in charge of the department of the holder today', async () => {

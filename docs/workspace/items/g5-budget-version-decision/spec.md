@@ -24,11 +24,11 @@ Người duyệt chi quyết phiên bản ngân sách mà Finance đã gửi: du
 
 ## Primary Story/AC
 
-| Story    | AC               | Coverage | Phần còn lại thuộc                                                                                                                                                 |
-| -------- | ---------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| US-06-07 | AC-3, AC-4, AC-6 | partial  | AC-1, AC-2, AC-5, AC-7: `g5-commitment-creation`                                                                                                                   |
+| Story    | AC               | Coverage | Phần còn lại thuộc                                                                                                                                                               |
+| -------- | ---------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| US-06-07 | AC-3, AC-4, AC-6 | partial  | AC-1, AC-2, AC-5, AC-7: `g5-commitment-creation`                                                                                                                                 |
 | US-06-09 | AC-10, AC-21     | partial  | AC-1, AC-3, AC-5→AC-8, AC-11, AC-13→AC-20, AC-22, AC-23: `g5-budget-proposal-and-review`; AC-2, AC-4, AC-9: `g5-commitment-creation`; AC-12: `g3-downstream-finance-integration` |
-| US-06-11 | AC-1→AC-10       | full     | —                                                                                                                                                                  |
+| US-06-11 | AC-1→AC-10       | full     | —                                                                                                                                                                                |
 
 ## Supporting references
 

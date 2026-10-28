@@ -228,7 +228,10 @@ describe('the history of the edits of a version (integration, real PostgreSQL)',
       const imported = await h.importLines(s.version.id, csv);
 
       expect(imported.status).toBe(201);
-      expect(h.dataOf<{ added: number; rejected: number }>(imported)).toMatchObject({ added: 200, rejected: 0 });
+      expect(h.dataOf<{ result: { added: number; rejected: number } }>(imported).result).toMatchObject({
+        added: 200,
+        rejected: 0,
+      });
       const entries = (await history(s.version.id, h.finance, { pageSize: 100 })).items
         .filter((entry) => entry.kind === 'LINES_IMPORTED')
         .sort((a, b) => a.seq - b.seq);
@@ -257,14 +260,18 @@ describe('the history of the edits of a version (integration, real PostgreSQL)',
         row(code, 1, 'Right', 'A note'),
         row(code, 2, 'd'.repeat(201), 'A note'),
         row(code, 3, 'Right too', 'n'.repeat(1001)),
-        row(code, 4, 'x'.repeat(300_000), ''),
+        // The file reader takes a cell of 2 000 characters at most (`parseCsv`): the longest description it can hand over.
+        row(code, 4, 'x'.repeat(2000), ''),
       ].join('\n');
       const before = (await history(s.version.id)).items.length;
 
       const imported = await h.importLines(s.version.id, csv);
 
       expect(imported.status).toBe(201);
-      expect(h.dataOf<{ added: number; rejected: number; errors: { row: number; code: string }[] }>(imported)).toEqual({
+      expect(
+        h.dataOf<{ result: { added: number; rejected: number; errors: { row: number; code: string }[] } }>(imported)
+          .result,
+      ).toEqual({
         added: 1,
         rejected: 3,
         errors: [

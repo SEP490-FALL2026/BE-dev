@@ -9,6 +9,7 @@ import {
   insertAccountFixture,
   seedInstallation,
 } from '../support/http-test-app';
+import { HR_BASIS } from '../support/hr-basis';
 
 const ORG_TIME_ZONE = 'Asia/Ho_Chi_Minh';
 
@@ -220,10 +221,11 @@ describe('handing the Super Admin role to a successor over HTTP (integration, re
 
     it('(i) refuses a person who heads a department, now or from a later day', async () => {
       const head = await successor();
+      // Naming the head of a department is the Super Admin's write (QĐ-87).
       await request(server())
         .post(`/api/v1/departments/${seed.departmentId}/head-assignments`)
-        .set(asAccount(it1))
-        .send({ employeeId: head.employeeId, effectiveFrom: today() })
+        .set(as(admin))
+        .send({ employeeId: head.employeeId, effectiveFrom: today(), hrBasis: HR_BASIS })
         .expect(200);
 
       await expectRefused(admin, head.appUserId, 422, 'SUPER_ADMIN_TRANSFER.HEADS_DEPARTMENT');
@@ -364,14 +366,15 @@ describe('handing the Super Admin role to a successor over HTTP (integration, re
     it('refuses to grant the role to a department head or to an approval role holder, whoever asks', async () => {
       const head = await successor();
       const approver = await successor();
+      // The head is named by the Super Admin (QĐ-87), so before the role of the Super Admin is taken away below.
+      await request(server())
+        .post(`/api/v1/departments/${seed.departmentId}/head-assignments`)
+        .set(as(admin))
+        .send({ employeeId: head.employeeId, effectiveFrom: today(), hrBasis: HR_BASIS })
+        .expect(200);
       await ctx.sql.query(
         `UPDATE role_grants SET revoked_at = now() WHERE role = 'SUPER_ADMIN' AND revoked_at IS NULL`,
       );
-      await request(server())
-        .post(`/api/v1/departments/${seed.departmentId}/head-assignments`)
-        .set(asAccount(it1))
-        .send({ employeeId: head.employeeId, effectiveFrom: today() })
-        .expect(200);
       await ctx.sql.query(
         `UPDATE approval_role_holders SET held_until = now() WHERE role = 'FALLBACK_APPROVER' AND held_until IS NULL`,
       );

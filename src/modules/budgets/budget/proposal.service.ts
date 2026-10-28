@@ -79,7 +79,7 @@ export class ProposalService {
     const fiscalStart = await this.support.fiscalYearStartMonth();
 
     return this.runner.run(async (tx) => {
-      const previous = await this.ownedLocked(tx, actor, id);
+      const previous = await this.ownedLocked(tx, actor, id, true);
       const today = await this.support.today(new Date(), tx);
       if (yearHasEnded(previous.year, today, fiscalStart)) throw new BudgetYearEndedError(previous.year);
       if (!canResubmit(previous.state)) throw new BudgetProposalStateError('RESUBMIT', previous.state);
@@ -255,13 +255,25 @@ export class ProposalService {
   }
 
   /** The proposal, locked, for the head whose Cost Center it is; anybody else finds nothing. */
-  private async ownedLocked(tx: DbTx, actor: AuthenticatedPrincipal, id: string): Promise<ProposalRecord> {
+  private async ownedLocked(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    id: string,
+    keepWhenNoneInUse = false,
+  ): Promise<ProposalRecord> {
     const proposal = await this.proposals.lockById(tx, id);
     const today = await this.support.today(new Date(), tx);
-    if (!proposal || (await this.support.headedCostCenter(actor.employeeId, today, tx)) !== proposal.costCenterId) {
-      throw new BudgetProposalNotFoundError();
+    if (!proposal) throw new BudgetProposalNotFoundError();
+    if ((await this.support.headedCostCenter(actor.employeeId, today, tx)) === proposal.costCenterId) return proposal;
+    // The head of a department whose Cost Center was retired still owns the proposal that was given back: sending it again meets
+    // the 409 FINANCE.SETUP_INCOMPLETE of `send` (F83), not a 404.
+    if (
+      keepWhenNoneInUse &&
+      (await this.support.headsDepartmentWithNoneInUse(actor.employeeId, proposal.costCenterId, today, tx))
+    ) {
+      return proposal;
     }
 
-    return proposal;
+    throw new BudgetProposalNotFoundError();
   }
 }

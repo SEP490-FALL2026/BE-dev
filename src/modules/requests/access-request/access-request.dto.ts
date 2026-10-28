@@ -179,7 +179,8 @@ export const requestSchema = z.strictObject({
     })
     .nullable(),
   department: z.strictObject({ id: z.uuid(), code: z.string(), name: z.string() }),
-  costCenter: z.strictObject({ id: z.uuid(), code: z.string() }),
+  /** What the request is charged to; null for a free internal request of a department that has no Cost Center in use (`QĐ-87g(2)`). */
+  costCenter: z.strictObject({ id: z.uuid(), code: z.string() }).nullable(),
   requester: employeeRef,
   /** The person it is for; null for a request for a group (`type` GROUP_GRANT), whose people are read as lines. */
   beneficiary: employeeRef.nullable(),

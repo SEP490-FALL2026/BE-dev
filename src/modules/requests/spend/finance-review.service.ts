@@ -5,6 +5,7 @@ import { AuditService } from '../../audit/audit.service';
 import { OrganizationService } from '../../organization/organization.service';
 import { accessRequestAuditEvent } from '../access-request/access-request-audit-event';
 import { AccessRequestNotFoundError } from '../access-request/access-request.errors';
+import { chargedCostCenterId } from '../access-request/access-request.policy';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
 import { BudgetCheckRepo, type CheckRecord } from './budget-check.repo';
@@ -182,8 +183,8 @@ export class FinanceReviewService {
       .sort((a, b) => a - b);
 
     return years.length === 0
-      ? { costCenterId: request.costCenterId }
-      : { costCenterId: request.costCenterId, year: years[0] };
+      ? { costCenterId: chargedCostCenterId(request) }
+      : { costCenterId: chargedCostCenterId(request), year: years[0] };
   }
 
   /**

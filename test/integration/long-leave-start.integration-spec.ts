@@ -86,7 +86,8 @@ describe('recording the start of a long leave (integration, real PostgreSQL)', (
     const members = h.dataOf<{ items: { employeeCode: string; workState: string }[] }>(
       await request(h.server())
         .get(`/api/v1/departments/${des.id}/employees?pageSize=100`)
-        .set(h.as(h.it1))
+        // The members with their work state are read by the Super Admin and the head of the department; the IT Admin reads a technical minimum.
+        .set({ Authorization: `Bearer ${h.admin}` })
         .expect(200),
     ).items;
 

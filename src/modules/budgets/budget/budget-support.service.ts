@@ -197,6 +197,23 @@ export class BudgetSupportService {
     return unit.costCenter.id;
   }
 
+  /**
+   * Whether the person heads a department that has no Cost Center in use and the Cost Center is one that department had: the head
+   * still owns what was sent for it, and `send` tells them the setup is incomplete (F83) instead of that the proposal does not exist.
+   */
+  async headsDepartmentWithNoneInUse(
+    employeeId: string,
+    costCenterId: string,
+    today: BusinessDate,
+    tx?: DbTx,
+  ): Promise<boolean> {
+    const unit = await this.headedUnit(employeeId, today, tx);
+    if (unit === null || unit.costCenter !== null) return false;
+    const [found] = await this.organization.costCentersByIds([costCenterId], tx);
+
+    return found?.departmentId === unit.departmentId;
+  }
+
   /** Throws BudgetNotYourCostCenterError. */
   async requireHead(employeeId: string, costCenterId: string, today: BusinessDate, tx?: DbTx): Promise<void> {
     if ((await this.headedCostCenter(employeeId, today, tx)) !== costCenterId) throw new BudgetNotYourCostCenterError();

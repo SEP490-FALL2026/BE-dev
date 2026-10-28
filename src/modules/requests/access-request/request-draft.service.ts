@@ -16,7 +16,7 @@ import {
 import { mayRequest, policyFor } from './access-request.policy';
 import { beneficiaryCountOfContent, contentOf, draftSnapshot, toContentJson } from './request-draft-content';
 import type { AccessRequestDraftWire, DraftSaveBody } from './request-draft.dto';
-import { kindOfType, REQUEST_TYPE_OF_KIND } from './request-draft.policy';
+import { draftVerdict, REQUEST_TYPE_OF_KIND } from './request-draft.policy';
 import { RequestDraftRepo, type DraftRow } from './request-draft.repo';
 
 /**
@@ -54,7 +54,10 @@ export class RequestDraftService {
 
       const saved = await this.drafts.insert(tx, {
         organizationId: employee.organizationId,
-        type: REQUEST_TYPE_OF_KIND[body.kind],
+        // A request of the type SERVICE_ACCOUNT must have its detail row when the transaction commits (`access_requests_service_account_detail`)
+        // and the detail is never deleted, while a draft has none: it is saved as the plain request it is until it is sent, and the
+        // kind it will be is kept with its content (`policy.draft.kind`); sending it gives the row its type with the detail.
+        type: body.kind === 'SERVICE_ACCOUNT' ? 'GRANT' : REQUEST_TYPE_OF_KIND[body.kind],
         // The branch the plan leads to; the policy is fixed, with the SLA of the day, only when the draft is sent.
         branch: policyFor(target.applicationKind, 1).branch,
         planId: body.planId,
@@ -103,6 +106,16 @@ export class RequestDraftService {
   }
 
   /**
+   * The draft of the caller by its id, for the read of a request (`accessRequestGet`, spec L.1, F92). A request that was sent, a draft of
+   * somebody else and an id that is not there are all null: one answer, so nothing says whether another person's draft exists.
+   */
+  async readOwn(actor: AuthenticatedPrincipal, id: string): Promise<AccessRequestDraftWire | null> {
+    const row = await this.drafts.find(id);
+
+    return row !== null && draftVerdict(row, actor.employeeId) === 'OK' ? this.wire(row) : null;
+  }
+
+  /**
    * Deletes the draft and what hangs from it in one transaction, and says in the Audit Trail what it was. A request that is not the
    * caller's is answered as one that does not exist; one that is the caller's and was sent already is not a draft.
    * Throws AccessRequestSuperAdminCannotRequestError, AccessRequestNotFoundError and AccessRequestNotDraftError.
@@ -129,15 +142,15 @@ export class RequestDraftService {
   }
 
   private wire(row: DraftRow): AccessRequestDraftWire {
-    const kind = kindOfType(row.type);
-    if (kind === null || row.planId === null) throw new Error(`The draft ${row.id} is not a draft of a request.`);
+    if (row.planId === null) throw new Error(`The draft ${row.id} is not a draft of a request.`);
+    const content = contentOf(row);
 
     return {
       id: row.id,
-      kind,
+      kind: content.kind,
       departmentId: row.departmentId,
       planId: row.planId,
-      beneficiaryCount: beneficiaryCountOfContent(contentOf(row)),
+      beneficiaryCount: beneficiaryCountOfContent(content),
       createdAt: row.savedAt.toISOString(),
     };
   }

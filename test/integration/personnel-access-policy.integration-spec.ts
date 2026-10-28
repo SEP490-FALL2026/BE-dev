@@ -1,3 +1,4 @@
+import request from 'supertest';
 import { LeaveService } from '../../src/modules/personnel/leave/leave.service';
 import { NoticeHandlingService } from '../../src/modules/personnel/notice/notice-handling.service';
 import { OffboardingService } from '../../src/modules/personnel/offboarding/offboarding.service';
@@ -6,7 +7,6 @@ import { userActor, type PersonnelActor } from '../../src/modules/personnel/pers
 import { TransferService } from '../../src/modules/personnel/transfer/transfer.service';
 import type { ApiAccount } from '../support/api-accounts';
 import { NoticeHarness } from '../support/notice-harness';
-import type { CaseWire } from '../support/offboarding-harness';
 import type { Department, Person } from '../support/request-harness';
 import { handOthersToSecondItAdmin } from '../support/second-it-admin';
 import type { TransferWire } from '../support/transfer-harness';
@@ -131,7 +131,7 @@ describe('who may write and who may read the events of the personnel context (in
         });
       }
 
-      expect((await h.noticeRows(who.employeeId))[0].status).toBe('PENDING');
+      expect((await h.noticeRows(who.employeeId))[0].status).toBe('PENDING_VERIFICATION');
     });
   });
 
@@ -210,6 +210,27 @@ describe('who may write and who may read the events of the personnel context (in
     let freeToo: Department;
     let own: Department;
 
+    const listLeaves = (query: string, account: ApiAccount) =>
+      request(h.server()).get(`/api/v1/long-leaves${query}`).set(h.as(account));
+    const readLeave = (id: string, account: ApiAccount) =>
+      request(h.server()).get(`/api/v1/long-leaves/${id}`).set(h.as(account));
+    const startedLeave = async (employeeId: string): Promise<{ id: string }> =>
+      h.dataOf<{ id: string }>(
+        await h
+          .startLongLeave({
+            employeeId,
+            startedOn: h.day(-1),
+            approvedReturnOn: h.day(40),
+            grounds: {
+              type: 'LEAVE_APPROVAL',
+              reference: 'DN-07/2026',
+              issuer: 'HR Department',
+              issuedOn: '2026-05-25',
+            },
+          })
+          .expect(201),
+      );
+
     /** A transfer, a leave, a notice and a departure, each about a person of its own in the department; the transfer goes to `into`. */
     const eventsOf = async (department: Department, into: Department) => {
       const head = await h.head(department, `ACCQ${(sequence += 1)}`);
@@ -225,12 +246,7 @@ describe('who may write and who may read the events of the personnel context (in
           effectiveOn: h.day(20),
           grounds: h.grounds,
         }),
-        leave: await h.started({
-          employeeId: away.employeeId,
-          startedOn: h.day(-1),
-          approvedReturnOn: h.day(40),
-          grounds: h.approval,
-        }),
+        leave: await startedLeave(away.employeeId),
         notice: await h.sentNotice(
           { employeeId: noticed.employeeId, kind: 'DEPARTURE', proposedOn: h.day(5) },
           head.account,
@@ -257,11 +273,11 @@ describe('who may write and who may read the events of the personnel context (in
     it('a department with no IT Admin named is read by every IT Admin: the transfer, the leave, the notice and the departure', async () => {
       for (const account of [h.it1, it2]) {
         expect(idsOf(await h.listTransfers('?pageSize=100', account).expect(200))).toContain(readOf.free.transfer.id);
-        expect(idsOf(await h.listLeaves('?pageSize=100', account).expect(200))).toContain(readOf.free.leave.id);
+        expect(idsOf(await listLeaves('?pageSize=100', account).expect(200))).toContain(readOf.free.leave.id);
         expect(idsOf(await h.listNotices('?pageSize=100', account).expect(200))).toContain(readOf.free.notice.id);
         expect(idsOf(await h.listCases('?pageSize=100', account).expect(200))).toContain(readOf.free.departure.id);
         await h.readTransfer(readOf.free.transfer.id, account).expect(200);
-        await h.readLeave(readOf.free.leave.id, account).expect(200);
+        await readLeave(readOf.free.leave.id, account).expect(200);
         await h.readNotice(readOf.free.notice.id, account).expect(200);
         await h.readCase(readOf.free.departure.id, account).expect(200);
       }
@@ -269,17 +285,17 @@ describe('who may write and who may read the events of the personnel context (in
 
     it('a department with a usable IT Admin named is read by that IT Admin alone: the other one finds it in no list and gets 404 on a read', async () => {
       await h.readTransfer(readOf.own.transfer.id, h.it1).expect(200);
-      await h.readLeave(readOf.own.leave.id, h.it1).expect(200);
+      await readLeave(readOf.own.leave.id, h.it1).expect(200);
       await h.readNotice(readOf.own.notice.id, h.it1).expect(200);
       await h.readCase(readOf.own.departure.id, h.it1).expect(200);
 
       expect(idsOf(await h.listTransfers('?pageSize=100', it2).expect(200))).not.toContain(readOf.own.transfer.id);
-      expect(idsOf(await h.listLeaves('?pageSize=100', it2).expect(200))).not.toContain(readOf.own.leave.id);
+      expect(idsOf(await listLeaves('?pageSize=100', it2).expect(200))).not.toContain(readOf.own.leave.id);
       expect(idsOf(await h.listNotices('?pageSize=100', it2).expect(200))).not.toContain(readOf.own.notice.id);
       expect(idsOf(await h.listCases('?pageSize=100', it2).expect(200))).not.toContain(readOf.own.departure.id);
       const reads = [
         ['DEPARTMENT_TRANSFER.NOT_FOUND', await h.readTransfer(readOf.own.transfer.id, it2)],
-        ['LONG_LEAVE.NOT_FOUND', await h.readLeave(readOf.own.leave.id, it2)],
+        ['LONG_LEAVE.NOT_FOUND', await readLeave(readOf.own.leave.id, it2)],
         ['PERSONNEL_NOTICE.NOT_FOUND', await h.readNotice(readOf.own.notice.id, it2)],
         ['OFFBOARDING_CASE.NOT_FOUND', await h.readCase(readOf.own.departure.id, it2)],
       ] as const;
@@ -298,8 +314,8 @@ describe('who may write and who may read the events of the personnel context (in
     it('naming a usable IT Admin in charge of a department ends the stand-in: the other IT Admin no longer reads its people', async () => {
       await h.setItAdminInCharge(free, { employeeId: it2.employeeId, account: it2 });
 
-      const stoodIn = await h.readLeave(readOf.free.leave.id, h.it1);
-      await h.readLeave(readOf.free.leave.id, it2).expect(200);
+      const stoodIn = await readLeave(readOf.free.leave.id, h.it1);
+      await readLeave(readOf.free.leave.id, it2).expect(200);
       // The transfer also enters `freeToo`, which nobody is in charge of: it stays readable by both through that end.
       await h.readTransfer(readOf.free.transfer.id, h.it1).expect(200);
 

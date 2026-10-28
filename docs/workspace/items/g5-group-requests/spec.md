@@ -32,15 +32,15 @@ Employee (tối đa 10 người cùng phòng) hoặc trưởng phòng gửi mộ
 
 ## Primary Story/AC
 
-| Story    | AC                     | Coverage | Phần còn lại thuộc                                                                                                                                                       |
-| -------- | ---------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Story    | AC                     | Coverage | Phần còn lại thuộc                                                                                                                                                              |
+| -------- | ---------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | US-05-02 | AC-2                   | partial  | AC-1, AC-4, AC-11: `g5-request-amount-and-payment-schedule`; AC-3, AC-5→AC-7, AC-9, AC-10, AC-12: `g5-request-submission-and-routing`; AC-8: `g5-it-assessment-of-new-software` |
-| US-05-03 | AC-8, AC-14            | partial  | AC-1→AC-5, AC-9→AC-13: `g5-request-submission-and-routing`; AC-6, AC-7: `g5-delegated-requests`                                                                          |
-| US-05-04 | AC-14                  | partial  | AC-1→AC-10: `g5-manager-need-decision`; AC-11→AC-13, AC-15, AC-16: `g5-spend-submission-batches`                                                                         |
-| US-05-17 | AC-1→AC-9, AC-11→AC-17 | partial  | AC-10: `g5-commitment-lifecycle`                                                                                                                                         |
-| US-06-14 | AC-6, AC-13            | partial  | AC-1→AC-5, AC-7→AC-13, AC-15 (vế đổi ngày của AC-13): `g5-spend-submission-batches`; AC-14: `g5-request-withdrawal`                                                      |
-| US-06-01 | AC-15                  | partial  | AC-1→AC-10, AC-12→AC-14, AC-16→AC-21: `g5-spend-approval-decision`                                                                                                       |
-| US-06-08 | AC-10                  | partial  | AC-1, AC-3→AC-8, AC-11: `g5-spend-approval-decision`; AC-2, AC-9: `g5-delegated-requests`                                                                                |
+| US-05-03 | AC-8, AC-14            | partial  | AC-1→AC-5, AC-9→AC-13: `g5-request-submission-and-routing`; AC-6, AC-7: `g5-delegated-requests`                                                                                 |
+| US-05-04 | AC-14                  | partial  | AC-1→AC-10: `g5-manager-need-decision`; AC-11→AC-13, AC-15, AC-16: `g5-spend-submission-batches`                                                                                |
+| US-05-17 | AC-1→AC-9, AC-11→AC-17 | partial  | AC-10: `g5-commitment-lifecycle`                                                                                                                                                |
+| US-06-14 | AC-6, AC-13            | partial  | AC-1→AC-5, AC-7→AC-13, AC-15 (vế đổi ngày của AC-13): `g5-spend-submission-batches`; AC-14: `g5-request-withdrawal`                                                             |
+| US-06-01 | AC-15                  | partial  | AC-1→AC-10, AC-12→AC-14, AC-16→AC-21: `g5-spend-approval-decision`                                                                                                              |
+| US-06-08 | AC-10                  | partial  | AC-1, AC-3→AC-8, AC-11: `g5-spend-approval-decision`; AC-2, AC-9: `g5-delegated-requests`                                                                                       |
 
 ## Supporting references
 

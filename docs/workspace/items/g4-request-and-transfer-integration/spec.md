@@ -34,10 +34,10 @@ Hoàn tất các AC của G3/G4 cần Request hoặc sự kiện điều chuyể
 
 ## Primary Story/AC
 
-| Story    | AC                       | Coverage | Phần còn lại thuộc                                                                                                                                         |
-| -------- | ------------------------ | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Story    | AC                       | Coverage | Phần còn lại thuộc                                                                                                                                               |
+| -------- | ------------------------ | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | US-07-01 | AC-1, AC-3, AC-15, AC-16 | partial  | AC-1, AC-2, AC-4→AC-9, AC-11→AC-13, AC-15, AC-17, AC-18: `g4-provisioning-queue-manual`; AC-14: `g4-seat-baseline-import`; AC-10: `g4-device-dependent-features` |
-| US-07-04 | AC-4, AC-6, AC-12, AC-15 | partial  | AC-1→AC-3, AC-6→AC-14: `g4-provisioning-failure-handling`; AC-3, AC-6, AC-12, AC-13: `g4-notification-delivery`; AC-5: `g3-downstream-finance-integration` |
+| US-07-04 | AC-4, AC-6, AC-12, AC-15 | partial  | AC-1→AC-3, AC-6→AC-14: `g4-provisioning-failure-handling`; AC-3, AC-6, AC-12, AC-13: `g4-notification-delivery`; AC-5: `g3-downstream-finance-integration`       |
 
 ## Supporting references
 

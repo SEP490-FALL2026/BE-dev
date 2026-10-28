@@ -28,10 +28,10 @@ IT Admin xử lý một hàng đợi tác vụ cấp phát theo kiểu cấp c�
 
 ## Primary Story/AC
 
-| Story    | AC                                               | Coverage | Phần còn lại thuộc                                                                                                                       |
-| -------- | ------------------------------------------------ | -------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Story    | AC                                                      | Coverage | Phần còn lại thuộc                                                                                                                       |
+| -------- | ------------------------------------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
 | US-07-01 | AC-1, AC-2, AC-4→AC-9, AC-11→AC-13, AC-15, AC-17, AC-18 | partial  | AC-1, AC-3, AC-15, AC-16: `g4-request-and-transfer-integration`; AC-14: `g4-seat-baseline-import`; AC-10: `g4-device-dependent-features` |
-| US-07-02 | AC-1→AC-7                                        | partial  | AC-1: `g4-notification-delivery`; AC-4: `g4-device-dependent-features`                                                                   |
+| US-07-02 | AC-1→AC-7                                               | partial  | AC-1: `g4-notification-delivery`; AC-4: `g4-device-dependent-features`                                                                   |
 
 Phần `partial`, nói rõ vế đã làm và vế còn lại:
 

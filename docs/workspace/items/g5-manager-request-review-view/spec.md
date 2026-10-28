@@ -24,9 +24,9 @@ Trưởng phòng được giao bước nhu cầu xem yêu cầu kèm các seat n
 
 ## Primary Story/AC
 
-| Story    | AC         | Coverage | Phần còn lại thuộc                                                                                                                                  |
-| -------- | ---------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| US-05-04 | AC-3       | partial  | AC-1, AC-2, AC-4→AC-6, AC-8→AC-10: `g5-manager-need-decision`; AC-11→AC-13, AC-15, AC-16: `g5-spend-submission-batches`; AC-14: `g5-group-requests` |
+| Story    | AC   | Coverage | Phần còn lại thuộc                                                                                                                                  |
+| -------- | ---- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| US-05-04 | AC-3 | partial  | AC-1, AC-2, AC-4→AC-6, AC-8→AC-10: `g5-manager-need-decision`; AC-11→AC-13, AC-15, AC-16: `g5-spend-submission-batches`; AC-14: `g5-group-requests` |
 
 ## Supporting references
 

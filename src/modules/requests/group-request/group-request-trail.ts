@@ -40,7 +40,7 @@ export function submissionEvents(
       beneficiaryEmployeeIds: people,
       lineCount: people.length,
       departmentId: unit.departmentId,
-      costCenterId: unit.costCenter.id,
+      costCenterId: unit.costCenter?.id ?? null,
       policyVersion: policy.version,
       hasSpendStep: hasSpendStep(policy),
       slaWorkingDays: policy.slaWorkingDays,

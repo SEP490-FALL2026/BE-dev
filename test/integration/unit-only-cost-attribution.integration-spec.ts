@@ -226,7 +226,10 @@ describe('cost attribution to Units only (integration, BBI-D04 → BBI-D08, BBI-
     const change = (id: string, body: object) =>
       request(h.server()).post(`/api/v1/license-assignments/${id}/responsible-changes`).set(h.as(h.it1)).send(body);
     const deactivate = (id: string) =>
-      request(h.server()).post(`/api/v1/departments/${id}/deactivate`).set(h.as(h.it1));
+      request(h.server())
+        .post(`/api/v1/departments/${id}/deactivate`)
+        .set({ Authorization: `Bearer ${h.admin}` })
+        .send({ hrBasis: HR_BASIS });
 
     it('keeps a service account in the department that owns it: the person who takes over must be in that department', async () => {
       today('2026-12-01');
@@ -273,6 +276,8 @@ describe('cost attribution to Units only (integration, BBI-D04 → BBI-D08, BBI-
         serviceAccounts: [{ assignmentId: service.id, accountIdentifier: 'uo3-bot' }],
       });
       await h.ctx.sql.query(`UPDATE license_assignments SET valid_until = '2026-12-10' WHERE id = $1`, [service.id]);
+      // The subscription the department owns keeps it in use until its term is over (QĐ-90e).
+      await h.ctx.sql.query(`UPDATE subscriptions SET end_date = '2026-12-10' WHERE id = $1`, [subscriptionId]);
       today('2026-12-20');
       await deactivate(ops.id).expect(200);
     });

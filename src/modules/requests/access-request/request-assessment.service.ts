@@ -36,8 +36,15 @@ export interface HeldAccess {
   validUntil: BusinessDate | null;
 }
 
-/** The unit of the day with the Cost Center the request is charged to (`OrganizationService.requireUnitCostCenter`). */
-type OwningUnit = ReturnType<OrganizationService['requireUnitCostCenter']>;
+/**
+ * The department of the day and its Unit: the Cost Center is there when the department has one in use and null when it has none
+ * yet (`QĐ-87d(1)`). A request that costs money, or that ends in a service seat, is judged only with one
+ * (`OrganizationService.requireUnitCostCenter`); a free internal request is judged without it (`QĐ-87g(2)`, F91).
+ */
+type OwningUnit =
+  Awaited<ReturnType<OrganizationService['getOwningUnits']>> extends Map<string, infer Unit> ? Unit : never;
+/** The same with the Cost Center in use: what a cost is charged to. */
+type CostedUnit = ReturnType<OrganizationService['requireUnitCostCenter']>;
 type SeatTarget = NonNullable<Awaited<ReturnType<CatalogService['findPlanSeatTargets']>>[number]>;
 
 /** Everything a request is decided by, read for one person asking for one plan on one day. */
@@ -54,7 +61,8 @@ export interface Assessment {
 /** What a proposal of software that is not in the catalog is judged by: there is no plan, so no price or seat. */
 export interface ProposalAssessment {
   today: BusinessDate;
-  unit: OwningUnit;
+  /** A proposal is of paid software, so its department has a Cost Center in use. */
+  unit: CostedUnit;
   policy: RequestPolicy;
   /** Missing until the IT Admin records a quote (`US-05-06` AC-11): the request is not yet priced. */
   pricing: PricingRecord;
@@ -73,6 +81,11 @@ export interface AssessmentInput {
   settings: RequestSettings;
   /** Sending locks the department of the sender against change until commit; showing a preview locks nothing. */
   lockDepartment: boolean;
+  /**
+   * The request ends in a seat charged to the Unit of the department (the service seat, `QĐ-86a`): it is judged with a Cost Center
+   * in use whatever it costs, because an Assignment of that kind cannot exist without one.
+   */
+  chargedToUnit?: boolean;
 }
 
 /**
@@ -100,21 +113,28 @@ export class RequestAssessmentService {
   }
 
   /**
-   * Throws AccessRequestNoDepartmentError, FinanceSetupIncompleteError (the department has no Cost Center yet),
-   * AccessRequestPlanNotFoundError, AccessRequestApplicationRetiredError and AccessRequestSpendDateNotAllowedError.
+   * Throws AccessRequestNoDepartmentError, AccessRequestPlanNotFoundError, AccessRequestApplicationRetiredError,
+   * FinanceSetupIncompleteError (a request that costs money, or ends in a service seat, and the department has no Cost Center yet:
+   * the gate runs before the budget check, `QĐ-87g(3)`; a free internal request is not stopped by it, `QĐ-87g(2)`, F91) and
+   * AccessRequestSpendDateNotAllowedError.
    */
   async assess(tx: DbTx, input: AssessmentInput): Promise<Assessment> {
     const today = await this.organization.businessToday(input.now, tx);
     const found = (await this.organization.getOwningUnits([input.employeeId], today, tx)).get(input.employeeId);
     if (!found) throw new AccessRequestNoDepartmentError();
-    const unit = this.organization.requireUnitCostCenter(found);
-    if (input.lockDepartment) await this.organization.lockDepartmentShared(tx, unit.departmentId);
 
     const [target] = await this.catalog.findPlanSeatTargets([input.planId], tx);
     if (!target) throw new AccessRequestPlanNotFoundError();
     if (target.applicationStatus === 'RETIRED') throw new AccessRequestApplicationRetiredError();
 
     const policy = policyFor(target.applicationKind, input.settings.slaWorkingDays);
+    // What the request is charged to is known only now that the branch is: no Cost Center, no charge, and no gate for what is free.
+    const unit =
+      policy.branch === 'INTERNAL_FREE' && !input.chargedToUnit
+        ? found
+        : this.organization.requireUnitCostCenter(found);
+    if (input.lockDepartment) await this.organization.lockDepartmentShared(tx, unit.departmentId);
+
     const pricing = await this.priceFor(tx, {
       planId: input.planId,
       departmentId: unit.departmentId,

@@ -6,7 +6,7 @@ import { BudgetsService } from '../../budgets/budgets.service';
 import { CatalogService } from '../../catalog/catalog.service';
 import { OrganizationService } from '../../organization/organization.service';
 import { AccessRequestNotFoundError } from '../access-request/access-request.errors';
-import { hasSpendStep } from '../access-request/access-request.policy';
+import { chargedCostCenterId, hasSpendStep } from '../access-request/access-request.policy';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
 import { PlanLineService } from './plan-line.service';
@@ -87,7 +87,7 @@ export class PlanLineRouteService {
       year === null
         ? null
         : await this.budgets.currentLines(
-            request.costCenterId,
+            chargedCostCenterId(request),
             year,
             (query.page - 1) * query.pageSize,
             query.pageSize,

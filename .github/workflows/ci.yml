@@ -79,7 +79,7 @@ permissions:
 jobs:
   quality:
     runs-on: ubuntu-latest
-    timeout-minutes: 65
+    timeout-minutes: 15
     services:
       postgres:
         image: postgres:17-alpine
@@ -117,12 +117,13 @@ jobs:
           NODE_OPTIONS: --max-old-space-size=4096
         run: pnpm check
 
-      # HTTP-E2E-DEFERRED-BY-OWNER (27/10/2026, Prompt 04 continuation section 9.6): the HTTP E2E suite is paused until the Owner's
-      # redesign. This step alone is disabled; unit, rules, schema-drift, integration, security, build and deploy controls stay.
-      # Original condition: `if: github.ref == 'refs/heads/main'`. To re-enable: restore that condition, delete this comment and
-      # record it in the BE tracker. `pnpm test:e2e` and the suite stay in the repository; nothing here replaces the run with a
-      # fake pass (no continue-on-error, no `|| true`).
-      - name: Run API E2E tests
+      # HTTP-E2E-DEFERRED-BY-OWNER (Owner, 27–28/10/2026, Prompt 04 continuation sections 9.6 and 9.9): the HTTP E2E suite is
+      # paused until the Owner redesigns its runner (it ran over an hour and timed the runner out). Original condition:
+      # `if: github.ref == 'refs/heads/main'`. To re-enable: restore that condition, give the job a timeout that fits the suite,
+      # delete this comment and record it in the BE tracker. While it is off, CI proves nothing about HTTP behavior; `pnpm
+      # test:e2e` and the suite stay in the repository, and nothing here replaces the run with a fake pass (no
+      # continue-on-error, no `|| true`).
+      - name: Run API E2E tests (HTTP-E2E-DEFERRED-BY-OWNER)
         if: ${{ false }}
         run: pnpm test:e2e
 
@@ -163,8 +164,14 @@ jobs:
           pnpm exec prisma migrate deploy
           pnpm exec prisma migrate diff --from-config-datasource --to-schema prisma --exit-code
 
-      - name: Run isolated PostgreSQL integration tests
-        if: github.ref == 'refs/heads/main'
+      # INTEGRATION-DEFERRED-BY-OWNER (Owner, 28/10/2026, Prompt 04 continuation section 9.9): the isolated PostgreSQL integration
+      # suite (about 45–50 minutes) is paused until the Owner redesigns its runner. Original condition:
+      # `if: github.ref == 'refs/heads/main'`. To re-enable: restore that condition, give the job a timeout that fits the suite,
+      # delete this comment and record it in the BE tracker. While it is off, CI proves no real-database behavior, runtime-role
+      # privilege, concurrency or recovery: the schema check above proves only that the migrations build the Prisma schema on
+      # an empty database. The suite stays in the repository; nothing here replaces the run with a fake pass.
+      - name: Run isolated PostgreSQL integration tests (INTEGRATION-DEFERRED-BY-OWNER)
+        if: ${{ false }}
         run: pnpm test:integration
         env:
           TEST_DATABASE_ADMIN_URL: postgresql://ci_integration:ci-integration-only@127.0.0.1:5432/postgres
