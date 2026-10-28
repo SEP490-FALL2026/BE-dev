@@ -495,63 +495,9 @@ the `migrate` service. Exit 2 (`already installed`) requires inspecting the exis
 
 ### Bootstrap wrapper (Prompt 06)
 
-`scripts/ops/bootstrap-installation.sh` runs the same `node dist/installation-cli.js` once, in the image the last deployment
-recorded in `<APP_DIR>/releases/current-image`, with the settings **and the Super Admin password** read from a private file
-(`.env.bootstrap`, template [`.env.bootstrap.example`](../../.env.bootstrap.example)). It adds no seed, no SQL path and no
-automatic installation: nothing runs it but the operator, and CI/CD does not. The host needs Bash 4+ and Docker Compose only (no
-Node, no pnpm). It is for the first installation of a database; later deployments that keep the database never run it again.
-
-**One-time use**
-
-1. **The image must have the mode.** `--password-stdin` exists only in an image built from a revision that contains it. The wrapper
-   asks the selected image (`installation-cli.js --help`) first and refuses, with exit 3 and **no password sent**, an image
-   without it; it never feeds a password to the older hidden prompt. Getting that image onto the host is an ordinary build and
-   deploy of the revision to the database that is already installed fresh: **do not reset the database for it.**
-2. **Copy the wrapper and the empty template to the VPS** (a separate operator step: CD copies only `docker-compose.prod.yml`,
-   `Caddyfile` and `scripts/ops/deploy-release.sh`, and this does not change the deploy workflow). From a checkout of the same
-   revision: `scp scripts/ops/bootstrap-installation.sh .env.bootstrap.example <host>:<APP_DIR>/`.
-3. **Fill `.env.bootstrap` on the VPS only.** In `<APP_DIR>`: `(umask 077 && cp .env.bootstrap.example .env.bootstrap)`, edit it
-   there, then check `stat -c '%a %U' .env.bootstrap` prints `600` and the deploy user. It is separate from `.env` (Compose and
-   database credentials) and `.env.app` (API and worker settings); it is ignored by Git (`.gitignore` excepts only the empty
-   example), kept out of every image build context (`.dockerignore` `.env.*`) and never goes into a CI artifact, a ticket or a chat.
-   The password is chosen by the person who will hold the Super Admin role.
-4. **After a green CD** (and no deployment running: the wrapper does not take the host lock), in `<APP_DIR>`:
-   `bash bootstrap-installation.sh --app-dir <APP_DIR> --config <APP_DIR>/.env.bootstrap`.
-5. **Verify** — a ready deployment is not an installation: `API_IMAGE="$(head -n 1 releases/current-image)" docker compose
---project-directory <APP_DIR> -f <APP_DIR>/docker-compose.prod.yml run --rm --no-deps migrate node dist/inspect-cli.js` → exit 0, then
-   the same with `dist/migration-preflight-cli.js` → `READY`, then sign in as the Super Admin. The wrapper prints these commands.
-6. **Afterwards** keep `.env.bootstrap` at mode 600, or delete the password line or the file: an operator choice. The script never
-   changes or deletes it, and no report prints it.
-
-**Exit codes:** the installation command's — 0 installed · 2 already installed (nothing changed; inspect it, never reset or
-overwrite blindly) · 130 cancelled · 1 failure (**does not prove nothing was written**: a lost reply to `COMMIT` can hide an
-installation — inspect before running again) — and **3** = this script refused before starting the command (nothing was changed).
-
-**Configuration syntax.** The file is parsed as data; nothing in it is evaluated, sourced or expanded.
-
-- One `NAME=VALUE` per line; no spaces around `=`, no `export`, no comment after a value; blank lines and whole-line `#` comments
-  are ignored; Unix (LF) line endings only (a carriage return is refused, never kept or dropped silently).
-- The value is everything after the first `=`, literally: no `$variable`, backticks, `$(command)`, escapes or trimming. One pair of
-  matching outer quotes (single or double) is removed, so `'  edge spaces  '` keeps its spaces; an opening quote without its closing
-  one is refused. Unicode, spaces and shell metacharacters are passed as they are, each as one `--name=value` argument.
-- Required, non-empty: `BOOTSTRAP_TIMEZONE`, `BOOTSTRAP_ORGANIZATION_NAME`, `BOOTSTRAP_DEPARTMENT_CODE`,
-  `BOOTSTRAP_DEPARTMENT_NAME`, `BOOTSTRAP_ADMIN_CODE`, `BOOTSTRAP_ADMIN_NAME`, `BOOTSTRAP_ADMIN_EMAIL`,
-  `BOOTSTRAP_ADMIN_HIRE_DATE`, `BOOTSTRAP_OPERATOR_REFERENCE`, `BOOTSTRAP_ADMIN_PASSWORD`. Optional (empty = the command's
-  default): `BOOTSTRAP_CURRENCY`, `BOOTSTRAP_LOGIN_EMAIL`, `BOOTSTRAP_ADMIN_TYPE`. `--environment` is always `SHARED` (this VPS).
-  An unknown or repeated name is refused by line number.
-- The wrapper checks only presence and syntax; the installation command validates every value and the password policy (12–128
-  characters, not the email) before it writes anything.
-
-**What it guarantees about the password.** It is taken from `BOOTSTRAP_ADMIN_PASSWORD` of the file only (a variable the caller
-exported is ignored and not forwarded to Docker), never trimmed, never defaulted, and sent as one line on standard input through a
-pipe from a shell builtin: not in any argument or Docker `-e`/`--env-file`, not in Compose interpolation or image metadata, not in a
-temporary file, not in an output or error message. Tracing is switched off before the file is read. The wrapper asks Docker for
-nothing but `run --rm --no-deps -T api` of the live Compose file with `API_IMAGE` set explicitly to the recorded image (never
-`latest` or an inherited value); it resets nothing, writes no SQL and cleans up no business data.
-
-**Evidence.** [`bootstrap-installation.test.mjs`](../../scripts/verify/bootstrap-installation.test.mjs) runs the real script against
-a fake `docker`: it proves what the wrapper sends and refuses. It does **not** prove an installation on the VPS; that is the
-operator's verification (step 5), recorded in the Task 1.2b table.
+The canonical operator guide is now [Bootstrap tổ chức và Super Admin trên VPS](bootstrap-installation.md).
+It covers the VPS file layout, exact copy/config/run/check commands, private-file syntax, exit codes and later deployments.
+This anchor stays for existing links; keep bootstrap instructions in that one guide instead of duplicating them here.
 
 ### The pre-migrate dump is a protected operational document
 

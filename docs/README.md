@@ -16,6 +16,12 @@ không phải bộ chức năng đã hoàn thành.
 Kiến trúc hiện hành nằm ở ARCHITECTURE.md root. Không cần tạo một bản song song
 trong docs/architecture. Các gói triển khai auth/US cũ đã được dọn khỏi baseline.
 
+## Hướng dẫn vận hành
+
+- [Bootstrap tổ chức và Super Admin trên VPS](guides/bootstrap-installation.md): nguồn hướng dẫn chính cho wrapper,
+  `.env.bootstrap`, copy file, cài đầu tiên, kiểm tra và các lần deploy sau.
+- [Container, PostgreSQL roles và deploy](guides/containers.md): chuẩn bị hạ tầng, backup, migration và phục hồi release.
+
 ## Quyết định còn áp dụng
 
 - [Modular monolith](decisions/0001-modular-monolith.md).
