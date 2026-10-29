@@ -23,7 +23,8 @@ duy nhất được phép). Được dùng bởi: budgets, catalog, installation
   - `findAccountIdOfEmployee`, `findLoginEmailOfEmployee`, `employeeIdsOfAccounts` — ánh xạ tài khoản ↔ nhân viên.
 - `HolderRecoveryApi`, `RoleTransferRecoveryApi` (`public/holder-recovery.api.ts`, `role-transfer-recovery.api.ts`) —
   khôi phục Super Admin, chỉ lệnh `pnpm ops:recover` (qua `recovery.module.ts`).
-- `IdentityAccessInspectionApi` — chỉ `pnpm ops:inspect`; `LocalDemoAccountApi` — chỉ `pnpm dev:seed`.
+- `IdentityAccessInspectionApi` — chỉ `pnpm ops:inspect`; `LocalDemoAccountApi` — chỉ `pnpm dev:seed` và
+  `pnpm ops:demo-dataset` (qua `DemoAccountsApi` của installation).
 - Type/lỗi: `identity-access.types.ts`, `identity-access.errors.ts`, `recovery.types.ts`, `recovery.errors.ts`.
 
 ## Bảng sở hữu

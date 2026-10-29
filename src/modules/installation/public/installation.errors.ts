@@ -36,3 +36,11 @@ export class AlreadyInstalledError extends Error {
     this.name = 'AlreadyInstalledError';
   }
 }
+
+/** `ops:demo-dataset`: the demo accounts changed between the read and the write (someone wrote meanwhile). Nothing was written. */
+export class DemoAccountsChangedError extends Error {
+  constructor() {
+    super('The demo accounts changed while they were being written; nothing was written. Run the command again.');
+    this.name = 'DemoAccountsChangedError';
+  }
+}

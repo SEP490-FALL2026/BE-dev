@@ -430,7 +430,7 @@ assign or link cannot be placed between two migrations of one deploy: it is plac
 ### Task 1.2b action 9 on a real server (two paths)
 
 Action 9 records that **one named database** is ready to receive the final release. It is not a deploy of the final release and
-it **seeds no demo data** (the demo dataset stays deferred). The Owner/operator runs it on the host, per database, and records the
+it **seeds no demo data** (the demo dataset is a separate operator step: [demo-dataset](demo-dataset.md)). The Owner/operator runs it on the host, per database, and records the
 evidence in the Task 1.2b template of the work item's plan; a local rehearsal or a CI run never counts as action 9, and nothing here
 runs in CI/CD. Placeholders: `<APP_DIR>`, `<IMAGE>` (`ghcr.io/<owner>/<repo>` in lower case), `<COMPAT_SHA>` =
 `fba4dfe0885f19e6a76a6e6e7e15d30223d124ab`, `<FINAL_SHA>` (the Owner's commit of the final release), `<ATTEMPT>`, `<REF>` (a

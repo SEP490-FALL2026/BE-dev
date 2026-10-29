@@ -53,10 +53,10 @@ flowchart BT
   identity_access -->|18| audit
   identity_access -->|10| notifications
   identity_access -->|32| organization
-  installation -->|6| audit
+  installation -->|8| audit
   installation -->|2| finance
-  installation -->|13| identity_access
-  installation -->|7| organization
+  installation -->|18| identity_access
+  installation -->|9| organization
   licensing -->|24| audit
   licensing -->|29| catalog
   licensing -->|3| identity_access

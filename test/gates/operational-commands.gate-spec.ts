@@ -23,6 +23,7 @@ const COMMAND_FOLDERS = [
   'cli',
   'modules/installation/inspect',
   'modules/installation/dev-seed',
+  'modules/installation/demo-dataset',
   'modules/installation/migration-preflight',
   'modules/catalog/subscription-owner-assignment',
   'modules/organization/cost-center-direction',
@@ -38,6 +39,7 @@ const COMMAND_ONLY_FILES = [
   'modules/installation/inspect/inspection.module.ts',
   'modules/identity-access/identity-access-local-seed-facade.module.ts',
   'modules/installation/dev-seed/dev-seed.module.ts',
+  'modules/installation/demo-dataset/demo-dataset.module.ts',
   'modules/installation/migration-preflight/migration-preflight.module.ts',
   'cli/assign-subscription-owner/assign-subscription-owner-cli.module.ts',
   'modules/catalog/subscription-owner-assignment/subscription-owner-assignment.module.ts',
@@ -56,8 +58,11 @@ const ALIAS_CALLERS = [
   'docker-compose.prod.yml',
   'scripts/ops/deploy-release.sh',
   'scripts/ops/bootstrap-installation.sh',
+  'scripts/ops/demo-dataset.sh',
+  'scripts/ops/demo-dataset-local.mjs',
   'docs/guides/containers.md',
   'docs/guides/bootstrap-installation.md',
+  'docs/guides/demo-dataset.md',
 ];
 /** Known weak defaults that must never appear in product code, scripts or the environment template (rule 5). */
 const WEAK_DEFAULTS = [/Password123/i, /changeme/i, /admin123/i, /P@ssw0rd/i, /correct horse battery staple/i];

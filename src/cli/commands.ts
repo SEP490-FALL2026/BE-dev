@@ -73,6 +73,12 @@ export const COMMANDS: readonly CommandEntry[] = [
     load: () => import('./db-roles/db-roles.command').then((m) => m.dbRolesCommand),
   },
   {
+    name: 'demo-dataset',
+    description: 'Write a versioned demo dataset through the API of a running installation (plan, then apply).',
+    alias: 'demo-dataset-cli',
+    load: () => import('./demo-dataset/demo-dataset.command').then((m) => m.demoDatasetCommand),
+  },
+  {
     name: 'dev-seed',
     description: 'Write the local demo data (local databases only, --confirm-local).',
     alias: 'dev-seed-cli',

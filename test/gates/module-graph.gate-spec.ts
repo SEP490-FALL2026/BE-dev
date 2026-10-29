@@ -26,6 +26,7 @@ import { RecoveryModule } from '../../src/modules/identity-access/recovery.modul
 import { InstallationModule } from '../../src/modules/installation/installation.module';
 import { InspectionModule } from '../../src/modules/installation/inspect/inspection.module';
 import { DevSeedModule } from '../../src/modules/installation/dev-seed/dev-seed.module';
+import { DemoDatasetModule } from '../../src/modules/installation/demo-dataset/demo-dataset.module';
 import { MigrationPreflightModule } from '../../src/modules/installation/migration-preflight/migration-preflight.module';
 import { SubscriptionOwnerAssignmentModule } from '../../src/modules/catalog/subscription-owner-assignment/subscription-owner-assignment.module';
 import { SubscriptionOwnerAssignmentCliModule } from '../../src/cli/assign-subscription-owner/assign-subscription-owner-cli.module';
@@ -92,6 +93,8 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   'InstallationModule: InstallationApi',
   // H6.2: the entry service of `pnpm dev:seed`.
   'DevSeedModule: DevSeedApi',
+  // The in-process part of `pnpm ops:demo-dataset`: the demo accounts of the shared demo dataset (the rest goes through HTTP).
+  'DemoDatasetModule: DemoAccountsApi',
   // H6.1: the entry service of `pnpm ops:inspect`.
   'InspectionModule: InstallationInspectionApi',
   // P28-01 (Prompt 29): the entry service of `pnpm ops:preflight`.
@@ -341,6 +344,7 @@ describe('module graph', () => {
     ['RecoveryCliModule', RecoveryCliModule],
     ['InspectionModule', InspectionModule],
     ['DevSeedModule', DevSeedModule],
+    ['DemoDatasetModule', DemoDatasetModule],
     ['MigrationPreflightModule', MigrationPreflightModule],
   ];
 
@@ -606,6 +610,7 @@ describe('operational command graphs (H6.1, docs/rules/operational-commands.md)'
           InspectionModule,
           IdentityAccessInspectionFacadeModule,
           DevSeedModule,
+          DemoDatasetModule,
           IdentityAccessLocalSeedFacadeModule,
           MigrationPreflightModule,
           SubscriptionOwnerAssignmentModule,
@@ -628,6 +633,7 @@ describe('operational command graphs (H6.1, docs/rules/operational-commands.md)'
       ['RecoveryCliModule', RecoveryCliModule, 0],
       ['InspectionModule', InspectionModule, 1],
       ['DevSeedModule', DevSeedModule, 0],
+      ['DemoDatasetModule', DemoDatasetModule, 0],
       ['MigrationPreflightModule', MigrationPreflightModule, 1],
       ['SubscriptionOwnerAssignmentCliModule', SubscriptionOwnerAssignmentCliModule, 0],
       ['CostCenterDirectionCliModule', CostCenterDirectionCliModule, 0],
@@ -714,6 +720,8 @@ describe('the local seed graph (H6.2)', () => {
       ['RecoveryCliModule', RecoveryCliModule, 0],
       ['InspectionModule', InspectionModule, 0],
       ['DevSeedModule', DevSeedModule, 1],
+      // ops:demo-dataset writes its demo accounts through the same contract (one direct role, never a derived one).
+      ['DemoDatasetModule', DemoDatasetModule, 1],
       ['MigrationPreflightModule', MigrationPreflightModule, 0],
       ['SubscriptionOwnerAssignmentCliModule', SubscriptionOwnerAssignmentCliModule, 0],
       ['CostCenterDirectionCliModule', CostCenterDirectionCliModule, 0],
@@ -731,26 +739,32 @@ describe('the local seed graph (H6.2)', () => {
     }
   });
 
-  it('loads only what the seed writes through: no controller, mail, queue, JWT, API module or full configuration', () => {
-    const graph = collectGraph(DevSeedModule);
-    const modules = graph.map((node) => node.module);
+  it.each([
+    ['DevSeedModule', DevSeedModule],
+    ['DemoDatasetModule', DemoDatasetModule],
+  ])(
+    '%s loads only what it writes through: no controller, mail, queue, JWT, API module or full configuration',
+    (_name, root) => {
+      const graph = collectGraph(root);
+      const modules = graph.map((node) => node.module);
 
-    expect(controllersOf(graph)).toEqual([]);
-    for (const forbidden of [
-      NotificationsModule,
-      IdentityAccessModule,
-      RecoveryModule,
-      QueueInfrastructureModule,
-      ObjectStorageModule,
-    ]) {
-      expect({ forbidden: forbidden.name, mounted: modules.includes(forbidden) }).toEqual({
-        forbidden: forbidden.name,
-        mounted: false,
-      });
-    }
-    expect(moduleNames(graph)).not.toContain('JwtModule');
-    expect(moduleNames(graph)).not.toContain('ConfigurationModule');
-    expect(moduleNames(graph)).toContain('InstallationConfigurationModule');
-    expect(declarationsOf(graph, MailTransport)).toHaveLength(0);
-  });
+      expect(controllersOf(graph)).toEqual([]);
+      for (const forbidden of [
+        NotificationsModule,
+        IdentityAccessModule,
+        RecoveryModule,
+        QueueInfrastructureModule,
+        ObjectStorageModule,
+      ]) {
+        expect({ forbidden: forbidden.name, mounted: modules.includes(forbidden) }).toEqual({
+          forbidden: forbidden.name,
+          mounted: false,
+        });
+      }
+      expect(moduleNames(graph)).not.toContain('JwtModule');
+      expect(moduleNames(graph)).not.toContain('ConfigurationModule');
+      expect(moduleNames(graph)).toContain('InstallationConfigurationModule');
+      expect(declarationsOf(graph, MailTransport)).toHaveLength(0);
+    },
+  );
 });

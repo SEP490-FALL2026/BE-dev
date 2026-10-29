@@ -8,8 +8,9 @@ architecture gate, không copy layout của một module cụ thể.
 Employee, mời/kích hoạt, khóa/mở và gán/thu hồi vai, đổi/đặt lại mật khẩu, tra cứu Audit Trail, danh mục chức vụ/Cost
 Center, phòng và trưởng phòng (vai Manager suy ra), Người duyệt chi, tham số vận hành, import nhân sự CSV, checklist khởi
 tạo, chuyển giao Super Admin, lệnh khôi phục ngoài HTTP `pnpm ops:recover --help`, lệnh kiểm trạng thái chỉ đọc
-`pnpm ops:inspect`, lệnh tách vai PostgreSQL production `pnpm ops:db-roles` và lệnh dữ liệu demo chỉ local
-`pnpm dev:seed -- --confirm-local` (các lệnh ngoài HTTP cần
+`pnpm ops:inspect`, lệnh tách vai PostgreSQL production `pnpm ops:db-roles`, lệnh dữ liệu demo chỉ local
+`pnpm dev:seed -- --confirm-local` và lệnh nạp dataset demo dùng chung qua API `pnpm ops:demo-dataset`
+([runbook](docs/guides/demo-dataset.md)) (các lệnh ngoài HTTP cần
 `pnpm build`; rule: [operational commands](docs/rules/operational-commands.md)).
 Từ PR #14 (21/10/2026) có thêm route HTTP của G3/G4 ở ba ngữ cảnh `catalog`, `finance`, `licensing`
 ([ADR-0013](docs/decisions/0013-catalog-finance-licensing-contexts.md)): danh mục ứng dụng, gói, nhà cung cấp, hồ sơ thuế,

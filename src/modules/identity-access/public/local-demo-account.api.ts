@@ -10,11 +10,11 @@ import { CreateDemoAccountInput, DemoAccountRole, DemoAccountState } from './ide
 const DEMO_ACCOUNT_ROLES: ReadonlySet<string> = new Set<DemoAccountRole>(['IT_ADMIN', 'FINANCE', 'EMPLOYEE']);
 
 /**
- * Local demo accounts for `pnpm dev:seed` (H6.2). Declared only in IdentityAccessLocalSeedFacadeModule, which nothing
- * but the seed graph loads; the command checks its local guards before it calls this. One activated account per demo
- * employee with exactly one direct role, never SUPER_ADMIN and never a derived role (operational-commands rule 6). The
- * login email counts as asserted by the person who ran the command, as for the installation's Super Admin: the demo
- * mailbox does not exist, so there is no invitation.
+ * Demo accounts for `pnpm dev:seed` (H6.2, after its local guards) and `pnpm ops:demo-dataset` (the shared demo dataset,
+ * after it proved its target installation). Declared only in IdentityAccessLocalSeedFacadeModule, which nothing but those
+ * two command graphs loads. One activated account per demo employee with exactly one direct role, never SUPER_ADMIN and
+ * never a derived role (operational-commands rule 6). The login email counts as asserted by the person who ran the
+ * command, as for the installation's Super Admin: the demo mailbox does not exist, so there is no invitation.
  */
 @Injectable()
 export class LocalDemoAccountApi {
