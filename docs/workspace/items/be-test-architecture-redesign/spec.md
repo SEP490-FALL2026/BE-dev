@@ -4,7 +4,8 @@
 - Thiết kế ban đầu bởi: AI theo yêu cầu Owner (28/10/2026). Phân tích tĩnh + log CI cũ; **không chạy test** (Owner không
   cho chạy) — mọi con số thời gian lấy từ log GitHub Actions, Phase T0 phải đo lại.
 - Thiết kế: `draft`. Owner review: chưa review toàn spec. Owner chốt `OD-T1` → `OD-T5` ngày 28/10/2026, cả năm theo đề xuất
-  (mục _Owner decisions_).
+  (mục _Owner decisions_). Triển khai local 29/10/2026 trên BE `dee61eb` (Owner cho chạy test), chưa commit: kết quả,
+  số đo T0 và sai khác ở [plan](plan.md#kết-quả-triển-khai-29102026).
 - Nguồn: Docs `578f442` (BRD v3.57; báo cáo `Docs/CI-CD/Test-Optimization-and-Redesign-Guide.md` được review ở đây),
   BE `c49a7dd`. Log CI: run `39281599561` (19/10), `39885940175` (23/10), `40091710522` (24/10), `40704221067` (28/10).
 - Nhóm roadmap: xuyên module — `technical-enabler`, không thuộc nhóm G (xem `## Sizing decision`).
@@ -245,16 +246,16 @@ nightly (dev) ─ toàn bộ integration + e2e-smoke + test:mutation + báo cáo
 
 ## Test matrix
 
-| AC / rủi ro           | Tình huống (gồm từ chối, edge case)                            | Cấp test                | Kết quả mong đợi                                           | Bằng chứng sau implement |
-| --------------------- | -------------------------------------------------------------- | ----------------------- | ---------------------------------------------------------- | ------------------------ |
-| `TEST-R1` C1          | HTTP spec dựng app trong `it`/`beforeEach`                     | gate `test:discovery`   | đỏ, chỉ ra file                                            | chưa có                  |
-| `TEST-R1` C1          | Token không có tiền tố test / `unavailable`                    | HTTP contract           | 401 `INVALID_ACCESS_TOKEN` / 503 như hiện nay              | chưa có                  |
-| `TEST-R1` giữ phạm vi | So số test và tên test trước/sau đổi harness                   | script so sánh `--json` | không mất test; khác biệt có lý do trong PR                | chưa có                  |
-| `TEST-R1` C2          | Builder tạo phòng không có Cost Center rồi tạo Request trả phí | integration             | lỗi _cấu hình tài chính chưa hoàn tất_ như qua HTTP        | chưa có                  |
-| `TEST-R1` C3          | Hai worker chạy song song hai file cùng bảng                   | integration             | không ảnh hưởng nhau (DB riêng)                            | chưa có                  |
-| `TEST-R1` C4          | File tạo role cluster nằm ngoài `_serial`                      | gate `test:discovery`   | đỏ                                                         | chưa có                  |
-| `TEST-R2`             | Integration đỏ trên `main`                                     | CI                      | `deploy` không chạy                                        | chưa có                  |
-| `TEST-R2`             | Push chỉ đổi `src/modules/finance`                             | CI                      | chạy integration của finance và module phụ thuộc theo tầng | chưa có                  |
+| AC / rủi ro           | Tình huống (gồm từ chối, edge case)                            | Cấp test                | Kết quả mong đợi                                           | Bằng chứng sau implement                                                                                                                                                   |
+| --------------------- | -------------------------------------------------------------- | ----------------------- | ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `TEST-R1` C1          | HTTP spec dựng app trong `it`/`beforeEach`                     | gate `test:discovery`   | đỏ, chỉ ra file                                            | `scripts/verify/http-app-placement.mjs` trong `pnpm test:discovery` (node:test; thử vi phạm → đỏ)                                                                          |
+| `TEST-R1` C1          | Token không có tiền tố test / `unavailable`                    | HTTP contract           | 401 `INVALID_ACCESS_TOKEN` / 503 như hiện nay              | `test/http/platform/app.http-spec.ts`: 401 `INVALID_ACCESS_TOKEN`, 503 khi dịch vụ xác thực không tới được                                                                 |
+| `TEST-R1` giữ phạm vi | So số test và tên test trước/sau đổi harness                   | script so sánh `--json` | không mất test; khác biệt có lý do trong PR                | `--json` trước/sau: HTTP 1 238 → 1 240, integration 3 465 → 3 466, T2.2 289 → 289 ([nghiệm thu §3](../../../reviews/be-architecture-test-acceptance-2026-10-29/README.md)) |
+| `TEST-R1` C2          | Builder tạo phòng không có Cost Center rồi tạo Request trả phí | integration             | lỗi _cấu hình tài chính chưa hoàn tất_ như qua HTTP        | `test/integration/requests/finance-setup-gate.integration-spec.ts`: phòng và người dựng qua builder của harness, 409 `FINANCE.SETUP_INCOMPLETE`, không ghi gì              |
+| `TEST-R1` C3          | Hai worker chạy song song hai file cùng bảng                   | integration             | không ảnh hưởng nhau (DB riêng)                            | lượt đầy đủ 6 worker lặp lại ([nghiệm thu §5 P4](../../../reviews/be-architecture-test-acceptance-2026-10-29/README.md))                                                   |
+| `TEST-R1` C4          | File tạo role cluster nằm ngoài `_serial`                      | gate `test:discovery`   | đỏ                                                         | gate `parallel-safety` (`pnpm test:gates`, không phải `test:discovery`): `clusterActionsOutsideSerial`, self-test + thử đỏ                                                 |
+| `TEST-R2`             | Integration đỏ trên `main`                                     | CI                      | `deploy` không chạy                                        | chờ CI của Owner ([nghiệm thu §8 bước 2](../../../reviews/be-architecture-test-acceptance-2026-10-29/README.md))                                                           |
+| `TEST-R2`             | Push chỉ đổi `src/modules/finance`                             | CI                      | chạy integration của finance và module phụ thuộc theo tầng | `scripts/verify/affected-modules.test.mjs`: finance → `budgets`, `finance`, `requests`; trên GitHub chờ CI của Owner                                                       |
 
 ## Definition of Done
 

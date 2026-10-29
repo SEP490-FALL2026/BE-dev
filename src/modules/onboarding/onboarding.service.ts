@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import type { AuthenticatedPrincipal } from '../../infrastructure/security/tokens/access-token-verifier.port';
-import { CatalogService } from '../catalog/catalog.service';
-import { DataImportService } from '../data-import/data-import.service';
-import { IdentityAccessService } from '../identity-access/identity-access.service';
-import { LicensingService } from '../licensing/licensing.service';
-import { OrganizationService } from '../organization/organization.service';
+import { CatalogApi } from '../catalog/public/catalog.api';
+import { DataImportApi } from '../data-import/public/data-import.api';
+import { IdentityAccessApi } from '../identity-access/public/identity-access.api';
+import { LicensingApi } from '../licensing/public/licensing.api';
+import { OrganizationApi } from '../organization/public/organization.api';
 import { assertMayReadChecklist } from './onboarding.policy';
 
 export type StepStatus = 'DONE' | 'INCOMPLETE' | 'BLOCKED' | 'NOT_AVAILABLE';
@@ -67,11 +67,11 @@ export interface OnboardingChecklist {
 @Injectable()
 export class OnboardingService {
   constructor(
-    private readonly organization: OrganizationService,
-    private readonly identity: IdentityAccessService,
-    private readonly imports: DataImportService,
-    private readonly catalog: CatalogService,
-    private readonly licensing: LicensingService,
+    private readonly organization: OrganizationApi,
+    private readonly identity: IdentityAccessApi,
+    private readonly imports: DataImportApi,
+    private readonly catalog: CatalogApi,
+    private readonly licensing: LicensingApi,
   ) {}
 
   /** The Super Admin and the IT Admin read it, and nobody else: OnboardingForbiddenError. */

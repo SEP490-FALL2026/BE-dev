@@ -44,10 +44,8 @@ function fail(name: string, rule: string): never {
   throw new DatabaseRoleSettingsError(`${name} ${rule}`);
 }
 
-function readLogin(environment: Record<string, string | undefined>, name: string): PostgresLogin {
-  const value = environment[name];
-  if (!value) fail(name, 'is required');
-
+/** The value of variable `name` as a PostgreSQL URL to exactly one host, with nothing that could redirect it. */
+function parsePostgresUrl(value: string, name: string): URL {
   let url: URL;
   try {
     url = new URL(value);
@@ -60,6 +58,14 @@ function readLogin(environment: Record<string, string | undefined>, name: string
   if (url.search || url.hash) fail(name, 'must not carry a query or a fragment');
   if (!url.hostname || url.hostname.includes(',')) fail(name, 'must name exactly one host');
 
+  return url;
+}
+
+function readLogin(environment: Record<string, string | undefined>, name: string): PostgresLogin {
+  const value = environment[name];
+  if (!value) fail(name, 'is required');
+
+  const url = parsePostgresUrl(value, name);
   const role = decodeURIComponent(url.username);
   const password = decodeURIComponent(url.password);
   const database = decodeURIComponent(url.pathname.slice(1));

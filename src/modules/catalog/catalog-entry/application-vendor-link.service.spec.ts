@@ -1,7 +1,7 @@
 import { HttpStatus } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
-import type { AuditService } from '../../audit/audit.service';
+import type { AuditApi } from '../../audit/public/audit.api';
 import type { VendorDictionaryLookupService } from '../vendor-dictionary/vendor-dictionary-lookup.service';
 import type { VendorProposalIntakeService } from '../vendor-dictionary/vendor-proposal-intake.service';
 import type { VendorDirectoryService, VendorRecord } from '../vendor/vendor-directory.service';
@@ -35,7 +35,7 @@ function linkWith(holder: VendorRecord | null, adopted: { vendor: VendorRecord; 
     dictionary as unknown as VendorDictionaryLookupService,
     vendors as unknown as VendorDirectoryService,
     {} as VendorProposalIntakeService,
-    {} as AuditService,
+    {} as AuditApi,
   );
 
   return { service, vendors };

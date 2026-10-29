@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { ActionTokenPurpose, ActionTokenRevokedReason, ActionTokenSnapshot } from '../identity-access.types';
-import { ActionLinkState } from '../policies/account-policy';
+import { ActionTokenPurpose, ActionTokenRevokedReason, ActionTokenSnapshot } from '../public/identity-access.types';
+import { ActionLinkState } from '../policies/account.policy';
 
 const TOKEN_SELECT = {
   tokenHash: true,

@@ -1,4 +1,4 @@
-import type { UseItem } from '../organization-use.types';
+import type { UseItem } from '../public/organization-use.types';
 
 export class DepartmentNotFoundError extends Error {
   constructor() {
@@ -106,5 +106,16 @@ export class DepartmentOutOfScopeError extends Error {
   constructor() {
     super('This department is not yours.');
     this.name = 'DepartmentOutOfScopeError';
+  }
+}
+
+/**
+ * No module reads one group of what keeps a department or a Cost Center in use, so retiring it could pass what the organization
+ * cannot see: a configuration error that fails loudly instead of letting the retirement through.
+ */
+export class UseReaderMissingError extends Error {
+  constructor(readonly group: string) {
+    super(`No module reads ${group}, which keeps a department or a Cost Center in use.`);
+    this.name = 'UseReaderMissingError';
   }
 }

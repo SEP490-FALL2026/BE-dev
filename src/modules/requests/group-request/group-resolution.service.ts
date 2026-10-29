@@ -1,14 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { AuditService } from '../../audit/audit.service';
-import { OrganizationService } from '../../organization/organization.service';
-import { accessRequestAuditEvent } from '../access-request/access-request-audit-event';
+import { AuditApi } from '../../audit/public/audit.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
+import { accessRequestAuditEvent } from '../access-request/access-request-audit-event.mapper';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
-import { RepricingService } from '../access-request/repricing.service';
+import { RepricingService } from '../assessment/repricing.service';
 import { RequestAssessmentService } from '../access-request/request-assessment.service';
-import { BudgetInformationService } from '../spend/budget-information.service';
+import { BudgetInformationService } from '../budget-information/budget-information.service';
 import { SpendBatchRepo } from '../spend/spend-batch.repo';
 import { SpendEntryService } from '../spend/spend-entry.service';
 import { SpendStepRepo } from '../spend/spend-step.repo';
@@ -47,12 +47,12 @@ export class GroupResolutionService {
     private readonly lines: RequestLineRepo,
     private readonly repricing: RepricingService,
     private readonly assessment: RequestAssessmentService,
-    private readonly organization: OrganizationService,
+    private readonly organization: OrganizationApi,
     private readonly entry: SpendEntryService,
     private readonly steps: SpendStepRepo,
     private readonly batches: SpendBatchRepo,
     private readonly questions: BudgetInformationService,
-    private readonly audit: AuditService,
+    private readonly audit: AuditApi,
   ) {}
 
   /** Reads the lines now and moves the request where they say; `actor` is null when the system moves it (the grant gate). */

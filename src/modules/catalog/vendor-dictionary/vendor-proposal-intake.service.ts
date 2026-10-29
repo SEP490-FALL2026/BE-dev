@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { searchKey } from './vendor-matcher';
+import { searchKey } from './vendor-matcher.policy';
 import { VendorProposalRepo } from './vendor-proposal.repo';
 
 /** How an application declaration proposes software that is not in the dictionary (`US-04-01` AC-5). */

@@ -1,6 +1,6 @@
 import { AuditQueryService } from './audit-query.service';
 import type { AuditQueryRepo } from './audit-query.repo';
-import type { StoredAuditEvent } from './audit.types';
+import type { StoredAuditEvent } from './public/audit.types';
 
 const event = (overrides: Partial<StoredAuditEvent> = {}): StoredAuditEvent => ({
   id: 'a8b6c4d2-1f3e-4a5b-9c7d-0e2f4a6b8c10',

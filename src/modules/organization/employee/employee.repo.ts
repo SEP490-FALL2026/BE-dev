@@ -12,7 +12,7 @@ import {
   EmployeeOpenSeatNeedsEndError,
   PlacementDepartmentInactiveError,
   PlacementOverlapError,
-} from '../organization.errors';
+} from '../public/organization.errors';
 import {
   CreateEmployeeWithPlacementInput,
   EmployeeCandidate,
@@ -23,7 +23,7 @@ import {
   PlacementInForce,
   ScheduledStructureChange,
   StructureChangeInput,
-} from '../organization.types';
+} from '../public/organization.types';
 
 /** The employee as the facade shows it. */
 function toEmployeeRecord(row: {

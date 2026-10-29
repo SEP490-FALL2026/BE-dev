@@ -547,7 +547,7 @@ read-only (PostgreSQL refuses any write, `25006`). `--json` gives the same repor
 **The preflight is a read-only check, not a repair.** It changes nothing, and no command in this repository invents a
 department or `Unit`, rewrites immutable placement or allocation history, or recreates a database (`P29-RV-01`).
 
-Supported and blocked histories (each proven by `test/integration/unit-only-upgrade-history.integration-spec.ts`):
+Supported and blocked histories (each proven by `test/integration/platform/unit-only-upgrade-history.integration-spec.ts`):
 
 | History                                                                             | Path                                                                                                     |
 | ----------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |

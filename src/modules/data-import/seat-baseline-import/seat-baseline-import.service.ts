@@ -3,17 +3,17 @@ import { createHash } from 'node:crypto';
 import { Page, pageOf } from '../../../core/application/pagination';
 import { DbTx, TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { AuditService } from '../../audit/audit.service';
-import type { SeatTarget, SeatTargetRef } from '../../catalog/catalog.types';
-import { AssignmentConflictError, SeatBaselineClosedError } from '../../licensing/licensing.errors';
-import { LicensingService } from '../../licensing/licensing.service';
-import type { BaselineFacts, NewBaselineAssignment } from '../../licensing/licensing.types';
-import { OrganizationService } from '../../organization/organization.service';
+import { AuditApi } from '../../audit/public/audit.api';
+import type { SeatTarget, SeatTargetRef } from '../../catalog/public/catalog.types';
+import { AssignmentConflictError, SeatBaselineClosedError } from '../../licensing/public/licensing.errors';
+import { LicensingApi } from '../../licensing/public/licensing.api';
+import type { BaselineFacts, NewBaselineAssignment } from '../../licensing/public/licensing.types';
+import { OrganizationApi } from '../../organization/public/organization.api';
 import {
   seatImportCancelledEvent,
   seatImportConfirmedEvent,
   seatImportUploadedEvent,
-} from './seat-baseline-import-audit';
+} from './seat-baseline-import-audit.mapper';
 import {
   SeatImportAlreadyConfirmedError,
   SeatImportNotFoundError,
@@ -31,8 +31,8 @@ import type {
   SeatRowOutcome,
   SeatRowResult,
 } from './seat-baseline-import.types';
-import { readSeatFile } from './seat-baseline-file';
-import { judgeSeatRows, lookupNamesOf, occupiedOn, sameJudgement, type SeatFacts } from './seat-baseline-rows';
+import { readSeatFile } from './seat-baseline-file.policy';
+import { judgeSeatRows, lookupNamesOf, occupiedOn, sameJudgement, type SeatFacts } from './seat-baseline-rows.policy';
 
 /** A preview that is not confirmed goes stale on its own after this long. */
 export const PREVIEW_TTL_MS = 24 * 60 * 60 * 1000;
@@ -60,9 +60,9 @@ const refOf = (record: ImportRecord): SeatTargetRef =>
 export class SeatBaselineImportService {
   constructor(
     private readonly repo: SeatBaselineImportRepo,
-    private readonly organization: OrganizationService,
-    private readonly licensing: LicensingService,
-    private readonly audit: AuditService,
+    private readonly organization: OrganizationApi,
+    private readonly licensing: LicensingApi,
+    private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
   ) {}
 

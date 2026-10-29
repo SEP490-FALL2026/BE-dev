@@ -1,5 +1,5 @@
 import type { BusinessDate } from '../../../core/business-date';
-import { checkBeneficiary, type BeneficiaryRefusal } from '../access-request/beneficiary-eligibility.policy';
+import { checkBeneficiary, type BeneficiaryRefusal } from '../delegated-request/beneficiary-eligibility.policy';
 
 /**
  * The rules of sending a request for a group of people of one department (`US-05-17`), as pure decisions: which plans take

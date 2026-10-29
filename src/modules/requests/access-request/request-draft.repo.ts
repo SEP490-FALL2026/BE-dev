@@ -3,7 +3,7 @@ import type { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AccessRequestBranchCode } from './access-request.policy';
-import { draftVerdict, type DraftVerdict } from './request-draft.policy';
+import { draftVerdict, type DraftVerdict } from '../draft/request-draft.policy';
 
 /** A request being drafted as the draft operations read it. */
 export interface DraftRow {

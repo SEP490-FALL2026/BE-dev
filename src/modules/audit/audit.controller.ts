@@ -11,7 +11,7 @@ import { ApiSuccessResponse } from '../../infrastructure/http/decorators/api-suc
 import { toUnavailableApiException } from '../../infrastructure/http/errors/service-unavailable';
 import { RequireRoles } from '../../infrastructure/security/decorators/access.decorators';
 import { AuditQueryService } from './audit-query.service';
-import { AuditEventPageResponseDto, ListAuditEventsQueryDto } from './dto/audit-event.dto';
+import { AuditEventPageResponseDto, ListAuditEventsQueryDto } from './audit-event.dto';
 
 /** The Audit Trail, for the Super Admin alone (`US-01-06` AC-5, AC-6). Any other role is a 403 and nothing is read. */
 @ApiTags('audit')

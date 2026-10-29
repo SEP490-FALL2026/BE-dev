@@ -73,9 +73,9 @@ nguyên; người dùng, HTTP, file import, preview đã lưu và audit không t
 | Adapter nhập tay `employee-row.validator.ts` | `organization/employee`                             | phát hiện ô trống của form, `field` (`departmentCode`/`jobTitleId`), `EMPLOYEE_CODE_TAKEN`, `WORK_EMAIL_TAKEN` sau phòng/chức vụ         |
 | Adapter import `employee-import-rows.ts`     | `data-import/employee-import`                       | làm sạch ô, `column` (`department_code`/`job_title`), trùng trong file, mã/họ tên/email/loại/ngày, `EXISTS_*`, thứ tự riêng, preview lưu |
 
-Không bảng, migration, token hay operation mới. Hợp đồng liên module mới đúng **một** tệp: `organization/employee-placement.policy.ts`
+Không bảng, migration, token hay operation mới. Hợp đồng liên module mới đúng **một** tệp: `organization/public/employee-placement.policy.ts`
 đăng ký chính xác trong `PUBLIC_ROOT_POLICY_FILES` (cùng danh sách ở `architecture-boundaries.spec.ts`,
-`architecture-structure.spec.ts` và gate `src/policy-ownership.spec.ts`, có ca kiểm ba danh sách bằng nhau) kèm danh sách
+`architecture-structure.spec.ts` và gate `test/gates/policy-ownership.gate-spec.ts`, có ca kiểm ba danh sách bằng nhau) kèm danh sách
 consumer chính xác; không hậu tố `*.policy.ts` nào tự mở, không thư mục `shared/common/utils`, không export repo.
 
 ## Behavior and design
@@ -101,13 +101,13 @@ found: { active } | null } }` — model trung tính: không DTO HTTP, tên cột
 
 ## Test matrix
 
-| AC / rủi ro             | Tình huống                                                                            | Cấp test                                         | Kết quả mong đợi                | Bằng chứng sau implement |
-| ----------------------- | ------------------------------------------------------------------------------------- | ------------------------------------------------ | ------------------------------- | ------------------------ |
-| Policy                  | 7 lý do, ưu tiên trong subject, phòng trước chức vụ, `named: false` bỏ qua `found`    | unit `employee-placement.policy.spec.ts`         | literal, không tính bằng helper | plan                     |
-| D-1 → D-4               | 13 ca characterization H8 không đổi + adapter literal                                 | unit parity, validator, rows                     | giữ nguyên                      | plan                     |
-| Chỉ một chủ sở hữu      | literal lý do ngoài policy; consumer chính xác; import private; ba registry bằng nhau | gate `src/policy-ownership.spec.ts` + boundaries | đột biến đỏ                     | plan                     |
-| Không đổi hành vi       | corpus 1500 ca nhập tay + 3360 dòng import (riêng, một file, khóa riêng)              | script so trước/sau                              | byte-identical                  | plan                     |
-| Không đổi wire/DB/audit | nhập tay + import qua HTTP, PostgreSQL thật; `openapi.json`                           | integration, e2e, export                         | xanh; OpenAPI byte-identical    | plan                     |
+| AC / rủi ro             | Tình huống                                                                            | Cấp test                                                     | Kết quả mong đợi                | Bằng chứng sau implement |
+| ----------------------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------ | ------------------------------- | ------------------------ |
+| Policy                  | 7 lý do, ưu tiên trong subject, phòng trước chức vụ, `named: false` bỏ qua `found`    | unit `employee-placement.policy.spec.ts`                     | literal, không tính bằng helper | plan                     |
+| D-1 → D-4               | 13 ca characterization H8 không đổi + adapter literal                                 | unit parity, validator, rows                                 | giữ nguyên                      | plan                     |
+| Chỉ một chủ sở hữu      | literal lý do ngoài policy; consumer chính xác; import private; ba registry bằng nhau | gate `test/gates/policy-ownership.gate-spec.ts` + boundaries | đột biến đỏ                     | plan                     |
+| Không đổi hành vi       | corpus 1500 ca nhập tay + 3360 dòng import (riêng, một file, khóa riêng)              | script so trước/sau                                          | byte-identical                  | plan                     |
+| Không đổi wire/DB/audit | nhập tay + import qua HTTP, PostgreSQL thật; `openapi.json`                           | integration, e2e, export                                     | xanh; OpenAPI byte-identical    | plan                     |
 
 ## Definition of Done
 

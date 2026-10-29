@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { BusinessDate, fromDateColumn, toDateColumn } from '../../../core/business-date';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
-import type { ClearedHeadSuccessor } from '../organization.types';
+import type { ClearedHeadSuccessor } from '../public/organization.types';
 import { DepartmentHeadRecord, HeadPeriodChanges, HeadPeriodRecord } from './department.types';
 
 /**

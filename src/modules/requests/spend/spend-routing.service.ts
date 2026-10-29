@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { AuditService } from '../../audit/audit.service';
-import { IdentityAccessService } from '../../identity-access/identity-access.service';
+import { AuditApi } from '../../audit/public/audit.api';
+import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { StepTargetService } from '../reassignment/step-target.service';
-import { accessRequestAuditEvent } from '../access-request/access-request-audit-event';
+import { accessRequestAuditEvent } from '../access-request/access-request-audit-event.mapper';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord, AccessRequestState } from '../access-request/access-request.types';
 import { codesOf, type CheckRoute } from './budget-check.policy';
@@ -39,9 +39,9 @@ export class SpendRoutingService {
     private readonly requests: AccessRequestRepo,
     private readonly checks: BudgetCheckService,
     private readonly steps: SpendStepRepo,
-    private readonly identity: IdentityAccessService,
+    private readonly identity: IdentityAccessApi,
     private readonly targets: StepTargetService,
-    private readonly audit: AuditService,
+    private readonly audit: AuditApi,
   ) {}
 
   /** Makes a check and moves the request where it says. The request must have no review or spend step open. */

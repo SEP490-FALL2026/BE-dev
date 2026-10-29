@@ -1,6 +1,6 @@
-import { SuperAdminEventRefusedError } from './super-admin-event.errors';
+import { SuperAdminEventRefusedError } from '../public/super-admin-event.errors';
 import { assertContext, assertSplit, noticeKindFitsMode, parametersDigest } from './super-admin-event.policy';
-import type { SuperAdminEventContext, SuperAdminEventParameters } from './super-admin-event.types';
+import type { SuperAdminEventContext, SuperAdminEventParameters } from '../public/super-admin-event.types';
 
 const BASIS = { type: 'DECISION', reference: 'QD-31/2026', issuer: 'Board of Directors', issuedOn: '2026-10-20' };
 const context = (patch: Partial<SuperAdminEventContext> = {}): SuperAdminEventContext => ({

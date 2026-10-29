@@ -1,9 +1,10 @@
 import { Client } from 'pg';
 import request from 'supertest';
 import { addDays } from '../../src/core/business-date';
-import { OrganizationHistoryService } from '../../src/modules/organization/organization-history.service';
-import { OrganizationService } from '../../src/modules/organization/organization.service';
-import type { OrganizationChange, OrganizationChangeListener } from '../../src/modules/organization/organization.types';
+import { OrganizationHistoryApi } from '../../src/modules/organization/public/organization-history.api';
+import { OrganizationApi } from '../../src/modules/organization/public/organization.api';
+import { OrganizationChangeListeners } from '../../src/modules/organization/public/organization.extension-points';
+import type { OrganizationChange } from '../../src/modules/organization/public/organization.types';
 import type { ApiAccount } from './api-accounts';
 import { waitForLockWaiters } from './lock-wait';
 import type { Person } from './request-harness';
@@ -167,24 +168,26 @@ export class TransferHarness extends ReassignmentHarness {
     return rows;
   }
 
-  history = () => this.ctx.app.get(OrganizationHistoryService, { strict: false });
-  organizationService = () => this.ctx.app.get(OrganizationService, { strict: false });
+  history = () => this.ctx.app.get(OrganizationHistoryApi, { strict: false });
+  organizationService = () => this.ctx.app.get(OrganizationApi, { strict: false });
 
   /** The hourly telling of the organization, run by hand as of `day` (default today). */
   sweepAt = (day: string = this.today()) => this.history().announceDueChanges(day);
 
-  /** A listener that keeps what it is told; with `failing` it throws, so the change rolls back. */
+  private listened = 0;
+
+  /** A listener that keeps what it is told; with `failing` it throws, so the change rolls back. Added after the listeners of the app. */
   listen(options: { failing?: () => boolean } = {}): { heard: OrganizationChange[] } {
     const heard: OrganizationChange[] = [];
-    const listener: OrganizationChangeListener = {
-      onChange: (_tx, change) => {
+    this.listened += 1;
+    this.ctx.app
+      .get(OrganizationChangeListeners, { strict: false })
+      .add(`test.transfer-harness-${this.listened}`, (_tx, change) => {
         if (options.failing?.()) return Promise.reject(new Error('the listener failed'));
         heard.push(change);
 
         return Promise.resolve();
-      },
-    };
-    this.organizationService().registerChangeListener(listener);
+      });
 
     return { heard };
   }

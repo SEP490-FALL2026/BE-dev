@@ -1,14 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { AuditService } from '../../audit/audit.service';
-import { BudgetsService } from '../../budgets/budgets.service';
-import { LicensingService } from '../../licensing/licensing.service';
-import { accessRequestAuditEvent } from '../access-request/access-request-audit-event';
+import { AuditApi } from '../../audit/public/audit.api';
+import { BudgetsApi } from '../../budgets/public/budgets.api';
+import { LicensingApi } from '../../licensing/public/licensing.api';
+import { accessRequestAuditEvent } from '../access-request/access-request-audit-event.mapper';
 import { AccessRequestNotFoundError } from '../access-request/access-request.errors';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
-import { RequestOutcomeListeners } from '../access-request/request-outcome-listeners';
+import { RequestOutcomeService } from '../outcome/request-outcome.service';
 import { ServiceAccountReviewRefusedError } from './service-account-request.errors';
 import { reviewRefusal, verdictOf, type ReviewDecision } from './service-account-request.policy';
 import { ServiceAccountRequestRepo } from './service-account-request.repo';
@@ -28,10 +28,10 @@ export class ServiceAccountBoundaryService {
     private readonly runner: TransactionRunner,
     private readonly requests: AccessRequestRepo,
     private readonly details: ServiceAccountRequestRepo,
-    private readonly budgets: BudgetsService,
-    private readonly licensing: LicensingService,
-    private readonly audit: AuditService,
-    private readonly outcomes: RequestOutcomeListeners,
+    private readonly budgets: BudgetsApi,
+    private readonly licensing: LicensingApi,
+    private readonly audit: AuditApi,
+    private readonly outcomes: RequestOutcomeService,
   ) {}
 
   /** Throws AccessRequestNotFoundError, ServiceAccountReviewRefusedError and ProvisioningAnotherItAdminNeededError. */

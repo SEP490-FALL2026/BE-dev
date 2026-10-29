@@ -2,11 +2,11 @@ import { Injectable, Logger } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { isWorkingDay, wallClockAt, workingDaysBetween } from '../../../core/working-days';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
-import { AuditService } from '../../audit/audit.service';
-import { IdentityAccessService } from '../../identity-access/identity-access.service';
-import { NotificationsService } from '../../notifications/notifications.service';
-import { OperatingParametersService } from '../../operating-parameters/operating-parameters.service';
-import { OrganizationService } from '../../organization/organization.service';
+import { AuditApi } from '../../audit/public/audit.api';
+import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
+import { NotificationsApi } from '../../notifications/public/notifications.api';
+import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
 import { CongestionRepo } from './congestion.repo';
 import { isBacklog } from './step-sla.policy';
 
@@ -29,11 +29,11 @@ export class BacklogAlertService {
   constructor(
     private readonly runner: TransactionRunner,
     private readonly congestion: CongestionRepo,
-    private readonly notifications: NotificationsService,
-    private readonly audit: AuditService,
-    private readonly identity: IdentityAccessService,
-    private readonly organization: OrganizationService,
-    private readonly parameters: OperatingParametersService,
+    private readonly notifications: NotificationsApi,
+    private readonly audit: AuditApi,
+    private readonly identity: IdentityAccessApi,
+    private readonly organization: OrganizationApi,
+    private readonly parameters: OperatingParametersApi,
   ) {}
 
   async alert(now: Date = new Date()): Promise<BacklogAlertResult> {

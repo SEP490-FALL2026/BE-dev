@@ -110,6 +110,88 @@ const SEQUENCE_PRIVILEGES = ['USAGE', 'SELECT', 'UPDATE'];
 const held = (check: string, object: string, privileges: readonly string[]): string =>
   `array_remove(ARRAY[${privileges.map((privilege) => `CASE WHEN ${check}($1, ${object}, '${privilege}') THEN '${privilege}' END`).join(', ')}], NULL)`;
 
+// $1 is the runtime role in every statement below but the default privileges, which also name the deploy role ($2).
+
+/** Relations, routines, types and schemas of this database the runtime role owns, and the database itself if it does. */
+async function runtimeOwnedObjectCount(client: ClientBase, runtime: string): Promise<number> {
+  const [owned] = await rows<{ count: number }>(
+    client,
+    `WITH r AS (SELECT oid FROM pg_roles WHERE rolname = $1)
+     SELECT ((SELECT count(*) FROM pg_class WHERE relowner = (SELECT oid FROM r))
+       + (SELECT count(*) FROM pg_proc WHERE proowner = (SELECT oid FROM r))
+       + (SELECT count(*) FROM pg_type WHERE typowner = (SELECT oid FROM r))
+       + (SELECT count(*) FROM pg_namespace WHERE nspowner = (SELECT oid FROM r))
+       + (SELECT count(*) FROM pg_database WHERE datdba = (SELECT oid FROM r) AND datname = current_database()))::int
+       AS count`,
+    [runtime],
+  );
+  return owned.count;
+}
+
+function tablePrivileges(client: ClientBase, runtime: string): Rows<SeparationFacts['tables'][number]> {
+  return rows(
+    client,
+    `SELECT c.relname AS name, ${held('has_table_privilege', 'c.oid', TABLE_PRIVILEGES)} AS privileges
+       FROM pg_class c WHERE c.relnamespace = 'public'::regnamespace AND c.relkind IN ('r', 'p', 'v', 'm', 'f')
+      ORDER BY c.relname`,
+    [runtime],
+  );
+}
+
+function sequencePrivileges(client: ClientBase, runtime: string): Rows<SeparationFacts['sequences'][number]> {
+  return rows(
+    client,
+    `SELECT c.relname AS name, ${held('has_sequence_privilege', 'c.oid', SEQUENCE_PRIVILEGES)} AS privileges
+       FROM pg_class c WHERE c.relnamespace = 'public'::regnamespace AND c.relkind = 'S' ORDER BY c.relname`,
+    [runtime],
+  );
+}
+
+/** What the runtime role holds on schema `public` and on the database. */
+async function schemaAndDatabasePrivileges(
+  client: ClientBase,
+  runtime: string,
+): Promise<{ schema: string[]; database: string[] }> {
+  const [access] = await rows<{ schema: string[]; database: string[] }>(
+    client,
+    `SELECT ${held('has_schema_privilege', `'public'`, ['USAGE', 'CREATE'])} AS schema,
+            ${held('has_database_privilege', 'current_database()', ['CONNECT', 'CREATE', 'TEMPORARY'])} AS database`,
+    [runtime],
+  );
+  return access;
+}
+
+async function defaultPrivileges(
+  client: ClientBase,
+  runtime: string,
+  deploy: string,
+): Promise<SeparationFacts['defaultPrivileges']> {
+  const defaults = await rows<{ type: string; privileges: string[] }>(
+    client,
+    `SELECT d.defaclobjtype AS type, array_agg(a.privilege_type::text ORDER BY a.privilege_type) AS privileges
+       FROM pg_default_acl d CROSS JOIN LATERAL aclexplode(d.defaclacl) a
+      WHERE d.defaclrole = (SELECT oid FROM pg_roles WHERE rolname = $2)
+        AND d.defaclnamespace = 'public'::regnamespace
+        AND a.grantee = (SELECT oid FROM pg_roles WHERE rolname = $1)
+      GROUP BY d.defaclobjtype`,
+    [runtime, deploy],
+  );
+  return {
+    tables: defaults.find((entry) => entry.type === 'r')?.privileges ?? [],
+    sequences: defaults.find((entry) => entry.type === 'S')?.privileges ?? [],
+  };
+}
+
+async function securityDefinerRoutines(client: ClientBase): Promise<string[]> {
+  const routines = await rows<{ name: string }>(
+    client,
+    `SELECT format('%s(%s)', p.proname, pg_get_function_identity_arguments(p.oid)) AS name
+         FROM pg_proc p WHERE p.pronamespace = 'public'::regnamespace AND p.prosecdef
+          AND NOT ${EXTENSION_MEMBER('pg_proc', 'p.oid')} ORDER BY 1`,
+  );
+  return routines.map((routine) => routine.name);
+}
+
 /** Everything `judgeSeparation` needs about the deploy/runtime pair in the connected database. */
 export async function readSeparationFacts(
   client: ClientBase,
@@ -132,62 +214,14 @@ export async function readSeparationFacts(
   };
   if (!runtimeFacts) return facts;
 
-  // $1 is the runtime role in every statement below but the default privileges, which also name the deploy role ($2).
-  const [owned] = await rows<{ count: number }>(
-    client,
-    `WITH r AS (SELECT oid FROM pg_roles WHERE rolname = $1)
-     SELECT ((SELECT count(*) FROM pg_class WHERE relowner = (SELECT oid FROM r))
-       + (SELECT count(*) FROM pg_proc WHERE proowner = (SELECT oid FROM r))
-       + (SELECT count(*) FROM pg_type WHERE typowner = (SELECT oid FROM r))
-       + (SELECT count(*) FROM pg_namespace WHERE nspowner = (SELECT oid FROM r))
-       + (SELECT count(*) FROM pg_database WHERE datdba = (SELECT oid FROM r) AND datname = current_database()))::int
-       AS count`,
-    [runtime],
-  );
-  facts.runtimeOwnedObjects = owned.count;
-  facts.tables = await rows(
-    client,
-    `SELECT c.relname AS name, ${held('has_table_privilege', 'c.oid', TABLE_PRIVILEGES)} AS privileges
-       FROM pg_class c WHERE c.relnamespace = 'public'::regnamespace AND c.relkind IN ('r', 'p', 'v', 'm', 'f')
-      ORDER BY c.relname`,
-    [runtime],
-  );
-  facts.sequences = await rows(
-    client,
-    `SELECT c.relname AS name, ${held('has_sequence_privilege', 'c.oid', SEQUENCE_PRIVILEGES)} AS privileges
-       FROM pg_class c WHERE c.relnamespace = 'public'::regnamespace AND c.relkind = 'S' ORDER BY c.relname`,
-    [runtime],
-  );
-  const [access] = await rows<{ schema: string[]; database: string[] }>(
-    client,
-    `SELECT ${held('has_schema_privilege', `'public'`, ['USAGE', 'CREATE'])} AS schema,
-            ${held('has_database_privilege', 'current_database()', ['CONNECT', 'CREATE', 'TEMPORARY'])} AS database`,
-    [runtime],
-  );
+  facts.runtimeOwnedObjects = await runtimeOwnedObjectCount(client, runtime);
+  facts.tables = await tablePrivileges(client, runtime);
+  facts.sequences = await sequencePrivileges(client, runtime);
+  const access = await schemaAndDatabasePrivileges(client, runtime);
   facts.schemaPrivileges = access.schema;
   facts.databasePrivileges = access.database;
-  const defaults = await rows<{ type: string; privileges: string[] }>(
-    client,
-    `SELECT d.defaclobjtype AS type, array_agg(a.privilege_type::text ORDER BY a.privilege_type) AS privileges
-       FROM pg_default_acl d CROSS JOIN LATERAL aclexplode(d.defaclacl) a
-      WHERE d.defaclrole = (SELECT oid FROM pg_roles WHERE rolname = $2)
-        AND d.defaclnamespace = 'public'::regnamespace
-        AND a.grantee = (SELECT oid FROM pg_roles WHERE rolname = $1)
-      GROUP BY d.defaclobjtype`,
-    [runtime, deploy],
-  );
-  facts.defaultPrivileges = {
-    tables: defaults.find((entry) => entry.type === 'r')?.privileges ?? [],
-    sequences: defaults.find((entry) => entry.type === 'S')?.privileges ?? [],
-  };
-  facts.securityDefinerRoutines = (
-    await rows<{ name: string }>(
-      client,
-      `SELECT format('%s(%s)', p.proname, pg_get_function_identity_arguments(p.oid)) AS name
-         FROM pg_proc p WHERE p.pronamespace = 'public'::regnamespace AND p.prosecdef
-          AND NOT ${EXTENSION_MEMBER('pg_proc', 'p.oid')} ORDER BY 1`,
-    )
-  ).map((routine) => routine.name);
+  facts.defaultPrivileges = await defaultPrivileges(client, runtime, deploy);
+  facts.securityDefinerRoutines = await securityDefinerRoutines(client);
 
   return facts;
 }

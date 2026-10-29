@@ -1,6 +1,6 @@
 import { BusinessDate } from '../../../core/business-date';
 import { CostCenterStatus } from '../cost-center/cost-center.types';
-import { EmployeeStatus, EmployeeWorkState } from '../organization.types';
+import { EmployeeStatus, EmployeeWorkState } from '../employee/employee.types';
 import { ProjectRecord } from '../project/project.types';
 
 export type DepartmentStatus = 'ACTIVE' | 'INACTIVE';

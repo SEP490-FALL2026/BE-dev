@@ -10,7 +10,7 @@ import { toMoneyApiException } from '../../../infrastructure/http/errors/money-e
 import { toUnavailableApiException } from '../../../infrastructure/http/errors/service-unavailable';
 import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
 import { isCheckViolation, isUniqueViolation } from '../../../infrastructure/database/unique-violation';
-import { FinanceSetupIncompleteError } from '../../organization/organization.errors';
+import { FinanceSetupIncompleteError } from '../../organization/public/organization.errors';
 import {
   BudgetCommitmentExistsError,
   BudgetCommitmentNotFoundError,

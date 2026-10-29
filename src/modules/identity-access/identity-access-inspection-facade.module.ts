@@ -3,7 +3,7 @@ import { DatabaseModule } from '../../infrastructure/database/database.module';
 import { ApprovalRoleDirectoryService } from './approval-roles/approval-role-directory.service';
 import { ApprovalRoleRepo } from './approval-roles/approval-role.repo';
 import { IdentityAccessFacadeModule } from './identity-access-facade.module';
-import { IdentityAccessInspectionService } from './identity-access-inspection.service';
+import { IdentityAccessInspectionApi } from './public/identity-access-inspection.api';
 
 /**
  * The account side of `ops:inspect` (H6.1). Only the inspection graph loads it (module-graph.spec.ts), so the approval
@@ -11,7 +11,7 @@ import { IdentityAccessInspectionService } from './identity-access-inspection.se
  */
 @Module({
   imports: [DatabaseModule, IdentityAccessFacadeModule],
-  providers: [ApprovalRoleRepo, ApprovalRoleDirectoryService, IdentityAccessInspectionService],
-  exports: [IdentityAccessInspectionService],
+  providers: [ApprovalRoleRepo, ApprovalRoleDirectoryService, IdentityAccessInspectionApi],
+  exports: [IdentityAccessInspectionApi],
 })
 export class IdentityAccessInspectionFacadeModule {}

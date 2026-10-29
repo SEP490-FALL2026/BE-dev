@@ -20,6 +20,7 @@ Nếu nguồn mâu thuẫn hoặc cần đổi nghiệp vụ, người phụ tr�
 - items/: một thư mục mỗi lát, tên ổn định như us-xx-yy-short-name hoặc issue-123-short-name; không cần bộ đếm riêng.
 - local/: nháp cá nhân; không chứa đầu vào bàn giao duy nhất.
 - research/: hướng dẫn nghiên cứu; kết quả theo hạng mục đặt cạnh spec.
+- [prompts/](prompts/README.md): cách giao một phần G, một G hoặc nhiều G; bộ prompt theo giai đoạn cho dev tự làm hoặc dùng AI.
 - [Roadmap](../roadmap.md): thứ tự dự kiến, phụ thuộc và tiến độ hạng mục.
 
 ## Chia hạng mục theo vertical slice
@@ -52,6 +53,11 @@ Hạng mục legacy được chạm lớn thì chuyển sang mẫu mới và xó
 
 ## Quy trình
 
+Khi Owner giao một phần G, một G hoặc nhiều G, dùng [hướng dẫn nhận việc và prompt mẫu](prompts/README.md).
+Tin giao việc xác định phạm vi và quyền thao tác; spec/plan, scope map và tiến độ vẫn nằm ở các nguồn hiện hữu bên dưới.
+Nếu dùng AI, thực hiện các bước thiết kế → audit thiết kế → implement/test → audit implementation → validate/regression
+→ commit/bàn giao theo bộ prompt. Dev tự làm cũng theo cùng đầu ra và tiêu chí, không bắt buộc dùng AI.
+
 1. Chọn lát US/AC hoặc technical enabler; kiểm tra roadmap tránh trùng, ghi người phụ trách và người thiết kế ban đầu. Hai vai có thể cùng một người.
 2. Người phụ trách dùng mẫu trong `_template/` để tạo hoặc tiếp quản spec/plan. Ghi [nguồn BRD/US](sources.md) có revision, phạm vi, quyết định và câu hỏi. Chỉ tạo research.md/test-plan.md khi chúng có nội dung riêng cần duy trì.
 3. Làm rõ hành vi, API, dữ liệu, quyền, lỗi, migration, thiết kế test và cách kiểm chứng. Phần không liên quan ghi không áp dụng cùng lý do. Khi đủ đầu vào để code, đánh dấu thiết kế `ready`; trạng thái này không có nghĩa Owner đã duyệt.
@@ -61,6 +67,10 @@ Hạng mục legacy được chạm lớn thì chuyển sang mẫu mới và xó
 7. Owner review cuối trên revision cụ thể, đối chiếu spec/plan/decision, source, test, AC và bằng chứng. Nếu cần sửa, ghi `changes-requested`; nếu đạt, ghi `accepted` cùng Owner, revision, môi trường và bằng chứng. Chỉ revision `accepted` mới đủ điều kiện đưa lên `main`/production; `released` chỉ ghi sau sự kiện triển khai thật.
 
 Task nhỏ không đổi nghiệp vụ/contract dùng issue/PR với scope, kiểm tra và review. Quyết định kiến trúc lâu dài ghi ADR, liên kết từ spec thay vì sao chép.
+
+Trong luồng giao dev khác, người nhận commit/push nhánh cá nhân theo quyền trong tin giao việc; **Owner** merge vào `dev`
+và review cuối. Sau merge phải kiểm chứng revision `dev` đã kết hợp các thay đổi: kết quả trên nhánh cá nhân không thay
+cho kết quả cây sau merge. Findings trả lại đi qua cùng vòng sửa → audit → kiểm chứng; không tự ghi Owner đã nghiệm thu.
 
 ## Nguồn và bàn giao
 

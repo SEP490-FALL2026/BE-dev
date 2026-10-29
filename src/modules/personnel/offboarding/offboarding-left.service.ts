@@ -2,10 +2,10 @@ import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { IdentityAccessService } from '../../identity-access/identity-access.service';
-import { OrganizationHistoryService } from '../../organization/organization-history.service';
-import { PersonnelFileHooks } from '../personnel-file-hooks';
-import { actorColumns, userActor, type PersonnelActor } from '../personnel.types';
+import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
+import { OrganizationHistoryApi } from '../../organization/public/organization-history.api';
+import { PersonnelFileHooks } from '../event-notice/personnel-file-hooks.service';
+import { actorColumns, userActor, type PersonnelActor } from '../public/personnel.types';
 import { TransferGuardService } from '../transfer/transfer-guard.service';
 import { OffboardingAuditService } from './offboarding-audit.service';
 import { OffboardingRefusedError } from './offboarding.errors';
@@ -25,8 +25,8 @@ export class OffboardingLeftService {
   constructor(
     private readonly frame: OffboardingFrame,
     private readonly repo: OffboardingRepo,
-    private readonly history: OrganizationHistoryService,
-    private readonly identity: IdentityAccessService,
+    private readonly history: OrganizationHistoryApi,
+    private readonly identity: IdentityAccessApi,
     private readonly audit: OffboardingAuditService,
     private readonly hooks: PersonnelFileHooks,
     private readonly guard: TransferGuardService,

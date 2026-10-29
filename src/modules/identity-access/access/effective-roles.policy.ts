@@ -1,4 +1,4 @@
-import { AppRole } from '../identity-access.types';
+import { AppRole } from '../public/identity-access.types';
 
 /** Facts about an account that make roles appear without a grant. Each is read afresh on every request. */
 export interface DerivedRoleFacts {

@@ -6,8 +6,8 @@ import { IdentityAccessFacadeModule } from '../../identity-access/identity-acces
 import { IdentityAccessLocalSeedFacadeModule } from '../../identity-access/identity-access-local-seed-facade.module';
 import { OrganizationModule } from '../../organization/organization.module';
 import { DevSeedRepo } from './dev-seed.repo';
-import { DevSeedService, LOCAL_PASSWORD_GENERATOR } from './dev-seed.service';
-import { generateLocalPassword } from './local-password';
+import { DevSeedApi, LOCAL_PASSWORD_GENERATOR } from '../public/dev-seed.api';
+import { generateLocalPassword } from './local-password.service';
 
 /**
  * The graph of `pnpm dev:seed` (H6.2). Database settings only, the owning services it writes through and nothing of
@@ -22,7 +22,7 @@ import { generateLocalPassword } from './local-password';
     IdentityAccessFacadeModule,
     IdentityAccessLocalSeedFacadeModule,
   ],
-  providers: [DevSeedRepo, DevSeedService, { provide: LOCAL_PASSWORD_GENERATOR, useValue: generateLocalPassword }],
-  exports: [DevSeedService],
+  providers: [DevSeedRepo, DevSeedApi, { provide: LOCAL_PASSWORD_GENERATOR, useValue: generateLocalPassword }],
+  exports: [DevSeedApi],
 })
 export class DevSeedModule {}

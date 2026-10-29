@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import { OrganizationService } from '../../organization/organization.service';
+import { OrganizationApi } from '../../organization/public/organization.api';
 import { PlanLookupService } from '../plan/plan-lookup.service';
 import { recommendK2, type K2Recommendation } from '../subscription/seat-guard.policy';
-import { SeatOccupancyRegistry } from '../subscription/seat-occupancy.registry';
+import { SeatOccupancyHook } from '../public/catalog.extension-points';
 import { replacementRequired } from './application.policy';
 import type { ApplicationRecord, ApplicationView, BusinessOwnerView } from './application.types';
 
@@ -14,9 +14,9 @@ import type { ApplicationRecord, ApplicationView, BusinessOwnerView } from './ap
 @Injectable()
 export class ApplicationViewService {
   constructor(
-    private readonly organization: OrganizationService,
+    private readonly organization: OrganizationApi,
     private readonly plans: PlanLookupService,
-    private readonly occupancy: SeatOccupancyRegistry,
+    private readonly occupancy: SeatOccupancyHook,
   ) {}
 
   /** The records with their Business Owners, read in one call. Throws when an owner is not an employee. */
@@ -51,7 +51,7 @@ export class ApplicationViewService {
       .map((plan) => plan.id);
     if (k1Plans.length === 0) return [];
     const today = await this.organization.businessToday();
-    const recommendation = recommendK2(await this.occupancy.current().openHolderCount(k1Plans, today));
+    const recommendation = recommendK2(await this.occupancy.get().openHolderCount(k1Plans, today));
 
     return recommendation ? [recommendation] : [];
   }

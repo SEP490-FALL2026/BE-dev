@@ -12,7 +12,7 @@ import { RequireRoles } from '../../../infrastructure/security/decorators/access
 import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { PERSONNEL_ACCESS_ERROR_EXAMPLES } from '../mappers/personnel-access.http-errors';
-import { userActor } from '../personnel.types';
+import { userActor } from '../public/personnel.types';
 import {
   ChangeReturnDateBodyDto,
   ConfirmReturnBodyDto,

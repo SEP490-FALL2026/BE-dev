@@ -3,7 +3,7 @@ import {
   TaxProfileTaxTypeDuplicateError,
   TaxProfileTaxTypeInvalidError,
   TaxProfileTooManyLinesError,
-} from '../finance.errors';
+} from '../public/finance.errors';
 import { DEFAULT_TAX_PROFILE, cleanTaxLines, payerOfGroup, sameProfile, toProfileView } from './tax-profile.policy';
 
 describe('payerOfGroup (QĐ-60b)', () => {

@@ -1,8 +1,8 @@
 import { Test } from '@nestjs/testing';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { AuditService } from '../../audit/audit.service';
-import { OrganizationService } from '../organization.service';
+import { AuditApi } from '../../audit/public/audit.api';
+import { OrganizationApi } from '../public/organization.api';
 import { HR_BASIS } from '../../../../test/support/hr-basis';
 import { ProjectForbiddenError, ProjectInvalidError, ProjectNotFoundError } from './project.errors';
 import { ProjectRepo } from './project.repo';
@@ -70,8 +70,8 @@ describe('ProjectService', () => {
       providers: [
         ProjectService,
         { provide: ProjectRepo, useValue: repo },
-        { provide: OrganizationService, useValue: organization },
-        { provide: AuditService, useValue: audit },
+        { provide: OrganizationApi, useValue: organization },
+        { provide: AuditApi, useValue: audit },
         { provide: TransactionRunner, useValue: runner },
       ],
     }).compile();

@@ -1,11 +1,12 @@
+import type { HeldAccess } from './access-request.types';
 import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import { fiscalYearOf } from '../../../core/fiscal-year';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { CatalogService } from '../../catalog/catalog.service';
-import { LicensingService } from '../../licensing/licensing.service';
-import { OperatingParametersService } from '../../operating-parameters/operating-parameters.service';
-import { OrganizationService } from '../../organization/organization.service';
+import { CatalogApi } from '../../catalog/public/catalog.api';
+import { LicensingApi } from '../../licensing/public/licensing.api';
+import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
 import {
   AccessRequestApplicationRetiredError,
   AccessRequestNoDepartmentError,
@@ -29,23 +30,15 @@ export interface RequestSettings {
   fiscalYearStartMonth: number;
 }
 
-/** What the person already holds of the plan: the seat that makes asking for it again pointless (`US-05-01` AC-2). */
-export interface HeldAccess {
-  assignmentId: string;
-  effectiveFrom: BusinessDate;
-  validUntil: BusinessDate | null;
-}
-
 /**
  * The department of the day and its Unit: the Cost Center is there when the department has one in use and null when it has none
  * yet (`QĐ-87d(1)`). A request that costs money, or that ends in a service seat, is judged only with one
- * (`OrganizationService.requireUnitCostCenter`); a free internal request is judged without it (`QĐ-87g(2)`, F91).
+ * (`OrganizationApi.requireUnitCostCenter`); a free internal request is judged without it (`QĐ-87g(2)`, F91).
  */
-type OwningUnit =
-  Awaited<ReturnType<OrganizationService['getOwningUnits']>> extends Map<string, infer Unit> ? Unit : never;
+type OwningUnit = Awaited<ReturnType<OrganizationApi['getOwningUnits']>> extends Map<string, infer Unit> ? Unit : never;
 /** The same with the Cost Center in use: what a cost is charged to. */
-type CostedUnit = ReturnType<OrganizationService['requireUnitCostCenter']>;
-type SeatTarget = NonNullable<Awaited<ReturnType<CatalogService['findPlanSeatTargets']>>[number]>;
+type CostedUnit = ReturnType<OrganizationApi['requireUnitCostCenter']>;
+type SeatTarget = NonNullable<Awaited<ReturnType<CatalogApi['findPlanSeatTargets']>>[number]>;
 
 /** Everything a request is decided by, read for one person asking for one plan on one day. */
 export interface Assessment {
@@ -97,11 +90,11 @@ export interface AssessmentInput {
 @Injectable()
 export class RequestAssessmentService {
   constructor(
-    private readonly organization: OrganizationService,
-    private readonly catalog: CatalogService,
+    private readonly organization: OrganizationApi,
+    private readonly catalog: CatalogApi,
     private readonly routing: RoutingFactsService,
-    private readonly parameters: OperatingParametersService,
-    private readonly licensing: LicensingService,
+    private readonly parameters: OperatingParametersApi,
+    private readonly licensing: LicensingApi,
   ) {}
 
   /** Read before the transaction opens, so a slow parameter read never holds a lock. */

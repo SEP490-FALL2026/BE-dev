@@ -54,7 +54,7 @@ harness đặc tả projection và số query của repository danh sách.
   (mảng lồng không biên chưa có finding) thêm ở Prompt 09B.
 - Rule hiện có: [API contract](../../../rules/api-contract.md) (không có quy tắc collection),
   [database và nghiệp vụ](../../../rules/database-business.md) (đếm + trang cùng snapshot, thứ tự có khóa phụ).
-- Gate cùng họ: `test/e2e/api-inventory.e2e-spec.ts`, `src/architecture-structure.spec.ts` (ledger chỉ được co lại).
+- Gate cùng họ: `test/http/platform/api-inventory.http-spec.ts`, `test/gates/architecture-structure.gate-spec.ts` (ledger chỉ được co lại).
 
 ## Explicit out of scope
 
@@ -71,13 +71,13 @@ spec; các điểm _Cần Owner quyết_ chặn riêng hạng mục capability t
 
 - `docs/rules/api-contract.md` — mục [Collection và detail](../../../rules/api-contract.md#collection-và-detail-api-list-detail1)
   là nguồn chuẩn của quy tắc (bản trong spec này là thiết kế gốc); `docs/workspace/_template/spec.md` một đoạn nhắc.
-- Gate `src/api-collection-contract.spec.ts` (unit, chạy trong `pnpm check`) đọc `openapi.json` đã commit — an toàn vì
+- Gate `test/gates/api-collection-contract.gate-spec.ts` (unit, chạy trong `pnpm check`) đọc `openapi.json` đã commit — an toàn vì
   `GATE-01` của `delivery-gate-hardening` ghim artifact về LF và test export so đúng byte với bản sinh từ controller.
   **Lệch kế hoạch có chủ đích:** registry nằm **trong** tệp gate (như `LEGACY` của `architecture-structure.spec.ts`), không ở
   `src/api-collection-contract.registry.ts`: một `.ts` không phải spec trong `src/` sẽ được build vào `dist`.
 - Harness `test/support/query-count.ts` đọc lưu lượng qua `PgRelay.observe` (relay sẵn có, thêm theo dõi **mỗi lần thực thi**:
   Query hoặc Execute của portal đã Bind, không đọc giá trị bind); không đổi `PrismaService`, không thêm dependency, không cần
-  `pg_stat_statements`. Mẫu: `test/integration/query-count-harness.integration-spec.ts`.
+  `pg_stat_statements`. Mẫu: `test/integration/identity-access/query-count-harness.integration-spec.ts`.
 - Không đổi route, DTO, Prisma schema, migration hay query sản phẩm.
 
 ## Behavior and design

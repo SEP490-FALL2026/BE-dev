@@ -132,8 +132,8 @@ Wrapper chỉ vận chuyển mật khẩu gốc qua stdin, không tự hash và 
 4. Service tạo Super Admin và chuyển **hash** tới `CredentialRepo`; DB lưu trong `password_credentials.hash`, kèm
    `hash_policy_version`. Khi đăng nhập, hệ thống dùng hàm verify để so mật khẩu nhập vào với hash, không giải mã hash.
 
-Nguồn đối chiếu: [installation service](../../src/modules/installation/installation.service.ts),
-[identity facade](../../src/modules/identity-access/identity-access.service.ts),
+Nguồn đối chiếu: [installation service](../../src/modules/installation/public/installation.api.ts),
+[identity facade](../../src/modules/identity-access/public/identity-access.api.ts),
 [credential service](../../src/modules/identity-access/accounts/credential.service.ts),
 [password hasher](../../src/modules/identity-access/accounts/password-hasher.service.ts),
 [credential repository](../../src/modules/identity-access/accounts/credential.repo.ts),

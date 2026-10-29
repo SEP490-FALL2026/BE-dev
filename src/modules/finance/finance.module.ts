@@ -7,7 +7,7 @@ import { CurrencyService } from './currency/currency.service';
 import { ExchangeRateLedgerService } from './exchange-rate/exchange-rate-ledger.service';
 import { ExchangeRateRepo } from './exchange-rate/exchange-rate.repo';
 import { ExchangeRateService } from './exchange-rate/exchange-rate.service';
-import { FinanceService } from './finance.service';
+import { FinanceApi } from './public/finance.api';
 import { TaxProfileRepo } from './tax-profile/tax-profile.repo';
 import { TaxProfileService } from './tax-profile/tax-profile.service';
 
@@ -18,7 +18,7 @@ import { TaxProfileService } from './tax-profile/tax-profile.service';
 @Module({
   imports: [DatabaseModule, AuditModule, OrganizationModule],
   providers: [
-    FinanceService,
+    FinanceApi,
     CurrencyService,
     CurrencyRepo,
     ExchangeRateLedgerService,
@@ -27,6 +27,6 @@ import { TaxProfileService } from './tax-profile/tax-profile.service';
     TaxProfileRepo,
     TaxProfileService,
   ],
-  exports: [FinanceService, ExchangeRateService],
+  exports: [FinanceApi, ExchangeRateService],
 })
 export class FinanceModule {}

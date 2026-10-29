@@ -1,15 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { CatalogService } from '../../catalog/catalog.service';
-import { LicensingService } from '../../licensing/licensing.service';
-import { IdentityAccessService } from '../../identity-access/identity-access.service';
-import { OrganizationService } from '../../organization/organization.service';
-import type { EmployeeRecord } from '../../organization/organization.types';
-import { PersonnelAccessRefusedError } from '../personnel.errors';
-import { readAccessOf, type ReadAccess } from '../personnel-self-action.policy';
+import { CatalogApi } from '../../catalog/public/catalog.api';
+import { LicensingApi } from '../../licensing/public/licensing.api';
+import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
+import type { EmployeeRecord } from '../../organization/public/organization.types';
+import { PersonnelAccessRefusedError } from '../public/personnel.errors';
+import { readAccessOf, type ReadAccess } from '../policies/personnel-self-action.policy';
 import { RoleDutiesService } from '../role-duties/role-duties.service';
-import { OffboardingBlockerRegistry } from './offboarding-blocker.registry';
+import { OffboardingSources } from './offboarding-sources.service';
 import type {
   OffboardingChangeWire,
   OffboardingDetailWire,
@@ -55,12 +55,12 @@ export class OffboardingViewService {
   constructor(
     private readonly repo: OffboardingRepo,
     private readonly lists: OffboardingListRepo,
-    private readonly organization: OrganizationService,
-    private readonly licensing: LicensingService,
-    private readonly catalog: CatalogService,
-    private readonly registry: OffboardingBlockerRegistry,
+    private readonly organization: OrganizationApi,
+    private readonly licensing: LicensingApi,
+    private readonly catalog: CatalogApi,
+    private readonly sources: OffboardingSources,
     private readonly roleDuties: RoleDutiesService,
-    private readonly identity: IdentityAccessService,
+    private readonly identity: IdentityAccessApi,
   ) {}
 
   async list(
@@ -114,7 +114,7 @@ export class OffboardingViewService {
     const opened = live ? await this.repo.openedAssignmentIds(record.id) : [];
     const held = new Set(seats.map((seat) => seat.assignmentId));
     const closed = record.closedAt !== null;
-    const registered = live ? await this.registry.blockersOf(record.employeeId) : {};
+    const registered = live ? await this.sources.blockersOf(record.employeeId) : {};
     const accessRunsOn = seats.filter((seat) => terminating.has(seat.assignmentId)).length;
     const openRights = seats.length - accessRunsOn;
 
@@ -132,7 +132,7 @@ export class OffboardingViewService {
       ]),
       this.organization.getDepartmentBrief(record.departmentId),
       live ? this.catalog.getApplicationsOwnedBy(record.employeeId, 1) : Promise.resolve({ total: 0 }),
-      live ? this.registry.warningsOf(record.employeeId) : Promise.resolve({}),
+      live ? this.sources.warningsOf(record.employeeId) : Promise.resolve({}),
     ]);
 
     return toDetail(

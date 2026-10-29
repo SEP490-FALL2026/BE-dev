@@ -2,13 +2,13 @@ import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import { isUniqueViolation } from '../../../infrastructure/database/unique-violation';
-import { AuditService } from '../../audit/audit.service';
-import { OrganizationHistoryService } from '../../organization/organization-history.service';
-import { OrganizationService } from '../../organization/organization.service';
+import { AuditApi } from '../../audit/public/audit.api';
+import { OrganizationHistoryApi } from '../../organization/public/organization-history.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
 import { PersonnelNotifier, type PersonnelEventKind } from '../event-notice/personnel-notifier.service';
-import { groundsSnapshot, normalizedGrounds } from '../grounds/grounds.policy';
-import { personnelAuditEvent } from '../mappers/personnel-audit-event';
-import { actorColumns, type PersonnelActor } from '../personnel.types';
+import { groundsSnapshot, normalizedGrounds } from '../policies/grounds.policy';
+import { personnelAuditEvent } from '../mappers/personnel-audit-event.mapper';
+import { actorColumns, type PersonnelActor } from '../public/personnel.types';
 import { TransferGuardService } from '../transfer/transfer-guard.service';
 import { LeaveRefusedError } from './leave.errors';
 import {
@@ -33,11 +33,11 @@ import type { ChangeReturnDateInput, ConfirmReturnInput, LeaveRecord, StartLeave
 export class LeaveService {
   constructor(
     private readonly runner: TransactionRunner,
-    private readonly organization: OrganizationService,
-    private readonly history: OrganizationHistoryService,
+    private readonly organization: OrganizationApi,
+    private readonly history: OrganizationHistoryApi,
     private readonly guard: TransferGuardService,
     private readonly leaves: LeaveRepo,
-    private readonly audit: AuditService,
+    private readonly audit: AuditApi,
     private readonly notifier: PersonnelNotifier,
   ) {}
 

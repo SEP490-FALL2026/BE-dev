@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { fromDateColumn, toDateColumn, type BusinessDate } from '../../../core/business-date';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import type { ProvisioningTaskStatus, RevocationSource } from '../licensing.types';
+import type { ProvisioningTaskStatus, RevocationSource } from '../public/licensing.types';
 
 export interface PersonalSeatRow {
   assignmentId: string;

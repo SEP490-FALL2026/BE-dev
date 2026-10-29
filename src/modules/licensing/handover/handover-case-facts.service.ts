@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { addDays, type BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { OperatingParametersService } from '../../operating-parameters/operating-parameters.service';
-import { OrganizationHistoryService } from '../../organization/organization-history.service';
-import { OrganizationService } from '../../organization/organization.service';
-import type { RevocationSource } from '../licensing.types';
+import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
+import { OrganizationHistoryApi } from '../../organization/public/organization-history.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
+import type { RevocationSource } from '../public/licensing.types';
 import { shortDueOn } from './handover-confirmer.policy';
 
 const SHORT_DEADLINE = 'HANDOVER_SHORT_DEADLINE_WORKING_DAYS';
@@ -19,9 +19,9 @@ const CALENDAR_WINDOW_DAYS = 90;
 @Injectable()
 export class HandoverCaseFacts {
   constructor(
-    private readonly organization: OrganizationService,
-    private readonly history: OrganizationHistoryService,
-    private readonly parameters: OperatingParametersService,
+    private readonly organization: OrganizationApi,
+    private readonly history: OrganizationHistoryApi,
+    private readonly parameters: OperatingParametersApi,
   ) {}
 
   today(now: Date, tx?: DbTx): Promise<BusinessDate> {

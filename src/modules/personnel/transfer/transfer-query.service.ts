@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { IdentityAccessService } from '../../identity-access/identity-access.service';
-import { OrganizationService } from '../../organization/organization.service';
-import { PersonnelAccessRefusedError } from '../personnel.errors';
-import { readAccessOf, type ReadAccess } from '../personnel-self-action.policy';
+import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
+import { PersonnelAccessRefusedError } from '../public/personnel.errors';
+import { readAccessOf, type ReadAccess } from '../policies/personnel-self-action.policy';
 import { TransferRefusedError } from './transfer.errors';
 import type { TransferChangeWire, TransferDetailWire, TransferRecordedWire, TransferSummaryWire } from './transfer.dto';
 import { toChange, toDetail, toRecorded, toSummary, type TransferNames } from './transfer.mapper';
@@ -35,8 +35,8 @@ const paged = <T>(items: T[], total: number, page: { page: number; pageSize: num
 export class TransferQueryService {
   constructor(
     private readonly transfers: TransferRepo,
-    private readonly organization: OrganizationService,
-    private readonly identity: IdentityAccessService,
+    private readonly organization: OrganizationApi,
+    private readonly identity: IdentityAccessApi,
   ) {}
 
   /** One page of summaries; the names of the page are read in one statement each, whatever the page size (`LD-07`). */

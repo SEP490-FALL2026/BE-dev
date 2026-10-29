@@ -75,8 +75,8 @@ preflight vì Prompt 26 chưa commit; chạy lại sau khi Owner commit/push.
 - `src/infrastructure/http/dto/zod-dto.ts` (mới): `createZodDto` của ứng dụng; 37 tệp DTO/controller đổi import sang đây.
 - `scripts/dev/export-openapi.ts`: từ chối ghi document lệch dialect, in từng pointer.
 - Test: `openapi-dialect.spec.ts`, `openapi-presentation.spec.ts`, `dto/zod-dto.spec.ts`;
-  `test/e2e/openapi-dialect.e2e-spec.ts`, `test/e2e/security-upgrade-regression.e2e-spec.ts`,
-  `test/e2e/openapi-export.e2e-spec.ts`, `test/e2e/api-inventory.e2e-spec.ts`; support `test/support/openapi-semantics.ts`.
+  `test/http/platform/openapi-dialect.http-spec.ts`, `test/http/platform/security-upgrade-regression.http-spec.ts`,
+  `test/http/platform/openapi-export.http-spec.ts`, `test/http/platform/api-inventory.http-spec.ts`; support `test/support/openapi-semantics.ts`.
 - `openapi.json` (exporter). Không bảng, migration, bounded context hay import liên module mới.
 - Prompt 00A: `src/infrastructure/http/request-body-limit.ts` (`ACCEPTED_CONTENT_ENCODINGS`, `contentEncodingAllowlist`) và
   spec của nó; `src/infrastructure/mail/mail-transport.spec.ts` (mới); `package.json` (`nodemailer` 10.1.7),

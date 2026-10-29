@@ -79,7 +79,7 @@ Hai port khai ở `accounts/account.types.ts` (`interface` + `Symbol`): `ACCOUNT
 E6: provider cả API lẫn lệnh khôi phục cần mà facade không cần được khai ở **cả** `IdentityAccessModule` và
 `RecoveryModule` (hai graph khác nhau, mỗi graph một khai báo): `ActionLinkRevocation`, `ApprovalRoleDirectoryService`,
 `ApprovalRoleRepo`, `RecoveryRepo`, `SessionDirectoryService`, `SessionRepo`, `SuccessorEligibility`, hai port. Danh sách
-chính xác ghim trong `DECLARED_FOR_API_AND_RECOVERY` của [module-graph.spec.ts](../../../../src/module-graph.spec.ts);
+chính xác ghim trong `DECLARED_FOR_API_AND_RECOVERY` của [module-graph.spec.ts](../../../../test/gates/module-graph.gate-spec.ts);
 `RecoveryCliModule` vào các graph được kiểm, bốn repo aggregate chỉ một khai báo mỗi graph, graph recovery không có
 controller hay JWT. Worker và lệnh khởi tạo chỉ còn thấy facade + bốn contract (không còn repo approval role/recovery).
 

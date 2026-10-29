@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { IdentityAccessService } from '../../identity-access/identity-access.service';
-import { OrganizationService } from '../../organization/organization.service';
-import { PersonnelAccessRefusedError } from '../personnel.errors';
-import { readAccessOf, type ReadAccess } from '../personnel-self-action.policy';
+import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
+import { PersonnelAccessRefusedError } from '../public/personnel.errors';
+import { readAccessOf, type ReadAccess } from '../policies/personnel-self-action.policy';
 import { NoticeRefusedError } from './notice.errors';
 import type { NoticeDetailWire, NoticeSummaryWire } from './notice.dto';
 import { toDetail, toSummary } from './notice.mapper';
@@ -26,8 +26,8 @@ export interface NoticePage {
 export class NoticeQueryService {
   constructor(
     private readonly notices: NoticeRepo,
-    private readonly organization: OrganizationService,
-    private readonly identity: IdentityAccessService,
+    private readonly organization: OrganizationApi,
+    private readonly identity: IdentityAccessApi,
   ) {}
 
   async list(

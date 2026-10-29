@@ -3,8 +3,12 @@ import { Page, pageOf } from '../../../core/application/pagination';
 import { businessDateAt } from '../../../core/business-date';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { AuditService } from '../../audit/audit.service';
-import { COST_CENTER_NAME_MAX_LENGTH, displayCostCenterName, isReservedCostCenterName } from './cost-center-name';
+import { AuditApi } from '../../audit/public/audit.api';
+import {
+  COST_CENTER_NAME_MAX_LENGTH,
+  displayCostCenterName,
+  isReservedCostCenterName,
+} from './cost-center-name.policy';
 import { assertMayMaintainCostCenters, assertMayReadCostCenters } from './cost-center.policy';
 import { CostCenterRepo } from './cost-center.repo';
 import { CostCenterKind, CostCenterRecord, CostCenterStatus } from './cost-center.types';
@@ -18,7 +22,7 @@ import {
   CostCenterNotFoundError,
 } from './cost-center.errors';
 import { organizationAuditEvent } from '../mappers/audit-event.mapper';
-import { OrganizationService } from '../organization.service';
+import { OrganizationApi } from '../public/organization.api';
 
 /** How many of each kind of open obligation the refusal to retire a cost center lists. */
 const IN_USE_LISTED = 20;
@@ -33,8 +37,8 @@ const IN_USE_LISTED = 20;
 export class CostCenterService {
   constructor(
     private readonly repo: CostCenterRepo,
-    private readonly organization: OrganizationService,
-    private readonly audit: AuditService,
+    private readonly organization: OrganizationApi,
+    private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
   ) {}
 

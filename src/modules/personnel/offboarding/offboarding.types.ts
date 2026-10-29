@@ -1,6 +1,6 @@
 import type { BusinessDate } from '../../../core/business-date';
-import type { Grounds, GroundsInput } from '../grounds/grounds.policy';
-import type { RoleFlag } from '../personnel.types';
+import type { Grounds, GroundsInput } from '../policies/grounds.policy';
+import type { RoleFlag } from '../public/personnel.types';
 
 export type OffboardingState = 'HANDING_OVER' | 'LEFT' | 'CANCELLED';
 export type OffboardingChangeKind =

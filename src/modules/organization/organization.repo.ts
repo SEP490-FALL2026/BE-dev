@@ -2,8 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { DbTx } from '../../infrastructure/database/transaction-runner';
 import { isUniqueViolation } from '../../infrastructure/database/unique-violation';
-import { OrganizationAlreadyExistsError } from './organization.errors';
-import { CreateOrganizationInput, OrganizationRecord } from './organization.types';
+import { OrganizationAlreadyExistsError } from './public/organization.errors';
+import { CreateOrganizationInput, OrganizationRecord } from './public/organization.types';
 
 const ORGANIZATION_SELECT = { id: true, name: true, timeZone: true, reportingCurrency: true } as const;
 

@@ -24,21 +24,21 @@ Mỗi task theo TDD: viết test đỏ, xem nó đỏ đúng lý do, viết mã 
 
 ### Task 2: dữ liệu `currencies` và `exchange_rates`
 
-- Files: `prisma/models/finance.prisma`, migration `20261020100000_finance_money_and_exchange_rates`, `src/architecture-boundaries.spec.ts` (`PRISMA_MODEL_OWNER`), `test/integration/exchange-rate-constraints.integration-spec.ts`.
+- Files: `prisma/models/finance.prisma`, migration `20261020100000_finance_money_and_exchange_rates`, `test/gates/architecture-boundaries.gate-spec.ts` (`PRISMA_MODEL_OWNER`), `test/integration/finance/exchange-rate-constraints.integration-spec.ts`.
 - Depends on: Task 1 (hằng giới hạn), `g3-catalog-foundation`.
 - Acceptance: CHECK tỷ giá, unique cặp (tiền tệ, ngày), khóa ngoại tiền tệ và trigger đồng tiền báo cáo hoạt động trên PostgreSQL thật (chèn trái luật bằng SQL bị từ chối đúng SQLSTATE).
 - Verify: `pnpm prisma:validate`, `pnpm prisma:generate`; `pnpm exec jest --config test/config/jest.integration.cjs exchange-rate-constraints` → đỏ trước migration, xanh sau.
 
 ### Task 3: capability `finance/exchange-rate` và facade
 
-- Files: `src/modules/finance/finance.module.ts`, `finance.service.ts`, `finance.types.ts`, `currency/currency.repo.ts`, `exchange-rate/exchange-rate.repo.ts`, `exchange-rate.service.ts`, `exchange-rate.errors.ts`, `exchange-rate-ledger.service.ts` (kiểu dùng chung ở `finance.types.ts`), `mappers/finance-audit-event.ts`, `src/infrastructure/http/errors/money-errors.ts`, spec đơn vị cạnh mã; `src/module-graph.spec.ts` (`PUBLIC_CONTRACT_EXPORTS`).
+- Files: `src/modules/finance/finance.module.ts`, `finance.service.ts`, `finance.types.ts`, `currency/currency.repo.ts`, `exchange-rate/exchange-rate.repo.ts`, `exchange-rate.service.ts`, `exchange-rate.errors.ts`, `exchange-rate-ledger.service.ts` (kiểu dùng chung ở `finance.types.ts`), `mappers/finance-audit-event.ts`, `src/infrastructure/http/errors/money-errors.ts`, spec đơn vị cạnh mã; `test/gates/module-graph.gate-spec.ts` (`PUBLIC_CONTRACT_EXPORTS`).
 - Depends on: Task 1, Task 2; facade `OrganizationService` (`getOrganization`, `businessToday`).
 - Acceptance: ghi tỷ giá cùng giao dịch với audit; trùng cặp → `ExchangeRateAlreadyRecordedError`; `parseMoney`/`snapshotMoney` đúng T-M7 (có tỷ giá đúng ngày, thiếu tỷ giá, cùng tiền).
 - Verify: `pnpm exec jest src/modules/finance` và integration `exchange-rates-http` → xanh.
 
 ### Task 4: lớp HTTP `FinanceHttpModule` và route
 
-- Files: `finance-http.module.ts`, `exchange-rate/exchange-rates.controller.ts`, `exchange-rate.dto.ts`, `currency/currencies.controller.ts`, `src/app.module.ts`, `test/support/api-coverage-manifest.ts`, `test/e2e/exchange-rates.e2e-spec.ts`, `test/integration/exchange-rates-http.integration-spec.ts`.
+- Files: `finance-http.module.ts`, `exchange-rate/exchange-rates.controller.ts`, `exchange-rate.dto.ts`, `currency/currencies.controller.ts`, `src/app/app.module.ts`, `test/support/api-coverage-manifest.ts`, `test/http/finance/exchange-rates.http-spec.ts`, `test/integration/finance/exchange-rates-http.integration-spec.ts`.
 - Depends on: Task 3.
 - Acceptance: ba operation đúng bảng HTTP của spec; 401/403/422 theo vai; 409 trùng; audit `EXCHANGE_RATE.RECORDED` ghi người nhập và vai `FINANCE`; `PUT/PATCH/DELETE` trả 404.
 - Verify: `pnpm test:e2e` (suite `exchange-rates` và `api-inventory`), integration `exchange-rates-http` → xanh.

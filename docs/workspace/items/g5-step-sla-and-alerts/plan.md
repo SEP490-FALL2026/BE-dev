@@ -21,7 +21,7 @@
 
 ### Task 2: lõi ngày làm việc và tham số (Phase 1)
 
-- Files: `src/core/working-days.ts` (+ spec; tệp dùng chung với `g6-transfer-record`: nếu đã có thì chỉ thêm hàm), `src/modules/operating-parameters/parameter-definitions.ts`, `operating-parameters.service.ts`, `operating-parameters.repo.ts`, test tham số hiện có (danh sách thêm một khóa)
+- Files: `src/core/working-days.ts` (+ spec; tệp dùng chung với `g6-transfer-record`: nếu đã có thì chỉ thêm hàm), `src/modules/operating-parameters/parameter-definitions.policy.ts`, `operating-parameters.service.ts`, `operating-parameters.repo.ts`, test tham số hiện có (danh sách thêm một khóa)
 - Depends on: Task 1
 - Acceptance: `isWorkingDay`, `addWorkingDays`, `workingDaysBetween`, `wallClockAt`, `slaDueAt` đúng cho cuối tuần, ngày nghỉ liền kề, tạo vào thứ Bảy, múi giờ có giờ mùa hè; `BACKLOG_ALERT_THRESHOLD` (1–500, mặc định 10) có trong danh sách tham số với Audit trước/sau; `getValueAt` trả giá trị hiệu lực tại thời điểm (trước và sau lần đổi, khóa chưa có dòng thì mặc định); `getNonWorkingDates` trả tập ngày
 - Verify: `working-days.spec.ts` (ít nhất 16 ca của hạng mục này, cộng ca đã có của G6) xanh; nhóm integration `operating-parameters` xanh
@@ -45,7 +45,7 @@
 
 ### Task 5: tra Super Admin qua facade
 
-- Files: `src/modules/identity-access/identity-access.service.ts`, `accounts/app-user.repo.ts`, test tích hợp tài khoản
+- Files: `src/modules/identity-access/public/identity-access.api.ts`, `accounts/app-user.repo.ts`, test tích hợp tài khoản
 - Depends on: Task 1
 - Acceptance: `findUsableSuperAdminEmployeeId` trả nhân viên của tài khoản Super Admin dùng được (đã kích hoạt, không khóa), `null` khi không có
 - Verify: ca tích hợp mới xanh; kiểm tra kiến trúc (`jest src`) xanh
@@ -69,10 +69,10 @@
 
 ### Task 8: worker (Phase 1)
 
-- Files: `src/modules/requests/step-sla-sweep.service.ts`, `src/modules/requests/requests-work-facade.module.ts`, `src/modules/requests/requests.module.ts`, `src/request-work.loop.ts` (+ spec), `src/worker.module.ts`, `src/infrastructure/config/env-schema.ts` (+ spec), `.env.example`, `module-graph.spec.ts`, `architecture-boundaries.spec.ts`, `ARCHITECTURE.md`, `docs/rules/security-jobs.md`
+- Files: `src/modules/requests/public/step-sla-sweep.api.ts`, `src/modules/requests/requests-work-facade.module.ts`, `src/modules/requests/requests.module.ts`, `src/worker/request-work.job.ts` (+ spec), `src/worker/worker.module.ts`, `src/infrastructure/config/env-schema.ts` (+ spec), `.env.example`, `module-graph.spec.ts`, `architecture-boundaries.spec.ts`, `ARCHITECTURE.md`, `docs/rules/security-jobs.md`
 - Depends on: Task 6, Task 7
 - Acceptance: worker chạy `StepSlaSweepService.sweep` theo `REQUEST_WORK_INTERVAL_MS`, một lượt không chồng lượt trước, dừng đúng khi tắt, lỗi chỉ ghi tên; đồ thị worker không import `CatalogModule` hay kho tệp; hợp đồng gốc đăng ký đủ ở `PUBLIC_ROOT_CONTRACT_FILES` và `PUBLIC_CONTRACT_EXPORTS`; nếu hạng mục anh em đã tạo vòng thì thêm lời gọi chứ không tạo vòng thứ hai
-- Verify: `request-work.loop.spec.ts` xanh; `jest src` (kiến trúc, đồ thị module, cấu hình) xanh; ca tích hợp chạy `sweep` qua đồ thị `RequestsWorkFacadeModule`
+- Verify: `worker/request-work.job.spec.ts` xanh; `jest src` (kiến trúc, đồ thị module, cấu hình) xanh; ca tích hợp chạy `sweep` qua đồ thị `RequestsWorkFacadeModule`
 - Kết quả: xong. `RequestWorkLoop` và `RequestsWorkFacadeModule` do `g5-step-reassignment-and-controlled-wait` tạo trước nên chỉ thêm lời gọi `StepSlaSweepService.sweep` (một ca unit mới về thứ tự và lỗi chỉ ghi tên, `request-work.loop.spec` 7 ca); `REQUEST_WORK_INTERVAL_MS` đã có. Hợp đồng gốc `step-sla-sweep.service.ts` đăng ký ở `PUBLIC_ROOT_CONTRACT_FILES` của cả hai spec kiến trúc; `SlaQueueAgeService` và `CongestionRepo` khai một lần ở `RequestsWorkFacadeModule` rồi xuất ra (khai ở cả hai module vi phạm cổng một provider một module), có ca ở `module-graph.spec`. Các ca tích hợp gọi `StepSlaSweepService` qua đồ thị API; đồ thị worker chỉ kiểm bằng `module-graph.spec` (không import `CatalogModule`, không controller), chưa khởi động tiến trình worker thật.
 
 ### Task 9: bảng nghẽn, cảnh báo backlog, sự cố, API (Phase 1)

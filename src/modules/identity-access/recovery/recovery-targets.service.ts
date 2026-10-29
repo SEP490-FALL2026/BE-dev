@@ -1,12 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { OrganizationService } from '../../organization/organization.service';
-import { EmployeeRecord, OrganizationRecord } from '../../organization/organization.types';
+import { OrganizationApi } from '../../organization/public/organization.api';
+import { EmployeeRecord, OrganizationRecord } from '../../organization/public/organization.types';
 import { AccountDirectoryService } from '../accounts/account-directory.service';
 import { RoleGrantService } from '../accounts/role-grant.service';
-import { AccountSnapshot } from '../identity-access.types';
-import { tryNormalize } from './recovery-procedure';
-import { RecoveryRefusedError } from './recovery.errors';
+import { AccountSnapshot } from '../public/identity-access.types';
+import { tryNormalize } from './recovery-procedure.policy';
+import { RecoveryRefusedError } from '../public/recovery.errors';
 
 /**
  * The accounts a recovery acts on: found by email before any lock, then locked in the order of the lock protocol
@@ -17,7 +17,7 @@ export class RecoveryTargets {
   constructor(
     private readonly accounts: AccountDirectoryService,
     private readonly grants: RoleGrantService,
-    private readonly organization: OrganizationService,
+    private readonly organization: OrganizationApi,
   ) {}
 
   async requireOrganization(): Promise<OrganizationRecord> {

@@ -3,7 +3,7 @@ import {
   type InAppNotificationCode,
   type InAppNotificationInput,
   type InAppNotificationRefusal,
-} from '../notifications.types';
+} from '../public/notifications.types';
 
 /**
  * Keys that never reach an inbox: the secrets the Audit Trail refuses, whatever the code says (`FR-3.11`, `INF-06`). A key that

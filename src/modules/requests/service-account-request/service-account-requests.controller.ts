@@ -13,7 +13,7 @@ import { CurrentPrincipal } from '../../../infrastructure/security/models/curren
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AccessRequestResponseDto, RequestIdParamDto } from '../access-request/access-request.dto';
 import { AccessRequestQueryService } from '../access-request/access-request-query.service';
-import { toWire } from '../access-request/access-request.wire';
+import { toWire } from '../access-request/access-request.mapper';
 import { ServiceAccountBoundaryService } from './service-account-boundary.service';
 import { ServiceAccountRequestService } from './service-account-request.service';
 import { ServiceAccountReviewBodyDto, ServiceAccountSubmitBodyDto } from './service-account-request.dto';

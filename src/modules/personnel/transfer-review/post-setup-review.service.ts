@@ -1,14 +1,11 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { AuditService } from '../../audit/audit.service';
-import type {
-  SeatBaselineClosedEvent,
-  SeatBaselineClosedListener,
-} from '../../licensing/licensing-seat-baseline.types';
-import { LicensingService } from '../../licensing/licensing.service';
-import { OrganizationHistoryService } from '../../organization/organization-history.service';
-import { OrganizationService } from '../../organization/organization.service';
-import { personnelSystemAuditEvent } from '../mappers/personnel-audit-event';
+import { AuditApi } from '../../audit/public/audit.api';
+import type { SeatBaselineClosedEvent } from '../../licensing/public/licensing.extension-points';
+import { LicensingApi } from '../../licensing/public/licensing.api';
+import { OrganizationHistoryApi } from '../../organization/public/organization-history.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
+import { personnelSystemAuditEvent } from '../mappers/personnel-audit-event.mapper';
 import { TransferReviewRepo } from './transfer-review.repo';
 import { TransferReviewService } from './transfer-review.service';
 
@@ -19,23 +16,19 @@ import { TransferReviewService } from './transfer-review.service';
  * review is only told, and a tool no longer needed opens a revocation whose source is `POST_SETUP_REVIEW`. It reuses the model of the
  * review after a transfer with no transfer behind it (`transfer_id` empty); the review is anchored on the placement the person has
  * the day the baseline closes, and a placement that has a review already has no second one. It runs in the transaction that closes the
- * baseline, so there is never a closed baseline without its reviews. It is the `SeatBaselineClosedListener` of licensing, registered
- * when the module starts, so licensing never imports personnel.
+ * baseline, so there is never a closed baseline without its reviews. `post-setup-review.listener.ts` adds it to licensing's
+ * `SeatBaselineClosedListeners` when the module starts, so licensing never imports personnel.
  */
 @Injectable()
-export class PostSetupReviewService implements SeatBaselineClosedListener, OnModuleInit {
+export class PostSetupReviewService {
   constructor(
     private readonly reviews: TransferReviewRepo,
     private readonly opening: TransferReviewService,
-    private readonly licensing: LicensingService,
-    private readonly organization: OrganizationService,
-    private readonly history: OrganizationHistoryService,
-    private readonly audit: AuditService,
+    private readonly licensing: LicensingApi,
+    private readonly organization: OrganizationApi,
+    private readonly history: OrganizationHistoryApi,
+    private readonly audit: AuditApi,
   ) {}
-
-  onModuleInit(): void {
-    this.licensing.registerSeatBaselineClosedListener(this);
-  }
 
   async baselineClosed(tx: DbTx, event: SeatBaselineClosedEvent): Promise<void> {
     const dueOn = await this.opening.dueOnAfter(event.closedOn);

@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { pageOf, type Page } from '../../../core/application/pagination';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { CatalogService } from '../../catalog/catalog.service';
-import { OrganizationService } from '../../organization/organization.service';
+import { CatalogApi } from '../../catalog/public/catalog.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
 import type { ReturnDetailWire, ReturnSummaryWire } from './return-request.dto';
 import { ReturnRequestRefusedError } from './return-request.errors';
 import { mayReadReturn } from './return-request.policy';
@@ -17,8 +17,8 @@ import { ReturnRequestRepo, type ReturnRequestRecord, type ReturnRequestSummaryR
 export class ReturnRequestQueryService {
   constructor(
     private readonly returns: ReturnRequestRepo,
-    private readonly organization: OrganizationService,
-    private readonly catalog: CatalogService,
+    private readonly organization: OrganizationApi,
+    private readonly catalog: CatalogApi,
   ) {}
 
   /** Throws ReturnRequestRefusedError (`NOT_FOUND`, also for a return the caller has no part in). */

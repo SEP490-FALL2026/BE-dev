@@ -9,67 +9,69 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { OperatingParametersModule } from '../operating-parameters/operating-parameters.module';
 import { OrganizationModule } from '../organization/organization.module';
 import { AssignmentEndService } from './assignment/assignment-end.service';
-import { AssignmentFactsRepo } from './assignment/assignment-facts.repo';
-import { AssignmentRenewalService } from './assignment/assignment-renewal.service';
+import { AssignmentFactsRepo } from './assignment/renewal/assignment-facts.repo';
+import { AssignmentRenewalService } from './assignment/renewal/assignment-renewal.service';
 import { AssignmentResponsibleService } from './assignment/assignment-responsible.service';
-import { RegisteredRenewalHold } from './assignment/registered-renewal-hold.service';
-import { RegisteredResponsibleDeadline } from './assignment/registered-responsible-deadline.service';
-import { ServiceAccountDutiesController } from './assignment/service-account-duties.controller';
-import { ServiceAccountDutyRepo } from './assignment/service-account-duty.repo';
-import { ServiceAccountDutyService } from './assignment/service-account-duty.service';
-import { ServiceAccountDutySweeper } from './assignment/service-account-duty.sweeper';
+import { ServiceAccountDutiesController } from './assignment/service-account-duty/service-account-duties.controller';
+import { ServiceAccountDutyRepo } from './assignment/service-account-duty/service-account-duty.repo';
+import { ServiceAccountDutyService } from './assignment/service-account-duty/service-account-duty.service';
+import { ServiceAccountDutySweeper } from './assignment/service-account-duty/service-account-duty.job';
 import { AssignmentDepartmentRepo } from './assignment/assignment-department.repo';
 import { AssignmentRepo } from './assignment/assignment.repo';
-import { AssignmentSeatOccupancy } from './assignment/seat-occupancy.reader';
-import { AssignmentServiceAccountReader } from './assignment/service-account-reader';
+import { AssignmentSeatOccupancy } from './assignment/assignment-seat-occupancy.listener';
+import { AssignmentServiceAccountReader } from './assignment/assignment-service-account.listener';
 import { AssignmentListService } from './assignment/assignment-list.service';
 import { AssignmentService } from './assignment/assignment.service';
 import { AssignmentsController } from './assignment/assignments.controller';
-import { DepartmentToolsController } from './assignment/department-tools.controller';
-import { DepartmentToolsService } from './assignment/department-tools.service';
+import { DepartmentToolsController } from './assignment/department-tools/department-tools.controller';
+import { DepartmentToolsService } from './assignment/department-tools/department-tools.service';
 import { SubscriptionSeatsController } from './assignment/subscription-seats.controller';
 import { ExpiryController } from './expiry/expiry.controller';
 import { ExpiryQueueRepo } from './expiry/expiry-queue.repo';
 import { ExpiryQueueService } from './expiry/expiry-queue.service';
 import { ExpiryReminderRepo } from './expiry/expiry-reminder.repo';
 import { ExpiryReminderService } from './expiry/expiry-reminder.service';
-import { ExpiryReminderSweeper } from './expiry/expiry-reminder.sweeper';
+import { ExpiryReminderSweeper } from './expiry/expiry-reminder.job';
 import { HandoverCaseFacts } from './handover/handover-case-facts.service';
 import { HandoverConfirmationService } from './handover/handover-confirmation.service';
-import { HandoverConfirmerResolver } from './handover/handover-confirmer.resolver';
+import { HandoverConfirmerResolver } from './handover/handover-confirmer.service';
 import { HandoverDutiesController } from './handover/handover-duties.controller';
-import { HandoverDutySweeper } from './handover/handover-duty.sweeper';
+import { HandoverDutySweeper } from './handover/handover-duty.job';
 import { HandoverIssueService } from './handover/handover-issue.service';
 import { HandoverListRepo } from './handover/handover-list.repo';
 import { HandoverOverdueService } from './handover/handover-overdue.service';
-import { HandoverRevocationHook } from './handover/handover-revocation.hook';
+import { HandoverRevocationHook } from './handover/handover-revocation.listener';
 import { HandoverViewService } from './handover/handover-view.service';
 import { HandoverRepo } from './handover/handover.repo';
 import { HandoverService } from './handover/handover.service';
-import { LicenseKeyCipher, parsePreviousVaultKeys } from './license-key/license-key-cipher';
+import { LicenseKeyCipher, parsePreviousVaultKeys } from './license-key/license-key-cipher.service';
 import { LicenseKeyRepo } from './license-key/license-key.repo';
 import { LicenseKeyRevealQuotaRepo } from './license-key/license-key-reveal-quota.repo';
 import { LicenseKeyService } from './license-key/license-key.service';
 import { LicenseKeysController } from './license-key/license-keys.controller';
-import { GRANT_REQUEST_GATE } from './licensing.types';
-import { LicensingService } from './licensing.service';
-import { ProvisioningCancellationService } from './provisioning/provisioning-cancellation.service';
-import { ProvisioningDecisionService } from './provisioning/provisioning-decision.service';
+import {
+  GrantRequestGateHook,
+  RenewalHoldHook,
+  ResponsibleDeadlineHook,
+  RevocationListeners,
+  SeatBaselineClosedListeners,
+} from './public/licensing.extension-points';
+import { LicensingApi } from './public/licensing.api';
+import { ProvisioningCancellationService } from './provisioning/grant-cancellation/provisioning-cancellation.service';
+import { ProvisioningDecisionService } from './provisioning/tasks/provisioning-decision.service';
 import { ProvisioningFailureService } from './provisioning/provisioning-failure.service';
-import { ProvisioningHolderService } from './provisioning/provisioning-holder.service';
-import { ProvisioningService } from './provisioning/provisioning.service';
+import { ProvisioningHolderService } from './provisioning/tasks/provisioning-holder.service';
+import { ProvisioningService } from './provisioning/tasks/provisioning.service';
 import { ProvisioningTaskFrame } from './provisioning/provisioning-task-frame.service';
 import { ProvisioningTaskViewService } from './provisioning/provisioning-task-view.service';
 import { ProvisioningTaskRepo } from './provisioning/provisioning-task.repo';
-import { ProvisioningTasksController } from './provisioning/provisioning-tasks.controller';
-import { RevocationTasksController } from './provisioning/revocation-tasks.controller';
-import { RegisteredGrantRequestGate } from './provisioning/registered-grant-request-gate.service';
-import { DepartmentOpenWorkReader } from './provisioning/department-open-work.reader';
-import { ProvisioningDepartmentUseRepo } from './provisioning/provisioning-department-use.repo';
-import { RegisteredRevocationHook } from './provisioning/registered-revocation-hook.service';
-import { RevocationCompletionService } from './provisioning/revocation-completion.service';
-import { OpenGrantTaskRepo } from './provisioning/open-grant-task.repo';
-import { OpenGrantTaskService } from './provisioning/open-grant-task.service';
+import { ProvisioningTasksController } from './provisioning/tasks/provisioning-tasks.controller';
+import { RevocationTasksController } from './provisioning/revocation-completion/revocation-tasks.controller';
+import { DepartmentOpenWorkReader } from './provisioning/department-use/department-open-work.listener';
+import { ProvisioningDepartmentUseRepo } from './provisioning/department-use/provisioning-department-use.repo';
+import { RevocationCompletionService } from './provisioning/revocation-completion/revocation-completion.service';
+import { OpenGrantTaskRepo } from './provisioning/open-grants/open-grant-task.repo';
+import { OpenGrantTaskService } from './provisioning/open-grants/open-grant-task.service';
 import { RevocationReadRepo } from './provisioning/revocation-read.repo';
 import { RevocationReadService } from './provisioning/revocation-read.service';
 import { RevocationService } from './provisioning/revocation.service';
@@ -80,7 +82,7 @@ import { SaasIssueHandlingService } from './saas-issue/saas-issue-handling.servi
 import { SaasIssueRepo } from './saas-issue/saas-issue.repo';
 import { SaasIssueService } from './saas-issue/saas-issue.service';
 import { SaasIssueSweepService } from './saas-issue/saas-issue-sweep.service';
-import { SaasIssueSweeper } from './saas-issue/saas-issue.sweeper';
+import { SaasIssueSweeper } from './saas-issue/saas-issue.job';
 import { SaasIssueViewService } from './saas-issue/saas-issue-view.service';
 import { SaasIssuesController } from './saas-issue/saas-issues.controller';
 import { SeatBaselineController } from './seat-baseline/seat-baseline.controller';
@@ -90,7 +92,7 @@ import { SeatBaselineService } from './seat-baseline/seat-baseline.service';
 /**
  * The licensing context (C3, ADR-0013): the assignments of seats, the closing of the seat baseline, the queue of
  * provisioning and the vault of license keys. It reads the
- * catalog through `CatalogService` and the organization through its facade; nothing in the catalog reads it back. The
+ * catalog through `CatalogApi` and the organization through its facade; nothing in the catalog reads it back. The
  * HTTP controllers live in the module itself because no graph other than the API needs it yet: a separate HTTP module is
  * made when the worker or a command imports `licensing`.
  */
@@ -128,8 +130,8 @@ import { SeatBaselineService } from './seat-baseline/seat-baseline.service';
     AssignmentEndService,
     AssignmentFactsRepo,
     AssignmentRenewalService,
-    RegisteredRenewalHold,
-    RegisteredResponsibleDeadline,
+    RenewalHoldHook,
+    ResponsibleDeadlineHook,
     AssignmentResponsibleService,
     ServiceAccountDutyRepo,
     ServiceAccountDutyService,
@@ -138,6 +140,7 @@ import { SeatBaselineService } from './seat-baseline/seat-baseline.service';
     DepartmentToolsService,
     SeatBaselineRepo,
     SeatBaselineService,
+    SeatBaselineClosedListeners,
     ProvisioningTaskRepo,
     ProvisioningTaskFrame,
     ProvisioningHolderService,
@@ -147,7 +150,7 @@ import { SeatBaselineService } from './seat-baseline/seat-baseline.service';
     ProvisioningCancellationService,
     ProvisioningFailureService,
     ProvisioningTaskReasonRepo,
-    RegisteredRevocationHook,
+    RevocationListeners,
     RevocationService,
     RevocationCompletionService,
     RevocationReadRepo,
@@ -197,12 +200,18 @@ import { SeatBaselineService } from './seat-baseline/seat-baseline.service';
         });
       },
     },
-    // The module of requests registers its gate here when it starts; until then every request is refused.
-    RegisteredGrantRequestGate,
-    { provide: GRANT_REQUEST_GATE, useExisting: RegisteredGrantRequestGate },
-    LicensingService,
+    // The extension points licensing opens (public/licensing.extension-points.ts): requests binds the gate.
+    GrantRequestGateHook,
+    LicensingApi,
   ],
-  // Other modules read through the facade only; the capability services and the repos stay private.
-  exports: [LicensingService],
+  // Other modules read through the facade and bind the extension points; the capability services and the repos stay private.
+  exports: [
+    LicensingApi,
+    GrantRequestGateHook,
+    RevocationListeners,
+    RenewalHoldHook,
+    ResponsibleDeadlineHook,
+    SeatBaselineClosedListeners,
+  ],
 })
 export class LicensingModule {}

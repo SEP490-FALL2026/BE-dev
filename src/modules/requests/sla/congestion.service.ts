@@ -4,10 +4,10 @@ import { type BusinessDate } from '../../../core/business-date';
 import { wallClockAt, workingDaysBetween, type NonWorkingDates } from '../../../core/working-days';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { AuditService } from '../../audit/audit.service';
-import { OperatingParametersService } from '../../operating-parameters/operating-parameters.service';
-import { OrganizationService } from '../../organization/organization.service';
-import type { EmployeeRecord } from '../../organization/organization.types';
+import { AuditApi } from '../../audit/public/audit.api';
+import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
+import type { EmployeeRecord } from '../../organization/public/organization.types';
 import { CongestionHolderNotFoundError } from './congestion.errors';
 import { CongestionRepo, type IncidentRecord } from './congestion.repo';
 import type { CongestionIncidentWire, CongestionRowWire, CongestionStepWire } from './congestion.dto';
@@ -34,9 +34,9 @@ export class CongestionService {
   constructor(
     private readonly runner: TransactionRunner,
     private readonly congestion: CongestionRepo,
-    private readonly organization: OrganizationService,
-    private readonly parameters: OperatingParametersService,
-    private readonly audit: AuditService,
+    private readonly organization: OrganizationApi,
+    private readonly parameters: OperatingParametersApi,
+    private readonly audit: AuditApi,
   ) {}
 
   async board(query: Paging, now: Date = new Date()): Promise<Page<CongestionRowWire>> {

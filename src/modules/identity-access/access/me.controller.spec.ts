@@ -8,7 +8,7 @@ import {
   CurrentPasswordInvalidError,
   LoginTemporarilyBlockedError,
 } from '../auth/auth.errors';
-import { PasswordPolicyError } from '../identity-access.errors';
+import { PasswordPolicyError } from '../public/identity-access.errors';
 import { MeController } from './me.controller';
 import { MeService } from './me.service';
 

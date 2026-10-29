@@ -15,7 +15,7 @@ Ghi bằng chứng lỗi ở [review mục 6](../../../reviews/g0-g4-post-merge-
 
 ### Task 1: xuống dòng cố định
 
-- Files: `.gitattributes`, `test/e2e/openapi-export.e2e-spec.ts`, `openapi.json` (sinh lại), CONTRIBUTING.md, test/README.md.
+- Files: `.gitattributes`, `test/http/platform/openapi-export.http-spec.ts`, `openapi.json` (sinh lại), CONTRIBUTING.md, test/README.md.
 - Depends on: Owner đồng ý — có (`GATE-EOL=A`, Prompt 09).
 - Acceptance: `GATE-01`.
 - Verify: test đỏ trước (so byte + cấm CR + ghim rule: 2/3 đỏ vì CR và thiếu `.gitattributes`); thêm đúng một rule, sinh lại
@@ -24,7 +24,7 @@ Ghi bằng chứng lỗi ở [review mục 6](../../../reviews/g0-g4-post-merge-
 
 ### Task 2: ổn định suite integration
 
-- Files: `test/support/disposable-database.ts`, `test/integration/disposable-database.integration-spec.ts`, test/README.md.
+- Files: `test/support/disposable-database.ts`, `test/integration/platform/disposable-database.integration-spec.ts`, test/README.md.
 - Depends on: none.
 - Acceptance: `GATE-02`.
 - Verify: lượt đầy đủ có đo (sampler `pg_stat_activity`/khóa chờ ngoài tiến trình, Jest JSON thời gian từng test): timeout gốc

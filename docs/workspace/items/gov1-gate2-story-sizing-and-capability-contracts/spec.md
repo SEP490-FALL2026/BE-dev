@@ -72,11 +72,11 @@ mở được helper/type riêng; port phiên dùng chung có một owner cấp 
 - Phase A: `docs/rules/work-item-sizing.md` (mới, nguồn chuẩn), router `docs/rules/README.md`, `AGENTS.md`,
   `CONTRIBUTING.md`, `docs/workspace/README.md`, `_template/{README,spec,plan}.md`, `scripts/check-rules{,.test}.mjs`,
   `rules-check.config.json` (`sizingGrandfathered`).
-- Phase B: `src/architecture-structure.spec.ts` (registry `INTRA_MODULE_CONTRACTS`), `src/module-graph.spec.ts`
-  (đặc tả token port), `src/modules/identity-access/identity-access.ports.ts` (mới) và đúng các file import/wiring port.
+- Phase B: `test/gates/architecture-structure.gate-spec.ts` (registry `INTRA_MODULE_CONTRACTS`), `test/gates/module-graph.gate-spec.ts`
+  (đặc tả token port), `src/modules/identity-access/account-sessions.extension-points.ts` (mới) và đúng các file import/wiring port.
 - Phase C (Prompt 20A): `docs/rules/work-item-sizing.md` (mục scope map), mẫu spec (`- Scope map:`),
   `docs/workspace/README.md`, `scripts/check-rules{,.test}.mjs`, `rules-check.config.json` (`roadmap`).
-- Phase D (Prompt 20A): `src/architecture-structure.spec.ts` (chiều ranh giới + 7 mục registry), `module-structure.md`,
+- Phase D (Prompt 20A): `test/gates/architecture-structure.gate-spec.ts` (chiều ranh giới + 7 mục registry), `module-structure.md`,
   `ARCHITECTURE.md`. Không đổi file `src/modules/**`.
 - Không bảng, không operation HTTP/CLI, không Nest submodule mới. Contract giữ nguyên: token `Symbol(ACCOUNT_SESSIONS)`,
   `AccountSessions.revokeAllSessions(tx, appUserId, reason, now)`, binding `useExisting: SessionDirectoryService` ở
@@ -167,8 +167,8 @@ chung → capability/root vượt ranh giới (cần bề mặt public ở root 
 
 | Importer (thư mục dùng chung)                   | Đích                                                                               | Xử lý                                                        |
 | ----------------------------------------------- | ---------------------------------------------------------------------------------- | ------------------------------------------------------------ |
-| `catalog/mappers/catalog-application.mapper`    | `catalog/catalog.types.ts`                                                         | bề mặt public ở root, giữ                                    |
-| `identity-access/mappers/auth.http-errors`      | `identity-access/identity-access.errors.ts`                                        | bề mặt public ở root, giữ                                    |
+| `catalog/mappers/catalog-application.mapper`    | `catalog/public/catalog.types.ts`                                                  | bề mặt public ở root, giữ                                    |
+| `identity-access/mappers/auth.http-errors`      | `identity-access/public/identity-access.errors.ts`                                 | bề mặt public ở root, giữ                                    |
 | `identity-access/mappers/account.http-errors`   | `accounts/account.errors.ts`                                                       | đăng ký: mapper dùng chung của route accounts + auth         |
 | `identity-access/mappers/auth.http-errors`      | `auth/auth.errors.ts`                                                              | đăng ký: mapper dùng chung của route auth + access           |
 | `organization/mappers/organization.http-errors` | `cost-center/`, `department/`, `employee/`, `job-title/`, `project/` `*.errors.ts` | đăng ký 5 file: mapper dùng chung của mọi route organization |

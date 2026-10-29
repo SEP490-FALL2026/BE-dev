@@ -4,10 +4,11 @@ import { randomUUID } from 'node:crypto';
 import { EnvironmentVariables } from '../../infrastructure/config/env-schema';
 import { TransactionRunner } from '../../infrastructure/database/transaction-runner';
 import { MailSendError, MailTransport } from '../../infrastructure/mail/mail-transport';
-import { UnknownEmailTemplateError, renderEmail } from './email-templates';
+import { renderEmail } from './email-templates.mapper';
+import { PayloadDecryptionError, UnknownEmailTemplateError } from './notifications.errors';
 import { NotificationsRepo } from './notifications.repo';
-import { ClaimedEmail, EmailTemplate, TokenUsability } from './notifications.types';
-import { PayloadCipher, PayloadDecryptionError } from './payload-cipher';
+import { ClaimedEmail, EmailTemplate, TokenUsability } from './public/notifications.types';
+import { PayloadCipher } from './payload-cipher.service';
 
 const MAX_ATTEMPTS = 5;
 const LEASE_MS = 60_000;

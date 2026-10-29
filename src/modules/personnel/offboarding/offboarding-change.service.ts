@@ -1,12 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { addDays } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { OrganizationHistoryService } from '../../organization/organization-history.service';
-import { OrganizationService } from '../../organization/organization.service';
+import { OrganizationHistoryApi } from '../../organization/public/organization-history.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
 import { LeaveDepartureService } from '../leave/leave-departure.service';
 import { PersonnelNotifier } from '../event-notice/personnel-notifier.service';
-import { PersonnelFileHooks } from '../personnel-file-hooks';
-import { actorColumns, type PersonnelActor } from '../personnel.types';
+import { PersonnelFileHooks } from '../event-notice/personnel-file-hooks.service';
+import { actorColumns, type PersonnelActor } from '../public/personnel.types';
 import { TransferGuardService } from '../transfer/transfer-guard.service';
 import { OffboardingAuditService } from './offboarding-audit.service';
 import { OffboardingFrame } from './offboarding-frame.service';
@@ -29,8 +29,8 @@ export class OffboardingChangeService {
   constructor(
     private readonly frame: OffboardingFrame,
     private readonly repo: OffboardingRepo,
-    private readonly organization: OrganizationService,
-    private readonly history: OrganizationHistoryService,
+    private readonly organization: OrganizationApi,
+    private readonly history: OrganizationHistoryApi,
     private readonly guard: TransferGuardService,
     private readonly periods: OffboardingPeriodsService,
     private readonly handovers: OffboardingHandoverService,

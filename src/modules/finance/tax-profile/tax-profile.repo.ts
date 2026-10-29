@@ -3,7 +3,7 @@ import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { searchKey } from '../../../core/search-key';
-import type { TaxGroup } from '../finance.types';
+import type { TaxGroup } from '../public/finance.types';
 import type { TaxLineRecord, TaxProfileVersion } from './tax-profile.types';
 
 const WITH_LINES = { lines: { orderBy: { position: 'asc' } } } as const;

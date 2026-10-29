@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { CatalogService } from '../../catalog/catalog.service';
-import { OrganizationService } from '../../organization/organization.service';
-import type { PersonalSeat, RevocationSource, TerminatingAccess } from '../licensing.types';
+import { CatalogApi } from '../../catalog/public/catalog.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
+import type { PersonalSeat, RevocationSource, TerminatingAccess } from '../public/licensing.types';
 import { RevocationReadRepo } from './revocation-read.repo';
 
 /**
@@ -15,8 +15,8 @@ import { RevocationReadRepo } from './revocation-read.repo';
 export class RevocationReadService {
   constructor(
     private readonly reads: RevocationReadRepo,
-    private readonly catalog: CatalogService,
-    private readonly organization: OrganizationService,
+    private readonly catalog: CatalogApi,
+    private readonly organization: OrganizationApi,
   ) {}
 
   async personalSeatsOf(employeeId: string, onDate: BusinessDate, tx?: DbTx): Promise<PersonalSeat[]> {

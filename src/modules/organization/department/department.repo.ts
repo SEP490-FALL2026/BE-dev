@@ -5,7 +5,7 @@ import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { isUniqueViolation } from '../../../infrastructure/database/unique-violation';
 import { CostCenterStatus } from '../cost-center/cost-center.types';
-import { CreateDepartmentInput, EmployeeStatus, EmployeeWorkState } from '../organization.types';
+import { CreateDepartmentInput, EmployeeStatus, EmployeeWorkState } from '../public/organization.types';
 import { DepartmentCodeTakenError } from './department.errors';
 import { DepartmentMemberRecord, DepartmentRecord, DepartmentStatus } from './department.types';
 

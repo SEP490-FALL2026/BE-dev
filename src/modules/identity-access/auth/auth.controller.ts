@@ -21,7 +21,7 @@ import {
   RefreshTokenBodyDto,
   SessionTokenResponseDto,
 } from '../dto/auth.dto';
-import { IssuedSession } from '../identity-access.types';
+import { IssuedSession } from '../public/identity-access.types';
 import { ACCOUNT_ERROR_EXAMPLES, toAccountApiException } from '../mappers/account.http-errors';
 import {
   AUTH_ERROR_EXAMPLES,

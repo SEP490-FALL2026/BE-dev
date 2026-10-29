@@ -1,20 +1,20 @@
 import type { INestApplicationContext } from '@nestjs/common';
 import { TransactionRunner } from '../../src/infrastructure/database/transaction-runner';
-import { AuditService } from '../../src/modules/audit/audit.service';
-import { IdentityAccessService } from '../../src/modules/identity-access/identity-access.service';
-import { NotificationsService } from '../../src/modules/notifications/notifications.service';
-import { OrganizationService } from '../../src/modules/organization/organization.service';
+import { AuditApi } from '../../src/modules/audit/public/audit.api';
+import { IdentityAccessApi } from '../../src/modules/identity-access/public/identity-access.api';
+import { NotificationsApi } from '../../src/modules/notifications/public/notifications.api';
+import { OrganizationApi } from '../../src/modules/organization/public/organization.api';
 import { LeaveService } from '../../src/modules/personnel/leave/leave.service';
 import { NoticeHandlingService } from '../../src/modules/personnel/notice/notice-handling.service';
 import { OffboardingChangeService } from '../../src/modules/personnel/offboarding/offboarding-change.service';
 import { OffboardingService } from '../../src/modules/personnel/offboarding/offboarding.service';
 import { ProfileCorrectionService } from '../../src/modules/personnel/super-admin-event/profile-correction.service';
 import { SuperAdminEventRepo } from '../../src/modules/personnel/super-admin-event/super-admin-event.repo';
-import { SuperAdminEventService } from '../../src/modules/personnel/super-admin-event/super-admin-event.service';
+import { SuperAdminEventApi } from '../../src/modules/personnel/public/super-admin-event.api';
 import type {
   SuperAdminEventParameters,
   SuperAdminEventResult,
-} from '../../src/modules/personnel/super-admin-event/super-admin-event.types';
+} from '../../src/modules/personnel/public/super-admin-event.types';
 import { TransferChangeService } from '../../src/modules/personnel/transfer/transfer-change.service';
 import { TransferService } from '../../src/modules/personnel/transfer/transfer.service';
 
@@ -31,11 +31,11 @@ export const SUPER_ADMIN_EVENT_BASIS = {
  * application, as the command builds it: the one way to record an event about the Super Admin, which the application refuses to
  * record for them (`PERSONNEL.SELF_CHANGE_FORBIDDEN`). No assertion lives here.
  */
-export function superAdminEventService(app: INestApplicationContext): SuperAdminEventService {
-  return new SuperAdminEventService(
+export function superAdminEventService(app: INestApplicationContext): SuperAdminEventApi {
+  return new SuperAdminEventApi(
     app.get(TransactionRunner, { strict: false }),
-    app.get(OrganizationService, { strict: false }),
-    app.get(IdentityAccessService, { strict: false }),
+    app.get(OrganizationApi, { strict: false }),
+    app.get(IdentityAccessApi, { strict: false }),
     new SuperAdminEventRepo(),
     app.get(TransferService, { strict: false }),
     app.get(TransferChangeService, { strict: false }),
@@ -44,9 +44,9 @@ export function superAdminEventService(app: INestApplicationContext): SuperAdmin
     app.get(OffboardingChangeService, { strict: false }),
     app.get(NoticeHandlingService, { strict: false }),
     new ProfileCorrectionService(
-      app.get(OrganizationService, { strict: false }),
-      app.get(AuditService, { strict: false }),
-      app.get(NotificationsService, { strict: false }),
+      app.get(OrganizationApi, { strict: false }),
+      app.get(AuditApi, { strict: false }),
+      app.get(NotificationsApi, { strict: false }),
     ),
   );
 }

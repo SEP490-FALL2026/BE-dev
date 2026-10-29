@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import type { InAppNotificationInput, InAppNotificationRecord, InAppParamValue } from '../notifications.types';
+import type { InAppNotificationInput, InAppNotificationRecord, InAppParamValue } from '../public/notifications.types';
 
 const READ_SELECT = {
   id: true,

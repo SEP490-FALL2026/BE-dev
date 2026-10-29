@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { IdentityAccessFacadeModule } from './identity-access-facade.module';
-import { LocalDemoAccountService } from './local-demo-account.service';
+import { LocalDemoAccountApi } from './public/local-demo-account.api';
 
 /**
  * The account side of `pnpm dev:seed` (H6.2): local demo accounts through the account contracts. Only the seed graph
@@ -8,7 +8,7 @@ import { LocalDemoAccountService } from './local-demo-account.service';
  */
 @Module({
   imports: [IdentityAccessFacadeModule],
-  providers: [LocalDemoAccountService],
-  exports: [LocalDemoAccountService],
+  providers: [LocalDemoAccountApi],
+  exports: [LocalDemoAccountApi],
 })
 export class IdentityAccessLocalSeedFacadeModule {}

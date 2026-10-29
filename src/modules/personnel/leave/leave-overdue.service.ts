@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
-import { AuditService } from '../../audit/audit.service';
-import { OrganizationService } from '../../organization/organization.service';
-import { personnelSystemAuditEvent } from '../mappers/personnel-audit-event';
+import { AuditApi } from '../../audit/public/audit.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
+import { personnelSystemAuditEvent } from '../mappers/personnel-audit-event.mapper';
 import { LeaveRepo } from './leave.repo';
 
 /** How many leaves one pass tells about; the next pass takes the rest. */
@@ -19,8 +19,8 @@ export class LeaveOverdueService {
   constructor(
     private readonly runner: TransactionRunner,
     private readonly leaves: LeaveRepo,
-    private readonly organization: OrganizationService,
-    private readonly audit: AuditService,
+    private readonly organization: OrganizationApi,
+    private readonly audit: AuditApi,
   ) {}
 
   /** Returns how many leaves were told in this pass. */

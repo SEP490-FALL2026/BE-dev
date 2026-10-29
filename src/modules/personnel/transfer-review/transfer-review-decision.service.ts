@@ -1,13 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionRunner, readSqlState, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { AuditService } from '../../audit/audit.service';
-import { AssignmentNotOpenError, RevocationRefusedError } from '../../licensing/licensing.errors';
-import type { OpenedRevocation } from '../../licensing/licensing.types';
-import { LicensingService } from '../../licensing/licensing.service';
-import { OrganizationService } from '../../organization/organization.service';
-import { personnelAuditEvent } from '../mappers/personnel-audit-event';
-import { userActor } from '../personnel.types';
+import { AuditApi } from '../../audit/public/audit.api';
+import { AssignmentNotOpenError, RevocationRefusedError } from '../../licensing/public/licensing.errors';
+import type { OpenedRevocation } from '../../licensing/public/licensing.types';
+import { LicensingApi } from '../../licensing/public/licensing.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
+import { personnelAuditEvent } from '../mappers/personnel-audit-event.mapper';
+import { userActor } from '../public/personnel.types';
 import { TransferReviewError } from './transfer-review.errors';
 import { isChangeOfMind, mayDecide, mayRecordDecision, statusAfterDecision } from './transfer-review.policy';
 import { TransferReviewRepo } from './transfer-review.repo';
@@ -43,9 +43,9 @@ export class TransferReviewDecisionService {
   constructor(
     private readonly runner: TransactionRunner,
     private readonly reviews: TransferReviewRepo,
-    private readonly licensing: LicensingService,
-    private readonly organization: OrganizationService,
-    private readonly audit: AuditService,
+    private readonly licensing: LicensingApi,
+    private readonly organization: OrganizationApi,
+    private readonly audit: AuditApi,
   ) {}
 
   /** Throws TransferReviewError (`NOT_FOUND`, `NOT_REVIEWER`, `NOT_OPEN`, `EMPLOYEE_LEFT`, `ITEM_NOT_FOUND`, `DECISION_ALREADY_RECORDED`, ...). */

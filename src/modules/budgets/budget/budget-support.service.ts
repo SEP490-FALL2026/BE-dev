@@ -4,13 +4,13 @@ import { formatAmount } from '../../../core/money/money';
 import { MoneyOutOfRangeError } from '../../../core/money/money.errors';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import type { AuditEventInput, AuditValue } from '../../audit/audit.types';
-import { CatalogService } from '../../catalog/catalog.service';
-import { FinanceService } from '../../finance/finance.service';
-import { IdentityAccessService } from '../../identity-access/identity-access.service';
-import { OperatingParametersService } from '../../operating-parameters/operating-parameters.service';
-import { FinanceSetupIncompleteError } from '../../organization/organization.errors';
-import { OrganizationService } from '../../organization/organization.service';
+import type { AuditEventInput, AuditValue } from '../../audit/public/audit.types';
+import { CatalogApi } from '../../catalog/public/catalog.api';
+import { FinanceApi } from '../../finance/public/finance.api';
+import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
+import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
+import { FinanceSetupIncompleteError } from '../../organization/public/organization.errors';
+import { OrganizationApi } from '../../organization/public/organization.api';
 import {
   BudgetCostCenterNotFoundError,
   BudgetCurrencyError,
@@ -75,11 +75,11 @@ export function budgetAuditEvent(
 @Injectable()
 export class BudgetSupportService {
   constructor(
-    private readonly organization: OrganizationService,
-    private readonly finance: FinanceService,
-    private readonly parameters: OperatingParametersService,
-    private readonly identity: IdentityAccessService,
-    private readonly catalog: CatalogService,
+    private readonly organization: OrganizationApi,
+    private readonly finance: FinanceApi,
+    private readonly parameters: OperatingParametersApi,
+    private readonly identity: IdentityAccessApi,
+    private readonly catalog: CatalogApi,
   ) {}
 
   /** Whether the person holds the role of the spending approver now: who decides the versions of a budget. */

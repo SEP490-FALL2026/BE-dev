@@ -1,15 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { IdentityAccessService } from '../../identity-access/identity-access.service';
-import { OrganizationService } from '../../organization/organization.service';
-import { PersonnelAccessRefusedError } from '../personnel.errors';
-import { readAccessOf, type ReadAccess } from '../personnel-self-action.policy';
+import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
+import { PersonnelAccessRefusedError } from '../public/personnel.errors';
+import { readAccessOf, type ReadAccess } from '../policies/personnel-self-action.policy';
 import { LeaveRefusedError } from './leave.errors';
 import type { LeaveChangeWire, LeaveDetailWire, LeaveSummaryWire } from './leave.dto';
 import { toChange, toDetail, toSummary } from './leave.mapper';
 import { LeaveRepo } from './leave.repo';
-import type { LeaveInterval } from '../personnel.types';
+import type { LeaveInterval } from '../public/personnel.types';
 import type { LeaveRecord } from './leave.types';
 
 export interface Paged<T> {
@@ -37,8 +37,8 @@ const paged = <T>(items: T[], total: number, page: { page: number; pageSize: num
 export class LeaveQueryService {
   constructor(
     private readonly leaves: LeaveRepo,
-    private readonly organization: OrganizationService,
-    private readonly identity: IdentityAccessService,
+    private readonly organization: OrganizationApi,
+    private readonly identity: IdentityAccessApi,
   ) {}
 
   /** One page of summaries; the names of the page are read in one statement whatever the page size (`LD-07`). */

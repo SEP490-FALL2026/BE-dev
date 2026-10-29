@@ -34,7 +34,7 @@
 
 ### Task 4: harness và e2e
 
-- Files: `test/support/provisioning-harness.ts` (cổng giả có `claimForGrant`, `reportOutcome`), `request-harness.ts`, `test/e2e/provisioning.e2e-spec.ts`, `openapi.json`
+- Files: `test/support/provisioning-harness.ts` (cổng giả có `claimForGrant`, `reportOutcome`), `request-harness.ts`, `test/http/licensing/provisioning.http-spec.ts`, `openapi.json`
 - Depends on: Task 3
 - Acceptance: test cũ giữ nguyên ý; harness của Request dùng cổng thật
 - Verify: `pnpm test:e2e` các suite liên quan xanh

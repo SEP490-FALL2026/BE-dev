@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { CatalogOnboardingFacts, PlanSummary } from '../catalog.types';
+import type { CatalogOnboardingFacts, PlanSummary } from '../public/catalog.types';
 import { ApplicationLookupService } from '../catalog-entry/application-lookup.service';
 import { PlanLookupService } from '../plan/plan-lookup.service';
 import { SubscriptionRepo } from './subscription.repo';

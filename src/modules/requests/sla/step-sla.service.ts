@@ -3,8 +3,8 @@ import { randomUUID } from 'node:crypto';
 import { type BusinessDate } from '../../../core/business-date';
 import { isWorkingDay, wallClockAt } from '../../../core/working-days';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
-import { OperatingParametersService } from '../../operating-parameters/operating-parameters.service';
-import { OrganizationService } from '../../organization/organization.service';
+import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
 import { ReminderWriter } from './reminder-writer.service';
 import { SlaRecipientFactsService } from './sla-recipient-facts.service';
 import { SlaSubjectRepo, type CandidateCursor } from './sla-subject.repo';
@@ -47,8 +47,8 @@ export class StepSlaService {
     private readonly subjects: SlaSubjectRepo,
     private readonly facts: SlaRecipientFactsService,
     private readonly writer: ReminderWriter,
-    private readonly organization: OrganizationService,
-    private readonly parameters: OperatingParametersService,
+    private readonly organization: OrganizationApi,
+    private readonly parameters: OperatingParametersApi,
   ) {}
 
   async sweep(now: Date = new Date()): Promise<SlaSweepResult> {

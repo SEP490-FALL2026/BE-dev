@@ -16,7 +16,7 @@ export class EmployeeForbiddenError extends Error {
 export class EmployeeSelfChangeForbiddenError extends Error {
   constructor() {
     super(
-      'You cannot change your own employee record. A change to the record of the Super Admin is made through the controlled procedure: pnpm ops:record-super-admin-event profile-correct.',
+      'You cannot change your own employee record. The Super Admin record is changed with: pnpm ops:record-super-admin-event profile-correct.',
     );
     this.name = 'EmployeeSelfChangeForbiddenError';
   }

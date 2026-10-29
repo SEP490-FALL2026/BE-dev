@@ -1,4 +1,4 @@
-import { checkReviewOutcome } from './finance-review.policy';
+import { checkReviewOutcome } from '../finance-review/finance-review.policy';
 import { routeFinanceReview, routeSpendStep } from './spend-routing.policy';
 
 const people = { requesterEmployeeId: 'h1', beneficiaryEmployeeIds: ['e1', 'e2'] };

@@ -1,6 +1,6 @@
-import type { EmployeeRecord } from '../../organization/organization.types';
+import type { EmployeeRecord } from '../../organization/public/organization.types';
 import { planProfileCorrection } from './profile-correction.policy';
-import type { ProfileCorrection } from './super-admin-event.types';
+import type { ProfileCorrection } from '../public/super-admin-event.types';
 
 const TODAY = '2026-10-28';
 const current: EmployeeRecord = {

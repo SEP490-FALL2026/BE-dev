@@ -7,8 +7,8 @@ import {
   TaxProfileTaxTypeDuplicateError,
   TaxProfileTaxTypeInvalidError,
   TaxProfileTooManyLinesError,
-} from '../finance.errors';
-import type { DefaultTaxProfileView, TaxGroup, TaxLineInput, TaxPayer, TaxProfileView } from '../finance.types';
+} from '../public/finance.errors';
+import type { DefaultTaxProfileView, TaxGroup, TaxLineInput, TaxPayer, TaxProfileView } from '../public/finance.types';
 import type { TaxLineRecord, TaxProfileContent, TaxProfileVersion } from './tax-profile.types';
 
 export const MAX_TAX_TYPE_LENGTH = 100;

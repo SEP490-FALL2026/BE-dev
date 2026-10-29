@@ -1,5 +1,5 @@
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import type { NotificationsService } from '../../notifications/notifications.service';
+import type { NotificationsApi } from '../../notifications/public/notifications.api';
 import type { ActionLinkService } from '../accounts/action-link.service';
 import { RecoveryLinks } from './recovery-links.service';
 
@@ -15,7 +15,7 @@ describe('RecoveryLinks recipients', () => {
   const links = { issue: jest.fn(), findUsableTokens: jest.fn() };
   const notifications = { enqueueEmail: jest.fn(), deliveryStates: jest.fn() };
   const recovery = () =>
-    new RecoveryLinks(links as unknown as ActionLinkService, notifications as unknown as NotificationsService);
+    new RecoveryLinks(links as unknown as ActionLinkService, notifications as unknown as NotificationsApi);
   const invitation = (recipient: string) => ({
     organizationId: 'org-1',
     appUserId: 'user-1',

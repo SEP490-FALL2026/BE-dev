@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { VendorDictionaryRepo } from './vendor-dictionary.repo';
 import type { VendorCandidate, VendorNormalization, VendorNormalizationKind } from './vendor-dictionary.types';
-import { matchDescription, matchDomain, matchName, type MatchableLine } from './vendor-matcher';
+import { matchDescription, matchDomain, matchName, type MatchableLine } from './vendor-matcher.policy';
 
 const toCandidate = (line: MatchableLine): VendorCandidate => ({
   serviceLineId: line.lineId,

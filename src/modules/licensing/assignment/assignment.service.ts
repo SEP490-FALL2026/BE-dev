@@ -3,12 +3,12 @@ import { normalizeAccountIdentifier } from '../../../core/account-identifier';
 import type { BusinessDate } from '../../../core/business-date';
 import { DbTx, TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { AuditService } from '../../audit/audit.service';
-import type { SeatTarget, SeatTargetRef } from '../../catalog/catalog.types';
-import { CatalogService } from '../../catalog/catalog.service';
-import { OrganizationService } from '../../organization/organization.service';
-import { AssignmentNotFoundError, AssignmentNotOpenError, SeatTargetNotFoundError } from '../licensing.errors';
-import type { SeatBaselineClosedHolder } from '../licensing-seat-baseline.types';
+import { AuditApi } from '../../audit/public/audit.api';
+import type { SeatTarget, SeatTargetRef } from '../../catalog/public/catalog.types';
+import { CatalogApi } from '../../catalog/public/catalog.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
+import { AssignmentNotFoundError, AssignmentNotOpenError, SeatTargetNotFoundError } from '../public/licensing.errors';
+import type { SeatBaselineClosedHolder } from '../public/licensing-seat-baseline.types';
 import type {
   AssignmentHolder,
   AssignmentRecord,
@@ -16,9 +16,9 @@ import type {
   NewBaselineAssignment,
   SeatHolder,
   SeatUsage,
-} from '../licensing.types';
-import { licensingAuditEvent } from '../mappers/licensing-audit-event';
-import { toAssignmentFailure } from './assignment-conflicts';
+} from '../public/licensing.types';
+import { licensingAuditEvent } from '../mappers/licensing-audit-event.mapper';
+import { toAssignmentFailure } from './assignment-conflicts.repo';
 import { AssignmentDepartmentRepo } from './assignment-department.repo';
 import {
   assertSubscriptionDepartment,
@@ -47,9 +47,9 @@ export class AssignmentService {
   constructor(
     private readonly repo: AssignmentRepo,
     private readonly byDepartment: AssignmentDepartmentRepo,
-    private readonly organization: OrganizationService,
-    private readonly catalog: CatalogService,
-    private readonly audit: AuditService,
+    private readonly organization: OrganizationApi,
+    private readonly catalog: CatalogApi,
+    private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
   ) {}
 

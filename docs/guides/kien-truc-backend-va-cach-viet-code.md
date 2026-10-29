@@ -31,11 +31,11 @@ Các file để đối chiếu:
 
 - [Controller](../../src/modules/audit/audit.controller.ts)
 - [Service](../../src/modules/audit/audit-query.service.ts)
-- [Filter thuần](../../src/modules/audit/audit-filter.ts)
+- [Filter thuần](../../src/modules/audit/audit-filter.repo.ts)
 - [Repository](../../src/modules/audit/audit-query.repo.ts)
-- [Request/response DTO](../../src/modules/audit/dto/audit-event.dto.ts)
+- [Request/response DTO](../../src/modules/audit/audit-event.dto.ts)
 - [HTTP module riêng](../../src/modules/audit/audit-http.module.ts) — vì CLI và worker chỉ cần facade ghi audit
-- Test: [e2e](../../test/e2e/audit-events.e2e-spec.ts), [integration](../../test/integration/audit-query-http.integration-spec.ts)
+- Test: [HTTP contract](../../test/http/audit/audit-events.http-spec.ts), [integration](../../test/integration/audit/audit-query-http.integration-spec.ts)
 
 Controller này đổi `Date` sang ISO ngay trong handler vì chỉ có một trường; khi wire model có nhiều trường, tách mapper.
 
@@ -55,10 +55,10 @@ Không catch tất cả lỗi thành success/404; lỗi không hiểu phải t�
 ## 4. Kiểm tra và đồng bộ contract
 
 - Unit test hành vi service/policy/mapper cạnh source.
-- HTTP E2E cho success, input sai, thiếu token và lỗi có chủ đích.
+- HTTP contract (`test/http/<module>/`) cho success, input sai, thiếu token, sai vai và lỗi có chủ đích.
 - Integration test cho query/constraint/transaction thay đổi; dùng PostgreSQL riêng.
 - Cập nhật [API manifest](../../test/support/api-coverage-manifest.ts) nếu thêm/bỏ route.
-- Chạy `pnpm check`, `pnpm test:e2e`, `pnpm openapi:export`.
+- Chạy `pnpm check`, `pnpm test:http`, `pnpm openapi:export`; đổi query/ràng buộc thì `pnpm test:integration` của module.
 - Review diff OpenAPI và báo consumer FE nếu contract thay đổi.
 
 Xem [test guide](../../test/README.md) để chọn runner. Không yêu cầu mã B1–B10

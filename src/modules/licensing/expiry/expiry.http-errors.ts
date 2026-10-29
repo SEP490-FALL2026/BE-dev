@@ -1,7 +1,7 @@
 import { HttpStatus } from '@nestjs/common';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
-import { ProvisioningAnotherItAdminNeededError, RevocationRefusedError } from '../licensing.errors';
+import { ProvisioningAnotherItAdminNeededError, RevocationRefusedError } from '../public/licensing.errors';
 import { toProvisioningApiException } from '../provisioning/provisioning.http-errors';
 import { ExpiryError, type ExpiryProblem } from './expiry.errors';
 

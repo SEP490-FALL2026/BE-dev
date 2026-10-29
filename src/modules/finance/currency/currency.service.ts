@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
-import type { CurrencyRecord } from '../finance.types';
+import type { CurrencyRecord } from '../public/finance.types';
 import { CurrencyRepo } from './currency.repo';
 
 /** The currency table as the rest of the finance module reads it; the repo stays private to this capability. */

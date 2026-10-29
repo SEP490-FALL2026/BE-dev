@@ -1,15 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { AuditService } from '../../audit/audit.service';
-import { EmployeeRecord } from '../../organization/organization.types';
+import { AuditApi } from '../../audit/public/audit.api';
+import { EmployeeRecord } from '../../organization/public/organization.types';
 import { AccountDirectoryService } from '../accounts/account-directory.service';
 import { ActionLinkRevocation } from '../accounts/action-link-revocation.service';
 import { SuccessorEligibility } from '../accounts/successor-eligibility.service';
 import { RecoveryLinks } from './recovery-links.service';
-import { operatorEvent, tryNormalize } from './recovery-procedure';
-import { RecoveryRefusedError } from './recovery.errors';
+import { operatorEvent, tryNormalize } from './recovery-procedure.policy';
+import { RecoveryRefusedError } from '../public/recovery.errors';
 import { RecoveryRepo, TicketRecord } from './recovery.repo';
-import { RecoveryContext, RecoveryResult } from './recovery.types';
+import { RecoveryContext, RecoveryResult } from '../public/recovery.types';
 
 /**
  * The successor's side of a role transfer (AC-12): first an account with no role and an invitation, then the wait until
@@ -26,7 +26,7 @@ export class SuccessorEnrolment {
     private readonly links: RecoveryLinks,
     private readonly revocation: ActionLinkRevocation,
     private readonly tickets: RecoveryRepo,
-    private readonly audit: AuditService,
+    private readonly audit: AuditApi,
   ) {}
 
   /** Stage 1: the successor has no account yet. It is created with no role, and invited. */

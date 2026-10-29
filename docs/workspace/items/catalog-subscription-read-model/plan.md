@@ -44,7 +44,7 @@ cảnh báo điều khoản của một gói (`LD-16`).
 ### Task 5: cảnh báo điều khoản của một gói có biên
 
 - Files: `plan-terms.service.ts`, `plan-terms.dto.ts`, `plan-terms-http.integration-spec.ts`,
-  `src/api-collection-contract.spec.ts` (gỡ mục `planTermsGet#warnings`), `openapi.json` (sinh) nếu đổi wire.
+  `test/gates/api-collection-contract.gate-spec.ts` (gỡ mục `planTermsGet#warnings`), `openapi.json` (sinh) nếu đổi wire.
 - Depends on: Task 3 (cùng `warningsFor`); hợp đồng đã được Owner duyệt (biên chứng minh được kèm tổng, hoặc dạng phân trang
   — chưa chọn).
 - Acceptance: `LD-16` (vế `planTermsGet#warnings`).

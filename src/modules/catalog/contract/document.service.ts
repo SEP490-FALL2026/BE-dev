@@ -4,10 +4,10 @@ import { ObjectKeyFactory } from '../../../infrastructure/object-storage/object-
 import { ObjectStorageUnavailableError } from '../../../infrastructure/object-storage/object-storage.errors';
 import { OBJECT_STORAGE, type ObjectStoragePort } from '../../../infrastructure/object-storage/object-storage.port';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { AuditService } from '../../audit/audit.service';
-import { OperatingParametersService } from '../../operating-parameters/operating-parameters.service';
-import { OrganizationService } from '../../organization/organization.service';
-import { catalogAuditEvent } from '../mappers/catalog-audit-event';
+import { AuditApi } from '../../audit/public/audit.api';
+import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
+import { catalogAuditEvent } from '../mappers/catalog-audit-event.mapper';
 import {
   ContractNotFoundError,
   DocumentAccessForbiddenError,
@@ -63,10 +63,10 @@ export class DocumentService {
   constructor(
     private readonly documents: DocumentRepo,
     private readonly contracts: ContractRepo,
-    private readonly organization: OrganizationService,
-    private readonly parameters: OperatingParametersService,
+    private readonly organization: OrganizationApi,
+    private readonly parameters: OperatingParametersApi,
     private readonly keys: ObjectKeyFactory,
-    private readonly audit: AuditService,
+    private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
     @Inject(OBJECT_STORAGE) private readonly storage: ObjectStoragePort,
   ) {}

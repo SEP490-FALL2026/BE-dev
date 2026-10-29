@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
-import { OperatingParametersService } from '../../operating-parameters/operating-parameters.service';
+import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
 import { reopenUntil, responseDueOn, windowEnd } from './saas-issue.policy';
 
 const RESPONSE_DAYS = 'SAAS_ISSUE_RESPONSE_WORKING_DAYS';
@@ -12,7 +12,7 @@ const REOPEN_DAYS = 'SAAS_ISSUE_REOPEN_WORKING_DAYS';
  */
 @Injectable()
 export class SaasIssueCalendar {
-  constructor(private readonly parameters: OperatingParametersService) {}
+  constructor(private readonly parameters: OperatingParametersApi) {}
 
   /** The day a report made on `today` should be taken up by. */
   async responseDueOn(today: BusinessDate): Promise<BusinessDate> {

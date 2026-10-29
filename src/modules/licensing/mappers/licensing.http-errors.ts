@@ -16,7 +16,7 @@ import {
   SeatTargetNotFoundError,
   ToolsDepartmentNotFoundError,
   ToolsDepartmentOutOfScopeError,
-} from '../licensing.errors';
+} from '../public/licensing.errors';
 
 const refuse = (status: HttpStatus, code: string, message: string, details?: Record<string, unknown>): ApiException =>
   new ApiException(status, { code, message, ...(details ? { details } : {}) });

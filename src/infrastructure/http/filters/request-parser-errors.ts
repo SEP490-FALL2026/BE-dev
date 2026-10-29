@@ -84,30 +84,43 @@ const MULTIPART_CLIENT_ERRORS: Readonly<Record<string, 'BAD_REQUEST' | 'TOO_LARG
   INVALID_FIELD_NAME: 'BAD_REQUEST',
 };
 
+type ParserErrorCandidate = Error & Record<string, unknown>;
+
 /** body-parser documents `type` as the way to tell its errors apart; the status and shape must match it too. */
 function bodyParserStatus(exception: unknown): ParserStatus | undefined {
   if (!(exception instanceof Error)) return undefined;
-  const candidate = exception as Error & Record<string, unknown>;
+  const candidate = exception as ParserErrorCandidate;
   if (candidate.expose !== true) return undefined;
 
   if (typeof candidate.type === 'string' && Object.hasOwn(BODY_PARSER_REFUSALS, candidate.type)) {
-    const refusal = BODY_PARSER_REFUSALS[candidate.type];
-    const shaped = Object.entries(refusal.shape).every(([key, kind]) => typeof candidate[key] === kind);
-
-    return candidate.status === refusal.code && candidate.statusCode === refusal.code && shaped
-      ? refusal.status
-      : undefined;
+    return refusalStatus(candidate, BODY_PARSER_REFUSALS[candidate.type]);
   }
 
-  const decompression =
+  return isDecompressionDataError(candidate) ? 'BAD_REQUEST' : undefined;
+}
+
+/** A typed refusal: http-errors stamped its status on both properties, and its creator's properties are all there. */
+function refusalStatus(
+  candidate: ParserErrorCandidate,
+  refusal: (typeof BODY_PARSER_REFUSALS)[string],
+): ParserStatus | undefined {
+  const shaped = Object.entries(refusal.shape).every(([key, kind]) => typeof candidate[key] === kind);
+
+  return candidate.status === refusal.code && candidate.statusCode === refusal.code && shaped
+    ? refusal.status
+    : undefined;
+}
+
+/** A zlib or brotli data error that body-parser passed on: status 400, no `type`, and a data code from the list. */
+function isDecompressionDataError(candidate: ParserErrorCandidate): boolean {
+  return (
     candidate.type === undefined &&
     candidate.status === 400 &&
     candidate.statusCode === 400 &&
     typeof candidate.errno === 'number' &&
     typeof candidate.code === 'string' &&
-    DECOMPRESSION_DATA_ERROR.test(candidate.code);
-
-  return decompression ? 'BAD_REQUEST' : undefined;
+    DECOMPRESSION_DATA_ERROR.test(candidate.code)
+  );
 }
 
 function multipartStatus(exception: unknown): 'BAD_REQUEST' | 'TOO_LARGE' | undefined {

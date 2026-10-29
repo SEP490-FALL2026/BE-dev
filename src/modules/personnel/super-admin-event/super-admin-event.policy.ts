@@ -1,11 +1,11 @@
 import { createHash } from 'node:crypto';
-import { groundsRefusal } from '../grounds/grounds.policy';
-import { SuperAdminEventRefusedError } from './super-admin-event.errors';
+import { groundsRefusal } from '../policies/grounds.policy';
+import { SuperAdminEventRefusedError } from '../public/super-admin-event.errors';
 import type {
   SuperAdminEventContext,
   SuperAdminEventModeName,
   SuperAdminEventParameters,
-} from './super-admin-event.types';
+} from '../public/super-admin-event.types';
 
 /** The same pattern as the ticket of `ops:recover`: whatever the approval system calls the ticket; the key that makes a re-run a no-op. */
 const TICKET_REFERENCE = /^[A-Za-z0-9][A-Za-z0-9._:/#-]{2,99}$/;

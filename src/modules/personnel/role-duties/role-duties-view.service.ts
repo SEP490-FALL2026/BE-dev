@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { IdentityAccessService } from '../../identity-access/identity-access.service';
-import { OrganizationService } from '../../organization/organization.service';
+import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
 import type { DepartureNoticeWire, SuperAdminWatchWire } from './role-duties.dto';
 import { assessSuperAdmin, departureLevel, flagMap } from './role-duties.policy';
 import { RoleDutiesRepo } from './role-duties.repo';
@@ -16,8 +16,8 @@ export class RoleDutiesViewService {
   constructor(
     private readonly repo: RoleDutiesRepo,
     private readonly roles: RoleDutiesService,
-    private readonly identity: IdentityAccessService,
-    private readonly organization: OrganizationService,
+    private readonly identity: IdentityAccessApi,
+    private readonly organization: OrganizationApi,
   ) {}
 
   /** The open departure of the person who asks, or null when there is none: never the departure of anyone else. */

@@ -3,9 +3,9 @@ import { pageOf, type Page } from '../../../core/application/pagination';
 import type { BusinessDate } from '../../../core/business-date';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { AuditService } from '../../audit/audit.service';
-import { CatalogService } from '../../catalog/catalog.service';
-import { OrganizationService } from '../../organization/organization.service';
+import { AuditApi } from '../../audit/public/audit.api';
+import { CatalogApi } from '../../catalog/public/catalog.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
 import type { ExpiryReminderWire } from './expiry.dto';
 import { ExpiryError } from './expiry.errors';
 import { REMINDER_OPTIONS, reminderRange, remindersOwed, type ReminderAudience } from './expiry.policy';
@@ -25,10 +25,10 @@ const PASS_BATCH = 200;
 export class ExpiryReminderService {
   constructor(
     private readonly repo: ExpiryReminderRepo,
-    private readonly organization: OrganizationService,
-    private readonly catalog: CatalogService,
+    private readonly organization: OrganizationApi,
+    private readonly catalog: CatalogApi,
     private readonly runner: TransactionRunner,
-    private readonly audit: AuditService,
+    private readonly audit: AuditApi,
   ) {}
 
   /** Writes the reminders that are due and returns how many were new in this pass. */

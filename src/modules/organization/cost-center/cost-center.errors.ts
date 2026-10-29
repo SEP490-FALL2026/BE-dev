@@ -1,4 +1,4 @@
-import type { UseItem } from '../organization-use.types';
+import type { UseItem } from '../public/organization-use.types';
 
 export class CostCenterNotFoundError extends Error {
   constructor() {

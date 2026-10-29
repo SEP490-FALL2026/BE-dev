@@ -4,7 +4,7 @@ import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { isUniqueViolation } from '../../../infrastructure/database/unique-violation';
 import { CostCenterCodeTakenError, CostCenterDepartmentAlreadyLinkedError } from './cost-center.errors';
-import { CostCenterBrief, CreateCostCenterInput } from '../organization.types';
+import { CostCenterBrief, CreateCostCenterInput } from '../public/organization.types';
 import { CostCenterKind, CostCenterRecord, CostCenterStatus } from './cost-center.types';
 
 interface CostCenterRow {

@@ -1,6 +1,6 @@
 import type { CostCenterRecord } from '../cost-center/cost-center.types';
 import type { DepartmentRecord } from '../department/department.types';
-import type { DepartmentBrief, LocalSeedFixtureFacts } from '../organization.types';
+import type { DepartmentBrief, LocalSeedFixtureFacts } from '../public/organization.types';
 
 /** What another module needs to know of a department to point at it: its code, name and whether it and its Cost Center are active. */
 export const toBrief = (

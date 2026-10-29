@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { BusinessDate, fromDateColumn } from '../../../core/business-date';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { EmployeeImportLookupData } from '../organization.types';
+import { EmployeeImportLookupData } from '../public/organization.types';
 
 /** Reads what a people file needs to be judged: the departments, people and emails it names. */
 @Injectable()

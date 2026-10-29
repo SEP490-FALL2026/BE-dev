@@ -1,13 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { addDays } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { AuditService } from '../../audit/audit.service';
-import { LicensingService } from '../../licensing/licensing.service';
-import { OperatingParametersService } from '../../operating-parameters/operating-parameters.service';
-import { OrganizationService } from '../../organization/organization.service';
-import type { OrganizationChange } from '../../organization/organization.types';
+import { AuditApi } from '../../audit/public/audit.api';
+import { LicensingApi } from '../../licensing/public/licensing.api';
+import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
+import type { OrganizationChange } from '../../organization/public/organization.types';
 import { PersonnelNotifier } from '../event-notice/personnel-notifier.service';
-import { personnelSystemAuditEvent } from '../mappers/personnel-audit-event';
+import { personnelSystemAuditEvent } from '../mappers/personnel-audit-event.mapper';
 import { reviewDueOn } from './transfer-review.policy';
 import { TransferReviewRepo } from './transfer-review.repo';
 
@@ -26,10 +26,10 @@ const CALENDAR_WINDOW_DAYS = 90;
 export class TransferReviewService {
   constructor(
     private readonly reviews: TransferReviewRepo,
-    private readonly licensing: LicensingService,
-    private readonly parameters: OperatingParametersService,
-    private readonly organization: OrganizationService,
-    private readonly audit: AuditService,
+    private readonly licensing: LicensingApi,
+    private readonly parameters: OperatingParametersApi,
+    private readonly organization: OrganizationApi,
+    private readonly audit: AuditApi,
     private readonly notifier: PersonnelNotifier,
   ) {}
 

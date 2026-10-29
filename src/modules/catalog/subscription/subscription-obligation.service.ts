@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { FinanceSetupIncompleteError } from '../../organization/organization.errors';
-import { OrganizationService } from '../../organization/organization.service';
+import { FinanceSetupIncompleteError } from '../../organization/public/organization.errors';
+import { OrganizationApi } from '../../organization/public/organization.api';
 import { increasesObligation, type ObligationState } from './subscription-obligation.policy';
 
 /**
@@ -11,7 +11,7 @@ import { increasesObligation, type ObligationState } from './subscription-obliga
  */
 @Injectable()
 export class SubscriptionObligationService {
-  constructor(private readonly organization: OrganizationService) {}
+  constructor(private readonly organization: OrganizationApi) {}
 
   /** Throws FinanceSetupIncompleteError (409 `FINANCE.SETUP_INCOMPLETE`) with nothing written. */
   async assertChargeable(

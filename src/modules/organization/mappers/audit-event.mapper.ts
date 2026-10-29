@@ -1,5 +1,5 @@
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import type { AuditEventInput, AuditValue } from '../../audit/audit.types';
+import type { AuditEventInput, AuditValue } from '../../audit/public/audit.types';
 
 /** The audit event for a change made by `actor` (an IT Admin acting as themselves, never as an operator), correlated by their session. */
 export function organizationAuditEvent(

@@ -22,7 +22,7 @@ Mỗi task theo TDD: viết test đỏ, xem nó đỏ đúng lý do, viết mã 
 
 ### Task 2: đăng ký chặn và người đọc của `licensing` — xong
 
-- Files: `catalog.types.ts` (`SeatOccupancyReader`, `SeatTarget.status`, `SeatTarget.missing`), `subscription/seat-occupancy.registry.ts`, `catalog.service.ts` (`registerSeatOccupancy`), `catalog.module.ts`, `licensing/assignment/assignment.repo.ts` (đếm), `licensing/assignment/seat-occupancy.reader.ts` (tự đăng ký ở `OnModuleInit`; `licensing.module.ts` chỉ cung cấp lớp này), `seat-target.service.ts` (trạng thái và dữ liệu thiếu), `src/architecture-structure.spec.ts`/`module-graph.spec.ts` nếu gate yêu cầu.
+- Files: `catalog.types.ts` (`SeatOccupancyReader`, `SeatTarget.status`, `SeatTarget.missing`), `subscription/seat-occupancy.registry.ts`, `catalog.service.ts` (`registerSeatOccupancy`), `catalog.module.ts`, `licensing/assignment/assignment.repo.ts` (đếm), `licensing/assignment/assignment-seat-occupancy.listener.ts` (tự đăng ký ở `OnModuleInit`; `licensing.module.ts` chỉ cung cấp lớp này), `seat-target.service.ts` (trạng thái và dữ liệu thiếu), `test/gates/architecture-structure.gate-spec.ts`/`module-graph.spec.ts` nếu gate yêu cầu.
 - Depends on: Task 1.
 - Acceptance: `licensing` đăng ký lúc khởi tạo; không đăng ký thì lỗi cấu hình; đếm Assignment chưa kết thúc, chưa `Thất bại`, người dùng khác nhau trên các gói.
 - Verify: unit của registry; integration `seat-guards-http`.
@@ -30,7 +30,7 @@ Mỗi task theo TDD: viết test đỏ, xem nó đỏ đúng lý do, viết mã 
 
 ### Task 3: bảo vệ số seat, thuê bao nháp, khuyến nghị — xong
 
-- Files: `subscription.service.ts` (bảo vệ trong `update`), `subscription.http-errors.ts`, `licensing/assignment/baseline-target.policy.ts` + `provisioning.service.ts` (từ chối nháp), `licensing/mappers/licensing.http-errors.ts`, `catalog-entry/application.service.ts` + DTO + controller (`recommendations`), `test/support/seat-baseline-harness.ts` (thuê bao đủ dữ liệu, `draftSubscription`), `test/integration/seat-guards-http.integration-spec.ts`, `test/e2e` nếu hợp đồng đổi.
+- Files: `subscription.service.ts` (bảo vệ trong `update`), `subscription.http-errors.ts`, `licensing/assignment/baseline-target.policy.ts` + `provisioning.service.ts` (từ chối nháp), `licensing/mappers/licensing.http-errors.ts`, `catalog-entry/application.service.ts` + DTO + controller (`recommendations`), `test/support/seat-baseline-harness.ts` (thuê bao đủ dữ liệu, `draftSubscription`), `test/integration/catalog/seat-guards-http.integration-spec.ts`, `test/e2e` nếu hợp đồng đổi.
 - Depends on: Task 2.
 - Acceptance: mọi AC trong ma trận; fixture cũ chuyển sang thuê bao đủ dữ liệu mà không đổi kỳ vọng nghiệp vụ của chúng.
 - Thay đổi thực tế ở lượt 21/10/2026: thêm test tất định `a cut of the seats waits for a grant that is being made, and then counts it`; mã lỗi vào mô tả OpenAPI; vế xác nhận baseline của AC-6 được chứng minh qua ứng dụng đã ngừng vì thuê bao `ACTIVE` không về `DRAFT` được (CHECK `subscriptions_active_complete`).

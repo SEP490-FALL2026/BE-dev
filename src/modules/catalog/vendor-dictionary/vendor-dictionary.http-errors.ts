@@ -16,7 +16,7 @@ import {
   VendorTooManyValuesError,
   VendorUpdateEmptyError,
 } from './vendor-dictionary.errors';
-import { MAX_VALUES } from './vendor-dictionary.validation';
+import { MAX_VALUES } from './vendor-dictionary.policy';
 
 const refuse = (status: HttpStatus, code: string, message: string, details?: Record<string, unknown>): ApiException =>
   new ApiException(status, { code, message, ...(details ? { details } : {}) });

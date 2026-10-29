@@ -2,16 +2,18 @@ import { INestApplication, Type } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { Client } from 'pg';
 import { App } from 'supertest/types';
-import { configureApplication } from '../../src/bootstrap';
+import { configureApplication } from '../../src/app/configure-application';
 import { TransactionRunner } from '../../src/infrastructure/database/transaction-runner';
-import { IdentityAccessService } from '../../src/modules/identity-access/identity-access.service';
-import { OrganizationService } from '../../src/modules/organization/organization.service';
+import { IdentityAccessApi } from '../../src/modules/identity-access/public/identity-access.api';
+import { OrganizationApi } from '../../src/modules/organization/public/organization.api';
+import { PasswordHasher } from '../../src/modules/identity-access/accounts/password-hasher.service';
 import {
   DisposableDatabase,
   dropDisposableDatabase,
   migrateDisposableDatabase,
   provisionDisposableDatabase,
 } from './disposable-database';
+import { defaultPasswordHasher, FastPasswordHasher } from './fast-password-hasher';
 
 export interface HttpTestApp {
   app: INestApplication<App>;
@@ -40,6 +42,11 @@ export async function createHttpTestApp(
      * nor dropped here. `sql` connects through its URL; the application through `appDatabaseUrl` when given.
      */
     database?: DisposableDatabase;
+    /**
+     * OD-T3: 'fast' (default outside test/integration/identity-access/) hashes with the cheapest Argon2id parameters;
+     * 'production' keeps the real ones.
+     */
+    passwordHasher?: 'fast' | 'production';
   } = {},
 ): Promise<HttpTestApp> {
   const owned = options.database === undefined;
@@ -57,11 +64,13 @@ export async function createHttpTestApp(
 
     // ConfigModule.forRoot validates process.env when AppModule is first imported, so the import
     // must happen after the variables above are set — a static import would read the real ones.
-    const { AppModule } = await import('../../src/app.module');
+    const { AppModule } = await import('../../src/app/app.module');
     let builder = Test.createTestingModule({
       imports: [AppModule],
       controllers: options.extraControllers ?? [],
     });
+    const hasher = options.passwordHasher ?? defaultPasswordHasher();
+    if (hasher === 'fast') builder = builder.overrideProvider(PasswordHasher).useValue(new FastPasswordHasher());
     for (const override of options.providerOverrides ?? []) {
       builder = builder.overrideProvider(override.token).useValue(override.useValue);
     }
@@ -107,8 +116,8 @@ export const SEED_PASSWORD = 'correct horse battery staple';
 /** Creates the minimum installation (what the bootstrap command creates) through the real services. */
 export async function seedInstallation(app: INestApplication): Promise<SeededInstallation> {
   const runner = app.get(TransactionRunner);
-  const organization = app.get(OrganizationService);
-  const identity = app.get(IdentityAccessService);
+  const organization = app.get(OrganizationApi);
+  const identity = app.get(IdentityAccessApi);
   const email = 'admin@acme.vn';
   const credential = await identity.prepareCredential(SEED_PASSWORD, email);
 
@@ -166,8 +175,8 @@ export async function insertAccountFixture(
   options: { code: string; email: string; activated: boolean; password?: string },
 ): Promise<{ appUserId: string; employeeId: string }> {
   const runner = app.get(TransactionRunner);
-  const organization = app.get(OrganizationService);
-  const identity = app.get(IdentityAccessService);
+  const organization = app.get(OrganizationApi);
+  const identity = app.get(IdentityAccessApi);
   const credential = options.activated
     ? await identity.prepareCredential(options.password ?? SEED_PASSWORD, options.email)
     : null;
@@ -212,7 +221,7 @@ export async function insertEmployeeFixture(
   options: { code: string; email: string | null; terminated?: boolean },
 ): Promise<{ employeeId: string }> {
   const runner = app.get(TransactionRunner);
-  const organization = app.get(OrganizationService);
+  const organization = app.get(OrganizationApi);
 
   return runner.run(async (tx) => {
     const employee = await organization.createEmployeeWithPlacement(tx, {

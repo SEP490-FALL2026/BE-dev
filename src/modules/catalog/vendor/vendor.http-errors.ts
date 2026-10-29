@@ -14,7 +14,7 @@ import {
   TaxProfileTaxTypeInvalidError,
   TaxProfileTooManyLinesError,
   TaxProfileVendorNotFoundError,
-} from '../../finance/finance.errors';
+} from '../../finance/public/finance.errors';
 import { VendorNotFoundError } from './vendor.errors';
 
 const refuse = (status: HttpStatus, code: string, message: string, details?: Record<string, unknown>): ApiException =>

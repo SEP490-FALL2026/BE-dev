@@ -7,7 +7,7 @@ import {
   SessionRevokedReason,
   SessionSnapshot,
   ThrottleSnapshot,
-} from '../identity-access.types';
+} from '../public/identity-access.types';
 
 /** Owns AuthSession, RefreshToken and LoginThrottle. */
 @Injectable()

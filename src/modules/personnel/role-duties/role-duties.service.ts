@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import type { WorkspaceDuty } from '../../catalog/catalog.types';
-import { CatalogService } from '../../catalog/catalog.service';
-import { IdentityAccessService } from '../../identity-access/identity-access.service';
-import { OrganizationHistoryService } from '../../organization/organization-history.service';
-import type { RoleFlag, RoleFlagMap } from '../personnel.types';
+import type { WorkspaceDuty } from '../../catalog/public/catalog.types';
+import { CatalogApi } from '../../catalog/public/catalog.api';
+import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
+import { OrganizationHistoryApi } from '../../organization/public/organization-history.api';
+import type { RoleFlag, RoleFlagMap } from '../public/personnel.types';
 import { flagMap, flagsOf } from './role-duties.policy';
 
 /** A person to read the roles of; whether they head the department they leave is told by their case. */
@@ -30,9 +30,9 @@ export interface RoleView {
 @Injectable()
 export class RoleDutiesService {
   constructor(
-    private readonly identity: IdentityAccessService,
-    private readonly organization: OrganizationHistoryService,
-    private readonly catalog: CatalogService,
+    private readonly identity: IdentityAccessApi,
+    private readonly organization: OrganizationHistoryApi,
+    private readonly catalog: CatalogApi,
   ) {}
 
   async rolesOf(people: readonly RoleDutyInput[], tx?: DbTx): Promise<Map<string, RoleView>> {

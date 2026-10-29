@@ -3,8 +3,8 @@ import { randomUUID } from 'node:crypto';
 import type { BusinessDate } from '../../../core/business-date';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { DepartmentDirectoryService } from '../department/department-directory.service';
-import { EmployeeNotFoundError } from '../organization.errors';
-import { profileNoticesOf } from '../mappers/profile-notice.mapper';
+import { EmployeeNotFoundError } from '../public/organization.errors';
+import { profileNoticesOf } from './profile-notice.mapper';
 import {
   CreateEmployeeWithPlacementInput,
   EmployeeCandidate,
@@ -18,7 +18,7 @@ import {
   ProfileNoticeRequest,
   ScheduledStructureChange,
   StructureChangeInput,
-} from '../organization.types';
+} from '../public/organization.types';
 import { EmployeeDepartureRepo } from './employee-departure.repo';
 import { EmployeeRepo } from './employee.repo';
 import { ImportLookupRepo } from './import-lookup.repo';

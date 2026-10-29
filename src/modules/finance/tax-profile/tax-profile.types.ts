@@ -1,4 +1,4 @@
-import type { TaxGroup } from '../finance.types';
+import type { TaxGroup } from '../public/finance.types';
 
 /** One tax of a profile as it is kept: the estimated rate in hundredths of a percent (1000 is 10%). */
 export interface TaxLineRecord {

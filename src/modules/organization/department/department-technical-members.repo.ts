@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { BusinessDate, fromDateColumn } from '../../../core/business-date';
 import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
-import { EmployeeTechnicalView, EmployeeWorkState } from '../organization.types';
+import { EmployeeTechnicalView, EmployeeWorkState } from '../public/organization.types';
 
 /**
  * What an IT Admin may read of the people of a department they answer for (`F12`): the least a technical task needs. Read-only, and

@@ -16,7 +16,7 @@ Mỗi task theo TDD: viết test đỏ, xem nó đỏ đúng lý do, viết mã 
 
 ### Task 1: dữ liệu `plan_terms`, `plan_term_opinions`
 
-- Files: `prisma/models/catalog.prisma`, `prisma/models/organization.prisma` (quan hệ ngược), migration `20261020160000_catalog_plan_terms`, `src/architecture-boundaries.spec.ts` (`PRISMA_MODEL_OWNER`), `test/integration/plan-terms-constraints.integration-spec.ts`.
+- Files: `prisma/models/catalog.prisma`, `prisma/models/organization.prisma` (quan hệ ngược), migration `20261020160000_catalog_plan_terms`, `test/gates/architecture-boundaries.gate-spec.ts` (`PRISMA_MODEL_OWNER`), `test/integration/catalog/plan-terms-constraints.integration-spec.ts`.
 - Depends on: `g3-plan-declaration` (bảng `plans`).
 - Acceptance: CHECK độ dài và số thiết bị, trigger gói K5 và số thiết bị chỉ cho K4, ý kiến bất biến, không cột kết luận pháp lý, khóa ngoại.
 - Verify: `pnpm prisma:validate`, `pnpm prisma:generate`; test constraints đỏ trước migration, xanh sau.
@@ -30,14 +30,14 @@ Mỗi task theo TDD: viết test đỏ, xem nó đỏ đúng lý do, viết mã 
 
 ### Task 3: repo, service, contract
 
-- Files: `plan-terms/plan-terms.repo.ts`, `plan-terms.service.ts`, `subscription/subscription-notice.service.ts` (contract) và `subscription.repo.ts`, `plan/plan-lookup.service.ts` + `plan.repo.ts` (mở rộng), `catalog.module.ts`, `src/architecture-structure.spec.ts`.
+- Files: `plan-terms/plan-terms.repo.ts`, `plan-terms.service.ts`, `subscription/subscription-notice.service.ts` (contract) và `subscription.repo.ts`, `plan/plan-lookup.service.ts` + `plan.repo.ts` (mở rộng), `catalog.module.ts`, `test/gates/architecture-structure.gate-spec.ts`.
 - Depends on: Task 1, Task 2.
 - Acceptance: ghi điều khoản và ý kiến cùng audit trong một giao dịch; cảnh báo suy ra từ thuê bao kỳ đang hoạt động; mốc bằng mốc của thuê bao.
 - Verify: `pnpm exec jest src/modules/catalog src/architecture src/module-graph`; integration `plan-terms-http` ở Task 4.
 
 ### Task 4: HTTP, hợp đồng
 
-- Files: `plan-terms/plan-terms.dto.ts`, `plan-terms.http-errors.ts`, `plan-terms.controller.ts`, `test/support/api-coverage-manifest.ts` (+4), `test/e2e/api-inventory.e2e-spec.ts` (94 → 98), `test/e2e/plan-terms.e2e-spec.ts`, `test/integration/plan-terms-http.integration-spec.ts`.
+- Files: `plan-terms/plan-terms.dto.ts`, `plan-terms.http-errors.ts`, `plan-terms.controller.ts`, `test/support/api-coverage-manifest.ts` (+4), `test/http/platform/api-inventory.http-spec.ts` (94 → 98), `test/http/catalog/plan-terms.http-spec.ts`, `test/integration/catalog/plan-terms-http.integration-spec.ts`.
 - Depends on: Task 3.
 - Acceptance: bốn operation đúng bảng HTTP; 401/403/422 theo vai; 404; không `DELETE`; mọi AC trong ma trận.
 - Verify: `pnpm test:e2e` (suite `plan-terms`, `api-inventory`), integration `plan-terms-http` → xanh; đột biến (bỏ cận mốc, bỏ so ngày rà soát với mốc, bỏ loại vĩnh viễn) làm test đỏ.

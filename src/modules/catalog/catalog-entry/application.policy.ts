@@ -1,5 +1,5 @@
 import { normalizeDisplayName } from '../../../core/display-name';
-import { normalizeHost } from '../vendor-dictionary/vendor-matcher';
+import { normalizeHost } from '../vendor-dictionary/vendor-matcher.policy';
 import {
   ApplicationDomainInvalidError,
   ApplicationInternalHasNoVendorError,

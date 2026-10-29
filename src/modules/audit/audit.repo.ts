@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '../../generated/prisma/client';
 import { DbTx } from '../../infrastructure/database/transaction-runner';
-import { AuditCursor, AuditEventInput, AuditEventSlice, AuditValue } from './audit.types';
+import { AuditCursor, AuditEventInput, AuditEventSlice, AuditValue } from './public/audit.types';
 
 interface SliceRow {
   id: string;

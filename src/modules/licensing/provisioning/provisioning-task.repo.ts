@@ -10,8 +10,8 @@ import type {
   ProvisioningTaskStatus,
   RevocationCompletion,
   RevocationSource,
-} from '../licensing.types';
-import { SUMMARY_SELECT, WITH_ASSIGNMENT, toRecord, type ProvisioningTaskRecord } from './provisioning-task.record';
+} from '../public/licensing.types';
+import { SUMMARY_SELECT, WITH_ASSIGNMENT, toRecord, type ProvisioningTaskRecord } from './provisioning-task.types';
 
 export interface TaskPageFilter {
   channel?: ProvisioningChannel;

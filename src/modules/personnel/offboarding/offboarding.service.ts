@@ -2,14 +2,14 @@ import { Injectable } from '@nestjs/common';
 import { addDays, type BusinessDate } from '../../../core/business-date';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import { isUniqueViolation } from '../../../infrastructure/database/unique-violation';
-import { OrganizationHistoryService } from '../../organization/organization-history.service';
-import { EmployeeNotFoundError } from '../../organization/organization.errors';
-import { OrganizationService } from '../../organization/organization.service';
+import { OrganizationHistoryApi } from '../../organization/public/organization-history.api';
+import { EmployeeNotFoundError } from '../../organization/public/organization.errors';
+import { OrganizationApi } from '../../organization/public/organization.api';
 import { PersonnelNotifier } from '../event-notice/personnel-notifier.service';
 import { LeaveDepartureService } from '../leave/leave-departure.service';
-import { groundsSnapshot, normalizedGrounds } from '../grounds/grounds.policy';
-import { PersonnelFileHooks } from '../personnel-file-hooks';
-import { actorColumns, type PersonnelActor } from '../personnel.types';
+import { groundsSnapshot, normalizedGrounds } from '../policies/grounds.policy';
+import { PersonnelFileHooks } from '../event-notice/personnel-file-hooks.service';
+import { actorColumns, type PersonnelActor } from '../public/personnel.types';
 import { TransferChangeService } from '../transfer/transfer-change.service';
 import { TransferGuardService } from '../transfer/transfer-guard.service';
 import { OffboardingAuditService } from './offboarding-audit.service';
@@ -34,8 +34,8 @@ import type { OffboardingRecord, PriorWorkState, RecordOffboardingInput } from '
 export class OffboardingService {
   constructor(
     private readonly runner: TransactionRunner,
-    private readonly organization: OrganizationService,
-    private readonly history: OrganizationHistoryService,
+    private readonly organization: OrganizationApi,
+    private readonly history: OrganizationHistoryApi,
     private readonly guard: TransferGuardService,
     private readonly transfers: TransferChangeService,
     private readonly leaves: LeaveDepartureService,

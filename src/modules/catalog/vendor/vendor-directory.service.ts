@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { searchKey } from '../vendor-dictionary/vendor-matcher';
+import { searchKey } from '../vendor-dictionary/vendor-matcher.policy';
 import { VendorDictionaryGroupChangedError, VendorNameHeldByAnotherGroupError } from './vendor.errors';
 import { VendorRepo, type VendorRow } from './vendor.repo';
 

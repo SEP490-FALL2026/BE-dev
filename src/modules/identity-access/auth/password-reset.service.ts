@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionRunner, toTransientError } from '../../../infrastructure/database/transaction-runner';
-import { OrganizationService } from '../../organization/organization.service';
+import { OrganizationApi } from '../../organization/public/organization.api';
 import { AccountDirectoryService } from '../accounts/account-directory.service';
 import { ActionLinkService } from '../accounts/action-link.service';
 import { CredentialService } from '../accounts/credential.service';
-import { PasswordPolicyError } from '../identity-access.errors';
+import { PasswordPolicyError } from '../public/identity-access.errors';
 import { PasswordResetInvalidError } from './auth.errors';
 import { PasswordResetRedemptionService } from './password-reset-redemption.service';
 import { canReceiveResetMail } from './password-reset.policy';
@@ -19,7 +19,7 @@ export class PasswordResetService {
     private readonly accounts: AccountDirectoryService,
     private readonly links: ActionLinkService,
     private readonly credentials: CredentialService,
-    private readonly organization: OrganizationService,
+    private readonly organization: OrganizationApi,
     private readonly redemption: PasswordResetRedemptionService,
     private readonly runner: TransactionRunner,
   ) {}

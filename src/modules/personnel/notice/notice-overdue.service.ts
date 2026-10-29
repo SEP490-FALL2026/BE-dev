@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
-import { AuditService } from '../../audit/audit.service';
-import { OrganizationService } from '../../organization/organization.service';
+import { AuditApi } from '../../audit/public/audit.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
 import { PersonnelNotifier } from '../event-notice/personnel-notifier.service';
-import { personnelSystemAuditEvent } from '../mappers/personnel-audit-event';
+import { personnelSystemAuditEvent } from '../mappers/personnel-audit-event.mapper';
 import { NoticeRepo } from './notice.repo';
 
 /** How many notices one pass tells about; the next pass takes the rest. */
@@ -20,8 +20,8 @@ export class NoticeOverdueService {
   constructor(
     private readonly runner: TransactionRunner,
     private readonly notices: NoticeRepo,
-    private readonly organization: OrganizationService,
-    private readonly audit: AuditService,
+    private readonly organization: OrganizationApi,
+    private readonly audit: AuditApi,
     private readonly notifier: PersonnelNotifier,
   ) {}
 

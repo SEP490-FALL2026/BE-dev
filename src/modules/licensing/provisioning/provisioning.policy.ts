@@ -9,7 +9,7 @@ import {
   ProvisioningTaskNotManualError,
   ProvisioningTaskStateError,
   ProvisioningTypeNotSupportedError,
-} from '../licensing.errors';
+} from '../public/licensing.errors';
 import { ProvisioningItAdminRequiredError } from './provisioning.errors';
 import type {
   ProvisioningAction,
@@ -19,7 +19,7 @@ import type {
   ProvisioningTaskStatus,
   TaskDoneWhen,
   TaskStep,
-} from '../licensing.types';
+} from '../public/licensing.types';
 
 /** Only an IT Admin works the provisioning queue (`QĐ-87a`, `SoD-1`, F13): the route guard is not the only place this is judged. */
 export function assertItAdmin(actor: { roles: readonly string[] }): void {

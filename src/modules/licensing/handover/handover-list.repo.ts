@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { BusinessDate, fromDateColumn, toDateColumn } from '../../../core/business-date';
 import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
-import type { HeadPeriodOfEmployee } from '../../organization/organization.types';
+import type { HeadPeriodOfEmployee } from '../../organization/public/organization.types';
 import { OPEN_DUTY, type DutyRecord } from './handover.repo';
 
 const date = (value: Date | null): BusinessDate | null => (value ? fromDateColumn(value) : null);

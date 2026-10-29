@@ -59,7 +59,7 @@ thật sự cho hết hạn vẫn 409 `UPLOAD_EXPIRED`, một sự kiện, uploa
 **Prompt 29C (24/10/2026, `P29-N5`):** hai lần hoàn tất đồng thời — kẻ thua thấy upload đã bị kẻ thắng xóa (sau commit) trước
 đây trả 409 `UPLOAD_PENDING` sai nghĩa; nay đọc lại dòng (qua kiểm tra chủ sở hữu) ⟹ 409 `NOT_AWAITING_UPLOAD`. Bằng chứng tất
 định thay bài đua `Promise.all` không rào: kho giả có `beforeCall` giữ một lời gọi, khóa dòng giữ bằng kết nối thứ ba;
-`test/integration/document-complete-commit.integration-spec.ts` (11 test). Contract, OpenAPI không đổi.
+`test/integration/catalog/document-complete-commit.integration-spec.ts` (11 test). Contract, OpenAPI không đổi.
 [g0-g4-checkpoint-fix-forward](../g0-g4-checkpoint-fix-forward/plan.md), Phase G.
 
 **Prompt 29 (23/10/2026):** `P28-11` — hoàn tất tệp ghi CSDL trước, xóa upload sau commit; commit lỗi rút bản chép trừ khi dòng trỏ tới; `P28-17` tài liệu CORS cấp server của MinIO và bản chép mồ côi. `SEC-09`: Prompt 28 đã kiểm PUT trình duyệt trên MinIO thật (200/403/403, CORS mặc định của server). [g0-g4-checkpoint-fix-forward](../g0-g4-checkpoint-fix-forward/spec.md).

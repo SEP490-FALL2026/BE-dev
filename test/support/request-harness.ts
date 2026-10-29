@@ -1,7 +1,9 @@
-import type { AssessmentWire } from '../../src/modules/requests/access-request/assessment.dto';
-import type { PreviewWire } from '../../src/modules/requests/access-request/request-preview.dto';
+import type { AssessmentWire } from '../../src/modules/requests/assessment/assessment.dto';
+import type { PreviewWire } from '../../src/modules/requests/request-submission/request-preview.dto';
 import request from 'supertest';
 import { ApiAccount } from './api-accounts';
+import { declareSubscription } from './builders/catalog.builder';
+import { assignHead, setApprovalRole } from './builders/organization.builder';
 import { HR_BASIS } from './hr-basis';
 import { OwnedSubscriptions } from './owned-subscriptions';
 import { ProvisioningHarness } from './provisioning-harness';
@@ -103,12 +105,7 @@ export class RequestHarness extends ProvisioningHarness {
   private titleName: string | null = null;
 
   /** A request is priced, and a seat taken, by the subscription of its own department (F38, F20): see owned-subscriptions.ts. */
-  readonly owned = new OwnedSubscriptions(
-    async (body) =>
-      this.dataOf<{ id: string }>(
-        await request(this.server()).post('/api/v1/subscriptions').set(this.as(this.it1)).send(body).expect(201),
-      ).id,
-  );
+  readonly owned = new OwnedSubscriptions((body) => declareSubscription(this.ctx, this.it1.accessToken, body));
 
   constructor() {
     super();
@@ -160,31 +157,33 @@ export class RequestHarness extends ProvisioningHarness {
     return { employeeId, account: await this.account(code, employeeId, roles) };
   }
 
-  /** Makes the person the head of the department from today (as the Super Admin does: the IT Admin has no right to, `QĐ-87`). */
+  /**
+   * Makes the person the head of the department from today (as the Super Admin does: the IT Admin has no right to, `QĐ-87`),
+   * through the service of the route (T2.2: no HTTP).
+   */
   async makeHead(department: Department, person: Person): Promise<void> {
-    await request(this.server())
-      .post(`/api/v1/departments/${department.id}/head-assignments`)
-      .set({ Authorization: `Bearer ${this.admin}` })
-      .send({ employeeId: person.employeeId, effectiveFrom: this.today(), hrBasis: HR_BASIS })
-      .expect(200);
+    await assignHead(this.ctx, this.admin, department.id, {
+      employeeId: person.employeeId,
+      effectiveFrom: this.today(),
+      hrBasis: HR_BASIS,
+    });
   }
 
-  /** The Super Admin names the holder of an approval role. */
+  /** The Super Admin names the holder of an approval role, through the service of the route (T2.2: no HTTP). */
   async setRole(
     role: 'SPENDING_APPROVER' | 'CONFLICT_SUBSTITUTE' | 'FALLBACK_APPROVER',
     person: Person,
   ): Promise<void> {
-    await request(this.server())
-      .put(`/api/v1/approval-roles/${role}`)
-      .set({ Authorization: `Bearer ${this.admin}` })
-      .send({ employeeId: person.employeeId })
-      .expect(200);
+    await setApprovalRole(this.ctx, this.admin, role, person.employeeId);
   }
 
-  /** Nobody holds the role any more: the way a role is left empty, which no route does. */
+  /**
+   * Nobody holds the role any more: the way a role is left empty, which no route does. `held_from` carries the application's
+   * clock, which can run ahead of the database's on a developer machine, so the holding never ends before it began.
+   */
   async clearRole(role: 'SPENDING_APPROVER' | 'CONFLICT_SUBSTITUTE' | 'FALLBACK_APPROVER'): Promise<void> {
     await this.ctx.sql.query(
-      `UPDATE approval_role_holders SET held_until = now() WHERE role = $1::"ApprovalRole" AND held_until IS NULL`,
+      `UPDATE approval_role_holders SET held_until = GREATEST(now(), held_from) WHERE role = $1::"ApprovalRole" AND held_until IS NULL`,
       [role],
     );
   }

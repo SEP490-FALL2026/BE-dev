@@ -1,4 +1,4 @@
-import { RevocationHookRefusedError } from '../../licensing/licensing.errors';
+import { RevocationHookRefusedError } from '../../licensing/public/licensing.errors';
 import type { ReturnableProblem, SenderRefusal } from './return-request.policy';
 
 export type ReturnRefusal =

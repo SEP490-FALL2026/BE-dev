@@ -16,7 +16,7 @@ Prompt 08 nếu nó chạm `/applications`.
 
 - Files: `application.dto.ts`, `application.policy.ts`, `application.service.ts`, `application.errors.ts`,
   `application.http-errors.ts`, `applications.controller.ts`, `application.policy.spec.ts`,
-  `test/integration/application-http.integration-spec.ts`, `openapi.json` (sinh).
+  `test/integration/catalog/application-http.integration-spec.ts`, `openapi.json` (sinh).
 - Depends on: none.
 - Acceptance: `FREE_EXTERNAL` ⟹ 422 `VALIDATION_ERROR`; ba loại hợp lệ không đổi; OpenAPI chỉ đổi enum và mô tả lỗi.
 - Verify: test integration sửa trước để đỏ trên code cũ (mong `VALIDATION_ERROR`), xanh sau; `pnpm check`;

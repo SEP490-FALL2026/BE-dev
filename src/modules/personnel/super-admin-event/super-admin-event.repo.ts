@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import type { SuperAdminEventMode } from '../../../generated/prisma/client';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import type { SuperAdminEventModeName } from './super-admin-event.types';
+import type { SuperAdminEventModeName } from '../public/super-admin-event.types';
 
 /** The mode as the ticket table keeps it. */
 const MODE_COLUMN: Readonly<Record<SuperAdminEventModeName, SuperAdminEventMode>> = {

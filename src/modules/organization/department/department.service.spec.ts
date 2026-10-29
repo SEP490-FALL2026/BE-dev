@@ -2,10 +2,10 @@ import { Test } from '@nestjs/testing';
 import { HR_BASIS } from '../../../../test/support/hr-basis';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { AuditService } from '../../audit/audit.service';
-import { IdentityAccessService } from '../../identity-access/identity-access.service';
-import { EmployeeNotFoundError } from '../organization.errors';
-import { OrganizationService } from '../organization.service';
+import { AuditApi } from '../../audit/public/audit.api';
+import { EmployeeNotFoundError } from '../public/organization.errors';
+import { OrganizationApi } from '../public/organization.api';
+import { EmployeeAccountsHook, type EmployeeAccounts } from '../public/organization.extension-points';
 import { DepartmentForbiddenError, DepartmentInUseError, DepartmentItAdminInvalidError } from './department.errors';
 import { DepartmentRepo } from './department.repo';
 import { DepartmentService } from './department.service';
@@ -59,9 +59,17 @@ describe('DepartmentService', () => {
       providers: [
         DepartmentService,
         { provide: DepartmentRepo, useValue: departments },
-        { provide: OrganizationService, useValue: organization },
-        { provide: IdentityAccessService, useValue: identity },
-        { provide: AuditService, useValue: audit },
+        { provide: OrganizationApi, useValue: organization },
+        {
+          provide: EmployeeAccountsHook,
+          useFactory: () => {
+            const hook = new EmployeeAccountsHook();
+            hook.bind(identity as unknown as EmployeeAccounts);
+
+            return hook;
+          },
+        },
+        { provide: AuditApi, useValue: audit },
         { provide: TransactionRunner, useValue: runner },
       ],
     }).compile();

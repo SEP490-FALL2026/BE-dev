@@ -11,7 +11,7 @@ import { AuthenticatedOnly } from '../../../infrastructure/security/decorators/a
 import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AccessRequestQueryService } from '../access-request/access-request-query.service';
-import { toWire } from '../access-request/access-request.wire';
+import { toWire } from '../access-request/access-request.mapper';
 import { RenewalBodyDto, RenewalResponseDto } from './renewal-request.dto';
 import { RENEWAL_ERROR_EXAMPLES, toRenewalApiException } from './renewal-request.http-errors';
 import { RenewalRequestService } from './renewal-request.service';

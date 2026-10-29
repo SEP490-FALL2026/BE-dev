@@ -2,9 +2,9 @@ import { Test } from '@nestjs/testing';
 import { HR_BASIS } from '../../../../test/support/hr-basis';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { AuditService } from '../../audit/audit.service';
-import { IdentityAccessService } from '../../identity-access/identity-access.service';
-import { OrganizationService } from '../organization.service';
+import { AuditApi } from '../../audit/public/audit.api';
+import { OrganizationApi } from '../public/organization.api';
+import { EmployeeAccountsHook, type EmployeeAccounts } from '../public/organization.extension-points';
 import { DepartmentHeadService } from './department-head.service';
 import { DepartmentRepo } from './department.repo';
 import type { HeadPeriodChanges, HeadPeriodRecord } from './department.types';
@@ -60,12 +60,19 @@ describe('DepartmentHeadService announces the head periods that take effect toda
       providers: [
         DepartmentHeadService,
         { provide: DepartmentRepo, useValue: departments },
-        { provide: OrganizationService, useValue: organization },
+        { provide: OrganizationApi, useValue: organization },
         {
-          provide: IdentityAccessService,
-          useValue: { inspectEmployeeAccount: jest.fn().mockResolvedValue({ roles: [] }) },
+          provide: EmployeeAccountsHook,
+          useFactory: () => {
+            const hook = new EmployeeAccountsHook();
+            hook.bind({
+              inspectEmployeeAccount: jest.fn().mockResolvedValue({ roles: [] }),
+            } as unknown as EmployeeAccounts);
+
+            return hook;
+          },
         },
-        { provide: AuditService, useValue: { record: jest.fn() } },
+        { provide: AuditApi, useValue: { record: jest.fn() } },
         {
           provide: TransactionRunner,
           useValue: { run: jest.fn((work: (transaction: unknown) => Promise<unknown>) => work(tx)) },

@@ -15,42 +15,42 @@ Mỗi task theo TDD: viết test đỏ, xem nó đỏ đúng lý do, viết mã 
 
 ### Task 1: dữ liệu `license_assignments` và `seat_baseline_states`
 
-- Files: `prisma/models/licensing.prisma`, `prisma/models/catalog.prisma`/`organization.prisma` (quan hệ ngược), migration `20261020190000_licensing_assignments`, `src/architecture-boundaries.spec.ts` (`PRISMA_MODEL_OWNER`), `test/integration/license-assignment-constraints.integration-spec.ts`.
+- Files: `prisma/models/licensing.prisma`, `prisma/models/catalog.prisma`/`organization.prisma` (quan hệ ngược), migration `20261020190000_licensing_assignments`, `test/gates/architecture-boundaries.gate-spec.ts` (`PRISMA_MODEL_OWNER`), `test/integration/licensing/license-assignment-constraints.integration-spec.ts`.
 - Depends on: `g3-subscription-purchase`, `g3-plan-declaration`, `g2-cost-center-catalogue`.
 - Acceptance: CHECK loại/lý do/Cost Center/ngày; loại trừ chồng lấn cá nhân và định danh trùng; trigger sức chứa `INV-01` (kể cả hai giao dịch song song), `INV-07`, đúng gói của thuê bao, đóng khởi tạo; dòng `HANDOVER`/`REQUEST` không cần import.
 - Verify: `pnpm prisma:validate`, `pnpm prisma:generate`; test constraints đỏ trước migration, xanh sau.
 
 ### Task 2: dữ liệu `seat_baseline_imports` và dòng
 
-- Files: `prisma/models/data-import.prisma`, migration `20261020190100_data_import_seat_baseline`, `PRISMA_MODEL_OWNER`, `test/integration/seat-baseline-import-constraints.integration-spec.ts`.
+- Files: `prisma/models/data-import.prisma`, migration `20261020190100_data_import_seat_baseline`, `PRISMA_MODEL_OWNER`, `test/integration/data-import/seat-baseline-import-constraints.integration-spec.ts`.
 - Depends on: Task 1.
 - Acceptance: trạng thái, khóa idempotency, `baseline_import_id` khóa ngoại, dòng xóa theo lần import.
 - Verify: test constraints đỏ trước, xanh sau.
 
 ### Task 3: hợp đồng `catalog` và `organization`
 
-- Files: `src/modules/catalog/catalog.service.ts`, `catalog.types.ts`, `catalog.module.ts` (export), `src/modules/organization/organization.service.ts` (`getEmployeesByCodes`, `getCostCentersByCodes`, `getCompanyEmailDomains`), `organization.types.ts` (`EmployeeRecord.employmentType`), repo liên quan, `src/module-graph.spec.ts` (`PUBLIC_CONTRACT_EXPORTS`).
+- Files: `src/modules/catalog/public/catalog.api.ts`, `catalog.types.ts`, `catalog.module.ts` (export), `src/modules/organization/public/organization.api.ts` (`getEmployeesByCodes`, `getCostCentersByCodes`, `getCompanyEmailDomains`), `organization.types.ts` (`EmployeeRecord.employmentType`), repo liên quan, `test/gates/module-graph.gate-spec.ts` (`PUBLIC_CONTRACT_EXPORTS`).
 - Depends on: Task 1.
 - Acceptance: `resolveSeatTarget`/`lockSeatTarget` trả đúng loại gói và số đã mua, từ chối K4 ở tầng `licensing`; tra cứu theo mã không lộ trường thừa.
 - Verify: integration `seat-baseline-contracts` (đỏ trước), `pnpm exec jest src/architecture src/module-graph`.
 
 ### Task 4: `licensing` — capability `assignment/` và `seat-baseline/`
 
-- Files: `src/modules/licensing/{licensing.module,licensing.service,licensing.types,licensing.errors}.ts`, `assignment/{assignment.policy,assignment.repo,assignment.service,assignment.types}.ts` (+ `assignment.policy.spec.ts`), `seat-baseline/{seat-baseline.repo,seat-baseline.service}.ts`, `app.module.ts`, `src/architecture-structure.spec.ts` (hợp đồng nội module), `src/module-graph.spec.ts`.
+- Files: `src/modules/licensing/{licensing.module,licensing.service,licensing.types,licensing.errors}.ts`, `assignment/{assignment.policy,assignment.repo,assignment.service,assignment.types}.ts` (+ `assignment.policy.spec.ts`), `seat-baseline/{seat-baseline.repo,seat-baseline.service}.ts`, `app/app.module.ts`, `test/gates/architecture-structure.gate-spec.ts` (hợp đồng nội module), `test/gates/module-graph.gate-spec.ts`.
 - Depends on: Task 1, Task 3.
 - Acceptance: tạo hàng loạt dưới khóa thuê bao, trạng thái đóng khởi tạo, đổi người chịu trách nhiệm một giao dịch, đếm seat, Audit Trail từng Assignment; chuyển `employeeCode`→`id` không nằm ở đây.
 - Verify: `pnpm exec jest src/modules/licensing src/architecture src/module-graph`; integration `license-assignment-http`.
 
 ### Task 5: `data-import` — capability `seat-baseline-import/`
 
-- Files: `src/core/csv.ts` (chuyển từ `employee-import/csv.ts`) + spec, `src/modules/data-import/seat-baseline-import/{seat-baseline-file,seat-baseline-rows,seat-baseline-import.repo,seat-baseline-import.service,seat-baseline-import.errors,seat-baseline-import.types,seat-baseline-import.dto,seat-baseline-imports.controller,seat-baseline-import.http-errors}.ts` (+ spec của file và dòng), `data-import.module.ts`, `src/architecture-structure.spec.ts`.
+- Files: `src/core/csv.ts` (chuyển từ `employee-import/csv.ts`) + spec, `src/modules/data-import/seat-baseline-import/{seat-baseline-file,seat-baseline-rows,seat-baseline-import.repo,seat-baseline-import.service,seat-baseline-import.errors,seat-baseline-import.types,seat-baseline-import.dto,seat-baseline-imports.controller,seat-baseline-import.http-errors}.ts` (+ spec của file và dòng), `data-import.module.ts`, `test/gates/architecture-structure.gate-spec.ts`.
 - Depends on: Task 2, Task 4.
 - Acceptance: đọc tệp, phán xét dòng theo bảng mã lỗi, xem trước lưu dòng, xác nhận một lần có xét lại dưới khóa, hủy, lỗi riêng.
 - Verify: `pnpm exec jest src/modules/data-import`; integration `seat-baseline-import-http`.
 
 ### Task 6: route của `licensing` và HTTP
 
-- Files: `assignment/{assignment.dto,assignments.controller,assignment.http-errors}.ts`, `seat-baseline/{seat-baseline.dto,seat-baseline.controller}.ts`, `test/support/api-coverage-manifest.ts` (+10), `test/e2e/api-inventory.e2e-spec.ts` (103 → 113), `test/e2e/seat-baseline.e2e-spec.ts`, `test/integration/{license-assignment-http,seat-baseline-http}.integration-spec.ts`.
+- Files: `assignment/{assignment.dto,assignments.controller,assignment.http-errors}.ts`, `seat-baseline/{seat-baseline.dto,seat-baseline.controller}.ts`, `test/support/api-coverage-manifest.ts` (+10), `test/http/platform/api-inventory.http-spec.ts` (103 → 113), `test/http/data-import/seat-baseline.http-spec.ts`, `test/integration/{license-assignment-http,seat-baseline-http}.integration-spec.ts`.
 - Depends on: Task 4, Task 5.
 - Acceptance: mười operation đúng bảng HTTP; 401/403/404/409/422 theo vai và tình huống; không `DELETE`; đồng thời hợp lệ; mọi AC trong ma trận.
 - Verify: `pnpm test:e2e`, integration; đột biến (bỏ khóa thuê bao, bỏ kiểm sức chứa của policy, bỏ trigger đóng khởi tạo, bỏ so khớp xét lại, bỏ nối chuỗi) làm test đỏ.
@@ -65,7 +65,7 @@ Mỗi task theo TDD: viết test đỏ, xem nó đỏ đúng lý do, viết mã 
 ### Task 8: bổ sung đợt hoàn tất G2–G4 (21/10/2026)
 
 - Trạng thái: đã làm (theo [audit](../../../reviews/g2-g4-completion-2026-10-21/README.md), quyết định D1).
-- Files: `src/modules/data-import/seat-baseline-import/seat-baseline-rows.ts` + `seat-baseline-import.types.ts` (mã `EFFECTIVE_BEFORE_HIRE`), `seat-baseline-rows.spec.ts`, `test/integration/seat-baseline-import-http.integration-spec.ts`, harness test tạo người hiện trạng với ngày vào làm 2020-01-01, mô tả OpenAPI của controller tải lên/xác nhận (`SEAT_TARGET.APPLICATION_RETIRED`, `SEAT_TARGET.SUBSCRIPTION_DRAFT`).
+- Files: `src/modules/data-import/seat-baseline-import/seat-baseline-rows.policy.ts` + `seat-baseline-import.types.ts` (mã `EFFECTIVE_BEFORE_HIRE`), `seat-baseline-rows.spec.ts`, `test/integration/data-import/seat-baseline-import-http.integration-spec.ts`, harness test tạo người hiện trạng với ngày vào làm 2020-01-01, mô tả OpenAPI của controller tải lên/xác nhận (`SEAT_TARGET.APPLICATION_RETIRED`, `SEAT_TARGET.SUBSCRIPTION_DRAFT`).
 - Depends on: Task 5, Task 6.
 - Acceptance: không dòng nào cho một seat bắt đầu trước ngày vào làm của người giữ (`US-02-02` AC-15); dòng đã bị `GRANTED_ON_INVALID`/`GRANTED_ON_IN_FUTURE` không bị gắn thêm mã này.
 - Verify: `pnpm exec jest src/modules/data-import/seat-baseline-import` và `seat-baseline-import-http` (xanh; chưa ghi nhận lần đỏ-trước riêng cho phần này).

@@ -5,15 +5,15 @@ import { InvalidEmailError, normalizeEmail } from '../../../core/email';
 import type { HrBasis } from '../../../core/hr-basis';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { AuditService } from '../../audit/audit.service';
-import { NotificationsService } from '../../notifications/notifications.service';
-import { EmployeeCodeTakenError, EmployeeEmailTakenError } from '../organization.errors';
+import { AuditApi } from '../../audit/public/audit.api';
+import { NotificationsApi } from '../../notifications/public/notifications.api';
+import { EmployeeCodeTakenError, EmployeeEmailTakenError } from '../public/organization.errors';
 import { EmployeeRowInvalidError } from './employee.errors';
 import { assertMayEnterEmployees } from './employee.policy';
-import { validateEmployeeRow } from './employee-row.validator';
+import { validateEmployeeRow } from './employee-row.policy';
 import { organizationAuditEvent } from '../mappers/audit-event.mapper';
-import { OrganizationService } from '../organization.service';
-import { EmploymentType } from '../organization.types';
+import { OrganizationApi } from '../public/organization.api';
+import { EmploymentType } from '../public/organization.types';
 
 /** What the form sends. The department is named by its code, like the import file column (`FR-9.7`); the job title is optional free text. */
 export interface ManualEmployeeInput {
@@ -55,9 +55,9 @@ export interface ManualEmployeeView {
 @Injectable()
 export class EmployeeManualService {
   constructor(
-    private readonly organization: OrganizationService,
-    private readonly audit: AuditService,
-    private readonly notifications: NotificationsService,
+    private readonly organization: OrganizationApi,
+    private readonly audit: AuditApi,
+    private readonly notifications: NotificationsApi,
     private readonly runner: TransactionRunner,
   ) {}
 

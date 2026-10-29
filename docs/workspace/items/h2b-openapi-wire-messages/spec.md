@@ -14,7 +14,7 @@
 
 Sau lát này, client phân biệt được bốn response thành công theo `message` riêng, và OpenAPI khai đủ 422 của năm
 operation có validation cùng 429 của rate limit toàn cục trên cả 60 operation — contract khớp với runtime. Kiểm được bằng
-test HTTP, `test/e2e/api-inventory.e2e-spec.ts` và diff `openapi.json`.
+test HTTP, `test/http/platform/api-inventory.http-spec.ts` và diff `openapi.json`.
 
 ## Primary Story/AC
 
@@ -43,7 +43,7 @@ test HTTP, `test/e2e/api-inventory.e2e-spec.ts` và diff `openapi.json`.
 
 ## Ownership: module, data, API
 
-- `identity-access/accounts/app-users.controller.ts`, `infrastructure/health/health.controller.ts`: `message` cụ thể.
+- `identity-access/accounts/app-users/app-users.controller.ts`, `infrastructure/health/health.controller.ts`: `message` cụ thể.
 - `organization/cost-centers.controller.ts`, `data-import/employee-imports.controller.ts`: khai 422.
 - `infrastructure/http/openapi-rate-limit.ts` (mới, thuần): thêm 429 toàn cục cho operation chưa tự khai; gọi trong
   `createOpenApiDocument`. `auth.controller.ts`, `me.controller.ts`: mô tả 429 riêng nêu cả hai nhánh.

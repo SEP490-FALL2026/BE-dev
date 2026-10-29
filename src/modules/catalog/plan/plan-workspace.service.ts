@@ -1,11 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionRunner, DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { AuditService } from '../../audit/audit.service';
-import { IdentityAccessService } from '../../identity-access/identity-access.service';
-import { EmployeeNotFoundError } from '../../organization/organization.errors';
-import { OrganizationService } from '../../organization/organization.service';
-import { catalogAuditEvent } from '../mappers/catalog-audit-event';
+import { AuditApi } from '../../audit/public/audit.api';
+import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
+import { EmployeeNotFoundError } from '../../organization/public/organization.errors';
+import { OrganizationApi } from '../../organization/public/organization.api';
+import { catalogAuditEvent } from '../mappers/catalog-audit-event.mapper';
 import {
   PlanNotFoundError,
   PlanWorkspacePersonInvalidError,
@@ -63,9 +63,9 @@ const sameSnapshot = (a: ReturnType<typeof snapshot>, b: ReturnType<typeof snaps
 export class PlanWorkspaceService {
   constructor(
     private readonly plans: PlanRepo,
-    private readonly organization: OrganizationService,
-    private readonly identity: IdentityAccessService,
-    private readonly audit: AuditService,
+    private readonly organization: OrganizationApi,
+    private readonly identity: IdentityAccessApi,
+    private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
   ) {}
 

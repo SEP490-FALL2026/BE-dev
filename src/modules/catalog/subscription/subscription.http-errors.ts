@@ -9,7 +9,7 @@ import {
   MoneyScaleExceededError,
   ReportingCurrencyNotSupportedError,
 } from '../../../core/money/money.errors';
-import { FinanceSetupIncompleteError } from '../../organization/organization.errors';
+import { FinanceSetupIncompleteError } from '../../organization/public/organization.errors';
 import {
   SubscriptionApplicationRetiredError,
   SubscriptionDatesInvalidError,

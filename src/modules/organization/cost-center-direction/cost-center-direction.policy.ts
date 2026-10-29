@@ -1,5 +1,5 @@
-import { DirectionRefusedError } from './cost-center-direction.errors';
-import type { DirectionEnvironment } from './cost-center-direction.types';
+import { DirectionRefusedError } from '../public/cost-center-direction.errors';
+import type { DirectionEnvironment } from '../public/cost-center-direction.types';
 
 /** A release reference or a basis is a short written reference, not prose and not data. */
 const REFERENCE_MIN = 2;

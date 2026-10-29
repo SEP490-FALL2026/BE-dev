@@ -1,10 +1,15 @@
 # Lệnh vận hành ngoài HTTP
 
 Áp dụng cho mọi lệnh chạy từ terminal ngoài API/worker: `pnpm ops:bootstrap`, `pnpm ops:recover`, `pnpm ops:inspect`,
-`pnpm dev:seed`, `pnpm ops:preflight`, `pnpm ops:db-roles`, `pnpm ops:assign-subscription-owner`, `pnpm ops:cost-center-direction`, `pnpm ops:record-super-admin-event` và lệnh thêm sau. Gate: [operational-commands.spec.ts](../../src/operational-commands.spec.ts) (cấu
-trúc, import, chuỗi bị cấm), [module-graph.spec.ts](../../src/module-graph.spec.ts) (đồ thị Nest) và test của từng
+`pnpm dev:seed`, `pnpm ops:preflight`, `pnpm ops:db-roles`, `pnpm ops:assign-subscription-owner`, `pnpm ops:cost-center-direction`, `pnpm ops:record-super-admin-event` và lệnh thêm sau. Gate: [operational-commands.spec.ts](../../test/gates/operational-commands.gate-spec.ts) (cấu
+trúc, import, chuỗi bị cấm), [module-graph.spec.ts](../../test/gates/module-graph.gate-spec.ts) (đồ thị Nest) và test của từng
 lệnh. Vị trí file theo [module structure](module-structure.md); dữ liệu và transaction theo
 [database rules](database-business.md).
+
+**Một điểm vào, alias giữ vĩnh viễn (`OD-A7`):** mọi lệnh chạy bằng `node dist/cli.js <lệnh>` (`pnpm ops:<lệnh>`,
+`pnpm dev:seed`); bảng lệnh duy nhất là [`src/cli/commands.ts`](../../src/cli/commands.ts), mã của lệnh nằm ở `src/cli/<lệnh>/`.
+`pnpm build` sinh từ bảng đó `dist/<tên cũ>-cli.js` một dòng cho mỗi lệnh (`scripts/build/emit-cli-aliases.mjs`); image,
+`scripts/ops/*.sh` và runbook gọi các đường này nên không bỏ hay đổi tên alias. Lệnh mới = một dòng bảng + một thư mục.
 
 ## Tám quy tắc
 
@@ -16,7 +21,7 @@ lệnh. Vị trí file theo [module structure](module-structure.md); dữ liệu
    hoặc `test`), host của `DATABASE_URL` hiệu lực **parse** ra là loopback (`localhost`, `127.0.0.0/8`, `::1`), và cờ xác
    nhận tường minh (`--confirm-local`). Không có `--force` hay cờ chung nào bỏ qua một chốt.
 3. **Entry CLI và module lệnh không tới được từ `AppModule` và `WorkerModule`** (cả import TypeScript lẫn đồ thị Nest).
-4. **Phân vai:** entry (`src/*-cli.ts`) parse tham số, in kết quả, chọn mã thoát; repository query; service
+4. **Phân vai:** entry (`src/cli/<lệnh>/<lệnh>.command.ts`) parse tham số, in kết quả, chọn mã thoát; repository query; service
    application/domain thực thi workflow và ghi Audit Trail. Không Prisma trực tiếp hay raw SQL trong entry hoặc service
    điều phối.
 5. **Không commit mật khẩu, token, hash hay private key mặc định.** Credential sinh ra (CSPRNG) chỉ được in **một lần**
@@ -76,11 +81,11 @@ Chi tiết từng lệnh: `--help` của lệnh và
 [hạng mục H6.1 + H6.2](../workspace/items/installation-local-data-h6-1-h6-2/spec.md).
 
 `ops:preflight` (P28-01) đọc schema **trước** migration mà không model nào mô tả, nên repository của nó là ngoại lệ có
-đăng ký `PRE_MIGRATION_READERS` của [architecture-boundaries](../../src/architecture-boundaries.spec.ts). Ngoại lệ chỉ đứng
+đăng ký `PRE_MIGRATION_READERS` của [architecture-boundaries](../../test/gates/architecture-boundaries.gate-spec.ts). Ngoại lệ chỉ đứng
 khi gate còn chứng minh đủ bốn điều (Owner chấp nhận ở Prompt 29A, 24/10/2026): (1) **đúng tên tệp**, không thư mục hay
 wildcard; (2) chỉ câu `$queryRaw` mở đầu `SELECT`/`WITH` và mảnh `Prisma.sql`, không từ khóa ghi/khóa/đổi phiên, không
 `$executeRaw`, không `*Unsafe`, không ghi qua delegate Prisma; (3) phiên của graph preflight chỉ đọc
-([module-graph](../../src/module-graph.spec.ts), rule 1); (4) **chỉ** `migration-preflight-cli.ts` với tới tệp đó qua import —
+([module-graph](../../test/gates/module-graph.gate-spec.ts), rule 1); (4) **chỉ** lệnh `preflight` (`src/cli/preflight/`) với tới tệp đó qua import —
 không API, worker, bootstrap hay lệnh khác. Thêm câu ghi, thêm reader hay thêm đường gọi làm gate đỏ.
 `ops:db-roles` (H7) quản trị **vai** PostgreSQL, không phải dữ liệu nghiệp vụ, nên không có đồ thị Nest, Prisma hay Audit
 Trail: `provision` nối bằng superuser của cluster (`DATABASE_BOOTSTRAP_URL`), `reconcile`/`verify` bằng deploy role
@@ -93,15 +98,15 @@ khẩu; mật khẩu gửi lên server dưới dạng verifier SCRAM. Vai nào c
 reader hay đường gọi. Nhận nhãn của image (`docker image inspect --format '{{json .Config.Labels}}'`), đếm dòng của từng dạng dữ
 liệu mà runtime cũ không đọc được và trả lời image đó có phục vụ lại CSDL này được không — đích quay về của deploy H7
 (`scripts/ops/deploy-release.sh`) và của rollback tay ([containers](../guides/containers.md#deploys-after-h7-h7-ops-02-h7-ops-rv-0107)).
-Danh mục dạng dữ liệu và nhãn Dockerfile là một (`recovery-target.spec.ts`); thêm dạng mới là thêm cả hai trong cùng thay đổi.
+Danh mục dạng dữ liệu và nhãn Dockerfile là một (`installation/public/recovery-target.policy.spec.ts`); thêm dạng mới là thêm cả hai trong cùng thay đổi.
 
 **`--password-stdin` của `ops:bootstrap` (Prompt 06, Owner 28/10/2026):** mặc định mật khẩu Super Admin vẫn nhập hai lần ở prompt ẩn
 và lệnh từ chối mọi nguồn khác (đối số, môi trường, pipe). Chỉ khi cờ boolean `--password-stdin` được nêu tường minh, lệnh đọc đúng **một
 bản ghi** từ stdin: mật khẩu + một line feed rồi EOF, tối đa 1024 byte, UTF-8 hợp lệ, không ký tự điều khiển và không CR; khoảng
 trắng đầu/cuối thuộc mật khẩu; stdin là terminal, thiếu line feed (ghi bị cắt), dòng thứ hai, quá hạn 10 giây hay quá cỡ đều bị từ chối
 trước mọi ghi, thông báo lỗi không mang byte nào của bản ghi. Chính sách mật khẩu và service ghi giữ nguyên; `--password VALUE` và các
-biến thể literal vẫn bị từ chối theo tên. Hiện thực: `stdin-password.ts` (đọc có giới hạn), `installation.password.ts` (chọn nguồn),
-`installation-cli.ts` chỉ nối. Người dùng cờ này là [bootstrap wrapper](../../scripts/ops/bootstrap-installation.sh) trên VPS
+biến thể literal vẫn bị từ chối theo tên. Hiện thực (`src/cli/bootstrap/`): `stdin-password.ts` (đọc có giới hạn), `hidden-prompt.ts` (chọn nguồn),
+`bootstrap.command.ts` chỉ nối. Người dùng cờ này là [bootstrap wrapper](../../scripts/ops/bootstrap-installation.sh) trên VPS
 (`.env.bootstrap` riêng, owner-only, parse như dữ liệu): [containers](../guides/containers.md#bootstrap-wrapper-prompt-06).
 
 **Preflight chỉ kiểm, không sửa:** CSDL bị chặn (exit 2) giữ nguyên, deploy dừng trước migration; xem lịch sử được hỗ trợ và

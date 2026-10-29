@@ -5,7 +5,7 @@ import type {
   PendingFileQuery,
   PendingPersonnelFile,
   PersonnelFileKind,
-} from '../../licensing/licensing-service-account.types';
+} from '../../licensing/public/licensing-service-account.types';
 
 interface Row {
   employee_id: string;

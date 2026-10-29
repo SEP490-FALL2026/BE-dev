@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { addDays, type BusinessDate } from '../../../core/business-date';
-import { OperatingParametersService } from '../../operating-parameters/operating-parameters.service';
+import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
 import { deriveNotice, noticeInputOf } from './subscription.policy';
 import { SubscriptionRepo } from './subscription.repo';
 
@@ -27,7 +27,7 @@ export interface ActiveNotice {
 export class SubscriptionNoticeService {
   constructor(
     private readonly subscriptions: SubscriptionRepo,
-    private readonly parameters: OperatingParametersService,
+    private readonly parameters: OperatingParametersApi,
   ) {}
 
   /**

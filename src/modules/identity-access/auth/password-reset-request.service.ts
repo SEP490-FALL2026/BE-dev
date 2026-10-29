@@ -2,8 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { InvalidEmailError, normalizeEmail } from '../../../core/email';
 import { TransactionRunner, toTransientError } from '../../../infrastructure/database/transaction-runner';
-import { AuditService } from '../../audit/audit.service';
-import { OrganizationService } from '../../organization/organization.service';
+import { AuditApi } from '../../audit/public/audit.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
 import { AccountDirectoryService } from '../accounts/account-directory.service';
 import { RecoveryTicketService } from '../recovery/recovery-ticket.service';
 import { PasswordResetMailService } from './password-reset-mail.service';
@@ -17,10 +17,10 @@ import { canReceiveResetMail } from './password-reset.policy';
 export class PasswordResetRequestService {
   constructor(
     private readonly accounts: AccountDirectoryService,
-    private readonly organization: OrganizationService,
+    private readonly organization: OrganizationApi,
     private readonly recoveryTickets: RecoveryTicketService,
     private readonly mail: PasswordResetMailService,
-    private readonly audit: AuditService,
+    private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
   ) {}
 

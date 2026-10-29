@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { IdentityAccessService } from '../../identity-access/identity-access.service';
-import type { ApprovalRoleHolders } from '../../identity-access/identity-access.types';
-import { OrganizationService } from '../../organization/organization.service';
+import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
+import type { ApprovalRoleHolders } from '../../identity-access/public/identity-access.types';
+import { OrganizationApi } from '../../organization/public/organization.api';
 import { RoutingFactsService } from '../access-request/routing-facts.service';
 import { routeNeedStep } from '../access-request/routing.policy';
 import { routeFinanceReview, routeSpendStep } from '../spend/spend-routing.policy';
@@ -29,8 +29,8 @@ export interface TodayFacts {
 @Injectable()
 export class StepTargetService {
   constructor(
-    private readonly organization: OrganizationService,
-    private readonly identity: IdentityAccessService,
+    private readonly organization: OrganizationApi,
+    private readonly identity: IdentityAccessApi,
     private readonly routing: RoutingFactsService,
   ) {}
 

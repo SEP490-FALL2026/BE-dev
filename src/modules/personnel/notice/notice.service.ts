@@ -4,12 +4,12 @@ import { addWorkingDays } from '../../../core/working-days';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import { isUniqueViolation } from '../../../infrastructure/database/unique-violation';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { AuditService } from '../../audit/audit.service';
-import { OperatingParametersService } from '../../operating-parameters/operating-parameters.service';
-import { OrganizationService } from '../../organization/organization.service';
+import { AuditApi } from '../../audit/public/audit.api';
+import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
 import { PersonnelNotifier } from '../event-notice/personnel-notifier.service';
-import { personnelAuditEvent } from '../mappers/personnel-audit-event';
-import { userActor } from '../personnel.types';
+import { personnelAuditEvent } from '../mappers/personnel-audit-event.mapper';
+import { userActor } from '../public/personnel.types';
 import { NoticeRefusedError } from './notice.errors';
 import { isPriorityKind, pendingRefusal, sendRefusal } from './notice.policy';
 import { NoticeRepo } from './notice.repo';
@@ -29,10 +29,10 @@ const CALENDAR_WINDOW_DAYS = 90;
 export class NoticeService {
   constructor(
     private readonly runner: TransactionRunner,
-    private readonly organization: OrganizationService,
-    private readonly parameters: OperatingParametersService,
+    private readonly organization: OrganizationApi,
+    private readonly parameters: OperatingParametersApi,
     private readonly notices: NoticeRepo,
-    private readonly audit: AuditService,
+    private readonly audit: AuditApi,
     private readonly notifier: PersonnelNotifier,
   ) {}
 

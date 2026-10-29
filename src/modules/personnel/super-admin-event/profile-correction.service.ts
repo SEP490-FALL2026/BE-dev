@@ -1,13 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { AuditService } from '../../audit/audit.service';
-import { NotificationsService } from '../../notifications/notifications.service';
-import { OrganizationService } from '../../organization/organization.service';
-import { personnelAuditEvent } from '../mappers/personnel-audit-event';
-import type { PersonnelActor } from '../personnel.types';
+import { AuditApi } from '../../audit/public/audit.api';
+import { NotificationsApi } from '../../notifications/public/notifications.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
+import { personnelAuditEvent } from '../mappers/personnel-audit-event.mapper';
+import type { PersonnelActor } from '../public/personnel.types';
 import { planProfileCorrection } from './profile-correction.policy';
-import { SuperAdminEventRefusedError } from './super-admin-event.errors';
-import type { EventBasis, ProfileCorrection } from './super-admin-event.types';
+import { SuperAdminEventRefusedError } from '../public/super-admin-event.errors';
+import type { EventBasis, ProfileCorrection } from '../public/super-admin-event.types';
 
 /**
  * The tenth mode of `pnpm ops:record-super-admin-event` (spec L.2, `QĐ-87c`): the correction of the official fields of the record of
@@ -22,9 +22,9 @@ import type { EventBasis, ProfileCorrection } from './super-admin-event.types';
 @Injectable()
 export class ProfileCorrectionService {
   constructor(
-    private readonly organization: OrganizationService,
-    private readonly audit: AuditService,
-    private readonly notifications: NotificationsService,
+    private readonly organization: OrganizationApi,
+    private readonly audit: AuditApi,
+    private readonly notifications: NotificationsApi,
   ) {}
 
   async correct(

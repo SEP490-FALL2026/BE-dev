@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import type { HeldDepartmentNotificationInput, InAppParamValue } from '../notifications.types';
+import type { HeldDepartmentNotificationInput, InAppParamValue } from '../public/notifications.types';
 
 /** A held notice as it is read back to be handed to the first head of its department. */
 export interface HeldNotificationRow {

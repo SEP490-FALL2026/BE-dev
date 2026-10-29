@@ -23,13 +23,13 @@ import {
   ParameterResponseDto,
   RenameNonWorkingDateBodyDto,
   SetParameterBodyDto,
-} from './dto/operating-parameters.dto';
+} from './operating-parameters.dto';
 import { NonWorkingDatesService } from './non-working-dates.service';
 import {
   OPERATING_PARAMETERS_ERROR_EXAMPLES,
   toOperatingParametersApiException,
 } from './operating-parameters.http-errors';
-import { OperatingParametersService, ParameterView } from './operating-parameters.service';
+import { OperatingParametersApi, ParameterView } from './public/operating-parameters.api';
 
 const AUTH_ERRORS = [
   UNAUTHENTICATED_RESPONSE,
@@ -79,7 +79,7 @@ function toWire(view: ParameterView) {
 @Controller({ version: '1' })
 export class OperatingParametersController {
   constructor(
-    private readonly parameters: OperatingParametersService,
+    private readonly parameters: OperatingParametersApi,
     private readonly nonWorkingDates: NonWorkingDatesService,
   ) {}
 

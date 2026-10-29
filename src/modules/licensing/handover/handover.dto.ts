@@ -1,7 +1,7 @@
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { z } from 'zod';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
-import { REVOCATION_SOURCES } from '../licensing.types';
+import { REVOCATION_SOURCES } from '../public/licensing.types';
 
 const idParamSchema = z.strictObject({ id: z.uuid() });
 

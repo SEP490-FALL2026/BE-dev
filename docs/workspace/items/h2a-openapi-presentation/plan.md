@@ -9,7 +9,7 @@
 ## Before coding
 
 Đã đọc AGENTS.md, CONTRIBUTING.md, ARCHITECTURE.md, rule `api-contract`, `security-jobs`, `documentation`, mục 6 của
-audit, phần H2 của handoff, item H1, `bootstrap.ts`, access/public decorator, guard, 15 controller mount, helper
+audit, phần H2 của handoff, item H1, `app/configure-application.ts`, access/public decorator, guard, 15 controller mount, helper
 `Api*Response`, `api-inventory.e2e-spec.ts`, manifest và lệnh export. Cây BE lúc bắt đầu: `dev` `bd05007`, sạch (Prompt
 02B/02C/H1/H1B đã commit ở đó). Inventory máy đọc 60 operation (method, path, `operationId`, controller.handler, khai báo
 quyền hiệu lực, summary, security) sinh bằng script tạm ngoài repo từ chính metadata guard đọc; số liệu ở bảng trước/sau
@@ -20,15 +20,15 @@ của spec.
 ### Task 1: test đỏ cho security, summary, schema, example và mô tả
 
 - Files: `src/infrastructure/security/decorators/access.decorators.spec.ts` (mới),
-  `src/infrastructure/http/openapi-presentation.spec.ts` (mới), `test/e2e/api-inventory.e2e-spec.ts`.
+  `src/infrastructure/http/openapi-presentation.spec.ts` (mới), `test/http/platform/api-inventory.http-spec.ts`.
 - Depends on: none.
 - Acceptance: test đỏ trên `bd05007` vì finding thật (thiếu security, summary, example; còn `const`, pattern dư, mô tả
   lặp/mã nội bộ); test có sẵn vẫn xanh.
-- Verify: `pnpm exec jest --runInBand <hai spec>`, `pnpm test:e2e -- test/e2e/api-inventory.e2e-spec.ts` → đỏ đúng lý do.
+- Verify: `pnpm exec jest --runInBand <hai spec>`, `pnpm test:e2e -- test/http/platform/api-inventory.http-spec.ts` → đỏ đúng lý do.
 
 ### Task 2: implementation tối thiểu
 
-- Files: `access.decorators.ts`, `openapi-presentation.ts` (mới), `bootstrap.ts`, `api-error-responses.decorator.ts`,
+- Files: `access.decorators.ts`, `openapi-presentation.ts` (mới), `app/configure-application.ts`, `api-error-responses.decorator.ts`,
   15 controller mount, `dto/auth.dto.ts`, `dto/account-management.dto.ts`.
 - Depends on: Task 1.
 - Acceptance: test Task 1 xanh; guard metadata, route, status, body không đổi.

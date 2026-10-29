@@ -1,5 +1,5 @@
 import type { BusinessDate } from '../../../core/business-date';
-import { ROLE_FLAGS, type RoleFlag, type RoleFlagMap } from '../personnel.types';
+import { ROLE_FLAGS, type RoleFlag, type RoleFlagMap } from '../public/personnel.types';
 
 /** What is read of one person to say which roles they hold. */
 export interface RoleFacts {

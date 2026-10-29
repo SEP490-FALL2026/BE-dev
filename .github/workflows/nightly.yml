@@ -1,0 +1,102 @@
+name: Backend nightly
+
+# OD-T2: once a night on dev, everything the push pipeline may skip there — the full integration suite, the end-to-end
+# smoke journeys and the targeted mutation run — with the timing report of every file kept as an artifact.
+
+on:
+  schedule:
+    - cron: '0 19 * * *' # 02:00 Asia/Ho_Chi_Minh
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    services:
+      postgres: &postgres
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: ci_bootstrap
+          POSTGRES_PASSWORD: ci-bootstrap-only
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci_bootstrap -d postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - name: Check out dev
+        uses: actions/checkout@v4
+        with:
+          ref: dev
+
+      - name: Set up the backend
+        uses: ./.github/actions/setup
+
+      - name: Provision the test database role
+        uses: ./.github/actions/test-database
+        with:
+          container: ${{ job.services.postgres.id }}
+
+      # The CLI suites start the built `dist/cli.js` (TEST_CLI_RUNTIME=dist) instead of compiling the sources per call.
+      - name: Build
+        run: pnpm build
+
+      - name: Run every integration suite (parallel files)
+        env:
+          TEST_DATABASE_ADMIN_URL: postgresql://ci_integration:ci-integration-only@127.0.0.1:5432/postgres
+          TEST_CLI_RUNTIME: dist
+        run: pnpm test:integration --maxWorkers=2
+
+      - name: Run integration tests that bound wall-clock time (in band)
+        env:
+          TEST_DATABASE_ADMIN_URL: postgresql://ci_integration:ci-integration-only@127.0.0.1:5432/postgres
+        run: pnpm test:integration:timing
+
+      - name: Run integration tests that share the cluster (in band)
+        env:
+          TEST_DATABASE_ADMIN_URL: postgresql://ci_integration:ci-integration-only@127.0.0.1:5432/postgres
+          TEST_CLI_RUNTIME: dist
+          TEST_DATABASE_BOOTSTRAP_URL: postgresql://ci_bootstrap:ci-bootstrap-only@127.0.0.1:5432/postgres
+        run: pnpm test:integration:serial
+
+      - name: Run end-to-end smoke journeys
+        env:
+          TEST_DATABASE_ADMIN_URL: postgresql://ci_integration:ci-integration-only@127.0.0.1:5432/postgres
+        run: pnpm test:e2e
+
+      - name: Keep test timings
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-test-timings
+          path: reports/test-timings/
+          if-no-files-found: ignore
+
+  mutation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    services:
+      postgres: *postgres
+    steps:
+      - name: Check out dev
+        uses: actions/checkout@v4
+        with:
+          ref: dev
+
+      - name: Set up the backend
+        uses: ./.github/actions/setup
+
+      - name: Provision the test database role
+        uses: ./.github/actions/test-database
+        with:
+          container: ${{ job.services.postgres.id }}
+
+      # Some probes of a mutant are integration suites.
+      - name: Run targeted mutation tests
+        env:
+          TEST_DATABASE_ADMIN_URL: postgresql://ci_integration:ci-integration-only@127.0.0.1:5432/postgres
+        run: pnpm test:mutation

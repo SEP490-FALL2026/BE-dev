@@ -1,5 +1,5 @@
 import type { BusinessDate } from '../../../core/business-date';
-import type { GroundsInput } from '../grounds/grounds.policy';
+import type { GroundsInput } from '../policies/grounds.policy';
 
 /**
  * What a notice can be about as it is read: a person going to another department, coming to theirs, a new job title, leaving,

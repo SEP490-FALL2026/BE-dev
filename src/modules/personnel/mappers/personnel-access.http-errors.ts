@@ -2,7 +2,7 @@ import { HttpStatus } from '@nestjs/common';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import { FORBIDDEN_ERROR } from '../../../infrastructure/http/errors/access-errors';
 import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
-import { PersonnelAccessRefusedError } from '../personnel.errors';
+import { PersonnelAccessRefusedError } from '../public/personnel.errors';
 
 const SELF_CHANGE_MESSAGE =
   'An event or a notice about yourself is not recorded in the application: it is done by the controlled procedure (pnpm ops:record-super-admin-event).';

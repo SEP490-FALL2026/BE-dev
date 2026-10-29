@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Page, pageOf } from '../../../core/application/pagination';
-import { OrganizationService } from '../../organization/organization.service';
+import { OrganizationApi } from '../../organization/public/organization.api';
 import { ApplicationNotFoundError } from './application.errors';
 import { replacementRequired } from './application.policy';
 import { ApplicationRepo } from './application.repo';
@@ -47,7 +47,7 @@ function viewOf(employee: EmployeeFacts | undefined): BusinessOwnerView {
 export class ApplicationOwnerService {
   constructor(
     private readonly applications: ApplicationRepo,
-    private readonly organization: OrganizationService,
+    private readonly organization: OrganizationApi,
   ) {}
 
   /** Every application, of every kind, whose Business Owner has left, by name. */

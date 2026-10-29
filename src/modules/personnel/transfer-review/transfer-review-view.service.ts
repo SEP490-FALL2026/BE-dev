@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { CatalogService } from '../../catalog/catalog.service';
-import { LicensingService } from '../../licensing/licensing.service';
-import { OrganizationService } from '../../organization/organization.service';
-import { RequestsService } from '../../requests/requests.service';
+import { CatalogApi } from '../../catalog/public/catalog.api';
+import { LicensingApi } from '../../licensing/public/licensing.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
+import { RequestsApi } from '../../requests/public/requests.api';
 import type {
   TransferReviewDecisionWire,
   TransferReviewDetailWire,
@@ -45,10 +45,10 @@ const paged = <T>(items: T[], total: number, page: { page: number; pageSize: num
 export class TransferReviewViewService {
   constructor(
     private readonly lists: TransferReviewListRepo,
-    private readonly organization: OrganizationService,
-    private readonly catalog: CatalogService,
-    private readonly requests: RequestsService,
-    private readonly licensing: LicensingService,
+    private readonly organization: OrganizationApi,
+    private readonly catalog: CatalogApi,
+    private readonly requests: RequestsApi,
+    private readonly licensing: LicensingApi,
   ) {}
 
   async list(actor: AuthenticatedPrincipal, query: ReviewListQuery): Promise<Paged<TransferReviewSummaryWire>> {

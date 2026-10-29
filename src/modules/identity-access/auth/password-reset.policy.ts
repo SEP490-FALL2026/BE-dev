@@ -1,5 +1,5 @@
-import type { EmployeeStatus } from '../../organization/organization.types';
-import { employeeHasNotLeft } from '../policies/account-policy';
+import type { EmployeeStatus } from '../../organization/public/organization.types';
+import { employeeHasNotLeft } from '../policies/account.policy';
 
 /**
  * Whether a password-reset link may be issued or redeemed for this account: active, activated, and

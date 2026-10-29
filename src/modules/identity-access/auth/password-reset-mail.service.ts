@@ -2,11 +2,11 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EnvironmentVariables } from '../../../infrastructure/config/env-schema';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { NotificationsService } from '../../notifications/notifications.service';
-import { EmployeeRecord } from '../../organization/organization.types';
+import { NotificationsApi } from '../../notifications/public/notifications.api';
+import { EmployeeRecord } from '../../organization/public/organization.types';
 import { ActionLinkRevocation } from '../accounts/action-link-revocation.service';
 import { ActionLinkService } from '../accounts/action-link.service';
-import { AccountSnapshot } from '../identity-access.types';
+import { AccountSnapshot } from '../public/identity-access.types';
 
 const ONE_HOUR_MS = 60 * 60 * 1000;
 
@@ -19,7 +19,7 @@ export class PasswordResetMailService {
   constructor(
     private readonly links: ActionLinkService,
     private readonly revocation: ActionLinkRevocation,
-    private readonly notifications: NotificationsService,
+    private readonly notifications: NotificationsApi,
     private readonly config: ConfigService<EnvironmentVariables, true>,
   ) {}
 

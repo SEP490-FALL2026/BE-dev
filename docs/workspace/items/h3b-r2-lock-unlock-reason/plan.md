@@ -20,7 +20,7 @@ lock/unlock: `account-management-http`, `account-concurrency`, `approval-roles-h
 
 ### Task 1: test đỏ
 
-- Files: `test/integration/account-management-http.integration-spec.ts`, `test/e2e/api-inventory.e2e-spec.ts`,
+- Files: `test/integration/identity-access/account-management-http.integration-spec.ts`, `test/http/platform/api-inventory.http-spec.ts`,
   `src/modules/identity-access/dto/account-management.dto.spec.ts` (mới).
 - Depends on: none.
 - Acceptance: 422 khi thiếu/không hợp lệ (trạng thái, audit không đổi); audit có `reason` đã trim và before/after;

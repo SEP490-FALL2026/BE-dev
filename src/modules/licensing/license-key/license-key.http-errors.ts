@@ -6,7 +6,7 @@ import {
   LicenseKeyPlanNotK4Error,
   LicenseKeyRevealLimitError,
   SeatTargetNotFoundError,
-} from '../licensing.errors';
+} from '../public/licensing.errors';
 import { toLicensingApiException } from '../mappers/licensing.http-errors';
 import { LicenseKeyApplicationRetiredError } from './license-key.errors';
 

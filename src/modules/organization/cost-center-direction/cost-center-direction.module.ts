@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { DatabaseModule } from '../../../infrastructure/database/database.module';
 import { AuditModule } from '../../audit/audit.module';
 import { CostCenterDirectionRepo } from './cost-center-direction.repo';
-import { CostCenterDirectionService } from './cost-center-direction.service';
+import { CostCenterDirectionApi } from '../public/cost-center-direction.api';
 
 /**
  * The Cost Center link procedures (`pnpm ops:cost-center-direction`, F01, spec L.11): their own repository and service, reached by
@@ -10,7 +10,7 @@ import { CostCenterDirectionService } from './cost-center-direction.service';
  */
 @Module({
   imports: [DatabaseModule, AuditModule],
-  providers: [CostCenterDirectionRepo, CostCenterDirectionService],
-  exports: [CostCenterDirectionService],
+  providers: [CostCenterDirectionRepo, CostCenterDirectionApi],
+  exports: [CostCenterDirectionApi],
 })
 export class CostCenterDirectionModule {}

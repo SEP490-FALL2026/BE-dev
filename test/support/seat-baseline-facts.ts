@@ -1,6 +1,9 @@
-import type { ExistingAssignment } from '../../src/modules/licensing/licensing.types';
+import type { ExistingAssignment } from '../../src/modules/licensing/public/licensing.types';
 import type { SeatCells } from '../../src/modules/data-import/seat-baseline-import/seat-baseline-import.types';
-import { judgeSeatRows, type SeatFacts } from '../../src/modules/data-import/seat-baseline-import/seat-baseline-rows';
+import {
+  judgeSeatRows,
+  type SeatFacts,
+} from '../../src/modules/data-import/seat-baseline-import/seat-baseline-rows.policy';
 
 export type { ExistingAssignment };
 

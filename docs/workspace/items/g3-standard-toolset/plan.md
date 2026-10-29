@@ -15,7 +15,7 @@ Mỗi task theo TDD: viết test đỏ, xem nó đỏ đúng lý do, viết mã 
 
 ### Task 1: dữ liệu ba bảng bộ chuẩn — xong
 
-- Files: `prisma/models/catalog.prisma`, quan hệ ngược ở `organization.prisma`, migrations `20261020210000_catalog_standard_toolsets` và `20261021110000_catalog_standard_toolset_history_guard` (ba trigger thứ tự lịch sử, thêm ở lượt 21/10/2026), `src/architecture-boundaries.spec.ts`, `test/integration/standard-toolset-constraints.integration-spec.ts`.
+- Files: `prisma/models/catalog.prisma`, quan hệ ngược ở `organization.prisma`, migrations `20261020210000_catalog_standard_toolsets` và `20261021110000_catalog_standard_toolset_history_guard` (ba trigger thứ tự lịch sử, thêm ở lượt 21/10/2026), `test/gates/architecture-boundaries.gate-spec.ts`, `test/integration/standard-toolset-constraints.integration-spec.ts`.
 - Depends on: `g3-plan-declaration`, `g2-department-profile`, `g2-job-title-catalogue-and-manual-employee`.
 - Acceptance: CHECK phiên bản/lý do, unique `(phòng, chức vụ, phiên bản)`, khóa ngoại, trigger bất biến (`55000`).
 - Verify: constraints đỏ trước migration, xanh sau; `prisma migrate diff` không khác biệt.
@@ -36,7 +36,7 @@ Mỗi task theo TDD: viết test đỏ, xem nó đỏ đúng lý do, viết mã 
 
 ### Task 4: repo, service, route — xong
 
-- Files: `standard-toolset.{repo,service,dto,http-errors}.ts`, `standard-toolsets.controller.ts`, `catalog.module.ts`, `src/architecture-structure.spec.ts` nếu cần, `test/support/api-coverage-manifest.ts` (+5), `test/e2e/api-inventory.e2e-spec.ts` (116 → 121 khi lát này vào; hiện tổng 143 do các lát sau), `test/e2e/standard-toolset.e2e-spec.ts`, `test/integration/standard-toolset-http.integration-spec.ts`.
+- Files: `standard-toolset.{repo,service,dto,http-errors}.ts`, `standard-toolsets.controller.ts`, `catalog.module.ts`, `test/gates/architecture-structure.gate-spec.ts` nếu cần, `test/support/api-coverage-manifest.ts` (+5), `test/http/platform/api-inventory.http-spec.ts` (116 → 121 khi lát này vào; hiện tổng 143 do các lát sau), `test/e2e/standard-toolset.e2e-spec.ts`, `test/integration/standard-toolset-http.integration-spec.ts`.
 - Depends on: Task 1, Task 2, Task 3.
 - Acceptance: năm operation đúng bảng HTTP; mọi AC trong ma trận; không Assignment/tác vụ nào đổi.
 - Thay đổi thực tế ở lượt 21/10/2026: test AC-4 seed một Assignment thật rồi so hàng Assignment và các số đếm trước/sau; ba test `mine` mới; test ràng buộc cho ba trigger của migration `20261021110000`. Các gói được kiểm trước giao dịch (không khóa `FOR SHARE` trong giao dịch), an toàn nhờ khóa ngoại `RESTRICT`.

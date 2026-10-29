@@ -38,23 +38,33 @@ export function withRequestParserResponses<T extends { paths: object }>(document
       if (!operation?.requestBody?.content?.['application/json']) continue;
       operation.responses ??= {};
       for (const [status, description, example] of PARSER_RESPONSES) {
-        const own = operation.responses[status];
-        if (own === undefined) {
-          operation.responses[status] = {
-            description,
-            content: { 'application/json': { schema: ERROR_ENVELOPE, examples: toNamedErrorExamples([example]) } },
-          };
-          continue;
-        }
-        if (!(own.description ?? '').includes(description)) {
-          own.description = own.description ? `${own.description} ${description}` : description;
-        }
-        if (own.content?.['application/json']) {
-          operation.responses[status] = withErrorExamples(own as Parameters<typeof withErrorExamples>[0], [example]);
-        }
+        addParserResponse(operation.responses, status, description, example);
       }
     }
   }
 
   return result;
+}
+
+/** One parser answer on one operation: added when the status is free, else appended once to the operation's own. */
+function addParserResponse(
+  responses: Record<string, Response>,
+  status: string,
+  description: string,
+  example: ErrorExample,
+): void {
+  const own = responses[status];
+  if (own === undefined) {
+    responses[status] = {
+      description,
+      content: { 'application/json': { schema: ERROR_ENVELOPE, examples: toNamedErrorExamples([example]) } },
+    };
+    return;
+  }
+  if (!(own.description ?? '').includes(description)) {
+    own.description = own.description ? `${own.description} ${description}` : description;
+  }
+  if (own.content?.['application/json']) {
+    responses[status] = withErrorExamples(own as Parameters<typeof withErrorExamples>[0], [example]);
+  }
 }

@@ -13,7 +13,7 @@
 Sau lát này Swagger UI và `openapi.json` cho mỗi response JSON một ví dụ đọc được: response thành công hiện đúng `message`
 mà handler trả (key ngắn như `APPLICATION.LISTED`), response lỗi hiện các mã lỗi thật sự với tới được ở operation và status
 đó, mỗi mã một ví dụ đặt tên theo mã — thay cho chuỗi ngẫu nhiên dài mà bộ sinh mẫu của Swagger tạo từ regex của
-`message`/`code`. Kiểm bằng `test/e2e/api-inventory.e2e-spec.ts` (đối chiếu manifest literal độc lập) và diff `openapi.json`
+`message`/`code`. Kiểm bằng `test/http/platform/api-inventory.http-spec.ts` (đối chiếu manifest literal độc lập) và diff `openapi.json`
 chỉ gồm ví dụ.
 
 ## Sizing decision
@@ -69,13 +69,13 @@ manifest — gate e2e đỏ nếu thiếu.
 ## Ownership: module, data, API
 
 - `src/infrastructure/http`: `openapi-error-examples.ts` (mới: `ErrorExample`, `errorExampleOf`, `toNamedErrorExamples`,
-  `withErrorExamples`); `openapi-success-examples.ts` (mới: `withSuccessMessageExamples`); `bootstrap.ts` (thêm bước đó vào
+  `withErrorExamples`); `openapi-success-examples.ts` (mới: `withSuccessMessageExamples`); `app/configure-application.ts` (thêm bước đó vào
   `createOpenApiDocument`); `decorators/api-success-response.decorator.ts`, `decorators/api-error-responses.decorator.ts`;
   `openapi-rate-limit.ts`, `openapi-request-parser.ts`; `filters/fallback-error.ts` (mới, tách từ filter); `errors/access-errors.ts`
   (mới); `errors/service-unavailable.ts`, `pipes/zod-validation.pipe.ts` (hằng body dùng chung).
 - `src/infrastructure/security/guards/*`, `src/infrastructure/health/health.controller.ts`: ném đúng hằng body mà ví dụ dùng.
 - 20 tệp `*.http-errors.ts`: thêm hằng `*_ERROR_EXAMPLES`; 39 controller: thêm `examples` cho mọi khai báo lỗi.
-- `test/support/openapi-example-manifest.ts` (mới), `test/e2e/api-inventory.e2e-spec.ts`, unit spec của các tệp trên.
+- `test/support/openapi-example-manifest.ts` (mới), `test/http/platform/api-inventory.http-spec.ts`, unit spec của các tệp trên.
 - Không bảng, migration hay bounded context mới; không import liên capability mới (ví dụ lấy từ đúng mapper controller đã dùng).
 
 ## Behavior and design

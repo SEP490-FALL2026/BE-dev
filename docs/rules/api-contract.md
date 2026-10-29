@@ -36,7 +36,7 @@ trong cùng tệp: **tối đa 100 tham số** (`URLENCODED_PARAMETER_LIMIT`) v�
 không dựa vào mặc định thư viện (P29-N4).
 
 Ma trận lỗi parser (P29-N1, P29-N2, P29-N4 — đo lại trên body-parser 2.4.0 / raw-body 3 / multer 2.5.0 ở `SEC-UPGRADE-RV-01`,
-[test](../../test/e2e/security-upgrade-regression.e2e-spec.ts); nhận theo `type` đã tài liệu hóa **cùng** status và
+[test](../../test/http/platform/security-upgrade-regression.http-spec.ts); nhận theo `type` đã tài liệu hóa **cùng** status và
 thuộc tính mà nơi tạo luôn gán; không bao giờ chỉ theo `status`, tên hay thông điệp —
 [request-parser-errors.ts](../../src/infrastructure/http/filters/request-parser-errors.ts)):
 
@@ -72,7 +72,7 @@ Một mã lỗi chỉ đi với **một** HTTP status. Kẻ thua đua (ví dụ 
 ## Collection và detail (`API-LIST-DETAIL.1`)
 
 Áp cho mọi `GET` trả nhiều dòng (collection, search, page) và detail tương ứng. Gate
-[`src/api-collection-contract.spec.ts`](../../src/api-collection-contract.spec.ts) (trong `pnpm check`) kiểm phần thấy
+[`test/gates/api-collection-contract.gate-spec.ts`](../../test/gates/api-collection-contract.gate-spec.ts) (trong `pnpm check`) kiểm phần thấy
 được trong `openapi.json`; phần query chứng minh bằng test đếm câu lệnh với
 [`test/support/query-count.ts`](../../test/support/query-count.ts).
 
@@ -213,7 +213,7 @@ const COLLECTION_EXCEPTIONS = [{ operationId: 'currencyList', removeWhen: 'Revie
   `@AuthenticatedOnly()`/`@RequireRoles(...)` đã gắn bearer, `@Public()` không. Route có guard dùng
   `UNAUTHENTICATED_RESPONSE` và `GUARDED_SERVICE_UNAVAILABLE_RESPONSE` cho 401/503. Mô tả public không chứa mã nội bộ
   (`US-*`, `AC-*`, `QĐ-*`); credential trong example là placeholder như `<refresh-token>`. `createOpenApiDocument`
-  đổi `const` thành `enum` và bỏ `pattern` lặp format uuid/date-time; `test/e2e/api-inventory.e2e-spec.ts` kiểm các
+  đổi `const` thành `enum` và bỏ `pattern` lặp format uuid/date-time; `test/http/platform/api-inventory.http-spec.ts` kiểm các
   điều trên.
 - Mọi `@ApiSuccessResponse` của route mount khai `message` riêng; không route sản phẩm nào rơi về `COMMON.SUCCESS`
   (chỉ probe trong test). Route có đầu vào (path, query, body) khai 422 `VALIDATION_ERROR`.
@@ -237,7 +237,7 @@ const COLLECTION_EXCEPTIONS = [{ operationId: 'currencyList', removeWhen: 'Revie
   `nullable`; enum nullable liệt kê `null`; bound số → cờ boolean; bỏ `propertyNames: {type: "string"}`) và để nguyên hình không
   có cách viết 3.0 chính xác. [Gate dialect](../../src/infrastructure/http/openapi-dialect.ts) nêu pointer + lý do: `pnpm
 openapi:export` từ chối ghi, e2e kiểm document trong tiến trình và `openapi.json`. Gate ngữ nghĩa
-  ([openapi-dialect.e2e-spec.ts](../../test/e2e/openapi-dialect.e2e-spec.ts)) so mọi DTO body/query/path/response với bản 3.0 do
+  ([openapi-dialect.e2e-spec.ts](../../test/http/platform/openapi-dialect.http-spec.ts)) so mọi DTO body/query/path/response với bản 3.0 do
   chính Zod dựng từ schema runtime — nâng Zod/nestjs-zod/Swagger làm đổi nghĩa document thì đỏ. Không sửa bằng cách đổi chuỗi
   `openapi`, tắt validator hay bỏ ràng buộc.
 - Cập nhật [API inventory](../../test/support/api-coverage-manifest.ts) khi thêm/bỏ operation.
@@ -247,5 +247,5 @@ openapi:export` từ chối ghi, e2e kiểm document trong tiến trình và `op
 
 Ví dụ hiện có, đã mount và khai báo quyền đúng: [audit controller](../../src/modules/audit/audit.controller.ts)
 (`GET /api/v1/audit-events`, `@RequireRoles('SUPER_ADMIN')` ở class, `operationId`, success/error response) cùng test
-[e2e](../../test/e2e/audit-events.e2e-spec.ts) và [integration](../../test/integration/audit-query-http.integration-spec.ts).
+[e2e](../../test/http/audit/audit-events.http-spec.ts) và [integration](../../test/integration/audit/audit-query-http.integration-spec.ts).
 Cách thêm endpoint: [development guide](../guides/kien-truc-backend-va-cach-viet-code.md).

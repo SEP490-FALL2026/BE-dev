@@ -1,5 +1,6 @@
 import request from 'supertest';
 import type { ApiAccount } from './api-accounts';
+import { assignmentIdOf, importSeats } from './builders/seat.builder';
 import type { AccessRequestWire, Person } from './request-harness';
 import { ServiceAccountHarness } from './service-account-harness';
 
@@ -97,9 +98,12 @@ export class ReturnHarness extends ServiceAccountHarness {
       [person.employeeId],
     );
     const code = rows[0].employee_code;
-    // A target names one subscription or one internal plan, never both.
+    // A target names one subscription or one internal plan, never both. Uploaded, confirmed and found through the services
+    // (T2.2): the suites standing on this seat do not prove the import.
     const one = target.subscriptionId ? { subscriptionId: target.subscriptionId } : { planId: target.planId };
-    const upload = await this.upload(
+    await importSeats(
+      this.ctx,
+      this.it1.accessToken,
       one,
       this.file([
         {
@@ -110,17 +114,14 @@ export class ReturnHarness extends ServiceAccountHarness {
         },
       ]),
     );
-    if (upload.status !== 201) throw new Error(`baseline: ${upload.status} ${JSON.stringify(upload.body)}`);
-    const preview = this.dataOf<{ id: string; previewVersion: number }>(upload);
-    await this.confirm(preview.id, preview.previewVersion).expect(200);
-    const found = (
-      await this.assignmentsOf(
-        one.subscriptionId ? { subscriptionId: one.subscriptionId } : { planId: one.planId ?? '' },
-      )
-    ).find((assignment) => assignment.employeeId === person.employeeId);
+    const found = await assignmentIdOf(
+      this.ctx,
+      one.subscriptionId ? { subscriptionId: one.subscriptionId } : { planId: one.planId ?? '' },
+      person.employeeId,
+    );
     if (!found) throw new Error(`no seat of ${code}`);
 
-    return found.id;
+    return found;
   }
 
   /** The plan says what to do before its right is taken away, and whether removing it loses data. */

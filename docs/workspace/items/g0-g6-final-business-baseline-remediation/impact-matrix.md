@@ -163,12 +163,12 @@ contract/xuyên suốt. Tóm tắt một dòng ở mục 3.0; chi tiết ở m�
   (`CostCenter.departmentId`, `UNIQUE(departmentId) WHERE status = ACTIVE`, `CostCenter.linkedAt`).
 - **Code:** `prisma/models/organization.prisma:144` (`Department.costCenterId String @unique`, bắt buộc);
   `src/modules/organization/department/department.dto.ts:15` (`costCenterId` bắt buộc), `:56-61` (`costCenter` non-null);
-  `src/modules/organization/department/department.service.ts:71-76`; `src/modules/organization/employee-placement.policy.ts:43-48`
+  `src/modules/organization/department/department.service.ts:71-76`; `src/modules/organization/public/employee-placement.policy.ts:43-48`
   (`DEPARTMENT_COST_CENTER_INACTIVE` chặn nhận người); trigger `departments_require_unit_cost_center`
   (`prisma/migrations/20261016150000_cost_center_lifecycle/migration.sql:22`); guard tài khoản dịch vụ đọc
   `departments.cost_center_id` (`prisma/migrations/20261022120000_cost_centers_unit_only/migration.sql:71-99`);
   `access_requests.cost_center_id NOT NULL` (`prisma/models/requests.prisma:144`).
-- **Test:** `test/integration/departments-http.integration-spec.ts` (không có ca phòng thiếu Cost Center).
+- **Test:** `test/integration/organization/departments-http.integration-spec.ts` (không có ca phòng thiếu Cost Center).
 - **Dữ liệu:** đảo chiều liên kết 1–1 tất định (duy nhất ở `departments`); `linked_at` lấy mốc tạo **muộn** hơn của cặp
   (`GREATEST(c.created_at, d.created_at)`; bản đầu của Prompt 04 chép mốc sớm hơn — sửa bằng F68);
   bỏ trigger cũ, viết lại guard tài khoản dịch vụ; `access_requests.cost_center_id` nullable chỉ cho nháp (F27). Sửa review `P03-RV-03`
@@ -189,7 +189,7 @@ contract/xuyên suốt. Tóm tắt một dòng ở mục 3.0; chi tiết ở m�
   mà ở dòng_ Chưa phân bổ Cost Center _(`QĐ-87d`(3))"_; `INV-14a` — Cost Center hiện hành tại ngày `t` là bản ghi có `linkedAt` ≤ `t` <
   `deactivatedAt`.
 - **Code (cây Prompt 04 trước khi sửa):** `prisma/migrations/20261027110000_cost_center_department_link/migration.sql` — `UPDATE … SET "linked_at" =
-LEAST(c."created_at", d."created_at")`; `test/integration/cost-center-link-migration.integration-spec.ts` — ca _copies each department ↔ Cost
+LEAST(c."created_at", d."created_at")`; `test/integration/organization/cost-center-link-migration.integration-spec.ts` — ca _copies each department ↔ Cost
   Center pair … at the earlier of the two creation moments_; spec L.10/L.11 và plan/test matrix nói _mốc tạo sớm hơn_.
 - **Hợp đồng legacy `7c28e75` (đã kiểm bằng mã, chỉ đọc):** `departments.cost_center_id` (`NOT NULL`, `UNIQUE`) chỉ được ghi một lần, ở
   `DepartmentRepo.insert` (`department.repo.ts:87-96`) do `DepartmentService.create` gọi (`department.service.ts:71-83`) **sau khi** khóa và đọc
@@ -205,7 +205,7 @@ d.created_at)` (không bao giờ sớm hơn một trong hai dòng, kể cả khi
   `INACTIVE` ghi `GREATEST(deactivated_at, c.created_at, d.created_at)` thay vì `deactivated_at` đơn thuần (khoảng hiện hành vẫn rỗng); Cost Center
   `ACTIVE` ghi `GREATEST(now(), c.created_at, d.created_at)`. Không đổi cột, ràng buộc hay trigger nào khác; migration `…_cost_center_department_link`
   chưa merge nên sửa tại chỗ (không vi phạm `DB-15`).
-- **Test:** `test/integration/cost-center-link-migration.integration-spec.ts` — bản backfill (cặp thường; cặp có Cost Center tạo **sau** phòng) chứng
+- **Test:** `test/integration/organization/cost-center-link-migration.integration-spec.ts` — bản backfill (cặp thường; cặp có Cost Center tạo **sau** phòng) chứng
   minh `linked_at ≥ c.created_at` và `≥ d.created_at`, bằng đúng `GREATEST`; chi phí ở thời điểm trước `linked_at` không khớp khoảng hiện hành nào
   của phòng (còn ở dòng _Chưa phân bổ_); trigger gắn tiến không bao giờ ghi sớm hơn một trong hai dòng; đối chứng `LEAST` ⟹ đỏ. Lệnh `link`:
   integration `cost-center-direction-cli`.
@@ -233,8 +233,8 @@ d.created_at)` (không bao giờ sớm hơn một trong hai dòng, kể cả khi
 - **Nguồn:** `QĐ-87e` DL L2800, `D-1`; `US-02-07` `RETIRED`; `US-02-02` AC-13; `US-02-03` AC-1, AC-2, AC-7; BEH-04, BEH-05(a).
 - **Code:** `prisma/models/organization.prisma:227-247` (`JobTitle`), `EmployeePlacement.jobTitleId` NOT NULL;
   `src/modules/organization/employee/employee-manual.service.ts:80-84,106`;
-  `src/modules/organization/employee/employee-row.validator.ts:53-59`; `src/modules/organization/employee-placement.policy.ts:17-24,47-49`
-  (`JOB_TITLE_REQUIRED|NOT_FOUND|INACTIVE`); `src/modules/data-import/employee-import/employee-import-rows.ts:212-223`;
+  `src/modules/organization/employee/employee-row.policy.ts:53-59`; `src/modules/organization/public/employee-placement.policy.ts:17-24,47-49`
+  (`JOB_TITLE_REQUIRED|NOT_FOUND|INACTIVE`); `src/modules/data-import/employee-import/employee-import-rows.policy.ts:212-223`;
   `src/modules/organization/employee/employee.dto.ts:40,78`; năm operation `jobTitle*`; khoảng 82 tệp nguồn tham chiếu.
 - **Dữ liệu:** `employee_placements.job_title_id` NOT NULL FK; `department_transfers.from/to_job_title_id` NOT NULL và CHECK
   cho phép điều chuyển chỉ đổi chức vụ (`20261024140200_personnel_department_transfers/migration.sql:17-18,42,101-105`);
@@ -253,7 +253,7 @@ d.created_at)` (không bao giờ sớm hơn một trong hai dòng, kể cả khi
 - **Nguồn:** `QĐ-87h`(1) DL L2803, `D-15`; `US-04-10` `RETIRED`; `US-05-01` AC-6 _(bỏ)_, `US-05-04` AC-7 _(bỏ)_; BRD
   `FR-3.18` đã bỏ; BEH-05(b).
 - **Code:** `src/modules/requests/access-request/request-assessment.service.ts:118-120`;
-  `src/modules/requests/access-request/access-request.service.ts:89`; nhóm, ủy quyền, gia hạn, xem trước, màn duyệt chi
+  `src/modules/requests/request-submission/access-request.service.ts:89`; nhóm, ủy quyền, gia hạn, xem trước, màn duyệt chi
   (`group-submission-facts.service.ts:105-175`, `renewal-request.service.ts:136,212-213`,
   `spend-approval-view.service.ts:212`); `src/modules/catalog/standard-toolset/standard-toolsets.controller.ts:54-170`;
   `src/modules/onboarding/onboarding.service.ts:50-57,171-180`; `src/modules/personnel/transfer-review/transfer-review.service.ts:51-53` (F42).
@@ -271,7 +271,7 @@ d.created_at)` (không bao giờ sớm hơn một trong hai dòng, kể cả khi
 - **Mức / nhãn:** High · obsolete (+ contract change).
 - **Nguồn:** `QĐ-89a`(2) DL L2874; `INV-03` viết lại; `US-04-08` `RETIRED`; `US-12-13`; BEH-09.
 - **Code:** `src/modules/catalog/subscription/subscription-allocation.controller.ts:56,75,129`; `src/modules/finance/cost-allocation/*`;
-  `src/modules/finance/finance.service.ts:162-185`.
+  `src/modules/finance/public/finance.api.ts:162-185`.
 - **Dữ liệu:** `subscription_cost_allocations`, `_versions`, `_lines` (`prisma/models/finance.prisma:99-144`; trigger bất biến
   và tổng 10 000 ở `20261020180000`; guard ở `20261022110000:113-153`). Không còn consumer ngoài catalog/finance.
   Số phận dữ liệu: P03-D06 = A — bỏ sau bản `pg_dump` được bảo vệ ([spec L.5](spec.md#l5-gỡ-bộ-chuẩn-phân-bổ-chuyển-phòng-tài-khoản-dịch-vụ-và-bản-sao-lưu-p03-d06-f04-f05-f06)).
@@ -296,7 +296,7 @@ d.created_at)` (không bao giờ sớm hơn một trong hai dòng, kể cả khi
 CANCELLED_NOT_APPLICABLE)`; `US-07-07` AC-9.
 - **Code:** `prisma/migrations/20261024080000_licensing_revocation_tasks/migration.sql:76-77`
   (`provisioning_tasks_one_grant_per_assignment` không có điều kiện trạng thái); chỉ mục thu hồi đã đúng (`:78-79`).
-- **Test:** `test/integration/provisioning-revocation-constraints.integration-spec.ts:181-186` khẳng định 23505.
+- **Test:** `test/integration/licensing/provisioning-revocation-constraints.integration-spec.ts:181-186` khẳng định 23505.
 - **Dữ liệu:** nới chỉ mục — dữ liệu hiện có luôn hợp lệ; không backfill. Thực thi lại cấp (`US-07-07`) vẫn ngoài G0–G6 —
   chỉ gỡ chặn.
 
@@ -305,11 +305,11 @@ CANCELLED_NOT_APPLICABLE)`; `US-07-07` AC-9.
 - **Mức / nhãn:** High · contract change (+ migration CHECK).
 - **Nguồn:** `QĐ-90a` DL L2922; BEH-10; `US-07-04` AC-9 (EP-07:192); `US-07-01` AC-7, AC-11; `US-07-02` AC-5.
 - **Code:** `src/modules/licensing/provisioning/provisioning.dto.ts:28` (`handOffBodySchema = completeBodySchema`);
-  `src/modules/licensing/provisioning/provisioning-decision.service.ts:56-75` (`cleanEvidence` trước tiên → 422
+  `src/modules/licensing/provisioning/tasks/provisioning-decision.service.ts:56-75` (`cleanEvidence` trước tiên → 422
   `EVIDENCE_REQUIRED`); `src/modules/licensing/provisioning/provisioning-task.repo.ts:28-38,161-172` (`CLEARED` xóa `lastError`,
   `failureKind`, `failureReason`, `attempts`); CHECK `provisioning_tasks_hand_off_whole`
   (`20261020230100*/migration.sql:73-79`).
-- **Test:** `test/integration/provisioning-decision-http.integration-spec.ts:99-101` khẳng định điều ngược `QĐ-90a`;
+- **Test:** `test/integration/licensing/provisioning-decision-http.integration-spec.ts:99-101` khẳng định điều ngược `QĐ-90a`;
   `provisioning-failure-constraints.integration-spec.ts:250-256`.
 - **Thiết kế (T-8):** bằng chứng = chữ không rỗng (ghi chú), tệp là tùy chọn sau; `ALREADY_GONE` lưu ghi chú làm bằng chứng
   (`revocation.policy.ts:145-146`) ⟹ `aligned` theo thiết kế này. Hoàn tất mọi tác vụ `MANUAL` (K1 → K5) đã đòi bằng chứng
@@ -323,11 +323,11 @@ CANCELLED_NOT_APPLICABLE)`; `US-07-07` AC-9.
 
 - **Mức / nhãn:** High · implementation gap.
 - **Nguồn:** `QĐ-87f`(1) DL L2801; BRD `FR-9.8`; `US-01-01` AC-19; `US-02-04` AC-4; BEH-01.
-- **Code:** `src/modules/installation/installation.service.ts:89-97` (Cost Center `Unit`), `:99-108` (phòng gắn Cost Center),
-  `:110-111` (chức vụ), `:113-132` (Employee Super Admin **và** IT Admin); `src/modules/installation/installation.input.ts:49-53,57`;
+- **Code:** `src/modules/installation/public/installation.api.ts:89-97` (Cost Center `Unit`), `:99-108` (phòng gắn Cost Center),
+  `:110-111` (chức vụ), `:113-132` (Employee Super Admin **và** IT Admin); `src/modules/installation/installation.dto.ts:49-53,57`;
   sự kiện `INSTALLATION.*` không mang dấu _ngoại lệ cài đặt_ (`:64-76`).
-- **Test:** `installation.service.spec.ts:14-39,71-82`; `test/integration/installation.integration-spec.ts:90,147,157,168`;
-  `src/modules/installation/inspect/inspection-facts.ts:8-15` (đòi 1 Cost Center, 1 chức vụ, 2 Employee).
+- **Test:** `installation.service.spec.ts:14-39,71-82`; `test/integration/installation/installation.integration-spec.ts:90,147,157,168`;
+  `src/modules/installation/inspect/inspection-facts.policy.ts:8-15` (đòi 1 Cost Center, 1 chức vụ, 2 Employee).
 - **Dữ liệu:** bản cài đặt cũ giữ sự kiện cũ (append-only); `ops:inspect` phải nhận cả hai tập.
 - **Aligned:** một giao dịch, khóa tư vấn, chạy lại thoát, mật khẩu do người giữ vai đặt.
 
@@ -339,7 +339,7 @@ CANCELLED_NOT_APPLICABLE)`; `US-07-07` AC-9.
 - **Code:** `src/modules/organization/department/departments.controller.ts:36-40` (`IT_ONLY`), `:132,188,214,237,260`
   (`departmentCreate|Update|Deactivate|HeadAssign|HeadVacate`); `src/modules/organization/project/projects.controller.ts:103-105,120-122`;
   `department-head.service.ts:63-170` (không căn cứ); **không có** endpoint chỉ định người kế nhiệm trưởng phòng (`D-5`).
-- **Test:** `test/integration/departments-http.integration-spec.ts:383-396` khẳng định Super Admin bị 403.
+- **Test:** `test/integration/organization/departments-http.integration-spec.ts:383-396` khẳng định Super Admin bị 403.
 - **Wire:** các operation trên đổi vai thành `SUPER_ADMIN`, thêm `hrBasis` bắt buộc (tái dùng
   `src/infrastructure/http/dto/hr-basis.dto.ts:8-13`); thêm operation chỉ định/hủy người kế nhiệm.
 - **Aligned:** Super Admin không làm trưởng phòng, trưởng phòng là thành viên (`department-head.service.ts:82-86`).
@@ -350,7 +350,7 @@ CANCELLED_NOT_APPLICABLE)`; `US-07-07` AC-9.
 - **Nguồn:** `QĐ-87a`, `D-8`, `D-9`; `US-02-02` AC-19; `US-14-06` (nơi nhận yêu cầu chỉnh sửa → Super Admin, `D-3`).
 - **Code:** `src/modules/organization/employee/employee-maintenance.controller.ts:24` (`@RequireRoles('IT_ADMIN')` cấp lớp);
   logic `SoD-5` tự sửa `employee-maintenance.service.ts:68-71` hết đối tượng; chức vụ không sửa được.
-- **Test:** `test/integration/employee-maintenance-http.integration-spec.ts:139-150` (Super Admin 403), `:241-260`.
+- **Test:** `test/integration/notifications/employee-maintenance-http.integration-spec.ts:139-150` (Super Admin 403), `:241-260`.
 - **Wire:** `employeeUpdateOfficialFields` → `SUPER_ADMIN`, thêm `jobTitle` chữ tự do; từ chối hồ sơ của chính Super Admin.
 
 #### F12 — Phạm vi đọc: Super Admin và IT Admin tối thiểu
@@ -430,7 +430,7 @@ CANCELLED_NOT_APPLICABLE)`; `US-07-07` AC-9.
 - **Mức / nhãn:** High · ADR/Owner decision required (T-2).
 - **Nguồn:** `QĐ-87c`(1) → (4) DL L2798, `QĐ-88b` DL L2851; `US-03-11` AC-8; `US-01-09`.
 - **Code:** từ chối tự thao tác chỉ ở tạo/import hồ sơ (`employee-manual.service.ts:87-91`); sự kiện nhân sự chỉ có luật
-  _IT Admin về chính mình_ (`src/modules/personnel/personnel-self-action.policy.ts:8-12`,
+  _IT Admin về chính mình_ (`src/modules/personnel/policies/personnel-self-action.policy.ts:8-12`,
   `src/modules/personnel/transfer/transfer-guard.service.ts:31-38`); không kiểm đối tượng có giữ `SUPER_ADMIN`.
 - **Cần:** chặn tự thao tác trên hồ sơ/sự kiện/`BM-09` của chính Super Admin; thủ tục có kiểm soát khi Super Admin duy nhất
   là đối tượng (P03-D02 = A, Owner 27/10/2026: lệnh `pnpm ops:record-super-admin-event` — [spec
@@ -453,7 +453,7 @@ CANCELLED_NOT_APPLICABLE)`; `US-07-07` AC-9.
 #### F21 — Bước 4 khởi tạo theo `QĐ-89e`
 
 - **Mức / nhãn:** Medium · implementation gap. Phụ thuộc F02, F20, F42.
-- **Code:** `src/modules/data-import/seat-baseline-import/seat-baseline-rows.ts:176-198` (seat cá nhân không có phòng; tài khoản
+- **Code:** `src/modules/data-import/seat-baseline-import/seat-baseline-rows.policy.ts:176-198` (seat cá nhân không có phòng; tài khoản
   dịch vụ lấy `Unit` của phòng người chịu trách nhiệm, không phải phòng sở hữu thuê bao); không có rà soát sau khởi tạo
   (`RevocationSource` không có giá trị tương ứng — `licensing.prisma:188-201`).
 - **Thiết kế:** rà soát mở khi IT Admin chốt bước 4 (`FR-9.4`), người quyết là trưởng phòng **của người giữ** (`US-07-09`
@@ -463,7 +463,7 @@ CANCELLED_NOT_APPLICABLE)`; `US-07-07` AC-9.
 
 - **Mức / nhãn:** Medium · implementation gap.
 - **Nguồn:** `QĐ-87h`(2), `D-14`; `US-03-06` AC-13, AC-17.
-- **Code:** `src/modules/licensing/assignment/department-tools.service.ts:37,48-117`; `assignment.repo.ts:290-326`
+- **Code:** `src/modules/licensing/assignment/department-tools/department-tools.service.ts:37,48-117`; `assignment.repo.ts:290-326`
   (gom seat cá nhân theo **phòng hiện tại của người giữ** `:303`); khóa `K4` không có (`LicenseKey` không có người giữ —
   `licensing.prisma:258-277`); `K1` đang chấm dứt không có nhãn.
 - **Thiết kế:** gom theo phòng sở hữu của Assignment (`QĐ-89a`(1)); `K4` lấy từ khóa đang gán khi có dữ liệu người giữ (nếu
@@ -482,7 +482,7 @@ CANCELLED_NOT_APPLICABLE)`; `US-07-07` AC-9.
 - **Mức / nhãn:** Medium · implementation gap.
 - **Nguồn:** `QĐ-77m` (tính trong cùng giao dịch; cờ audit **và** báo Super Admin); `US-01-05` AC-12, AC-13.
 - **Code:** `src/modules/licensing/provisioning/provisioning-task-frame.service.ts:52-57,90-98` (`countUsableItAdminsExcept`
-  không truyền `tx`); facade `src/modules/identity-access/identity-access.service.ts:137-139` không nhận `tx`; không có thông
+  không truyền `tx`); facade `src/modules/identity-access/public/identity-access.api.ts:137-139` không nhận `tx`; không có thông
   báo Super Admin.
 
 #### F25 — Đảo thứ tự khóa giữa cấp và đóng thất bại
@@ -513,7 +513,7 @@ CANCELLED_NOT_APPLICABLE)`; `US-07-07` AC-9.
   `US-06-09` AC-19, `US-06-10` AC-10, `US-06-12` AC-19; BEH-08.
 - **Code:** trạng thái không biểu diễn được (F01); không đường gửi nào có cổng (`access-request.service.ts:62-83`,
   `group-request.service.ts:106-130`, `service-account-request.service.ts:44-102`, `spend-batch.service.ts:86-110`,
-  `src/modules/budgets/budget/version.service.ts:50-157`); không có trạng thái nháp (`requests.prisma:28-63`);
+  `src/modules/budgets/budget/version/version.service.ts:50-157`); không có trạng thái nháp (`requests.prisma:28-63`);
   `budget-support.service.ts:132-142` gộp _không có Cost Center_ với _không phải Cost Center của bạn_.
 - **Wire:** 409 `FINANCE.SETUP_INCOMPLETE` (spec K), phân biệt với `NO_ACTIVE_BUDGET` và _phòng chưa có trưởng phòng_ (T-3) trên
   `accessRequestSubmit`, `groupRequestSubmit`, `delegatedRequestSend`, `accessRequestServiceAccountSubmit`,
@@ -529,7 +529,7 @@ CANCELLED_NOT_APPLICABLE)`; `US-07-07` AC-9.
   (lượt hằng ngày); `organization-change.listener.ts:44-51`; `step-target.service.ts:130-135`. Trigger đổi trưởng phòng theo
   **thành viên** (`organization-change.listener.ts:53-64`) — Request trả phí giữ phòng lúc gửi thì phải khóa theo
   `access_requests.department_id` như tài khoản dịch vụ (`step-reassignment.repo.ts:136-144`).
-- **Test:** `test/integration/step-reassignment.integration-spec.ts:80-113` chỉ phần mềm nội bộ — `aligned` cho nhánh (a).
+- **Test:** `test/integration/requests/step-reassignment.integration-spec.ts:80-113` chỉ phần mềm nội bộ — `aligned` cho nhánh (a).
 
 #### F29 — Kết cục _bị hủy — người thụ hưởng điều chuyển_
 
@@ -555,7 +555,7 @@ CANCELLED_NOT_APPLICABLE)`; `US-07-07` AC-9.
 
 - **Mức / nhãn:** High · implementation gap.
 - **Nguồn:** BRD `FR-3.20` (tính lại lúc duyệt), mục 5.5.2 (hai Request chạy song song).
-- **Code:** `src/modules/requests/spend/spend-decision.service.ts` khóa riêng Request; `budget-check.service.ts:126-129` đọc
+- **Code:** `src/modules/requests/spend-approval/spend-decision.service.ts` khóa riêng Request; `budget-check.service.ts:126-129` đọc
   _còn lại_ và tổng đang chờ không khóa; `src/modules/budgets/budget/commitment.repo.ts:51-83` chèn không khóa phiên bản;
   Read Committed. Hai Request khác nhau cùng thấy đủ ⟹ cùng `BUDGET_OK`, bỏ qua Finance rà soát bắt buộc.
 - **Cần:** khóa tuần tự theo (Cost Center, năm) — `pg_advisory_xact_lock` trên khóa băm chốt ở spec K, sau khóa Request — giữ qua kiểm tra và
@@ -579,7 +579,7 @@ CANCELLED_NOT_APPLICABLE)`; `US-07-07` AC-9.
   `QĐ-92d`(2) (_không chọn được … kể cả khi đã có phiên bản hiện hành_ — chỉ có nghĩa khi có phiên bản hiện hành thì kết cục này chọn
   được); `US-06-13` AC-13 (`INSUFFICIENT_BUDGET` + phòng chưa có trưởng phòng ⟹ không lưu, lý do duy nhất là thiếu trưởng phòng),
   AC-11 (ví dụ `NO_ACTIVE_BUDGET`, không có chữ _chỉ_). Không còn mâu thuẫn BRD ↔ Story ⟹ P03-D08 đóng, không cần chat Docs sửa Story.
-- **Code:** `src/modules/requests/spend/finance-review.policy.ts:27` trả `NO_BUDGET_TO_MAKE` khi không có năm `NO_ACTIVE_BUDGET`
+- **Code:** `src/modules/requests/finance-review/finance-review.policy.ts:27` trả `NO_BUDGET_TO_MAKE` khi không có năm `NO_ACTIVE_BUDGET`
   (chặn `INSUFFICIENT_BUDGET` dù phòng có trưởng phòng); `spend-budget.listener.ts:48-61` (`waitingForYear`) chỉ chọn Request có năm
   `NO_ACTIVE_BUDGET` ⟹ Request chờ phiên bản sửa đổi từ `INSUFFICIENT_BUDGET` không bao giờ được kiểm lại khi phiên bản được duyệt.
 - **Cần:** _cần sửa ngân sách_ chọn được cho `INSUFFICIENT_BUDGET` và `NO_ACTIVE_BUDGET` khi phòng có trưởng phòng có hiệu lực; bị từ chối
@@ -646,7 +646,7 @@ CANCELLED_NOT_APPLICABLE)`; `US-07-07` AC-9.
 - **Code:** `src/modules/personnel/transfer/transfers.controller.ts:72` (`@RequireRoles('IT_ADMIN')` cấp lớp);
   `src/modules/personnel/leave/long-leaves.controller.ts:55`; `src/modules/personnel/offboarding/offboarding.controller.ts:78`;
   `src/modules/personnel/notice/notice.controller.ts:202,228,272`; `notice-handling.service.ts:157` (IT Admin ghi bản ghi xác minh).
-- **Test:** `test/e2e/department-transfers.e2e-spec.ts:84`, `long-leaves.e2e-spec.ts:80`, `offboarding-cases.e2e-spec.ts:102`,
+- **Test:** `test/http/personnel/department-transfers.http-spec.ts:84`, `long-leaves.e2e-spec.ts:80`, `offboarding-cases.e2e-spec.ts:102`,
   `personnel-notices.e2e-spec.ts:90`, `service-account-handover.e2e-spec.ts:89` khẳng định Super Admin bị 403.
 - **Aligned (giữ):** căn cứ, dời/hủy, một sự kiện chờ, xác minh chỉ ở đường `BM-09`, logic quay lại `QĐ-80`, bước kỹ thuật
   `BM-08` của IT Admin.
@@ -671,7 +671,7 @@ CANCELLED_NOT_APPLICABLE)`; `US-07-07` AC-9.
 - **Nguồn:** `QĐ-87h`(3) DL L2803, `QĐ-89b` DL L2875, `QĐ-90b`, `QĐ-90c`; `US-03-07` AC-1, AC-3, AC-15.
 - **Code:** `src/modules/personnel/transfer-review/transfer-review.service.ts:51-53` (`getStandardToolsetPlanIds` →
   `toolsOutsideStandard`; không còn gì thì không mở rà soát); `transfer-review.policy.ts:22-29`.
-- **Test:** `test/integration/transfer-review-open.integration-spec.ts:11,55,69` khẳng định _ngoài bộ chuẩn_.
+- **Test:** `test/integration/personnel/transfer-review-open.integration-spec.ts:11,55,69` khẳng định _ngoài bộ chuẩn_.
 - **Cần:** liệt kê **mọi** quyền đang giữ (trả phí và nội bộ) + danh sách thông tin phần Request trả phí chưa cấp xong (F29).
 - **Aligned (giữ):** 5 ngày làm việc, không tự thu hồi, quá hạn chỉ nhắc, phòng thiếu trưởng phòng thì chờ, hạn không đặt lại,
   người xác nhận bàn giao gói mất dữ liệu là trưởng phòng mới (`handover-confirmer.policy.ts:60-66`).
@@ -742,7 +742,7 @@ CANCELLED_NOT_APPLICABLE)`; `US-07-07` AC-9.
 
 #### F52 — Suite vai runtime chưa chạy đường G5/G6
 
-- **Mức / nhãn:** Low · implementation gap. `test/integration/database-runtime-role-app.integration-spec.ts:83-125` chỉ phủ đăng nhập,
+- **Mức / nhãn:** Low · implementation gap. `test/integration/_serial/database-runtime-role-app.integration-spec.ts:83-125` chỉ phủ đăng nhập,
   refresh, một ghi audit, mail. Thêm ít nhất một đường ghi G5 (gửi + duyệt) và một G6 (ghi sự kiện) dưới `slm_runtime` — hai suite riêng
   `database-runtime-role-budget-write` và `database-runtime-role-leave-write` (mỗi file một ứng dụng).
 - **Nguồn:** H7 `F-15`/`DB-04`/`Q9` (api/worker không dùng owner/superuser — vai runtime tối thiểu, tracker); Prompt 03 §2 (tương thích vai runtime H7 của đường ghi đã review); Prompt 04 §3 bước 6.
@@ -752,16 +752,16 @@ CANCELLED_NOT_APPLICABLE)`; `US-07-07` AC-9.
 - **Mức / nhãn:** Medium · ADR/Owner decision required. Chín sweeper đăng ký trong module HTTP
   (`organization-http.module.ts:49`, `personnel.module.ts:132,138,169`, `licensing.module.ts:136,167,170,180`,
   `catalog.module.ts:141`), mỗi giờ, mỗi instance; idempotent bằng dấu dòng. Worker chỉ chạy mail và `RequestWorkLoop`
-  (`src/worker.module.ts:12-24`, `src/request-work.loop.ts:49-54`). P03-D12.
+  (`src/worker/worker.module.ts:12-24`, `src/worker/request-work.job.ts:49-54`). P03-D12.
 
 #### F54 — Allowlist nội module tăng
 
-- **Mức / nhãn:** Medium · ADR/Owner decision required. `src/architecture-structure.spec.ts:34-43` — 136 mục, khoảng 75 mục G5/G6
+- **Mức / nhãn:** Medium · ADR/Owner decision required. `test/gates/architecture-structure.gate-spec.ts:34-43` — 136 mục, khoảng 75 mục G5/G6
   mở repo xuyên capability trong `requests`. Không có vi phạm ẩn (ledger rỗng). P03-D13.
 
 #### F55 — Gate collection và `LD-13`
 
-- **Mức / nhãn:** Medium · ADR/Owner decision required. Gate chỉ duyệt GET (`src/api-collection-contract.spec.ts:1715-1718`);
+- **Mức / nhãn:** Medium · ADR/Owner decision required. Gate chỉ duyệt GET (`test/gates/api-collection-contract.gate-spec.ts:1715-1718`);
   khoảng 175 mảng phản hồi không có `maxItems`, gồm phản hồi POST (`openapi.json` `PreviewResponseDto`,
   `EmployeeImportConfirmationResponseDto`); `LD-13` điểm 1 → 7 còn mở (`api-list-detail-contract-remediation`). P03-D14.
 
@@ -983,7 +983,7 @@ chỉ từ đề xuất: `INITIAL` chỉ tạo qua `createFromProposal`, `REVISI
 - **Nguồn:** `QĐ-92b`(1) → (5); BRD `FR-5.14` dòng _Phiên bản ngân sách chờ duyệt_, _Request chờ phiên bản…_ và bốn dòng mới; `US-12-15` dòng
   18, 40, 41, 47, 48, 52 → 55, AC-24, luồng phụ (ngoại lệ có chủ đích của dòng 53); `US-06-10` AC-11, AC-12, `US-06-11` AC-3, AC-10,
   `US-06-09` AC-21, `US-06-13` AC-9, AC-11; `T-11` (thông báo giữ chờ cho trưởng phòng đầu tiên được gán).
-- **Code:** bảng mã đóng `IN_APP_NOTIFICATION_CODES` (`src/modules/notifications/notifications.types.ts:47`) và `PARAM_KEYS_BY_CODE`
+- **Code:** bảng mã đóng `IN_APP_NOTIFICATION_CODES` (`src/modules/notifications/public/notifications.types.ts:47`) và `PARAM_KEYS_BY_CODE`
   (`inbox/inbox.policy.ts:28-61`) không có mã nào cho đề xuất/phiên bản ngân sách hay vòng Finance–trưởng phòng; `src/modules/budgets` không
   gọi hộp thông báo; bộ chiếu trạng thái Request (`src/modules/requests/status/status-rules.*.ts`) không có quy tắc cho sự kiện kiểm tra ngân
   sách, mở/hoàn tất Finance rà soát hay chờ phiên bản. `g5-request-status-notifications` spec mục _Explicit out of scope_ giao các thông báo
@@ -1343,7 +1343,7 @@ của từng finding nằm ở mục 3; bảng dưới ghi trạng thái từng 
 | `OPENAPI-EXAMPLE.1-F9`                                        | Mở — năm lỗi runtime nằm trong F37 và F36 (theo inventory G5/G6 của Prompt 02)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | `openapi-response-examples` spec                                                                               |
 | `OPENAPI-EXAMPLE.1-F11`                                       | Đóng (Prompt 02)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | spec Prompt 02                                                                                                 |
 | `P02-DEC-1`, `P02-DEC-2`                                      | Đã áp trong mã                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | `budget.http-errors.ts:145-159`; `budget-proposals.controller.ts:120`                                          |
-| `LD-13` điểm 1 → 7                                            | Mở, ngoài Prompt 04 trừ mục registry của operation bị gỡ — F55 / P03-D14                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | gate `src/api-collection-contract.spec.ts:260-433`                                                             |
+| `LD-13` điểm 1 → 7                                            | Mở, ngoài Prompt 04 trừ mục registry của operation bị gỡ — F55 / P03-D14                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | gate `test/gates/api-collection-contract.gate-spec.ts:260-433`                                                 |
 | `LD-R2-RV-01` → `-03`                                         | Đóng (09A, 09B)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | gate `:48-58`, `:1678`, `:1994-2002`                                                                           |
 | `GATE-RV-01`                                                  | Đóng (09C)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | `scripts/verify/git-bash.mjs`                                                                                  |
 | `BBI-E01`                                                     | Đóng trong mã                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | `budget.policy.ts:68-69`; `budget-check.policy.ts:99-110`                                                      |

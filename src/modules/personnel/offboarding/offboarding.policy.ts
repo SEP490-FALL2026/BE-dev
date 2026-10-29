@@ -1,6 +1,6 @@
 import { addDays, type BusinessDate } from '../../../core/business-date';
 import { addWorkingDays, type NonWorkingDates } from '../../../core/working-days';
-import { groundsRefusal, type GroundsInput } from '../grounds/grounds.policy';
+import { groundsRefusal, type GroundsInput } from '../policies/grounds.policy';
 import type { OffboardingState } from './offboarding.types';
 
 /** What the policy refuses, as a semantic code (`OFFBOARDING_CASE.<code>` on the wire) and the facts a person needs to put it right. */

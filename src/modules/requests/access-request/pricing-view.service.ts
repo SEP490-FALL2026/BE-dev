@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { formatAmount } from '../../../core/money/money';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { FinanceService } from '../../finance/finance.service';
-import type { TaxEstimateBasis, TaxGroup } from '../../finance/finance.types';
+import { FinanceApi } from '../../finance/public/finance.api';
+import type { TaxEstimateBasis, TaxGroup } from '../../finance/public/finance.types';
 import type { PricingRecord } from './access-request.types';
 
 export interface MoneyView {
@@ -44,7 +44,7 @@ export interface CostEstimateView {
 /** Writes the money and the estimated tax of a request for a reader; one read of the currencies, never one per amount. */
 @Injectable()
 export class PricingViewService {
-  constructor(private readonly finance: FinanceService) {}
+  constructor(private readonly finance: FinanceApi) {}
 
   async view(pricing: PricingRecord): Promise<PricingView> {
     const units = await this.minorUnits(pricing.amount?.currency ?? pricing.unitPrice?.currency);

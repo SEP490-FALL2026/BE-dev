@@ -2,10 +2,10 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EnvironmentVariables } from '../../../infrastructure/config/env-schema';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { ActionTokenPurpose, ActionTokenRevokedReason, ActionTokenSnapshot } from '../identity-access.types';
-import { ActionLinkState } from '../policies/account-policy';
+import { ActionTokenPurpose, ActionTokenRevokedReason, ActionTokenSnapshot } from '../public/identity-access.types';
+import { ActionLinkState } from '../policies/account.policy';
 import { ActionTokenRepo } from './action-token.repo';
-import { hashActionToken, isWellFormedActionToken, newActionToken } from './action-token';
+import { hashActionToken, isWellFormedActionToken, newActionToken } from './action-token.policy';
 
 /** Which configured lifetime a new link gets: an invitation's, or a password reset's (T-1). */
 export type ActionLinkLifetime = 'INVITATION' | 'PASSWORD_RESET';

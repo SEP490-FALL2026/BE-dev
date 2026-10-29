@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import type { AuditCursor } from '../../audit/audit.types';
+import type { AuditCursor } from '../../audit/public/audit.types';
 
 const CURSOR_NAME = 'REQUEST_STATUS';
 

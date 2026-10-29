@@ -1,15 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { DbTx, TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { AuditService } from '../../audit/audit.service';
-import { IdentityAccessService } from '../../identity-access/identity-access.service';
-import { NotificationsService } from '../../notifications/notifications.service';
-import { OrganizationService } from '../../organization/organization.service';
-import { ProvisioningTaskNotFoundError } from '../licensing.errors';
-import type { SelfExecutionMode } from '../licensing.types';
-import { licensingAuditEvent } from '../mappers/licensing-audit-event';
+import { AuditApi } from '../../audit/public/audit.api';
+import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
+import { NotificationsApi } from '../../notifications/public/notifications.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
+import { ProvisioningTaskNotFoundError } from '../public/licensing.errors';
+import type { SelfExecutionMode } from '../public/licensing.types';
+import { licensingAuditEvent } from '../mappers/licensing-audit-event.mapper';
 import { assertItAdmin, selfExecution } from './provisioning.policy';
-import type { ProvisioningTaskRecord } from './provisioning-task.record';
+import type { ProvisioningTaskRecord } from './provisioning-task.types';
 import { ProvisioningTaskRepo } from './provisioning-task.repo';
 
 /** What a write of one of the actions decided: the audit action and the after-snapshot, or nothing changed. */
@@ -33,10 +33,10 @@ export interface TaskWorkContext {
 export class ProvisioningTaskFrame {
   constructor(
     private readonly repo: ProvisioningTaskRepo,
-    private readonly organization: OrganizationService,
-    private readonly identity: IdentityAccessService,
-    private readonly notifications: NotificationsService,
-    private readonly audit: AuditService,
+    private readonly organization: OrganizationApi,
+    private readonly identity: IdentityAccessApi,
+    private readonly notifications: NotificationsApi,
+    private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
   ) {}
 

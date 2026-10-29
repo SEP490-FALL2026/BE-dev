@@ -4,17 +4,17 @@ import { Page, pageOf } from '../../../core/application/pagination';
 import type { LicenseKeyStatus } from '../../../generated/prisma/client';
 import { DbTx, TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { AuditService } from '../../audit/audit.service';
-import { CatalogService } from '../../catalog/catalog.service';
-import { OrganizationService } from '../../organization/organization.service';
+import { AuditApi } from '../../audit/public/audit.api';
+import { CatalogApi } from '../../catalog/public/catalog.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
 import {
   LicenseKeyNotFoundError,
   LicenseKeyPlanNotK4Error,
   LicenseKeyRevealLimitError,
   SeatTargetNotFoundError,
-} from '../licensing.errors';
-import { licensingAuditEvent } from '../mappers/licensing-audit-event';
-import { LicenseKeyCipher } from './license-key-cipher';
+} from '../public/licensing.errors';
+import { licensingAuditEvent } from '../mappers/licensing-audit-event.mapper';
+import { LicenseKeyCipher } from './license-key-cipher.service';
 import { LicenseKeyApplicationRetiredError } from './license-key.errors';
 import {
   capacityOf,
@@ -54,9 +54,9 @@ export class LicenseKeyService {
     private readonly repo: LicenseKeyRepo,
     private readonly quota: LicenseKeyRevealQuotaRepo,
     private readonly cipher: LicenseKeyCipher,
-    private readonly catalog: CatalogService,
-    private readonly organization: OrganizationService,
-    private readonly audit: AuditService,
+    private readonly catalog: CatalogApi,
+    private readonly organization: OrganizationApi,
+    private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
   ) {}
 

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { OrganizationService } from '../../organization/organization.service';
+import { OrganizationApi } from '../../organization/public/organization.api';
 import { ApplicationRepo } from './application.repo';
 import type { ApplicationKind, CatalogStatus } from './application.types';
 
@@ -16,7 +16,7 @@ export interface LockedApplication {
 export class ApplicationLookupService {
   constructor(
     private readonly applications: ApplicationRepo,
-    private readonly organization: OrganizationService,
+    private readonly organization: OrganizationApi,
   ) {}
 
   /** The application, locked `FOR SHARE` until the transaction ends so it cannot be retired meanwhile; null if absent. */

@@ -1,15 +1,20 @@
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import type { DbTx } from '../../src/infrastructure/database/transaction-runner';
-import { LicensingService } from '../../src/modules/licensing/licensing.service';
+import { LicensingApi } from '../../src/modules/licensing/public/licensing.api';
 import {
-  GRANT_REQUEST_GATE,
-  type GrantOutcome,
-  type GrantRequestAnswer,
+  GrantRequestGateHook,
   type GrantRequestGate,
-  type ProvisioningFailureKind,
-} from '../../src/modules/licensing/licensing.types';
-import { ApiAccount, createActivatedAccount } from './api-accounts';
+} from '../../src/modules/licensing/public/licensing.extension-points';
+import type {
+  GrantOutcome,
+  GrantRequestAnswer,
+  ProvisioningFailureKind,
+} from '../../src/modules/licensing/public/licensing.types';
+import type { ApiAccount } from './api-accounts';
+import { buildActivatedAccount } from './builders/account.builder';
+import { createDepartment, enterEmployee } from './builders/organization.builder';
+import { StandInGrantRequestGateHook } from './grant-gate-stand-in';
 import { SeatHarness } from './seat-baseline-harness';
 import { HR_BASIS } from './hr-basis';
 
@@ -125,7 +130,10 @@ export class ProvisioningHarness extends SeatHarness {
   override async start(options: Parameters<SeatHarness['start']>[0] = {}): Promise<void> {
     await super.start({
       ...options,
-      providerOverrides: [{ token: GRANT_REQUEST_GATE, useValue: this.gate }, ...(options.providerOverrides ?? [])],
+      providerOverrides: [
+        { token: GrantRequestGateHook, useValue: new StandInGrantRequestGateHook(this.gate) },
+        ...(options.providerOverrides ?? []),
+      ],
     });
     this.gate.defaultDepartmentId = this.seed.departmentId;
   }
@@ -133,64 +141,49 @@ export class ProvisioningHarness extends SeatHarness {
   /** Today in the calendar of the organization (the seeded one is Asia/Ho_Chi_Minh). */
   today = (): string => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date());
 
-  private created = (response: request.Response): request.Response => {
-    if (response.status !== 201) throw new Error(`${response.status} ${JSON.stringify(response.body)}`);
-
-    return response;
-  };
-
   /** A job title is free text on the person (`QĐ-87e`): there is nothing to create, so the name is the title. */
   jobTitle(name: string): Promise<string> {
     return Promise.resolve(name);
   }
 
   /**
-   * A department the Super Admin creates (with no Cost Center) and the Cost Center Finance creates for it (`QĐ-87d(1)`).
+   * A department the Super Admin creates (with no Cost Center) and the Cost Center Finance creates for it (`QĐ-87d(1)`), both
+   * through the services (T2.2: no HTTP).
    */
   async department(code: string, itAdminEmployeeId?: string): Promise<{ id: string; code: string }> {
-    const department = this.dataOf<{ id: string; code: string }>(
-      await request(this.server())
-        .post('/api/v1/departments')
-        .set({ Authorization: `Bearer ${this.admin}` })
-        .send({
-          code,
-          name: `Department ${code}`,
-          hrBasis: HR_BASIS,
-          ...(itAdminEmployeeId ? { itAdminEmployeeId } : {}),
-        })
-        .then(this.created),
-    );
+    const department = await createDepartment(this.ctx, this.admin, {
+      code,
+      name: `Department ${code}`,
+      hrBasis: HR_BASIS,
+      ...(itAdminEmployeeId ? { itAdminEmployeeId } : {}),
+    });
     await this.costCenterFor(department.id);
 
     return department;
   }
 
-  /** A person of the company in this department, with the work email `code@acme.vn`. */
+  /** A person of the company in this department, with the work email `code@acme.vn`, entered by the Super Admin (T2.2: no HTTP). */
   async member(departmentCode: string, code: string, jobTitle: string): Promise<string> {
-    return this.dataOf<{ id: string }>(
-      await request(this.server())
-        .post('/api/v1/employees')
-        .set({ Authorization: `Bearer ${this.admin}` })
-        .send({
-          hrBasis: HR_BASIS,
-          employeeCode: code,
-          fullName: `Person ${code}`,
-          workEmail: `${code.toLowerCase()}@acme.vn`,
-          employmentType: 'STAFF',
-          hireDate: '2026-10-01',
-          departmentCode,
-          jobTitle,
-        })
-        .then(this.created),
+    return (
+      await enterEmployee(this.ctx, this.admin, {
+        hrBasis: HR_BASIS,
+        employeeCode: code,
+        fullName: `Person ${code}`,
+        workEmail: `${code.toLowerCase()}@acme.vn`,
+        employmentType: 'STAFF',
+        hireDate: '2026-10-01',
+        departmentCode,
+        jobTitle,
+      })
     ).id;
   }
 
+  /** An activated account of the employee holding `roles`, signed in (T2.2: built, not invited through HTTP). */
   account(code: string, employeeId: string, roles: string[]): Promise<ApiAccount> {
-    return createActivatedAccount(this.ctx, this.seed, {
+    return buildActivatedAccount(this.ctx, this.seed, {
       code,
       email: `${code.toLowerCase()}@acme.vn`,
       roles,
-      admin: this.admin,
       employeeId,
     });
   }
@@ -271,7 +264,7 @@ export class ProvisioningHarness extends SeatHarness {
 
   /** What the connector will call when a try fails (`US-07-03` does not exist yet): the facade of the module. */
   recordFailure = (taskId: string, kind: ProvisioningFailureKind, detail = `error of ${kind}`, now?: Date) =>
-    this.ctx.app.get(LicensingService).recordProvisioningFailure({ taskId, kind, detail, ...(now ? { now } : {}) });
+    this.ctx.app.get(LicensingApi).recordProvisioningFailure({ taskId, kind, detail, ...(now ? { now } : {}) });
 
   /** A task of the connector: no connector exists, so a task by hand is moved to that channel the way G7 will make it. */
   async makeConnector(taskId: string): Promise<void> {

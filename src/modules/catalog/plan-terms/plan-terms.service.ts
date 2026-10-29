@@ -3,9 +3,9 @@ import { Page, pageOf } from '../../../core/application/pagination';
 import type { BusinessDate } from '../../../core/business-date';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { AuditService } from '../../audit/audit.service';
-import { OrganizationService } from '../../organization/organization.service';
-import { catalogAuditEvent } from '../mappers/catalog-audit-event';
+import { AuditApi } from '../../audit/public/audit.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
+import { catalogAuditEvent } from '../mappers/catalog-audit-event.mapper';
 import { PlanLookupService } from '../plan/plan-lookup.service';
 import { SubscriptionNoticeService } from '../subscription/subscription-notice.service';
 import { PlanTermsPlanNotFoundError, PlanTermsTextInvalidError } from './plan-terms.errors';
@@ -83,8 +83,8 @@ export class PlanTermsService {
     private readonly terms: PlanTermsRepo,
     private readonly plans: PlanLookupService,
     private readonly notices: SubscriptionNoticeService,
-    private readonly organization: OrganizationService,
-    private readonly audit: AuditService,
+    private readonly organization: OrganizationApi,
+    private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
   ) {}
 

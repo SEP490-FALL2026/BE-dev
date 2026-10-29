@@ -1,10 +1,10 @@
 import { Test } from '@nestjs/testing';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { CatalogService } from '../../catalog/catalog.service';
-import { LicensingService } from '../../licensing/licensing.service';
-import { OperatingParametersService } from '../../operating-parameters/operating-parameters.service';
-import { FinanceSetupIncompleteError } from '../../organization/organization.errors';
-import { OrganizationService } from '../../organization/organization.service';
+import { CatalogApi } from '../../catalog/public/catalog.api';
+import { LicensingApi } from '../../licensing/public/licensing.api';
+import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
+import { FinanceSetupIncompleteError } from '../../organization/public/organization.errors';
+import { OrganizationApi } from '../../organization/public/organization.api';
 import { AccessRequestPlanNotFoundError } from './access-request.errors';
 import { RequestAssessmentService, type AssessmentInput } from './request-assessment.service';
 import { RoutingFactsService } from './routing-facts.service';
@@ -77,11 +77,11 @@ describe('RequestAssessmentService.assess', () => {
     const module = await Test.createTestingModule({
       providers: [
         RequestAssessmentService,
-        { provide: OrganizationService, useValue: organization },
-        { provide: CatalogService, useValue: catalog },
+        { provide: OrganizationApi, useValue: organization },
+        { provide: CatalogApi, useValue: catalog },
         { provide: RoutingFactsService, useValue: routing },
-        { provide: OperatingParametersService, useValue: { getValue: jest.fn() } },
-        { provide: LicensingService, useValue: licensing },
+        { provide: OperatingParametersApi, useValue: { getValue: jest.fn() } },
+        { provide: LicensingApi, useValue: licensing },
       ],
     }).compile();
     service = module.get(RequestAssessmentService);

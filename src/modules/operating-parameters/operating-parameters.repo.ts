@@ -4,7 +4,7 @@ import { Prisma } from '../../generated/prisma/client';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { DbTx } from '../../infrastructure/database/transaction-runner';
 import { isUniqueViolation } from '../../infrastructure/database/unique-violation';
-import { ParameterValue } from './parameter-definitions';
+import { ParameterValue } from './parameter-definitions.policy';
 
 export interface ParameterRow {
   key: string;

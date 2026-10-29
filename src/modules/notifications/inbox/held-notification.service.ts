@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { InvalidInAppNotificationError } from '../notifications.errors';
-import type { HeldDepartmentNotificationInput } from '../notifications.types';
+import { InvalidInAppNotificationError } from '../public/notifications.errors';
+import type { HeldDepartmentNotificationInput } from '../public/notifications.types';
 import { HeldNotificationRepo } from './held-notification.repo';
 import { InboxService } from './inbox.service';
 import { isKnownCode, refuseInAppNotification } from './inbox.policy';

@@ -3,10 +3,10 @@ import { Page, pageOf } from '../../../core/application/pagination';
 import type { BusinessDate } from '../../../core/business-date';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { AuditService } from '../../audit/audit.service';
-import { OrganizationService } from '../../organization/organization.service';
-import type { EmptyState } from '../catalog.types';
-import { catalogAuditEvent } from '../mappers/catalog-audit-event';
+import { AuditApi } from '../../audit/public/audit.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
+import type { EmptyState } from '../public/catalog.types';
+import { catalogAuditEvent } from '../mappers/catalog-audit-event.mapper';
 import { PlanLookupService, type LockedPlan } from '../plan/plan-lookup.service';
 import {
   SubscriptionApplicationRetiredError,
@@ -17,10 +17,10 @@ import {
   SubscriptionUpdateEmptyError,
 } from './subscription.errors';
 import { assertQuantityNotBelowOccupied } from './seat-guard.policy';
-import { SeatOccupancyRegistry } from './seat-occupancy.registry';
+import { SeatOccupancyHook } from '../public/catalog.extension-points';
 import { assertSubscriptionShape, deriveNotice, missingData, noticeInputOf } from './subscription.policy';
 import { SubscriptionRepo } from './subscription.repo';
-import { sameState, snapshotOf, stateOf } from './subscription.state';
+import { sameState, snapshotOf, stateOf } from './subscription.mapper';
 import { SubscriptionObligationService } from './subscription-obligation.service';
 import { SubscriptionPricingService } from './subscription-pricing.service';
 import { SubscriptionViewService } from './subscription-view.service';
@@ -78,9 +78,9 @@ export class SubscriptionService {
     private readonly pricing: SubscriptionPricingService,
     private readonly obligation: SubscriptionObligationService,
     private readonly views: SubscriptionViewService,
-    private readonly organization: OrganizationService,
-    private readonly occupancy: SeatOccupancyRegistry,
-    private readonly audit: AuditService,
+    private readonly organization: OrganizationApi,
+    private readonly occupancy: SeatOccupancyHook,
+    private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
   ) {}
 
@@ -346,7 +346,7 @@ export class SubscriptionService {
   ): Promise<void> {
     if (requested === undefined || current === null || requested >= current) return;
     const today = await this.organization.businessToday(new Date(), tx);
-    const occupied = await this.occupancy.current().occupiedBySubscription(subscriptionId, today, tx);
+    const occupied = await this.occupancy.get().occupiedBySubscription(subscriptionId, today, tx);
     assertQuantityNotBelowOccupied({ requested, occupied });
   }
 

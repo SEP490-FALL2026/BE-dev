@@ -23,11 +23,11 @@
 - Files: `prisma/models/requests.prisma`, quan hệ ngược ở `organization.prisma` và `catalog.prisma`, `prisma/migrations/20261023100000_requests_access_request_core/migration.sql`.
 - Depends on: Task 1.
 - Acceptance: ba bảng với CHECK, UNIQUE và FK `RESTRICT` của spec; không drift giữa migration và schema.
-- Verify: áp mọi migration vào CSDL rỗng rồi `prisma migrate diff --from-config-datasource --to-schema prisma --exit-code` → 0; `test/integration/access-request-constraints.integration-spec.ts` → 22 ca xanh.
+- Verify: áp mọi migration vào CSDL rỗng rồi `prisma migrate diff --from-config-datasource --to-schema prisma --exit-code` → 0; `test/integration/requests/access-request-constraints.integration-spec.ts` → 22 ca xanh.
 
 ### Task 3: hợp đồng đọc vai duyệt của `identity-access`
 
-- Files: `approval-roles/approval-role-reader.repo.ts`, `approval-roles/approval-role-holders.service.ts`, `identity-access.service.ts`, `identity-access-facade.module.ts`, `identity-access.types.ts`, `src/architecture-structure.spec.ts` (một mục registry).
+- Files: `approval-roles/approval-role-reader.repo.ts`, `approval-roles/approval-role-holders.service.ts`, `identity-access.service.ts`, `identity-access-facade.module.ts`, `identity-access.types.ts`, `test/gates/architecture-structure.gate-spec.ts` (một mục registry).
 - Depends on: Task 2.
 - Acceptance: facade `getApprovalRoleHolders` trả người giữ ba vai hiện tại; không đổi hành vi hiện có; gate cấu trúc xanh không thêm ledger.
 - Verify: `pnpm exec jest src/architecture src/module-graph` → xanh.
@@ -41,10 +41,10 @@
 
 ### Task 5: use case gửi, đọc và API
 
-- Files: `requests/access-request/` (`access-request.service.ts`, `access-request-query.service.ts`, `access-request.repo.ts`, `routing-facts.service.ts`, `access-requests.controller.ts`, DTO, lỗi, mapper lỗi HTTP, audit), `requests.module.ts`, `app.module.ts`, `architecture-boundaries.spec.ts` (chủ bảng), `test/support/api-coverage-manifest.ts`, `test/e2e/api-inventory.e2e-spec.ts` (146 → 148 operation), `openapi.json`.
+- Files: `requests/access-request/` (`access-request.service.ts`, `access-request-query.service.ts`, `access-request.repo.ts`, `routing-facts.service.ts`, `access-requests.controller.ts`, DTO, lỗi, mapper lỗi HTTP, audit), `requests.module.ts`, `app/app.module.ts`, `architecture-boundaries.spec.ts` (chủ bảng), `test/support/api-coverage-manifest.ts`, `test/http/platform/api-inventory.http-spec.ts` (146 → 148 operation), `openapi.json`.
 - Depends on: Task 2, 3, 4.
 - Acceptance: AC của bảng Primary; một transaction ghi Request, người thụ hưởng, bước và hai sự kiện audit; response không mảng.
-- Verify: `test/integration/access-request-http.integration-spec.ts` → 30 ca xanh; `pnpm test:e2e` → 839 ca xanh; `pnpm openapi:export` → diff chỉ thêm hai operation.
+- Verify: `test/integration/audit/access-request-http.integration-spec.ts` → 30 ca xanh; `pnpm test:e2e` → 839 ca xanh; `pnpm openapi:export` → diff chỉ thêm hai operation.
 
 ### Checkpoint
 

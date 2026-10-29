@@ -1,12 +1,12 @@
 import request from 'supertest';
 import { TransactionRunner } from '../../src/infrastructure/database/transaction-runner';
-import { OrganizationService } from '../../src/modules/organization/organization.service';
-import type { NewOrganizationChange } from '../../src/modules/organization/organization.types';
+import { OrganizationApi } from '../../src/modules/organization/public/organization.api';
+import type { NewOrganizationChange } from '../../src/modules/organization/public/organization.types';
 import { StepReassignmentService } from '../../src/modules/requests/reassignment/step-reassignment.service';
 import {
-  StepRedeterminationSweepService,
+  StepRedeterminationSweepApi,
   type SweepResult,
-} from '../../src/modules/requests/step-redetermination-sweep.service';
+} from '../../src/modules/requests/public/step-redetermination-sweep.api';
 import type { ApiAccount } from './api-accounts';
 import { HR_BASIS } from './hr-basis';
 import { SpendHarness } from './spend-harness';
@@ -52,7 +52,7 @@ export interface WaitWire {
  */
 export class ReassignmentHarness extends SpendHarness {
   private runner = () => this.ctx.app.get(TransactionRunner, { strict: false });
-  private organization = () => this.ctx.app.get(OrganizationService, { strict: false });
+  private organization = () => this.ctx.app.get(OrganizationApi, { strict: false });
 
   /** Announces a change of the organization in a transaction of its own, as the item that writes it will in its own. */
   async emit(change: NewOrganizationChange): Promise<void> {
@@ -105,12 +105,12 @@ export class ReassignmentHarness extends SpendHarness {
       .send({ effectiveFrom: this.today(), hrBasis: HR_BASIS });
 
   /** A sweep of the worker that has not run the pass of the day yet, which is what the first sweep of a worker does. */
-  freshSweep(): StepRedeterminationSweepService {
+  freshSweep(): StepRedeterminationSweepApi {
     const app = this.ctx.app;
 
-    return new StepRedeterminationSweepService(
+    return new StepRedeterminationSweepApi(
       app.get(StepReassignmentService, { strict: false }),
-      app.get(OrganizationService, { strict: false }),
+      app.get(OrganizationApi, { strict: false }),
     );
   }
 

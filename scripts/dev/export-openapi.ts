@@ -12,8 +12,8 @@ async function exportOpenApi(outputPath: string): Promise<void> {
   // The document depends on the routes and API_PREFIX, never on a secret or a connection. The configuration module
   // validates when the graph is imported, so the graph is imported inside the export-only environment.
   const document = await withExportOnlyEnvironment(async () => {
-    const { AppModule } = await import('../../src/app.module');
-    const { configureApplication, createOpenApiDocument } = await import('../../src/bootstrap');
+    const { AppModule } = await import('../../src/app/app.module');
+    const { configureApplication, createOpenApiDocument } = await import('../../src/app/configure-application');
 
     // abortOnError: false — by default Nest calls process.exit on a start-up error, which would skip the `finally`
     // that restores the environment and removes the temporary folder, and the one-line message below.

@@ -2,7 +2,7 @@ import { HttpStatus } from '@nestjs/common';
 import { TransientDatabaseError } from '../../../infrastructure/database/transaction-runner';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { EmployeeNotFoundError } from '../../organization/organization.errors';
+import { EmployeeNotFoundError } from '../../organization/public/organization.errors';
 import {
   ApprovalRoleHolderInvalidError,
   ApprovalRoleHolderProblem,

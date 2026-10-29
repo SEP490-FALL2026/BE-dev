@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { randomBytes } from 'node:crypto';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { ACCOUNT_SESSIONS, AccountSessions } from '../identity-access.ports';
+import { ACCOUNT_SESSIONS, AccountSessions } from '../account-sessions.extension-points';
 import { ActionLinkRevocation } from '../accounts/action-link-revocation.service';
 import { CredentialService } from '../accounts/credential.service';
 

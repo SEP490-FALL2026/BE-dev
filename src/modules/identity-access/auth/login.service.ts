@@ -1,11 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { InvalidEmailError, normalizeEmail } from '../../../core/email';
 import { TransactionRunner, toTransientError } from '../../../infrastructure/database/transaction-runner';
-import { OrganizationService } from '../../organization/organization.service';
+import { OrganizationApi } from '../../organization/public/organization.api';
 import { AccountDirectoryService } from '../accounts/account-directory.service';
 import { CredentialService } from '../accounts/credential.service';
-import { AccountSnapshot, IssuedSession } from '../identity-access.types';
-import { employeeHasNotLeft } from '../policies/account-policy';
+import { AccountSnapshot, IssuedSession } from '../public/identity-access.types';
+import { employeeHasNotLeft } from '../policies/account.policy';
 import { InvalidCredentialsError } from './auth.errors';
 import { LoginThrottle } from './login-throttle.service';
 import { SessionTokenService } from './session-token.service';
@@ -14,7 +14,7 @@ import { SessionTokenService } from './session-token.service';
 export class LoginService {
   constructor(
     private readonly accounts: AccountDirectoryService,
-    private readonly organization: OrganizationService,
+    private readonly organization: OrganizationApi,
     private readonly credentials: CredentialService,
     private readonly throttle: LoginThrottle,
     private readonly sessionTokens: SessionTokenService,

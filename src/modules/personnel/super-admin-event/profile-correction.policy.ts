@@ -1,8 +1,8 @@
 import { normalizeDisplayName } from '../../../core/display-name';
 import { InvalidEmailError, normalizeEmail } from '../../../core/email';
-import { isJobTitleTooLong, placementReasons } from '../../organization/employee-placement.policy';
-import type { EmployeeRecord, OfficialFieldsPatch } from '../../organization/organization.types';
-import type { ProfileCorrection } from './super-admin-event.types';
+import { isJobTitleTooLong, placementReasons } from '../../organization/public/employee-placement.policy';
+import type { EmployeeRecord, OfficialFieldsPatch } from '../../organization/public/organization.types';
+import type { ProfileCorrection } from '../public/super-admin-event.types';
 
 /** What the correction would change, what it was, and why it must be refused. Pure: no store, no clock. */
 export interface ProfilePlan {

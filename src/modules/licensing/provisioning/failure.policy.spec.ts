@@ -1,4 +1,4 @@
-import { ProvisioningTaskAlreadyManualError, ProvisioningTaskStateError } from '../licensing.errors';
+import { ProvisioningTaskAlreadyManualError, ProvisioningTaskStateError } from '../public/licensing.errors';
 import {
   assertDecidable,
   assertHandOffAllowed,

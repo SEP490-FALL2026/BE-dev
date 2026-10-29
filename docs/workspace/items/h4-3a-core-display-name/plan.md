@@ -49,7 +49,7 @@ data-import và ba gate — 7 suite/126 test xanh. `openapi.json` `14fd428b…`.
 
 ### Task 4: ratchet ledger
 
-- Files: `src/architecture-boundaries.spec.ts`.
+- Files: `test/gates/architecture-boundaries.gate-spec.ts`.
 - Depends on: Task 3.
 - Acceptance: trước khi gỡ, gate báo đúng hai mục stale; sau khi gỡ, ba gate xanh; thêm lại một import data-import →
   `job-title-name.ts` làm gate đỏ (mutation tạm, khôi phục byte).

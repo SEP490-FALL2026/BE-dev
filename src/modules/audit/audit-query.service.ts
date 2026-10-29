@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { AuditEventFilter } from './audit-filter';
+import { AuditEventFilter } from './audit-filter.repo';
 import { AuditQueryRepo } from './audit-query.repo';
-import { StoredAuditEvent } from './audit.types';
+import { StoredAuditEvent } from './public/audit.types';
 
 export interface AuditEventPage {
   items: StoredAuditEvent[];

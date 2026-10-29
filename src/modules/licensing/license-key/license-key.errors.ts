@@ -5,3 +5,11 @@ export class LicenseKeyApplicationRetiredError extends Error {
     this.name = 'LicenseKeyApplicationRetiredError';
   }
 }
+
+/** A sealed key that does not open: an unknown key id, a ciphertext of another row, or one that was touched. */
+export class LicenseKeyDecryptionError extends Error {
+  constructor() {
+    super('A license key could not be decrypted.');
+    this.name = 'LicenseKeyDecryptionError';
+  }
+}

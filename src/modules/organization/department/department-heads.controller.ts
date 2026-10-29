@@ -26,7 +26,7 @@ import {
   SUPER_ADMIN_ONLY,
   VALIDATION_ERROR,
   VALIDATION_ERROR_DESCRIPTION,
-} from './department.responses';
+} from './department.http-errors';
 
 const HEAD_ASSIGN_INVALID = {
   status: HttpStatus.UNPROCESSABLE_ENTITY,

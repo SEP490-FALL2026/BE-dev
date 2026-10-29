@@ -50,6 +50,9 @@ Trạng thái triển khai của các lát dùng hai ADR trên nằm ở [roadma
 
 [Quy trình thiết kế](workspace/README.md) · [Roadmap](roadmap.md) · [Nguồn BRD/US](workspace/sources.md)
 
+[Giao việc theo G và bộ prompt dùng lại](workspace/prompts/README.md): dùng cho dev tự làm hoặc dùng AI, gồm tin nhắn
+giao một phần G/một G/hai G và các bước thiết kế, audit, implement, validate, bàn giao.
+
 ## Review G0/G1
 
 - [Review và remediation G0/1a/1b](reviews/g0-g1-remediation-2026-10-15/README.md): lịch sử finding, bản sửa remediation, kết quả kiểm chứng và phần còn mở; không phải phê duyệt của dev.

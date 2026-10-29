@@ -3,8 +3,8 @@ import { Page, pageOf } from '../../core/application/pagination';
 import { BusinessDate } from '../../core/business-date';
 import { TransactionRunner } from '../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../infrastructure/security/tokens/access-token-verifier.port';
-import { AuditService } from '../audit/audit.service';
-import { OrganizationService } from '../organization/organization.service';
+import { AuditApi } from '../audit/public/audit.api';
+import { OrganizationApi } from '../organization/public/organization.api';
 import {
   NonWorkingDateInPastError,
   NonWorkingDateNotFoundError,
@@ -23,8 +23,8 @@ const REASON_MAX_LENGTH = 200;
 export class NonWorkingDatesService {
   constructor(
     private readonly repo: OperatingParametersRepo,
-    private readonly organization: OrganizationService,
-    private readonly audit: AuditService,
+    private readonly organization: OrganizationApi,
+    private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
   ) {}
 
@@ -132,7 +132,7 @@ export class NonWorkingDatesService {
   }
 
   private record(
-    tx: Parameters<AuditService['record']>[0],
+    tx: Parameters<AuditApi['record']>[0],
     actor: AuthenticatedPrincipal,
     organizationId: string,
     action: string,

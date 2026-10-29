@@ -3,10 +3,10 @@ import { normalizeDisplayName } from '../../../core/display-name';
 import type { HrBasis } from '../../../core/hr-basis';
 import { DbTx, TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { AuditService } from '../../audit/audit.service';
-import { IdentityAccessService } from '../../identity-access/identity-access.service';
+import { AuditApi } from '../../audit/public/audit.api';
 import { organizationAuditEvent } from '../mappers/audit-event.mapper';
-import { OrganizationService } from '../organization.service';
+import { OrganizationApi } from '../public/organization.api';
+import { EmployeeAccountsHook } from '../public/organization.extension-points';
 import {
   DepartmentInUseError,
   DepartmentInactiveError,
@@ -15,7 +15,7 @@ import {
   DepartmentNotFoundError,
   DepartmentUpdateEmptyError,
 } from './department.errors';
-import { lockAndReadEmployee, requireOrganization } from './department-lookups';
+import { lockAndReadEmployee, requireOrganization } from './department-lookups.service';
 import { assertMayChangeOrganization } from './department.policy';
 import { DepartmentRepo } from './department.repo';
 
@@ -41,9 +41,9 @@ const normalizeFunction = (raw: string | null | undefined): string | null => {
 export class DepartmentService {
   constructor(
     private readonly repo: DepartmentRepo,
-    private readonly organization: OrganizationService,
-    private readonly identity: IdentityAccessService,
-    private readonly audit: AuditService,
+    private readonly organization: OrganizationApi,
+    private readonly employeeAccounts: EmployeeAccountsHook,
+    private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
   ) {}
 
@@ -206,7 +206,7 @@ export class DepartmentService {
   private async assertUsableItAdmin(tx: DbTx, employeeId: string) {
     const employee = await lockAndReadEmployee(this.organization, tx, employeeId);
     if (!employee || employee.status !== 'ACTIVE') throw new DepartmentItAdminInvalidError();
-    const account = await this.identity.inspectEmployeeAccount(tx, employeeId);
+    const account = await this.employeeAccounts.get().inspectEmployeeAccount(tx, employeeId);
     if (!account.usable || !account.roles.includes('IT_ADMIN')) throw new DepartmentItAdminInvalidError();
   }
 

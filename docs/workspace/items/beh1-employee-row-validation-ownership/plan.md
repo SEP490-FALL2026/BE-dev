@@ -27,7 +27,7 @@
 
 ### Task 1: policy (test trước)
 
-- Files: `src/modules/organization/employee-placement.policy.ts` + spec.
+- Files: `src/modules/organization/public/employee-placement.policy.ts` + spec.
 - Depends on: none
 - Acceptance: kỳ vọng literal mọi lý do, ưu tiên trong subject, phòng trước chức vụ; không `field`/`column`.
 - Verify: unit policy; đột biến M1 → M3.
@@ -36,7 +36,7 @@ Bằng chứng: spec đỏ trước (`Cannot find module './employee-placement.p
 
 ### Task 2: gate sở hữu (test trước)
 
-- Files: `src/policy-ownership.spec.ts`.
+- Files: `test/gates/policy-ownership.gate-spec.ts`.
 - Depends on: Task 1
 - Acceptance: literal lý do phòng/chức vụ chỉ trong policy (ngoại lệ chính xác: `dev-seed-plan.ts`, `dev-seed.types.ts`,
   `project.errors.ts`, `project.service.ts` — quyết định khác); policy thuần; consumer chính xác và có gọi
@@ -48,7 +48,7 @@ consumer, chưa gọi, chưa registry); một lần đỏ do self-test của tô
 
 ### Task 3: hai adapter
 
-- Files: `organization/employee/employee-row.validator.ts` + spec, `data-import/employee-import/employee-import-rows.ts`,
+- Files: `organization/employee/employee-row.policy.ts` + spec, `data-import/employee-import/employee-import-rows.policy.ts`,
   `employee-import-rows.placement.spec.ts`.
 - Depends on: Task 1, Task 2
 - Acceptance: hai adapter gọi policy, map `subject` sang `field`/`column`; thang chép bị xóa cùng lượt, không bản tương
@@ -58,31 +58,31 @@ consumer, chưa gọi, chưa registry); một lần đỏ do self-test của tô
 Bằng chứng: `employee-import-rows.validation-parity.spec.ts` không đổi một byte trong lượt refactor (sau review chỉ sửa chú
 thích đầu tệp, xem bảng cuối), 13/13; adapter literal 35/35; corpus sau =
 trước (`bc27bebb1c1f…`); gate sở hữu chỉ còn đỏ ca registry; hai gate kiến trúc đỏ đúng hai cạnh mới
-(`data-import → organization/employee-placement.policy.ts`, capability `employee/` → root).
+(`data-import → organization/public/employee-placement.policy.ts`, capability `employee/` → root).
 
 ### Task 4: registry public + rule
 
-- Files: `src/architecture-boundaries.spec.ts`, `src/architecture-structure.spec.ts`, `docs/rules/module-structure.md`.
+- Files: `test/gates/architecture-boundaries.gate-spec.ts`, `test/gates/architecture-structure.gate-spec.ts`, `docs/rules/module-structure.md`.
 - Depends on: Task 3
 - Acceptance: một đường dẫn chính xác, không hậu tố; rule Đúng/Sai/Lách sai; gate kiến trúc xanh.
 - Verify: gate kiến trúc 137/137; đột biến.
 
 Đột biến (mỗi tệp khôi phục, SHA-256 khớp; trạng thái Git trước/sau bằng nhau):
 
-| Mã  | Đột biến                                                                   | Kết quả                      |
-| --- | -------------------------------------------------------------------------- | ---------------------------- |
-| M1  | policy: mã `JOB_TITLE_INACTIVE` → `JOB_TITLE_NOT_FOUND`                    | 11 đỏ                        |
-| M2  | policy: ưu tiên phòng ngừng dùng/Cost Center ngừng dùng đảo                | 2 đỏ                         |
-| M3  | policy: chức vụ trước phòng (`reverse()`)                                  | đỏ (policy, adapter, parity) |
-| M4  | form: `DEPARTMENT` → field `jobTitleId`                                    | đỏ (12 khác biệt `field`)    |
-| M5  | import: `DEPARTMENT` → column `job_title`                                  | đỏ (12 khác biệt `column`)   |
-| M6  | form: phòng luôn `named`                                                   | 7 đỏ                         |
-| M7  | import: phòng luôn `named`                                                 | 5 đỏ                         |
-| M8  | import: thêm literal `'DEPARTMENT_INACTIVE'` (thang chép)                  | gate sở hữu đỏ               |
-| M9  | import: import `organization/employee/employee-row.validator.ts` (private) | gate ranh giới đỏ            |
-| M10 | bỏ mục `PUBLIC_ROOT_POLICY_FILES` ở boundaries                             | 2 đỏ (ranh giới + registry)  |
-| M11 | policy: thêm `class`                                                       | gate thuần đỏ                |
-| M12 | form: thay lời gọi policy bằng hàm tự viết                                 | 28 đỏ                        |
+| Mã  | Đột biến                                                                | Kết quả                      |
+| --- | ----------------------------------------------------------------------- | ---------------------------- |
+| M1  | policy: mã `JOB_TITLE_INACTIVE` → `JOB_TITLE_NOT_FOUND`                 | 11 đỏ                        |
+| M2  | policy: ưu tiên phòng ngừng dùng/Cost Center ngừng dùng đảo             | 2 đỏ                         |
+| M3  | policy: chức vụ trước phòng (`reverse()`)                               | đỏ (policy, adapter, parity) |
+| M4  | form: `DEPARTMENT` → field `jobTitleId`                                 | đỏ (12 khác biệt `field`)    |
+| M5  | import: `DEPARTMENT` → column `job_title`                               | đỏ (12 khác biệt `column`)   |
+| M6  | form: phòng luôn `named`                                                | 7 đỏ                         |
+| M7  | import: phòng luôn `named`                                              | 5 đỏ                         |
+| M8  | import: thêm literal `'DEPARTMENT_INACTIVE'` (thang chép)               | gate sở hữu đỏ               |
+| M9  | import: import `organization/employee/employee-row.policy.ts` (private) | gate ranh giới đỏ            |
+| M10 | bỏ mục `PUBLIC_ROOT_POLICY_FILES` ở boundaries                          | 2 đỏ (ranh giới + registry)  |
+| M11 | policy: thêm `class`                                                    | gate thuần đỏ                |
+| M12 | form: thay lời gọi policy bằng hàm tự viết                              | 28 đỏ                        |
 
 ### Task 5: metadata và full gate
 

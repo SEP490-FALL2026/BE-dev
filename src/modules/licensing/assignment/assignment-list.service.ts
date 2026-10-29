@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { Page, pageOf } from '../../../core/application/pagination';
-import { CatalogService } from '../../catalog/catalog.service';
-import { OrganizationService } from '../../organization/organization.service';
-import type { AssignmentListFilter, AssignmentSummaryView } from '../licensing.types';
+import { CatalogApi } from '../../catalog/public/catalog.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
+import type { AssignmentListFilter, AssignmentSummaryView } from '../public/licensing.types';
 import { AssignmentRepo } from './assignment.repo';
 import { toAssignmentView } from './assignment.policy';
 
@@ -15,8 +15,8 @@ import { toAssignmentView } from './assignment.policy';
 export class AssignmentListService {
   constructor(
     private readonly repo: AssignmentRepo,
-    private readonly organization: OrganizationService,
-    private readonly catalog: CatalogService,
+    private readonly organization: OrganizationApi,
+    private readonly catalog: CatalogApi,
   ) {}
 
   /** One page by start date then id, the start shown as the grant date only when it is the real one. */

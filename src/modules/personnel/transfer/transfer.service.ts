@@ -2,21 +2,21 @@ import { Injectable } from '@nestjs/common';
 import { addDays, type BusinessDate } from '../../../core/business-date';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import { isUniqueViolation } from '../../../infrastructure/database/unique-violation';
-import { AuditService } from '../../audit/audit.service';
-import { CatalogService } from '../../catalog/catalog.service';
-import { OrganizationHistoryService } from '../../organization/organization-history.service';
+import { AuditApi } from '../../audit/public/audit.api';
+import { CatalogApi } from '../../catalog/public/catalog.api';
+import { OrganizationHistoryApi } from '../../organization/public/organization-history.api';
 import {
   EmployeeNotFoundError,
   HeadHandoverRefusedError,
   PlacementDepartmentInactiveError,
   PlacementOverlapError,
-} from '../../organization/organization.errors';
-import { OrganizationService } from '../../organization/organization.service';
+} from '../../organization/public/organization.errors';
+import { OrganizationApi } from '../../organization/public/organization.api';
 import { PersonnelNotifier } from '../event-notice/personnel-notifier.service';
-import { groundsSnapshot, normalizedGrounds } from '../grounds/grounds.policy';
-import { personnelAuditEvent } from '../mappers/personnel-audit-event';
-import { PersonnelFileHooks } from '../personnel-file-hooks';
-import { actorColumns, type PersonnelActor } from '../personnel.types';
+import { groundsSnapshot, normalizedGrounds } from '../policies/grounds.policy';
+import { personnelAuditEvent } from '../mappers/personnel-audit-event.mapper';
+import { PersonnelFileHooks } from '../event-notice/personnel-file-hooks.service';
+import { actorColumns, type PersonnelActor } from '../public/personnel.types';
 import { TransferRefusedError } from './transfer.errors';
 import { newTransferRefusal, retiredDestinationRefusal } from './transfer.policy';
 import { TransferGuardService } from './transfer-guard.service';
@@ -41,14 +41,14 @@ import {
 export class TransferService {
   constructor(
     private readonly runner: TransactionRunner,
-    private readonly organization: OrganizationService,
-    private readonly history: OrganizationHistoryService,
+    private readonly organization: OrganizationApi,
+    private readonly history: OrganizationHistoryApi,
     private readonly guard: TransferGuardService,
     private readonly transfers: TransferRepo,
     private readonly settlement: TransferSettlementService,
-    private readonly audit: AuditService,
+    private readonly audit: AuditApi,
     private readonly hooks: PersonnelFileHooks,
-    private readonly catalog: CatalogService,
+    private readonly catalog: CatalogApi,
     private readonly notifier: PersonnelNotifier,
   ) {}
 
@@ -249,10 +249,7 @@ export class TransferService {
     }
   }
 
-  private async scheduleStructure(
-    tx: DbTx,
-    input: Parameters<OrganizationHistoryService['scheduleStructureChange']>[1],
-  ) {
+  private async scheduleStructure(tx: DbTx, input: Parameters<OrganizationHistoryApi['scheduleStructureChange']>[1]) {
     try {
       return await this.history.scheduleStructureChange(tx, input);
     } catch (error) {

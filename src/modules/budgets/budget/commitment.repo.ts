@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import type { CommitmentHoldInput, CommitmentReleaseReason, HeldCommitment } from '../budgets.types';
+import type { CommitmentHoldInput, CommitmentReleaseReason, HeldCommitment } from '../public/budgets.types';
 import { BudgetYearLockRepo } from './budget-year-lock.repo';
 import type { CommitmentRow } from './commitment-release.policy';
 

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
-import type { SeatTarget, SeatTargetRef } from '../catalog.types';
+import type { SeatTarget, SeatTargetRef } from '../public/catalog.types';
 import { PlanLookupService } from '../plan/plan-lookup.service';
 import type { LockedPlan as PlanLookup } from '../plan/plan-lookup.service';
 import { missingData } from './subscription.policy';

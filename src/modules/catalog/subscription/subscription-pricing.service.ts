@@ -2,9 +2,9 @@ import { Injectable } from '@nestjs/common';
 import type { Money } from '../../../core/money/money';
 import { MoneyOutOfRangeError } from '../../../core/money/money.errors';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { FinanceService } from '../../finance/finance.service';
-import { OrganizationService } from '../../organization/organization.service';
-import { toSnapshot } from './subscription.state';
+import { FinanceApi } from '../../finance/public/finance.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
+import { toSnapshot } from './subscription.mapper';
 import type { PriceSnapshotRecord, UnitPriceRecord } from './subscription.types';
 
 /**
@@ -15,8 +15,8 @@ import type { PriceSnapshotRecord, UnitPriceRecord } from './subscription.types'
 @Injectable()
 export class SubscriptionPricingService {
   constructor(
-    private readonly finance: FinanceService,
-    private readonly organization: OrganizationService,
+    private readonly finance: FinanceApi,
+    private readonly organization: OrganizationApi,
   ) {}
 
   /** Reads the unit price in the minor units of its currency; a negative price is out of range. */

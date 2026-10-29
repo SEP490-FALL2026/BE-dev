@@ -3,11 +3,11 @@ import type { BusinessDate } from '../../../core/business-date';
 import { readSqlState, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import { isCheckViolation } from '../../../infrastructure/database/unique-violation';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { IdentityAccessService } from '../../identity-access/identity-access.service';
-import { OrganizationService } from '../../organization/organization.service';
-import { PersonnelAccessRefusedError } from '../personnel.errors';
-import { operatorSubjectRefusal, userWriterRefusal } from '../personnel-self-action.policy';
-import type { PersonnelActor } from '../personnel.types';
+import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
+import { PersonnelAccessRefusedError } from '../public/personnel.errors';
+import { operatorSubjectRefusal, userWriterRefusal } from '../policies/personnel-self-action.policy';
+import type { PersonnelActor } from '../public/personnel.types';
 import { TransferRefusedError } from './transfer.errors';
 import { TransferRepo } from './transfer.repo';
 import { successorRefusal, type SuccessorFacts, type TransferRefusal } from './transfer.policy';
@@ -17,8 +17,8 @@ import type { SuccessorChoice } from './transfer.types';
 @Injectable()
 export class TransferGuardService {
   constructor(
-    private readonly organization: OrganizationService,
-    private readonly identity: IdentityAccessService,
+    private readonly organization: OrganizationApi,
+    private readonly identity: IdentityAccessApi,
     private readonly transfers: TransferRepo,
   ) {}
 

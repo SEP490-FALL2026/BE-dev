@@ -2,21 +2,21 @@ import { Injectable } from '@nestjs/common';
 import { addDays } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { AuditService } from '../../audit/audit.service';
-import { CatalogService } from '../../catalog/catalog.service';
-import { SeatTargetNotFoundError } from '../licensing.errors';
+import { AuditApi } from '../../audit/public/audit.api';
+import { CatalogApi } from '../../catalog/public/catalog.api';
+import { SeatTargetNotFoundError } from '../public/licensing.errors';
 import type {
   CancelHandoverInput,
   HandoverDutyBrief,
   OpenedHandoverDuties,
   OpenHandoverDutiesInput,
   ReconcileHandoverInput,
-} from '../licensing-handover.types';
-import type { RevocationContext, RevocationReasonFacts, RevocationTaskFacts } from '../licensing.types';
-import { licensingAuditEvent } from '../mappers/licensing-audit-event';
+} from '../public/licensing-handover.types';
+import type { RevocationContext, RevocationReasonFacts, RevocationTaskFacts } from '../public/licensing.types';
+import { licensingAuditEvent } from '../mappers/licensing-audit-event.mapper';
 import { RevocationReadService } from '../provisioning/revocation-read.service';
 import { isOverdue, requirementOf } from './handover-confirmer.policy';
-import { HandoverConfirmerResolver } from './handover-confirmer.resolver';
+import { HandoverConfirmerResolver } from './handover-confirmer.service';
 import { HandoverCaseFacts } from './handover-case-facts.service';
 import { HandoverIssueService } from './handover-issue.service';
 import { HandoverRepo } from './handover.repo';
@@ -41,9 +41,9 @@ export class HandoverService {
     private readonly issue: HandoverIssueService,
     private readonly repo: HandoverRepo,
     private readonly reads: RevocationReadService,
-    private readonly catalog: CatalogService,
+    private readonly catalog: CatalogApi,
     private readonly facts: HandoverCaseFacts,
-    private readonly audit: AuditService,
+    private readonly audit: AuditApi,
     private readonly resolver: HandoverConfirmerResolver,
   ) {}
 

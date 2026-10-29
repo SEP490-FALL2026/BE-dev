@@ -1,11 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { AuditService } from '../../audit/audit.service';
-import { OrganizationService } from '../../organization/organization.service';
+import { AuditApi } from '../../audit/public/audit.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
 import { ControlledWaitRepo } from './controlled-wait.repo';
 import { alertRecipientsOf, configurationHintOf, type ReassignableStepKind } from './reassignment.policy';
-import { reassignmentAuditEvent } from './reassignment-audit';
+import { reassignmentAuditEvent } from './reassignment-audit.mapper';
 
 /** A step that waits, as the alert is raised for it. */
 export interface WaitingStep {
@@ -31,8 +31,8 @@ export interface WaitingStep {
 export class ControlledWaitAlertService {
   constructor(
     private readonly alerts: ControlledWaitRepo,
-    private readonly organization: OrganizationService,
-    private readonly audit: AuditService,
+    private readonly organization: OrganizationApi,
+    private readonly audit: AuditApi,
   ) {}
 
   /** Raises the alert of the stretch if it was not raised yet; true when it was raised now. */

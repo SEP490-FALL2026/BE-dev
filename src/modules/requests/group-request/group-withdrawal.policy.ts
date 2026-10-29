@@ -1,5 +1,5 @@
 import type { SpendStage } from '../spend/spend-status.service';
-import { headMayWithdraw, type WithdrawalRefusal } from '../access-request/withdrawal.policy';
+import { headMayWithdraw, type WithdrawalRefusal } from '../withdraw/withdrawal.policy';
 import type { LineState } from './group-request.types';
 
 /**

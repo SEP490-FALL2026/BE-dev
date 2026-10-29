@@ -3,9 +3,9 @@ import { Page, cutHistory, pageOf } from '../../../core/application/pagination';
 import type { BusinessDate } from '../../../core/business-date';
 import { normalizeDisplayName } from '../../../core/display-name';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { IdentityAccessService } from '../../identity-access/identity-access.service';
-import { EmployeeTechnicalView } from '../organization.types';
-import { OrganizationService } from '../organization.service';
+import { EmployeeTechnicalView } from '../public/organization.types';
+import { OrganizationApi } from '../public/organization.api';
+import { EmployeeAccountsHook } from '../public/organization.extension-points';
 import { ProjectService } from '../project/project.service';
 import { DepartmentForbiddenError, DepartmentNotFoundError, DepartmentOutOfScopeError } from './department.errors';
 import {
@@ -57,9 +57,9 @@ export class DepartmentQueryService {
   constructor(
     private readonly repo: DepartmentRepo,
     private readonly technical: DepartmentTechnicalMembersRepo,
-    private readonly organization: OrganizationService,
+    private readonly organization: OrganizationApi,
     private readonly projects: ProjectService,
-    private readonly identity: IdentityAccessService,
+    private readonly employeeAccounts: EmployeeAccountsHook,
   ) {}
 
   /** The Super Admin reads all; an IT Admin the departments in their scope. Throws DepartmentForbiddenError for any other role. */
@@ -173,9 +173,11 @@ export class DepartmentQueryService {
       this.repo.activeDepartmentsWithoutHead(today),
       this.repo.activeDepartmentsWithItAdmin(),
     ]);
-    const usable = await this.identity.findUsableItAdminEmployeeIds(
-      withItAdmin.flatMap((department) => (department.itAdminEmployeeId ? [department.itAdminEmployeeId] : [])),
-    );
+    const usable = await this.employeeAccounts
+      .get()
+      .findUsableItAdminEmployeeIds(
+        withItAdmin.flatMap((department) => (department.itAdminEmployeeId ? [department.itAdminEmployeeId] : [])),
+      );
     const visible = (id: string) => scope === undefined || scope.has(id);
     const items: DepartmentWarningItem[] = [
       ...withoutHead
@@ -246,7 +248,7 @@ export class DepartmentQueryService {
   private async scopeOf(principal: AuthenticatedPrincipal): Promise<ReadonlySet<string>> {
     return new Set(
       await this.organization.getItAdminScope(principal.employeeId, (ids) =>
-        this.identity.findUsableItAdminEmployeeIds(ids),
+        this.employeeAccounts.get().findUsableItAdminEmployeeIds(ids),
       ),
     );
   }
@@ -259,7 +261,7 @@ export class DepartmentQueryService {
       this.repo.memberCounts(ids, today),
     ]);
     const itAdminIds = records.flatMap((record) => (record.itAdmin ? [record.itAdmin.employeeId] : []));
-    const usable = await this.identity.findUsableItAdminEmployeeIds(itAdminIds);
+    const usable = await this.employeeAccounts.get().findUsableItAdminEmployeeIds(itAdminIds);
 
     return records.map((record) => {
       const head = heads.get(record.id) ?? null;

@@ -2,13 +2,13 @@ import { Injectable } from '@nestjs/common';
 import { DbTx, TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import { isCheckViolation, isUniqueViolation } from '../../../infrastructure/database/unique-violation';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { AuditService } from '../../audit/audit.service';
-import { EmployeeNotFoundError } from '../../organization/organization.errors';
-import { OrganizationService } from '../../organization/organization.service';
+import { AuditApi } from '../../audit/public/audit.api';
+import { EmployeeNotFoundError } from '../../organization/public/organization.errors';
+import { OrganizationApi } from '../../organization/public/organization.api';
 import type { K2Recommendation } from '../subscription/seat-guard.policy';
-import type { EmptyState } from '../catalog.types';
+import type { EmptyState } from '../public/catalog.types';
 import { FunctionalGroupLookupService } from '../functional-group/functional-group-lookup.service';
-import { catalogAuditEvent } from '../mappers/catalog-audit-event';
+import { catalogAuditEvent } from '../mappers/catalog-audit-event.mapper';
 import { VendorDictionaryLookupService } from '../vendor-dictionary/vendor-dictionary-lookup.service';
 import { VendorDirectoryService, type EnsuredVendor } from '../vendor/vendor-directory.service';
 import { VendorDictionaryGroupChangedError, VendorNameHeldByAnotherGroupError } from '../vendor/vendor.errors';
@@ -35,7 +35,7 @@ import {
 import { ApplicationRepo } from './application.repo';
 import { ApplicationVendorLinkService } from './application-vendor-link.service';
 import { ApplicationViewService } from './application-view.service';
-import { mergeCommunication, sameCommunication, sameList, snapshot } from './application.state';
+import { mergeCommunication, sameCommunication, sameList, snapshot } from './application-state.policy';
 import type {
   ApplicationChanges,
   ApplicationKind,
@@ -80,9 +80,9 @@ export class ApplicationService {
     private readonly functionalGroups: FunctionalGroupLookupService,
     private readonly dictionary: VendorDictionaryLookupService,
     private readonly vendorLinks: ApplicationVendorLinkService,
-    private readonly organization: OrganizationService,
+    private readonly organization: OrganizationApi,
     private readonly views: ApplicationViewService,
-    private readonly audit: AuditService,
+    private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
   ) {}
 

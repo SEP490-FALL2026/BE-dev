@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { OrganizationHistoryService } from '../../organization/organization-history.service';
-import { HeadHandoverRefusedError, PlacementOverlapError } from '../../organization/organization.errors';
+import { OrganizationHistoryApi } from '../../organization/public/organization-history.api';
+import { HeadHandoverRefusedError, PlacementOverlapError } from '../../organization/public/organization.errors';
 import { OffboardingRefusedError } from './offboarding.errors';
 import type { HeadHandoverFacts, OffboardingRecord, SuccessorChoice } from './offboarding.types';
 
@@ -19,7 +19,7 @@ export interface ScheduledDeparture {
  */
 @Injectable()
 export class OffboardingPeriodsService {
-  constructor(private readonly history: OrganizationHistoryService) {}
+  constructor(private readonly history: OrganizationHistoryApi) {}
 
   async schedule(
     tx: DbTx,

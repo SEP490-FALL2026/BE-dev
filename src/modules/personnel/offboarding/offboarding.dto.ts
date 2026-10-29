@@ -2,8 +2,8 @@ import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { z } from 'zod';
 import { isBusinessDate } from '../../../core/business-date';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
-import { REVOCATION_SOURCES } from '../../licensing/licensing.types';
-import { ROLE_FLAGS } from '../personnel.types';
+import { REVOCATION_SOURCES } from '../../licensing/public/licensing.types';
+import { ROLE_FLAGS } from '../public/personnel.types';
 
 const businessDate = z.string().refine(isBusinessDate, { message: 'The day must be a real date as YYYY-MM-DD.' });
 const flag = z.enum(['true', 'false']).transform((value) => value === 'true');

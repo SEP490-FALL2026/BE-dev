@@ -3,13 +3,13 @@ import { BusinessDate } from '../../../core/business-date';
 import type { HrBasis } from '../../../core/hr-basis';
 import { DbTx, TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { AuditService } from '../../audit/audit.service';
-import { IdentityAccessService } from '../../identity-access/identity-access.service';
+import { AuditApi } from '../../audit/public/audit.api';
 import { organizationAuditEvent } from '../mappers/audit-event.mapper';
-import { OrganizationService } from '../organization.service';
-import type { EmployeeRecord, NewOrganizationChange } from '../organization.types';
+import { OrganizationApi } from '../public/organization.api';
+import { EmployeeAccountsHook } from '../public/organization.extension-points';
+import type { EmployeeRecord, NewOrganizationChange } from '../public/organization.types';
 import { DepartmentInactiveError, DepartmentNotFoundError, HeadAssignmentError } from './department.errors';
-import { lockAndReadEmployee, requireOrganization } from './department-lookups';
+import { lockAndReadEmployee, requireOrganization } from './department-lookups.service';
 import { assertMayChangeOrganization, successorProblem } from './department.policy';
 import { DepartmentRepo } from './department.repo';
 import { DEPARTMENT_HEAD_HISTORY_LIMIT, HeadPeriodChanges, HeadPeriodRecord } from './department.types';
@@ -50,9 +50,9 @@ const endedAsChanges = (
 export class DepartmentHeadService {
   constructor(
     private readonly repo: DepartmentRepo,
-    private readonly organization: OrganizationService,
-    private readonly identity: IdentityAccessService,
-    private readonly audit: AuditService,
+    private readonly organization: OrganizationApi,
+    private readonly employeeAccounts: EmployeeAccountsHook,
+    private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
   ) {}
 
@@ -281,7 +281,7 @@ export class DepartmentHeadService {
     const employee = await lockAndReadEmployee(this.organization, tx, employeeId);
     if (!employee) throw new HeadAssignmentError('EMPLOYEE_NOT_FOUND');
     if (employee.status !== 'ACTIVE') throw new HeadAssignmentError('EMPLOYEE_NOT_ACTIVE');
-    const account = await this.identity.inspectEmployeeAccount(tx, employeeId);
+    const account = await this.employeeAccounts.get().inspectEmployeeAccount(tx, employeeId);
     if (account.roles.includes('SUPER_ADMIN')) throw new HeadAssignmentError('SUPER_ADMIN_CANNOT_HEAD');
     const placement = await this.repo.placementOn(tx, employeeId, day);
     if (!placement || placement.departmentId !== departmentId || placement.validTo !== null) {

@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { formatAmount } from '../../../core/money/money';
 import { formatRate } from '../../../core/money/rate';
-import { FinanceService } from '../../finance/finance.service';
-import type { TaxEstimateResult } from '../../finance/finance.types';
-import { OperatingParametersService } from '../../operating-parameters/operating-parameters.service';
+import { FinanceApi } from '../../finance/public/finance.api';
+import type { TaxEstimateResult } from '../../finance/public/finance.types';
+import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
 import { alertDates, deriveNotice, missingData, noticeInputOf, noticeWarnings } from './subscription.policy';
 import type { SubscriptionRecord, SubscriptionView, TaxEstimateSummary } from './subscription.types';
 
@@ -15,8 +15,8 @@ import type { SubscriptionRecord, SubscriptionView, TaxEstimateSummary } from '.
 @Injectable()
 export class SubscriptionViewService {
   constructor(
-    private readonly finance: FinanceService,
-    private readonly parameters: OperatingParametersService,
+    private readonly finance: FinanceApi,
+    private readonly parameters: OperatingParametersApi,
   ) {}
 
   /** The records as they are answered, with the derived notice, alerts, warnings, tax profile and estimate. */

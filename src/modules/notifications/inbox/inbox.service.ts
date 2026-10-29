@@ -1,15 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { pageOf, type Page } from '../../../core/application/pagination';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import type { InAppNotificationInput, InAppNotificationRecord } from '../notifications.types';
+import type { InAppNotificationInput, InAppNotificationRecord } from '../public/notifications.types';
 import { InAppNotificationRepo } from './in-app-notification.repo';
-import { InvalidInAppNotificationError } from '../notifications.errors';
+import { InvalidInAppNotificationError } from '../public/notifications.errors';
 import { NotificationNotFoundError } from './inbox.errors';
 import { refuseInAppNotification } from './inbox.policy';
 
 /**
  * The inbox of the application: it gives a notice in the transaction of the change behind it and lets a person list, count and
- * mark as read their own notices, nobody else's. The facade `NotificationsService` reads it for the first, the routes for the
+ * mark as read their own notices, nobody else's. The facade `NotificationsApi` reads it for the first, the routes for the
  * rest.
  */
 @Injectable()

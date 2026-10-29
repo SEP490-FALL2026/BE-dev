@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Page, pageOf } from '../../../core/application/pagination';
-import { OrganizationService } from '../../organization/organization.service';
+import { OrganizationApi } from '../../organization/public/organization.api';
 import { replacementRequired } from './application.policy';
 import { ApplicationRepo } from './application.repo';
 import type { ApplicationKind, ApplicationSummaryView, BusinessOwnerView, CatalogStatus } from './application.types';
@@ -14,7 +14,7 @@ import type { ApplicationKind, ApplicationSummaryView, BusinessOwnerView, Catalo
 export class ApplicationListService {
   constructor(
     private readonly applications: ApplicationRepo,
-    private readonly organization: OrganizationService,
+    private readonly organization: OrganizationApi,
   ) {}
 
   async list(query: {

@@ -1,5 +1,5 @@
-import type { DepartmentBrief, EmployeeRecord } from '../../organization/organization.types';
-import type { ReadAccess } from '../personnel-self-action.policy';
+import type { DepartmentBrief, EmployeeRecord } from '../../organization/public/organization.types';
+import type { ReadAccess } from '../policies/personnel-self-action.policy';
 import type { TransferChangeWire, TransferDetailWire, TransferRecordedWire, TransferSummaryWire } from './transfer.dto';
 import type { TransferChangeRecord, TransferRecord, TransferSummaryRecord, TransferWarning } from './transfer.types';
 

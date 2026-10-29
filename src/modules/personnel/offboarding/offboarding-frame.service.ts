@@ -3,12 +3,12 @@ import { businessDateAt, type BusinessDate } from '../../../core/business-date';
 import { TransactionRunner, readSqlState, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import { isCheckViolation } from '../../../infrastructure/database/unique-violation';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { OrganizationHistoryService } from '../../organization/organization-history.service';
-import { EmployeeNotFoundError } from '../../organization/organization.errors';
-import { OrganizationService } from '../../organization/organization.service';
-import { PersonnelAccessRefusedError } from '../personnel.errors';
-import { technicalStepRefusal } from '../personnel-self-action.policy';
-import type { PersonnelActor } from '../personnel.types';
+import { OrganizationHistoryApi } from '../../organization/public/organization-history.api';
+import { EmployeeNotFoundError } from '../../organization/public/organization.errors';
+import { OrganizationApi } from '../../organization/public/organization.api';
+import { PersonnelAccessRefusedError } from '../public/personnel.errors';
+import { technicalStepRefusal } from '../policies/personnel-self-action.policy';
+import type { PersonnelActor } from '../public/personnel.types';
 import { TransferGuardService } from '../transfer/transfer-guard.service';
 import { OffboardingRefusedError } from './offboarding.errors';
 import { OffboardingRepo } from './offboarding.repo';
@@ -39,8 +39,8 @@ interface FrameOptions {
 export class OffboardingFrame {
   constructor(
     private readonly runner: TransactionRunner,
-    private readonly organization: OrganizationService,
-    private readonly history: OrganizationHistoryService,
+    private readonly organization: OrganizationApi,
+    private readonly history: OrganizationHistoryApi,
     private readonly guard: TransferGuardService,
     private readonly repo: OffboardingRepo,
   ) {}

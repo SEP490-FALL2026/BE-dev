@@ -1,5 +1,5 @@
 import type { BusinessDate } from '../../../core/business-date';
-import { groundsRefusal, type GroundsInput } from '../grounds/grounds.policy';
+import { groundsRefusal, type GroundsInput } from '../policies/grounds.policy';
 
 /**
  * What the policy of a long leave refuses, as a semantic code (`LONG_LEAVE.<code>` on the wire) and the facts a person needs to

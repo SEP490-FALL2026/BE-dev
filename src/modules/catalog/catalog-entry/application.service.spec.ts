@@ -1,9 +1,9 @@
 import type { DbTx, TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import type { AuditService } from '../../audit/audit.service';
-import type { OrganizationService } from '../../organization/organization.service';
+import type { AuditApi } from '../../audit/public/audit.api';
+import type { OrganizationApi } from '../../organization/public/organization.api';
 import type { PlanLookupService } from '../plan/plan-lookup.service';
-import type { SeatOccupancyRegistry } from '../subscription/seat-occupancy.registry';
+import { SeatOccupancyHook, type SeatOccupancyReader } from '../public/catalog.extension-points';
 import type { FunctionalGroupLookupService } from '../functional-group/functional-group-lookup.service';
 import type { VendorDictionaryLookupService } from '../vendor-dictionary/vendor-dictionary-lookup.service';
 import type { VendorDirectoryService } from '../vendor/vendor-directory.service';
@@ -92,7 +92,8 @@ function serviceWith(input: {
     getOrganization: jest.fn().mockResolvedValue({ id: 'organization-1' }),
   };
   const plans = { plansOfApplication: jest.fn().mockResolvedValue(input.plans ?? []) };
-  const occupancy = { current: () => ({ openHolderCount }) };
+  const occupancy = new SeatOccupancyHook();
+  occupancy.bind({ openHolderCount } as unknown as SeatOccupancyReader);
   const audit = { record: jest.fn().mockResolvedValue(undefined) };
   const runner = { run: jest.fn(async (write: (tx: DbTx) => Promise<unknown>) => write(TX)) };
   const service = new ApplicationService(
@@ -101,13 +102,13 @@ function serviceWith(input: {
     { findActive: jest.fn() } as unknown as FunctionalGroupLookupService,
     {} as VendorDictionaryLookupService,
     {} as ApplicationVendorLinkService,
-    organization as unknown as OrganizationService,
+    organization as unknown as OrganizationApi,
     new ApplicationViewService(
-      organization as unknown as OrganizationService,
+      organization as unknown as OrganizationApi,
       plans as unknown as PlanLookupService,
-      occupancy as unknown as SeatOccupancyRegistry,
+      occupancy,
     ),
-    audit as unknown as AuditService,
+    audit as unknown as AuditApi,
     runner as unknown as TransactionRunner,
   );
 

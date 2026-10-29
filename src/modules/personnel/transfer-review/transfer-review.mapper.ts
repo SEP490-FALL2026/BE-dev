@@ -1,6 +1,6 @@
 import type { BusinessDate } from '../../../core/business-date';
-import type { PlanRevocationInfo } from '../../catalog/catalog.types';
-import type { DepartmentBrief, EmployeeRecord } from '../../organization/organization.types';
+import type { PlanRevocationInfo } from '../../catalog/public/catalog.types';
+import type { DepartmentBrief, EmployeeRecord } from '../../organization/public/organization.types';
 import type { TransferReviewItemWire, TransferReviewSummaryWire } from './transfer-review.dto';
 import { isReviewOverdue, overdueDaysOf, waitingReasonOf } from './transfer-review.policy';
 import type { ReviewItemRecord, ReviewSummaryRecord } from './transfer-review.types';

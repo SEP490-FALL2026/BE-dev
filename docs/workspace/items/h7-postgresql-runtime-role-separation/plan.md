@@ -58,22 +58,22 @@ DEFINER`, không `GRANT`/`OWNER TO`. `audit_events` chỉ ghi thêm bằng hai t
 
 ### Task 1: gate wiring và unit test đỏ trước
 
-- Files: `src/deployment-roles.spec.ts`, `src/infrastructure/config/database-administration-credentials.spec.ts`,
+- Files: `test/gates/deployment-roles.gate-spec.ts`, `src/infrastructure/config/database-administration-credentials.spec.ts`,
   `src/infrastructure/database/{database-role-judgement,runtime-role.guard}.spec.ts`,
   `src/infrastructure/database/roles/{database-role-settings,scram-verifier}.spec.ts`.
 - Depends on: none.
 - Acceptance: đỏ đúng nguyên nhân trên `3aa0857` — gate 7/7 đỏ (API nhận
   `postgresql://${POSTGRES_USER:-app}:${POSTGRES_PASSWORD}@…`, thiếu service `migrate`/`backup`/`db-admin`, deploy chạy
   `run … api node`); validator nhận cả bốn biến quản trị CSDL ở production (5 ca đỏ hành vi); module mới chưa có.
-- Verify: `pnpm exec jest src/deployment-roles.spec.ts src/infrastructure/config src/infrastructure/database`.
+- Verify: `pnpm exec jest test/gates/deployment-roles.gate-spec.ts src/infrastructure/config src/infrastructure/database`.
 
 ### Task 2: lệnh `ops:db-roles` và kiểm tra danh tính khi khởi động
 
 - Files: `src/database-roles-cli.ts`, `src/infrastructure/database/roles/*` (settings, verifier SCRAM, catalog,
   provisioning, arguments, report), `src/infrastructure/database/database-role-judgement.ts`,
-  `src/infrastructure/database/runtime-role.{guard,module}.ts`, `src/app.module.ts`, `src/worker.module.ts`,
+  `src/infrastructure/database/runtime-role.{guard,module}.ts`, `src/app/app.module.ts`, `src/worker/worker.module.ts`,
   `src/infrastructure/config/{database-environment,env-schema}.ts`, `package.json` (`ops:db-roles`),
-  `src/operational-commands.spec.ts` (entry, thư mục chỉ-lệnh, argument file, rule 5).
+  `test/gates/operational-commands.gate-spec.ts` (entry, thư mục chỉ-lệnh, argument file, rule 5).
 - Depends on: Task 1.
 - Acceptance: unit xanh; verifier khớp RFC 7677 (ServerSignature, ClientProof); thư mục `roles/` không tới được từ
   `main.ts`/`worker.ts` (mutation: guard import provisioning ⟹ rule 3 đỏ với bốn tệp, gỡ ⟹ xanh).
@@ -96,7 +96,7 @@ DEFINER`, không `GRANT`/`OWNER TO`. `audit_events` chỉ ghi thêm bằng hai t
 - Acceptance: gate wiring xanh; `docker compose config` hợp lệ với mọi profile, từ chối thiếu mật khẩu runtime và thiếu
   `.env.app`; `up` mặc định không chạy `migrate`/`backup`/`db-admin`; CI chạy integration với `TEST_DATABASE_BOOTSTRAP_URL` và
   kiểm Compose production.
-- Verify: `pnpm exec jest src/deployment-roles.spec.ts src/infrastructure/config/env-example.spec.ts`; `docker compose config`.
+- Verify: `pnpm exec jest test/gates/deployment-roles.gate-spec.ts src/infrastructure/config/env-example.spec.ts`; `docker compose config`.
 
 ### Task 5: tài liệu và smoke image production
 
@@ -125,7 +125,7 @@ tên tệp thực thi).
 | Xanh sau                                               | 2/2 xanh hai lượt, 0 tiến trình, 0 thư mục sót                                                                                                                                                                                  |
 | Checkpoint bắt buộc                                    | bảy ca khóa host **7/7 ba lượt liên tiếp** (30 s, 32 s, 30 s), mỗi lượt `TEMP` riêng; 0 tiến trình nhắc `TEMP` của lượt, 0 thư mục `slm-deploy-release-*`                                                                       |
 | Toàn bộ `deploy-release.test.mjs`                      | **55/55** (193 s), 0 tiến trình/thư mục sót                                                                                                                                                                                     |
-| `src/deployment-roles.spec.ts`                         | 16/16                                                                                                                                                                                                                           |
+| `test/gates/deployment-roles.gate-spec.ts`             | 16/16                                                                                                                                                                                                                           |
 | Bảo toàn                                               | `deploy-release.sh`, `ci.yml`, `deploy.yml`, `docker-compose.prod.yml`, `compose.yaml` trùng sha256 trước/sau; runbook không đổi                                                                                                |
 | Gate cuối Prompt 02                                    | xem plan của [openapi-response-examples](../openapi-response-examples/plan.md) — cùng cây, cùng lượt (`pnpm check` scripts 85/85)                                                                                               |
 

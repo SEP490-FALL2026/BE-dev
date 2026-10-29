@@ -458,7 +458,7 @@ Chốt trong Prompt 03 để Prompt 04 không còn lựa chọn hiện thực ng
   `currency`, `by` (`{ id, name }`), `at` — `changes` `maxItems: 16`; `before`/`after` là chuỗi hoặc `null` (tiền: số thập phân theo `currency` của phiên bản; ngày `YYYY-MM-DD`); dòng
   thêm/nhập chỉ hiện khoảng vị trí và số dòng (nội dung đủ ở cột `after`, đọc dòng qua `budgetVersionLineList`). **Không** có vai, phiên,
   `correlationId`, IP hay dữ liệu của bản ghi khác. Ví dụ OpenAPI: 200, 403 `AUTHORIZATION.FORBIDDEN`, 404 `BUDGET.VERSION_NOT_FOUND`, 422
-  `VALIDATION_ERROR`. Đăng ký collection mới ở gate `src/api-collection-contract.spec.ts` (trang có biên, mảng lồng có `maxItems`).
+  `VALIDATION_ERROR`. Đăng ký collection mới ở gate `test/gates/api-collection-contract.gate-spec.ts` (trang có biên, mảng lồng có `maxItems`).
 
 ### K. Tên chốt — mã lỗi, cột, khóa, mã thông báo (26/10/2026, Prompt 03 tiếp)
 
@@ -514,7 +514,7 @@ NOT NULL`); `access_requests.submitted_at` bỏ NOT NULL (giữ default) + CHECK
     `createdAt`), message `ACCESS_REQUEST.DRAFT_SAVED`; 422 `VALIDATION_ERROR`.
   - `accessRequestDraftList` — `GET /access-requests/drafts`: chỉ nháp do người gọi tạo; `page` ≥ 1, `pageSize` 1 → 100 (mặc định 20), sai
     ⟹ 422 `VALIDATION_ERROR`; thứ tự `created_at` giảm dần rồi `id`; `Page<AccessRequestDraftResponseDto>`, message
-    `ACCESS_REQUEST.DRAFTS_LISTED`; đăng ký collection ở gate `src/api-collection-contract.spec.ts`.
+    `ACCESS_REQUEST.DRAFTS_LISTED`; đăng ký collection ở gate `test/gates/api-collection-contract.gate-spec.ts`.
   - `accessRequestDraftSubmit` — `POST /access-requests/drafts/{id}/submission`, body `{}`: chạy **lại toàn bộ** đường trình của loại đó
     trên nội dung đã lưu với phòng hiện tại của người yêu cầu (cổng tài chính F27, F30, danh mục/gói còn hiệu lực, giá L.8, kiểm tra ngân
     sách, định tuyến, khóa F31) và chuyển chính dòng đó `DRAFT → SUBMITTED` (`submitted_at` = lúc trình). Thành công ⟹ status, DTO, message
@@ -541,7 +541,7 @@ NOT NULL`); `access_requests.submitted_at` bỏ NOT NULL (giữ default) + CHECK
 - **Lệnh:** `pnpm ops:record-super-admin-event <mode> [options]` — script `"ops:record-super-admin-event": "node
 dist/super-admin-event-cli"`; entry `src/super-admin-event-cli.ts`, module lệnh `src/super-admin-event-cli.module.ts`; capability
   `src/modules/personnel/super-admin-event/` (`super-admin-event.arguments.ts`, `.service.ts`, `.policy.ts`, `.repo.ts`, `.errors.ts`,
-  `.types.ts`); đăng ký ở `COMMAND_ENTRIES`/`COMMAND_ONLY_FILES` của `src/operational-commands.spec.ts` và bảng _Hợp đồng lệnh hiện có_
+  `.types.ts`); đăng ký ở `COMMAND_ENTRIES`/`COMMAND_ONLY_FILES` của `test/gates/operational-commands.gate-spec.ts` và bảng _Hợp đồng lệnh hiện có_
   của `docs/rules/operational-commands.md`; không tới được từ `AppModule`/`WorkerModule`; chạy như `ops:recover` (vai runtime).
 - **Mode** — mỗi mode gọi đúng service ghi của capability sở hữu; tham số riêng = đúng các trường body HTTP tương ứng (tên kebab-case, cùng
   schema validate): `transfer-record`, `transfer-reschedule`, `transfer-cancel`, `leave-start`, `leave-return`, `departure-record`,
@@ -662,7 +662,7 @@ dist/super-admin-event-cli"`; entry `src/super-admin-event-cli.ts`, module lện
 departmentId, basis, operator, environment }`). Không suy diễn: không gán hàng loạt, không gán theo quy tắc. Mã thoát 0 đã gán · 2 đã
   gán đúng phòng đó (không ghi) · 1 bị từ chối/lỗi, không ghi (`SUBSCRIPTION_NOT_FOUND`, `DEPARTMENT_NOT_ACTIVE`, `OWNER_ALREADY_SET` — đã
   có phòng sở hữu hoặc đã gán phòng khác). Đầu ra chỉ `subscription`, `department` (UUID), `outcome`. Đăng ký ở
-  `src/operational-commands.spec.ts` và `docs/rules/operational-commands.md`.
+  `test/gates/operational-commands.gate-spec.ts` và `docs/rules/operational-commands.md`.
 - **Mốc thu hẹp** (Task 1.2c — chỉ sau khi bản mở rộng đã deploy và **mọi** dòng gán đã xác minh; cùng Prompt 04):
   - Migration (B) `…_subscription_owner_required` là **migration đầu tiên của bản cuối** (liền sau (A) trong lịch sử; viết sau khi tiếp tục
     Prompt 04) và **một mình** đặt ràng buộc CSDL về phòng sở hữu: khối `DO $$` **trước mọi ghi** — còn thuê bao thiếu dòng gán hợp lệ hoặc
@@ -936,7 +936,7 @@ cost_centers c ON c.id = d.cost_center_id` (inner join — phòng thiếu Cost C
   `"ops:cost-center-direction": "node dist/cost-center-direction-cli"`, entry `src/cost-center-direction-cli.ts`, module lệnh
   `src/cost-center-direction-cli.module.ts`, capability `src/modules/organization/cost-center-direction/` (`cost-center-direction.arguments.ts`,
   `.service.ts`, `.policy.ts`, `.repo.ts`, `.errors.ts`, `.types.ts`); đăng ký ở `COMMAND_ENTRIES`/`COMMAND_ONLY_FILES` của
-  `src/operational-commands.spec.ts`, `src/module-graph.spec.ts` và bảng _Hợp đồng lệnh hiện có_ của `docs/rules/operational-commands.md`; không
+  `test/gates/operational-commands.gate-spec.ts`, `test/gates/module-graph.gate-spec.ts` và bảng _Hợp đồng lệnh hiện có_ của `docs/rules/operational-commands.md`; không
   tới được từ `AppModule`/`WorkerModule`; chạy như `ops:assign-subscription-owner` (vai runtime). Không thao tác sẵn có nào làm đúng việc này:
   `costCenterCreate` tạo Cost Center **mới**, `departmentCreate` của `7c28e75` dựng phòng **quanh** Cost Center có sẵn (ngược chiều `QĐ-87d`),
   `ops:assign-subscription-owner` chỉ ghi phòng sở hữu thuê bao.

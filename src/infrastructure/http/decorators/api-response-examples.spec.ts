@@ -3,7 +3,7 @@ import { NestFactory } from '@nestjs/core';
 import type { OpenAPIObject } from '@nestjs/swagger';
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
-import { createOpenApiDocument } from '../../../bootstrap';
+import { createOpenApiDocument } from '../../../app/configure-application';
 import { successEnvelopeSchema } from '../dto/success-envelope.dto';
 import { EXAMPLE_REQUEST_ID } from '../openapi-error-examples';
 import { ApiErrorResponses, VALIDATION_EXAMPLE } from './api-error-responses.decorator';

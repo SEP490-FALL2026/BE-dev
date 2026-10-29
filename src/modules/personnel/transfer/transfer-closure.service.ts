@@ -1,13 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { AuditService } from '../../audit/audit.service';
-import { LicensingService } from '../../licensing/licensing.service';
-import { OrganizationService } from '../../organization/organization.service';
-import { personnelAuditEvent } from '../mappers/personnel-audit-event';
-import { PersonnelAccessRefusedError } from '../personnel.errors';
-import { technicalStepRefusal } from '../personnel-self-action.policy';
-import { SERVICE_ACCOUNT_UNASSIGNED, TRANSFER_REVIEW_OPEN, userActor } from '../personnel.types';
+import { AuditApi } from '../../audit/public/audit.api';
+import { LicensingApi } from '../../licensing/public/licensing.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
+import { personnelAuditEvent } from '../mappers/personnel-audit-event.mapper';
+import { PersonnelAccessRefusedError } from '../public/personnel.errors';
+import { technicalStepRefusal } from '../policies/personnel-self-action.policy';
+import { SERVICE_ACCOUNT_UNASSIGNED, TRANSFER_REVIEW_OPEN, userActor } from '../public/personnel.types';
 import { TransferGuardService } from './transfer-guard.service';
 import { TransferRefusedError } from './transfer.errors';
 import { TransferRepo } from './transfer.repo';
@@ -25,9 +25,9 @@ export class TransferClosureService {
     private readonly runner: TransactionRunner,
     private readonly transfers: TransferRepo,
     private readonly settlement: TransferSettlementService,
-    private readonly organization: OrganizationService,
-    private readonly licensing: LicensingService,
-    private readonly audit: AuditService,
+    private readonly organization: OrganizationApi,
+    private readonly licensing: LicensingApi,
+    private readonly audit: AuditApi,
     private readonly guard: TransferGuardService,
   ) {}
 

@@ -1,6 +1,6 @@
 import type { BusinessDate } from '../../../core/business-date';
-import type { EmployeeRecord } from '../../organization/organization.types';
-import type { ReadAccess } from '../personnel-self-action.policy';
+import type { EmployeeRecord } from '../../organization/public/organization.types';
+import type { ReadAccess } from '../policies/personnel-self-action.policy';
 import type { LeaveChangeWire, LeaveDetailWire, LeaveSummaryWire } from './leave.dto';
 import { isReturnOverdue } from './leave.policy';
 import type { LeaveChangeRecord, LeaveRecord, LeaveSummaryRecord } from './leave.types';

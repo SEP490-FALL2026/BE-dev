@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { BusinessDate, fromDateColumn } from '../../../core/business-date';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
-import type { NewOrganizationChange } from '../organization.types';
+import type { NewOrganizationChange } from '../public/organization.types';
 
 export type AnnouncementKind = NewOrganizationChange['kind'];
 type Change<Kind extends AnnouncementKind> = NewOrganizationChange & { kind: Kind };

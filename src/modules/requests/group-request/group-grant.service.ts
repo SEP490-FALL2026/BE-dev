@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { AuditService } from '../../audit/audit.service';
-import { BudgetsService } from '../../budgets/budgets.service';
-import type { GrantOutcome } from '../../licensing/licensing.types';
+import { AuditApi } from '../../audit/public/audit.api';
+import { BudgetsApi } from '../../budgets/public/budgets.api';
+import type { GrantOutcome } from '../../licensing/public/licensing.types';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
-import { RequestOutcomeListeners } from '../access-request/request-outcome-listeners';
+import { RequestOutcomeService } from '../outcome/request-outcome.service';
 import { GroupResolutionService } from './group-resolution.service';
 import { shareToRelease } from './line-allocation.policy';
 import { LineAmountRepo } from './line-amount.repo';
@@ -23,9 +23,9 @@ export class GroupGrantService {
     private readonly lines: RequestLineRepo,
     private readonly amounts: LineAmountRepo,
     private readonly resolution: GroupResolutionService,
-    private readonly budgets: BudgetsService,
-    private readonly audit: AuditService,
-    private readonly outcomes: RequestOutcomeListeners,
+    private readonly budgets: BudgetsApi,
+    private readonly audit: AuditApi,
+    private readonly outcomes: RequestOutcomeService,
   ) {}
 
   /** The person's line, approved, becomes the one being carried out; the request is being carried out from the first. */

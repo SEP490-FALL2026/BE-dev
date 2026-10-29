@@ -685,12 +685,12 @@
                     }
                   },
                   "EMPLOYEE.SELF_CHANGE_FORBIDDEN": {
-                    "summary": "You cannot change your own employee record. A change to the record of the Super Admin is made through the controlled procedure: pnpm ops:record-super-admin-event profile-correct.",
+                    "summary": "You cannot change your own employee record. The Super Admin record is changed with: pnpm ops:record-super-admin-event profile-correct.",
                     "value": {
                       "success": false,
                       "error": {
                         "code": "EMPLOYEE.SELF_CHANGE_FORBIDDEN",
-                        "message": "You cannot change your own employee record. A change to the record of the Super Admin is made through the controlled procedure: pnpm ops:record-super-admin-event profile-correct.",
+                        "message": "You cannot change your own employee record. The Super Admin record is changed with: pnpm ops:record-super-admin-event profile-correct.",
                         "requestId": "req_example"
                       }
                     }
@@ -8330,12 +8330,12 @@
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
                 "examples": {
                   "TRANSFER_REVIEW.DECISION_ALREADY_RECORDED": {
-                    "summary": "A decision about this tool was written already and is final. Only \"still needed\" can become \"no longer needed\", and only while the old seat is not being taken back.",
+                    "summary": "This decision is final. Only \"still needed\" may become \"no longer needed\", and only while the old seat is not being taken back.",
                     "value": {
                       "success": false,
                       "error": {
                         "code": "TRANSFER_REVIEW.DECISION_ALREADY_RECORDED",
-                        "message": "A decision about this tool was written already and is final. Only \"still needed\" can become \"no longer needed\", and only while the old seat is not being taken back.",
+                        "message": "This decision is final. Only \"still needed\" may become \"no longer needed\", and only while the old seat is not being taken back.",
                         "requestId": "req_example"
                       }
                     }
@@ -50905,7 +50905,7 @@
           }
         },
         "security": [{ "bearer": [] }],
-        "summary": "Remove one person who left or was transferred from a request for a group",
+        "summary": "Remove a person who left or was transferred from a group request",
         "tags": ["group-requests"]
       }
     },

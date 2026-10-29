@@ -111,7 +111,7 @@ trên lịch sử migration thật, test HTTP thật, test đua khóa tất đ�
   `default_transaction_read_only=on`; đăng ký trong `module-graph`, `operational-commands`, `architecture-boundaries`
   (ngoại lệ `PRE_MIGRATION_READERS` có lý do, chỉ SELECT — **điểm Owner cần review**).
 - Không route HTTP mới; OpenAPI đổi khai báo/mô tả và một mã trạng thái (`P28-12`).
-- Prompt 29A: giới hạn thân request một chỗ `src/infrastructure/http/request-body-limit.ts` (đăng ký trong `bootstrap.ts`),
+- Prompt 29A: giới hạn thân request một chỗ `src/infrastructure/http/request-body-limit.ts` (đăng ký trong `app/configure-application.ts`),
   helper OpenAPI 413 `openapi-request-body-limit.ts`, nhận diện lỗi parser `filters/request-parser-errors.ts` (gọi từ
   `HttpExceptionFilter`); lỗi có type của capability `catalog/vendor` (`vendor.errors.ts`), ánh xạ ở
   `catalog-entry/application.service.ts` và `application.http-errors.ts` — `vendor.errors.ts` **đăng ký thành contract nội

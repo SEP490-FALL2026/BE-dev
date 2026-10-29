@@ -1,7 +1,8 @@
 import { Test } from '@nestjs/testing';
-import { NotificationsService } from '../../notifications/notifications.service';
-import { OrganizationService } from '../organization.service';
-import type { OrganizationChange } from '../organization.types';
+import { NotificationsApi } from '../../notifications/public/notifications.api';
+import { OrganizationApi } from '../public/organization.api';
+import { OrganizationChangeListeners } from '../public/organization.extension-points';
+import type { OrganizationChange } from '../public/organization.types';
 import { HeldNoticeHandoverListener } from './held-notice-handover.listener';
 
 const tx = { name: 'tx' } as never;
@@ -24,15 +25,19 @@ const started = (
  * their period STARTS, by hearing `HEAD_PERIOD_START` on the registry of the organization, and by nothing else.
  */
 describe('HeldNoticeHandoverListener', () => {
-  const organization = { registerChangeListener: jest.fn(), getOrganization: jest.fn() };
+  const organization = { getOrganization: jest.fn() };
   const notifications = { deliverHeldToHead: jest.fn() };
 
+  let changes: OrganizationChangeListeners;
+
   async function listener(): Promise<HeldNoticeHandoverListener> {
+    changes = new OrganizationChangeListeners();
     const moduleRef = await Test.createTestingModule({
       providers: [
         HeldNoticeHandoverListener,
-        { provide: OrganizationService, useValue: organization },
-        { provide: NotificationsService, useValue: notifications },
+        { provide: OrganizationApi, useValue: organization },
+        { provide: NotificationsApi, useValue: notifications },
+        { provide: OrganizationChangeListeners, useValue: changes },
       ],
     }).compile();
 
@@ -50,7 +55,7 @@ describe('HeldNoticeHandoverListener', () => {
 
     instance.onModuleInit();
 
-    expect(organization.registerChangeListener).toHaveBeenCalledWith(instance);
+    expect(changes.names()).toEqual(['organization.held-notice-handover']);
   });
 
   it('hands the kept notices of the department to the head whose period starts, in the transaction of the change', async () => {

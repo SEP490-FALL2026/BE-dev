@@ -1,223 +1,173 @@
 # Cấu trúc module, capability và lỗi
 
-Áp dụng khi thêm hoặc di chuyển file trong `src/`, tạo controller/service/repo/error mới, hoặc review một thay đổi chạm
-ranh giới. [ARCHITECTURE](../../ARCHITECTURE.md) mô tả hiện trạng; rule này là mô hình đích. Nguồn: kết luận và quyết định
-Owner Q6/Q7 trong [báo cáo audit nền tảng 18/10/2026](../reviews/be-foundation-audit-2026-10-18/README.md).
+Áp dụng khi thêm, di chuyển hay đổi tên file trong `src/`. Máy kiểm phần lớn quy tắc dưới đây: `pnpm arch:check`
+([dependency-cruiser](../../.dependency-cruiser.cjs)), `pnpm test:gates`
+([module layout](../../test/gates/module-layout.gate-spec.ts),
+[architecture boundaries](../../test/gates/architecture-boundaries.gate-spec.ts)) và ESLint. Quyết định:
+[ADR-0019](../decisions/0019-module-tiers-and-public-api.md).
 
 ## Tầng source
 
-1. `src/core`: TypeScript thuần — không Nest, Prisma, SDK, `infrastructure` hay business module.
-2. `src/infrastructure`: adapter kỹ thuật và port dùng chung (HTTP, security, database, mail, storage, queue, config,
-   observability). Không chứa business workflow, không import business module.
-3. `src/modules/<bounded-context>`: sở hữu nghiệp vụ và persistence của mình. Bảng nào thuộc module nào nằm trong
-   `PRISMA_MODEL_OWNER` của [architecture test](../../src/architecture-boundaries.spec.ts).
-4. File ở `src/` gốc chỉ là composition root (API, worker, CLI) và gate kiến trúc.
+| Thư mục                            | Chứa                                                                            | Được import                                              |
+| ---------------------------------- | ------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| `src/core`                         | TypeScript thuần: ngày nghiệp vụ, tiền, CSV, `Hook`/`Listeners`/`Contributions` | không gì khác                                            |
+| `src/infrastructure`               | Adapter kỹ thuật: config, database, HTTP, bảo mật, mail, storage, queue         | `core`                                                   |
+| `src/modules/<m>`                  | Một bounded context nghiệp vụ                                                   | `core`, `infrastructure`, module tầng dưới qua `public/` |
+| `src/app`, `src/worker`, `src/cli` | Ghép API, worker, lệnh vận hành (composition root)                              | mọi thứ, nhưng module chỉ qua `public/` và `*.module.ts` |
 
-## Layout trong một bounded context
+`src/main.ts`, `src/worker.ts`, `src/cli.ts` là ba điểm vào tiến trình; xem [src/README](../../src/README.md).
 
-- **Phẳng** khi module nhỏ: tối đa 2 controller và 12 file non-spec ở root.
-- **Theo capability** khi vượt một trong hai ngưỡng trên, hoặc khi có nhiều capability khó tìm file: mỗi capability một
-  folder, tối đa **hai tầng thư mục** dưới root module (`<module>/<capability>/<dto|errors|mappers|policies>/file.ts`).
-- **Root module** chỉ giữ thứ thực sự công khai hoặc là điểm ghép: `<module>.module.ts`; `<module>-http.module.ts` khi lớp
-  HTTP có vòng đời riêng; facade `<module>.service.ts`; `<module>.types.ts` (type public); `<module>.errors.ts` (lỗi mà
-  module khác thật sự phải bắt); Nest module của capability có entry riêng (ví dụ `recovery.module.ts` của lệnh
-  `ops:recover`; hiện thực nằm trong `recovery/` theo E7); `<module>.ports.ts` khi nhiều capability cùng dùng một port
-  (contract nội module đăng ký, xem dưới). Không biến root thành nơi chứa mọi controller/service/repo.
-- **Root module không phải vùng public mặc định.** Trong cùng module, root là một phần như capability: file root không
-  import file private của capability, capability không import file private ở root (ví dụ repo). Chỉ file Nest module
-  (`*.module.ts`) được ghép mọi provider của module mình.
-- **Folder dùng chung cấp module** (`dto/`, `errors/`, `mappers/`, `policies/` ở root module) chỉ cho nội dung mà ít nhất
-  hai capability cùng dùng; nội dung của một capability nằm trong folder của capability đó. Folder dùng chung là đích
-  tự do cho mọi phần, nhưng khi chính nó import vào capability/root thì chịu cùng contract (xem
-  [gate](#gate-và-legacy-ledger)).
+## Tầng module
 
-### Ownership của capability folder
+Module chỉ import module **tầng thấp hơn**, hoặc module cùng tầng có ghi trong bảng. Nguồn duy nhất:
+[scripts/arch/tiers.cjs](../../scripts/arch/tiers.cjs); hình: [module graph](../generated/module-graph.md).
 
-Mỗi capability folder sở hữu controller, service, repo cho aggregate/bảng của mình, cùng `dto/`, `errors/`, `mappers/`,
-`policies/` của nó. Mỗi bảng có **một** repo ghi trong module. Phần khác trong **cùng** module (capability khác, hoặc file
-root) chỉ import một file của capability khi file đó là **contract nội module đã đăng ký** trong registry chính xác
-`INTRA_MODULE_CONTRACTS` của [architecture-structure.spec.ts](../../src/architecture-structure.spec.ts) (GATE.2): đường dẫn
-tương đối `src/` kèm lý do public. Hậu tố tên file không mở gì — `*.service.ts`/`*.types.ts` chưa đăng ký vẫn private;
-repo, controller, http-errors, credential hasher, policy, validator, helper và service hiện thực luôn private trừ khi
-được nâng thành contract có chủ đích. Mỗi mục phải có file và còn consumer ở phần khác của module; mục mất consumer cuối
-cùng bị gate báo và phải xóa. Cần một contract mới thì đăng ký nó trong cùng thay đổi (review như
-`PUBLIC_CONTRACT_EXPORTS`), ghi lý do trong spec của item; port mà nhiều capability cùng dùng đặt ở file root
-`<module>.ports.ts` đăng ký trong registry (không thuộc bề mặt liên module), port chỉ một capability tiêu thụ ở lại
-capability đó.
+| Tầng | Module                                    | Cùng tầng được phép              |
+| ---- | ----------------------------------------- | -------------------------------- |
+| T1   | `audit`, `notifications`                  | —                                |
+| T2   | `organization`, `identity-access`         | `identity-access → organization` |
+| T3   | `finance`, `operating-parameters`         | `operating-parameters → finance` |
+| T4   | `catalog`, `licensing`                    | `licensing → catalog`            |
+| T5   | `budgets`, `requests`, `data-import`      | `requests → budgets`             |
+| T6   | `personnel`, `onboarding`, `installation` | —                                |
 
-### Khi nào folder trở thành Nest submodule
+Cần gọi ngược chiều (module dưới cần biết điều module trên giữ): module dưới **mở một extension point**, module trên
+đăng ký (mục dưới). Không thêm cạnh ngược, không thêm cạnh cùng tầng khi chưa sửa bảng và ADR.
 
-Folder **không** tự động là Nest module. Chỉ tạo Nest submodule khi có ít nhất một điều kiện sau, và ghi điều kiện đó
-trong spec của item:
+## Layout trong một module
 
-1. một entry point/graph khác cần nó mà không cần phần còn lại (CLI, worker, chỉ API);
-2. vòng đời hoặc provider riêng (ví dụ JWT, queue, scheduler);
-3. contract công khai riêng được module khác tiêu thụ;
-4. loại bỏ coupling có bằng chứng (ví dụ phá một `forwardRef` hoặc chu trình đo được).
+```text
+src/modules/<m>/
+  README.md                 # module card: mục đích, tầng, public API, bảng sở hữu, extension point
+  <m>.module.ts             # wiring Nest (và <m>-http.module.ts … nếu cần tách graph API/worker/CLI)
+  public/                   # cửa DUY NHẤT cho module khác và composition root
+    <m>.api.ts              # facade: class <M>Api
+    <m>.types.ts  <m>.errors.ts  <m>.extension-points.ts
+  <capability>/             # nhóm theo năng lực: department/, spend/, offboarding/ …
+    <capability>.controller.ts  .repo.ts  .types.ts  .errors.ts  .http-errors.ts  .mapper.ts   # điểm vào + lõi chung
+    <group>/                # nhóm chức năng: một use case (preview/, confirmation/) hoặc một phần chung (rules/)
+      <capability>-<group>.service.ts   # điểm vào của nhóm (.service, .policy hoặc .types mang tên nhóm)
+```
 
-Ví dụ hiện có đúng điều kiện 1: `OrganizationHttpModule`, `AuditHttpModule`, `IdentityAccessFacadeModule`,
-`RecoveryModule`. Tách thành **bounded context mới** khi capability có bảng riêng, contract công khai riêng và nghiệp vụ
-riêng; quyết định bằng ADR. `approval-roles` hoãn quyết định này tới thiết kế G3 (Q7); hiện không chuyển ownership bảng.
+- Tối đa **2 cấp thư mục** dưới module (capability → nhóm), tối đa **25 file mỗi thư mục** (kể cả spec).
+- **Nhóm chức năng có một điểm vào và phần riêng.** Điểm vào là file đặt tên `<…>-<tên nhóm>.service.ts`,
+  `.policy.ts` hoặc `.types.ts` (ví dụ `employee-import/preview/employee-import-preview.service.ts`,
+  `requests/status/rules/request-status-rules.policy.ts`). Trong capability, mọi file — controller, service điều phối,
+  nhóm anh em — chỉ gọi điểm vào của nhóm; file còn lại của nhóm (đọc CSV, bảng luật con …) chỉ nhóm đó dùng. Ngoài
+  capability chỉ Nest module và facade `public/` thấy nhóm. Spec được nhìn vào trong. Không vòng import.
+- Một phần mà capability khác dùng thì nó là một capability, không phải nhóm (ví dụ `requests/assessment/`). Hai chức
+  năng không chia sẻ gì là hai capability (ví dụ `requests/status/` và `requests/timing/`).
+- Capability trong cùng module được import nhau; module card ghi file nào là "lõi chung" (ví dụ
+  `requests/access-request/`).
+- Không có thư mục catch-all `src/common`, `src/shared`, `utils`, `helpers`, `errors` toàn cục.
 
-### Trách nhiệm từng loại file
+**Khi nào tách nhóm.** Mục tiêu: mở một capability là thấy các chức năng của nó, không phải một danh sách file dài. Tách
+theo **chức năng**, không theo loại file (không `services/`, `types/`, `errors/` trong capability — đó là dựng lại tầng
+kỹ thuật), không theo số dòng hay chữ cái. Tách một cụm thành `<capability>/<group>/` khi nó là một việc người đọc tìm
+theo tên (upload và preview, xác nhận, bảng luật) và ra khỏi cấp capability thì danh sách còn lại ngắn và rõ hơn — số
+file chỉ là tín hiệu để xem lại, không tự nó là lý do. File mà mọi nhóm dùng — repo, types, errors, http-errors, mapper,
+policy quyền — ở cấp capability; controller ở cấp capability là điểm vào HTTP và điều phối sang các nhóm. Service gánh
+nhiều use case thì tách theo nhóm, không chỉ dời file; không thêm "service chính" chỉ để gọi lại service khác, không tạo
+Nest module cho nhóm, không barrel. Mẫu: `catalog/catalog-entry/retirement/`, `data-import/employee-import/`
+(`row-validation/`, `preview/`, `confirmation/`), `requests/status/rules/`.
 
-- Controller: map HTTP/DTO/lỗi, khai báo quyền, operation ID và response; không chứa business logic, không import
-  controller khác.
-- Service: điều phối một use case, transaction và gọi facade module khác; ném lỗi nghiệp vụ, **không** dùng
-  `ApiException`/`HttpStatus` — ánh xạ HTTP thuộc controller hoặc `*.http-errors.ts`.
-- Repo (`*.repo.ts`): persistence duy nhất của bảng mình sở hữu; raw SQL chỉ ở đây.
-- Mapper: tạo wire model; policy: rule thuần, test độc lập.
-- Không generic base repository/service/controller, không scaffold hàng loạt khi chưa có Story.
+## Từ vựng file
 
-### Liên module
+| Hậu tố                           | Vai trò                                                                   | Được dùng Nest/Prisma? |
+| -------------------------------- | ------------------------------------------------------------------------- | ---------------------- |
+| `.module.ts`                     | Wiring Nest                                                               | Nest                   |
+| `.controller.ts`                 | Map HTTP ↔ DTO, khai quyền, gọi service; không import controller khác     | Nest                   |
+| `.dto.ts`                        | Zod schema / wire shape của request, response                             | không                  |
+| `.service.ts`                    | Một use case: transaction, điều phối, audit                               | Nest                   |
+| `.policy.ts`                     | Quy tắc nghiệp vụ thuần, trả quyết định                                   | không                  |
+| `.repo.ts`                       | Persistence; mọi SQL (Prisma lẫn raw) nằm đây                             | Prisma                 |
+| `.mapper.ts`                     | Record → wire                                                             | không                  |
+| `.types.ts`                      | Type, hằng số                                                             | không                  |
+| `.errors.ts` / `.http-errors.ts` | Lỗi nghiệp vụ / ánh xạ lỗi → HTTP                                         | không / Nest           |
+| `.api.ts`                        | Facade công khai, chỉ trong `public/`                                     | Nest                   |
+| `.extension-points.ts`           | Hook/Listeners/Contributions module này mở, chỉ trong `public/`           | không                  |
+| `.listener.ts`                   | Hiện thực extension point của module khác (bind/add trong `onModuleInit`) | Nest                   |
+| `.job.ts`                        | Việc định kỳ (sweeper, vòng của worker)                                   | Nest                   |
 
-Bề mặt công khai của module là **allowlist**, không phải mọi file ở root. Module khác và composition root chỉ import
-file ở root module khác khớp: `<module>.module.ts`, `*-http.module.ts`, `*-facade.module.ts`, facade
-`<module>.service.ts`, `*.types.ts`, `*.errors.ts`. Composition root (file trực tiếp trong `src/`) được import thêm đúng các
-entry CLI liệt kê trong `CLI_ENTRY_FILES` của [architecture-boundaries.spec.ts](../../src/architecture-boundaries.spec.ts);
-module khác thì không. Mọi file root khác, file trong subfolder, repo và credential hasher là private; không truy cập
-bảng module khác.
+Spec unit nằm cạnh file: `x.policy.ts` → `x.policy.spec.ts`. Tên file kebab-case, bắt đầu bằng danh từ của capability.
 
-**Một hợp đồng injectable công khai mỗi tệp (ROOT-HARDEN.1).** Mỗi tệp nguồn non-spec dưới `src/modules/**` export tối
-đa **một** lớp `@Injectable` (lớp/interface/hàm helper private vẫn được). Một hợp đồng công khai thứ hai của module nằm ở
-tệp root riêng, đăng ký **chính xác** trong `PUBLIC_ROOT_CONTRACT_FILES` của
-[architecture-boundaries.spec.ts](../../src/architecture-boundaries.spec.ts) (cùng danh sách ở
-`architecture-structure.spec.ts`), có consumer thật ngoài module và token ở `PUBLIC_CONTRACT_EXPORTS`. Không tệp module nào
-re-export (`export ... from`). Gate đọc bằng parser TypeScript.
+## Liên module
 
-- **Đúng:** `notifications/notifications.service.ts` chỉ chứa `NotificationsService`; `notifications/email-delivery.service.ts`
-  chứa `EmailDeliveryService` cho vòng gửi thư của worker; `identity-access-inspection.service.ts` và
-  `local-demo-account.service.ts` cho hai lệnh vận hành.
-- **Sai:** hai facade `@Injectable` công khai trong một `<module>.service.ts` để lọt qua quy tắc tên tệp.
-- **Lách sai:** barrel hay `export { EmailDispatcher } from './email-dispatcher.service'` trong tệp công khai; allowlist chung
-  cho mọi `*.service.ts` ở root; đăng ký một tệp không ai ngoài module dùng.
+- Module khác và composition root chỉ import `modules/<x>/public/**` hoặc `modules/<x>/*.module.ts`. Không import repo,
+  không đọc bảng của module khác. Spec unit được nhìn vào trong (white-box) khi cần.
+- Mỗi file non-spec dưới `src/modules/**` export tối đa **một** lớp `@Injectable`; không file module nào re-export
+  (`export … from`), kể cả `public/` — import thẳng file trong `public/`, không barrel.
+- **Validation dùng chung là dùng chung policy ngữ nghĩa (BEH.1).** Khi hai workflow cần cùng một quyết định, chỉ quyết
+  định đó dùng chung: một hàm thuần ở module sở hữu dữ liệu, trả **mã lý do ngữ nghĩa** theo thứ tự xác định (không
+  `field`/`column`); mỗi adapter tự ánh xạ sang vị trí trình bày. File policy dùng liên module nằm trong `public/`, đăng
+  ký chính xác ở `PUBLIC_ROOT_POLICY_FILES` của [policy-ownership](../../test/gates/policy-ownership.gate-spec.ts). Ví
+  dụ: `organization/public/employee-placement.policy.ts` dùng cho form nhập tay và preview import.
+- Nest module nghiệp vụ chỉ export contract công khai; danh sách chính xác ở `PUBLIC_CONTRACT_EXPORTS` của
+  [module-graph](../../test/gates/module-graph.gate-spec.ts).
 
-**Validation dùng chung là dùng chung policy ngữ nghĩa (BEH.1).** Khi hai workflow cần cùng một quyết định nghiệp vụ, chỉ
-quyết định đó được dùng chung: một hàm thuần ở module sở hữu dữ liệu nghiệp vụ, nhận model tra cứu trung tính (không DTO
-HTTP, tên cột file, row Prisma hay repo) và trả **mã lý do ngữ nghĩa** theo thứ tự xác định, không `field`/`column`. Mỗi
-adapter (form, import, lệnh) tự ánh xạ lý do sang vị trí trình bày của mình và thêm lý do riêng của workflow (khóa đã có,
-trùng trong file, ô khác) theo thứ tự của nó. Tệp policy dùng liên module ở root module, đăng ký chính xác trong
-`PUBLIC_ROOT_POLICY_FILES` (cùng danh sách ở `architecture-boundaries.spec.ts`, `architecture-structure.spec.ts`), và
-[policy-ownership.spec.ts](../../src/policy-ownership.spec.ts) giữ consumer chính xác, tính thuần (không class, decorator
-hay import giá trị ngoài `src/core`) và việc mã lý do chỉ được viết trong policy (ngoại lệ là quyết định khác, liệt kê
-chính xác kèm lý do).
+## Extension point
 
-- **Đúng:** `organization/employee-placement.policy.ts` trả `{ subject: 'DEPARTMENT', code: 'DEPARTMENT_INACTIVE' }`; form
-  nhập tay ánh xạ thành `field: departmentCode`, preview import thành `column: department_code`; import vẫn so người đã
-  có (`EXISTS_*`) trước khi gọi policy và giữ `EMPLOYEE_CODE_DUPLICATE_IN_FILE` của mình.
-- **Sai:** policy trả tên cột CSV hay `field` của form; ép form nhập tay dùng outcome import `EXISTS_DIFFERENT`; làm hai
-  đường giống nhau chỉ để dùng lại code khi Story không đòi.
-- **Lách sai:** chép cùng thang `if`/`switch` lý do vào hai adapter; import validator private của module khác
-  (`organization/employee/employee-row.validator.ts`) từ `data-import`; dồn mọi thứ vào `core/utils` hay
-  `shared/common`; mở mọi `*.policy.ts` bằng hậu tố.
+Ba kiểu, định nghĩa một lần ở `src/core/extension/`:
 
-Nest module nghiệp vụ chỉ export **contract công khai**: facade, port nó hiện thực cho `infrastructure`, hoặc service của
-module entry CLI — danh sách cặp `Module: token` chính xác trong `PUBLIC_CONTRACT_EXPORTS` của
-[module-graph.spec.ts](../../src/module-graph.spec.ts). Token khác bị coi là private bất kể tên (ngoại lệ đang gỡ nằm
-trong ledger, xem dưới).
+| Kiểu               | Khi nào                                                                             | Ví dụ                             |
+| ------------------ | ----------------------------------------------------------------------------------- | --------------------------------- |
+| `Hook<T>`          | Đúng một hiện thực; module dưới gọi, module trên cung cấp                           | cổng cấp quyền của licensing      |
+| `Listeners<E, Tx>` | 0..n người nghe chạy tuần tự **trong transaction** của bên phát; ném lỗi = hoàn tác | kết quả của một Request           |
+| `Contributions<T>` | 0..n hiện thực trả giá trị; bên mở gọi `all()` rồi gộp                              | "điều gì giữ phòng ban đang dùng" |
+
+- Bên mở khai một provider trong `public/<m>.extension-points.ts`
+  (`@Injectable() export class XHook extends Hook<X> { constructor() { super('<m>.x'); } }`) và export nó từ Nest
+  module.
+- Bên đăng ký có một `<tên>.listener.ts` inject provider đó và `bind`/`add` trong `onModuleInit`.
+- `Hook` chưa bind thì ném lỗi có tên. Chỉ khai `whenUnbound` khi một graph hợp lệ chạy thiếu bên đăng ký (lệnh CLI chỉ
+  nạp một phần app) — giá trị đó nằm ngay chỗ khai báo, không giấu trong lớp "Refusing".
+- Không dùng event bus bất đồng bộ: người nghe có quyền từ chối và phải hoàn tác cùng transaction.
+- Module card liệt kê điểm mở và người đăng ký, để đọc được luồng ngược mà không cần chạy code.
 
 ## Lỗi
 
-- Lỗi domain/application ở **capability sở hữu** (`<capability>/errors/` hoặc `<capability>.errors.ts`); helper/adapter
-  nhỏ có thể khai lỗi riêng ngay cạnh mình khi chỉ chính nó ném. **Không** khai lớp lỗi trong service, controller hay repo.
-- Mapper lỗi HTTP ở cùng capability hoặc lớp HTTP của bounded context (`*.http-errors.ts`); **không** đặt
-  `ApiException`/`HttpStatus` trong tệp lỗi nghiệp vụ.
-- Lỗi adapter kỹ thuật ở adapter sở hữu trong `src/infrastructure` (ví dụ `TransientDatabaseError`).
-- Lỗi public liên module chỉ ở root module khi consumer thật sự phải bắt nó (ví dụ `PasswordPolicyError`).
-- **Không** có `src/errors`, `src/common`, `src/shared` hay folder catch-all tương tự.
-- **Không** có hai lớp hoặc hai mã lỗi đồng nghĩa ở root và `errors/` của cùng module.
-- So khớp lỗi bằng `instanceof`, không bằng chuỗi `error.name` — trong toàn bộ `src` (module, `infrastructure`,
-  composition root), trừ test và mã sinh.
-- FE dùng **mã ổn định** (`DOMAIN.ACTION`), không branch theo message.
-- Không log secret, token, credential; không biến lỗi hệ thống thành 401 giả — dependency không sẵn sàng là 503, lỗi
-  không nhận diện được vẫn là 500 ([API contract](api-contract.md), [security](security-jobs.md)).
+- Lỗi nghiệp vụ khai trong `*.errors.ts` của capability sở hữu; **không** khai lớp lỗi trong service, controller, repo.
+- Ánh xạ HTTP ở `*.http-errors.ts` hoặc controller; **không** `ApiException`/`HttpStatus` trong file lỗi hay service.
+- Lỗi adapter kỹ thuật ở `src/infrastructure` (ví dụ `TransientDatabaseError`); lỗi liên module trong `public/`.
+- Một lớp cho mỗi tên lỗi trong một module; so khớp bằng `instanceof`, không bằng chuỗi `error.name`.
+- FE dùng **mã ổn định** (`DOMAIN.ACTION`), không branch theo message. Dependency không sẵn sàng là 503, lỗi không nhận
+  diện được là 500 ([API contract](api-contract.md), [security](security-jobs.md)).
 
-## Kích thước và tín hiệu review
+## Kích thước và độ phức tạp
 
-Ngưỡng là **tín hiệu kiểm tra**, không phải lý do máy móc để chia nhỏ:
+ESLint (`eslint.config.mjs`) đo trên `src/**` trừ spec và mã sinh:
 
-| Tín hiệu                                    | Ngưỡng                                                         | Hành động                                                                                                                |
-| ------------------------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| File non-spec trong `src/`                  | > 400 dòng (gate); > 700 dòng (cấm)                            | Tách trước khi thêm; file trong ledger không được vượt cap                                                               |
-| Unit spec trong `src/modules/**`            | > 400 dòng (gate, không ledger)                                | Tách theo use case; harness chung ở `test/support/` ([test guide](../../test/README.md#kích-thước-unit-spec-của-module)) |
-| Tệp `test/support/**/*.ts`                  | > 400 dòng, gọi/import test hay assertion (gate, không ledger) | Fixture/harness thuần; assertion ở spec ([test guide](../../test/README.md#tệp-trong-testsupport-test-harden1))          |
-| Controller ở root module                    | > 2 (gate)                                                     | Chia theo capability                                                                                                     |
-| File non-spec ở root module                 | > 12 (gate)                                                    | Chia theo capability                                                                                                     |
-| Độ sâu thư mục trong module                 | > 2 (gate)                                                     | Gộp lại hoặc tách capability                                                                                             |
-| Service nhận > 6 dependency                 | review                                                         | Xem service có điều phối quá nhiều capability không                                                                      |
-| Repo ghi > 1 aggregate hoặc nhiều nhóm bảng | review                                                         | Tách repo theo aggregate                                                                                                 |
-| Capability không có owner rõ ràng           | review                                                         | Ghi owner trong spec của item; tách folder hoặc bounded context                                                          |
+| Rule                     | Ngưỡng                                 |
+| ------------------------ | -------------------------------------- |
+| `max-lines`              | 500 dòng code (bỏ dòng trống, comment) |
+| `max-lines-per-function` | 60                                     |
+| `complexity`             | 12                                     |
+| `max-params`             | 8 (cả constructor)                     |
+| `max-depth`              | 4                                      |
 
-Ngoại lệ phải ghi lý do và người sở hữu remediation trong item. Refactor cấu trúc là thay đổi riêng, không gộp với thay
-đổi hành vi.
+Vượt ngưỡng là tín hiệu tách use case hoặc đưa nhánh vào policy thuần — **không** cắt file theo chữ cái hay theo con số.
+Ngoại lệ ghi tại chỗ: `// eslint-disable-next-line complexity -- <lý do>`; không có ledger riêng. Một ngoại lệ theo mẫu
+file: `*.http-errors.ts` không đo `complexity`/`max-lines-per-function` — đó là bảng `instanceof` → câu trả lời HTTP,
+mỗi lỗi một nhánh, thứ tự có nghĩa với lớp con; độ dài của nó là số lỗi, không phải logic. `pnpm lint` chạy với
+`--max-warnings N` (`package.json`): ESLint chỉ thoát lỗi khi **tổng** số cảnh báo của mọi rule mức `warn` vượt N — nó
+không chặn một hàm đã vượt ngưỡng dài thêm, không chặn cảnh báo mới được bù bằng cảnh báo vừa sửa, và không tự hạ N. Hai
+quy ước review (không phải gate): PR chạm vào một hàm vượt ngưỡng để lại nó nhỏ hơn; PR làm giảm số cảnh báo hạ N ngay
+trong PR đó. Spec unit của module tối đa 400 dòng (H8-RV-01, gate `module-layout`): dài hơn thì tách
+theo use case, harness có kiểu đặt ở `test/support/`.
 
-## Gate và legacy ledger
+## Gate
 
-| Gate                                                                                                                                                                                                                                                                                                                                                                                                          | Nơi enforce                                                                  |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| Core không import Nest/Prisma/SDK/`infrastructure`/`modules`                                                                                                                                                                                                                                                                                                                                                  | [architecture-boundaries.spec.ts](../../src/architecture-boundaries.spec.ts) |
-| Liên module chỉ qua allowlist bề mặt công khai (+ entry CLI cho composition root); Prisma delegate và raw SQL chỉ trên bảng mình sở hữu                                                                                                                                                                                                                                                                       | [architecture-boundaries.spec.ts](../../src/architecture-boundaries.spec.ts) |
-| Import chéo capability (gồm root module) chỉ tới contract đăng ký chính xác, registry không thừa/thiếu, controller → controller, folder catch-all, lỗi trong service/controller/repo, lỗi trùng tên, HTTP mapping trong tệp lỗi và trong business service, so khớp `error.name` trong toàn `src`, raw SQL ngoài repo, kích thước file và unit spec của module (`H8-RV-01`), số file/controller ở root, độ sâu | [architecture-structure.spec.ts](../../src/architecture-structure.spec.ts)   |
-| Module nghiệp vụ chỉ export contract trong allowlist; provider không khai trùng                                                                                                                                                                                                                                                                                                                               | [module-graph.spec.ts](../../src/module-graph.spec.ts)                       |
-| `test/support/**/*.ts` ≤ 400 dòng, không đăng ký test/hook/assertion, không import thư viện test, không tên giống spec (TEST-HARDEN.1, đọc bằng parser TypeScript)                                                                                                                                                                                                                                            | [test-support-structure.spec.ts](../../src/test-support-structure.spec.ts)   |
-| Policy nghiệp vụ dùng chung có một chủ: mã lý do chỉ viết trong policy (ngoại lệ chính xác), policy thuần, consumer chính xác và có gọi, `PUBLIC_ROOT_POLICY_FILES` bằng nhau ở hai gate kiến trúc (BEH.1, đọc bằng parser TypeScript)                                                                                                                                                                        | [policy-ownership.spec.ts](../../src/policy-ownership.spec.ts)               |
+| Lệnh                   | Kiểm                                                                                                                       |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm arch:check`      | Tầng module, cửa `public/`, composition root, nhóm chỉ qua điểm vào, không vòng import, controller không import controller |
+| `pnpm test:gates`      | Layout và từ vựng file, chỗ đặt lỗi/SQL/HTTP, sở hữu bảng Prisma, export Nest, lệnh vận hành                               |
+| `pnpm arch:docs:check` | `docs/generated/module-graph.md` và `docs/generated/routes.md` khớp code (`pnpm arch:graph`, `pnpm arch:routes`)           |
+| `pnpm lint`            | Kích thước và độ phức tạp (mục trên)                                                                                       |
 
-Vi phạm có sẵn khi một gate ra đời nằm trong ledger: `LEGACY` của `architecture-structure.spec.ts`,
-`LEGACY_PRIVATE_MODULE_IMPORTS` của `architecture-boundaries.spec.ts` và `LEGACY_PRIVATE_EXPORTS` của
-`module-graph.spec.ts`. Mỗi mục là một file, cạnh import hoặc token **chính xác** (không wildcard, không regex theo thư
-mục, không nới cap), kèm lý do tạm thời và lát sẽ gỡ nó — trong
-[foundation-remediation-handoff-2026-10-18](../workspace/items/foundation-remediation-handoff-2026-10-18/spec.md) hoặc mục
-9 của [audit H4.0](../reviews/be-full-src-architecture-audit-2026-10-19/README.md). Gate fail khi có vi phạm **mới** và cả
-khi một mục ledger **không còn đúng** (vi phạm đã hết mà mục còn), nên ledger chỉ có thể co lại: lát gỡ vi phạm xóa đúng
-mục của nó trong cùng thay đổi. Không thêm mục để làm xanh build; nếu buộc phải thêm, ghi lý do trong item và chờ
-Owner/dev review. Allowlist (`CLI_ENTRY_FILES`, `PUBLIC_CONTRACT_EXPORTS`) và registry `INTRA_MODULE_CONTRACTS` chỉ đổi
-khi contract thật sự đổi, cũng qua review; registry không phải ledger — mục mất consumer phải xóa. Gate không chứng minh
-thiết kế đúng — review vẫn bắt buộc.
+## Thêm một use case
 
-Ranh giới nội module có **chiều** (GATE2-02): capability hoặc root dùng thư mục dùng chung cấp module (`dto/`, `errors/`,
-`mappers/`, `policies/`) tự do, và các thư mục dùng chung dùng lẫn nhau; nhưng một file trong thư mục dùng chung đọc vào
-capability hoặc root là **vượt ranh giới** như mọi phần khác — đích phải là bề mặt public ở root hoặc mục chính xác của
-`INTRA_MODULE_CONTRACTS`; hậu tố tên file không mở gì, chỉ `*.module.ts` ghép mọi provider. Đúng:
-`identity-access/mappers/account.http-errors.ts` → `accounts/account.errors.ts` (lỗi của capability là contract mà mapper
-HTTP dùng chung của route `accounts` và `auth` ánh xạ, đã đăng ký). Sai: một mapper hay policy dùng chung import
-`accounts/app-user.repo.ts` hoặc một helper/type riêng của capability — dời file đó về capability sở hữu hoặc dùng
-contract công khai nhỏ nhất đã có.
-
-## Ví dụ đích và trạng thái chuyển tiếp
-
-`organization` đích theo capability `cost-center/`, `department/`, `project/`, `job-title/`, `employee/`; root giữ
-module, HTTP module, facade, type và lỗi public; `normalizeDisplayName` và `Page<T>`/`pageOf` ở `src/core` (Q6).
-**Sau Wave 3 (H4.6, H4.7):** cả năm capability đã tách; root còn 6 file, 0 controller (`organization.repo.ts` chỉ còn
-Organization); `dto/` và `mappers/` chỉ giữ nội dung ít nhất hai capability dùng. Repo Job Title, Employee, Department
-Head là provider riêng của `OrganizationModule` sau capability service mà chỉ facade dùng; use case HTTP gọi facade (E4
-giữ ba repo export — ngoại lệ ledger duy nhất còn lại của `organization`, xem lại ở G3).
-**Sau Identity Access Wave A (H5.0 → H5.4):** `identity-access` giữ `auth/`, `accounts/`, `approval-roles/`, `access/`;
-DTO, lỗi, mapper HTTP và policy của một capability nằm phẳng trong capability đó (ví dụ `auth/auth.errors.ts`,
-`access/me.dto.ts`, `approval-roles/approval-role.http-errors.ts`); `dto/`, `mappers/` (`auth.http-errors.ts`,
-`account.http-errors.ts`) và `policies/account-policy.ts` chỉ giữ nội dung có ít nhất hai capability dùng; không còn
-`errors/`.
-**Sau Identity Access Wave B (H5.5 → H5.7):** theo E5–E7 của
-[audit H4.0](../reviews/be-full-src-architecture-audit-2026-10-19/README.md), không đổi contract. Ledger
-`crossCapabilityImports` rỗng; không còn mục identity-access trong `LEGACY_PRIVATE_EXPORTS`. `accounts` sở hữu một repo
-mỗi aggregate (`app-user`, `credential`, `role-grant`, `action-token`) sau bốn contract service export bởi
-`IdentityAccessFacadeModule`; chu trình capability bị cắt bằng hai port bind `useExisting`: `ACCOUNT_SESSIONS` (consumer
-`accounts` và `recovery`, `auth` hiện thực) ở `identity-access.ports.ts` từ GATE.2, `APPROVAL_ROLE_HOLDINGS` (consumer
-duy nhất `accounts`, `approval-roles` hiện thực) ở `accounts/account.types.ts`. Lệnh khôi phục ở `recovery/` (entry
-`HolderRecoveryService`, `RoleTransferRecoveryService`); root 7 file, 0 controller: module, facade module, facade,
-type, lỗi public, port dùng chung và `recovery.module.ts`. Provider dùng cho cả API và lệnh khôi phục mà
-facade không cần khai ở cả `IdentityAccessModule` và `RecoveryModule` (E6), ghim bằng danh sách chính xác trong
-[module-graph.spec.ts](../../src/module-graph.spec.ts).
-**Lệnh vận hành H6.1/H6.2 (E8 = A):** `installation` giữ root (cài đặt) và hai capability `inspect/` (`ops:inspect`) và
-`dev-seed/` (`dev:seed`), mỗi capability có Nest module riêng làm entry của lệnh (điều kiện "một entry point/graph khác"),
-không module `operations` chung. Hai hợp đồng hẹp của `identity-access` (`IdentityAccessInspectionService`,
-`LocalDemoAccountService`) ở hai tệp root riêng `identity-access-inspection.service.ts`, `local-demo-account.service.ts` (ROOT-HARDEN.1), khai trong hai `*-facade.module.ts` chỉ đồ thị lệnh nạp; quy tắc
-riêng của lệnh ở [operational commands](operational-commands.md).
-**Sau Data Import Wave (H8.1 → H8.3):** `data-import` giữ một capability `employee-import/` (controller, service điều
-phối, repo duy nhất của `employee_imports`/`employee_import_rows`, đọc file thuần, quy tắc dòng và so judgement, builder
-audit, type, DTO, lỗi và mapper HTTP `employee-import.http-errors.ts` cạnh nhau; không `dto/` một file, không Nest
-submodule). Root 3 file non-spec: module, facade `DataImportService` (một method `latestEmployeeImport` cho
-onboarding) và `data-import.types.ts`; facade là export liên module duy nhất (`DataImportModule: DataImportService`);
-service capability là contract nội module đăng ký vì facade đọc qua nó. Không còn mục `data-import` trong ledger nào;
-`Page<T>` dùng bản core. Hai đường kiểm dòng (import và nhập tay) dùng chung đúng một quyết định — điều kiện phòng/chức
-vụ của `organization/employee-placement.policy.ts` — và giữ phần còn lại riêng (H8 D-1 → D-4,
-[`beh1-employee-row-validation-ownership`](../workspace/items/beh1-employee-row-validation-ownership/spec.md), A4-11).
+1. Tìm module sở hữu dữ liệu (bảng tầng ở trên, [routes](../generated/routes.md) cho route gần giống).
+2. Đặt file vào capability của nó: `<x>.controller.ts`, `<x>.dto.ts`, `<x>.service.ts`, `<x>.policy.ts` + spec.
+3. Cần dữ liệu module khác: gọi facade trong `public/` của module đó; cần module tầng trên phản ứng: mở extension point.
+4. `pnpm check`, rồi integration/HTTP của module ([test guide](../../test/README.md)); cập nhật module card nếu public
+   API hay extension point đổi.

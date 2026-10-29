@@ -9,8 +9,8 @@ import {
   MigrationRecord,
   SubscriptionOwnerSchema,
   UNIT_ONLY_MIGRATION,
-} from './migration-preflight.types';
-import { RecoveryTargetFacts } from './recovery-target';
+} from '../public/migration-preflight.types';
+import { RecoveryTargetFacts } from '../public/recovery-target.policy';
 
 /**
  * Reads the data the unit-only conversion touches, in the schema the database has **now** — before the merged migration

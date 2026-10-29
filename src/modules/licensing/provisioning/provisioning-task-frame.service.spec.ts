@@ -1,11 +1,11 @@
 import { Test } from '@nestjs/testing';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { AuditService } from '../../audit/audit.service';
-import { IdentityAccessService } from '../../identity-access/identity-access.service';
-import { NotificationsService } from '../../notifications/notifications.service';
-import { OrganizationService } from '../../organization/organization.service';
-import { ProvisioningAnotherItAdminNeededError } from '../licensing.errors';
+import { AuditApi } from '../../audit/public/audit.api';
+import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
+import { NotificationsApi } from '../../notifications/public/notifications.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
+import { ProvisioningAnotherItAdminNeededError } from '../public/licensing.errors';
 import { ProvisioningTaskFrame } from './provisioning-task-frame.service';
 import { ProvisioningTaskRepo } from './provisioning-task.repo';
 
@@ -79,10 +79,10 @@ describe('ProvisioningTaskFrame.work', () => {
       providers: [
         ProvisioningTaskFrame,
         { provide: ProvisioningTaskRepo, useValue: repo },
-        { provide: OrganizationService, useValue: organization },
-        { provide: IdentityAccessService, useValue: identity },
-        { provide: NotificationsService, useValue: notifications },
-        { provide: AuditService, useValue: audit },
+        { provide: OrganizationApi, useValue: organization },
+        { provide: IdentityAccessApi, useValue: identity },
+        { provide: NotificationsApi, useValue: notifications },
+        { provide: AuditApi, useValue: audit },
         { provide: TransactionRunner, useValue: runner },
       ],
     }).compile();

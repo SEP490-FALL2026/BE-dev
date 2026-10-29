@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { EmployeeColumn, EmployeeRowOutcome, RowDifference, RowIssue } from './employee-import-rows';
+import { EmployeeColumn, EmployeeRowOutcome, RowDifference, RowIssue } from './employee-import-row.types';
 
 export type ImportStatus = 'PREVIEW' | 'COMPLETED' | 'CANCELLED';
 

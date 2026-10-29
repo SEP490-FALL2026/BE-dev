@@ -1,5 +1,5 @@
-import type { AnswerRefusal, AskRefusal } from './budget-information.policy';
-import type { ReviewRefusal } from './finance-review.policy';
+import type { AnswerRefusal, AskRefusal } from '../budget-information/budget-information.policy';
+import type { ReviewRefusal } from '../finance-review/finance-review.policy';
 
 /** The request has no review of Finance to read, or the caller has no part in its check: the two answer alike. */
 export class SpendReviewNotFoundError extends Error {

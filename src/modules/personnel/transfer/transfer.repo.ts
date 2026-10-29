@@ -4,7 +4,7 @@ import { BusinessDate, fromDateColumn, toDateColumn } from '../../../core/busine
 import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
-import type { Grounds } from '../grounds/grounds.policy';
+import type { Grounds } from '../policies/grounds.policy';
 import type {
   HeadHandoverFacts,
   TransferChangeRecord,

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { actorColumns, type PersonnelActor } from '../personnel.types';
+import { actorColumns, type PersonnelActor } from '../public/personnel.types';
 import { stateAfterCancelledDeparture } from './leave.policy';
 import { LeaveRepo } from './leave.repo';
 import type { LeaveRecord } from './leave.types';

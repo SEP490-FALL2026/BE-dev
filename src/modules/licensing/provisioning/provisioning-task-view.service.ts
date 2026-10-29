@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
-import { CatalogService } from '../../catalog/catalog.service';
-import type { SeatTarget } from '../../catalog/catalog.types';
-import { OrganizationService } from '../../organization/organization.service';
+import { CatalogApi } from '../../catalog/public/catalog.api';
+import type { SeatTarget } from '../../catalog/public/catalog.types';
+import { OrganizationApi } from '../../organization/public/organization.api';
 import type {
   AccessState,
   ProvisioningChannel,
@@ -15,11 +15,11 @@ import type {
   RevocationSource,
   TaskDoneWhen,
   TaskStep,
-} from '../licensing.types';
+} from '../public/licensing.types';
 import { availableDecisions } from './failure.policy';
 import { doneWhenFor, inGeneralQueue, stepsFor } from './provisioning.policy';
 import { isTerminating } from './revocation.policy';
-import type { ProvisioningTaskRecord } from './provisioning-task.record';
+import type { ProvisioningTaskRecord } from './provisioning-task.types';
 import { ProvisioningTaskReasonRepo, type ReasonRecord } from './provisioning-task-reason.repo';
 
 /** What a row of the list says of a revocation: why it was opened, how it ended and whether the access still runs on. */
@@ -127,8 +127,8 @@ interface ViewContext {
 @Injectable()
 export class ProvisioningTaskViewService {
   constructor(
-    private readonly catalog: CatalogService,
-    private readonly organization: OrganizationService,
+    private readonly catalog: CatalogApi,
+    private readonly organization: OrganizationApi,
     private readonly reasons: ProvisioningTaskReasonRepo,
   ) {}
 

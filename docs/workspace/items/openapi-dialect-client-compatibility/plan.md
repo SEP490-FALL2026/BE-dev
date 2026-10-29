@@ -8,7 +8,7 @@
 ## Before coding
 
 Đã đọc AGENTS.md, [API contract](../../../rules/api-contract.md), [documentation](../../../rules/documentation.md), spec/plan
-Prompt 26, `openapi-presentation.ts`, `bootstrap.ts`, `scripts/dev/export-openapi.ts`, `api-inventory`/`openapi-export` e2e, mã
+Prompt 26, `openapi-presentation.ts`, `app/configure-application.ts`, `scripts/dev/export-openapi.ts`, `api-inventory`/`openapi-export` e2e, mã
 `nestjs-zod` 5.5.0 (`convertToOpenApi3Point0`, `cleanupOpenApiDoc`, metadata factory), Zod 4.6.7 (`compactTypeUnion`),
 `@nestjs/swagger` 11.4.6 (`ModelPropertiesAccessor`), cách Orval 8.39 kiểm input (`@scalar/openapi-parser` `validate` theo
 phiên bản khai, rồi `upgrade` lên 3.1).
@@ -29,7 +29,7 @@ nạp thật: đúng một bản mỗi thư viện, `MulterError` của filter l
 ### Task 1: test đỏ trước trên artifact Prompt 26
 
 - Files: `src/infrastructure/http/openapi-dialect.spec.ts`, `src/infrastructure/http/openapi-presentation.spec.ts`,
-  `src/infrastructure/http/dto/zod-dto.spec.ts`, `test/e2e/openapi-dialect.e2e-spec.ts`, `test/e2e/openapi-export.e2e-spec.ts`,
+  `src/infrastructure/http/dto/zod-dto.spec.ts`, `test/http/platform/openapi-dialect.http-spec.ts`, `test/http/platform/openapi-export.http-spec.ts`,
   `test/support/openapi-semantics.ts`; checker `openapi-dialect.ts` viết trước (là gate).
 - Depends on: none.
 - Acceptance: đỏ đúng chỗ — 20 unit (presentation F3, factory, ranh giới import); e2e: 78 vi phạm dialect, 166 khác biệt ngữ
@@ -47,7 +47,7 @@ nạp thật: đúng một bản mỗi thư viện, `MulterError` của filter l
 
 ### Task 3: `SEC-UPGRADE-RV-01`
 
-- Files: `test/e2e/security-upgrade-regression.e2e-spec.ts`.
+- Files: `test/http/platform/security-upgrade-regression.http-spec.ts`.
 - Depends on: Task 2 (dùng factory).
 - Acceptance: Zod/body-parser/multer đúng ma trận trên module thật; thay đổi hành vi so bản trước ghi finding.
 - Verify: e2e spec; script phiên so Zod 4.4.3/4.6.7, body-parser 2.3.0/2.4.0, multer 2.4.0/2.5.0; `pnpm audit` của CI.
@@ -64,7 +64,7 @@ nạp thật: đúng một bản mỗi thư viện, `MulterError` của filter l
 ### Task 5: Prompt 00A — correction trong cùng checkpoint
 
 - Files: `src/infrastructure/http/request-body-limit.ts` (+ spec), `src/infrastructure/mail/mail-transport.spec.ts` (mới),
-  `test/e2e/security-upgrade-regression.e2e-spec.ts`, `package.json`, `pnpm-workspace.yaml`, `pnpm-lock.yaml` (pnpm),
+  `test/http/platform/security-upgrade-regression.http-spec.ts`, `package.json`, `pnpm-workspace.yaml`, `pnpm-lock.yaml` (pnpm),
   `docs/rules/api-contract.md`, spec/plan này, roadmap, items index, tracker ngoài repo.
 - Depends on: Task 4 (cây 26A giữ nguyên, 56 path đã hash trước khi sửa).
 - Acceptance: zstd ⟹ 415 trước parser (đỏ trước: 2xx); gzip/deflate/br, 413 sau giải nén, multipart không đổi; `qs` 6.16.1,

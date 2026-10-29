@@ -1,4 +1,4 @@
-import type { ProvisioningKind } from '../../licensing/licensing.types';
+import type { ProvisioningKind } from '../../licensing/public/licensing.types';
 import type { AccessRequestState } from '../access-request/access-request.types';
 
 /**

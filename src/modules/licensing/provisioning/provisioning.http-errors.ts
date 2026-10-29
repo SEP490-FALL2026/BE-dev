@@ -2,7 +2,7 @@ import { HttpStatus } from '@nestjs/common';
 import { FORBIDDEN_ERROR } from '../../../infrastructure/http/errors/access-errors';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
-import { EmployeeNotFoundError } from '../../organization/organization.errors';
+import { EmployeeNotFoundError } from '../../organization/public/organization.errors';
 import {
   AssignmentConflictError,
   GrantRequestRefusedError,
@@ -28,7 +28,7 @@ import {
   SeatQuantityUnknownError,
   SeatSubscriptionDraftError,
   SeatTargetNotFoundError,
-} from '../licensing.errors';
+} from '../public/licensing.errors';
 import { toLicensingApiException } from '../mappers/licensing.http-errors';
 import { ProvisioningItAdminRequiredError } from './provisioning.errors';
 

@@ -16,7 +16,7 @@ import { toUnavailableApiException } from '../../infrastructure/http/errors/serv
 import { RequireRoles } from '../../infrastructure/security/decorators/access.decorators';
 import { CurrentPrincipal } from '../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../infrastructure/security/tokens/access-token-verifier.port';
-import { OnboardingForbiddenError } from './onboarding.policy';
+import { OnboardingForbiddenError } from './onboarding.errors';
 import { OnboardingService } from './onboarding.service';
 
 const stepStatus = z.enum(['DONE', 'INCOMPLETE', 'BLOCKED', 'NOT_AVAILABLE']);

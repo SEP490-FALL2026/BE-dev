@@ -22,7 +22,7 @@
 
 ### Task 2: migration (xong)
 
-- Files: `prisma/migrations/20261024180000_personnel_offboarding_cases/migration.sql`, `prisma/migrations/20261024180100_identity_app_user_employee_left/migration.sql`, `prisma/models/personnel.prisma`, `prisma/models/identity-access.prisma`, `prisma/models/organization.prisma` (quan hệ ngược), `src/architecture-boundaries.spec.ts` (model owner)
+- Files: `prisma/migrations/20261024180000_personnel_offboarding_cases/migration.sql`, `prisma/migrations/20261024180100_identity_app_user_employee_left/migration.sql`, `prisma/models/personnel.prisma`, `prisma/models/identity-access.prisma`, `prisma/models/organization.prisma` (quan hệ ngược), `test/gates/architecture-boundaries.gate-spec.ts` (model owner)
 - Depends on: Task 1, `g6-transfer-record`, `g6-long-leave`
 - Acceptance: enum và bảng hồ sơ với `CHECK` đồng bộ trạng thái, unique một phần một hồ sơ sống mỗi nhân viên, bảng thay đổi chỉ thêm; cột `employee_left_on` ghi một lần
 - Verify: nhóm test _what the database refuses_ (`23505`, `23514`, `55000`) xanh; `pnpm prisma:validate`; `migrate diff --exit-code` = 0 trên CSDL kiểm thử riêng
@@ -36,7 +36,7 @@
 
 ### Task 4: hàm của `organization` và `identity-access` (xong)
 
-- Files: `organization/organization-history.service.ts`, `organization/employee/employee-departure.repo.ts`, `employee-directory.service.ts`, `identity-access/identity-access.service.ts`, `accounts/account-directory.service.ts`, `accounts/app-user.repo.ts`, `dto/account-management.dto.ts`
+- Files: `organization/public/organization-history.api.ts`, `organization/employee/employee-departure.repo.ts`, `employee-directory.service.ts`, `identity-access/public/identity-access.api.ts`, `accounts/account-directory.service.ts`, `accounts/app-user.repo.ts`, `dto/account-management.dto.ts`
 - Depends on: Task 2
 - Acceptance: `scheduleDepartureEnd`, `cancelDepartureEnd` (đổi ngày = hủy rồi ghi lại), `markEmployeeLeft`; `markEmployeeLeft` của identity; `GET /app-users` lọc `employeeLeft` (lọc `status` đã có)
 - Verify: tích hợp của các hàm qua `offboarding-*`; hồi quy `organization`, `account-list-and-redeem`, `account-management-http` xanh

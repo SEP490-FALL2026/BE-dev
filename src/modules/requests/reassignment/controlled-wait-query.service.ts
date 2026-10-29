@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { pageOf, type Page } from '../../../core/application/pagination';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { OrganizationService } from '../../organization/organization.service';
+import { OrganizationApi } from '../../organization/public/organization.api';
 import { ControlledWaitRepo } from './controlled-wait.repo';
 import type { ControlledWaitWire } from './controlled-wait.dto';
 import { configurationHintOf } from './reassignment.policy';
@@ -15,7 +15,7 @@ import { configurationHintOf } from './reassignment.policy';
 export class ControlledWaitQueryService {
   constructor(
     private readonly waits: ControlledWaitRepo,
-    private readonly organization: OrganizationService,
+    private readonly organization: OrganizationApi,
   ) {}
 
   async page(

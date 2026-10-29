@@ -1,11 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { LicensingService } from '../../licensing/licensing.service';
-import { userActor } from '../personnel.types';
-import { RevocationRefusedError, AssignmentNotOpenError } from '../../licensing/licensing.errors';
+import { LicensingApi } from '../../licensing/public/licensing.api';
+import { userActor } from '../public/personnel.types';
+import { RevocationRefusedError, AssignmentNotOpenError } from '../../licensing/public/licensing.errors';
 import { OffboardingAuditService } from './offboarding-audit.service';
-import { OffboardingBlockerRegistry } from './offboarding-blocker.registry';
+import { OffboardingSources } from './offboarding-sources.service';
 import { OffboardingFrame } from './offboarding-frame.service';
 import { OffboardingLeftService } from './offboarding-left.service';
 import { OffboardingRefusedError } from './offboarding.errors';
@@ -33,9 +33,9 @@ export class OffboardingRevocationService {
   constructor(
     private readonly frame: OffboardingFrame,
     private readonly repo: OffboardingRepo,
-    private readonly licensing: LicensingService,
+    private readonly licensing: LicensingApi,
     private readonly left: OffboardingLeftService,
-    private readonly registry: OffboardingBlockerRegistry,
+    private readonly sources: OffboardingSources,
     private readonly audit: OffboardingAuditService,
   ) {}
 
@@ -106,7 +106,7 @@ export class OffboardingRevocationService {
         lockRecorded: held.accountLockAt !== null,
         openRights: seats.filter((seat) => !terminating.has(seat.assignmentId)).length,
         accessRunsOn: seats.filter((seat) => terminating.has(seat.assignmentId)).length,
-        registered: await this.registry.blockersOf(held.employeeId, tx),
+        registered: await this.sources.blockersOf(held.employeeId, tx),
       });
       if (refusal) throw new OffboardingRefusedError(refusal.code, refusal.details);
       if (!(await this.repo.close(tx, held.id, actor.appUserId)))

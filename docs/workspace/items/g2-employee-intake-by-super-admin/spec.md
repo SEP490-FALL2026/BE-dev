@@ -20,7 +20,7 @@ hồ sơ mới mang căn cứ trong Audit Trail — kiểm bằng test HTTP.
 - Container: G2 (nhóm giao việc, không phải ranh giới hạng mục).
 - Mode: `grouped-stories`.
 - Outcome and owner: khởi tạo hồ sơ nhân viên mới do Super Admin kèm căn cứ HR; capability `organization/employee` (nhập
-  tay) và `data-import/employee-import` (import), dùng chung policy đặt chỗ `organization/employee-placement.policy.ts`.
+  tay) và `data-import/employee-import` (import), dùng chung policy đặt chỗ `organization/public/employee-placement.policy.ts`.
 - Boundaries: lệnh ghi nhân viên mới (một transaction mỗi lần nhập tay hoặc xác nhận import); HTTP `POST /employees`,
   `/employee-imports*`; quyền chuyển `IT_ADMIN` → `SUPER_ADMIN`; Audit Trail thêm tham chiếu căn cứ.
 - Not larger: bảo trì trường chính thức của hồ sơ đã có là hạng mục `g2-employee-official-field-maintenance`; thông báo

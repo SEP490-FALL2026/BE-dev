@@ -14,6 +14,8 @@ RUN pnpm install --frozen-lockfile
 COPY tsconfig.json tsconfig.build.json nest-cli.json prisma.config.ts ./
 COPY prisma ./prisma
 COPY src ./src
+# `pnpm build` ends by writing the old command entries dist/<alias>.js from the command table (OD-A7).
+COPY scripts/build ./scripts/build
 RUN pnpm build
 
 FROM build AS migrate
@@ -26,7 +28,7 @@ WORKDIR /app
 # P04-CPE-04 (spec L.12): the data representations this runtime reads that an older runtime cannot. scripts/ops/deploy-release.sh
 # brings a previous image back only when its label declares every representation the database holds rows of
 # (`ops:preflight --recovery-target`). Equal to DATA_REPRESENTATIONS of
-# src/modules/installation/migration-preflight/recovery-target.ts (recovery-target.spec.ts). Only this stage's labels reach the image.
+# src/modules/installation/public/recovery-target.policy.ts (recovery-target.policy.spec.ts). Only this stage's labels reach the image.
 LABEL io.github.baophipham.slm.data-reads="access-request-null-cost-center"
 ENV NODE_ENV=production
 RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates \

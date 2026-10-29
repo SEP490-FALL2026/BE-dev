@@ -209,3 +209,10 @@ export interface AccessRequestRecord {
   /** The people of a request for a group, in the order they were named, each with their own state; empty for any other request. */
   lines: LineRecord[];
 }
+
+/** What the person already holds of the plan: the seat that makes asking for it again pointless (`US-05-01` AC-2). */
+export interface HeldAccess {
+  assignmentId: string;
+  effectiveFrom: BusinessDate;
+  validUntil: BusinessDate | null;
+}

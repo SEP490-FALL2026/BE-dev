@@ -4,7 +4,7 @@ import { formatRate, parseRate, type ScaledRate } from '../../../core/money/rate
 import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
-import type { ExchangeRateListFilter, ExchangeRateRecord } from '../finance.types';
+import type { ExchangeRateListFilter, ExchangeRateRecord } from '../public/finance.types';
 
 interface RateRow {
   id: string;

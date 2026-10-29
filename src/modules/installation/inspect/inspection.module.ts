@@ -5,7 +5,7 @@ import { ReadOnlyDatabaseSessionModule } from '../../../infrastructure/database/
 import { AuditModule } from '../../audit/audit.module';
 import { IdentityAccessInspectionFacadeModule } from '../../identity-access/identity-access-inspection-facade.module';
 import { OrganizationModule } from '../../organization/organization.module';
-import { InstallationInspectionService } from './inspection.service';
+import { InstallationInspectionApi } from '../public/inspection.api';
 import { MigrationStateRepo } from './migration-state.repo';
 
 /**
@@ -21,7 +21,7 @@ import { MigrationStateRepo } from './migration-state.repo';
     AuditModule,
     IdentityAccessInspectionFacadeModule,
   ],
-  providers: [MigrationStateRepo, InstallationInspectionService],
-  exports: [InstallationInspectionService],
+  providers: [MigrationStateRepo, InstallationInspectionApi],
+  exports: [InstallationInspectionApi],
 })
 export class InspectionModule {}

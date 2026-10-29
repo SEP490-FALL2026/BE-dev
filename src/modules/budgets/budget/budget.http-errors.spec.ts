@@ -1,7 +1,7 @@
 import { HttpStatus } from '@nestjs/common';
 import { Prisma } from '../../../generated/prisma/client';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
-import { FinanceSetupIncompleteError } from '../../organization/organization.errors';
+import { FinanceSetupIncompleteError } from '../../organization/public/organization.errors';
 import {
   BudgetDepartmentHasNoHeadError,
   BudgetNotAHistoryReaderError,

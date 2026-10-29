@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { AuditService } from '../../audit/audit.service';
+import { AuditApi } from '../../audit/public/audit.api';
 import { AccountDirectoryService } from '../accounts/account-directory.service';
-import { ActionTokenSnapshot } from '../identity-access.types';
+import { ActionTokenSnapshot } from '../public/identity-access.types';
 import { RecoveryRepo } from './recovery.repo';
 
 /**
@@ -15,7 +15,7 @@ export class RecoveryTicketService {
   constructor(
     private readonly tickets: RecoveryRepo,
     private readonly accounts: AccountDirectoryService,
-    private readonly audit: AuditService,
+    private readonly audit: AuditApi,
   ) {}
 
   /**

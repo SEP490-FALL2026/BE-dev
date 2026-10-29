@@ -5,13 +5,17 @@ import { InvalidEmailError, normalizeEmail } from '../../../core/email';
 import type { HrBasis } from '../../../core/hr-basis';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { AuditService } from '../../audit/audit.service';
-import { NotificationsService } from '../../notifications/notifications.service';
+import { AuditApi } from '../../audit/public/audit.api';
+import { NotificationsApi } from '../../notifications/public/notifications.api';
 import { organizationAuditEvent } from '../mappers/audit-event.mapper';
-import { EmployeeEmailTakenError, EmployeeNotFoundError, EmployeeOpenSeatNeedsEndError } from '../organization.errors';
-import { isJobTitleTooLong, placementReasons } from '../employee-placement.policy';
-import { OrganizationService } from '../organization.service';
-import { EmployeeWorkState, EmploymentType } from '../organization.types';
+import {
+  EmployeeEmailTakenError,
+  EmployeeNotFoundError,
+  EmployeeOpenSeatNeedsEndError,
+} from '../public/organization.errors';
+import { isJobTitleTooLong, placementReasons } from '../public/employee-placement.policy';
+import { OrganizationApi } from '../public/organization.api';
+import { EmployeeWorkState, EmploymentType } from '../public/organization.types';
 import { EmployeeRowInvalidError, EmployeeUpdateEmptyError } from './employee.errors';
 import { assertMayCorrectEmployee } from './employee.policy';
 
@@ -52,9 +56,9 @@ type Official = (typeof OFFICIAL)[number];
 @Injectable()
 export class EmployeeMaintenanceService {
   constructor(
-    private readonly organization: OrganizationService,
-    private readonly audit: AuditService,
-    private readonly notifications: NotificationsService,
+    private readonly organization: OrganizationApi,
+    private readonly audit: AuditApi,
+    private readonly notifications: NotificationsApi,
     private readonly runner: TransactionRunner,
   ) {}
 

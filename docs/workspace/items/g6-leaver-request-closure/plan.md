@@ -7,7 +7,7 @@
 
 ## Before coding
 
-Đọc AGENTS.md, CONTRIBUTING.md, [module structure](../../../rules/module-structure.md), spec và plan của `g5-request-withdrawal` và `g5-commitment-lifecycle` (đã `verified` local), mã `requests/access-request/withdrawal.service.ts`, `access-request-grant.gate.ts`, `access-request.repo.ts`, `access-request.policy.ts`, `grant.policy.ts`, `requests/spend/commitment-release.guard.ts`, `licensing/provisioning/provisioning-cancellation.service.ts` và migration `20261024030100_requests_withdrawal` ở BE `7920ee5`. Đối chiếu: `AccessRequestState` chưa có `CANCELLED`; `CommitmentReleaseReason` đã có `REQUEST_CANCELLED`; guard chuyển trạng thái tác vụ chưa cho `IN_PROGRESS → CANCELLED`; `requests` chưa có facade `RequestsService`. Kiểm `pnpm exec jest` của rút Request xanh trước khi tách. Migration `20261024087000`, `20261024087100` (tạm thời) là task riêng đi trước mã dùng chúng.
+Đọc AGENTS.md, CONTRIBUTING.md, [module structure](../../../rules/module-structure.md), spec và plan của `g5-request-withdrawal` và `g5-commitment-lifecycle` (đã `verified` local), mã `requests/withdraw/withdrawal.service.ts`, `access-request-grant.gate.ts`, `access-request.repo.ts`, `access-request.policy.ts`, `grant.policy.ts`, `requests/spend/commitment-release.listener.ts`, `licensing/provisioning/grant-cancellation/provisioning-cancellation.service.ts` và migration `20261024030100_requests_withdrawal` ở BE `7920ee5`. Đối chiếu: `AccessRequestState` chưa có `CANCELLED`; `CommitmentReleaseReason` đã có `REQUEST_CANCELLED`; guard chuyển trạng thái tác vụ chưa cho `IN_PROGRESS → CANCELLED`; `requests` chưa có facade `RequestsService`. Kiểm `pnpm exec jest` của rút Request xanh trước khi tách. Migration `20261024087000`, `20261024087100` (tạm thời) là task riêng đi trước mã dùng chúng.
 
 ## Tasks
 
@@ -48,7 +48,7 @@
 
 ### Task 6: đóng Request bị hủy và API (xong)
 
-- Files: `departure-cancellation.service.ts`, `access-request.repo.ts`, `access-requests.controller.ts`, `access-request.dto.ts`, `access-request.http-errors.ts`, `requests/requests.service.ts` (`listOpenOfBeneficiary`), `src/module-graph.spec.ts` (`PUBLIC_CONTRACT_EXPORTS`), `personnel/offboarding/open-requests.controller.ts`, `personnel/personnel.module.ts`, `api-coverage-manifest.ts`, `api-inventory.e2e-spec.ts`, `openapi.json`
+- Files: `departure-cancellation.service.ts`, `access-request.repo.ts`, `access-requests.controller.ts`, `access-request.dto.ts`, `access-request.http-errors.ts`, `requests/public/requests.api.ts` (`listOpenOfBeneficiary`), `test/gates/module-graph.gate-spec.ts` (`PUBLIC_CONTRACT_EXPORTS`), `personnel/offboarding/open-requests/open-requests.controller.ts`, `personnel/personnel.module.ts`, `api-coverage-manifest.ts`, `api-inventory.e2e-spec.ts`, `openapi.json`
 - Depends on: Task 2, Task 4, Task 5, `g6-offboarding-record`
 - Acceptance: đóng Request đúng thứ tự khóa và kết cục; ba route; hai danh sách phân trang; audit liệt kê khi ghi hồ sơ; AC-24, AC-25 ở ma trận test
 - Verify: integration PostgreSQL và e2e của các AC đó xanh; `pnpm openapi:export` không lệch; test đếm câu lệnh xanh

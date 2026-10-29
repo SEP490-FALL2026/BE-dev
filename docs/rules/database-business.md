@@ -3,7 +3,7 @@
 ## Persistence
 
 - Model theo domain trong `prisma/models/`; module sở hữu bảng được khai báo ở
-  [architecture test](../../src/architecture-boundaries.spec.ts).
+  [architecture test](../../test/gates/architecture-boundaries.gate-spec.ts).
 - Chỉ `*.repo.ts` trong business module dùng Prisma. Module khác gọi public facade,
   không truy cập bảng/repository của nhau.
 - Add schema only for the User Story being implemented. Do not scaffold unused models.
@@ -16,7 +16,7 @@
   lớn hơn migration cuối đã merge, để thứ tự áp dụng là thứ tự đọc. Ba migration đã merge `20261020240000`,
   `20261020250000`, `20261020260000` mang giờ 24–26: thứ tự vẫn tất định (so chuỗi) nên **giữ nguyên tên** — đổi tên một
   migration đã áp làm `_prisma_migrations` lệch với thư mục. Không đổi tên hay sửa migration đã merge. Gate
-  `src/migration-order.spec.ts` (trong `pnpm check`) đọc danh sách migration đã merge ở `scripts/verify/merged-migrations.txt` (mỗi dòng
+  `test/gates/migration-order.gate-spec.ts` (trong `pnpm check`) đọc danh sách migration đã merge ở `scripts/verify/merged-migrations.txt` (mỗi dòng
   một thư mục, thêm dòng khi merge một bản phát hành): migration chưa có trong danh sách phải đứng sau migration cuối của danh sách, và
   migration đã merge không bị đổi tên hay xóa.
 - **Drift (`DB-16`):** CI áp mọi migration vào CSDL rỗng rồi chạy

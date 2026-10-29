@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
-import { AuditService } from '../../audit/audit.service';
-import { groundsSnapshot, normalizedGrounds } from '../grounds/grounds.policy';
-import { personnelAuditEvent } from '../mappers/personnel-audit-event';
-import { PersonnelAccessRefusedError } from '../personnel.errors';
-import { actorColumns, type PersonnelActor } from '../personnel.types';
+import { AuditApi } from '../../audit/public/audit.api';
+import { groundsSnapshot, normalizedGrounds } from '../policies/grounds.policy';
+import { personnelAuditEvent } from '../mappers/personnel-audit-event.mapper';
+import { PersonnelAccessRefusedError } from '../public/personnel.errors';
+import { actorColumns, type PersonnelActor } from '../public/personnel.types';
 import { TransferGuardService } from '../transfer/transfer-guard.service';
 import { NoticeRefusedError } from './notice.errors';
 import {
@@ -17,9 +17,10 @@ import {
   type NoticeRefusal,
 } from './notice.policy';
 import { NoticeRepo } from './notice.repo';
-import { NoticeRecorderRegistry } from './notice-recorder.registry';
+import { NoticeRecorderContributions, type NoticeEventRecorder } from '../public/personnel.extension-points';
 import type {
   LinkNoticeInput,
+  NoticeEventKind,
   NoticeEventRef,
   NoticeRecord,
   RecordNoticeInput,
@@ -44,8 +45,8 @@ export class NoticeHandlingService {
   constructor(
     private readonly runner: TransactionRunner,
     private readonly notices: NoticeRepo,
-    private readonly recorders: NoticeRecorderRegistry,
-    private readonly audit: AuditService,
+    private readonly recorders: NoticeRecorderContributions,
+    private readonly audit: AuditApi,
     private readonly guard: TransferGuardService,
   ) {}
 
@@ -85,7 +86,7 @@ export class NoticeHandlingService {
       refuse(eventShapeRefusal(held.kind, input.event));
       const grounds = normalizedGrounds(input.grounds ?? {});
 
-      const recorder = this.recorders.recorderFor(eventKindOf(held.kind));
+      const recorder = this.recorderFor(eventKindOf(held.kind));
       // The refusals of the event come out with their own codes and undo everything, the notice included.
       const event = await recorder.record(tx, { actor, notice: held, grounds, event: input.event });
       const recorded = await this.complete(tx, actor, held, event, input.verification);
@@ -121,7 +122,7 @@ export class NoticeHandlingService {
       const held = await this.waiting(tx, id, actor, { inApplicationOnly: true });
       refuse(verificationRefusal(input.verification));
       const kind = eventKindOf(held.kind);
-      const eventId = await this.recorders.recorderFor(kind).findLinkable(tx, held, input.eventId);
+      const eventId = await this.recorderFor(kind).findLinkable(tx, held, input.eventId);
       if (!eventId) throw new NoticeRefusedError('NO_MATCHING_EVENT');
 
       const event: NoticeEventRef = { kind, id: eventId };
@@ -146,6 +147,14 @@ export class NoticeHandlingService {
 
       return linked;
     });
+  }
+
+  /** The recorder the capability that owns this kind of event added; one of each kind is added when the module starts. */
+  private recorderFor(kind: NoticeEventKind): NoticeEventRecorder {
+    const found = this.recorders.all().find((recorder) => recorder.eventKind === kind);
+    if (!found) throw new Error(`No notice recorder for ${kind}`);
+
+    return found;
   }
 
   /**

@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { searchKey } from '../vendor-dictionary/vendor-matcher';
+import { searchKey } from '../vendor-dictionary/vendor-matcher.policy';
 import type {
   ApplicationChanges,
   ApplicationKind,

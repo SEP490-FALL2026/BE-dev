@@ -2,10 +2,10 @@ import { Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import type { BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { IdentityAccessService } from '../../identity-access/identity-access.service';
-import { NotificationsService } from '../../notifications/notifications.service';
-import type { InAppNotificationCode, InAppParamValue } from '../../notifications/notifications.types';
-import { OrganizationService } from '../../organization/organization.service';
+import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
+import { NotificationsApi } from '../../notifications/public/notifications.api';
+import type { InAppNotificationCode, InAppParamValue } from '../../notifications/public/notifications.types';
+import { OrganizationApi } from '../../organization/public/organization.api';
 
 /** What happened to a person that the people concerned are told (`F17`, spec B "Thông báo bù"). Codes only: no name, no basis. */
 export type PersonnelEventKind =
@@ -37,9 +37,9 @@ interface Common {
 @Injectable()
 export class PersonnelNotifier {
   constructor(
-    private readonly notifications: NotificationsService,
-    private readonly organization: OrganizationService,
-    private readonly identity: IdentityAccessService,
+    private readonly notifications: NotificationsApi,
+    private readonly organization: OrganizationApi,
+    private readonly identity: IdentityAccessApi,
   ) {}
 
   /** The person and the heads of `departmentIds` are told an event about the person was recorded, moved, cancelled or finished. */

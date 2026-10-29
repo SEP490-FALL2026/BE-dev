@@ -1,9 +1,9 @@
 import { Test } from '@nestjs/testing';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { AuditService } from '../../audit/audit.service';
-import { LicensingService } from '../../licensing/licensing.service';
-import { OperatingParametersService } from '../../operating-parameters/operating-parameters.service';
-import { OrganizationService } from '../../organization/organization.service';
+import { AuditApi } from '../../audit/public/audit.api';
+import { LicensingApi } from '../../licensing/public/licensing.api';
+import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
 import { PersonnelNotifier } from '../event-notice/personnel-notifier.service';
 import { TransferReviewService } from './transfer-review.service';
 import { TransferReviewRepo } from './transfer-review.repo';
@@ -31,10 +31,10 @@ describe('TransferReviewService.tellHead', () => {
       providers: [
         TransferReviewService,
         { provide: TransferReviewRepo, useValue: {} },
-        { provide: LicensingService, useValue: {} },
-        { provide: OperatingParametersService, useValue: {} },
-        { provide: OrganizationService, useValue: organization },
-        { provide: AuditService, useValue: {} },
+        { provide: LicensingApi, useValue: {} },
+        { provide: OperatingParametersApi, useValue: {} },
+        { provide: OrganizationApi, useValue: organization },
+        { provide: AuditApi, useValue: {} },
         { provide: PersonnelNotifier, useValue: notifier },
       ],
     }).compile();

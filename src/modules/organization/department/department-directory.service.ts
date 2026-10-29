@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { BusinessDate } from '../../../core/business-date';
 import { DbTx, readSqlState } from '../../../infrastructure/database/transaction-runner';
 import { isCheckViolation } from '../../../infrastructure/database/unique-violation';
-import { FinanceSetupIncompleteError } from '../organization.errors';
+import { FinanceSetupIncompleteError } from '../public/organization.errors';
 import {
   ClearedHeadSuccessor,
   CostedOwningUnit,
@@ -10,7 +10,7 @@ import {
   EmployeeStatus,
   OwningUnit,
   UsableItAdmins,
-} from '../organization.types';
+} from '../public/organization.types';
 import { HeadAssignmentError } from './department.errors';
 import { itAdminScope } from './department.policy';
 import { DepartmentHeadRepo } from './department-head.repo';

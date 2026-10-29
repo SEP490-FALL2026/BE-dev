@@ -14,10 +14,10 @@ file này sau `ab0c43a`, cập nhật spec trước khi code. Không có blocker
 
 ## Các bước nhỏ
 
-- [x] **Bước 1 — contract đỏ.** Thêm `src/modules/audit/dto/audit-event.dto.ts` (query `z.strictObject` + `superRefine`
+- [x] **Bước 1 — contract đỏ.** Thêm `src/modules/audit/audit-event.dto.ts` (query `z.strictObject` + `superRefine`
       cho hai kiểm chéo; response page), `src/modules/audit/audit.controller.ts` (`@RequireRoles('SUPER_ADMIN')`,
       `@ApiErrorResponses` 401/403/422/503). Cập nhật `test/support/api-coverage-manifest.ts`. Viết e2e đỏ trong
-      `test/e2e/audit-events.e2e-spec.ts`: 401, 403 (EMPLOYEE/IT_ADMIN/FINANCE/không vai), 422 (năm ca), 200 envelope.
+      `test/http/audit/audit-events.http-spec.ts`: 401, 403 (EMPLOYEE/IT_ADMIN/FINANCE/không vai), 422 (năm ca), 200 envelope.
       Kiểm: `pnpm test:e2e -- audit-events` đỏ đúng lý do, rồi xanh sau Bước 2.
 - [x] **Bước 2 — đọc dữ liệu.** `audit.repo.ts` thêm `findPage(filter, page)` (một `where` dùng chung cho `findMany` và
       `count` trong một giao dịch `RepeatableRead` như `AccountRepo` của `appUserList`, `orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }]`); `audit-query.service.ts` (không export) map
@@ -28,11 +28,11 @@ file này sau `ab0c43a`, cập nhật spec trước khi code. Không có blocker
       chỉ `CREATE INDEX audit_events_actor_app_user_id_occurred_at_id_idx ON audit_events (actor_app_user_id,
 occurred_at DESC, id DESC)`; khai `@@index` tương ứng trong `audit.prisma`. Tạo SQL bằng
       `pnpm db:migrate:dev --create-only` trên database dùng riêng, không sửa migration đã merge.
-      `test/integration/audit-query-http.integration-spec.ts` dùng `createHttpTestApp` + `seedInstallation`: Super Admin
+      `test/integration/audit/audit-query-http.integration-spec.ts` dùng `createHttpTestApp` + `seedInstallation`: Super Admin
       đăng nhập qua `/auth/login`; tạo bản ghi audit bằng **workflow thật** (tạo tài khoản, khóa/mở khóa của lát 1b) và
       bổ sung bản ghi tổng hợp bằng `AuditService.record` trong `TransactionRunner` cho ca phân trang 25 bản ghi; kiểm lọc,
       thứ tự, phân trang, 403 cho tài khoản IT/Finance/Employee đã kích hoạt qua API; 401 sau khi khóa.
-      Ca 503: theo mẫu `me-unavailable.integration-spec.ts` với `PgRelay.holdWhen(/audit_events/)`.
+      Ca 503: theo mẫu `me-unavailable.timing-spec.ts` với `PgRelay.holdWhen(/audit_events/)`.
 - [x] **Bước 4 — OpenAPI, tài liệu, review diff.** `pnpm openapi:export`; diff `openapi.json` chỉ thêm
       `auditEventList` + schema của nó. Cập nhật `AGENTS.md` (dòng _Current runtime_), roadmap, bảng kiểm chứng dưới đây.
 

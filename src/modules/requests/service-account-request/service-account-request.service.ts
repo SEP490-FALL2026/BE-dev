@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { AuditService } from '../../audit/audit.service';
-import { LicensingService } from '../../licensing/licensing.service';
-import { OrganizationService } from '../../organization/organization.service';
-import { accessRequestAuditEvent } from '../access-request/access-request-audit-event';
+import { AuditApi } from '../../audit/public/audit.api';
+import { LicensingApi } from '../../licensing/public/licensing.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
+import { accessRequestAuditEvent } from '../access-request/access-request-audit-event.mapper';
 import {
   AccessRequestNoDepartmentError,
   AccessRequestNotDraftError,
@@ -37,10 +37,10 @@ export class ServiceAccountRequestService {
     private readonly runner: TransactionRunner,
     private readonly requests: AccessRequestRepo,
     private readonly details: ServiceAccountRequestRepo,
-    private readonly organization: OrganizationService,
+    private readonly organization: OrganizationApi,
     private readonly assessment: RequestAssessmentService,
-    private readonly licensing: LicensingService,
-    private readonly audit: AuditService,
+    private readonly licensing: LicensingApi,
+    private readonly audit: AuditApi,
     private readonly drafts: RequestDraftRepo,
   ) {}
 

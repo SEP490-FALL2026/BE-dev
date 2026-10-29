@@ -1,10 +1,10 @@
-import { ProvisioningTaskAlreadyManualError, ProvisioningTaskStateError } from '../licensing.errors';
+import { ProvisioningTaskAlreadyManualError, ProvisioningTaskStateError } from '../public/licensing.errors';
 import type {
   ProvisioningChannel,
   ProvisioningDecision,
   ProvisioningFailureKind,
   ProvisioningTaskStatus,
-} from '../licensing.types';
+} from '../public/licensing.types';
 import { FAILURE_REASON_MAX_LENGTH } from './provisioning.policy';
 
 /**

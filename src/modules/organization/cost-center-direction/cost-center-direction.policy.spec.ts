@@ -1,4 +1,4 @@
-import { DirectionRefusedError } from './cost-center-direction.errors';
+import { DirectionRefusedError } from '../public/cost-center-direction.errors';
 import { assertDirectionRules } from './cost-center-direction.policy';
 
 const base = { environment: 'SHARED' as const, approvedBy: 'finance-lead', operator: 'ops-1' };

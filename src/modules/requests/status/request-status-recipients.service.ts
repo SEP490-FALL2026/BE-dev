@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
-import { IdentityAccessService } from '../../identity-access/identity-access.service';
-import { OrganizationService } from '../../organization/organization.service';
+import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
 import type { FactNeed, RequestFacts, StatusFacts } from './request-status.types';
 
 export type RoleHolders = Pick<
@@ -18,8 +18,8 @@ export type RoleHolders = Pick<
 @Injectable()
 export class RequestStatusRecipientsService {
   constructor(
-    private readonly organization: OrganizationService,
-    private readonly identity: IdentityAccessService,
+    private readonly organization: OrganizationApi,
+    private readonly identity: IdentityAccessApi,
   ) {}
 
   /** Only the roles the rule asked for are read. */

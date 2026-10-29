@@ -1,11 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { AuditService } from '../../audit/audit.service';
-import { BudgetsService } from '../../budgets/budgets.service';
-import { LicensingService } from '../../licensing/licensing.service';
-import { OrganizationService } from '../../organization/organization.service';
-import { accessRequestAuditEvent } from '../access-request/access-request-audit-event';
+import { AuditApi } from '../../audit/public/audit.api';
+import { BudgetsApi } from '../../budgets/public/budgets.api';
+import { LicensingApi } from '../../licensing/public/licensing.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
+import { accessRequestAuditEvent } from '../access-request/access-request-audit-event.mapper';
 import {
   AccessRequestNotFoundError,
   AccessRequestWithdrawalRefusedError,
@@ -13,7 +13,7 @@ import {
 import { canViewRequest, viewFactsOf } from '../access-request/access-request.policy';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
-import { checkWithdrawal } from '../access-request/withdrawal.policy';
+import { checkWithdrawal } from '../withdraw/withdrawal.policy';
 import { SpendStatusService } from '../spend/spend-status.service';
 import { GroupGrantService } from './group-grant.service';
 import { checkLineWithdrawal, holdsMoney } from './group-withdrawal.policy';
@@ -22,7 +22,7 @@ import { GroupResolutionService } from './group-resolution.service';
 import { shareToRelease } from './line-allocation.policy';
 import { LineAmountRepo } from './line-amount.repo';
 import { RequestLineRepo } from './request-line.repo';
-import { RequestOutcomeListeners } from '../access-request/request-outcome-listeners';
+import { RequestOutcomeService } from '../outcome/request-outcome.service';
 
 /** What the withdrawal of one line did: it ended, or it waits for the IT Admin to close the task of a grant that had failed. */
 type Withdrawn = { kind: 'ENDED'; released: boolean } | { kind: 'WAITING_FOR_IT'; taskId: string };
@@ -44,12 +44,12 @@ export class GroupWithdrawalService {
     private readonly amounts: LineAmountRepo,
     private readonly grant: GroupGrantService,
     private readonly resolution: GroupResolutionService,
-    private readonly licensing: LicensingService,
-    private readonly organization: OrganizationService,
+    private readonly licensing: LicensingApi,
+    private readonly organization: OrganizationApi,
     private readonly spendStatus: SpendStatusService,
-    private readonly budgets: BudgetsService,
-    private readonly audit: AuditService,
-    private readonly outcomes: RequestOutcomeListeners,
+    private readonly budgets: BudgetsApi,
+    private readonly audit: AuditApi,
+    private readonly outcomes: RequestOutcomeService,
   ) {}
 
   /** Throws AccessRequestNotFoundError and AccessRequestWithdrawalRefusedError. */

@@ -7,6 +7,7 @@ import type { CheckTrigger } from '../../src/modules/requests/spend/budget-check
 import { SpendRoutingService, type RoutingOutcome } from '../../src/modules/requests/spend/spend-routing.service';
 import type { ApiAccount } from './api-accounts';
 import { BudgetHarness, type VersionWire } from './budget-harness';
+import { approvedBudget } from './builders/budget.builder';
 import { waitForLockWaiters } from './lock-wait';
 import type { Department, Person } from './request-harness';
 
@@ -165,24 +166,26 @@ export class SpendHarness extends BudgetHarness {
     );
   }
 
-  /** The current budget of the department for the year, approved through the real decision, with what is held and spent. */
+  /**
+   * The current budget of the department for the year, approved through the real decision, with what is held and spent. The
+   * proposal, the version, its sending and the decision go through their services, not HTTP (T2.2): no suite that stands on
+   * this proves those routes.
+   */
   async budgetFor(unit: Unit, spec: BudgetSpec): Promise<VersionWire> {
     const year = spec.year ?? this.year;
     const window = { windowFrom: `${year}-12-01`, windowTo: `${year}-12-31`, quoteValidUntil: undefined };
-    const proposal = await this.budgetProposed(
-      unit.head,
-      unit.department.unitId,
-      spec.lines ?? [this.line(window)],
-      year,
-    );
-    const version = await this.built(proposal.id, {
-      base: this.money(spec.total),
-      reserve: this.money(0),
-      highValuePercent: spec.percent ?? 50,
-      ...(spec.amountThreshold ? { highValueAmount: this.money(spec.amountThreshold) } : {}),
+    const version = await approvedBudget<VersionWire>(this.ctx, {
+      headToken: unit.head.account.accessToken,
+      financeToken: this.finance.accessToken,
+      deciderToken: (await this.deciderOf(unit)).accessToken,
+      proposal: this.proposalBody(unit.department.unitId, spec.lines ?? [this.line(window)], year),
+      version: {
+        base: this.money(spec.total),
+        reserve: this.money(0),
+        highValuePercent: spec.percent ?? 50,
+        ...(spec.amountThreshold ? { highValueAmount: this.money(spec.amountThreshold) } : {}),
+      },
     });
-    await this.sendVersion(version.id).expect(200);
-    await this.decideVersion(version.id, { decision: 'APPROVE' }, await this.deciderOf(unit)).expect(200);
     if (spec.held) await this.commit(unit, version.id, year, spec.held, 'HELD');
     if (spec.spent) await this.commit(unit, version.id, year, spec.spent, 'EXPENSED');
 

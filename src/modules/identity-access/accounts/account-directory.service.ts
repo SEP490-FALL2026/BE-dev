@@ -9,7 +9,7 @@ import {
   AppUserStatus,
   CreateAppUserInput,
   SuperAdminHolder,
-} from '../identity-access.types';
+} from '../public/identity-access.types';
 import { AppUserRepo } from './app-user.repo';
 import { SuperAdminHolderRepo } from './super-admin-holder.repo';
 

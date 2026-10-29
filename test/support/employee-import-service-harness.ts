@@ -1,24 +1,27 @@
 import type { DbTx, TransactionRunner } from '../../src/infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../src/infrastructure/security/tokens/access-token-verifier.port';
-import type { AuditService } from '../../src/modules/audit/audit.service';
-import type { LicensingService } from '../../src/modules/licensing/licensing.service';
-import type { NotificationsService } from '../../src/modules/notifications/notifications.service';
-import type { InAppNotificationInput } from '../../src/modules/notifications/notifications.types';
-import type { OrganizationService } from '../../src/modules/organization/organization.service';
-import type { EmployeeImportLookupData } from '../../src/modules/organization/organization.types';
+import type { AuditApi } from '../../src/modules/audit/public/audit.api';
+import type { LicensingApi } from '../../src/modules/licensing/public/licensing.api';
+import type { NotificationsApi } from '../../src/modules/notifications/public/notifications.api';
+import type { InAppNotificationInput } from '../../src/modules/notifications/public/notifications.types';
+import type { OrganizationApi } from '../../src/modules/organization/public/organization.api';
+import type { EmployeeImportLookupData } from '../../src/modules/organization/public/organization.types';
+import { EmployeeImportConfirmationService } from '../../src/modules/data-import/employee-import/confirmation/employee-import-confirmation.service';
 import type {
   EmployeeImportRepo,
   ImportRecord,
   StoredRow,
 } from '../../src/modules/data-import/employee-import/employee-import.repo';
-import { EmployeeImportService } from '../../src/modules/data-import/employee-import/employee-import.service';
+import { EmployeeImportPreviewService } from '../../src/modules/data-import/employee-import/preview/employee-import-preview.service';
+import { EmployeeImportRowValidationService } from '../../src/modules/data-import/employee-import/row-validation/employee-import-row-validation.service';
 
 /*
  * The shared harness of the people import use-case specs (H8 Phase 0 characterization, split by use case in Prompt 21A):
- * what the service asks of its collaborators, in which transaction and in which order, and what it writes and records.
+ * what the services ask of their collaborators, in which transaction and in which order, and what they write and record.
  * The collaborators are in-memory stand-ins at the boundary (repository, organization facade, audit, transaction
- * runner); the row rules and the CSV reader are real. Only construction lives here; the assertions stay in the specs
- * `src/modules/data-import/employee-import/employee-import-{upload,preview-lifecycle,confirm}.spec.ts`.
+ * runner); the row validation, the row rules and the CSV reader are real. Only construction lives here; the assertions stay
+ * in the specs `src/modules/data-import/employee-import/preview/employee-import-{upload,preview-lifecycle}.service.spec.ts`
+ * and `confirmation/employee-import-confirmation.service.spec.ts`.
  */
 
 /** The fixed clock of every case: the specs install it with `jest.useFakeTimers(FAKE_CLOCK)`. */
@@ -217,7 +220,7 @@ export function harness(start: Directory = directory()) {
       calls.push('org.getOrganization');
       return Promise.resolve(organization);
     },
-    lookupForEmployeeImport(names: Parameters<OrganizationService['lookupForEmployeeImport']>[0], tx?: DbTx) {
+    lookupForEmployeeImport(names: Parameters<OrganizationApi['lookupForEmployeeImport']>[0], tx?: DbTx) {
       calls.push(`org.lookupForEmployeeImport(${where(tx)})`);
       lookups.push(clone(names));
       const data: EmployeeImportLookupData = {
@@ -311,17 +314,27 @@ export function harness(start: Directory = directory()) {
     },
   };
 
-  const service = new EmployeeImportService(
+  const rowValidation = new EmployeeImportRowValidationService(org as unknown as OrganizationApi);
+  const preview = new EmployeeImportPreviewService(
     repo as unknown as EmployeeImportRepo,
-    org as unknown as OrganizationService,
-    audit as unknown as AuditService,
+    org as unknown as OrganizationApi,
+    audit as unknown as AuditApi,
     runner as unknown as TransactionRunner,
-    { openSeatHolders: () => Promise.resolve([]) } as unknown as LicensingService,
-    notifications as unknown as NotificationsService,
+    { openSeatHolders: () => Promise.resolve([]) } as unknown as LicensingApi,
+    rowValidation,
+  );
+  const confirmation = new EmployeeImportConfirmationService(
+    repo as unknown as EmployeeImportRepo,
+    org as unknown as OrganizationApi,
+    audit as unknown as AuditApi,
+    runner as unknown as TransactionRunner,
+    notifications as unknown as NotificationsApi,
+    rowValidation,
   );
 
   return {
-    service,
+    preview,
+    confirmation,
     dir,
     calls,
     imports,
@@ -354,7 +367,7 @@ export function harness(start: Directory = directory()) {
 export type ImportHarness = ReturnType<typeof harness>;
 
 export const upload = (h: ImportHarness, text: string | Buffer, fileName = 'people.csv') =>
-  h.service.upload(ACTOR, { fileName, bytes: typeof text === 'string' ? Buffer.from(text, 'utf8') : text });
+  h.preview.upload(ACTOR, { fileName, bytes: typeof text === 'string' ? Buffer.from(text, 'utf8') : text });
 
 export const confirmBody = (
   overrides: Partial<{ previewVersion: number; idempotencyKey: string; hrBasis: typeof HR_BASIS }> = {},

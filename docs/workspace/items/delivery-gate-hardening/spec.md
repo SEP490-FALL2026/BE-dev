@@ -42,7 +42,7 @@ merge), `DB-17` (ADR-0005 status, ADR-0013 còn Proposed, chú thích `catalog.m
 
 ## Supporting references
 
-- `GATE-01`: `test/e2e/openapi-export.e2e-spec.ts:37-38` so byte tệp làm việc; `git ls-files --eol openapi.json` →
+- `GATE-01`: `test/http/platform/openapi-export.http-spec.ts:37-38` so byte tệp làm việc; `git ls-files --eol openapi.json` →
   `i/lf w/crlf`; repo không có `.gitattributes`; bản export trùng byte với `git show HEAD:openapi.json`.
 - `GATE-02`: lượt đầy đủ 22/10/2026 `employee-imports-http` 521 s, test _gives the same answer to the same confirmation sent
   again_ vượt 30 s; chạy riêng 38/38 trong 10 s.
@@ -61,9 +61,9 @@ mở.
 
 ## Ownership: module, data, API
 
-Đã sửa (Prompt 09): `.gitattributes` (mới, một rule); `test/e2e/openapi-export.e2e-spec.ts` (so byte, cấm CR, ghim rule);
+Đã sửa (Prompt 09): `.gitattributes` (mới, một rule); `test/http/platform/openapi-export.http-spec.ts` (so byte, cấm CR, ghim rule);
 `openapi.json` (sinh lại, chỉ đổi EOL ở cây làm việc); `test/support/disposable-database.ts` và
-`test/integration/disposable-database.integration-spec.ts` (nguyên nhân thật của lượt đầy đủ đỏ — xem dưới);
+`test/integration/platform/disposable-database.integration-spec.ts` (nguyên nhân thật của lượt đầy đủ đỏ — xem dưới);
 `.github/workflows/ci.yml` (bước drift, path filter `.gitattributes`); `.github/workflows/deploy.yml` (sao lưu trước migrate);
 `scripts/ops/postgres-backup-retention.sh` và `scripts/verify/backup-retention.test.mjs` (dọn bản sao lưu có giới hạn);
 `docs/rules/database-business.md`, `docs/guides/containers.md`, `CONTRIBUTING.md`, `test/README.md`, `scripts/README.md`;

@@ -10,7 +10,7 @@ import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-
 import { AuthenticatedOnly } from '../../../infrastructure/security/decorators/access.decorators';
 import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import type { InAppNotificationRecord } from '../notifications.types';
+import type { InAppNotificationRecord } from '../public/notifications.types';
 import {
   NotificationIdParamDto,
   NotificationListQueryDto,

@@ -1,5 +1,5 @@
 import type { BusinessDate } from '../../../core/business-date';
-import type { DepartmentBrief, EmployeeRecord } from '../../organization/organization.types';
+import type { DepartmentBrief, EmployeeRecord } from '../../organization/public/organization.types';
 import type { NoticeDetailWire, NoticeSummaryWire } from './notice.dto';
 import { isNoticeOverdue, isPriorityKind } from './notice.policy';
 import type { NoticeRecord, NoticeSummaryRecord, NoticeVerificationRecord } from './notice.types';

@@ -11,7 +11,7 @@ import {
   PasswordResetInvalidError,
   SessionInvalidError,
 } from '../auth/auth.errors';
-import { PasswordPolicyError } from '../identity-access.errors';
+import { PasswordPolicyError } from '../public/identity-access.errors';
 
 // Shared by the auth routes (auth/) and the password change of the signed-in account (access/).
 

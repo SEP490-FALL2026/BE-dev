@@ -120,7 +120,7 @@ migration) và từ wiring hiện tại (`docker-compose.prod.yml`, `deploy.yml`
   privileges; không đụng dữ liệu nghiệp vụ, không Audit Trail (quản trị vai không phải hành động nghiệp vụ).
 - API: không route, DTO, status, mã lỗi hay OpenAPI nào đổi. Lệnh mới ngoài HTTP: `pnpm ops:db-roles`.
 - Không Nest submodule nghiệp vụ mới; `RuntimeDatabaseRoleModule` là module hạ tầng có vòng đời riêng (điều kiện 2 của
-  [module structure](../../../rules/module-structure.md#khi-nào-folder-trở-thành-nest-submodule)).
+  [module structure](../../../rules/module-structure.md#layout-trong-một-module)).
 
 ## Behavior and design
 

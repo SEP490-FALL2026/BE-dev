@@ -16,7 +16,7 @@ Mỗi task theo TDD: viết test đỏ, xem nó đỏ đúng lý do, viết mã 
 ### Task 1: bí mật cấu hình
 
 - Trạng thái: xong. Lượt rà soát 21/10/2026 thêm: khóa kho phải khác `OUTBOX_PAYLOAD_KEY`, kiểm `LICENSE_KEY_VAULT_PREVIOUS_KEYS`, sửa `docs/guides/containers.md` (test ở `env-schema.spec.ts`); `pnpm check` xanh.
-- Files: `src/infrastructure/config/secret-environment.ts`, `env-schema.ts`, `env-schema.spec.ts`, `env-matrix.spec.ts`, `env-example.spec.ts`, `.env.example`, `scripts/dev/export-environment.ts`, `README.md` và `docs/guides/containers.md` (nơi liệt kê biến), `test/integration/recovery-cli.integration-spec.ts` (môi trường dựng tay cần ba bí mật mới).
+- Files: `src/infrastructure/config/secret-environment.ts`, `env-schema.ts`, `env-schema.spec.ts`, `env-matrix.spec.ts`, `env-example.spec.ts`, `.env.example`, `scripts/dev/export-environment.ts`, `README.md` và `docs/guides/containers.md` (nơi liệt kê biến), `test/integration/identity-access/recovery-cli.integration-spec.ts` (môi trường dựng tay cần ba bí mật mới).
 - Depends on: —
 - Acceptance: bốn biến mới bắt buộc ngoài môi trường test, khóa 32 byte base64, giá trị mặc định của test và giá trị công khai trong repo bị từ chối ở production, `PREVIOUS_KEYS` rỗng được, `.env.example` và lệnh xuất cấu hình khớp.
 - Verify: các spec cấu hình đỏ trước, xanh sau; `pnpm check`.
@@ -24,7 +24,7 @@ Mỗi task theo TDD: viết test đỏ, xem nó đỏ đúng lý do, viết mã 
 ### Task 2: mã hóa và chính sách thuần
 
 - Trạng thái: xong; `pnpm check` xanh. `LicenseKeyDecryptionError` nằm ở `license-key-cipher.ts` (lỗi kỹ thuật bên trong capability), không ở `licensing.errors.ts`.
-- Files: `src/modules/licensing/license-key/license-key-cipher.ts`, `license-key-cipher.spec.ts`, `license-key.policy.ts`, `license-key.policy.spec.ts`, `licensing.errors.ts`.
+- Files: `src/modules/licensing/license-key/license-key-cipher.service.ts`, `license-key-cipher.spec.ts`, `license-key.policy.ts`, `license-key.policy.spec.ts`, `licensing.errors.ts`.
 - Depends on: Task 1.
 - Acceptance: mã hóa và giải mã đúng, bản mã chép sang dòng khác hoặc đổi mã khóa không mở được, khóa cũ mở được, dấu vân tay ổn định; phán xét lô (sai định dạng, trùng trong lô), mặt nạ, sức chứa và cảnh báo lệch.
 - Verify: `pnpm exec jest src/modules/licensing/license-key` đỏ trước, xanh sau.
@@ -32,7 +32,7 @@ Mỗi task theo TDD: viết test đỏ, xem nó đỏ đúng lý do, viết mã 
 ### Task 3: dữ liệu `license_keys`
 
 - Trạng thái: xong; migration và `license-key-constraints.integration-spec.ts` xanh trong `pnpm test:integration`. Chưa chạy lại `prisma migrate diff` trong lượt cập nhật tài liệu này.
-- Files: `prisma/models/licensing.prisma`, quan hệ ngược ở `catalog.prisma`/`organization.prisma`, migration `20261020260000_licensing_license_keys`, `src/architecture-boundaries.spec.ts`, `test/integration/license-key-constraints.integration-spec.ts`.
+- Files: `prisma/models/licensing.prisma`, quan hệ ngược ở `catalog.prisma`/`organization.prisma`, migration `20261020260000_licensing_license_keys`, `test/gates/architecture-boundaries.gate-spec.ts`, `test/integration/licensing/license-key-constraints.integration-spec.ts`.
 - Depends on: Task 2.
 - Acceptance: CHECK, `UNIQUE (organization_id, fingerprint)`, không xóa, cột không đổi trừ `status`, khóa ngoại.
 - Verify: constraints đỏ trước migration, xanh sau; `prisma migrate diff` không khác biệt.
@@ -40,7 +40,7 @@ Mỗi task theo TDD: viết test đỏ, xem nó đỏ đúng lý do, viết mã 
 ### Task 4: repo, service, route
 
 - Trạng thái: xong; e2e và integration xanh. Các đột biến liệt kê ở Verify không được chạy lại ở lượt 21/10/2026, nên không có bằng chứng mới về chúng.
-- Files: `license-key.repo.ts`, `license-key.service.ts`, `license-key.dto.ts`, `license-key.http-errors.ts`, `license-keys.controller.ts`, `licensing.errors.ts`, `licensing.module.ts` (nhà máy `LicenseKeyCipher` từ cấu hình), `test/support/api-coverage-manifest.ts` (+3), `test/e2e/api-inventory.e2e-spec.ts`, `test/e2e/license-key.e2e-spec.ts`, `test/integration/license-key-http.integration-spec.ts`.
+- Files: `license-key.repo.ts`, `license-key.service.ts`, `license-key.dto.ts`, `license-key.http-errors.ts`, `license-keys.controller.ts`, `licensing.errors.ts`, `licensing.module.ts` (nhà máy `LicenseKeyCipher` từ cấu hình), `test/support/api-coverage-manifest.ts` (+3), `test/http/platform/api-inventory.http-spec.ts`, `test/http/licensing/license-key.http-spec.ts`, `test/integration/licensing/license-key-http.integration-spec.ts`.
 - Depends on: Task 3.
 - Acceptance: ba operation đúng bảng HTTP; mọi AC trong ma trận; giá trị khóa không ở bảng, log, Audit Trail, danh sách.
 - Verify: e2e + integration; đột biến (bỏ chống trùng, bỏ kiểm gói K4, lưu rõ, bỏ audit khi xem, cho vai khác xem, sức chứa không lấy min, bỏ `no-store`) làm đỏ.

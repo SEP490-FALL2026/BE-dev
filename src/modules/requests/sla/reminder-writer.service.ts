@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { AuditService } from '../../audit/audit.service';
-import { NotificationsService } from '../../notifications/notifications.service';
+import { AuditApi } from '../../audit/public/audit.api';
+import { NotificationsApi } from '../../notifications/public/notifications.api';
 import { SlaReminderRepo } from './sla-reminder.repo';
 import {
   noticeCodeOf,
@@ -40,8 +40,8 @@ export interface ReminderToWrite {
 export class ReminderWriter {
   constructor(
     private readonly reminders: SlaReminderRepo,
-    private readonly notifications: NotificationsService,
-    private readonly audit: AuditService,
+    private readonly notifications: NotificationsApi,
+    private readonly audit: AuditApi,
   ) {}
 
   /** True when the reminder was written now, false when the subject already had one for the day. */

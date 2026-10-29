@@ -1,8 +1,8 @@
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import type { IdentityAccessService } from '../../identity-access/identity-access.service';
-import type { NotificationsService } from '../../notifications/notifications.service';
-import type { InAppNotificationInput } from '../../notifications/notifications.types';
-import type { OrganizationService } from '../../organization/organization.service';
+import type { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
+import type { NotificationsApi } from '../../notifications/public/notifications.api';
+import type { InAppNotificationInput } from '../../notifications/public/notifications.types';
+import type { OrganizationApi } from '../../organization/public/organization.api';
 import { PersonnelNotifier } from './personnel-notifier.service';
 
 const TX = {} as DbTx;
@@ -29,7 +29,7 @@ function notifierOf(world: World = {}) {
 
       return Promise.resolve(true);
     }),
-  } as unknown as NotificationsService;
+  } as unknown as NotificationsApi;
   const organization = {
     businessToday: () => Promise.resolve('2026-10-28'),
     getDepartmentHeads: (ids: string[]) =>
@@ -37,11 +37,11 @@ function notifierOf(world: World = {}) {
         new Map(ids.flatMap((id) => (world.heads?.[id] ? [[id, { employeeId: world.heads[id] }] as const] : []))),
       ),
     getItAdminInCharge: () => Promise.resolve({ departmentId: 'd1', itAdminEmployeeId: world.itAdminInCharge ?? null }),
-  } as unknown as OrganizationService;
+  } as unknown as OrganizationApi;
   const identity = {
     getSuperAdminHolder: () => Promise.resolve(world.superAdmin ? { employeeId: world.superAdmin } : null),
     findFirstUsableItAdminEmployeeId: () => Promise.resolve(world.firstUsableItAdmin ?? null),
-  } as unknown as IdentityAccessService;
+  } as unknown as IdentityAccessApi;
 
   return { notifier: new PersonnelNotifier(notifications, organization, identity), told, held };
 }

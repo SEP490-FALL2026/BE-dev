@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { fromDateColumn } from '../../../core/business-date';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import type { PlanLineFacts, PlanLineSummary, YearBudgetFacts } from '../budgets.types';
+import type { PlanLineFacts, PlanLineSummary, YearBudgetFacts } from '../public/budgets.types';
 import { CommitmentRepo, heldKey } from './commitment.repo';
 import { REFERENCE_VERSION } from './version.repo';
 

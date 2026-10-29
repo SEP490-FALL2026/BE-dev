@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { OrganizationService } from '../../organization/organization.service';
+import { OrganizationApi } from '../../organization/public/organization.api';
 import { AccountDirectoryService } from './account-directory.service';
 import { APPROVAL_ROLE_HOLDINGS, ApprovalRoleHoldings } from './account.types';
 import { RoleGrantService } from './role-grant.service';
@@ -30,7 +30,7 @@ export class SuccessorEligibility {
     private readonly accounts: AccountDirectoryService,
     private readonly grants: RoleGrantService,
     @Inject(APPROVAL_ROLE_HOLDINGS) private readonly approvalRoles: ApprovalRoleHoldings,
-    private readonly organization: OrganizationService,
+    private readonly organization: OrganizationApi,
   ) {}
 
   /** The first reason the account cannot take the role, or null when it can. */

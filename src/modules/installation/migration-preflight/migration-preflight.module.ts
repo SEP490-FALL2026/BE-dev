@@ -3,7 +3,7 @@ import { InstallationConfigurationModule } from '../../../infrastructure/config/
 import { DatabaseModule } from '../../../infrastructure/database/database.module';
 import { ReadOnlyDatabaseSessionModule } from '../../../infrastructure/database/read-only-session.module';
 import { MigrationPreflightRepo } from './migration-preflight.repo';
-import { MigrationPreflightService } from './migration-preflight.service';
+import { MigrationPreflightApi } from '../public/migration-preflight.api';
 
 /**
  * The graph of `pnpm ops:preflight` (P28-01): database settings only, every session read-only, no business module.
@@ -11,7 +11,7 @@ import { MigrationPreflightService } from './migration-preflight.service';
  */
 @Module({
   imports: [InstallationConfigurationModule, ReadOnlyDatabaseSessionModule, DatabaseModule],
-  providers: [MigrationPreflightRepo, MigrationPreflightService],
-  exports: [MigrationPreflightService],
+  providers: [MigrationPreflightRepo, MigrationPreflightApi],
+  exports: [MigrationPreflightApi],
 })
 export class MigrationPreflightModule {}

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { DbTx } from '../../infrastructure/database/transaction-runner';
-import { ClaimedEmail, DeliveryState } from './notifications.types';
+import { ClaimedEmail, DeliveryState } from './public/notifications.types';
 
 interface ClaimedRow {
   id: string;

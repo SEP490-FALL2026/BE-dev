@@ -1,7 +1,7 @@
 import { HttpStatus } from '@nestjs/common';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import { toUnavailableApiException } from '../../../infrastructure/http/errors/service-unavailable';
-import { FinanceSetupIncompleteError } from '../../organization/organization.errors';
+import { FinanceSetupIncompleteError } from '../../organization/public/organization.errors';
 import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
 import {
   AccessRequestAlreadyHoldsAccessError,

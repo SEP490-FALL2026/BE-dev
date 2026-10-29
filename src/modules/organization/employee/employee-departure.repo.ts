@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { fromDateColumn, type BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { readSqlState } from '../../../infrastructure/database/transaction-runner';
-import { PlacementOverlapError } from '../organization.errors';
+import { PlacementOverlapError } from '../public/organization.errors';
 
 /**
  * The writes of the leaving of a person on the placements and on the employee (`g6-offboarding-record`): the open placement ends

@@ -27,7 +27,7 @@
   `@RequireRoles(...)` (missing means 500). Session, account status and employee status are checked in the
   database on every request; roles are never read from the token. Never use an always-accept verifier
   outside isolated tests.
-- Public routes need @Public(), an entry in the public allowlist of `test/e2e/api-inventory.e2e-spec.ts`
+- Public routes need @Public(), an entry in the public allowlist of `test/http/platform/api-inventory.http-spec.ts`
   and anonymous HTTP tests. Add authorization from the US before opening real business access.
 - Passwords enter through the installation prompt, `/auth/login`, `/auth/invitations/redeem`, `/auth/password-resets`
   or `/me/password`; they are never accepted
@@ -42,7 +42,7 @@
   current account status or resource permission.
 - Distinguish invalid credentials from unavailable dependencies. Do not log secrets.
 - Global rate limiting uses per-process memory, with a separate counter for each route and IP
-  (Owner decision 14/10/2026, R-07; pinned by `test/e2e/rate-limit.e2e-spec.ts`).
+  (Owner decision 14/10/2026, R-07; pinned by `test/http/platform/rate-limit.http-spec.ts`).
   Login failure throttling is separately keyed by normalized email: only failed logins increase
   its failure counter, after the password check (Owner confirmed the existing spec, R-06).
   See [G0/G1 remediation review](../reviews/g0-g1-remediation-2026-10-15/README.md). Redis is queue infrastructure.
@@ -56,8 +56,8 @@
   `EmailDispatchLoop` in the separate worker polls PostgreSQL `EmailOutbox` and sends via SMTP
   outside the business transaction (ADR-0012, Proposed). Delivery is at-least-once. `RequestWorkLoop` also projects the audit
   events of requests into the in-app inbox: one transaction per batch locks the cursor (`FOR UPDATE SKIP LOCKED`), reads only
-  events older than `DB_TRANSACTION_TIMEOUT_MS` plus five seconds (an event is stamped when its transaction begins, not when it
-  commits), writes the notices and moves the cursor, so a failed pass writes nothing and a repeated one writes nothing twice.
+  events older than `DB_TRANSACTION_TIMEOUT_MS` plus five seconds (an event is stamped by the writing process when its insert is
+  sent, before it commits), writes the notices and moves the cursor, so a failed pass writes nothing and a repeated one writes nothing twice.
   A notice never carries a secret, an amount or a finding of the budget: the closed table of codes and parameter keys is in
   `inbox.policy.ts`. The events of the lines of a request for a group (`ACCESS_REQUEST.LINE_*`) carry `beneficiaryEmployeeId`, so a
   person is told of their own line only, with the sender. `RequestWorkLoop` also runs the reminders of late steps (`StepSlaSweepService`): on a working day of the
@@ -67,7 +67,7 @@
   `access_requests`, `access_request_steps`, approval records, spend decisions or commitments, sends no mail, and a failed
   subject rolls back whole and is tried again on the next tick. Run one by hand with `StepSlaSweepService.sweep(now)`.
   The API (not the worker) runs `OrganizationChangeSweeper` once an hour, the first pass five minutes after start, with an unreferenced
-  timer: it tells the modules that act on the organization (the listeners registered with `OrganizationService.registerChangeListener`)
+  timer: it tells the modules that act on the organization (the listeners added to `OrganizationChangeListeners`)
   of the placements and head periods that took effect on a day that has come and were not told. One transaction for each change
   records it in `organization_change_announcements` (unique `(kind, subject_id)`, so two instances tell it once) and calls the
   listeners; a listener that throws rolls that change back and it is tried again at the next pass, and a failed pass only logs.

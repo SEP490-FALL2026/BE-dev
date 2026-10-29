@@ -8,7 +8,7 @@ import {
   AssignmentNotOpenError,
   AssignmentNotServiceAccountError,
   AssignmentResponsibleInvalidError,
-} from '../licensing.errors';
+} from '../public/licensing.errors';
 import { toLicensingApiException } from '../mappers/licensing.http-errors';
 import { AssignmentResponsibleAfterDeadlineError, ServiceAccountDutyTooManyError } from './service-account.errors';
 

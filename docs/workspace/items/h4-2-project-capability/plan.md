@@ -26,7 +26,7 @@ nên đặt HTTP mapper ở `errors/` (như prompt) đòi ledger hoặc nới ga
 
 ### Task 1: characterization trên code cũ
 
-- Files: `test/integration/departments-http.integration-spec.ts` (khối `project contract kept by the H4.2 move`, 6 test),
+- Files: `test/integration/organization/departments-http.integration-spec.ts` (khối `project contract kept by the H4.2 move`, 6 test),
   `src/modules/organization/project.service.spec.ts` (6 test; sau move ở `project/`).
 - Depends on: none.
 - Acceptance: wire, list/filter/thứ tự, chuẩn hóa, no-op, audit trường đổi, lỗi, hồ sơ phòng; thứ tự lock/kiểm/ghi/audit
@@ -60,7 +60,7 @@ nên đặt HTTP mapper ở `errors/` (như prompt) đòi ledger hoặc nới ga
 
 ### Task 5: ratchet gate
 
-- Files: `src/architecture-structure.spec.ts`.
+- Files: `test/gates/architecture-structure.gate-spec.ts`.
 - Depends on: Task 4.
 - Acceptance: root 4 controller / 22 file; mục oversized `department.repo.ts` gỡ; cap `department.service.ts` 508.
 - Verify: ba architecture spec.

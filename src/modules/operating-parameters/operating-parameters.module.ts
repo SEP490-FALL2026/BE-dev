@@ -4,7 +4,7 @@ import { AuditModule } from '../audit/audit.module';
 import { OrganizationModule } from '../organization/organization.module';
 import { NonWorkingDatesService } from './non-working-dates.service';
 import { OperatingParametersRepo } from './operating-parameters.repo';
-import { OperatingParametersService } from './operating-parameters.service';
+import { OperatingParametersApi } from './public/operating-parameters.api';
 
 /**
  * The operating parameters and the non-working dates, as a service other modules read. The HTTP side is
@@ -12,7 +12,7 @@ import { OperatingParametersService } from './operating-parameters.service';
  */
 @Module({
   imports: [DatabaseModule, AuditModule, OrganizationModule],
-  providers: [OperatingParametersRepo, OperatingParametersService, NonWorkingDatesService],
-  exports: [OperatingParametersService, NonWorkingDatesService],
+  providers: [OperatingParametersRepo, OperatingParametersApi, NonWorkingDatesService],
+  exports: [OperatingParametersApi, NonWorkingDatesService],
 })
 export class OperatingParametersModule {}

@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { NotificationsService } from '../../notifications/notifications.service';
-import type { InAppNotificationCode, InAppParamValue } from '../../notifications/notifications.types';
+import { NotificationsApi } from '../../notifications/public/notifications.api';
+import type { InAppNotificationCode, InAppParamValue } from '../../notifications/public/notifications.types';
 import { deciderOf } from './budget.policy';
 import { BudgetSupportService } from './budget-support.service';
 import type { ProposalRecord } from './proposal.repo';
@@ -27,7 +27,7 @@ interface Notice {
 @Injectable()
 export class BudgetNotifierService {
   constructor(
-    private readonly notifications: NotificationsService,
+    private readonly notifications: NotificationsApi,
     private readonly support: BudgetSupportService,
   ) {}
 

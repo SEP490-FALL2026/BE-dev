@@ -1,14 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { AuditService } from '../../audit/audit.service';
-import { BudgetsService } from '../../budgets/budgets.service';
-import { accessRequestAuditEvent } from '../access-request/access-request-audit-event';
+import { AuditApi } from '../../audit/public/audit.api';
+import { BudgetsApi } from '../../budgets/public/budgets.api';
+import { accessRequestAuditEvent } from '../access-request/access-request-audit-event.mapper';
 import { chargedCostCenterId } from '../access-request/access-request.policy';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
 import { BudgetCheckRepo, type CheckRecord } from './budget-check.repo';
-import { BudgetInformationService } from './budget-information.service';
+import { BudgetInformationService } from '../budget-information/budget-information.service';
 import { FinanceReviewRepo } from './finance-review.repo';
 import type { BlockedReason } from './spend-decision.policy';
 import { SpendDecisionRefusedError } from './spend.errors';
@@ -27,9 +27,9 @@ export class SpendEffectsService {
     private readonly steps: SpendStepRepo,
     private readonly checkRepo: BudgetCheckRepo,
     private readonly reviews: FinanceReviewRepo,
-    private readonly budgets: BudgetsService,
+    private readonly budgets: BudgetsApi,
     private readonly information: BudgetInformationService,
-    private readonly audit: AuditService,
+    private readonly audit: AuditApi,
   ) {}
 
   /**

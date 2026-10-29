@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
-import type { PlanRevocationInfo, PlanSummary, WorkspaceDuty } from '../catalog.types';
+import type { PlanRevocationInfo, PlanSummary, WorkspaceDuty } from '../public/catalog.types';
 import { PlanRepo } from './plan.repo';
 import type { PlanLookup } from './plan.types';
 

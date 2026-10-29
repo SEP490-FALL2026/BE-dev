@@ -32,7 +32,11 @@ import {
   EmployeeUpdateEmptyError,
 } from '../employee/employee.errors';
 import { ProjectForbiddenError, ProjectInvalidError, ProjectNotFoundError } from '../project/project.errors';
-import { EmployeeCodeTakenError, EmployeeNotFoundError, OrganizationAlreadyExistsError } from '../organization.errors';
+import {
+  EmployeeCodeTakenError,
+  EmployeeNotFoundError,
+  OrganizationAlreadyExistsError,
+} from '../public/organization.errors';
 import { toOrganizationApiException } from './organization.http-errors';
 
 /** The HTTP answer an error becomes: status and the body the global filter writes. */

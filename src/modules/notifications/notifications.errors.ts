@@ -1,13 +1,15 @@
-import type { InAppNotificationRefusal } from './notifications.types';
+/** A sealed outbox payload that does not open: an unknown key id, a ciphertext of another row, or one that was touched. */
+export class PayloadDecryptionError extends Error {
+  constructor() {
+    super('The outbox payload could not be decrypted.');
+    this.name = 'PayloadDecryptionError';
+  }
+}
 
-/**
- * A programming error: an in-app notice the closed table refuses (an unknown code, a key the code does not carry, a forbidden
- * key, a value that is not flat, too large). It never reaches a reader as data. Public because the module that writes the
- * notice decides what to do with its own mistake (the projection of the requests skips the event and logs it).
- */
-export class InvalidInAppNotificationError extends Error {
-  constructor(readonly refusal: InAppNotificationRefusal) {
-    super(`The in-app notification was refused: ${refusal.reason}`);
-    this.name = 'InvalidInAppNotificationError';
+/** The row names a template this build does not have (for example one written by a newer build). It can never be sent. */
+export class UnknownEmailTemplateError extends Error {
+  constructor(readonly template: string) {
+    super(`Unknown email template: ${template}`);
+    this.name = 'UnknownEmailTemplateError';
   }
 }

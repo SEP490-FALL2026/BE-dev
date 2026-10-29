@@ -122,7 +122,7 @@ từ chối UPDATE/DELETE dưới role runtime).
 
 ### Legacy ledger mỗi lát gỡ
 
-| Lát | Mục trong `src/architecture-structure.spec.ts` / `src/module-graph.spec.ts`                                                                                                                                                                            |
+| Lát | Mục trong `test/gates/architecture-structure.gate-spec.ts` / `test/gates/module-graph.gate-spec.ts`                                                                                                                                                    |
 | --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | H4  | `controllerImports`, `errorMatchedByName`, `oversizedFiles` (department.\*), `rootControllers`/`rootFiles` organization, export repo của `OrganizationModule`                                                                                          |
 | H5  | `crossCapabilityImports` (21 mục), `errorClassesOutsideErrorFiles` (super-admin-transfer), `httpMappingInErrorFiles` (approval-role), `oversizedFiles` (recovery.service, account.repo), export repo/`PasswordHasher` của `IdentityAccessFacadeModule` |

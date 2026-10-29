@@ -2,18 +2,18 @@ import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { AuditService } from '../../audit/audit.service';
-import { AssignmentNotFoundError } from '../../licensing/licensing.errors';
-import { LicensingService } from '../../licensing/licensing.service';
-import type { AssignmentFacts } from '../../licensing/licensing-renewal.types';
-import { OrganizationService } from '../../organization/organization.service';
-import { accessRequestAuditEvent } from '../access-request/access-request-audit-event';
+import { AuditApi } from '../../audit/public/audit.api';
+import { AssignmentNotFoundError } from '../../licensing/public/licensing.errors';
+import { LicensingApi } from '../../licensing/public/licensing.api';
+import type { AssignmentFacts } from '../../licensing/public/licensing-renewal.types';
+import { OrganizationApi } from '../../organization/public/organization.api';
+import { accessRequestAuditEvent } from '../access-request/access-request-audit-event.mapper';
 import { TERM_MONTHS_MAX } from '../access-request/access-request.dto';
 import { AccessRequestSuperAdminCannotRequestError } from '../access-request/access-request.errors';
 import { mayRequest } from '../access-request/access-request.policy';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
-import { AccessRequestService } from '../access-request/access-request.service';
+import { AccessRequestService } from '../request-submission/access-request.service';
 import { LONG_TERM_MONTHS, nextRequestState } from '../access-request/need-decision.policy';
 import {
   RequestAssessmentService,
@@ -21,7 +21,7 @@ import {
   type RequestSettings,
 } from '../access-request/request-assessment.service';
 import { RenewalApplyService } from './renewal-apply.service';
-import { DELEGATED_ROW, RenewalRequestTrail } from './renewal-request-trail';
+import { DELEGATED_ROW, RenewalRequestTrail } from './renewal-request-trail.service';
 import type { RenewalBodyDto } from './renewal-request.dto';
 import { RenewalRequestRefusedError } from './renewal-request.errors';
 import { checkNewEnd, checkRenewable, checkRenewalSender, monthsBetween, routeRenewal } from './renewal-request.policy';
@@ -50,11 +50,11 @@ export class RenewalRequestService {
     private readonly renewals: RenewalRequestRepo,
     private readonly accessRequests: AccessRequestService,
     private readonly assessment: RequestAssessmentService,
-    private readonly organization: OrganizationService,
-    private readonly licensing: LicensingService,
+    private readonly organization: OrganizationApi,
+    private readonly licensing: LicensingApi,
     private readonly apply: RenewalApplyService,
     private readonly trail: RenewalRequestTrail,
-    private readonly audit: AuditService,
+    private readonly audit: AuditApi,
   ) {}
 
   /**

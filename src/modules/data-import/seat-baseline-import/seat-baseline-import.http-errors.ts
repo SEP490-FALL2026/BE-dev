@@ -10,7 +10,7 @@ import {
   SeatSubscriptionDraftError,
   SeatTargetInvalidError,
   SeatTargetNotFoundError,
-} from '../../licensing/licensing.errors';
+} from '../../licensing/public/licensing.errors';
 import {
   SeatImportAlreadyConfirmedError,
   SeatImportFileInvalidError,

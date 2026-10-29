@@ -1,13 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
-import { AuditService } from '../../audit/audit.service';
-import { OrganizationService } from '../../organization/organization.service';
+import { AuditApi } from '../../audit/public/audit.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
 import {
   ProvisioningTaskNotConnectorError,
   ProvisioningTaskNotFoundError,
   ProvisioningTaskStateError,
-} from '../licensing.errors';
-import type { ProvisioningFailureKind } from '../licensing.types';
+} from '../public/licensing.errors';
+import type { ProvisioningFailureKind } from '../public/licensing.types';
 import { classifyFailure, connectorErrorDetail } from './failure.policy';
 import { ProvisioningTaskRepo } from './provisioning-task.repo';
 
@@ -29,8 +29,8 @@ export interface FailureRecorded {
 export class ProvisioningFailureService {
   constructor(
     private readonly repo: ProvisioningTaskRepo,
-    private readonly organization: OrganizationService,
-    private readonly audit: AuditService,
+    private readonly organization: OrganizationApi,
+    private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
   ) {}
 

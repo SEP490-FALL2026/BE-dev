@@ -14,7 +14,7 @@ const ANSWERS: Readonly<Record<TransferReviewProblem, { status: HttpStatus; mess
   DECISION_ALREADY_RECORDED: {
     status: HttpStatus.CONFLICT,
     message:
-      'A decision about this tool was written already and is final. Only "still needed" can become "no longer needed", and only while the old seat is not being taken back.',
+      'This decision is final. Only "still needed" may become "no longer needed", and only while the old seat is not being taken back.',
   },
   NOT_OPEN: { status: HttpStatus.CONFLICT, message: 'The review is not open: it was completed or replaced.' },
   EMPLOYEE_LEFT: {

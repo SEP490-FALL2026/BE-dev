@@ -1,4 +1,4 @@
-import type { SeatTarget } from '../../catalog/catalog.types';
+import type { SeatTarget } from '../../catalog/public/catalog.types';
 import {
   SeatPlanNotSupportedError,
   SeatApplicationRetiredError,
@@ -6,7 +6,7 @@ import {
   SeatSubscriptionDraftError,
   SeatTargetInvalidError,
   SeatTargetNotFoundError,
-} from '../licensing.errors';
+} from '../public/licensing.errors';
 import { assertBaselineTarget, assertSeatTargetUsable, toSeatTargetRef } from './baseline-target.policy';
 
 const subscription = (over: Partial<SeatTarget> = {}): SeatTarget => ({

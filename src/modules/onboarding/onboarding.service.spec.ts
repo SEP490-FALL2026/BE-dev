@@ -1,13 +1,13 @@
-import { CatalogService } from '../catalog/catalog.service';
-import type { CatalogOnboardingFacts } from '../catalog/catalog.types';
-import { DataImportService } from '../data-import/data-import.service';
-import { LatestEmployeeImport } from '../data-import/data-import.types';
-import { IdentityAccessService } from '../identity-access/identity-access.service';
-import { LicensingService } from '../licensing/licensing.service';
-import type { BaselineProgress } from '../licensing/licensing.types';
-import { OnboardingFacts } from '../organization/organization.types';
-import { OrganizationService } from '../organization/organization.service';
-import { OnboardingForbiddenError } from './onboarding.policy';
+import { CatalogApi } from '../catalog/public/catalog.api';
+import type { CatalogOnboardingFacts } from '../catalog/public/catalog.types';
+import { DataImportApi } from '../data-import/public/data-import.api';
+import { LatestEmployeeImport } from '../data-import/public/data-import.types';
+import { IdentityAccessApi } from '../identity-access/public/identity-access.api';
+import { LicensingApi } from '../licensing/public/licensing.api';
+import type { BaselineProgress } from '../licensing/public/licensing.types';
+import { OnboardingFacts } from '../organization/public/organization.types';
+import { OrganizationApi } from '../organization/public/organization.api';
+import { OnboardingForbiddenError } from './onboarding.errors';
 import { OnboardingService } from './onboarding.service';
 
 const facts = (overrides: Partial<OnboardingFacts> = {}): OnboardingFacts => ({
@@ -48,13 +48,13 @@ function serviceWith(
 
         return Promise.resolve(organizationFacts);
       },
-    } as unknown as OrganizationService,
+    } as unknown as OrganizationApi,
     {
       findUsableItAdminEmployeeIds: () => Promise.resolve(new Set(usableItAdmins)),
-    } as unknown as IdentityAccessService,
-    { latestEmployeeImport: () => Promise.resolve(latest) } as unknown as DataImportService,
-    { getOnboardingFacts: () => Promise.resolve(catalog) } as unknown as CatalogService,
-    { getBaselineProgress: () => Promise.resolve(baseline) } as unknown as LicensingService,
+    } as unknown as IdentityAccessApi,
+    { latestEmployeeImport: () => Promise.resolve(latest) } as unknown as DataImportApi,
+    { getOnboardingFacts: () => Promise.resolve(catalog) } as unknown as CatalogApi,
+    { getBaselineProgress: () => Promise.resolve(baseline) } as unknown as LicensingApi,
   );
 
   return { reads, checklist: (roles: readonly string[] = ['IT_ADMIN']) => service.checklist({ roles }) };

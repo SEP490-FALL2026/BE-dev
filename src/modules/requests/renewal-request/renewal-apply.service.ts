@@ -1,11 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { AuditService } from '../../audit/audit.service';
-import { BudgetsService } from '../../budgets/budgets.service';
-import { AssignmentNotFoundError, AssignmentRenewalRefusedError } from '../../licensing/licensing.errors';
-import { LicensingService } from '../../licensing/licensing.service';
-import { accessRequestAuditEvent } from '../access-request/access-request-audit-event';
+import { AuditApi } from '../../audit/public/audit.api';
+import { BudgetsApi } from '../../budgets/public/budgets.api';
+import { AssignmentNotFoundError, AssignmentRenewalRefusedError } from '../../licensing/public/licensing.errors';
+import { LicensingApi } from '../../licensing/public/licensing.api';
+import { accessRequestAuditEvent } from '../access-request/access-request-audit-event.mapper';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
 import { RenewalRequestRepo } from './renewal-request.repo';
@@ -23,9 +23,9 @@ export class RenewalApplyService {
   constructor(
     private readonly requests: AccessRequestRepo,
     private readonly renewals: RenewalRequestRepo,
-    private readonly licensing: LicensingService,
-    private readonly budgets: BudgetsService,
-    private readonly audit: AuditService,
+    private readonly licensing: LicensingApi,
+    private readonly budgets: BudgetsApi,
+    private readonly audit: AuditApi,
   ) {}
 
   async apply(tx: DbTx, actor: AuthenticatedPrincipal, request: AccessRequestRecord, now: Date): Promise<void> {

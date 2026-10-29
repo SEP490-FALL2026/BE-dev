@@ -2,10 +2,10 @@ import { Test } from '@nestjs/testing';
 import { HR_BASIS } from '../../../../test/support/hr-basis';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { AuditService } from '../../audit/audit.service';
-import { IdentityAccessService } from '../../identity-access/identity-access.service';
-import { EmployeeNotFoundError } from '../organization.errors';
-import { OrganizationService } from '../organization.service';
+import { AuditApi } from '../../audit/public/audit.api';
+import { EmployeeNotFoundError } from '../public/organization.errors';
+import { OrganizationApi } from '../public/organization.api';
+import { EmployeeAccountsHook, type EmployeeAccounts } from '../public/organization.extension-points';
 import { DepartmentForbiddenError, HeadAssignmentError } from './department.errors';
 import { DepartmentHeadService } from './department-head.service';
 import { DepartmentRepo } from './department.repo';
@@ -62,12 +62,19 @@ describe('DepartmentHeadService', () => {
       providers: [
         DepartmentHeadService,
         { provide: DepartmentRepo, useValue: departments },
-        { provide: OrganizationService, useValue: organization },
+        { provide: OrganizationApi, useValue: organization },
         {
-          provide: IdentityAccessService,
-          useValue: { inspectEmployeeAccount: jest.fn().mockResolvedValue({ roles: [] }) },
+          provide: EmployeeAccountsHook,
+          useFactory: () => {
+            const hook = new EmployeeAccountsHook();
+            hook.bind({
+              inspectEmployeeAccount: jest.fn().mockResolvedValue({ roles: [] }),
+            } as unknown as EmployeeAccounts);
+
+            return hook;
+          },
         },
-        { provide: AuditService, useValue: audit },
+        { provide: AuditApi, useValue: audit },
         { provide: TransactionRunner, useValue: runner },
       ],
     }).compile();

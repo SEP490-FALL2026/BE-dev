@@ -1,5 +1,5 @@
 import type { BusinessDate } from '../../../core/business-date';
-import type { Grounds, GroundsInput } from '../grounds/grounds.policy';
+import type { Grounds, GroundsInput } from '../policies/grounds.policy';
 
 export type TransferStatus = 'PENDING' | 'EFFECTIVE' | 'CANCELLED';
 

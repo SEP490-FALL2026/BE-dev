@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { AuditService } from '../../audit/audit.service';
-import { catalogAuditEvent } from '../mappers/catalog-audit-event';
+import { AuditApi } from '../../audit/public/audit.api';
+import { catalogAuditEvent } from '../mappers/catalog-audit-event.mapper';
 import { VendorDictionaryLookupService } from '../vendor-dictionary/vendor-dictionary-lookup.service';
 import { VendorProposalIntakeService } from '../vendor-dictionary/vendor-proposal-intake.service';
 import { VendorDirectoryService } from '../vendor/vendor-directory.service';
@@ -24,7 +24,7 @@ export class ApplicationVendorLinkService {
     private readonly dictionary: VendorDictionaryLookupService,
     private readonly vendors: VendorDirectoryService,
     private readonly proposals: VendorProposalIntakeService,
-    private readonly audit: AuditService,
+    private readonly audit: AuditApi,
   ) {}
 
   /**

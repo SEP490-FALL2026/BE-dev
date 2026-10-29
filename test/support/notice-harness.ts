@@ -1,5 +1,5 @@
 import request from 'supertest';
-import { OrganizationService } from '../../src/modules/organization/organization.service';
+import { OrganizationApi } from '../../src/modules/organization/public/organization.api';
 import { NoticeOverdueService } from '../../src/modules/personnel/notice/notice-overdue.service';
 import type { ApiAccount } from './api-accounts';
 import { OffboardingHarness } from './offboarding-harness';
@@ -105,7 +105,7 @@ export class NoticeHarness extends OffboardingHarness {
 
   /** The organization says today is `day` until the returned function is called; the data written meanwhile is dated from it. */
   pretendToday(day: string): () => void {
-    const spy = jest.spyOn(this.ctx.app.get(OrganizationService, { strict: false }), 'businessToday');
+    const spy = jest.spyOn(this.ctx.app.get(OrganizationApi, { strict: false }), 'businessToday');
     spy.mockResolvedValue(day);
 
     return () => spy.mockRestore();

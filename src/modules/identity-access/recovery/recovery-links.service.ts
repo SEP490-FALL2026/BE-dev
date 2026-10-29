@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { NotificationsService } from '../../notifications/notifications.service';
+import { NotificationsApi } from '../../notifications/public/notifications.api';
 import { ActionLinkService } from '../accounts/action-link.service';
 import { TicketRecord } from './recovery.repo';
 
@@ -24,7 +24,7 @@ function requireRecipient(recipient: string): string {
 export class RecoveryLinks {
   constructor(
     private readonly links: ActionLinkService,
-    private readonly notifications: NotificationsService,
+    private readonly notifications: NotificationsApi,
   ) {}
 
   /** Whether the ticket has a link that can still be used and whose mail has not failed: then nothing is sent again. */

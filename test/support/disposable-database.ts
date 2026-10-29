@@ -37,6 +37,8 @@ export class DisposableDatabaseError extends Error {
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1']);
 const SAFE_NAME = /^[a-z][a-z0-9_]*_test$/;
 const quote = (identifier: string): string => '"' + identifier.replaceAll('"', '""') + '"';
+/** A loaded runner can take seconds to accept a connection to a freshly cloned database; long, but finite. */
+const CONNECT_TIMEOUT_MS = 15_000;
 
 function sqlState(error: unknown): string | null {
   if (typeof error !== 'object' || error === null || !('code' in error)) return null;
@@ -144,7 +146,7 @@ export function checkDisposableUrl(value: string): { host: string; database: str
 
 export async function assertDisposableDatabase(url: string, runId: string): Promise<void> {
   const { database } = checkDisposableUrl(url);
-  const client = new Client({ connectionString: url, connectionTimeoutMillis: 5000 });
+  const client = new Client({ connectionString: url, connectionTimeoutMillis: CONNECT_TIMEOUT_MS });
   let failure: DisposableDatabaseError | undefined;
   try {
     await client.connect();
@@ -171,6 +173,12 @@ export function adminUrl(source: string): string {
   return url.toString();
 }
 
+/** The admin connection of CREATE/DROP DATABASE: parallel files wait behind one another, so 30 s, but finite. */
+function harnessAdminClient(connectionString: string): Client {
+  const timeout = { connectionTimeoutMillis: CONNECT_TIMEOUT_MS, query_timeout: 30000, statement_timeout: 30000 };
+  return new Client({ connectionString, ...timeout, application_name: 'slm-disposable-harness' });
+}
+
 /** Requires explicit opt-in to a local server; never falls back to the application's database. */
 export async function provisionDisposableDatabase(runId: string = randomUUID()): Promise<DisposableDatabase> {
   const source = process.env.TEST_DATABASE_ADMIN_URL;
@@ -183,14 +191,8 @@ export async function provisionDisposableDatabase(runId: string = randomUUID()):
   const target = new URL(admin);
   target.pathname = '/' + name;
   const url = target.toString();
-  const adminClient = new Client({
-    connectionString: admin,
-    connectionTimeoutMillis: 5000,
-    query_timeout: 5000,
-    statement_timeout: 5000,
-    application_name: 'slm-disposable-harness',
-  });
-  const client = new Client({ connectionString: url, connectionTimeoutMillis: 5000 });
+  const adminClient = harnessAdminClient(admin);
+  const client = new Client({ connectionString: url, connectionTimeoutMillis: CONNECT_TIMEOUT_MS });
   let created = false;
   let clientClosed = false;
   let failure: DisposableDatabaseError | undefined;
@@ -236,13 +238,7 @@ export async function dropDisposableDatabase(database: DisposableDatabase): Prom
   if (name !== database.name) throw new DisposableDatabaseError('Database handle name does not match its URL.');
   await assertDisposableDatabase(database.url, database.runId);
   // Derive the server from the owned handle, never from mutable process environment.
-  const client = new Client({
-    connectionString: adminUrl(database.url),
-    connectionTimeoutMillis: 5000,
-    query_timeout: 5000,
-    statement_timeout: 5000,
-    application_name: 'slm-disposable-harness',
-  });
+  const client = harnessAdminClient(adminUrl(database.url));
   let failure: DisposableDatabaseError | undefined;
   try {
     await client.connect();
@@ -321,7 +317,7 @@ export function migratedTemplate(): { name: string; runId: string } | null {
 }
 
 async function markDatabase(url: string, runId: string, fresh: boolean): Promise<void> {
-  const client = new Client({ connectionString: url, connectionTimeoutMillis: 5000 });
+  const client = new Client({ connectionString: url, connectionTimeoutMillis: CONNECT_TIMEOUT_MS });
   await client.connect();
   try {
     if (fresh) {
@@ -353,13 +349,13 @@ const FOREIGN_OBJECTS = `SELECT (SELECT count(*) FROM pg_class c JOIN pg_namespa
  * suite that already used its database never loses what it made.
  */
 async function cloneMigratedTemplate(database: DisposableDatabase, template: string): Promise<boolean> {
-  const target = new Client({ connectionString: database.url, connectionTimeoutMillis: 5000 });
+  const target = new Client({ connectionString: database.url, connectionTimeoutMillis: CONNECT_TIMEOUT_MS });
   await target.connect();
   const foreign = await target.query<{ count: string }>(FOREIGN_OBJECTS).finally(() => target.end());
   if (Number(foreign.rows[0].count) !== 0) return false;
   const admin = new Client({
     connectionString: adminUrl(database.url),
-    connectionTimeoutMillis: 5000,
+    connectionTimeoutMillis: CONNECT_TIMEOUT_MS,
     query_timeout: 30000,
     application_name: 'slm-disposable-harness',
   });

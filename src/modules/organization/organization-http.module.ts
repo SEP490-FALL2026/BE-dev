@@ -1,9 +1,8 @@
 import { Module } from '@nestjs/common';
 import { DatabaseModule } from '../../infrastructure/database/database.module';
 import { AuditModule } from '../audit/audit.module';
-import { IdentityAccessFacadeModule } from '../identity-access/identity-access-facade.module';
 import { NotificationsModule } from '../notifications/notifications.module';
-import { OrganizationChangeSweeper } from './change-announcement/organization-change.sweeper';
+import { OrganizationChangeSweeper } from './change-announcement/organization-change.job';
 import { CostCenterService } from './cost-center/cost-center.service';
 import { CostCentersController } from './cost-center/cost-centers.controller';
 import { DepartmentHeadService } from './department/department-head.service';
@@ -25,10 +24,11 @@ import { ProjectsController } from './project/projects.controller';
 /**
  * The HTTP side of the organization module, mounted by the API only. It is a module of its own, not part of
  * `OrganizationModule`, because the installation command and the worker import `OrganizationModule` for the
- * facade and must not carry controllers with them.
+ * facade and must not carry controllers with them. The accounts of the employees the department use cases check are read through
+ * `EmployeeAccountsHook`, which identity-access binds (D5): this module never imports identity-access.
  */
 @Module({
-  imports: [DatabaseModule, AuditModule, OrganizationModule, IdentityAccessFacadeModule, NotificationsModule],
+  imports: [DatabaseModule, AuditModule, OrganizationModule, NotificationsModule],
   controllers: [
     EmployeesController,
     EmployeeMaintenanceController,
@@ -44,7 +44,7 @@ import { ProjectsController } from './project/projects.controller';
     DepartmentQueryService,
     DepartmentService,
     DepartmentHeadService,
-    // Hands the notices kept for a department with no head to the head whose period starts (T-11), registered on the change registry.
+    // Hands the notices kept for a department with no head to the head whose period starts (T-11), added to the change listeners.
     HeldNoticeHandoverListener,
     DepartmentTechnicalMembersRepo,
     ProjectService,

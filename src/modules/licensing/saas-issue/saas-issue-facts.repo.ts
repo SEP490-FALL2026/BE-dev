@@ -3,7 +3,7 @@ import { fromDateColumn, toDateColumn, type BusinessDate } from '../../../core/b
 import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { OPEN_GRANT_TASK_STATUSES } from '../licensing-open-grants.types';
+import { OPEN_GRANT_TASK_STATUSES } from '../public/licensing-open-grants.types';
 import type { ReportableAssignment } from './saas-issue.policy';
 
 /** A right the caller may report on, with the grant that is not finished for it, if any. */

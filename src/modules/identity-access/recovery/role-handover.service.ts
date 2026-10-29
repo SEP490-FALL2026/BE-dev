@@ -1,11 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { DbTx, readSqlState } from '../../../infrastructure/database/transaction-runner';
-import { AuditService } from '../../audit/audit.service';
+import { AuditApi } from '../../audit/public/audit.api';
 import { RoleGrantService } from '../accounts/role-grant.service';
-import { operatorEvent } from './recovery-procedure';
-import { RecoveryRefusedError } from './recovery.errors';
+import { operatorEvent } from './recovery-procedure.policy';
+import { RecoveryRefusedError } from '../public/recovery.errors';
 import { RecoveryRepo, TicketRecord } from './recovery.repo';
-import { RecoveryContext, RecoveryResult } from './recovery.types';
+import { RecoveryContext, RecoveryResult } from '../public/recovery.types';
 
 /**
  * The last step of a role transfer (AC-12): the Super Admin role leaves the holder (if anyone holds it) and reaches the
@@ -16,7 +16,7 @@ export class RoleHandover {
   constructor(
     private readonly grants: RoleGrantService,
     private readonly tickets: RecoveryRepo,
-    private readonly audit: AuditService,
+    private readonly audit: AuditApi,
   ) {}
 
   async move(

@@ -3,7 +3,7 @@ import { toDateColumn, type BusinessDate } from '../../../core/business-date';
 import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import type { AssignmentRecord } from '../licensing.types';
+import type { AssignmentRecord } from '../public/licensing.types';
 import { toRecord } from './assignment.repo';
 
 /** A seat of the baseline that is held on a subscription, as the review after the installation needs to see it (F21). */

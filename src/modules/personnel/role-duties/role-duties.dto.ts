@@ -1,7 +1,7 @@
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { z } from 'zod';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
-import { ROLE_FLAGS } from '../personnel.types';
+import { ROLE_FLAGS } from '../public/personnel.types';
 
 /** Every role flag with whether the person holds it: the wire has no list of them. */
 const roleFlagsSchema = z.record(z.enum(ROLE_FLAGS), z.boolean());

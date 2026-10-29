@@ -1,7 +1,10 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { OrganizationService } from '../../organization/organization.service';
-import type { OrganizationChange, OrganizationChangeListener } from '../../organization/organization.types';
+import {
+  OrganizationChangeListeners,
+  type OrganizationChangeListener,
+} from '../../organization/public/organization.extension-points';
+import type { OrganizationChange } from '../../organization/public/organization.types';
 import { TransferSettlementService } from './transfer-settlement.service';
 
 /**
@@ -11,12 +14,12 @@ import { TransferSettlementService } from './transfer-settlement.service';
 @Injectable()
 export class TransferEffectiveListener implements OrganizationChangeListener, OnModuleInit {
   constructor(
-    private readonly organization: OrganizationService,
+    private readonly changes: OrganizationChangeListeners,
     private readonly settlement: TransferSettlementService,
   ) {}
 
   onModuleInit(): void {
-    this.organization.registerChangeListener(this);
+    this.changes.add('personnel.transfer-effective', (tx, change) => this.onChange(tx, change));
   }
 
   async onChange(tx: DbTx, change: OrganizationChange): Promise<void> {

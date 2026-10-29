@@ -1,6 +1,6 @@
 import { type BusinessDate } from '../../../core/business-date';
-import { placementReasons } from '../../organization/employee-placement.policy';
-import { groundsRefusal, type GroundsInput } from '../grounds/grounds.policy';
+import { placementReasons } from '../../organization/public/employee-placement.policy';
+import { groundsRefusal, type GroundsInput } from '../policies/grounds.policy';
 
 /**
  * What the policy of a transfer refuses, as a semantic code (`DEPARTMENT_TRANSFER.<code>` on the wire) and the facts a person

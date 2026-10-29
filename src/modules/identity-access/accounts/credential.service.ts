@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { PasswordPolicyError } from '../identity-access.errors';
+import { PasswordPolicyError } from '../public/identity-access.errors';
 import { CredentialRepo } from './credential.repo';
 import { PASSWORD_HASH_POLICY_VERSION, PasswordHasher } from './password-hasher.service';
 import { PasswordPolicyViolation, checkPasswordPolicy } from './password.policy';

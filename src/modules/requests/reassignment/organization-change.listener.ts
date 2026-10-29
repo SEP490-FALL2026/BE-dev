@@ -1,8 +1,12 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, OnModuleInit } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { OrganizationService } from '../../organization/organization.service';
-import type { OrganizationChange, OrganizationChangeListener } from '../../organization/organization.types';
-import { RequestDraftDepartureService } from '../access-request/request-draft-departure.service';
+import { OrganizationApi } from '../../organization/public/organization.api';
+import {
+  OrganizationChangeListeners,
+  type OrganizationChangeListener,
+} from '../../organization/public/organization.extension-points';
+import type { OrganizationChange } from '../../organization/public/organization.types';
+import { RequestDraftDepartureService } from '../draft/request-draft-departure.service';
 import type { ReassignmentTrigger } from './reassignment.policy';
 import { StepReassignmentRepo } from './step-reassignment.repo';
 import { StepReassignmentService } from './step-reassignment.service';
@@ -12,16 +16,22 @@ import { StepReassignmentService } from './step-reassignment.service';
  * the department of the requester, the head of a department and a person who has left are the three kinds of change that move
  * a step. A change of the job title alone moves nothing (`US-03-01` AC-11). Every step that waits is tried again on each of
  * them, since nobody holds it. The listener keys nothing on the change: the table is run on today's data, so hearing the same
- * change twice finds nothing left to change.
+ * change twice finds nothing left to change. It adds itself to the change listeners of the organization when the module starts,
+ * so the organization never imports this module.
  */
 @Injectable()
-export class RequestsOrganizationChangeListener implements OrganizationChangeListener {
+export class RequestsOrganizationChangeListener implements OrganizationChangeListener, OnModuleInit {
   constructor(
     private readonly repo: StepReassignmentRepo,
     private readonly reassignment: StepReassignmentService,
-    private readonly organization: OrganizationService,
+    private readonly organization: OrganizationApi,
     private readonly drafts: RequestDraftDepartureService,
+    private readonly changes: OrganizationChangeListeners,
   ) {}
+
+  onModuleInit(): void {
+    this.changes.add('requests.step-reassignment', (tx, change) => this.onChange(tx, change));
+  }
 
   async onChange(tx: DbTx, change: OrganizationChange): Promise<void> {
     // The drafts of a person who left are theirs alone and go with them, whoever else the change moves a step of (spec L.1).

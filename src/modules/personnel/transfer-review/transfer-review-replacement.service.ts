@@ -1,13 +1,12 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { AuditService } from '../../audit/audit.service';
-import { IdentityAccessService } from '../../identity-access/identity-access.service';
-import { AssignmentNotOpenError, RevocationRefusedError } from '../../licensing/licensing.errors';
-import { LicensingService } from '../../licensing/licensing.service';
-import type { RequestOutcomeEvent, RequestOutcomeListener } from '../../requests/requests.types';
-import { RequestsService } from '../../requests/requests.service';
-import { personnelSystemAuditEvent } from '../mappers/personnel-audit-event';
+import { AuditApi } from '../../audit/public/audit.api';
+import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
+import { AssignmentNotOpenError, RevocationRefusedError } from '../../licensing/public/licensing.errors';
+import { LicensingApi } from '../../licensing/public/licensing.api';
+import type { RequestOutcomeEvent } from '../../requests/public/requests.extension-points';
+import { personnelSystemAuditEvent } from '../mappers/personnel-audit-event.mapper';
 import { TransferReviewRepo } from './transfer-review.repo';
 import type { StillNeededLine } from './transfer-review.types';
 
@@ -23,18 +22,13 @@ import type { StillNeededLine } from './transfer-review.types';
  * that meets this listener at the same moment finds the revocation of the review there, so the old seat is taken back once. A seat that is no longer open, or has no revocation, is left and said so in the Audit Trail.
  */
 @Injectable()
-export class TransferReviewReplacementService implements RequestOutcomeListener, OnModuleInit {
+export class TransferReviewReplacementService {
   constructor(
-    private readonly requests: RequestsService,
     private readonly reviews: TransferReviewRepo,
-    private readonly licensing: LicensingService,
-    private readonly identity: IdentityAccessService,
-    private readonly audit: AuditService,
+    private readonly licensing: LicensingApi,
+    private readonly identity: IdentityAccessApi,
+    private readonly audit: AuditApi,
   ) {}
-
-  onModuleInit(): void {
-    this.requests.registerOutcomeListener(this);
-  }
 
   async requestOutcome(tx: DbTx, event: RequestOutcomeEvent): Promise<void> {
     for (const employeeId of event.beneficiaryEmployeeIds) {

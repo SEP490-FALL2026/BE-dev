@@ -2,11 +2,11 @@ import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { AuditService } from '../../audit/audit.service';
-import { OrganizationService } from '../../organization/organization.service';
+import { AuditApi } from '../../audit/public/audit.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
 import { AssignmentEndService } from '../assignment/assignment-end.service';
-import { licensingAuditEvent } from '../mappers/licensing-audit-event';
-import type { OperatorAuditActor } from '../licensing-handover.types';
+import { licensingAuditEvent } from '../mappers/licensing-audit-event.mapper';
+import type { OperatorAuditActor } from '../public/licensing-handover.types';
 import { confirmationCovers, requirementOf, takesOver, type SourceFact } from './handover-confirmer.policy';
 import { HandoverRepo, type DutyRecord } from './handover.repo';
 
@@ -42,8 +42,8 @@ export class HandoverIssueService {
   constructor(
     private readonly repo: HandoverRepo,
     private readonly ending: AssignmentEndService,
-    private readonly organization: OrganizationService,
-    private readonly audit: AuditService,
+    private readonly organization: OrganizationApi,
+    private readonly audit: AuditApi,
   ) {}
 
   async ensure(tx: DbTx, actor: AuthenticatedPrincipal, input: IssueInput): Promise<Issued> {

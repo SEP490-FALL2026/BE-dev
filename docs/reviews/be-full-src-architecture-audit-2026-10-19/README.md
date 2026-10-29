@@ -77,7 +77,7 @@ infrastructure ──► core          (không tệp infrastructure nào import 
   `ARCHITECTURE.md`.
 - Cạnh liên module tới tệp root **không phải facade** (Fact): `data-import/employee-import-rows.ts:3`,
   `employee-import.service.ts:8` → `organization/job-title-name.ts`; `onboarding/onboarding.service.ts:2` →
-  `data-import/employee-import.service.ts`; `src/email-dispatch.loop.ts:5` → `notifications/email-dispatcher.service.ts`
+  `data-import/employee-import.service.ts`; `src/worker/email-dispatch.job.ts:5` → `notifications/email-dispatcher.service.ts`
   (A4-02).
 
 ## 3. Ma trận disposition module/capability
@@ -111,9 +111,9 @@ quyết (đã quyết ở 09B — [mục 12](#quyết-định-owner-09b)). Mỗi
 | infrastructure / config                                         | C     | `env-schema.ts` 425/425 dòng (cap ledger, không còn khoảng trống cho biến mới của G3); `resolveDatabaseUrl` bị chép ở `prisma.config.ts:4-16` trong khi chú thích `env-schema.ts:409-410` nói Prisma CLI dùng lại (A4-07)                                                                                                                                 | H6.3 (E3)             |
 | infrastructure / database                                       | C     | F-30: cảnh báo `pg` từ test; `pg-pool.ts` dựa vào nội bộ `pg`/`pg-pool` (`:126`, `:248-251`) với phạm vi `^8.23.0`                                                                                                                                                                                                                                        | INF.1                 |
 | infrastructure / security                                       | C     | F-18: `bearer-token.ts:6` phân biệt hoa/thường scheme (RFC 7235 không phân biệt); không test ghim hành vi                                                                                                                                                                                                                                                 | AUTH.1                |
-| infrastructure / object-storage, queue                          | E     | `ObjectStorageModule` không có consumer nhưng nạp ở `app.module.ts:25`, `worker.module.ts:16`; `QueueInfrastructureModule` nạp ở `worker.module.ts:17` không đăng ký queue; production đòi `REDIS_PASSWORD` (`env-schema.ts:377`) và object storage HTTPS (A4-06)                                                                                         | H6.4 (E2)             |
+| infrastructure / object-storage, queue                          | E     | `ObjectStorageModule` không có consumer nhưng nạp ở `app/app.module.ts:25`, `worker/worker.module.ts:16`; `QueueInfrastructureModule` nạp ở `worker/worker.module.ts:17` không đăng ký queue; production đòi `REDIS_PASSWORD` (`env-schema.ts:377`) và object storage HTTPS (A4-06)                                                                                         | H6.4 (E2)             |
 | infrastructure / http, health, mail, observability              | A     | Đúng ranh giới; hằng số 422 cục bộ lặp ở 6 controller (A4-13) xử lý trong lát module                                                                                                                                                                                                                                                                      | —                     |
-| composition roots                                               | B     | Không business logic; hai CLI chép `fail`/`cliLogger`/`isEnvironmentValidationError` (`recovery-cli.ts:15-34`, `installation-cli.ts:142-165`) và so `error.name` (`recovery-cli.ts:32`, `installation-cli.ts:41`) mà gate không quét root (A4-04); `email-dispatch.loop.ts` là root có logic, đặt chủ đích (ADR-0012) nhưng rule chưa cho phép tường minh | GATE.1, DOC.1, ROOT.1 |
+| composition roots                                               | B     | Không business logic; hai CLI chép `fail`/`cliLogger`/`isEnvironmentValidationError` (`recovery-cli.ts:15-34`, `installation-cli.ts:142-165`) và so `error.name` (`recovery-cli.ts:32`, `installation-cli.ts:41`) mà gate không quét root (A4-04); `worker/email-dispatch.job.ts` là root có logic, đặt chủ đích (ADR-0012) nhưng rule chưa cho phép tường minh | GATE.1, DOC.1, ROOT.1 |
 | architecture gates (`src/*.spec.ts`)                            | B     | Bốn điểm mù đo được (mục 7)                                                                                                                                                                                                                                                                                                                               | GATE.1 (E9)           |
 | `test/**`, scripts                                              | B     | 50 import từ `test/**` vào `src/modules` (9 vào subfolder, 9 vào `*.repo.ts`); đa phần là tra token DI, typecheck bắt khi move. Không cần gate; cần một dòng hướng dẫn trong `test/README.md`                                                                                                                                                             | DOC.1                 |
 
@@ -134,7 +134,7 @@ identity-access/organization và ba điểm nhỏ của infrastructure — khôn
 | `infrastructure/config/env-schema.ts`              | 425  | 425        | khai báo kiểu, schema đầy đủ, schema cài đặt, bất biến database, chính sách production (`:343-390`)                                 |
 | `identity-access/accounts/account.repo.ts`         | 411  | 411        | AppUser, credential, role grant, action token (~35 method)                                                                          |
 | `organization/organization.repo.ts`                | 398  | —          | Organization, CostCenter, Department, JobTitle, Employee/Placement                                                                  |
-| `identity-access/accounts/app-users.controller.ts` | 296  | —          | 9 route, cùng try/catch, mapper wire (`:31-58`)                                                                                     |
+| `identity-access/accounts/app-users/app-users.controller.ts` | 296  | —          | 9 route, cùng try/catch, mapper wire (`:31-58`)                                                                                     |
 | `organization/departments.controller.ts`           | 293  | —          | 9 route, mapper `toWire`/`toProjectWire`/`toProfileWire` (`:41-80`)                                                                 |
 | `identity-access/auth/auth.controller.ts`          | 274  | —          | phiên, đặt lại, redeem lời mời, mapping lỗi inline                                                                                  |
 
@@ -185,10 +185,10 @@ organization → audit 7, → identity-access 2 (chỉ `department.service.ts` +
   `security` — F-18; `AuthenticatedPrincipal` (`access-token-verifier.port.ts:13-16`) mang từ vựng identity (ghi nhận,
   giữ); `SecurityModule` export hai guard không ai dùng (giữ, nhỏ); `object-storage`/`queue` không consumer (A4-06, E2);
   `mail` không có Nest module, do notifications cung cấp (giữ).
-- **Composition root (B):** `main.ts`, `bootstrap.ts`, `worker.ts` không có business logic; `ConfigModule.forRoot` validate
+- **Composition root (B):** `main.ts`, `app/configure-application.ts`, `worker.ts` không có business logic; `ConfigModule.forRoot` validate
   env lúc import (CLI hoãn đúng bằng dynamic import `recovery-cli.ts:67`, `installation-cli.ts:188`). `RecoveryCliModule`
   gọn. Hai CLI chép helper và so `error.name` (A4-04); `installation-cli.ts:229` viết cứng "12–128 ký tự" thay vì hằng số
-  policy. `email-dispatch.loop.ts` là provider của `WorkerModule` (`worker.module.ts:21`) nối dispatcher với
+  policy. `worker/email-dispatch.job.ts` là provider của `WorkerModule` (`worker/worker.module.ts:21`) nối dispatcher với
   `isActionLinkUsable` mà không cho notifications import identity-access — đặt chủ đích theo ADR-0012, nhưng
   `module-structure.md` chỉ cho root chứa composition root và gate.
 
@@ -282,7 +282,7 @@ chồng lên các tệp mà H4/H5 sẽ di chuyển (`app-users.controller.ts`,
   Dừng khi: gate xanh, mỗi rule fail trên một ví dụ tổng hợp, không entry mới ngoài danh sách đã duyệt. Rủi ro merge: thấp
   (chỉ spec). Kích thước: 0 capability, 3 tệp test.
 - **DOC.1 — đính chính tài liệu.** Files: `CONTRIBUTING.md`, root `README.md`, `ARCHITECTURE.md` (catalog là mẫu, `:193`,
-  quy tắc tệp root như `email-dispatch.loop.ts`), ADR-0003 (ghi chú sửa đổi), `test/README.md` (ưu tiên HTTP/facade), bằng
+  quy tắc tệp root như `worker/email-dispatch.job.ts`), ADR-0003 (ghi chú sửa đổi), `test/README.md` (ưu tiên HTTP/facade), bằng
   chứng F-26 (7 bản `Page`). Findings: A4-14, A4-17, A4-18, F-09 phần còn lại. Catalog theo **E1 = A**: thôi gọi là
   mẫu, ghi là module chưa mount chờ thiết kế G3. Dừng
   khi: `pnpm rules:check`, `pnpm rules:format` sạch. Kích thước: tài liệu.
@@ -386,7 +386,7 @@ H4 và H5 chạm module khác nhau, có thể song song nếu do hai người v�
 - Nest submodule `OrganizationHttpModule`, `IdentityAccessFacadeModule`, `RecoveryModule`, `AuditHttpModule`.
 - `organization.http-errors.ts` (một mapper cho lớp HTTP của bounded context); `import-lookup.repo.ts` chỉ đọc;
   `employee-row.validator`, `cost-center-name`, `organization-audit`.
-- Toàn bộ `audit`, `notifications` (gồm `email-dispatch.loop.ts` ở root theo ADR-0012), `onboarding`,
+- Toàn bộ `audit`, `notifications` (gồm `worker/email-dispatch.job.ts` ở root theo ADR-0012), `onboarding`,
   `operating-parameters` (kể cả `parameter-definitions.ts`), và trong data-import: `employee-import-rows.ts`, `csv.ts`,
   `employee-import.repo.ts`.
 - Tệp entry CLI của installation (`hidden-prompt.ts`, `installation.arguments.ts`, `installation.input.ts`) và
@@ -456,7 +456,7 @@ G10 chưa bắt đầu và mỗi lát cần prompt riêng.
 | `git rev-parse HEAD`, `git status --porcelain=v1 -uall`, `git diff --stat`                                                   | `bd05007` `dev`; đầu lượt 68 đường dẫn dirty (52 tracked + 16 untracked); cuối lượt 70 (52 + 18, thêm 2 tệp báo cáo)                                                                    |
 | `sha256sum` mọi tệp dirty (đầu và cuối lượt), `openapi.json`, tệp prompt                                                     | 68/68 tệp dirty cũ giống hệt (chuỗi H1 → H3c giữ nguyên); chỉ thêm 2 tệp báo cáo; `openapi.json` `14fd428b…` không đổi; prompt 00–09 không đổi, chỉ tracker đổi; repo Docs như đầu lượt |
 | Script đọc-chỉ `inventory.py` / `edges.py` (scratchpad, không ghi vào repo)                                                  | 246 tệp TS, 22 554 dòng; đồ thị import; 0 cạnh vào subfolder/repo module khác; danh sách raw SQL, tệp lớn                                                                               |
-| `pnpm exec jest --runInBand src/architecture-structure.spec.ts src/architecture-boundaries.spec.ts src/module-graph.spec.ts` | exit 0; 3 suite, 35 test pass                                                                                                                                                           |
+| `pnpm exec jest --runInBand test/gates/architecture-structure.gate-spec.ts test/gates/architecture-boundaries.gate-spec.ts test/gates/module-graph.gate-spec.ts` | exit 0; 3 suite, 35 test pass                                                                                                                                                           |
 | Đọc kiểm lại finding của subagent (`grep`/`sed` trên tệp nguồn)                                                              | Mọi finding dùng ở mục 3–9 đã đối chiếu tệp:dòng; không phát hiện sai lệch                                                                                                              |
 | `prettier --check` hai tệp báo cáo; script kiểm link/anchor tương đối của báo cáo (báo cáo nằm ngoài phạm vi `rules:check`)  | Prettier sạch; 0 link/anchor hỏng; 0 dòng có khoảng trắng cuối                                                                                                                          |
 | `pnpm rules:check`, `pnpm rules:format`, `git diff --check` (BE); `git diff --no-index --check` cho tracker                  | `BE: 87 files, 704 links, 0 errors`; format sạch; không lỗi khoảng trắng                                                                                                                |

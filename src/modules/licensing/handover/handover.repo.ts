@@ -4,7 +4,7 @@ import { BusinessDate, fromDateColumn, toDateColumn } from '../../../core/busine
 import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import type { RevocationSource } from '../licensing.types';
+import type { RevocationSource } from '../public/licensing.types';
 import type { HandoverConfirmedRole, HandoverRole, HandoverValue } from './handover-confirmer.policy';
 
 type DutyRow = Prisma.HandoverDutyGetPayload<Record<string, never>>;

@@ -1,12 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { normalizeEmail } from '../../../core/email';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { AuditService } from '../../audit/audit.service';
-import type { AuditEventInput } from '../../audit/audit.types';
-import { NotificationsService } from '../../notifications/notifications.service';
+import { AuditApi } from '../../audit/public/audit.api';
+import type { AuditEventInput } from '../../audit/public/audit.types';
+import { NotificationsApi } from '../../notifications/public/notifications.api';
 import { ActionLinkRevocation } from '../accounts/action-link-revocation.service';
 import { CredentialService } from '../accounts/credential.service';
-import { AccountSnapshot } from '../identity-access.types';
+import { AccountSnapshot } from '../public/identity-access.types';
 import { LoginThrottle } from './login-throttle.service';
 import { SessionRepo } from './session.repo';
 
@@ -36,8 +36,8 @@ export class CredentialChangeService {
     private readonly revocation: ActionLinkRevocation,
     private readonly sessions: SessionRepo,
     private readonly throttle: LoginThrottle,
-    private readonly notifications: NotificationsService,
-    private readonly audit: AuditService,
+    private readonly notifications: NotificationsApi,
+    private readonly audit: AuditApi,
   ) {}
 
   async replace(tx: DbTx, change: CredentialChange): Promise<void> {

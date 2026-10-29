@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { isCheckViolation } from '../../../infrastructure/database/unique-violation';
-import { DirectionRefusedError } from './cost-center-direction.errors';
+import { DirectionRefusedError } from '../public/cost-center-direction.errors';
 
 /** The Cost Center as the link reads it, after it is locked. */
 export interface LockedCostCenter {

@@ -7,7 +7,7 @@ import { OrganizationModule } from '../../organization/organization.module';
 import { PersonnelModule } from '../personnel.module';
 import { ProfileCorrectionService } from './profile-correction.service';
 import { SuperAdminEventRepo } from './super-admin-event.repo';
-import { SuperAdminEventService } from './super-admin-event.service';
+import { SuperAdminEventApi } from '../public/super-admin-event.api';
 
 /**
  * The controlled procedure for an event whose subject is the Super Admin (`pnpm ops:record-super-admin-event`, F19, spec L.2): its own
@@ -25,7 +25,7 @@ import { SuperAdminEventService } from './super-admin-event.service';
     IdentityAccessFacadeModule,
     PersonnelModule,
   ],
-  providers: [SuperAdminEventRepo, ProfileCorrectionService, SuperAdminEventService],
-  exports: [SuperAdminEventService],
+  providers: [SuperAdminEventRepo, ProfileCorrectionService, SuperAdminEventApi],
+  exports: [SuperAdminEventApi],
 })
 export class SuperAdminEventModule {}

@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '../../../generated/prisma/client';
 import { fromDateColumn, toDateColumn } from '../../../core/business-date';
-import type { PlanRevocationInfo, PlanSummary, WorkspaceDuty } from '../catalog.types';
+import type { PlanRevocationInfo, PlanSummary, WorkspaceDuty } from '../public/catalog.types';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { searchKey } from '../vendor-dictionary/vendor-matcher';
+import { searchKey } from '../vendor-dictionary/vendor-matcher.policy';
 import type {
   NewPlan,
   PlanChanges,

@@ -23,7 +23,7 @@ cây và index sạch, `4cc9a47`/`7920ee5`/`2bb130c` là tổ tiên của `HEAD`
   `DB-16`), `test/support/legacy-unit-only-fixture.ts` (dữ liệu theo schema trước `20261022120000`).
 - Depends on: none.
 - Acceptance: `_prisma_migrations` do chính Prisma ghi; checksum migration cũ trùng bản đã áp.
-- Verify: `test/integration/unit-only-upgrade-history.integration-spec.ts`.
+- Verify: `test/integration/platform/unit-only-upgrade-history.integration-spec.ts`.
 
 ### Task A2: `pnpm ops:preflight` và migration tiến
 
@@ -40,7 +40,7 @@ cây và index sạch, `4cc9a47`/`7920ee5`/`2bb130c` là tổ tiên của `HEAD`
   `employee-maintenance.service.ts`, `employee-maintenance.controller.ts`, `organization.errors.ts`.
 - Depends on: none.
 - Acceptance: 422 `OPEN_ASSIGNMENT_NEEDS_EXPECTED_END` không audit; SQL trực tiếp 23514; đua hai thứ tự tất định.
-- Verify: `test/integration/employee-kind-of-staff-assignment-end.integration-spec.ts` (5): 4 đỏ → 5 xanh.
+- Verify: `test/integration/organization/employee-kind-of-staff-assignment-end.integration-spec.ts` (5): 4 đỏ → 5 xanh.
 
 ### Checkpoint
 
@@ -59,8 +59,8 @@ Migration mới trên CSDL mới + mọi fixture; drift sạch; gate kiến trú
 ### Task B2: đồng hồ, tải, EOL
 
 - Files: `licensing-provisioning-task-read-contracts`, `license-key-reveal-quota` (+ seam `license-key.service.ts`),
-  `test/e2e/app.e2e-spec.ts`, `test/support/disposable-database.ts`, `test/support/http-test-app.ts`,
-  `test/support/cli-process.ts`, `test/integration/document-http.integration-spec.ts`.
+  `test/http/platform/app.http-spec.ts`, `test/support/disposable-database.ts`, `test/support/http-test-app.ts`,
+  `test/support/cli-process.ts`, `test/integration/catalog/document-http.integration-spec.ts`.
 - Depends on: none.
 - Acceptance: thời gian trôi và cửa sổ quota theo thời điểm test đặt; deploy không phụ thuộc mạng; lỗi hạ tầng tự nói
   nguyên nhân; setup lỗi không để lại CSDL; `git diff --check 0198456` sạch.
@@ -111,10 +111,10 @@ Suite của ba đường ghi và suite lân cận (license-key, document, subscr
 
 ### Task D2: registry gate collection
 
-- Files: `src/api-collection-contract.spec.ts`.
+- Files: `test/gates/api-collection-contract.gate-spec.ts`.
 - Depends on: none.
 - Acceptance: baseline Prompt 09 nguyên vẹn; khác biệt chỉ qua `REGISTRY_EVENTS_SINCE_INITIAL`; hai mục `LD-13` trở lại.
-- Verify: `pnpm exec jest src/api-collection-contract.spec.ts` (34) và hai đột biến.
+- Verify: `pnpm exec jest test/gates/api-collection-contract.gate-spec.ts` (34) và hai đột biến.
 
 ### Task D3: Compose, OpenAPI, tài liệu
 
@@ -146,8 +146,8 @@ Suite của ba đường ghi và suite lân cận (license-key, document, subscr
 ### Task E2: `P29-N1` thân JSON quá giới hạn
 
 - Files: `src/infrastructure/http/request-body-limit.ts` (+ spec), `openapi-request-body-limit.ts` (+ spec),
-  `filters/request-parser-errors.ts`, `filters/http-exception.filter.ts` (+ spec), `src/bootstrap.ts`,
-  `test/e2e/app.e2e-spec.ts`, `test/e2e/api-inventory.e2e-spec.ts`, `openapi.json`, `docs/rules/api-contract.md`.
+  `filters/request-parser-errors.ts`, `filters/http-exception.filter.ts` (+ spec), `src/app/configure-application.ts`,
+  `test/http/platform/app.http-spec.ts`, `test/http/platform/api-inventory.http-spec.ts`, `openapi.json`, `docs/rules/api-contract.md`.
 - Depends on: none.
 - Acceptance: 413 `HTTP_PAYLOAD_TOO_LARGE` không lộ gì; object chỉ mang `status: 413` vẫn 500; 413 khai trên mọi operation
   có thân JSON.
@@ -155,7 +155,7 @@ Suite của ba đường ghi và suite lân cận (license-key, document, subscr
 
 ### Task E3: `P29-N2` multipart sai tên trường
 
-- Files: `filters/request-parser-errors.ts`, `test/e2e/employee-imports.e2e-spec.ts`, `test/e2e/seat-baseline.e2e-spec.ts`.
+- Files: `filters/request-parser-errors.ts`, `test/http/data-import/employee-imports.http-spec.ts`, `test/http/data-import/seat-baseline.http-spec.ts`.
 - Depends on: E2 (cùng tệp nhận diện).
 - Acceptance: hai route 400 `HTTP_BAD_REQUEST`; mã multer lạ/`STREAM_DESTROYED`/lỗi lưu trữ vẫn 500; thiếu tệp vẫn 422 miền.
 - Verify: e2e đỏ trước (2 × 500) → xanh; unit filter; đột biến M3, M4a, M4b.
@@ -164,8 +164,8 @@ Suite của ba đường ghi và suite lân cận (license-key, document, subscr
 
 - Files: `catalog/vendor/vendor.errors.ts`, `vendor-directory.service.ts` (+ spec mới), `catalog-entry/application.service.ts`,
   `application.errors.ts`, `application.http-errors.ts`, `applications.controller.ts`,
-  `application-vendor-link.service.spec.ts`, `test/integration/catalog-licensing-write-integrity.integration-spec.ts`,
-  `test/e2e/api-inventory.e2e-spec.ts`, spec `g3-catalog-entry`, plan `catalog-licensing-write-integrity`.
+  `application-vendor-link.service.spec.ts`, `test/integration/catalog/catalog-licensing-write-integrity.integration-spec.ts`,
+  `test/http/platform/api-inventory.http-spec.ts`, spec `g3-catalog-entry`, plan `catalog-licensing-write-integrity`.
 - Depends on: none.
 - Acceptance: 422 mismatch không ghi gì; 409 `APPLICATION.DICTIONARY_GROUP_CHANGED` cho kẻ thua đua (tạo và sửa); 422/409
   `DICTIONARY_LINE_TAKEN` không đổi.
@@ -173,7 +173,7 @@ Suite của ba đường ghi và suite lân cận (license-key, document, subscr
 
 ### Task E5: siết gate `PRE_MIGRATION_READERS`
 
-- Files: `src/architecture-boundaries.spec.ts`.
+- Files: `test/gates/architecture-boundaries.gate-spec.ts`.
 - Depends on: none.
 - Acceptance: tệp chính xác; SQL phân tích theo AST (chỉ `SELECT`/`WITH`, không từ khóa ghi, không `$executeRaw`/`*Unsafe`/
   delegate ghi); chỉ `migration-preflight-cli.ts` với tới; phiên chỉ đọc (gate `module-graph` sẵn có).
@@ -200,7 +200,7 @@ migration `20261022120000` sha256 `115efb61…`, năm suite unit 29A xanh (48 te
 ### Task F2: ma trận parser và không ghi khi client đã đi
 
 - Files: `filters/request-parser-errors.ts`, `filters/http-exception.filter.ts` (+ spec), `request-body-limit.ts` (+ spec),
-  `test/e2e/app.e2e-spec.ts`.
+  `test/http/platform/app.http-spec.ts`.
 - Depends on: F1.
 - Acceptance: 400/413/415 theo bảng, không lộ thân/charset/encoding/giá trị/stack; phủ định 500; `request.aborted` không ghi,
   không log lỗi bất ngờ, server phục vụ yêu cầu sau; giới hạn URL-encoded 100/5 ghi rõ.
@@ -208,8 +208,8 @@ migration `20261022120000` sha256 `115efb61…`, năm suite unit 29A xanh (48 te
 
 ### Task F3: OpenAPI 400/413/415 cho thân JSON
 
-- Files: `openapi-request-parser.ts` (+ spec; thay `openapi-request-body-limit.ts`), `src/bootstrap.ts`,
-  `test/e2e/api-inventory.e2e-spec.ts`, `openapi.json`, `docs/rules/api-contract.md`.
+- Files: `openapi-request-parser.ts` (+ spec; thay `openapi-request-body-limit.ts`), `src/app/configure-application.ts`,
+  `test/http/platform/api-inventory.http-spec.ts`, `openapi.json`, `docs/rules/api-contract.md`.
 - Depends on: F2.
 - Acceptance: mọi operation có thân JSON khai 400/413/415; 400 riêng giữ nguyên, nghĩa parser nối đúng một lần; không
   operation nào quảng bá URL-encoded.
@@ -231,7 +231,7 @@ helper trình bày đổi — giữ bằng chứng integration đầy đủ củ
 ### Task G1: thứ tự ép tất định
 
 - Files: `test/support/fake-object-storage.ts` (`beforeCall` được await ở đầu `head`, `readPrefix`, `copyIfMatch`, `delete`),
-  `test/integration/document-complete-commit.integration-spec.ts`.
+  `test/integration/catalog/document-complete-commit.integration-spec.ts`.
 - Depends on: none.
 - Acceptance: năm thứ tự của Prompt 29C bằng lời gọi kho bị giữ hoặc khóa dòng bị giữ; không sleep, không lặp xác suất.
 - Verify: đỏ trước sửa.
@@ -259,7 +259,7 @@ migration `20261022120000` sha256 `115efb61…`, suite hoàn tất tệp và `pg
 ### Task H1: mốc hết hạn (`P29-N7`)
 
 - Files: `src/modules/catalog/contract/document.service.ts`, `contract.policy.ts`,
-  `test/integration/document-complete-commit.integration-spec.ts`.
+  `test/integration/catalog/document-complete-commit.integration-spec.ts`.
 - Depends on: none.
 - Acceptance: kẻ thua vượt mốc sau khi kẻ thắng giữ tệp ⟹ 409 `NOT_AWAITING_UPLOAD`, không sự kiện hết hạn, object kẻ thắng giữ
   nguyên; lời gọi thật sự cho hết hạn ⟹ 409 `UPLOAD_EXPIRED`, một sự kiện, upload xóa sau commit; 29C không đổi.
@@ -267,14 +267,14 @@ migration `20261022120000` sha256 `115efb61…`, suite hoàn tất tệp và `pg
 
 ### Task H2: `pg-pool` I1 theo sự kiện (`P29-N6`)
 
-- Files: `test/integration/pg-pool.integration-spec.ts`.
+- Files: `test/integration/platform/pg-pool.integration-spec.ts`.
 - Depends on: none.
 - Acceptance: không truy vấn sau nào trên nạn nhân hay backend mới; chờ `remove`; timeout thật 1 s giữ nguyên.
 - Verify: tái hiện dưới tải có điều khiển; đột biến làm hỏng retire/gỡ; lặp làm bằng chứng phụ.
 
 ### Task H3: dọn dẹp sau setup dở (`P29-N8`)
 
-- Files: `test/integration/document-complete-commit.integration-spec.ts`.
+- Files: `test/integration/catalog/document-complete-commit.integration-spec.ts`.
 - Depends on: none.
 - Acceptance: không có `TEST_DATABASE_ADMIN_URL` ⟹ chỉ lỗi setup gốc, suite vẫn đỏ; có ⟹ xanh.
 - Verify: chạy hai cách.

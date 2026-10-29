@@ -8,7 +8,7 @@ import {
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
 import { RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
-import { FinanceService } from '../finance.service';
+import { FinanceApi } from '../public/finance.api';
 import { toFinanceApiException } from '../mappers/finance.http-errors';
 import { CurrencyListResponseDto } from './currency.dto';
 
@@ -17,7 +17,7 @@ import { CurrencyListResponseDto } from './currency.dto';
 @Controller({ path: 'currencies', version: '1' })
 @RequireRoles('FINANCE', 'IT_ADMIN')
 export class CurrenciesController {
-  constructor(private readonly finance: FinanceService) {}
+  constructor(private readonly finance: FinanceApi) {}
 
   @Get()
   @ApiOperation({ operationId: 'currencyList', summary: 'List supported currencies' })

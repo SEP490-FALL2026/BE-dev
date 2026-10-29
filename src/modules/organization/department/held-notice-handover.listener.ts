@@ -1,8 +1,9 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { NotificationsService } from '../../notifications/notifications.service';
-import { OrganizationService } from '../organization.service';
-import type { OrganizationChange, OrganizationChangeListener } from '../organization.types';
+import { NotificationsApi } from '../../notifications/public/notifications.api';
+import { OrganizationApi } from '../public/organization.api';
+import { OrganizationChangeListeners, type OrganizationChangeListener } from '../public/organization.extension-points';
+import type { OrganizationChange } from '../public/organization.types';
 
 /**
  * Hands the notices kept for a department while nobody headed it to the person whose head period STARTS (`T-11`, F67): in the
@@ -19,12 +20,13 @@ import type { OrganizationChange, OrganizationChangeListener } from '../organiza
 @Injectable()
 export class HeldNoticeHandoverListener implements OrganizationChangeListener, OnModuleInit {
   constructor(
-    private readonly organization: OrganizationService,
-    private readonly notifications: NotificationsService,
+    private readonly organization: OrganizationApi,
+    private readonly notifications: NotificationsApi,
+    private readonly changes: OrganizationChangeListeners,
   ) {}
 
   onModuleInit(): void {
-    this.organization.registerChangeListener(this);
+    this.changes.add('organization.held-notice-handover', (tx, change) => this.onChange(tx, change));
   }
 
   async onChange(tx: DbTx, change: OrganizationChange): Promise<void> {

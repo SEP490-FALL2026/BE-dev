@@ -4,6 +4,10 @@ import test from 'node:test';
 
 const packageJson = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8'));
 const ciWorkflow = readFileSync(new URL('../../.github/workflows/ci.yml', import.meta.url), 'utf8');
+const testDatabaseAction = readFileSync(
+  new URL('../../.github/actions/test-database/action.yml', import.meta.url),
+  'utf8',
+);
 
 const steps = packageJson.scripts.check.split(' && ');
 
@@ -25,15 +29,19 @@ test('CI path filters only list files that exist in the repository', () => {
 
 test('CI provisions and asserts an ordinary integration role before running the suite', () => {
   assert.match(ciWorkflow, /POSTGRES_USER: ci_bootstrap/);
+  // The integration job provisions through the composite action before any integration command runs.
+  const integrationJob = ciWorkflow.slice(ciWorkflow.indexOf('\n  integration:'));
+  const uses = integrationJob.indexOf('uses: ./.github/actions/test-database');
+  const integration = integrationJob.indexOf('pnpm test:integration');
+  assert.ok(uses >= 0 && uses < integration, 'the integration job must provision the role before its suites');
   assert.match(
-    ciWorkflow,
+    testDatabaseAction,
     /CREATE ROLE ci_integration LOGIN NOSUPERUSER CREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS/,
   );
-  const provision = ciWorkflow.indexOf('CREATE ROLE ci_integration');
-  const assertion = ciWorkflow.indexOf('Assert ordinary integration role');
-  const integration = ciWorkflow.indexOf('run: pnpm test:integration');
-  assert.ok(provision >= 0 && provision < assertion && assertion < integration);
-  const roleAssertion = ciWorkflow.slice(assertion, integration);
+  const provision = testDatabaseAction.indexOf('CREATE ROLE ci_integration');
+  const assertion = testDatabaseAction.indexOf('Assert ordinary integration role');
+  assert.ok(provision >= 0 && provision < assertion);
+  const roleAssertion = testDatabaseAction.slice(assertion);
   for (const attribute of [
     'rolsuper',
     'rolcreatedb',

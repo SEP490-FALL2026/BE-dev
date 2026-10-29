@@ -20,7 +20,7 @@
 
 ### Task 2: dữ liệu
 
-- Files: migration `20261024060000_requests_service_account_values`, `20261024060100_requests_service_account_requests`, `prisma/models/requests.prisma`, `prisma/models/organization.prisma` (hai quan hệ ngược của `Employee`), `src/architecture-boundaries.spec.ts` (chủ sở hữu bảng mới; không có danh sách INV-05 để thêm)
+- Files: migration `20261024060000_requests_service_account_values`, `20261024060100_requests_service_account_requests`, `prisma/models/requests.prisma`, `prisma/models/organization.prisma` (hai quan hệ ngược của `Employee`), `test/gates/architecture-boundaries.gate-spec.ts` (chủ sở hữu bảng mới; không có danh sách INV-05 để thêm)
 - Depends on: Task 1
 - Acceptance: enum và bảng `access_request_service_accounts` đúng spec; `CHECK` đồng bộ trạng thái phán quyết; phán quyết đã ghi không sửa, không xóa; Request `SERVICE_ACCOUNT` có đúng một dòng chi tiết lúc commit và loại khác không có; giá trị enum thêm bằng migration riêng (không dùng được trong giao dịch thêm nó)
 - Verify: nhóm _what the database refuses_ của hạng mục xanh trên PostgreSQL riêng; `prisma migrate deploy` rồi `migrate diff --exit-code` = 0
@@ -48,7 +48,7 @@
 
 ### Task 6: kiểm ranh giới, API
 
-- Files: `service-account-request/service-account-boundary.service.ts`, `service-account-requests.controller.ts`, `service-account-request.http-errors.ts`, `service-account-request.dto.ts` (thân phán quyết), `requests.module.ts`, `test/support/api-coverage-manifest.ts`, `test/e2e/api-inventory.e2e-spec.ts` (211), `openapi.json`, `test/support/service-account-harness.ts` và `test/integration/service-account-request.integration-spec.ts` (mới)
+- Files: `service-account-request/service-account-boundary.service.ts`, `service-account-requests.controller.ts`, `service-account-request.http-errors.ts`, `service-account-request.dto.ts` (thân phán quyết), `requests.module.ts`, `test/support/api-coverage-manifest.ts`, `test/http/platform/api-inventory.http-spec.ts` (211), `openapi.json`, `test/support/service-account-harness.ts` và `test/integration/requests/service-account-request.integration-spec.ts` (mới)
 - Depends on: Task 5
 - Acceptance: hai thao tác mới và trường thêm vào `POST /provisioning-tasks`, `GET /grant-queue`, Request; từ chối ranh giới giải phóng cam kết và kết thúc `IT_REJECTED`; mọi ca ở ma trận test xanh
 - Verify: nhóm _boundary review_ xanh; e2e kiểm kê và OpenAPI xanh (`pnpm openapi:export` không đổi ngoài ý muốn); `pnpm exec jest src` xanh; hồi quy `access-request`, `budget`, `spend`, `provisioning` xanh

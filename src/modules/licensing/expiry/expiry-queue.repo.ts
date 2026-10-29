@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { fromDateColumn, toDateColumn, type BusinessDate } from '../../../core/business-date';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import type { ProvisioningTaskStatus } from '../licensing.types';
+import type { ProvisioningTaskStatus } from '../public/licensing.types';
 
 /** An open personal right whose end date has passed, with the revocation of it that is under way, if one is. */
 export interface ExpiredRight {

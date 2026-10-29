@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { AuditService } from '../../audit/audit.service';
-import { OrganizationService } from '../../organization/organization.service';
-import { licensingAuditEvent } from '../mappers/licensing-audit-event';
+import { AuditApi } from '../../audit/public/audit.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
+import { licensingAuditEvent } from '../mappers/licensing-audit-event.mapper';
 import { SaasIssueError } from './saas-issue.errors';
 import {
   canMove,
@@ -36,11 +36,11 @@ const blankToNull = (text: string | null): string | null => (text && text.trim()
 export class SaasIssueHandlingService {
   constructor(
     private readonly runner: TransactionRunner,
-    private readonly organization: OrganizationService,
+    private readonly organization: OrganizationApi,
     private readonly calendar: SaasIssueCalendar,
     private readonly issues: SaasIssueRepo,
     private readonly facts: SaasIssueFactsRepo,
-    private readonly audit: AuditService,
+    private readonly audit: AuditApi,
   ) {}
 
   async transition(actor: AuthenticatedPrincipal, id: string, input: TransitionInput): Promise<SaasIssueRecord> {

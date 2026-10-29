@@ -10,7 +10,7 @@ import type {
   AssignmentRecord,
   AssignmentSource,
   ExistingAssignment,
-} from '../licensing.types';
+} from '../public/licensing.types';
 
 /** The columns an assignment is answered with: a list reads these and nothing else (`LD-10`). */
 const RECORD_SELECT = {

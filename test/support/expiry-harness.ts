@@ -1,8 +1,7 @@
 import request from 'supertest';
 import { ExpiryReminderService } from '../../src/modules/licensing/expiry/expiry-reminder.service';
-import { LicensingService } from '../../src/modules/licensing/licensing.service';
-import type { PendingRenewal, RenewalHold } from '../../src/modules/licensing/licensing-renewal.types';
-import { RenewalHoldReader } from '../../src/modules/requests/renewal-request/renewal-hold.reader';
+import type { PendingRenewal } from '../../src/modules/licensing/public/licensing-renewal.types';
+import { RenewalHoldReader } from '../../src/modules/requests/renewal-request/renewal-hold.listener';
 import type { ApiAccount } from './api-accounts';
 import { ReturnHarness } from './return-harness';
 
@@ -123,18 +122,22 @@ export class ExpiryHarness extends ReturnHarness {
 
   /**
    * Stands in for the module of requests: these seats have a renewal waiting. Returns what puts the real reader back. The real
-   * reader answers only for renewals that were really sent, and a renewal sent in time is for a right that has not ended yet.
+   * reader answers only for renewals that were really sent, and a renewal sent in time is for a right that has not ended yet. The
+   * reader stays the one bound to licensing's `RenewalHoldHook`; only its answers are replaced until the returned function runs.
    */
   waitingRenewals(waiting: ReadonlyMap<string, PendingRenewal>): () => void {
-    const licensing = this.ctx.app.get(LicensingService);
-    const real = this.ctx.app.get(RenewalHoldReader);
-    const fake: RenewalHold = {
+    const reader = this.ctx.app.get(RenewalHoldReader);
+    const answers: Pick<RenewalHoldReader, 'hasPendingRenewal' | 'pendingRenewalsOf'> = {
       hasPendingRenewal: (assignmentId) => Promise.resolve(waiting.has(assignmentId)),
       pendingRenewalsOf: (ids) =>
         Promise.resolve(new Map([...waiting].filter(([assignmentId]) => ids.includes(assignmentId)))),
     };
-    licensing.registerRenewalHold(fake);
+    Object.assign(reader, answers);
 
-    return () => licensing.registerRenewalHold(real);
+    return () => {
+      // The answers were own properties of the reader: removing them gives back the methods of its class.
+      delete (reader as Partial<typeof answers>).hasPendingRenewal;
+      delete (reader as Partial<typeof answers>).pendingRenewalsOf;
+    };
   }
 }

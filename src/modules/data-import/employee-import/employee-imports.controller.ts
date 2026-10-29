@@ -23,8 +23,9 @@ import {
 } from './employee-import.dto';
 import { ImportFileInvalidError } from './employee-import.errors';
 import { IMPORT_ERROR_EXAMPLES, toImportApiException } from './employee-import.http-errors';
-import { EmployeeImportService } from './employee-import.service';
 import { ImportView } from './employee-import.types';
+import { EmployeeImportConfirmationService } from './confirmation/employee-import-confirmation.service';
+import { EmployeeImportPreviewService } from './preview/employee-import-preview.service';
 
 /** The largest file the route reads: a people file of 1 000 rows is far smaller. */
 const MAX_FILE_BYTES = 2 * 1024 * 1024;
@@ -90,11 +91,16 @@ function toWire(view: ImportView) {
  * Importing people from a file in six steps (`US-02-01`): upload → read → preview → confirm → write → summary. The Super
  * Admin uploads a CSV file and confirms it with the HR basis it is entered on; nothing is written until the preview is
  * confirmed, and then once. The IT Admin, Managers and Finance do not import people (`US-02-02` AC-12, `QĐ-82i`).
+ * Upload, reading, judging again and cancelling are the preview (`preview/`); writing the people is the confirmation
+ * (`confirmation/`).
  */
 @ApiTags('employee-imports')
 @Controller({ path: 'employee-imports', version: '1' })
 export class EmployeeImportsController {
-  constructor(private readonly imports: EmployeeImportService) {}
+  constructor(
+    private readonly previews: EmployeeImportPreviewService,
+    private readonly confirmations: EmployeeImportConfirmationService,
+  ) {}
 
   @Post()
   @RequireRoles('SUPER_ADMIN')
@@ -127,7 +133,7 @@ export class EmployeeImportsController {
     try {
       if (!file) throw new ImportFileInvalidError('FILE_REQUIRED');
 
-      return toWire(await this.imports.upload(actor, { fileName: file.originalname, bytes: file.buffer }));
+      return toWire(await this.previews.upload(actor, { fileName: file.originalname, bytes: file.buffer }));
     } catch (error) {
       throw toImportApiException(error);
     }
@@ -143,7 +149,7 @@ export class EmployeeImportsController {
   @ApiErrorResponses(...COMMON_ERRORS, NOT_FOUND, INVALID_ID)
   async get(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: ImportIdParamDto) {
     try {
-      return toWire(await this.imports.view(actor, params.id));
+      return toWire(await this.previews.view(actor, params.id));
     } catch (error) {
       throw toImportApiException(error);
     }
@@ -168,7 +174,7 @@ export class EmployeeImportsController {
     @Query() query: ListImportRowsQueryDto,
   ) {
     try {
-      const page = await this.imports.rows(actor, params.id, query);
+      const page = await this.previews.rows(actor, params.id, query);
 
       return {
         items: page.items.map((row) => ({
@@ -200,7 +206,7 @@ export class EmployeeImportsController {
   })
   async refresh(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: ImportIdParamDto) {
     try {
-      return toWire(await this.imports.refresh(actor, params.id));
+      return toWire(await this.previews.refresh(actor, params.id));
     } catch (error) {
       throw toImportApiException(error);
     }
@@ -242,7 +248,7 @@ export class EmployeeImportsController {
     @Body() body: ConfirmImportBodyDto,
   ) {
     try {
-      const confirmed = await this.imports.confirm(actor, params.id, body);
+      const confirmed = await this.confirmations.confirm(actor, params.id, body);
 
       return { replayed: confirmed.replayed, import: toWire(confirmed.import) };
     } catch (error) {
@@ -264,7 +270,7 @@ export class EmployeeImportsController {
   })
   async cancel(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: ImportIdParamDto) {
     try {
-      return toWire(await this.imports.cancel(actor, params.id));
+      return toWire(await this.previews.cancel(actor, params.id));
     } catch (error) {
       throw toImportApiException(error);
     }

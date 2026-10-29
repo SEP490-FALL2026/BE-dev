@@ -4,10 +4,12 @@ import { AuditModule } from '../audit/audit.module';
 import { LicensingModule } from '../licensing/licensing.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { OrganizationModule } from '../organization/organization.module';
-import { DataImportService } from './data-import.service';
+import { DataImportApi } from './public/data-import.api';
+import { EmployeeImportConfirmationService } from './employee-import/confirmation/employee-import-confirmation.service';
 import { EmployeeImportRepo } from './employee-import/employee-import.repo';
-import { EmployeeImportService } from './employee-import/employee-import.service';
 import { EmployeeImportsController } from './employee-import/employee-imports.controller';
+import { EmployeeImportPreviewService } from './employee-import/preview/employee-import-preview.service';
+import { EmployeeImportRowValidationService } from './employee-import/row-validation/employee-import-row-validation.service';
 import { SeatBaselineImportRepo } from './seat-baseline-import/seat-baseline-import.repo';
 import { SeatBaselineImportService } from './seat-baseline-import/seat-baseline-import.service';
 import { SeatBaselineImportsController } from './seat-baseline-import/seat-baseline-imports.controller';
@@ -22,12 +24,14 @@ import { SeatBaselineImportsController } from './seat-baseline-import/seat-basel
   controllers: [EmployeeImportsController, SeatBaselineImportsController],
   providers: [
     EmployeeImportRepo,
-    EmployeeImportService,
+    EmployeeImportRowValidationService,
+    EmployeeImportPreviewService,
+    EmployeeImportConfirmationService,
     SeatBaselineImportRepo,
     SeatBaselineImportService,
-    DataImportService,
+    DataImportApi,
   ],
-  // Other modules read imports through the facade only; the capability service and the repo stay private.
-  exports: [DataImportService],
+  // Other modules read imports through the facade only; the capability services and the repos stay private.
+  exports: [DataImportApi],
 })
 export class DataImportModule {}

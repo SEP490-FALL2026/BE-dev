@@ -2,19 +2,19 @@ import { randomUUID } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { AuditService } from '../../audit/audit.service';
-import { CatalogService } from '../../catalog/catalog.service';
+import { AuditApi } from '../../audit/public/audit.api';
+import { CatalogApi } from '../../catalog/public/catalog.api';
 import {
   AssignmentNotFoundError,
   AssignmentNotOpenError,
   RevocationRefusedError,
   SeatTargetNotFoundError,
-} from '../../licensing/licensing.errors';
-import { LicensingService } from '../../licensing/licensing.service';
-import type { AssignmentFacts } from '../../licensing/licensing-renewal.types';
-import { OperatingParametersService } from '../../operating-parameters/operating-parameters.service';
-import { OrganizationService } from '../../organization/organization.service';
-import { accessRequestAuditEvent } from '../access-request/access-request-audit-event';
+} from '../../licensing/public/licensing.errors';
+import { LicensingApi } from '../../licensing/public/licensing.api';
+import type { AssignmentFacts } from '../../licensing/public/licensing-renewal.types';
+import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
+import { accessRequestAuditEvent } from '../access-request/access-request-audit-event.mapper';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { ReturnBodyDto } from './return-request.dto';
 import { ReturnRequestRefusedError } from './return-request.errors';
@@ -38,11 +38,11 @@ export class ReturnRequestService {
     private readonly runner: TransactionRunner,
     private readonly returns: ReturnRequestRepo,
     private readonly requests: AccessRequestRepo,
-    private readonly organization: OrganizationService,
-    private readonly licensing: LicensingService,
-    private readonly catalog: CatalogService,
-    private readonly parameters: OperatingParametersService,
-    private readonly audit: AuditService,
+    private readonly organization: OrganizationApi,
+    private readonly licensing: LicensingApi,
+    private readonly catalog: CatalogApi,
+    private readonly parameters: OperatingParametersApi,
+    private readonly audit: AuditApi,
   ) {}
 
   /**

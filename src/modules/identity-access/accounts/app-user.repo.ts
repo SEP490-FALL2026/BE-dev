@@ -9,7 +9,7 @@ import {
   ActivationState,
   AppUserStatus,
   CreateAppUserInput,
-} from '../identity-access.types';
+} from '../public/identity-access.types';
 
 type LockMode = 'SHARE' | 'UPDATE';
 

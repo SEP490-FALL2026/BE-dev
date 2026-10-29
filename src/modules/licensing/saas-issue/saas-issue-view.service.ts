@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { pageOf, type Page } from '../../../core/application/pagination';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { CatalogService } from '../../catalog/catalog.service';
-import { OrganizationService } from '../../organization/organization.service';
+import { CatalogApi } from '../../catalog/public/catalog.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
 import type {
   SaasIssueEligibleWire,
   SaasIssueEntryWire,
@@ -41,8 +41,8 @@ export class SaasIssueViewService {
   constructor(
     private readonly issues: SaasIssueRepo,
     private readonly facts: SaasIssueFactsRepo,
-    private readonly organization: OrganizationService,
-    private readonly catalog: CatalogService,
+    private readonly organization: OrganizationApi,
+    private readonly catalog: CatalogApi,
   ) {}
 
   /** The form: the warning, the categories and impacts, and the page of the rights the caller may report on. */

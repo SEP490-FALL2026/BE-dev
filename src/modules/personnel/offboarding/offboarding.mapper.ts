@@ -1,14 +1,14 @@
-import type { EmployeeRecord, DepartmentBrief } from '../../organization/organization.types';
-import type { PersonalSeat } from '../../licensing/licensing.types';
-import type { HandoverDutyBrief } from '../../licensing/licensing-handover.types';
+import type { EmployeeRecord, DepartmentBrief } from '../../organization/public/organization.types';
+import type { PersonalSeat } from '../../licensing/public/licensing.types';
+import type { HandoverDutyBrief } from '../../licensing/public/licensing-handover.types';
 import type {
   OffboardingChangeWire,
   OffboardingDetailWire,
   OffboardingRightWire,
   OffboardingSummaryWire,
 } from './offboarding.dto';
-import type { ReadAccess } from '../personnel-self-action.policy';
-import { ROLE_FLAGS, type RoleFlagMap } from '../personnel.types';
+import type { ReadAccess } from '../policies/personnel-self-action.policy';
+import { ROLE_FLAGS, type RoleFlagMap } from '../public/personnel.types';
 import type { Checklist } from './offboarding.policy';
 import type { OffboardingChangeRecord, OffboardingRecord, OffboardingSummaryRecord } from './offboarding.types';
 import { isPastLastDay, isRevocableType } from './offboarding.policy';

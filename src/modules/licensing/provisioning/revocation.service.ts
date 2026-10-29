@@ -1,24 +1,24 @@
 import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { AuditService } from '../../audit/audit.service';
-import { CatalogService } from '../../catalog/catalog.service';
-import { OperatingParametersService } from '../../operating-parameters/operating-parameters.service';
-import { OrganizationService } from '../../organization/organization.service';
+import { AuditApi } from '../../audit/public/audit.api';
+import { CatalogApi } from '../../catalog/public/catalog.api';
+import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
 import { AssignmentEndService } from '../assignment/assignment-end.service';
-import { SeatTargetNotFoundError } from '../licensing.errors';
+import { SeatTargetNotFoundError } from '../public/licensing.errors';
 import type {
   OpenedRevocation,
   OpenRevocationInput,
   RevocationReasonFacts,
   RevocationSource,
-} from '../licensing.types';
-import { licensingAuditEvent } from '../mappers/licensing-audit-event';
+} from '../public/licensing.types';
+import { licensingAuditEvent } from '../mappers/licensing-audit-event.mapper';
 import { maxAttempts as maxAttemptsFor } from './failure.policy';
-import { RegisteredRevocationHook } from './registered-revocation-hook.service';
+import { RevocationListeners } from '../public/licensing.extension-points';
 import { assertRevocable, assertRevocationSource, isOpenAssignment } from './revocation.policy';
 import { ProvisioningTaskFrame } from './provisioning-task-frame.service';
-import { toRevocationFacts, type ProvisioningTaskRecord } from './provisioning-task.record';
+import { toRevocationFacts, type ProvisioningTaskRecord } from './provisioning-task.types';
 import { ProvisioningTaskReasonRepo, type ReasonRecord } from './provisioning-task-reason.repo';
 import { ProvisioningTaskRepo } from './provisioning-task.repo';
 
@@ -44,12 +44,12 @@ export class RevocationService {
     private readonly tasks: ProvisioningTaskRepo,
     private readonly reasons: ProvisioningTaskReasonRepo,
     private readonly ending: AssignmentEndService,
-    private readonly catalog: CatalogService,
-    private readonly organization: OrganizationService,
-    private readonly parameters: OperatingParametersService,
-    private readonly audit: AuditService,
+    private readonly catalog: CatalogApi,
+    private readonly organization: OrganizationApi,
+    private readonly parameters: OperatingParametersApi,
+    private readonly audit: AuditApi,
     private readonly frame: ProvisioningTaskFrame,
-    private readonly hook: RegisteredRevocationHook,
+    private readonly revocation: RevocationListeners,
   ) {}
 
   /**
@@ -115,7 +115,8 @@ export class RevocationService {
     // An IT Admin who asks for their own seat to go because no other IT Admin can is told to the Super Admin (`SoD-5`, F24).
     if (selfExecuted) await this.frame.tellSuperAdmin(tx, organization.id, task.id, actor.employeeId);
     const reasons = (await this.reasons.listOf([task.id], tx)).map(factsOf);
-    await this.hook.onOpened(tx, toRevocationFacts(task), reasons, input.context ?? {}, actor, now);
+    const context = input.context ?? {};
+    await this.revocation.emit(tx, { moment: 'OPENED', task: toRevocationFacts(task), reasons, context, actor, now });
 
     return { taskId: task.id, created: live === null, reasonAdded: live !== null, status: task.status };
   }

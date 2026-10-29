@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { AuditService } from '../../audit/audit.service';
-import type { AuditValue } from '../../audit/audit.types';
-import { personnelAuditEvent, personnelSystemAuditEvent } from '../mappers/personnel-audit-event';
-import type { PersonnelActor } from '../personnel.types';
+import { AuditApi } from '../../audit/public/audit.api';
+import type { AuditValue } from '../../audit/public/audit.types';
+import { personnelAuditEvent, personnelSystemAuditEvent } from '../mappers/personnel-audit-event.mapper';
+import type { PersonnelActor } from '../public/personnel.types';
 import type { OffboardingRecord } from './offboarding.types';
 
 type Snapshot = { [key: string]: AuditValue } | null;
@@ -15,7 +15,7 @@ type Snapshot = { [key: string]: AuditValue } | null;
  */
 @Injectable()
 export class OffboardingAuditService {
-  constructor(private readonly audit: AuditService) {}
+  constructor(private readonly audit: AuditApi) {}
 
   async changed(
     tx: DbTx,

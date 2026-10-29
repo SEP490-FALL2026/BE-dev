@@ -4,9 +4,9 @@ import { normalizeDisplayName } from '../../../core/display-name';
 import type { HrBasis } from '../../../core/hr-basis';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { AuditService } from '../../audit/audit.service';
+import { AuditApi } from '../../audit/public/audit.api';
 import { organizationAuditEvent } from '../mappers/audit-event.mapper';
-import { OrganizationService } from '../organization.service';
+import { OrganizationApi } from '../public/organization.api';
 import { ProjectInvalidError, ProjectNotFoundError } from './project.errors';
 import { assertMayKeepProjects } from './project.policy';
 import { ProjectRepo } from './project.repo';
@@ -24,8 +24,8 @@ export const PROJECT_DESCRIPTION_MAX_LENGTH = 2000;
 export class ProjectService {
   constructor(
     private readonly repo: ProjectRepo,
-    private readonly organization: OrganizationService,
-    private readonly audit: AuditService,
+    private readonly organization: OrganizationApi,
+    private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
   ) {}
 

@@ -2,14 +2,14 @@ import { Injectable } from '@nestjs/common';
 import { fiscalYearOf } from '../../../core/fiscal-year';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { BudgetsService } from '../../budgets/budgets.service';
-import { CatalogService } from '../../catalog/catalog.service';
-import { FinanceService } from '../../finance/finance.service';
-import { OperatingParametersService } from '../../operating-parameters/operating-parameters.service';
-import { OrganizationService } from '../../organization/organization.service';
+import { BudgetsApi } from '../../budgets/public/budgets.api';
+import { CatalogApi } from '../../catalog/public/catalog.api';
+import { FinanceApi } from '../../finance/public/finance.api';
+import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
 import { chargedCostCenterId } from '../access-request/access-request.policy';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
-import { AssessmentRepo } from '../access-request/assessment.repo';
+import { AssessmentRepo } from '../assessment/assessment.repo';
 import { scaleSchedule } from '../group-request/line-allocation.policy';
 import { checkBudget, type CheckResult, type YearBudget, type YearSlice } from './budget-check.policy';
 import { BudgetCheckRepo, type CheckRecord, type CheckTrigger } from './budget-check.repo';
@@ -37,11 +37,11 @@ export type CheckOutcome =
 export class BudgetCheckService {
   constructor(
     private readonly checks: BudgetCheckRepo,
-    private readonly budgets: BudgetsService,
-    private readonly finance: FinanceService,
-    private readonly catalog: CatalogService,
-    private readonly organization: OrganizationService,
-    private readonly parameters: OperatingParametersService,
+    private readonly budgets: BudgetsApi,
+    private readonly finance: FinanceApi,
+    private readonly catalog: CatalogApi,
+    private readonly organization: OrganizationApi,
+    private readonly parameters: OperatingParametersApi,
     private readonly assessments: AssessmentRepo,
   ) {}
 

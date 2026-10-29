@@ -5,8 +5,8 @@ import {
   RevocationCompletionError,
   RevocationRefusedError,
   type RevocationCompletionProblem,
-} from '../licensing.errors';
-import { REVOCATION_SOURCES } from '../licensing.types';
+} from '../public/licensing.errors';
+import { REVOCATION_SOURCES } from '../public/licensing.types';
 import { doneWhenFor, stepsFor } from './provisioning.policy';
 import {
   assertNotRevocationTask,

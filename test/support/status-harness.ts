@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { Client } from 'pg';
 import request from 'supertest';
-import { RequestStatusProjectorService } from '../../src/modules/requests/request-status-projector.service';
+import { RequestStatusProjectorApi } from '../../src/modules/requests/public/request-status-projector.api';
 import {
   RequestStatusProjection,
   type ProjectionResult,
@@ -38,7 +38,7 @@ export interface NoticeWire {
  */
 export class StatusHarness extends ReassignmentHarness {
   private projection = () => this.ctx.app.get(RequestStatusProjection, { strict: false });
-  private projector = () => this.ctx.app.get(RequestStatusProjectorService, { strict: false });
+  private projector = () => this.ctx.app.get(RequestStatusProjectorApi, { strict: false });
 
   /** A connection of its own to the database, for a transaction a test holds open; the test ends it. */
   async openClient(): Promise<Client> {
@@ -57,9 +57,14 @@ export class StatusHarness extends ReassignmentHarness {
    * One pass of the projection that reads everything that has committed so far: the pass is told it is the moment of the database
    * plus the delay it keeps, and two milliseconds more because the column keeps whole milliseconds, rounded: an event of a moment
    * ago may read a millisecond later than the clock it is compared to. A test makes its next change only after this returns.
+   *
+   * Prisma fills `@default(now())` of an audit event with this process's clock, and on a developer machine the database runs in a
+   * VM whose clock can fall behind under load: the moment is the later of the two clocks.
    */
   async project(): Promise<ProjectionResult> {
-    return this.projector().project(new Date((await this.databaseNow()).getTime() + this.projection().delayMs() + 2));
+    const moment = Math.max((await this.databaseNow()).getTime(), Date.now());
+
+    return this.projector().project(new Date(moment + this.projection().delayMs() + 2));
   }
 
   /** A pass made at the moment given, as the worker makes it (events newer than the delay are not read). */

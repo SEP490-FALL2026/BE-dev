@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { NotificationsService } from '../../notifications/notifications.service';
-import { ActionTokenPurpose, ActionTokenRevokedReason } from '../identity-access.types';
+import { NotificationsApi } from '../../notifications/public/notifications.api';
+import { ActionTokenPurpose, ActionTokenRevokedReason } from '../public/identity-access.types';
 import { ActionLinkService } from './action-link.service';
 
 /**
@@ -13,7 +13,7 @@ import { ActionLinkService } from './action-link.service';
 export class ActionLinkRevocation {
   constructor(
     private readonly links: ActionLinkService,
-    private readonly notifications: NotificationsService,
+    private readonly notifications: NotificationsApi,
   ) {}
 
   /** Revokes every usable token of the account (of one purpose, or all) and returns their hashes. */

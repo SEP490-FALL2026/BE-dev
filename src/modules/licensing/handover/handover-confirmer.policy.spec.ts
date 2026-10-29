@@ -1,4 +1,4 @@
-import { REVOCATION_SOURCES, type RevocationSource } from '../licensing.types';
+import { REVOCATION_SOURCES, type RevocationSource } from '../public/licensing.types';
 import {
   allowedValues,
   confirmationCovers,

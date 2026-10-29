@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { BudgetsService } from '../../budgets/budgets.service';
-import type { ReleasedCommitment } from '../../budgets/budgets.types';
-import { BudgetInformationService } from '../spend/budget-information.service';
+import { BudgetsApi } from '../../budgets/public/budgets.api';
+import type { ReleasedCommitment } from '../../budgets/public/budgets.types';
+import { BudgetInformationService } from '../budget-information/budget-information.service';
 import { SpendBatchRepo } from '../spend/spend-batch.repo';
 import { SpendStepRepo } from '../spend/spend-step.repo';
 
@@ -23,7 +23,7 @@ export class RequestEndService {
     private readonly steps: SpendStepRepo,
     private readonly batches: SpendBatchRepo,
     private readonly questions: BudgetInformationService,
-    private readonly budgets: BudgetsService,
+    private readonly budgets: BudgetsApi,
   ) {}
 
   /** Returns what was released from the commitments of the request; throws BudgetCommitmentRefusedError for amounts that do not fit. */

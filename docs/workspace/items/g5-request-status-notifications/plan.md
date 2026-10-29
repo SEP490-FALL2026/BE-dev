@@ -29,7 +29,7 @@
 ### Task 3: quy tắc thuần của hộp thư (Phase 1)
 
 - Trạng thái: xong, đã kiểm (24/10/2026, local, chưa commit); bằng chứng ở bảng cuối.
-- Files: `src/modules/notifications/notifications.types.ts`, `src/modules/notifications/inbox/inbox.policy.ts` (+ spec)
+- Files: `src/modules/notifications/public/notifications.types.ts`, `src/modules/notifications/inbox/inbox.policy.ts` (+ spec)
 - Depends on: Task 1
 - Acceptance: bảng mã đóng (mã của ba hạng mục), tham số chỉ gồm chuỗi, số, boolean, rỗng, không khóa cấm, không quá 4 096 byte, khóa duy nhất không quá 200 ký tự; từ chối mã lạ
 - Verify: ít nhất 10 ca chính sách xanh
@@ -45,7 +45,7 @@
 ### Task 5: API hộp thư (Phase 1)
 
 - Trạng thái: xong, đã kiểm (24/10/2026, local, chưa commit); bằng chứng ở bảng cuối.
-- Files: `inbox/inbox.controller.ts`, `inbox/inbox.dto.ts`, `inbox/inbox.http-errors.ts`, `src/modules/notifications/notifications-http.module.ts`, `src/app.module.ts`, `module-graph.spec.ts`, `api-coverage-manifest.ts`, `api-inventory.e2e-spec.ts`, `api-collection-contract.spec.ts` (nếu cần), `openapi.json`
+- Files: `inbox/inbox.controller.ts`, `inbox/inbox.dto.ts`, `inbox/inbox.http-errors.ts`, `src/modules/notifications/notifications-http.module.ts`, `src/app/app.module.ts`, `module-graph.spec.ts`, `api-coverage-manifest.ts`, `api-inventory.e2e-spec.ts`, `api-collection-contract.spec.ts` (nếu cần), `openapi.json`
 - Depends on: Task 4
 - Acceptance: bốn thao tác `notificationList`, `notificationUnreadCount`, `notificationMarkRead`, `notificationMarkAllRead`; mỗi route khai `@AuthenticatedOnly()`; chỉ hộp thư của chính người gọi; `404 NOTIFICATION.NOT_FOUND`; thứ tự có khóa phụ, biên trang 50, số câu lệnh không phụ thuộc số dòng; worker không mount controller
 - Verify: nhóm API hộp thư xanh; e2e kiểm kê và OpenAPI xanh; `jest src` xanh
@@ -73,7 +73,7 @@
 ### Task 8: cửa đọc audit cho consumer hệ thống (Phase 2)
 
 - Trạng thái: xong, đã kiểm (24/10/2026, local, chưa commit); bằng chứng ở bảng cuối.
-- Files: `src/modules/audit/audit.service.ts`, `audit.types.ts`, `audit.repo.ts`, `audit.service.spec.ts`, `test/integration` (đọc theo con trỏ)
+- Files: `src/modules/audit/public/audit.api.ts`, `audit.types.ts`, `audit.repo.ts`, `audit.service.spec.ts`, `test/integration` (đọc theo con trỏ)
 - Depends on: Task 1
 - Acceptance: `readSince(cursor, { upTo, actions, limit })` trả theo `(occurred_at, id)` tăng dần, chỉ các `action` yêu cầu, không vượt `upTo`, con trỏ rỗng đọc từ đầu; không lộ qua HTTP; không đổi bảng
 - Verify: ca tích hợp đọc theo con trỏ xanh; `jest src` (kiến trúc) xanh
@@ -81,10 +81,10 @@
 ### Task 9: bộ chiếu thông báo và worker (Phase 2)
 
 - Trạng thái: xong, đã kiểm (24/10/2026, local, chưa commit); bằng chứng ở bảng cuối.
-- Files: `status/request-status.repo.ts`, `status/request-status-recipients.service.ts`, `status/request-status-facts.service.ts`, `status/status-rules.*.ts`, `status/status-cursor.repo.ts`, `status/request-status-projector.service.ts`, `src/modules/requests/request-status-projector.service.ts`, `src/modules/requests/requests-work-facade.module.ts`, `src/request-work.loop.ts` (+ spec), `module-graph.spec.ts`, `architecture-boundaries.spec.ts`, `architecture-structure.spec.ts`, `request-status-notifications.integration-spec.ts`
+- Files: `status/request-status.repo.ts`, `status/request-status-recipients.service.ts`, `status/request-status-facts.service.ts`, `status/status-rules.*.ts`, `status/status-cursor.repo.ts`, `status/request-status-projector.service.ts`, `src/modules/requests/public/request-status-projector.api.ts`, `src/modules/requests/requests-work-facade.module.ts`, `src/worker/request-work.job.ts` (+ spec), `module-graph.spec.ts`, `architecture-boundaries.spec.ts`, `architecture-structure.spec.ts`, `request-status-notifications.integration-spec.ts`
 - Depends on: Task 4, Task 6, Task 7, Task 8
 - Acceptance: một lượt khóa con trỏ `SKIP LOCKED`, đọc cửa sổ đủ cũ (`DB_TRANSACTION_TIMEOUT_MS` + 5 giây), ghi thông báo, dời con trỏ trong một transaction; chiếu lại không sinh trùng; hai worker song song không trùng; sự kiện commit muộn trong độ trễ không mất; sự kiện hỏng bị bỏ qua có cảnh báo; không dòng `email_outbox`; nếu hạng mục anh em đã tạo `RequestWorkLoop` và module facade thì thêm lời gọi
-- Verify: nhóm AC-1, AC-2, AC-4 → AC-12 và nhóm _chống trùng, đồng thời_, _sự kiện hỏng_, _vế thông báo của rút_ xanh; `request-work.loop.spec.ts` xanh
+- Verify: nhóm AC-1, AC-2, AC-4 → AC-12 và nhóm _chống trùng, đồng thời_, _sự kiện hỏng_, _vế thông báo của rút_ xanh; `worker/request-work.job.spec.ts` xanh
 
 ### Task 10: số đo thời gian và route (Phase 2)
 

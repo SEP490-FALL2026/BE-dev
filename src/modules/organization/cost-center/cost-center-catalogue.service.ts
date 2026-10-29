@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { CostCenterBrief, CreateCostCenterInput } from '../organization.types';
+import { CostCenterBrief, CreateCostCenterInput } from '../public/organization.types';
 import { CostCenterRepo } from './cost-center.repo';
 import { CostCenterRecord } from './cost-center.types';
 

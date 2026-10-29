@@ -1,11 +1,11 @@
 import { Test } from '@nestjs/testing';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { CatalogService } from '../../catalog/catalog.service';
-import { FinanceService } from '../../finance/finance.service';
-import { IdentityAccessService } from '../../identity-access/identity-access.service';
-import { NotificationsService } from '../../notifications/notifications.service';
-import { OperatingParametersService } from '../../operating-parameters/operating-parameters.service';
-import { OrganizationService } from '../../organization/organization.service';
+import { CatalogApi } from '../../catalog/public/catalog.api';
+import { FinanceApi } from '../../finance/public/finance.api';
+import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
+import { NotificationsApi } from '../../notifications/public/notifications.api';
+import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
 import { BudgetNotifierService } from './budget-notifier.service';
 import { BudgetSupportService } from './budget-support.service';
 import type { ProposalRecord } from './proposal.repo';
@@ -41,7 +41,7 @@ describe('the notices of the budget loops that may be kept for a department with
         providers: [
           BudgetNotifierService,
           { provide: BudgetSupportService, useValue: support },
-          { provide: NotificationsService, useValue: notifications },
+          { provide: NotificationsApi, useValue: notifications },
         ],
       }).compile();
 
@@ -110,11 +110,11 @@ describe('the notices of the budget loops that may be kept for a department with
       const moduleRef = await Test.createTestingModule({
         providers: [
           BudgetSupportService,
-          { provide: OrganizationService, useValue: organization },
-          { provide: FinanceService, useValue: {} },
-          { provide: OperatingParametersService, useValue: {} },
-          { provide: IdentityAccessService, useValue: {} },
-          { provide: CatalogService, useValue: {} },
+          { provide: OrganizationApi, useValue: organization },
+          { provide: FinanceApi, useValue: {} },
+          { provide: OperatingParametersApi, useValue: {} },
+          { provide: IdentityAccessApi, useValue: {} },
+          { provide: CatalogApi, useValue: {} },
         ],
       }).compile();
 

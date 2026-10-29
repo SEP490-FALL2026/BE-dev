@@ -32,7 +32,7 @@ import {
   EmployeeSelfChangeForbiddenError,
   EmployeeUpdateEmptyError,
 } from '../employee/employee.errors';
-import { EmployeeNotFoundError } from '../organization.errors';
+import { EmployeeNotFoundError } from '../public/organization.errors';
 import {
   PROJECT_INVALID_REASONS,
   ProjectForbiddenError,

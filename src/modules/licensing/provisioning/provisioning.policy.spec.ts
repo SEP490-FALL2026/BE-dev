@@ -8,7 +8,7 @@ import {
   ProvisioningTaskNotManualError,
   ProvisioningTaskStateError,
   ProvisioningTypeNotSupportedError,
-} from '../licensing.errors';
+} from '../public/licensing.errors';
 import { ProvisioningItAdminRequiredError } from './provisioning.errors';
 import {
   assertGrantableType,

@@ -1,5 +1,5 @@
 import type { BusinessDate } from '../../../core/business-date';
-import { groundsRefusal, type GroundsInput } from '../grounds/grounds.policy';
+import { groundsRefusal, type GroundsInput } from '../policies/grounds.policy';
 import {
   TRANSFER_KINDS,
   type NoticeEventField,

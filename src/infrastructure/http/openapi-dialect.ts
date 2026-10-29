@@ -125,29 +125,52 @@ function walkSchema(node: unknown, pointer: string, out: OpenApiDialectViolation
   }
   if (!isRecord(node)) return;
 
+  checkSchemaShape(node, pointer, out);
+  for (const [name, value] of Object.entries(node)) {
+    const at = `${pointer}/${escape(name)}`;
+    if (name.startsWith('x-')) continue;
+    checkSchemaField(node, name, value, at, out);
+    walkSubschemas(name, value, at, out);
+  }
+}
+
+/** What 3.0 makes of the schema as a whole: siblings of `$ref` are ignored, an array needs its items. */
+function checkSchemaShape(node: Record<string, unknown>, pointer: string, out: OpenApiDialectViolation[]): void {
   if (typeof node.$ref === 'string' && Object.keys(node).some((key) => key !== '$ref' && !key.startsWith('x-')))
     out.push({ pointer, reason: 'siblings of $ref are ignored in OpenAPI 3.0' });
   if (node.type === 'array' && node.items === undefined)
     out.push({ pointer, reason: 'an array schema must declare items in OpenAPI 3.0' });
+}
 
-  for (const [name, value] of Object.entries(node)) {
-    const at = `${pointer}/${escape(name)}`;
-    if (name.startsWith('x-')) continue;
-    if (!SCHEMA_FIELDS.has(name)) out.push({ pointer: at, reason: `${name} is not an OpenAPI 3.0 schema field` });
-    else if (name === 'type') {
-      if (Array.isArray(value))
-        out.push({ pointer: at, reason: `type must be one string in OpenAPI 3.0, found ${JSON.stringify(value)}` });
-      else if (typeof value !== 'string' || !TYPES.has(value))
-        out.push({ pointer: at, reason: `type ${JSON.stringify(value)} is not an OpenAPI 3.0 type` });
-    } else if ((name === 'exclusiveMinimum' || name === 'exclusiveMaximum') && typeof value !== 'boolean')
-      out.push({ pointer: at, reason: `${name} must be a boolean in OpenAPI 3.0` });
-    else if (name === 'enum' && Array.isArray(value) && value.includes(null) && node.nullable !== true)
-      out.push({ pointer: at, reason: 'enum allows null but nullable is not true' });
+/** One keyword of a schema: a 3.0 field, with the value 3.0 gives it. */
+function checkSchemaField(
+  node: Record<string, unknown>,
+  name: string,
+  value: unknown,
+  at: string,
+  out: OpenApiDialectViolation[],
+): void {
+  if (!SCHEMA_FIELDS.has(name)) out.push({ pointer: at, reason: `${name} is not an OpenAPI 3.0 schema field` });
+  else if (name === 'type') checkSchemaType(value, at, out);
+  else if ((name === 'exclusiveMinimum' || name === 'exclusiveMaximum') && typeof value !== 'boolean')
+    out.push({ pointer: at, reason: `${name} must be a boolean in OpenAPI 3.0` });
+  else if (name === 'enum' && Array.isArray(value) && value.includes(null) && node.nullable !== true)
+    out.push({ pointer: at, reason: 'enum allows null but nullable is not true' });
+}
 
-    if (SUBSCHEMA.includes(name)) walkSchema(value, at, out);
-    else if (SUBSCHEMA_LIST.includes(name) && Array.isArray(value))
-      value.forEach((item, index) => walkSchema(item, `${at}/${index}`, out));
-    else if (SUBSCHEMA_MAP.includes(name) && isRecord(value))
-      for (const [key, schema] of Object.entries(value)) walkSchema(schema, `${at}/${escape(key)}`, out);
-  }
+/** `type` is one string naming one of the six 3.0 types. */
+function checkSchemaType(value: unknown, at: string, out: OpenApiDialectViolation[]): void {
+  if (Array.isArray(value))
+    out.push({ pointer: at, reason: `type must be one string in OpenAPI 3.0, found ${JSON.stringify(value)}` });
+  else if (typeof value !== 'string' || !TYPES.has(value))
+    out.push({ pointer: at, reason: `type ${JSON.stringify(value)} is not an OpenAPI 3.0 type` });
+}
+
+/** The schemas below a keyword: one, a list or a map of them. */
+function walkSubschemas(name: string, value: unknown, at: string, out: OpenApiDialectViolation[]): void {
+  if (SUBSCHEMA.includes(name)) walkSchema(value, at, out);
+  else if (SUBSCHEMA_LIST.includes(name) && Array.isArray(value))
+    value.forEach((item, index) => walkSchema(item, `${at}/${index}`, out));
+  else if (SUBSCHEMA_MAP.includes(name) && isRecord(value))
+    for (const [key, schema] of Object.entries(value)) walkSchema(schema, `${at}/${escape(key)}`, out);
 }

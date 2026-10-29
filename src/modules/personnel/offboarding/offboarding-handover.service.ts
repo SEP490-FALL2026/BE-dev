@@ -2,10 +2,10 @@ import { Injectable } from '@nestjs/common';
 import { addDays, type BusinessDate } from '../../../core/business-date';
 import { addWorkingDays } from '../../../core/working-days';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { LicensingService } from '../../licensing/licensing.service';
-import type { OperatorAuditActor } from '../../licensing/licensing-handover.types';
-import { OperatingParametersService } from '../../operating-parameters/operating-parameters.service';
-import type { PersonnelActor } from '../personnel.types';
+import { LicensingApi } from '../../licensing/public/licensing.api';
+import type { OperatorAuditActor } from '../../licensing/public/licensing-handover.types';
+import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
+import type { PersonnelActor } from '../public/personnel.types';
 import { TransferGuardService } from '../transfer/transfer-guard.service';
 import { handoverDueOn } from './offboarding.policy';
 import type { OffboardingRecord } from './offboarding.types';
@@ -24,8 +24,8 @@ const CALENDAR_WINDOW_DAYS = 90;
 @Injectable()
 export class OffboardingHandoverService {
   constructor(
-    private readonly licensing: LicensingService,
-    private readonly parameters: OperatingParametersService,
+    private readonly licensing: LicensingApi,
+    private readonly parameters: OperatingParametersApi,
     private readonly guard: TransferGuardService,
   ) {}
 

@@ -63,16 +63,16 @@ lại byte-identical.
 
 ### Task 4: đặc tả lỗ hậu tố và port phiên
 
-- Files: `src/architecture-structure.spec.ts`, `src/module-graph.spec.ts`.
+- Files: `test/gates/architecture-structure.gate-spec.ts`, `test/gates/module-graph.gate-spec.ts`.
 - Depends on: Checkpoint A.
 - Acceptance: `internal-helper.service.ts`, `private-state.types.ts` xuyên capability phải bị từ chối — đỏ trên gate
   `bdc9fe8` đúng lý do; đặc tả port (một khai báo symbol, cùng token bind ở API/recovery, hai consumer inject token đó)
   xanh trên vị trí cũ.
-- Verify: `pnpm exec jest --runInBand src/architecture-structure.spec.ts src/module-graph.spec.ts`.
+- Verify: `pnpm exec jest --runInBand test/gates/architecture-structure.gate-spec.ts test/gates/module-graph.gate-spec.ts`.
 
 ### Task 5: registry contract chính xác
 
-- Files: `src/architecture-structure.spec.ts`.
+- Files: `test/gates/architecture-structure.gate-spec.ts`.
 - Depends on: Task 4.
 - Acceptance: `INTRA_MODULE_CONTRACTS` thay suy luận hậu tố; ratchet file thiếu/entry thừa/import mới; test synthetic
   cho service lạ, type lạ, contract thật, thiếu contract thật, entry thừa.
@@ -80,9 +80,9 @@ lại byte-identical.
 
 ### Task 6: port `ACCOUNT_SESSIONS` về `identity-access.ports.ts`
 
-- Files: `src/modules/identity-access/identity-access.ports.ts` (mới), `accounts/account.types.ts`,
+- Files: `src/modules/identity-access/account-sessions.extension-points.ts` (mới), `accounts/account.types.ts`,
   `accounts/account-status.service.ts`, `auth/session-directory.service.ts`, `recovery/holder-credential-reset.service.ts`,
-  `identity-access.module.ts`, `recovery.module.ts`, `src/module-graph.spec.ts`, `src/architecture-structure.spec.ts`.
+  `identity-access.module.ts`, `recovery.module.ts`, `test/gates/module-graph.gate-spec.ts`, `test/gates/architecture-structure.gate-spec.ts`.
 - Depends on: Task 5.
 - Acceptance: một owner khai báo; cùng token/chữ ký/binding; không export `SessionRepo`, không private export mới.
 - Verify: jest identity-access + module graph; integration session revocation/recovery trên PostgreSQL cô lập.
@@ -125,7 +125,7 @@ Gate focused xanh; registry hai chiều; không mục legacy/allowlist mới ngo
 
 ### Task 10: chiều ranh giới của thư mục dùng chung
 
-- Files: `src/architecture-structure.spec.ts`, `docs/rules/module-structure.md`, `ARCHITECTURE.md`.
+- Files: `test/gates/architecture-structure.gate-spec.ts`, `docs/rules/module-structure.md`, `ARCHITECTURE.md`.
 - Depends on: Checkpoint C.
 - Acceptance: ba test synthetic đỏ trên gate Prompt 20; `crossesModuleParts` có chiều; 7 file lỗi được đăng ký với lý
   do; không ledger/wildcard/miễn trừ; không đổi `src/modules/**`.

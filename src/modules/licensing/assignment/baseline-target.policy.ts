@@ -1,4 +1,4 @@
-import type { SeatTarget, SeatTargetRef } from '../../catalog/catalog.types';
+import type { SeatTarget, SeatTargetRef } from '../../catalog/public/catalog.types';
 import {
   SeatPlanNotSupportedError,
   SeatApplicationRetiredError,
@@ -6,7 +6,7 @@ import {
   SeatSubscriptionDraftError,
   SeatTargetInvalidError,
   SeatTargetNotFoundError,
-} from '../licensing.errors';
+} from '../public/licensing.errors';
 
 /** The target a baseline is for: exactly one subscription of a paid plan, or one internal plan. */
 export function toSeatTargetRef(input: { subscriptionId?: string; planId?: string }): SeatTargetRef {

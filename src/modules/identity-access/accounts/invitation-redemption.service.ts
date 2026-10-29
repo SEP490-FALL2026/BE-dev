@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
-import { AuditService } from '../../audit/audit.service';
-import { OrganizationService } from '../../organization/organization.service';
-import { PasswordPolicyError } from '../identity-access.errors';
-import { employeeHasNotLeft } from '../policies/account-policy';
+import { AuditApi } from '../../audit/public/audit.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
+import { PasswordPolicyError } from '../public/identity-access.errors';
+import { employeeHasNotLeft } from '../policies/account.policy';
 import { AccountDirectoryService } from './account-directory.service';
 import { InvitationInvalidError } from './account.errors';
 import { ActionLinkService } from './action-link.service';
@@ -19,8 +19,8 @@ export class InvitationRedemptionService {
     private readonly accounts: AccountDirectoryService,
     private readonly links: ActionLinkService,
     private readonly credentials: CredentialService,
-    private readonly organization: OrganizationService,
-    private readonly audit: AuditService,
+    private readonly organization: OrganizationApi,
+    private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
   ) {}
 

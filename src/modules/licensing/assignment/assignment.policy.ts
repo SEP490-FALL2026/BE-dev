@@ -1,5 +1,5 @@
 import type { BusinessDate } from '../../../core/business-date';
-import type { EmployeeWorkState } from '../../organization/organization.types';
+import type { EmployeeWorkState } from '../../organization/public/organization.types';
 import {
   AssignmentConflictError,
   AssignmentEffectiveDateInvalidError,
@@ -7,9 +7,9 @@ import {
   AssignmentNotOpenError,
   AssignmentNotServiceAccountError,
   AssignmentResponsibleInvalidError,
-} from '../licensing.errors';
-import type { SeatBaselineClosedHolder } from '../licensing-seat-baseline.types';
-import type { AssignmentDateBasis, AssignmentRecord, AssignmentView } from '../licensing.types';
+} from '../public/licensing.errors';
+import type { SeatBaselineClosedHolder } from '../public/licensing-seat-baseline.types';
+import type { AssignmentDateBasis, AssignmentRecord, AssignmentView } from '../public/licensing.types';
 import { AssignmentResponsibleAfterDeadlineError } from './service-account.errors';
 
 /** What the audit event of a new assignment says of it; the account identifier and the purpose are never written to the trail. */

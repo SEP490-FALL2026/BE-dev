@@ -1,8 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { TransactionRunner } from '../../src/infrastructure/database/transaction-runner';
-import { OrganizationService } from '../../src/modules/organization/organization.service';
-import { ApiAccount, adminToken, createActivatedAccount } from './api-accounts';
+import { OrganizationApi } from '../../src/modules/organization/public/organization.api';
+import type { ApiAccount } from './api-accounts';
+import { buildActivatedAccount, signIn } from './builders/account.builder';
+import { declareApplication, declarePlan, declareSubscription } from './builders/catalog.builder';
+import { createCostCenter } from './builders/organization.builder';
 import {
   HttpTestApp,
   SeededInstallation,
@@ -72,24 +75,22 @@ export class SeatHarness {
   async start(options: Parameters<typeof createHttpTestApp>[0] = {}): Promise<void> {
     this.ctx = await createHttpTestApp(options);
     this.seed = await seedInstallation(this.ctx.app);
-    this.admin = await adminToken(this.ctx, this.seed);
-    this.it1 = await createActivatedAccount(this.ctx, this.seed, {
+    // T2.2: the people every suite starts with are built and signed in through the services, not through HTTP.
+    this.admin = await signIn(this.ctx, this.seed.superAdmin.email, this.seed.superAdmin.password);
+    this.it1 = await buildActivatedAccount(this.ctx, this.seed, {
       code: 'E-IT1',
       email: 'it1@acme.vn',
       roles: ['IT_ADMIN'],
-      admin: this.admin,
     });
-    this.finance = await createActivatedAccount(this.ctx, this.seed, {
+    this.finance = await buildActivatedAccount(this.ctx, this.seed, {
       code: 'E-FIN',
       email: 'fin@acme.vn',
       roles: ['FINANCE'],
-      admin: this.admin,
     });
-    this.employee = await createActivatedAccount(this.ctx, this.seed, {
+    this.employee = await buildActivatedAccount(this.ctx, this.seed, {
       code: 'E-EMP',
       email: 'emp@acme.vn',
       roles: [],
-      admin: this.admin,
     });
     this.businessOwner = (
       await insertEmployeeFixture(this.ctx.app, this.seed, { code: 'E-OWN', email: 'owner@acme.vn' })
@@ -152,39 +153,30 @@ export class SeatHarness {
     return { id: rows[0].id, departmentId: this.seed.departmentId };
   }
 
-  private async application(kind: 'SAAS' | 'LICENSED' | 'INTERNAL') {
-    return this.dataOf<{ id: string }>(
-      await request(this.server())
-        .post('/api/v1/applications')
-        .set(this.as(this.it1))
-        .send({
-          name: this.unique('App'),
-          kind,
-          ...(kind === 'INTERNAL' ? {} : { vendorName: this.unique('Vendor') }),
-          dataSensitivity: 'LOW',
-          businessOwnerEmployeeId: this.businessOwner,
-          communication: NO,
-        })
-        .expect(201),
-    );
+  /** T2.2: the catalog a test only stands on is declared through the services as the IT Admin, not through HTTP. */
+  private async application(kind: 'SAAS' | 'LICENSED' | 'INTERNAL'): Promise<{ id: string }> {
+    return {
+      id: await declareApplication(this.ctx, this.it1.accessToken, {
+        name: this.unique('App'),
+        kind,
+        ...(kind === 'INTERNAL' ? {} : { vendorName: this.unique('Vendor') }),
+        dataSensitivity: 'LOW',
+        businessOwnerEmployeeId: this.businessOwner,
+        communication: NO,
+      }),
+    };
   }
 
   /** A plan of a new application; `internal` makes a K5 plan of an internal application with no subscription. */
   async plan(type: 'K1' | 'K2' | 'K4' | 'K5' = 'K2', pricing = 'PER_SEAT'): Promise<string> {
     const application = await this.application(type === 'K5' ? 'INTERNAL' : 'SAAS');
 
-    return this.dataOf<{ id: string }>(
-      await request(this.server())
-        .post('/api/v1/plans')
-        .set(this.as(this.it1))
-        .send({
-          applicationId: application.id,
-          name: this.unique('Plan'),
-          provisioningType: type,
-          ...(type === 'K5' ? {} : { pricingModel: pricing, controlLevel: 'FULL' }),
-        })
-        .expect(201),
-    ).id;
+    return declarePlan(this.ctx, this.it1.accessToken, {
+      applicationId: application.id,
+      name: this.unique('Plan'),
+      provisioningType: type,
+      ...(type === 'K5' ? {} : { pricingModel: pricing, controlLevel: 'FULL' }),
+    });
   }
 
   /**
@@ -200,34 +192,27 @@ export class SeatHarness {
   ): Promise<string> {
     const planId = await this.plan(type, quantity === null ? 'FLAT_RATE' : 'PER_SEAT');
 
-    return this.dataOf<{ id: string }>(
-      await request(this.server())
-        .post('/api/v1/subscriptions')
-        .set(this.as(this.it1))
-        .send({
-          ownerDepartmentId,
-          planId,
-          kind: 'TERM',
-          unitPrice: { amount: '1000000', currency: 'VND' },
-          billingCycle: 'MONTHLY',
-          startDate: '2026-01-05',
-          ...(quantity === null ? {} : { purchasedQuantity: quantity }),
-        })
-        .expect(201),
-    ).id;
+    return declareSubscription(this.ctx, this.it1.accessToken, {
+      ownerDepartmentId,
+      planId,
+      kind: 'TERM',
+      unitPrice: { amount: '1000000', currency: 'VND' },
+      billingCycle: 'MONTHLY',
+      startDate: '2026-01-05',
+      ...(quantity === null ? {} : { purchasedQuantity: quantity }),
+    });
   }
 
   /** A subscription that still lacks data (no price, start, cycle): a draft, which takes no seat (US-04-03 AC-6). */
   async draftSubscription(type: 'K1' | 'K2' | 'K4' = 'K2'): Promise<string> {
     const planId = await this.plan(type);
 
-    return this.dataOf<{ id: string }>(
-      await request(this.server())
-        .post('/api/v1/subscriptions')
-        .set(this.as(this.it1))
-        .send({ ownerDepartmentId: this.seed.departmentId, planId, kind: 'TERM', purchasedQuantity: 10 })
-        .expect(201),
-    ).id;
+    return declareSubscription(this.ctx, this.it1.accessToken, {
+      ownerDepartmentId: this.seed.departmentId,
+      planId,
+      kind: 'TERM',
+      purchasedQuantity: 10,
+    });
   }
 
   /** A department with no Cost Center, written the way the installation writes one (`QĐ-87d(1)`). */
@@ -237,24 +222,18 @@ export class SeatHarness {
       .get(TransactionRunner)
       .run((tx) =>
         this.ctx.app
-          .get(OrganizationService)
+          .get(OrganizationApi)
           .createDepartment(tx, { organizationId: this.seed.organizationId, code, name: `Department ${code}` }),
       );
 
     return { id, code };
   }
 
-  /** What Finance sends to create the Cost Center of a department (`QĐ-87d(1)`). */
+  /** What Finance sends to create the Cost Center of a department (`QĐ-87d(1)`), through the service (T2.2). */
   async costCenterFor(departmentId: string, kind: 'UNIT' = 'UNIT'): Promise<{ id: string; code: string }> {
     const code = `CC-${(this.counter += 1)}-${randomUUID().slice(0, 4)}`.toUpperCase();
 
-    return this.dataOf<{ id: string; code: string }>(
-      await request(this.server())
-        .post('/api/v1/cost-centers')
-        .set(this.as(this.finance))
-        .send({ code, name: `Name of ${code}`, kind, departmentId })
-        .expect(201),
-    );
+    return createCostCenter(this.ctx, this.finance.accessToken, { code, name: `Name of ${code}`, kind, departmentId });
   }
 
   /** A Cost Center of its own: Finance creates it for a new department that has none (`QĐ-87d(1)`). */

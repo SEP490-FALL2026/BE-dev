@@ -2,11 +2,11 @@ import { Test } from '@nestjs/testing';
 import { HR_BASIS } from '../../../../test/support/hr-basis';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { AuditService } from '../../audit/audit.service';
-import { NotificationsService } from '../../notifications/notifications.service';
-import { EmployeeNotFoundError } from '../organization.errors';
-import { OrganizationService } from '../organization.service';
-import type { EmployeeRecord } from '../organization.types';
+import { AuditApi } from '../../audit/public/audit.api';
+import { NotificationsApi } from '../../notifications/public/notifications.api';
+import { EmployeeNotFoundError } from '../public/organization.errors';
+import { OrganizationApi } from '../public/organization.api';
+import type { EmployeeRecord } from '../public/organization.types';
 import {
   EmployeeForbiddenError,
   EmployeeRowInvalidError,
@@ -70,9 +70,9 @@ describe('EmployeeMaintenanceService', () => {
     const moduleRef = await Test.createTestingModule({
       providers: [
         EmployeeMaintenanceService,
-        { provide: OrganizationService, useValue: organization },
-        { provide: AuditService, useValue: audit },
-        { provide: NotificationsService, useValue: notifications },
+        { provide: OrganizationApi, useValue: organization },
+        { provide: AuditApi, useValue: audit },
+        { provide: NotificationsApi, useValue: notifications },
         { provide: TransactionRunner, useValue: runner },
       ],
     }).compile();

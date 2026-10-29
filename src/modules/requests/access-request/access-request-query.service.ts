@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { BudgetsService } from '../../budgets/budgets.service';
-import { CatalogService } from '../../catalog/catalog.service';
-import { OrganizationService } from '../../organization/organization.service';
-import { AssessmentRepo, type ProposalRecord } from './assessment.repo';
+import { BudgetsApi } from '../../budgets/public/budgets.api';
+import { CatalogApi } from '../../catalog/public/catalog.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
+import { AssessmentRepo, type ProposalRecord } from '../assessment/assessment.repo';
 import { PricingViewService, type PricingView } from './pricing-view.service';
 import { SpendStatusService, type SpendStatusView } from '../spend/spend-status.service';
 import { AccessRequestNotFoundError } from './access-request.errors';
@@ -125,12 +125,12 @@ export interface CancellationView {
 export class AccessRequestQueryService {
   constructor(
     private readonly repo: AccessRequestRepo,
-    private readonly organization: OrganizationService,
-    private readonly catalog: CatalogService,
+    private readonly organization: OrganizationApi,
+    private readonly catalog: CatalogApi,
     private readonly pricing: PricingViewService,
     private readonly assessments: AssessmentRepo,
     private readonly spendStatus: SpendStatusService,
-    private readonly budgets: BudgetsService,
+    private readonly budgets: BudgetsApi,
   ) {}
 
   async get(actor: AuthenticatedPrincipal, id: string): Promise<AccessRequestView> {

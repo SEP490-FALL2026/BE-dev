@@ -96,7 +96,7 @@ thư luôn được gửi plaintext.
 
 ## Build và kiểm tra
 
-`pnpm check` chạy gate không cần dịch vụ ngoài; `pnpm test:e2e` kiểm tra HTTP
+`pnpm check` chạy gate không cần dịch vụ ngoài; `pnpm test:http` kiểm tra hợp đồng HTTP
 với boundary thay thế. Integration test cần PostgreSQL riêng: xem [test guide](test/README.md).
 `pnpm check` sinh Prisma client trước lint nên chạy được trực tiếp trên checkout sạch.
 

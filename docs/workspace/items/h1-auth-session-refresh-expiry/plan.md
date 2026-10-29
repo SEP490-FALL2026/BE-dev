@@ -20,8 +20,8 @@ PostgreSQL 17 trong container dùng một lần theo [test guide](../../../../te
 ### Task 1: test đỏ cho hợp đồng và máy trạng thái refresh
 
 - Files: `src/modules/identity-access/auth/session.service.spec.ts` (mới), `login.service.spec.ts` (mới),
-  `auth.controller.spec.ts` (mới, chỉ mapper), `test/integration/auth-http.integration-spec.ts`,
-  `test/integration/auth-concurrency.integration-spec.ts`, `test/e2e/auth-unavailable.e2e-spec.ts`,
+  `auth.controller.spec.ts` (mới, chỉ mapper), `test/integration/identity-access/auth-http.integration-spec.ts`,
+  `test/integration/identity-access/auth-concurrency.integration-spec.ts`, `test/http/identity-access/auth-unavailable.http-spec.ts`,
   `test/support/api-body.ts`.
 - Depends on: none.
 - Acceptance: test mới đỏ vì thiếu `refreshExpiresAt`/`refreshTokenExpiresAt` hoặc thiếu tên `authenticateAndRotate`;

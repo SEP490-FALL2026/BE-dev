@@ -5,8 +5,8 @@ import {
   AssignmentNotOpenError,
   AssignmentNotServiceAccountError,
   AssignmentResponsibleInvalidError,
-} from '../licensing.errors';
-import type { AssignmentRecord } from '../licensing.types';
+} from '../public/licensing.errors';
+import type { AssignmentRecord } from '../public/licensing.types';
 import { AssignmentResponsibleAfterDeadlineError } from './service-account.errors';
 import {
   assertResponsibleChange,

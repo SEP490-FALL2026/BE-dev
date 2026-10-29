@@ -2,8 +2,8 @@ import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { LeaveOverdueService } from '../../src/modules/personnel/leave/leave-overdue.service';
 import { LeaveDepartureService } from '../../src/modules/personnel/leave/leave-departure.service';
-import { PersonnelService } from '../../src/modules/personnel/personnel.service';
-import type { PersonnelActor } from '../../src/modules/personnel/personnel.types';
+import { PersonnelApi } from '../../src/modules/personnel/public/personnel.api';
+import type { PersonnelActor } from '../../src/modules/personnel/public/personnel.types';
 import { TransactionRunner } from '../../src/infrastructure/database/transaction-runner';
 import type { ApiAccount } from './api-accounts';
 import type { Department, Person } from './request-harness';
@@ -140,7 +140,7 @@ export class LeaveHarness extends TransferHarness {
   });
 
   departure = () => this.ctx.app.get(LeaveDepartureService, { strict: false });
-  personnel = () => this.ctx.app.get(PersonnelService, { strict: false });
+  personnel = () => this.ctx.app.get(PersonnelApi, { strict: false });
   inTransaction = <T>(work: Parameters<TransactionRunner['run']>[0]): Promise<T> =>
     this.ctx.app.get(TransactionRunner, { strict: false }).run(work) as Promise<T>;
 }

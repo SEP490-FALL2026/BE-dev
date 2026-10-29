@@ -51,7 +51,7 @@ const H7_ENV = `ENV_GENERATION=h7\nPOSTGRES_PASSWORD=${SECRET}\nDATABASE_DEPLOY_
 const PRE_H7_ENV = `ENV_GENERATION=pre-h7\nPOSTGRES_PASSWORD=${SECRET}\nAUTH_ACCESS_TOKEN_SECRET=${SECRET}\n`;
 /**
  * P04-CPE-04: the labels `docker image inspect --format '{{json .Config.Labels}}'` prints for an image that reads the
- * representation the final release writes (the Dockerfile label, pinned in recovery-target.spec.ts). The previous image
+ * representation the final release writes (the Dockerfile label, pinned in recovery-target.policy.spec.ts). The previous image
  * prints `null` by default: an image built before the label, as the compatibility image `fba4dfe`.
  */
 const FINAL_LABELS = JSON.stringify({ 'io.github.baophipham.slm.data-reads': 'access-request-null-cost-center' });
@@ -217,7 +217,7 @@ case "$*" in
     if [ "$image" = "\${FAKE_ABSENT_IMAGE:-}" ]; then echo "Error: No such image: $image" >&2; exit 1; fi
     if [ "$image" = "$FAKE_NEW_IMAGE" ]; then echo "$FAKE_NEW_LABELS"; else echo "\${FAKE_OLD_LABELS:-null}"; fi ;;
   *"/migration-preflight-cli.js --recovery-target "*)
-    # A stand-in for the judgement of ops:preflight --recovery-target (unit-tested in recovery-target.spec.ts): the rows
+    # A stand-in for the judgement of ops:preflight --recovery-target (unit-tested in recovery-target.policy.spec.ts): the rows
     # this fake database holds against what the labels declare. Exit 0 compatible, 2 incompatible, 3 no history.
     if [ -n "\${FAKE_JUDGE_FAILS_AFTER_RECREATE:-}" ] && [ "$generation" -ge 1 ]; then echo 'The preflight failed: Error' >&2; exit 1; fi
     if [ -n "\${FAKE_NO_HISTORY:-}" ]; then echo 'Recovery target: NO_HISTORY'; exit 3; fi
@@ -950,7 +950,7 @@ describe('deploy-release.sh (H7-OPS-02, H7-OPS-RV-01..07)', () => {
   });
 
   // P04-CPE-04 (spec L.12). The judgement itself is a stand-in here (the fake docker compares the rows of its database with
-  // the labels it was given); ops:preflight --recovery-target is unit-tested in recovery-target.spec.ts. What these cases
+  // the labels it was given); ops:preflight --recovery-target is unit-tested in recovery-target.policy.spec.ts. What these cases
   // prove is the script: when it judges, with what, as whom, and what it does with each verdict — not that a real image
   // reads a real row.
   describe('the way back (P04-CPE-04)', () => {

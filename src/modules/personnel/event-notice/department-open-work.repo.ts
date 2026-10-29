@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import type { UseGroup, UseItem } from '../../organization/organization-use.types';
+import type { UseGroup, UseItem } from '../../organization/public/organization-use.types';
 
 /**
  * The events of the personnel context that are not over for a department, told to the organization when it asks whether the

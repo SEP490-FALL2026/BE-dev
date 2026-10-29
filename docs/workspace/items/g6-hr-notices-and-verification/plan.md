@@ -7,7 +7,7 @@
 
 ## Before coding
 
-Đọc AGENTS.md, CONTRIBUTING.md, [module structure](../../../rules/module-structure.md), [API contract](../../../rules/api-contract.md), spec của `g6-transfer-record`, `g6-long-leave`, `g6-offboarding-record` (các biến thể `recordInTx`, `startInTx`), và mã `operating-parameters/parameter-definitions.ts` ở BE `7920ee5`. Đối chiếu: chưa có bảng thông báo; `getItAdminInCharge` đã có ở `organization`; vai `MANAGER` suy ra từ giai đoạn trưởng phòng. Ba hạng mục sự kiện phải xong trước. Migration `20261024230000_personnel_notices` (tên tạm ban đầu `089000`) là task riêng đi trước mã dùng nó.
+Đọc AGENTS.md, CONTRIBUTING.md, [module structure](../../../rules/module-structure.md), [API contract](../../../rules/api-contract.md), spec của `g6-transfer-record`, `g6-long-leave`, `g6-offboarding-record` (các biến thể `recordInTx`, `startInTx`), và mã `operating-parameters/parameter-definitions.policy.ts` ở BE `7920ee5`. Đối chiếu: chưa có bảng thông báo; `getItAdminInCharge` đã có ở `organization`; vai `MANAGER` suy ra từ giai đoạn trưởng phòng. Ba hạng mục sự kiện phải xong trước. Migration `20261024230000_personnel_notices` (tên tạm ban đầu `089000`) là task riêng đi trước mã dùng nó.
 
 ## Tasks
 
@@ -20,7 +20,7 @@
 
 ### Task 2: dữ liệu và tham số (xong)
 
-- Files: `prisma/migrations/20261024230000_personnel_notices/migration.sql`, `prisma/models/personnel.prisma` (và hai khóa ngoại ngược ở `organization.prisma`), `src/modules/operating-parameters/parameter-definitions.ts`, `parameter-definitions.spec.ts`, `PRISMA_MODEL_OWNER` ở `architecture-boundaries.spec.ts`
+- Files: `prisma/migrations/20261024230000_personnel_notices/migration.sql`, `prisma/models/personnel.prisma` (và hai khóa ngoại ngược ở `organization.prisma`), `src/modules/operating-parameters/parameter-definitions.policy.ts`, `parameter-definitions.spec.ts`, `PRISMA_MODEL_OWNER` ở `architecture-boundaries.spec.ts`
 - Depends on: Task 1, `g6-transfer-record`, `g6-long-leave`, `g6-offboarding-record`
 - Acceptance: sequence mã, ba enum, `personnel_notices` (unique một phần thông báo chờ, `CHECK` trạng thái), `personnel_notice_verifications` chỉ thêm, cột `notice_id` unique ở ba bảng sự kiện; khóa tham số `PERSONNEL_NOTICE_REVIEW_WORKING_DAYS`
 - Verify: nhóm test _what the database refuses_ (`23505`, `23514`, `55000`) xanh; test định nghĩa tham số xanh; `pnpm prisma:validate`; `migrate diff --exit-code` = 0 trên CSDL kiểm thử riêng
@@ -41,7 +41,7 @@
 
 ### Task 5: từ chối, ghi, gắn và API (xong)
 
-- Files: `notice-handling.service.ts`, `notice-recorder.registry.ts`, `notice.controller.ts`, `notice.dto.ts`, `notice.http-errors.ts`, `transfer/transfer-notice.recorder.ts`, `leave/leave-notice.recorder.ts`, `offboarding/offboarding-notice.recorder.ts`, `noticeId` ở `transfer.service.ts`, `leave.service.ts`, `offboarding.service.ts` và ba repo, `api-coverage-manifest.ts`, `api-inventory.e2e-spec.ts`, `openapi.json`, `test/e2e/personnel-notices.e2e-spec.ts`
+- Files: `notice-handling.service.ts`, `notice-recorder.registry.ts`, `notice.controller.ts`, `notice.dto.ts`, `notice.http-errors.ts`, `transfer/transfer-notice.recorder.ts`, `leave/leave-notice.recorder.ts`, `offboarding/offboarding-notice.recorder.ts`, `noticeId` ở `transfer.service.ts`, `leave.service.ts`, `offboarding.service.ts` và ba repo, `api-coverage-manifest.ts`, `api-inventory.e2e-spec.ts`, `openapi.json`, `test/http/personnel/personnel-notices.http-spec.ts`
 - Depends on: Task 4
 - Acceptance: từ chối có lý do, ghi đường A trong một transaction với bản ghi xác minh và căn cứ, lỗi quy tắc sự kiện làm lùi cả lệnh, gắn sự kiện đang có, đường B không tạo thông báo; `403` đúng vai; AC-1→AC-9 của `US-03-11`
 - Verify: integration PostgreSQL và e2e của các AC đó xanh; `pnpm openapi:export` không lệch; test đếm câu lệnh xanh

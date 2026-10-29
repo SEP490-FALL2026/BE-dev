@@ -38,8 +38,8 @@ Inventory trước khi sửa (đọc trực tiếp source, không subagent):
 - Files: `employee-import.http-errors.spec.ts`, `employee-import.service.spec.ts` (tách theo use case ở Task 7,
   H8-RV-01),
   `employee-import-rows.validation-parity.spec.ts` (mới, ban đầu cạnh source phẳng);
-  `test/integration/employee-imports-http.integration-spec.ts` (khối characterization),
-  `test/integration/onboarding-http.integration-spec.ts`, `src/modules/onboarding/onboarding.service.spec.ts`.
+  `test/integration/data-import/employee-imports-http.integration-spec.ts` (khối characterization),
+  `test/integration/onboarding/onboarding-http.integration-spec.ts`, `src/modules/onboarding/onboarding.service.spec.ts`.
 - Depends on: none
 - Acceptance: mapper (16 ca + key order, pass-through, 503, identity); giao thức từng use case với fake ở boundary (thứ tự
   lời gọi, `tx`, payload ghi, audit chính xác, mọi nhánh từ chối, so judgement theo thứ tự key/lý do); wire chính xác 6
@@ -58,7 +58,7 @@ onboarding 2 suite/28 test; integration import + onboarding 2 suite/45 test; `ts
 ### Task 2: `employee-import.http-errors.ts`
 
 - Files: `employee-import.errors.ts`, `employee-import.http-errors.ts` (mới), `employee-imports.controller.ts`,
-  `employee-import.http-errors.spec.ts`, `src/architecture-structure.spec.ts`.
+  `employee-import.http-errors.spec.ts`, `test/gates/architecture-structure.gate-spec.ts`.
 - Depends on: Task 1
 - Acceptance: `toImportApiException`/`refuse` dời nguyên văn; tệp lỗi chỉ còn lớp/type nghiệp vụ; gỡ đúng mục
   `httpMappingInErrorFiles` (ledger rỗng, gate giữ). Không đăng ký mapper/lỗi làm contract liên module.
@@ -84,7 +84,7 @@ byte-identical (hash kiểm bằng script).
 
 - Files: `employee-import.service.ts`, `employee-import-file.ts`, `employee-import-audit.ts`, `employee-import.types.ts`
   (mới), `employee-import-rows.ts`, `employee-imports.controller.ts`, spec cạnh owner (`employee-import-file.spec.ts` mới,
-  khối judgement trong `employee-import-rows.spec.ts`), `src/architecture-structure.spec.ts`.
+  khối judgement trong `employee-import-rows.spec.ts`), `test/gates/architecture-structure.gate-spec.ts`.
 - Depends on: Task 3
 - Acceptance: owner theo bảng của spec; service 355 dòng, 4 dependency; mọi file non-spec dưới 400 dòng; lời gọi
   facade/repo, `tx` và thứ tự không đổi (characterization lời gọi xanh); gỡ mục `oversizedFiles` của service, không tăng
@@ -102,8 +102,8 @@ import 22 xanh. Đường cũ zero-hit (trừ cạnh onboarding gỡ ở Phase C
 ### Task 5: `DataImportService` cho onboarding, `Page<T>` core
 
 - Files: `data-import.service.ts`, `data-import.types.ts`, `data-import.service.spec.ts` (mới), `data-import.module.ts`,
-  `onboarding.service.ts`, `onboarding.service.spec.ts`, `src/module-graph.spec.ts`,
-  `src/architecture-boundaries.spec.ts`, `src/architecture-structure.spec.ts`.
+  `onboarding.service.ts`, `onboarding.service.spec.ts`, `test/gates/module-graph.gate-spec.ts`,
+  `test/gates/architecture-boundaries.gate-spec.ts`, `test/gates/architecture-structure.gate-spec.ts`.
 - Depends on: Task 4
 - Acceptance: facade một method `latestEmployeeImport` → `{ id, status, errorRows } | null`; `DataImportModule` export
   facade, service capability và repo private; `PUBLIC_CONTRACT_EXPORTS` thêm `DataImportModule: DataImportService`,
@@ -131,7 +131,7 @@ byte-identical.
 
 ### Task 7: gate unit spec module và tách spec 1.084 dòng theo use case
 
-- Files: `src/architecture-structure.spec.ts`; `employee-import.service.spec.ts` (xóa) →
+- Files: `test/gates/architecture-structure.gate-spec.ts`; `employee-import.service.spec.ts` (xóa) →
   `employee-import-upload.spec.ts`, `employee-import-preview-lifecycle.spec.ts`, `employee-import-confirm.spec.ts`;
   `test/support/employee-import-service-harness.ts` (mới); `test/README.md`, `docs/rules/module-structure.md`; spec/plan
   này; tracker ngoài repo.

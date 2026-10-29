@@ -74,7 +74,7 @@ const INVALID_UPDATE = {
     SUBSCRIPTION_ERROR_EXAMPLES.CURRENCY_NOT_SUPPORTED,
   ],
 } as const;
-/** Only where a unit price is converted (`FinanceService.snapshotMoney`); the database key of `DB-02` normally rules it out. */
+/** Only where a unit price is converted (`FinanceApi.snapshotMoney`); the database key of `DB-02` normally rules it out. */
 const REPORTING_CURRENCY_CONFLICT = {
   status: HttpStatus.CONFLICT,
   description:
