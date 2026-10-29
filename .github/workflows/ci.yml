@@ -156,7 +156,8 @@ jobs:
 
   integration:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # Measured on 2 vCPU: the parallel step alone took 19–21 min, the whole job about 24–27 min (Owner, 30/10/2026).
+    timeout-minutes: 40
     services:
       postgres: *postgres
     steps:

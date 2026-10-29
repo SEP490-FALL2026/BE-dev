@@ -1,4 +1,4 @@
-import { spawn, type ChildProcess } from 'node:child_process';
+import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
 import { appendFileSync } from 'node:fs';
 
 /**
@@ -43,8 +43,31 @@ export function prismaProcessesStarted(): number {
   return started;
 }
 process.once('exit', () => {
-  for (const child of running) child.kill('SIGKILL');
+  for (const child of running) stopProcessTree(child);
 });
+
+/**
+ * Stops the Prisma CLI and every process it started. The CLI runs `migrate deploy` in a separate schema-engine process
+ * that owns the database connection and talks to the CLI over pipes: a SIGKILL of the CLI alone leaves that engine
+ * running, blocked on its statement and still holding the session (H7-RUN-01, seen on Linux CI). On POSIX the CLI leads
+ * its own process group (`detached`), so one signal reaches the engine; Windows has no groups, `taskkill /T` walks the
+ * tree while the CLI is still alive.
+ */
+function stopProcessTree(child: ChildProcess): void {
+  const pid = child.pid;
+  if (pid !== undefined && child.exitCode === null && child.signalCode === null) {
+    if (process.platform === 'win32') {
+      spawnSync('taskkill', ['/pid', String(pid), '/T', '/F'], { stdio: 'ignore', windowsHide: true });
+    } else {
+      try {
+        process.kill(-pid, 'SIGKILL');
+      } catch {
+        // The group is already gone.
+      }
+    }
+  }
+  child.kill('SIGKILL');
+}
 
 export function deployMigrations(url: string, reachableMs: number, timeoutMs: number): Promise<MigrationPhases> {
   const base = performance.now() - reachableMs;
@@ -73,6 +96,8 @@ export function deployMigrations(url: string, reachableMs: number, timeoutMs: nu
         CHECKPOINT_DISABLE: '1',
       },
       stdio: ['ignore', 'pipe', 'pipe'],
+      // POSIX: a process group of its own, so stopping it reaches the schema engine too (stopProcessTree).
+      detached: process.platform !== 'win32',
       windowsHide: true,
     });
     running.add(child);
@@ -90,7 +115,7 @@ export function deployMigrations(url: string, reachableMs: number, timeoutMs: nu
     child.stderr?.on('data', read);
     const timer = setTimeout(() => {
       phases.outcome = 'timed-out';
-      child.kill('SIGKILL');
+      stopProcessTree(child);
     }, timeoutMs);
     child.on('exit', (code) => {
       phases.exitedMs = at();

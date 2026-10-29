@@ -64,7 +64,10 @@ nào ngoài marker, không session nào còn lại (chờ tối đa 2 s) — nê
 (`migration-setup.integration-spec.ts` so lịch sử migration và catalog). Còn lại — database suite đã dùng trước khi
 migrate, handle không do harness provision (deploy role, superuser của suite vai PostgreSQL, relay) và chính database mẫu
 — đi Prisma CLI trong `support/migration-deploy.ts`: tiến trình riêng, giới hạn 60 s, lỗi nêu thời điểm từng pha (kết nối,
-CLI khởi động, đọc lịch sử, thoát, đóng pipe), không bao giờ còn tiến trình hay session sau một lần dừng. Đặt
+CLI khởi động, đọc lịch sử, thoát, đóng pipe), không bao giờ còn tiến trình hay session sau một lần dừng. Hết giới hạn thì
+dừng **cả cây tiến trình**: CLI chạy `migrate deploy` trong tiến trình schema engine riêng giữ kết nối DB, nên chỉ kill CLI
+thì engine còn sống và giữ session (thấy trên CI Linux). POSIX: CLI có process group riêng (`detached`), kill cả nhóm;
+Windows: `taskkill /T` khi CLI còn sống. Đặt
 `TEST_MIGRATION_TIMINGS_FILE=<file ngoài repo>` để ghi một dòng JSON mỗi lần migrate/sao (chỉ thời gian, không URL).
 
 Mỗi suite tạo slm_<random>_test với ownership marker riêng. Mọi suite áp dụng

@@ -14,7 +14,8 @@ permissions:
 jobs:
   integration:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    # ci.yml's integration job (about 24–27 min on 2 vCPU) plus the end-to-end smoke journeys (Owner, 30/10/2026).
+    timeout-minutes: 50
     services:
       postgres: &postgres
         image: postgres:17-alpine

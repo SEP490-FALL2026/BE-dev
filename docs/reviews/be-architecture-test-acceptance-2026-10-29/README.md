@@ -300,3 +300,48 @@ và chạy lại. Không chạy lại full `pnpm check`, toàn bộ integration 
 Cleanup: container riêng `slm-ci-fix-20261029-01` trên `127.0.0.1:55439`, nhãn `slm.task=ci-fix-20261029-01`; sau test
 còn 0 database `slm_*_test`, đã xóa đúng container ID và volume ẩn danh của nó. Redis có sẵn được giữ nguyên. Không SSH,
 commit hay push. Bước kế: Owner review/commit correction, push `dev`, chờ integration và các job CI thực tế xanh.
+
+## 10. Nguyên nhân gốc của `migration-setup` đỏ trên CI Linux (30/10/2026)
+
+Run `40899387513` (`4a93078`) và `40907589777` (`3dffadd`): bước integration song song đỏ cùng một ca —
+`migration-setup` › _names the stalled phase…_. Lượt 1 đỏ ở `holding === false`; lượt 2, sau sửa của mục 9, vẫn đỏ vì
+chờ 10 s mà socket không đóng. Mục 9 coi đây là race giữa hai sự kiện `close`; không đúng gốc.
+
+- **Gốc.** `prisma migrate deploy` chạy hai tiến trình: CLI Node và `schema-engine` native do CLI spawn với stdio
+  `pipe`, không `detached` (bundle `prisma/build/cli.js` của Prisma 7.9.1). Engine giữ kết nối DB. Hết giới hạn, harness
+  chỉ `SIGKILL` CLI; trên Linux engine thành tiến trình mồ côi (PPID 1), vẫn chặn ở câu lệnh relay giữ và giữ session tới
+  khi `afterAll` dừng relay. Trên Windows engine thoát khi pipe vỡ, nên lượt local trước đó xanh. Lỗi là của harness
+  (hứa "không còn tiến trình hay session"), không phải race của assertion.
+- **Tái hiện.** Bản sao Linux của job `integration`: `node:22-bookworm` + `postgres:17-alpine` chung network namespace,
+  role `ci_integration`, `fsync=off`, cây LF như checkout CI, `pnpm build`, `TEST_CLI_RUNTIME=dist`. Code `3dffadd`: đỏ
+  **3/3** đúng thông báo CI; sau mỗi lượt `ps` thấy `schema-engine` PPID 1.
+- **Sửa** (`test/support/migration-deploy.ts`): dừng cả cây tiến trình. POSIX: CLI chạy `detached` (process group riêng),
+  hết hạn thì `process.kill(-pid, 'SIGKILL')`; Windows: `taskkill /T /F` khi CLI còn sống; hook `exit` cũng dừng cả cây.
+  Cùng cách `scripts/verify/deploy-release.test.mjs` đã dùng. Không đổi giới hạn 15 s/60 s hay assertion; giữ
+  `waitForHeldConnectionsToClose` của mục 9 vì socket đóng sau khi tiến trình chết vẫn là sự kiện bất đồng bộ.
+- **Kiểm chứng sau sửa.**
+
+  | Phạm vi                                                                                    | Kết quả                                  |
+  | ------------------------------------------------------------------------------------------ | ---------------------------------------- |
+  | `migration-setup` trên bản sao Linux                                                       | xanh **5/5**, không còn `schema-engine`  |
+  | `migration-setup` trên Windows 11 (PostgreSQL 17 docker)                                   | xanh **3/3**, không còn `schema-engine`  |
+  | `migration-setup` + `pg-relay-lifecycle` + `access-request-preview`                        | 3 file / 28 test xanh (Linux, 2 worker)  |
+  | `test:integration:timing` (bước CI chưa từng chạy)                                         | 7 file / 28 test xanh (Linux)            |
+  | `test:integration:serial` (bước CI chưa từng chạy; deploy qua CLI)                         | 8 file / 59 test xanh (Linux)            |
+  | `test:e2e` (job `e2e-smoke`, chưa từng chạy trên CI)                                       | 8 file / 36 test xanh (Linux)            |
+  | `test:integration` song song, bản sao Linux 4 worker (dừng sớm, máy tải)                   | 22 file đầu xanh, gồm globalSetup deploy |
+  | `test:gates`, `rules:check`, `rules:format`, `test:discovery`, ESLint, Prettier, typecheck | đạt                                      |
+
+  Bản sao phải đổi `pg_hba.conf` của image `postgres` từ `trust` sang `scram-sha-256` cho `127.0.0.1`: khi chung network
+  namespace, kết nối đến từ loopback nên mật khẩu sai vẫn được nhận và hai suite `_serial` kiểm từ chối credential đỏ giả.
+  Trên CI runner kết nối qua cổng publish nên PostgreSQL luôn đòi mật khẩu.
+
+- **Chưa kiểm chứng.** Toàn bộ bước song song chưa chạy lại hết trên bản sao (máy dev quá tải); bằng chứng cho 232 file
+  còn lại là run `40907589777` (253/254 xanh trên Linux, ca đỏ duy nhất là ca đã sửa). CI thật chờ Owner push.
+- **Ngân sách thời gian — Owner chọn 30/10/2026.** Bước song song trên runner 2 vCPU mất 1 142–1 280 s; cộng setup,
+  build, timing, `_serial` ước 24–27 phút, sát `timeout-minutes: 30`. Owner chọn nâng timeout, vẫn một runner (OD-T2):
+  `ci.yml` job `integration` 30 → **40** phút, `nightly.yml` job `integration` (gồm thêm e2e) 40 → **50** phút. Quy tắc
+  "timeout gấp đôi mục tiêu" của spec không còn khớp vì P5 (≤ 15 phút) chưa đạt.
+- **Ghi nhận, không sửa.** CI in nhiều cảnh báo pg 8.23 _Calling client.query() when the client is already executing a
+  query_: `Promise.all` trên cùng một transaction client trong repo nguồn (ví dụ `spend-request.repo.ts`,
+  `assignment.repo.ts`, `budget-facts.repo.ts`). pg@8 tự xếp hàng nên hiện không lỗi; nâng pg@9 thì sẽ vỡ.
