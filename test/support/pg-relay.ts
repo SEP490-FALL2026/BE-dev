@@ -96,6 +96,33 @@ export class PgRelay {
     return [...this.connections].some((connection) => connection.held);
   }
 
+  /** Observe the held peers closing; never release or destroy them to make a failed cleanup look successful. */
+  async waitForHeldConnectionsToClose(timeoutMs: number): Promise<void> {
+    const sockets = [...this.connections]
+      .filter((connection) => connection.held)
+      .flatMap((connection) => [connection.client, connection.upstream]);
+    if (sockets.every((socket) => socket.closed)) return;
+
+    await new Promise<void>((resolve, reject) => {
+      const cleanup = (): void => {
+        clearTimeout(timer);
+        for (const socket of sockets) socket.removeListener('close', onClose);
+      };
+      const onClose = (): void => {
+        if (sockets.every((socket) => socket.closed)) {
+          cleanup();
+          resolve();
+        }
+      };
+      const timer = setTimeout(() => {
+        cleanup();
+        reject(new Error('A held relay connection is still open after its cleanup deadline'));
+      }, timeoutMs);
+      for (const socket of sockets) if (!socket.closed) socket.once('close', onClose);
+      onClose();
+    });
+  }
+
   releaseHeld(): void {
     this.trigger = null;
     for (const connection of this.connections) {

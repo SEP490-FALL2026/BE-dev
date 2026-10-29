@@ -213,6 +213,8 @@ describe('requests over HTTP: the preview before sending (integration, real Post
     });
 
     it('answers 404 to every route of the standard toolset, as to a route that does not exist', async () => {
+      // The fixture owns the listener: no individual SuperTest request may close its siblings' server.
+      expect(h.server()).toHaveProperty('listening', true);
       const department = design.id;
       const title = '3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11';
       const answers = await Promise.all([

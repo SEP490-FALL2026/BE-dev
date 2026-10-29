@@ -8,6 +8,13 @@ Danh mục helper trong `test/support/`: dùng cái nào cho ca nào. Tầng tes
 
 Tất cả integration suite dùng support/disposable-database.ts. Cấu hình
 TEST_DATABASE_ADMIN_URL một cách rõ ràng; helper không fallback sang DATABASE_URL.
+
+`createHttpTestApp` sở hữu một listener HTTP ở cổng động trên `127.0.0.1` suốt đời fixture, đóng bằng `app.close()`.
+Không để SuperTest tự mở/đóng listener cho từng request: request đầu hoàn tất có thể đóng server trong khi các request
+song song còn kết nối. Khi kiểm Prisma đã dừng, chờ `PgRelay.waitForHeldConnectionsToClose` quan sát sự kiện đóng TCP
+trước khi kiểm `holding`; child-process close và socket close là hai sự kiện độc lập. Helper chỉ quan sát, không tự
+đóng/release peer để che lỗi cleanup; peer còn sống vẫn làm test đỏ khi hết hạn chờ.
+
 Server phải ở localhost/127.0.0.1; integration dùng role LOGIN NOSUPERUSER CREATEDB NOCREATEROLE
 NOREPLICATION NOBYPASSRLS. Helper assert thuộc tính bằng SQL trước CREATE DATABASE và từ chối bootstrap
 superuser. Không trỏ đến shared server. Helper chỉ đọc env được truyền vào, không tự load `.env`.

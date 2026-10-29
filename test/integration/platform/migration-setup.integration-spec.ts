@@ -93,6 +93,9 @@ describe('the migration setup of the harness stops at its limit and leaves nothi
       /did not finish within 15 s on the disposable database \(the process was stopped\); phases \(ms\): reachable \d+, Prisma started \d+, history read -/,
     );
     expect(runningMigrations()).toBe(0);
+    // ChildProcess 'close' and the relay's TCP 'close' arrive on independent event sources.
+    // Observe peer shutdown before asserting it; a surviving process still fails this bounded wait.
+    await relay.waitForHeldConnectionsToClose(10000);
     // Stopping the CLI closed the held connection: its schema engine, which owned it, did not outlive it.
     expect(relay.holding).toBe(false);
 

@@ -77,7 +77,9 @@ export async function createHttpTestApp(
     const moduleRef = await builder.compile();
     app = moduleRef.createNestApplication<INestApplication<App>>();
     configureApplication(app, { mountDocs: false });
-    await app.init();
+    // Own one listener for the fixture lifetime. Otherwise SuperTest owns the first request's
+    // auto-listened server and may close it while parallel sibling requests are still connecting.
+    await app.listen(0, '127.0.0.1');
 
     sql = new Client({ connectionString: database.url });
     await sql.connect();

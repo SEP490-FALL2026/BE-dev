@@ -276,3 +276,27 @@ gh run download <run-id> --dir run-<run-id>
 | 4    | VPS sau deploy thường  | HTTP status của health, đăng nhập được hay không, dòng log worker, exit code hai lệnh `--help`                                                                                                                                                                                                                                                                                                                                                                                 |
 
 Số liệu gửi lại được ghi vào plan hai hạng mục và mục 5 (P5; số P7, P8 chỉ là dữ liệu tham khảo vì đã được miễn).
+
+## 9. Sửa hai lỗi harness từ lượt CI đầu trên `4a93078` (29/10/2026)
+
+Log Owner cung cấp: `quality` và `http-contract` xanh; integration song song đỏ hai ca. Các sửa dưới đây chưa commit
+và chưa kiểm chứng lại trên GitHub; không đổi source nghiệp vụ, schema/migration, timeout production hoặc workflow.
+
+- `access-request-preview`: năm request tới route đã bỏ dùng chung server chưa listen. SuperTest tự mở listener cho
+  request đầu rồi đóng khi request đó xong; các request anh em có thể nhận `ECONNRESET`. `createHttpTestApp` nay tự
+  listen ở cổng động trên `127.0.0.1`, giữ listener tới `app.close()`. Assertion hồi quy về quyền sở hữu listener đỏ
+  trên harness cũ, xanh sau sửa; cả năm status vẫn phải là `404`.
+- `migration-setup`: child-process `close` không bảo đảm relay đã nhận TCP `close`, nên assertion `holding === false`
+  ngay sau khi Prisma dừng bị race. `PgRelay.waitForHeldConnectionsToClose` chỉ quan sát close của hai đầu socket với
+  deadline hữu hạn, không destroy/release peer. Test vẫn kiểm process count bằng 0, session bằng 0 và DROP không FORCE.
+  Hai ca hồi quy TCP thật kiểm peer đóng và peer còn sống (phải hết hạn và giữ `holding === true`). Không tăng thời hạn
+  migrate 15 s hay ngân sách test 60 s.
+
+Kiểm chứng trên PostgreSQL 17 cô lập, role thường, hai Jest worker: 5 file / **37 test xanh** (hai file CI lỗi, relay
+lifecycle, auth concurrency, outcome-listener rollback); 2 gate support/parallel-safety **28/28**; typecheck, ESLint
+các TS đổi, Prettier và discovery đạt. Typecheck ban đầu bắt union `App` ở assertion mới, đã sửa bằng `toHaveProperty`
+và chạy lại. Không chạy lại full `pnpm check`, toàn bộ integration hoặc HTTP/E2E; bằng chứng remote còn chờ push.
+
+Cleanup: container riêng `slm-ci-fix-20261029-01` trên `127.0.0.1:55439`, nhãn `slm.task=ci-fix-20261029-01`; sau test
+còn 0 database `slm_*_test`, đã xóa đúng container ID và volume ẩn danh của nó. Redis có sẵn được giữ nguyên. Không SSH,
+commit hay push. Bước kế: Owner review/commit correction, push `dev`, chờ integration và các job CI thực tế xanh.
