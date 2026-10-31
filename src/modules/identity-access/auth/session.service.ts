@@ -1,10 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { TransactionRunner, toTransientError } from '../../../infrastructure/database/transaction-runner';
-import { AuditService } from '../../audit/audit.service';
-import { OrganizationService } from '../../organization/organization.service';
+import { AuditApi } from '../../audit/public/audit.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
 import { AccountDirectoryService } from '../accounts/account-directory.service';
-import { IssuedSession } from '../identity-access.types';
-import { employeeHasNotLeft } from '../policies/account-policy';
+import { IssuedSession } from '../public/identity-access.types';
+import { employeeHasNotLeft } from '../accounts/account.policy';
 import { SessionInvalidError } from './auth.errors';
 import { SessionTokenService } from './session-token.service';
 import { SessionRepo } from './session.repo';
@@ -20,8 +20,8 @@ export class SessionService {
   constructor(
     private readonly accounts: AccountDirectoryService,
     private readonly sessions: SessionRepo,
-    private readonly organization: OrganizationService,
-    private readonly audit: AuditService,
+    private readonly organization: OrganizationApi,
+    private readonly audit: AuditApi,
     private readonly sessionTokens: SessionTokenService,
     private readonly runner: TransactionRunner,
   ) {}

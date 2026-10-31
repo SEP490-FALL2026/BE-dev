@@ -10,8 +10,9 @@ import type { RequestFacts, StatusFacts } from './request-status.types';
 @Injectable()
 export class RequestStatusRepo {
   async requestFacts(tx: DbTx, requestId: string): Promise<RequestFacts | null> {
+    // A request being drafted is written by the release after this one and has no status to read.
     const row = await tx.accessRequest.findUnique({
-      where: { id: requestId },
+      where: { id: requestId, state: { not: 'DRAFT' } },
       select: {
         id: true,
         organizationId: true,

@@ -2,8 +2,10 @@ import { Body, Controller, Get, HttpStatus, Param, Patch, Post, Query } from '@n
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
+  FORBIDDEN_EXAMPLE,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
+  VALIDATION_EXAMPLE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
 import { RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
@@ -28,26 +30,56 @@ import {
   VendorServiceLineResponseDto,
   VendorSuggestionResponseDto,
 } from './vendor-dictionary.dto';
-import { toVendorDictionaryApiException } from './vendor-dictionary.http-errors';
+import { toVendorDictionaryApiException, VENDOR_DICTIONARY_ERROR_EXAMPLES } from './vendor-dictionary.http-errors';
 import { VendorDictionaryService } from './vendor-dictionary.service';
 import type { VendorGroupRecord, VendorLineRecord, VendorProposalRecord } from './vendor-dictionary.types';
 import { VendorProposalService } from './vendor-proposal.service';
 import { VendorRecognitionService } from './vendor-recognition.service';
 
 const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPONSE] as const;
-const IT_ONLY = { status: HttpStatus.FORBIDDEN, description: 'Only an IT Admin uses the vendor dictionary.' } as const;
+const IT_ONLY = {
+  status: HttpStatus.FORBIDDEN,
+  description: 'Only an IT Admin uses the vendor dictionary.',
+  examples: [FORBIDDEN_EXAMPLE],
+} as const;
 const INVALID = {
   status: HttpStatus.UNPROCESSABLE_ENTITY,
   description:
     'The request is invalid (VALIDATION_ERROR) or a value is refused: VENDOR_DICTIONARY.NAME_INVALID, DOMAIN_INVALID, PATTERN_INVALID, TOO_MANY_VALUES or UPDATE_EMPTY.',
 } as const;
+const E = VENDOR_DICTIONARY_ERROR_EXAMPLES;
+const INVALID_GROUP_CREATE = {
+  ...INVALID,
+  examples: [VALIDATION_EXAMPLE, E.NAME_INVALID, E.DOMAIN_INVALID, E.TOO_MANY_VALUES],
+} as const;
+const INVALID_GROUP_UPDATE = {
+  ...INVALID,
+  examples: [VALIDATION_EXAMPLE, E.NAME_INVALID, E.DOMAIN_INVALID, E.TOO_MANY_VALUES, E.UPDATE_EMPTY],
+} as const;
+const INVALID_LINE_CREATE = {
+  ...INVALID,
+  examples: [VALIDATION_EXAMPLE, E.NAME_INVALID, E.DOMAIN_INVALID, E.PATTERN_INVALID, E.TOO_MANY_VALUES],
+} as const;
+const INVALID_LINE_UPDATE = {
+  ...INVALID,
+  examples: [
+    VALIDATION_EXAMPLE,
+    E.NAME_INVALID,
+    E.DOMAIN_INVALID,
+    E.PATTERN_INVALID,
+    E.TOO_MANY_VALUES,
+    E.UPDATE_EMPTY,
+  ],
+} as const;
 const GROUP_NOT_FOUND = {
   status: HttpStatus.NOT_FOUND,
   description: 'The vendor group does not exist (VENDOR_DICTIONARY.GROUP_NOT_FOUND).',
+  examples: [E.GROUP_NOT_FOUND],
 } as const;
 const LINE_NOT_FOUND = {
   status: HttpStatus.NOT_FOUND,
   description: 'The service line does not exist (VENDOR_DICTIONARY.SERVICE_LINE_NOT_FOUND).',
+  examples: [E.SERVICE_LINE_NOT_FOUND],
 } as const;
 
 const toLineWire = (line: VendorLineRecord) => ({
@@ -101,6 +133,7 @@ export class VendorDictionaryController {
   @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description: 'The query is invalid (VALIDATION_ERROR).',
+    examples: [VALIDATION_EXAMPLE],
   })
   async listGroups(@Query() query: ListGroupsQueryDto) {
     try {
@@ -120,10 +153,11 @@ export class VendorDictionaryController {
     message: 'VENDOR_DICTIONARY.GROUP_CREATED',
     description: 'The vendor group exists with no service line yet.',
   })
-  @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, INVALID, {
+  @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, INVALID_GROUP_CREATE, {
     status: HttpStatus.CONFLICT,
     description:
       'A group with this name exists, ignoring case, accents and spacing (VENDOR_DICTIONARY.GROUP_NAME_TAKEN).',
+    examples: [E.GROUP_NAME_TAKEN],
   })
   async createGroup(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: CreateGroupBodyDto) {
     try {
@@ -141,9 +175,10 @@ export class VendorDictionaryController {
     description:
       'The group as it is after the change; a change that changes nothing is answered the same and not audited.',
   })
-  @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, INVALID, GROUP_NOT_FOUND, {
+  @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, INVALID_GROUP_UPDATE, GROUP_NOT_FOUND, {
     status: HttpStatus.CONFLICT,
     description: 'Another group has this name (VENDOR_DICTIONARY.GROUP_NAME_TAKEN).',
+    examples: [E.GROUP_NAME_TAKEN],
   })
   async updateGroup(
     @CurrentPrincipal() actor: AuthenticatedPrincipal,
@@ -165,9 +200,10 @@ export class VendorDictionaryController {
     message: 'VENDOR_DICTIONARY.SERVICE_LINE_CREATED',
     description: 'The service line exists in the group, with its domains and literal description patterns.',
   })
-  @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, INVALID, GROUP_NOT_FOUND, {
+  @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, INVALID_LINE_CREATE, GROUP_NOT_FOUND, {
     status: HttpStatus.CONFLICT,
     description: 'The group already has a line with this name (VENDOR_DICTIONARY.SERVICE_LINE_NAME_TAKEN).',
+    examples: [E.SERVICE_LINE_NAME_TAKEN],
   })
   async createServiceLine(
     @CurrentPrincipal() actor: AuthenticatedPrincipal,
@@ -189,9 +225,10 @@ export class VendorDictionaryController {
     description:
       'The line as it is after the change; a change that changes nothing is answered the same and not audited.',
   })
-  @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, INVALID, LINE_NOT_FOUND, {
+  @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, INVALID_LINE_UPDATE, LINE_NOT_FOUND, {
     status: HttpStatus.CONFLICT,
     description: 'Another line of the group has this name (VENDOR_DICTIONARY.SERVICE_LINE_NAME_TAKEN).',
+    examples: [E.SERVICE_LINE_NAME_TAKEN],
   })
   async updateServiceLine(
     @CurrentPrincipal() actor: AuthenticatedPrincipal,
@@ -215,6 +252,7 @@ export class VendorDictionaryController {
   @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description: 'The query is invalid (VALIDATION_ERROR).',
+    examples: [VALIDATION_EXAMPLE],
   })
   async suggest(@Query() query: SuggestQueryDto) {
     try {
@@ -235,6 +273,7 @@ export class VendorDictionaryController {
   @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description: 'The request is invalid (VALIDATION_ERROR).',
+    examples: [VALIDATION_EXAMPLE],
   })
   async normalize(@Body() body: NormalizeBodyDto) {
     try {
@@ -254,6 +293,7 @@ export class VendorDictionaryController {
   @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description: 'The query is invalid (VALIDATION_ERROR).',
+    examples: [VALIDATION_EXAMPLE],
   })
   async listProposals(@Query() query: ListProposalsQueryDto) {
     try {
@@ -279,15 +319,18 @@ export class VendorDictionaryController {
       status: HttpStatus.NOT_FOUND,
       description:
         'The proposal (VENDOR_DICTIONARY.PROPOSAL_NOT_FOUND) or the named service line (VENDOR_DICTIONARY.SERVICE_LINE_NOT_FOUND) does not exist.',
+      examples: [E.PROPOSAL_NOT_FOUND, E.SERVICE_LINE_NOT_FOUND],
     },
     {
       status: HttpStatus.CONFLICT,
       description: 'The proposal was already resolved (VENDOR_DICTIONARY.PROPOSAL_ALREADY_RESOLVED).',
+      examples: [E.PROPOSAL_ALREADY_RESOLVED],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
         'The request is invalid (VALIDATION_ERROR), or ACCEPTED names no line or DISMISSED names one (VENDOR_DICTIONARY.PROPOSAL_RESOLUTION_INVALID).',
+      examples: [VALIDATION_EXAMPLE, E.PROPOSAL_RESOLUTION_INVALID],
     },
   )
   async resolveProposal(

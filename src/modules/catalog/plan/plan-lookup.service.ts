@@ -1,14 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
-import type { PlanRevocationInfo, PlanSummary, WorkspaceDuty } from '../catalog.types';
+import { ApplicationPlans } from '../catalog-entry/application-plans.types';
+import type { PlanRevocationInfo, PlanSummary, WorkspaceDuty } from '../public/catalog.types';
 import { PlanRepo } from './plan.repo';
 import type { PlanLookup } from './plan.types';
 
 export type LockedPlan = PlanLookup;
 
-/** What the subscriptions and the terms of a plan need to know about it. */
+/** What the subscriptions and the terms of a plan need to know about it, and what the application needs to know of its plans. */
 @Injectable()
-export class PlanLookupService {
+export class PlanLookupService implements ApplicationPlans {
   constructor(private readonly plans: PlanRepo) {}
 
   /** The plan, locked `FOR SHARE` until the transaction ends so its kind cannot change meanwhile; null if absent. */

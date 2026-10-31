@@ -2,20 +2,22 @@ import { Body, Controller, HttpStatus, Param, Post } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
+  FORBIDDEN_EXAMPLE,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
+  VALIDATION_EXAMPLE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
 import { AuthenticatedOnly, RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
 import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AccessRequestResponseDto, RequestIdParamDto } from '../access-request/access-request.dto';
-import { AccessRequestQueryService } from '../access-request/access-request-query.service';
-import { toWire } from '../access-request/access-request.wire';
+import { AccessRequestQueryService } from '../request-view/access-request-query.service';
+import { toWire } from '../request-view/access-request.mapper';
 import { ServiceAccountBoundaryService } from './service-account-boundary.service';
 import { ServiceAccountRequestService } from './service-account-request.service';
 import { ServiceAccountReviewBodyDto, ServiceAccountSubmitBodyDto } from './service-account-request.dto';
-import { toServiceAccountApiException } from './service-account-request.http-errors';
+import { SERVICE_ACCOUNT_ERROR_EXAMPLES, toServiceAccountApiException } from './service-account-request.http-errors';
 
 const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPONSE] as const;
 
@@ -48,18 +50,35 @@ export class ServiceAccountRequestsController {
   @ApiErrorResponses(
     ...AUTH_ERRORS,
     {
+      status: HttpStatus.FORBIDDEN,
+      description: 'The Super Admin sends no request (ACCESS_REQUEST.SUPER_ADMIN_CANNOT_REQUEST).',
+      examples: [SERVICE_ACCOUNT_ERROR_EXAMPLES.SUPER_ADMIN_CANNOT_REQUEST],
+    },
+    {
       status: HttpStatus.NOT_FOUND,
       description: 'The plan does not exist (ACCESS_REQUEST.PLAN_NOT_FOUND).',
+      examples: [SERVICE_ACCOUNT_ERROR_EXAMPLES.PLAN_NOT_FOUND],
     },
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The seat baseline is not closed yet (SERVICE_ACCOUNT_REQUEST.BASELINE_NOT_CLOSED), the application of the plan is retired (ACCESS_REQUEST.APPLICATION_RETIRED) or the sender belongs to no department (ACCESS_REQUEST.NO_DEPARTMENT). Nothing is written.',
+        'The seat baseline is not closed yet (SERVICE_ACCOUNT_REQUEST.BASELINE_NOT_CLOSED), the application of the plan is retired (ACCESS_REQUEST.APPLICATION_RETIRED) , the sender belongs to no department (ACCESS_REQUEST.NO_DEPARTMENT) or the department has no Cost Center in use yet (FINANCE.SETUP_INCOMPLETE). Nothing is written.',
+      examples: [
+        SERVICE_ACCOUNT_ERROR_EXAMPLES.BASELINE_NOT_CLOSED,
+        SERVICE_ACCOUNT_ERROR_EXAMPLES.APPLICATION_RETIRED,
+        SERVICE_ACCOUNT_ERROR_EXAMPLES.NO_DEPARTMENT,
+        SERVICE_ACCOUNT_ERROR_EXAMPLES.FINANCE_SETUP_INCOMPLETE,
+      ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
         'The form is incomplete or invalid (VALIDATION_ERROR): the purpose, the identifier, the reason and the term are required. The plan is granted by a key tied to a device or cannot be granted yet (SERVICE_ACCOUNT_REQUEST.PLAN_NOT_SUPPORTED), or an expected spend date is given for internal software (ACCESS_REQUEST.NO_SPEND_FOR_FREE_SOFTWARE). Nothing is written.',
+      examples: [
+        VALIDATION_EXAMPLE,
+        SERVICE_ACCOUNT_ERROR_EXAMPLES.PLAN_NOT_SUPPORTED,
+        SERVICE_ACCOUNT_ERROR_EXAMPLES.NO_SPEND_FOR_FREE_SOFTWARE,
+      ],
     },
   )
   async submit(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: ServiceAccountSubmitBodyDto) {
@@ -89,20 +108,27 @@ export class ServiceAccountRequestsController {
       status: HttpStatus.FORBIDDEN,
       description:
         'Only an IT Admin decides, and one who answers for the account themselves waits for another usable IT Admin (PROVISIONING.ANOTHER_IT_ADMIN_NEEDED).',
+      examples: [FORBIDDEN_EXAMPLE, SERVICE_ACCOUNT_ERROR_EXAMPLES.ANOTHER_IT_ADMIN_NEEDED],
     },
     {
       status: HttpStatus.NOT_FOUND,
       description: 'The request does not exist (ACCESS_REQUEST.NOT_FOUND).',
+      examples: [SERVICE_ACCOUNT_ERROR_EXAMPLES.REQUEST_NOT_FOUND],
     },
     {
       status: HttpStatus.CONFLICT,
       description:
         'The request is not for a service account or is not waiting to be carried out (SERVICE_ACCOUNT_REQUEST.NOT_REVIEWABLE), or the verdict is already given (SERVICE_ACCOUNT_REQUEST.BOUNDARY_ALREADY_DECIDED). Nothing changes.',
+      examples: [
+        SERVICE_ACCOUNT_ERROR_EXAMPLES.NOT_REVIEWABLE,
+        SERVICE_ACCOUNT_ERROR_EXAMPLES.BOUNDARY_ALREADY_DECIDED,
+      ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
         'The id or the body is invalid (VALIDATION_ERROR): a refusal without a reason, or an acceptance with one.',
+      examples: [VALIDATION_EXAMPLE],
     },
   )
   async review(

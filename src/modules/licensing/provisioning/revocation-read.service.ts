@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { CatalogService } from '../../catalog/catalog.service';
-import { OrganizationService } from '../../organization/organization.service';
-import type { PersonalSeat, TerminatingAccess } from '../licensing.types';
+import { CatalogApi } from '../../catalog/public/catalog.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
+import type { PersonalSeat, RevocationSource, TerminatingAccess } from '../public/licensing.types';
 import { RevocationReadRepo } from './revocation-read.repo';
 
 /**
@@ -15,8 +15,8 @@ import { RevocationReadRepo } from './revocation-read.repo';
 export class RevocationReadService {
   constructor(
     private readonly reads: RevocationReadRepo,
-    private readonly catalog: CatalogService,
-    private readonly organization: OrganizationService,
+    private readonly catalog: CatalogApi,
+    private readonly organization: OrganizationApi,
   ) {}
 
   async personalSeatsOf(employeeId: string, onDate: BusinessDate, tx?: DbTx): Promise<PersonalSeat[]> {
@@ -57,6 +57,16 @@ export class RevocationReadService {
   /** How many personal seats each person holds on `onDate` or will, one statement for any number of people (none: absent). */
   countPersonalSeats(employeeIds: readonly string[], onDate: BusinessDate, tx?: DbTx): Promise<Map<string, number>> {
     return this.reads.countPersonalSeats(employeeIds, onDate, tx);
+  }
+
+  /** Which of these seats a revocation asked for with this reference is under way for (one statement). */
+  openedByReference(
+    sources: readonly RevocationSource[],
+    referenceId: string,
+    assignmentIds: readonly string[],
+    tx?: DbTx,
+  ): Promise<Set<string>> {
+    return this.reads.openedByReference(sources, referenceId, assignmentIds, tx);
   }
 
   async terminatingAccess(employeeIds: readonly string[], tx?: DbTx): Promise<TerminatingAccess[]> {

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
-import type { ApprovalRoleHolders } from '../identity-access.types';
+import type { ApprovalRoleHolders } from '../public/identity-access.types';
 import { ApprovalRoleReaderRepo } from './approval-role-reader.repo';
 
 /**

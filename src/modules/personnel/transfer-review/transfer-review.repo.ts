@@ -3,10 +3,29 @@ import { fromDateColumn, toDateColumn, type BusinessDate } from '../../../core/b
 import type { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import type { NewReview, ReviewItemRecord, ReviewRecord } from './transfer-review.types';
+import type { NewReview, ReviewItemRecord, ReviewRecord, StillNeededLine } from './transfer-review.types';
 
 type ReviewRow = Prisma.TransferReviewGetPayload<Record<string, never>>;
 type ItemRow = Prisma.TransferReviewItemGetPayload<Record<string, never>>;
+type TransferReader = Pick<DbTx, 'departmentTransfer'>;
+
+/**
+ * The transfer that opened each of these placements, for the ones a transfer opened. A transfer for today is written after the
+ * placement that opens its review (the listeners are told when the placement begins) and the database keeps the transfer of a review
+ * from changing, so the row of a review may not name its transfer: the transfer that opened its placement is the one.
+ */
+export async function transfersOfPlacements(
+  client: TransferReader,
+  placementIds: readonly string[],
+): Promise<Map<string, string>> {
+  if (placementIds.length === 0) return new Map();
+  const rows = await client.departmentTransfer.findMany({
+    where: { opensPlacementId: { in: [...placementIds] } },
+    select: { id: true, opensPlacementId: true },
+  });
+
+  return new Map(rows.map((row) => [row.opensPlacementId, row.id]));
+}
 
 export function toReviewRecord(row: ReviewRow): ReviewRecord {
   return {
@@ -16,7 +35,6 @@ export function toReviewRecord(row: ReviewRow): ReviewRecord {
     transferId: row.transferId,
     placementId: row.placementId,
     departmentId: row.departmentId,
-    jobTitleId: row.jobTitleId,
     effectiveOn: fromDateColumn(row.effectiveOn),
     dueOn: fromDateColumn(row.dueOn),
     status: row.status,
@@ -52,13 +70,25 @@ export class TransferReviewRepo {
   async findByPlacement(tx: DbTx, placementId: string): Promise<ReviewRecord | null> {
     const row = await tx.transferReview.findUnique({ where: { placementId } });
 
-    return row && toReviewRecord(row);
+    return row && (await this.withTransfer(tx, row));
   }
 
   async find(id: string, tx?: DbTx): Promise<ReviewRecord | null> {
-    const row = await (tx ?? this.prisma).transferReview.findUnique({ where: { id } });
+    const client = tx ?? this.prisma;
+    const row = await client.transferReview.findUnique({ where: { id } });
 
-    return row && toReviewRecord(row);
+    return row && (await this.withTransfer(client, row));
+  }
+
+  /** The review as the row says, with the transfer that opened its placement when the row does not name one (see `transfersOfPlacements`). */
+  private async withTransfer(client: TransferReader, row: ReviewRow): Promise<ReviewRecord> {
+    const record = toReviewRecord(row);
+    if (record.transferId !== null) return record;
+
+    return {
+      ...record,
+      transferId: (await transfersOfPlacements(client, [row.placementId])).get(row.placementId) ?? null,
+    };
   }
 
   /** The review held `FOR UPDATE` until the transaction ends, read after the lock; null when there is none. */
@@ -93,7 +123,6 @@ export class TransferReviewRepo {
           transferId: input.transferId,
           placementId: input.placementId,
           departmentId: input.departmentId,
-          jobTitleId: input.jobTitleId,
           effectiveOn: toDateColumn(input.effectiveOn),
           dueOn: toDateColumn(input.dueOn),
         },
@@ -178,6 +207,77 @@ export class TransferReviewRepo {
     });
 
     return result.count === 1;
+  }
+
+  /**
+   * A line a head decided `STILL_NEEDED` is taken to `NOT_NEEDED` with the revocation that decision opens, once (T-6: the head changes
+   * their decision, so the seat that was waiting for a new Request goes). False when the line is not `STILL_NEEDED` any more or has a
+   * revocation task already. The database lets this single move through, and only while the line has no revocation task; every other
+   * change of a decided line is refused (migration `20261029100900_transfer_review_change_of_mind`).
+   */
+  async changeStillNeededToNotNeeded(
+    tx: DbTx,
+    reviewId: string,
+    assignmentId: string,
+    by: { byEmployeeId: string; at: Date; revocationTaskId: string },
+  ): Promise<boolean> {
+    const result = await tx.transferReviewItem.updateMany({
+      where: { reviewId, assignmentId, decision: 'STILL_NEEDED', revocationTaskId: null },
+      data: {
+        decision: 'NOT_NEEDED',
+        decidedByEmployeeId: by.byEmployeeId,
+        decidedAt: by.at,
+        revocationTaskId: by.revocationTaskId,
+      },
+    });
+
+    return result.count === 1;
+  }
+
+  /**
+   * The lines of this person in the department of a request that a head said are still needed and whose review has not been made
+   * obsolete: the tools whose old seat waits for the new Request (T-6). A request for software that is not in the catalog names no plan
+   * and so matches nothing.
+   */
+  async stillNeededFor(
+    tx: DbTx,
+    input: { employeeId: string; departmentId: string; planId: string | null },
+  ): Promise<StillNeededLine[]> {
+    if (input.planId === null) return [];
+    const rows = await tx.transferReviewItem.findMany({
+      where: {
+        decision: 'STILL_NEEDED',
+        planId: input.planId,
+        review: {
+          employeeId: input.employeeId,
+          departmentId: input.departmentId,
+          status: { in: ['OPEN', 'COMPLETED'] },
+        },
+      },
+      include: { review: true },
+      orderBy: [{ reviewId: 'asc' }, { assignmentId: 'asc' }],
+    });
+    const opened = await transfersOfPlacements(
+      tx,
+      rows.filter((row) => row.review.transferId === null).map((row) => row.review.placementId),
+    );
+
+    return rows.flatMap((row) =>
+      row.decidedByEmployeeId
+        ? [
+            {
+              reviewId: row.reviewId,
+              organizationId: row.review.organizationId,
+              departmentId: row.review.departmentId,
+              employeeId: row.review.employeeId,
+              transferId: row.review.transferId ?? opened.get(row.review.placementId) ?? null,
+              assignmentId: row.assignmentId,
+              planId: row.planId,
+              decidedByEmployeeId: row.decidedByEmployeeId,
+            },
+          ]
+        : [],
+    );
   }
 
   countPending(tx: DbTx, reviewId: string): Promise<number> {

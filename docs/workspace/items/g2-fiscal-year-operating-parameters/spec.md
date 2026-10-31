@@ -64,12 +64,12 @@ code.
 
 ## Ownership: module, data, API
 
-`src/modules/operating-parameters/parameter-definitions.ts` (+ spec), `operating-parameters.service.ts` (không đổi hành
+`src/modules/operating-parameters/parameter-definitions.policy.ts` (+ spec), `operating-parameters.service.ts` (không đổi hành
 vi đọc: khóa không còn định nghĩa bị bỏ qua khi đọc), test `operating-parameters-http.integration-spec.ts`. Không
 migration (giá trị cũ của `BUDGET_PERIOD_KIND` trong `parameter_values` không còn được đọc và giữ làm lịch sử). OpenAPI
 không liệt kê khóa — diff dự kiến rỗng; kiểm lại khi export. Vế `LD-15`: `operating-parameters.controller.ts`,
 `dto/operating-parameters.dto.ts` (`listNonWorkingDatesQuerySchema`), `non-working-dates.service.ts`,
-`operating-parameters.repo.ts` (`listNonWorkingDates`), `src/api-collection-contract.spec.ts` (gỡ mục); OpenAPI đổi nếu
+`operating-parameters.repo.ts` (`listNonWorkingDates`), `test/gates/api-collection-contract.gate-spec.ts` (gỡ mục); OpenAPI đổi nếu
 query hay response đổi.
 
 ## Behavior and design

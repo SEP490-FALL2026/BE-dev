@@ -14,17 +14,17 @@ Docker `127.0.0.1:55432` (role `ci_integration`). Baseline `pnpm check` trên c�
 
 ### Task 1: test đỏ — mẫu cũ phải biến mất khỏi CSDL
 
-- Files: `test/integration/catalog-sample-removal.integration-spec.ts`.
+- Files: `test/integration/catalog/catalog-sample-removal.integration-spec.ts`.
 - Depends on: none.
 - Acceptance: áp mọi migration lên CSDL trống rồi khẳng định không còn bảng `catalog_applications` và kiểu `CatalogApplicationStatus`; test đỏ vì bảng còn.
 - Verify: `pnpm exec jest --config test/config/jest.integration.cjs catalog-sample-removal` → đỏ với `Received: "catalog_applications"`.
 
 ### Task 2: gỡ mẫu cũ và sửa gate
 
-- Files: `prisma/migrations/20261020090000_drop_catalog_sample/migration.sql`; xóa `src/modules/catalog/**`, `prisma/models/catalog.prisma`, `test/integration/catalog.repo.integration-spec.ts`; `src/architecture-boundaries.spec.ts` (bỏ `CatalogApplication`), `src/architecture-structure.spec.ts` (bỏ mục `httpMappingInServices`), `src/app.module.ts` và `src/module-graph.spec.ts` (bỏ chú thích mẫu), `test/e2e/api-inventory.e2e-spec.ts` (đổi tên test 404).
+- Files: `prisma/migrations/20261020090000_drop_catalog_sample/migration.sql`; xóa `src/modules/catalog/**`, `prisma/models/catalog.prisma`, `test/integration/catalog.repo.integration-spec.ts`; `test/gates/architecture-boundaries.gate-spec.ts` (bỏ `CatalogApplication`), `test/gates/architecture-structure.gate-spec.ts` (bỏ mục `httpMappingInServices`), `src/app/app.module.ts` và `test/gates/module-graph.gate-spec.ts` (bỏ chú thích mẫu), `test/http/platform/api-inventory.http-spec.ts` (đổi tên test 404).
 - Depends on: Task 1.
 - Acceptance: test của Task 1 xanh; gate kiến trúc/module-graph xanh; ledger không tăng (mục catalog bị xóa); `pnpm prisma:validate` xanh.
-- Verify: `pnpm exec jest src/architecture-boundaries.spec.ts src/architecture-structure.spec.ts src/module-graph.spec.ts src/policy-ownership.spec.ts` → 107 test xanh; test Task 1 xanh.
+- Verify: `pnpm exec jest test/gates/architecture-boundaries.gate-spec.ts test/gates/architecture-structure.gate-spec.ts test/gates/module-graph.gate-spec.ts test/gates/policy-ownership.gate-spec.ts` → 107 test xanh; test Task 1 xanh.
 
 ### Task 3: ADR-0013 và tài liệu
 

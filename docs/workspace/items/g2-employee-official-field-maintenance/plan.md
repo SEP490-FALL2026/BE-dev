@@ -36,3 +36,5 @@ Gate xanh; ghi chú FE; cập nhật roadmap/scope map; Owner review trên revis
 - [x] Diff cuối đã tự review; tài liệu vận hành/runbook bị ảnh hưởng đã cập nhật; phần chưa kiểm chứng ghi rõ.
 - [ ] Giao Owner review trên revision cụ thể; cập nhật roadmap/PR. Chỉ ghi `merged-dev`, `accepted`, `released` sau
       đúng sự kiện thật.
+
+**Prompt 29 (23/10/2026):** `P28-04` sửa — đổi loại nhân sự sang CONTRACTOR/FREELANCER/INTERN bị từ chối (422 `OPEN_ASSIGNMENT_NEEDS_EXPECTED_END`, không audit) khi còn Assignment mở thiếu ngày kết thúc; trigger PostgreSQL hai phía (migration `20261023110000`). `P28-05` (đổi email khi có lời mời/khôi phục đang mở) **giao G6** làm merge requirement; phần rộng `P28-15` là backlog. Chi tiết: [g0-g4-checkpoint-fix-forward](../g0-g4-checkpoint-fix-forward/spec.md).

@@ -16,8 +16,9 @@ Bug fix cần test tái hiện lỗi ở boundary phù hợp. Refactor giữ pub
 không gộp tính năng hoặc nâng dependency không liên quan. Sửa tài liệu cần kiểm tra
 nội dung, link và format; không cần test giả cho một câu văn.
 
-Đặt file, capability folder và lỗi theo [module structure](docs/rules/module-structure.md); `pnpm check` chạy gate cấu trúc
-(`src/architecture-structure.spec.ts`) với legacy ledger chỉ được co lại. Hạng mục mới là một outcome kiểm chứng độc lập,
+Đặt file, capability folder, nhóm chức năng và lỗi theo [module structure](docs/rules/module-structure.md); `pnpm check`
+chạy `pnpm arch:check` (dependency-cruiser) và gate layout `test/gates/module-layout.gate-spec.ts`, không có ledger ngoại
+lệ. Hạng mục mới là một outcome kiểm chứng độc lập,
 chia theo Story chứ không theo nhóm G ([work-item sizing](docs/rules/work-item-sizing.md)), dùng
 [mẫu](docs/workspace/_template/README.md); `pnpm rules:check` kiểm cấu trúc và mục `Sizing decision` của nó.
 
@@ -27,16 +28,16 @@ Task nhỏ không đổi nghiệp vụ/contract dùng issue/PR. Tính năng US h
 
 Chạy tại gốc BE; dùng pnpm được pin trong `package.json`.
 
-| Thay đổi                                   | Kiểm tra                                                                      |
-| ------------------------------------------ | ----------------------------------------------------------------------------- |
-| Tài liệu/rule/AI adapter                   | `pnpm rules:check`, `pnpm rules:format`, xem diff                             |
-| Source, test hoặc cấu hình                 | `pnpm check`                                                                  |
-| HTTP, DTO, guard, filter, interceptor      | Thêm `pnpm test:e2e`, `pnpm openapi:export`; review diff `openapi.json`       |
-| Query, schema, transaction hoặc constraint | Thêm integration test với PostgreSQL riêng; xem [test/README](test/README.md) |
-| Script kiểm tra tài liệu                   | Thêm `pnpm rules:test`                                                        |
+| Thay đổi                                   | Kiểm tra                                                                             |
+| ------------------------------------------ | ------------------------------------------------------------------------------------ |
+| Tài liệu/rule/AI adapter                   | `pnpm rules:check`, `pnpm rules:format`, xem diff                                    |
+| Source, test hoặc cấu hình                 | `pnpm check`                                                                         |
+| HTTP, DTO, guard, filter, interceptor      | Thêm `pnpm test:http`, `pnpm openapi:export`; review diff `openapi.json`             |
+| Query, schema, transaction hoặc constraint | `pnpm test:integration` của module, PostgreSQL riêng ([test/README](test/README.md)) |
+| Script kiểm tra tài liệu                   | Thêm `pnpm rules:test`                                                               |
 
-Test đơn lẻ: `pnpm exec jest --runInBand <path-or-pattern>`.
-E2E theo tên: `pnpm test:e2e -t "<test title>"`. Formatter/linter trong gate không tự sửa.
+Test đơn lẻ: `pnpm test -- <path>` (unit), `pnpm test:http -- <path>`, `pnpm test:integration -- <path>`; theo tên thêm
+`-t "<test title>"`. Formatter/linter trong gate không tự sửa.
 Khi cần format, dùng `pnpm exec prettier --write <changed-files>` để tránh diff ngoài phạm vi.
 
 `pnpm check` gồm sinh Prisma client trước typecheck, kiểm tra tài liệu/format/lint,
@@ -53,14 +54,14 @@ mọi checkout, kể cả Windows `core.autocrlf=true`. Checkout có từ trư�
 
 ## Chọn tài liệu theo tác vụ
 
-| Đang làm                              | Đọc thêm                                                                                                              |
-| ------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| Thêm endpoint                         | [Hướng dẫn viết code](docs/guides/kien-truc-backend-va-cach-viet-code.md), [API contract](docs/rules/api-contract.md) |
-| Persistence/nghiệp vụ                 | [Database và nghiệp vụ](docs/rules/database-business.md)                                                              |
-| Auth, upload hoặc job                 | [Security và jobs](docs/rules/security-jobs.md)                                                                       |
-| Lệnh vận hành ngoài HTTP, seed local  | [Lệnh vận hành](docs/rules/operational-commands.md)                                                                   |
-| Tài liệu hoặc quyết định              | [Quy ước tài liệu](docs/rules/documentation.md)                                                                       |
-| Tìm ADR hoặc thiết kế chưa triển khai | [Chỉ mục tài liệu](docs/README.md)                                                                                    |
+| Đang làm                              | Đọc thêm                                                                                          |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| Thêm endpoint                         | [Hướng dẫn dev mới](docs/guides/huong-dan-dev-moi.md), [API contract](docs/rules/api-contract.md) |
+| Persistence/nghiệp vụ                 | [Database và nghiệp vụ](docs/rules/database-business.md)                                          |
+| Auth, upload hoặc job                 | [Security và jobs](docs/rules/security-jobs.md)                                                   |
+| Lệnh vận hành ngoài HTTP, seed local  | [Lệnh vận hành](docs/rules/operational-commands.md)                                               |
+| Tài liệu hoặc quyết định              | [Quy ước tài liệu](docs/rules/documentation.md)                                                   |
+| Tìm ADR hoặc thiết kế chưa triển khai | [Chỉ mục tài liệu](docs/README.md)                                                                |
 
 Yêu cầu nghiệp vụ đến từ task và BRD/User Stories được team cung cấp. Checkout BE
 độc lập không bắt buộc có thư mục Docs/FE bên cạnh hoặc cài skill/plugin của người khác.

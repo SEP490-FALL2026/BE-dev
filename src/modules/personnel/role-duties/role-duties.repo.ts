@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { fromDateColumn, type BusinessDate } from '../../../core/business-date';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import type { RoleFlag } from '../personnel.types';
+import type { RoleFlag } from '../public/personnel.types';
 
 /** What the flows of the roles read of a case of a person who leaves. */
 export interface RoleDutyCase {

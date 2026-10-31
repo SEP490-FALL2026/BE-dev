@@ -17,23 +17,23 @@ Hoàn tất các AC của G3/G4 chỉ kiểm được khi đã có hóa đơn, �
 
 ## Sizing decision
 
-- Container: G3 và G4 (nhóm giao việc, không phải ranh giới hạng mục).
+- Container: G3, G4 và G5 (nhóm giao việc, không phải ranh giới hạng mục; G5 thêm ngày 27/10/2026 để giữ `US-12-15` AC-24).
 - Mode: `split-story`.
 - Outcome and owner: Hoàn tất các AC của G3/G4 chỉ kiểm được khi đã có hóa đơn, ảnh chụp ngân sách, khoản cam kết, báo cáo chi phí theo Cost Center, bảng mục nợ và lần import sao kê.
 - Boundaries: Hạng mục khung: không có code. Mở khóa khi các lát G5 (cam kết), G8 (hóa đơn, báo cáo, khép kỳ) và G9 (import sao kê) có nguồn.
 - Not larger: Không thêm AC mới; chỉ giữ chỗ cho AC đã ánh xạ.
 - Not smaller: Các AC này cùng chờ một nhóm hạ tầng dữ liệu tài chính; tách theo Story sẽ tạo bốn khung rỗng.
 - Siblings: `g3-vendor-tax-profile`, `g3-shared-cost-allocation`, `g3-contract-documents`, `g4-provisioning-failure-handling`.
-- Scope map: [G3](../../../roadmap.md#work-item-decomposition-g3), [G4](../../../roadmap.md#work-item-decomposition-g4).
+- Scope map: [G3](../../../roadmap.md#work-item-decomposition-g3), [G4](../../../roadmap.md#work-item-decomposition-g4), [G5](../../../roadmap.md#work-item-decomposition-g5).
 
 ## Primary Story/AC
 
 | Story    | AC               | Coverage | Phần còn lại thuộc                                                                                                                                                        |
 | -------- | ---------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | US-04-04 | AC-4→AC-7, AC-11 | partial  | AC-1→AC-3, AC-6, AC-9, AC-10: `g3-contract-documents`; AC-8: `g4-device-dependent-features`                                                                               |
-| US-04-08 | AC-1, AC-3, AC-4 | partial  | AC-1, AC-2, AC-5: `g3-shared-cost-allocation`                                                                                                                             |
 | US-07-04 | AC-5             | partial  | AC-1→AC-3, AC-6→AC-14: `g4-provisioning-failure-handling`; AC-3, AC-6, AC-12, AC-13: `g4-notification-delivery`; AC-4, AC-6, AC-12: `g4-request-and-transfer-integration` |
 | US-12-09 | AC-5, AC-9       | partial  | AC-1→AC-8: `g3-vendor-tax-profile`                                                                                                                                        |
+| US-12-15 | AC-24            | partial  | vế phát thông báo trong ứng dụng (`FR-5.14`, F67): `g5-budget-proposal-and-review`                                                                                        |
 
 ## Size exception
 
@@ -92,3 +92,7 @@ Ma trận trên là khung từ tiêu đề AC; tình huống cụ thể (từ ch
 ## Changes and acceptance
 
 20/10/2026: lập khung theo bản đồ phân rã G3/G4 của [roadmap](../../../roadmap.md). Chưa thiết kế chi tiết, chưa code, chưa review, chưa nghiệm thu.
+
+## Cập nhật scope map theo baseline `e0cb5a0` (Prompt 04, 27/10/2026)
+
+- _27/10/2026 (Prompt 04, Task 0.1 của `g0-g6-final-business-baseline-remediation`, F60 — re-pin scope map [G3](../../../roadmap.md#work-item-decomposition-g3) Docs `e0cb5a0`, BE `7c28e75`):_ `US-04-08` `RETIRED` nên bỏ dòng `US-04-08` AC-1, AC-3, AC-4 khỏi bảng _Primary Story/AC_ (lịch sử: từng `partial` — AC-1 vế báo cáo, AC-3, AC-4 khoản chi nội bộ, chờ G8/G9); nhận `US-12-15` AC-24 `partial` ở khung G8 (danh mục cảnh báo và bảng điều khiển; phần phát thông báo trong ứng dụng thuộc `g5-budget-proposal-and-review`, scope map G5); trường `Container` và liên kết `Scope map` của hạng mục thêm G5 để khóa G5 này khớp bản đồ ([impact matrix mục 9](../g0-g6-final-business-baseline-remediation/impact-matrix.md#9-phụ-lục-delta-user-stories-72e1480--769bb64), [mục 9.1](../g0-g6-final-business-baseline-remediation/impact-matrix.md#91-delta-user-stories-769bb64--e0cb5a0)). Phần đã ghi phía trên là lịch sử, giữ nguyên.

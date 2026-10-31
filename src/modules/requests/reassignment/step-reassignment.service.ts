@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
-import { AuditService } from '../../audit/audit.service';
-import { OrganizationService } from '../../organization/organization.service';
+import { AuditApi } from '../../audit/public/audit.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
 import { ControlledWaitAlertService } from './controlled-wait-alert.service';
 import {
   decideReassignment,
@@ -10,10 +10,14 @@ import {
   type OpenStep,
   type ReassignableStepKind,
   type ReassignmentTrigger,
-} from './reassignment.policy';
-import { reassignmentAuditEvent } from './reassignment-audit';
-import { StepReassignmentRepo, type ReassignableRequest, type ReassignableStep } from './step-reassignment.repo';
-import { StepTargetService, type TodayFacts } from './step-target.service';
+} from '../step-routing/reassignment.policy';
+import { reassignmentAuditEvent } from './reassignment-audit.mapper';
+import {
+  StepReassignmentRepo,
+  type ReassignableRequest,
+  type ReassignableStep,
+} from '../step-routing/step-reassignment.repo';
+import { StepTargetService, type TodayFacts } from '../step-routing/step-target.service';
 
 /** The events a pass of the worker looks again at a request for. */
 export type SweepTrigger = 'WAITING_RETRY' | 'HOLDER_LEFT' | 'EFFECTIVE_DATE_REACHED';
@@ -51,8 +55,8 @@ export class StepReassignmentService {
     private readonly repo: StepReassignmentRepo,
     private readonly targets: StepTargetService,
     private readonly alerts: ControlledWaitAlertService,
-    private readonly organization: OrganizationService,
-    private readonly audit: AuditService,
+    private readonly organization: OrganizationApi,
+    private readonly audit: AuditApi,
   ) {}
 
   // --- what the worker looks at: the requests no event carried, each in a transaction of its own -------------------

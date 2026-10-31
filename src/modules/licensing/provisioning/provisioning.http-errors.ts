@@ -1,7 +1,10 @@
 import { HttpStatus } from '@nestjs/common';
+import { FORBIDDEN_ERROR } from '../../../infrastructure/http/errors/access-errors';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
-import { EmployeeNotFoundError } from '../../organization/organization.errors';
+import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
+import { EmployeeNotFoundError } from '../../organization/public/organization.errors';
 import {
+  AssignmentConflictError,
   GrantRequestRefusedError,
   ProvisioningAccountIdentifierRequiredError,
   ProvisioningAnotherItAdminNeededError,
@@ -21,9 +24,13 @@ import {
   RevocationCompletionError,
   RevocationHookRefusedError,
   RevocationRefusedError,
+  SeatApplicationRetiredError,
   SeatQuantityUnknownError,
-} from '../licensing.errors';
-import { toLicensingApiException } from '../mappers/licensing.http-errors';
+  SeatSubscriptionDraftError,
+  SeatTargetNotFoundError,
+} from '../public/licensing.errors';
+import { toLicensingApiException } from '../licensing.http-errors';
+import { ProvisioningItAdminRequiredError } from './provisioning.errors';
 
 const refuse = (status: HttpStatus, code: string, message: string, details?: Record<string, unknown>): ApiException =>
   new ApiException(status, { code, message, ...(details ? { details } : {}) });
@@ -124,6 +131,70 @@ export function toProvisioningApiException(error: unknown): unknown {
   if (error instanceof ProvisioningAnotherItAdminNeededError) {
     return refuse(HttpStatus.FORBIDDEN, 'PROVISIONING.ANOTHER_IT_ADMIN_NEEDED', error.message);
   }
+  // The same answer as the role guard of the route: the policy of the work refuses what the guard would have refused.
+  if (error instanceof ProvisioningItAdminRequiredError) return new ApiException(HttpStatus.FORBIDDEN, FORBIDDEN_ERROR);
 
   return toLicensingApiException(error);
 }
+
+const example = (error: Error) => errorExampleOf(toProvisioningApiException(error));
+
+/**
+ * The answers above as OpenAPI examples, each produced by the mapper that gives it at runtime (OPENAPI-EXAMPLE.1). Since G5
+ * binds the request gate of the module of requests, a grant reaches every check after the gate and its tasks exist, so the
+ * task routes answer with the states of a real task.
+ */
+export const PROVISIONING_ERROR_EXAMPLES = {
+  REQUEST_NOT_FOUND: example(new GrantRequestRefusedError('NOT_FOUND')),
+  TASK_NOT_FOUND: example(new ProvisioningTaskNotFoundError()),
+  EVIDENCE_REQUIRED: example(new ProvisioningEvidenceRequiredError()),
+  REASON_REQUIRED: example(new ProvisioningReasonRequiredError()),
+  ANOTHER_IT_ADMIN_NEEDED: example(new ProvisioningAnotherItAdminNeededError()),
+  NOT_CLAIMABLE: example(new ProvisioningTaskStateError('NOT_CLAIMABLE')),
+  NOT_IN_PROGRESS: example(new ProvisioningTaskStateError('NOT_IN_PROGRESS')),
+  IS_REVOCATION: example(new ProvisioningTaskStateError('IS_REVOCATION')),
+  NOT_REVOCATION: example(new ProvisioningTaskStateError('NOT_REVOCATION')),
+  NOT_FAILED: example(new ProvisioningTaskStateError('NOT_FAILED')),
+  WITHDRAWAL_PENDING: example(new ProvisioningTaskStateError('WITHDRAWAL_PENDING')),
+  NO_WITHDRAWAL: example(new ProvisioningTaskStateError('NO_WITHDRAWAL')),
+  NOT_TERMINATING: example(new ProvisioningTaskStateError('NOT_TERMINATING')),
+  ALREADY_MANUAL: example(new ProvisioningTaskAlreadyManualError()),
+  BENEFICIARY_DEPARTED: example(new ProvisioningBeneficiaryDepartedError('<request-id>')),
+  COMPLETION_NOT_ALLOWED: example(new RevocationCompletionError('COMPLETION_NOT_ALLOWED')),
+  NOTE_REQUIRED: example(new RevocationCompletionError('NOTE_REQUIRED')),
+  PAID_THROUGH_REQUIRED: example(new RevocationCompletionError('PAID_THROUGH_REQUIRED')),
+  ACCESS_STATE_REQUIRED: example(new RevocationCompletionError('ACCESS_STATE_REQUIRED')),
+  ACCESS_STATE_INVALID: example(new RevocationCompletionError('ACCESS_STATE_INVALID')),
+} as const;
+
+/** The refusals of the grant of a seat, by status, after the request gate of G5 (`US-07-01`). */
+export const PROVISIONING_GRANT_EXAMPLES = {
+  NOT_FOUND: [PROVISIONING_ERROR_EXAMPLES.REQUEST_NOT_FOUND, example(new SeatTargetNotFoundError('SUBSCRIPTION'))],
+  CONFLICT: [
+    example(new GrantRequestRefusedError('NOT_APPROVED')),
+    example(new GrantRequestRefusedError('ENDED')),
+    example(new GrantRequestRefusedError('NOT_IN_CATALOG')),
+    example(new GrantRequestRefusedError('BOUNDARY_NOT_CHECKED')),
+    example(new ProvisioningResponsibleNotInDepartmentError()),
+    example(new ProvisioningTypeNotSupportedError('K4')),
+    PROVISIONING_ERROR_EXAMPLES.BENEFICIARY_DEPARTED,
+    example(new ProvisioningBeneficiaryNotStartedError('<request-id>', '2026-01-01')),
+    example(new SeatApplicationRetiredError()),
+    example(new AssignmentConflictError('SEAT_CAPACITY', 0)),
+  ],
+  UNPROCESSABLE: [
+    example(new GrantRequestRefusedError('BENEFICIARY_REQUIRED')),
+    example(new ProvisioningPersonalAccountError()),
+    example(new ProvisioningAccountIdentifierRequiredError()),
+    example(new ProvisioningResponsibleInvalidError('OUTSIDE_DEPARTMENT')),
+    example(new ProvisioningSubscriptionError('REQUIRED')),
+    example(new ProvisioningSubscriptionError('NOT_ALLOWED')),
+    example(new ProvisioningSubscriptionError('PLAN_MISMATCH')),
+    example(new SeatQuantityUnknownError()),
+    example(new SeatSubscriptionDraftError(['START_DATE'])),
+    example(new AssignmentConflictError('OVERLAP', 0)),
+    example(new AssignmentConflictError('IDENTIFIER_IN_USE', 0)),
+    example(new AssignmentConflictError('EXPECTED_END_REQUIRED', 0)),
+    example(new AssignmentConflictError('SUBSCRIPTION_DEPARTMENT_MISMATCH', 0)),
+  ],
+} as const;

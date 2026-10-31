@@ -1,6 +1,23 @@
 import { HttpStatus } from '@nestjs/common';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
-import { toSpendApiException } from '../spend/spend.http-errors';
+import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
+import { FinanceSetupIncompleteError } from '../../organization/public/organization.errors';
+import {
+  AccessRequestApplicationRetiredError,
+  AccessRequestCancellationRefusedError,
+  AccessRequestDecisionRefusedError,
+  AccessRequestNoDepartmentError,
+  AccessRequestNotFoundError,
+  AccessRequestNotPriceableError,
+  AccessRequestPlanLineRefusedError,
+  AccessRequestPlanNotFoundError,
+  AccessRequestSpendDateNotAllowedError,
+  AccessRequestSuperAdminCannotRequestError,
+  AccessRequestWithdrawalRefusedError,
+} from '../access-request/access-request.errors';
+import { SpendDecisionRefusedError, SpendSupplementRefusedError } from '../spend/spend.errors';
+import { toRecheckedApiException, toSpendApiException } from '../spend/spend.http-errors';
+import { GROUP_EMPLOYEE_MAX } from './group-request.policy';
 import {
   GroupRequestDuplicateLineError,
   GroupRequestLineHoldsAccessError,
@@ -83,3 +100,62 @@ export function toGroupRequestApiException(error: unknown): unknown {
 
   return toSpendApiException(error);
 }
+
+const example = (error: Error) => errorExampleOf(toGroupRequestApiException(error));
+const PERSON = '<employee-id>';
+
+/** The answers above as OpenAPI examples, each produced by the mapper that gives it at runtime (OPENAPI-EXAMPLE.1). */
+export const GROUP_REQUEST_ERROR_EXAMPLES = {
+  PLAN_NOT_FOUND: example(new AccessRequestPlanNotFoundError()),
+  APPLICATION_RETIRED: example(new AccessRequestApplicationRetiredError()),
+  NO_DEPARTMENT: example(new AccessRequestNoDepartmentError()),
+  FINANCE_SETUP_INCOMPLETE: example(new FinanceSetupIncompleteError('<department-id>')),
+  SUPER_ADMIN_CANNOT_REQUEST: example(new AccessRequestSuperAdminCannotRequestError()),
+  NO_SPEND_FOR_FREE_SOFTWARE: example(new AccessRequestSpendDateNotAllowedError()),
+  PLAN_NOT_ELIGIBLE: example(new GroupRequestPlanNotEligibleError('KIND_NOT_MULTI_SEAT')),
+  TOO_MANY_LINES: example(new GroupRequestTooManyLinesError(GROUP_EMPLOYEE_MAX)),
+  DUPLICATE_LINE: example(new GroupRequestDuplicateLineError([PERSON])),
+  LINES_REFUSED: example(new GroupRequestLinesRefusedError([{ employeeId: PERSON, reason: 'OUTSIDE_DEPARTMENT' }])),
+  TERM_CONFIRMATION_REQUIRED: example(new GroupRequestTermConfirmationRequiredError()),
+  REQUEST_NOT_FOUND: example(new AccessRequestNotFoundError()),
+  CLOSURE_ALREADY_ENDED: example(new AccessRequestCancellationRefusedError('ALREADY_ENDED')),
+  CLOSURE_WITHDRAWAL_PENDING: example(new AccessRequestCancellationRefusedError('WITHDRAWAL_PENDING')),
+  BENEFICIARY_NOT_LEFT: example(new AccessRequestCancellationRefusedError('BENEFICIARY_NOT_LEFT')),
+  BENEFICIARY_NOT_TRANSFERRED: example(new AccessRequestCancellationRefusedError('BENEFICIARY_NOT_TRANSFERRED')),
+  EVIDENCE_REQUIRED: example(new AccessRequestCancellationRefusedError('EVIDENCE_REQUIRED')),
+  NEED_OWN_REQUEST: example(new AccessRequestDecisionRefusedError('OWN_REQUEST')),
+  NEED_NOT_THE_ASSIGNEE: example(new AccessRequestDecisionRefusedError('NOT_THE_ASSIGNEE')),
+  NEED_STEP_NOT_PENDING: example(new AccessRequestDecisionRefusedError('STEP_NOT_PENDING')),
+  NEED_TERM_CONFIRMATION_REQUIRED: example(new AccessRequestDecisionRefusedError('TERM_CONFIRMATION_REQUIRED')),
+  PLAN_LINE_REQUIRED: example(new AccessRequestDecisionRefusedError('PLAN_LINE_REQUIRED')),
+  SPEND_NOT_APPLICABLE: example(new AccessRequestDecisionRefusedError('SPEND_NOT_APPLICABLE')),
+  PLAN_LINE_NOT_FOUND: example(new AccessRequestPlanLineRefusedError('LINE_NOT_FOUND')),
+  STILL_NEEDED_REQUIRED: example(new AccessRequestPlanLineRefusedError('STILL_NEEDED_REQUIRED')),
+  LINE_HOLDS_ACCESS: example(new GroupRequestLineHoldsAccessError([PERSON])),
+  LINES_MISMATCH: example(new GroupRequestLinesMismatchError({ missing: [PERSON], extra: [] })),
+  SPEND_NOT_THE_ASSIGNEE: example(new SpendDecisionRefusedError('NOT_THE_ASSIGNEE')),
+  SPEND_OWN_REQUEST: example(new SpendDecisionRefusedError('OWN_REQUEST')),
+  NO_SPEND_STEP: example(new SpendDecisionRefusedError('NO_SPEND_STEP')),
+  NOT_CHECKABLE: example(new SpendDecisionRefusedError('NOT_CHECKABLE')),
+  REVIEWER_IS_APPROVER: example(new SpendDecisionRefusedError('REVIEWER_IS_APPROVER')),
+  OVERRIDE_REQUIRED: example(new SpendDecisionRefusedError('OVERRIDE_REQUIRED', [2026])),
+  OVERRIDE_MISMATCH: example(new SpendDecisionRefusedError('OVERRIDE_MISMATCH', [2026])),
+  OVERRIDE_NOT_NEEDED: example(new SpendDecisionRefusedError('OVERRIDE_NOT_NEEDED')),
+  RECHECKED_NEEDS_FINANCE_REVIEW: example(toRecheckedApiException({ to: 'FINANCE_REVIEW' })),
+  RECHECKED_RETURNED_TO_HEAD: example(toRecheckedApiException({ to: 'HEAD', reason: 'STALE_COST_EVIDENCE' })),
+  NOT_REQUESTER: example(new AccessRequestWithdrawalRefusedError('NOT_REQUESTER')),
+  WITHDRAWAL_ALREADY_ENDED: example(new AccessRequestWithdrawalRefusedError('ALREADY_ENDED')),
+  WITHDRAWAL_PENDING: example(new AccessRequestWithdrawalRefusedError('WITHDRAWAL_PENDING')),
+  GRANT_RUNNING: example(new AccessRequestWithdrawalRefusedError('GRANT_RUNNING', { employeeIds: [PERSON] })),
+  GRANT_COMPLETED: example(
+    new AccessRequestWithdrawalRefusedError('GRANT_COMPLETED', { assignmentId: '<assignment-id>' }),
+  ),
+  REASON_REQUIRED: example(new AccessRequestWithdrawalRefusedError('REASON_REQUIRED')),
+  SUPPLEMENT_NOT_IN_QUEUE: example(new SpendSupplementRefusedError('NOT_IN_QUEUE')),
+  SUPPLEMENT_NOT_PRICED: example(new SpendSupplementRefusedError('NOT_PRICED')),
+  SUPPLEMENT_NO_CHANGE: example(new SpendSupplementRefusedError('NO_CHANGE')),
+  NOT_PRICEABLE: example(new AccessRequestNotPriceableError()),
+  LINE_NOT_DROPPABLE: example(new GroupSupplementDropRefusedError('LINE_NOT_DROPPABLE', [PERSON])),
+  CANNOT_DROP_LAST_LINE: example(new GroupSupplementDropRefusedError('CANNOT_DROP_LAST_LINE')),
+  DROP_NOT_FOR_GROUP: example(new GroupSupplementDropRefusedError('DROP_NOT_FOR_GROUP')),
+} as const;

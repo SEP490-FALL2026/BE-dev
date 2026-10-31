@@ -1,7 +1,9 @@
+import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { LeaveOverdueService } from '../../src/modules/personnel/leave/leave-overdue.service';
 import { LeaveDepartureService } from '../../src/modules/personnel/leave/leave-departure.service';
-import { PersonnelService } from '../../src/modules/personnel/personnel.service';
+import { PersonnelApi } from '../../src/modules/personnel/public/personnel.api';
+import type { PersonnelActor } from '../../src/modules/personnel/public/personnel.types';
 import { TransactionRunner } from '../../src/infrastructure/database/transaction-runner';
 import type { ApiAccount } from './api-accounts';
 import type { Department, Person } from './request-harness';
@@ -15,11 +17,11 @@ export interface LeaveWire {
   approvedReturnOn: string;
   endedOn: string | null;
   overdueReturn: boolean;
-  grounds: { type: string; reference: string; issuer: string; issuedOn: string };
+  grounds: { type: string; reference: string; issuer: string; issuedOn: string } | null;
   endKind: 'RETURNED' | 'DEPARTURE_STARTED' | null;
   resumesLeaveId: string | null;
-  startedByAppUserId: string;
-  selfExecuted: boolean;
+  startedByAppUserId: string | null;
+  startedByProcedure: boolean;
 }
 
 export interface LeaveChangeWire {
@@ -30,7 +32,8 @@ export interface LeaveChangeWire {
   returnedOn: string | null;
   onSchedule: boolean | null;
   grounds: { type: string; reference: string; issuer: string; issuedOn: string } | null;
-  selfExecuted: boolean;
+  recordedByAppUserId: string | null;
+  recordedByProcedure: boolean;
 }
 
 /** The people, the calls of the routes of the long leaves and what a leave leaves in the database. No assertion lives here. */
@@ -56,21 +59,21 @@ export class LeaveHarness extends TransferHarness {
     return person;
   }
 
-  startLeave = (body: object, account: ApiAccount = this.it1) =>
+  startLeave = (body: object, account: ApiAccount = this.sa) =>
     request(this.server()).post('/api/v1/long-leaves').set(this.as(account)).send(body);
-  changeReturnDate = (id: string, body: object, account: ApiAccount = this.it1) =>
+  changeReturnDate = (id: string, body: object, account: ApiAccount = this.sa) =>
     request(this.server()).post(`/api/v1/long-leaves/${id}/return-date-changes`).set(this.as(account)).send(body);
-  confirmReturn = (id: string, body: object, account: ApiAccount = this.it1) =>
+  confirmReturn = (id: string, body: object, account: ApiAccount = this.sa) =>
     request(this.server()).post(`/api/v1/long-leaves/${id}/returns`).set(this.as(account)).send(body);
-  readLeave = (id: string, account: ApiAccount = this.it1) =>
+  readLeave = (id: string, account: ApiAccount = this.sa) =>
     request(this.server()).get(`/api/v1/long-leaves/${id}`).set(this.as(account));
-  listLeaves = (query = '', account: ApiAccount = this.it1) =>
+  listLeaves = (query = '', account: ApiAccount = this.sa) =>
     request(this.server()).get(`/api/v1/long-leaves${query}`).set(this.as(account));
-  leaveChanges = (id: string, query = '', account: ApiAccount = this.it1) =>
+  leaveChanges = (id: string, query = '', account: ApiAccount = this.sa) =>
     request(this.server()).get(`/api/v1/long-leaves/${id}/changes${query}`).set(this.as(account));
 
   /** A leave started and expected to succeed (201). */
-  async started(body: object, account: ApiAccount = this.it1): Promise<LeaveWire> {
+  async started(body: object, account: ApiAccount = this.sa): Promise<LeaveWire> {
     const response = await this.startLeave(body, account);
     if (response.status !== 201) throw new Error(`start: ${response.status} ${JSON.stringify(response.body)}`);
 
@@ -122,8 +125,22 @@ export class LeaveHarness extends TransferHarness {
   noticeOverdueAt = (day: string = this.today()): Promise<number> =>
     this.ctx.app.get(LeaveOverdueService, { strict: false }).noticeOverdue(new Date(`${day}T12:00:00Z`));
 
+  /** The Super Admin signed in, as the actor of a write of the personnel context made without HTTP. */
+  saActor = (): PersonnelActor => ({
+    kind: 'USER',
+    principal: {
+      subject: this.sa.appUserId,
+      appUserId: this.sa.appUserId,
+      sessionId: randomUUID(),
+      employeeId: this.sa.employeeId,
+      directRoles: ['SUPER_ADMIN'],
+      derivedRoles: [],
+      roles: ['SUPER_ADMIN'],
+    },
+  });
+
   departure = () => this.ctx.app.get(LeaveDepartureService, { strict: false });
-  personnel = () => this.ctx.app.get(PersonnelService, { strict: false });
+  personnel = () => this.ctx.app.get(PersonnelApi, { strict: false });
   inTransaction = <T>(work: Parameters<TransactionRunner['run']>[0]): Promise<T> =>
     this.ctx.app.get(TransactionRunner, { strict: false }).run(work) as Promise<T>;
 }

@@ -41,7 +41,8 @@ export type SeatRowErrorCode =
   | 'COST_CENTER_NOT_FOUND'
   | 'COST_CENTER_INACTIVE'
   | 'COST_CENTER_NOT_OWNING_UNIT'
-  | 'COST_CENTER_NOT_ALLOWED';
+  | 'COST_CENTER_NOT_ALLOWED'
+  | 'SUBSCRIPTION_DEPARTMENT_MISMATCH';
 
 export interface SeatRowError {
   code: SeatRowErrorCode;
@@ -54,7 +55,10 @@ export interface ParsedSeatRow {
   accountIdentifier: string;
   reason: string | null;
   costCenterId: string | null;
-  /** The department of the responsible person on the day of the import: the owner of a service account (`QĐ-86c`). */
+  /**
+   * The department the seat belongs to: for a service account the department of the responsible person on the day of the import
+   * (`QĐ-86c`), for a personal seat the owner of the subscription (`QĐ-89a`); null on an internal plan, which has no owner.
+   */
   owningDepartmentId: string | null;
   effectiveFrom: BusinessDate;
   effectiveFromBasis: 'ACTUAL' | 'RECORDED';

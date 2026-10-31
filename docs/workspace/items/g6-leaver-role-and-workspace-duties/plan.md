@@ -37,7 +37,7 @@
 
 ### Task 4: hàm đọc ở ba module
 
-- Files: `identity-access/identity-access.service.ts`, `identity-access/accounts/role-grant.service.ts`, `organization/organization.service.ts`, `organization/department/department.repo.ts`, `catalog/catalog.service.ts`, `catalog/plan/plan-workspace.service.ts`
+- Files: `identity-access/public/identity-access.api.ts`, `identity-access/accounts/role-grant.service.ts`, `organization/public/organization.api.ts`, `organization/department/department.repo.ts`, `catalog/public/catalog.api.ts`, `catalog/plan/plan-workspace.service.ts`
 - Depends on: Task 2
 - Acceptance: `getSuperAdminHolder`, `listRoleHoldersAmong`, `getDepartmentsInChargeOf`, `getHeadedDepartments`, `getWorkspaceDutiesOf` theo lô, chỉ đọc, một câu lệnh mỗi lần gọi
 - Verify: integration test từng hàm; test đếm câu lệnh không phụ thuộc số người

@@ -1,6 +1,10 @@
 import { Injectable } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 import type { BusinessDate } from '../../../core/business-date';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
+import { DepartmentDirectoryService } from '../department/department-directory.service';
+import { EmployeeNotFoundError } from '../public/organization.errors';
+import { profileNoticesOf } from './profile-notice.mapper';
 import {
   CreateEmployeeWithPlacementInput,
   EmployeeCandidate,
@@ -10,9 +14,11 @@ import {
   EmployeeWorkState,
   OfficialFieldsPatch,
   PlacementInForce,
+  ProfileNotice,
+  ProfileNoticeRequest,
   ScheduledStructureChange,
   StructureChangeInput,
-} from '../organization.types';
+} from '../public/organization.types';
 import { EmployeeDepartureRepo } from './employee-departure.repo';
 import { EmployeeRepo } from './employee.repo';
 import { ImportLookupRepo } from './import-lookup.repo';
@@ -29,7 +35,32 @@ export class EmployeeDirectoryService {
     private readonly repo: EmployeeRepo,
     private readonly importLookup: ImportLookupRepo,
     private readonly departures: EmployeeDepartureRepo,
+    private readonly departments: DepartmentDirectoryService,
   ) {}
+
+  /**
+   * The notices a created or corrected record owes: who they go to follows from the department the person is in on the day
+   * and who heads it and is IT Admin in charge of it then. Read in the caller's transaction, so they are right for what it writes.
+   */
+  async profileNotices(tx: DbTx, request: ProfileNoticeRequest): Promise<ProfileNotice[]> {
+    const employee = await this.repo.findEmployee(request.employeeId, tx);
+    if (!employee) throw new EmployeeNotFoundError(request.employeeId);
+    const placement = await this.repo.placementIdsOn(request.employeeId, request.onDate, tx);
+    const departmentId = placement?.departmentId ?? null;
+    const head = departmentId
+      ? (await this.departments.headsOn([departmentId], request.onDate, tx)).get(departmentId)
+      : undefined;
+
+    return profileNoticesOf({
+      kind: request.kind,
+      organizationId: request.organizationId,
+      employee: { id: employee.id, working: employee.status === 'ACTIVE' },
+      departmentId,
+      headEmployeeId: head?.employeeId ?? null,
+      itAdminEmployeeId: departmentId ? await this.departments.itAdminInChargeOf(departmentId, tx) : null,
+      eventId: randomUUID(),
+    });
+  }
 
   createWithPlacement(tx: DbTx, input: CreateEmployeeWithPlacementInput): Promise<{ id: string }> {
     return this.repo.createEmployeeWithPlacement(tx, input);
@@ -51,11 +82,7 @@ export class EmployeeDirectoryService {
     return this.repo.findEmployees(employeeIds, tx);
   }
 
-  placementOn(
-    employeeId: string,
-    onDate: BusinessDate,
-    tx?: DbTx,
-  ): Promise<{ departmentId: string; jobTitleId: string } | null> {
+  placementOn(employeeId: string, onDate: BusinessDate, tx?: DbTx): Promise<{ departmentId: string } | null> {
     return this.repo.placementIdsOn(employeeId, onDate, tx);
   }
 
@@ -105,7 +132,6 @@ export class EmployeeDirectoryService {
     tx: DbTx | undefined,
     names: {
       departmentCodes: string[];
-      normalizedJobTitleNames: string[];
       employeeCodes: string[];
       normalizedEmails: string[];
     },
@@ -153,7 +179,7 @@ export class EmployeeDirectoryService {
     return this.departures.markLeft(tx, employeeId);
   }
 
-  lockForImport(tx: DbTx, departmentIds: string[], jobTitleIds: string[]): Promise<void> {
-    return this.importLookup.lockForImport(tx, departmentIds, jobTitleIds);
+  lockForImport(tx: DbTx, departmentIds: string[]): Promise<void> {
+    return this.importLookup.lockForImport(tx, departmentIds);
   }
 }

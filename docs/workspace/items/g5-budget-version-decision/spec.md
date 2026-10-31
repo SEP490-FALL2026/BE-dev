@@ -24,11 +24,11 @@ Người duyệt chi quyết phiên bản ngân sách mà Finance đã gửi: du
 
 ## Primary Story/AC
 
-| Story    | AC               | Coverage | Phần còn lại thuộc                                                                                                                                                 |
-| -------- | ---------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| US-06-07 | AC-3, AC-4, AC-6 | partial  | AC-1, AC-2, AC-5, AC-7: `g5-commitment-creation`                                                                                                                   |
-| US-06-09 | AC-10            | partial  | AC-1, AC-3, AC-5→AC-8, AC-11, AC-13→AC-18: `g5-budget-proposal-and-review`; AC-2, AC-4, AC-9: `g5-commitment-creation`; AC-12: `g3-downstream-finance-integration` |
-| US-06-11 | AC-1→AC-9        | full     | —                                                                                                                                                                  |
+| Story    | AC               | Coverage | Phần còn lại thuộc                                                                                                                                                               |
+| -------- | ---------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| US-06-07 | AC-3, AC-4, AC-6 | partial  | AC-1, AC-2, AC-5, AC-7: `g5-commitment-creation`                                                                                                                                 |
+| US-06-09 | AC-10, AC-21     | partial  | AC-1, AC-3, AC-5→AC-8, AC-11, AC-13→AC-20, AC-22, AC-23: `g5-budget-proposal-and-review`; AC-2, AC-4, AC-9: `g5-commitment-creation`; AC-12: `g3-downstream-finance-integration` |
+| US-06-11 | AC-1→AC-10       | full     | —                                                                                                                                                                                |
 
 ## Supporting references
 
@@ -103,3 +103,10 @@ Người duyệt chi quyết phiên bản ngân sách mà Finance đã gửi: du
 23/10/2026: lập khung theo scope map G5 của [roadmap](../../../roadmap.md). Chưa thiết kế chi tiết, chưa code, chưa review, chưa nghiệm thu.
 
 23/10/2026: implement và `verified` local (người phụ trách: AI theo giao việc của người dùng). Các test cần khoản cam kết chờ ngân sách đặt chúng bằng SQL vì việc tạo khoản thuộc `g5-commitment-creation`. `makeCurrent` của harness (đặt `APPROVED` bằng SQL) vẫn dùng ở các suite của `g5-budget-proposal-and-review`; suite quyết định dùng đường thật. Chưa commit, chưa peer review, chưa Owner review, chưa nghiệm thu.
+
+## Mở lại theo baseline `769bb64` (Prompt 03, 26/10/2026)
+
+- Audit G0–G6 trên Docs `769bb64` ↔ BE `7c28e75` mở lại hạng mục này: F27, F36, F37, F39 — cổng tài chính; bản nháp kẹt; `reason: null` → 500; va chạm số phiên bản.
+- Remediation duy nhất: [g0-g6-final-business-baseline-remediation](../g0-g6-final-business-baseline-remediation/spec.md) ([impact matrix](../g0-g6-final-business-baseline-remediation/impact-matrix.md#3-findings)). AC liên quan không còn được coi là thỏa nguồn hiện hành cho tới khi remediation xong; trạng thái triển khai ở roadmap. Phần đã ghi phía trên là lịch sử, giữ nguyên.
+- _26/10/2026 (Prompt 03, delta Docs `769bb64..e0cb5a0` — Owner pin `e0cb5a0`, `QĐ-91`, `QĐ-92`):_ thêm F62, F63, F67 — đóng cuối năm (`US-06-09` AC-21, `US-06-11` AC-10: hôm nay phiên bản của năm đã kết thúc vẫn duyệt được thành `APPROVED`); từ chối không còn trả đề xuất về `RETURNED` mà giữ đề xuất _đã dùng_ cho phiên bản tiếp theo (`US-06-11` AC-3); thông báo dòng 18, 40, 52. Duyệt = hiện hành + bị thay cùng giao dịch và yêu cầu sửa trả chính phiên bản vẫn `aligned` ([impact matrix mục 3.8](../g0-g6-final-business-baseline-remediation/impact-matrix.md#38-delta-docs-769bb64e0cb5a0-qđ-91-qđ-92)).
+- _27/10/2026 (Prompt 04, Task 0.1 của `g0-g6-final-business-baseline-remediation`, F60 — re-pin scope map [G5](../../../roadmap.md#work-item-decomposition-g5) Docs `e0cb5a0`, BE `7c28e75`):_ nhận thêm `US-06-09` AC-21 và `US-06-11` AC-10 (mục 9.1 — đóng cuối năm tài chính, F62) ([impact matrix mục 9](../g0-g6-final-business-baseline-remediation/impact-matrix.md#9-phụ-lục-delta-user-stories-72e1480--769bb64), [mục 9.1](../g0-g6-final-business-baseline-remediation/impact-matrix.md#91-delta-user-stories-769bb64--e0cb5a0)). Phần đã ghi phía trên là lịch sử, giữ nguyên.

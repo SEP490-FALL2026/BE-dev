@@ -16,7 +16,7 @@ Mỗi task theo TDD: viết test đỏ, xem nó đỏ đúng lý do, viết mã 
 ### Task 1: dữ liệu của lỗi và đóng thất bại
 
 - Trạng thái: đã làm (20/10/2026); mở rộng bởi Task 6.
-- Files: `prisma/models/licensing.prisma`, migrations `20261020230000_licensing_provisioning_failure_values` và `20261020230100_licensing_provisioning_failure_handling`, `test/integration/provisioning-task-constraints.integration-spec.ts` (mở rộng), `test/integration/provisioning-failure-constraints.integration-spec.ts` (tác vụ lỗi và Assignment `Thất bại`; không phải `license-assignment-constraints`, như plan đầu ghi).
+- Files: `prisma/models/licensing.prisma`, migrations `20261020230000_licensing_provisioning_failure_values` và `20261020230100_licensing_provisioning_failure_handling`, `test/integration/licensing/provisioning-task-constraints.integration-spec.ts` (mở rộng), `test/integration/licensing/provisioning-failure-constraints.integration-spec.ts` (tác vụ lỗi và Assignment `Thất bại`; không phải `license-assignment-constraints`, như plan đầu ghi).
 - Depends on: `g4-provisioning-queue-manual`.
 - Acceptance: CHECK trạng thái ⟺ cột sáu trạng thái, dòng `FAILED` cũ được điền, `CLOSED_FAILED` bất biến, Assignment `failed_at` ⟹ khoảng rỗng đặt một lần, khoảng rỗng không chiếm seat và không va chạm `INV-02`.
 - Verify: constraints đỏ trước migration, xanh sau; `prisma migrate diff` không khác biệt.
@@ -41,9 +41,9 @@ Mỗi task theo TDD: viết test đỏ, xem nó đỏ đúng lý do, viết mã 
 
 ### Task 4: route, DTO, lỗi HTTP
 
-- Trạng thái: đã làm. `test/e2e/api-inventory.e2e-spec.ts` hiện đếm 143 operation toàn API (con số 127 → 130 dưới đây là lúc làm lát này).
+- Trạng thái: đã làm. `test/http/platform/api-inventory.http-spec.ts` hiện đếm 143 operation toàn API (con số 127 → 130 dưới đây là lúc làm lát này).
 
-- Files: `provisioning-tasks.controller.ts`, `provisioning.dto.ts`, `provisioning.http-errors.ts`, `test/support/api-coverage-manifest.ts` (+3), `test/e2e/api-inventory.e2e-spec.ts` (127 → 130), `test/e2e/provisioning.e2e-spec.ts`, `test/integration/provisioning-failure-http.integration-spec.ts`.
+- Files: `provisioning-tasks.controller.ts`, `provisioning.dto.ts`, `provisioning.http-errors.ts`, `test/support/api-coverage-manifest.ts` (+3), `test/http/platform/api-inventory.http-spec.ts` (127 → 130), `test/http/licensing/provisioning.http-spec.ts`, `test/integration/licensing/provisioning-failure-http.integration-spec.ts`.
 - Depends on: Task 3.
 - Acceptance: ba operation đúng bảng HTTP; thẻ có các trường mới; mọi AC trong ma trận.
 - Verify: e2e + integration; đột biến (cho quyết định ở trạng thái khác `FAILED`, bỏ lý do bắt buộc, bỏ bằng chứng chuyển tay, nhả seat khi đóng thu hồi, không nhả khi đóng cấp, không đọc tham số `PROVISIONING_RETRY_COUNT`, tự chuyển làm tay) làm đỏ.
@@ -60,7 +60,7 @@ Mỗi task theo TDD: viết test đỏ, xem nó đỏ đúng lý do, viết mã 
 ### Task 6: bổ sung đợt hoàn tất G2–G4 (21/10/2026)
 
 - Trạng thái: đã làm (theo [audit](../../../reviews/g2-g4-completion-2026-10-21/README.md), quyết định D2).
-- Files: migration `20261021100000_licensing_provisioning_task_max_attempts` (cột `max_attempts`, CHECK 1..11, điền ngược, trigger bất biến từ chối đổi); `provisioning.service.ts` (`grant` đọc `PROVISIONING_RETRY_COUNT` một lần), `provisioning-failure.service.ts` và `provisioning-task-view.service.ts` (dùng `task.maxAttempts`), `provisioning-task.repo.ts`; `test/integration/provisioning-failure-http.integration-spec.ts`, `provisioning-task-constraints.integration-spec.ts`, `provisioning-decision-http.integration-spec.ts`.
+- Files: migration `20261021100000_licensing_provisioning_task_max_attempts` (cột `max_attempts`, CHECK 1..11, điền ngược, trigger bất biến từ chối đổi); `provisioning.service.ts` (`grant` đọc `PROVISIONING_RETRY_COUNT` một lần), `provisioning-failure.service.ts` và `provisioning-task-view.service.ts` (dùng `task.maxAttempts`), `provisioning-task.repo.ts`; `test/integration/licensing/provisioning-failure-http.integration-spec.ts`, `provisioning-task-constraints.integration-spec.ts`, `provisioning-decision-http.integration-spec.ts`.
 - Depends on: Task 1 đến Task 4; migration `20261021100000_licensing_provisioning_task_max_attempts` đi trước mã đọc cột.
 - Acceptance: `US-01-04` AC-13 — giới hạn thử lại cố định trên tác vụ lúc tạo, đổi tham số chỉ đến tác vụ tạo sau; `selfExecuted: true` được kiểm cho retry, hand-off, close; AC-11 đi qua `recordFailure`; test `decides on a failed task only` đạt `RETRY_SCHEDULED` qua `recordFailure`.
 - Verify: test `US-01-04 AC-13…` đỏ trước rồi xanh; ràng buộc `max_attempts` có đột biến giữ SQL hợp lệ; đột biến ép `selfExecuted` về false làm đỏ.

@@ -37,7 +37,7 @@ Inventory (đọc source; hai subagent chỉ đọc):
 
 - Files: `docs/rules/operational-commands.md` (mới), `docs/rules/README.md`, `AGENTS.md`, `CONTRIBUTING.md`,
   `rules-check.config.json`; `src/infrastructure/config/database-url-parsing.spec.ts`,
-  `test/integration/installation-bootstrap-facts.integration-spec.ts` (mới).
+  `test/integration/installation/installation-bootstrap-facts.integration-spec.ts` (mới).
 - Depends on: none
 - Acceptance: rule đủ tám quy tắc và ví dụ đúng/sai/lách sai/dọn sai; characterization bootstrap (bản ghi, audit, chạy
   lại), đọc tài khoản không lộ hash, ràng buộc vai/Finance, parse URL của `node:url` cho mọi dạng host.
@@ -120,7 +120,7 @@ mount seed vào API, import seed từ worker → đều đỏ đúng test/gate.
 
 - Files: `organization.service.ts`, `organization.types.ts`, repo và service capability `cost-center`, `department`,
   `job-title`, `employee`; `accounts/app-user.repo.ts`, `account-directory.service.ts`, `identity-access.service.ts`;
-  `installation/dev-seed/dev-seed-plan.ts`, `dev-seed.service.ts`, `dev-seed.types.ts`; `installation/inspect/inspection.service.ts`;
+  `installation/dev-seed/dev-seed-plan.policy.ts`, `dev-seed.service.ts`, `dev-seed.types.ts`; `installation/public/inspection.api.ts`;
   spec mới `dev-seed-plan.spec.ts`, `inspection.service.spec.ts`, `organization-onboarding-facts.spec.ts`,
   `onboarding-facts-transaction.repo.spec.ts`, `app-user-transaction.repo.spec.ts`; `dev-seed.service.spec.ts`,
   `dev-seed.integration-spec.ts`; Docs `CI-CD/deployment.md`.

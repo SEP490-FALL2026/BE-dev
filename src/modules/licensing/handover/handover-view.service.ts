@@ -1,14 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { CatalogService } from '../../catalog/catalog.service';
-import type { PlanRevocationInfo } from '../../catalog/catalog.types';
-import { OrganizationHistoryService } from '../../organization/organization-history.service';
-import { OrganizationService } from '../../organization/organization.service';
-import type { EmployeeRecord } from '../../organization/organization.types';
-import { SeatTargetNotFoundError } from '../licensing.errors';
+import { CatalogApi } from '../../catalog/public/catalog.api';
+import type { PlanRevocationInfo } from '../../catalog/public/catalog.types';
+import { OrganizationHistoryApi } from '../../organization/public/organization-history.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
+import type { EmployeeRecord } from '../../organization/public/organization.types';
+import { SeatTargetNotFoundError } from '../public/licensing.errors';
 import { HandoverCaseFacts } from './handover-case-facts.service';
-import { HandoverConfirmerResolver, type ResolvedConfirmer } from './handover-confirmer.resolver';
+import { HandoverConfirmerResolver, type ResolvedConfirmer } from './handover-confirmer.service';
 import { isOverdue } from './handover-confirmer.policy';
 import type { HandoverDutyDetailWire, HandoverDutySummaryWire } from './handover.dto';
 import { HandoverDutyError } from './handover.errors';
@@ -51,9 +51,9 @@ export class HandoverViewService {
     private readonly lists: HandoverListRepo,
     private readonly resolver: HandoverConfirmerResolver,
     private readonly facts: HandoverCaseFacts,
-    private readonly history: OrganizationHistoryService,
-    private readonly organization: OrganizationService,
-    private readonly catalog: CatalogService,
+    private readonly history: OrganizationHistoryApi,
+    private readonly organization: OrganizationApi,
+    private readonly catalog: CatalogApi,
   ) {}
 
   /** Throws HandoverDutyError (`SCOPE_FORBIDDEN`) when someone who is not an IT Admin asks for every duty. */

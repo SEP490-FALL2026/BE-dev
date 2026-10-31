@@ -22,12 +22,12 @@ mỗi giờ đếm mọi token `RESET_PASSWORD`, gồm liên kết khôi phục 
 
 ### Task 1: test đỏ
 
-- Files: `test/integration/super-admin-recovery.integration-spec.ts` (suite có ứng dụng HTTP và `RecoveryService` thật trên
+- Files: `test/integration/identity-access/super-admin-recovery.integration-spec.ts` (suite có ứng dụng HTTP và `RecoveryService` thật trên
   cùng database; chỉ tài khoản giữ vai Super Admin có thể là đối tượng của ticket).
 - Depends on: none.
 - Acceptance: ca chính, AC-4 sau yêu cầu bị chặn và race đỏ trên code hiện tại vì yêu cầu thay liên kết khôi phục; các ca
   không chặn xanh (hồi quy).
-- Verify: `pnpm test:integration -- test/integration/super-admin-recovery.integration-spec.ts` trên PostgreSQL riêng.
+- Verify: `pnpm test:integration -- test/integration/identity-access/super-admin-recovery.integration-spec.ts` trên PostgreSQL riêng.
 
 ### Task 2: kiểm ticket chờ trong giao dịch quên mật khẩu
 

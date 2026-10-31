@@ -24,9 +24,9 @@ Request phần mềm trả phí mang số tiền do hệ thống tính từ giá
 
 ## Primary Story/AC
 
-| Story    | AC                | Coverage | Phần còn lại thuộc                                                                                                                     |
-| -------- | ----------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| US-05-02 | AC-1, AC-4, AC-11 | partial  | AC-2: `g5-group-requests`; AC-3, AC-5→AC-7, AC-9, AC-10: `g5-request-submission-and-routing`; AC-8: `g5-it-assessment-of-new-software` |
+| Story    | AC                | Coverage | Phần còn lại thuộc                                                                                                                            |
+| -------- | ----------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| US-05-02 | AC-1, AC-4, AC-11 | partial  | AC-2: `g5-group-requests`; AC-3, AC-5→AC-7, AC-9, AC-10, AC-12: `g5-request-submission-and-routing`; AC-8: `g5-it-assessment-of-new-software` |
 
 ## Supporting references
 
@@ -98,3 +98,8 @@ Request phần mềm trả phí mang số tiền do hệ thống tính từ giá
 23/10/2026: lập khung theo scope map G5 của [roadmap](../../../roadmap.md). Chưa thiết kế chi tiết, chưa code, chưa review, chưa nghiệm thu.
 
 23/10/2026: implement và `verified` local (người phụ trách: AI theo giao việc của người dùng). Phạm vi đúng các vế AC-1, AC-4, AC-11 của `US-05-02`; AC-2 (nhóm), AC-8 (xem trước) và chặn trình chi khi thiếu giá thuộc hạng mục khác trong scope map. Chưa commit, chưa peer review, chưa Owner review, chưa nghiệm thu.
+
+## Mở lại theo baseline `769bb64` (Prompt 03, 26/10/2026)
+
+- Audit G0–G6 trên Docs `769bb64` ↔ BE `7c28e75` mở lại hạng mục này: F34, F38 — giá 0; nguồn giá theo phòng Request.
+- Remediation duy nhất: [g0-g6-final-business-baseline-remediation](../g0-g6-final-business-baseline-remediation/spec.md) ([impact matrix](../g0-g6-final-business-baseline-remediation/impact-matrix.md#3-findings)). AC liên quan không còn được coi là thỏa nguồn hiện hành cho tới khi remediation xong; trạng thái triển khai ở roadmap. Phần đã ghi phía trên là lịch sử, giữ nguyên.

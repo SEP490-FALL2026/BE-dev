@@ -1,16 +1,18 @@
 import { Injectable } from '@nestjs/common';
 import { fromDateColumn, toDateColumn, type BusinessDate } from '../../../core/business-date';
+import { normalizeDisplayName } from '../../../core/display-name';
 import { normalizeEmail } from '../../../core/email';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx, readSqlState } from '../../../infrastructure/database/transaction-runner';
-import { isUniqueViolation, isCheckViolation } from '../../../infrastructure/database/unique-violation';
+import { isCheckViolation, isUniqueViolation } from '../../../infrastructure/database/unique-violation';
 import {
   EmployeeCodeTakenError,
   EmployeeEmailTakenError,
   EmployeeNotFoundError,
+  EmployeeOpenSeatNeedsEndError,
   PlacementDepartmentInactiveError,
   PlacementOverlapError,
-} from '../organization.errors';
+} from '../public/organization.errors';
 import {
   CreateEmployeeWithPlacementInput,
   EmployeeCandidate,
@@ -21,7 +23,7 @@ import {
   PlacementInForce,
   ScheduledStructureChange,
   StructureChangeInput,
-} from '../organization.types';
+} from '../public/organization.types';
 
 /** The employee as the facade shows it. */
 function toEmployeeRecord(row: {
@@ -34,6 +36,7 @@ function toEmployeeRecord(row: {
   status: EmployeeRecord['status'];
   workState: EmployeeWorkState;
   hireDate: Date;
+  jobTitle: string | null;
 }): EmployeeRecord {
   return {
     id: row.id,
@@ -45,6 +48,7 @@ function toEmployeeRecord(row: {
     status: row.status,
     workState: row.workState,
     hireDate: fromDateColumn(row.hireDate),
+    jobTitle: row.jobTitle,
   };
 }
 
@@ -98,6 +102,8 @@ export class EmployeeRepo {
           fullName: input.fullName,
           workEmail,
           normalizedWorkEmail: workEmail === null ? null : normalizeEmail(workEmail),
+          // The display form (T-12) whoever calls: the free text of the person, or none.
+          jobTitle: normalizeDisplayName(input.jobTitle ?? '') || null,
           employmentType: input.employmentType,
           hireDate: toDateColumn(input.hireDate),
           status: 'ACTIVE',
@@ -109,7 +115,6 @@ export class EmployeeRepo {
           organizationId: input.organizationId,
           employeeId: employee.id,
           departmentId: input.departmentId,
-          jobTitleId: input.jobTitleId,
           validFrom: toDateColumn(input.memberSince ?? input.hireDate),
         },
       });
@@ -137,10 +142,14 @@ export class EmployeeRepo {
             : {}),
           ...(patch.employmentType !== undefined ? { employmentType: patch.employmentType } : {}),
           ...(patch.hireDate !== undefined ? { hireDate: toDateColumn(patch.hireDate) } : {}),
+          // The display form (T-12) whoever calls; an empty one clears the title.
+          ...(patch.jobTitle !== undefined ? { jobTitle: normalizeDisplayName(patch.jobTitle ?? '') || null } : {}),
         },
       });
     } catch (error) {
       if (isUniqueViolation(error, 'normalized_work_email')) throw new EmployeeEmailTakenError();
+      // The trigger of migration 20261023110000 (INV-07 from the side of the person).
+      if (isCheckViolation(error, 'on every open seat')) throw new EmployeeOpenSeatNeedsEndError();
       throw error;
     }
   }
@@ -162,8 +171,8 @@ export class EmployeeRepo {
    */
   async scheduleStructureChange(tx: DbTx, input: StructureChangeInput): Promise<ScheduledStructureChange> {
     const open = (
-      await tx.$queryRaw<{ id: string; department_id: string; job_title_id: string; valid_from: Date }[]>`
-        SELECT id, department_id, job_title_id, valid_from FROM employee_placements
+      await tx.$queryRaw<{ id: string; department_id: string; valid_from: Date }[]>`
+        SELECT id, department_id, valid_from FROM employee_placements
          WHERE employee_id = ${input.employeeId}::uuid AND valid_to IS NULL FOR UPDATE`
     )[0];
     if (!open) throw new PlacementOverlapError('NO_OPEN_PLACEMENT');
@@ -177,7 +186,6 @@ export class EmployeeRepo {
           organizationId: input.organizationId,
           employeeId: input.employeeId,
           departmentId: input.departmentId,
-          jobTitleId: input.jobTitleId,
           validFrom: toDateColumn(input.effectiveOn),
         },
         select: { id: true },
@@ -186,7 +194,7 @@ export class EmployeeRepo {
       return {
         closedPlacementId: open.id,
         openedPlacementId: opened.id,
-        from: { departmentId: open.department_id, jobTitleId: open.job_title_id, validFrom },
+        from: { departmentId: open.department_id, validFrom },
       };
     } catch (error) {
       if (readSqlState(error) === '23P01' || isUniqueViolation(error, 'valid_from')) {
@@ -209,10 +217,8 @@ export class EmployeeRepo {
 
   /** The placement in force on `onDate` with its days, read in the caller's transaction; null when there is none. */
   async placementInForce(tx: DbTx, employeeId: string, onDate: BusinessDate): Promise<PlacementInForce | null> {
-    const rows = await tx.$queryRaw<
-      { id: string; department_id: string; job_title_id: string; valid_from: Date; valid_to: Date | null }[]
-    >`
-      SELECT id, department_id, job_title_id, valid_from, valid_to FROM employee_placements
+    const rows = await tx.$queryRaw<{ id: string; department_id: string; valid_from: Date; valid_to: Date | null }[]>`
+      SELECT id, department_id, valid_from, valid_to FROM employee_placements
        WHERE employee_id = ${employeeId}::uuid AND valid_from <= ${onDate}::date
          AND (valid_to IS NULL OR valid_to > ${onDate}::date)`;
     const row = rows[0];
@@ -221,7 +227,6 @@ export class EmployeeRepo {
       ? {
           placementId: row.id,
           departmentId: row.department_id,
-          jobTitleId: row.job_title_id,
           validFrom: fromDateColumn(row.valid_from),
           validTo: row.valid_to ? fromDateColumn(row.valid_to) : null,
         }
@@ -266,15 +271,11 @@ export class EmployeeRepo {
   }
 
   /** The department and the job title of the employee on `onDate`, by id; null when no placement holds that day. */
-  async placementIdsOn(
-    employeeId: string,
-    onDate: BusinessDate,
-    tx?: DbTx,
-  ): Promise<{ departmentId: string; jobTitleId: string } | null> {
+  async placementIdsOn(employeeId: string, onDate: BusinessDate, tx?: DbTx): Promise<{ departmentId: string } | null> {
     const date = toDateColumn(onDate);
     const row = await (tx ?? this.prisma).employeePlacement.findFirst({
       where: { employeeId, validFrom: { lte: date }, OR: [{ validTo: null }, { validTo: { gt: date } }] },
-      select: { departmentId: true, jobTitleId: true },
+      select: { departmentId: true },
     });
 
     return row;
@@ -357,9 +358,10 @@ export class EmployeeRepo {
         id: true,
         employeeCode: true,
         fullName: true,
+        jobTitle: true,
         placements: {
           where: { validFrom: { lte: onDate }, OR: [{ validTo: null }, { validTo: { gt: onDate } }] },
-          select: { department: { select: { code: true, name: true } }, jobTitle: { select: { name: true } } },
+          select: { department: { select: { code: true, name: true } } },
           take: 1,
         },
       },
@@ -372,7 +374,7 @@ export class EmployeeRepo {
       employeeCode: employee.employeeCode,
       fullName: employee.fullName,
       department: placement?.department ?? null,
-      jobTitle: placement?.jobTitle.name ?? null,
+      jobTitle: employee.jobTitle,
     };
   }
 }

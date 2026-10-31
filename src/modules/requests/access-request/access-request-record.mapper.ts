@@ -19,8 +19,6 @@ export const SELECT_REQUEST = {
   businessReason: true,
   termMonths: true,
   projectLabel: true,
-  outsideStandardReason: true,
-  outsideStandard: true,
   pricingStatus: true,
   priceMissingReason: true,
   expectedSpendOn: true,
@@ -114,7 +112,23 @@ export const SELECT_REQUEST = {
 
 export type RequestRow = Prisma.AccessRequestGetPayload<{ select: typeof SELECT_REQUEST }>;
 
+/**
+ * A request that is read as a request has been sent, so it has the moment it was sent: only a draft has none (the table checks it),
+ * and a draft is never read here (`AccessRequestRepo.findById` leaves it out). Its Cost Center is the one it is charged to; a free
+ * internal request of a department that has none carries none (the table checks that too).
+ */
+function sentColumns(row: RequestRow): { costCenterId: string | null; submittedAt: Date } {
+  if (row.submittedAt === null) {
+    throw new Error(
+      `The request ${row.id} has not been sent: it is a draft and is read as one only by the draft operations.`,
+    );
+  }
+
+  return { costCenterId: row.costCenterId, submittedAt: row.submittedAt };
+}
+
 export function toRecord(row: RequestRow): AccessRequestRecord {
+  const sent = sentColumns(row);
   const needSteps = row.steps.map((step) => ({
     id: step.id,
     // A need step is only ever held, waiting, approved or refused.
@@ -142,12 +156,10 @@ export function toRecord(row: RequestRow): AccessRequestRecord {
     planId: row.planId,
     requesterEmployeeId: row.requesterEmployeeId,
     departmentId: row.departmentId,
-    costCenterId: row.costCenterId,
+    costCenterId: sent.costCenterId,
     businessReason: row.businessReason,
     termMonths: row.termMonths,
     projectLabel: row.projectLabel,
-    outsideStandardReason: row.outsideStandardReason,
-    outsideStandard: row.outsideStandard,
     pricing: toPricing(row),
     planLine:
       row.planLineVersionId !== null && row.planLinePosition !== null
@@ -158,7 +170,7 @@ export function toRecord(row: RequestRow): AccessRequestRecord {
     expectedEndDate: row.expectedEndDate ? fromDateColumn(row.expectedEndDate) : null,
     // Written by `insert` from a `RequestPolicy`, and nowhere else.
     policy: row.policy as unknown as RequestPolicy,
-    submittedAt: row.submittedAt,
+    submittedAt: sent.submittedAt,
     withdrawal:
       row.withdrawalRequestedAt !== null && row.withdrawnByEmployeeId !== null
         ? {

@@ -1,6 +1,6 @@
 import type { BusinessDate } from '../../../core/business-date';
 import { addWorkingDays, type NonWorkingDates } from '../../../core/working-days';
-import type { RevocationSource } from '../licensing.types';
+import type { RevocationSource } from '../public/licensing.types';
 
 /**
  * Who confirms that the data of a tool was handed over before its seat is taken away, and what a duty is allowed to say

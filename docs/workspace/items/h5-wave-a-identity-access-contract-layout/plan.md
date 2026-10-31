@@ -59,7 +59,7 @@ super-admin-recovery, recovery-cli, auth-concurrency 13 suite/190 test (90 s, co
 
 - Files: `auth/auth.errors.ts`, `accounts/account.errors.ts`, `accounts/account-constraints.ts` (mới); xóa
   `errors/identity-access.errors.ts`; `super-admin-transfer.service.ts`; import trong auth/accounts, spec,
-  `test/integration/account-management-http.integration-spec.ts`; `mappers/account.http-errors.ts` (+ spec, move); ledger.
+  `test/integration/identity-access/account-management-http.integration-spec.ts`; `mappers/account.http-errors.ts` (+ spec, move); ledger.
 - Depends on: Task 2.
 - Acceptance: không lớp lỗi trong service/controller/repo của module; mỗi lỗi một class; không re-export.
 - Verify: Checkpoint B.

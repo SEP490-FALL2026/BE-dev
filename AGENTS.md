@@ -5,73 +5,69 @@ Scope: this backend repository. Work from its root with the pnpm version in `pac
 ## Start here
 
 - Read [CONTRIBUTING.md](CONTRIBUTING.md) for workflow and verification commands.
-- Read [ARCHITECTURE.md](ARCHITECTURE.md) before changing module boundaries.
+- Read [ARCHITECTURE.md](ARCHITECTURE.md) before changing module boundaries; [src/README.md](src/README.md) says where
+  each process starts.
+- What the API does today: [routes](docs/generated/routes.md) (every route → controller → service) and the module cards
+  `src/modules/<m>/README.md`. Slice status, AC coverage and evidence: [roadmap](docs/roadmap.md) — nothing counts as
+  reviewed or `accepted` unless the roadmap records it.
 - Check the branch, working diff and relevant source/tests; preserve existing changes.
-- Current capability, in short: health, internal authentication and sessions (`/auth/*`, `/me`), Super Admin
-  account administration and transfer, password self-service, the Audit Trail query, the organization and import
-  foundation (Cost Centers, departments and heads, job titles, employees, approval roles, operating parameters,
-  onboarding step 1), money and manually entered exchange rates, the shared vendor dictionary, the application catalog (declaration only) with functional groups, plans and workspace profiles, vendor tax profiles with tax estimates, subscriptions and perpetual purchases with a frozen price conversion, plan terms with derived review alerts, Business Owner history with a departed-owner alert, cost allocation of non-per-seat subscriptions (versioned, shares add up to 100%), the seat baseline import with assignments, closing the baseline and the tools a department uses, the provisioning queue (grant through the request gate, claim, complete with evidence, report failure, and retry, hand off or close a failed task; IT Admin only), the standard toolset of a department and job title (versioned, a reason on every change, grants nothing), retiring an application (confirmed by the current Business Owner, blocked by held seats and live subscriptions), contracts with the files kept for them (signed links, five-minute view links, IT Admin and Finance only), seat guards on subscriptions (drafts and retired applications take no seat), the license key vault of K4 purchases (keys sealed at rest, masked in lists, every reveal audited; IT Admin only), the reporting currency with its lock, onboarding steps 1 to 4 with the standard toolset suggested after step 3, new employee records entered by the Super Admin on an HR basis and corrected by the IT Admin on one, Cost Centers that are Units only with service accounts owned by a department, and out-of-HTTP commands (`pnpm ops:bootstrap`, `pnpm ops:recover`, read-only
-  `pnpm ops:inspect`, local-only `pnpm dev:seed`). The catalog, finance and licensing contexts
-  (G3/G4) are being added slice by slice, and the requests context (G5, [ADR-0015](docs/decisions/0015-requests-context.md))
-  starts with sending a request for access and the routing of its need step, and the budgets context (G5, [ADR-0016](docs/decisions/0016-budgets-context.md)) with the proposals of the heads, the versions Finance builds and the spending approver decides, and the check of the budget of a request with the review of Finance, and the withdrawal of a request by its requester with the cancellation of a grant nobody has worked, and the request for a service account after the installation with the verdict of the IT Admin on whether it is a non-human subject, and the revocation of a seat by its kind of grant (K1 cancels the renewal and keeps access to the end of the paid period, K2 removes the member, K5 revokes off the system) through one gate every source calls, and the return of a seat by its holder or the head of their department (a record of its own that opens the revocation, with a light handover) and the renewal of a right that ends on a day (a request of its own whose approval writes the record that follows the old one), and a request for a group of people of one department (an Employee names up to ten, a head up to a hundred; a line for each person with a state, a decision and a seat of their own, one amount, one spend step and one commitment for each year divided among the people approved) and the status of a request told to the people it concerns in an in-app inbox (`/notifications*`, written from the audit events by the worker) with the time each request took (`/access-requests/{id}/timings`), and the record of a transfer of a person to another department or job title with the day it takes effect and the basis it rests on, which can be moved or cancelled until its day (`/department-transfers*`, the personnel context of [ADR-0017](docs/decisions/0017-personnel-context.md); the organization tells the modules that act when a change takes effect), and the confirmation that the data of a tool was handed over before its seat is taken away (`/handover-duties*`: who confirms comes from a table by the source of the revocation and is read from the organization when asked, the removal is held until it is confirmed or its deadline ends and then goes on flagged), and the review that the head of the new department makes of the tools outside the standard toolset after a transfer (`/transfer-reviews*`: opened when the transfer takes effect, one decision for each tool written once, a tool that is no longer needed opens a revocation, a late review is only told), and the long leave of an employee with the day they are due back and the basis of it (`/long-leaves*`, the personnel context: a new day or a return on another day needs a new basis, the return on the approved day needs none, no reason for a leave is kept, a late return is only told and never changes the state), and the departure of a person (`/offboarding-cases*`: a handover with a last working day and the basis of it, or an abrupt departure that is `LEFT` at once; the head of the department they leave is handed over or left empty without blocking the record, the confirmation of every tool is asked of the head, the sign-in is refused from the next action once they have left, the company account lock is recorded, the rights are listed and the IT Admin revokes them all at once with the count and one reason, and the case closes only when nothing is held; nothing is revoked by itself and no license goes to a successor), and the replacement of the person who answers for a service account before a transfer or a departure takes effect (`/service-account-duties`, `/license-assignments/{id}/responsible-changes` and `…/department-moves`, `/service-account-moves*`, `/department-transfers/{id}/closure`: a change may not come later than the day of the file of the current person, the new person has to work in the department that owns the account and not be handing over, a move to another department waits for the head of the receiving department, recording a transfer or a departure is never held for it, a late account is only told, and the record cannot be closed while one is left), and the reminder before a right that ends on a day ends and the queue of the IT Admin for those that have ended (`/assignment-expiry-queue*`, `/assignment-expiry-reminders`: seven days before the end the holder, the head of their department and the IT Admin in charge are reminded, a department with no head has no reminder for the head; a right whose end day has passed stays in force and is listed, nothing is revoked or renewed by itself, a renewal sent in time keeps it waiting, and the IT Admin starts the revocation with its own source, whose handover is the IT Admin's to confirm), and the requests and grants of a person who leaves (`/offboarding-cases/{id}/open-requests`, `…/open-grant-tasks` and `POST /access-requests/{id}/cancellation`: the open ones are listed beside the record and warned of, nothing closes by itself, and once the person has left the IT Admin closes each request as cancelled, one at a time, with the task of its grant, the steps, the batch, the questions to Finance and the held money going with it; a request for a group is closed for the one person who left, on their own line, with `POST /access-requests/{id}/lines/{employeeId}/departure-closure`: only their task and their share of the commitment go, the request goes on for the others and ends only when no line is live), and the roles of a person who leaves (`/me/departure-notice`, `/super-admin-watch`, the filter `roleFlag` of `/offboarding-cases`: the Super Admin, Finance, the approval roles, the IT Admin in charge of a department, the head of a department and the owner or administrator of a workspace are warned of and never hold the record, the lock or the revocations back, the state of the Super Admin role is told in four ways, and the record cannot be closed while the person still owns or administers a workspace), and the notice of a department head about a change coming for one of their people (`/personnel-notices*`: information with no effect whose code is never a basis; the IT Admin rejects it with a reason, or checks it against a basis outside the notice and records the transfer, the long leave or the departure by the rules of that event, or ties it to the event that exists; a late one is only told and nothing changes by itself), and the report of an error in a SaaS right that a person holds (`/saas-issues*`, the form `BM-11`: given to one IT Admin when it is sent, who asks, types the vendor ticket by hand, resolves it or marks a duplicate; the reporter reopens it within the window and reads it, the head of a department does not; nothing is sent to the vendor and no assignment, grant or request changes; a late one is only told and a resolved one is closed after its window); other US workflows are not implemented. A merged slice may cover a Story only partly, and
-  nothing counts as reviewed or `accepted` unless the [roadmap](docs/roadmap.md) records it. Slice status, AC
-  coverage, revisions and evidence: [roadmap](docs/roadmap.md); module map and technical limits:
-  [ARCHITECTURE.md](ARCHITECTURE.md); latest baseline check:
-  [foundation audit](docs/reviews/be-foundation-audit-2026-10-18/README.md); planned remediation and refactors:
-  [foundation remediation handoff](docs/workspace/items/foundation-remediation-handoff-2026-10-18/spec.md);
-  business-baseline impact (`QĐ-82` → `QĐ-86`) on merged code and forward fixes:
-  [business baseline impact](docs/workspace/items/business-baseline-impact-2026-10-22/spec.md).
+- When receiving a delegated task (part of a G, one G or multiple Gs), use the
+  [assignment and reusable prompts](docs/workspace/prompts/README.md). Start at the assigned stage; finish its
+  handoff before switching stages/models. The assignee owns design, implementation, tests and evidence.
 
 ## Read only what the task needs
 
-| Task                                         | Reference                                                                                                        |
-| -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| Add an endpoint                              | [Development guide](docs/guides/kien-truc-backend-va-cach-viet-code.md), [API rules](docs/rules/api-contract.md) |
-| Add/move a file, capability folder or error  | [Module structure rules](docs/rules/module-structure.md)                                                         |
-| Model, query, transaction, business behavior | [Database rules](docs/rules/database-business.md)                                                                |
-| Authentication, files, jobs                  | [Security rules](docs/rules/security-jobs.md)                                                                    |
-| Add or change a script                       | [Script guide](scripts/README.md)                                                                                |
-| Add or update tests                          | [Test guide](test/README.md)                                                                                     |
-| Documentation or ADR                         | [Documentation rules](docs/rules/documentation.md)                                                               |
-| Split assigned work into items (spec/plan)   | [Work-item sizing](docs/rules/work-item-sizing.md)                                                               |
-| Add or change an out-of-HTTP command or seed | [Operational commands](docs/rules/operational-commands.md)                                                       |
+| Task                                         | Reference                                                                                      |
+| -------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| Add an endpoint                              | [Hướng dẫn dev mới](docs/guides/huong-dan-dev-moi.md), [API rules](docs/rules/api-contract.md) |
+| Add/move a file, capability folder or error  | [Module structure rules](docs/rules/module-structure.md)                                       |
+| Model, query, transaction, business behavior | [Database rules](docs/rules/database-business.md)                                              |
+| Authentication, files, jobs                  | [Security rules](docs/rules/security-jobs.md)                                                  |
+| Add or change a script                       | [Script guide](scripts/README.md)                                                              |
+| Add or update tests                          | [Test guide](test/README.md)                                                                   |
+| Documentation or ADR                         | [Documentation rules](docs/rules/documentation.md)                                             |
+| Split assigned work into items (spec/plan)   | [Work-item sizing](docs/rules/work-item-sizing.md)                                             |
+| Add or change an out-of-HTTP command or seed | [Operational commands](docs/rules/operational-commands.md)                                     |
 
 ## Repository constraints
 
-- Default to flat feature modules; group by capability once a module root passes 2 controllers or 12 files, with
-  at most two directory levels. A capability folder is not automatically a Nest module. Controllers map HTTP;
-  services coordinate; `*.repo.ts` owns persistence; business errors live with their capability, never in a global
-  errors folder. Details and the enforced gates: [module structure](docs/rules/module-structure.md).
-- Cross-module calls use exported facades/contracts; never import another module's private files or query its tables.
-- Keep framework-free primitives in `src/core`; technical adapters in `src/infrastructure`.
-- Generated `src/generated/`, `dist/` and `openapi.json` change through their generators.
-- Do not load every ADR, design document or external repository by default.
-  Obtain the relevant requirement before inventing missing business behavior.
-- For US design and implementation handoff, follow [shared planning](docs/workspace/README.md). A roadmap group `G`
-  is never a spec/plan boundary: size each item by Story and outcome per
+- Modules follow the tiers of [ADR-0019](docs/decisions/0019-module-tiers-and-public-api.md): a module imports only
+  lower tiers, and another module only through its `public/` folder (`<m>.api.ts` facade `<M>Api`, types, errors,
+  extension points) or its `*.module.ts`. A lower module that needs a higher one opens a
+  `Hook`/`Listeners`/`Contributions` extension point; the higher module binds it in a `*.listener.ts`. `pnpm arch:check`
+  enforces this.
+- Inside a module: capability folders; inside one, functional group folders reached through their entry file
+  `<…>-<group>.service|policy|types.ts`, the rest of a group private (split by function, not file count); file
+  suffix = role (`.controller` HTTP, `.service` one use case, `.policy` pure rule, `.repo` all SQL …). Never query
+  another module's tables. Details: [module structure](docs/rules/module-structure.md).
+- Keep framework-free primitives in `src/core`; technical adapters in `src/infrastructure`; process wiring in `src/app`,
+  `src/worker`, `src/cli`.
+- Generated `src/generated/`, `dist/`, `openapi.json` and `docs/generated/` change through their generators
+  (`pnpm openapi:export`, `pnpm arch:graph`, `pnpm arch:routes`).
+- Do not load every ADR, design document or external repository by default. Obtain the relevant requirement before
+  inventing missing business behavior.
+- For US design and implementation handoff, follow [shared planning](docs/workspace/README.md). A roadmap group `G` is
+  never a spec/plan boundary: size each item by Story and outcome per
   [work-item sizing](docs/rules/work-item-sizing.md).
-- One canonical source per fact: progress, commits/PRs and test results go to the roadmap, item plan or review, not
-  into this file or ARCHITECTURE.md. Which document owns what:
-  [documentation responsibilities](docs/rules/documentation.md#trách-nhiệm-từng-loại-tài-liệu).
-- Use pinned BRD/US revisions and the current spec/plan. The assignee owns design, implementation,
-  tests and plan maintenance; peer review is optional, except where a pinned requirement, decision or spec
-  explicitly requires it (for example the US-01-10 technical values) — then it is a recorded gate before
-  `accepted`. Never invent Owner approval, peer review or acceptance.
-- No specific AI vendor or external skill package is required. An AI that supports skills should follow
-  the phase-specific guidance in [shared planning](docs/workspace/README.md); repository rules, pinned
-  requirements, the current spec/plan and acceptance criteria remain authoritative.
-- Multi-agent work is optional. Use it only for independent, clearly bounded tasks; one primary agent
-  must own integration, final diff review and verification. Do not let agents edit the same files,
-  operate on the same test database or perform Git publication concurrently.
+- One canonical source per fact: progress, commits/PRs and test results go to the roadmap, item plan or review, not into
+  this file or ARCHITECTURE.md
+  ([documentation responsibilities](docs/rules/documentation.md#trách-nhiệm-từng-loại-tài-liệu)).
+- Use pinned BRD/US revisions and the current spec/plan. Never invent Owner approval, peer review or acceptance; a
+  review a pinned requirement or spec requires is a recorded gate before `accepted`.
+- No specific AI vendor or skill package is required; repository rules, pinned requirements, the current spec/plan and
+  acceptance criteria remain authoritative.
+- Multi-agent work is optional and only for independent, bounded tasks; one primary agent owns integration, final diff
+  review and verification. Agents never edit the same files, share a test database or publish to Git concurrently.
 
 ## Verify and hand off
 
 - Docs: `pnpm rules:check` and `pnpm rules:format`.
-- Source/config: `pnpm check`; HTTP changes also require `pnpm test:e2e` and `pnpm openapi:export`.
-- Database changes need the isolated integration setup in the test guide.
-- Before handoff, self-review the final diff against the assigned spec/plan and AC; update affected
-  operational documentation or runbooks. Report actual commands/results and unverified boundaries.
-  Do not silently skip a failed gate.
+- Source/config: `pnpm check` (rules, format, lint, types, unit, gates, architecture, build). HTTP changes also run
+  `pnpm test:http` and `pnpm openapi:export`; database or cross-module changes run `pnpm test:integration` for the
+  touched modules with the isolated database setup in the [test guide](test/README.md).
+- Before handoff, self-review the final diff against the assigned spec/plan and AC; update affected operational
+  documentation or runbooks. Report actual commands/results and unverified boundaries. Never silently skip a failed
+  gate.
 - Keep secrets and real data out of artifacts. Do not commit, push, deploy or change shared data unless authorized.
 
 [All topic rules](docs/rules/README.md).

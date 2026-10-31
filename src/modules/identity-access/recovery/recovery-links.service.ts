@@ -1,8 +1,19 @@
 import { Injectable } from '@nestjs/common';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { NotificationsService } from '../../notifications/notifications.service';
+import { NotificationsApi } from '../../notifications/public/notifications.api';
 import { ActionLinkService } from '../accounts/action-link.service';
 import { TicketRecord } from './recovery.repo';
+
+/**
+ * A mail with nobody to go to is a programming error, never a silent skip or a send to somebody else: the caller
+ * names the login email of the account, and an empty one stops the transaction before a link or a mail is written.
+ */
+function requireRecipient(recipient: string): string {
+  if (recipient.trim() === '')
+    throw new Error('A recovery mail needs the login email of the account as its recipient.');
+
+  return recipient;
+}
 
 /**
  * The links a recovery sends and their mails: a reset link to the holder's mailbox (AC-9, AC-10) or an invitation to the
@@ -13,7 +24,7 @@ import { TicketRecord } from './recovery.repo';
 export class RecoveryLinks {
   constructor(
     private readonly links: ActionLinkService,
-    private readonly notifications: NotificationsService,
+    private readonly notifications: NotificationsApi,
   ) {}
 
   /** Whether the ticket has a link that can still be used and whose mail has not failed: then nothing is sent again. */
@@ -51,6 +62,7 @@ export class RecoveryLinks {
     },
     now: Date,
   ): Promise<void> {
+    const recipient = requireRecipient(input.recipient);
     const link = await this.links.issue(
       tx,
       {
@@ -67,7 +79,7 @@ export class RecoveryLinks {
     );
     await this.notifications.enqueueEmail(tx, {
       organizationId: input.organizationId,
-      recipient: input.recipient,
+      recipient,
       template: 'PASSWORD_RESET',
       locale: 'vi',
       actionTokenHash: link.hash,
@@ -81,6 +93,7 @@ export class RecoveryLinks {
     input: { organizationId: string; appUserId: string; ticketId: string; recipient: string; fullName: string },
     now: Date,
   ): Promise<void> {
+    const recipient = requireRecipient(input.recipient);
     const link = await this.links.issue(
       tx,
       { appUserId: input.appUserId, purpose: 'INVITE', createdBy: null, recoveryTicketId: input.ticketId },
@@ -89,7 +102,7 @@ export class RecoveryLinks {
     );
     await this.notifications.enqueueEmail(tx, {
       organizationId: input.organizationId,
-      recipient: input.recipient,
+      recipient,
       template: 'ACCOUNT_INVITATION',
       locale: 'vi',
       actionTokenHash: link.hash,

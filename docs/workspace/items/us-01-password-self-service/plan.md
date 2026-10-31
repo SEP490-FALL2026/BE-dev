@@ -12,7 +12,7 @@
 [database rules](../../../rules/database-business.md), [API rules](../../../rules/api-contract.md),
 [test guide](../../../../test/README.md), ADR-0011/0012 và spec 1a/1b/G0. Đối chiếu spec với
 `src/modules/identity-access/{auth,accounts,access}/**`, `identity-access.service.ts`, `src/modules/notifications/**`,
-`src/email-dispatch.loop.ts`, `prisma/models/{identity-access,notifications}.prisma`. Nếu `dev` đã đổi các file này sau
+`src/worker/email-dispatch.job.ts`, `prisma/models/{identity-access,notifications}.prisma`. Nếu `dev` đã đổi các file này sau
 `ab0c43a`, cập nhật spec trước. Không có blocker nguồn hoặc nghiệp vụ.
 
 ## Các bước nhỏ
@@ -21,7 +21,7 @@
       index theo spec), sửa `prisma/models/identity-access.prisma`, `notifications.prisma`. `notifications.types.ts`,
       `notifications.service.ts`, `email-dispatcher.service.ts` (bỏ gọi `isUsable` khi `actionTokenHash` null),
       `email-templates.ts` (ba mẫu, `resetPasswordLink`). Facade `isActionLinkUsable` trong `identity-access.service.ts` + `accounts/account.repo.ts` (`latestToken()` lọc purpose `INVITE` để chi tiết tài khoản không hiện token đặt lại);
-      `src/email-dispatch.loop.ts`. Unit: dispatcher bỏ qua kiểm token cho thư báo; render
+      `src/worker/email-dispatch.job.ts`. Unit: dispatcher bỏ qua kiểm token cho thư báo; render
       thư báo không chứa `#token=`; `isActionLinkUsable` đúng cho `INVITE`/`RESET_PASSWORD` × trạng thái.
       Integration: `email-outbox.integration-spec.ts` thêm thư `actionTokenHash = null` (hai dòng null cùng tồn tại);
       `worker-mail-loop.integration-spec.ts` gửi thư báo qua SMTP trong tiến trình. Hồi quy 1b: toàn bộ suite lời mời PASS.
@@ -34,7 +34,7 @@
 - [x] **Bước 4 — đổi mật khẩu.** `access/me.controller.ts` (`POST /me/password`, `@AuthenticatedOnly`, xóa cookie refresh
       như `auth.controller.ts` logout), `auth/password-change.service.ts`; T-6 dùng chung upsert throttle của
       `login.service.ts` qua repo, không sao chép logic. HTTP integration: AC-5, AC-7 vế đổi, AC-12.
-- [x] **Bước 5 — đồng thời, lỗi tạm thời, bảo mật.** `test/integration/password-self-service-concurrency.integration-spec.ts`
+- [x] **Bước 5 — đồng thời, lỗi tạm thời, bảo mật.** `test/integration/identity-access/password-self-service-concurrency.integration-spec.ts`
       với `concurrency-harness` (6 ca trong spec, mỗi ca kiểm cả hai thứ tự commit qua `pg_locks`); ca `PgRelay` 503 không
       ghi dở (kiểm `pg_stat_activity` không còn `idle in transaction`); AC-9 grep token/mật khẩu thật trên `audit_events`,
       `email_outbox` (ngoài ciphertext) và log bắt được.
@@ -52,7 +52,7 @@ Biến môi trường mới có mặc định nên cấu hình cũ vẫn khởi 
 Chạy từ gốc BE. Integration: PostgreSQL 17 localhost, `TEST_DATABASE_ADMIN_URL` với role
 `LOGIN NOSUPERUSER CREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS`; mỗi suite tạo/drop `slm_<random>_test` riêng.
 SMTP: server trong tiến trình cổng ngẫu nhiên `127.0.0.1` (mẫu `worker-mail-loop`), không dùng SMTP chung hay hộp thư thật.
-Worker: `INestApplicationContext` của `worker.module.ts` trong test, đóng ở `afterAll` trước khi drop DB; timeout chờ thư
+Worker: `INestApplicationContext` của `worker/worker.module.ts` trong test, đóng ở `afterAll` trước khi drop DB; timeout chờ thư
 bằng poll trạng thái outbox có hạn, không `sleep` cố định. Dữ liệu tổng hợp qua `seedInstallation` + API 1b (tạo, mời,
 kích hoạt); `TERMINATED` bằng SQL fixture có ghi chú vì G6 chưa có API.
 

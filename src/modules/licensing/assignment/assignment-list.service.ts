@@ -1,13 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { Page, pageOf } from '../../../core/application/pagination';
-import { CatalogService } from '../../catalog/catalog.service';
-import { OrganizationService } from '../../organization/organization.service';
-import type { AssignmentListFilter, AssignmentSummaryView } from '../licensing.types';
+import { CatalogApi } from '../../catalog/public/catalog.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
+import type { AssignmentListFilter, AssignmentSummaryView } from '../public/licensing.types';
 import { AssignmentRepo } from './assignment.repo';
 import { toAssignmentView } from './assignment.policy';
 
 /**
- * The assignments an IT Admin browses (`US-02-05`, `LD-10`): a page cut and counted in one snapshot, each row with the
+ * The assignments an IT Admin browses (`US-02-05`): a page cut and counted in one snapshot, each row with the
  * person, the plan and the Cost Center it names, read once for the whole page instead of one at a time. Three reads of
  * other capabilities at most, whatever the page size.
  */
@@ -15,8 +15,8 @@ import { toAssignmentView } from './assignment.policy';
 export class AssignmentListService {
   constructor(
     private readonly repo: AssignmentRepo,
-    private readonly organization: OrganizationService,
-    private readonly catalog: CatalogService,
+    private readonly organization: OrganizationApi,
+    private readonly catalog: CatalogApi,
   ) {}
 
   /** One page by start date then id, the start shown as the grant date only when it is the real one. */

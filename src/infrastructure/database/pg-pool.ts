@@ -7,6 +7,16 @@ type QueryCallback = (error: Error | null, result?: unknown) => void;
 
 const isReadTimeout = (error: unknown): boolean => error instanceof Error && error.message === CLIENT_QUERY_TIMEOUT;
 
+/** The forms the class doc refuses: a Submittable, a config object with a `callback`, a callback in two positions. */
+const isUnobservableQuery = (first: unknown, second: unknown, third: unknown): boolean =>
+  typeof (first as { submit?: unknown } | null)?.submit === 'function' ||
+  (typeof first === 'object' && first !== null && (first as { callback?: unknown }).callback !== undefined) ||
+  (typeof second === 'function' && third !== undefined);
+
+/** Where pg finds the callback: the third argument if it is a function, else the second; -1 when there is none. */
+const callbackPosition = (second: unknown, third: unknown): number =>
+  typeof third === 'function' ? 2 : typeof second === 'function' ? 1 : -1;
+
 /**
  * A query form the pooled client cannot observe. It is a programming error (not a database
  * condition), so it is deliberately not one of the messages `toTransientError` maps to a 503.
@@ -45,7 +55,7 @@ export class RetireOnTimeoutClient extends Client {
   private retired = false;
 
   constructor(config?: string | ClientConfig) {
-    // Refused before pg sees the configuration (INF.1 / F-30): pg itself warns that a custom Promise is deprecated, and
+    // Refused before pg sees the configuration: pg itself warns that a custom Promise is deprecated, and
     // pipelined queries survive end() until they drain while a custom Promise breaks the .then below.
     const options = (typeof config === 'object' ? config : undefined) as
       { pipeline?: unknown; Promise?: unknown } | undefined;
@@ -56,15 +66,9 @@ export class RetireOnTimeoutClient extends Client {
     // An own property wraps the accepted forms (see the class doc) and refuses the rest.
     this.query = ((...args: unknown[]): unknown => {
       const [first, second, third] = args;
-      if (
-        typeof (first as { submit?: unknown } | null)?.submit === 'function' ||
-        (typeof first === 'object' && first !== null && (first as { callback?: unknown }).callback !== undefined) ||
-        (typeof second === 'function' && third !== undefined)
-      ) {
-        throw new UnsupportedQueryFormError();
-      }
+      if (isUnobservableQuery(first, second, third)) throw new UnsupportedQueryFormError();
 
-      const position = typeof third === 'function' ? 2 : typeof second === 'function' ? 1 : -1;
+      const position = callbackPosition(second, third);
       if (position === -1) {
         const result = query(...args);
         if (!(result instanceof Promise)) return result;

@@ -26,7 +26,7 @@ khoảng trống chính là chế độ khóa, ba audit payload và vài ca faca
 
 ### Task 1: characterization trên code cũ
 
-- Files: `test/integration/organization-concurrency.integration-spec.ts` (khối `lock modes kept by the Wave 2 move`, 3 test),
+- Files: `test/integration/organization/organization-concurrency.integration-spec.ts` (khối `lock modes kept by the Wave 2 move`, 3 test),
   `organization.integration-spec.ts` (3 test), `employee-manual-http`, `job-titles-http`, `cost-centers-http` (audit payload).
 - Depends on: none.
 - Acceptance: xanh trên code chưa sửa.

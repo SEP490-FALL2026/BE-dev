@@ -48,7 +48,7 @@
 
 ### Task 6: API, harness và gate
 
-- Files: `budget.dto.ts`, `budget-harness.ts`, `api-coverage-manifest.ts`, `api-inventory.e2e-spec.ts`, `openapi.json`, `app.module.ts`
+- Files: `budget.dto.ts`, `budget-harness.ts`, `api-coverage-manifest.ts`, `api-inventory.e2e-spec.ts`, `openapi.json`, `app/app.module.ts`
 - Depends on: Task 4
 - Acceptance: 22 route, op count 180, danh sách trả bản tóm tắt, OpenAPI xuất lại
 - Verify: `jest src`, e2e kiểm kê, `tsc`, `eslint` xanh

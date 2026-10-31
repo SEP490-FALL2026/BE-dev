@@ -44,3 +44,5 @@ gỡ mục registry; ghi chú FE; Owner review trên revision cụ thể.
 - [x] Diff cuối đã tự review; tài liệu vận hành/runbook bị ảnh hưởng đã cập nhật; phần chưa kiểm chứng ghi rõ.
 - [ ] Giao Owner review trên revision cụ thể; cập nhật roadmap/PR. Chỉ ghi `merged-dev`, `accepted`, `released` sau
       đúng sự kiện thật.
+
+**Prompt 29 (23/10/2026):** `P28-06` — dòng `LD-08` "xanh" trước đây không có code cắt chi tiết lỗi; nay `connectorErrorDetail` (tối đa `FAILURE_REASON_MAX_LENGTH`, không cắt đôi ký tự) và test biên unit + integration. `P28-13` so `elapsedSeconds` giữa list/detail theo thời điểm đặt. [g0-g4-checkpoint-fix-forward](../g0-g4-checkpoint-fix-forward/spec.md).

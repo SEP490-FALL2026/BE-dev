@@ -8,9 +8,11 @@ import {
   ProvisioningTaskNotManualError,
   ProvisioningTaskStateError,
   ProvisioningTypeNotSupportedError,
-} from '../licensing.errors';
+} from '../public/licensing.errors';
+import { ProvisioningItAdminRequiredError } from './provisioning.errors';
 import {
   assertGrantableType,
+  assertItAdmin,
   assertSubscriptionChoice,
   chooseAccount,
   chooseServiceIdentifier,
@@ -200,6 +202,19 @@ describe('the identifier of a service account (US-05-21 AC-4)', () => {
   it('is required: nothing, an empty text and spaces alone are refused', () => {
     for (const given of [undefined, '', '   ']) {
       expect(() => chooseServiceIdentifier(given)).toThrow(ProvisioningAccountIdentifierRequiredError);
+    }
+  });
+});
+
+describe('the role that works the provisioning queue (F13, QĐ-87a)', () => {
+  it('is the IT Admin: a person who holds the role passes, whatever else they hold', () => {
+    expect(() => assertItAdmin({ roles: ['IT_ADMIN'] })).not.toThrow();
+    expect(() => assertItAdmin({ roles: ['MANAGER', 'IT_ADMIN'] })).not.toThrow();
+  });
+
+  it('is judged here and not only by the guard of the route: any other role, or none, is refused', () => {
+    for (const roles of [[], ['FINANCE'], ['SUPER_ADMIN'], ['MANAGER', 'SPENDING_APPROVER']]) {
+      expect(() => assertItAdmin({ roles })).toThrow(ProvisioningItAdminRequiredError);
     }
   });
 });

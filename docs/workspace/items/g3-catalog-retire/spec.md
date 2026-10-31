@@ -133,3 +133,8 @@ Migration `20261020240000_catalog_application_retirement`: bảng `application_r
 Giới hạn còn lại: (1) `confirmedBy` chấp nhận lại một xác nhận cũ của người hiện là Business Owner khi người đó từng được thay rồi phục hồi (xác nhận cũ lại có hiệu lực) — câu hỏi cho Owner; (2) thuê bao `TERM` nháp không có ngày kết thúc chặn việc ngừng và chưa có đường hủy cho tới `US-11-02` (G8); (3) test dựng Assignment đã kết thúc bằng SQL vì thu hồi (`US-07-05`) thuộc G6; (4) chưa có remote CI, chưa chạy trên môi trường dùng chung.
 
 Câu hỏi cho Owner: giới hạn (1) có chấp nhận không hay xác nhận phải ghi lại sau mỗi lần đổi Business Owner; giới hạn (2) có cần đường hủy thuê bao nháp sớm hơn `US-11-02` không. Chưa có câu nào trong Q1–Q8 của kiểm kê liên quan trực tiếp tới lát này.
+
+## Mở lại theo baseline `769bb64` (Prompt 03, 26/10/2026)
+
+- Audit G0–G6 trên Docs `769bb64` ↔ BE `7c28e75` mở lại hạng mục này: F23 — khai thuê bao/nhập khóa cho ứng dụng đã ngừng.
+- Remediation duy nhất: [g0-g6-final-business-baseline-remediation](../g0-g6-final-business-baseline-remediation/spec.md) ([impact matrix](../g0-g6-final-business-baseline-remediation/impact-matrix.md#3-findings)). AC liên quan không còn được coi là thỏa nguồn hiện hành cho tới khi remediation xong; trạng thái triển khai ở roadmap. Phần đã ghi phía trên là lịch sử, giữ nguyên.

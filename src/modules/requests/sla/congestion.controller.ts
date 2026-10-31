@@ -2,8 +2,10 @@ import { Body, Controller, Get, HttpStatus, Post, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
+  FORBIDDEN_EXAMPLE,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
+  VALIDATION_EXAMPLE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
 import { RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
@@ -19,17 +21,19 @@ import {
   CongestionStepsQueryDto,
   CongestionStepsResponseDto,
 } from './congestion.dto';
-import { toCongestionApiException } from './congestion.http-errors';
+import { CONGESTION_ERROR_EXAMPLES, toCongestionApiException } from './congestion.http-errors';
 import { CongestionService } from './congestion.service';
 
 const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPONSE] as const;
 const SUPER_ADMIN_ONLY = {
   status: HttpStatus.FORBIDDEN,
   description: 'Only the Super Admin reads the board and records incidents (AUTHORIZATION.FORBIDDEN).',
+  examples: [FORBIDDEN_EXAMPLE],
 } as const;
 const INVALID_QUERY = {
   status: HttpStatus.UNPROCESSABLE_ENTITY,
   description: 'The query is invalid (VALIDATION_ERROR).',
+  examples: [VALIDATION_EXAMPLE],
 } as const;
 
 /**
@@ -93,11 +97,13 @@ export class CongestionController {
     {
       status: HttpStatus.NOT_FOUND,
       description: 'The person is not an employee of the organization (STEP_CONGESTION.HOLDER_NOT_FOUND).',
+      examples: [CONGESTION_ERROR_EXAMPLES.HOLDER_NOT_FOUND],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
         'The form is invalid (VALIDATION_ERROR): the description is required and at most 1000 characters, and the person is an id or null. Nothing is written.',
+      examples: [VALIDATION_EXAMPLE],
     },
   )
   async record(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: CongestionIncidentBodyDto) {

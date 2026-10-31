@@ -1,14 +1,14 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { randomBytes } from 'node:crypto';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { ACCOUNT_SESSIONS, AccountSessions } from '../identity-access.ports';
+import { ACCOUNT_SESSIONS, AccountSessions } from '../accounts/account-sessions.types';
 import { ActionLinkRevocation } from '../accounts/action-link-revocation.service';
-import { CredentialService } from '../accounts/credential.service';
+import { CredentialService } from '../credentials/credential.service';
 
 /**
  * What an operator's credential reset takes away from the holder (AC-9): every link, every session and the old password,
  * which a credential nobody knows replaces. The sessions end through the repository that owns them, in the same
- * transaction (F-19, E6).
+ * transaction.
  */
 @Injectable()
 export class HolderCredentialReset {

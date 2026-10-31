@@ -1,21 +1,19 @@
 import type { BusinessDate } from '../../../core/business-date';
-import type { PlanRevocationInfo } from '../../catalog/catalog.types';
-import type { OrganizationService } from '../../organization/organization.service';
-import type { DepartmentBrief, EmployeeRecord } from '../../organization/organization.types';
+import type { PlanRevocationInfo } from '../../catalog/public/catalog.types';
+import type { DepartmentBrief, EmployeeRecord } from '../../organization/public/organization.types';
 import type { TransferReviewItemWire, TransferReviewSummaryWire } from './transfer-review.dto';
 import { isReviewOverdue, overdueDaysOf, waitingReasonOf } from './transfer-review.policy';
 import type { ReviewItemRecord, ReviewSummaryRecord } from './transfer-review.types';
-
-type JobTitleRecord = Awaited<ReturnType<OrganizationService['getJobTitles']>>[number];
 
 /** What the wire needs of the organization and the catalog, read in batches for a whole page. */
 export interface ReviewNames {
   employees: ReadonlyMap<string, EmployeeRecord>;
   departments: ReadonlyMap<string, DepartmentBrief>;
-  jobTitles: ReadonlyMap<string, JobTitleRecord>;
   plans: ReadonlyMap<string, PlanRevocationInfo>;
   /** The head of each department today, by department id; absent while it has none. */
   heads: ReadonlyMap<string, string>;
+  /** The seats of the lines of the page whose old seat is already being taken back for this review. */
+  revoking: ReadonlySet<string>;
 }
 
 export const employeeBriefOf = (employee: EmployeeRecord) => ({
@@ -39,13 +37,12 @@ export function toSummary(
 ): TransferReviewSummaryWire {
   const head = names.heads.get(record.departmentId) ?? null;
   const department = required(names.departments.get(record.departmentId), 'department');
-  const jobTitle = required(names.jobTitles.get(record.jobTitleId), 'job title');
 
   return {
     id: record.id,
+    origin: record.transferId === null ? 'POST_SETUP' : 'TRANSFER',
     employee: employeeBriefOf(required(names.employees.get(record.employeeId), 'person')),
     department: { id: department.id, code: department.code, name: department.name },
-    jobTitle: { id: jobTitle.id, name: jobTitle.name },
     effectiveOn: record.effectiveOn,
     dueOn: record.dueOn,
     status: record.status,
@@ -74,5 +71,7 @@ export function toItem(item: ReviewItemRecord, names: ReviewNames): TransferRevi
     decidedAt: item.decidedAt ? item.decidedAt.toISOString() : null,
     newToolNote: item.newToolNote,
     revocationTaskId: item.revocationTaskId,
+    // A new Request is still asked for only while the old seat stays: once its revocation is under way (the Request ended) it is not.
+    needsNewRequest: item.decision === 'STILL_NEEDED' && !names.revoking.has(item.assignmentId),
   };
 }

@@ -1,6 +1,7 @@
 import { HttpStatus } from '@nestjs/common';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import { toUnavailableApiException } from '../../../infrastructure/http/errors/service-unavailable';
+import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
 import {
   ContractNameRequiredError,
   ContractNotFoundError,
@@ -61,3 +62,26 @@ export function toContractApiException(error: unknown): unknown {
 
   return toUnavailableApiException(error) ?? error;
 }
+
+const example = (error: Error) => errorExampleOf(toContractApiException(error));
+
+/** The default of the operating parameter DOCUMENT_MAX_SIZE_MB (10 MB), the largest file the example refuses. */
+const EXAMPLE_MAX_BYTES = 10 * 1024 * 1024;
+
+/** The answers above as OpenAPI examples, each produced by the mapper that gives it at runtime. */
+export const CONTRACT_ERROR_EXAMPLES = {
+  CONTRACT_NOT_FOUND: example(new ContractNotFoundError()),
+  NAME_REQUIRED: example(new ContractNameRequiredError()),
+  DOCUMENT_NOT_FOUND: example(new DocumentNotFoundError()),
+  PURPOSE_FORBIDDEN: example(new DocumentPurposeForbiddenError()),
+  PURPOSE_NOT_AVAILABLE: example(new DocumentPurposeNotAvailableError('TAX_PAYMENT_PROOF')),
+  TYPE_NOT_ALLOWED: example(new DocumentTypeNotAllowedError()),
+  TOO_LARGE: example(new DocumentTooLargeError(EXAMPLE_MAX_BYTES)),
+  FILE_INVALID: example(new DocumentFileInvalidError('NAME')),
+  UPLOAD_MISMATCH: example(new DocumentUploadMismatchError()),
+  NOT_AWAITING_UPLOAD: example(new DocumentNotAwaitingUploadError()),
+  UPLOAD_PENDING: example(new DocumentUploadPendingError()),
+  UPLOAD_EXPIRED: example(new DocumentUploadExpiredError()),
+  ALREADY_ATTACHED: example(new DocumentAlreadyAttachedError()),
+  NOT_READY_TO_ATTACH: example(new DocumentNotReadyToAttachError()),
+} as const;

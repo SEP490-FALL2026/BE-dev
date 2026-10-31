@@ -4,8 +4,8 @@ import { type BusinessDate, fromDateColumn, toDateColumn } from '../../../core/b
 import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import type { Grounds } from '../grounds/grounds.policy';
-import type { LeaveInterval } from '../personnel.types';
+import type { Grounds } from '../personnel-grounds.policy';
+import type { LeaveInterval } from '../public/personnel.types';
 import type {
   LeaveChangeKind,
   LeaveChangeRecord,
@@ -47,8 +47,8 @@ function toRecord(row: LeaveRow): LeaveRecord {
       issuedOn: fromDateColumn(row.groundsIssuedOn),
     },
     startedByAppUserId: row.startedByAppUserId,
+    startedByTicketId: row.startedByTicketId,
     startedAt: row.startedAt,
-    selfExecuted: row.selfExecuted,
     returnOverdueNoticedFor: dateOrNull(row.returnOverdueNoticedFor),
   };
 }
@@ -78,8 +78,8 @@ function toChange(row: ChangeRow): LeaveChangeRecord {
           }
         : null,
     recordedByAppUserId: row.recordedByAppUserId,
+    recordedByTicketId: row.recordedByTicketId,
     recordedAt: row.recordedAt,
-    selfExecuted: row.selfExecuted,
   };
 }
 
@@ -107,7 +107,7 @@ export class LeaveRepo {
         resumesLeaveId: input.resumesLeaveId,
         ...groundsColumns(input.grounds),
         startedByAppUserId: input.startedByAppUserId,
-        selfExecuted: input.selfExecuted,
+        startedByTicketId: input.startedByTicketId,
         noticeId: input.noticeId ?? null,
       },
     });
@@ -175,8 +175,8 @@ export class LeaveRepo {
       returnedOn?: BusinessDate;
       onSchedule?: boolean;
       grounds?: Grounds;
-      recordedByAppUserId: string;
-      selfExecuted: boolean;
+      recordedByAppUserId: string | null;
+      recordedByTicketId: string | null;
     },
   ): Promise<void> {
     await tx.employeeLeaveChange.create({
@@ -190,7 +190,7 @@ export class LeaveRepo {
         onSchedule: input.onSchedule ?? null,
         ...(input.grounds ? groundsColumns(input.grounds) : {}),
         recordedByAppUserId: input.recordedByAppUserId,
-        selfExecuted: input.selfExecuted,
+        recordedByTicketId: input.recordedByTicketId,
       },
     });
   }
@@ -198,6 +198,7 @@ export class LeaveRepo {
   /** One page of leaves, the nearest day of return first, and the total for the same filter, from one snapshot. */
   async list(filter: LeaveListFilter): Promise<{ items: LeaveSummaryRecord[]; total: number }> {
     const where: Prisma.EmployeeLeaveWhereInput = {
+      ...(filter.employeeIds ? { AND: [{ employeeId: { in: [...filter.employeeIds] } }] } : {}),
       ...(filter.employeeId ? { employeeId: filter.employeeId } : {}),
       ...(filter.overdueReturn
         ? { status: 'ACTIVE', approvedReturnOn: { lt: toDateColumn(filter.today) } }

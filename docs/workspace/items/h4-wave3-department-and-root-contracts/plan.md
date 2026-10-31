@@ -42,7 +42,7 @@ identity-access, core — 30 suite/569 test.
 
 ### Task 1: characterization trên code cũ
 
-- Files: `test/integration/departments-http.integration-spec.ts` (7 test), `organization-concurrency.integration-spec.ts`
+- Files: `test/integration/organization/departments-http.integration-spec.ts` (7 test), `organization-concurrency.integration-spec.ts`
   (3 test; helper `settlesWhileShared` nâng lên phạm vi suite), `organization.integration-spec.ts` (3 test) — mỗi tệp một
   khối `... kept by the Wave 3 move`.
 - Đã có từ trước: tạo/sửa/ngừng, mã trùng, Cost Center không dùng được, `IN_USE` ba khóa, head AC-5 → AC-9/AC-18,

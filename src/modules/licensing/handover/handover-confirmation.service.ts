@@ -1,11 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { AuditService } from '../../audit/audit.service';
-import { licensingAuditEvent } from '../mappers/licensing-audit-event';
+import { AuditApi } from '../../audit/public/audit.api';
+import { licensingAuditEvent } from '../licensing-audit-event.mapper';
 import { confirmedRoleOf, isOverdue, isValueAllowed } from './handover-confirmer.policy';
 import { HandoverCaseFacts } from './handover-case-facts.service';
-import { HandoverConfirmerResolver } from './handover-confirmer.resolver';
+import { HandoverConfirmerResolver } from './handover-confirmer.service';
 import { HandoverDutyError } from './handover.errors';
 import { HandoverRepo, type DutyRecord } from './handover.repo';
 
@@ -22,7 +22,7 @@ export class HandoverConfirmationService {
     private readonly repo: HandoverRepo,
     private readonly resolver: HandoverConfirmerResolver,
     private readonly facts: HandoverCaseFacts,
-    private readonly audit: AuditService,
+    private readonly audit: AuditApi,
   ) {}
 
   /** Throws HandoverDutyError (`NOT_FOUND`, `NOT_CONFIRMER`, `CANCELLED`, `ALREADY_CONFIRMED`, `VALUE_NOT_ALLOWED`). */

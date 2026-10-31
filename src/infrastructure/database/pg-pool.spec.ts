@@ -92,7 +92,7 @@ describe('RetireOnTimeoutClient', () => {
       expect(events).toEqual(['end', 'hook', 'caller']);
     });
 
-    // INF.1 / F-30: one query at a time, as the Prisma adapter sends them; pg deprecates queueing a second query on a
+    // One query at a time, as the Prisma adapter sends them; pg deprecates queueing a second query on a
     // client that is still running one, and nothing in production does.
     it('retires once when two queries in turn both time out, and each caller gets its own error', async () => {
       const { client, end } = build();

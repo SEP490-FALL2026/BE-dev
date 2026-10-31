@@ -19,11 +19,11 @@ audit (F-02, Q4), H3a của handoff, R-1/Bước 1 của remediation, spec/plan 
 
 ### Task 1: test đỏ cho response 409
 
-- Files: `test/integration/departments-http.integration-spec.ts`.
+- Files: `test/integration/organization/departments-http.integration-spec.ts`.
 - Depends on: none.
 - Acceptance: test khẳng định 409, code, message, đúng ba khóa `details`, không `sharedAccounts`, phòng `ACTIVE`, audit
   không thêm; đỏ trên code hiện tại chỉ vì khóa còn tồn tại.
-- Verify: `pnpm test:integration -- test/integration/departments-http.integration-spec.ts` trên PostgreSQL riêng → 1 đỏ.
+- Verify: `pnpm test:integration -- test/integration/organization/departments-http.integration-spec.ts` trên PostgreSQL riêng → 1 đỏ.
 
 ### Task 2: sửa tối thiểu
 

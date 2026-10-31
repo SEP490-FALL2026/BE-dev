@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import type { RevocationSource } from '../licensing.types';
+import type { RevocationSource } from '../public/licensing.types';
 
 /** A reason that asked for the revocation of a seat, as it is kept. */
 export interface ReasonRecord {

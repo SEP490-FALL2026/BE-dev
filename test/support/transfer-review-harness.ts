@@ -8,7 +8,7 @@ export interface ReviewWire {
   id: string;
   employee: { id: string; employeeCode: string; fullName: string };
   department: { id: string; code: string; name: string };
-  jobTitle: { id: string; name: string };
+  origin: 'TRANSFER' | 'POST_SETUP';
   effectiveOn: string;
   dueOn: string;
   status: 'OPEN' | 'COMPLETED' | 'SUPERSEDED';
@@ -22,6 +22,7 @@ export interface ReviewWire {
   transferId?: string | null;
   completedAt?: string | null;
   overdueNoticedAt?: string | null;
+  unfinishedRequests?: { requestId: string; type: string; state: string; plan: { id: string; name: string } | null }[];
 }
 
 export interface ReviewItemWire {
@@ -36,6 +37,7 @@ export interface ReviewItemWire {
   decidedAt: string | null;
   newToolNote: string | null;
   revocationTaskId: string | null;
+  needsNewRequest: boolean;
 }
 
 export interface ReviewRow {
@@ -81,7 +83,7 @@ export class TransferReviewHarness extends HandoverHarness {
   /** The reminder of the hour for the reviews past their deadline, run by hand. */
   noticeLateReviews = (now: Date = new Date()) => this.ctx.app.get(TransferReviewOverdueService).noticeOverdue(now);
 
-  /** The transfer of the person to the department from today, recorded as the IT Admin does; the review opens in the same step. */
+  /** The transfer of the person to the department from today, recorded as the Super Admin does; the review opens in the same step. */
   async moveToday(person: Person, to: Department, extra: object = {}) {
     return this.recorded({
       employeeId: person.employeeId,

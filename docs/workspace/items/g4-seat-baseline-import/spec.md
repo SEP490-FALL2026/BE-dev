@@ -29,10 +29,10 @@ IT Admin import hiện trạng ai đang giữ seat nào của **một thuê bao*
 
 ## Primary Story/AC
 
-| Story    | AC         | Coverage | Phần còn lại thuộc                                                                                                                                                                       |
-| -------- | ---------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| US-02-05 | AC-1→AC-14 | partial  | AC-11 vế K4: `g4-device-dependent-features`; AC-7, AC-10 vế phòng sở hữu (`QĐ-86`, 22/10/2026): `g2-g4-unit-only-cost-attribution`                                                       |
-| US-07-01 | AC-14      | partial  | AC-1, AC-2, AC-4→AC-9, AC-11→AC-13, AC-15, AC-17: `g4-provisioning-queue-manual`; AC-1, AC-3, AC-15, AC-16: `g4-request-and-transfer-integration`; AC-10: `g4-device-dependent-features` |
+| Story    | AC         | Coverage | Phần còn lại thuộc                                                                                                                                                                              |
+| -------- | ---------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| US-02-05 | AC-1→AC-16 | partial  | AC-11 vế K4: `g4-device-dependent-features`; AC-7, AC-10 vế phòng sở hữu (`QĐ-86`, 22/10/2026): `g2-g4-unit-only-cost-attribution`                                                              |
+| US-07-01 | AC-14      | partial  | AC-1, AC-2, AC-4→AC-9, AC-11→AC-13, AC-15, AC-17, AC-18: `g4-provisioning-queue-manual`; AC-1, AC-3, AC-15, AC-16: `g4-request-and-transfer-integration`; AC-10: `g4-device-dependent-features` |
 
 AC-11 `partial`: dòng K1/K2 ghi như Assignment thường trên tài khoản công ty (có test); gói K4 bị từ chối cả lần import với lý do _chưa hỗ trợ khóa và thiết bị công ty_ — vế _một khóa trong kho gắn đúng một Assignment cùng thiết bị công ty_ thuộc `g4-device-dependent-features`. US-07-01 AC-14 `partial`: lát này làm vế _Assignment khởi tạo được đánh dấu_ (`source = BASELINE`, không Request, Audit Trail ghi nguồn), không làm cấp từ Request.
 
@@ -167,3 +167,9 @@ Audit cùng giao dịch như bảng _Làm rõ yêu cầu_. Định danh tài kho
 Triển khai và kiểm chứng cục bộ đã ghi ở [plan](plan.md) (bảng _Verification and handoff_). Owner review: chưa review. Peer review: chưa có. Chưa có nghiệm thu nào.
 
 21/10/2026 (đợt hoàn tất G2–G4, [audit](../../../reviews/g2-g4-completion-2026-10-21/README.md), quyết định D1 của AI, chờ Owner): thêm mã lỗi dòng `EFFECTIVE_BEFORE_HIRE` — một seat không bao giờ bắt đầu trước ngày vào làm của người giữ (xem hàng _Ngày cấp_ ở bảng _Làm rõ yêu cầu_ và hàng `US-02-02` AC-15 của test matrix). Không đổi bảng Primary Story/AC. Mô tả OpenAPI của tải lên và xác nhận nay nêu `SEAT_TARGET.APPLICATION_RETIRED` và `SEAT_TARGET.SUBSCRIPTION_DRAFT` (bảng HTTP đã cập nhật). Harness test tạo người hiện trạng với ngày vào làm 2020-01-01. Lệnh `pnpm check`, `pnpm test:e2e`, `pnpm test:integration` của đợt này ghi ở plan của `g4-provisioning-queue-manual` và `g4-provisioning-failure-handling` (cùng một cây làm việc).
+
+## Mở lại theo baseline `769bb64` (Prompt 03, 26/10/2026)
+
+- Audit G0–G6 trên Docs `769bb64` ↔ BE `7c28e75` mở lại hạng mục này: F21 — phòng sở hữu và rà soát sau khởi tạo (`QĐ-89e`).
+- Remediation duy nhất: [g0-g6-final-business-baseline-remediation](../g0-g6-final-business-baseline-remediation/spec.md) ([impact matrix](../g0-g6-final-business-baseline-remediation/impact-matrix.md#3-findings)). AC liên quan không còn được coi là thỏa nguồn hiện hành cho tới khi remediation xong; trạng thái triển khai ở roadmap. Phần đã ghi phía trên là lịch sử, giữ nguyên.
+- _27/10/2026 (Prompt 04, Task 0.1 của `g0-g6-final-business-baseline-remediation`, F60 — re-pin scope map [G4](../../../roadmap.md#work-item-decomposition-g4) Docs `e0cb5a0`, BE `7c28e75`):_ nhận thêm `US-02-05` AC-15, AC-16 (F21 — `QĐ-89e`, bước 4 khởi tạo; mục 4 nêu hạng mục này) ([impact matrix mục 9](../g0-g6-final-business-baseline-remediation/impact-matrix.md#9-phụ-lục-delta-user-stories-72e1480--769bb64)). Phần đã ghi phía trên là lịch sử, giữ nguyên.

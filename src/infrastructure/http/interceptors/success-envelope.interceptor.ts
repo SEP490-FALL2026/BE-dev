@@ -2,7 +2,11 @@ import { CallHandler, ExecutionContext, Injectable, NestInterceptor } from '@nes
 import { Reflector } from '@nestjs/core';
 import { map, Observable } from 'rxjs';
 import { RAW_RESPONSE_METADATA } from '../decorators/raw-response.decorator';
-import { DEFAULT_SUCCESS_MESSAGE, SUCCESS_MESSAGE_METADATA } from '../decorators/api-success-response.decorator';
+import {
+  DEFAULT_SUCCESS_MESSAGE,
+  SUCCESS_MESSAGE_OVERRIDE,
+  SUCCESS_MESSAGE_METADATA,
+} from '../decorators/api-success-response.decorator';
 
 @Injectable()
 export class SuccessEnvelopeInterceptor implements NestInterceptor {
@@ -25,9 +29,17 @@ export class SuccessEnvelopeInterceptor implements NestInterceptor {
     return next.handle().pipe(
       map((data: unknown) => ({
         success: true as const,
-        message,
+        message: this.chosenMessage(context) ?? message,
         data: data ?? null,
       })),
     );
+  }
+
+  /** The message a handler put on the request for this call (`SUCCESS_MESSAGE_OVERRIDE`), read once the handler has answered. */
+  private chosenMessage(context: ExecutionContext): string | null {
+    const request = context.switchToHttp?.().getRequest<Record<string, unknown> | undefined>();
+    const chosen = request?.[SUCCESS_MESSAGE_OVERRIDE];
+
+    return typeof chosen === 'string' ? chosen : null;
   }
 }

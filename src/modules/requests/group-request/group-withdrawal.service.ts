@@ -1,11 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { AuditService } from '../../audit/audit.service';
-import { BudgetsService } from '../../budgets/budgets.service';
-import { LicensingService } from '../../licensing/licensing.service';
-import { OrganizationService } from '../../organization/organization.service';
-import { accessRequestAuditEvent } from '../access-request/access-request-audit-event';
+import { LicensingApi } from '../../licensing/public/licensing.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
 import {
   AccessRequestNotFoundError,
   AccessRequestWithdrawalRefusedError,
@@ -15,16 +12,11 @@ import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
 import { checkWithdrawal } from '../access-request/withdrawal.policy';
 import { SpendStatusService } from '../spend/spend-status.service';
-import { GroupGrantService } from './group-grant.service';
-import { checkLineWithdrawal, holdsMoney } from './group-withdrawal.policy';
-import { isEnded, type LineRecord } from './group-request.types';
-import { GroupResolutionService } from './group-resolution.service';
-import { shareToRelease } from './line-allocation.policy';
-import { LineAmountRepo } from './line-amount.repo';
+import { GroupLineWithdrawer } from './group-line-withdrawer.service';
+import { GroupWithdrawalAftermath } from './group-withdrawal-aftermath.service';
+import { checkLineWithdrawal, type Withdrawn } from './group-withdrawal.policy';
+import { isEnded, type LineRecord } from '../access-request/group-request.types';
 import { RequestLineRepo } from './request-line.repo';
-
-/** What the withdrawal of one line did: it ended, or it waits for the IT Admin to close the task of a grant that had failed. */
-type Withdrawn = { kind: 'ENDED'; released: boolean } | { kind: 'WAITING_FOR_IT'; taskId: string };
 
 /**
  * Withdrawing one person of a request for a group, or all the people that are left (`US-05-08`, `US-06-14` AC-14, `US-05-17` AC-10).
@@ -40,14 +32,11 @@ export class GroupWithdrawalService {
     private readonly runner: TransactionRunner,
     private readonly requests: AccessRequestRepo,
     private readonly lines: RequestLineRepo,
-    private readonly amounts: LineAmountRepo,
-    private readonly grant: GroupGrantService,
-    private readonly resolution: GroupResolutionService,
-    private readonly licensing: LicensingService,
-    private readonly organization: OrganizationService,
+    private readonly licensing: LicensingApi,
+    private readonly organization: OrganizationApi,
     private readonly spendStatus: SpendStatusService,
-    private readonly budgets: BudgetsService,
-    private readonly audit: AuditService,
+    private readonly withdrawer: GroupLineWithdrawer,
+    private readonly aftermath: GroupWithdrawalAftermath,
   ) {}
 
   /** Throws AccessRequestNotFoundError and AccessRequestWithdrawalRefusedError. */
@@ -77,15 +66,12 @@ export class GroupWithdrawalService {
       if (refusal) throw new AccessRequestWithdrawalRefusedError(refusal);
 
       const now = new Date();
-      const done = await this.withdrawOne(tx, actor, request, line, reason, now);
-      await this.afterWithdrawing(
-        tx,
-        actor,
-        request,
-        [{ line, done }],
-        { reason, release: 'PARTICIPANT_WITHDRAWN' },
+      const done = await this.withdrawer.withdrawOne(tx, actor, request, line, { reason, now });
+      await this.aftermath.after(tx, actor, request, [{ line, done }], {
+        reason,
+        release: 'PARTICIPANT_WITHDRAWN',
         now,
-      );
+      });
 
       return this.reread(tx, requestId);
     });
@@ -126,113 +112,12 @@ export class GroupWithdrawalService {
       const now = new Date();
       const done: { line: LineRecord; done: Withdrawn }[] = [];
       for (const line of open) {
-        done.push({ line, done: await this.withdrawOne(tx, actor, request, line, reason, now) });
+        done.push({ line, done: await this.withdrawer.withdrawOne(tx, actor, request, line, { reason, now }) });
       }
-      await this.afterWithdrawing(tx, actor, request, done, { reason, release: 'REQUEST_WITHDRAWN' }, now);
+      await this.aftermath.after(tx, actor, request, done, { reason, release: 'REQUEST_WITHDRAWN', now });
 
       return this.reread(tx, requestId);
     });
-  }
-
-  /** What becomes of the line in the state it is in; the refusals are thrown and undo whatever was done before. */
-  private async withdrawOne(
-    tx: DbTx,
-    actor: AuthenticatedPrincipal,
-    request: AccessRequestRecord,
-    line: LineRecord,
-    reason: string | null,
-    now: Date,
-  ): Promise<Withdrawn> {
-    if (line.state === 'EXECUTING') {
-      const grant = await this.licensing.cancelGrantOfRequest(tx, actor, {
-        organizationId: request.organizationId,
-        requestId: request.id,
-        employeeId: line.employeeId,
-        now,
-      });
-      if (grant.status === 'RUNNING') {
-        throw new AccessRequestWithdrawalRefusedError('GRANT_RUNNING', { employeeIds: [line.employeeId] });
-      }
-      if (grant.status === 'COMPLETED') {
-        throw new AccessRequestWithdrawalRefusedError('GRANT_COMPLETED', { assignmentId: grant.assignmentId });
-      }
-      if (grant.status === 'ENDED') {
-        throw new AccessRequestWithdrawalRefusedError('ALREADY_ENDED', { employeeIds: [line.employeeId] });
-      }
-      if (grant.status === 'FAILED') {
-        // The grant failed: the IT Admin closes the task as cancelled, and only then does the line end and the money go back.
-        await this.lines.move(tx, request.id, line.employeeId, {
-          state: 'AWAITING_IT_CLOSE',
-          endedByEmployeeId: actor.employeeId,
-          endReason: reason,
-          withdrawalRequestedAt: now,
-        });
-
-        return { kind: 'WAITING_FOR_IT', taskId: grant.taskId };
-      }
-    }
-
-    await this.lines.move(tx, request.id, line.employeeId, {
-      state: 'WITHDRAWN',
-      endedAt: now,
-      endedByEmployeeId: actor.employeeId,
-      endReason: reason,
-      withdrawalRequestedAt: now,
-    });
-
-    return { kind: 'ENDED', released: holdsMoney(line.state) };
-  }
-
-  /** Gives back what the people hold, once for all of them, says what happened to each and lets the request follow its lines. */
-  private async afterWithdrawing(
-    tx: DbTx,
-    actor: AuthenticatedPrincipal,
-    request: AccessRequestRecord,
-    withdrawn: readonly { line: LineRecord; done: Withdrawn }[],
-    why: { reason: string | null; release: 'PARTICIPANT_WITHDRAWN' | 'REQUEST_WITHDRAWN' },
-    now: Date,
-  ): Promise<void> {
-    const toRelease = withdrawn.filter((entry) => entry.done.kind === 'ENDED' && entry.done.released);
-    const years = new Map<number, bigint>();
-    for (const entry of toRelease) {
-      const shares = shareToRelease(await this.amounts.of(request.id, entry.line.employeeId, tx));
-      for (const share of shares) years.set(share.year, (years.get(share.year) ?? 0n) + share.amountMinor);
-    }
-    if (years.size > 0) {
-      await this.budgets.releaseForRequest(tx, {
-        requestId: request.id,
-        reason: why.release,
-        amounts: [...years].map(([year, amountMinor]) => ({ year, amountMinor })),
-        now,
-      });
-      for (const entry of toRelease) await this.amounts.markReleased(tx, request.id, entry.line.employeeId, now);
-    }
-
-    for (const { line, done } of withdrawn) {
-      await this.audit.record(
-        tx,
-        accessRequestAuditEvent(
-          actor,
-          request.organizationId,
-          done.kind === 'ENDED' ? 'ACCESS_REQUEST.LINE_WITHDRAWN' : 'ACCESS_REQUEST.LINE_WITHDRAWAL_REQUESTED',
-          'ACCESS_REQUEST',
-          request.id,
-          {
-            requestId: request.id,
-            beneficiaryEmployeeId: line.employeeId,
-            from: line.state,
-            to: done.kind === 'ENDED' ? 'WITHDRAWN' : 'AWAITING_IT_CLOSE',
-            withdrawnByEmployeeId: actor.employeeId,
-            reason: why.reason,
-            requesterEmployeeId: request.requesterEmployeeId,
-            byRequester: actor.employeeId === request.requesterEmployeeId,
-            released: done.kind === 'ENDED' && done.released,
-            ...(done.kind === 'WAITING_FOR_IT' ? { taskId: done.taskId } : {}),
-          },
-        ),
-      );
-    }
-    await this.resolution.resolve(tx, actor, request.id, now);
   }
 
   /** The request locked, as a request for a group the caller has a part in, or the head of its department. */

@@ -2,7 +2,7 @@ import Joi from 'joi';
 import { EnvironmentValidationError } from './environment-validation';
 
 /**
- * Owner decision E3 = C (H4.0 audit, 09B): only NODE_ENV=test gets a public fallback for the secrets. Development and
+ * Owner decision: only NODE_ENV=test gets a public fallback for the secrets. Development and
  * production must supply their own values (development from `.env`), and neither may use a value that is public in
  * this repository: the test fallbacks below or the development fallbacks of earlier revisions. The key id of the outbox
  * and vault key ids follow their keys: a fallback in test, supplied everywhere else. Values never appear in an error message.
@@ -32,7 +32,7 @@ const TEST_FALLBACKS: SecretEnvironmentVariables = {
   LICENSE_KEY_FINGERPRINT_PEPPER: 'test-only-license-key-fingerprint-pepper-public',
 };
 
-/** Development fallbacks of revisions before H6.3: still public in the Git history, so never acceptable again. */
+/** Development fallbacks of older revisions: still public in the Git history, so never acceptable again. */
 const RETIRED_DEVELOPMENT_FALLBACKS: Pick<
   SecretEnvironmentVariables,
   'AUTH_ACCESS_TOKEN_SECRET' | 'AUTH_THROTTLE_PEPPER' | 'OUTBOX_PAYLOAD_KEY'

@@ -1,7 +1,7 @@
-import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
-import { isBusinessDate } from '../../../core/business-date';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
+import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
+import { businessDate } from '../../../infrastructure/http/dto/business-date.dto';
 
 /**
  * Only the shape and a generous bound are checked here. Whether a name is empty or too long, the kind fits the
@@ -16,7 +16,6 @@ const pricingModel = z.enum(['PER_SEAT', 'FLAT_RATE', 'CONCURRENT', 'CONSUMPTION
 const controlLevel = z.enum(['FULL', 'PARTIAL', 'UNCONTROLLABLE']);
 const sharingPolicy = z.enum(['ALLOWED', 'NOT_ALLOWED']);
 const workspaceRole = z.enum(['OWNER', 'ADMIN']);
-const businessDate = z.string().refine(isBusinessDate, { message: 'Must be a real date as YYYY-MM-DD.' });
 
 export const declarePlanBodySchema = z.strictObject({
   applicationId: z.uuid(),
@@ -85,7 +84,7 @@ const workspaceProfileSchema = z.strictObject({
     .nullable(),
   updatedAt: z.iso.datetime(),
 });
-/** A row of the list (`LD-05`); the plan as a detail or a write answers it is this and the revocation note. */
+/** A row of the list; the plan as a detail or a write answers it is this and the revocation note. */
 const planSummarySchema = z.strictObject({
   id: z.uuid(),
   applicationId: z.uuid(),

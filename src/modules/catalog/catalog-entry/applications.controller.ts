@@ -2,8 +2,10 @@ import { Body, Controller, Get, HttpStatus, Param, Patch, Post, Query } from '@n
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
+  FORBIDDEN_EXAMPLE,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
+  VALIDATION_EXAMPLE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
 import { RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
@@ -19,7 +21,7 @@ import {
   ListApplicationsQueryDto,
   UpdateApplicationBodyDto,
 } from './application.dto';
-import { toApplicationApiException } from './application.http-errors';
+import { APPLICATION_ERROR_EXAMPLES as EXAMPLES, toApplicationApiException } from './application.http-errors';
 import { usageCollectionDefault } from './application.policy';
 import { ApplicationListService } from './application-list.service';
 import { ApplicationService } from './application.service';
@@ -29,24 +31,53 @@ const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPO
 const IT_ONLY = {
   status: HttpStatus.FORBIDDEN,
   description: 'Only an IT Admin changes the application catalog.',
+  examples: [FORBIDDEN_EXAMPLE],
 } as const;
 const READERS = {
   status: HttpStatus.FORBIDDEN,
   description: 'Only the IT Admin and Finance read the application catalog.',
+  examples: [FORBIDDEN_EXAMPLE],
 } as const;
-const INVALID = {
+const INVALID_DESCRIPTION =
+  'The request is invalid (VALIDATION_ERROR) or a rule refuses it: NAME_INVALID, VENDOR_NAME_INVALID, DOMAIN_INVALID, TOO_MANY_DOMAINS, NOTE_INVALID, VENDOR_REQUIRED, VENDOR_SOURCE_AMBIGUOUS, INTERNAL_HAS_NO_VENDOR, BUSINESS_OWNER_INVALID, FUNCTIONAL_GROUP_INVALID, DICTIONARY_LINE_NOT_FOUND, DICTIONARY_LINE_MISMATCH or UPDATE_EMPTY.';
+/** The rule refusals both a declaration and a change can meet. */
+const SHARED_RULE_EXAMPLES = [
+  EXAMPLES.NAME_INVALID,
+  EXAMPLES.DOMAIN_INVALID,
+  EXAMPLES.TOO_MANY_DOMAINS,
+  EXAMPLES.NOTE_INVALID,
+  EXAMPLES.INTERNAL_HAS_NO_VENDOR,
+  EXAMPLES.BUSINESS_OWNER_INVALID,
+  EXAMPLES.FUNCTIONAL_GROUP_INVALID,
+  EXAMPLES.DICTIONARY_LINE_NOT_FOUND,
+  EXAMPLES.DICTIONARY_LINE_MISMATCH,
+] as const;
+const DECLARE_INVALID = {
   status: HttpStatus.UNPROCESSABLE_ENTITY,
-  description:
-    'The request is invalid (VALIDATION_ERROR) or a rule refuses it: NAME_INVALID, VENDOR_NAME_INVALID, DOMAIN_INVALID, TOO_MANY_DOMAINS, NOTE_INVALID, VENDOR_REQUIRED, VENDOR_SOURCE_AMBIGUOUS, INTERNAL_HAS_NO_VENDOR, BUSINESS_OWNER_INVALID, FUNCTIONAL_GROUP_INVALID, DICTIONARY_LINE_NOT_FOUND, DICTIONARY_LINE_MISMATCH or UPDATE_EMPTY.',
+  description: INVALID_DESCRIPTION,
+  examples: [
+    VALIDATION_EXAMPLE,
+    ...SHARED_RULE_EXAMPLES,
+    EXAMPLES.VENDOR_NAME_INVALID,
+    EXAMPLES.VENDOR_REQUIRED,
+    EXAMPLES.VENDOR_SOURCE_AMBIGUOUS,
+  ],
+} as const;
+const UPDATE_INVALID = {
+  status: HttpStatus.UNPROCESSABLE_ENTITY,
+  description: INVALID_DESCRIPTION,
+  examples: [VALIDATION_EXAMPLE, ...SHARED_RULE_EXAMPLES, EXAMPLES.UPDATE_EMPTY],
 } as const;
 const CONFLICT = {
   status: HttpStatus.CONFLICT,
   description:
-    'The vendor already has an application of this name (APPLICATION.NAME_TAKEN) or the dictionary line belongs to another application (APPLICATION.DICTIONARY_LINE_TAKEN).',
+    'The vendor already has an application of this name (APPLICATION.NAME_TAKEN), the dictionary line belongs to another application (APPLICATION.DICTIONARY_LINE_TAKEN), or a simultaneous request changed the dictionary group of the vendor or of the line first (APPLICATION.DICTIONARY_GROUP_CHANGED): refresh the application and the line, then send the request again.',
+  examples: [EXAMPLES.NAME_TAKEN, EXAMPLES.DICTIONARY_LINE_TAKEN, EXAMPLES.DICTIONARY_GROUP_CHANGED],
 } as const;
 const NOT_FOUND = {
   status: HttpStatus.NOT_FOUND,
   description: 'The application does not exist (APPLICATION.NOT_FOUND).',
+  examples: [EXAMPLES.NOT_FOUND],
 } as const;
 
 function toSummaryWire(application: ApplicationSummaryView) {
@@ -101,6 +132,7 @@ export class ApplicationsController {
   @ApiErrorResponses(...AUTH_ERRORS, READERS, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description: 'The query is invalid (VALIDATION_ERROR).',
+    examples: [VALIDATION_EXAMPLE],
   })
   async list(@Query() query: ListApplicationsQueryDto) {
     try {
@@ -122,7 +154,7 @@ export class ApplicationsController {
     description:
       'The application is in the catalog; proposedToDictionary says it was outside the dictionary and proposed to it.',
   })
-  @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, INVALID, CONFLICT)
+  @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, DECLARE_INVALID, CONFLICT)
   async declare(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: DeclareApplicationBodyDto) {
     try {
       const { application, proposed } = await this.applications.declare(actor, body);
@@ -144,6 +176,7 @@ export class ApplicationsController {
   @ApiErrorResponses(...AUTH_ERRORS, READERS, NOT_FOUND, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description: 'The id is not a UUID (VALIDATION_ERROR).',
+    examples: [VALIDATION_EXAMPLE],
   })
   async get(@Param() params: ApplicationIdParamDto) {
     try {
@@ -163,7 +196,7 @@ export class ApplicationsController {
     description:
       'The application as it is after the change; a change of nothing is answered the same and not audited. The kind and the vendor cannot change.',
   })
-  @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, INVALID, CONFLICT, NOT_FOUND)
+  @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, UPDATE_INVALID, CONFLICT, NOT_FOUND)
   async update(
     @CurrentPrincipal() actor: AuthenticatedPrincipal,
     @Param() params: ApplicationIdParamDto,

@@ -1,9 +1,34 @@
 name: Backend CD (Deploy to VPS)
 
+# H7-OPS-02, H7-OPS-RV-02 (docs/guides/containers.md#postgresql-roles-h7):
+# - publish-only (manual): builds and pushes the image of exactly this commit as `<image>:<full sha>`; never touches the
+#   VPS and never moves `latest`.
+# - deploy (after CI on `main`, or manual): the same image, then the Compose/Caddy candidate is copied to
+#   `<app dir>/releases/<full sha>/` and scripts/ops/deploy-release.sh runs it there; the live files are replaced only after
+#   validation, backup, preflight, migrate and the role reconcile succeeded.
+# - Each run of the deploy job is one attempt `<run id>-<run attempt>` (H7-OPS-RV-05): the host keeps its rollback evidence
+#   in `releases/<full sha>/attempts/<attempt>/` and refuses an attempt it already has. A re-run gets a new attempt.
+# - The host script succeeds only when the new release is ready and stable (H7-OPS-RV-04); otherwise it restores the
+#   previous release, checks it, and exits non-zero.
+# - `latest` names the last release deployed successfully: only the step after a successful host deployment moves it.
+# - `concurrency` orders the deploy jobs of this workflow only. The host script itself takes the lock
+#   `<app dir>/releases/.deploy.lock` (H7-OPS-RV-07), which also covers a deployment run by hand (runbook step 7): while
+#   another deployment holds it, the script exits 2 before changing anything, this job fails and `latest` stays.
 on:
-  push:
-    branches: [main]
+  workflow_call:
+    inputs:
+      mode:
+        type: string
+        default: deploy
   workflow_dispatch:
+    inputs:
+      mode:
+        description: 'publish-only: build and push the image of this commit, no VPS. deploy: publish, then deploy.'
+        type: choice
+        options:
+          - publish-only
+          - deploy
+        default: publish-only
 
 permissions:
   contents: read
@@ -34,13 +59,12 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Compute lowercase image name and short SHA tag
+      - name: Compute lowercase image name and immutable commit tag
         id: meta
         run: |
           IMAGE_LOWERCASE=$(echo "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}" | tr '[:upper:]' '[:lower:]')
-          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
-          echo "image=${IMAGE_LOWERCASE}" >> $GITHUB_OUTPUT
-          echo "tag=${SHORT_SHA}" >> $GITHUB_OUTPUT
+          echo "image=${IMAGE_LOWERCASE}" >> "$GITHUB_OUTPUT"
+          echo "tag=${{ github.sha }}" >> "$GITHUB_OUTPUT"
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
@@ -49,119 +73,79 @@ jobs:
           file: ./Dockerfile
           target: runtime
           push: true
-          tags: |
-            ${{ steps.meta.outputs.image }}:latest
-            ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.tag }}
+          # The commit tag only, in both modes; `latest` moves after a successful deployment (job deploy).
+          tags: ${{ steps.meta.outputs.image }}:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
   deploy:
     name: Deploy to VPS over SSH
     needs: build-and-push
+    # publish-only never reaches a step that connects to the VPS.
+    if: ${{ inputs.mode == 'deploy' }}
     runs-on: ubuntu-latest
+    # One deploy job of this workflow at a time, and `latest` moves in the order they finished. Manual deployments on the
+    # host are serialized with these by the host lock of deploy-release.sh (H7-OPS-RV-07), not by this setting.
+    concurrency:
+      group: production-deploy
+      cancel-in-progress: false
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Copy Compose and Caddyfile to VPS
+      # A candidate of its own: the live docker-compose.prod.yml and Caddyfile are not touched here.
+      - name: Copy the release candidate to the VPS
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          source: "docker-compose.prod.yml,Caddyfile"
-          target: "${{ secrets.VPS_APP_DIR || '/opt/slm/backend' }}"
+          source: 'docker-compose.prod.yml,Caddyfile,scripts/ops/deploy-release.sh'
+          target: "${{ secrets.VPS_APP_DIR || '/opt/slm/backend' }}/releases/${{ github.sha }}"
           overwrite: true
 
-      - name: Deploy on VPS
+      - name: Deploy the release on the VPS
         uses: appleboy/ssh-action@v1.2.0
         env:
           CR_PAT: ${{ secrets.GHCR_PAT || secrets.GITHUB_TOKEN }}
           REGISTRY_USER: ${{ github.actor }}
+          APP_DIR: ${{ secrets.VPS_APP_DIR || '/opt/slm/backend' }}
+          RELEASE: ${{ github.sha }}
+          IMAGE: ${{ needs.build-and-push.outputs.image }}:${{ github.sha }}
+          # One id per run of this job, never reused by GitHub: a re-run has a new run attempt (H7-OPS-RV-05).
+          ATTEMPT: ${{ github.run_id }}-${{ github.run_attempt }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          envs: CR_PAT,REGISTRY_USER
+          envs: CR_PAT,REGISTRY_USER,APP_DIR,RELEASE,IMAGE,ATTEMPT
           timeout: 30m
           command_timeout: 30m
           script: |
             set -e
-
-            # 1. Chuyển vào thư mục chứa project trên VPS
-            APP_DIR="${{ secrets.VPS_APP_DIR }}"
-            if [ -z "$APP_DIR" ]; then
-              APP_DIR="/opt/slm/backend"
-            fi
-
-            cd "$APP_DIR"
-
-            # 2. Kiểm tra file .env an toàn
-            if [ ! -f .env ]; then
-              echo "❌ LỖI: Không tìm thấy file .env tại $APP_DIR. Hãy tạo file .env trước khi deploy!"
-              exit 1
-            fi
-
-            # 2.5. Đăng nhập GHCR (hỗ trợ private image khi Organization chặn public package)
+            # Đăng nhập GHCR (hỗ trợ private image khi Organization chặn public package)
             if [ -n "$CR_PAT" ]; then
               echo "$CR_PAT" | docker login ghcr.io -u "$REGISTRY_USER" --password-stdin || true
             fi
+            # Mọi bước (kiểm Compose và Caddyfile ứng viên, sao lưu, preflight, migrate, reconcile, promote, recreate, kiểm
+            # readiness) nằm trong script của chính release này; lỗi trước promote giữ nguyên release live và container đang
+            # chạy, lỗi lúc promote/recreate/readiness đưa cả release trước về và kiểm lại nó (H7-OPS-RV-02, RV-04). Mỗi lượt
+            # chạy là một attempt riêng (RV-05). Một deploy khác (workflow hay chạy tay) đang giữ khóa host ⟹ script exit 2
+            # trước mọi thay đổi (RV-07). Script lỗi thì bước đánh dấu `latest` không chạy.
+            case "$ATTEMPT" in '' | *[!0-9-]*) echo 'refused: ATTEMPT is not <run id>-<run attempt>' >&2; exit 2 ;; esac
+            bash "$APP_DIR/releases/$RELEASE/scripts/ops/deploy-release.sh" \
+              --app-dir "$APP_DIR" --release "$RELEASE" --image "$IMAGE" --attempt "$ATTEMPT"
 
-            # 3. Đặt biến môi trường image cho docker-compose
-            export API_IMAGE="${{ needs.build-and-push.outputs.image }}:latest"
+      # Runs only when the host deployment above succeeded: a failed deployment leaves `latest` on the last good release.
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-            echo "🚀 Đang pull image mới nhất: $API_IMAGE"
-            docker compose -f docker-compose.prod.yml pull api worker
-
-            echo "📦 Khởi động database & reverse proxy nếu chưa chạy..."
-            docker compose -f docker-compose.prod.yml up -d postgres caddy
-
-            # 3.5. DB-05: sao lưu trước migration. Không có down migration: khôi phục = roll-forward hoặc pg_restore bản
-            # sao lưu này (docs/guides/containers.md). pg_dump hoặc kiểm đọc lỗi ⟹ dừng deploy trước `migrate deploy`.
-            # Lệnh chạy trong container postgres qua socket cục bộ với biến của chính container; không in thông tin
-            # đăng nhập. Thư mục cố định, chỉ chủ sở hữu đọc được; workflow không xóa bản sao lưu nào (dọn có giới hạn:
-            # scripts/ops/postgres-backup-retention.sh, dry run trước, chạy tay).
-            echo "⏳ Chờ PostgreSQL sẵn sàng..."
-            READY=0
-            for attempt in $(seq 1 30); do
-              if docker compose -f docker-compose.prod.yml exec -T postgres sh -c 'pg_isready -q -U "$POSTGRES_USER" -d "$POSTGRES_DB"'; then
-                READY=1
-                break
-              fi
-              sleep 2
-            done
-            if [ "$READY" -ne 1 ]; then
-              echo "❌ LỖI: PostgreSQL không sẵn sàng; dừng deploy trước khi sao lưu và migrate."
-              exit 1
-            fi
-
-            BACKUP_DIR="$APP_DIR/backups/postgres"
-            umask 077
-            mkdir -p "$BACKUP_DIR"
-            chmod 700 "$BACKUP_DIR"
-            BACKUP_FILE="$BACKUP_DIR/slm-pre-migrate-$(date -u +%Y%m%dT%H%M%SZ)-${{ needs.build-and-push.outputs.tag }}.dump"
-
-            echo "💾 Sao lưu CSDL trước migration: $BACKUP_FILE"
-            if ! docker compose -f docker-compose.prod.yml exec -T postgres sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" --format=custom --no-owner --no-privileges' > "$BACKUP_FILE.partial"; then
-              rm -f "$BACKUP_FILE.partial"
-              echo "❌ LỖI: pg_dump thất bại; dừng deploy, chưa chạy migration."
-              exit 1
-            fi
-            if [ ! -s "$BACKUP_FILE.partial" ] || ! docker compose -f docker-compose.prod.yml exec -T postgres pg_restore --list > /dev/null < "$BACKUP_FILE.partial"; then
-              rm -f "$BACKUP_FILE.partial"
-              echo "❌ LỖI: bản sao lưu rỗng hoặc pg_restore --list không đọc được; dừng deploy, chưa chạy migration."
-              exit 1
-            fi
-            mv "$BACKUP_FILE.partial" "$BACKUP_FILE"
-            echo "✅ Bản sao lưu đọc được ($(wc -c < "$BACKUP_FILE") byte). Số bản sao lưu hiện có: $(ls -1 "$BACKUP_DIR"/slm-pre-migrate-*.dump | wc -l)"
-
-            echo "🔄 Chạy Prisma Migration cập nhật Database..."
-            docker compose -f docker-compose.prod.yml run --rm --no-deps api node node_modules/prisma/build/index.js migrate deploy
-
-            echo "♻️ Khởi chạy lại container API & Worker với code mới..."
-            docker compose -f docker-compose.prod.yml up -d --force-recreate api worker
-
-            echo "🧹 Dọn dẹp Docker images cũ..."
-            docker image prune -f
-
-            echo "🎉 Hoàn tất deploy Backend lên VPS thành công!"
+      - name: Mark the deployed release as latest
+        env:
+          IMAGE: ${{ needs.build-and-push.outputs.image }}
+          RELEASE: ${{ github.sha }}
+        run: docker buildx imagetools create --tag "$IMAGE:latest" "$IMAGE:$RELEASE"

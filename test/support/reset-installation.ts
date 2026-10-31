@@ -20,5 +20,5 @@ const switchTriggers = (action: 'DISABLE' | 'ENABLE') => `
 export const RESET_INSTALLATION_SQL = `
   ${switchTriggers('DISABLE')}
   TRUNCATE audit_events, role_grants, password_credentials, app_users, employee_placements, employees,
-           job_titles, departments, cost_centers, organizations CASCADE;
+           departments, cost_centers, organizations CASCADE;
   ${switchTriggers('ENABLE')}`;

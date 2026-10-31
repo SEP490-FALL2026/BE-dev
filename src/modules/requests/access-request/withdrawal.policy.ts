@@ -1,5 +1,4 @@
-import type { AccessRequestState } from './access-request.types';
-import type { SpendStage } from '../spend/spend-status.service';
+import type { AccessRequestState, SpendStage } from './access-request.types';
 
 /**
  * Why a request is not withdrawn (`US-05-08`, `US-06-14` AC-14). `NOT_REQUESTER` is also the answer to the person it is for
@@ -55,4 +54,50 @@ export function checkWithdrawal(facts: WithdrawalFacts): WithdrawalRefusal | nul
   if (byHead && (facts.reason === null || facts.reason.trim() === '')) return 'REASON_REQUIRED';
 
   return null;
+}
+
+/**
+ * What the cancellation of the grant of a request answers that stops the withdrawal (`US-05-08`, `US-05-13`): a task being worked refuses, a
+ * task that is done sends the person to the return of the seat it made, a task that ended refuses; anything else lets the request go on.
+ */
+export function grantCancelRefusal(grant: {
+  status: string;
+  assignmentId?: string;
+}): { reason: 'GRANT_RUNNING' | 'GRANT_COMPLETED' | 'ALREADY_ENDED'; details: { assignmentId: string } | null } | null {
+  if (grant.status === 'RUNNING') return { reason: 'GRANT_RUNNING', details: null };
+  if (grant.status === 'COMPLETED') {
+    return { reason: 'GRANT_COMPLETED', details: { assignmentId: grant.assignmentId as string } };
+  }
+  if (grant.status === 'ENDED') return { reason: 'ALREADY_ENDED', details: null };
+
+  return null;
+}
+
+/**
+ * The audit entry of a withdrawal: the request ended as withdrawn, or (`waiting` given) it waits as `AWAITING_IT_CLOSE` for the IT Admin to
+ * close the task of a grant that failed, and only then does it end.
+ */
+export function withdrawalAuditOf(
+  request: { id: string; requesterEmployeeId: string },
+  by: { from: string; actorEmployeeId: string; reason: string | null },
+  waiting: { taskId: string } | null,
+): { action: string; detail: { [key: string]: string | boolean | null } } {
+  if (waiting) {
+    return {
+      action: 'ACCESS_REQUEST.WITHDRAWAL_REQUESTED',
+      detail: { requestId: request.id, from: by.from, to: 'AWAITING_IT_CLOSE', taskId: waiting.taskId },
+    };
+  }
+
+  return {
+    action: 'ACCESS_REQUEST.WITHDRAWN',
+    detail: {
+      requestId: request.id,
+      from: by.from,
+      to: 'WITHDRAWN',
+      byRequester: by.actorEmployeeId === request.requesterEmployeeId,
+      withdrawnByEmployeeId: by.actorEmployeeId,
+      reason: by.reason,
+    },
+  };
 }

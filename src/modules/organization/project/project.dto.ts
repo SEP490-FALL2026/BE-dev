@@ -1,13 +1,40 @@
-import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
+import { hrBasisSchema } from '../../../infrastructure/http/dto/hr-basis.dto';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
-import { projectSchema, projectSummarySchema } from '../dto/project-wire.dto';
+import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 
+/**
+ * The project resource, shared by the project routes and the department profile, which embeds the same resource: one
+ * definition for both (the schema twin of `project.mapper.ts`).
+ */
+const departmentRef = z.strictObject({ id: z.uuid(), code: z.string(), name: z.string() });
+
+/** What a list of projects shows of each: the description is read from the project itself. */
+export const projectSummarySchema = z.strictObject({
+  id: z.uuid(),
+  name: z.string(),
+  status: z.enum(['RUNNING', 'FINISHED']),
+  departments: z.array(departmentRef),
+  updatedAt: z.iso.datetime(),
+});
+
+export const projectSchema = z.strictObject({
+  id: z.uuid(),
+  name: z.string(),
+  description: z.string().nullable(),
+  status: z.enum(['RUNNING', 'FINISHED']),
+  departments: z.array(z.strictObject({ id: z.uuid(), code: z.string(), name: z.string() })),
+  createdAt: z.iso.datetime(),
+  updatedAt: z.iso.datetime(),
+});
+
+/** Every change cites the HR document it is made on (`QĐ-87b(1)`): a missing part is a validation error and nothing is written. */
 export const createProjectBodySchema = z.strictObject({
   name: z.string().max(1000),
   description: z.string().max(5000).nullish(),
   status: z.enum(['RUNNING', 'FINISHED']).optional(),
   departmentIds: z.array(z.uuid()).max(100),
+  hrBasis: hrBasisSchema,
 });
 
 export const updateProjectBodySchema = z.strictObject({
@@ -15,6 +42,7 @@ export const updateProjectBodySchema = z.strictObject({
   description: z.string().max(5000).nullable().optional(),
   status: z.enum(['RUNNING', 'FINISHED']).optional(),
   departmentIds: z.array(z.uuid()).max(100).optional(),
+  hrBasis: hrBasisSchema,
 });
 
 export const listProjectsQuerySchema = z.strictObject({

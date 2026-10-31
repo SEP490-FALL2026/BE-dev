@@ -37,7 +37,7 @@
 
 ### Task 4: hợp đồng người nghe phía `organization`
 
-- Files: `src/modules/organization/organization.types.ts`, `organization.service.ts`, `department/department-head.service.ts` (+ spec), `module-graph.spec.ts`, `architecture-structure.spec.ts`
+- Files: `src/modules/organization/public/organization.types.ts`, `organization.service.ts`, `department/department-head.service.ts` (+ spec), `module-graph.spec.ts`, `architecture-structure.spec.ts`
 - Depends on: Task 1 (và `g6-transfer-record` nếu đã implement: khi đó chỉ thêm loại `EMPLOYEE_LEFT`, không tạo lại kiểu)
 - Acceptance: `OrganizationChange`, `OrganizationChangeListener` và `registerChangeListener` đúng như spec `g6-transfer-record` (nếu chưa có thì tạo đúng chữ ký đó cùng một bên phát tối thiểu trong `organization`, để G6 xây bảng thông báo và tác vụ quét lên trên); thêm loại `EMPLOYEE_LEFT`; người nghe chạy trong transaction của thay đổi gốc theo thứ tự đăng ký và một người nghe ném lỗi thì thay đổi đó hoàn tác; `assign` và `vacate` trưởng phòng hiệu lực hôm nay phát `HEAD_PERIOD_END` và `HEAD_PERIOD_START` trong transaction của chúng; không import `requests`
 - Verify: ca tích hợp người nghe giả xanh; nhóm `department` hiện có xanh; `jest src` (kiến trúc) xanh
@@ -45,7 +45,7 @@
 
 ### Task 5: hợp đồng người nghe phía `identity-access`
 
-- Files: `src/modules/identity-access/identity-access.types.ts`, `identity-access.service.ts`, `approval-roles/approval-role.service.ts`, `accounts/role-grant.service.ts` (+ spec), `module-graph.spec.ts`
+- Files: `src/modules/identity-access/public/identity-access.types.ts`, `identity-access.service.ts`, `approval-roles/approval-role.service.ts`, `accounts/role-grant.service.ts` (+ spec), `module-graph.spec.ts`
 - Depends on: Task 1
 - Acceptance: `ApprovalRoleChange`, `ApprovalRoleChangeListener`, `registerApprovalRoleListener`; gán, gỡ ba vai duyệt và cấp, thu vai `FINANCE` phát trong transaction của chính lệnh với `id`, người cũ, người mới; registry là provider đơn nhất dùng chung API và worker
 - Verify: ca tích hợp người nghe giả xanh; nhóm `approval-roles` và `role-grant` hiện có xanh
@@ -69,10 +69,10 @@
 
 ### Task 8: lượt quét ngày hiệu lực và bước chờ
 
-- Files: `src/modules/requests/step-redetermination-sweep.service.ts`, `src/modules/requests/requests-work-facade.module.ts`, `src/request-work.loop.ts` (+ spec), `src/worker.module.ts`, `module-graph.spec.ts`, `architecture-boundaries.spec.ts`, `ARCHITECTURE.md`
+- Files: `src/modules/requests/public/step-redetermination-sweep.api.ts`, `src/modules/requests/requests-work-facade.module.ts`, `src/worker/request-work.job.ts` (+ spec), `src/worker/worker.module.ts`, `module-graph.spec.ts`, `architecture-boundaries.spec.ts`, `ARCHITECTURE.md`
 - Depends on: Task 6, Task 7
 - Acceptance: lượt quét thử giao lại mọi bước đang chờ và tạo cảnh báo còn thiếu, xác định lại bước do người đã nghỉ việc giữ, và một lần mỗi ngày nhặt sự kiện tới ngày hiệu lực; không ghi gì khi dữ liệu không đổi; từng Request một transaction; hai worker song song không trùng; nếu hạng mục anh em đã tạo `RequestWorkLoop` và module facade thì thêm lời gọi, không tạo thứ hai
-- Verify: ca ngày hiệu lực (phòng và trưởng phòng ghi cho ngày mai) xanh; `request-work.loop.spec.ts` xanh; `jest src` xanh
+- Verify: ca ngày hiệu lực (phòng và trưởng phòng ghi cho ngày mai) xanh; `worker/request-work.job.spec.ts` xanh; `jest src` xanh
 - Kết quả: xong. `StepRedeterminationSweepService`, `RequestWorkLoop` (4 ca unit), `REQUEST_WORK_INTERVAL_MS` (ca unit ở `env-schema.spec`), `RequestsWorkFacadeModule` (hạng mục anh em chưa tạo nên tạo ở đây); ca ngày hiệu lực (ngày mai không đổi, đến ngày thì đổi) xanh. Hai worker song song chưa có test riêng.
 
 ### Task 9: API, hồi quy, tài liệu

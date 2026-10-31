@@ -22,7 +22,11 @@ export function classifyDatabaseUrl(value: string): DatabaseHostKind {
   if (url.protocol !== 'postgres:' && url.protocol !== 'postgresql:') return 'invalid';
   if (HOST_OVERRIDES.some((name) => url.searchParams.has(name))) return 'not-loopback';
 
-  const host = url.hostname.toLowerCase();
+  return classifyHost(url.hostname.toLowerCase());
+}
+
+/** The parsed, lowercased host of the URL: one name or address, judged as such. */
+function classifyHost(host: string): DatabaseHostKind {
   if (host === '' || host.includes(',')) return 'not-loopback';
   if (host === 'localhost') return 'loopback';
 

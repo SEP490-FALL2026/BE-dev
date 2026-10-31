@@ -1,18 +1,19 @@
 import { Controller, Get, HttpCode, HttpStatus, Post } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
 import {
   ApiErrorResponses,
+  FORBIDDEN_EXAMPLE,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
+import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
 import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { toLicensingApiException } from '../mappers/licensing.http-errors';
+import { toLicensingApiException } from '../licensing.http-errors';
 import { SeatBaselineService } from './seat-baseline.service';
 
 class SeatBaselineResponseDto extends createZodDto(
@@ -27,6 +28,7 @@ class SeatBaselineClosedResponseDto extends createZodDto(
 const IT_ONLY = {
   status: HttpStatus.FORBIDDEN,
   description: 'Only an IT Admin reads or closes the seat baseline.',
+  examples: [FORBIDDEN_EXAMPLE],
 } as const;
 
 /**

@@ -1,12 +1,12 @@
 import { Module } from '@nestjs/common';
 import { DatabaseModule } from '../../infrastructure/database/database.module';
 import { AuditRepo } from './audit.repo';
-import { AuditService } from './audit.service';
+import { AuditApi } from './public/audit.api';
 
 @Module({
   imports: [DatabaseModule],
-  providers: [AuditService, AuditRepo],
+  providers: [AuditApi, AuditRepo],
   // The repo stays private: other modules record through the facade.
-  exports: [AuditService],
+  exports: [AuditApi],
 })
 export class AuditModule {}

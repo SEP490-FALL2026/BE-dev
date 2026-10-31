@@ -35,3 +35,5 @@ Hạng mục khung: không code. Đọc spec, xác nhận blocker ở mục _Dep
 - [ ] Spec/plan/test design phản ánh đúng implementation cuối.
 - [ ] Diff cuối đã tự review; tài liệu vận hành bị ảnh hưởng đã cập nhật; phần chưa kiểm chứng ghi rõ.
 - [ ] Giao Owner review trên revision cụ thể; cập nhật roadmap/PR. Chỉ ghi `merged-dev`, `accepted`, `released` sau đúng sự kiện thật.
+
+**Prompt 29 (23/10/2026):** merge requirement `P28-09` (AC-17 của `US-02-02`, fail closed cho production) ghi ở [g0-g4-checkpoint-fix-forward](../g0-g4-checkpoint-fix-forward/spec.md).

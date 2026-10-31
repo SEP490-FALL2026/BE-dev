@@ -3,11 +3,17 @@ import type { BusinessDate } from '../../../core/business-date';
 import type { AccessRequestBranchCode, RequestPolicy } from './access-request.policy';
 import type { BillingCycleCode, MissingPriceReason, PaymentPeriod } from './pricing.policy';
 import type { WaitingReason } from './routing.policy';
-import type { LineRecord } from '../group-request/group-request.types';
+import type { LineRecord, ReadableCancelCause } from './group-request.types';
 
 /** The shapes the repository of requests reads and writes; the repository re-exports them, so importers do not change. */
 
+/**
+ * `DRAFT` is a paid request saved before the finance gates: it has no Cost Center, no moment it was sent, no step, no check
+ * and no commitment. It is neither listed nor readable as a request (`AccessRequestRepo.findById` and every other read filter it out and
+ * no wire of a request carries it): only `RequestDraftRepo` and the four draft operations see it.
+ */
 export type AccessRequestState =
+  | 'DRAFT'
   | 'PENDING'
   | 'WAITING_CONTROLLED'
   | 'AWAITING_EXECUTION'
@@ -81,12 +87,11 @@ export interface NewAccessRequest {
   /** The people it is for, in order: one today. */
   beneficiaryEmployeeIds: readonly string[];
   departmentId: string;
-  costCenterId: string;
+  /** Null only for a free internal request of a department that has no Cost Center in use (`QĐ-87g(2)`). */
+  costCenterId: string | null;
   businessReason: string;
   termMonths: number;
   projectLabel: string | null;
-  outsideStandardReason: string | null;
-  outsideStandard: boolean;
   pricing: PricingRecord;
   policy: RequestPolicy;
   delegatedBatchId?: string | null;
@@ -94,6 +99,11 @@ export interface NewAccessRequest {
   createdByAppUserId: string;
   now: Date;
   needStep: NewNeedStep;
+  /**
+   * The draft this request is made from: the row of the draft becomes the request, so it is the same request from the
+   * day it was saved. Absent for a request written new. The caller holds the lock of the draft (`RequestDraftRepo.lock`).
+   */
+  draftId?: string | null;
 }
 
 /** A need step as it is written: the first one with the request, the others after it (`addNeedStep`). */
@@ -155,7 +165,7 @@ export interface WithdrawalRecord {
 export interface CancellationRecord {
   cancelledAt: Date;
   cancelledByEmployeeId: string;
-  cause: 'BENEFICIARY_LEFT';
+  cause: ReadableCancelCause;
   note: string | null;
 }
 
@@ -168,12 +178,11 @@ export interface AccessRequestRecord {
   planId: string | null;
   requesterEmployeeId: string;
   departmentId: string;
-  costCenterId: string;
+  /** Null only for a free internal request of a department that has no Cost Center in use (`QĐ-87g(2)`): nothing is charged. */
+  costCenterId: string | null;
   businessReason: string;
   termMonths: number;
   projectLabel: string | null;
-  outsideStandardReason: string | null;
-  outsideStandard: boolean;
   pricing: PricingRecord;
   /** The line of the plan of the budget it is attached to; null when it is attached to none. */
   planLine: { versionId: string; position: number; confirmed: boolean } | null;
@@ -200,3 +209,79 @@ export interface AccessRequestRecord {
   /** The people of a request for a group, in the order they were named, each with their own state; empty for any other request. */
   lines: LineRecord[];
 }
+
+/** What the person already holds of the plan: the seat that makes asking for it again pointless (`US-05-01` AC-2). */
+export interface HeldAccess {
+  assignmentId: string;
+  effectiveFrom: BusinessDate;
+  validUntil: BusinessDate | null;
+}
+
+/**
+ * Why the IT Admin may not close a request because its beneficiary left (`US-03-04` AC-25). The checks run in this order, so a request
+ * has one answer; the task of the grant is judged by licensing, in the transaction (`EVIDENCE_REQUIRED` is its answer).
+ */
+export type CancellationRefusal =
+  /** Refused, rejected, completed, failed, withdrawn or already cancelled: nothing is left to close. */
+  | 'ALREADY_ENDED'
+  /** The requester withdrew and the request waits for the IT Admin to close the task of its grant: that has its own way. */
+  | 'WITHDRAWAL_PENDING'
+  /**
+   * A request for a group with more than one person still live: one of them leaving is not the end of the request, so the IT Admin
+   * removes each person who left from their own line. A request whose last live line is the leaver's is that removal.
+   */
+  | 'GROUP_REQUEST_UNSUPPORTED'
+  /** The person it is for still works, handing over included: the request is only listed until they have left. */
+  | 'BENEFICIARY_NOT_LEFT'
+  /**
+   * The request is closed because its beneficiary was transferred, and they are not: they still sit in the department the request was
+   * sent from, left the company, or the request is not a request of one person for access.
+   */
+  | 'BENEFICIARY_NOT_TRANSFERRED';
+
+/** The states a request ends in: nothing is left to do for anybody (not `DRAFT`, which is not a request yet). */
+export const ENDED_STATES: readonly AccessRequestState[] = [
+  'REJECTED',
+  'IT_REJECTED',
+  'COMPLETED',
+  'FAILED',
+  'WITHDRAWN',
+  'CANCELLED',
+];
+
+/**
+ * The states of a request that is not open for the person it is for who left: at an end of its own, or waiting for the IT Admin to close
+ * the task of a withdrawal (that has its own way).
+ */
+export const NOT_OPEN_FOR_LEAVER: readonly AccessRequestState[] = [...ENDED_STATES, 'AWAITING_IT_CLOSE'];
+
+export type DelegationRefusal =
+  /** The caller does not head the department they belong to today (`AC-11`). */
+  | 'NOT_HEAD'
+  /** The person is not in the department of the head: the request is refused at once, with no request for them (`US-05-03` row 7, `AC-5`). */
+  | 'OUTSIDE_DEPARTMENT'
+  /** The person has no work email yet (`AC-3`). */
+  | 'EMAIL_REQUIRED'
+  /** The person has left the company. */
+  | 'BENEFICIARY_NOT_ACTIVE'
+  /** A contractor, freelancer or intern needs the day the access ends (`AC-10`). */
+  | 'END_DATE_REQUIRED'
+  /** The day the access ends is before the day it can begin. */
+  | 'END_DATE_TOO_EARLY'
+  /** A long term is confirmed in so many words by whoever confirms the need (`OI-07a`). */
+  | 'TERM_CONFIRMATION_REQUIRED';
+
+/**
+ * Where a request that costs money stands on its way to the spending approver, as the people with a part in it read it
+ * (`US-06-14` AC-9, AC-13). It says what is waiting and, for a request that stopped, why: and it is never a figure of a
+ * budget, a code of the check that is not a problem with the head's own data, or what is left (`QĐ-82m` `INF-06`).
+ */
+export type SpendStage =
+  | 'NOT_SUBMITTED'
+  | 'BLOCKED'
+  | 'RETURNED_BY_FINANCE'
+  | 'WAITING_FINANCE_REVIEW'
+  | 'WAITING_BUDGET'
+  | 'WAITING_SPEND_DECISION'
+  /** The spending approver refused it, with the reason (`US-06-01` AC-4). */
+  | 'REFUSED';

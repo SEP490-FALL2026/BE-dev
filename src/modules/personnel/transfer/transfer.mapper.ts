@@ -1,5 +1,5 @@
-import type { DepartmentBrief, EmployeeRecord } from '../../organization/organization.types';
-import type { OrganizationService } from '../../organization/organization.service';
+import type { DepartmentBrief, EmployeeRecord } from '../../organization/public/organization.types';
+import type { ReadAccess } from '../personnel-self-action.policy';
 import type { TransferChangeWire, TransferDetailWire, TransferRecordedWire, TransferSummaryWire } from './transfer.dto';
 import type { TransferChangeRecord, TransferRecord, TransferSummaryRecord, TransferWarning } from './transfer.types';
 
@@ -7,21 +7,14 @@ import type { TransferChangeRecord, TransferRecord, TransferSummaryRecord, Trans
 export interface TransferNames {
   employees: Map<string, EmployeeRecord>;
   departments: Map<string, DepartmentBrief>;
-  jobTitles: Map<string, JobTitleRecord>;
 }
-
-type JobTitleRecord = Awaited<ReturnType<OrganizationService['getJobTitles']>>[number];
 
 const UNKNOWN = '';
 
-function placeOf(names: TransferNames, departmentId: string, jobTitleId: string) {
+function placeOf(names: TransferNames, departmentId: string) {
   const department = names.departments.get(departmentId);
-  const jobTitle = names.jobTitles.get(jobTitleId);
 
-  return {
-    department: { id: departmentId, code: department?.code ?? UNKNOWN, name: department?.name ?? UNKNOWN },
-    jobTitle: { id: jobTitleId, name: jobTitle?.name ?? UNKNOWN },
-  };
+  return { department: { id: departmentId, code: department?.code ?? UNKNOWN, name: department?.name ?? UNKNOWN } };
 }
 
 const employeeBrief = (names: TransferNames, employeeId: string) => {
@@ -31,39 +24,48 @@ const employeeBrief = (names: TransferNames, employeeId: string) => {
 };
 
 export function toSummary(record: TransferSummaryRecord, names: TransferNames): TransferSummaryWire {
-  const department = record.fromDepartmentId !== record.toDepartmentId;
-  const jobTitle = record.fromJobTitleId !== record.toJobTitleId;
-
   return {
     id: record.id,
     employee: employeeBrief(names, record.employeeId),
-    changes: department ? (jobTitle ? 'DEPARTMENT_AND_JOB_TITLE' : 'DEPARTMENT') : 'JOB_TITLE',
-    from: placeOf(names, record.fromDepartmentId, record.fromJobTitleId),
-    to: placeOf(names, record.toDepartmentId, record.toJobTitleId),
+    from: placeOf(names, record.fromDepartmentId),
+    to: placeOf(names, record.toDepartmentId),
     effectiveOn: record.effectiveOn,
     status: record.status,
-    selfExecuted: record.selfExecuted,
   };
 }
 
-export function toDetail(record: TransferRecord, names: TransferNames): TransferDetailWire {
+/**
+ * The transfer in full for the Super Admin; for the IT Admin only the minimal projection: the people, the departments, the day
+ * and the state the technical work needs, without the basis, the handover of the head or the reason of a cancellation.
+ */
+export function toDetail(
+  record: TransferRecord,
+  names: TransferNames,
+  access: ReadAccess = 'FULL',
+): TransferDetailWire {
   const handover = record.headHandover;
+  const full = access === 'FULL';
 
   return {
     ...toSummary(record, names),
-    grounds: { ...record.grounds },
-    headSuccessor: handover && {
-      kind: handover.successor,
-      employee: handover.successorEmployeeId ? employeeBrief(names, handover.successorEmployeeId) : null,
-    },
+    grounds: full ? { ...record.grounds } : null,
+    headSuccessor:
+      full && handover
+        ? {
+            kind: handover.successor,
+            employee: handover.successorEmployeeId ? employeeBrief(names, handover.successorEmployeeId) : null,
+          }
+        : null,
     recordedByAppUserId: record.recordedByAppUserId,
+    recordedByProcedure: record.recordedByTicketId !== null,
     recordedAt: record.recordedAt.toISOString(),
     effectiveAt: record.effectiveAt?.toISOString() ?? null,
     cancellation:
-      record.cancelledAt && record.cancelledByAppUserId && record.cancelledReason !== null
+      full && record.cancelledAt && record.cancelledReason !== null
         ? {
             cancelledAt: record.cancelledAt.toISOString(),
             cancelledByAppUserId: record.cancelledByAppUserId,
+            cancelledByProcedure: record.cancelledByTicketId !== null,
             reason: record.cancelledReason,
           }
         : null,
@@ -88,5 +90,6 @@ export const toChange = (change: TransferChangeRecord): TransferChangeWire => ({
   reason: change.reason,
   grounds: { ...change.grounds },
   changedByAppUserId: change.changedByAppUserId,
+  changedByProcedure: change.changedByTicketId !== null,
   changedAt: change.changedAt.toISOString(),
 });

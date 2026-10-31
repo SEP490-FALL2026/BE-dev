@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { wallClockAt } from '../../../core/working-days';
-import { OperatingParametersService } from '../../operating-parameters/operating-parameters.service';
-import { OrganizationService } from '../../organization/organization.service';
+import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
 import { SlaReminderRepo } from './sla-reminder.repo';
 import { standingOf } from './step-sla.policy';
 
@@ -25,8 +25,8 @@ export interface QueueAge {
 @Injectable()
 export class SlaQueueAgeService {
   constructor(
-    private readonly organization: OrganizationService,
-    private readonly parameters: OperatingParametersService,
+    private readonly organization: OrganizationApi,
+    private readonly parameters: OperatingParametersApi,
     private readonly reminders: SlaReminderRepo,
   ) {}
 

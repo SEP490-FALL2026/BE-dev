@@ -16,28 +16,28 @@ Mỗi task theo TDD: viết test đỏ, xem nó đỏ đúng lý do, viết mã 
 
 ### Task 1: dữ liệu ba bảng phân bổ
 
-- Files: `prisma/models/finance.prisma`, `prisma/models/catalog.prisma` (quan hệ ngược của `Subscription`), `prisma/models/organization.prisma` (quan hệ ngược của `CostCenter`), migration `20261020180000_finance_subscription_cost_allocations`, `src/architecture-boundaries.spec.ts` (`PRISMA_MODEL_OWNER`), `test/integration/cost-allocation-constraints.integration-spec.ts`.
+- Files: `prisma/models/finance.prisma`, `prisma/models/catalog.prisma` (quan hệ ngược của `Subscription`), `prisma/models/organization.prisma` (quan hệ ngược của `CostCenter`), migration `20261020180000_finance_subscription_cost_allocations`, `test/gates/architecture-boundaries.gate-spec.ts` (`PRISMA_MODEL_OWNER`), `test/integration/cost-allocation-constraints.integration-spec.ts`.
 - Depends on: `g3-subscription-purchase`, `g2-cost-center-catalogue`.
 - Acceptance: CHECK tỷ lệ/vị trí/phiên bản, unique `(subscription, version)` và `(version, cost_center)`, khóa ngoại, trigger bất biến (`55000`), constraint trigger tổng 10000 lúc commit (`23514`, kể cả phiên bản không dòng).
 - Verify: `pnpm prisma:validate`, `pnpm prisma:generate`; test constraints đỏ trước migration, xanh sau.
 
 ### Task 2: policy thuần `cleanAllocationLines`
 
-- Files: `src/modules/finance/cost-allocation/cost-allocation.policy.ts`, `cost-allocation.policy.spec.ts`, `src/modules/finance/finance.errors.ts` (lỗi phân bổ), `src/modules/finance/finance.types.ts`.
+- Files: `src/modules/finance/cost-allocation/cost-allocation.policy.ts`, `cost-allocation.policy.spec.ts`, `src/modules/finance/public/finance.errors.ts` (lỗi phân bổ), `src/modules/finance/public/finance.types.ts`.
 - Depends on: `core/money/tax-estimate` (`parseRatePercent`, `formatRatePercent`).
 - Acceptance: 60+40, 60+30 ⟹ tổng 9000, 33,33 × 3 ⟹ 9999 bị từ chối, 33,33 + 33,33 + 33,34 ⟹ 10000, tỷ lệ 0/âm/101/3 chữ số/chữ, 0 và 21 dòng, trùng Cost Center (kể cả khác hoa/thường), thứ tự kiểm lỗi, `sameAllocation` không phụ thuộc thứ tự.
 - Verify: `pnpm exec jest src/modules/finance/cost-allocation` → đỏ trước (thiếu policy), xanh sau.
 
 ### Task 3: capability `finance/cost-allocation` và Cost Center của organization
 
-- Files: `cost-allocation.repo.ts`, `cost-allocation.service.ts`, `cost-allocation.types.ts`, `finance.module.ts`, `finance.service.ts`, `src/modules/organization/cost-center/cost-center-catalogue.service.ts`, `cost-center.repo.ts` (đọc theo nhiều id, khóa `FOR SHARE`), `organization.service.ts`, `src/architecture-structure.spec.ts`/`src/module-graph.spec.ts` nếu gate yêu cầu.
+- Files: `cost-allocation.repo.ts`, `cost-allocation.service.ts`, `cost-allocation.types.ts`, `finance.module.ts`, `finance.service.ts`, `src/modules/organization/cost-center/cost-center-catalogue.service.ts`, `cost-center.repo.ts` (đọc theo nhiều id, khóa `FOR SHARE`), `organization.service.ts`, `test/gates/architecture-structure.gate-spec.ts`/`test/gates/module-graph.gate-spec.ts` nếu gate yêu cầu.
 - Depends on: Task 1, Task 2.
 - Acceptance: khai là một giao dịch có khóa đầu phiên bản và khóa Cost Center, phiên bản mới chỉ khi đổi, audit cùng giao dịch; Cost Center không có/ngừng dùng bị từ chối trước khi ghi.
 - Verify: `pnpm exec jest src/modules/finance src/modules/organization src/architecture src/module-graph`.
 
 ### Task 4: route ở `catalog/subscription`
 
-- Files: `subscription-allocation.service.ts`, `subscription-allocation.controller.ts`, `subscription-allocation.dto.ts`, `subscription.errors.ts`, `subscription.http-errors.ts`, `subscription.repo.ts` (nếu cần đọc nhẹ), `catalog.module.ts`, `test/support/api-coverage-manifest.ts` (+3), `test/e2e/api-inventory.e2e-spec.ts` (100 → 103), `test/e2e/cost-allocation.e2e-spec.ts`, `test/integration/cost-allocation-http.integration-spec.ts`.
+- Files: `subscription-allocation.service.ts`, `subscription-allocation.controller.ts`, `subscription-allocation.dto.ts`, `subscription.errors.ts`, `subscription.http-errors.ts`, `subscription.repo.ts` (nếu cần đọc nhẹ), `catalog.module.ts`, `test/support/api-coverage-manifest.ts` (+3), `test/http/platform/api-inventory.http-spec.ts` (100 → 103), `test/e2e/cost-allocation.e2e-spec.ts`, `test/integration/cost-allocation-http.integration-spec.ts`.
 - Depends on: Task 3.
 - Acceptance: ba operation đúng bảng HTTP; 401/403/404/409/422 theo vai và tình huống; không `DELETE`; đồng thời hợp lệ; mọi AC trong ma trận.
 - Verify: `pnpm test:e2e` (suite `cost-allocation`, `api-inventory`), integration `cost-allocation-http` → xanh; đột biến (bỏ khóa đầu phiên bản, bỏ kiểm tổng của policy, bỏ kiểm `PER_SEAT`, bỏ kiểm Cost Center đang dùng) làm test đỏ.

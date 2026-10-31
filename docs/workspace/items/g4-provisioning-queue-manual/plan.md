@@ -17,7 +17,7 @@ Mỗi task theo TDD: viết test đỏ, xem nó đỏ đúng lý do, viết mã 
 
 - Trạng thái: đã làm (20/10/2026); mở rộng bởi Task 6.
 
-- Files: `prisma/models/licensing.prisma`, quan hệ ngược ở `organization.prisma`, migration `20261020220000_licensing_provisioning_tasks`, `src/architecture-boundaries.spec.ts`, `test/integration/provisioning-task-constraints.integration-spec.ts`.
+- Files: `prisma/models/licensing.prisma`, quan hệ ngược ở `organization.prisma`, migration `20261020220000_licensing_provisioning_tasks`, `test/gates/architecture-boundaries.gate-spec.ts`, `test/integration/licensing/provisioning-task-constraints.integration-spec.ts`.
 - Depends on: `g4-seat-baseline-import` (bảng `license_assignments`).
 - Acceptance: CHECK trạng thái ⟺ cột, `COMPLETED` cần bằng chứng không rỗng, unique `(assignment_id, kind)`, khóa ngoại, trigger bất biến cho `COMPLETED` và chặn xóa (`55000`).
 - Verify: constraints đỏ trước migration, xanh sau; `prisma migrate diff` không khác biệt.
@@ -34,7 +34,7 @@ Mỗi task theo TDD: viết test đỏ, xem nó đỏ đúng lý do, viết mã 
 ### Task 3: facade và cổng
 
 - Trạng thái: đã làm.
-- Files: `licensing.types.ts` (`GRANT_REQUEST_GATE` và kiểu của cổng; không phải `licensing.ports.ts`), `provisioning/refusing-grant-request-gate.service.ts`, `licensing.module.ts`, `assignment.service.ts` (`createFromRequest`), `organization.service.ts` + repo phòng (`getItAdminInCharge`), `identity-access.service.ts` + repo tài khoản (`countUsableItAdminsExcept`), `src/module-graph.spec.ts`, `src/architecture-structure.spec.ts` nếu gate yêu cầu.
+- Files: `licensing.types.ts` (`GRANT_REQUEST_GATE` và kiểu của cổng; không phải `licensing.ports.ts`), `provisioning/refusing-grant-request-gate.service.ts`, `licensing.module.ts`, `assignment.service.ts` (`createFromRequest`), `organization.service.ts` + repo phòng (`getItAdminInCharge`), `identity-access.service.ts` + repo tài khoản (`countUsableItAdminsExcept`), `test/gates/module-graph.gate-spec.ts`, `test/gates/architecture-structure.gate-spec.ts` nếu gate yêu cầu.
 - Depends on: Task 2.
 - Acceptance: người phụ trách mặc định của phòng hiện tại (hoặc `null`), số IT Admin dùng được khác người thao tác, cổng mặc định từ chối; Assignment nguồn `REQUEST` ghi dưới khóa thuê bao, có audit.
 - Verify: integration `provisioning-http` (qua service); unit của repo nếu cần.
@@ -42,7 +42,7 @@ Mỗi task theo TDD: viết test đỏ, xem nó đỏ đúng lý do, viết mã 
 ### Task 4: repo, service, route
 
 - Trạng thái: đã làm.
-- Files: `provisioning-task.repo.ts`, `provisioning.service.ts`, `provisioning.dto.ts`, `provisioning.http-errors.ts`, `provisioning-tasks.controller.ts`, `licensing.module.ts`, `test/support/api-coverage-manifest.ts` (+6), `test/e2e/api-inventory.e2e-spec.ts` (121 → 127 lúc làm; hiện 143 sau các lát G3/G4 khác, trong đó ba operation của `g4-provisioning-failure-handling`), `test/e2e/provisioning.e2e-spec.ts`, `test/integration/provisioning-http.integration-spec.ts` (+ harness nếu cần).
+- Files: `provisioning-task.repo.ts`, `provisioning.service.ts`, `provisioning.dto.ts`, `provisioning.http-errors.ts`, `provisioning-tasks.controller.ts`, `licensing.module.ts`, `test/support/api-coverage-manifest.ts` (+6), `test/http/platform/api-inventory.http-spec.ts` (121 → 127 lúc làm; hiện 143 sau các lát G3/G4 khác, trong đó ba operation của `g4-provisioning-failure-handling`), `test/http/licensing/provisioning.http-spec.ts`, `test/integration/provisioning-http.integration-spec.ts` (+ harness nếu cần).
 - Depends on: Task 1, Task 2, Task 3.
 - Acceptance: sáu operation đúng bảng HTTP; mọi AC trong ma trận; Assignment, seat và Audit Trail đúng.
 - Verify: e2e + integration; đột biến (bỏ khóa thuê bao, bỏ kiểm người nghỉ việc, bỏ kiểm tài khoản công ty, bỏ bằng chứng bắt buộc, cho Finance hoàn tất, bỏ ghi người phụ trách, tự thực thi không kiểm IT Admin khác) làm đỏ.
@@ -58,7 +58,7 @@ Mỗi task theo TDD: viết test đỏ, xem nó đỏ đúng lý do, viết mã 
 ### Task 6: bổ sung đợt hoàn tất G2–G4 (21/10/2026)
 
 - Trạng thái: đã làm (theo [audit](../../../reviews/g2-g4-completion-2026-10-21/README.md), quyết định D1 và D4).
-- Files: migration `20261021120000_licensing_provisioning_task_transitions` (trigger `provisioning_task_transition_guard`); `provisioning.service.ts` + `licensing.errors.ts` + `provisioning.http-errors.ts` + mô tả của `provisioning-tasks.controller.ts` (từ chối người chưa vào làm, `PROVISIONING.BENEFICIARY_NOT_STARTED`); `test/integration/provisioning-failure-constraints.integration-spec.ts`, `provisioning-grant-http.integration-spec.ts`, `provisioning-queue-http.integration-spec.ts`, `provisioning-task-constraints.integration-spec.ts`.
+- Files: migration `20261021120000_licensing_provisioning_task_transitions` (trigger `provisioning_task_transition_guard`); `provisioning.service.ts` + `licensing.errors.ts` + `provisioning.http-errors.ts` + mô tả của `provisioning-tasks.controller.ts` (từ chối người chưa vào làm, `PROVISIONING.BENEFICIARY_NOT_STARTED`); `test/integration/licensing/provisioning-failure-constraints.integration-spec.ts`, `provisioning-grant-http.integration-spec.ts`, `provisioning-queue-http.integration-spec.ts`, `provisioning-task-constraints.integration-spec.ts`.
 - Depends on: Task 1 đến Task 4; `g4-provisioning-failure-handling` (sáu trạng thái, cột `max_attempts`).
 - Acceptance: lệnh cấp từ chối người chưa vào làm (`US-02-02` AC-15) mà không ghi gì; CSDL từ chối mọi dòng trạng thái ngoài đồ thị cho phép; AC-13 chứng minh cả đường tải lên và đường SQL sau khi đóng khởi tạo; có test `US-01-11` AC-7; INSERT SQL trong test mang `max_attempts`.
 - Verify: test `US-02-02 AC-15: does not grant to someone who starts after today…` đỏ trước (trả 201) rồi xanh; `provisioning-failure-constraints` — sáu dòng trái phép bị từ chối với `55000`, các dòng hợp lệ được nhận, tắt trigger làm bảy test đỏ.

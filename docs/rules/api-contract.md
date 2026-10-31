@@ -3,7 +3,8 @@
 ## DTO và pipeline
 
 - Base path mặc định `/api/v1`; resource plural kebab-case, JSON camelCase.
-- Dùng Zod 4 DTO qua `nestjs-zod`; request object dùng `z.strictObject`.
+- Dùng Zod 4 DTO qua `createZodDto` của ứng dụng ([dto/zod-dto.ts](../../src/infrastructure/http/dto/zod-dto.ts)), không
+  import thẳng từ `nestjs-zod` (test ranh giới đỏ); request object dùng `z.strictObject`.
 - Khai schema cho body, query **và params**. Ví dụ `@Param() params: ApplicationIdParamDto`.
   Global pipe dùng strict schema declaration; param primitive không có schema có thể trả 500.
 - Guards chạy trước pipe. Kiểm tra quyền theo input/resource đã validate ở use case.
@@ -26,10 +27,52 @@ an unreachable database is 503 (`TOKEN_VERIFICATION_UNAVAILABLE`, or `AUTH.UNAVA
 never 401; account administration routes use 503 `SERVICE_UNAVAILABLE` for a transient database failure.
 Request-body validation errors are 422 `VALIDATION_ERROR`.
 
+Giới hạn thân request (P29-N1): **một** giới hạn 100 KiB cho thân JSON và URL-encoded,
+`REQUEST_BODY_LIMIT_BYTES` ở [request-body-limit.ts](../../src/infrastructure/http/request-body-limit.ts), đăng ký trong
+`configureApplication`. Thân lớn hơn bị parser từ chối trước routing, guard và validation: 413 `HTTP_PAYLOAD_TOO_LARGE`, không
+có thông điệp parser hay mảnh thân. Đổi con số là đổi contract (FE/Mobile sinh lại client, reverse proxy phải cho qua ít nhất
+mức này). Parser URL-encoded vẫn gắn (như mặc định của Nest) dù không route nào khai URL-encoded, nên giới hạn của nó ghi rõ
+trong cùng tệp: **tối đa 100 tham số** (`URLENCODED_PARAMETER_LIMIT`) và **độ sâu lồng tối đa 5** (`URLENCODED_DEPTH_LIMIT`),
+không dựa vào mặc định thư viện (P29-N4).
+
+Ma trận lỗi parser (P29-N1, P29-N2, P29-N4 — đo lại trên body-parser 2.4.0 / raw-body 3 / multer 2.5.0 ở `SEC-UPGRADE-RV-01`,
+[test](../../test/http/platform/security-upgrade-regression.http-spec.ts); nhận theo `type` đã tài liệu hóa **cùng** status và
+thuộc tính mà nơi tạo luôn gán; không bao giờ chỉ theo `status`, tên hay thông điệp —
+[request-parser-errors.ts](../../src/infrastructure/http/filters/request-parser-errors.ts)):
+
+| Lỗi parser                                                                   | HTTP / mã                         |
+| ---------------------------------------------------------------------------- | --------------------------------- |
+| JSON hỏng (`entity.parse.failed`; Nest tự đổi `SyntaxError` thành 400)       | 400 `HTTP_BAD_REQUEST`            |
+| `request.size.invalid` (độ dài khai báo lệch số byte), `request.aborted`     | 400 `HTTP_BAD_REQUEST`            |
+| `querystring.parse.rangeError` (URL-encoded lồng sâu quá giới hạn)           | 400 `HTTP_BAD_REQUEST`            |
+| thân nén hỏng (gzip/deflate/br): lỗi zlib/brotli có `errno`, không `type`    | 400 `HTTP_BAD_REQUEST`            |
+| `entity.too.large`, `parameters.too.many`                                    | 413 `HTTP_PAYLOAD_TOO_LARGE`      |
+| `charset.unsupported`, `encoding.unsupported`                                | 415 `HTTP_UNSUPPORTED_MEDIA_TYPE` |
+| multipart: sai tên trường tệp, phá giới hạn form / tệp quá lớn               | 400 / 413                         |
+| `stream.encoding.set`, `stream.not.readable`, type lạ, mã multer lạ, lưu trữ | 500 `INTERNAL_SERVER_ERROR`       |
+
+Mã hóa nội dung (`Content-Encoding`) của thân JSON/URL-encoded: chỉ `gzip`, `deflate`, `br` hoặc không mã hóa — contract
+trước body-parser 2.4.0 (Owner, 25/10/2026, `SEC-UPGRADE-RV-01-F1`). body-parser 2.4.0 tự giải nén cả `zstd` nơi Node hỗ trợ
+(CI Node 22, image `node:24`), nên `contentEncodingAllowlist` ở
+[request-body-limit.ts](../../src/infrastructure/http/request-body-limit.ts) từ chối mọi mã hóa khác **trước** parser — 415
+`HTTP_UNSUPPORTED_MEDIA_TYPE`, không handler nào chạy; header đọc như body-parser (vắng/rỗng = không mã hóa, không phân biệt
+hoa/thường). Thân không phải JSON/URL-encoded (multipart) và request không thân không qua allowlist. Giới hạn 100 KiB tính
+trên byte **đã nở** (thân nén nở quá ⟹ 413). Multipart: trường văn bản tối đa **đúng** 64 byte (65 ⟹ 400, multer 2.5.0);
+tệp rỗng tới route.
+`entity.verify.failed` không xảy ra (không cấu hình verify hook), nên không có contract. Không có thông điệp parser, charset,
+encoding, giá trị trường hay stack nào trả về. Client đã đi (`request.aborted`) thì filter phân loại nhưng **không** ghi lên
+socket đã đóng. Multer nhận bằng `instanceof` đúng lớp `MulterError` mà `FileInterceptor` của Nest nạp, không so tên lỗi.
+Mọi operation có thân JSON khai 400, 413 và 415 của parser qua một helper
+([openapi-request-parser.ts](../../src/infrastructure/http/openapi-request-parser.ts)): mô tả 400 riêng của operation được
+giữ và thêm nghĩa của parser đúng một lần — không chép mô tả vào controller.
+
+Một mã lỗi chỉ đi với **một** HTTP status. Kẻ thua đua (ví dụ `DB-03`) dùng 409 với mã riêng bảo client làm mới rồi gửi lại —
+`APPLICATION.DICTIONARY_GROUP_CHANGED` — không mượn mã 422 của lỗi nghiệp vụ cùng chủ đề (P29-N3).
+
 ## Collection và detail (`API-LIST-DETAIL.1`)
 
 Áp cho mọi `GET` trả nhiều dòng (collection, search, page) và detail tương ứng. Gate
-[`src/api-collection-contract.spec.ts`](../../src/api-collection-contract.spec.ts) (trong `pnpm check`) kiểm phần thấy
+[`test/gates/api-collection-contract.gate-spec.ts`](../../test/gates/api-collection-contract.gate-spec.ts) (trong `pnpm check`) kiểm phần thấy
 được trong `openapi.json`; phần query chứng minh bằng test đếm câu lệnh với
 [`test/support/query-count.ts`](../../test/support/query-count.ts).
 
@@ -170,13 +213,47 @@ const COLLECTION_EXCEPTIONS = [{ operationId: 'currencyList', removeWhen: 'Revie
   `@AuthenticatedOnly()`/`@RequireRoles(...)` đã gắn bearer, `@Public()` không. Route có guard dùng
   `UNAUTHENTICATED_RESPONSE` và `GUARDED_SERVICE_UNAVAILABLE_RESPONSE` cho 401/503. Mô tả public không chứa mã nội bộ
   (`US-*`, `AC-*`, `QĐ-*`); credential trong example là placeholder như `<refresh-token>`. `createOpenApiDocument`
-  đổi `const` thành `enum` và bỏ `pattern` lặp format uuid/date-time; `test/e2e/api-inventory.e2e-spec.ts` kiểm các
+  đổi `const` thành `enum` và bỏ `pattern` lặp format uuid/date-time; `test/http/platform/api-inventory.http-spec.ts` kiểm các
   điều trên.
 - Mọi `@ApiSuccessResponse` của route mount khai `message` riêng; không route sản phẩm nào rơi về `COMMON.SUCCESS`
   (chỉ probe trong test). Route có đầu vào (path, query, body) khai 422 `VALIDATION_ERROR`.
 - 429 của `ThrottlerGuard` toàn cục (`HTTP_TOO_MANY_REQUESTS`) được `createOpenApiDocument` thêm cho mọi operation
   không tự khai 429. Route tự khai 429 (khóa đăng nhập, limit riêng) phải nêu cả `HTTP_TOO_MANY_REQUESTS` trong mô tả.
   Không dùng `@SkipThrottle` nếu chưa sửa cách tài liệu hóa 429. Inventory test kiểm các điều trên.
+- **Ví dụ response (`OPENAPI-EXAMPLE.1`).** `@ApiSuccessResponse` tự hiện đúng `message` đã khai (một giá trị cho interceptor
+  và ví dụ, overlay `allOf` trên DTO). Mỗi mục `ApiErrorResponses` **bắt buộc** `examples`: chỉ các mã route đó thật sự trả
+  ở status đó — truy vết guard → pipe → service/policy/repo → mapper, không lấy từ mô tả. Dùng ví dụ chung
+  (`UNAUTHENTICATED_RESPONSE`, `GUARDED_SERVICE_UNAVAILABLE_RESPONSE`, `FORBIDDEN_EXAMPLE`, `VALIDATION_EXAMPLE`,
+  `fallbackExample`) và hằng `*_ERROR_EXAMPLES` của chính `*.http-errors.ts` mà controller dùng, dựng bằng
+  `errorExampleOf(toXApiException(new XError(...)))` — không chép literal mã/thông điệp. Đối số động là placeholder tất định
+  (`'<employee-id>'`, `'2026-01-01'`; thời điểm duy nhất `2026-01-01T00:00:00.000Z`); `code` ≤ 80, `message` ≤ 160 ký tự,
+  không token/secret/email/mã nội bộ. Status đã khai mà runtime đang chạy chưa trả được (đường đi chờ lát sau) dùng
+  `noExampleBecause` thay ví dụ và có mục chính xác trong `NO_EXAMPLE_RESPONSES` — danh sách chỉ co lại. Thêm hoặc đổi route ⟹ cập nhật
+  [manifest ví dụ](../../test/support/openapi-example-manifest.ts) (message thành công, mã theo route); inventory test so tập
+  mã chính xác.
+- **Một dialect: OpenAPI 3.0 (`OPENAPI-EXAMPLE.1-F3`).** Document khai `3.0.0` và mọi schema là Schema Object 3.0 — FE/Mobile
+  (Orval) kiểm cả document theo phiên bản khai và từ chối document lẫn JSON Schema 2020-12. Zod (qua nestjs-zod) phát 2020-12;
+  `toOpenApi30Presentation` viết lại theo 3.0 (`type` mảng → `type` + `nullable` hoặc `anyOf`; nhánh `{type: "null"}` →
+  `nullable`; enum nullable liệt kê `null`; bound số → cờ boolean; bỏ `propertyNames: {type: "string"}`) và để nguyên hình không
+  có cách viết 3.0 chính xác. [Gate dialect](../../src/infrastructure/http/openapi-dialect.ts) nêu pointer + lý do: `pnpm
+openapi:export` từ chối ghi, e2e kiểm document trong tiến trình và `openapi.json`. Gate ngữ nghĩa
+  ([openapi-dialect.e2e-spec.ts](../../test/http/platform/openapi-dialect.http-spec.ts)) so mọi DTO body/query/path/response với bản 3.0 do
+  chính Zod dựng từ schema runtime — nâng Zod/nestjs-zod/Swagger làm đổi nghĩa document thì đỏ. Không sửa bằng cách đổi chuỗi
+  `openapi`, tắt validator hay bỏ ràng buộc.
+- **Luật của request mà document nói được (`F01`).** Ngày nghiệp vụ trong body, query, path dùng đúng một định nghĩa
+  ([business-date.dto.ts](../../src/infrastructure/http/dto/business-date.dto.ts): `businessDate`, `businessDay`,
+  `businessDateSchema(message)`) — không viết lại `refine(isBusinessDate)` trong DTO; document nhận `format: date` và mô tả,
+  không `pattern`. Mảng phần tử vô hướng không trùng gắn `.meta({ uniqueItems: true })`, body "ít nhất một field" gắn
+  `.meta({ minProperties: 1 })`; luật không có từ khóa OpenAPI 3.0 (trim, điều kiện chéo field, địa chỉ web, email chuẩn hóa) ghi
+  bằng `description` của field hoặc của object (query DTO ghi trên field, vì nestjs-zod bỏ metadata cấp object của query); câu về
+  trim nằm một lần ở `info.description`. Không `anyOf`, không `pattern` thêm. Test
+  [openapi-request-rules](../../test/http/platform/openapi-request-rules.http-spec.ts) đọc cây Zod của từng route và đòi mọi ngày,
+  mảng, patch có keyword; dialect gate vẫn so document với bản Zod tự dựng.
+- **Lời của 403/422 ở route đọc (`F03`).** Route GET mô tả đúng ai đọc được và cái gì có thể sai ở một lần đọc (id, query), không
+  mượn câu của route ghi cùng controller (HR basis, luật của phòng ban, "maintains", "configures", "imports"). Khai hằng riêng cho
+  route đọc; `status`, `examples`, guard không đổi. Test
+  [openapi-read-wording](../../test/http/platform/openapi-read-wording.http-spec.ts) cấm cụm từ của route ghi trên GET và ghim câu
+  của các route đọc đã sửa.
 - Cập nhật [API inventory](../../test/support/api-coverage-manifest.ts) khi thêm/bỏ operation.
 - Chạy `pnpm test:e2e`, `pnpm openapi:export`; review diff `openapi.json`.
 - Contract sinh từ controller/DTO. Không sửa JSON hoặc generated FE client bằng tay.
@@ -184,5 +261,5 @@ const COLLECTION_EXCEPTIONS = [{ operationId: 'currencyList', removeWhen: 'Revie
 
 Ví dụ hiện có, đã mount và khai báo quyền đúng: [audit controller](../../src/modules/audit/audit.controller.ts)
 (`GET /api/v1/audit-events`, `@RequireRoles('SUPER_ADMIN')` ở class, `operationId`, success/error response) cùng test
-[e2e](../../test/e2e/audit-events.e2e-spec.ts) và [integration](../../test/integration/audit-query-http.integration-spec.ts).
-Cách thêm endpoint: [development guide](../guides/kien-truc-backend-va-cach-viet-code.md).
+[e2e](../../test/http/audit/audit-events.http-spec.ts) và [integration](../../test/integration/audit/audit-query-http.integration-spec.ts).
+Cách thêm endpoint: [hướng dẫn dev mới](../guides/huong-dan-dev-moi.md).

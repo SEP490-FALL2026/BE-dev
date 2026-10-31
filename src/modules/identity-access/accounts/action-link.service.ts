@@ -2,12 +2,12 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EnvironmentVariables } from '../../../infrastructure/config/env-schema';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { ActionTokenPurpose, ActionTokenRevokedReason, ActionTokenSnapshot } from '../identity-access.types';
-import { ActionLinkState } from '../policies/account-policy';
+import { ActionTokenPurpose, ActionTokenRevokedReason, ActionTokenSnapshot } from '../public/identity-access.types';
+import { ActionLinkState } from './account.policy';
 import { ActionTokenRepo } from './action-token.repo';
-import { hashActionToken, isWellFormedActionToken, newActionToken } from './action-token';
+import { hashActionToken, isWellFormedActionToken, newActionToken } from './action-token.policy';
 
-/** Which configured lifetime a new link gets: an invitation's, or a password reset's (T-1). */
+/** Which configured lifetime a new link gets: an invitation's, or a password reset's. */
 export type ActionLinkLifetime = 'INVITATION' | 'PASSWORD_RESET';
 
 export interface IssuedActionLink {
@@ -64,7 +64,7 @@ export class ActionLinkService {
     return this.links.findUsableTokens(tx, appUserId, purpose);
   }
 
-  /** How many tokens of this purpose the account was issued since `since`, whatever became of them (T-2). */
+  /** How many tokens of this purpose the account was issued since `since`, whatever became of them. */
   countTokensSince(tx: DbTx, appUserId: string, purpose: ActionTokenPurpose, since: Date): Promise<number> {
     return this.links.countTokensSince(tx, appUserId, purpose, since);
   }

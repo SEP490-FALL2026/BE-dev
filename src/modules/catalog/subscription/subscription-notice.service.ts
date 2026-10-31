@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { addDays, type BusinessDate } from '../../../core/business-date';
-import { OperatingParametersService } from '../../operating-parameters/operating-parameters.service';
+import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
 import { deriveNotice, noticeInputOf } from './subscription.policy';
 import { SubscriptionRepo } from './subscription.repo';
 
@@ -27,11 +27,11 @@ export interface ActiveNotice {
 export class SubscriptionNoticeService {
   constructor(
     private readonly subscriptions: SubscriptionRepo,
-    private readonly parameters: OperatingParametersService,
+    private readonly parameters: OperatingParametersApi,
   ) {}
 
   /**
-   * The notices whose base date is on or after `today` and within the earliest alert days (`LD-02`): the subscriptions
+   * The notices whose base date is on or after `today` and within the earliest alert days: the subscriptions
    * outside that window cannot be due for a review, so they are not read.
    */
   async activeNotices(today: BusinessDate, planId?: string): Promise<ActiveNotice[]> {

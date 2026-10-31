@@ -3,10 +3,10 @@ import { Page, pageOf } from '../../../core/application/pagination';
 import { DbTx, TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import { isCheckViolation, isUniqueViolation } from '../../../infrastructure/database/unique-violation';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { AuditService } from '../../audit/audit.service';
-import { OrganizationService } from '../../organization/organization.service';
+import { AuditApi } from '../../audit/public/audit.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
 import { ApplicationLookupService } from '../catalog-entry/application-lookup.service';
-import { catalogAuditEvent } from '../mappers/catalog-audit-event';
+import { catalogAuditEvent } from '../catalog-audit-event.mapper';
 import {
   PlanApplicationNotFoundError,
   PlanApplicationRetiredError,
@@ -76,8 +76,8 @@ export class PlanService {
     private readonly plans: PlanRepo,
     private readonly workspace: PlanWorkspaceService,
     private readonly applications: ApplicationLookupService,
-    private readonly organization: OrganizationService,
-    private readonly audit: AuditService,
+    private readonly organization: OrganizationApi,
+    private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
   ) {}
 

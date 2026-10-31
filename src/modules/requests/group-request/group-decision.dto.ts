@@ -1,13 +1,14 @@
-import { createZodDto } from 'nestjs-zod';
+import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { z } from 'zod';
-import { isBusinessDate } from '../../../core/business-date';
 import {
+  PLAN_LINE_CHOICE_DESCRIPTION,
   REASON_MAX_LENGTH,
   oneChoice,
   planLineChoiceFields,
   withdrawBodySchema,
 } from '../access-request/access-request.dto';
 import { GROUP_HEAD_MAX } from './group-request.policy';
+import { businessDate } from '../../../infrastructure/http/dto/business-date.dto';
 
 const reason = z.string().trim().min(1).max(REASON_MAX_LENGTH);
 
@@ -25,7 +26,8 @@ const verdictSchema = z
     if (verdict.decision === 'APPROVE' && verdict.reason !== undefined) {
       ctx.addIssue({ code: 'custom', path: ['reason'], message: 'Only a refusal gives a reason.' });
     }
-  });
+  })
+  .meta({ description: 'A refusal (REJECT) gives its reason; an approval (APPROVE) gives none.' });
 
 /**
  * The decision of the need on the people of a step (`US-05-17` AC-4): every person of the step, each approved or refused with the
@@ -39,12 +41,10 @@ export const lineNeedDecisionBodySchema = z
     spend: z
       .strictObject({
         ...planLineChoiceFields,
-        expectedSpendOn: z
-          .string()
-          .refine(isBusinessDate, { message: 'Must be a real date as YYYY-MM-DD.' })
-          .optional(),
+        expectedSpendOn: businessDate.optional(),
       })
       .superRefine(oneChoice)
+      .meta({ description: PLAN_LINE_CHOICE_DESCRIPTION })
       .optional(),
   })
   .superRefine((body, ctx) => {
@@ -58,6 +58,11 @@ export const lineNeedDecisionBodySchema = z
     if (new Set(body.lines.map((line) => line.employeeId)).size !== body.lines.length) {
       ctx.addIssue({ code: 'custom', path: ['lines'], message: 'A person is decided once.' });
     }
+  })
+  .meta({
+    description:
+      'Each person of the step is decided once. A term confirmation and a choice of line of the plan (spend) are accepted only ' +
+      'when at least one person is approved.',
   });
 
 /**
@@ -75,7 +80,8 @@ export const lineSpendDecisionBodySchema = z
           .array(z.number().int().min(2000).max(2200))
           .min(1)
           .max(20)
-          .refine((years) => new Set(years).size === years.length, { message: 'A year is named once.' }),
+          .refine((years) => new Set(years).size === years.length, { message: 'A year is named once.' })
+          .meta({ uniqueItems: true }),
       })
       .optional(),
   })
@@ -86,17 +92,30 @@ export const lineSpendDecisionBodySchema = z
     if (new Set(body.lines.map((line) => line.employeeId)).size !== body.lines.length) {
       ctx.addIssue({ code: 'custom', path: ['lines'], message: 'A person is decided once.' });
     }
+  })
+  .meta({
+    description:
+      'Each person is decided once. An exception (override) is accepted only when at least one person is approved.',
   });
 
 /**
- * The body of removing a person who left from a request for a group: `cause` is the one cause there is; `note` is what the IT Admin keeps
- * with the closing; `evidence` is what they did to undo a grant that is being worked, needed only for such a task.
+ * The body of removing a person who left, or was transferred, from a request for a group: `cause` says which; `note` is what the IT
+ * Admin keeps with the closing, and the reason of a closing for a transfer; `evidence` is what they did to undo a grant that is being
+ * worked, and, for a transfer, the confirmation that they checked with the vendor and collected the invitation.
  */
-export const lineClosureBodySchema = z.strictObject({
-  cause: z.enum(['BENEFICIARY_LEFT']),
-  note: reason.optional(),
-  evidence: reason.optional(),
-});
+export const lineClosureBodySchema = z
+  .strictObject({
+    cause: z.enum(['BENEFICIARY_LEFT', 'BENEFICIARY_TRANSFERRED']),
+    note: reason.optional(),
+    evidence: reason.optional(),
+  })
+  .superRefine((body, ctx) => {
+    // A closing for a transfer gives its reason; `evidence` is the confirmation of the check with the vendor.
+    if (body.cause === 'BENEFICIARY_TRANSFERRED' && body.note === undefined) {
+      ctx.addIssue({ code: 'custom', path: ['note'], message: 'A closing for a transfer gives its reason.' });
+    }
+  })
+  .meta({ description: 'A closing for a transfer (cause BENEFICIARY_TRANSFERRED) gives its reason in note.' });
 
 export class LineNeedDecisionBodyDto extends createZodDto(lineNeedDecisionBodySchema) {}
 export class LineSpendDecisionBodyDto extends createZodDto(lineSpendDecisionBodySchema) {}

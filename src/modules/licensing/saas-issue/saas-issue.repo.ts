@@ -141,11 +141,28 @@ const toRecord = (row: Row): SaasIssueRecord => ({
 export class SaasIssueRepo {
   constructor(private readonly prisma: PrismaService) {}
 
-  /** The next number of a code for `year`: `BM11-<year>-<six digits>`. */
+  /**
+   * The next code for `year`: `BM11-<year>-<six digits>`, numbered again from 1 every year. The number is taken
+   * under the lock of the row of the year in `saas_issue_counters`: one more than the greater of the counter and the highest number
+   * already in a code of that year (so a number the compatibility image drew from the old sequence is never issued again), and the old
+   * sequence is lifted to it in the same transaction (never lowered), so that image never draws one the counter has issued either.
+   */
   async nextCode(tx: DbTx, year: string): Promise<string> {
-    const rows = await tx.$queryRaw<{ n: number }[]>`SELECT nextval('saas_issue_seq')::int AS n`;
+    const yearNumber = Number(year);
+    await tx.$executeRaw`
+      INSERT INTO saas_issue_counters (year, last_value) VALUES (${yearNumber}::int, 0) ON CONFLICT (year) DO NOTHING`;
+    const counter = await tx.$queryRaw<{ last_value: number }[]>`
+      SELECT last_value FROM saas_issue_counters WHERE year = ${yearNumber}::int FOR UPDATE`;
+    const used = await tx.$queryRaw<{ highest: number }[]>`
+      SELECT COALESCE(MAX(substring(code FROM 11 FOR 6)::int), 0)::int AS highest
+        FROM saas_issues WHERE code LIKE ${`BM11-${year}-%`}`;
+    const next = Math.max(counter[0].last_value, used[0].highest) + 1;
+    await tx.$executeRaw`UPDATE saas_issue_counters SET last_value = ${next}::int WHERE year = ${yearNumber}::int`;
+    await tx.$executeRaw`
+      SELECT setval('saas_issue_seq', ${next}::bigint, true)
+       WHERE (SELECT CASE WHEN is_called THEN last_value ELSE last_value - 1 END FROM saas_issue_seq) < ${next}::bigint`;
 
-    return `BM11-${year}-${String(rows[0].n).padStart(6, '0')}`;
+    return `BM11-${year}-${String(next).padStart(6, '0')}`;
   }
 
   async insert(tx: DbTx, code: string, input: NewSaasIssue): Promise<SaasIssueRecord> {

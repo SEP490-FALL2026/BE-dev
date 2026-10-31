@@ -1,19 +1,22 @@
 import { Injectable } from '@nestjs/common';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { AuditService } from '../../audit/audit.service';
-import { EmployeeRecord } from '../../organization/organization.types';
+import { AuditApi } from '../../audit/public/audit.api';
+import { EmployeeRecord } from '../../organization/public/organization.types';
 import { AccountDirectoryService } from '../accounts/account-directory.service';
 import { ActionLinkRevocation } from '../accounts/action-link-revocation.service';
 import { SuccessorEligibility } from '../accounts/successor-eligibility.service';
 import { RecoveryLinks } from './recovery-links.service';
-import { operatorEvent, tryNormalize } from './recovery-procedure';
-import { RecoveryRefusedError } from './recovery.errors';
+import { operatorEvent, tryNormalize } from './recovery-procedure.policy';
+import { RecoveryRefusedError } from '../public/recovery.errors';
 import { RecoveryRepo, TicketRecord } from './recovery.repo';
-import { RecoveryContext, RecoveryResult } from './recovery.types';
+import { RecoveryContext, RecoveryResult } from '../public/recovery.types';
 
 /**
  * The successor's side of a role transfer (AC-12): first an account with no role and an invitation, then the wait until
- * they have activated it. Activating never grants the role; only the next run of the same ticket moves it.
+ * they have activated it. Activating never grants the role; only the next run of the same ticket moves it. Every invitation goes to
+ * the login email of the successor's account, never to the work email on the record as it is now: the work email
+ * can change while an invitation is on its way, the account's login email does not, so a link is never sent to an address the
+ * account does not have.
  */
 @Injectable()
 export class SuccessorEnrolment {
@@ -23,7 +26,7 @@ export class SuccessorEnrolment {
     private readonly links: RecoveryLinks,
     private readonly revocation: ActionLinkRevocation,
     private readonly tickets: RecoveryRepo,
-    private readonly audit: AuditService,
+    private readonly audit: AuditApi,
   ) {}
 
   /** Stage 1: the successor has no account yet. It is created with no role, and invited. */
@@ -44,10 +47,12 @@ export class SuccessorEnrolment {
     if (await this.accounts.findAccountByLoginEmail(organizationId, normalized)) {
       throw new RecoveryRefusedError('SUCCESSOR_EMAIL_TAKEN');
     }
+    // The account is created with the work email as its login email, and the invitation goes to the login email it was given.
+    const loginEmail = successor.workEmail;
     const created = await this.accounts.createAppUser(tx, {
       organizationId,
       employeeId: successor.id,
-      loginEmail: successor.workEmail,
+      loginEmail,
       normalizedLoginEmail: normalized,
       status: 'ACTIVE',
       activationState: 'INVITED',
@@ -60,7 +65,7 @@ export class SuccessorEnrolment {
         organizationId,
         appUserId: created.id,
         ticketId: ticket.id,
-        recipient: successor.workEmail,
+        recipient: loginEmail,
         fullName: successor.fullName,
       },
       now,
@@ -78,7 +83,7 @@ export class SuccessorEnrolment {
       ticketRef: context.ticketRef,
       mode: 'TRANSFER_ROLE',
       outcome: 'ACCOUNT_CREATED',
-      sentTo: 'WORK_EMAIL',
+      sentTo: 'LOGIN_EMAIL',
     };
   }
 
@@ -105,13 +110,15 @@ export class SuccessorEnrolment {
         return { ticketRef: context.ticketRef, mode: 'TRANSFER_ROLE', outcome: 'INVITATION_ALREADY_SENT' };
       }
       await this.revocation.revokeUsable(tx, successorAccountId, 'SUPERSEDED', now);
+      // The login email of the account, whatever the work email on the record says now: never the other, never empty.
+      const account = await this.accounts.findAccountById(successorAccountId);
       await this.links.sendInvitation(
         tx,
         {
           organizationId,
           appUserId: successorAccountId,
           ticketId: ticket.id,
-          recipient: successor.workEmail ?? '',
+          recipient: account?.loginEmail ?? '',
           fullName: successor.fullName,
         },
         now,
@@ -121,7 +128,7 @@ export class SuccessorEnrolment {
         ticketRef: context.ticketRef,
         mode: 'TRANSFER_ROLE',
         outcome: 'INVITATION_REISSUED',
-        sentTo: 'WORK_EMAIL',
+        sentTo: 'LOGIN_EMAIL',
       };
     }
     if (problem) throw new RecoveryRefusedError(problem);

@@ -17,7 +17,7 @@ Mỗi task theo TDD: viết test đỏ, xem nó đỏ đúng lý do, viết mã 
 
 ### Task 1: dữ liệu `vendors`, `functional_groups`, `applications`
 
-- Files: `prisma/models/catalog.prisma`, `prisma/models/organization.prisma` (quan hệ ngược), migration `20261020120000_catalog_applications`, `src/architecture-boundaries.spec.ts` (`PRISMA_MODEL_OWNER`), `test/integration/application-constraints.integration-spec.ts`.
+- Files: `prisma/models/catalog.prisma`, `prisma/models/organization.prisma` (quan hệ ngược), migration `20261020120000_catalog_applications`, `test/gates/architecture-boundaries.gate-spec.ts` (`PRISMA_MODEL_OWNER`), `test/integration/catalog/application-constraints.integration-spec.ts`.
 - Depends on: `g3-vendor-dictionary` (bảng `vendor_groups`, `vendor_service_lines`, `vendor_dictionary_proposals`).
 - Acceptance: unique tên nhà cung cấp/nhóm/ứng dụng (kể cả hai chỉ mục một phần), unique dòng từ điển, CHECK `kind ⇔ vendor`, CHECK cờ liên lạc, CHECK tối đa 20 tên miền, trigger dòng khớp nhóm của nhà cung cấp, khóa ngoại, hai cột mới của đề xuất.
 - Verify: `pnpm prisma:validate`, `pnpm prisma:generate`; test constraints đỏ trước migration, xanh sau.
@@ -31,14 +31,14 @@ Mỗi task theo TDD: viết test đỏ, xem nó đỏ đúng lý do, viết mã 
 
 ### Task 3: capability `vendor/`, `functional-group/` và contract của `vendor-dictionary/`
 
-- Files: `vendor/vendor.repo.ts`, `vendor/vendor-directory.service.ts`, `functional-group/functional-group.{repo,service,errors,types,dto,controller,http-errors}.ts`, `functional-group/functional-group-lookup.service.ts`, `vendor-dictionary/vendor-dictionary-lookup.service.ts`, `vendor-dictionary/vendor-proposal-intake.service.ts`, `vendor-proposal.repo.ts` (thêm `raise`), `mappers/catalog-audit-event.ts` (chuyển từ `vendor-dictionary-audit.ts`), `src/architecture-structure.spec.ts` (`INTRA_MODULE_CONTRACTS`).
+- Files: `vendor/vendor.repo.ts`, `vendor/vendor-directory.service.ts`, `functional-group/functional-group.{repo,service,errors,types,dto,controller,http-errors}.ts`, `functional-group/functional-group-lookup.service.ts`, `vendor-dictionary/vendor-dictionary-lookup.service.ts`, `vendor-dictionary/vendor-proposal-intake.service.ts`, `vendor-proposal.repo.ts` (thêm `raise`), `mappers/catalog-audit-event.ts` (chuyển từ `vendor-dictionary-audit.ts`), `test/gates/architecture-structure.gate-spec.ts` (`INTRA_MODULE_CONTRACTS`).
 - Depends on: Task 1.
 - Acceptance: nhóm chức năng thêm/đổi tên/bật-tắt cùng audit trong một giao dịch; nhà cung cấp tìm-hoặc-tạo an toàn khi đồng thời; đề xuất `ON CONFLICT DO NOTHING`.
 - Verify: `pnpm exec jest src/modules/catalog src/architecture`; integration `functional-group-http` (Task 5).
 
 ### Task 4: capability `catalog-entry/` — repo, service, lỗi, HTTP
 
-- Files: `catalog-entry/application.{repo,service,errors,types,dto,http-errors}.ts`, `catalog-entry/applications.controller.ts`, `catalog.module.ts`, `src/app.module.ts` (đã có `CatalogModule`), `test/support/api-coverage-manifest.ts` (+7), `test/e2e/api-inventory.e2e-spec.ts` (72 → 79), `test/e2e/application-catalog.e2e-spec.ts`, `test/integration/application-http.integration-spec.ts`, `test/integration/functional-group-http.integration-spec.ts`.
+- Files: `catalog-entry/application.{repo,service,errors,types,dto,http-errors}.ts`, `catalog-entry/applications.controller.ts`, `catalog.module.ts`, `src/app/app.module.ts` (đã có `CatalogModule`), `test/support/api-coverage-manifest.ts` (+7), `test/http/platform/api-inventory.http-spec.ts` (72 → 79), `test/http/catalog/application-catalog.http-spec.ts`, `test/integration/catalog/application-http.integration-spec.ts`, `test/integration/catalog/functional-group-http.integration-spec.ts`.
 - Depends on: Task 2, Task 3.
 - Acceptance: bảy operation đúng bảng HTTP; 401/403/422 theo vai; 409 trùng; không `DELETE`; đồng thời hợp lệ; mọi AC trong ma trận.
 - Verify: `pnpm test:e2e` (suite `application-catalog`, `api-inventory`), integration `application-http`, `functional-group-http` → xanh; đột biến (bỏ khóa nhân viên, bỏ ánh xạ unique) làm test đỏ.
@@ -66,6 +66,15 @@ Sau Task 1, Task 3 và Task 4: gate liên quan xanh; tự review diff theo spec/
 | `pnpm test:e2e`                                                                                     | như trên                                   | 18 suite, 394 test xanh                                                                                                                                                     | —                                                                                                |
 | `pnpm test:integration`                                                                             | như trên                                   | 58 suite, 764 test xanh                                                                                                                                                     | —                                                                                                |
 | `pnpm openapi:export`                                                                               | như trên                                   | thêm bảy operation (`applicationList/Create/Get/Update`, `functionalGroupList/Create/Update`)                                                                               | FE cần regenerate client                                                                         |
+
+### Prompt 02 — tách `ApplicationService` theo size gate (26/10/2026, merge `0da8f56`)
+
+| Kiểm tra                            | Kết quả                                                                                                                                                                                                                                                                                                    |
+| ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Đỏ trước                            | size gate (`architecture-structure.spec.ts`, "keeps source files under the size thresholds"): `application.service.ts` 407 dòng                                                                                                                                                                            |
+| Characterization trước khi dời code | `application.service.spec.ts` mới (7 ca: chi tiết với Business Owner và cờ thay, ứng dụng tương tự, khuyến nghị K2 từ ba người giữ K1 trong ngày, không đọc ngày khi không có K1, không tồn tại, owner không phải nhân viên, khai báo, đổi owner một transaction, thay đổi rỗng không ghi) xanh trên mã cũ |
+| Sau tách                            | cùng 7 ca xanh (chỉ đổi cách dựng service); `application.service.ts` 367 dòng, `application-view.service.ts` 58 dòng; unit `src/modules/catalog` + ba suite kiến trúc xanh (size gate không còn liệt kê tệp này)                                                                                           |
+| Gate cuối                           | cùng lượt với plan [openapi-response-examples](../openapi-response-examples/plan.md) (Prompt 02)                                                                                                                                                                                                           |
 
 - [x] AC trong scope có bằng chứng; lỗi đã xử lý hoặc ghi blocker.
 - [x] Spec/plan/test design phản ánh đúng implementation cuối.

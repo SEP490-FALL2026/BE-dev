@@ -1,13 +1,14 @@
 # Tài liệu backend
 
 Bắt đầu ở [README](../README.md), [CONTRIBUTING](../CONTRIBUTING.md)
-và [ARCHITECTURE](../ARCHITECTURE.md). Đây là foundation để triển khai US,
+và [ARCHITECTURE](../ARCHITECTURE.md); dev mới đọc thêm
+[hướng dẫn dev mới](guides/huong-dan-dev-moi.md). Đây là foundation để triển khai US,
 không phải bộ chức năng đã hoàn thành.
 
 | Thư mục    | Mục đích                                                                  |
 | ---------- | ------------------------------------------------------------------------- |
 | rules/     | Quy tắc ngắn phải tuân thủ theo phần code thay đổi                        |
-| guides/    | Cách thực hiện: thêm endpoint, dùng AI, chạy container, vận hành kho khóa |
+| guides/    | Cách thực hiện: hướng dẫn dev mới, dùng AI, chạy container, kho khóa      |
 | decisions/ | Vì sao chọn một hướng kỹ thuật; ghi rõ accepted khác implemented          |
 | examples/  | Dữ liệu mẫu/template tham khảo, không phải runtime hay acceptance đã pass |
 | reviews/   | Kết quả review và phạm vi đã kiểm chứng                                   |
@@ -15,6 +16,14 @@ không phải bộ chức năng đã hoàn thành.
 
 Kiến trúc hiện hành nằm ở ARCHITECTURE.md root. Không cần tạo một bản song song
 trong docs/architecture. Các gói triển khai auth/US cũ đã được dọn khỏi baseline.
+
+## Hướng dẫn vận hành
+
+- [Bootstrap tổ chức và Super Admin trên VPS](guides/bootstrap-installation.md): nguồn hướng dẫn chính cho wrapper,
+  `.env.bootstrap`, copy file, cài đầu tiên, kiểm tra và các lần deploy sau.
+- [Nạp dataset demo vào VPS dùng chung](guides/demo-dataset.md): wrapper `demo-dataset.sh`, `.env.demo-dataset`,
+  xem trước → nạp → kiểm tra, chạy lại và bàn giao tài khoản demo cho FE.
+- [Container, PostgreSQL roles và deploy](guides/containers.md): chuẩn bị hạ tầng, backup, migration và phục hồi release.
 
 ## Quyết định còn áp dụng
 
@@ -35,6 +44,7 @@ trong docs/architecture. Các gói triển khai auth/US cũ đã được dọn 
 - [Ngữ cảnh `requests` (C4) cho Request, bước duyệt và định tuyến](decisions/0015-requests-context.md) — Proposed; chờ Owner review/Accepted.
 - [Ngữ cảnh `budgets` (C5) cho đề xuất và phiên bản ngân sách](decisions/0016-budgets-context.md) — Proposed; chờ Owner review/Accepted.
 - [Ngữ cảnh `personnel` (C2) cho vòng đời nhân sự](decisions/0017-personnel-context.md) — Proposed; chờ Owner review/Accepted.
+- [Các sweeper theo giờ vẫn chạy trong tiến trình API](decisions/0018-sweepers-stay-in-the-api-process.md) — Proposed; chờ Owner review/Accepted.
 
 Trạng thái triển khai của các lát dùng hai ADR trên nằm ở [roadmap](roadmap.md). Số ADR bị khuyết không cần đánh lại.
 Định hướng tài khoản/mật khẩu + JWT hiện ghi ở ARCHITECTURE; spec/plan từng lát ở [workspace](workspace/README.md).
@@ -43,12 +53,18 @@ Trạng thái triển khai của các lát dùng hai ADR trên nằm ở [roadma
 
 [Quy trình thiết kế](workspace/README.md) · [Roadmap](roadmap.md) · [Nguồn BRD/US](workspace/sources.md)
 
+[Giao việc theo G và bộ prompt dùng lại](workspace/prompts/README.md): dùng cho dev tự làm hoặc dùng AI, gồm tin nhắn
+giao một phần G/một G/hai G và các bước thiết kế, audit, implement, validate, bàn giao.
+
 ## Review G0/G1
 
 - [Review và remediation G0/1a/1b](reviews/g0-g1-remediation-2026-10-15/README.md): lịch sử finding, bản sửa remediation, kết quả kiểm chứng và phần còn mở; không phải phê duyệt của dev.
 
 ## Audit nền tảng
 
+- [Audit roadmap/API GAP và chia việc hai dev, 31/10/2026](reviews/roadmap-and-api-gaps-2026-10-31/README.md): đối chiếu
+  G0–G6 với source, API cần sớm cho FE và hai list G8/G9/Mobile-BE; Owner giữ G7/Tools, bên AI giữ AI G10;
+  không phải nghiệm thu.
 - [Audit BE nền tảng 18/10/2026](reviews/be-foundation-audit-2026-10-18/README.md): gate trên revision được audit, finding, quyết định kỹ thuật Q1–Q9 của Owner và giới hạn chưa kiểm chứng; không phải phê duyệt của dev.
 - [Audit kiến trúc toàn bộ `src` H4.0, 19/10/2026](reviews/be-full-src-architecture-audit-2026-10-19/README.md): inventory, finding `A4-01` → `A4-23`, backlog lát nhỏ và quyết định kỹ thuật E1–E9 của Owner; không phải phê duyệt của dev.
 - [Review checkpoint CP-0A, 19/10/2026](reviews/cp0-h1-h3c-checkpoint-review-2026-10-19/README.md): gate và review trước checkpoint `5aac33f`, manifest đường dẫn, finding `CP0-01` → `CP0-10`; không phải phê duyệt của dev.

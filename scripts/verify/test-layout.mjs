@@ -6,14 +6,23 @@ const base = (file) => file.slice(file.lastIndexOf('/') + 1);
 
 export const toPosix = (path) => path.replaceAll('\\', '/');
 
-/** The runner that owns a file because of where it lives, or undefined. */
+/**
+ * The runner that owns a file because of where it lives, or undefined. Where two runners share a directory the suffix
+ * decides; a file carrying neither suffix belongs to the first, which reports it.
+ */
 export function ownerOf(file, runners = RUNNERS) {
-  return runners.find((runner) => runner.roots.some((root) => inside(file, root)));
+  const here = runners.filter((runner) => owns(runner, file));
+  return here.find((runner) => file.endsWith(runner.suffix)) ?? here[0];
+}
+
+/** A runner owns the files under its roots, minus the directories it excludes (owned by another runner). */
+function owns(runner, file) {
+  return runner.roots.some((root) => inside(file, root)) && !(runner.exclude ?? []).some((dir) => inside(file, dir));
 }
 
 /** Specs that would exist on disk for a runner: inside its roots and carrying its suffix. */
 export function expectedFor(runner, files) {
-  return files.filter((file) => runner.roots.some((root) => inside(file, root)) && file.endsWith(runner.suffix)).sort();
+  return files.filter((file) => owns(runner, file) && file.endsWith(runner.suffix)).sort();
 }
 
 /**

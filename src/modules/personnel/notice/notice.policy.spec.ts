@@ -10,7 +10,7 @@ import {
   verificationRefusal,
   type SendFacts,
 } from './notice.policy';
-import type { NoticeKind } from './notice.types';
+import type { NoticeKind } from '../personnel-notice.types';
 
 const HEAD = 'head-1';
 const PERSON = 'person-1';
@@ -174,12 +174,9 @@ describe('the basis outside the notice (US-03-11 AC-9)', () => {
 describe('the event a notice is recorded as', () => {
   it.each([
     ['a transfer with its day', 'DEPARTMENT_TRANSFER_OUT', { effectiveOn: '2026-11-01' }],
-    [
-      'a transfer with the department and the title',
-      'DEPARTMENT_TRANSFER_IN',
-      { effectiveOn: '2026-11-01', toJobTitleId: 't' },
-    ],
-    ['a new title with the title and the day', 'JOB_TITLE_CHANGE', { toJobTitleId: 't', effectiveOn: '2026-11-01' }],
+    ['a transfer with the department', 'DEPARTMENT_TRANSFER_IN', { effectiveOn: '2026-11-01', toDepartmentId: 'd' }],
+    // Retired (QĐ-87e): a notice of this kind that was sent before is read and rejected; recording it needs only a day.
+    ['a retired change of title with its day', 'JOB_TITLE_CHANGE', { effectiveOn: '2026-11-01' }],
     ['a departure with the last working day', 'DEPARTURE', { lastWorkingDay: '2026-10-31' }],
     ['a sudden departure with the day', 'ABRUPT_DEPARTURE', { lastWorkingDay: '2026-10-24' }],
     ['a long leave with its days', 'LONG_LEAVE', { startedOn: '2026-10-01', approvedReturnOn: '2026-12-01' }],
@@ -189,7 +186,13 @@ describe('the event a notice is recorded as', () => {
 
   it.each([
     ['a transfer with no day', 'DEPARTMENT_TRANSFER_OUT', {}, ['effectiveOn'], []],
-    ['a new title with no title', 'JOB_TITLE_CHANGE', { effectiveOn: '2026-11-01' }, ['toJobTitleId'], []],
+    [
+      'a retired change of title with a title (the title is no field of any event)',
+      'JOB_TITLE_CHANGE',
+      { effectiveOn: '2026-11-01', toDepartmentId: 'd' },
+      [],
+      ['toDepartmentId'],
+    ],
     [
       'a departure with a transfer day',
       'DEPARTURE',

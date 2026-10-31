@@ -1,8 +1,12 @@
 import {
   cancelRefusal,
+  headSuccessorLabel,
   newTransferRefusal,
+  placementHeld,
+  previousSuccessorChoice,
   rescheduleRefusal,
   retiredDestinationRefusal,
+  subjectRefusal,
   successorRefusal,
   type NewTransferFacts,
   type PendingTransferFacts,
@@ -17,13 +21,11 @@ const facts = (patch: Partial<NewTransferFacts> = {}): NewTransferFacts => ({
   today: '2026-10-15',
   effectiveOn: '2026-11-01',
   employee: { status: 'ACTIVE', workState: 'WORKING' },
-  current: { departmentId: 'dep-des', jobTitleId: 'title-designer', validFrom: '2026-01-01' },
-  target: { departmentId: 'dep-fin', jobTitleId: 'title-designer' },
-  destinationDepartment: { active: true, costCenterActive: true },
-  destinationJobTitle: null,
+  current: { departmentId: 'dep-des', validFrom: '2026-01-01' },
+  target: { departmentId: 'dep-fin' },
+  destinationDepartment: { active: true },
   grounds: GROUNDS,
   pending: null,
-  selfMode: 'ALLOW',
   successor: NO_SUCCESSOR,
   ...patch,
 });
@@ -41,7 +43,7 @@ describe('whether a transfer may be recorded (US-03-01)', () => {
       { employee: { status: 'TERMINATED' as const, workState: 'LEFT' as const } },
       'EMPLOYEE_LEFT',
     ],
-    ['nothing changes', { target: { departmentId: 'dep-des', jobTitleId: 'title-designer' } }, 'NO_CHANGE'],
+    ['the department does not change', { target: { departmentId: 'dep-des' } }, 'NO_CHANGE'],
     ['the day is before today (AC-16)', { effectiveOn: '2026-10-01' }, 'EFFECTIVE_DATE_IN_PAST'],
     [
       'the day is the first day of the current placement',
@@ -49,16 +51,7 @@ describe('whether a transfer may be recorded (US-03-01)', () => {
       'EFFECTIVE_DATE_NOT_AFTER_CURRENT_PERIOD',
     ],
     ['the destination does not exist', { destinationDepartment: null }, 'DEPARTMENT_NOT_FOUND'],
-    [
-      'the destination is retired',
-      { destinationDepartment: { active: false, costCenterActive: true } },
-      'DEPARTMENT_INACTIVE',
-    ],
-    [
-      'the Cost Center of the destination is retired',
-      { destinationDepartment: { active: true, costCenterActive: false } },
-      'DEPARTMENT_COST_CENTER_INACTIVE',
-    ],
+    ['the destination is retired', { destinationDepartment: { active: false } }, 'DEPARTMENT_INACTIVE'],
     ['the grounds are empty (AC-18)', { grounds: undefined }, 'GROUNDS_REQUIRED'],
     ['the grounds are a notice', { grounds: { ...GROUNDS, reference: 'BM09-2026-000001' } }, 'GROUNDS_IS_NOTICE'],
     ['another transfer waits (AC-21)', { pending: { effectiveOn: '2026-12-01' } }, 'PENDING_EVENT_EXISTS'],
@@ -68,13 +61,14 @@ describe('whether a transfer may be recorded (US-03-01)', () => {
       { employee: { status: 'ACTIVE' as const, workState: 'HANDING_OVER' as const } },
       'PENDING_EVENT_EXISTS',
     ],
-    [
-      'an IT Admin does it for themselves while another can (AC-22)',
-      { selfMode: 'NEEDS_ANOTHER_IT_ADMIN' as const },
-      'SELF_EVENT_NEEDS_ANOTHER_IT_ADMIN',
-    ],
   ])('refuses when %s', (_name, patch, expected) => {
     expect(code(patch)).toBe(expected);
+  });
+
+  it('records a transfer into a department that has no Cost Center like any other (QĐ-87d(3), F44)', () => {
+    // The destination is judged by whether it exists and takes people; the policy is not told of a Cost Center at all.
+    expect(Object.keys(facts().destinationDepartment ?? {})).toEqual(['active']);
+    expect(newTransferRefusal(facts({ destinationDepartment: { active: true } }))).toBeNull();
   });
 
   it('allows today, and a person on a long leave', () => {
@@ -82,21 +76,9 @@ describe('whether a transfer may be recorded (US-03-01)', () => {
     expect(code({ employee: { status: 'ACTIVE', workState: 'ON_LONG_LEAVE' } })).toBeUndefined();
   });
 
-  it('judges the title only when it changes: the title a person keeps is no error even when it is retired (AC-17)', () => {
-    expect(code({ destinationJobTitle: { active: false } })).toBeUndefined();
-    const same = { target: { departmentId: 'dep-des', jobTitleId: 'title-senior' }, destinationJobTitle: null };
-    expect(code(same)).toBe('JOB_TITLE_NOT_FOUND');
-    expect(code({ ...same, destinationJobTitle: { active: false } })).toBe('JOB_TITLE_INACTIVE');
-    expect(code({ ...same, destinationJobTitle: { active: true } })).toBeUndefined();
-  });
-
-  it('does not judge the department a person keeps while only the title changes', () => {
-    const titleOnly = {
-      target: { departmentId: 'dep-des', jobTitleId: 'title-senior' },
-      destinationDepartment: null,
-      destinationJobTitle: { active: true },
-    };
-    expect(code(titleOnly)).toBeUndefined();
+  it('changes the department only (QĐ-87e): a job title is not a fact of a transfer, and a department that stays is no transfer', () => {
+    expect('jobTitleId' in facts().target).toBe(false);
+    expect(code({ target: { departmentId: 'dep-des' }, destinationDepartment: null })).toBe('NO_CHANGE');
   });
 
   it('names the part of the basis that is missing', () => {
@@ -108,7 +90,7 @@ describe('whether a transfer may be recorded (US-03-01)', () => {
 
   it('says the same as the policy does when the database finds the destination retired', () => {
     expect(retiredDestinationRefusal()).toEqual(
-      newTransferRefusal(facts({ destinationDepartment: { active: false, costCenterActive: true } })),
+      newTransferRefusal(facts({ destinationDepartment: { active: false } })),
     );
   });
 });
@@ -159,7 +141,6 @@ describe('moving or cancelling a transfer that has not taken effect (US-03-01 AC
     periodStart: '2026-01-01',
     reason: 'The department asked for later',
     grounds: GROUNDS,
-    selfMode: 'ALLOW',
     ...patch,
   });
   const move = (patch: Partial<PendingTransferFacts> = {}, newEffectiveOn = '2026-12-15') =>
@@ -175,11 +156,6 @@ describe('moving or cancelling a transfer that has not taken effect (US-03-01 AC
     ['was cancelled', { status: 'CANCELLED' as const }, 'ALREADY_CANCELLED'],
     ['has no reason', { reason: '  ' }, 'REASON_REQUIRED'],
     ['has no basis', { grounds: undefined }, 'GROUNDS_REQUIRED'],
-    [
-      'is moved by an IT Admin for themselves',
-      { selfMode: 'NEEDS_ANOTHER_IT_ADMIN' as const },
-      'SELF_EVENT_NEEDS_ANOTHER_IT_ADMIN',
-    ],
   ])('refuses a move of a transfer that %s', (_name, patch, expected) => {
     expect(move(patch)).toBe(expected);
   });
@@ -213,8 +189,40 @@ describe('moving or cancelling a transfer that has not taken effect (US-03-01 AC
     expect(cancelRefusal(pending({ effectiveOn: '2026-11-19' }))?.code).toBe('ALREADY_EFFECTIVE');
     expect(cancelRefusal(pending({ reason: '' }))?.code).toBe('REASON_REQUIRED');
     expect(cancelRefusal(pending({ grounds: { ...GROUNDS, type: '' } }))?.code).toBe('GROUNDS_INCOMPLETE');
-    expect(cancelRefusal(pending({ selfMode: 'NEEDS_ANOTHER_IT_ADMIN' }))?.code).toBe(
-      'SELF_EVENT_NEEDS_ANOTHER_IT_ADMIN',
-    );
+  });
+});
+
+describe('what a change of department needs before and after the locks', () => {
+  it.each([
+    ['nobody', null, 'EMPLOYEE_NOT_FOUND'],
+    ['a person who is terminated', { status: 'TERMINATED' }, 'EMPLOYEE_LEFT'],
+    ['a person who works', { status: 'ACTIVE' }, null],
+  ])('refuses %s at once (subjectRefusal)', (_label, seen, code) => {
+    expect(subjectRefusal(seen)).toBe(code);
+  });
+
+  it.each([
+    ['the placement is gone', null, 'p-1', false],
+    ['another placement is in force', { placementId: 'p-2' }, 'p-1', false],
+    ['the same placement is in force', { placementId: 'p-1' }, 'p-1', true],
+  ])('knows the placement is still the one seen when %s (placementHeld)', (_label, current, seenId, held) => {
+    expect(placementHeld(current, seenId)).toBe(held);
+  });
+
+  it('names the successor of a head handover, NONE when nobody takes over, and nothing when the person did not head', () => {
+    expect(headSuccessorLabel({ successorEmployeeId: 'e-2' })).toBe('e-2');
+    expect(headSuccessorLabel({ successorEmployeeId: null })).toBe('NONE');
+    expect(headSuccessorLabel(null)).toBeNull();
+  });
+});
+
+describe('who follows the head when the day of a handover is moved (US-03-01 AC-19, US-03-04 AC-22)', () => {
+  it('keeps the choice of who follows the head when the move names nobody: the person chosen, or nobody', () => {
+    expect(previousSuccessorChoice({ successorEmployeeId: 'e-2' })).toEqual({ kind: 'EMPLOYEE', employeeId: 'e-2' });
+    expect(previousSuccessorChoice({ successorEmployeeId: null })).toEqual({ kind: 'NONE' });
+  });
+
+  it('has no choice to keep when the person did not head the department', () => {
+    expect(previousSuccessorChoice(null)).toBeUndefined();
   });
 });

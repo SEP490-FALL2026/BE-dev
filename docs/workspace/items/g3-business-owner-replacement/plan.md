@@ -16,7 +16,7 @@ Mỗi task theo TDD: viết test đỏ, xem nó đỏ đúng lý do, viết mã 
 
 ### Task 1: dữ liệu `application_business_owners`
 
-- Files: `prisma/models/catalog.prisma`, `prisma/models/organization.prisma` (quan hệ ngược), migration `20261020170000_catalog_application_business_owners`, `src/architecture-boundaries.spec.ts` (`PRISMA_MODEL_OWNER`), `test/integration/application-owners-constraints.integration-spec.ts`.
+- Files: `prisma/models/catalog.prisma`, `prisma/models/organization.prisma` (quan hệ ngược), migration `20261020170000_catalog_application_business_owners`, `test/gates/architecture-boundaries.gate-spec.ts` (`PRISMA_MODEL_OWNER`), `test/integration/catalog/application-owners-constraints.integration-spec.ts`.
 - Depends on: `g3-catalog-entry` (bảng `applications`).
 - Acceptance: một giai đoạn mở mỗi ứng dụng, `ended_at ≥ assigned_at`, giai đoạn đóng bất biến, khóa ngoại, dữ liệu có trước được chép.
 - Verify: `pnpm prisma:validate`, `pnpm prisma:generate`; test constraints đỏ trước migration, xanh sau.
@@ -37,7 +37,7 @@ Mỗi task theo TDD: viết test đỏ, xem nó đỏ đúng lý do, viết mã 
 
 ### Task 4: HTTP, hợp đồng
 
-- Files: `catalog-entry/application-owners.controller.ts`, `application.dto.ts` (cờ), `applications.controller.ts` (cờ vào wire), `catalog.module.ts`, `test/support/api-coverage-manifest.ts` (+2), `test/e2e/api-inventory.e2e-spec.ts` (98 → 100), `test/e2e/application-owners.e2e-spec.ts`, `test/integration/application-owners-http.integration-spec.ts`.
+- Files: `catalog-entry/application-owners.controller.ts`, `application.dto.ts` (cờ), `applications.controller.ts` (cờ vào wire), `catalog.module.ts`, `test/support/api-coverage-manifest.ts` (+2), `test/http/platform/api-inventory.http-spec.ts` (98 → 100), `test/http/catalog/application-owners.http-spec.ts`, `test/integration/catalog/application-owners-http.integration-spec.ts`.
 - Depends on: Task 3.
 - Acceptance: hai operation đúng bảng HTTP; 401/403 theo vai; 404; mọi AC trong ma trận.
 - Verify: `pnpm test:e2e` (suite `application-owners`, `api-inventory`), integration `application-owners-http` → xanh; đột biến (bỏ lọc `TERMINATED`, đổi người không đóng giai đoạn cũ, người nhận không kiểm trạng thái) làm test đỏ.

@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { fromDateColumn, toDateColumn, type BusinessDate } from '../../../core/business-date';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import type { ProvisioningTaskStatus, RevocationSource } from '../licensing.types';
+import type { ProvisioningTaskStatus, RevocationSource } from '../public/licensing.types';
 
 export interface PersonalSeatRow {
   assignmentId: string;
@@ -94,6 +94,30 @@ export class RevocationReadRepo {
     });
 
     return new Map(rows.map((row) => [row.employeeId, row._count._all]));
+  }
+
+  /**
+   * Which of these seats have a revocation under way or done (a task of the kind that is not cancelled and not closed as failed)
+   * that was asked for with one of these sources and this reference, whatever else asked for it too. One statement.
+   */
+  async openedByReference(
+    sources: readonly RevocationSource[],
+    referenceId: string,
+    assignmentIds: readonly string[],
+    tx?: DbTx,
+  ): Promise<Set<string>> {
+    if (assignmentIds.length === 0) return new Set();
+    const rows = await (tx ?? this.prisma).provisioningTask.findMany({
+      where: {
+        kind: 'REVOKE',
+        status: { notIn: ['CLOSED_FAILED', 'CANCELLED'] },
+        assignmentId: { in: [...assignmentIds] },
+        reasons: { some: { source: { in: [...sources] }, referenceId } },
+      },
+      select: { assignmentId: true },
+    });
+
+    return new Set(rows.map((row) => row.assignmentId));
   }
 
   /** The K1 seats of these people whose renewal is cancelled and whose access runs on past `day`. */

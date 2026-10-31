@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { toDateColumn } from '../../../core/business-date';
 import type { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
-import { toReviewRecord } from './transfer-review.repo';
+import { toReviewRecord, transfersOfPlacements } from './transfer-review.repo';
 import type { ReviewItemRecord, ReviewListFilter, ReviewScope, ReviewSummaryRecord } from './transfer-review.types';
 
 const COUNTS = {
@@ -45,10 +45,16 @@ export class TransferReviewListRepo {
       this.prisma.transferReview.count({ where }),
     ]);
     const pending = await this.pendingByReview(rows.map((row) => row.id));
+    // A review of a transfer for today may not name its transfer yet: the one that opened its placement is the one.
+    const opened = await transfersOfPlacements(
+      this.prisma,
+      rows.filter((row) => row.transferId === null).map((row) => row.placementId),
+    );
 
     return {
       items: rows.map((row) => ({
         ...toReviewRecord(row),
+        transferId: row.transferId ?? opened.get(row.placementId) ?? null,
         totalItems: row._count.items,
         pendingItems: pending.get(row.id) ?? 0,
       })),

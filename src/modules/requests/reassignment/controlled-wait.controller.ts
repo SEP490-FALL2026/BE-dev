@@ -2,10 +2,13 @@ import { Controller, Get, HttpStatus, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
+  FORBIDDEN_EXAMPLE,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
+  VALIDATION_EXAMPLE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
+import { toUnavailableApiException } from '../../../infrastructure/http/errors/service-unavailable';
 import { RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
 import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
@@ -16,10 +19,12 @@ const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPO
 const INVALID = {
   status: HttpStatus.UNPROCESSABLE_ENTITY,
   description: 'The query is invalid (VALIDATION_ERROR).',
+  examples: [VALIDATION_EXAMPLE],
 } as const;
 const ROLE_ONLY = {
   status: HttpStatus.FORBIDDEN,
   description: 'Only the Super Admin and an IT Admin read the queue (AUTHORIZATION.FORBIDDEN).',
+  examples: [FORBIDDEN_EXAMPLE],
 } as const;
 
 /**
@@ -41,7 +46,12 @@ export class ControlledWaitController {
       'The steps nobody valid can hold, the longest waiting first: the request, the kind of step, why it waits, what ends the wait, since when, who sent it and for which department, and when the people who can put it right were told. The Super Admin reads all of them, an IT Admin those of the departments they are in charge of.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, ROLE_ONLY, INVALID)
-  list(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Query() query: ControlledWaitListQueryDto) {
-    return this.waits.page(actor, query);
+  async list(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Query() query: ControlledWaitListQueryDto) {
+    try {
+      return await this.waits.page(actor, query);
+    } catch (error) {
+      // A database that cannot answer is a 503 like on every guarded route; anything else goes to the global filter.
+      throw toUnavailableApiException(error) ?? error;
+    }
   }
 }

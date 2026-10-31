@@ -2,14 +2,14 @@ import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import { isUniqueViolation } from '../../../infrastructure/database/unique-violation';
-import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { AuditService } from '../../audit/audit.service';
-import { IdentityAccessService } from '../../identity-access/identity-access.service';
-import { OrganizationHistoryService } from '../../organization/organization-history.service';
-import { OrganizationService } from '../../organization/organization.service';
-import { groundsSnapshot, normalizedGrounds } from '../grounds/grounds.policy';
-import { personnelAuditEvent } from '../mappers/personnel-audit-event';
-import { selfActionMode, type SelfActionMode } from '../personnel-self-action.policy';
+import { AuditApi } from '../../audit/public/audit.api';
+import { OrganizationHistoryApi } from '../../organization/public/organization-history.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
+import { PersonnelNotifier, type PersonnelEventKind } from '../event-notice/personnel-notifier.service';
+import { groundsSnapshot, normalizedGrounds } from '../personnel-grounds.policy';
+import { personnelAuditEvent } from '../personnel-audit-event.mapper';
+import { actorColumns, type PersonnelActor } from '../public/personnel.types';
+import { TransferGuardService } from '../transfer/transfer-guard.service';
 import { LeaveRefusedError } from './leave.errors';
 import {
   changeReturnDateRefusal,
@@ -25,34 +25,39 @@ import type { ChangeReturnDateInput, ConfirmReturnInput, LeaveRecord, StartLeave
  * The three writes a long leave has (`US-03-03` AC-5, AC-7, AC-8): it begins with the day the person is due back and the basis of
  * that day, the day moves on a new basis, and the person is recorded back (on the approved day without a new document, on any other
  * day with one). One transaction for each, under the lock of the employee; the work state of the person moves with it through the
- * organization. Nothing here changes by the calendar: a late return is only told (`LeaveOverdueService`). The reason for a leave
- * is never asked for nor kept.
+ * organization. Only the Super Admin writes them, never about themselves; the controlled procedure writes them for the Super Admin
+ * with a ticket. Everyone concerned is told in the same transaction. Nothing here changes by the calendar: a
+ * late return is only told (`LeaveOverdueService`). The reason for a leave is never asked for nor kept.
  */
 @Injectable()
 export class LeaveService {
   constructor(
     private readonly runner: TransactionRunner,
-    private readonly organization: OrganizationService,
-    private readonly history: OrganizationHistoryService,
-    private readonly identity: IdentityAccessService,
+    private readonly organization: OrganizationApi,
+    private readonly history: OrganizationHistoryApi,
+    private readonly guard: TransferGuardService,
     private readonly leaves: LeaveRepo,
-    private readonly audit: AuditService,
+    private readonly audit: AuditApi,
+    private readonly notifier: PersonnelNotifier,
   ) {}
 
-  /** Throws LeaveRefusedError for everything the policy or the database refuses. */
-  start(actor: AuthenticatedPrincipal, input: StartLeaveInput): Promise<LeaveRecord> {
+  /** Throws LeaveRefusedError for everything the policy or the database refuses, and PersonnelAccessRefusedError for the actor. */
+  start(actor: PersonnelActor, input: StartLeaveInput): Promise<LeaveRecord> {
+    this.guard.requireWriter(actor, input.employeeId);
+
     return this.runner.run((tx) => this.startInTx(tx, actor, input));
   }
 
-  /** The same in the transaction of the caller (the write that starts from a notice of the head, later). */
-  async startInTx(tx: DbTx, actor: AuthenticatedPrincipal, input: StartLeaveInput): Promise<LeaveRecord> {
+  /** The same in the transaction of the caller (the write that starts from a notice of the head, or from the controlled procedure). */
+  async startInTx(tx: DbTx, actor: PersonnelActor, input: StartLeaveInput): Promise<LeaveRecord> {
+    this.guard.requireWriter(actor, input.employeeId);
     const organization = await this.requireOrganization();
     const today = await this.organization.businessToday(new Date(), tx);
     if (!(await this.organization.getEmployee(input.employeeId, tx))) throw new LeaveRefusedError('EMPLOYEE_NOT_FOUND');
     await this.organization.lockEmployeeForUpdate(tx, input.employeeId);
+    await this.guard.requireOperatorSubject(tx, actor, input.employeeId);
     const employee = await this.organization.getEmployee(input.employeeId, tx);
     if (!employee) throw new LeaveRefusedError('EMPLOYEE_NOT_FOUND');
-    const selfMode = await this.selfMode(actor, input.employeeId);
 
     refuse(
       startLeaveRefusal({
@@ -62,11 +67,10 @@ export class LeaveService {
         hireDate: employee.hireDate,
         employee: { status: employee.status, workState: employee.workState },
         grounds: input.grounds,
-        selfMode,
       }),
     );
     const grounds = normalizedGrounds(input.grounds ?? {});
-    const selfExecuted = selfMode === 'ALLOW_SELF_EXECUTED';
+    const by = actorColumns(actor);
     await this.history.setEmployeeWorkState(tx, input.employeeId, 'ON_LONG_LEAVE');
     const leave = await this.insertLeave(tx, {
       organizationId: organization.id,
@@ -75,8 +79,8 @@ export class LeaveService {
       approvedReturnOn: input.approvedReturnOn,
       resumesLeaveId: null,
       grounds,
-      startedByAppUserId: actor.appUserId,
-      selfExecuted,
+      startedByAppUserId: by.appUserId,
+      startedByTicketId: by.ticketId,
       noticeId: input.noticeId ?? null,
     });
     await this.leaves.insertChange(tx, {
@@ -84,8 +88,8 @@ export class LeaveService {
       kind: 'STARTED',
       newReturnOn: input.approvedReturnOn,
       grounds,
-      recordedByAppUserId: actor.appUserId,
-      selfExecuted,
+      recordedByAppUserId: by.appUserId,
+      recordedByTicketId: by.ticketId,
     });
     await this.audit.record(
       tx,
@@ -101,19 +105,25 @@ export class LeaveService {
           startedOn: input.startedOn,
           approvedReturnOn: input.approvedReturnOn,
           grounds: groundsSnapshot(grounds),
-          selfExecuted,
         },
       ),
     );
-    await this.auditSelfExecuted(tx, actor, leave, employee.employeeCode, 'LONG_LEAVE_STARTED');
+    await this.tell(tx, leave, 'LONG_LEAVE_STARTED', input.startedOn, today);
 
     return leave;
   }
 
-  /** The approved day of return moves, on a new basis; the old day and basis stay in the log. */
-  changeReturnDate(actor: AuthenticatedPrincipal, leaveId: string, input: ChangeReturnDateInput): Promise<LeaveRecord> {
-    return this.runner.run(async (tx) => {
-      const { organizationId, leave, employeeCode, today, selfMode } = await this.lockedLeave(tx, actor, leaveId);
+  /**
+   * The approved day of return moves, on a new basis; the old day and basis stay in the log. With `outer` it runs in the
+   * transaction of the caller (the controlled procedure).
+   */
+  changeReturnDate(
+    actor: PersonnelActor,
+    leaveId: string,
+    input: ChangeReturnDateInput,
+    outer?: DbTx,
+  ): Promise<LeaveRecord> {
+    return this.inTransaction(actor, leaveId, outer, async (tx, { organizationId, leave, employeeCode, today }) => {
       refuse(
         changeReturnDateRefusal({
           today,
@@ -122,11 +132,10 @@ export class LeaveService {
           approvedReturnOn: leave.approvedReturnOn,
           newApprovedReturnOn: input.newApprovedReturnOn,
           grounds: input.grounds,
-          selfMode,
         }),
       );
       const grounds = normalizedGrounds(input.grounds ?? {});
-      const selfExecuted = selfMode === 'ALLOW_SELF_EXECUTED';
+      const by = actorColumns(actor);
       const changed = await this.leaves.changeReturnDate(tx, leave.id, input.newApprovedReturnOn, grounds);
       await this.leaves.insertChange(tx, {
         leaveId: leave.id,
@@ -134,8 +143,8 @@ export class LeaveService {
         oldReturnOn: leave.approvedReturnOn,
         newReturnOn: input.newApprovedReturnOn,
         grounds,
-        recordedByAppUserId: actor.appUserId,
-        selfExecuted,
+        recordedByAppUserId: by.appUserId,
+        recordedByTicketId: by.ticketId,
       });
       await this.audit.record(
         tx,
@@ -146,19 +155,18 @@ export class LeaveService {
           'EmployeeLeave',
           leave.id,
           { employeeCode, approvedReturnOn: leave.approvedReturnOn, grounds: groundsSnapshot(leave.grounds) },
-          { approvedReturnOn: input.newApprovedReturnOn, grounds: groundsSnapshot(grounds), selfExecuted },
+          { approvedReturnOn: input.newApprovedReturnOn, grounds: groundsSnapshot(grounds) },
         ),
       );
-      await this.auditSelfExecuted(tx, actor, changed, employeeCode, 'LONG_LEAVE_RETURN_DATE_CHANGED', selfExecuted);
+      await this.tell(tx, changed, 'LONG_LEAVE_RETURN_DATE_CHANGED', input.newApprovedReturnOn, today);
 
       return changed;
     });
   }
 
   /** The person is back from `returnedOn`; on the approved day no document is needed, on any other day a new basis is. */
-  confirmReturn(actor: AuthenticatedPrincipal, leaveId: string, input: ConfirmReturnInput): Promise<LeaveRecord> {
-    return this.runner.run(async (tx) => {
-      const { organizationId, leave, employeeCode, today, selfMode } = await this.lockedLeave(tx, actor, leaveId);
+  confirmReturn(actor: PersonnelActor, leaveId: string, input: ConfirmReturnInput, outer?: DbTx): Promise<LeaveRecord> {
+    return this.inTransaction(actor, leaveId, outer, async (tx, { organizationId, leave, employeeCode, today }) => {
       refuse(
         confirmReturnRefusal({
           today,
@@ -167,12 +175,11 @@ export class LeaveService {
           approvedReturnOn: leave.approvedReturnOn,
           returnedOn: input.returnedOn,
           grounds: input.grounds,
-          selfMode,
         }),
       );
       const onSchedule = isOnSchedule(input.returnedOn, leave.approvedReturnOn);
       const grounds = onSchedule ? undefined : normalizedGrounds(input.grounds ?? {});
-      const selfExecuted = selfMode === 'ALLOW_SELF_EXECUTED';
+      const by = actorColumns(actor);
       const ended = await this.leaves.end(tx, leave.id, input.returnedOn, 'RETURNED');
       await this.history.setEmployeeWorkState(tx, leave.employeeId, 'WORKING');
       await this.leaves.insertChange(tx, {
@@ -181,8 +188,8 @@ export class LeaveService {
         returnedOn: input.returnedOn,
         onSchedule,
         grounds,
-        recordedByAppUserId: actor.appUserId,
-        selfExecuted,
+        recordedByAppUserId: by.appUserId,
+        recordedByTicketId: by.ticketId,
       });
       await this.audit.record(
         tx,
@@ -198,11 +205,10 @@ export class LeaveService {
             returnedOn: input.returnedOn,
             onSchedule,
             grounds: grounds ? groundsSnapshot(grounds) : null,
-            selfExecuted,
           },
         ),
       );
-      await this.auditSelfExecuted(tx, actor, ended, employeeCode, 'LONG_LEAVE_RETURNED', selfExecuted);
+      await this.tell(tx, ended, 'LONG_LEAVE_RETURNED', input.returnedOn, today);
 
       return ended;
     });
@@ -216,34 +222,35 @@ export class LeaveService {
     return organization;
   }
 
-  /** Whether the actor may act on this person: an IT Admin on themselves needs another IT Admin unless they are the only one. */
-  private async selfMode(actor: AuthenticatedPrincipal, employeeId: string): Promise<SelfActionMode> {
-    const isSelf = actor.employeeId === employeeId;
+  /**
+   * The frame of the writes on a leave that exists: the leave read, then the employee locked, then the leave held and read again (the
+   * lock protocol: the employee comes first), then the rule of the actor. A caller that already holds a transaction passes it.
+   */
+  private inTransaction<T>(
+    actor: PersonnelActor,
+    leaveId: string,
+    outer: DbTx | undefined,
+    work: (
+      tx: DbTx,
+      context: { organizationId: string; leave: LeaveRecord; employeeCode: string; today: BusinessDate },
+    ) => Promise<T>,
+  ): Promise<T> {
+    const body = async (tx: DbTx): Promise<T> => {
+      const organization = await this.requireOrganization();
+      const today: BusinessDate = await this.organization.businessToday(new Date(), tx);
+      const seen = await this.leaves.find(leaveId, tx);
+      if (!seen) throw new LeaveRefusedError('NOT_FOUND');
+      this.guard.requireWriter(actor, seen.employeeId);
+      await this.organization.lockEmployeeForUpdate(tx, seen.employeeId);
+      await this.guard.requireOperatorSubject(tx, actor, seen.employeeId);
+      const leave = await this.leaves.lock(tx, leaveId);
+      if (!leave) throw new LeaveRefusedError('NOT_FOUND');
+      const employee = await this.organization.getEmployee(leave.employeeId, tx);
 
-    return selfActionMode({
-      isSelf,
-      otherUsableItAdmins: isSelf ? await this.identity.countUsableItAdminsExcept(actor.employeeId) : 0,
-    });
-  }
-
-  /** The leave read, then the employee locked, then the leave held and read again (the lock protocol: the employee comes first). */
-  private async lockedLeave(tx: DbTx, actor: AuthenticatedPrincipal, leaveId: string) {
-    const organization = await this.requireOrganization();
-    const today: BusinessDate = await this.organization.businessToday(new Date(), tx);
-    const seen = await this.leaves.find(leaveId, tx);
-    if (!seen) throw new LeaveRefusedError('NOT_FOUND');
-    await this.organization.lockEmployeeForUpdate(tx, seen.employeeId);
-    const leave = await this.leaves.lock(tx, leaveId);
-    if (!leave) throw new LeaveRefusedError('NOT_FOUND');
-    const employee = await this.organization.getEmployee(leave.employeeId, tx);
-
-    return {
-      organizationId: organization.id,
-      leave,
-      employeeCode: employee?.employeeCode ?? '',
-      today,
-      selfMode: await this.selfMode(actor, leave.employeeId),
+      return work(tx, { organizationId: organization.id, leave, employeeCode: employee?.employeeCode ?? '', today });
     };
+
+    return outer ? body(outer) : this.runner.run(body);
   }
 
   private async insertLeave(tx: DbTx, input: Parameters<LeaveRepo['insert']>[1]): Promise<LeaveRecord> {
@@ -257,23 +264,25 @@ export class LeaveService {
     }
   }
 
-  /** The event that tells the Super Admin an IT Admin did this for themselves when they were the only one. */
-  private async auditSelfExecuted(
+  /** The person and the head of their department are told, in the transaction of the write. */
+  private async tell(
     tx: DbTx,
-    actor: AuthenticatedPrincipal,
     leave: LeaveRecord,
-    employeeCode: string,
-    event: string,
-    selfExecuted: boolean = leave.selfExecuted,
+    eventKind: PersonnelEventKind,
+    effectiveOn: BusinessDate,
+    today: BusinessDate,
   ): Promise<void> {
-    if (!selfExecuted) return;
-    await this.audit.record(
-      tx,
-      personnelAuditEvent(actor, leave.organizationId, 'PERSONNEL.SELF_EXECUTED', 'EmployeeLeave', leave.id, null, {
-        employeeCode,
-        event,
-      }),
-    );
+    const placement = await this.organization.getEmployeePlacement(leave.employeeId, today, tx);
+    if (!placement) return;
+    await this.notifier.eventRecorded(tx, {
+      organizationId: leave.organizationId,
+      employeeId: leave.employeeId,
+      departmentId: placement.departmentId,
+      eventKind,
+      eventId: leave.id,
+      subjectType: 'EMPLOYEE_LEAVE',
+      effectiveOn,
+    });
   }
 }
 

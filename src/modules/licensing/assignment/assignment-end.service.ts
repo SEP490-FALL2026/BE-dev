@@ -2,11 +2,11 @@ import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { AuditService } from '../../audit/audit.service';
-import { CatalogService } from '../../catalog/catalog.service';
-import { AssignmentNotFoundError, AssignmentNotOpenError } from '../licensing.errors';
-import type { AssignmentRecord } from '../licensing.types';
-import { licensingAuditEvent } from '../mappers/licensing-audit-event';
+import { AuditApi } from '../../audit/public/audit.api';
+import { CatalogApi } from '../../catalog/public/catalog.api';
+import { AssignmentNotFoundError, AssignmentNotOpenError } from '../public/licensing.errors';
+import type { AssignmentRecord } from '../public/licensing.types';
+import { licensingAuditEvent } from '../licensing-audit-event.mapper';
 import { AssignmentRepo } from './assignment.repo';
 
 interface EndInput {
@@ -27,8 +27,8 @@ interface EndInput {
 export class AssignmentEndService {
   constructor(
     private readonly repo: AssignmentRepo,
-    private readonly catalog: CatalogService,
-    private readonly audit: AuditService,
+    private readonly catalog: CatalogApi,
+    private readonly audit: AuditApi,
   ) {}
 
   /** The assignment, locked `FOR UPDATE` after its subscription. Throws AssignmentNotFoundError. */

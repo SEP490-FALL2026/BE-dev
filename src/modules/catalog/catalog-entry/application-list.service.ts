@@ -1,12 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { Page, pageOf } from '../../../core/application/pagination';
-import { OrganizationService } from '../../organization/organization.service';
+import { OrganizationApi } from '../../organization/public/organization.api';
 import { replacementRequired } from './application.policy';
 import { ApplicationRepo } from './application.repo';
 import type { ApplicationKind, ApplicationSummaryView, BusinessOwnerView, CatalogStatus } from './application.types';
 
 /**
- * The application list (`LD-04`): a page of summaries. It reads only the columns a row of the list shows (no domains, no
+ * The application list: a page of summaries. It reads only the columns a row of the list shows (no domains, no
  * communication note) and the Business Owners of the whole page in one read; the detail (`ApplicationService.get`) is
  * where the rest of an application is read.
  */
@@ -14,7 +14,7 @@ import type { ApplicationKind, ApplicationSummaryView, BusinessOwnerView, Catalo
 export class ApplicationListService {
   constructor(
     private readonly applications: ApplicationRepo,
-    private readonly organization: OrganizationService,
+    private readonly organization: OrganizationApi,
   ) {}
 
   async list(query: {

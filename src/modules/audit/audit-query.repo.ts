@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
-import { AuditEventFilter, buildAuditEventWhere } from './audit-filter';
-import { StoredAuditEvent } from './audit.types';
+import { AuditEventFilter, buildAuditEventWhere } from './audit-filter.repo';
+import { StoredAuditEvent } from './public/audit.types';
 
 /** Everything a reader gets, and nothing else: no organization, no internal column. */
 const READ_SELECT = {

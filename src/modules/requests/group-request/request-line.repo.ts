@@ -3,7 +3,7 @@ import { fromDateColumn, toDateColumn } from '../../../core/business-date';
 import type { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import type { LineCancelCause, LineRecord, LineState } from './group-request.types';
+import type { LineCancelCause, LineRecord, LineState } from '../access-request/group-request.types';
 
 export interface NewLine {
   requestId: string;

@@ -20,7 +20,7 @@
 
 ### Task 2: dữ liệu (xong)
 
-- Files: `prisma/migrations/20261024160000_personnel_transfer_reviews/migration.sql`, `prisma/models/personnel.prisma`, `src/architecture-boundaries.spec.ts` (model owner)
+- Files: `prisma/migrations/20261024160000_personnel_transfer_reviews/migration.sql`, `prisma/models/personnel.prisma`, `test/gates/architecture-boundaries.gate-spec.ts` (model owner)
 - Depends on: Task 1, `g6-transfer-record`
 - Acceptance: hai enum, `transfer_reviews` (unique `placement_id`), `transfer_review_items` (khóa `(review_id, assignment_id)`), `CHECK` đồng bộ quyết định, trigger ghi một lần
 - Verify: nhóm test _what the database refuses_ xanh; `pnpm prisma:validate`; `migrate diff --exit-code` = 0 trên CSDL kiểm thử riêng

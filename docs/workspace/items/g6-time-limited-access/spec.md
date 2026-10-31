@@ -129,3 +129,8 @@ Cập nhật 25/10/2026 bởi người phụ trách (AI theo giao việc của n
 **Chưa kiểm chứng / giới hạn:** hộp thông báo là việc của `g4-notification-delivery` và `g6-downstream-integration` (điểm gọi: audit `LICENSE_ASSIGNMENT.EXPIRY_REMINDER`); bảng điều khiển mục nợ (`AC-3`) ở G8; không giả được đồng hồ của `businessToday` nên ca _qua đêm sang ngày kết thúc_ chỉ kiểm bằng `now` truyền vào sweeper và ngày kết thúc ở quá khứ khi nhập baseline; đường _gia hạn được duyệt rồi Assignment cũ kết thúc_ kiểm bằng cách đặt `valid_until` như bản ghi gia hạn làm (g5 đã kiểm phần ghi); `RENEWAL_PENDING` thật kiểm bằng cổng của `requests` với gia hạn gửi trước hạn (chưa quá hạn) và bằng cổng giả ở hàng đợi đã quá hạn.
 
 **Cho hạng mục sau:** `g6-downstream-integration` và `g4-notification-delivery` lấy nhắc từ `LICENSE_ASSIGNMENT.EXPIRY_REMINDER` (mỗi người nhận một sự kiện). G8 đọc cờ `debt` và `daysOverdue` của `GET /assignment-expiry-queue`. FE: ba thao tác mới, các mã `ASSIGNMENT_EXPIRY.*`, trạng thái hàng đợi `WAITING_RENEWAL_DECISION`, `READY_TO_REVOKE`, `REVOCATION_OPEN`.
+
+## Mở lại theo baseline `769bb64` (Prompt 03, 26/10/2026)
+
+- Audit G0–G6 trên Docs `769bb64` ↔ BE `7c28e75` mở lại hạng mục này: F58 — nhắc T−7 chưa vào hộp thông báo (phạm vi theo P03-D15).
+- Remediation duy nhất: [g0-g6-final-business-baseline-remediation](../g0-g6-final-business-baseline-remediation/spec.md) ([impact matrix](../g0-g6-final-business-baseline-remediation/impact-matrix.md#3-findings)). AC liên quan không còn được coi là thỏa nguồn hiện hành cho tới khi remediation xong; trạng thái triển khai ở roadmap. Phần đã ghi phía trên là lịch sử, giữ nguyên.

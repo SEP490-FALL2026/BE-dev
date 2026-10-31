@@ -106,3 +106,8 @@ Trưởng phòng giữ hàng đợi các Request có chi phí đã được duy�
 23/10/2026: implement và `verified` local (người phụ trách: AI theo giao việc của người dùng). Scope map chuyển `US-06-14` AC-14 sang `g5-request-withdrawal`, AC-6 sang `g5-group-requests` và vế bỏ người thụ hưởng của AC-13 sang `g5-group-requests`. Quyết định nhu cầu của trưởng phòng có chi phí giờ cần chọn dòng hay _ngoài kế hoạch_ (hợp đồng đổi, báo FE). Chưa commit, chưa peer review, chưa Owner review, chưa nghiệm thu.
 
 24/10/2026 (sau `g5-group-requests`): `US-06-14` AC-6 và vế bỏ người thụ hưởng của AC-13 đã làm ở `g5-group-requests`: hàng đợi trình và hồ sơ bổ sung nhận Request nhóm (`beneficiary` null và `lineCount` ở hàng đợi, `dropEmployeeIds` và `droppedCount` ở hồ sơ bổ sung); cờ _cùng người_ đặt theo người được giao của từng bước nhu cầu.
+
+## Mở lại theo baseline `769bb64` (Prompt 03, 26/10/2026)
+
+- Audit G0–G6 trên Docs `769bb64` ↔ BE `7c28e75` mở lại hạng mục này: F27 — cổng tài chính cho lô trình duyệt chi.
+- Remediation duy nhất: [g0-g6-final-business-baseline-remediation](../g0-g6-final-business-baseline-remediation/spec.md) ([impact matrix](../g0-g6-final-business-baseline-remediation/impact-matrix.md#3-findings)). AC liên quan không còn được coi là thỏa nguồn hiện hành cho tới khi remediation xong; trạng thái triển khai ở roadmap. Phần đã ghi phía trên là lịch sử, giữ nguyên.

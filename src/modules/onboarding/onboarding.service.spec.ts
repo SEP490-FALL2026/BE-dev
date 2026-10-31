@@ -1,18 +1,19 @@
-import { CatalogService } from '../catalog/catalog.service';
-import type { CatalogOnboardingFacts } from '../catalog/catalog.types';
-import { DataImportService } from '../data-import/data-import.service';
-import { LatestEmployeeImport } from '../data-import/data-import.types';
-import { IdentityAccessService } from '../identity-access/identity-access.service';
-import { LicensingService } from '../licensing/licensing.service';
-import type { BaselineProgress } from '../licensing/licensing.types';
-import { OnboardingFacts } from '../organization/organization.types';
-import { OrganizationService } from '../organization/organization.service';
+import { CatalogApi } from '../catalog/public/catalog.api';
+import type { CatalogOnboardingFacts } from '../catalog/public/catalog.types';
+import { DataImportApi } from '../data-import/public/data-import.api';
+import { LatestEmployeeImport } from '../data-import/public/data-import.types';
+import { IdentityAccessApi } from '../identity-access/public/identity-access.api';
+import { LicensingSeatBaselineApi } from '../licensing/public/licensing-seat-baseline.api';
+import type { BaselineProgress } from '../licensing/public/licensing.types';
+import { OnboardingFacts } from '../organization/public/organization.types';
+import { OrganizationApi } from '../organization/public/organization.api';
+import { OnboardingForbiddenError } from './onboarding.errors';
 import { OnboardingService } from './onboarding.service';
 
 const facts = (overrides: Partial<OnboardingFacts> = {}): OnboardingFacts => ({
   activeDepartments: 3,
   activeEmployees: 40,
-  freeCostCenters: 1,
+  departmentsWithoutCostCenter: [],
   departmentsWithoutHead: [],
   departmentsByItAdmin: [],
   ...overrides,
@@ -22,7 +23,6 @@ const catalogFacts = (overrides: Partial<CatalogOnboardingFacts> = {}): CatalogO
   applications: 4,
   plans: 6,
   subscriptions: 5,
-  standardToolsets: 0,
   ...overrides,
 });
 const progress = (overrides: Partial<BaselineProgress> = {}): BaselineProgress => ({
@@ -32,29 +32,57 @@ const progress = (overrides: Partial<BaselineProgress> = {}): BaselineProgress =
   ...overrides,
 });
 
+/** The service with in-memory collaborators; `checklist` is asked as an IT Admin unless the case names the roles. */
 function serviceWith(
   organizationFacts: OnboardingFacts,
   latest: LatestEmployeeImport | null,
   usableItAdmins: string[] = [],
   catalog: CatalogOnboardingFacts = catalogFacts(),
   baseline: BaselineProgress = progress(),
-): OnboardingService {
-  return new OnboardingService(
-    { getOnboardingFacts: () => Promise.resolve(organizationFacts) } as unknown as OrganizationService,
+) {
+  const reads: string[] = [];
+  const service = new OnboardingService(
+    {
+      getOnboardingFacts: () => {
+        reads.push('organization');
+
+        return Promise.resolve(organizationFacts);
+      },
+    } as unknown as OrganizationApi,
     {
       findUsableItAdminEmployeeIds: () => Promise.resolve(new Set(usableItAdmins)),
-    } as unknown as IdentityAccessService,
-    { latestEmployeeImport: () => Promise.resolve(latest) } as unknown as DataImportService,
-    { getOnboardingFacts: () => Promise.resolve(catalog) } as unknown as CatalogService,
-    { getBaselineProgress: () => Promise.resolve(baseline) } as unknown as LicensingService,
+    } as unknown as IdentityAccessApi,
+    { latestEmployeeImport: () => Promise.resolve(latest) } as unknown as DataImportApi,
+    { getOnboardingFacts: () => Promise.resolve(catalog) } as unknown as CatalogApi,
+    { getBaselineProgress: () => Promise.resolve(baseline) } as unknown as LicensingSeatBaselineApi,
   );
+
+  return { reads, checklist: (roles: readonly string[] = ['IT_ADMIN']) => service.checklist({ roles }) };
 }
 
 describe('onboarding checklist (US-02-04)', () => {
   it('has step 1 done when there are departments, people and no wrong row in the latest file (AC-1)', async () => {
     const { steps } = await serviceWith(facts(), null).checklist();
 
-    expect(steps[0]).toMatchObject({ step: 1, status: 'DONE', reasons: [], createDepartmentBlockedBy: null });
+    expect(steps[0]).toMatchObject({ step: 1, status: 'DONE', reasons: [] });
+  });
+
+  describe('who reads it (F13, US-02-04 phạm vi quyền)', () => {
+    it.each([['SUPER_ADMIN'], ['IT_ADMIN']])('lets the %s read it', async (role) => {
+      const { steps } = await serviceWith(facts(), null).checklist([role]);
+
+      expect(steps).toHaveLength(5);
+    });
+
+    it.each([['FINANCE'], ['MANAGER'], ['EMPLOYEE'], ['SPENDING_APPROVER']])(
+      'refuses the %s before anything is read, whatever the route let through',
+      async (role) => {
+        const h = serviceWith(facts(), null);
+
+        await expect(h.checklist([role])).rejects.toBeInstanceOf(OnboardingForbiddenError);
+        expect(h.reads).toEqual([]);
+      },
+    );
   });
 
   it.each([
@@ -120,10 +148,29 @@ describe('onboarding checklist (US-02-04)', () => {
     ]);
   });
 
-  it('says that creating a department waits for Finance when no cost center is free (AC-4)', async () => {
-    const { steps } = await serviceWith(facts({ freeCostCenters: 0 }), null).checklist();
+  it('says nothing of an activation or a free Cost Center any more: a department is created before its Cost Center (F14, QĐ-87d(1))', async () => {
+    const { steps } = await serviceWith(
+      facts({ departmentsWithoutCostCenter: [{ code: 'P-OPS', name: 'Operations' }] }),
+      null,
+    ).checklist(['SUPER_ADMIN']);
 
-    expect(steps[0].createDepartmentBlockedBy).toBe('NO_FREE_COST_CENTER');
+    expect(Object.keys(steps[0]).sort()).toEqual(['facts', 'key', 'reasons', 'status', 'step', 'warnings']);
+    expect(JSON.stringify(steps[0])).not.toMatch(/AWAITING_ACTIVATION|NO_FREE_COST_CENTER/);
+  });
+
+  it('shows a department with no Cost Center as a warning that stops nothing (QĐ-87d(1))', async () => {
+    const { steps } = await serviceWith(
+      facts({ departmentsWithoutCostCenter: [{ code: 'P-OPS', name: 'Operations' }] }),
+      null,
+    ).checklist();
+
+    expect(steps[0].status).toBe('DONE');
+    expect(steps[0].warnings).toContainEqual({
+      code: 'MISSING_COST_CENTER',
+      departmentCode: 'P-OPS',
+      departmentName: 'Operations',
+    });
+    expect(steps[0].facts.departmentsWithoutCostCenter).toBe(1);
   });
 
   describe('step 2, the applications (US-02-04, FR-9.1)', () => {
@@ -225,39 +272,10 @@ describe('onboarding checklist (US-02-04)', () => {
     expect(steps[4]).toEqual({ step: 5, key: 'USAGE', status: 'NOT_AVAILABLE', reasons: ['NOT_BUILT_YET'] });
   });
 
-  describe('standard toolset suggestion (US-02-04 AC-5, US-04-10)', () => {
-    it('is available once step 3 is done, counts the configured pairs and blocks nothing', async () => {
-      const { suggestions, steps } = await serviceWith(
-        facts(),
-        null,
-        [],
-        catalogFacts({ standardToolsets: 7 }),
-      ).checklist();
+  it('has five steps and nothing else: the standard toolset is not suggested any more (QĐ-87h)', async () => {
+    const checklist = await serviceWith(facts(), null).checklist();
 
-      expect(suggestions).toEqual([
-        {
-          key: 'STANDARD_TOOLSET',
-          afterStep: 3,
-          story: 'US-04-10',
-          available: true,
-          configuredPairs: 7,
-          blocksStep: false,
-        },
-      ]);
-      expect(steps[3].status).toBe('INCOMPLETE');
-    });
-
-    it('is not available before step 3 is done, and having no toolset never changes a step', async () => {
-      const without = await serviceWith(facts(), null, [], catalogFacts({ subscriptions: 0 })).checklist();
-      const withSome = await serviceWith(
-        facts(),
-        null,
-        [],
-        catalogFacts({ subscriptions: 0, standardToolsets: 3 }),
-      ).checklist();
-
-      expect(without.suggestions[0]).toMatchObject({ available: false, configuredPairs: 0 });
-      expect(withSome.steps).toEqual(without.steps);
-    });
+    expect(Object.keys(checklist)).toEqual(['steps']);
+    expect(checklist.steps).toHaveLength(5);
   });
 });

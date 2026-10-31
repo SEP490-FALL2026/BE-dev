@@ -8,9 +8,11 @@ import {
   ActivationState,
   AppUserStatus,
   CreateAppUserInput,
+  EmployeeAccountInspection,
   SuperAdminHolder,
-} from '../identity-access.types';
+} from '../public/identity-access.types';
 import { AppUserRepo } from './app-user.repo';
+import { RoleGrantService } from './role-grant.service';
 import { SuperAdminHolderRepo } from './super-admin-holder.repo';
 
 /**
@@ -24,6 +26,7 @@ export class AccountDirectoryService {
   constructor(
     private readonly accounts: AppUserRepo,
     private readonly superAdmin: SuperAdminHolderRepo,
+    private readonly grants: RoleGrantService,
   ) {}
 
   /** Unlocked lookup used before the transaction to decide what to verify. */
@@ -144,5 +147,26 @@ export class AccountDirectoryService {
   /** Ids of every Employee that already has an account, whatever its state (one per Employee, AC-8). */
   findEmployeeIdsWithAccount(): Promise<string[]> {
     return this.accounts.findEmployeeIdsWithAccount();
+  }
+
+  /**
+   * The account of an employee as another module needs to judge it: does it exist, can it sign in, which roles it
+   * holds. Takes the account's row lock `FOR SHARE` first (lock protocol: the employee, then the account) and reads
+   * in a statement of its own, so a grant or a lock that commits after this cannot change what was judged before
+   * commit.
+   */
+  async inspectEmployeeAccount(tx: DbTx, employeeId: string): Promise<EmployeeAccountInspection> {
+    const appUserId = await this.accounts.findAccountIdByEmployee(tx, employeeId);
+    if (appUserId === null) return { hasAccount: false, usable: false, roles: [] };
+
+    await this.accounts.lockAppUser(tx, appUserId, 'SHARE');
+    const account = await this.accounts.readAccount(tx, appUserId);
+    const roles = await this.grants.effectiveRoles(appUserId, tx);
+
+    return {
+      hasAccount: account !== null,
+      usable: account !== null && account.status === 'ACTIVE' && account.activationState === 'ACTIVATED',
+      roles,
+    };
   }
 }

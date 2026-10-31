@@ -2,10 +2,10 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { createHash } from 'node:crypto';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
-import { AuditService } from '../../audit/audit.service';
-import { OrganizationService } from '../../organization/organization.service';
+import { AuditApi } from '../../audit/public/audit.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
 import { AccountDirectoryService } from '../accounts/account-directory.service';
-import { RefreshTokenSnapshot, SessionSnapshot } from '../identity-access.types';
+import { RefreshTokenSnapshot, SessionSnapshot } from '../public/identity-access.types';
 import { SessionInvalidError } from './auth.errors';
 import { SessionTokenService } from './session-token.service';
 import { SessionRepo } from './session.repo';
@@ -104,8 +104,8 @@ function setUp(world: World) {
   const service = new SessionService(
     accounts as unknown as AccountDirectoryService,
     sessions as unknown as SessionRepo,
-    organization as unknown as OrganizationService,
-    audit as unknown as AuditService,
+    organization as unknown as OrganizationApi,
+    audit as unknown as AuditApi,
     new SessionTokenService(sessions as unknown as SessionRepo, tokens, config as never),
     runner as unknown as TransactionRunner,
   );

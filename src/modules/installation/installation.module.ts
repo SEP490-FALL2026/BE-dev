@@ -6,7 +6,7 @@ import { FinanceModule } from '../finance/finance.module';
 import { IdentityAccessFacadeModule } from '../identity-access/identity-access-facade.module';
 import { OrganizationModule } from '../organization/organization.module';
 import { InstallationRepo } from './installation.repo';
-import { InstallationService } from './installation.service';
+import { InstallationApi } from './public/installation.api';
 
 /** No controllers and no tables of its own: it orchestrates the other modules from the command line. */
 @Module({
@@ -18,7 +18,7 @@ import { InstallationService } from './installation.service';
     AuditModule,
     FinanceModule,
   ],
-  providers: [InstallationRepo, InstallationService],
-  exports: [InstallationService],
+  providers: [InstallationRepo, InstallationApi],
+  exports: [InstallationApi],
 })
 export class InstallationModule {}

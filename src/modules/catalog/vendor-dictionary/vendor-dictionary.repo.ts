@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { searchKey, type MatchableLine } from './vendor-matcher';
+import { searchKey, type MatchableLine } from './vendor-matcher.policy';
 import type { VendorGroupListFilter, VendorGroupRecord, VendorLineRecord } from './vendor-dictionary.types';
 
 type LineRow = Prisma.VendorServiceLineGetPayload<object>;

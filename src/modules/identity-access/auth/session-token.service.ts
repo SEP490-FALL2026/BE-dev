@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EnvironmentVariables } from '../../../infrastructure/config/env-schema';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { IssuedSession } from '../identity-access.types';
+import { IssuedSession } from '../public/identity-access.types';
 import { SessionRepo } from './session.repo';
 import { TokenService } from './token.service';
 

@@ -3,9 +3,9 @@ import { CurrencyNotSupportedError } from '../../core/money/money.errors';
 import { Prisma } from '../../generated/prisma/client';
 import { readSqlState, TransactionRunner } from '../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../infrastructure/security/tokens/access-token-verifier.port';
-import { AuditService } from '../audit/audit.service';
-import { FinanceService } from '../finance/finance.service';
-import { OrganizationService } from '../organization/organization.service';
+import { AuditApi } from '../audit/public/audit.api';
+import { FinanceApi } from '../finance/public/finance.api';
+import { OrganizationApi } from '../organization/public/organization.api';
 import { ReportingCurrencyLockedError } from './operating-parameters.errors';
 
 /**
@@ -17,9 +17,9 @@ import { ReportingCurrencyLockedError } from './operating-parameters.errors';
 @Injectable()
 export class ReportingCurrencyService {
   constructor(
-    private readonly organization: OrganizationService,
-    private readonly finance: FinanceService,
-    private readonly audit: AuditService,
+    private readonly organization: OrganizationApi,
+    private readonly finance: FinanceApi,
+    private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
   ) {}
 

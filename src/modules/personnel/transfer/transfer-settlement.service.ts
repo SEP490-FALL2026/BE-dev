@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { AuditService } from '../../audit/audit.service';
-import { personnelSystemAuditEvent } from '../mappers/personnel-audit-event';
+import { AuditApi } from '../../audit/public/audit.api';
+import { personnelSystemAuditEvent } from '../personnel-audit-event.mapper';
 import { TransferRepo } from './transfer.repo';
 import type { TransferRecord } from './transfer.types';
 
@@ -15,7 +15,7 @@ import type { TransferRecord } from './transfer.types';
 export class TransferSettlementService {
   constructor(
     private readonly transfers: TransferRepo,
-    private readonly audit: AuditService,
+    private readonly audit: AuditApi,
   ) {}
 
   /** The transfer that opened this placement takes effect now; `source` names who noticed (kept in the audit event). */

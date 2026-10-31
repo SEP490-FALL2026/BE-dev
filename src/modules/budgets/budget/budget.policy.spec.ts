@@ -2,17 +2,31 @@ import type { BusinessDate } from '../../../core/business-date';
 import {
   backwardLines,
   checkVersionDecision,
+  commitmentAttachedAfter,
+  decisionOutcomeOf,
   canResubmit,
   canReturn,
   canWithdraw,
+  closesAtYearEnd,
+  deciderOf,
   incompleteLines,
   isEditable,
+  copiedLineOf,
   isOverdue,
+  quartersMismatchAfter,
+  patchChangesLine,
+  versionDecidedDetail,
   kindOfChange,
+  proposalIsSucceedable,
   quartersMatch,
   totalOf,
+  versionSourceOf,
+  yearEndOfVersion,
+  yearHasEnded,
   yearIsOpen,
   type LineDraft,
+  type ProposalState,
+  type VersionStateName,
 } from './budget.policy';
 
 const day = (value: string): BusinessDate => value;
@@ -84,8 +98,95 @@ describe('what can be done to a proposal that was sent (US-06-10 AC-4, AC-5, AC-
 
   it('a version is changed by Finance only while it is a draft or was sent back to them', () => {
     expect(
-      (['DRAFT', 'SENT', 'APPROVED', 'REJECTED', 'CHANGES_REQUESTED', 'SUPERSEDED'] as const).filter(isEditable),
+      (['DRAFT', 'SENT', 'APPROVED', 'REJECTED', 'CHANGES_REQUESTED', 'SUPERSEDED', 'EXPIRED'] as const).filter(
+        (state) => isEditable(state),
+      ),
     ).toEqual(['DRAFT', 'CHANGES_REQUESTED']);
+  });
+
+  it('a draft that a withdrawn or given-back proposal left behind is detached: it is neither changed nor sent (F36)', () => {
+    expect(isEditable('DRAFT', true)).toBe(false);
+    expect(isEditable('CHANGES_REQUESTED', true)).toBe(false);
+    expect(isEditable('DRAFT', false)).toBe(true);
+  });
+});
+
+describe('the year that has ended (F62, QĐ-91c)', () => {
+  it('has ended once the fiscal year after it has begun, whatever the month the fiscal year begins in', () => {
+    expect(yearHasEnded(2026, day('2027-01-01'), 1)).toBe(true);
+    expect(yearHasEnded(2026, day('2026-12-31'), 1)).toBe(false);
+    // With a year that begins in April, the fiscal year 2026 runs to the 31st of March 2027.
+    expect(yearHasEnded(2026, day('2027-03-31'), 4)).toBe(false);
+    expect(yearHasEnded(2026, day('2027-04-01'), 4)).toBe(true);
+    expect(yearHasEnded(2027, day('2027-04-01'), 4)).toBe(false);
+  });
+
+  it('keeps the current version as the reference budget and closes the ones that never became current', () => {
+    expect(yearEndOfVersion('APPROVED')).toEqual({ neverCurrent: false });
+    expect((['DRAFT', 'SENT', 'CHANGES_REQUESTED'] as const).map((state) => [state, yearEndOfVersion(state)])).toEqual([
+      ['DRAFT', { neverCurrent: true }],
+      ['SENT', { neverCurrent: true }],
+      ['CHANGES_REQUESTED', { neverCurrent: true }],
+    ]);
+    expect((['REJECTED', 'SUPERSEDED', 'EXPIRED'] as const).map((state) => yearEndOfVersion(state))).toEqual([
+      null,
+      null,
+      null,
+    ]);
+  });
+
+  it('closes the proposal that was sent or given back and never used, and no other', () => {
+    const states: ProposalState[] = ['SUBMITTED', 'WITHDRAWN', 'RETURNED', 'REVIEWED', 'CLOSED_FISCAL_YEAR_ENDED'];
+
+    expect(states.filter(closesAtYearEnd)).toEqual(['SUBMITTED', 'RETURNED']);
+  });
+});
+
+describe('who decides a version (US-06-08 AC-11)', () => {
+  const holders = { spendingApproverEmployeeId: 'approver', conflictSubstituteEmployeeId: 'substitute' };
+
+  it('is the spending approver, or the substitute when the approver sent the proposal behind the version', () => {
+    expect(deciderOf(holders, 'head')).toEqual({ employeeId: 'approver', approverIsParty: false });
+    expect(deciderOf(holders, null)).toEqual({ employeeId: 'approver', approverIsParty: false });
+    expect(deciderOf(holders, 'approver')).toEqual({ employeeId: 'substitute', approverIsParty: true });
+  });
+
+  it('is nobody while the role that decides has no holder', () => {
+    expect(deciderOf({ ...holders, spendingApproverEmployeeId: null }, 'head').employeeId).toBeNull();
+    expect(deciderOf({ ...holders, conflictSubstituteEmployeeId: null }, 'approver').employeeId).toBeNull();
+  });
+});
+
+describe('a version made from a proposal that a refusal left reviewed, and a successor of it (F63, spec J.1)', () => {
+  const reviewed = { state: 'REVIEWED', succeededAt: null } as const;
+  const sources = (state: ProposalState, succeededAt: Date | null, latest: VersionStateName | null) =>
+    versionSourceOf({ state, succeededAt }, latest);
+
+  it('is the first version of a proposal that waits, whatever else is there', () => {
+    expect(sources('SUBMITTED', null, null)).toBe('FIRST');
+    expect(sources('SUBMITTED', null, 'DRAFT')).toBe('FIRST');
+  });
+
+  it('is made again from a reviewed proposal only when the latest version made from it was refused and nobody follows it', () => {
+    expect(versionSourceOf(reviewed, 'REJECTED')).toBe('AFTER_REFUSAL');
+    expect(versionSourceOf(reviewed, 'CHANGES_REQUESTED')).toBeNull();
+    expect(versionSourceOf(reviewed, 'APPROVED')).toBeNull();
+    expect(versionSourceOf(reviewed, null)).toBeNull();
+    expect(sources('REVIEWED', new Date(), 'REJECTED')).toBeNull();
+  });
+
+  it.each(['WITHDRAWN', 'RETURNED', 'CLOSED_FISCAL_YEAR_ENDED'] as const)(
+    'is not made from a proposal that is %s',
+    (state) => {
+      expect(sources(state, null, 'REJECTED')).toBeNull();
+    },
+  );
+
+  it('a proposal is followed by a new one only while it is reviewed, has no successor and its latest version was refused', () => {
+    expect(proposalIsSucceedable(reviewed, 'REJECTED')).toBe(true);
+    expect(proposalIsSucceedable({ ...reviewed, succeededAt: new Date() }, 'REJECTED')).toBe(false);
+    expect(proposalIsSucceedable(reviewed, 'DRAFT')).toBe(false);
+    expect(proposalIsSucceedable({ state: 'SUBMITTED', succeededAt: null }, 'REJECTED')).toBe(false);
   });
 });
 
@@ -150,4 +251,133 @@ describe('who may decide a version, and when (US-06-11 AC-7, AC-8, SoD-8)', () =
       expect(checkVersionDecision({ ...facts, state })).toBe('NOT_SENT');
     },
   );
+});
+
+describe('what the decision of the spending approver on a version of a budget records (US-06-11, F63)', () => {
+  it('maps each decision to what the record says and the state the version goes to', () => {
+    expect(decisionOutcomeOf('APPROVE')).toEqual({ decision: 'APPROVED', state: 'APPROVED' });
+    expect(decisionOutcomeOf('REJECT')).toEqual({ decision: 'REJECTED', state: 'REJECTED' });
+    expect(decisionOutcomeOf('REQUEST_CHANGES')).toEqual({ decision: 'CHANGES_REQUESTED', state: 'CHANGES_REQUESTED' });
+  });
+
+  const version = { costCenterId: 'cc-1', year: 2027, totalMinor: 5_000n };
+
+  it('says what the version was and what it replaced, the amounts as text, and the reason when one was given', () => {
+    expect(versionDecidedDetail(version, { totalMinor: 4_000n }, 'Vượt kế hoạch')).toEqual({
+      costCenterId: 'cc-1',
+      year: 2027,
+      totalMinor: '5000',
+      previousTotalMinor: '4000',
+      reason: 'Vượt kế hoạch',
+    });
+  });
+
+  it('has no previous total when nothing was replaced, and no reason when none was given', () => {
+    const detail = versionDecidedDetail(version, undefined, undefined);
+
+    expect(detail).toEqual({ costCenterId: 'cc-1', year: 2027, totalMinor: '5000', previousTotalMinor: null });
+    expect(detail).not.toHaveProperty('reason');
+  });
+
+  it('says of a commitment that was attached to the approved version which request it is for and how much, as text', () => {
+    expect(
+      commitmentAttachedAfter({ requestId: 'req-1', amountMinor: 700n }, { versionId: 'v-1', ...version }),
+    ).toEqual({
+      requestId: 'req-1',
+      versionId: 'v-1',
+      costCenterId: 'cc-1',
+      year: 2027,
+      amountMinor: '700',
+    });
+  });
+});
+
+describe('whether an adjustment changes what the line of the proposal said (US-06-09 AC-14)', () => {
+  const line = {
+    description: 'Giấy phép',
+    planId: 'plan-1' as string | null,
+    seats: 10 as number | null,
+    amountMinor: 1_000n,
+    windowFrom: '2027-01-01',
+    windowTo: '2027-03-31',
+    servicePeriodMonths: 12,
+    repeatCycle: 'ANNUAL' as const,
+    quoteValidUntil: '2026-12-31' as string | null,
+  };
+
+  it('changes nothing when the patch gives nothing, or gives what the line already says', () => {
+    expect(patchChangesLine(line, {})).toBe(false);
+    expect(patchChangesLine(line, { description: 'Giấy phép', seats: 10, amountMinor: 1_000n })).toBe(false);
+    expect(patchChangesLine(line, { planId: undefined, quoteValidUntil: undefined })).toBe(false);
+  });
+
+  it.each([
+    ['its words', { description: 'Giấy phép mới' }],
+    ['its plan', { planId: 'plan-2' }],
+    ['its plan, cleared', { planId: null }],
+    ['its seats', { seats: 12 }],
+    ['its money', { amountMinor: 1_100n }],
+    ['the start of its window', { windowFrom: '2027-02-01' }],
+    ['the end of its window', { windowTo: '2027-04-30' }],
+    ['its service', { servicePeriodMonths: 6 }],
+    ['its cycle', { repeatCycle: 'MONTHLY' as const }],
+    ['the day its quote is valid until', { quoteValidUntil: '2027-01-31' }],
+  ])('changes the line when the patch changes %s', (_label, patch) => {
+    expect(patchChangesLine(line, patch)).toBe(true);
+  });
+});
+
+describe('what a version copies from the line before it, and whether an edit keeps the quarters honest (US-06-09, QĐ-82e)', () => {
+  const line = {
+    description: 'Giấy phép',
+    planId: 'plan-1',
+    seats: 10,
+    amountMinor: 1_000n,
+    windowFrom: '2027-01-01',
+    windowTo: '2027-03-31',
+    servicePeriodMonths: 12,
+    repeatCycle: 'ANNUAL' as const,
+    quoteValidUntil: '2026-12-31',
+    financeComment: 'đã có',
+    adjustmentReason: 'đổi giá',
+  };
+
+  it('copies the line with where it came from, and starts it without a comment of Finance or a reason to adjust it', () => {
+    expect(copiedLineOf(line, { proposalId: 'prop-1', proposalPosition: 3 })).toEqual({
+      proposalId: 'prop-1',
+      proposalPosition: 3,
+      description: 'Giấy phép',
+      planId: 'plan-1',
+      seats: 10,
+      amountMinor: 1_000n,
+      windowFrom: '2027-01-01',
+      windowTo: '2027-03-31',
+      servicePeriodMonths: 12,
+      repeatCycle: 'ANNUAL',
+      quoteValidUntil: '2026-12-31',
+      financeComment: null,
+      adjustmentReason: null,
+    });
+  });
+
+  const version = {
+    baseMinor: 800n,
+    reserveMinor: 200n,
+    quarters: [250n, 250n, 250n, 250n] as [bigint, bigint, bigint, bigint] | null,
+  };
+
+  it('is honest while the quarters add up to the base and the reserve, as they are after the edit', () => {
+    expect(quartersMismatchAfter(version, {})).toBe(false);
+    expect(quartersMismatchAfter(version, { baseMinor: 900n, quarters: [300n, 300n, 300n, 200n] })).toBe(false);
+  });
+
+  it('refuses an edit that moves the total and leaves the quarters, or sets quarters that do not add up', () => {
+    expect(quartersMismatchAfter(version, { baseMinor: 900n })).toBe(true);
+    expect(quartersMismatchAfter(version, { quarters: [1n, 1n, 1n, 1n] })).toBe(true);
+  });
+
+  it('has nothing to keep honest when there are no quarters, or when the edit takes them away', () => {
+    expect(quartersMismatchAfter({ ...version, quarters: null }, { baseMinor: 5n })).toBe(false);
+    expect(quartersMismatchAfter(version, { baseMinor: 5n, quarters: null })).toBe(false);
+  });
 });

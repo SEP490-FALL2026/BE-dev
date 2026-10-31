@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { AppRole, RoleGrantRecord } from '../identity-access.types';
+import { AppRole, RoleGrantRecord } from '../public/identity-access.types';
 
 /** Owns RoleGrant: the roles granted to accounts, with their history. The one writer of `role_grants`. */
 @Injectable()

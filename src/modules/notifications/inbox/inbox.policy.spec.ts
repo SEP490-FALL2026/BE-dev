@@ -1,4 +1,4 @@
-import { IN_APP_NOTIFICATION_CODES, type InAppNotificationInput } from '../notifications.types';
+import { IN_APP_NOTIFICATION_CODES, type InAppNotificationInput } from '../public/notifications.types';
 import {
   FIGURE_WORDS,
   FORBIDDEN_PARAM_KEY,

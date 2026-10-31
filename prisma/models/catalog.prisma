@@ -227,7 +227,6 @@ model Plan {
   assessmentsAlternative AccessRequestAssessment[] @relation("AssessmentAlternativePlan")
   budgetProposalLines    BudgetProposalLine[]      @relation("BudgetProposalLinePlan")
   budgetVersionLines     BudgetVersionLine[]       @relation("BudgetVersionLinePlan")
-  standardToolsetItems   StandardToolsetItem[]
 
   @@unique([organizationId, applicationId, normalizedName])
   @@index([applicationId])
@@ -316,20 +315,45 @@ model Subscription {
   noticePeriodDays       Int?               @map("notice_period_days")
   autoRenew              Boolean            @default(false) @map("auto_renew")
   allowsMidTermReduction Boolean            @default(false) @map("allows_mid_term_reduction")
+  // The department that owns the purchase (QĐ-89a): required, and never changed once set (a trigger).
+  ownerDepartmentId      String             @map("owner_department_id") @db.Uuid
   createdAt              DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt              DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  organization        Organization                @relation(fields: [organizationId], references: [id])
-  plan                Plan                        @relation(fields: [planId], references: [id])
-  priceCurrency       Currency?                   @relation("SubscriptionPriceCurrency", fields: [unitPriceCurrency], references: [code], onDelete: Restrict)
-  exchangeRate        ExchangeRate?               @relation(fields: [priceExchangeRateId], references: [id], onDelete: Restrict)
-  costAllocation      SubscriptionCostAllocation?
+  organization        Organization                 @relation(fields: [organizationId], references: [id])
+  plan                Plan                         @relation(fields: [planId], references: [id])
+  ownerDepartment     Department                   @relation("SubscriptionOwnerDepartment", fields: [ownerDepartmentId], references: [id], onDelete: Restrict)
+  ownerAssignment     SubscriptionOwnerAssignment?
+  priceCurrency       Currency?                    @relation("SubscriptionPriceCurrency", fields: [unitPriceCurrency], references: [code], onDelete: Restrict)
+  exchangeRate        ExchangeRate?                @relation(fields: [priceExchangeRateId], references: [id], onDelete: Restrict)
   seatBaselineImports SeatBaselineImport[]
   licenseAssignments  LicenseAssignment[]
   licenseKeys         LicenseKey[]
 
   @@index([planId])
+  @@index([ownerDepartmentId])
   @@map("subscriptions")
+}
+
+// The durable record of the basis on which an operator gave an existing subscription its owner department (QĐ-89e,
+// `pnpm ops:assign-subscription-owner`). Added to, never changed: the final release copies the department from here
+// into `subscriptions.owner_department_id` and keeps the row as the evidence.
+model SubscriptionOwnerAssignment {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  subscriptionId String   @unique @map("subscription_id") @db.Uuid
+  departmentId   String   @map("department_id") @db.Uuid
+  basisReference String   @map("basis_reference")
+  operatorRef    String   @map("operator_ref")
+  environment    String
+  assignedAt     DateTime @default(now()) @map("assigned_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Restrict)
+  department   Department   @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+
+  @@index([departmentId])
+  @@map("subscription_owner_assignments")
 }
 
 // What IT read in the terms of a plan (US-04-11): a link, the date of the last review and the points of the checklist, as
@@ -384,56 +408,6 @@ model ApplicationBusinessOwner {
 
   @@index([applicationId, assignedAt])
   @@map("application_business_owners")
-}
-
-// The standard toolset of a pair (department, job title): the plans IT keeps as the usual tools of that kind of work
-// (US-04-10). This is the head, the only row that moves: it names the current version of the pair. A department and a
-// job title are organization tables: foreign keys only.
-model StandardToolset {
-  departmentId   String   @map("department_id") @db.Uuid
-  jobTitleId     String   @map("job_title_id") @db.Uuid
-  organizationId String   @map("organization_id") @db.Uuid
-  currentVersion Int      @default(0) @map("current_version")
-  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
-
-  organization Organization             @relation(fields: [organizationId], references: [id])
-  department   Department               @relation(fields: [departmentId], references: [id])
-  jobTitle     JobTitle                 @relation(fields: [jobTitleId], references: [id])
-  versions     StandardToolsetVersion[]
-
-  @@id([departmentId, jobTitleId])
-  @@map("standard_toolsets")
-}
-
-// One setting of the toolset, by whom, why and when. Immutable: a change is a new version.
-model StandardToolsetVersion {
-  id                 String   @id @default(uuid()) @db.Uuid
-  departmentId       String   @map("department_id") @db.Uuid
-  jobTitleId         String   @map("job_title_id") @db.Uuid
-  version            Int
-  reason             String
-  // A value, not a foreign key: the history outlives the account (as the audit trail does).
-  changedByAppUserId String   @map("changed_by_app_user_id") @db.Uuid
-  changedAt          DateTime @default(now()) @map("changed_at") @db.Timestamptz(3)
-
-  toolset StandardToolset       @relation(fields: [departmentId, jobTitleId], references: [departmentId, jobTitleId])
-  items   StandardToolsetItem[]
-
-  @@unique([departmentId, jobTitleId, version])
-  @@map("standard_toolset_versions")
-}
-
-// One plan of a version.
-model StandardToolsetItem {
-  versionId String @map("version_id") @db.Uuid
-  planId    String @map("plan_id") @db.Uuid
-
-  version StandardToolsetVersion @relation(fields: [versionId], references: [id])
-  plan    Plan                   @relation(fields: [planId], references: [id])
-
-  @@id([versionId, planId])
-  @@index([planId])
-  @@map("standard_toolset_items")
 }
 
 // What the Business Owner confirmed before an application was retired: who, what they said, who recorded it and when.

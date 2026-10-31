@@ -1,5 +1,5 @@
 import type { BusinessDate } from '../../../core/business-date';
-import type { Grounds, GroundsInput } from '../grounds/grounds.policy';
+import type { Grounds, GroundsInput } from '../personnel-grounds.policy';
 
 export type TransferStatus = 'PENDING' | 'EFFECTIVE' | 'CANCELLED';
 
@@ -21,20 +21,20 @@ export interface TransferRecord {
   employeeId: string;
   fromDepartmentId: string;
   toDepartmentId: string;
-  fromJobTitleId: string;
-  toJobTitleId: string;
   effectiveOn: BusinessDate;
   status: TransferStatus;
   closesPlacementId: string;
   opensPlacementId: string;
   headHandover: HeadHandoverFacts | null;
   grounds: Grounds;
-  selfExecuted: boolean;
-  recordedByAppUserId: string;
+  /** Who recorded it: an account, or the ticket of the controlled procedure: exactly one of the two is set. */
+  recordedByAppUserId: string | null;
+  recordedByTicketId: string | null;
   recordedAt: Date;
   effectiveAt: Date | null;
   cancelledAt: Date | null;
   cancelledByAppUserId: string | null;
+  cancelledByTicketId: string | null;
   cancelledReason: string | null;
   closedAt: Date | null;
   closedByAppUserId: string | null;
@@ -46,11 +46,8 @@ export interface TransferSummaryRecord {
   employeeId: string;
   fromDepartmentId: string;
   toDepartmentId: string;
-  fromJobTitleId: string;
-  toJobTitleId: string;
   effectiveOn: BusinessDate;
   status: TransferStatus;
-  selfExecuted: boolean;
 }
 
 export interface TransferChangeRecord {
@@ -60,11 +57,15 @@ export interface TransferChangeRecord {
   newEffectiveOn: BusinessDate | null;
   reason: string;
   grounds: Grounds;
-  changedByAppUserId: string;
+  /** The account, or the ticket of the controlled procedure. */
+  changedByAppUserId: string | null;
+  changedByTicketId: string | null;
   changedAt: Date;
 }
 
 export interface TransferListFilter {
+  /** Set for an IT Admin: only the transfers that leave or enter these departments. Empty reads nothing. */
+  departmentIds?: readonly string[];
   employeeId?: string;
   status?: TransferStatus;
   effectiveFrom?: BusinessDate;
@@ -75,8 +76,8 @@ export interface TransferListFilter {
 
 export interface RecordTransferInput {
   employeeId: string;
+  /** Left out, nothing changes and the policy says so (a notice that names no department). */
   toDepartmentId?: string;
-  toJobTitleId?: string;
   effectiveOn: BusinessDate;
   grounds?: GroundsInput;
   successor?: SuccessorChoice;

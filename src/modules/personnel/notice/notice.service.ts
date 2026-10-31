@@ -4,14 +4,16 @@ import { addWorkingDays } from '../../../core/working-days';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import { isUniqueViolation } from '../../../infrastructure/database/unique-violation';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { AuditService } from '../../audit/audit.service';
-import { OperatingParametersService } from '../../operating-parameters/operating-parameters.service';
-import { OrganizationService } from '../../organization/organization.service';
-import { personnelAuditEvent } from '../mappers/personnel-audit-event';
+import { AuditApi } from '../../audit/public/audit.api';
+import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
+import { PersonnelNotifier } from '../event-notice/personnel-notifier.service';
+import { personnelAuditEvent } from '../personnel-audit-event.mapper';
+import { userActor } from '../public/personnel.types';
 import { NoticeRefusedError } from './notice.errors';
 import { isPriorityKind, pendingRefusal, sendRefusal } from './notice.policy';
 import { NoticeRepo } from './notice.repo';
-import type { NoticeRecord, SendNoticeInput } from './notice.types';
+import type { NoticeRecord, SendNoticeInput } from '../personnel-notice.types';
 
 const REVIEW_DAYS = 'PERSONNEL_NOTICE_REVIEW_WORKING_DAYS';
 /** The parameter is at most thirty working days: ninety calendar days hold them with the holidays in between. */
@@ -27,10 +29,11 @@ const CALENDAR_WINDOW_DAYS = 90;
 export class NoticeService {
   constructor(
     private readonly runner: TransactionRunner,
-    private readonly organization: OrganizationService,
-    private readonly parameters: OperatingParametersService,
+    private readonly organization: OrganizationApi,
+    private readonly parameters: OperatingParametersApi,
     private readonly notices: NoticeRepo,
-    private readonly audit: AuditService,
+    private readonly audit: AuditApi,
+    private readonly notifier: PersonnelNotifier,
   ) {}
 
   /** Throws NoticeRefusedError for everything the policy or the database refuses. */
@@ -60,7 +63,7 @@ export class NoticeService {
       await this.audit.record(
         tx,
         personnelAuditEvent(
-          actor,
+          userActor(actor),
           held.organizationId,
           'PERSONNEL_NOTICE.WITHDRAWN',
           'PersonnelNotice',
@@ -127,14 +130,30 @@ export class NoticeService {
     };
     await this.audit.record(
       tx,
-      personnelAuditEvent(actor, organization.id, 'PERSONNEL_NOTICE.SENT', 'PersonnelNotice', notice.id, null, after),
+      personnelAuditEvent(
+        userActor(actor),
+        organization.id,
+        'PERSONNEL_NOTICE.SENT',
+        'PersonnelNotice',
+        notice.id,
+        null,
+        after,
+      ),
     );
+    // The Super Admin handles the notices (`QĐ-87a`): a new one is told to them in the transaction that sends it.
+    await this.notifier.noticeReceived(tx, {
+      organizationId: organization.id,
+      employeeId: employee.id,
+      departmentId: senderHead.departmentId,
+      noticeId: notice.id,
+      kind: notice.kind,
+    });
     if (isPriorityKind(notice.kind)) {
       // The point the high-priority warning to the IT Admin and the Super Admin is taken from; the person is not changed by it.
       await this.audit.record(
         tx,
         personnelAuditEvent(
-          actor,
+          userActor(actor),
           organization.id,
           'PERSONNEL_NOTICE.ABRUPT_SENT',
           'PersonnelNotice',

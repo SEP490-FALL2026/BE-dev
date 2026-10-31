@@ -1,14 +1,19 @@
 import type { Client } from 'pg';
 
 /**
- * Resolves once at least `count` backends are waiting for a lock, so a test that holds a lock in another connection knows
- * the request under test has reached it before the lock is released (a deterministic order, never a sleep).
+ * Resolves once at least `count` backends of the observer's database are waiting for a lock, so a test that holds a lock
+ * in another connection knows the request under test has reached it before the lock is released (a deterministic order,
+ * never a sleep). Only the suite's own database counts: integration files run in parallel on one cluster, and a lock
+ * wait of another file must never release this barrier.
  */
 export async function waitForLockWaiters(observer: Client, count: number, timeoutMs = 10_000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
     const { rows } = await observer.query<{ waiting: number }>(
-      'SELECT count(*)::int AS waiting FROM pg_locks WHERE NOT granted',
+      `SELECT count(*)::int AS waiting
+         FROM pg_locks l
+         JOIN pg_stat_activity a ON a.pid = l.pid
+        WHERE NOT l.granted AND a.datname = current_database()`,
     );
     if (rows[0].waiting >= count) return;
     if (Date.now() > deadline) throw new Error(`Fewer than ${count} backends reached a lock wait in time.`);

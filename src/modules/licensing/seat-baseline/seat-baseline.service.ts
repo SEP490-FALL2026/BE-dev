@@ -1,24 +1,29 @@
 import { Injectable } from '@nestjs/common';
 import { DbTx, TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { AuditService } from '../../audit/audit.service';
-import { OrganizationService } from '../../organization/organization.service';
-import { SeatBaselineClosedError } from '../licensing.errors';
-import { licensingAuditEvent } from '../mappers/licensing-audit-event';
+import { AuditApi } from '../../audit/public/audit.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
+import { AssignmentService } from '../assignment/assignment.service';
+import { SeatBaselineClosedError } from '../public/licensing.errors';
+import { SeatBaselineClosedListeners } from '../public/licensing.extension-points';
+import { licensingAuditEvent } from '../licensing-audit-event.mapper';
 import { SeatBaselineRepo } from './seat-baseline.repo';
 
 /**
  * Whether the seat baseline, step 4 of the installation, is closed (`US-02-05` AC-6, `OI-10`, `BR-01.7`). Closing is
  * the IT Admin saying the step is done; from then on no assignment is taken without a request, whatever route it would
- * come by. It is final: nothing reopens it, and the database refuses to.
+ * come by. It is final: nothing reopens it, and the database refuses to. Closing tells the modules listening for it, in its own
+ * transaction, which people hold a seat on another department's subscription, for the review their own head makes (`QĐ-89e`).
  */
 @Injectable()
 export class SeatBaselineService {
   constructor(
     private readonly repo: SeatBaselineRepo,
-    private readonly organization: OrganizationService,
-    private readonly audit: AuditService,
+    private readonly organization: OrganizationApi,
+    private readonly assignments: AssignmentService,
+    private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
+    private readonly closedListeners: SeatBaselineClosedListeners,
   ) {}
 
   async state(tx?: DbTx): Promise<{ closed: boolean; closedAt: Date | null }> {
@@ -30,7 +35,8 @@ export class SeatBaselineService {
 
   /**
    * Closes the baseline, once. The state is locked `FOR UPDATE`, so a confirmation that holds it `FOR SHARE` finishes
-   * first and one that comes later is refused. Closing again changes nothing and says so.
+   * first and one that comes later is refused. Closing again changes nothing and says so. The people who hold a seat of another
+   * department's subscription are found in the same transaction and told to every listener (none: nobody is told).
    */
   async close(actor: AuthenticatedPrincipal): Promise<{ closedAt: Date; alreadyClosed: boolean }> {
     const organization = await this.requireOrganization();
@@ -40,6 +46,8 @@ export class SeatBaselineService {
       if (state.closedAt) return { closedAt: state.closedAt, alreadyClosed: true };
 
       const closedAt = await this.repo.close(tx, organization.id, actor.appUserId);
+      const closedOn = await this.organization.businessToday(closedAt, tx);
+      const holders = await this.assignments.baselineHoldersOfOtherDepartments(tx, closedOn);
       await this.audit.record(
         tx,
         licensingAuditEvent(
@@ -49,9 +57,11 @@ export class SeatBaselineService {
           'SeatBaseline',
           organization.id,
           { closed: false },
-          { closed: true, closedAt: closedAt.toISOString() },
+          // Only how many people the review will concern: who they are is for the review, not for the trail of the closing.
+          { closed: true, closedAt: closedAt.toISOString(), holdersOfOtherDepartments: holders.length },
         ),
       );
+      await this.closedListeners.emit(tx, { organizationId: organization.id, closedOn, holders });
 
       return { closedAt, alreadyClosed: false };
     });

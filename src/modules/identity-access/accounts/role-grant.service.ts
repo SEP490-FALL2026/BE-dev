@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { ApprovalRoleChangeRegistry } from '../approval-roles/approval-role-change.registry';
-import { AppRole, RoleGrantRecord } from '../identity-access.types';
+import { ApprovalRoleChangeListeners } from '../public/identity-access.extension-points';
+import { AppRole, RoleGrantRecord } from '../public/identity-access.types';
 import { RoleGrantRepo } from './role-grant.repo';
 
 /**
@@ -12,7 +13,7 @@ import { RoleGrantRepo } from './role-grant.repo';
 export class RoleGrantService {
   constructor(
     private readonly grants: RoleGrantRepo,
-    private readonly roleChanges: ApprovalRoleChangeRegistry,
+    private readonly roleChanges: ApprovalRoleChangeListeners,
   ) {}
 
   effectiveRoles(appUserId: string, tx?: DbTx): Promise<AppRole[]> {
@@ -34,10 +35,11 @@ export class RoleGrantService {
   ): Promise<{ id: string }> {
     const granted = await this.grants.grantRole(tx, input);
     if (input.role === 'FINANCE') {
-      await this.roleChanges.announce(tx, {
+      await this.roleChanges.emit(tx, {
         role: 'FINANCE',
         fromEmployeeId: null,
         toEmployeeId: await this.grants.employeeOf(tx, input.appUserId),
+        id: randomUUID(),
       });
     }
 
@@ -51,10 +53,11 @@ export class RoleGrantService {
   ): Promise<boolean> {
     const revoked = await this.grants.revokeRole(tx, input);
     if (revoked && input.role === 'FINANCE') {
-      await this.roleChanges.announce(tx, {
+      await this.roleChanges.emit(tx, {
         role: 'FINANCE',
         fromEmployeeId: await this.grants.employeeOf(tx, input.appUserId),
         toEmployeeId: null,
+        id: randomUUID(),
       });
     }
 

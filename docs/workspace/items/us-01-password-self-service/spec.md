@@ -122,7 +122,7 @@ Một migration mới `<timestamp>_password_self_service`, không sửa migratio
 - `notifications.types.ts`: `EmailTemplate` thêm `'PASSWORD_RESET' | 'PASSWORD_CHANGED_NOTICE'`; `EnqueueEmailInput.actionTokenHash`
   thành `string | null`; `TokenUsability` chỉ được gọi khi có `actionTokenHash`. `email-templates.ts` render ba mẫu `vi`/`en`.
 - Facade `IdentityAccessService.isInvitationLinkUsable` đổi thành `isActionLinkUsable(tokenHash)` theo purpose (T-10);
-  cập nhật `src/email-dispatch.loop.ts`. Không có module nào khác đọc bảng identity.
+  cập nhật `src/worker/email-dispatch.job.ts`. Không có module nào khác đọc bảng identity.
 - `AccountRepo.latestToken()` và chi tiết `GET /app-users/{id}.invitation` (`account-query.service.ts`) **lọc purpose
   `INVITE`**: hiện chưa lọc, nên không sửa thì token đặt lại hiện thành "lời mời" cho Super Admin (hồi quy 1b). Test hồi quy bắt buộc.
 - Tên khóa trong `before`/`after` của audit không được khớp `/pass(word)?|hash|token|secret|cookie|credential|…/i`

@@ -8,7 +8,7 @@
 
 | Lệnh                    | Kết quả                                                                                                                                                          |
 | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pnpm check`            | **Đỏ** lúc đầu: một dòng chưa format trong `test/integration/plan-http.integration-spec.ts`. Sau `prettier --write` đúng một tệp: exit 0, 136 suite / 1970 test. |
+| `pnpm check`            | **Đỏ** lúc đầu: một dòng chưa format trong `test/integration/catalog/plan-http.integration-spec.ts`. Sau `prettier --write` đúng một tệp: exit 0, 136 suite / 1970 test. |
 | `pnpm test:e2e`         | Xanh: 32 suite, 811 test.                                                                                                                                        |
 | `pnpm test:integration` | 96/97 suite, 1279/1282 test. Ba test đỏ ở `departments-http`: ngày cứng `2026-10-20` (xem Task A1), không phải lỗi nghiệp vụ.                                    |
 

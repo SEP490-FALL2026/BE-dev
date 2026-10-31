@@ -1,4 +1,4 @@
-import type { SeatTarget } from '../../catalog/catalog.types';
+import type { SeatTarget } from '../../catalog/public/catalog.types';
 import {
   SeatPlanNotSupportedError,
   SeatApplicationRetiredError,
@@ -6,7 +6,7 @@ import {
   SeatSubscriptionDraftError,
   SeatTargetInvalidError,
   SeatTargetNotFoundError,
-} from '../licensing.errors';
+} from '../public/licensing.errors';
 import { assertBaselineTarget, assertSeatTargetUsable, toSeatTargetRef } from './baseline-target.policy';
 
 const subscription = (over: Partial<SeatTarget> = {}): SeatTarget => ({
@@ -22,6 +22,7 @@ const subscription = (over: Partial<SeatTarget> = {}): SeatTarget => ({
   status: 'ACTIVE',
   missing: [],
   purchasedQuantity: 100,
+  ownerDepartmentId: 'd1',
   ...over,
 });
 const internal: SeatTarget = subscription({
@@ -32,6 +33,7 @@ const internal: SeatTarget = subscription({
   provisioningType: 'K5',
   status: null,
   purchasedQuantity: null,
+  ownerDepartmentId: null,
 });
 
 describe('toSeatTargetRef (a baseline is for one subscription or one internal plan)', () => {

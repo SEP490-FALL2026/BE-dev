@@ -3,13 +3,13 @@ import { ConfigService } from '@nestjs/config';
 import type { BusinessDate } from '../../../core/business-date';
 import type { EnvironmentVariables } from '../../../infrastructure/config/env-schema';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
-import { AuditService } from '../../audit/audit.service';
-import type { AuditCursor, AuditEventSlice } from '../../audit/audit.types';
-import { InvalidInAppNotificationError } from '../../notifications/notifications.errors';
-import { NotificationsService } from '../../notifications/notifications.service';
+import { AuditApi } from '../../audit/public/audit.api';
+import type { AuditCursor, AuditEventSlice } from '../../audit/public/audit.types';
+import { InvalidInAppNotificationError } from '../../notifications/public/notifications.errors';
+import { NotificationsApi } from '../../notifications/public/notifications.api';
 import { RequestStatusFactsService } from './request-status-facts.service';
 import { RequestStatusRecipientsService } from './request-status-recipients.service';
-import { PROJECTED_ACTIONS, plan } from './request-status.policy';
+import { PROJECTED_ACTIONS, plan } from './rules/request-status-rules.policy';
 import type { PlannedNotification, StatusEvent } from './request-status.types';
 import { StatusCursorRepo } from './status-cursor.repo';
 
@@ -17,7 +17,7 @@ import { StatusCursorRepo } from './status-cursor.repo';
 export const BATCH_SIZE = 200;
 /** How many full batches one pass goes on to read, so a long backlog is worked off over a few passes and never in one long hold. */
 export const MAX_BATCHES_PER_PASS = 5;
-/** Added to the longest time a transaction may take: an event is stamped when its transaction begins, so this is how old it must be. */
+/** Added to the longest time a transaction may take: an event is stamped before its transaction commits, so this is how old it must be. */
 export const SAFETY_MARGIN_MS = 5000;
 /** The largest id: a pass that read everything up to a moment puts the cursor after every event of that moment. */
 const LAST_ID = 'ffffffff-ffff-ffff-ffff-ffffffffffff';
@@ -41,7 +41,8 @@ export interface ProjectionResult {
  * committed after the event.
  *
  * It reads only events old enough that no transaction can still commit an older one (the longest a transaction may take, plus a
- * margin): the audit event carries the time its transaction began, not the time it committed.
+ * margin): the audit event carries the clock of the process that wrote it when the insert was sent (Prisma fills
+ * `@default(now())` on the client), between the start of its transaction and its commit, not the time it committed.
  */
 @Injectable()
 export class RequestStatusProjection {
@@ -50,10 +51,10 @@ export class RequestStatusProjection {
   constructor(
     private readonly runner: TransactionRunner,
     private readonly cursor: StatusCursorRepo,
-    private readonly audit: AuditService,
+    private readonly audit: AuditApi,
     private readonly facts: RequestStatusFactsService,
     private readonly recipients: RequestStatusRecipientsService,
-    private readonly notifications: NotificationsService,
+    private readonly notifications: NotificationsApi,
     private readonly config: ConfigService<EnvironmentVariables, true>,
   ) {}
 

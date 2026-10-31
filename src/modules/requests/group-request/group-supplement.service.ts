@@ -1,13 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { AuditService } from '../../audit/audit.service';
-import { accessRequestAuditEvent } from '../access-request/access-request-audit-event';
+import { AuditApi } from '../../audit/public/audit.api';
+import { accessRequestAuditEvent } from '../access-request/access-request-audit-event.mapper';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
 import { GroupSupplementDropRefusedError } from './group-request.errors';
-import { pricedPeople } from './group-request.types';
+import { pricedPeople } from '../access-request/group-request.types';
 import { GroupResolutionService } from './group-resolution.service';
 import { RequestLineRepo } from './request-line.repo';
+import { RequestOutcomeService } from '../outcome/request-outcome.service';
 import { SupplementDropRepo } from './supplement-drop.repo';
 
 /**
@@ -22,7 +23,8 @@ export class GroupSupplementService {
     private readonly lines: RequestLineRepo,
     private readonly drops: SupplementDropRepo,
     private readonly resolution: GroupResolutionService,
-    private readonly audit: AuditService,
+    private readonly audit: AuditApi,
+    private readonly outcomes: RequestOutcomeService,
   ) {}
 
   /**
@@ -92,6 +94,8 @@ export class GroupSupplementService {
           },
         ),
       );
+      // The line of a person the head left out of the file ended for them without a grant.
+      await this.outcomes.ended(tx, request, [employeeId], now);
     }
     await this.drops.insertMany(tx, request.id, number, employeeIds);
     await this.resolution.resolve(tx, actor, request.id, now);

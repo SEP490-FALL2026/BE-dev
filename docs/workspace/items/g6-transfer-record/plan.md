@@ -24,10 +24,10 @@
 ### Task 2: ADR và khung module
 
 - Status: `done`: ADR-0017 `Proposed` và mục ở `docs/README.md`; một Nest module `PersonnelModule` (không có `personnel-http.module.ts`, xem spec); `PRISMA_MODEL_OWNER`, `PUBLIC_ROOT_CONTRACT_FILES`, `PUBLIC_CONTRACT_EXPORTS`, `INTRA_MODULE_CONTRACTS` cập nhật.
-- Files: `docs/decisions/0017-personnel-context.md`, `src/modules/personnel/personnel.module.ts`, `src/modules/personnel/personnel-http.module.ts`, `src/app.module.ts`, `src/architecture-boundaries.spec.ts` (`PRISMA_MODEL_OWNER`), `src/architecture-structure.spec.ts` (`INTRA_MODULE_CONTRACTS`), `docs/rules/module-structure.md` (chỉ nếu ví dụ cần cập nhật), `ARCHITECTURE.md` (bản đồ module)
+- Files: `docs/decisions/0017-personnel-context.md`, `src/modules/personnel/personnel.module.ts`, `src/modules/personnel/personnel-http.module.ts`, `src/app/app.module.ts`, `test/gates/architecture-boundaries.gate-spec.ts` (`PRISMA_MODEL_OWNER`), `test/gates/architecture-structure.gate-spec.ts` (`INTRA_MODULE_CONTRACTS`), `docs/rules/module-structure.md` (chỉ nếu ví dụ cần cập nhật), `ARCHITECTURE.md` (bản đồ module)
 - Depends on: Task 1
 - Acceptance: ADR `Proposed` ghi hướng phụ thuộc `personnel → organization, identity-access, licensing, requests, catalog, operating-parameters, audit` và lý do không đặt trong `organization`; module rỗng nhưng khởi động được, không vòng phụ thuộc
-- Verify: `pnpm exec jest src/module-graph.spec.ts src/architecture-boundaries.spec.ts src/architecture-structure.spec.ts` → xanh
+- Verify: `pnpm exec jest test/gates/module-graph.gate-spec.ts test/gates/architecture-boundaries.gate-spec.ts test/gates/architecture-structure.gate-spec.ts` → xanh
 
 ### Task 3: migration `work_state` và thông báo thay đổi tổ chức
 
@@ -40,7 +40,7 @@
 ### Task 4: quy tắc thuần và hàm ngày làm việc
 
 - Status: `done` một phần theo thiết kế: `grounds.policy.ts`, `personnel-self-action.policy.ts`, `transfer.policy.ts` và spec; `src/core/working-days.ts` đã có từ G5 và hàm bao của `operating-parameters` chưa xây vì chưa có người dùng (thuộc `g6-service-account-handover`).
-- Files: `src/core/working-days.ts` (+ spec), `src/modules/personnel/grounds/grounds.policy.ts` (+ spec), `src/modules/personnel/personnel-self-action.policy.ts` (+ spec), `src/modules/personnel/transfer/transfer.policy.ts` (+ spec), `operating-parameters/non-working-dates.service.ts` (hàm bao `addWorkingDays`, `subtractWorkingDays`)
+- Files: `src/core/working-days.ts` (+ spec), `src/modules/personnel/policies/grounds.policy.ts` (+ spec), `src/modules/personnel/policies/personnel-self-action.policy.ts` (+ spec), `src/modules/personnel/transfer/transfer.policy.ts` (+ spec), `operating-parameters/non-working-dates.service.ts` (hàm bao `addWorkingDays`, `subtractWorkingDays`)
 - Depends on: Task 2
 - Acceptance: căn cứ (loại, số hiệu, người ban hành, ngày; nhận ra mã `BM09-…`), tự ghi, một điều chuyển chờ, ngày hiệu lực, chức vụ, successor; ngày làm việc bỏ thứ Bảy, Chủ nhật và ngày không làm việc
 - Verify: unit test của từng policy xanh; `policy-ownership.spec.ts` xanh
@@ -48,7 +48,7 @@
 ### Task 5: hàm ghi lịch sử của `organization` và bộ phát sự kiện
 
 - Status: `done` với khác biệt: facade thứ hai `OrganizationHistoryService` (`OrganizationService` đã 399 dòng), sổ người nghe và sweeper ở `organization/change-announcement/`, sweeper đăng ký ở `OrganizationHttpModule`; không có `rescheduleStructureChange` (xem spec). Đọc `import-lookup.repo.ts` theo ngày hôm nay; `department-head.service.ts` giữ nguyên có chủ ý.
-- Files: `organization/employee/employee.repo.ts`, `organization/department/department-head.repo.ts`, `organization/organization.service.ts`, `organization/organization.types.ts`, `organization/change-announcement/organization-change.service.ts`, `organization/change-announcement/organization-change.sweeper.ts`, `organization/organization.module.ts`, rà `import-lookup.repo.ts` và `department-head.service.ts` (đọc theo ngày hôm nay)
+- Files: `organization/employee/employee.repo.ts`, `organization/department/department-head.repo.ts`, `organization/public/organization.api.ts`, `organization/public/organization.types.ts`, `organization/change-announcement/organization-change.service.ts`, `organization/change-announcement/organization-change.job.ts`, `organization/organization.module.ts`, rà `import-lookup.repo.ts` và `department-head.service.ts` (đọc theo ngày hôm nay)
 - Depends on: Task 3, Task 4
 - Acceptance: `scheduleStructureChange`, `rescheduleStructureChange`, `cancelStructureChange`, `scheduleHeadHandover`, `shiftScheduledHeadHandover`, `undoScheduledHeadHandover`, `setEmployeeWorkState`; `registerChangeListener` và sweeper phát đúng một lần mỗi thay đổi, mỗi thay đổi một transaction, lỗi listener lùi và thử lại
 - Verify: integration test bộ phát (hai lần chạy, listener lỗi, gán trưởng phòng qua `US-03-06`) xanh; test hồi quy `department-head`, `employee-import` xanh
@@ -70,7 +70,7 @@ Gate chạy xanh trên cây làm việc (`pnpm check` phần liên quan, integra
 ### Task 7: dịch vụ ghi và API
 
 - Status: `done` với khác biệt: `PersonnelFileHooks` có, `PersonnelFileDeadlines` chưa xây (chưa ai dùng). Sáu route (ghi, danh sách, chi tiết, nhật ký, đổi ngày, hủy) cùng một lúc vì cùng một repo và một bộ DTO.
-- Files: `personnel/transfer/transfer.service.ts`, `transfer.repo.ts`, `transfer.dto.ts`, `transfer.http-errors.ts`, `transfer.mapper.ts`, `transfer.controller.ts`, `personnel/personnel-file-hooks.ts`, `personnel/personnel-file-deadlines.service.ts`, `personnel/mappers/personnel-audit-event.ts`, `catalog.service.ts` (`getApplicationsOwnedBy`), `api-coverage-manifest.ts`, `api-inventory.e2e-spec.ts`, `openapi.json`
+- Files: `personnel/transfer/transfer.service.ts`, `transfer.repo.ts`, `transfer.dto.ts`, `transfer.http-errors.ts`, `transfer.mapper.ts`, `transfer.controller.ts`, `personnel/public/personnel.extension-points.ts`, `personnel/personnel-file-deadlines.service.ts`, `personnel/mappers/personnel-audit-event.mapper.ts`, `catalog.service.ts` (`getApplicationsOwnedBy`), `api-coverage-manifest.ts`, `api-inventory.e2e-spec.ts`, `openapi.json`
 - Depends on: Task 5, Task 6
 - Acceptance: ghi, đọc danh sách/chi tiết, thứ tự khóa phòng → nhân viên → tài khoản, trưởng phòng đi cùng, cảnh báo Business Owner, registry `PersonnelFileHooks` và `PersonnelFileDeadlines` (rỗng/đọc được, chưa hook nào), `403` cho vai khác, AC-1→AC-8, AC-11, AC-13→AC-18, AC-22 ở ma trận test
 - Verify: integration PostgreSQL và e2e của các AC đó xanh; `pnpm openapi:export` không lệch; test đếm câu lệnh của danh sách

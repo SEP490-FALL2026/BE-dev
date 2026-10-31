@@ -5,7 +5,7 @@ import {
   RevocationCompletionError,
   RevocationRefusedError,
   type RevocationCompletionProblem,
-} from '../licensing.errors';
+} from '../public/licensing.errors';
 import {
   REVOCATION_SOURCES,
   type AccessState,
@@ -15,7 +15,7 @@ import {
   type ProvisioningTaskStatus,
   type RevocationCompletion,
   type RevocationSource,
-} from '../licensing.types';
+} from '../public/licensing.types';
 import { cleanEvidence } from './provisioning.policy';
 
 /** The longest note a completion or a reason keeps; the DTO bounds the request with it. */

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
-import type { SeatTarget, SeatTargetRef } from '../catalog.types';
+import type { SeatTarget, SeatTargetRef } from '../public/catalog.types';
 import { PlanLookupService } from '../plan/plan-lookup.service';
 import type { LockedPlan as PlanLookup } from '../plan/plan-lookup.service';
 import { missingData } from './subscription.policy';
@@ -20,6 +20,7 @@ const ofPlan = (plan: PlanLookup): SeatTarget => ({
   status: null,
   missing: [],
   purchasedQuantity: null,
+  ownerDepartmentId: null,
 });
 
 const ofSubscription = (subscription: SubscriptionRecord, plan: PlanLookup): SeatTarget => ({
@@ -37,6 +38,7 @@ const ofSubscription = (subscription: SubscriptionRecord, plan: PlanLookup): Sea
     hasSnapshot: subscription.priceSnapshot !== null,
   }),
   purchasedQuantity: subscription.purchasedQuantity,
+  ownerDepartmentId: subscription.ownerDepartmentId,
 });
 
 /**
@@ -62,7 +64,7 @@ export class SeatTargetService {
     return subscription ? this.withPlan(subscription) : null;
   }
 
-  /** The seat targets of many plans in one read, without a lock; a plan that does not exist is absent (`LD-08`). */
+  /** The seat targets of many plans in one read, without a lock; a plan that does not exist is absent. */
   async findPlans(planIds: readonly string[], tx?: DbTx): Promise<SeatTarget[]> {
     return (await this.plans.lookups(planIds, tx)).map(ofPlan);
   }

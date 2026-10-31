@@ -1,22 +1,27 @@
 import type { DbTx, TransactionRunner } from '../../src/infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../src/infrastructure/security/tokens/access-token-verifier.port';
-import type { AuditService } from '../../src/modules/audit/audit.service';
-import type { LicensingService } from '../../src/modules/licensing/licensing.service';
-import type { OrganizationService } from '../../src/modules/organization/organization.service';
-import type { EmployeeImportLookupData } from '../../src/modules/organization/organization.types';
+import type { AuditApi } from '../../src/modules/audit/public/audit.api';
+import type { LicensingSeatBaselineApi } from '../../src/modules/licensing/public/licensing-seat-baseline.api';
+import type { NotificationsApi } from '../../src/modules/notifications/public/notifications.api';
+import type { InAppNotificationInput } from '../../src/modules/notifications/public/notifications.types';
+import type { OrganizationApi } from '../../src/modules/organization/public/organization.api';
+import type { EmployeeImportLookupData } from '../../src/modules/organization/public/organization.types';
+import { EmployeeImportConfirmationService } from '../../src/modules/data-import/employee-import/confirmation/employee-import-confirmation.service';
 import type {
   EmployeeImportRepo,
   ImportRecord,
   StoredRow,
 } from '../../src/modules/data-import/employee-import/employee-import.repo';
-import { EmployeeImportService } from '../../src/modules/data-import/employee-import/employee-import.service';
+import { EmployeeImportPreviewService } from '../../src/modules/data-import/employee-import/preview/employee-import-preview.service';
+import { EmployeeImportRowValidationService } from '../../src/modules/data-import/employee-import/row-validation/employee-import-row-validation.service';
 
 /*
  * The shared harness of the people import use-case specs (H8 Phase 0 characterization, split by use case in Prompt 21A):
- * what the service asks of its collaborators, in which transaction and in which order, and what it writes and records.
+ * what the services ask of their collaborators, in which transaction and in which order, and what they write and record.
  * The collaborators are in-memory stand-ins at the boundary (repository, organization facade, audit, transaction
- * runner); the row rules and the CSV reader are real. Only construction lives here; the assertions stay in the specs
- * `src/modules/data-import/employee-import/employee-import-{upload,preview-lifecycle,confirm}.spec.ts`.
+ * runner); the row validation, the row rules and the CSV reader are real. Only construction lives here; the assertions stay
+ * in the specs `src/modules/data-import/employee-import/preview/employee-import-{upload,preview-lifecycle}.service.spec.ts`
+ * and `confirmation/employee-import-confirmation.service.spec.ts`.
  */
 
 /** The fixed clock of every case: the specs install it with `jest.useFakeTimers(FAKE_CLOCK)`. */
@@ -50,25 +55,19 @@ export interface Department {
   code: string;
   name: string;
   active: boolean;
-  costCenterActive: boolean;
   headed: boolean;
 }
 
 export interface Directory {
   departments: Department[];
-  jobTitles: EmployeeImportLookupData['jobTitles'];
   employees: EmployeeImportLookupData['employees'];
 }
 
 export function directory(): Directory {
   return {
     departments: [
-      { id: 'd-ops', code: 'P-OPS', name: 'Operations', active: true, costCenterActive: true, headed: true },
-      { id: 'd-des', code: 'P-DES', name: 'Design', active: true, costCenterActive: true, headed: false },
-    ],
-    jobTitles: [
-      { id: 'j-adm', name: 'Administrator', normalizedName: 'administrator', status: 'ACTIVE' },
-      { id: 'j-des', name: 'Designer', normalizedName: 'designer', status: 'ACTIVE' },
+      { id: 'd-ops', code: 'P-OPS', name: 'Operations', active: true, headed: true },
+      { id: 'd-des', code: 'P-DES', name: 'Design', active: true, headed: false },
     ],
     employees: [
       {
@@ -117,6 +116,7 @@ export function harness(start: Directory = directory()) {
   const audits: unknown[] = [];
   const lookups: unknown[] = [];
   const locks: unknown[] = [];
+  const notices: InAppNotificationInput[] = [];
   let sequence = 0;
   let organization: { id: string } | null = { id: 'org-1' };
   let failCreate: ((code: string) => Error | undefined) | undefined;
@@ -220,14 +220,13 @@ export function harness(start: Directory = directory()) {
       calls.push('org.getOrganization');
       return Promise.resolve(organization);
     },
-    lookupForEmployeeImport(names: Parameters<OrganizationService['lookupForEmployeeImport']>[0], tx?: DbTx) {
+    lookupForEmployeeImport(names: Parameters<OrganizationApi['lookupForEmployeeImport']>[0], tx?: DbTx) {
       calls.push(`org.lookupForEmployeeImport(${where(tx)})`);
       lookups.push(clone(names));
       const data: EmployeeImportLookupData = {
         departments: dir.departments
           .filter((department) => names.departmentCodes.includes(department.code))
-          .map(({ id, code, active, costCenterActive }) => ({ id, code, active, costCenterActive })),
-        jobTitles: dir.jobTitles.filter((title) => names.normalizedJobTitleNames.includes(title.normalizedName)),
+          .map(({ id, code, active }) => ({ id, code, active })),
         employees: dir.employees.filter((employee) => names.employeeCodes.includes(employee.employeeCode)),
         emailOwners: dir.employees
           .filter((employee) => employee.workEmail && names.normalizedEmails.includes(employee.workEmail))
@@ -243,9 +242,9 @@ export function harness(start: Directory = directory()) {
           : null,
       );
     },
-    lockForEmployeeImport(tx: DbTx, departmentIds: string[], jobTitleIds: string[]) {
+    lockForEmployeeImport(tx: DbTx, departmentIds: string[]) {
       calls.push(`org.lockForEmployeeImport(${where(tx)})`);
-      locks.push({ departmentIds, jobTitleIds });
+      locks.push({ departmentIds });
       return Promise.resolve();
     },
     businessToday() {
@@ -258,6 +257,20 @@ export function harness(start: Directory = directory()) {
       if (failure) return Promise.reject(failure);
       created.push(input);
       return Promise.resolve({ id: `new-${input.employeeCode}` });
+    },
+    /** The notices a created record owes, as the organization builds them: one, to the head of the department (`F17`). */
+    getProfileNotices(tx: DbTx, request: { kind: string; organizationId: string; employeeId: string }) {
+      calls.push(`org.getProfileNotices(${where(tx)}, ${request.kind}, ${request.employeeId})`);
+      const notice: InAppNotificationInput = {
+        organizationId: request.organizationId,
+        recipientEmployeeId: 'e-head',
+        code: 'EMPLOYEE_PROFILE_CREATED',
+        subject: { type: 'EMPLOYEE', id: request.employeeId },
+        params: { employeeId: request.employeeId, departmentId: null },
+        eventKey: `employee_profile_created:${request.employeeId}`,
+      };
+
+      return Promise.resolve([notice]);
     },
     departmentsWithoutHead(ids: string[]) {
       calls.push(`org.departmentsWithoutHead(${ids.join(',')})`);
@@ -277,6 +290,16 @@ export function harness(start: Directory = directory()) {
     },
   };
 
+  /** The inbox: a notice is written in the transaction of the record it is about, or not at all (`F17`). */
+  const notifications = {
+    notifyInApp(tx: DbTx, input: InAppNotificationInput) {
+      calls.push(`notifications.notifyInApp(${where(tx)}, ${input.recipientEmployeeId})`);
+      notices.push(clone(input));
+
+      return Promise.resolve(true);
+    },
+  };
+
   const runner = {
     async run<T>(work: (tx: DbTx) => Promise<T>): Promise<T> {
       calls.push('BEGIN');
@@ -291,16 +314,27 @@ export function harness(start: Directory = directory()) {
     },
   };
 
-  const service = new EmployeeImportService(
+  const rowValidation = new EmployeeImportRowValidationService(org as unknown as OrganizationApi);
+  const preview = new EmployeeImportPreviewService(
     repo as unknown as EmployeeImportRepo,
-    org as unknown as OrganizationService,
-    audit as unknown as AuditService,
+    org as unknown as OrganizationApi,
+    audit as unknown as AuditApi,
     runner as unknown as TransactionRunner,
-    { openSeatHolders: () => Promise.resolve([]) } as unknown as LicensingService,
+    { openSeatHolders: () => Promise.resolve([]) } as unknown as LicensingSeatBaselineApi,
+    rowValidation,
+  );
+  const confirmation = new EmployeeImportConfirmationService(
+    repo as unknown as EmployeeImportRepo,
+    org as unknown as OrganizationApi,
+    audit as unknown as AuditApi,
+    runner as unknown as TransactionRunner,
+    notifications as unknown as NotificationsApi,
+    rowValidation,
   );
 
   return {
-    service,
+    preview,
+    confirmation,
     dir,
     calls,
     imports,
@@ -309,12 +343,14 @@ export function harness(start: Directory = directory()) {
     audits,
     lookups,
     locks,
+    notices,
     reset() {
       calls.length = 0;
       created.length = 0;
       audits.length = 0;
       lookups.length = 0;
       locks.length = 0;
+      notices.length = 0;
     },
     withoutOrganization() {
       organization = null;
@@ -331,7 +367,7 @@ export function harness(start: Directory = directory()) {
 export type ImportHarness = ReturnType<typeof harness>;
 
 export const upload = (h: ImportHarness, text: string | Buffer, fileName = 'people.csv') =>
-  h.service.upload(ACTOR, { fileName, bytes: typeof text === 'string' ? Buffer.from(text, 'utf8') : text });
+  h.preview.upload(ACTOR, { fileName, bytes: typeof text === 'string' ? Buffer.from(text, 'utf8') : text });
 
 export const confirmBody = (
   overrides: Partial<{ previewVersion: number; idempotencyKey: string; hrBasis: typeof HR_BASIS }> = {},

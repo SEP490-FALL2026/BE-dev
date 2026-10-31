@@ -138,3 +138,9 @@ Migration `20261020210000_catalog_standard_toolsets` và `20261021110000_catalog
 Giới hạn còn lại: không có chặn `TRUNCATE` (giống các bảng khác); gói của ứng dụng đã ngừng vẫn được nhận vào bộ chuẩn; `ToolsetEmployeeNotFoundError` được khai báo nhưng chưa dùng; `list` và `mine` đọc theo N+1; chưa có remote CI.
 
 Câu hỏi cho Owner: Q7 của kiểm kê (cũng là `OQ-B-09`) — gói của ứng dụng đã ngừng có được đưa vào bộ công cụ chuẩn không; hiện lát này nhận và không cảnh báo.
+
+## Mở lại theo baseline `769bb64` (Prompt 03, 26/10/2026)
+
+- Audit G0–G6 trên Docs `769bb64` ↔ BE `7c28e75` mở lại hạng mục này: F04 — bộ công cụ chuẩn bị gỡ (`US-04-10` `RETIRED`).
+- Remediation duy nhất: [g0-g6-final-business-baseline-remediation](../g0-g6-final-business-baseline-remediation/spec.md) ([impact matrix](../g0-g6-final-business-baseline-remediation/impact-matrix.md#3-findings)). AC liên quan không còn được coi là thỏa nguồn hiện hành cho tới khi remediation xong; trạng thái triển khai ở roadmap. Phần đã ghi phía trên là lịch sử, giữ nguyên.
+- _27/10/2026 (Prompt 04, Task 0.1 của `g0-g6-final-business-baseline-remediation`, F60 — re-pin scope map [G3](../../../roadmap.md#work-item-decomposition-g3) Docs `e0cb5a0`, BE `7c28e75`):_ `US-04-10` `RETIRED` (F04): scope map khóa `US-04-10` AC-1→AC-12 ở `not affected`, hạng mục không còn là chủ của AC nào; bảng _Primary Story/AC_ ở trên giữ nguyên làm lịch sử của lát đã làm, mã/schema/API gỡ ở Task 1.4 ([impact matrix mục 9](../g0-g6-final-business-baseline-remediation/impact-matrix.md#9-phụ-lục-delta-user-stories-72e1480--769bb64)). Phần đã ghi phía trên là lịch sử, giữ nguyên.

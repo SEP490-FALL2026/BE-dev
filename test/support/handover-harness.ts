@@ -1,19 +1,22 @@
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
+import { HR_BASIS } from './hr-basis';
 import { TransactionRunner } from '../../src/infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../src/infrastructure/security/tokens/access-token-verifier.port';
 import { HandoverOverdueService } from '../../src/modules/licensing/handover/handover-overdue.service';
-import { LicensingService } from '../../src/modules/licensing/licensing.service';
+import { LicensingApi } from '../../src/modules/licensing/public/licensing.api';
+import { LicensingHandoverApi } from '../../src/modules/licensing/public/licensing-handover.api';
 import type {
   OpenedHandoverDuties,
   OpenHandoverDutiesInput,
-} from '../../src/modules/licensing/licensing-handover.types';
+} from '../../src/modules/licensing/public/licensing-handover.types';
 import type {
   OpenedRevocation,
   RevocationContext,
   RevocationDecision,
-} from '../../src/modules/licensing/licensing.types';
+} from '../../src/modules/licensing/public/licensing.types';
 import type { ApiAccount } from './api-accounts';
+import { assignmentIdOf, importSeats } from './builders/seat.builder';
 import type { Person } from './request-harness';
 import { TransferHarness } from './transfer-harness';
 
@@ -92,21 +95,29 @@ export class HandoverHarness extends TransferHarness {
     };
   }
 
-  /** A seat of an existing person that began long ago, so ending it gives the seat back today; returns its assignment. */
+  /**
+   * A seat of an existing person that began long ago, so ending it gives the seat back today; returns its assignment. The
+   * baseline is imported and the seat found through the services (T2.2): the suites standing on it do not prove the import.
+   */
   async seatOf(person: Person, target: { subscriptionId?: string; planId?: string }, code: string): Promise<string> {
     // The person joined long ago, so a grant date in the past is right.
     await this.ctx.sql.query(`UPDATE employees SET hire_date = '2020-01-01' WHERE id = $1`, [person.employeeId]);
-    await this.written(target, [
-      { employee_code: code, account_identifier: `${code.toLowerCase()}@acme.vn`, granted_on: '2026-01-05' },
-    ]);
-    const found = (
-      await this.assignmentsOf(
-        target.subscriptionId ? { subscriptionId: target.subscriptionId } : { planId: target.planId ?? '' },
-      )
-    ).find((assignment) => assignment.employeeId === person.employeeId);
+    await importSeats(
+      this.ctx,
+      this.it1.accessToken,
+      target,
+      this.file([
+        { employee_code: code, account_identifier: `${code.toLowerCase()}@acme.vn`, granted_on: '2026-01-05' },
+      ]),
+    );
+    const found = await assignmentIdOf(
+      this.ctx,
+      target.subscriptionId ? { subscriptionId: target.subscriptionId } : { planId: target.planId ?? '' },
+      person.employeeId,
+    );
     if (!found) throw new Error(`no seat of ${code}`);
 
-    return found.id;
+    return found;
   }
 
   /** What the plan says about losing data and what to do before taking it away. */
@@ -123,7 +134,7 @@ export class HandoverHarness extends TransferHarness {
 
   /** What a source module does in its own transaction: ask the licensing facade to open the revocation of a seat. */
   open = (assignmentId: string, source: string | undefined, options: OpenOptions = {}): Promise<OpenedRevocation> => {
-    const facade = this.ctx.app.get(LicensingService);
+    const facade = this.ctx.app.get(LicensingApi);
     const actor = options.actor ?? this.actorOf(this.it1);
 
     return this.ctx.app.get(TransactionRunner).run((tx) =>
@@ -144,11 +155,11 @@ export class HandoverHarness extends TransferHarness {
   ): Promise<OpenedHandoverDuties> =>
     this.ctx.app
       .get(TransactionRunner)
-      .run((tx) => this.ctx.app.get(LicensingService).openHandoverDuties(tx, actor, { caseRefId: null, ...input }));
+      .run((tx) => this.ctx.app.get(LicensingHandoverApi).openHandoverDuties(tx, actor, { caseRefId: null, ...input }));
 
   reconcileDuties = (caseRefId: string, dueOn: string, lastWorkingDay?: string) =>
     this.ctx.app.get(TransactionRunner).run((tx) =>
-      this.ctx.app.get(LicensingService).reconcileHandoverDuties(tx, this.actorOf(this.it1), {
+      this.ctx.app.get(LicensingHandoverApi).reconcileHandoverDuties(tx, this.actorOf(this.it1), {
         caseRefId,
         dueOn,
         ...(lastWorkingDay ? { lastWorkingDay } : {}),
@@ -159,7 +170,7 @@ export class HandoverHarness extends TransferHarness {
     this.ctx.app
       .get(TransactionRunner)
       .run((tx) =>
-        this.ctx.app.get(LicensingService).cancelHandoverDuties(tx, this.actorOf(this.it1), { caseRefId, reason }),
+        this.ctx.app.get(LicensingHandoverApi).cancelHandoverDuties(tx, this.actorOf(this.it1), { caseRefId, reason }),
       );
 
   /** The reminder of the hour, run by hand. */
@@ -222,12 +233,12 @@ export class HandoverHarness extends TransferHarness {
     return rows.map((row) => row.action);
   }
 
-  /** Makes the person the head of the department from the day (the route of the IT Admin accepts a day to come). */
+  /** Makes the person the head of the department from the day (the route of the Super Admin accepts a day to come). */
   async makeHeadFrom(department: { id: string }, person: Person, day: string): Promise<void> {
     await request(this.server())
       .post(`/api/v1/departments/${department.id}/head-assignments`)
-      .set(this.as(this.it1))
-      .send({ employeeId: person.employeeId, effectiveFrom: day })
+      .set({ Authorization: `Bearer ${this.admin}` })
+      .send({ employeeId: person.employeeId, effectiveFrom: day, hrBasis: HR_BASIS })
       .expect(200);
   }
 }

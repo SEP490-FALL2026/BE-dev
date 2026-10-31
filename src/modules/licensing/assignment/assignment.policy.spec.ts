@@ -1,13 +1,20 @@
 import {
+  AssignmentConflictError,
   AssignmentEffectiveDateInvalidError,
   AssignmentExpectedEndRequiredError,
   AssignmentNotOpenError,
   AssignmentNotServiceAccountError,
   AssignmentResponsibleInvalidError,
-} from '../licensing.errors';
-import type { AssignmentRecord } from '../licensing.types';
+} from '../public/licensing.errors';
+import type { AssignmentRecord } from '../public/licensing.types';
 import { AssignmentResponsibleAfterDeadlineError } from './service-account.errors';
-import { assertResponsibleChange, effectiveFromLabel, toAssignmentView } from './assignment.policy';
+import {
+  assertResponsibleChange,
+  assertSubscriptionDepartment,
+  effectiveFromLabel,
+  holdersOfOtherDepartments,
+  toAssignmentView,
+} from './assignment.policy';
 
 const bot: AssignmentRecord = {
   id: 'a1',
@@ -172,5 +179,84 @@ describe('assertResponsibleChange (AC-10)', () => {
     expect(() => assertResponsibleChange(bot, { ...change, effectiveFrom: '2026-10-01' }, null, '2026-09-01')).toThrow(
       AssignmentEffectiveDateInvalidError,
     );
+  });
+});
+
+describe('assertSubscriptionDepartment (F20, QĐ-89a: a seat of a department sits on a subscription of that department)', () => {
+  it('lets a seat of the owning department through', () => {
+    expect(() => assertSubscriptionDepartment({ ownerDepartmentId: 'd-des' }, 'd-des', 0)).not.toThrow();
+  });
+
+  it('refuses a seat of another department before anything is written, with the index of its row', () => {
+    let thrown: unknown;
+    try {
+      assertSubscriptionDepartment({ ownerDepartmentId: 'd-des' }, 'd-fin', 3);
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBeInstanceOf(AssignmentConflictError);
+    expect(thrown).toMatchObject({ conflict: 'SUBSCRIPTION_DEPARTMENT_MISMATCH', index: 3 });
+  });
+
+  it('compares nothing for an internal plan, which has no subscription and no owner, nor for a seat with no department to compare', () => {
+    expect(() => assertSubscriptionDepartment({ ownerDepartmentId: null }, 'd-fin', 0)).not.toThrow();
+    expect(() => assertSubscriptionDepartment({ ownerDepartmentId: 'd-des' }, null, 0)).not.toThrow();
+    expect(() => assertSubscriptionDepartment({ ownerDepartmentId: null }, null, 0)).not.toThrow();
+  });
+});
+
+describe('holdersOfOtherDepartments (F21, QĐ-89e: who is asked after the installation, and for which seats)', () => {
+  const seat = (assignmentId: string, employeeId: string, owningDepartmentId: string) => ({
+    assignmentId,
+    employeeId,
+    owningDepartmentId,
+  });
+
+  it('keeps only the people whose own department is not the one that owns the subscription, grouped by person', () => {
+    const holders = holdersOfOtherDepartments(
+      [seat('a1', 'e1', 'd-des'), seat('a2', 'e2', 'd-des'), seat('a3', 'e2', 'd-fin'), seat('a4', 'e3', 'd-fin')],
+      new Map([
+        ['e1', 'd-des'],
+        ['e2', 'd-fin'],
+        ['e3', 'd-des'],
+      ]),
+    );
+
+    expect(holders).toEqual([
+      {
+        employeeId: 'e2',
+        employeeDepartmentId: 'd-fin',
+        assignments: [{ assignmentId: 'a2', owningDepartmentId: 'd-des' }],
+      },
+      {
+        employeeId: 'e3',
+        employeeDepartmentId: 'd-des',
+        assignments: [{ assignmentId: 'a4', owningDepartmentId: 'd-fin' }],
+      },
+    ]);
+  });
+
+  it('leaves out a person who is in no department on the day, since nobody can decide for them', () => {
+    expect(holdersOfOtherDepartments([seat('a1', 'e9', 'd-des')], new Map())).toEqual([]);
+  });
+
+  it('sorts the people by employee id and the seats of a person by assignment id, whatever the order it was given', () => {
+    const departments = new Map([
+      ['e1', 'd-fin'],
+      ['e2', 'd-fin'],
+    ]);
+    const seats = [
+      seat('a9', 'e2', 'd-des'),
+      seat('a3', 'e1', 'd-des'),
+      seat('a5', 'e2', 'd-it'),
+      seat('a1', 'e2', 'd-des'),
+    ];
+
+    const holders = holdersOfOtherDepartments(seats, departments);
+
+    expect(holders.map((holder) => holder.employeeId)).toEqual(['e1', 'e2']);
+    expect(holders[1].assignments.map((one) => one.assignmentId)).toEqual(['a1', 'a5', 'a9']);
+    expect(holdersOfOtherDepartments([...seats].reverse(), departments)).toEqual(holders);
   });
 });

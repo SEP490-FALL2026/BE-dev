@@ -4,9 +4,9 @@ import { normalizeDisplayName } from '../../../core/display-name';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import { isUniqueViolation } from '../../../infrastructure/database/unique-violation';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { AuditService } from '../../audit/audit.service';
-import { OrganizationService } from '../../organization/organization.service';
-import { catalogAuditEvent } from '../mappers/catalog-audit-event';
+import { AuditApi } from '../../audit/public/audit.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
+import { catalogAuditEvent } from '../catalog-audit-event.mapper';
 import {
   FunctionalGroupNameInvalidError,
   FunctionalGroupNameTakenError,
@@ -35,8 +35,8 @@ function cleanName(raw: string): string {
 export class FunctionalGroupService {
   constructor(
     private readonly groups: FunctionalGroupRepo,
-    private readonly organization: OrganizationService,
-    private readonly audit: AuditService,
+    private readonly organization: OrganizationApi,
+    private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
   ) {}
 

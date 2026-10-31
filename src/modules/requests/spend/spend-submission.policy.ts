@@ -86,3 +86,83 @@ export function checkSupplement(facts: {
 
   return sameDay && facts.leavesPeopleOut !== true ? 'NO_CHANGE' : null;
 }
+
+type Priced = {
+  status: string;
+  expectedSpendOn: string | null;
+  budgetYear: number | null;
+  amount: { amountMinor: bigint; currency: string } | null;
+};
+
+/**
+ * What a supplementary file keeps of the request: what it was and what it became, when both are priced with a day, a year and an amount;
+ * null when either is not, which the file cannot record (`AccessRequestNotPriceableError`).
+ */
+export function supplementChangeOf(
+  before: Priced,
+  after: Priced,
+): {
+  beforeExpectedSpendOn: string;
+  afterExpectedSpendOn: string;
+  beforeBudgetYear: number;
+  afterBudgetYear: number;
+  beforeAmountMinor: bigint;
+  afterAmountMinor: bigint;
+  currency: string;
+} | null {
+  if (
+    after.status !== 'PRICED' ||
+    after.amount === null ||
+    after.expectedSpendOn === null ||
+    after.budgetYear === null
+  ) {
+    return null;
+  }
+  if (before.amount === null || before.expectedSpendOn === null || before.budgetYear === null) return null;
+
+  return {
+    beforeExpectedSpendOn: before.expectedSpendOn,
+    afterExpectedSpendOn: after.expectedSpendOn,
+    beforeBudgetYear: before.budgetYear,
+    afterBudgetYear: after.budgetYear,
+    beforeAmountMinor: before.amount.amountMinor,
+    afterAmountMinor: after.amount.amountMinor,
+    currency: before.amount.currency,
+  };
+}
+
+/** A line of the plan of another year's budget no longer fits when the year changes: the request is attached again before it is sent. */
+export function supplementDropsPlanLine(
+  newBudgetYear: number,
+  oldBudgetYear: number | null,
+  attached: { planLine: unknown; offPlan: boolean },
+): boolean {
+  return newBudgetYear !== oldBudgetYear && (attached.planLine !== null || attached.offPlan);
+}
+
+/** What the audit entry `ACCESS_REQUEST.SUPPLEMENT_ADDED` says: the file as it was saved (the amounts as text) and who was left out. */
+export function supplementAuditDetail(
+  requestId: string,
+  saved: {
+    number: number;
+    beforeExpectedSpendOn: string;
+    afterExpectedSpendOn: string;
+    beforeBudgetYear: number;
+    afterBudgetYear: number;
+    beforeAmountMinor: bigint;
+    afterAmountMinor: bigint;
+  },
+  dropped: readonly string[],
+): { [key: string]: string | number | string[] } {
+  return {
+    requestId,
+    number: saved.number,
+    before: saved.beforeExpectedSpendOn,
+    after: saved.afterExpectedSpendOn,
+    beforeBudgetYear: saved.beforeBudgetYear,
+    afterBudgetYear: saved.afterBudgetYear,
+    beforeAmountMinor: saved.beforeAmountMinor.toString(),
+    afterAmountMinor: saved.afterAmountMinor.toString(),
+    droppedEmployeeIds: [...dropped],
+  };
+}

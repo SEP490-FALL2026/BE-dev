@@ -1,4 +1,10 @@
-import { checkWithdrawal, headMayWithdraw, type WithdrawalFacts } from './withdrawal.policy';
+import {
+  checkWithdrawal,
+  grantCancelRefusal,
+  headMayWithdraw,
+  withdrawalAuditOf,
+  type WithdrawalFacts,
+} from './withdrawal.policy';
 
 const base: WithdrawalFacts = {
   actorEmployeeId: 'e1',
@@ -77,5 +83,57 @@ describe('checkWithdrawal (US-05-08)', () => {
     expect(headMayWithdraw('BLOCKED')).toBe(true);
     expect(headMayWithdraw('WAITING_SPEND_DECISION')).toBe(false);
     expect(headMayWithdraw(null)).toBe(false);
+  });
+});
+
+describe('what the withdrawal of a request whose grant is under way is refused for, and what it records (US-05-08, US-05-13)', () => {
+  it.each([
+    ['a task being worked refuses', { status: 'RUNNING' }, { reason: 'GRANT_RUNNING', details: null }],
+    [
+      'a task that is done sends the person to the return of the seat',
+      { status: 'COMPLETED', assignmentId: 'asg-1' },
+      { reason: 'GRANT_COMPLETED', details: { assignmentId: 'asg-1' } },
+    ],
+    ['a task that ended refuses', { status: 'ENDED' }, { reason: 'ALREADY_ENDED', details: null }],
+  ])('%s (grantCancelRefusal)', (_label, grant, expected) => {
+    expect(grantCancelRefusal(grant)).toEqual(expected);
+  });
+
+  it.each([
+    ['a task nobody has worked, cancelled', { status: 'CANCELLED' }],
+    ['no task at all', { status: 'NO_TASK' }],
+    ['a task that failed, which the IT Admin closes', { status: 'FAILED' }],
+  ])('lets the request go on when the grant is %s (grantCancelRefusal)', (_label, grant) => {
+    expect(grantCancelRefusal(grant)).toBeNull();
+  });
+
+  const request = { id: 'req-1', requesterEmployeeId: 'sender' };
+
+  it('records a withdrawal that ended the request, by the sender or the head, and the reason', () => {
+    expect(withdrawalAuditOf(request, { from: 'PENDING', actorEmployeeId: 'head', reason: 'Không cần' }, null)).toEqual(
+      {
+        action: 'ACCESS_REQUEST.WITHDRAWN',
+        detail: {
+          requestId: 'req-1',
+          from: 'PENDING',
+          to: 'WITHDRAWN',
+          byRequester: false,
+          withdrawnByEmployeeId: 'head',
+          reason: 'Không cần',
+        },
+      },
+    );
+    expect(
+      withdrawalAuditOf(request, { from: 'AWAITING_EXECUTION', actorEmployeeId: 'sender', reason: null }, null).detail,
+    ).toMatchObject({ byRequester: true, reason: null });
+  });
+
+  it('records a withdrawal that waits for the IT Admin to close the task of a grant that failed', () => {
+    expect(
+      withdrawalAuditOf(request, { from: 'EXECUTING', actorEmployeeId: 'sender', reason: null }, { taskId: 'task-1' }),
+    ).toEqual({
+      action: 'ACCESS_REQUEST.WITHDRAWAL_REQUESTED',
+      detail: { requestId: 'req-1', from: 'EXECUTING', to: 'AWAITING_IT_CLOSE', taskId: 'task-1' },
+    });
   });
 });

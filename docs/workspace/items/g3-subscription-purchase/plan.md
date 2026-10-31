@@ -17,7 +17,7 @@ Mỗi task theo TDD: viết test đỏ, xem nó đỏ đúng lý do, viết mã 
 
 ### Task 1: dữ liệu `subscriptions`
 
-- Files: `prisma/models/catalog.prisma`, `prisma/models/organization.prisma` (quan hệ ngược), migration `20261020150000_catalog_subscriptions`, `src/architecture-boundaries.spec.ts` (`PRISMA_MODEL_OWNER`), `test/integration/subscription-constraints.integration-spec.ts`.
+- Files: `prisma/models/catalog.prisma`, `prisma/models/organization.prisma` (quan hệ ngược), migration `20261020150000_catalog_subscriptions`, `test/gates/architecture-boundaries.gate-spec.ts` (`PRISMA_MODEL_OWNER`), `test/integration/catalog/subscription-constraints.integration-spec.ts`.
 - Depends on: `g3-plan-declaration` (bảng `plans`), `g3-money-and-exchange-rates` (`currencies`, `exchange_rates`).
 - Acceptance: CHECK giá/ảnh chụp cùng có hoặc không, cận tiền, thứ tự ngày, khoản mua vĩnh viễn không kỳ, `ACTIVE` ⟹ đủ dữ liệu; trigger gói K5, vĩnh viễn chỉ `LICENSED`, `ACTIVE` + `PER_SEAT` ⟹ có số lượng; khóa ngoại.
 - Verify: `pnpm prisma:validate`, `pnpm prisma:generate`; test constraints đỏ trước migration, xanh sau.
@@ -31,14 +31,14 @@ Mỗi task theo TDD: viết test đỏ, xem nó đỏ đúng lý do, viết mã 
 
 ### Task 3: repo, service, contract đọc gói
 
-- Files: `subscription/subscription.repo.ts`, `subscription.service.ts`, `plan/plan-lookup.service.ts` (contract nội module) và `plan.repo.ts` (khóa `FOR SHARE` gói), `catalog.module.ts` (`OperatingParametersModule`), `src/architecture-structure.spec.ts`.
+- Files: `subscription/subscription.repo.ts`, `subscription.service.ts`, `plan/plan-lookup.service.ts` (contract nội module) và `plan.repo.ts` (khóa `FOR SHARE` gói), `catalog.module.ts` (`OperatingParametersModule`), `test/gates/architecture-structure.gate-spec.ts`.
 - Depends on: Task 1, Task 2.
 - Acceptance: ghi thuê bao cùng ảnh chụp giá và audit trong một giao dịch; ngày ghi giá = `businessToday`; hoàn tất nháp chụp theo `priceRecordedOn`; trạng thái do hệ thống tính; lỗi bắt theo ràng buộc.
 - Verify: `pnpm exec jest src/modules/catalog src/architecture src/module-graph`; integration `subscription-http` ở Task 4.
 
 ### Task 4: HTTP, hợp đồng
 
-- Files: `subscription/subscription.dto.ts`, `subscription.http-errors.ts`, `subscriptions.controller.ts`, `test/support/api-coverage-manifest.ts` (+5), `test/e2e/api-inventory.e2e-spec.ts` (89 → 94), `test/e2e/subscription-purchase.e2e-spec.ts`, `test/integration/subscription-http.integration-spec.ts`.
+- Files: `subscription/subscription.dto.ts`, `subscription.http-errors.ts`, `subscriptions.controller.ts`, `test/support/api-coverage-manifest.ts` (+5), `test/http/platform/api-inventory.http-spec.ts` (89 → 94), `test/http/catalog/subscription-purchase.http-spec.ts`, `test/integration/catalog/subscription-http.integration-spec.ts`.
 - Depends on: Task 3.
 - Acceptance: năm operation đúng bảng HTTP; 401/403/422 theo vai; 404; không `DELETE`; mọi AC trong ma trận.
 - Verify: `pnpm test:e2e` (suite `subscription-purchase`, `api-inventory`), integration `subscription-http` → xanh; đột biến (bỏ khóa gói, đổi ngày chụp sang hôm nay, đổi bảng chọn mốc) làm test đỏ.

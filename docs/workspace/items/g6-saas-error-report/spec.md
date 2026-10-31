@@ -24,10 +24,10 @@ Employee báo lỗi cho một quyền đang được cấp cho chính mình bằ
 
 ## Primary Story/AC
 
-| Story    | AC        | Coverage | Phần còn lại thuộc |
-| -------- | --------- | -------- | ------------------ |
-| US-07-10 | AC-1→AC-9 | full     | —                  |
-| US-07-11 | AC-1→AC-9 | full     | —                  |
+| Story    | AC         | Coverage | Phần còn lại thuộc |
+| -------- | ---------- | -------- | ------------------ |
+| US-07-10 | AC-1→AC-10 | full     | —                  |
+| US-07-11 | AC-1→AC-9  | full     | —                  |
 
 ## Supporting references
 
@@ -139,3 +139,9 @@ Cập nhật 25/10/2026 bởi người phụ trách (AI theo giao việc của n
 **Chưa kiểm chứng / giới hạn:** tệp minh chứng, thời hạn lưu phiếu (`OQ-31`, không xóa tự động) và hộp thông báo ngoài phạm vi; `AC-9` của `US-07-10` chỉ kiểm được ở mức OpenAPI. Chưa có test đồng thời riêng cho hai IT Admin cùng chuyển một phiếu (tuần tự hóa bằng khóa dòng) hay hai lượt chạy `SaasIssueSweeper` một lúc (dấu `response_overdue_noticed_at` đặt trong cùng transaction). Phiếu của IT Admin về quyền của chính họ do chính họ xử lý được, vì thiết kế không nêu quy tắc tách vai (`SoD-5`) cho phiếu; cần Owner xem nếu muốn chặn. Hai tham số mặc định lấy từ ví dụ của Story, chưa phải Owner chọn.
 
 **Cho hạng mục sau / FE:** chín route mới, hai tham số, các mã `SAAS_ISSUE.*`; `options` là collection; `linkedWork` là object bốn khóa; mô tả không đi vào audit. Hộp thông báo lấy từ `SAAS_ISSUE.{SUBMITTED,TRANSITIONED,MESSAGE_ADDED,REOPENED,DUPLICATED,RESOLVED,RESPONSE_OVERDUE,CLOSED}` (trường `notifyEmployeeId`).
+
+## Mở lại theo baseline `769bb64` (Prompt 03, 26/10/2026)
+
+- Audit G0–G6 trên Docs `769bb64` ↔ BE `7c28e75` mở lại hạng mục này: F48 — sequence mã báo lỗi theo năm.
+- Remediation duy nhất: [g0-g6-final-business-baseline-remediation](../g0-g6-final-business-baseline-remediation/spec.md) ([impact matrix](../g0-g6-final-business-baseline-remediation/impact-matrix.md#3-findings)). AC liên quan không còn được coi là thỏa nguồn hiện hành cho tới khi remediation xong; trạng thái triển khai ở roadmap. Phần đã ghi phía trên là lịch sử, giữ nguyên.
+- _27/10/2026 (Prompt 04, Task 0.1 của `g0-g6-final-business-baseline-remediation`, F60 — re-pin scope map [G6](../../../roadmap.md#work-item-decomposition-g6) Docs `e0cb5a0`, BE `7c28e75`):_ nhận thêm `US-07-10` AC-10 (mục 9 không có cột chủ đề xuất, không có finding riêng ở mục 4 — gán theo hạng mục đang chủ cả Story, chờ xác nhận) ([impact matrix mục 9](../g0-g6-final-business-baseline-remediation/impact-matrix.md#9-phụ-lục-delta-user-stories-72e1480--769bb64)). Phần đã ghi phía trên là lịch sử, giữ nguyên.

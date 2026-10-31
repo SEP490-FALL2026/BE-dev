@@ -2,8 +2,10 @@ import { Body, Controller, Get, HttpStatus, Param, Patch, Post, Put, Query } fro
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
+  FORBIDDEN_EXAMPLE,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
+  VALIDATION_EXAMPLE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
 import { RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
@@ -20,26 +22,68 @@ import {
   WorkspaceProfileBodyDto,
   WorkspaceProfileResponseDto,
 } from './plan.dto';
-import { toPlanApiException } from './plan.http-errors';
+import { PLAN_ERROR_EXAMPLES as EXAMPLES, toPlanApiException } from './plan.http-errors';
 import { seatTrackingOf } from './plan.policy';
 import { PlanService } from './plan.service';
 import type { PlanRecord, PlanSummaryRecord, WorkspaceProfileView } from './plan.types';
 import { PlanWorkspaceService } from './plan-workspace.service';
 
 const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPONSE] as const;
-const IT_ONLY = { status: HttpStatus.FORBIDDEN, description: 'Only an IT Admin declares or changes plans.' } as const;
-const READERS = { status: HttpStatus.FORBIDDEN, description: 'Only the IT Admin and Finance read plans.' } as const;
-const INVALID = {
+const IT_ONLY = {
+  status: HttpStatus.FORBIDDEN,
+  description: 'Only an IT Admin declares or changes plans.',
+  examples: [FORBIDDEN_EXAMPLE],
+} as const;
+const READERS = {
+  status: HttpStatus.FORBIDDEN,
+  description: 'Only the IT Admin and Finance read plans.',
+  examples: [FORBIDDEN_EXAMPLE],
+} as const;
+const INVALID_DESCRIPTION =
+  'The request is invalid (VALIDATION_ERROR) or a rule refuses it: PLAN.APPLICATION_NOT_FOUND, APPLICATION_RETIRED, NAME_INVALID, NOTE_INVALID, PROVISIONING_TYPE_NOT_SUPPORTED, PROVISIONING_TYPE_MISMATCH, PRICING_MODEL_REQUIRED, PRICING_MODEL_NOT_APPLICABLE, CONTROL_LEVEL_REQUIRED, DATA_LOSS_NOTE_REQUIRED or UPDATE_EMPTY.';
+/** The rule refusals of the shape of a plan, met by a declaration and by a change alike. */
+const SHAPE_EXAMPLES = [
+  EXAMPLES.NAME_INVALID,
+  EXAMPLES.NOTE_INVALID,
+  EXAMPLES.PROVISIONING_TYPE_NOT_SUPPORTED,
+  EXAMPLES.PROVISIONING_TYPE_MISMATCH,
+  EXAMPLES.PRICING_MODEL_REQUIRED,
+  EXAMPLES.PRICING_MODEL_NOT_APPLICABLE,
+  EXAMPLES.CONTROL_LEVEL_REQUIRED,
+  EXAMPLES.DATA_LOSS_NOTE_REQUIRED,
+] as const;
+const DECLARE_INVALID = {
   status: HttpStatus.UNPROCESSABLE_ENTITY,
-  description:
-    'The request is invalid (VALIDATION_ERROR) or a rule refuses it: PLAN.APPLICATION_NOT_FOUND, APPLICATION_RETIRED, NAME_INVALID, NOTE_INVALID, PROVISIONING_TYPE_NOT_SUPPORTED, PROVISIONING_TYPE_MISMATCH, PRICING_MODEL_REQUIRED, PRICING_MODEL_NOT_APPLICABLE, CONTROL_LEVEL_REQUIRED, DATA_LOSS_NOTE_REQUIRED or UPDATE_EMPTY.',
+  description: INVALID_DESCRIPTION,
+  examples: [VALIDATION_EXAMPLE, EXAMPLES.APPLICATION_NOT_FOUND, EXAMPLES.APPLICATION_RETIRED, ...SHAPE_EXAMPLES],
 } as const;
-const NAME_TAKEN = {
+const UPDATE_INVALID = {
+  status: HttpStatus.UNPROCESSABLE_ENTITY,
+  description: INVALID_DESCRIPTION,
+  examples: [VALIDATION_EXAMPLE, ...SHAPE_EXAMPLES, EXAMPLES.UPDATE_EMPTY],
+} as const;
+const CONFLICT_DESCRIPTION =
+  'The application already has a plan of this name (PLAN.NAME_TAKEN) or the plan still has a workspace profile or a numeric install limit the new kind cannot keep (PLAN.WORKSPACE_PROFILE_BLOCKS_TYPE_CHANGE, PLAN.TERMS_BLOCK_TYPE_CHANGE), or a subscription or license key of the plan would no longer fit the new pricing model or kind (PLAN.IN_USE_BLOCKS_CHANGE, `details.reason`: ACTIVE_SUBSCRIPTION_WITHOUT_QUANTITY, LICENSE_KEYS or SUBSCRIPTIONS).';
+const DECLARE_CONFLICT = {
   status: HttpStatus.CONFLICT,
-  description:
-    'The application already has a plan of this name (PLAN.NAME_TAKEN) or the plan still has a workspace profile or a numeric install limit the new kind cannot keep (PLAN.WORKSPACE_PROFILE_BLOCKS_TYPE_CHANGE, PLAN.TERMS_BLOCK_TYPE_CHANGE), or a subscription or license key of the plan would no longer fit the new pricing model or kind (PLAN.IN_USE_BLOCKS_CHANGE, `details.reason`: ACTIVE_SUBSCRIPTION_WITHOUT_QUANTITY, LICENSE_KEYS or SUBSCRIPTIONS).',
+  description: CONFLICT_DESCRIPTION,
+  examples: [EXAMPLES.NAME_TAKEN],
 } as const;
-const NOT_FOUND = { status: HttpStatus.NOT_FOUND, description: 'The plan does not exist (PLAN.NOT_FOUND).' } as const;
+const UPDATE_CONFLICT = {
+  status: HttpStatus.CONFLICT,
+  description: CONFLICT_DESCRIPTION,
+  examples: [
+    EXAMPLES.NAME_TAKEN,
+    EXAMPLES.WORKSPACE_PROFILE_BLOCKS_TYPE_CHANGE,
+    EXAMPLES.TERMS_BLOCK_TYPE_CHANGE,
+    EXAMPLES.IN_USE_BLOCKS_CHANGE,
+  ],
+} as const;
+const NOT_FOUND = {
+  status: HttpStatus.NOT_FOUND,
+  description: 'The plan does not exist (PLAN.NOT_FOUND).',
+  examples: [EXAMPLES.NOT_FOUND],
+} as const;
 
 function toPlanSummaryWire(plan: PlanSummaryRecord) {
   return {
@@ -89,6 +133,7 @@ export class PlansController {
   @ApiErrorResponses(...AUTH_ERRORS, READERS, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description: 'The query is invalid (VALIDATION_ERROR).',
+    examples: [VALIDATION_EXAMPLE],
   })
   async list(@Query() query: ListPlansQueryDto) {
     try {
@@ -108,7 +153,7 @@ export class PlansController {
     message: 'PLAN.CREATED',
     description: 'The plan is declared; seatTracking says whether seats are counted for it at all.',
   })
-  @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, INVALID, NAME_TAKEN)
+  @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, DECLARE_INVALID, DECLARE_CONFLICT)
   async declare(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: DeclarePlanBodyDto) {
     try {
       return toPlanWire(await this.plans.declare(actor, body));
@@ -127,6 +172,7 @@ export class PlansController {
   @ApiErrorResponses(...AUTH_ERRORS, READERS, NOT_FOUND, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description: 'The id is not a UUID (VALIDATION_ERROR).',
+    examples: [VALIDATION_EXAMPLE],
   })
   async get(@Param() params: PlanIdParamDto) {
     try {
@@ -146,7 +192,7 @@ export class PlansController {
     description:
       'The plan as it is after the change; a change of nothing is answered the same and not audited. The application cannot change.',
   })
-  @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, INVALID, NAME_TAKEN, NOT_FOUND)
+  @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, UPDATE_INVALID, UPDATE_CONFLICT, NOT_FOUND)
   async update(
     @CurrentPrincipal() actor: AuthenticatedPrincipal,
     @Param() params: PlanIdParamDto,
@@ -171,6 +217,15 @@ export class PlansController {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description:
       'The request is invalid (VALIDATION_ERROR) or a rule refuses it: PLAN.WORKSPACE_PROFILE_NOT_APPLICABLE, WORKSPACE_PERSON_INVALID, PRIMARY_OWNER_NOT_LISTED, WORKSPACE_MEMBER_DUPLICATE, WORKSPACE_LIMIT_EXCEEDED or WORKSPACE_TEXT_INVALID.',
+    examples: [
+      VALIDATION_EXAMPLE,
+      EXAMPLES.WORKSPACE_PROFILE_NOT_APPLICABLE,
+      EXAMPLES.WORKSPACE_PERSON_INVALID,
+      EXAMPLES.PRIMARY_OWNER_NOT_LISTED,
+      EXAMPLES.WORKSPACE_MEMBER_DUPLICATE,
+      EXAMPLES.WORKSPACE_LIMIT_EXCEEDED,
+      EXAMPLES.WORKSPACE_TEXT_INVALID,
+    ],
   })
   async setWorkspaceProfile(
     @CurrentPrincipal() actor: AuthenticatedPrincipal,

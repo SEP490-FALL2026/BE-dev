@@ -1,9 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { BusinessDate } from '../../../core/business-date';
 import { DbTx, TransactionRunner } from '../../../infrastructure/database/transaction-runner';
-import type { NewOrganizationChange, OrganizationChangeListener } from '../organization.types';
+import { OrganizationChangeListeners } from '../public/organization.extension-points';
+import type { NewOrganizationChange, OrganizationChange } from '../public/organization.types';
 import { AnnouncementRepo } from './announcement.repo';
-import { OrganizationChangeRegistry } from './organization-change.registry';
 
 /** How many changes of each kind one pass tells at most: the rest wait for the next pass. */
 const SWEEP_BATCH = 200;
@@ -24,20 +24,29 @@ export class OrganizationChangeService {
   private readonly logger = new Logger(OrganizationChangeService.name);
 
   constructor(
-    private readonly registry: OrganizationChangeRegistry,
+    private readonly listeners: OrganizationChangeListeners,
     private readonly announcements: AnnouncementRepo,
     private readonly runner: TransactionRunner,
   ) {}
 
-  register(listener: OrganizationChangeListener): void {
-    this.registry.register(listener);
+  /** For `ops:inspect`: the changes that had taken effect at `asOf` in their organization's calendar and were never marked as told. */
+  countUnmarkedAsOf(
+    tx: DbTx,
+    asOf: Date,
+  ): Promise<Record<'PLACEMENT_START' | 'HEAD_PERIOD_START' | 'HEAD_PERIOD_END', number>> {
+    return this.announcements.countUnmarkedAsOf(tx, asOf);
   }
 
-  /** Tells the listeners in the caller's transaction, unless the change was told already; one that throws rolls it back. */
+  /**
+   * Tells the listeners in the caller's transaction, in the order they were added, unless the change was told already; one that
+   * throws rolls it back. `id` is the identity of the change the listeners see: the announcement row gives it, so it is the same
+   * on every path.
+   */
   async emit(tx: DbTx, change: NewOrganizationChange): Promise<void> {
     const id = await this.announcements.record(tx, change);
     if (id === null) return;
-    await this.registry.announce(tx, change, id);
+    const announced: OrganizationChange = { ...change, id };
+    await this.listeners.emit(tx, announced);
   }
 
   /**

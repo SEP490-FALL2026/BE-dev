@@ -1,6 +1,7 @@
 import { HttpStatus } from '@nestjs/common';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import { toUnavailableApiException } from '../../../infrastructure/http/errors/service-unavailable';
+import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
 import {
   PlanTermsInstallLimitNumericOnlyForK4Error,
   PlanTermsNotApplicableError,
@@ -34,3 +35,15 @@ export function toPlanTermsApiException(error: unknown): unknown {
 
   return toUnavailableApiException(error) ?? error;
 }
+
+const example = (error: Error) => errorExampleOf(toPlanTermsApiException(error));
+
+/** The answers above as OpenAPI examples, each produced by the mapper that gives it at runtime. */
+export const PLAN_TERMS_ERROR_EXAMPLES = {
+  PLAN_NOT_FOUND: example(new PlanTermsPlanNotFoundError()),
+  NOT_APPLICABLE: example(new PlanTermsNotApplicableError()),
+  URL_INVALID: example(new PlanTermsUrlInvalidError()),
+  TEXT_INVALID: example(new PlanTermsTextInvalidError()),
+  REVIEW_DATE_IN_FUTURE: example(new PlanTermsReviewDateInFutureError()),
+  INSTALL_LIMIT_NUMERIC_ONLY_FOR_K4: example(new PlanTermsInstallLimitNumericOnlyForK4Error()),
+} as const;

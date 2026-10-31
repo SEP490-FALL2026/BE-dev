@@ -27,7 +27,7 @@ Thuê bao không giảm xuống dưới số Assignment đang chiếm chỗ, thu
 | Story    | AC         | Coverage | Phần còn lại thuộc                                |
 | -------- | ---------- | -------- | ------------------------------------------------- |
 | US-04-02 | AC-9       | partial  | AC-1→AC-8, AC-10→AC-12: `g3-plan-declaration`     |
-| US-04-03 | AC-5, AC-6 | partial  | AC-1→AC-4, AC-7→AC-12: `g3-subscription-purchase` |
+| US-04-03 | AC-5, AC-6 | partial  | AC-1→AC-4, AC-7→AC-13: `g3-subscription-purchase` |
 
 Hạng mục làm đủ ba AC trên (AC-9 của `US-04-02`, AC-5 và AC-6 của `US-04-03`); `partial` chỉ vì các AC còn lại của hai Story thuộc hạng mục khác. Hai điểm nói rõ vế đã làm:
 

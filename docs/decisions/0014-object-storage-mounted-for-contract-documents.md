@@ -46,7 +46,7 @@ versioning của bucket. Không phải Owner review hay chấp nhận; đổi sa
 8. `complete` khi đối tượng **chưa tới kho** trả 409 `DOCUMENT.UPLOAD_PENDING` (thử lại được), không cách ly. Tệp `AWAITING_UPLOAD`
    quá 24 giờ chuyển `EXPIRED` (trạng thái cuối, sự kiện Audit `DOCUMENT.EXPIRED`, xóa đối tượng nếu có): ngay khi gọi
    `complete` quá hạn (409 `DOCUMENT.UPLOAD_EXPIRED`) hoặc theo `DocumentExpirySweeper` mỗi giờ của API (lần đầu sau 5 phút).
-9. **Kiểm chứng trên kho giao thức S3 thật:** `test/integration/object-storage-real.integration-spec.ts` chạy adapter thật với
+9. **Kiểm chứng trên kho giao thức S3 thật:** `test/integration/platform/object-storage-real.integration-spec.ts` chạy adapter thật với
    `TEST_OBJECT_STORAGE_ENDPOINT` (không có thì bị bỏ qua và nói lý do). Đã chạy 23/10/2026 trên **LocalStack 3.8.1** (kiểm chữ
    ký) — không phải MinIO hay AWS S3: ký đúng thì nhận, sai `Content-Type`/lớn hơn/nhỏ hơn thì 403, `If-Match` sai thì
    `PreconditionFailed` và không sao chép, tải về trả đúng `Content-Disposition`/`Content-Type`. Chưa kiểm chứng: trình duyệt PUT

@@ -31,7 +31,7 @@ Inventory (đọc trực tiếp, không subagent):
 
 ### Task 1: Phase 0 — `CP0-05` → `CP0-08`
 
-- Files: `test/integration/auth-concurrency.integration-spec.ts`, `auth-http.integration-spec.ts`,
+- Files: `test/integration/identity-access/auth-concurrency.integration-spec.ts`, `auth-http.integration-spec.ts`,
   `super-admin-recovery.integration-spec.ts`.
 - Depends on: none.
 - Acceptance: `CP0-05` — audit thu hồi phiên lọc `resource_id` của chính phiên ca kiểm, kỳ vọng đúng một

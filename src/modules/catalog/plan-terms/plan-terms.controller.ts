@@ -2,8 +2,10 @@ import { Body, Controller, Get, HttpStatus, Param, Post, Put, Query } from '@nes
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
+  FORBIDDEN_EXAMPLE,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
+  VALIDATION_EXAMPLE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
 import { RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
@@ -21,13 +23,21 @@ import {
   PlanWarningsQueryDto,
   TermOpinionsQueryDto,
 } from './plan-terms.dto';
-import { toPlanTermsApiException } from './plan-terms.http-errors';
+import { PLAN_TERMS_ERROR_EXAMPLES as EXAMPLES, toPlanTermsApiException } from './plan-terms.http-errors';
 import { PlanTermsService } from './plan-terms.service';
 import type { OpinionView, TermsRecord } from './plan-terms.types';
 
 const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPONSE] as const;
-const IT_ONLY = { status: HttpStatus.FORBIDDEN, description: 'Only an IT Admin records the terms of a plan.' } as const;
-const NOT_FOUND = { status: HttpStatus.NOT_FOUND, description: 'The plan does not exist (PLAN.NOT_FOUND).' } as const;
+const IT_ONLY = {
+  status: HttpStatus.FORBIDDEN,
+  description: 'Only an IT Admin records the terms of a plan.',
+  examples: [FORBIDDEN_EXAMPLE],
+} as const;
+const NOT_FOUND = {
+  status: HttpStatus.NOT_FOUND,
+  description: 'The plan does not exist (PLAN.NOT_FOUND).',
+  examples: [EXAMPLES.PLAN_NOT_FOUND],
+} as const;
 
 const toTermsWire = (terms: TermsRecord) => ({
   termsUrl: terms.termsUrl,
@@ -63,9 +73,17 @@ export class PlanTermsController {
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
-    { status: HttpStatus.FORBIDDEN, description: 'Only the IT Admin and Finance read the terms of a plan.' },
+    {
+      status: HttpStatus.FORBIDDEN,
+      description: 'Only the IT Admin and Finance read the terms of a plan.',
+      examples: [FORBIDDEN_EXAMPLE],
+    },
     NOT_FOUND,
-    { status: HttpStatus.UNPROCESSABLE_ENTITY, description: 'The id is not a UUID (VALIDATION_ERROR).' },
+    {
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      description: 'The id is not a UUID (VALIDATION_ERROR).',
+      examples: [VALIDATION_EXAMPLE],
+    },
   )
   async get(@Param() params: PlanIdParamDto) {
     try {
@@ -93,6 +111,14 @@ export class PlanTermsController {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description:
       'The request is invalid (VALIDATION_ERROR) or a rule refuses it: PLAN_TERMS.NOT_APPLICABLE, URL_INVALID, TEXT_INVALID, REVIEW_DATE_IN_FUTURE or INSTALL_LIMIT_NUMERIC_ONLY_FOR_K4.',
+    examples: [
+      VALIDATION_EXAMPLE,
+      EXAMPLES.NOT_APPLICABLE,
+      EXAMPLES.URL_INVALID,
+      EXAMPLES.TEXT_INVALID,
+      EXAMPLES.REVIEW_DATE_IN_FUTURE,
+      EXAMPLES.INSTALL_LIMIT_NUMERIC_ONLY_FOR_K4,
+    ],
   })
   async set(
     @CurrentPrincipal() actor: AuthenticatedPrincipal,
@@ -117,11 +143,16 @@ export class PlanTermsController {
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
-    { status: HttpStatus.FORBIDDEN, description: 'Only the IT Admin and Finance read the opinions.' },
+    {
+      status: HttpStatus.FORBIDDEN,
+      description: 'Only the IT Admin and Finance read the opinions.',
+      examples: [FORBIDDEN_EXAMPLE],
+    },
     NOT_FOUND,
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description: 'The id is not a UUID or the query is invalid (VALIDATION_ERROR).',
+      examples: [VALIDATION_EXAMPLE],
     },
   )
   async listOpinions(@Param() params: PlanIdParamDto, @Query() query: TermOpinionsQueryDto) {
@@ -150,6 +181,7 @@ export class PlanTermsController {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description:
       'The request is invalid (VALIDATION_ERROR), the opinion is empty or too long (PLAN_TERMS.TEXT_INVALID) or the plan has no terms (PLAN_TERMS.NOT_APPLICABLE).',
+    examples: [VALIDATION_EXAMPLE, EXAMPLES.TEXT_INVALID, EXAMPLES.NOT_APPLICABLE],
   })
   async recordOpinion(
     @CurrentPrincipal() actor: AuthenticatedPrincipal,
@@ -173,8 +205,16 @@ export class PlanTermsController {
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
-    { status: HttpStatus.FORBIDDEN, description: 'Only an IT Admin reads the review alerts.' },
-    { status: HttpStatus.UNPROCESSABLE_ENTITY, description: 'The query is invalid (VALIDATION_ERROR).' },
+    {
+      status: HttpStatus.FORBIDDEN,
+      description: 'Only an IT Admin reads the review alerts.',
+      examples: [FORBIDDEN_EXAMPLE],
+    },
+    {
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      description: 'The query is invalid (VALIDATION_ERROR).',
+      examples: [VALIDATION_EXAMPLE],
+    },
   )
   async warnings(@Query() query: PlanWarningsQueryDto) {
     try {

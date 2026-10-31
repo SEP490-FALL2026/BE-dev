@@ -4,10 +4,10 @@ import { ObjectKeyFactory } from '../../../infrastructure/object-storage/object-
 import { ObjectStorageUnavailableError } from '../../../infrastructure/object-storage/object-storage.errors';
 import { OBJECT_STORAGE, type ObjectStoragePort } from '../../../infrastructure/object-storage/object-storage.port';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { AuditService } from '../../audit/audit.service';
-import { OperatingParametersService } from '../../operating-parameters/operating-parameters.service';
-import { OrganizationService } from '../../organization/organization.service';
-import { catalogAuditEvent } from '../mappers/catalog-audit-event';
+import { AuditApi } from '../../audit/public/audit.api';
+import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
+import { catalogAuditEvent } from '../catalog-audit-event.mapper';
 import {
   ContractNotFoundError,
   DocumentAccessForbiddenError,
@@ -25,6 +25,8 @@ import {
   assertPurposeAvailable,
   assertUploadMatches,
   contentMatchesType,
+  isStorageObjectChanged as isChanged,
+  isStorageObjectMissing as isNotFound,
   SIGNATURE_PREFIX_BYTES,
   mayOpen,
   type DocumentPurpose,
@@ -61,10 +63,10 @@ export class DocumentService {
   constructor(
     private readonly documents: DocumentRepo,
     private readonly contracts: ContractRepo,
-    private readonly organization: OrganizationService,
-    private readonly parameters: OperatingParametersService,
+    private readonly organization: OrganizationApi,
+    private readonly parameters: OperatingParametersApi,
     private readonly keys: ObjectKeyFactory,
-    private readonly audit: AuditService,
+    private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
     @Inject(OBJECT_STORAGE) private readonly storage: ObjectStoragePort,
   ) {}
@@ -136,11 +138,13 @@ export class DocumentService {
     const current = await this.ownedBy(actor, id);
     if (current.status !== 'AWAITING_UPLOAD') throw new DocumentNotAwaitingUploadError();
     if (Date.now() - current.createdAt.getTime() > UPLOAD_ABANDONED_AFTER_MS) {
-      await this.expire(current.id, current.objectKey, actor);
-      throw new DocumentUploadExpiredError();
+      // Given up by this call, or changed first by a simultaneous one: then the row as it is now answers.
+      if (await this.expire(current.id, current.objectKey, actor)) throw new DocumentUploadExpiredError();
+      throw await this.answerFromRow(actor, id);
     }
     const stored = await this.stored(current.objectKey);
-    if (stored.etag === undefined) throw new DocumentUploadPendingError();
+    // Never came, or kept (or given up) by a simultaneous call that deletes it only after its commit.
+    if (stored.etag === undefined) throw await this.answerFromRow(actor, id);
     let finalKey: string | null = null;
     try {
       assertUploadMatches(current, stored);
@@ -155,33 +159,56 @@ export class DocumentService {
       if (!(error instanceof DocumentUploadMismatchError)) throw error;
       finalKey = null;
     }
-    // The upload link is no more use once the object is judged, whatever the answer; a failed delete leaves the object to the lifecycle of the bucket.
+    // The database first, the upload last: a commit that fails takes its own copy back and keeps the upload, so
+    // the same call works again — no lost upload, no orphan copy, no false 409.
+    const result = await this.runner
+      .run(async (tx) => {
+        const locked = await this.documents.lock(tx, id);
+        if (!locked) throw new DocumentNotFoundError();
+        if (locked.status !== 'AWAITING_UPLOAD') throw new DocumentNotAwaitingUploadError();
+        if (finalKey !== null) await this.documents.markUploaded(tx, id, finalKey);
+        else await this.documents.markQuarantined(tx, id);
+        await this.audit.record(
+          tx,
+          catalogAuditEvent(
+            actor,
+            organization.id,
+            finalKey !== null ? 'DOCUMENT.UPLOADED' : 'DOCUMENT.QUARANTINED',
+            'DocumentAttachment',
+            id,
+            { status: 'AWAITING_UPLOAD' },
+            { status: finalKey !== null ? 'PENDING_ATTACH' : 'QUARANTINED' },
+          ),
+        );
+
+        return (await this.documents.find(id, tx)) ?? locked;
+      })
+      .catch(async (error: unknown) => {
+        if (finalKey !== null) await this.withdrawCopy(id, finalKey);
+        throw error;
+      });
+    // Known committed: the upload is no more use; a failed delete leaves it to the bucket's lifecycle.
     await this.discard(current.objectKey);
-
-    const result = await this.runner.run(async (tx) => {
-      const locked = await this.documents.lock(tx, id);
-      if (!locked) throw new DocumentNotFoundError();
-      if (locked.status !== 'AWAITING_UPLOAD') throw new DocumentNotAwaitingUploadError();
-      if (finalKey !== null) await this.documents.markUploaded(tx, id, finalKey);
-      else await this.documents.markQuarantined(tx, id);
-      await this.audit.record(
-        tx,
-        catalogAuditEvent(
-          actor,
-          organization.id,
-          finalKey !== null ? 'DOCUMENT.UPLOADED' : 'DOCUMENT.QUARANTINED',
-          'DocumentAttachment',
-          id,
-          { status: 'AWAITING_UPLOAD' },
-          { status: finalKey !== null ? 'PENDING_ATTACH' : 'QUARANTINED' },
-        ),
-      );
-
-      return (await this.documents.find(id, tx)) ?? locked;
-    });
     if (finalKey === null) throw new DocumentUploadMismatchError();
 
     return result;
+  }
+
+  /**
+   * The answer for a file a simultaneous call may have changed, from its row read again with the same owner check
+   *: still awaiting its upload ⟹ pending, given up ⟹ expired, otherwise done ⟹ not awaiting.
+   */
+  private async answerFromRow(actor: AuthenticatedPrincipal, id: string): Promise<Error> {
+    const { status } = await this.ownedBy(actor, id);
+    if (status === 'AWAITING_UPLOAD') return new DocumentUploadPendingError();
+
+    return status === 'EXPIRED' ? new DocumentUploadExpiredError() : new DocumentNotAwaitingUploadError();
+  }
+
+  /** The copy of a failed commit goes unless the row names it (the answer was lost); unreadable, it stays — never a kept file lost. */
+  private async withdrawCopy(id: string, finalKey: string): Promise<void> {
+    const row = await this.documents.find(id).catch(() => undefined);
+    if (row !== undefined && row?.finalObjectKey !== finalKey) await this.discard(finalKey);
   }
 
   /**
@@ -369,16 +396,4 @@ export class DocumentService {
 
     return organization;
   }
-}
-
-function isChanged(error: unknown): boolean {
-  const candidate = error as { name?: string; $metadata?: { httpStatusCode?: number } };
-
-  return candidate.name === 'PreconditionFailed' || candidate.$metadata?.httpStatusCode === 412;
-}
-
-function isNotFound(error: unknown): boolean {
-  const candidate = error as { name?: string; $metadata?: { httpStatusCode?: number } };
-
-  return candidate.name === 'NotFound' || candidate.name === 'NoSuchKey' || candidate.$metadata?.httpStatusCode === 404;
 }

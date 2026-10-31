@@ -7,7 +7,7 @@
 
 ## Before coding
 
-Đọc AGENTS.md, CONTRIBUTING.md, [module structure](../../../rules/module-structure.md), [database rules](../../../rules/database-business.md), spec của `g6-revocation-by-grant-kind` và `g6-handover-confirmation`, mã `licensing/assignment` và migration `20261020190100_licensing_assignments` (trigger `INV-07`) và mẫu sweeper `catalog/contract/document-expiry.sweeper.ts` ở BE `7920ee5`. Đối chiếu: `expected_end_date` đã có ở `license_assignments`; chưa có hàng đợi hết hạn, chưa có nhắc, chưa có cổng đọc gia hạn; `g5-return-and-renewal-requests` còn khung nên cổng đọc gia hạn dùng bản giả ở test. Hai hạng mục phụ thuộc phải xong trước. Migration `20261024088000_licensing_expiry_reminders` (tạm thời) là task riêng đi trước mã dùng nó.
+Đọc AGENTS.md, CONTRIBUTING.md, [module structure](../../../rules/module-structure.md), [database rules](../../../rules/database-business.md), spec của `g6-revocation-by-grant-kind` và `g6-handover-confirmation`, mã `licensing/assignment` và migration `20261020190100_licensing_assignments` (trigger `INV-07`) và mẫu sweeper `catalog/contract/document-expiry.job.ts` ở BE `7920ee5`. Đối chiếu: `expected_end_date` đã có ở `license_assignments`; chưa có hàng đợi hết hạn, chưa có nhắc, chưa có cổng đọc gia hạn; `g5-return-and-renewal-requests` còn khung nên cổng đọc gia hạn dùng bản giả ở test. Hai hạng mục phụ thuộc phải xong trước. Migration `20261024088000_licensing_expiry_reminders` (tạm thời) là task riêng đi trước mã dùng nó.
 
 ## Tasks
 

@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
-import { CatalogService } from '../../catalog/catalog.service';
-import type { SeatTarget } from '../../catalog/catalog.types';
-import { OrganizationService } from '../../organization/organization.service';
+import { CatalogApi } from '../../catalog/public/catalog.api';
+import type { SeatTarget } from '../../catalog/public/catalog.types';
+import { OrganizationApi } from '../../organization/public/organization.api';
 import type {
   AccessState,
   ProvisioningChannel,
@@ -15,11 +15,11 @@ import type {
   RevocationSource,
   TaskDoneWhen,
   TaskStep,
-} from '../licensing.types';
+} from '../public/licensing.types';
 import { availableDecisions } from './failure.policy';
 import { doneWhenFor, inGeneralQueue, stepsFor } from './provisioning.policy';
 import { isTerminating } from './revocation.policy';
-import type { ProvisioningTaskRecord } from './provisioning-task.record';
+import type { ProvisioningTaskRecord } from './provisioning-task.types';
 import { ProvisioningTaskReasonRepo, type ReasonRecord } from './provisioning-task-reason.repo';
 
 /** What a row of the list says of a revocation: why it was opened, how it ended and whether the access still runs on. */
@@ -50,7 +50,7 @@ export interface RevocationDetailView extends RevocationSummaryView {
   } | null;
 }
 
-/** The card of a task as the IT Admin reads it: the row of the list and the rest a detail adds (`LD-08`). */
+/** The card of a task as the IT Admin reads it: the row of the list and the rest a detail adds. */
 export interface TaskSummaryView {
   id: string;
   kind: ProvisioningTaskKind;
@@ -89,7 +89,7 @@ export interface TaskSummaryView {
   elapsedSeconds: number;
 }
 
-/** What only a detail carries: the steps, the evidence, the errors and who did what (`LD-08`). */
+/** What only a detail carries: the steps, the evidence, the errors and who did what. */
 export interface TaskDetailFields {
   steps: TaskStep[];
   doneWhen: TaskDoneWhen | null;
@@ -122,13 +122,13 @@ interface ViewContext {
 /**
  * Builds the cards of tasks: the people, the plan and its kind of provisioning, the steps that kind asks for, what the
  * IT Admin may decide, and how long the task has taken. Everything is read through the facades of the modules that own it,
- * the people and the plans of a whole page in one read each (`LD-08`).
+ * the people and the plans of a whole page in one read each.
  */
 @Injectable()
 export class ProvisioningTaskViewService {
   constructor(
-    private readonly catalog: CatalogService,
-    private readonly organization: OrganizationService,
+    private readonly catalog: CatalogApi,
+    private readonly organization: OrganizationApi,
     private readonly reasons: ProvisioningTaskReasonRepo,
   ) {}
 

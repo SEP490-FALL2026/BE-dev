@@ -1,54 +1,62 @@
 import { Injectable } from '@nestjs/common';
 import { Page, pageOf } from '../../../core/application/pagination';
 import { businessDateAt } from '../../../core/business-date';
-import { DbTx, TransactionRunner } from '../../../infrastructure/database/transaction-runner';
+import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { AuditService } from '../../audit/audit.service';
-import { COST_CENTER_NAME_MAX_LENGTH, displayCostCenterName, isReservedCostCenterName } from './cost-center-name';
-import { CostCenterRepo } from './cost-center.repo';
-import { CostCenterKind, CostCenterRecord, CostCenterStatus } from './cost-center.types';
+import { AuditApi } from '../../audit/public/audit.api';
 import {
+  COST_CENTER_NAME_MAX_LENGTH,
+  displayCostCenterName,
+  isReservedCostCenterName,
+} from './cost-center-name.policy';
+import { assertMayMaintainCostCenters, assertMayReadCostCenters } from './cost-center.policy';
+import { CostCenterRepo } from './cost-center.repo';
+import { CostCenterRecord } from './cost-center.types';
+import { CostCenterKind, CostCenterStatus } from '../organization-structure.types';
+import {
+  CostCenterDepartmentAlreadyLinkedError,
+  CostCenterDepartmentNotActiveError,
   CostCenterInUseError,
   CostCenterKindNotSupportedError,
   CostCenterNameInvalidError,
   CostCenterNameReservedError,
   CostCenterNotFoundError,
 } from './cost-center.errors';
-import { organizationAuditEvent } from '../mappers/audit-event.mapper';
-import { OrganizationService } from '../organization.service';
+import { organizationAuditEvent } from '../organization-audit-event.mapper';
+import { OrganizationContextService } from '../organization-context.service';
+import { DepartmentUseService } from '../department/department-use.service';
 
-/** How many names of the people still in the department the refusal to retire a cost center lists. */
-const IN_USE_LISTED_EMPLOYEES = 20;
+/** How many of each kind of open obligation the refusal to retire a cost center lists. */
+const IN_USE_LISTED = 20;
 
 /**
- * The Cost Center catalogue Finance maintains (`US-04-09`). Finance creates, renames and retires; IT Admin only
- * reads it, to pick a free `UNIT` when creating a department. A code is never reused or renamed, and a cost center
- * is retired, never deleted, so what was charged to it stays where it was (AC-10, AC-11).
+ * The Cost Center catalogue Finance maintains (`US-04-09`). Finance creates, renames and retires; the Super Admin, who owns the
+ * departments, may read it; the IT Admin has no operation on it (`QĐ-87a`). Who may do what is `cost-center.policy.ts`, run first in
+ * every use case. A code is never reused or renamed, and a cost center is retired, never deleted, so what was charged to it stays
+ * where it was (AC-10, AC-11).
  */
 @Injectable()
 export class CostCenterService {
   constructor(
     private readonly repo: CostCenterRepo,
-    private readonly organization: OrganizationService,
-    private readonly audit: AuditService,
+    private readonly context: OrganizationContextService,
+    private readonly use: DepartmentUseService,
+    private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
   ) {}
 
-  /**
-   * `FOR SHARE` on the cost center a new department takes (it must stay as it is until the department commits;
-   * lock order T-11: the cost center first), then its row; null when it does not exist. The department judges it.
-   */
-  lockForDepartment(tx: DbTx, costCenterId: string): Promise<CostCenterRecord | null> {
-    return this.repo.lock(tx, costCenterId, 'SHARE');
-  }
-
-  async list(query: {
-    status?: CostCenterStatus;
-    kind?: CostCenterKind;
-    search?: string;
-    page: number;
-    pageSize: number;
-  }): Promise<Page<CostCenterRecord>> {
+  /** Throws CostCenterForbiddenError for a caller who is neither Finance nor the Super Admin. */
+  async list(
+    actor: AuthenticatedPrincipal,
+    query: {
+      status?: CostCenterStatus;
+      kind?: CostCenterKind;
+      search?: string;
+      page: number;
+      pageSize: number;
+    },
+  ): Promise<Page<CostCenterRecord>> {
+    assertMayReadCostCenters(actor.roles);
     const search = query.search ? displayCostCenterName(query.search) : '';
     const { items, total } = await this.repo.list({
       ...(query.status ? { status: query.status } : {}),
@@ -61,11 +69,18 @@ export class CostCenterService {
     return pageOf(items, total, query.page, query.pageSize);
   }
 
-  /** Throws CostCenterKindNotSupportedError, CostCenterNameInvalidError, CostCenterNameReservedError or CostCenterCodeTakenError. */
+  /**
+   * Creates the Cost Center for a department that exists and is in use, and links it in the same insert (`QĐ-87d(1)`,
+   * `QĐ-87d(3)`: it is the department's current one from this moment, nothing before is charged to it). The department row is
+   * locked first, so two creations for one department meet there. Throws CostCenterForbiddenError,
+   * CostCenterKindNotSupportedError, CostCenterNameInvalidError, CostCenterNameReservedError,
+   * CostCenterDepartmentNotActiveError, CostCenterDepartmentAlreadyLinkedError or CostCenterCodeTakenError.
+   */
   async create(
     actor: AuthenticatedPrincipal,
-    input: { code: string; name: string; kind: string },
+    input: { code: string; name: string; kind: string; departmentId: string },
   ): Promise<CostCenterRecord> {
+    assertMayMaintainCostCenters(actor.roles);
     const kind = this.requireKind(input.kind);
     const name = this.requireName(input.name);
     // The shape of the code is the body schema's to judge; here it only has to be kept as sent, trimmed.
@@ -73,7 +88,17 @@ export class CostCenterService {
     const organization = await this.requireOrganization();
 
     return this.runner.run(async (tx) => {
-      const created = await this.repo.insert(tx, { organizationId: organization.id, code, name, kind });
+      const department = await this.repo.lockDepartmentForCostCenter(tx, organization.id, input.departmentId);
+      if (!department || !department.active) throw new CostCenterDepartmentNotActiveError();
+      if (department.hasCostCenterInUse) throw new CostCenterDepartmentAlreadyLinkedError(department.id);
+
+      const created = await this.repo.insert(tx, {
+        organizationId: organization.id,
+        code,
+        name,
+        kind,
+        departmentId: department.id,
+      });
       await this.audit.record(
         tx,
         organizationAuditEvent(actor, organization.id, 'COST_CENTER.CREATED', 'CostCenter', created.id, null, {
@@ -81,6 +106,7 @@ export class CostCenterService {
           name: created.name,
           kind: created.kind,
           status: created.status,
+          departmentId: department.id,
         }),
       );
 
@@ -90,6 +116,7 @@ export class CostCenterService {
 
   /** Changes the name; the code stays. The same name again changes nothing and records nothing. */
   async rename(actor: AuthenticatedPrincipal, id: string, rawName: string): Promise<CostCenterRecord> {
+    assertMayMaintainCostCenters(actor.roles);
     const name = this.requireName(rawName);
     const organization = await this.requireOrganization();
 
@@ -118,28 +145,25 @@ export class CostCenterService {
   }
 
   /**
-   * Stops the cost center being chosen for a department. Refused while the department charged to it still has
-   * people in it (AC-3); a department with nobody left may be released (AC-10, AC-11), and what was charged to
-   * the cost center before stays charged to it. Already retired ⟹ the same answer, nothing recorded.
+   * Stops the cost center being chosen for a department (`QĐ-87d(2)`). Refused while open obligations sit on it: Requests with a
+   * cost that are not over and commitments still held; the refusal lists each group with its first things and its total. The people
+   * in the department are not an obligation (AC-3). What was charged to the cost center before stays charged to it, and the
+   * department goes back to a finance configuration that is incomplete until Finance creates a new one. The cost center row is
+   * locked first, so a Request that takes it `FOR SHARE` and this meet there, and the obligations are read after the lock. Already
+   * retired ⟹ the same answer, nothing recorded. Throws CostCenterForbiddenError, CostCenterNotFoundError or CostCenterInUseError.
    */
   async deactivate(actor: AuthenticatedPrincipal, id: string): Promise<CostCenterRecord> {
+    assertMayMaintainCostCenters(actor.roles);
     const organization = await this.requireOrganization();
 
     return this.runner.run(async (tx) => {
-      // Lock order (T-11): the cost center, then the department charged to it, then the people.
       const current = await this.repo.lock(tx, id, 'UPDATE');
       if (!current) throw new CostCenterNotFoundError();
       if (current.status === 'INACTIVE') return current;
 
-      if (current.department) {
-        await this.repo.lockDepartmentOf(tx, id);
-        const today = businessDateAt(new Date(), organization.timeZone);
-        const members = await this.repo.currentMembersOfDepartment(tx, current.department.id, today, {
-          skip: 0,
-          take: IN_USE_LISTED_EMPLOYEES,
-        });
-        if (members.total > 0) throw new CostCenterInUseError(current.department, members.items, members.total);
-      }
+      const open = await this.use.readCostCenter(id, IN_USE_LISTED, tx);
+      if (open.requests.total > 0 || open.commitments.total > 0)
+        throw new CostCenterInUseError(current.department, open);
 
       await this.repo.deactivate(tx, id, new Date());
       const retired = (await this.repo.findById(id, tx)) as CostCenterRecord;
@@ -165,11 +189,13 @@ export class CostCenterService {
    * that the person is working. A cost center whose department is gone has no people.
    */
   async employees(
+    actor: AuthenticatedPrincipal,
     id: string,
     query: { page: number; pageSize: number },
   ): Promise<
     Page<{ employeeCode: string; fullName: string; status: 'WORKING' }> & { costCenter: { id: string; code: string } }
   > {
+    assertMayMaintainCostCenters(actor.roles);
     const organization = await this.requireOrganization();
     const costCenter = await this.repo.findById(id);
     if (!costCenter) throw new CostCenterNotFoundError();
@@ -208,7 +234,7 @@ export class CostCenterService {
   }
 
   private async requireOrganization() {
-    const organization = await this.organization.getOrganization();
+    const organization = await this.context.findOrganization();
     if (!organization) throw new Error('The cost center catalogue was used before installation');
 
     return organization;

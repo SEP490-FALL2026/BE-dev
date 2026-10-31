@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { Page, pageOf } from '../../../core/application/pagination';
 import { searchKey } from '../../../core/search-key';
-import { FinanceService } from '../../finance/finance.service';
-import type { TaxGroup } from '../../finance/finance.types';
+import { FinanceApi } from '../../finance/public/finance.api';
+import type { TaxGroup } from '../../finance/public/finance.types';
 import { VendorNotFoundError } from './vendor.errors';
 import { VendorRepo, type VendorRow } from './vendor.repo';
 
@@ -19,7 +19,7 @@ export interface VendorView {
 export class VendorQueryService {
   constructor(
     private readonly vendors: VendorRepo,
-    private readonly finance: FinanceService,
+    private readonly finance: FinanceApi,
   ) {}
 
   /** Throws VendorNotFoundError. */

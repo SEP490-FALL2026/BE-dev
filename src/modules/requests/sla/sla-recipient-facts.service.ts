@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { IdentityAccessService } from '../../identity-access/identity-access.service';
-import { OrganizationService } from '../../organization/organization.service';
+import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
 import { superiorOf, type QueueRecipientFacts, type StepRecipientFacts } from './step-sla.policy';
 
 /**
@@ -13,8 +13,8 @@ import { superiorOf, type QueueRecipientFacts, type StepRecipientFacts } from '.
 @Injectable()
 export class SlaRecipientFactsService {
   constructor(
-    private readonly organization: OrganizationService,
-    private readonly identity: IdentityAccessService,
+    private readonly organization: OrganizationApi,
+    private readonly identity: IdentityAccessApi,
   ) {}
 
   /** The people to tell about a step held by `holderEmployeeId` (or by nobody), with the question to Finance when one is open. */

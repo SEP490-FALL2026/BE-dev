@@ -163,3 +163,8 @@ Giới hạn đã biết (không sửa; thuộc câu hỏi cho Owner hoặc hạ
 - `RETRY_SCHEDULED` → `QUEUED` chưa là dòng hợp lệ; công việc connector thêm nó cùng migration của mình.
 - Không route nào tới `recordFailure` ở production (`RefusingGrantRequestGate` từ chối mọi lệnh cấp nên chưa có tác vụ `CONNECTOR` thật); nó được thử qua facade module.
 - Một số chú thích trong mã còn mô tả hành vi cũ; lượt này chỉ cập nhật tài liệu nên chưa sửa.
+
+## Mở lại theo baseline `769bb64` (Prompt 03, 26/10/2026)
+
+- Audit G0–G6 trên Docs `769bb64` ↔ BE `7c28e75` mở lại hạng mục này: F08 — chuyển làm tay không đòi bằng chứng, giữ lỗi gần nhất (`QĐ-90a`).
+- Remediation duy nhất: [g0-g6-final-business-baseline-remediation](../g0-g6-final-business-baseline-remediation/spec.md) ([impact matrix](../g0-g6-final-business-baseline-remediation/impact-matrix.md#3-findings)). AC liên quan không còn được coi là thỏa nguồn hiện hành cho tới khi remediation xong; trạng thái triển khai ở roadmap. Phần đã ghi phía trên là lịch sử, giữ nguyên.

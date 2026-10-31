@@ -16,7 +16,7 @@ export interface Page<T> {
 
 /** Page `page` of a list of `totalItems`, cut in pages of `pageSize`. */
 /**
- * A history shown up to `limit` entries (`LD-14`): ask the source for `limit + 1`, and the extra entry only says that more
+ * A history shown up to `limit` entries: ask the source for `limit + 1`, and the extra entry only says that more
  * exist, so the answer can carry `hasMore` instead of looking complete.
  */
 export function cutHistory<T>(rows: readonly T[], limit: number): { items: T[]; hasMore: boolean } {

@@ -1,20 +1,20 @@
 import { Injectable } from '@nestjs/common';
-import { normalizeAccountIdentifier } from '../../../core/account-identifier';
+import { normalizeAccountIdentifier } from '../public/account-identifier.policy';
 import type { BusinessDate } from '../../../core/business-date';
 import { DbTx, TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { AuditService } from '../../audit/audit.service';
-import { CatalogService } from '../../catalog/catalog.service';
-import { EmployeeNotFoundError } from '../../organization/organization.errors';
-import { OrganizationService } from '../../organization/organization.service';
-import { AssignmentNotFoundError } from '../licensing.errors';
-import type { ResponsibleHolder } from '../licensing-service-account.types';
-import type { AssignmentRecord, AssignmentView } from '../licensing.types';
-import { licensingAuditEvent } from '../mappers/licensing-audit-event';
-import { toAssignmentFailure } from './assignment-conflicts';
+import { AuditApi } from '../../audit/public/audit.api';
+import { CatalogApi } from '../../catalog/public/catalog.api';
+import { EmployeeNotFoundError } from '../../organization/public/organization.errors';
+import { OrganizationApi } from '../../organization/public/organization.api';
+import { AssignmentNotFoundError } from '../public/licensing.errors';
+import { ResponsibleDeadlineHook } from '../public/licensing.extension-points';
+import type { ResponsibleHolder } from '../public/licensing-service-account.types';
+import type { AssignmentRecord, AssignmentView } from '../public/licensing.types';
+import { licensingAuditEvent } from '../licensing-audit-event.mapper';
+import { toAssignmentFailure } from './assignment-conflicts.repo';
 import { assertResponsibleChange, assignmentCreatedSnapshot, toAssignmentView } from './assignment.policy';
 import { AssignmentRepo, type NewAssignment } from './assignment.repo';
-import { RegisteredResponsibleDeadline } from './registered-responsible-deadline.service';
 
 /** What the new assignment of a service account that passes on says: who, where it is owned and charged, and from which day. */
 export interface Succession {
@@ -35,11 +35,11 @@ export interface Succession {
 export class AssignmentResponsibleService {
   constructor(
     private readonly repo: AssignmentRepo,
-    private readonly organization: OrganizationService,
-    private readonly catalog: CatalogService,
-    private readonly audit: AuditService,
+    private readonly organization: OrganizationApi,
+    private readonly catalog: CatalogApi,
+    private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
-    private readonly deadlines: RegisteredResponsibleDeadline,
+    private readonly deadlines: ResponsibleDeadlineHook,
   ) {}
 
   /**
@@ -59,7 +59,7 @@ export class AssignmentResponsibleService {
     return this.runner.run(async (tx) => {
       const current = await this.lockAssignment(tx, assignmentId);
       const holder = await this.lockHolder(tx, input.employeeId, input.effectiveFrom);
-      const [file] = await this.deadlines.listPending({ employeeIds: [current.employeeId], limit: 1 }, tx);
+      const [file] = await this.deadlines.get().listPending({ employeeIds: [current.employeeId], limit: 1 }, tx);
       assertResponsibleChange(current, input, holder, today, file?.dueOn ?? null);
 
       return this.succeed(tx, actor, organization.id, current, {
@@ -164,7 +164,7 @@ export class AssignmentResponsibleService {
       workState: employee.workState,
       employmentType: employee.employmentType,
       departmentId: unit?.departmentId ?? null,
-      costCenterId: unit?.costCenter.id ?? null,
+      costCenterId: unit?.costCenter?.id ?? null,
     };
   }
 }

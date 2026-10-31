@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import type { WorkspaceDuty } from '../../catalog/catalog.types';
-import { CatalogService } from '../../catalog/catalog.service';
-import { IdentityAccessService } from '../../identity-access/identity-access.service';
-import { OrganizationHistoryService } from '../../organization/organization-history.service';
-import type { RoleFlag, RoleFlagMap } from '../personnel.types';
+import type { WorkspaceDuty } from '../../catalog/public/catalog.types';
+import { CatalogApi } from '../../catalog/public/catalog.api';
+import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
+import { OrganizationHistoryApi } from '../../organization/public/organization-history.api';
+import type { RoleFlag, RoleFlagMap } from '../public/personnel.types';
 import { flagMap, flagsOf } from './role-duties.policy';
 
 /** A person to read the roles of; whether they head the department they leave is told by their case. */
@@ -24,15 +24,15 @@ export interface RoleView {
 
 /**
  * Which roles the people who leave hold (`US-03-04` AC-11, AC-27, AC-28): read from the facades of the identity, the organization and
- * the catalog, a fixed number of statements for any number of people (`LD-07`), in the caller's transaction when it has one. Reads only:
+ * the catalog, a fixed number of statements for any number of people, in the caller's transaction when it has one. Reads only:
  * the alert and the snapshot are written by the hook, and nothing here changes a role, a step or an account.
  */
 @Injectable()
 export class RoleDutiesService {
   constructor(
-    private readonly identity: IdentityAccessService,
-    private readonly organization: OrganizationHistoryService,
-    private readonly catalog: CatalogService,
+    private readonly identity: IdentityAccessApi,
+    private readonly organization: OrganizationHistoryApi,
+    private readonly catalog: CatalogApi,
   ) {}
 
   async rolesOf(people: readonly RoleDutyInput[], tx?: DbTx): Promise<Map<string, RoleView>> {

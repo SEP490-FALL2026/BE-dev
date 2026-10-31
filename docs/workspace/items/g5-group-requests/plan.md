@@ -30,7 +30,7 @@ Ranh giới hai phase của `## Size exception`: _Phase 1 (mô hình dòng và g
 
 ### Task 2: dữ liệu (bước 1)
 
-- Files: migration `20261024130000_requests_group_values`, `20261024130100_requests_group_lines`, `prisma/models/requests.prisma`, `prisma/models/organization.prisma`, `src/architecture-boundaries.spec.ts` (chủ sở hữu ba bảng mới, danh sách INV-05)
+- Files: migration `20261024130000_requests_group_values`, `20261024130100_requests_group_lines`, `prisma/models/requests.prisma`, `prisma/models/organization.prisma`, `test/gates/architecture-boundaries.gate-spec.ts` (chủ sở hữu ba bảng mới, danh sách INV-05)
 - Depends on: Task 1
 - Acceptance: enum `GROUP_GRANT`, `AccessRequestLineState`, `LineDecisionStage`; ba bảng `access_request_lines`, `access_request_line_decisions`, `access_request_line_amounts` đúng spec; dòng chỉ có cho Request `GROUP_GRANT`; máy trạng thái dòng, trạng thái cuối không đổi; quyết định và `line_amounts` không sửa, không xóa (chỉ `released_at` đặt một lần); `CHECK` của `access_requests` cho `GROUP_GRANT`; giá trị enum thêm bằng migration riêng; `access_request_beneficiaries` không đổi cột
 - Verify: nhóm _what the database refuses_ của hạng mục xanh trên PostgreSQL riêng; `prisma migrate deploy` rồi `migrate diff --exit-code` = 0; test hiện có của `access_requests` xanh
@@ -69,7 +69,7 @@ Gate theo [CONTRIBUTING](../../../../CONTRIBUTING.md) xanh trên cây làm việ
 
 ### Task 7: gửi nhóm: API và chặn đường một người (bước 2)
 
-- Files: `group-request/group-request.dto.ts`, `group-requests.controller.ts`, `group-request.http-errors.ts`, `group-line-query.service.ts`, `access-request/access-requests.controller.ts` và `access-request.http-errors.ts` (`GROUP_USES_LINES`, `similar-seats` cần `employeeId`), `spend/spend-approvals.controller.ts` (chặn), `requests.module.ts`, `test/support/api-coverage-manifest.ts`, `test/e2e/api-inventory.e2e-spec.ts`, `openapi.json`
+- Files: `group-request/group-request.dto.ts`, `group-requests.controller.ts`, `group-request.http-errors.ts`, `group-line-query.service.ts`, `access-request/access-requests.controller.ts` và `access-request.http-errors.ts` (`GROUP_USES_LINES`, `similar-seats` cần `employeeId`), `spend/spend-approvals.controller.ts` (chặn), `requests.module.ts`, `test/support/api-coverage-manifest.ts`, `test/http/platform/api-inventory.http-spec.ts`, `openapi.json`
 - Depends on: Task 6
 - Acceptance: `groupRequestCheck`, `groupRequestSubmit`, `groupRequestCandidateList`, `accessRequestLineList` (người thụ hưởng khác người gửi chỉ thấy dòng của mình); mọi thao tác một người hiện có từ chối Request nhóm bằng `409 GROUP_USES_LINES`; `US-05-17` AC-1→AC-3, AC-5, AC-7, AC-8, AC-11→AC-16 ở phần gửi và `US-05-03` AC-8, AC-14, `US-05-02` AC-2 xanh
 - Verify: `group-request` (HTTP) xanh; e2e kiểm kê và OpenAPI xanh; `pnpm exec jest src` xanh; hồi quy `access-request`, `spend`, `budget` xanh
@@ -87,7 +87,7 @@ Gate theo [CONTRIBUTING](../../../../CONTRIBUTING.md) xanh trên cây làm việ
 
 ### Task 9: quyết nhu cầu theo dòng: API (bước 3)
 
-- Files: `group-request/group-request.dto.ts` (thân quyết), `group-requests.controller.ts`, `group-request.http-errors.ts`, `test/support/api-coverage-manifest.ts`, `test/e2e/api-inventory.e2e-spec.ts`, `openapi.json`
+- Files: `group-request/group-request.dto.ts` (thân quyết), `group-requests.controller.ts`, `group-request.http-errors.ts`, `test/support/api-coverage-manifest.ts`, `test/http/platform/api-inventory.http-spec.ts`, `openapi.json`
 - Depends on: Task 8
 - Acceptance: `accessRequestLineNeedDecide`; `US-05-17` AC-3, AC-4, AC-15, AC-16 và `US-05-04` AC-14 xanh; lỗi `LINES_MISMATCH`, `LINE_HOLDS_ACCESS`, `OWN_REQUEST`, `NOT_THE_ASSIGNEE`, `STEP_NOT_PENDING`, `TERM_CONFIRMATION_REQUIRED` đúng mã
 - Verify: `group-request` (HTTP) xanh; e2e kiểm kê và OpenAPI xanh; `pnpm exec jest src` xanh
@@ -105,7 +105,7 @@ Gate theo [CONTRIBUTING](../../../../CONTRIBUTING.md) xanh; hồi quy quyết nh
 
 ### Task 11: duyệt chi theo dòng: API và hiển thị (bước 4)
 
-- Files: `group-request/group-request.dto.ts` (thân quyết chi), `group-requests.controller.ts`, `spend/spend-approval-view.service.ts`, `spend/spend-approval.dto.ts`, `spend/spend-queue.service.ts`, `spend/spend-submission.dto.ts`, `spend/spend-request.repo.ts`, `spend/spend-step.repo.ts`, `spend/spend-batch-decision.service.ts`, `spend/spend-approval.dto.ts` (lý do bỏ qua `GROUP_NEEDS_LINES`), `test/support/api-coverage-manifest.ts`, `test/e2e/api-inventory.e2e-spec.ts`, `openapi.json`
+- Files: `group-request/group-request.dto.ts` (thân quyết chi), `group-requests.controller.ts`, `spend/spend-approval-view.service.ts`, `spend/spend-approval.dto.ts`, `spend/spend-queue.service.ts`, `spend/spend-submission.dto.ts`, `spend/spend-request.repo.ts`, `spend/spend-step.repo.ts`, `spend/spend-batch-decision.service.ts`, `spend/spend-approval.dto.ts` (lý do bỏ qua `GROUP_NEEDS_LINES`), `test/support/api-coverage-manifest.ts`, `test/http/platform/api-inventory.http-spec.ts`, `openapi.json`
 - Depends on: Task 10
 - Acceptance: `spendApprovalLineDecide`; panel quyết có `lines`; hàng đợi trình và hàng đợi quyết có `beneficiary` nullable và `lineCount`; quyết cả lô bỏ qua Request nhóm; `US-05-17` AC-9, `US-06-01` AC-15, `US-06-08` AC-10, `US-06-14` AC-6 xanh
 - Verify: `group-request` (HTTP) xanh; e2e kiểm kê và OpenAPI xanh; `pnpm exec jest src` xanh; hồi quy `spend-*`, `budget-*` xanh
@@ -123,7 +123,7 @@ Gate theo [CONTRIBUTING](../../../../CONTRIBUTING.md) xanh; đối chiếu tay m
 
 ### Task 13: rút theo dòng và rút cả nhóm: service (bước 5)
 
-- Files: `group-request/group-withdrawal.service.ts`, `access-request/withdrawal.service.ts` (giao cho nhóm), `access-request/withdrawal.policy.ts` (dùng lại `headMayWithdraw`), `licensing/provisioning/provisioning-decision.service.ts` (hủy tác vụ lỗi của một người báo cổng theo dòng), `requests.module.ts`
+- Files: `group-request/group-withdrawal.service.ts`, `access-request/withdrawal.service.ts` (giao cho nhóm), `access-request/withdrawal.policy.ts` (dùng lại `headMayWithdraw`), `licensing/provisioning/tasks/provisioning-decision.service.ts` (hủy tác vụ lỗi của một người báo cổng theo dòng), `requests.module.ts`
 - Depends on: Task 12
 - Acceptance: rút theo trạng thái dòng đúng ma trận (trước chi, đã duyệt chưa tác vụ, tác vụ chưa ai làm, đang làm, đã xong, lỗi chờ IT); giải phóng bằng `releaseForRequest` với `amounts` của dòng (`PARTICIPANT_WITHDRAWN`), cả nhóm dùng `REQUEST_WITHDRAWN` với `amounts`; dòng cuối kết thúc thì Request kết thúc, mục lô rời lô, câu hỏi Finance đóng; khóa theo thứ tự tác vụ → Request → dòng
 - Verify: nhóm `group-request` (withdrawal) và `access-request-withdrawal` xanh; ca `US-05-17` AC-10 (nối) xanh
@@ -137,7 +137,7 @@ Gate theo [CONTRIBUTING](../../../../CONTRIBUTING.md) xanh; đối chiếu tay m
 
 ### Task 15: bỏ người bằng hồ sơ bổ sung, rút dòng API, hoàn thiện (bước 5)
 
-- Files: `group-request/supplement-drop.repo.ts`, `spend/supplement.service.ts`, `spend/spend-submission.dto.ts` (`dropEmployeeIds`), `spend/spend-submission.controller.ts`, `group-request/group-requests.controller.ts` (`accessRequestLineWithdraw`), `group-request.http-errors.ts`, `test/support/api-coverage-manifest.ts`, `test/e2e/api-inventory.e2e-spec.ts`, `openapi.json`, `docs/` (ghi chú vận hành nếu có tài liệu liệt kê trạng thái Request)
+- Files: `group-request/supplement-drop.repo.ts`, `spend/supplement.service.ts`, `spend/spend-submission.dto.ts` (`dropEmployeeIds`), `spend/spend-submission.controller.ts`, `group-request/group-requests.controller.ts` (`accessRequestLineWithdraw`), `group-request.http-errors.ts`, `test/support/api-coverage-manifest.ts`, `test/http/platform/api-inventory.http-spec.ts`, `openapi.json`, `docs/` (ghi chú vận hành nếu có tài liệu liệt kê trạng thái Request)
 - Depends on: Task 14
 - Acceptance: bỏ người tính lại số tiền và giữ lịch sử trước và sau; không bỏ dòng cuối; `accessRequestLineWithdraw`; toàn bộ ma trận test xanh; ma trận _Không đổi hành vi_ xanh
 - Verify: `group-request` (HTTP) xanh; e2e kiểm kê và OpenAPI xanh; `pnpm exec jest src` xanh; toàn bộ `access-request-*`, `delegated-*`, `spend-*`, `budget-*`, `provisioning-*` xanh không đổi test

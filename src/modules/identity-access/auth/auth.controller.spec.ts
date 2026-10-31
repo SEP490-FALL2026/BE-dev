@@ -2,10 +2,10 @@ import { HttpStatus } from '@nestjs/common';
 import { TransientDatabaseError } from '../../../infrastructure/database/transaction-runner';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import { InvitationRedemptionService } from '../accounts/invitation-redemption.service';
-import { sessionTokenSchema } from '../dto/auth.dto';
+import { sessionTokenSchema } from './auth.dto';
 import { InvitationInvalidError } from '../accounts/account.errors';
-import { PasswordPolicyError } from '../identity-access.errors';
-import { IssuedSession } from '../identity-access.types';
+import { PasswordPolicyError } from '../public/identity-access.errors';
+import { IssuedSession } from '../public/identity-access.types';
 import { AuthController } from './auth.controller';
 import {
   InvalidCredentialsError,
@@ -52,7 +52,7 @@ describe('AuthController — session token wire shape', () => {
   });
 });
 
-// --- error answers of every auth route (H5.0 characterization) ---------------------------------------------------
+// --- error answers of every auth route (characterization) ---------------------------------------------------
 
 /** Credentials sent in the bodies below; no error answer may echo them. */
 const PASSWORD = 'correct-horse-battery-staple-1';

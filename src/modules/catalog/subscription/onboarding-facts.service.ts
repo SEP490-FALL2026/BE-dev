@@ -1,8 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import type { CatalogOnboardingFacts, PlanSummary } from '../catalog.types';
+import type { CatalogOnboardingFacts, PlanSummary } from '../public/catalog.types';
 import { ApplicationLookupService } from '../catalog-entry/application-lookup.service';
 import { PlanLookupService } from '../plan/plan-lookup.service';
-import { StandardToolsetService } from '../standard-toolset/standard-toolset.service';
 import { SubscriptionRepo } from './subscription.repo';
 
 /**
@@ -15,7 +14,6 @@ export class OnboardingFactsService {
     private readonly applications: ApplicationLookupService,
     private readonly plans: PlanLookupService,
     private readonly subscriptions: SubscriptionRepo,
-    private readonly toolsets: StandardToolsetService,
   ) {}
 
   /** The plans with these ids by name, with their application. */
@@ -28,8 +26,6 @@ export class OnboardingFactsService {
     const plans = await this.plans.count();
     const subscriptions = await this.subscriptions.count();
 
-    const standardToolsets = await this.toolsets.countConfigured();
-
-    return { applications, plans, subscriptions, standardToolsets };
+    return { applications, plans, subscriptions };
   }
 }

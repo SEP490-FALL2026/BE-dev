@@ -14,7 +14,7 @@
 - [x] **Bước 1 — Dữ liệu.** `prisma/models/organization.prisma` (`CostCenterStatus`, `status`, `updatedAt`, `deactivatedAt`); migration `20261016150000_cost_center_lifecycle` (CHECK nhất quán, trigger T-18). `pnpm prisma:validate`, áp lên PostgreSQL Docker.
 - [x] **Bước 2 — Quy tắc tên.** `cost-center-name.ts` (mã, tên giữ chỗ) + `cost-center-name.spec.ts`.
 - [x] **Bước 3 — Repo, service, controller, DTO.** `cost-center.repo.ts`, `cost-center.service.ts`, `cost-centers.controller.ts`, `dto/cost-center.dto.ts`, `errors/cost-center.errors.ts`, ánh xạ lỗi trong `organization.http-errors.ts`; đăng ký ở `OrganizationModule` (repo) và `OrganizationHttpModule` (controller, service). Lý do mới `DEPARTMENT_COST_CENTER_INACTIVE` trong validator T-16 + đọc lại trạng thái Cost Center sau khóa phòng (T-17).
-- [x] **Bước 4 — Test.** e2e `test/e2e/cost-centers.e2e-spec.ts` (401/403/422/DELETE 404); `test/integration/cost-centers-http.integration-spec.ts` (AC-1 → AC-6, AC-10/11, audit, đồng thời); manifest API.
+- [x] **Bước 4 — Test.** e2e `test/http/organization/cost-centers.http-spec.ts` (401/403/422/DELETE 404); `test/integration/organization/cost-centers-http.integration-spec.ts` (AC-1 → AC-6, AC-10/11, audit, đồng thời); manifest API.
 - [x] **Bước 5 — Contract, tài liệu.** `pnpm openapi:export`, `AGENTS.md`, `ARCHITECTURE.md`, roadmap, bảng phủ ở `items/README.md`.
 
 Rollback: Prisma không có migration ngược; code cũ bỏ qua cột mới. Điều kiện dừng: kiểm trigger ảnh hưởng lệnh khởi tạo (đã chạy hồi quy `installation*`).

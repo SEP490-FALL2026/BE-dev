@@ -1,5 +1,5 @@
 import request from 'supertest';
-import { StepSlaSweepService, type StepSlaSweepResult } from '../../src/modules/requests/step-sla-sweep.service';
+import { StepSlaSweepApi, type StepSlaSweepResult } from '../../src/modules/requests/public/step-sla-sweep.api';
 import { StatusHarness } from './status-harness';
 
 /** A reminder as the database keeps it, with the people it went to. */
@@ -24,7 +24,7 @@ export interface ReminderRow {
  * at a moment the test gives, and the reminders, the notices and the rows of a step read back. No assertion lives here.
  */
 export class SlaHarness extends StatusHarness {
-  private sweeper = () => this.ctx.app.get(StepSlaSweepService, { strict: false });
+  private sweeper = () => this.ctx.app.get(StepSlaSweepApi, { strict: false });
 
   /** One pass of the worker at `now`. */
   sweepAt = (now: Date): Promise<StepSlaSweepResult> => this.sweeper().sweep(now);

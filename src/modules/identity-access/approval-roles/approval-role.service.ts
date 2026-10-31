@@ -1,15 +1,16 @@
 import { Injectable } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 import { TransactionRunner, readSqlState } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { AuditService } from '../../audit/audit.service';
-import { OrganizationService } from '../../organization/organization.service';
+import { AuditApi } from '../../audit/public/audit.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
 import { AccountDirectoryService } from '../accounts/account-directory.service';
 import { RoleGrantService } from '../accounts/role-grant.service';
-import { employeeHasNotLeft } from '../policies/account-policy';
+import { employeeHasNotLeft } from '../accounts/account.policy';
 import { ApprovalRoleHolderInvalidError, ApprovalRolePairingError } from './approval-role.errors';
 import { cutHistory } from '../../../core/application/pagination';
 import { APPROVAL_ROLES, ApprovalRoleName, ApprovalRoleRepo } from './approval-role.repo';
-import { ApprovalRoleChangeRegistry } from './approval-role-change.registry';
+import { ApprovalRoleChangeListeners } from '../public/identity-access.extension-points';
 
 const HISTORY_LIMIT = 20;
 
@@ -34,10 +35,10 @@ export class ApprovalRoleService {
     private readonly repo: ApprovalRoleRepo,
     private readonly accounts: AccountDirectoryService,
     private readonly grants: RoleGrantService,
-    private readonly organization: OrganizationService,
-    private readonly audit: AuditService,
+    private readonly organization: OrganizationApi,
+    private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
-    private readonly changes: ApprovalRoleChangeRegistry,
+    private readonly changes: ApprovalRoleChangeListeners,
   ) {}
 
   async list(): Promise<ApprovalRoleView[]> {
@@ -145,10 +146,11 @@ export class ApprovalRoleService {
         correlationId: actor.sessionId,
       });
       // The steps held by the one who held the role move in this transaction, so the one who held it cannot decide after it.
-      await this.changes.announce(tx, {
+      await this.changes.emit(tx, {
         role,
         fromEmployeeId: current?.employeeId ?? null,
         toEmployeeId: employeeId,
+        id: randomUUID(),
       });
     });
 

@@ -14,7 +14,7 @@ import type {
   UnitPriceRecord,
 } from './subscription.types';
 
-/** The plan, its application and the vendor of it, only as far as a subscription is answered with them (`LD-01`). */
+/** The plan, its application and the vendor of it, only as far as a subscription is answered with them. */
 const WITH_PLAN = {
   plan: {
     select: {
@@ -63,6 +63,7 @@ function toRecord(row: Row): SubscriptionRecord {
     planId: row.planId,
     planName: row.plan.name,
     planPricingModel: row.plan.pricingModel,
+    ownerDepartmentId: row.ownerDepartmentId,
     applicationId: application.id,
     applicationName: application.name,
     applicationKind: application.kind,
@@ -116,9 +117,9 @@ export class SubscriptionRepo {
   constructor(private readonly prisma: PrismaService) {}
 
   async insert(tx: DbTx, input: NewSubscription): Promise<SubscriptionRecord> {
-    const { organizationId, planId, kind, ...state } = input;
+    const { organizationId, planId, ownerDepartmentId, kind, ...state } = input;
     const row = await tx.subscription.create({
-      data: { organizationId, planId, kind, ...columnsOf(state) },
+      data: { organizationId, planId, ownerDepartmentId, kind, ...columnsOf(state) },
       include: WITH_PLAN,
     });
 
@@ -158,11 +159,13 @@ export class SubscriptionRepo {
   }
 
   /**
-   * The price a plan is bought at: the unit price and billing cycle of its newest active subscription that has both. A
-   * draft has no price to rely on; two active subscriptions of one plan are told apart by the later start, then the id.
+   * The price a plan is bought at for the department of a request: the unit price and billing cycle of the newest active
+   * subscription of that department that has both, and never the one of another department (`QĐ-89a`, F38). A draft has no
+   * price to rely on; two active subscriptions of one plan are told apart by the later start, then the id.
    */
   async findPricedOfPlan(
     planId: string,
+    ownerDepartmentId: string,
     tx?: DbTx,
   ): Promise<{
     unitPriceMinor: bigint;
@@ -172,6 +175,7 @@ export class SubscriptionRepo {
     const row = await (tx ?? this.prisma).subscription.findFirst({
       where: {
         planId,
+        ownerDepartmentId,
         status: 'ACTIVE',
         unitPriceMinor: { not: null },
         unitPriceCurrency: { not: null },
@@ -228,6 +232,58 @@ export class SubscriptionRepo {
     });
 
     return rows.map(toRecord);
+  }
+
+  /**
+   * The ids of the term subscriptions a department owns that are not over on `day`, by id: those with no end date, an end date that
+   * has not passed, or that renew themselves (the catalog records no cancellation yet, so only an end date or switching the renewal
+   * off ends one). A draft counts: its data is incomplete, not its obligation.
+   */
+  async termIdsNotOverOf(departmentId: string, day: BusinessDate, tx?: DbTx): Promise<string[]> {
+    const rows = await (tx ?? this.prisma).subscription.findMany({
+      where: {
+        ownerDepartmentId: departmentId,
+        kind: 'TERM',
+        OR: [{ endDate: null }, { endDate: { gte: toDateColumn(day) } }, { autoRenew: true }],
+      },
+      select: { id: true },
+      orderBy: { id: 'asc' },
+    });
+
+    return rows.map((row) => row.id);
+  }
+
+  /** The ids of the perpetual purchases a department owns, by id: one blocks it only while some seat of it is held. */
+  async perpetualIdsOf(departmentId: string, tx?: DbTx): Promise<string[]> {
+    const rows = await (tx ?? this.prisma).subscription.findMany({
+      where: { ownerDepartmentId: departmentId, kind: 'PERPETUAL' },
+      select: { id: true },
+      orderBy: { id: 'asc' },
+    });
+
+    return rows.map((row) => row.id);
+  }
+
+  /** The ids of every subscription and purchase a department owns, by id. */
+  async idsOwnedBy(departmentId: string, tx?: DbTx): Promise<string[]> {
+    const rows = await (tx ?? this.prisma).subscription.findMany({
+      where: { ownerDepartmentId: departmentId },
+      select: { id: true },
+      orderBy: { id: 'asc' },
+    });
+
+    return rows.map((row) => row.id);
+  }
+
+  /** A short label for each of these subscriptions, by id: the application and the plan, never a price or a person. */
+  async labelsOf(ids: readonly string[], tx?: DbTx): Promise<Map<string, string>> {
+    if (ids.length === 0) return new Map();
+    const rows = await (tx ?? this.prisma).subscription.findMany({
+      where: { id: { in: [...ids] } },
+      select: { id: true, plan: { select: { name: true, application: { select: { name: true } } } } },
+    });
+
+    return new Map(rows.map((row) => [row.id, `${row.plan.application.name} / ${row.plan.name}`]));
   }
 
   /** One page by application, plan then creation, and the total for the same filter, from one snapshot. */

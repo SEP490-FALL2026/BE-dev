@@ -26,6 +26,10 @@ export interface ProposalRecord {
   year: number;
   state: ProposalState;
   previousProposalId: string | null;
+  /** The proposal this one follows, when the version made from that one was refused and the need changed. */
+  successorOfProposalId: string | null;
+  /** The proposal that follows this one, if any: at most one. */
+  successorProposalId: string | null;
   totalMinor: bigint;
   currency: string;
   submittedByEmployeeId: string;
@@ -34,6 +38,10 @@ export interface ProposalRecord {
   returnedByEmployeeId: string | null;
   returnedAt: Date | null;
   withdrawnAt: Date | null;
+  /** When a successor was sent; null while there is none. */
+  succeededAt: Date | null;
+  /** When the closure of the year closed it. */
+  closedAt: Date | null;
 }
 
 export interface NewProposal {
@@ -41,6 +49,8 @@ export interface NewProposal {
   costCenterId: string;
   year: number;
   previousProposalId: string | null;
+  /** Set by the system when this proposal follows a reviewed one whose version was refused; never by a client. */
+  successorOfProposalId?: string | null;
   currency: string;
   totalMinor: bigint;
   submittedByEmployeeId: string;
@@ -64,13 +74,17 @@ const toLine = (row: LineRow): ProposalLineRecord => ({
   note: row.note,
 });
 
-const toRecord = (row: Prisma.BudgetProposalGetPayload<object>): ProposalRecord => ({
+const WITH_SUCCESSOR = { successor: { select: { id: true } } } as const;
+
+const toRecord = (row: Prisma.BudgetProposalGetPayload<{ include: typeof WITH_SUCCESSOR }>): ProposalRecord => ({
   id: row.id,
   organizationId: row.organizationId,
   costCenterId: row.costCenterId,
   year: row.year,
   state: row.state,
   previousProposalId: row.previousProposalId,
+  successorOfProposalId: row.successorOfProposalId,
+  successorProposalId: row.successor?.id ?? null,
   totalMinor: row.totalMinor,
   currency: row.currency,
   submittedByEmployeeId: row.submittedByEmployeeId,
@@ -79,6 +93,8 @@ const toRecord = (row: Prisma.BudgetProposalGetPayload<object>): ProposalRecord 
   returnedByEmployeeId: row.returnedByEmployeeId,
   returnedAt: row.returnedAt,
   withdrawnAt: row.withdrawnAt,
+  succeededAt: row.succeededAt,
+  closedAt: row.closedAt,
 });
 
 export interface ProposalFilter {
@@ -103,6 +119,7 @@ export class ProposalRepo {
         year: input.year,
         state: 'SUBMITTED',
         previousProposalId: input.previousProposalId,
+        successorOfProposalId: input.successorOfProposalId ?? null,
         totalMinor: input.totalMinor,
         currency: input.currency,
         submittedByEmployeeId: input.submittedByEmployeeId,
@@ -130,18 +147,59 @@ export class ProposalRepo {
   }
 
   async findById(id: string, tx?: DbTx): Promise<ProposalRecord | null> {
-    const row = await (tx ?? this.prisma).budgetProposal.findUnique({ where: { id } });
+    const row = await (tx ?? this.prisma).budgetProposal.findUnique({ where: { id }, include: WITH_SUCCESSOR });
 
     return row ? toRecord(row) : null;
   }
 
-  /** Locked `FOR UPDATE` until the transaction ends, so a withdrawal and a return of the same proposal queue. */
+  /** Locked `FOR NO KEY UPDATE` until the transaction ends, so a withdrawal and a return of the same proposal queue (no lock that conflicts with a `KEY SHARE` of a foreign key). */
   async lockById(tx: DbTx, id: string): Promise<ProposalRecord | null> {
     const locked = await tx.$queryRaw<
       { id: string }[]
-    >`SELECT id FROM budget_proposals WHERE id = ${id}::uuid FOR UPDATE`;
+    >`SELECT id FROM budget_proposals WHERE id = ${id}::uuid FOR NO KEY UPDATE`;
 
     return locked.length === 0 ? null : this.findById(id, tx);
+  }
+
+  /**
+   * Locks every proposal the Cost Center has for the year, in the order of their ids, and reads them: what the closure of the
+   * year changes more than one of. The proposal rows are taken before the version rows (`BudgetYearLockRepo`).
+   */
+  async lockAllOfYear(tx: DbTx, costCenterId: string, year: number): Promise<ProposalRecord[]> {
+    await tx.$queryRaw<
+      { id: string }[]
+    >`SELECT id FROM budget_proposals WHERE cost_center_id = ${costCenterId}::uuid AND year = ${year} ORDER BY id FOR NO KEY UPDATE`;
+    const rows = await tx.budgetProposal.findMany({
+      where: { costCenterId, year },
+      include: WITH_SUCCESSOR,
+      orderBy: { id: 'asc' },
+    });
+
+    return rows.map(toRecord);
+  }
+
+  /**
+   * The proposals Finance gave back that nobody has sent again or withdrawn, of every Cost Center, by id: what waits for the head of
+   * a department. There is at most one for each Cost Center and year, so the list is as long as the number of heads with work to send.
+   */
+  async returned(tx: DbTx): Promise<ProposalRecord[]> {
+    const rows = await tx.budgetProposal.findMany({
+      where: { state: 'RETURNED' },
+      include: WITH_SUCCESSOR,
+      orderBy: { id: 'asc' },
+    });
+
+    return rows.map(toRecord);
+  }
+
+  /** The reviewed proposal of the Cost Center and year that nobody has followed yet, if any: at most one (the open key). */
+  async reviewedWithoutSuccessor(costCenterId: string, year: number, tx?: DbTx): Promise<ProposalRecord | null> {
+    const row = await (tx ?? this.prisma).budgetProposal.findFirst({
+      where: { costCenterId, year, state: 'REVIEWED', succeededAt: null },
+      include: WITH_SUCCESSOR,
+    });
+
+    return row ? toRecord(row) : null;
   }
 
   async allLines(proposalId: string, tx?: DbTx): Promise<ProposalLineRecord[]> {
@@ -175,6 +233,7 @@ export class ProposalRepo {
     const [rows, total] = await this.prisma.$transaction([
       this.prisma.budgetProposal.findMany({
         where,
+        include: WITH_SUCCESSOR,
         orderBy: [{ submittedAt: 'desc' }, { id: 'asc' }],
         skip: filter.skip,
         take: filter.take,
@@ -189,10 +248,21 @@ export class ProposalRepo {
   async chainOf(costCenterId: string, year: number, tx?: DbTx): Promise<ProposalRecord[]> {
     const rows = await (tx ?? this.prisma).budgetProposal.findMany({
       where: { costCenterId, year },
+      include: WITH_SUCCESSOR,
       orderBy: [{ submittedAt: 'desc' }, { id: 'asc' }],
     });
 
     return rows.map(toRecord);
+  }
+
+  /** The Cost Centers and years before `fiscalYear` that still hold a proposal the closure of the year closes. */
+  async endedYearsToClose(fiscalYear: number): Promise<{ costCenterId: string; year: number }[]> {
+    return this.prisma.budgetProposal.findMany({
+      where: { year: { lt: fiscalYear }, state: { in: ['SUBMITTED', 'RETURNED'] } },
+      distinct: ['costCenterId', 'year'],
+      select: { costCenterId: true, year: true },
+      orderBy: [{ year: 'asc' }, { costCenterId: 'asc' }],
+    });
   }
 
   async setWithdrawn(tx: DbTx, id: string, now: Date): Promise<void> {
@@ -213,5 +283,10 @@ export class ProposalRepo {
 
   async setReviewed(tx: DbTx, id: string): Promise<void> {
     await tx.budgetProposal.update({ where: { id }, data: { state: 'REVIEWED' } });
+  }
+
+  /** The closure of the year closes a proposal that was sent or given back and never used (F62); a return it had stays on it. */
+  async setClosed(tx: DbTx, id: string, now: Date): Promise<void> {
+    await tx.budgetProposal.update({ where: { id }, data: { state: 'CLOSED_FISCAL_YEAR_ENDED', closedAt: now } });
   }
 }

@@ -84,10 +84,10 @@ Model Prisma: `catalog.prisma` (M), `data-import.prisma` (M), `finance.prisma` (
 | `identity-access/accounts (M)`                                                                       | đếm IT Admin dùng được cho `QĐ-77m` (g4-provisioning-queue-manual)                                      |
 | `core/money, core/seat-occupancy, core/search-key, core/account-identifier, core/csv (R)`            | g3-money-and-exchange-rates; g3-subscription-seat-guards; g3-vendor-dictionary; g4-seat-baseline-import |
 | `infrastructure/object-storage, infrastructure/http, infrastructure/config, infrastructure/database` | g3-contract-documents (ADR-0014), g3-license-key-vault (khóa kho), operating-parameters                 |
-| `app.module.ts, module-graph/architecture specs`                                                     | g3-catalog-foundation (ADR-0013)                                                                        |
+| `app/app.module.ts, module-graph/architecture specs`                                                     | g3-catalog-foundation (ADR-0013)                                                                        |
 
 Route mới và trạng thái mount: [README mục 3](README.md#3-disposition-g0g4-và-bằng-chứng-storyac); mọi controller mới đăng ký trong
-module được `src/app.module.ts` import; `GRANT_REQUEST_GATE` gắn `RefusingGrantRequestGate`.
+module được `src/app/app.module.ts` import; `GRANT_REQUEST_GATE` gắn `RefusingGrantRequestGate`.
 
 ## 5. Tài liệu trong delta (không tính spike)
 

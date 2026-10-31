@@ -37,16 +37,20 @@ export class LicenseKeyRepo {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
-   * Keeps the key unless one with the same fingerprint is already in the organization's vault, and says which. The
-   * database decides, so a key that two batches add at the same time is kept once: the second waits for the first.
+   * Keeps every key of the batch whose fingerprint is not already in the organization's vault, in one statement, and
+   * answers the ids it kept. The database decides, so a key that two batches add at the same time is kept once: the
+   * second waits for the first. The rows go in the order given (the caller sorts them by fingerprint), which is the order
+   * the unique index is locked in, so two batches never wait for each other in a circle.
    */
-  async insertIfNew(tx: DbTx, key: NewLicenseKey): Promise<boolean> {
-    const { count } = await tx.licenseKey.createMany({
-      data: { ...key, ciphertext: new Uint8Array(key.ciphertext) },
+  async insertManyIfNew(tx: DbTx, keys: readonly NewLicenseKey[]): Promise<Set<string>> {
+    if (keys.length === 0) return new Set();
+    const kept = await tx.licenseKey.createManyAndReturn({
+      data: keys.map((key) => ({ ...key, ciphertext: new Uint8Array(key.ciphertext) })),
       skipDuplicates: true,
+      select: { id: true },
     });
 
-    return count === 1;
+    return new Set(kept.map((row) => row.id));
   }
 
   /** The keys of the purchase that can still be given out: in the store or assigned, not retired. */
@@ -56,7 +60,7 @@ export class LicenseKeyRepo {
     });
   }
 
-  /** One page, the total for the filter and the keys still usable, all from one snapshot (`LD-11`): a key imported meanwhile is in none or in all. */
+  /** One page, the total for the filter and the keys still usable, all from one snapshot: a key imported meanwhile is in none or in all. */
   async page(input: {
     subscriptionId: string;
     status?: LicenseKeyStatus;

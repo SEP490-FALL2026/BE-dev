@@ -26,12 +26,17 @@ export interface CliResult {
   stderr: string;
 }
 
+/**
+ * On Windows a child's own helper process (Prisma's schema engine) can still hold its working directory for a moment
+ * after the child exits; Node retries EBUSY/EPERM/ENOTEMPTY on removal for that case.
+ */
+const REMOVE = { recursive: true, force: true, maxRetries: 10, retryDelay: 200 } as const;
 const running = new Set<ChildProcess>();
 const directories = new Set<string>();
 
 process.once('exit', () => {
   for (const child of running) child.kill('SIGKILL');
-  for (const directory of directories) rmSync(directory, { recursive: true, force: true });
+  for (const directory of directories) rmSync(directory, REMOVE);
 });
 
 /** An empty working directory, so no `.env` can be picked up; removed by `stopCliProcesses()`. */
@@ -42,11 +47,17 @@ export function cliWorkingDirectory(prefix: string): string {
 }
 
 /**
- * Runs `src/<entry>` through ts-node with exactly `environment` plus the process basics (PATH, SystemRoot, TEMP,
- * TMP; a basic named in `environment` takes that value) and no stdin. The child is killed after `timeoutMs`.
+ * Runs `src/cli.ts <command> ...args` (the source of `node dist/cli.js`; `command` is a name of `src/cli/commands.ts`)
+ * through ts-node with exactly `environment` plus the process basics (PATH, SystemRoot, TEMP, TMP; a basic named in
+ * `environment` takes that value) and no stdin. The child is killed after `timeoutMs`.
  */
-export function runCli(entry: string, args: readonly string[], options: RunOptions): Promise<CliResult> {
-  return runTypeScript(join('src', entry), args, options);
+export function runCli(command: string, args: readonly string[], options: RunOptions): Promise<CliResult> {
+  // CI builds once and sets TEST_CLI_RUNTIME=dist: every call then starts the built `dist/cli.js` — what production
+  // runs — in about a second, instead of ts-node compiling the whole graph again for each call.
+  if (process.env.TEST_CLI_RUNTIME === 'dist') {
+    return runNode([join(PROJECT_ROOT, 'dist', 'cli.js'), command, ...args], 'dist/cli.js', options, {});
+  }
+  return runTypeScript(join('src', 'cli.ts'), [command, ...args], options);
 }
 
 /** Runs a repository script (a path from the project root, e.g. `scripts/dev/export-openapi.ts`) the same way. */
@@ -61,28 +72,38 @@ interface RunOptions {
 }
 
 function runTypeScript(path: string, args: readonly string[], options: RunOptions): Promise<CliResult> {
-  const environment: Record<string, string> = {
+  const typescript = {
     TS_NODE_TRANSPILE_ONLY: 'true',
     // The working directory is empty, so ts-node must be told where the TypeScript project is.
     TS_NODE_PROJECT: join(PROJECT_ROOT, 'tsconfig.json'),
-    ...options.environment,
   };
+  return runNode(
+    [...NATIVE_TYPESCRIPT_OFF, '-r', TS_NODE, join(PROJECT_ROOT, path), ...args],
+    path,
+    options,
+    typescript,
+  );
+}
+
+function runNode(
+  nodeArgs: readonly string[],
+  path: string,
+  options: RunOptions,
+  base: Record<string, string>,
+): Promise<CliResult> {
+  const environment: Record<string, string> = { ...base, ...options.environment };
   for (const name of ['PATH', 'SystemRoot', 'TEMP', 'TMP']) {
     const value = process.env[name];
     if (value !== undefined && !(name in options.environment)) environment[name] = value;
   }
 
   return new Promise((resolveRun, rejectRun) => {
-    const child = spawn(
-      process.execPath,
-      [...NATIVE_TYPESCRIPT_OFF, '-r', TS_NODE, join(PROJECT_ROOT, path), ...args],
-      {
-        cwd: options.cwd,
-        env: environment,
-        stdio: ['ignore', 'pipe', 'pipe'],
-        windowsHide: true,
-      },
-    );
+    const child = spawn(process.execPath, [...nodeArgs], {
+      cwd: options.cwd,
+      env: environment,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      windowsHide: true,
+    });
     running.add(child);
     let stdout = '';
     let stderr = '';
@@ -113,7 +134,7 @@ function runTypeScript(path: string, args: readonly string[], options: RunOption
 export function stopCliProcesses(): void {
   for (const child of running) child.kill('SIGKILL');
   running.clear();
-  for (const directory of directories) rmSync(directory, { recursive: true, force: true });
+  for (const directory of directories) rmSync(directory, REMOVE);
   directories.clear();
 }
 

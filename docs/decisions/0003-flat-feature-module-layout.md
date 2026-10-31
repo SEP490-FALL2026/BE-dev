@@ -4,6 +4,8 @@
 
 Accepted. Refined 2026-08-21: a root facade is created when a caller needs it, not in advance. Amended 2026-10-19:
 the `catalog` reference-module consequence is superseded (see Consequences); the layout decision itself is unchanged.
+Superseded in part 2026-10-29 by [ADR-0019](0019-module-tiers-and-public-api.md): the module layout (`public/` door,
+capability and use-case folders, depth and size limits) follows ADR-0019; infrastructure responsibilities stay as here.
 
 ## Date
 

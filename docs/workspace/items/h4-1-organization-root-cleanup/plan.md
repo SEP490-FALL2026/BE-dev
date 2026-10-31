@@ -32,7 +32,7 @@ ledger có đúng ba mục H4.1. `openapi.json` `14fd428b…`.
 - Files: `mappers/project.mapper.ts` (mới), `departments.controller.ts`, `projects.controller.ts`, spec mapper.
 - Depends on: Task 1.
 - Acceptance: không controller nào import controller; mapper không đổi; ledger `controllerImports` rỗng.
-- Verify: spec mapper + `src/architecture-structure.spec.ts` xanh.
+- Verify: spec mapper + `test/gates/architecture-structure.gate-spec.ts` xanh.
 
 ### Task 3: F-12 facade và `instanceof`
 
@@ -44,11 +44,11 @@ ledger có đúng ba mục H4.1. `openapi.json` `14fd428b…`.
 
 ### Task 4: F-13 export và A4-09 code chết
 
-- Files: `organization.module.ts`, `department.repo.ts`, `src/module-graph.spec.ts`.
+- Files: `organization.module.ts`, `department.repo.ts`, `test/gates/module-graph.gate-spec.ts`.
 - Depends on: none.
 - Acceptance: `ImportLookupRepo` còn provider, không còn export; ba export `E4` giữ; `readCostCenterForDepartment` không
   còn; ledger export gỡ đúng một mục.
-- Verify: `src/module-graph.spec.ts` xanh; quét 0 hit.
+- Verify: `test/gates/module-graph.gate-spec.ts` xanh; quét 0 hit.
 
 ### Checkpoint
 

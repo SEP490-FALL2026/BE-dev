@@ -1,50 +1,22 @@
 import { HttpStatus } from '@nestjs/common';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
-import { toLicensingApiException } from '../mappers/licensing.http-errors';
+import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
 import {
-  AssignmentResponsibleAfterDeadlineError,
-  ServiceAccountDutyTooManyError,
-  ServiceAccountMoveError,
-  type ServiceAccountMoveProblem,
-} from './service-account.errors';
-
-const ANSWERS: Readonly<Record<ServiceAccountMoveProblem, { status: HttpStatus; message: string }>> = {
-  NOT_FOUND: { status: HttpStatus.NOT_FOUND, message: 'The move of the service account does not exist.' },
-  NOT_CONFIRMER: {
-    status: HttpStatus.FORBIDDEN,
-    message: 'Only the head of the receiving department confirms the move, or the fallback approver when it has none.',
-  },
-  NOT_PENDING: { status: HttpStatus.CONFLICT, message: 'The move was confirmed or cancelled already.' },
-  MOVE_EFFECTIVE_DATE_PASSED: {
-    status: HttpStatus.CONFLICT,
-    message: 'The day the move takes effect has passed: propose it again.',
-  },
-  PENDING_EXISTS: { status: HttpStatus.CONFLICT, message: 'A move of this service account already waits.' },
-  TARGET_DEPARTMENT_INVALID: {
-    status: HttpStatus.UNPROCESSABLE_ENTITY,
-    message: 'The receiving department cannot take the service account.',
-  },
-  RESPONSIBLE_INVALID: {
-    status: HttpStatus.UNPROCESSABLE_ENTITY,
-    message: 'The person named cannot answer for the service account in the receiving department.',
-  },
-  REASON_REQUIRED: { status: HttpStatus.UNPROCESSABLE_ENTITY, message: 'A reason is required.' },
-};
+  AssignmentEffectiveDateInvalidError,
+  AssignmentExpectedEndRequiredError,
+  AssignmentNotFoundError,
+  AssignmentNotOpenError,
+  AssignmentNotServiceAccountError,
+  AssignmentResponsibleInvalidError,
+} from '../public/licensing.errors';
+import { toLicensingApiException } from '../licensing.http-errors';
+import { AssignmentResponsibleAfterDeadlineError, ServiceAccountDutyTooManyError } from './service-account.errors';
 
 /**
- * Maps the refusals of the routes of service accounts to their codes (`SERVICE_ACCOUNT_MOVE.*`, `SERVICE_ACCOUNT_DUTY.*` and the
- * deadline of a change of the person responsible); the rest goes to the licensing mapper.
+ * Maps the refusals of the routes of service accounts to their codes (`SERVICE_ACCOUNT_DUTY.*` and the deadline of a change of the
+ * person responsible); the rest goes to the licensing mapper.
  */
 export function toServiceAccountApiException(error: unknown): unknown {
-  if (error instanceof ServiceAccountMoveError) {
-    const answer = ANSWERS[error.problem];
-
-    return new ApiException(answer.status, {
-      code: `SERVICE_ACCOUNT_MOVE.${error.problem}`,
-      message: answer.message,
-      ...(error.reason ? { details: { reason: error.reason } } : {}),
-    });
-  }
   if (error instanceof AssignmentResponsibleAfterDeadlineError) {
     return new ApiException(HttpStatus.CONFLICT, {
       code: 'LICENSE_ASSIGNMENT.RESPONSIBLE_AFTER_DEADLINE',
@@ -61,3 +33,17 @@ export function toServiceAccountApiException(error: unknown): unknown {
 
   return toLicensingApiException(error);
 }
+
+const example = (error: Error) => errorExampleOf(toServiceAccountApiException(error));
+
+/** The answers above as OpenAPI examples, each produced by the mapper that gives it at runtime. */
+export const SERVICE_ACCOUNT_ERROR_EXAMPLES = {
+  ASSIGNMENT_NOT_FOUND: example(new AssignmentNotFoundError()),
+  ASSIGNMENT_NOT_OPEN: example(new AssignmentNotOpenError()),
+  NOT_SERVICE_ACCOUNT: example(new AssignmentNotServiceAccountError()),
+  RESPONSIBLE_INVALID: example(new AssignmentResponsibleInvalidError('NOT_ACTIVE')),
+  EFFECTIVE_DATE_INVALID: example(new AssignmentEffectiveDateInvalidError('IN_THE_PAST')),
+  EXPECTED_END_REQUIRED: example(new AssignmentExpectedEndRequiredError()),
+  RESPONSIBLE_AFTER_DEADLINE: example(new AssignmentResponsibleAfterDeadlineError('2026-01-01')),
+  DUTY_TOO_MANY: example(new ServiceAccountDutyTooManyError()),
+} as const;

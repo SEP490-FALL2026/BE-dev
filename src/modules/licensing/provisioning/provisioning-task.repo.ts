@@ -10,8 +10,8 @@ import type {
   ProvisioningTaskStatus,
   RevocationCompletion,
   RevocationSource,
-} from '../licensing.types';
-import { SUMMARY_SELECT, WITH_ASSIGNMENT, toRecord, type ProvisioningTaskRecord } from './provisioning-task.record';
+} from '../public/licensing.types';
+import { SUMMARY_SELECT, WITH_ASSIGNMENT, toRecord, type ProvisioningTaskRecord } from './provisioning-task.types';
 
 export interface TaskPageFilter {
   channel?: ProvisioningChannel;
@@ -24,18 +24,21 @@ export interface TaskPageFilter {
   take: number;
 }
 
-/** Everything a failed task carries, cleared when a decision puts it back in the queue to be done. */
-const CLEARED = {
+/**
+ * What a task that waits in the queue again cannot carry (the status check of the table: no taker, no failed day or person, no
+ * retry time). A hand-off clears only this: the last error, the kind and the reason of the failure and the tries made stay with the
+ * task for the person who takes it; the table asks only that the kind and the reason come together.
+ */
+const QUEUED_AGAIN = {
   claimedByAppUserId: null,
   claimedAt: null,
   failedByAppUserId: null,
   failedAt: null,
-  failureReason: null,
-  failureKind: null,
-  lastError: null,
   nextRetryAt: null,
-  attempts: 0,
 } as const;
+
+/** Everything a failed task carries, cleared when the decision is to try it again on its channel. */
+const CLEARED = { ...QUEUED_AGAIN, failureKind: null, failureReason: null, lastError: null, attempts: 0 } as const;
 
 /**
  * The one writer of `provisioning_tasks`. A task is made once with its assignment and then only moves forward: taken,
@@ -82,10 +85,20 @@ export class ProvisioningTaskRepo {
     return this.find(id, tx);
   }
 
+  /**
+   * A task in progress carries no failure kind or reason (the status check of the table), so a task handed off with them sheds both
+   * when a person takes it; its last error and its tries stay, and the audit event of the failure keeps the rest.
+   */
   async markClaimed(tx: DbTx, id: string, appUserId: string, now: Date): Promise<void> {
     await tx.provisioningTask.update({
       where: { id },
-      data: { status: 'IN_PROGRESS', claimedByAppUserId: appUserId, claimedAt: now },
+      data: {
+        status: 'IN_PROGRESS',
+        claimedByAppUserId: appUserId,
+        claimedAt: now,
+        failureKind: null,
+        failureReason: null,
+      },
     });
   }
 
@@ -157,17 +170,19 @@ export class ProvisioningTaskRepo {
     await tx.provisioningTask.update({ where: { id }, data: { status: 'QUEUED', ...CLEARED } });
   }
 
-  /** The decision to hand a connector task to a person: it is queued again, by hand, with who handed it and the evidence. */
-  async markHandedOff(tx: DbTx, id: string, appUserId: string, evidence: string, now: Date): Promise<void> {
+  /**
+   * The decision to hand a connector task to a person: it is queued again, by hand, with who handed it and when. No evidence is
+   * written (it is asked when the manual work completes, F08); the last error, the failure kind and reason and the tries made are kept.
+   */
+  async markHandedOff(tx: DbTx, id: string, appUserId: string, now: Date): Promise<void> {
     await tx.provisioningTask.update({
       where: { id },
       data: {
         status: 'QUEUED',
         channel: 'MANUAL',
-        ...CLEARED,
+        ...QUEUED_AGAIN,
         handedOffByAppUserId: appUserId,
         handedOffAt: now,
-        handOffEvidence: evidence,
       },
     });
   }
@@ -200,11 +215,20 @@ export class ProvisioningTaskRepo {
     return this.find(locked[0].id, tx);
   }
 
-  /** The cancellation of a task whose request was withdrawn: the end of it. A failure it had stays on the task. */
+  /**
+   * The cancellation of a task whose request was withdrawn: the end of it. A failure it had stays on the task, but a cancelled task
+   * waits for no try (`provisioning_tasks_status_columns`), so the moment of the next one goes.
+   */
   async markCancelled(tx: DbTx, id: string, appUserId: string, reason: string, now: Date): Promise<void> {
     await tx.provisioningTask.update({
       where: { id },
-      data: { status: 'CANCELLED', closedByAppUserId: appUserId, closedAt: now, closeReason: reason },
+      data: {
+        status: 'CANCELLED',
+        closedByAppUserId: appUserId,
+        closedAt: now,
+        closeReason: reason,
+        nextRetryAt: null,
+      },
     });
   }
 

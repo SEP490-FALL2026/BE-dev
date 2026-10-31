@@ -17,7 +17,7 @@ Mỗi task theo TDD: viết test đỏ, xem nó đỏ đúng lý do, viết mã 
 
 ### Task 1: dữ liệu `plans`, `plan_workspace_profiles`, `plan_workspace_admins`
 
-- Files: `prisma/models/catalog.prisma`, migration `20261020130000_catalog_plans`, `src/architecture-boundaries.spec.ts` (`PRISMA_MODEL_OWNER`), `test/integration/plan-constraints.integration-spec.ts`.
+- Files: `prisma/models/catalog.prisma`, migration `20261020130000_catalog_plans`, `test/gates/architecture-boundaries.gate-spec.ts` (`PRISMA_MODEL_OWNER`), `test/integration/catalog/plan-constraints.integration-spec.ts`.
 - Depends on: `g3-catalog-entry` (bảng `applications`).
 - Acceptance: CHECK mô hình giá / mức kiểm soát / cờ-lưu ý, unique tên gói trong ứng dụng, trigger kiểu cấp ⇔ loại ứng dụng, trigger hồ sơ chỉ cho K2/K3, CHECK tài khoản khẩn cấp và giới hạn, khóa ngoại.
 - Verify: `pnpm prisma:validate`, `pnpm prisma:generate`; test constraints đỏ trước migration, xanh sau.
@@ -31,14 +31,14 @@ Mỗi task theo TDD: viết test đỏ, xem nó đỏ đúng lý do, viết mã 
 
 ### Task 3: repo, service, contract đọc ứng dụng
 
-- Files: `plan/plan.repo.ts`, `plan.service.ts`, `plan-workspace.service.ts`, `plan.types.ts`, `catalog-entry/application-lookup.service.ts` (contract nội module), `catalog.module.ts` (`IdentityAccessFacadeModule`), `src/architecture-structure.spec.ts`.
+- Files: `plan/plan.repo.ts`, `plan.service.ts`, `plan-workspace.service.ts`, `plan.types.ts`, `catalog-entry/application-lookup.service.ts` (contract nội module), `catalog.module.ts` (`IdentityAccessFacadeModule`), `test/gates/architecture-structure.gate-spec.ts`.
 - Depends on: Task 1, Task 2.
 - Acceptance: ghi gói và hồ sơ cùng giao dịch với audit; khóa theo thứ tự (gói/ứng dụng, nhân viên, tài khoản); lỗi unique bắt ngoài giao dịch.
 - Verify: `pnpm exec jest src/modules/catalog src/architecture src/module-graph`; integration `plan-http` ở Task 4.
 
 ### Task 4: HTTP, hợp đồng
 
-- Files: `plan/plan.dto.ts`, `plan.http-errors.ts`, `plans.controller.ts`, `test/support/api-coverage-manifest.ts` (+5), `test/e2e/api-inventory.e2e-spec.ts` (79 → 84), `test/e2e/plan-declaration.e2e-spec.ts`, `test/integration/plan-http.integration-spec.ts`.
+- Files: `plan/plan.dto.ts`, `plan.http-errors.ts`, `plans.controller.ts`, `test/support/api-coverage-manifest.ts` (+5), `test/http/platform/api-inventory.http-spec.ts` (79 → 84), `test/http/catalog/plan-declaration.http-spec.ts`, `test/integration/catalog/plan-http.integration-spec.ts`.
 - Depends on: Task 3.
 - Acceptance: năm operation đúng bảng HTTP; 401/403/422 theo vai; 409 trùng; không `DELETE`; đồng thời hợp lệ; mọi AC trong ma trận.
 - Verify: `pnpm test:e2e` (suite `plan-declaration`, `api-inventory`), integration `plan-http` → xanh; đột biến (bỏ khóa nhân viên, bỏ kiểm vai IT Admin, bỏ ánh xạ unique) làm test đỏ.

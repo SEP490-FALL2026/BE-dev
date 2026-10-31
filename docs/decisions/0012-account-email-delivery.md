@@ -10,7 +10,7 @@ research and drafting; that is not a review or an approval.
 
 Slice 1b ([spec](../workspace/items/us-01-account-invitation-activation/spec.md)) sends the
 account invitation email (`QĐ-46`, `FR-3.11` exception for account lifecycle mail). The slice 1a
-research left R-5 (local SMTP) open. The worker (`src/worker.module.ts`) has BullMQ
+research left R-5 (local SMTP) open. The worker (`src/worker/worker.module.ts`) has BullMQ
 infrastructure but no registered queue, and ADR-0001 deferred queues until a genuinely slow or
 retryable job exists. Docker could not be run during the initial slice 1a experiments;
 this historical limitation does not describe the later review environment.

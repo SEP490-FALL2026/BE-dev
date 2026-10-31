@@ -2,6 +2,8 @@ import { Controller, Get, HttpStatus, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
+  FORBIDDEN_EXAMPLE,
+  VALIDATION_EXAMPLE,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
 } from '../../infrastructure/http/decorators/api-error-responses.decorator';
@@ -9,7 +11,7 @@ import { ApiSuccessResponse } from '../../infrastructure/http/decorators/api-suc
 import { toUnavailableApiException } from '../../infrastructure/http/errors/service-unavailable';
 import { RequireRoles } from '../../infrastructure/security/decorators/access.decorators';
 import { AuditQueryService } from './audit-query.service';
-import { AuditEventPageResponseDto, ListAuditEventsQueryDto } from './dto/audit-event.dto';
+import { AuditEventPageResponseDto, ListAuditEventsQueryDto } from './audit-event.dto';
 
 /** The Audit Trail, for the Super Admin alone (`US-01-06` AC-5, AC-6). Any other role is a 403 and nothing is read. */
 @ApiTags('audit')
@@ -27,8 +29,16 @@ export class AuditController {
   })
   @ApiErrorResponses(
     UNAUTHENTICATED_RESPONSE,
-    { status: HttpStatus.FORBIDDEN, description: 'Only the Super Admin may read the Audit Trail.' },
-    { status: HttpStatus.UNPROCESSABLE_ENTITY, description: 'The query is invalid (VALIDATION_ERROR).' },
+    {
+      status: HttpStatus.FORBIDDEN,
+      description: 'Only the Super Admin may read the Audit Trail.',
+      examples: [FORBIDDEN_EXAMPLE],
+    },
+    {
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      description: 'The query is invalid (VALIDATION_ERROR).',
+      examples: [VALIDATION_EXAMPLE],
+    },
     GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   )
   async list(@Query() query: ListAuditEventsQueryDto) {

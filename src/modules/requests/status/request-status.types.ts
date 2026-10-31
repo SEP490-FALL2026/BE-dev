@@ -1,5 +1,5 @@
-import type { AuditValue } from '../../audit/audit.types';
-import type { InAppNotificationCode, InAppParamValue } from '../../notifications/notifications.types';
+import type { AuditValue } from '../../audit/public/audit.types';
+import type { InAppNotificationCode, InAppParamValue } from '../../notifications/public/notifications.types';
 
 export type AuditPayload = { [key: string]: AuditValue };
 
@@ -112,8 +112,8 @@ export interface NotificationIntent {
 
 /**
  * A row of the table of events: what an audit event of the action means for the inbox. To add an event, add its rule to the
- * table of its file and list the file in `request-status.policy.ts`; the actions to read (`PROJECTED_ACTIONS`) and the facts
- * to load are taken from the rules, so nothing else needs to change.
+ * table of its file and list the file in `rules/request-status-rules.policy.ts`; the actions to read (`PROJECTED_ACTIONS`)
+ * and the facts to load are taken from the rules, so nothing else needs to change.
  */
 export interface StatusRule {
   /** What the notices are about, and so which key of the event holds its id. */

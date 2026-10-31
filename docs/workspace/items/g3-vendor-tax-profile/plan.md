@@ -17,7 +17,7 @@ Mỗi task theo TDD: viết test đỏ, xem nó đỏ đúng lý do, viết mã 
 
 ### Task 1: dữ liệu ba bảng hồ sơ thuế
 
-- Files: `prisma/models/finance.prisma`, `prisma/models/catalog.prisma` (quan hệ ngược của `Vendor`), `prisma/models/organization.prisma`, migration `20261020140000_finance_vendor_tax_profiles`, `src/architecture-boundaries.spec.ts` (`PRISMA_MODEL_OWNER`), `test/integration/vendor-tax-profile-constraints.integration-spec.ts`.
+- Files: `prisma/models/finance.prisma`, `prisma/models/catalog.prisma` (quan hệ ngược của `Vendor`), `prisma/models/organization.prisma`, migration `20261020140000_finance_vendor_tax_profiles`, `test/gates/architecture-boundaries.gate-spec.ts` (`PRISMA_MODEL_OWNER`), `test/integration/catalog/vendor-tax-profile-constraints.integration-spec.ts`.
 - Depends on: `g3-catalog-entry` (bảng `vendors`).
 - Acceptance: CHECK tỷ lệ và vị trí dòng, unique `(vendor, version)`, unique tên loại thuế chuẩn hóa trong phiên bản, khóa ngoại, trigger bất biến (`UPDATE`/`DELETE` bị `55000`).
 - Verify: `pnpm prisma:validate`, `pnpm prisma:generate`; test constraints đỏ trước migration, xanh sau.
@@ -31,14 +31,14 @@ Mỗi task theo TDD: viết test đỏ, xem nó đỏ đúng lý do, viết mã 
 
 ### Task 3: capability `finance/tax-profile`
 
-- Files: `src/modules/finance/tax-profile/tax-profile.{repo,service,errors,types,policy}.ts` (+ `tax-profile.policy.spec.ts`), `finance.module.ts`, `finance.service.ts` (`estimateTax`), `src/module-graph.spec.ts` (`PUBLIC_CONTRACT_EXPORTS`), `src/architecture-structure.spec.ts`.
+- Files: `src/modules/finance/tax-profile/tax-profile.{repo,service,errors,types,policy}.ts` (+ `tax-profile.policy.spec.ts`), `finance.module.ts`, `finance.service.ts` (`estimateTax`), `test/gates/module-graph.gate-spec.ts` (`PUBLIC_CONTRACT_EXPORTS`), `test/gates/architecture-structure.gate-spec.ts`.
 - Depends on: Task 1, Task 2.
 - Acceptance: khai là một giao dịch có khóa đầu phiên bản, phiên bản mới chỉ khi đổi, audit cùng giao dịch; ước tính dùng phiên bản mới nhất hoặc hồ sơ mặc định có nhãn.
 - Verify: `pnpm exec jest src/modules/finance src/architecture src/module-graph`.
 
 ### Task 4: route ở `catalog/vendor`
 
-- Files: `src/modules/catalog/vendor/vendor-query.service.ts`, `vendors.controller.ts`, `vendor.dto.ts`, `vendor.http-errors.ts`, `vendor.repo.ts` (đọc), `catalog.module.ts` (`FinanceModule`), `test/support/api-coverage-manifest.ts` (+5), `test/e2e/api-inventory.e2e-spec.ts` (84 → 89), `test/e2e/vendor-tax-profile.e2e-spec.ts`, `test/integration/vendor-tax-profile-http.integration-spec.ts`.
+- Files: `src/modules/catalog/vendor/vendor-query.service.ts`, `vendors.controller.ts`, `vendor.dto.ts`, `vendor.http-errors.ts`, `vendor.repo.ts` (đọc), `catalog.module.ts` (`FinanceModule`), `test/support/api-coverage-manifest.ts` (+5), `test/http/platform/api-inventory.http-spec.ts` (84 → 89), `test/http/catalog/vendor-tax-profile.http-spec.ts`, `test/integration/catalog/vendor-tax-profile-http.integration-spec.ts`.
 - Depends on: Task 3.
 - Acceptance: năm operation đúng bảng HTTP; 401/403/422 theo vai; 404 nhà cung cấp; không `DELETE`; đồng thời hợp lệ; mọi AC trong ma trận.
 - Verify: `pnpm test:e2e` (suite `vendor-tax-profile`, `api-inventory`), integration `vendor-tax-profile-http` → xanh; đột biến (bỏ khóa đầu phiên bản, bỏ so sánh không đổi, đổi `payer`) làm test đỏ.

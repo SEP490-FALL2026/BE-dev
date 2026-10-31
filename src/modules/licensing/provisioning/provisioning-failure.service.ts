@@ -1,14 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
-import { AuditService } from '../../audit/audit.service';
-import { OrganizationService } from '../../organization/organization.service';
+import { AuditApi } from '../../audit/public/audit.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
 import {
   ProvisioningTaskNotConnectorError,
   ProvisioningTaskNotFoundError,
   ProvisioningTaskStateError,
-} from '../licensing.errors';
-import type { ProvisioningFailureKind } from '../licensing.types';
-import { classifyFailure } from './failure.policy';
+} from '../public/licensing.errors';
+import type { ProvisioningFailureKind } from '../public/licensing.types';
+import { classifyFailure, connectorErrorDetail } from './failure.policy';
 import { ProvisioningTaskRepo } from './provisioning-task.repo';
 
 /** What the connector is told of the failure it reported. */
@@ -29,8 +29,8 @@ export interface FailureRecorded {
 export class ProvisioningFailureService {
   constructor(
     private readonly repo: ProvisioningTaskRepo,
-    private readonly organization: OrganizationService,
-    private readonly audit: AuditService,
+    private readonly organization: OrganizationApi,
+    private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
   ) {}
 
@@ -48,7 +48,7 @@ export class ProvisioningFailureService {
     const organization = await this.organization.getOrganization();
     if (!organization) throw new Error('A failure was recorded before installation');
     const now = input.now ?? new Date();
-    const detail = input.detail.trim() || input.kind;
+    const detail = connectorErrorDetail(input.detail, input.kind);
 
     return this.runner.run(async (tx) => {
       const task = await this.repo.lock(tx, input.taskId);

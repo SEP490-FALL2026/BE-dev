@@ -32,9 +32,9 @@ Inventory trước khi sửa (đọc trực tiếp source):
 
 ### Task 1: ghim cấu hình, installation, CLI, đồ thị và vòng gửi thư
 
-- Files: `src/infrastructure/config/env-matrix.spec.ts` (mới), `src/modules/installation/installation.service.spec.ts`
-  (mới), `src/module-graph.spec.ts`, `src/email-dispatch.loop.spec.ts`,
-  `test/integration/installation-cli.integration-spec.ts`, `test/integration/recovery-cli.integration-spec.ts`.
+- Files: `src/infrastructure/config/env-matrix.spec.ts` (mới), `src/modules/installation/public/installation.api.spec.ts`
+  (mới), `test/gates/module-graph.gate-spec.ts`, `src/worker/email-dispatch.job.spec.ts`,
+  `test/integration/installation/installation-cli.integration-spec.ts`, `test/integration/identity-access/recovery-cli.integration-spec.ts`.
 - Depends on: none
 - Acceptance: ma trận `test|development|production` của secret và hạ tầng; thứ tự lời gọi installation (chuẩn bị mật
   khẩu → `BEGIN` → khóa → đọc tổ chức → ghi + audit → `COMMIT`), lỗi nhập, đã cài; help/tham số lạ/env/DB/lỗi lạ đã
@@ -51,7 +51,7 @@ worker-mail-loop, email-outbox, super-admin-recovery) 5 suite/61 test; `tsc`, ES
 ### Task 2: lỗi và khóa của installation
 
 - Files: `installation.errors.ts`, `installation.repo.ts` (+ spec) mới; `installation.service.ts`,
-  `installation.module.ts`, `installation-cli.ts`; hai integration installation; `src/architecture-structure.spec.ts`.
+  `installation.module.ts`, `installation-cli.ts`; hai integration installation; `test/gates/architecture-structure.gate-spec.ts`.
 - Depends on: Task 1
 - Acceptance: hai lớp lỗi dời nguyên văn; khóa advisory (cùng key, cùng `tx`, cùng vị trí) trong repo; gỡ đúng hai mục
   `errorClassesOutsideErrorFiles` và mục `rawSqlOutsideRepositories`.
@@ -80,7 +80,7 @@ M-A3 đỏ đúng gate, khôi phục byte-identical (hash kiểm bằng script).
 ### Task 4: gỡ mount, validator riêng khi mount lại, Compose/deploy
 
 - Files: `queue.config.ts`, `object-storage.config.ts` (+ spec) mới; `queue-infrastructure.module.ts`,
-  `object-storage.module.ts`, `s3-compatible-object-storage.adapter.ts`, `app.module.ts`, `worker.module.ts`,
+  `object-storage.module.ts`, `s3-compatible-object-storage.adapter.ts`, `app/app.module.ts`, `worker/worker.module.ts`,
   `env-schema.ts`, `module-graph.spec.ts`; `compose.yaml`, `docker-compose.prod.yml`, `.github/workflows/deploy.yml`,
   `.env.example`.
 - Depends on: Task 3
@@ -101,7 +101,7 @@ thì dừng đúng danh sách).
 ### Task 5: helper CLI chung và contract gửi thư
 
 - Files: `infrastructure/cli/cli-runtime.ts` (+ spec) mới; `installation-cli.ts`, `recovery-cli.ts`;
-  `notifications.service.ts` (+ spec mới), `notifications.module.ts`, `email-dispatch.loop.ts`; ba gate.
+  `notifications.service.ts` (+ spec mới), `notifications.module.ts`, `worker/email-dispatch.job.ts`; ba gate.
 - Depends on: Task 4
 - Acceptance: hai CLI dùng một helper (`instanceof`), gỡ hai mục `errorMatchedByName`; vòng lặp đọc
   `EmailDeliveryService` (một method ủy quyền), dispatcher/repo/cipher/transport private; contract đăng ký đúng ở

@@ -1,4 +1,5 @@
 import request from 'supertest';
+import { pretendBusinessToday } from './pretend-today';
 import { NoticeOverdueService } from '../../src/modules/personnel/notice/notice-overdue.service';
 import type { ApiAccount } from './api-accounts';
 import { OffboardingHarness } from './offboarding-harness';
@@ -57,11 +58,11 @@ export class NoticeHarness extends OffboardingHarness {
     request(this.server()).get(`/api/v1/personnel-notices/${id}`).set(this.as(account));
   withdrawNotice = (id: string, account: ApiAccount) =>
     request(this.server()).post(`/api/v1/personnel-notices/${id}/withdrawal`).set(this.as(account));
-  rejectNotice = (id: string, body: object, account: ApiAccount = this.it1) =>
+  rejectNotice = (id: string, body: object, account: ApiAccount = this.sa) =>
     request(this.server()).post(`/api/v1/personnel-notices/${id}/rejection`).set(this.as(account)).send(body);
-  recordNotice = (id: string, body: object, account: ApiAccount = this.it1) =>
+  recordNotice = (id: string, body: object, account: ApiAccount = this.sa) =>
     request(this.server()).post(`/api/v1/personnel-notices/${id}/recording`).set(this.as(account)).send(body);
-  linkNotice = (id: string, body: object, account: ApiAccount = this.it1) =>
+  linkNotice = (id: string, body: object, account: ApiAccount = this.sa) =>
     request(this.server()).post(`/api/v1/personnel-notices/${id}/linking`).set(this.as(account)).send(body);
 
   /** A notice sent and expected to succeed (201). */
@@ -100,6 +101,13 @@ export class NoticeHarness extends OffboardingHarness {
     );
 
     return rows;
+  }
+
+  /** The organization says today is `day` until the returned function is called; the data written meanwhile is dated from it. */
+  pretendToday(day: string): () => void {
+    const spy = pretendBusinessToday(this.ctx.app, day);
+
+    return () => spy.mockRestore();
   }
 
   async noticeCount(): Promise<number> {

@@ -17,7 +17,7 @@ Mỗi task theo TDD: viết test đỏ, xem nó đỏ đúng lý do, viết mã 
 
 - Trạng thái: xong; migration và `document-constraints.integration-spec.ts` xanh trong `pnpm test:integration`. Chưa chạy lại `prisma migrate diff` trong lượt cập nhật tài liệu này.
 
-- Files: `prisma/models/catalog.prisma`, quan hệ ngược ở `organization.prisma`, migration `20261020250000_catalog_contracts_and_documents`, `src/architecture-boundaries.spec.ts`, `test/integration/document-constraints.integration-spec.ts`.
+- Files: `prisma/models/catalog.prisma`, quan hệ ngược ở `organization.prisma`, migration `20261020250000_catalog_contracts_and_documents`, `test/gates/architecture-boundaries.gate-spec.ts`, `test/integration/catalog/document-constraints.integration-spec.ts`.
 - Depends on: `g3-subscription-purchase`.
 - Acceptance: CHECK trạng thái ⟺ chủ, mục đích gắn được vào hợp đồng, `object_key` duy nhất, kích thước dương, tên hợp đồng không rỗng, trigger không xóa, `READY` bất biến, cột khai báo không đổi.
 - Verify: constraints đỏ trước migration, xanh sau; `prisma migrate diff` không khác biệt.
@@ -26,7 +26,7 @@ Mỗi task theo TDD: viết test đỏ, xem nó đỏ đúng lý do, viết mã 
 
 - Trạng thái: xong; `pnpm check` xanh. Lượt rà soát 21/10/2026 thêm `contentMatchesType` (chữ ký PDF, PNG, JPEG) vào `contract.policy.ts`.
 
-- Files: `src/modules/catalog/contract/contract.policy.ts`, `contract.policy.spec.ts`, `contract.errors.ts`, `src/modules/operating-parameters/parameter-definitions.ts` (`DOCUMENT_MAX_SIZE_MB`) và spec của nó.
+- Files: `src/modules/catalog/contract/contract.policy.ts`, `contract.policy.spec.ts`, `contract.errors.ts`, `src/modules/operating-parameters/parameter-definitions.policy.ts` (`DOCUMENT_MAX_SIZE_MB`) và spec của nó.
 - Depends on: Task 1.
 - Acceptance: luật vai theo mục đích, mục đích dùng được, loại và đuôi tệp, kích thước, khớp giữa khai báo và kho, ai mở theo trạng thái và vai, tên hợp đồng.
 - Verify: `pnpm exec jest src/modules/catalog/contract src/modules/operating-parameters` đỏ trước, xanh sau.
@@ -44,7 +44,7 @@ Mỗi task theo TDD: viết test đỏ, xem nó đỏ đúng lý do, viết mã 
 
 - Trạng thái: xong; e2e và integration xanh. Lượt rà soát: `complete` kiểm byte đầu và quarantine khi không khớp; lỗi kho ⟹ 503; thêm test ‘a role lost before the file is attached takes the right to attach it’. Các đột biến liệt kê ở Verify không được chạy lại ở lượt 21/10/2026, nên không có bằng chứng mới về chúng.
 
-- Files: `contract.repo.ts`, `contract.service.ts`, `contracts.controller.ts`, `document.repo.ts`, `document.service.ts`, `documents.controller.ts`, `contract.dto.ts`, `document.dto.ts`, `contract.http-errors.ts`, `catalog.module.ts`, `test/support/api-coverage-manifest.ts` (+7), `test/e2e/api-inventory.e2e-spec.ts` (143 operation toàn API, trong đó bảy của hạng mục), `test/e2e/document.e2e-spec.ts`, `test/integration/document-http.integration-spec.ts`.
+- Files: `contract.repo.ts`, `contract.service.ts`, `contracts.controller.ts`, `document.repo.ts`, `document.service.ts`, `documents.controller.ts`, `contract.dto.ts`, `document.dto.ts`, `contract.http-errors.ts`, `catalog.module.ts`, `test/support/api-coverage-manifest.ts` (+7), `test/http/platform/api-inventory.http-spec.ts` (143 operation toàn API, trong đó bảy của hạng mục), `test/http/catalog/document.http-spec.ts`, `test/integration/catalog/document-http.integration-spec.ts`.
 - Depends on: Task 3.
 - Acceptance: bảy operation đúng bảng HTTP; mọi AC trong ma trận; không URL ký nào ở CSDL, Audit Trail hay log.
 - Verify: e2e + integration; đột biến (bỏ kiểm đuôi tệp, bỏ kiểm kích thước, cho vai khác chọn mục đích, tệp chưa gắn thấy bởi người khác, lưu URL, bỏ kiểm khớp ở bước hoàn tất, cho gắn hai lần, quên kiểm vai lúc mở, thời hạn liên kết sai) làm đỏ.

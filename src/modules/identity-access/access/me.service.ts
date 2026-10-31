@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { businessDateAt, toDateColumn } from '../../../core/business-date';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { OrganizationService } from '../../organization/organization.service';
+import { OrganizationApi } from '../../organization/public/organization.api';
 import { AccountDirectoryService } from '../accounts/account-directory.service';
 
 export interface MeView {
@@ -22,7 +22,7 @@ export interface MeView {
 export class MeService {
   constructor(
     private readonly accounts: AccountDirectoryService,
-    private readonly organization: OrganizationService,
+    private readonly organization: OrganizationApi,
   ) {}
 
   /** The caller's own identity and effective roles. Roles come from the principal resolved this request. */

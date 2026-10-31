@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { ActionTokenPurpose, ActionTokenRevokedReason, ActionTokenSnapshot } from '../identity-access.types';
-import { ActionLinkState } from '../policies/account-policy';
+import { ActionTokenPurpose, ActionTokenRevokedReason, ActionTokenSnapshot } from '../public/identity-access.types';
+import { ActionLinkState } from './account.policy';
 
 const TOKEN_SELECT = {
   tokenHash: true,
@@ -47,7 +47,7 @@ export class ActionTokenRepo {
     });
   }
 
-  /** How many tokens of this purpose the account was issued since `since`, whatever became of them (T-2). */
+  /** How many tokens of this purpose the account was issued since `since`, whatever became of them. */
   async countTokensSince(tx: DbTx, appUserId: string, purpose: ActionTokenPurpose, since: Date): Promise<number> {
     return tx.accountActionToken.count({ where: { appUserId, purpose, createdAt: { gte: since } } });
   }

@@ -1,10 +1,13 @@
 # ADR-0005: Database invariants beyond Prisma
 
-Status: Accepted technical principle. No such custom constraints are currently
-needed by the catalog baseline.
+Status: Accepted technical principle. Reviewed SQL outside Prisma is part of the schema: a text search of
+`prisma/migrations` (125 migration folders, 31/10/2026) finds 5 `EXCLUDE USING` constraints, 161 `CREATE TRIGGER`
+statements, 8 `CREATE CONSTRAINT TRIGGER` statements, 140 function definitions and 341 `CHECK (` clauses (case-sensitive,
+so function names ending in `_check(` are not counted). They are text matches, not live objects: a later migration can
+replace or drop what an earlier one created.
 
-> _Implementation annotation (22/10/2026, `delivery-gate-hardening`, `DB-17`):_ the second sentence of the status is
-> superseded. Reviewed SQL outside Prisma now exists in committed migrations (text search of `prisma/migrations` at
+> _Implementation annotation (22/10/2026, `delivery-gate-hardening`, `DB-17`):_ the second sentence of the status (now
+> replaced by the count above) was superseded. Reviewed SQL outside Prisma now exists in committed migrations (text search of `prisma/migrations` at
 > `0198456`: 5 `EXCLUDE USING` constraints, 42 `CREATE TRIGGER` and 2 `CREATE CONSTRAINT TRIGGER` statements, 85 `CHECK (`
 > clauses). The CI workflow now also runs a schema-to-migrations drift check (added in the same item; no remote run
 > verified yet). The principle above is unchanged.

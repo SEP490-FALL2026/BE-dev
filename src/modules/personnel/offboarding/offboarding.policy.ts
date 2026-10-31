@@ -1,7 +1,6 @@
 import { addDays, type BusinessDate } from '../../../core/business-date';
 import { addWorkingDays, type NonWorkingDates } from '../../../core/working-days';
-import { groundsRefusal, type GroundsInput } from '../grounds/grounds.policy';
-import type { SelfActionMode } from '../personnel-self-action.policy';
+import { groundsRefusal, type GroundsInput } from '../personnel-grounds.policy';
 import type { OffboardingState } from './offboarding.types';
 
 /** What the policy refuses, as a semantic code (`OFFBOARDING_CASE.<code>` on the wire) and the facts a person needs to put it right. */
@@ -9,8 +8,6 @@ export interface OffboardingRefusal {
   code: string;
   details?: Record<string, unknown>;
 }
-
-const SELF_REFUSAL: OffboardingRefusal = { code: 'SELF_EVENT_NEEDS_ANOTHER_IT_ADMIN' };
 
 /**
  * The first day the person is no longer a member of the department (and no longer its head). A planned handover ends the day after
@@ -83,7 +80,6 @@ export interface RecordFacts extends LastDayFacts {
   transferCancellationReason: string | undefined;
   /** Another waiting transfer names this person to follow the head of its department. */
   namedAsSuccessor: boolean;
-  selfMode: SelfActionMode;
   /** How the head of the department the person leaves is provided for on the day they stop being its head; null when it is fine or not needed. */
   successor: OffboardingRefusal | null;
 }
@@ -91,7 +87,7 @@ export interface RecordFacts extends LastDayFacts {
 /**
  * Whether a departure may be recorded (`US-03-04` AC-2, AC-8, AC-18, AC-23, AC-29, `US-03-01` AC-21), the first thing that is wrong
  * winning in the order a person would fix it: the person works for the organization and has no handover yet, the last working day,
- * the basis, the transfer that waits, who acts, and who follows the head.
+ * the basis, the transfer that waits, and who follows the head. Who may act is the service's, not asked here.
  */
 export function recordRefusal(facts: RecordFacts): OffboardingRefusal | null {
   const { employee } = facts;
@@ -105,18 +101,31 @@ export function recordRefusal(facts: RecordFacts): OffboardingRefusal | null {
   if (grounds)
     return { code: grounds.reason, details: 'missing' in grounds ? { missing: grounds.missing } : undefined };
 
-  const pending = facts.pendingTransfer;
-  if (pending) {
-    // The last working day falls before the transfer takes effect: the transfer never happens, and the caller says why it is cancelled.
-    if ((facts.lastWorkingDay as BusinessDate) >= pending.effectiveOn)
-      return { code: 'PENDING_EVENT_EXISTS', details: { kind: 'TRANSFER', effectiveOn: pending.effectiveOn } };
-    if ((facts.transferCancellationReason ?? '').trim() === '')
-      return { code: 'TRANSFER_CANCELLATION_REASON_REQUIRED' };
-  }
+  const transfer = pendingTransferRefusal(
+    facts.pendingTransfer,
+    facts.lastWorkingDay as BusinessDate,
+    facts.transferCancellationReason,
+  );
+  if (transfer) return transfer;
   if (facts.namedAsSuccessor) return { code: 'PENDING_EVENT_EXISTS', details: { kind: 'HEAD_HANDOVER' } };
-  if (facts.selfMode === 'NEEDS_ANOTHER_IT_ADMIN') return SELF_REFUSAL;
 
   return facts.successor;
+}
+
+/**
+ * The transfer of the person that waits: when the last working day falls before it takes effect the transfer never happens, and the
+ * caller says why it is cancelled; on or after that day the transfer wins and the departure is refused.
+ */
+export function pendingTransferRefusal(
+  pending: { effectiveOn: BusinessDate } | null,
+  lastWorkingDay: BusinessDate,
+  cancellationReason: string | undefined,
+): OffboardingRefusal | null {
+  if (!pending) return null;
+  if (lastWorkingDay >= pending.effectiveOn)
+    return { code: 'PENDING_EVENT_EXISTS', details: { kind: 'TRANSFER', effectiveOn: pending.effectiveOn } };
+
+  return (cancellationReason ?? '').trim() === '' ? { code: 'TRANSFER_CANCELLATION_REASON_REQUIRED' } : null;
 }
 
 export interface ChangeLastDayFacts extends LastDayFacts {
@@ -124,7 +133,6 @@ export interface ChangeLastDayFacts extends LastDayFacts {
   currentLastWorkingDay: BusinessDate;
   newLastWorkingDay: BusinessDate;
   reason: string;
-  selfMode: SelfActionMode;
   successor: OffboardingRefusal | null;
 }
 
@@ -150,22 +158,16 @@ export function changeLastDayRefusal(facts: ChangeLastDayFacts): OffboardingRefu
   const day = plannedDayRefusal(facts.newLastWorkingDay, facts);
   if (day) return day;
   if (facts.newLastWorkingDay === facts.currentLastWorkingDay) return { code: 'NO_CHANGE' };
-  if (facts.selfMode === 'NEEDS_ANOTHER_IT_ADMIN') return SELF_REFUSAL;
 
   return facts.successor;
 }
 
-/** Whether a handover under way may be cancelled (`US-03-04` AC-15, AC-29): a reason, and not for oneself while another IT Admin can. */
-export function cancelRefusal(facts: {
-  state: OffboardingState;
-  reason: string;
-  selfMode: SelfActionMode;
-}): OffboardingRefusal | null {
+/** Whether a handover under way may be cancelled (`US-03-04` AC-15): a reason. */
+export function cancelRefusal(facts: { state: OffboardingState; reason: string }): OffboardingRefusal | null {
   const state = notHandingOverRefusal(facts.state);
   if (state) return state;
-  if (facts.reason.trim() === '') return { code: 'REASON_REQUIRED' };
 
-  return facts.selfMode === 'NEEDS_ANOTHER_IT_ADMIN' ? SELF_REFUSAL : null;
+  return facts.reason.trim() === '' ? { code: 'REASON_REQUIRED' } : null;
 }
 
 /** Whether the handover may become the departure (`US-03-04` AC-3, AC-10): any day, also after the last working day, never a day ahead. */
@@ -215,7 +217,22 @@ export interface RevocationFacts {
   rights: readonly RightFacts[];
   lockRecorded: boolean;
   lockGiven: boolean;
-  selfMode: SelfActionMode;
+}
+
+/** The first right named that is not there or already has a task, or has no revocation (K3, K4), in the order named; null when all can be taken. */
+export function namedRightsRefusal(named: readonly string[], rights: readonly RightFacts[]): OffboardingRefusal | null {
+  const byId = new Map(rights.map((right) => [right.assignmentId, right]));
+  for (const id of named) {
+    const right = byId.get(id);
+    if (!right || right.hasTask) return { code: 'ASSIGNMENT_NOT_AVAILABLE', details: { assignmentId: id } };
+    if (!right.revocable)
+      return {
+        code: 'REVOCATION_NOT_SUPPORTED',
+        details: { assignmentId: id, provisioningType: right.provisioningType },
+      };
+  }
+
+  return null;
 }
 
 /** The rights a command selects, and the refusal when it cannot; `selected` is meaningful only without a refusal. */
@@ -227,23 +244,14 @@ export function revocationSelection(facts: RevocationFacts): {
   if (facts.state !== 'LEFT') return none({ code: 'CASE_NOT_LEFT' });
   if (facts.closed) return none({ code: 'CASE_CLOSED' });
   if (facts.reason.trim() === '') return none({ code: 'REASON_REQUIRED' });
-  if (facts.selfMode === 'NEEDS_ANOTHER_IT_ADMIN') return none(SELF_REFUSAL);
 
-  const byId = new Map(facts.rights.map((right) => [right.assignmentId, right]));
   let selected: string[];
   if (facts.named === undefined) {
     selected = facts.rights.filter((right) => !right.hasTask && right.revocable).map((right) => right.assignmentId);
   } else {
     selected = [...new Set(facts.named)];
-    for (const id of selected) {
-      const right = byId.get(id);
-      if (!right || right.hasTask) return none({ code: 'ASSIGNMENT_NOT_AVAILABLE', details: { assignmentId: id } });
-      if (!right.revocable)
-        return none({
-          code: 'REVOCATION_NOT_SUPPORTED',
-          details: { assignmentId: id, provisioningType: right.provisioningType },
-        });
-    }
+    const named = namedRightsRefusal(selected, facts.rights);
+    if (named) return none(named);
   }
   if (facts.count !== selected.length) return none({ code: 'COUNT_MISMATCH', details: { expected: selected.length } });
   if (!facts.lockRecorded && !facts.lockGiven) return none({ code: 'ACCOUNT_LOCK_NOT_RECORDED' });
@@ -338,4 +346,28 @@ export function checklistOf(facts: ChecklistFacts): Checklist {
 /** Whether the case is in a handover that has passed its last working day (`US-03-04` AC-10): still working, listed for the IT Admin. */
 export function isPastLastDay(state: OffboardingState, lastWorkingDay: BusinessDate, today: BusinessDate): boolean {
   return state === 'HANDING_OVER' && lastWorkingDay < today;
+}
+
+/**
+ * What the person is now, read before the locks: refused at once when unknown, gone, already handing over or given no last working
+ * day, in that order (the first that holds is the answer). A person on long leave is judged later, by the policy of the record.
+ */
+export function subjectRefusal(
+  seen: { status: string; workState: string } | null,
+  lastWorkingDay: BusinessDate | undefined,
+): 'EMPLOYEE_NOT_FOUND' | 'EMPLOYEE_LEFT' | 'ALREADY_HANDING_OVER' | 'LAST_WORKING_DAY_REQUIRED' | null {
+  if (!seen) return 'EMPLOYEE_NOT_FOUND';
+  if (seen.status === 'TERMINATED' || seen.workState === 'LEFT') return 'EMPLOYEE_LEFT';
+  if (seen.workState === 'HANDING_OVER') return 'ALREADY_HANDING_OVER';
+  if (lastWorkingDay === undefined) return 'LAST_WORKING_DAY_REQUIRED';
+
+  return null;
+}
+
+/** The day the department is left with no head: only when a head hands over to nobody. */
+export function departmentWithoutHeadFrom(
+  handover: { successorEmployeeId: string | null } | null,
+  endsOn: BusinessDate,
+): BusinessDate | null {
+  return handover && handover.successorEmployeeId === null ? endsOn : null;
 }

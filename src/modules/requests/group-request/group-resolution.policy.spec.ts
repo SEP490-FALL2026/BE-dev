@@ -1,5 +1,5 @@
-import { pricedPeople, type LineState } from './group-request.types';
-import { summarizeGroup } from './group-resolution.policy';
+import { pricedPeople, type LineState } from '../access-request/group-request.types';
+import { requestEndingOf, summarizeGroup } from './group-resolution.policy';
 
 const summary = (lines: LineState[], state = 'PENDING') => summarizeGroup(lines, state);
 
@@ -71,5 +71,107 @@ describe('what a request for a group is, from its lines (US-05-17)', () => {
       ]),
     ).toBe(6);
     expect(pricedPeople([])).toBe(0);
+  });
+});
+
+describe('what the request is left with when every line has ended (US-05-17, US-05-08, US-03-04)', () => {
+  const at = (day: string) => new Date(`${day}T00:00:00Z`);
+  const line = (extra: Record<string, unknown>) => ({
+    state: 'COMPLETED' as const,
+    endedAt: null,
+    endedByEmployeeId: null,
+    endReason: null,
+    cancelCause: null,
+    withdrawalRequestedAt: null,
+    ...extra,
+  });
+  const now = at('2026-11-20');
+
+  it('ends granted or failed with the day the last line ended, or today when none says', () => {
+    expect(
+      requestEndingOf(
+        'COMPLETED',
+        [line({ endedAt: at('2026-11-02') }), line({ endedAt: at('2026-11-09') }), line({})],
+        'sender',
+        now,
+      ),
+    ).toEqual({ kind: 'GRANT_OUTCOME', outcome: 'COMPLETED', endedAt: at('2026-11-09') });
+    expect(requestEndingOf('FAILED', [line({ state: 'FAILED' })], 'sender', now)).toEqual({
+      kind: 'GRANT_OUTCOME',
+      outcome: 'FAILED',
+      endedAt: now,
+    });
+  });
+
+  it('is cancelled by the hand that closed the last cancelled line, for the cause and with the note it gave', () => {
+    const lines = [
+      line({
+        state: 'CANCELLED',
+        endedAt: at('2026-11-02'),
+        endedByEmployeeId: 'it-1',
+        cancelCause: 'BENEFICIARY_LEFT',
+        endReason: 'sớm',
+      }),
+      line({
+        state: 'CANCELLED',
+        endedAt: at('2026-11-09'),
+        endedByEmployeeId: 'it-2',
+        cancelCause: 'BENEFICIARY_TRANSFERRED',
+        endReason: 'muộn',
+      }),
+      line({ state: 'WITHDRAWN', endedAt: at('2026-11-15'), endedByEmployeeId: 'other' }),
+    ];
+
+    expect(requestEndingOf('CANCELLED', lines, 'sender', now)).toEqual({
+      kind: 'CANCELLATION',
+      cancelledAt: at('2026-11-09'),
+      cancelledByEmployeeId: 'it-2',
+      cause: 'BENEFICIARY_TRANSFERRED',
+      note: 'muộn',
+    });
+  });
+
+  it('is cancelled by the sender, today, because the person left, when no cancelled line says otherwise', () => {
+    expect(requestEndingOf('CANCELLED', [line({ state: 'CANCELLED' })], 'sender', now)).toEqual({
+      kind: 'CANCELLATION',
+      cancelledAt: now,
+      cancelledByEmployeeId: 'sender',
+      cause: 'BENEFICIARY_LEFT',
+      note: null,
+    });
+  });
+
+  it('is withdrawn when the last withdrawn line was asked, by whom and why, or by the sender today when none says', () => {
+    const lines = [
+      line({
+        state: 'WITHDRAWN',
+        endedAt: at('2026-11-09'),
+        endedByEmployeeId: 'head',
+        endReason: 'Không cần',
+        withdrawalRequestedAt: at('2026-11-08'),
+      }),
+    ];
+
+    expect(requestEndingOf('WITHDRAWN', lines, 'sender', now)).toEqual({
+      kind: 'WITHDRAWAL',
+      requestedAt: at('2026-11-08'),
+      requestedByEmployeeId: 'head',
+      reason: 'Không cần',
+      withdrawnAt: at('2026-11-09'),
+    });
+    expect(requestEndingOf('WITHDRAWN', [line({ state: 'WITHDRAWN' })], 'sender', now)).toEqual({
+      kind: 'WITHDRAWAL',
+      requestedAt: now,
+      requestedByEmployeeId: 'sender',
+      reason: null,
+      withdrawnAt: now,
+    });
+  });
+
+  it('goes to the state it was refused in, and nothing else is written', () => {
+    expect(requestEndingOf('REJECTED', [line({ state: 'NEED_REJECTED' })], 'sender', now)).toEqual({
+      kind: 'STATE',
+      state: 'REJECTED',
+    });
   });
 });

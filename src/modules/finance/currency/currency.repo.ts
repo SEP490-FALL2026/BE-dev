@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
-import type { CurrencyRecord } from '../finance.types';
+import type { CurrencyRecord } from '../public/finance.types';
 
 const CURRENCY_SELECT = { code: true, name: true, minorUnit: true } as const;
 

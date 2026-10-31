@@ -1,14 +1,24 @@
 name: Backend CI
 
+# Test tiers (docs/workspace/items/be-test-architecture-redesign/spec.md, OD-T2, OD-T5):
+# - quality: rules, format, lint, typecheck, unit, static gates, architecture, build, schema drift, OpenAPI, audit.
+# - http-contract: test/http, one Nest application per file, no database.
+# - integration: test/integration against a disposable PostgreSQL. On dev and pull requests only the modules the change
+#   touches and the modules that import them (scripts/ci/affected-modules.mjs); on main and by hand, everything.
+# - e2e-smoke: a few business journeys end to end, on main and by hand.
+# - deploy: only from main, only when every test job above passed. Nightly runs everything on dev (nightly.yml).
+# No step hides a failure (no continue-on-error, no `|| true`).
+
 on:
   pull_request:
-    paths:
+    paths: &watched
       - 'src/**'
       - 'test/**'
       - 'scripts/**'
       - 'prisma/**'
       - 'prisma.config.ts'
       - 'compose.yaml'
+      - 'docker-compose.prod.yml'
       - 'Dockerfile'
       - '.dockerignore'
       - 'infra/**'
@@ -19,7 +29,9 @@ on:
       - 'pnpm-workspace.yaml'
       - 'tsconfig*.json'
       - 'eslint.config.mjs'
-      - '.github/workflows/ci.yml'
+      - '.dependency-cruiser.cjs'
+      - '.github/workflows/**'
+      - '.github/actions/**'
       - 'README.md'
       - 'CONTRIBUTING.md'
       - 'ARCHITECTURE.md'
@@ -36,48 +48,19 @@ on:
       - '.prettierignore'
   push:
     branches: [main, dev]
-    paths:
-      - 'src/**'
-      - 'test/**'
-      - 'scripts/**'
-      - 'prisma/**'
-      - 'prisma.config.ts'
-      - 'compose.yaml'
-      - 'Dockerfile'
-      - '.dockerignore'
-      - 'infra/**'
-      - 'openapi.json'
-      - '.gitattributes'
-      - 'package.json'
-      - 'pnpm-lock.yaml'
-      - 'pnpm-workspace.yaml'
-      - 'tsconfig*.json'
-      - 'eslint.config.mjs'
-      - '.github/workflows/ci.yml'
-      - 'README.md'
-      - 'CONTRIBUTING.md'
-      - 'ARCHITECTURE.md'
-      - 'AGENTS.md'
-      - 'GEMINI.md'
-      - '.cursor/rules/**'
-      - '.claude/**'
-      - 'CLAUDE.md'
-      - '.windsurfrules'
-      - '.github/copilot-instructions.md'
-      - 'docs/**'
-      - 'rules-check.config.json'
-      - '.prettierrc'
-      - '.prettierignore'
+    paths: *watched
+  workflow_dispatch:
 
 permissions:
   contents: read
+  packages: write
 
 jobs:
   quality:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 20
     services:
-      postgres:
+      postgres: &postgres
         image: postgres:17-alpine
         env:
           POSTGRES_USER: ci_bootstrap
@@ -93,51 +76,18 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 11.1.3
-          run_install: false
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      - name: Set up the backend
+        uses: ./.github/actions/setup
 
       - name: Run local quality gate
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
         run: pnpm check
 
-      - name: Run API E2E tests
-        run: pnpm test:e2e
-
-      - name: Provision ordinary integration role
-        run: |
-          docker exec -i "${{ job.services.postgres.id }}" psql -X -U ci_bootstrap -d postgres -v ON_ERROR_STOP=1 <<'SQL'
-          CREATE ROLE ci_integration LOGIN NOSUPERUSER CREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS PASSWORD 'ci-integration-only';
-          SQL
-
-      - name: Assert ordinary integration role
-        env:
-          PGPASSWORD: ci-integration-only
-        run: |
-          docker exec -i -e PGPASSWORD "${{ job.services.postgres.id }}" psql -X -h 127.0.0.1 -U ci_integration -d postgres -v ON_ERROR_STOP=1 <<'SQL'
-          DO $$
-          BEGIN
-            IF NOT EXISTS (
-              SELECT 1 FROM pg_roles
-              WHERE rolname = current_user
-                AND rolcanlogin AND rolcreatedb AND NOT rolsuper
-                AND NOT rolcreaterole AND NOT rolreplication AND NOT rolbypassrls
-            ) THEN
-              RAISE EXCEPTION 'Integration requires an ordinary LOGIN CREATEDB role';
-            END IF;
-          END;
-          $$;
-          SQL
+      - name: Provision the test database role
+        uses: ./.github/actions/test-database
+        with:
+          container: ${{ job.services.postgres.id }}
 
       # DB-16: deploy every committed migration into an empty CI database, then fail when the Prisma schema
       # describes anything the migrations do not create (a schema change committed without its migration).
@@ -151,15 +101,21 @@ jobs:
           pnpm exec prisma migrate deploy
           pnpm exec prisma migrate diff --from-config-datasource --to-schema prisma --exit-code
 
-      - name: Run isolated PostgreSQL integration tests
-        run: pnpm test:integration
-        env:
-          TEST_DATABASE_ADMIN_URL: postgresql://ci_integration:ci-integration-only@127.0.0.1:5432/postgres
+      - name: Validate Compose configuration
+        run: docker compose config --quiet
 
-      - name: Validate Compose and build runtime
+      # H7: every profile of the production file interpolates with the three role passwords, and refuses without one.
+      - name: Validate production Compose configuration
         run: |
-          docker compose config --quiet
-          docker build -t slm-api:ci .
+          : > .env.app
+          printf 'POSTGRES_PASSWORD=ci-placeholder-bootstrap\nDATABASE_DEPLOY_PASSWORD=ci-placeholder-deploy\nDATABASE_RUNTIME_PASSWORD=ci-placeholder-runtime\n' > "$RUNNER_TEMP/prod.env"
+          docker compose --env-file "$RUNNER_TEMP/prod.env" -f docker-compose.prod.yml --profile deploy --profile admin config --quiet
+          grep -v RUNTIME "$RUNNER_TEMP/prod.env" > "$RUNNER_TEMP/prod-missing.env"
+          if docker compose --env-file "$RUNNER_TEMP/prod-missing.env" -f docker-compose.prod.yml config --quiet 2>/dev/null; then
+            echo 'docker-compose.prod.yml accepted a missing DATABASE_RUNTIME_PASSWORD' >&2
+            exit 1
+          fi
+          rm .env.app
 
       - name: Verify OpenAPI export
         run: |
@@ -168,3 +124,137 @@ jobs:
 
       - name: Audit production dependencies
         run: pnpm audit --prod --audit-level high
+
+      - name: Keep test timings
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-timings-quality
+          path: reports/test-timings/
+          if-no-files-found: ignore
+
+  http-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up the backend
+        uses: ./.github/actions/setup
+
+      - name: Run HTTP contract tests
+        run: pnpm test:http --maxWorkers=2
+
+      - name: Keep test timings
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-timings-http
+          path: reports/test-timings/
+          if-no-files-found: ignore
+
+  integration:
+    runs-on: ubuntu-latest
+    # Measured on 2 vCPU: the parallel step alone took 19–21 min, the whole job about 24–27 min (Owner, 30/10/2026).
+    timeout-minutes: 40
+    services:
+      postgres: *postgres
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          # the affected-module selection diffs against the previous commit of the branch or the PR base
+          fetch-depth: 0
+
+      - name: Set up the backend
+        uses: ./.github/actions/setup
+
+      - name: Provision the test database role
+        uses: ./.github/actions/test-database
+        with:
+          container: ${{ job.services.postgres.id }}
+
+      # The CLI suites start the built `dist/cli.js` (TEST_CLI_RUNTIME=dist) instead of compiling the sources per call.
+      - name: Build
+        run: pnpm build
+
+      - name: Choose the integration suites
+        id: select
+        env:
+          BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          if [ "$GITHUB_REF" = "refs/heads/main" ] || [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            printf 'paths=ALL\nserial=SERIAL\n' >> "$GITHUB_OUTPUT"
+          else
+            node scripts/ci/affected-modules.mjs "$BASE" "$GITHUB_SHA" > "$RUNNER_TEMP/affected.txt"
+            printf 'paths=%s\nserial=%s\n' "$(sed -n 1p "$RUNNER_TEMP/affected.txt")" "$(sed -n 2p "$RUNNER_TEMP/affected.txt")" >> "$GITHUB_OUTPUT"
+          fi
+          cat "$GITHUB_OUTPUT"
+
+      - name: Run integration tests (parallel files)
+        if: steps.select.outputs.paths != 'NONE'
+        env:
+          PATHS: ${{ steps.select.outputs.paths }}
+          TEST_DATABASE_ADMIN_URL: postgresql://ci_integration:ci-integration-only@127.0.0.1:5432/postgres
+          TEST_CLI_RUNTIME: dist
+        run: |
+          if [ "$PATHS" = "ALL" ]; then pnpm test:integration --maxWorkers=2; else pnpm test:integration --maxWorkers=2 $PATHS; fi
+
+      # The same modules' *.timing-spec.ts: their wall-clock bounds hold only with no other file running.
+      - name: Run integration tests that bound wall-clock time (in band)
+        if: steps.select.outputs.paths != 'NONE'
+        env:
+          PATHS: ${{ steps.select.outputs.paths }}
+          TEST_DATABASE_ADMIN_URL: postgresql://ci_integration:ci-integration-only@127.0.0.1:5432/postgres
+        run: |
+          if [ "$PATHS" = "ALL" ]; then pnpm test:integration:timing; else pnpm test:integration:timing $PATHS; fi
+
+      - name: Run integration tests that share the cluster (in band)
+        if: steps.select.outputs.serial == 'SERIAL'
+        env:
+          TEST_DATABASE_ADMIN_URL: postgresql://ci_integration:ci-integration-only@127.0.0.1:5432/postgres
+          TEST_CLI_RUNTIME: dist
+          # H7: the role-separation suites play the cluster administrator of the disposable service container only.
+          TEST_DATABASE_BOOTSTRAP_URL: postgresql://ci_bootstrap:ci-bootstrap-only@127.0.0.1:5432/postgres
+        run: pnpm test:integration:serial
+
+      - name: Keep test timings
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-timings-integration
+          path: reports/test-timings/
+          if-no-files-found: ignore
+
+  e2e-smoke:
+    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres: *postgres
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up the backend
+        uses: ./.github/actions/setup
+
+      - name: Provision the test database role
+        uses: ./.github/actions/test-database
+        with:
+          container: ${{ job.services.postgres.id }}
+
+      - name: Run end-to-end smoke journeys
+        env:
+          TEST_DATABASE_ADMIN_URL: postgresql://ci_integration:ci-integration-only@127.0.0.1:5432/postgres
+        run: pnpm test:e2e
+
+  deploy:
+    name: Deploy to VPS
+    needs: [quality, http-contract, integration, e2e-smoke]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    uses: ./.github/workflows/deploy.yml
+    with:
+      mode: deploy
+    secrets: inherit

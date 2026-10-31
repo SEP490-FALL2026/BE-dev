@@ -2,18 +2,28 @@ import { Injectable } from '@nestjs/common';
 import { BusinessDate } from '../../../core/business-date';
 import { DbTx, readSqlState } from '../../../infrastructure/database/transaction-runner';
 import { isCheckViolation } from '../../../infrastructure/database/unique-violation';
-import { CreateDepartmentInput, EmployeeStatus, OwningUnit } from '../organization.types';
+import { FinanceSetupIncompleteError } from '../public/organization.errors';
+import {
+  ClearedHeadSuccessor,
+  CostedOwningUnit,
+  CreateDepartmentInput,
+  EmployeeStatus,
+  OwningUnit,
+  UsableItAdmins,
+} from '../public/organization.types';
 import { HeadAssignmentError } from './department.errors';
+import { itAdminScope } from './department.policy';
 import { DepartmentHeadRepo } from './department-head.repo';
 import { DepartmentRepo } from './department.repo';
-import { DepartmentHeadRecord, DepartmentRecord, HeadPeriodChanges, HeadPeriodRecord } from './department.types';
+import { DepartmentHeadRecord, DepartmentRecord, HeadPeriodChanges } from './department.types';
+import { HeadPeriodRecord } from '../organization-structure.types';
 
 /**
  * The departments and their heads as `OrganizationModule` holds them: the owner of `DepartmentHeadRepo`, which no other
  * provider injects. The organization facade reaches departments through it, for other modules (installation, accounts,
  * the per-request role check, import, onboarding), for the manual entry and for the department use cases' head periods.
  * Every call runs in the caller's transaction, in the order the caller makes it; the rules stay with the use cases. The
- * department use cases keep using `DepartmentRepo` directly (Owner decision E4).
+ * department use cases keep using `DepartmentRepo` directly (a scoped Owner exception).
  */
 @Injectable()
 export class DepartmentDirectoryService {
@@ -32,7 +42,7 @@ export class DepartmentDirectoryService {
     tx: DbTx,
     organizationId: string,
     code: string,
-  ): Promise<{ id: string; code: string; name: string; active: boolean; costCenterActive: boolean } | null> {
+  ): Promise<{ id: string; code: string; name: string; active: boolean } | null> {
     return this.departments.lockByCode(tx, organizationId, code);
   }
 
@@ -102,14 +112,24 @@ export class DepartmentDirectoryService {
     );
 
     return new Map(
-      placements.flatMap((placement) => {
-        const costCenter = units.get(placement.departmentId);
-
-        return costCenter
-          ? [[placement.employeeId, { departmentId: placement.departmentId, costCenter }] as const]
-          : [];
-      }),
+      placements.flatMap((placement) =>
+        units.has(placement.departmentId)
+          ? [
+              [
+                placement.employeeId,
+                { departmentId: placement.departmentId, costCenter: units.get(placement.departmentId) ?? null },
+              ] as const,
+            ]
+          : [],
+      ),
     );
+  }
+
+  /** The unit with its Cost Center; throws FinanceSetupIncompleteError when the department has none yet (`QĐ-87d(1)`). */
+  requireUnitCostCenter(unit: OwningUnit): CostedOwningUnit {
+    if (!unit.costCenter) throw new FinanceSetupIncompleteError(unit.departmentId);
+
+    return { ...unit, costCenter: unit.costCenter };
   }
 
   find(id: string, tx?: DbTx): Promise<DepartmentRecord | null> {
@@ -130,6 +150,32 @@ export class DepartmentDirectoryService {
   /** The departments that name this employee IT Admin in charge, while they still work; empty otherwise. */
   idsInChargeOf(employeeId: string, tx?: DbTx): Promise<string[]> {
     return this.departments.idsInChargeOf(employeeId, tx);
+  }
+
+  /**
+   * The departments an IT Admin reads and handles (`US-01-11`): those that name them in charge (retired ones too) and the active
+   * ones nobody usable is in charge of, whose technical work falls to every IT Admin (`itAdminScope`). An unlocked read; `usableAmong`
+   * tells which of the IT Admins named can act.
+   */
+  async itAdminScopeOf(employeeId: string, usableAmong: UsableItAdmins, tx?: DbTx): Promise<string[]> {
+    const active = await this.departments.activeDepartmentsWithItAdmin(tx);
+    const usable = await usableAmong(
+      active.flatMap((department) => (department.itAdminEmployeeId ? [department.itAdminEmployeeId] : [])),
+    );
+    const standingIn = itAdminScope(
+      employeeId,
+      active.map((department) => ({
+        id: department.id,
+        active: true,
+        itAdminEmployeeId: department.itAdminEmployeeId,
+        itAdminUsable:
+          department.itAdminEmployeeId !== null &&
+          department.itAdminStatus === 'ACTIVE' &&
+          usable.has(department.itAdminEmployeeId),
+      })),
+    );
+
+    return [...new Set([...standingIn, ...(await this.idsInChargeOf(employeeId, tx))])];
   }
 
   /** The active departments each of these employees is named IT Admin in charge of (one read, in code order). */
@@ -166,6 +212,11 @@ export class DepartmentDirectoryService {
 
   hasHeadPeriodFrom(client: DbTx | undefined, employeeId: string, onDate: BusinessDate): Promise<boolean> {
     return this.heads.hasHeadPeriodFrom(client, employeeId, onDate);
+  }
+
+  /** Takes back the successor named for the department (a head period that begins after `today`) and reopens the head's period. */
+  clearHeadSuccessor(tx: DbTx, departmentId: string, today: BusinessDate): Promise<ClearedHeadSuccessor | null> {
+    return this.heads.clearSuccessor(tx, departmentId, today);
   }
 
   /** Cancels the head periods that begin on or after `from` and ends the one in force then, the day before. */

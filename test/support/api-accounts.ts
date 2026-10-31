@@ -1,7 +1,7 @@
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
-import { PayloadCipher } from '../../src/modules/notifications/payload-cipher';
+import { PayloadCipher } from '../../src/modules/notifications/email/payload-cipher.service';
 import { bodyOf } from './api-body';
 import { HttpTestApp, SEED_PASSWORD, SeededInstallation, insertEmployeeFixture } from './http-test-app';
 

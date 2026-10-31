@@ -18,7 +18,7 @@ interceptor envelope, exception filter (429 → `HTTP_TOO_MANY_REQUESTS`), `Secu
 
 ### Task 1: test đỏ và test đặc tả runtime
 
-- Files: `test/e2e/api-inventory.e2e-spec.ts`, `test/e2e/app.e2e-spec.ts`,
+- Files: `test/http/platform/api-inventory.http-spec.ts`, `test/http/platform/app.http-spec.ts`,
   `test/integration/{account-management-http,cost-centers-http,employee-imports-http,password-self-service-http}.integration-spec.ts`,
   `src/infrastructure/http/openapi-rate-limit.spec.ts` (mới).
 - Depends on: none.
@@ -29,7 +29,7 @@ interceptor envelope, exception filter (429 → `HTTP_TOO_MANY_REQUESTS`), `Secu
 ### Task 2: implementation tối thiểu
 
 - Files: `app-users.controller.ts`, `health.controller.ts`, `cost-centers.controller.ts`, `employee-imports.controller.ts`,
-  `auth.controller.ts`, `me.controller.ts`, `openapi-rate-limit.ts` (mới), `bootstrap.ts`.
+  `auth.controller.ts`, `me.controller.ts`, `openapi-rate-limit.ts` (mới), `app/configure-application.ts`.
 - Depends on: Task 1.
 - Acceptance: test Task 1 xanh; runtime chỉ đổi bốn `message`.
 - Verify: focused unit, e2e, integration; `pnpm typecheck`, `pnpm lint`.

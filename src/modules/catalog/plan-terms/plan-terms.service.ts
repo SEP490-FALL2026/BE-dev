@@ -3,9 +3,9 @@ import { Page, pageOf } from '../../../core/application/pagination';
 import type { BusinessDate } from '../../../core/business-date';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { AuditService } from '../../audit/audit.service';
-import { OrganizationService } from '../../organization/organization.service';
-import { catalogAuditEvent } from '../mappers/catalog-audit-event';
+import { AuditApi } from '../../audit/public/audit.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
+import { catalogAuditEvent } from '../catalog-audit-event.mapper';
 import { PlanLookupService } from '../plan/plan-lookup.service';
 import { SubscriptionNoticeService } from '../subscription/subscription-notice.service';
 import { PlanTermsPlanNotFoundError, PlanTermsTextInvalidError } from './plan-terms.errors';
@@ -35,10 +35,10 @@ export interface PlanTermsView {
   applicable: boolean;
   sharingPolicy: SharingPolicy | null;
   terms: TermsRecord | null;
-  /** The newest opinions, at most `OPINIONS_IN_VIEW`; `opinionTotal` counts them all (`LD-06`). */
+  /** The newest opinions, at most `OPINIONS_IN_VIEW`; `opinionTotal` counts them all. */
   opinions: OpinionView[];
   opinionTotal: number;
-  /** The earliest review alerts, at most `WARNINGS_IN_VIEW`; `warningTotal` counts them all (`LD-16`). */
+  /** The earliest review alerts, at most `WARNINGS_IN_VIEW`; `warningTotal` counts them all. */
   warnings: ReviewWarning[];
   warningTotal: number;
 }
@@ -83,8 +83,8 @@ export class PlanTermsService {
     private readonly terms: PlanTermsRepo,
     private readonly plans: PlanLookupService,
     private readonly notices: SubscriptionNoticeService,
-    private readonly organization: OrganizationService,
-    private readonly audit: AuditService,
+    private readonly organization: OrganizationApi,
+    private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
   ) {}
 

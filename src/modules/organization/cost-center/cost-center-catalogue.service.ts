@@ -1,13 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { CostCenterBrief, CreateCostCenterInput } from '../organization.types';
+import { CostCenterBrief, CreateCostCenterInput } from '../public/organization.types';
 import { CostCenterRepo } from './cost-center.repo';
 import { CostCenterRecord } from './cost-center.types';
 
 /**
  * The Cost Center catalogue as the organization facade needs it outside the catalogue's own HTTP use cases: the
- * installation's first UNIT and the number of free UNITs the onboarding checklist shows. The catalogue use cases
- * themselves (`CostCenterService`) keep using `CostCenterRepo` directly (Owner decision E4).
+ * installation's first UNIT, created for its department. The catalogue use cases
+ * themselves (`CostCenterService`) keep using `CostCenterRepo` directly (a scoped Owner exception).
  */
 @Injectable()
 export class CostCenterCatalogueService {
@@ -15,6 +15,18 @@ export class CostCenterCatalogueService {
 
   createUnitForInstallation(tx: DbTx, input: CreateCostCenterInput): Promise<{ id: string }> {
     return this.repo.createCostCenter(tx, input);
+  }
+
+  isDirectionActivated(tx?: DbTx): Promise<boolean> {
+    return this.repo.isDirectionActivated(tx);
+  }
+
+  departmentsWithoutCostCenter(tx?: DbTx): Promise<{ id: string; code: string; name: string }[]> {
+    return this.repo.departmentsWithoutCostCenter(tx);
+  }
+
+  recordLocalSeedActivation(tx: DbTx, organizationId: string): Promise<boolean> {
+    return this.repo.recordLocalSeedActivation(tx, organizationId);
   }
 
   findByCode(tx: DbTx, organizationId: string, code: string): Promise<CostCenterRecord | null> {
@@ -31,9 +43,5 @@ export class CostCenterCatalogueService {
 
   lockSharedBriefs(tx: DbTx, ids: readonly string[]): Promise<CostCenterBrief[]> {
     return this.repo.lockSharedBriefs(tx, ids);
-  }
-
-  countFreeUnits(tx?: DbTx): Promise<number> {
-    return this.repo.countFreeUnits(tx);
   }
 }

@@ -1,16 +1,16 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionRunner, toTransientError } from '../../../infrastructure/database/transaction-runner';
-import { OrganizationService } from '../../organization/organization.service';
+import { OrganizationApi } from '../../organization/public/organization.api';
 import { AccountDirectoryService } from '../accounts/account-directory.service';
 import { ActionLinkService } from '../accounts/action-link.service';
-import { CredentialService } from '../accounts/credential.service';
-import { PasswordPolicyError } from '../identity-access.errors';
+import { CredentialService } from '../credentials/credential.service';
+import { PasswordPolicyError } from '../public/identity-access.errors';
 import { PasswordResetInvalidError } from './auth.errors';
 import { PasswordResetRedemptionService } from './password-reset-redemption.service';
 import { canReceiveResetMail } from './password-reset.policy';
 
 /**
- * Resetting a password with a reset link (slice 1c). It takes the AppUser row lock first, then the token, and re-reads
+ * Resetting a password with a reset link. It takes the AppUser row lock first, then the token, and re-reads
  * what it decides on (lock protocol rules 1 and 2). Asking for the link is `PasswordResetRequestService`.
  */
 @Injectable()
@@ -19,7 +19,7 @@ export class PasswordResetService {
     private readonly accounts: AccountDirectoryService,
     private readonly links: ActionLinkService,
     private readonly credentials: CredentialService,
-    private readonly organization: OrganizationService,
+    private readonly organization: OrganizationApi,
     private readonly redemption: PasswordResetRedemptionService,
     private readonly runner: TransactionRunner,
   ) {}
@@ -43,7 +43,7 @@ export class PasswordResetService {
     const lengthViolation = this.credentials.checkPasswordPolicy(newPassword, '');
     if (lengthViolation && lengthViolation !== 'EQUALS_LOGIN_EMAIL') throw new PasswordPolicyError(lengthViolation);
 
-    // A malformed or unknown token costs no Argon2 (R-09): the answer is the same generic error either way.
+    // A malformed or unknown token costs no Argon2: the answer is the same generic error either way.
     if (!this.links.isWellFormedActionToken(token)) throw new PasswordResetInvalidError();
     const tokenHash = this.links.hashActionToken(token);
     const header = await this.links.findActionTokenHeader(tokenHash);

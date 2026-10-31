@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { IdentityAccessService } from '../../identity-access/identity-access.service';
+import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
 import { SpendRoutingService } from './spend-routing.service';
 import { entryFor } from './spend-submission.policy';
@@ -16,7 +16,7 @@ import { entryFor } from './spend-submission.policy';
 @Injectable()
 export class SpendEntryService {
   constructor(
-    private readonly identity: IdentityAccessService,
+    private readonly identity: IdentityAccessApi,
     private readonly routing: SpendRoutingService,
   ) {}
 

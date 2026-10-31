@@ -1,20 +1,42 @@
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
-import { LicensingService } from '../../src/modules/licensing/licensing.service';
+import type { DbTx } from '../../src/infrastructure/database/transaction-runner';
+import { LicensingApi } from '../../src/modules/licensing/public/licensing.api';
 import {
-  GRANT_REQUEST_GATE,
-  type GrantOutcome,
-  type GrantRequestAnswer,
+  GrantRequestGateHook,
   type GrantRequestGate,
-  type ProvisioningFailureKind,
-} from '../../src/modules/licensing/licensing.types';
-import { ApiAccount, createActivatedAccount } from './api-accounts';
+} from '../../src/modules/licensing/public/licensing.extension-points';
+import type {
+  GrantOutcome,
+  GrantRequestAnswer,
+  ProvisioningFailureKind,
+} from '../../src/modules/licensing/public/licensing.types';
+import type { ApiAccount } from './api-accounts';
+import { buildActivatedAccount } from './builders/account.builder';
+import { createDepartment, enterEmployee } from './builders/organization.builder';
+import { StandInGrantRequestGateHook } from './grant-gate-stand-in';
 import { SeatHarness } from './seat-baseline-harness';
 import { HR_BASIS } from './hr-basis';
 
 /** What the module of requests will answer, as the test decides: the request by id, and what it may be granted for. */
 export class FakeGrantGate implements GrantRequestGate {
   private readonly answers = new Map<string, GrantRequestAnswer>();
+
+  /** The department a request is of unless the test names one: the department of the seeded installation (set when the harness starts). */
+  defaultDepartmentId = '';
+
+  /** The requests that share one lock, as the persons of one request for a group do: the lock the real gate takes on the request row. */
+  private readonly lockKeys = new Map<string, string>();
+
+  /** Makes these requests one request for the locks: whoever touches one of them waits for whoever holds the lock of any of them. */
+  shareLock(key: string, ...requestIds: string[]): void {
+    for (const requestId of requestIds) this.lockKeys.set(requestId, key);
+  }
+
+  private async lock(tx: DbTx, requestId: string): Promise<void> {
+    const key = this.lockKeys.get(requestId);
+    if (key !== undefined) await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${key}, 0))`;
+  }
 
   check(requestId: string): Promise<GrantRequestAnswer> {
     return Promise.resolve(this.answers.get(requestId) ?? { status: 'NOT_FOUND' });
@@ -23,7 +45,9 @@ export class FakeGrantGate implements GrantRequestGate {
   /** What licensing told this gate about how a request ended, in order. */
   readonly outcomes: { requestId: string; outcome: GrantOutcome }[] = [];
 
-  claimForGrant(_tx: unknown, requestId: string): Promise<GrantRequestAnswer> {
+  async claimForGrant(tx: DbTx, requestId: string): Promise<GrantRequestAnswer> {
+    await this.lock(tx, requestId);
+
     return this.check(requestId);
   }
 
@@ -35,15 +59,21 @@ export class FakeGrantGate implements GrantRequestGate {
     return Promise.resolve(false);
   }
 
-  reportOutcome(_tx: unknown, requestId: string, outcome: GrantOutcome): Promise<void> {
+  async reportOutcome(tx: DbTx, requestId: string, outcome: GrantOutcome): Promise<void> {
+    await this.lock(tx, requestId);
     this.outcomes.push({ requestId, outcome });
-
-    return Promise.resolve();
   }
 
-  /** A request that is approved enough and not ended, for this person and plan. */
-  grantable(employeeId: string, planId: string): string {
-    return this.answer({ status: 'GRANTABLE', seat: 'PERSONAL', employeeId, planId, expectedEndDate: null });
+  /** A request that is approved enough and not ended, for this person and plan, of this department (the seed one by default). */
+  grantable(employeeId: string, planId: string, departmentId: string = this.defaultDepartmentId): string {
+    return this.answer({
+      status: 'GRANTABLE',
+      seat: 'PERSONAL',
+      employeeId,
+      planId,
+      departmentId,
+      expectedEndDate: null,
+    });
   }
 
   answer(answer: GrantRequestAnswer): string {
@@ -97,71 +127,63 @@ export interface TaskWire {
 export class ProvisioningHarness extends SeatHarness {
   readonly gate = new FakeGrantGate();
 
-  override start(options: Parameters<SeatHarness['start']>[0] = {}): Promise<void> {
-    return super.start({
+  override async start(options: Parameters<SeatHarness['start']>[0] = {}): Promise<void> {
+    await super.start({
       ...options,
-      providerOverrides: [{ token: GRANT_REQUEST_GATE, useValue: this.gate }, ...(options.providerOverrides ?? [])],
+      providerOverrides: [
+        { token: GrantRequestGateHook, useValue: new StandInGrantRequestGateHook(this.gate) },
+        ...(options.providerOverrides ?? []),
+      ],
     });
+    this.gate.defaultDepartmentId = this.seed.departmentId;
   }
 
   /** Today in the calendar of the organization (the seeded one is Asia/Ho_Chi_Minh). */
   today = (): string => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date());
 
-  private created = (response: request.Response): request.Response => {
-    if (response.status !== 201) throw new Error(`${response.status} ${JSON.stringify(response.body)}`);
-
-    return response;
-  };
-
-  async jobTitle(name: string): Promise<string> {
-    return this.dataOf<{ id: string }>(
-      await request(this.server()).post('/api/v1/job-titles').set(this.as(this.it1)).send({ name }).then(this.created),
-    ).id;
+  /** A job title is free text on the person (`QĐ-87e`): there is nothing to create, so the name is the title. */
+  jobTitle(name: string): Promise<string> {
+    return Promise.resolve(name);
   }
 
+  /**
+   * A department the Super Admin creates (with no Cost Center) and the Cost Center Finance creates for it (`QĐ-87d(1)`), both
+   * through the services (T2.2: no HTTP).
+   */
   async department(code: string, itAdminEmployeeId?: string): Promise<{ id: string; code: string }> {
-    const costCenter = await this.costCenter('UNIT');
+    const department = await createDepartment(this.ctx, this.admin, {
+      code,
+      name: `Department ${code}`,
+      hrBasis: HR_BASIS,
+      ...(itAdminEmployeeId ? { itAdminEmployeeId } : {}),
+    });
+    await this.costCenterFor(department.id);
 
-    return this.dataOf<{ id: string; code: string }>(
-      await request(this.server())
-        .post('/api/v1/departments')
-        .set(this.as(this.it1))
-        .send({
-          code,
-          name: `Department ${code}`,
-          costCenterId: costCenter.id,
-          ...(itAdminEmployeeId ? { itAdminEmployeeId } : {}),
-        })
-        .then(this.created),
-    );
+    return department;
   }
 
-  /** A person of the company in this department, with the work email `code@acme.vn`. */
-  async member(departmentCode: string, code: string, jobTitleId: string): Promise<string> {
-    return this.dataOf<{ id: string }>(
-      await request(this.server())
-        .post('/api/v1/employees')
-        .set({ Authorization: `Bearer ${this.admin}` })
-        .send({
-          hrBasis: HR_BASIS,
-          employeeCode: code,
-          fullName: `Person ${code}`,
-          workEmail: `${code.toLowerCase()}@acme.vn`,
-          employmentType: 'STAFF',
-          hireDate: '2026-10-01',
-          departmentCode,
-          jobTitleId,
-        })
-        .then(this.created),
+  /** A person of the company in this department, with the work email `code@acme.vn`, entered by the Super Admin (T2.2: no HTTP). */
+  async member(departmentCode: string, code: string, jobTitle: string): Promise<string> {
+    return (
+      await enterEmployee(this.ctx, this.admin, {
+        hrBasis: HR_BASIS,
+        employeeCode: code,
+        fullName: `Person ${code}`,
+        workEmail: `${code.toLowerCase()}@acme.vn`,
+        employmentType: 'STAFF',
+        hireDate: '2026-10-01',
+        departmentCode,
+        jobTitle,
+      })
     ).id;
   }
 
+  /** An activated account of the employee holding `roles`, signed in (T2.2: built, not invited through HTTP). */
   account(code: string, employeeId: string, roles: string[]): Promise<ApiAccount> {
-    return createActivatedAccount(this.ctx, this.seed, {
+    return buildActivatedAccount(this.ctx, this.seed, {
       code,
       email: `${code.toLowerCase()}@acme.vn`,
       roles,
-      admin: this.admin,
       employeeId,
     });
   }
@@ -179,14 +201,20 @@ export class ProvisioningHarness extends SeatHarness {
   list = (query: Record<string, string | number> = {}, account: ApiAccount = this.it1) =>
     request(this.server()).get('/api/v1/provisioning-tasks').query(query).set(this.as(account));
 
-  /** Grants and returns the task; the request is made grantable for `employeeId` and the plan of the subscription. */
+  /**
+   * Grants and returns the task; the request is made grantable for `employeeId` and the plan of the subscription, as a request of
+   * `departmentId` (the seed department unless named: the seat goes only on a subscription of the department of the request).
+   */
   async granted(
     employeeId: string,
     planId: string,
-    extra: { subscriptionId?: string; accountIdentifier?: string; account?: ApiAccount } = {},
+    extra: { subscriptionId?: string; accountIdentifier?: string; account?: ApiAccount; departmentId?: string } = {},
   ): Promise<TaskWire> {
-    const { account, ...body } = extra;
-    const response = await this.grant({ requestId: this.gate.grantable(employeeId, planId), ...body }, account);
+    const { account, departmentId, ...body } = extra;
+    const response = await this.grant(
+      { requestId: this.gate.grantable(employeeId, planId, departmentId), ...body },
+      account,
+    );
     if (response.status !== 201) throw new Error(`grant: ${response.status} ${JSON.stringify(response.body)}`);
 
     return this.dataOf<{ task: TaskWire }>(response).task;
@@ -236,7 +264,7 @@ export class ProvisioningHarness extends SeatHarness {
 
   /** What the connector will call when a try fails (`US-07-03` does not exist yet): the facade of the module. */
   recordFailure = (taskId: string, kind: ProvisioningFailureKind, detail = `error of ${kind}`, now?: Date) =>
-    this.ctx.app.get(LicensingService).recordProvisioningFailure({ taskId, kind, detail, ...(now ? { now } : {}) });
+    this.ctx.app.get(LicensingApi).recordProvisioningFailure({ taskId, kind, detail, ...(now ? { now } : {}) });
 
   /** A task of the connector: no connector exists, so a task by hand is moved to that channel the way G7 will make it. */
   async makeConnector(taskId: string): Promise<void> {

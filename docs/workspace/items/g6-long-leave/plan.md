@@ -20,7 +20,7 @@
 
 ### Task 2: dữ liệu (xong)
 
-- Files: `prisma/migrations/20261024170000_personnel_employee_leaves/migration.sql`, `prisma/models/personnel.prisma`, `src/architecture-boundaries.spec.ts` (model owner)
+- Files: `prisma/migrations/20261024170000_personnel_employee_leaves/migration.sql`, `prisma/models/personnel.prisma`, `test/gates/architecture-boundaries.gate-spec.ts` (model owner)
 - Depends on: Task 1, `g6-transfer-record`
 - Acceptance: ba enum, `employee_leaves` với unique một phần cho kỳ `ACTIVE` và `CHECK` ngày/trạng thái, `employee_leave_changes` chỉ thêm, không cột lý do nghỉ
 - Verify: nhóm test _what the database refuses_ (`23505`, `23514`, `55000`) xanh; `pnpm prisma:validate`; `migrate diff --exit-code` = 0 trên CSDL kiểm thử riêng
@@ -34,7 +34,7 @@
 
 ### Task 4: dịch vụ và sweeper (xong)
 
-- Files: `personnel/leave/leave.service.ts`, `leave.repo.ts`, `leave-return.sweeper.ts`, `personnel/personnel.service.ts`, `personnel.module.ts`, `src/module-graph.spec.ts` (`PUBLIC_CONTRACT_EXPORTS` khi có consumer)
+- Files: `personnel/leave/leave.service.ts`, `leave.repo.ts`, `leave-return.sweeper.ts`, `personnel/public/personnel.api.ts`, `personnel.module.ts`, `test/gates/module-graph.gate-spec.ts` (`PUBLIC_CONTRACT_EXPORTS` khi có consumer)
 - Depends on: Task 2, Task 3
 - Acceptance: `start`, `changeReturnDate`, `confirmReturn`, `endForDeparture`, `resumeAfterCancelledDeparture`, `getLeaveIntervals`; một transaction mỗi lệnh dưới khóa nhân viên; nhắc quá hạn một lần mỗi ngày đã duyệt; trạng thái không bao giờ tự đổi
 - Verify: integration PostgreSQL của AC-4, AC-5, AC-7, AC-8 và hai hàm cho nghỉ việc xanh

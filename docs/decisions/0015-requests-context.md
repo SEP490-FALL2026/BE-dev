@@ -18,7 +18,7 @@ dựng `catalog`, `finance`, `licensing` ([ADR-0013](0013-catalog-finance-licens
 
 1. Một module nghiệp vụ mới `requests` (C4) sở hữu `access_requests`, `access_request_beneficiaries`,
    `access_request_steps` và các bảng tiếp theo của G5 (bản ghi phê duyệt, `request_budget_checks`, `request_finance_reviews`, lô trình `spend_batches`, hồ sơ bổ sung `request_supplements`, câu hỏi ngân sách). Theo
-   [module structure](../rules/module-structure.md#khi-nào-folder-trở-thành-nest-submodule) đây là bounded context mới vì
+   [module structure](../rules/module-structure.md#layout-trong-một-module) đây là bounded context mới vì
    có bảng riêng, nghiệp vụ riêng và contract công khai riêng (cổng cấp phát).
 2. **Hướng phụ thuộc:** `requests → organization, identity-access (facade), catalog, finance, budgets (facade), operating-parameters,
 audit`. `requests`

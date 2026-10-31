@@ -1,5 +1,6 @@
 import type { BusinessDate } from '../../../core/business-date';
-import type { EmployeeRecord } from '../../organization/organization.types';
+import type { EmployeeRecord } from '../../organization/public/organization.types';
+import type { ReadAccess } from '../personnel-self-action.policy';
 import type { LeaveChangeWire, LeaveDetailWire, LeaveSummaryWire } from './leave.dto';
 import { isReturnOverdue } from './leave.policy';
 import type { LeaveChangeRecord, LeaveRecord, LeaveSummaryRecord } from './leave.types';
@@ -28,19 +29,21 @@ export function toSummary(
   };
 }
 
+/** The leave in full for the Super Admin; for the IT Admin without the basis of the approved day. */
 export function toDetail(
   record: LeaveRecord,
   employees: ReadonlyMap<string, EmployeeRecord>,
   today: BusinessDate,
+  access: ReadAccess = 'FULL',
 ): LeaveDetailWire {
   return {
     ...toSummary(record, employees, today),
-    grounds: { ...record.grounds },
+    grounds: access === 'FULL' ? { ...record.grounds } : null,
     endKind: record.endKind,
     resumesLeaveId: record.resumesLeaveId,
     startedByAppUserId: record.startedByAppUserId,
+    startedByProcedure: record.startedByTicketId !== null,
     startedAt: record.startedAt.toISOString(),
-    selfExecuted: record.selfExecuted,
   };
 }
 
@@ -53,6 +56,6 @@ export const toChange = (change: LeaveChangeRecord): LeaveChangeWire => ({
   onSchedule: change.onSchedule,
   grounds: change.grounds && { ...change.grounds },
   recordedByAppUserId: change.recordedByAppUserId,
+  recordedByProcedure: change.recordedByTicketId !== null,
   recordedAt: change.recordedAt.toISOString(),
-  selfExecuted: change.selfExecuted,
 });

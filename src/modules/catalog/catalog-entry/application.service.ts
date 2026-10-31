@@ -1,25 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { DbTx, TransactionRunner } from '../../../infrastructure/database/transaction-runner';
-import { isCheckViolation, isUniqueViolation } from '../../../infrastructure/database/unique-violation';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { AuditService } from '../../audit/audit.service';
-import { EmployeeNotFoundError } from '../../organization/organization.errors';
-import { OrganizationService } from '../../organization/organization.service';
-import { PlanLookupService } from '../plan/plan-lookup.service';
-import { recommendK2, type K2Recommendation } from '../subscription/seat-guard.policy';
-import { SeatOccupancyRegistry } from '../subscription/seat-occupancy.registry';
-import type { EmptyState } from '../catalog.types';
-import { FunctionalGroupLookupService } from '../functional-group/functional-group-lookup.service';
-import { catalogAuditEvent } from '../mappers/catalog-audit-event';
+import { AuditApi } from '../../audit/public/audit.api';
+import type { EmptyState } from '../public/catalog.types';
+import { catalogAuditEvent } from '../catalog-audit-event.mapper';
 import { VendorDictionaryLookupService } from '../vendor-dictionary/vendor-dictionary-lookup.service';
 import { VendorDirectoryService, type EnsuredVendor } from '../vendor/vendor-directory.service';
 import {
-  ApplicationBusinessOwnerInvalidError,
   ApplicationDictionaryLineNotFoundError,
-  ApplicationDictionaryLineMismatchError,
-  ApplicationDictionaryLineTakenError,
-  ApplicationFunctionalGroupInvalidError,
-  ApplicationNameTakenError,
   ApplicationNotFoundError,
   ApplicationUpdateEmptyError,
 } from './application.errors';
@@ -28,22 +16,17 @@ import {
   cleanApplicationName,
   cleanNote,
   isCommunicationService,
-  replacementRequired,
   SIMILAR_APPLICATION_LIMIT,
   vendorSourceOf,
   type CommunicationAnswers,
 } from './application.policy';
 import { ApplicationRepo } from './application.repo';
 import { ApplicationVendorLinkService } from './application-vendor-link.service';
-import { mergeCommunication, sameCommunication, sameList, snapshot } from './application.state';
-import type {
-  ApplicationChanges,
-  ApplicationKind,
-  ApplicationRecord,
-  ApplicationView,
-  BusinessOwnerView,
-  DataSensitivity,
-} from './application.types';
+import { ApplicationWriteGuards } from './application-write-guards.service';
+import { ApplicationViewService } from './application-view.service';
+import { applicationChangesOf, snapshot } from './application-state.policy';
+import type { K2Recommendation } from './k2-recommendation.policy';
+import type { ApplicationKind, ApplicationRecord, ApplicationView, DataSensitivity } from './application.types';
 
 export interface DeclareApplicationInput {
   name: string;
@@ -78,14 +61,12 @@ export class ApplicationService {
   constructor(
     private readonly applications: ApplicationRepo,
     private readonly vendors: VendorDirectoryService,
-    private readonly functionalGroups: FunctionalGroupLookupService,
     private readonly dictionary: VendorDictionaryLookupService,
     private readonly vendorLinks: ApplicationVendorLinkService,
-    private readonly organization: OrganizationService,
-    private readonly plans: PlanLookupService,
-    private readonly occupancy: SeatOccupancyRegistry,
-    private readonly audit: AuditService,
+    private readonly views: ApplicationViewService,
+    private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
+    private readonly guards: ApplicationWriteGuards,
   ) {}
 
   /** The guidance of an empty list: set only when there is not one application at all, not when a filter matched none. */
@@ -108,7 +89,7 @@ export class ApplicationService {
   }> {
     const record = await this.applications.find(id);
     if (!record) throw new ApplicationNotFoundError();
-    const [application] = await this.withOwners([record]);
+    const [application] = await this.views.withOwners([record]);
     const similar = record.functionalGroup
       ? await this.applications.similarTo(record.functionalGroup.id, id, SIMILAR_APPLICATION_LIMIT)
       : { items: [], total: 0 };
@@ -117,21 +98,23 @@ export class ApplicationService {
       application,
       similar: similar.items,
       similarTotal: similar.total,
-      recommendations: await this.recommendationsOf(id),
+      recommendations: await this.views.recommendationsOf(id),
     };
   }
 
   /**
    * Declares an application. Throws the vendor errors of `vendorSourceOf`, the
    * name, domain and note errors of the policy, ApplicationBusinessOwnerInvalidError,
-   * ApplicationFunctionalGroupInvalidError, ApplicationDictionaryLineNotFoundError, ApplicationNameTakenError and
-   * ApplicationDictionaryLineTakenError. `proposed` is true when the software is outside the dictionary.
+   * ApplicationFunctionalGroupInvalidError, ApplicationDictionaryLineNotFoundError, ApplicationNameTakenError,
+   * ApplicationDictionaryLineTakenError, ApplicationDictionaryLineMismatchError (a vendor of the group's name holds
+   * another group) and ApplicationVendorGroupChangedError (a simultaneous change took the group first, `DB-03`).
+   * `proposed` is true when the software is outside the dictionary.
    */
   async declare(
     actor: AuthenticatedPrincipal,
     input: DeclareApplicationInput,
   ): Promise<{ application: ApplicationView; proposed: boolean }> {
-    const [application] = await this.withOwners([await this.declareRecord(actor, input)]);
+    const [application] = await this.views.withOwners([await this.declareRecord(actor, input)]);
 
     return { application, proposed: vendorSourceOf(input).type === 'NAME' };
   }
@@ -139,102 +122,144 @@ export class ApplicationService {
   /** The same declaration, returning the record; with `outer` it is written in the caller's transaction (`US-05-20`). */
   async declareRecord(actor: AuthenticatedPrincipal, input: DeclareApplicationInput, outer?: DbTx) {
     const source = vendorSourceOf(input);
-    const name = cleanApplicationName(input.name);
-    const domains = cleanApplicationDomains(input.domains ?? []);
-    const note = cleanNote(input.communication.note);
-    const kind = input.kind;
-    const communication = {
-      personToPersonMessaging: input.communication.personToPersonMessaging,
-      callsOrMeetings: input.communication.callsOrMeetings,
-      mailbox: input.communication.mailbox,
-      isCommunicationService: isCommunicationService(input.communication),
-      note,
+    const prepared = {
+      source,
+      name: cleanApplicationName(input.name),
+      domains: cleanApplicationDomains(input.domains ?? []),
+      note: cleanNote(input.communication.note),
+      organizationId: await this.guards.requireOrganizationId(),
     };
-    const organizationId = await this.requireOrganizationId();
-
-    const write = async (tx: DbTx): Promise<ApplicationRecord> => {
-      {
-        await this.requireWorkingOwner(tx, input.businessOwnerEmployeeId);
-        const group = input.functionalGroupId ? await this.requireActiveGroup(tx, input.functionalGroupId) : null;
-
-        let ensured: EnsuredVendor | null = null;
-        let dictionaryServiceLineId: string | null = null;
-        if (source.type === 'DICTIONARY') {
-          const line = await this.dictionary.findLine(tx, source.lineId);
-          if (!line) throw new ApplicationDictionaryLineNotFoundError();
-          ensured = await this.vendors.ensureForDictionaryGroup(tx, organizationId, {
-            id: line.groupId,
-            name: line.groupName,
-          });
-          dictionaryServiceLineId = line.lineId;
-        } else if (source.type === 'NAME') {
-          ensured = await this.vendors.ensureByName(tx, organizationId, source.name);
-        }
-
-        const created = await this.applications.insert(tx, {
-          organizationId,
-          name,
-          kind,
-          vendorId: ensured?.vendor.id ?? null,
-          dictionaryServiceLineId,
-          functionalGroupId: group?.id ?? null,
-          businessOwnerEmployeeId: input.businessOwnerEmployeeId,
-          dataSensitivity: input.dataSensitivity,
-          communication,
-          domains,
-        });
-        await this.applications.openOwnerPeriod(tx, {
-          applicationId: created.id,
-          employeeId: input.businessOwnerEmployeeId,
-          assignedByAppUserId: actor.appUserId,
-        });
-        if (ensured?.created) {
-          await this.audit.record(
-            tx,
-            catalogAuditEvent(actor, organizationId, 'VENDOR.CREATED', 'Vendor', ensured.vendor.id, null, {
-              name: ensured.vendor.name,
-              dictionaryGroupId: ensured.vendor.dictionaryGroupId,
-            }),
-          );
-        }
-        if (ensured?.adopted) {
-          await this.vendorLinks.recordAdopted(
-            tx,
-            actor,
-            organizationId,
-            ensured.vendor.id,
-            ensured.vendor.dictionaryGroupId,
-          );
-        }
-        await this.audit.record(
-          tx,
-          catalogAuditEvent(
-            actor,
-            organizationId,
-            'APPLICATION.CREATED',
-            'Application',
-            created.id,
-            null,
-            snapshot(created),
-          ),
-        );
-        if (source.type === 'NAME') {
-          await this.vendorLinks.raiseProposal(tx, actor, {
-            organizationId,
-            name,
-            domains,
-            sourceApplicationId: created.id,
-          });
-        }
-
-        return created;
-      }
-    };
+    const write = (tx: DbTx): Promise<ApplicationRecord> => this.writeDeclaration(tx, actor, input, prepared);
 
     try {
       return await (outer ? write(outer) : this.runner.run(write));
     } catch (error) {
-      throw this.mapWriteError(error);
+      throw this.guards.mapWriteError(error);
+    }
+  }
+
+  /** The Business Owner and the functional group are checked, the vendor is found or made, the application is written, and the audit says so. */
+  private async writeDeclaration(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    input: DeclareApplicationInput,
+    prepared: {
+      source: ReturnType<typeof vendorSourceOf>;
+      name: string;
+      domains: string[];
+      note: string | null;
+      organizationId: string;
+    },
+  ): Promise<ApplicationRecord> {
+    const { source, name, domains, note, organizationId } = prepared;
+    await this.guards.requireWorkingOwner(tx, input.businessOwnerEmployeeId);
+    const group = input.functionalGroupId ? await this.guards.requireActiveGroup(tx, input.functionalGroupId) : null;
+    const { ensured, dictionaryServiceLineId } = await this.ensureVendor(tx, organizationId, source);
+
+    const created = await this.applications.insert(tx, {
+      organizationId,
+      name,
+      kind: input.kind,
+      vendorId: ensured?.vendor.id ?? null,
+      dictionaryServiceLineId,
+      functionalGroupId: group?.id ?? null,
+      businessOwnerEmployeeId: input.businessOwnerEmployeeId,
+      dataSensitivity: input.dataSensitivity,
+      communication: {
+        personToPersonMessaging: input.communication.personToPersonMessaging,
+        callsOrMeetings: input.communication.callsOrMeetings,
+        mailbox: input.communication.mailbox,
+        isCommunicationService: isCommunicationService(input.communication),
+        note,
+      },
+      domains,
+    });
+    await this.applications.openOwnerPeriod(tx, {
+      applicationId: created.id,
+      employeeId: input.businessOwnerEmployeeId,
+      assignedByAppUserId: actor.appUserId,
+    });
+    await this.auditCreated(tx, actor, created, { ensured, source, name, domains, organizationId });
+
+    return created;
+  }
+
+  /** The vendor the application is of: the one of the dictionary group, or one found or made by its name; none for software without one. */
+  private async ensureVendor(
+    tx: DbTx,
+    organizationId: string,
+    source: ReturnType<typeof vendorSourceOf>,
+  ): Promise<{ ensured: EnsuredVendor | null; dictionaryServiceLineId: string | null }> {
+    if (source.type === 'DICTIONARY') {
+      const line = await this.dictionary.findLine(tx, source.lineId);
+      if (!line) throw new ApplicationDictionaryLineNotFoundError();
+      const ensured = await this.vendors.ensureForDictionaryGroup(tx, organizationId, {
+        id: line.groupId,
+        name: line.groupName,
+      });
+
+      return { ensured, dictionaryServiceLineId: line.lineId };
+    }
+    if (source.type === 'NAME') {
+      return {
+        ensured: await this.vendors.ensureByName(tx, organizationId, source.name),
+        dictionaryServiceLineId: null,
+      };
+    }
+
+    return { ensured: null, dictionaryServiceLineId: null };
+  }
+
+  private async auditCreated(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    created: ApplicationRecord,
+    made: {
+      ensured: EnsuredVendor | null;
+      source: ReturnType<typeof vendorSourceOf>;
+      name: string;
+      domains: string[];
+      organizationId: string;
+    },
+  ): Promise<void> {
+    const { ensured, organizationId } = made;
+    if (ensured?.created) {
+      await this.audit.record(
+        tx,
+        catalogAuditEvent(actor, organizationId, 'VENDOR.CREATED', 'Vendor', ensured.vendor.id, null, {
+          name: ensured.vendor.name,
+          dictionaryGroupId: ensured.vendor.dictionaryGroupId,
+        }),
+      );
+    }
+    if (ensured?.adopted) {
+      await this.vendorLinks.recordAdopted(
+        tx,
+        actor,
+        organizationId,
+        ensured.vendor.id,
+        ensured.vendor.dictionaryGroupId,
+      );
+    }
+    await this.audit.record(
+      tx,
+      catalogAuditEvent(
+        actor,
+        organizationId,
+        'APPLICATION.CREATED',
+        'Application',
+        created.id,
+        null,
+        snapshot(created),
+      ),
+    );
+    if (made.source.type === 'NAME') {
+      await this.vendorLinks.raiseProposal(tx, actor, {
+        organizationId,
+        name: made.name,
+        domains: made.domains,
+        sourceApplicationId: created.id,
+      });
     }
   }
 
@@ -244,153 +269,69 @@ export class ApplicationService {
    */
   async update(actor: AuthenticatedPrincipal, id: string, input: UpdateApplicationInput): Promise<ApplicationView> {
     if (Object.values(input).every((value) => value === undefined)) throw new ApplicationUpdateEmptyError();
-    const name = input.name === undefined ? undefined : cleanApplicationName(input.name);
-    const domains = input.domains === undefined ? undefined : cleanApplicationDomains(input.domains);
-    const note = input.communication?.note === undefined ? undefined : cleanNote(input.communication.note);
-    const organizationId = await this.requireOrganizationId();
+    const cleaned = {
+      name: input.name === undefined ? undefined : cleanApplicationName(input.name),
+      domains: input.domains === undefined ? undefined : cleanApplicationDomains(input.domains),
+      note: input.communication?.note === undefined ? undefined : cleanNote(input.communication.note),
+    };
+    const organizationId = await this.guards.requireOrganizationId();
 
     try {
-      const record = await this.runner.run(async (tx) => {
-        const current = await this.applications.lock(tx, id);
-        if (!current) throw new ApplicationNotFoundError();
-        const changes: ApplicationChanges = {};
-        let adoptedGroup: { vendorId: string; groupId: string } | null = null;
+      const record = await this.runner.run((tx) => this.updateIn(tx, actor, id, input, { cleaned, organizationId }));
 
-        if (name !== undefined && name !== current.name) changes.name = name;
-        if (domains !== undefined && !sameList(domains, current.domains)) changes.domains = domains;
-        if (input.dataSensitivity !== undefined && input.dataSensitivity !== current.dataSensitivity) {
-          changes.dataSensitivity = input.dataSensitivity;
-        }
-        if (
-          input.businessOwnerEmployeeId !== undefined &&
-          input.businessOwnerEmployeeId !== current.businessOwnerEmployeeId
-        ) {
-          await this.requireWorkingOwner(tx, input.businessOwnerEmployeeId);
-          changes.businessOwnerEmployeeId = input.businessOwnerEmployeeId;
-        }
-        if (
-          input.functionalGroupId !== undefined &&
-          input.functionalGroupId !== (current.functionalGroup?.id ?? null)
-        ) {
-          if (input.functionalGroupId !== null) await this.requireActiveGroup(tx, input.functionalGroupId);
-          changes.functionalGroupId = input.functionalGroupId;
-        }
-        if (
-          input.dictionaryServiceLineId !== undefined &&
-          input.dictionaryServiceLineId !== current.dictionaryServiceLineId
-        ) {
-          if (input.dictionaryServiceLineId !== null) {
-            adoptedGroup = await this.vendorLinks.requireLine(tx, current, input.dictionaryServiceLineId);
-          }
-          changes.dictionaryServiceLineId = input.dictionaryServiceLineId;
-        }
-        if (input.communication !== undefined) {
-          const merged = mergeCommunication(current.communication, input.communication, note);
-          if (!sameCommunication(merged, current.communication)) changes.communication = merged;
-        }
-        if (Object.keys(changes).length === 0) return current;
+      return (await this.views.withOwners([record]))[0];
+    } catch (error) {
+      throw this.guards.mapWriteError(error);
+    }
+  }
 
-        const updated = await this.applications.update(tx, id, changes);
-        if (adoptedGroup) {
-          await this.vendorLinks.recordAdopted(tx, actor, organizationId, adoptedGroup.vendorId, adoptedGroup.groupId);
-        }
-        if (changes.businessOwnerEmployeeId !== undefined) {
-          await this.applications.closeOpenOwnerPeriod(tx, id);
-          await this.applications.openOwnerPeriod(tx, {
-            applicationId: id,
-            employeeId: changes.businessOwnerEmployeeId,
-            assignedByAppUserId: actor.appUserId,
-          });
-        }
-        await this.audit.record(
-          tx,
-          catalogAuditEvent(
-            actor,
-            organizationId,
-            'APPLICATION.UPDATED',
-            'Application',
-            id,
-            snapshot(current),
-            snapshot(updated),
-          ),
-        );
+  private async updateIn(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    id: string,
+    input: UpdateApplicationInput,
+    ctx: { cleaned: { name?: string; domains?: string[]; note?: string | null }; organizationId: string },
+  ): Promise<ApplicationRecord> {
+    const { organizationId } = ctx;
+    const current = await this.applications.lock(tx, id);
+    if (!current) throw new ApplicationNotFoundError();
+    const changes = applicationChangesOf(current, input, ctx.cleaned);
 
-        return updated;
+    // The references that changed are checked in this order: the Business Owner, the functional group, the dictionary line.
+    if (changes.businessOwnerEmployeeId !== undefined) {
+      await this.guards.requireWorkingOwner(tx, changes.businessOwnerEmployeeId);
+    }
+    if (changes.functionalGroupId) await this.guards.requireActiveGroup(tx, changes.functionalGroupId);
+    const adoptedGroup = changes.dictionaryServiceLineId
+      ? await this.vendorLinks.requireLine(tx, organizationId, current, changes.dictionaryServiceLineId)
+      : null;
+    if (Object.keys(changes).length === 0) return current;
+
+    const updated = await this.applications.update(tx, id, changes);
+    if (adoptedGroup) {
+      await this.vendorLinks.recordAdopted(tx, actor, organizationId, adoptedGroup.vendorId, adoptedGroup.groupId);
+    }
+    if (changes.businessOwnerEmployeeId !== undefined) {
+      await this.applications.closeOpenOwnerPeriod(tx, id);
+      await this.applications.openOwnerPeriod(tx, {
+        applicationId: id,
+        employeeId: changes.businessOwnerEmployeeId,
+        assignedByAppUserId: actor.appUserId,
       });
-
-      return (await this.withOwners([record]))[0];
-    } catch (error) {
-      throw this.mapWriteError(error);
     }
-  }
-
-  /** The plan changes worth recommending to the owner today, read not decided: three people on K1 plans suggest K2. */
-  private async recommendationsOf(applicationId: string): Promise<K2Recommendation[]> {
-    const k1Plans = (await this.plans.plansOfApplication(applicationId))
-      .filter((plan) => plan.provisioningType === 'K1')
-      .map((plan) => plan.id);
-    if (k1Plans.length === 0) return [];
-    const today = await this.organization.businessToday();
-    const recommendation = recommendK2(await this.occupancy.current().openHolderCount(k1Plans, today));
-
-    return recommendation ? [recommendation] : [];
-  }
-
-  /** Locks the employee `FOR SHARE` so a departure cannot slip in, then requires them to be still working (`INV-06`). */
-  private async requireWorkingOwner(tx: DbTx, employeeId: string): Promise<void> {
-    try {
-      await this.organization.lockEmployeeForShare(tx, employeeId);
-    } catch (error) {
-      if (error instanceof EmployeeNotFoundError) throw new ApplicationBusinessOwnerInvalidError();
-      throw error;
-    }
-    const employee = await this.organization.getEmployee(employeeId, tx);
-    if (!employee || employee.status !== 'ACTIVE') throw new ApplicationBusinessOwnerInvalidError();
-  }
-
-  private async requireActiveGroup(tx: DbTx, id: string): Promise<{ id: string; name: string }> {
-    const group = await this.functionalGroups.findActive(tx, id);
-    if (!group) throw new ApplicationFunctionalGroupInvalidError();
-
-    return group;
-  }
-
-  private mapWriteError(error: unknown): unknown {
-    if (isUniqueViolation(error, 'dictionary_line_id')) return new ApplicationDictionaryLineTakenError();
-    if (isUniqueViolation(error, 'normalized_name')) return new ApplicationNameTakenError();
-    if (isCheckViolation(error)) return new ApplicationDictionaryLineMismatchError();
-
-    return error;
-  }
-
-  private async withOwners(records: ApplicationRecord[]): Promise<ApplicationView[]> {
-    const employees = await this.organization.getEmployees([
-      ...new Set(records.map((record) => record.businessOwnerEmployeeId)),
-    ]);
-    const byId = new Map<string, BusinessOwnerView>(
-      employees.map((employee) => [
-        employee.id,
-        {
-          employeeId: employee.id,
-          employeeCode: employee.employeeCode,
-          fullName: employee.fullName,
-          status: employee.status,
-        },
-      ]),
+    await this.audit.record(
+      tx,
+      catalogAuditEvent(
+        actor,
+        organizationId,
+        'APPLICATION.UPDATED',
+        'Application',
+        id,
+        snapshot(current),
+        snapshot(updated),
+      ),
     );
 
-    return records.map((record) => {
-      const businessOwner = byId.get(record.businessOwnerEmployeeId);
-      if (!businessOwner) throw new Error('The Business Owner of an application is not an employee');
-
-      return { ...record, businessOwner, businessOwnerReplacementRequired: replacementRequired(businessOwner.status) };
-    });
-  }
-
-  private async requireOrganizationId(): Promise<string> {
-    const organization = await this.organization.getOrganization();
-    if (!organization) throw new Error('The application catalog was used before installation');
-
-    return organization.id;
+    return updated;
   }
 }

@@ -2,12 +2,13 @@
 // Proves every spec file is picked up by exactly the runner its location promises, and that
 // nothing is orphaned. Reads the taxonomy from runners.mjs; fails on any violation.
 import { execFileSync } from 'node:child_process';
-import { readdirSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { perTestAppProblems } from './http-app-placement.mjs';
 import { RUNNERS } from './runners.mjs';
-import { layoutProblems, listingProblems, missingRequired, toPosix } from './test-layout.mjs';
+import { layoutProblems, listingProblems, missingRequired, ownerOf, toPosix } from './test-layout.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const jestBin = createRequire(join(root, 'package.json')).resolve('jest/bin/jest');
@@ -34,12 +35,13 @@ function listed(runner) {
 export function run() {
   const files = ['src', 'test'].flatMap(walk).map(toPosix);
   const problems = [...layoutProblems(files), ...missingRequired(files)];
+  for (const file of files.filter((f) => f.startsWith('test/http/') && f.endsWith('.http-spec.ts'))) {
+    problems.push(...perTestAppProblems(file, readFileSync(join(root, file), 'utf8')));
+  }
   const counts = [];
 
   for (const runner of RUNNERS) {
-    const onDisk = files.filter(
-      (file) => file.endsWith(runner.suffix) && runner.roots.some((r) => file.startsWith(`${r}/`)),
-    );
+    const onDisk = files.filter((file) => file.endsWith(runner.suffix) && ownerOf(file) === runner);
     if (runner.jest) {
       let result;
       try {

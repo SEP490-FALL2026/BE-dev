@@ -3,10 +3,10 @@ import { Page, pageOf } from '../../../core/application/pagination';
 import { estimateTax } from '../../../core/money/tax-estimate';
 import { readSqlState, TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { AuditService } from '../../audit/audit.service';
-import { OrganizationService } from '../../organization/organization.service';
-import { financeAuditEvent } from '../mappers/finance-audit-event';
-import { TaxProfileVendorNotFoundError } from '../finance.errors';
+import { AuditApi } from '../../audit/public/audit.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
+import { financeAuditEvent } from '../finance-audit-event.mapper';
+import { TaxProfileVendorNotFoundError } from '../public/finance.errors';
 import {
   DEFAULT_TAX_PROFILE,
   cleanTaxLines,
@@ -21,7 +21,7 @@ import type {
   TaxGroup,
   TaxLineInput,
   TaxProfileView,
-} from '../finance.types';
+} from '../public/finance.types';
 import type { TaxProfileContent } from './tax-profile.types';
 
 const snapshot = (profile: TaxProfileContent & { version: number }) => ({
@@ -53,8 +53,8 @@ function estimateFrom(current: TaxProfileContent | null, netMinor: bigint): TaxE
 export class TaxProfileService {
   constructor(
     private readonly repo: TaxProfileRepo,
-    private readonly organization: OrganizationService,
-    private readonly audit: AuditService,
+    private readonly organization: OrganizationApi,
+    private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
   ) {}
 

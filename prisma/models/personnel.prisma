@@ -21,8 +21,9 @@ model DepartmentTransfer {
   employeeId           String                   @map("employee_id") @db.Uuid
   fromDepartmentId     String                   @map("from_department_id") @db.Uuid
   toDepartmentId       String                   @map("to_department_id") @db.Uuid
-  fromJobTitleId       String                   @map("from_job_title_id") @db.Uuid
-  toJobTitleId         String                   @map("to_job_title_id") @db.Uuid
+  // The titles the catalogue gave the person before it was removed: history only, read by nothing (`@ignore`).
+  fromJobTitleName     String?                  @map("from_job_title_name") @ignore
+  toJobTitleName       String?                  @map("to_job_title_name") @ignore
   effectiveOn          DateTime                 @map("effective_on") @db.Date
   status               DepartmentTransferStatus @default(PENDING)
   closesPlacementId    String                   @map("closes_placement_id") @db.Uuid
@@ -32,12 +33,15 @@ model DepartmentTransfer {
   groundsReference     String                   @map("grounds_reference")
   groundsIssuer        String                   @map("grounds_issuer")
   groundsIssuedOn      DateTime                 @map("grounds_issued_on") @db.Date
-  selfExecuted         Boolean                  @default(false) @map("self_executed")
-  recordedByAppUserId  String                   @map("recorded_by_app_user_id") @db.Uuid
+  selfExecuted         Boolean                  @default(false) @map("self_executed") @ignore
+  // Who recorded and who cancelled: an application account OR the ticket of the controlled procedure (spec L.2).
+  recordedByAppUserId  String?                  @map("recorded_by_app_user_id") @db.Uuid
+  recordedByTicketId   String?                  @map("recorded_by_ticket_id") @db.Uuid
   recordedAt           DateTime                 @default(now()) @map("recorded_at") @db.Timestamptz(3)
   effectiveAt          DateTime?                @map("effective_at") @db.Timestamptz(3)
   cancelledAt          DateTime?                @map("cancelled_at") @db.Timestamptz(3)
   cancelledByAppUserId String?                  @map("cancelled_by_app_user_id") @db.Uuid
+  cancelledByTicketId  String?                  @map("cancelled_by_ticket_id") @db.Uuid
   cancelledReason      String?                  @map("cancelled_reason")
   // Closed by the IT Admin once the people who answer for the service accounts of the person are named (US-03-08); only an EFFECTIVE transfer.
   closedAt             DateTime?                @map("closed_at") @db.Timestamptz(3)
@@ -45,15 +49,15 @@ model DepartmentTransfer {
   // The notice of a head this transfer was recorded from, when there was one (US-03-11).
   noticeId             String?                  @unique @map("notice_id") @db.Uuid
 
-  organization   Organization               @relation(fields: [organizationId], references: [id])
-  notice         PersonnelNotice?           @relation(fields: [noticeId], references: [id], onDelete: Restrict)
-  employee       Employee                   @relation(fields: [employeeId], references: [id])
-  fromDepartment Department                 @relation("TransferFromDepartment", fields: [fromDepartmentId], references: [id])
-  toDepartment   Department                 @relation("TransferToDepartment", fields: [toDepartmentId], references: [id])
-  fromJobTitle   JobTitle                   @relation("TransferFromJobTitle", fields: [fromJobTitleId], references: [id])
-  toJobTitle     JobTitle                   @relation("TransferToJobTitle", fields: [toJobTitleId], references: [id])
-  changes        DepartmentTransferChange[]
-  reviews        TransferReview[]
+  organization      Organization               @relation(fields: [organizationId], references: [id])
+  notice            PersonnelNotice?           @relation(fields: [noticeId], references: [id], onDelete: Restrict)
+  employee          Employee                   @relation(fields: [employeeId], references: [id])
+  fromDepartment    Department                 @relation("TransferFromDepartment", fields: [fromDepartmentId], references: [id])
+  toDepartment      Department                 @relation("TransferToDepartment", fields: [toDepartmentId], references: [id])
+  recordedByTicket  SuperAdminEventTicket?     @relation("TransferRecordedByTicket", fields: [recordedByTicketId], references: [id], onDelete: Restrict)
+  cancelledByTicket SuperAdminEventTicket?     @relation("TransferCancelledByTicket", fields: [cancelledByTicketId], references: [id], onDelete: Restrict)
+  changes           DepartmentTransferChange[]
+  reviews           TransferReview[]
 
   @@index([effectiveOn(sort: Desc), id])
   @@index([employeeId])
@@ -73,10 +77,12 @@ model DepartmentTransferChange {
   groundsReference   String                       @map("grounds_reference")
   groundsIssuer      String                       @map("grounds_issuer")
   groundsIssuedOn    DateTime                     @map("grounds_issued_on") @db.Date
-  changedByAppUserId String                       @map("changed_by_app_user_id") @db.Uuid
+  changedByAppUserId String?                      @map("changed_by_app_user_id") @db.Uuid
+  changedByTicketId  String?                      @map("changed_by_ticket_id") @db.Uuid
   changedAt          DateTime                     @default(now()) @map("changed_at") @db.Timestamptz(3)
 
-  transfer DepartmentTransfer @relation(fields: [transferId], references: [id])
+  transfer        DepartmentTransfer     @relation(fields: [transferId], references: [id])
+  changedByTicket SuperAdminEventTicket? @relation("TransferChangeByTicket", fields: [changedByTicketId], references: [id], onDelete: Restrict)
 
   @@index([transferId, changedAt, id])
   @@map("department_transfer_changes")
@@ -106,7 +112,8 @@ model TransferReview {
   transferId       String?              @map("transfer_id") @db.Uuid
   placementId      String               @unique @map("placement_id") @db.Uuid
   departmentId     String               @map("department_id") @db.Uuid
-  jobTitleId       String               @map("job_title_id") @db.Uuid
+  // The title the catalogue gave the period before it was removed: history only, read by nothing (`@ignore`).
+  jobTitleName     String?              @map("job_title_name") @ignore
   effectiveOn      DateTime             @map("effective_on") @db.Date
   dueOn            DateTime             @map("due_on") @db.Date
   status           TransferReviewStatus @default(OPEN)
@@ -119,7 +126,6 @@ model TransferReview {
   transfer     DepartmentTransfer?  @relation(fields: [transferId], references: [id], onDelete: Restrict)
   placement    EmployeePlacement    @relation(fields: [placementId], references: [id], onDelete: Restrict)
   department   Department           @relation(fields: [departmentId], references: [id], onDelete: Restrict)
-  jobTitle     JobTitle             @relation(fields: [jobTitleId], references: [id], onDelete: Restrict)
   items        TransferReviewItem[]
 
   @@index([dueOn, id])
@@ -188,19 +194,21 @@ model EmployeeLeave {
   groundsReference        String                @map("grounds_reference")
   groundsIssuer           String                @map("grounds_issuer")
   groundsIssuedOn         DateTime              @map("grounds_issued_on") @db.Date
-  startedByAppUserId      String                @map("started_by_app_user_id") @db.Uuid
+  startedByAppUserId      String?               @map("started_by_app_user_id") @db.Uuid
+  startedByTicketId       String?               @map("started_by_ticket_id") @db.Uuid
   startedAt               DateTime              @default(now()) @map("started_at") @db.Timestamptz(3)
-  selfExecuted            Boolean               @default(false) @map("self_executed")
+  selfExecuted            Boolean               @default(false) @map("self_executed") @ignore
   returnOverdueNoticedFor DateTime?             @map("return_overdue_noticed_for") @db.Date
   // The notice of a head this leave was recorded from, when there was one (US-03-11).
   noticeId                String?               @unique @map("notice_id") @db.Uuid
 
-  organization Organization          @relation(fields: [organizationId], references: [id])
-  notice       PersonnelNotice?      @relation(fields: [noticeId], references: [id], onDelete: Restrict)
-  employee     Employee              @relation(fields: [employeeId], references: [id])
-  resumes      EmployeeLeave?        @relation("EmployeeLeaveResumed", fields: [resumesLeaveId], references: [id], onDelete: Restrict)
-  resumedBy    EmployeeLeave[]       @relation("EmployeeLeaveResumed")
-  changes      EmployeeLeaveChange[]
+  organization    Organization           @relation(fields: [organizationId], references: [id])
+  notice          PersonnelNotice?       @relation(fields: [noticeId], references: [id], onDelete: Restrict)
+  employee        Employee               @relation(fields: [employeeId], references: [id])
+  resumes         EmployeeLeave?         @relation("EmployeeLeaveResumed", fields: [resumesLeaveId], references: [id], onDelete: Restrict)
+  resumedBy       EmployeeLeave[]        @relation("EmployeeLeaveResumed")
+  changes         EmployeeLeaveChange[]
+  startedByTicket SuperAdminEventTicket? @relation("LeaveStartedByTicket", fields: [startedByTicketId], references: [id], onDelete: Restrict)
 
   @@index([approvedReturnOn, id])
   @@index([employeeId, startedOn])
@@ -221,11 +229,13 @@ model EmployeeLeaveChange {
   groundsReference    String?                 @map("grounds_reference")
   groundsIssuer       String?                 @map("grounds_issuer")
   groundsIssuedOn     DateTime?               @map("grounds_issued_on") @db.Date
-  recordedByAppUserId String                  @map("recorded_by_app_user_id") @db.Uuid
+  recordedByAppUserId String?                 @map("recorded_by_app_user_id") @db.Uuid
+  recordedByTicketId  String?                 @map("recorded_by_ticket_id") @db.Uuid
   recordedAt          DateTime                @default(now()) @map("recorded_at") @db.Timestamptz(3)
-  selfExecuted        Boolean                 @default(false) @map("self_executed")
+  selfExecuted        Boolean                 @default(false) @map("self_executed") @ignore
 
-  leave EmployeeLeave @relation(fields: [leaveId], references: [id], onDelete: Restrict)
+  leave            EmployeeLeave          @relation(fields: [leaveId], references: [id], onDelete: Restrict)
+  recordedByTicket SuperAdminEventTicket? @relation("LeaveChangeByTicket", fields: [recordedByTicketId], references: [id], onDelete: Restrict)
 
   @@index([leaveId, recordedAt, id])
   @@map("employee_leave_changes")
@@ -285,25 +295,29 @@ model OffboardingCase {
   leftByAppUserId        String?               @map("left_by_app_user_id") @db.Uuid
   cancelledAt            DateTime?             @map("cancelled_at") @db.Timestamptz(3)
   cancelledByAppUserId   String?               @map("cancelled_by_app_user_id") @db.Uuid
+  cancelledByTicketId    String?               @map("cancelled_by_ticket_id") @db.Uuid
   cancelReason           String?               @map("cancel_reason")
   accountLockByAppUserId String?               @map("account_lock_by_app_user_id") @db.Uuid
   accountLockAt          DateTime?             @map("account_lock_at") @db.Timestamptz(3)
   accountLockNote        String?               @map("account_lock_note")
   closedAt               DateTime?             @map("closed_at") @db.Timestamptz(3)
   closedByAppUserId      String?               @map("closed_by_app_user_id") @db.Uuid
-  selfExecuted           Boolean               @default(false) @map("self_executed")
-  recordedByAppUserId    String                @map("recorded_by_app_user_id") @db.Uuid
+  selfExecuted           Boolean               @default(false) @map("self_executed") @ignore
+  recordedByAppUserId    String?               @map("recorded_by_app_user_id") @db.Uuid
+  recordedByTicketId     String?               @map("recorded_by_ticket_id") @db.Uuid
   recordedAt             DateTime              @default(now()) @map("recorded_at") @db.Timestamptz(3)
   // The roles the person held when the case was written or the day it moved (g6-leaver-role-and-workspace-duties); a snapshot.
   roleFlags              OffboardingRoleFlag[] @default([]) @map("role_flags")
   // The notice of a head this case was recorded from, when there was one (US-03-11).
   noticeId               String?               @unique @map("notice_id") @db.Uuid
 
-  organization Organization            @relation(fields: [organizationId], references: [id])
-  notice       PersonnelNotice?        @relation(fields: [noticeId], references: [id], onDelete: Restrict)
-  employee     Employee                @relation(fields: [employeeId], references: [id])
-  department   Department              @relation(fields: [departmentId], references: [id])
-  changes      OffboardingCaseChange[]
+  organization      Organization            @relation(fields: [organizationId], references: [id])
+  notice            PersonnelNotice?        @relation(fields: [noticeId], references: [id], onDelete: Restrict)
+  employee          Employee                @relation(fields: [employeeId], references: [id])
+  department        Department              @relation(fields: [departmentId], references: [id])
+  changes           OffboardingCaseChange[]
+  recordedByTicket  SuperAdminEventTicket?  @relation("OffboardingRecordedByTicket", fields: [recordedByTicketId], references: [id], onDelete: Restrict)
+  cancelledByTicket SuperAdminEventTicket?  @relation("OffboardingCancelledByTicket", fields: [cancelledByTicketId], references: [id], onDelete: Restrict)
 
   @@index([lastWorkingDay, id])
   @@index([employeeId])
@@ -322,11 +336,13 @@ model OffboardingCaseChange {
   newLastWorkingDay  DateTime?             @map("new_last_working_day") @db.Date
   reason             String?
   detail             Json?
-  changedByAppUserId String                @map("changed_by_app_user_id") @db.Uuid
+  changedByAppUserId String?               @map("changed_by_app_user_id") @db.Uuid
+  changedByTicketId  String?               @map("changed_by_ticket_id") @db.Uuid
   changedAt          DateTime              @default(now()) @map("changed_at") @db.Timestamptz(3)
-  selfExecuted       Boolean               @default(false) @map("self_executed")
+  selfExecuted       Boolean               @default(false) @map("self_executed") @ignore
 
-  offboardingCase OffboardingCase @relation(fields: [caseId], references: [id], onDelete: Restrict)
+  offboardingCase OffboardingCase        @relation(fields: [caseId], references: [id], onDelete: Restrict)
+  changedByTicket SuperAdminEventTicket? @relation("OffboardingChangeByTicket", fields: [changedByTicketId], references: [id], onDelete: Restrict)
 
   @@index([caseId, changedAt, id])
   @@map("offboarding_case_changes")
@@ -382,6 +398,7 @@ model PersonnelNotice {
   defaultItAdminEmployeeId String?                   @map("default_it_admin_employee_id") @db.Uuid
   dueOn                    DateTime                  @map("due_on") @db.Date
   handledByAppUserId       String?                   @map("handled_by_app_user_id") @db.Uuid
+  handledByTicketId        String?                   @map("handled_by_ticket_id") @db.Uuid
   handledAt                DateTime?                 @map("handled_at") @db.Timestamptz(3)
   overdueNoticedAt         DateTime?                 @map("overdue_noticed_at") @db.Timestamptz(3)
   createdAt                DateTime                  @default(now()) @map("created_at") @db.Timestamptz(3)
@@ -391,6 +408,7 @@ model PersonnelNotice {
   sender           Employee                     @relation("NoticeSender", fields: [senderEmployeeId], references: [id])
   targetDepartment Department?                  @relation("NoticeTargetDepartment", fields: [targetDepartmentId], references: [id], onDelete: Restrict)
   senderDepartment Department                   @relation("NoticeSenderDepartment", fields: [senderDepartmentId], references: [id])
+  handledByTicket  SuperAdminEventTicket?       @relation("NoticeHandledByTicket", fields: [handledByTicketId], references: [id], onDelete: Restrict)
   verification     PersonnelNoticeVerification?
   transfer         DepartmentTransfer?
   leave            EmployeeLeave?
@@ -409,10 +427,68 @@ model PersonnelNoticeVerification {
   noticeId            String             @unique @map("notice_id") @db.Uuid
   method              VerificationMethod
   reference           String
-  verifiedByAppUserId String             @map("verified_by_app_user_id") @db.Uuid
+  verifiedByAppUserId String?            @map("verified_by_app_user_id") @db.Uuid
+  verifiedByTicketId  String?            @map("verified_by_ticket_id") @db.Uuid
   verifiedAt          DateTime           @default(now()) @map("verified_at") @db.Timestamptz(3)
 
-  notice PersonnelNotice @relation(fields: [noticeId], references: [id], onDelete: Restrict)
+  notice           PersonnelNotice        @relation(fields: [noticeId], references: [id], onDelete: Restrict)
+  verifiedByTicket SuperAdminEventTicket? @relation("VerificationByTicket", fields: [verifiedByTicketId], references: [id], onDelete: Restrict)
 
   @@map("personnel_notice_verifications")
+}
+
+// The modes of the controlled procedure for an event whose subject is the Super Admin (`pnpm ops:record-super-admin-event`).
+enum SuperAdminEventMode {
+  TRANSFER_RECORD
+  TRANSFER_RESCHEDULE
+  TRANSFER_CANCEL
+  LEAVE_START
+  LEAVE_RETURN
+  DEPARTURE_RECORD
+  DEPARTURE_CHANGE
+  DEPARTURE_CANCEL
+  ABRUPT_DEPARTURE_RECORD
+  PROFILE_CORRECT
+}
+
+// The approval ticket of one run of the controlled procedure (spec L.2): the idempotency key, the record of who approved and
+// who ran it, and the "who" of the event it wrote in place of an application account. Added to, never changed (a trigger).
+model SuperAdminEventTicket {
+  id                String              @id @default(uuid()) @db.Uuid
+  organizationId    String              @map("organization_id") @db.Uuid
+  ticketRef         String              @map("ticket_ref")
+  mode              SuperAdminEventMode
+  subjectEmployeeId String              @map("subject_employee_id") @db.Uuid
+  // SHA-256 of the normalized parameters of the mode: the same ticket with other parameters is refused.
+  parametersDigest  String              @map("parameters_digest")
+  approverRef       String              @map("approver_ref")
+  operatorRef       String              @map("operator_ref")
+  environment       String
+  recordedAt        DateTime            @default(now()) @map("recorded_at") @db.Timestamptz(3)
+
+  organization         Organization                  @relation(fields: [organizationId], references: [id])
+  subject              Employee                      @relation("SuperAdminEventTicketSubject", fields: [subjectEmployeeId], references: [id], onDelete: Restrict)
+  transfersRecorded    DepartmentTransfer[]          @relation("TransferRecordedByTicket")
+  transfersCancelled   DepartmentTransfer[]          @relation("TransferCancelledByTicket")
+  transferChanges      DepartmentTransferChange[]    @relation("TransferChangeByTicket")
+  leavesStarted        EmployeeLeave[]               @relation("LeaveStartedByTicket")
+  leaveChanges         EmployeeLeaveChange[]         @relation("LeaveChangeByTicket")
+  offboardingRecorded  OffboardingCase[]             @relation("OffboardingRecordedByTicket")
+  offboardingCancelled OffboardingCase[]             @relation("OffboardingCancelledByTicket")
+  offboardingChanges   OffboardingCaseChange[]       @relation("OffboardingChangeByTicket")
+  noticesHandled       PersonnelNotice[]             @relation("NoticeHandledByTicket")
+  noticeVerifications  PersonnelNoticeVerification[] @relation("VerificationByTicket")
+
+  @@unique([organizationId, ticketRef])
+  @@index([subjectEmployeeId])
+  @@map("super_admin_event_tickets")
+}
+
+// The last number of the `BM09-<year>-<6 digits>` code given in a year (F48). The application takes the next one under the lock
+// of the row of the year, so the series restarts every year and never runs out of the old sequence's six digits.
+model PersonnelNoticeCounter {
+  year      Int @id
+  lastValue Int @map("last_value")
+
+  @@map("personnel_notice_counters")
 }

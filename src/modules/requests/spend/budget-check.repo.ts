@@ -1,10 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import type { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
+import { budgetYearLockKey } from '../../budgets/public/budget-year-lock-key.policy';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { CheckRoute, YearResult } from './budget-check.policy';
 
-export type CheckTrigger = 'SUBMISSION' | 'PLAN_LINE_MOVED' | 'BUDGET_VERSION_APPROVED' | 'SPEND_DECISION';
+/** What set a check going; `FINANCE_OUTCOME_WHILE_WAITING` is Finance giving an outcome to a request that waits for a version. */
+export type CheckTrigger =
+  'SUBMISSION' | 'PLAN_LINE_MOVED' | 'BUDGET_VERSION_APPROVED' | 'SPEND_DECISION' | 'FINANCE_OUTCOME_WHILE_WAITING';
 
 export interface CheckRecord {
   id: string;
@@ -120,6 +123,18 @@ export class BudgetCheckRepo {
     const row = await (tx ?? this.prisma).requestBudgetCheck.findUnique({ where: { id }, include: WITH_YEARS });
 
     return row ? toRecord(row) : null;
+  }
+
+  /**
+   * Takes, until the transaction ends, the lock that serialises everything which reads or writes the budget of this Cost Center in
+   * each of these years: the check of a request at its submission and at its decision, and the commitment written on approval, so
+   * that two requests of one Cost Center and year are judged one after the other and the second reads what the first now holds. The
+   * caller holds the lock of its request first, and the years go in ascending order, the same order every holder of these locks uses.
+   */
+  async lockBudgetYears(tx: DbTx, costCenterId: string, years: readonly number[]): Promise<void> {
+    for (const year of [...new Set(years)].sort((a, b) => a - b)) {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${budgetYearLockKey(costCenterId, year)}, 0))`;
+    }
   }
 
   /** The newest check of each of the requests, in one read. */

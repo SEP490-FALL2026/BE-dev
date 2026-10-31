@@ -19,6 +19,7 @@ lerna-debug.log*
 # Tests
 /coverage
 /.nyc_output
+/reports
 
 # Public model weights; download separately, never commit them.
 /.models/
@@ -47,6 +48,9 @@ lerna-debug.log*
 .env.local
 .env.*
 !.env.example
+!.env.bootstrap.example
+!.env.demo-dataset.example
+!.env.demo-dataset-local.example
 
 # Shared planning is versioned; only personal scratch is ignored.
 /docs/workspace/local/

@@ -2,16 +2,18 @@ import { INestApplication, Type } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { Client } from 'pg';
 import { App } from 'supertest/types';
-import { configureApplication } from '../../src/bootstrap';
+import { configureApplication } from '../../src/app/configure-application';
 import { TransactionRunner } from '../../src/infrastructure/database/transaction-runner';
-import { IdentityAccessService } from '../../src/modules/identity-access/identity-access.service';
-import { OrganizationService } from '../../src/modules/organization/organization.service';
+import { IdentityAccessApi } from '../../src/modules/identity-access/public/identity-access.api';
+import { OrganizationApi } from '../../src/modules/organization/public/organization.api';
+import { PasswordHasher } from '../../src/modules/identity-access/credentials/password-hasher.service';
 import {
   DisposableDatabase,
   dropDisposableDatabase,
   migrateDisposableDatabase,
   provisionDisposableDatabase,
 } from './disposable-database';
+import { defaultPasswordHasher, FastPasswordHasher } from './fast-password-hasher';
 
 export interface HttpTestApp {
   app: INestApplication<App>;
@@ -35,43 +37,71 @@ export async function createHttpTestApp(
     env?: Record<string, string>;
     /** Providers to replace with a stand-in, such as the gate of a module that does not exist yet. */
     providerOverrides?: { token: unknown; useValue: unknown }[];
+    /**
+     * An already migrated database the caller owns (the PostgreSQL role suites, H7): it is neither provisioned, migrated
+     * nor dropped here. `sql` connects through its URL; the application through `appDatabaseUrl` when given.
+     */
+    database?: DisposableDatabase;
+    /**
+     * OD-T3: 'fast' (default outside test/integration/identity-access/) hashes with the cheapest Argon2id parameters;
+     * 'production' keeps the real ones.
+     */
+    passwordHasher?: 'fast' | 'production';
   } = {},
 ): Promise<HttpTestApp> {
-  const database = await provisionDisposableDatabase();
-  await migrateDisposableDatabase(database);
-
+  const owned = options.database === undefined;
+  const database = options.database ?? (await provisionDisposableDatabase());
   const previous = { ...process.env };
-  process.env.TEST_DATABASE_URL = options.appDatabaseUrl ? await options.appDatabaseUrl(database.url) : database.url;
-  // Many sign-ins from one address in a test run must not trip the generic IP rate limit.
-  process.env.RATE_LIMIT_LIMIT = '10000';
-  Object.assign(process.env, options.env ?? {});
+  let app: INestApplication<App> | undefined;
+  let sql: Client | undefined;
+  try {
+    if (owned) await migrateDisposableDatabase(database);
 
-  // ConfigModule.forRoot validates process.env when AppModule is first imported, so the import
-  // must happen after the variables above are set — a static import would read the real ones.
-  const { AppModule } = await import('../../src/app.module');
-  let builder = Test.createTestingModule({
-    imports: [AppModule],
-    controllers: options.extraControllers ?? [],
-  });
-  for (const override of options.providerOverrides ?? []) {
-    builder = builder.overrideProvider(override.token).useValue(override.useValue);
+    process.env.TEST_DATABASE_URL = options.appDatabaseUrl ? await options.appDatabaseUrl(database.url) : database.url;
+    // Many sign-ins from one address in a test run must not trip the generic IP rate limit.
+    process.env.RATE_LIMIT_LIMIT = '10000';
+    Object.assign(process.env, options.env ?? {});
+
+    // ConfigModule.forRoot validates process.env when AppModule is first imported, so the import
+    // must happen after the variables above are set — a static import would read the real ones.
+    const { AppModule } = await import('../../src/app/app.module');
+    let builder = Test.createTestingModule({
+      imports: [AppModule],
+      controllers: options.extraControllers ?? [],
+    });
+    const hasher = options.passwordHasher ?? defaultPasswordHasher();
+    if (hasher === 'fast') builder = builder.overrideProvider(PasswordHasher).useValue(new FastPasswordHasher());
+    for (const override of options.providerOverrides ?? []) {
+      builder = builder.overrideProvider(override.token).useValue(override.useValue);
+    }
+    const moduleRef = await builder.compile();
+    app = moduleRef.createNestApplication<INestApplication<App>>();
+    configureApplication(app, { mountDocs: false });
+    // Own one listener for the fixture lifetime. Otherwise SuperTest owns the first request's
+    // auto-listened server and may close it while parallel sibling requests are still connecting.
+    await app.listen(0, '127.0.0.1');
+
+    sql = new Client({ connectionString: database.url });
+    await sql.connect();
+  } catch (error) {
+    // A setup that stops half-way leaves nothing behind (operational-commands rule 8): the database it provisioned is
+    // dropped and the environment restored; a failure while cleaning never hides the first one.
+    await sql?.end().catch(() => undefined);
+    await app?.close().catch(() => undefined);
+    if (owned) await dropDisposableDatabase(database).catch(() => undefined);
+    process.env = previous;
+    throw error;
   }
-  const moduleRef = await builder.compile();
-  const app = moduleRef.createNestApplication<INestApplication<App>>();
-  configureApplication(app, { mountDocs: false });
-  await app.init();
-
-  const sql = new Client({ connectionString: database.url });
-  await sql.connect();
+  const ready = { app, sql };
 
   return {
-    app,
+    app: ready.app,
     database,
-    sql,
+    sql: ready.sql,
     async close() {
-      await sql.end();
-      await app.close();
-      await dropDisposableDatabase(database);
+      await ready.sql.end();
+      await ready.app.close();
+      if (owned) await dropDisposableDatabase(database);
       process.env = previous;
     },
   };
@@ -80,7 +110,6 @@ export async function createHttpTestApp(
 export interface SeededInstallation {
   organizationId: string;
   departmentId: string;
-  jobTitleId: string;
   superAdmin: { appUserId: string; employeeId: string; email: string; password: string };
 }
 
@@ -89,8 +118,8 @@ export const SEED_PASSWORD = 'correct horse battery staple';
 /** Creates the minimum installation (what the bootstrap command creates) through the real services. */
 export async function seedInstallation(app: INestApplication): Promise<SeededInstallation> {
   const runner = app.get(TransactionRunner);
-  const organization = app.get(OrganizationService);
-  const identity = app.get(IdentityAccessService);
+  const organization = app.get(OrganizationApi);
+  const identity = app.get(IdentityAccessApi);
   const email = 'admin@acme.vn';
   const credential = await identity.prepareCredential(SEED_PASSWORD, email);
 
@@ -100,18 +129,18 @@ export async function seedInstallation(app: INestApplication): Promise<SeededIns
       timeZone: 'Asia/Ho_Chi_Minh',
       reportingCurrency: 'VND',
     });
-    const costCenter = await organization.createUnitCostCenter(tx, {
-      organizationId: org.id,
-      code: 'CC-1',
-      name: 'Ops',
-    });
+    // The department first, then the Cost Center created for it (`QĐ-87d(1)`), as the installation command does.
     const department = await organization.createDepartment(tx, {
       organizationId: org.id,
       code: 'P-OPS',
       name: 'Operations',
-      costCenterId: costCenter.id,
     });
-    const jobTitle = await organization.createJobTitle(tx, org.id, 'Administrator');
+    await organization.createUnitCostCenter(tx, {
+      organizationId: org.id,
+      code: 'CC-1',
+      name: 'Ops',
+      departmentId: department.id,
+    });
     const employee = await organization.createEmployeeWithPlacement(tx, {
       organizationId: org.id,
       employeeCode: 'E-ADMIN',
@@ -120,7 +149,7 @@ export async function seedInstallation(app: INestApplication): Promise<SeededIns
       employmentType: 'STAFF',
       hireDate: '2026-01-05',
       departmentId: department.id,
-      jobTitleId: jobTitle.id,
+      jobTitle: 'Administrator',
     });
     const account = await identity.createBootstrapSuperAdmin(tx, {
       organizationId: org.id,
@@ -133,7 +162,6 @@ export async function seedInstallation(app: INestApplication): Promise<SeededIns
     return {
       organizationId: org.id,
       departmentId: department.id,
-      jobTitleId: jobTitle.id,
       superAdmin: { appUserId: account.appUserId, employeeId: employee.id, email, password: SEED_PASSWORD },
     };
   });
@@ -149,8 +177,8 @@ export async function insertAccountFixture(
   options: { code: string; email: string; activated: boolean; password?: string },
 ): Promise<{ appUserId: string; employeeId: string }> {
   const runner = app.get(TransactionRunner);
-  const organization = app.get(OrganizationService);
-  const identity = app.get(IdentityAccessService);
+  const organization = app.get(OrganizationApi);
+  const identity = app.get(IdentityAccessApi);
   const credential = options.activated
     ? await identity.prepareCredential(options.password ?? SEED_PASSWORD, options.email)
     : null;
@@ -164,7 +192,7 @@ export async function insertAccountFixture(
       employmentType: 'STAFF',
       hireDate: '2026-01-05',
       departmentId: seed.departmentId,
-      jobTitleId: seed.jobTitleId,
+      jobTitle: 'Administrator',
     });
     const rows = await tx.$queryRaw<{ id: string }[]>`
       INSERT INTO app_users (id, organization_id, employee_id, login_email, normalized_login_email, status,
@@ -195,7 +223,7 @@ export async function insertEmployeeFixture(
   options: { code: string; email: string | null; terminated?: boolean },
 ): Promise<{ employeeId: string }> {
   const runner = app.get(TransactionRunner);
-  const organization = app.get(OrganizationService);
+  const organization = app.get(OrganizationApi);
 
   return runner.run(async (tx) => {
     const employee = await organization.createEmployeeWithPlacement(tx, {
@@ -206,7 +234,7 @@ export async function insertEmployeeFixture(
       employmentType: 'STAFF',
       hireDate: '2026-01-05',
       departmentId: seed.departmentId,
-      jobTitleId: seed.jobTitleId,
+      jobTitle: 'Administrator',
     });
     if (options.terminated) {
       await tx.$executeRaw`UPDATE employees SET status = 'TERMINATED' WHERE id = ${employee.id}::uuid`;

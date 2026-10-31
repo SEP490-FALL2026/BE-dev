@@ -1,6 +1,7 @@
 import { HttpStatus } from '@nestjs/common';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
-import { toLicensingApiException } from '../mappers/licensing.http-errors';
+import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
+import { toLicensingApiException } from '../licensing.http-errors';
 import { HandoverDutyError, type HandoverDutyProblem } from './handover.errors';
 
 const ANSWERS: Readonly<Record<HandoverDutyProblem, { status: HttpStatus; message: string }>> = {
@@ -34,3 +35,15 @@ export function toHandoverApiException(error: unknown): unknown {
 
   return toLicensingApiException(error);
 }
+
+const example = (error: Error) => errorExampleOf(toHandoverApiException(error));
+
+/** The answers above as OpenAPI examples, each produced by the mapper that gives it at runtime (OPENAPI-EXAMPLE.1). */
+export const HANDOVER_ERROR_EXAMPLES = {
+  NOT_FOUND: example(new HandoverDutyError('NOT_FOUND')),
+  SCOPE_FORBIDDEN: example(new HandoverDutyError('SCOPE_FORBIDDEN')),
+  NOT_CONFIRMER: example(new HandoverDutyError('NOT_CONFIRMER')),
+  VALUE_NOT_ALLOWED: example(new HandoverDutyError('VALUE_NOT_ALLOWED')),
+  ALREADY_CONFIRMED: example(new HandoverDutyError('ALREADY_CONFIRMED')),
+  CANCELLED: example(new HandoverDutyError('CANCELLED')),
+} as const;

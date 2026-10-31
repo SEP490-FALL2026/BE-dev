@@ -3,13 +3,15 @@ import { ConfigService } from '@nestjs/config';
 import { EnvironmentVariables } from '../../infrastructure/config/env-schema';
 import { DatabaseModule } from '../../infrastructure/database/database.module';
 import { MailTransport, SmtpMailTransport } from '../../infrastructure/mail/mail-transport';
-import { EmailDispatcher } from './email-dispatcher.service';
+import { EmailDispatcher } from './email/email-dispatcher.service';
+import { HeldNotificationRepo } from './inbox/held-notification.repo';
+import { HeldNotificationService } from './inbox/held-notification.service';
 import { InAppNotificationRepo } from './inbox/in-app-notification.repo';
 import { InboxService } from './inbox/inbox.service';
 import { NotificationsRepo } from './notifications.repo';
-import { EmailDeliveryService } from './email-delivery.service';
-import { NotificationsService } from './notifications.service';
-import { PayloadCipher } from './payload-cipher';
+import { EmailDeliveryApi } from './public/email-delivery.api';
+import { NotificationsApi } from './public/notifications.api';
+import { PayloadCipher } from './email/payload-cipher.service';
 
 /** `id:base64` pairs separated by commas. */
 function parsePreviousKeys(value: string): Record<string, string> {
@@ -30,9 +32,11 @@ function parsePreviousKeys(value: string): Record<string, string> {
   providers: [
     NotificationsRepo,
     InAppNotificationRepo,
+    HeldNotificationRepo,
+    HeldNotificationService,
     InboxService,
-    NotificationsService,
-    EmailDeliveryService,
+    NotificationsApi,
+    EmailDeliveryApi,
     EmailDispatcher,
     { provide: MailTransport, useClass: SmtpMailTransport },
     {
@@ -50,6 +54,6 @@ function parsePreviousKeys(value: string): Record<string, string> {
   ],
   // The facade for the business modules, the delivery contract for the worker loop and the inbox for the routes of
   // `NotificationsHttpModule` (the same context); the dispatcher stays private.
-  exports: [NotificationsService, EmailDeliveryService, InboxService],
+  exports: [NotificationsApi, EmailDeliveryApi, InboxService],
 })
 export class NotificationsModule {}

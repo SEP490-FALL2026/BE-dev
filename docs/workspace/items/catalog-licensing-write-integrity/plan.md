@@ -61,3 +61,11 @@ revision cụ thể.
 - [x] Diff cuối đã tự review; tài liệu vận hành/runbook bị ảnh hưởng đã cập nhật; phần chưa kiểm chứng ghi rõ.
 - [ ] Giao Owner review trên revision cụ thể; cập nhật roadmap/PR. Chỉ ghi `merged-dev`, `accepted`, `released` sau
       đúng sự kiện thật.
+
+**Prompt 29 (23/10/2026):** `P28-10` import khóa nay giữ thuê bao/gói trong transaction (comment `20261022110000:25-26` nay đúng), một `INSERT` cho cả lô; `P28-06` test `DB-09` kiểm chính transaction (đối số thứ tư); `P28-12` kẻ thua đua `DB-03` nhận 409 như spec (cùng mã `APPLICATION.DICTIONARY_LINE_MISMATCH`). [g0-g4-checkpoint-fix-forward](../g0-g4-checkpoint-fix-forward/spec.md).
+
+**Prompt 29A (24/10/2026, `P29-N3`):** kẻ thua đua `DB-03` giữ 409 nhưng nay mang mã riêng
+`APPLICATION.DICTIONARY_GROUP_CHANGED` (một mã chỉ một status); đường tạo ứng dụng (`ensureForDictionaryGroup`) thôi ném `Error`
+thô: tên đã thuộc nhóm khác ⟹ 422 mismatch, thua đua ⟹ 409 mã riêng. Test đua tất định bằng khóa dòng (không sleep) trong
+`catalog-licensing-write-integrity.integration-spec.ts`; bằng chứng ở
+[g0-g4-checkpoint-fix-forward](../g0-g4-checkpoint-fix-forward/plan.md), Phase E.

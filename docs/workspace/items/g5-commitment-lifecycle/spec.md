@@ -27,7 +27,7 @@ Tiền đã giữ cho một Request quay lại ngân sách khi Request không c�
 | Story    | AC                    | Coverage | Phần còn lại thuộc                                                                                                                                     |
 | -------- | --------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | US-05-08 | AC-5                  | partial  | AC-1, AC-3, AC-4, AC-6→AC-9, AC-11, AC-12: `g5-request-withdrawal`; AC-2: `g5-finance-information-request`; AC-10: `g3-downstream-finance-integration` |
-| US-05-17 | AC-10                 | partial  | AC-1→AC-8, AC-11→AC-16: `g5-group-requests`; AC-9: `g5-spend-approval-decision`                                                                        |
+| US-05-17 | AC-10                 | partial  | AC-1→AC-8, AC-11→AC-17: `g5-group-requests`; AC-9: `g5-spend-approval-decision`                                                                        |
 | US-06-06 | AC-2→AC-4, AC-6, AC-7 | partial  | AC-1, AC-5, AC-8→AC-12: `g3-downstream-finance-integration`                                                                                            |
 
 ## Supporting references

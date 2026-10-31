@@ -7,7 +7,7 @@ import { SessionRepo } from './session.repo';
 import { TokenService } from './token.service';
 
 /**
- * The failed-attempt counter behind sign-in and behind changing a password (T-6): one counter per
+ * The failed-attempt counter behind sign-in and behind changing a password: one counter per
  * email, so a wrong current password counts exactly like a wrong sign-in password and cannot be used
  * to guess around it. Never locks an account; it only makes the caller wait.
  */
@@ -34,7 +34,7 @@ export class LoginThrottle {
   }
 
   /**
-   * Counts one failure in a single atomic statement, so simultaneous wrong guesses are all counted (R-06).
+   * Counts one failure in a single atomic statement, so simultaneous wrong guesses are all counted.
    * Call it only after the check has finished and failed.
    */
   async recordFailure(organizationId: string, emailKeyHash: string): Promise<void> {
@@ -52,7 +52,7 @@ export class LoginThrottle {
     });
   }
 
-  /** A clean slate after a sign-in that worked or a password that was replaced (T-3), in the caller's transaction. */
+  /** A clean slate after a sign-in that worked or a password that was replaced, in the caller's transaction. */
   async clear(tx: DbTx, organizationId: string, emailKeyHash: string): Promise<void> {
     await this.sessions.clearThrottle(tx, organizationId, emailKeyHash);
   }

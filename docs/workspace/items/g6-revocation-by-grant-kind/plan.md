@@ -20,7 +20,7 @@
 
 ### Task 2: dữ liệu
 
-- Files: `prisma/migrations/20261024080000_licensing_revocation_tasks/migration.sql`, `prisma/models/licensing.prisma`, `src/architecture-boundaries.spec.ts` (nếu cần model owner)
+- Files: `prisma/migrations/20261024080000_licensing_revocation_tasks/migration.sql`, `prisma/models/licensing.prisma`, `test/gates/architecture-boundaries.gate-spec.ts` (nếu cần model owner)
 - Depends on: Task 1
 - Acceptance: ba enum mới; `request_id` nullable với `CHECK` gắn với `kind`; cột thu hồi và `CHECK` đồng bộ trạng thái; unique một phần thay unique `(assignment_id, kind)`; bảng `provisioning_task_reasons` bất biến
 - Verify: nhóm test _what the database refuses_ (`23514`, `23505`, `55000`) xanh; `pnpm prisma:validate`; `migrate diff --exit-code` = 0 trên CSDL kiểm thử riêng
@@ -48,7 +48,7 @@
 
 ### Task 6: API
 
-- Files: `revocation-tasks.controller.ts`, `provisioning-tasks.controller.ts`, `provisioning-task.wire.ts`, `provisioning.dto.ts`, `provisioning.http-errors.ts`, `test/e2e/provisioning.e2e-spec.ts`, `api-coverage-manifest.ts`, `api-inventory.e2e-spec.ts`, `openapi.json`
+- Files: `revocation-tasks.controller.ts`, `provisioning-tasks.controller.ts`, `provisioning-task.wire.ts`, `provisioning.dto.ts`, `provisioning.http-errors.ts`, `test/http/licensing/provisioning.http-spec.ts`, `api-coverage-manifest.ts`, `api-inventory.e2e-spec.ts`, `openapi.json`
 - Depends on: Task 5
 - Acceptance: hai route mới, `complete` của `REVOKE` trả `409`, khối `revocation` ở tác vụ; không route tạo tác vụ thu hồi; `403` cho vai không phải IT Admin
 - Verify: e2e `api-inventory` và test `403` xanh; `pnpm openapi:export` không lệch; `pnpm exec jest src` xanh

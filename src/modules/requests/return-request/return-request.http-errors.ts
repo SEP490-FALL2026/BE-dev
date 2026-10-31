@@ -1,5 +1,6 @@
 import { HttpStatus } from '@nestjs/common';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
+import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
 import { toAccessRequestApiException } from '../access-request/access-request.http-errors';
 import { ReturnRequestRefusedError, type ReturnRefusal } from './return-request.errors';
 
@@ -33,3 +34,22 @@ export function toReturnApiException(error: unknown): unknown {
 
   return toAccessRequestApiException(error);
 }
+
+const example = (error: Error) => errorExampleOf(toReturnApiException(error));
+
+/** The answers above as OpenAPI examples, each produced by the mapper that gives it at runtime (OPENAPI-EXAMPLE.1). */
+export const RETURN_ERROR_EXAMPLES = {
+  NOT_HOLDER: example(new ReturnRequestRefusedError('NOT_HOLDER')),
+  OUTSIDE_DEPARTMENT: example(new ReturnRequestRefusedError('OUTSIDE_DEPARTMENT')),
+  NOT_REQUESTER: example(new ReturnRequestRefusedError('NOT_REQUESTER')),
+  ASSIGNMENT_NOT_FOUND: example(new ReturnRequestRefusedError('ASSIGNMENT_NOT_FOUND')),
+  NOT_FOUND: example(new ReturnRequestRefusedError('NOT_FOUND')),
+  NO_DEPARTMENT: example(new ReturnRequestRefusedError('NO_DEPARTMENT')),
+  ASSIGNMENT_NOT_RETURNABLE: example(new ReturnRequestRefusedError('ASSIGNMENT_NOT_RETURNABLE', 'NOT_OPEN')),
+  ALREADY_REQUESTED: example(new ReturnRequestRefusedError('ALREADY_REQUESTED')),
+  RENEWAL_PENDING: example(new ReturnRequestRefusedError('RENEWAL_PENDING')),
+  HANDOVER_NOT_REQUIRED: example(new ReturnRequestRefusedError('HANDOVER_NOT_REQUIRED')),
+  HANDOVER_ALREADY_CONFIRMED: example(new ReturnRequestRefusedError('HANDOVER_ALREADY_CONFIRMED')),
+  NOT_AWAITING: example(new ReturnRequestRefusedError('NOT_AWAITING')),
+  ORIGIN_MISMATCH: example(new ReturnRequestRefusedError('ORIGIN_MISMATCH')),
+} as const;

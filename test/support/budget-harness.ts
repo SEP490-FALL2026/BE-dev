@@ -1,4 +1,7 @@
+import { Client } from 'pg';
 import request from 'supertest';
+import type { AuthenticatedPrincipal } from '../../src/infrastructure/security/tokens/access-token-verifier.port';
+import { BudgetYearEndService } from '../../src/modules/budgets/year-end/year-end.service';
 import type { ApiAccount } from './api-accounts';
 import { Department, Person, RequestHarness } from './request-harness';
 
@@ -6,12 +9,16 @@ export interface ProposalWire {
   id: string;
   costCenter: { id: string; code: string; name: string };
   year: number;
-  state: 'SUBMITTED' | 'WITHDRAWN' | 'RETURNED' | 'REVIEWED';
+  state: 'SUBMITTED' | 'WITHDRAWN' | 'RETURNED' | 'REVIEWED' | 'CLOSED_FISCAL_YEAR_ENDED';
   previousProposalId: string | null;
+  successorOfProposalId: string | null;
+  successorProposalId: string | null;
   total: { amount: string; currency: string };
   submittedBy: { employeeId: string } | null;
   returned: { reason: string } | null;
   withdrawnAt: string | null;
+  succeededAt: string | null;
+  closedAt: string | null;
 }
 
 export interface VersionWire {
@@ -20,9 +27,13 @@ export interface VersionWire {
   year: number;
   number: number;
   kind: 'INITIAL' | 'REVISION';
-  state: 'DRAFT' | 'SENT' | 'APPROVED' | 'REJECTED' | 'CHANGES_REQUESTED' | 'SUPERSEDED';
+  state: 'DRAFT' | 'SENT' | 'APPROVED' | 'REJECTED' | 'CHANGES_REQUESTED' | 'SUPERSEDED' | 'EXPIRED';
   proposalId: string | null;
   basedOnVersionId: string | null;
+  rejectedPredecessorId: string | null;
+  detachedAt: string | null;
+  neverCurrent: boolean;
+  expiredAt: string | null;
   base: { amount: string };
   reserve: { amount: string };
   total: { amount: string };
@@ -48,6 +59,18 @@ export interface VersionLineWire {
   financeComment: string | null;
   adjustmentReason: string | null;
   overdue: boolean;
+}
+
+export interface HistoryEntryWire {
+  seq: number;
+  kind: 'FIGURES_UPDATED' | 'LINE_UPDATED' | 'LINES_ADDED' | 'LINES_IMPORTED' | 'WINDOW_MOVED';
+  versionState: string;
+  position: number | null;
+  lines: { fromPosition: number; toPosition: number; count: number } | null;
+  changes: { field: string; before: string | null; after: string | null }[];
+  currency: string;
+  by: { id: string; name: string };
+  at: string;
 }
 
 export interface Pageable<T> {
@@ -152,6 +175,8 @@ export class BudgetHarness extends RequestHarness {
     request(this.server()).get(`/api/v1/budget-versions/${id}/lines/${position}/changes`).set(this.as(account));
   sendVersion = (id: string, account: ApiAccount = this.finance) =>
     request(this.server()).post(`/api/v1/budget-versions/${id}/submission`).set(this.as(account));
+  versionHistory = (id: string, account: ApiAccount = this.finance, query: Record<string, string | number> = {}) =>
+    request(this.server()).get(`/api/v1/budget-versions/${id}/history`).query(query).set(this.as(account));
   importLines = (id: string, csv: string, account: ApiAccount = this.finance) =>
     request(this.server())
       .post(`/api/v1/budget-versions/${id}/imports`)
@@ -237,6 +262,81 @@ export class BudgetHarness extends RequestHarness {
 
     return rows[0].id;
   }
+
+  /** The principal a call of a service is made as: what the access token would carry. */
+  principalOf(account: ApiAccount, roles: string[] = []): AuthenticatedPrincipal {
+    return {
+      subject: account.appUserId,
+      appUserId: account.appUserId,
+      sessionId: 'budget-harness-session',
+      employeeId: account.employeeId,
+      directRoles: roles,
+      derivedRoles: [],
+      roles,
+    };
+  }
+
+  /**
+   * Moves the proposals and the versions of a Cost Center from one year to another: how a test makes a year that has ended, which
+   * no route does (every route refuses a year that has ended).
+   */
+  async moveYear(costCenterId: string, from: number, to: number): Promise<void> {
+    for (const table of ['budget_proposals', 'budget_versions']) {
+      await this.ctx.sql.query(`UPDATE ${table} SET year = $3 WHERE cost_center_id = $1 AND year = $2`, [
+        costCenterId,
+        from,
+        to,
+      ]);
+    }
+  }
+
+  /** The closure of the fiscal years that have ended by `now` (the real clock when none is given). */
+  closeYears = (now?: Date) => this.ctx.app.get(BudgetYearEndService, { strict: false }).closeEndedYears(now);
+
+  /** A day in the middle of the year after next: both the year that is running and the one after it have ended by then. */
+  inTwoYears = (): Date => new Date(Date.UTC(this.next + 1, 5, 15));
+
+  /**
+   * Another connection that holds the row of a proposal or of a version locked until `release`, so that a test can queue
+   * requests behind it one by one (`waitForLockWaiters`) and let them run in the order they arrived.
+   */
+  async holdRow(table: 'budget_proposals' | 'budget_versions', id: string): Promise<{ release(): Promise<void> }> {
+    const holder = new Client({ connectionString: this.ctx.database.url });
+    await holder.connect();
+    await holder.query('BEGIN');
+    await holder.query(`SELECT id FROM ${table} WHERE id = $1 FOR UPDATE`, [id]);
+
+    return {
+      release: async () => {
+        await holder.query('COMMIT');
+        await holder.end();
+      },
+    };
+  }
+
+  /** Nobody heads the department any more: a head period removed, the way a test leaves a department without one. */
+  async withoutHead(department: Department): Promise<void> {
+    await this.ctx.sql.query(`DELETE FROM department_head_periods WHERE department_id = $1`, [department.id]);
+  }
+
+  /** The person heads the department from today and nobody else does: the head of a department changed hands. */
+  async replaceHead(department: Department, person: Person): Promise<void> {
+    await this.withoutHead(department);
+    await this.ctx.sql.query(
+      `INSERT INTO department_head_periods (id, organization_id, department_id, employee_id, valid_from)
+       VALUES (gen_random_uuid(), $1, $2, $3, $4::date)`,
+      [this.seed.organizationId, department.id, person.employeeId, this.today()],
+    );
+  }
+
+  /** The notices of the inbox of the budget loops with this code about this subject, whoever they were given to. */
+  budgetNoticesOf = async (code: string, subjectId: string) =>
+    (
+      await this.ctx.sql.query<{ recipient_employee_id: string; params: Record<string, unknown> }>(
+        `SELECT recipient_employee_id, params FROM in_app_notifications WHERE code = $1 AND subject_id = $2 ORDER BY created_at, id`,
+        [code, subjectId],
+      )
+    ).rows;
 
   budgetRows = async (table: string) =>
     Number((await this.ctx.sql.query<{ count: string }>(`SELECT count(*) FROM ${table}`)).rows[0].count);

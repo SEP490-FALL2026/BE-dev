@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { NotificationsService } from '../../notifications/notifications.service';
-import { EmployeeRecord } from '../../organization/organization.types';
+import { NotificationsApi } from '../../notifications/public/notifications.api';
+import { EmployeeRecord } from '../../organization/public/organization.types';
 import { ActionLinkService } from '../accounts/action-link.service';
-import { AccountSnapshot, ActionTokenSnapshot } from '../identity-access.types';
+import { AccountSnapshot, ActionTokenSnapshot } from '../public/identity-access.types';
 import { RecoveryTicketService } from '../recovery/recovery-ticket.service';
 import { CredentialChangeService } from './credential-change.service';
 
@@ -15,7 +15,7 @@ import { CredentialChangeService } from './credential-change.service';
 export class PasswordResetRedemptionService {
   constructor(
     private readonly links: ActionLinkService,
-    private readonly notifications: NotificationsService,
+    private readonly notifications: NotificationsApi,
     private readonly changes: CredentialChangeService,
     private readonly recoveryTickets: RecoveryTicketService,
   ) {}

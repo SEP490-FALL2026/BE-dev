@@ -10,7 +10,7 @@
 Đọc `AGENTS.md`, `CONTRIBUTING.md`, `ARCHITECTURE.md`, [API rules](../../../rules/api-contract.md),
 [database rules](../../../rules/database-business.md), [test guide](../../../../test/README.md), spec G0 (I-2, giao thức khóa).
 Đối chiếu spec với `src/modules/organization/**` (chưa có controller/DTO; lỗi tách ở `organization.errors.ts` công khai và
-`errors/organization.errors.ts` nội bộ), `src/modules/installation/installation.service.ts` (gọi `createJobTitle`,
+`errors/organization.errors.ts` nội bộ), `src/modules/installation/public/installation.api.ts` (gọi `createJobTitle`,
 `createEmployeeWithPlacement` khi khởi tạo), `prisma/models/organization.prisma`, migration `20261012092159_organization_foundation`,
 `test/support/{http-test-app,placement-coverage,api-coverage-manifest}.ts`. Nếu `dev` đã đổi các file này sau `ab0c43a`,
 cập nhật spec trước. Không có blocker nguồn hoặc nghiệp vụ.
@@ -31,10 +31,10 @@ cập nhật spec trước. Không có blocker nguồn hoặc nghiệp vụ.
 - [x] **Bước 3 — R-11 + nhập tay nhân viên.** `createEmployeeWithPlacement` nhận `memberSince`; đường khởi tạo truyền
       `hireDate`; validator dùng chung T-16 (`employee-row.validator.ts`), `employee.service.ts`, `dto/employee.dto.ts`,
       route `POST /employees`. Cập nhật `test/support/placement-coverage.ts` và mục I-2 của spec G0 trong **cùng** thay đổi.
-      HTTP + PostgreSQL thật (`test/integration/employee-manual-http.integration-spec.ts`): `US-02-02` AC-14, AC-15,
+      HTTP + PostgreSQL thật (`test/integration/organization/employee-manual-http.integration-spec.ts`): `US-02-02` AC-14, AC-15,
       `US-02-03` AC-1/4/5, mọi mã T-16, 0 tài khoản/vai/token/outbox; chuỗi `QĐ-67c`/`QĐ-73b` qua API 1b. Đồng hồ: đặt
       thời điểm giao dịch qua tham số clock của service (không sửa giờ hệ thống) để kiểm `D` và `D+11`.
-- [x] **Bước 4 — đồng thời, lỗi tạm thời.** `test/integration/organization-concurrency.integration-spec.ts` với
+- [x] **Bước 4 — đồng thời, lỗi tạm thời.** `test/integration/organization/organization-concurrency.integration-spec.ts` với
       `concurrency-harness` (`pg_locks`, không `sleep`): ngừng ↔ nhập tay cả hai thứ tự, hai lần nhập cùng mã/email (một
       201, một 422), hai lần thêm/sửa cùng tên (một thành công, một 409); ca `PgRelay` 503 không ghi dở. Cuối mỗi suite
       ghi tổ chức chạy `placement-coverage` (rỗng).

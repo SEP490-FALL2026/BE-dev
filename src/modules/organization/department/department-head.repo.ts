@@ -2,7 +2,9 @@ import { Injectable } from '@nestjs/common';
 import { BusinessDate, fromDateColumn, toDateColumn } from '../../../core/business-date';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { DepartmentHeadRecord, HeadPeriodChanges, HeadPeriodRecord } from './department.types';
+import type { ClearedHeadSuccessor } from '../public/organization.types';
+import { DepartmentHeadRecord, HeadPeriodChanges } from './department.types';
+import { HeadPeriodRecord } from '../organization-structure.types';
 
 /**
  * The one writer of `department_head_periods` (US-03-06 AC-5 → AC-9, US-01-02): who heads a department, on which
@@ -206,6 +208,48 @@ export class DepartmentHeadRepo {
 
   async deletePeriod(tx: DbTx, periodId: string): Promise<void> {
     await tx.$executeRaw`DELETE FROM department_head_periods WHERE id = ${periodId}::uuid`;
+  }
+
+  /**
+   * Takes back the head period that begins after `today`, the successor named to take over (the caller holds the department's
+   * `FOR UPDATE` lock), and opens again the period that ended the day it began, if one did. Null when no successor is named.
+   */
+  async clearSuccessor(tx: DbTx, departmentId: string, today: BusinessDate): Promise<ClearedHeadSuccessor | null> {
+    type PeriodRow = {
+      id: string;
+      employee_id: string;
+      employee_code: string;
+      full_name: string;
+      valid_from: Date;
+      valid_to: Date | null;
+    };
+    const toRecord = (row: PeriodRow): HeadPeriodRecord => ({
+      employeeId: row.employee_id,
+      employeeCode: row.employee_code,
+      fullName: row.full_name,
+      validFrom: fromDateColumn(row.valid_from),
+      validTo: row.valid_to ? fromDateColumn(row.valid_to) : null,
+    });
+    const removed = await tx.$queryRaw<PeriodRow[]>`
+      WITH removed AS (
+        DELETE FROM department_head_periods
+         WHERE department_id = ${departmentId}::uuid AND valid_from > ${today}::date
+        RETURNING id, employee_id, valid_from, valid_to)
+      SELECT r.id, e.id AS employee_id, e.employee_code, e.full_name, r.valid_from, r.valid_to
+        FROM removed r JOIN employees e ON e.id = r.employee_id
+       ORDER BY r.valid_from, r.id`;
+    const successor = removed[0];
+    if (!successor) return null;
+
+    const restored = await tx.$queryRaw<PeriodRow[]>`
+      WITH reopened AS (
+        UPDATE department_head_periods SET valid_to = NULL
+         WHERE department_id = ${departmentId}::uuid AND valid_to = ${fromDateColumn(successor.valid_from)}::date
+        RETURNING id, employee_id, valid_from, valid_to)
+      SELECT o.id, e.id AS employee_id, e.employee_code, e.full_name, o.valid_from, o.valid_to
+        FROM reopened o JOIN employees e ON e.id = o.employee_id`;
+
+    return { successor: toRecord(successor), restoredHead: restored[0] ? toRecord(restored[0]) : null };
   }
 
   /** The department the employee heads on `onDate`, if any (an unlocked read, for the per-request role check). */

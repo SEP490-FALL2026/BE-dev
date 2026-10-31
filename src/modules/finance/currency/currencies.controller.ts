@@ -2,21 +2,22 @@ import { Controller, Get, HttpStatus } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
+  FORBIDDEN_EXAMPLE,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
 import { RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
-import { FinanceService } from '../finance.service';
-import { toFinanceApiException } from '../mappers/finance.http-errors';
+import { toFinanceApiException } from '../finance.http-errors';
 import { CurrencyListResponseDto } from './currency.dto';
+import { CurrencyService } from './currency.service';
 
 /** The currencies the system can price in, with their minor digits. Finance and the IT Admin read them. */
 @ApiTags('currencies')
 @Controller({ path: 'currencies', version: '1' })
 @RequireRoles('FINANCE', 'IT_ADMIN')
 export class CurrenciesController {
-  constructor(private readonly finance: FinanceService) {}
+  constructor(private readonly currencies: CurrencyService) {}
 
   @Get()
   @ApiOperation({ operationId: 'currencyList', summary: 'List supported currencies' })
@@ -27,10 +28,11 @@ export class CurrenciesController {
   @ApiErrorResponses(UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPONSE, {
     status: HttpStatus.FORBIDDEN,
     description: 'Only Finance and the IT Admin read the currency list.',
+    examples: [FORBIDDEN_EXAMPLE],
   })
   async list() {
     try {
-      return { items: await this.finance.listCurrencies() };
+      return { items: await this.currencies.list() };
     } catch (error) {
       throw toFinanceApiException(error);
     }

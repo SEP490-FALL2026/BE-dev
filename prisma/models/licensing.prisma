@@ -33,7 +33,7 @@ model LicenseAssignment {
   normalizedAccountIdentifier String              @map("normalized_account_identifier")
   reason                      String?
   costCenterId                String?             @map("cost_center_id") @db.Uuid
-  // The department that owns a service account (QĐ-86c); null for a personal seat.
+  // The department that owns the seat (QĐ-86c, QĐ-89a): always the owner of its subscription; required for a service account, null on a personal seat of the compatibility era.
   owningDepartmentId          String?             @map("owning_department_id") @db.Uuid
   validFrom                   DateTime            @map("valid_from") @db.Date
   validFromBasis              AssignmentDateBasis @map("valid_from_basis")
@@ -61,8 +61,6 @@ model LicenseAssignment {
   provisioningTasks   ProvisioningTask[]
   returnRequests      ReturnRequest[]
   handoverDuties      HandoverDuty[]
-  serviceAccountMoves ServiceAccountMove[]       @relation("MoveOfAssignment")
-  resultOfMove        ServiceAccountMove?        @relation("MoveResultAssignment")
   dutyNotices         ServiceAccountDutyNotice[]
   expiryReminders     AssignmentExpiryReminder[]
   saasIssues          SaasIssue[]
@@ -198,6 +196,8 @@ enum RevocationSource {
   SUBSCRIPTION_EXPIRED
   NOT_LEGALIZED
   RE_EXECUTION
+  // The review the new head makes after a transfer took the seat away (spec L.10). Read only here.
+  POST_SETUP_REVIEW
 }
 
 enum RevocationCompletion {
@@ -341,56 +341,6 @@ model HandoverDuty {
   @@map("handover_duties")
 }
 
-enum ServiceAccountMoveStatus {
-  PENDING
-  CONFIRMED
-  CANCELLED
-}
-
-enum ServiceAccountMoveConfirmerRole {
-  DEPARTMENT_HEAD
-  FALLBACK_APPROVER
-}
-
-// A proposal to move a service account to another department (US-03-08 AC-10, QĐ-86c): a record that waits and touches no assignment
-// until the head of the receiving department (or the fallback approver when it has none) confirms; the confirmation ends the old
-// assignment and opens a new one in the receiving department in the same transaction. One PENDING proposal for each assignment (a
-// partial unique index), the columns of the state go together, and a confirmed or cancelled proposal is never changed (migration).
-model ServiceAccountMove {
-  id                       String                           @id @default(uuid(7)) @db.Uuid
-  organizationId           String                           @map("organization_id") @db.Uuid
-  assignmentId             String                           @map("assignment_id") @db.Uuid
-  fromDepartmentId         String                           @map("from_department_id") @db.Uuid
-  toDepartmentId           String                           @map("to_department_id") @db.Uuid
-  newResponsibleEmployeeId String                           @map("new_responsible_employee_id") @db.Uuid
-  effectiveFrom            DateTime                         @map("effective_from") @db.Date
-  expectedEndDate          DateTime?                        @map("expected_end_date") @db.Date
-  status                   ServiceAccountMoveStatus         @default(PENDING)
-  // The accounts that proposed and cancelled are values, as in the audit trail: the history outlives the account.
-  proposedByAppUserId      String                           @map("proposed_by_app_user_id") @db.Uuid
-  proposedAt               DateTime                         @default(now()) @map("proposed_at") @db.Timestamptz(3)
-  confirmedByEmployeeId    String?                          @map("confirmed_by_employee_id") @db.Uuid
-  confirmedByRole          ServiceAccountMoveConfirmerRole? @map("confirmed_by_role")
-  confirmedAt              DateTime?                        @map("confirmed_at") @db.Timestamptz(3)
-  cancelledByAppUserId     String?                          @map("cancelled_by_app_user_id") @db.Uuid
-  cancelledAt              DateTime?                        @map("cancelled_at") @db.Timestamptz(3)
-  cancelledReason          String?                          @map("cancelled_reason")
-  resultingAssignmentId    String?                          @unique @map("resulting_assignment_id") @db.Uuid
-
-  organization        Organization       @relation(fields: [organizationId], references: [id])
-  assignment          LicenseAssignment  @relation("MoveOfAssignment", fields: [assignmentId], references: [id], onDelete: Restrict)
-  fromDepartment      Department         @relation("MoveFromDepartment", fields: [fromDepartmentId], references: [id], onDelete: Restrict)
-  toDepartment        Department         @relation("MoveToDepartment", fields: [toDepartmentId], references: [id], onDelete: Restrict)
-  newResponsible      Employee           @relation("MoveNewResponsible", fields: [newResponsibleEmployeeId], references: [id], onDelete: Restrict)
-  confirmedBy         Employee?          @relation("MoveConfirmedBy", fields: [confirmedByEmployeeId], references: [id], onDelete: Restrict)
-  resultingAssignment LicenseAssignment? @relation("MoveResultAssignment", fields: [resultingAssignmentId], references: [id], onDelete: Restrict)
-
-  @@index([assignmentId])
-  @@index([toDepartmentId, status])
-  @@index([effectiveFrom, id])
-  @@map("service_account_moves")
-}
-
 // The reminder that a service account still has no new person after the day of the file that moves its person, written once for each
 // assignment and day (the overdue sweep). Insert-only (a trigger).
 model ServiceAccountDutyNotice {
@@ -532,4 +482,12 @@ model SaasIssueEntry {
 
   @@index([issueId, createdAt, id])
   @@map("saas_issue_entries")
+}
+
+// The last number of the `BM11-<year>-<6 digits>` code given in a year (F48), taken the same way as the `BM-09` one.
+model SaasIssueCounter {
+  year      Int @id
+  lastValue Int @map("last_value")
+
+  @@map("saas_issue_counters")
 }

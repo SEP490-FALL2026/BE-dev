@@ -5,7 +5,7 @@ describe('extractBearerToken', () => {
     expect(extractBearerToken('Bearer signed-token')).toBe('signed-token');
   });
 
-  // AUTH.1 / F-18: the authentication scheme is case-insensitive (RFC 9110 §11.1); the token is not.
+  // The authentication scheme is case-insensitive (RFC 9110 §11.1); the token is not.
   it.each(['bearer', 'BEARER', 'BeArEr'])('accepts the scheme written %s and keeps the token exactly', (scheme) => {
     expect(extractBearerToken(`${scheme} Signed.Token-_~+/=`)).toBe('Signed.Token-_~+/=');
   });

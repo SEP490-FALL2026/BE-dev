@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
-import { AuditService } from '../../audit/audit.service';
-import { OrganizationService } from '../../organization/organization.service';
+import { AuditApi } from '../../audit/public/audit.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
 import { isReopenLapsed } from './saas-issue.policy';
 import { SaasIssueRepo, type SaasIssueRecord } from './saas-issue.repo';
 
@@ -18,9 +18,9 @@ const BATCH = 200;
 export class SaasIssueSweepService {
   constructor(
     private readonly runner: TransactionRunner,
-    private readonly organization: OrganizationService,
+    private readonly organization: OrganizationApi,
     private readonly issues: SaasIssueRepo,
-    private readonly audit: AuditService,
+    private readonly audit: AuditApi,
   ) {}
 
   /** Runs both parts as of `now`; returns how many reports were closed and how many were told about. */

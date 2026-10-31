@@ -28,10 +28,10 @@ IT Admin xử lý một hàng đợi tác vụ cấp phát theo kiểu cấp c�
 
 ## Primary Story/AC
 
-| Story    | AC                                               | Coverage | Phần còn lại thuộc                                                                                                                       |
-| -------- | ------------------------------------------------ | -------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| US-07-01 | AC-1, AC-2, AC-4→AC-9, AC-11→AC-13, AC-15, AC-17 | partial  | AC-1, AC-3, AC-15, AC-16: `g4-request-and-transfer-integration`; AC-14: `g4-seat-baseline-import`; AC-10: `g4-device-dependent-features` |
-| US-07-02 | AC-1→AC-7                                        | partial  | AC-1: `g4-notification-delivery`; AC-4: `g4-device-dependent-features`                                                                   |
+| Story    | AC                                                      | Coverage | Phần còn lại thuộc                                                                                                                       |
+| -------- | ------------------------------------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| US-07-01 | AC-1, AC-2, AC-4→AC-9, AC-11→AC-13, AC-15, AC-17, AC-18 | partial  | AC-1, AC-3, AC-15, AC-16: `g4-request-and-transfer-integration`; AC-14: `g4-seat-baseline-import`; AC-10: `g4-device-dependent-features` |
+| US-07-02 | AC-1→AC-7                                               | partial  | AC-1: `g4-notification-delivery`; AC-4: `g4-device-dependent-features`                                                                   |
 
 Phần `partial`, nói rõ vế đã làm và vế còn lại:
 
@@ -184,3 +184,9 @@ Giới hạn đã biết (không sửa; thuộc câu hỏi cho Owner hoặc hạ
 - Cổng được gắn trong `LicensingModule`: G5 phải sửa chính `LicensingModule`; một provider `GRANT_REQUEST_GATE` ở module khác không thay được `RefusingGrantRequestGate`.
 - Việc người thụ hưởng đã nghỉ chỉ được kiểm lúc cấp và lúc nhận việc.
 - `US-07-02` AC-2 (không gì tự hoàn tất theo thời gian) chỉ được chứng minh bằng việc không có bộ hẹn giờ nào; test lùi `claimed_at` 10 ngày chỉ xác nhận không route nào đổi trạng thái.
+
+## Mở lại theo baseline `769bb64` (Prompt 03, 26/10/2026)
+
+- Audit G0–G6 trên Docs `769bb64` ↔ BE `7c28e75` mở lại hạng mục này: F07, F20, F24, F25 — duy nhất tác vụ đang mở; đích cấp theo phòng; `SoD-5` trong giao dịch; thứ tự khóa.
+- Remediation duy nhất: [g0-g6-final-business-baseline-remediation](../g0-g6-final-business-baseline-remediation/spec.md) ([impact matrix](../g0-g6-final-business-baseline-remediation/impact-matrix.md#3-findings)). AC liên quan không còn được coi là thỏa nguồn hiện hành cho tới khi remediation xong; trạng thái triển khai ở roadmap. Phần đã ghi phía trên là lịch sử, giữ nguyên.
+- _27/10/2026 (Prompt 04, Task 0.1 của `g0-g6-final-business-baseline-remediation`, F60 — re-pin scope map [G4](../../../roadmap.md#work-item-decomposition-g4) Docs `e0cb5a0`, BE `7c28e75`):_ nhận thêm `US-07-01` AC-18 (F20 — `QĐ-89a`, phòng sở hữu của Assignment; mục 4 nêu hạng mục này) ([impact matrix mục 9](../g0-g6-final-business-baseline-remediation/impact-matrix.md#9-phụ-lục-delta-user-stories-72e1480--769bb64)). Phần đã ghi phía trên là lịch sử, giữ nguyên.

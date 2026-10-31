@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import type { SuperAdminHolder } from '../identity-access.types';
+import type { SuperAdminHolder } from '../public/identity-access.types';
 
 /** The tickets of the recovery procedure that have not finished: the holder waits for a credential nobody has set yet. */
 const WAITING_TICKETS = ['PENDING', 'AWAITING_ACTIVATION'] as const;

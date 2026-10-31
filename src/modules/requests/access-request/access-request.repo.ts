@@ -24,48 +24,67 @@ const NEED_SEQUENCE = 1;
 export class AccessRequestRepo {
   constructor(private readonly prisma: PrismaService) {}
 
-  /** Writes the request, the people it is for and its need step together, and returns its id and the id of its need step. */
+  /**
+   * Writes the request, the people it is for and its need step together, and returns its id and the id of its need step. A request
+   * made from a draft (`draftId`) is the draft row itself, given its Cost Center, its price, its policy and the moment it was sent in
+   * one statement (the checks of the table accept a row only with all of them), and then its people and its need step.
+   */
   async insert(tx: DbTx, input: NewAccessRequest): Promise<{ id: string; needStepId: string }> {
+    // Only a free internal request is charged to nothing (`QĐ-87g(2)`): the table says so too, but a request that costs money and
+    // has no Cost Center is a defect of the caller, and it is told here, as one, before the table answers with an unmapped 23514.
+    if (input.costCenterId === null && (input.branch !== 'INTERNAL_FREE' || input.type === 'SERVICE_ACCOUNT')) {
+      throw new Error(
+        `A ${input.branch} request of the type ${input.type ?? 'GRANT'} cannot be written without a Cost Center.`,
+      );
+    }
     const { needStep } = input;
+    const columns = {
+      organizationId: input.organizationId,
+      type: input.type ?? 'GRANT',
+      branch: input.branch,
+      state: input.state,
+      planId: input.planId,
+      requesterEmployeeId: input.requesterEmployeeId,
+      departmentId: input.departmentId,
+      costCenterId: input.costCenterId,
+      businessReason: input.businessReason,
+      termMonths: input.termMonths,
+      projectLabel: input.projectLabel,
+      delegatedBatchId: input.delegatedBatchId ?? null,
+      expectedEndDate: input.expectedEndDate ? toDateColumn(input.expectedEndDate) : null,
+      ...pricingColumns(input.pricing),
+      policy: input.policy as unknown as Prisma.InputJsonObject,
+      createdByAppUserId: input.createdByAppUserId,
+      submittedAt: input.now,
+    };
+    const step = {
+      kind: 'NEED' as const,
+      sequence: NEED_SEQUENCE,
+      state: needStep.state,
+      assigneeEmployeeId: needStep.assigneeEmployeeId,
+      routingRow: needStep.routingRow,
+      waitingReason: needStep.waitingReason,
+      samePersonAsSpend: needStep.samePersonAsSpend,
+      slaWorkingDays: needStep.slaWorkingDays,
+      createdAt: input.now,
+      assignedAt: needStep.state === 'PENDING' ? input.now : null,
+    };
+    const people = input.beneficiaryEmployeeIds.map((employeeId, index) => ({ employeeId, position: index + 1 }));
+
+    const draftId = input.draftId;
+    if (draftId) {
+      // The draft stops being one first: the table refuses a step of a request that is still a draft.
+      await tx.accessRequest.update({ where: { id: draftId, state: 'DRAFT' }, data: columns });
+      await tx.accessRequestBeneficiary.createMany({
+        data: people.map((person) => ({ requestId: draftId, ...person })),
+      });
+      const made = await tx.accessRequestStep.create({ data: { requestId: draftId, ...step }, select: { id: true } });
+
+      return { id: draftId, needStepId: made.id };
+    }
+
     const created = await tx.accessRequest.create({
-      data: {
-        organizationId: input.organizationId,
-        type: input.type ?? 'GRANT',
-        branch: input.branch,
-        state: input.state,
-        planId: input.planId,
-        requesterEmployeeId: input.requesterEmployeeId,
-        departmentId: input.departmentId,
-        costCenterId: input.costCenterId,
-        businessReason: input.businessReason,
-        termMonths: input.termMonths,
-        projectLabel: input.projectLabel,
-        outsideStandardReason: input.outsideStandardReason,
-        outsideStandard: input.outsideStandard,
-        delegatedBatchId: input.delegatedBatchId ?? null,
-        expectedEndDate: input.expectedEndDate ? toDateColumn(input.expectedEndDate) : null,
-        ...pricingColumns(input.pricing),
-        policy: input.policy as unknown as Prisma.InputJsonObject,
-        createdByAppUserId: input.createdByAppUserId,
-        submittedAt: input.now,
-        beneficiaries: {
-          create: input.beneficiaryEmployeeIds.map((employeeId, index) => ({ employeeId, position: index + 1 })),
-        },
-        steps: {
-          create: {
-            kind: 'NEED',
-            sequence: NEED_SEQUENCE,
-            state: needStep.state,
-            assigneeEmployeeId: needStep.assigneeEmployeeId,
-            routingRow: needStep.routingRow,
-            waitingReason: needStep.waitingReason,
-            samePersonAsSpend: needStep.samePersonAsSpend,
-            slaWorkingDays: needStep.slaWorkingDays,
-            createdAt: input.now,
-            assignedAt: needStep.state === 'PENDING' ? input.now : null,
-          },
-        },
-      },
+      data: { ...columns, beneficiaries: { create: people }, steps: { create: step } },
       select: { id: true, steps: { select: { id: true }, take: 1 } },
     });
 
@@ -259,7 +278,7 @@ export class AccessRequestRepo {
         JOIN access_requests r ON r.id = b.request_id
         LEFT JOIN access_request_lines l ON l.request_id = b.request_id AND l.employee_id = b.employee_id
        WHERE r.plan_id = ${planId}::uuid AND b.employee_id = ANY(${[...employeeIds]}::uuid[])
-         AND r.type IN ('GRANT', 'GROUP_GRANT')
+         AND r.type IN ('GRANT', 'GROUP_GRANT') AND r.state <> 'DRAFT'
          AND (
            (r.type = 'GRANT' AND r.state NOT IN ('REJECTED', 'IT_REJECTED', 'FAILED', 'WITHDRAWN', 'CANCELLED', 'COMPLETED'))
            OR (r.type = 'GROUP_GRANT'
@@ -269,8 +288,15 @@ export class AccessRequestRepo {
     return new Set(rows.map((row) => row.employee_id));
   }
 
+  /**
+   * A request that is being drafted (`DRAFT`, spec L.1) is written by the release after this one and is not read here: it is
+   * answered as a request that does not exist, so no service of this release can see, list, decide or move it.
+   */
   async findById(id: string, tx?: DbTx): Promise<AccessRequestRecord | null> {
-    const row = await (tx ?? this.prisma).accessRequest.findUnique({ where: { id }, select: SELECT_REQUEST });
+    const row = await (tx ?? this.prisma).accessRequest.findUnique({
+      where: { id, state: { not: 'DRAFT' } },
+      select: SELECT_REQUEST,
+    });
 
     return row ? toRecord(row) : null;
   }

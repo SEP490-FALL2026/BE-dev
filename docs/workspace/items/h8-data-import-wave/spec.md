@@ -59,7 +59,7 @@ transaction, khóa, idempotency, OpenAPI — không đổi: characterization ghi
 
 ## Explicit out of scope
 
-- **BEH.1/A4-11:** dùng chung lý do dòng giữa form nhập tay (`organization/employee/employee-row.validator.ts`) và
+- **BEH.1/A4-11:** dùng chung lý do dòng giữa form nhập tay (`organization/employee/employee-row.policy.ts`) và
   preview import. Lát này chỉ characterization hai đường (bảng D-1 → D-4 dưới) và giữ nguyên cả hai; không import
   validator private của `organization`, không đưa validator nghiệp vụ vào `core`, không tạo facade giả. Finding khép ở
   [`beh1-employee-row-validation-ownership`](../beh1-employee-row-validation-ownership/spec.md) (Prompt 25).
@@ -81,7 +81,7 @@ transaction, khóa, idempotency, OpenAPI — không đổi: characterization ghi
 - Đọc qua facade `OrganizationService`: `getOrganization`, `lookupForEmployeeImport`, `lockForEmployeeImport`,
   `businessToday`, `createEmployeeWithPlacement`, `departmentsWithoutHead` — cùng lời gọi, cùng thứ tự, cùng `tx`.
 - Operation HTTP: không thêm/đổi. Không cần Nest submodule cho `employee-import/`: không điều kiện nào của
-  [rule](../../../rules/module-structure.md#khi-nào-folder-trở-thành-nest-submodule) áp — một entry (API), không vòng đời
+  [rule](../../../rules/module-structure.md#layout-trong-một-module) áp — một entry (API), không vòng đời
   hay provider riêng, contract liên module là facade ở root.
 - **Contract mới (đã review như `PUBLIC_CONTRACT_EXPORTS`):** `DataImportModule: DataImportService` (export liên module,
   thay `EmployeeImportService` khỏi `LEGACY_PRIVATE_EXPORTS`); một mục `INTRA_MODULE_CONTRACTS`
@@ -138,7 +138,7 @@ Root 3 file non-spec (trước 7 và folder `dto/`), 0 controller (trước 1); 
 ### BEH.1 — characterization hai đường kiểm dòng (A4-11)
 
 Cùng fixture phòng/chức vụ/mã/email chạy qua `validateEmployeeRow` (nhập tay) và `EmployeeRowClassifier` (import) —
-[spec characterization](../../../../src/modules/data-import/employee-import/employee-import-rows.validation-parity.spec.ts):
+[spec characterization](../../../../src/modules/data-import/employee-import/row-validation/employee-import-row-validation-parity.policy.spec.ts):
 
 | Mã  | Điểm                              | Nhập tay                                             | Import                                                                                                                                      |
 | --- | --------------------------------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -151,7 +151,7 @@ Cùng fixture phòng/chức vụ/mã/email chạy qua `validateEmployeeRow` (nh�
 Hai đường **không** tương đương; lát này giữ cả hai byte/deep-equal với baseline. BEH.1 quyết align hay chấp nhận khác.
 
 **Kết quả BEH.1 (Prompt 25, [`beh1-employee-row-validation-ownership`](../beh1-employee-row-validation-ownership/spec.md)):** chấp nhận D-1 → D-4 (Docs không đòi giống nhau);
-dòng "giống" (lý do phòng/chức vụ, mã, thứ tự) nay do một policy `organization/employee-placement.policy.ts` quyết,
+dòng "giống" (lý do phòng/chức vụ, mã, thứ tự) nay do một policy `organization/public/employee-placement.policy.ts` quyết,
 hai đường là adapter. 13 ca của spec characterization giữ nguyên văn.
 
 ## Test matrix
@@ -194,7 +194,7 @@ dòng vật lý, không ledger/ngoại lệ) — đỏ trước khi tách, chỉ
 `employee-import-upload.spec.ts` (318 dòng, 13 ca), `employee-import-preview-lifecycle.spec.ts` (209 dòng, 11 ca — view,
 rows, refresh, cancel, latest import) và `employee-import-confirm.spec.ts` (305 dòng, 14 ca), harness có kiểu
 `test/support/employee-import-service-harness.ts` (322 dòng; chỉ dựng fake, đồng hồ, dữ liệu mẫu). Thân 38 ca chép nguyên
-văn theo dải dòng, cùng 38 tên ca. Quy tắc và ví dụ ở [test guide](../../../../test/README.md#kích-thước-unit-spec-của-module)
+văn theo dải dòng, cùng 38 tên ca. Quy tắc và ví dụ ở [test guide](../../../../test/README.md#quy-tắc-chung)
 và [module structure](../../../rules/module-structure.md). Product code, integration/e2e và `openapi.json` byte-identical.
 
 20/10/2026 — A4-11 khép bởi [`beh1-employee-row-validation-ownership`](../beh1-employee-row-validation-ownership/spec.md) (Prompt 25): bảng D-1 → D-4 và spec

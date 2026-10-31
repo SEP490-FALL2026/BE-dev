@@ -28,3 +28,5 @@ Lưu ý khóa: thứ tự Employee (theo id) → AppUser (theo id) → phiếu; 
 
 - [x] AC trong scope có bằng chứng; spec/plan phản ánh implementation cuối.
 - [ ] Owner review trên revision cụ thể. Chỉ ghi `merged-dev`, `accepted`, `released` sau đúng sự kiện thật.
+
+**Prompt 29 (23/10/2026):** `P28-05` — đổi email công việc của người kế nhiệm làm đổi nơi nhận lời mời khôi phục; **giao G6** làm merge requirement (Owner chọn chặn đổi hay người nhận bất biến). [g0-g4-checkpoint-fix-forward](../g0-g4-checkpoint-fix-forward/spec.md).

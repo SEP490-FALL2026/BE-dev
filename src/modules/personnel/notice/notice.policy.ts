@@ -1,5 +1,5 @@
 import type { BusinessDate } from '../../../core/business-date';
-import { groundsRefusal, type GroundsInput } from '../grounds/grounds.policy';
+import { groundsRefusal, type GroundsInput } from '../personnel-grounds.policy';
 import {
   TRANSFER_KINDS,
   type NoticeEventField,
@@ -8,7 +8,7 @@ import {
   type NoticeKind,
   type NoticeStatus,
   type VerificationInput,
-} from './notice.types';
+} from '../personnel-notice.types';
 
 /** A refusal the notice rules give: the semantic code and what a person needs to put it right. */
 export interface NoticeRefusal {
@@ -106,13 +106,14 @@ interface EventShape {
 const SHAPES: Readonly<Record<NoticeKind, EventShape>> = {
   DEPARTMENT_TRANSFER_OUT: {
     required: ['effectiveOn'],
-    allowed: ['effectiveOn', 'toDepartmentId', 'toJobTitleId', 'successor'],
+    allowed: ['effectiveOn', 'toDepartmentId', 'successor'],
   },
   DEPARTMENT_TRANSFER_IN: {
     required: ['effectiveOn'],
-    allowed: ['effectiveOn', 'toDepartmentId', 'toJobTitleId', 'successor'],
+    allowed: ['effectiveOn', 'toDepartmentId', 'successor'],
   },
-  JOB_TITLE_CHANGE: { required: ['effectiveOn', 'toJobTitleId'], allowed: ['effectiveOn', 'toJobTitleId'] },
+  // Retired (`QĐ-87e`): one that was sent before can still be read and rejected; recording it has no department to go to.
+  JOB_TITLE_CHANGE: { required: ['effectiveOn'], allowed: ['effectiveOn'] },
   DEPARTURE: {
     required: ['lastWorkingDay'],
     allowed: ['lastWorkingDay', 'successor', 'pendingTransferCancellation'],

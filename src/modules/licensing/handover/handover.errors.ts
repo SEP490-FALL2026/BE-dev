@@ -1,5 +1,5 @@
 import type { BusinessDate } from '../../../core/business-date';
-import { RevocationHookRefusedError } from '../licensing.errors';
+import { RevocationHookRefusedError } from '../public/licensing.errors';
 import type { HandoverRole, WaitingReason } from './handover-confirmer.policy';
 
 /**

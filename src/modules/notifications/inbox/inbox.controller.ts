@@ -4,12 +4,13 @@ import {
   ApiErrorResponses,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
+  VALIDATION_EXAMPLE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
 import { AuthenticatedOnly } from '../../../infrastructure/security/decorators/access.decorators';
 import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import type { InAppNotificationRecord } from '../notifications.types';
+import type { InAppNotificationRecord } from '../public/notifications.types';
 import {
   NotificationIdParamDto,
   NotificationListQueryDto,
@@ -19,7 +20,7 @@ import {
   NotificationUnreadCountResponseDto,
   type NotificationWire,
 } from './inbox.dto';
-import { toInboxApiException } from './inbox.http-errors';
+import { INBOX_ERROR_EXAMPLES, toInboxApiException } from './inbox.http-errors';
 import { InboxService } from './inbox.service';
 
 const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPONSE] as const;
@@ -59,6 +60,7 @@ export class InboxController {
   @ApiErrorResponses(...AUTH_ERRORS, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description: 'The query is invalid (VALIDATION_ERROR).',
+    examples: [VALIDATION_EXAMPLE],
   })
   async list(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Query() query: NotificationListQueryDto) {
     try {
@@ -116,8 +118,13 @@ export class InboxController {
     {
       status: HttpStatus.NOT_FOUND,
       description: 'The notification does not exist or is not in the inbox of the caller (NOTIFICATION.NOT_FOUND).',
+      examples: [INBOX_ERROR_EXAMPLES.NOT_FOUND],
     },
-    { status: HttpStatus.UNPROCESSABLE_ENTITY, description: 'The id is invalid (VALIDATION_ERROR).' },
+    {
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      description: 'The id is invalid (VALIDATION_ERROR).',
+      examples: [VALIDATION_EXAMPLE],
+    },
   )
   async markRead(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: NotificationIdParamDto) {
     try {

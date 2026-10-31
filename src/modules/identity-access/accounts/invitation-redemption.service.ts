@@ -1,16 +1,16 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
-import { AuditService } from '../../audit/audit.service';
-import { OrganizationService } from '../../organization/organization.service';
-import { PasswordPolicyError } from '../identity-access.errors';
-import { employeeHasNotLeft } from '../policies/account-policy';
+import { AuditApi } from '../../audit/public/audit.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
+import { PasswordPolicyError } from '../public/identity-access.errors';
+import { employeeHasNotLeft } from './account.policy';
 import { AccountDirectoryService } from './account-directory.service';
 import { InvitationInvalidError } from './account.errors';
 import { ActionLinkService } from './action-link.service';
-import { CredentialService } from './credential.service';
+import { CredentialService } from '../credentials/credential.service';
 
 /**
- * Redeeming an invitation link: the account's first password, and its activation (slice 1b). It takes the AppUser row
+ * Redeeming an invitation link: the account's first password, and its activation. It takes the AppUser row
  * lock first, then the token, and re-reads what it decides on (lock protocol rules 1 and 2).
  */
 @Injectable()
@@ -19,8 +19,8 @@ export class InvitationRedemptionService {
     private readonly accounts: AccountDirectoryService,
     private readonly links: ActionLinkService,
     private readonly credentials: CredentialService,
-    private readonly organization: OrganizationService,
-    private readonly audit: AuditService,
+    private readonly organization: OrganizationApi,
+    private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
   ) {}
 
@@ -33,7 +33,7 @@ export class InvitationRedemptionService {
     const lengthViolation = this.credentials.checkPasswordPolicy(password, '');
     if (lengthViolation && lengthViolation !== 'EQUALS_LOGIN_EMAIL') throw new PasswordPolicyError(lengthViolation);
 
-    // Find the token first: a malformed or unknown token costs no Argon2 (R-09). The answer is the same
+    // Find the token first: a malformed or unknown token costs no Argon2. The answer is the same
     // generic error either way, and a 256-bit random token cannot be guessed from the timing.
     if (!this.links.isWellFormedActionToken(token)) throw new InvitationInvalidError();
     const tokenHash = this.links.hashActionToken(token);

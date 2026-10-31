@@ -2,6 +2,8 @@ import { HttpStatus } from '@nestjs/common';
 import { ApiException } from '../../infrastructure/http/errors/api.exception';
 import { toMoneyApiException } from '../../infrastructure/http/errors/money-errors';
 import { toUnavailableApiException } from '../../infrastructure/http/errors/service-unavailable';
+import { errorExampleOf } from '../../infrastructure/http/openapi-error-examples';
+import { CurrencyNotSupportedError } from '../../core/money/money.errors';
 import {
   NonWorkingDateInPastError,
   NonWorkingDateNotFoundError,
@@ -50,3 +52,17 @@ export function toOperatingParametersApiException(error: unknown): unknown {
 
   return toUnavailableApiException(error) ?? error;
 }
+
+const example = (error: Error) => errorExampleOf(toOperatingParametersApiException(error));
+
+/** The answers above as OpenAPI examples, each produced by the mapper that gives it at runtime. */
+export const OPERATING_PARAMETERS_ERROR_EXAMPLES = {
+  PARAMETER_NOT_FOUND: example(new ParameterNotFoundError('<parameter-key>')),
+  PARAMETER_VALUE_INVALID: example(new ParameterValueInvalidError('<parameter-key>', 'OUT_OF_RANGE')),
+  NON_WORKING_DATE_IN_PAST: example(new NonWorkingDateInPastError('2026-01-01')),
+  NON_WORKING_DATE_REASON_INVALID: example(new NonWorkingDateReasonInvalidError()),
+  NON_WORKING_DATE_TAKEN: example(new NonWorkingDateTakenError('2026-01-01')),
+  NON_WORKING_DATE_NOT_FOUND: example(new NonWorkingDateNotFoundError('2026-01-01')),
+  REPORTING_CURRENCY_LOCKED: example(new ReportingCurrencyLockedError('EXCHANGE_RATE')),
+  CURRENCY_NOT_SUPPORTED: example(new CurrencyNotSupportedError('XYZ')),
+} as const;

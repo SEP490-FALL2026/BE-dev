@@ -1,5 +1,35 @@
-import type { AnswerRefusal, AskRefusal } from './budget-information.policy';
-import type { ReviewRefusal } from './finance-review.policy';
+/** Why the spending approver may not put a question to Finance (`US-06-02`); the rules that judge it are in `budget-information`. */
+export type AskRefusal =
+  | 'OWN_REQUEST'
+  | 'NOT_THE_ASSIGNEE'
+  | 'STEP_NOT_PENDING'
+  /** A question of this step is still waiting for Finance; the approver asks the next one after the answer. */
+  | 'ALREADY_OPEN';
+
+/** Why Finance may not answer a question of the spending approver (`US-06-03`). */
+export type AnswerRefusal =
+  | 'NOT_FINANCE'
+  /** Finance is a party to the request: it asked for the access or is given it. */
+  | 'OWN_REQUEST'
+  /** The one who answers also decides the request as the spending approver (`SoD-8`, `US-06-03` AC-4). */
+  | 'SOD_APPROVER'
+  /** The question was answered or closed; a request that went away takes its question with it (`US-06-03` AC-6). */
+  | 'NOT_OPEN';
+
+/** Why a Finance review may not end as asked (`US-06-13`); the rules that judge it are in `finance-review`. */
+export type ReviewRefusal =
+  /** The plan line is still overdue: Finance moves it on the line, or gives the request back (`AC-4`). */
+  | 'PLAN_LINE_NOT_UPDATED'
+  /** There is no budget to make: no year lacks one or has too little, or this is neither of the two (`AC-11`). */
+  | 'NO_BUDGET_TO_MAKE'
+  /** Nobody heads the department, so nobody can propose the budget (`AC-11`). */
+  | 'NO_HEAD_TO_PROPOSE'
+  /** The request already waits for a budget: it asks for none again (J.3). */
+  | 'ALREADY_AWAITING_BUDGET'
+  /** Finance is the one who asked or one the request is for: nobody independent reviews it (`QĐ-82l`(8)). */
+  | 'OWN_REQUEST'
+  /** Finance is the one who will decide the spend step of the request: the two are two people (`SoD-8`). */
+  | 'REVIEWER_IS_APPROVER';
 
 /** The request has no review of Finance to read, or the caller has no part in its check: the two answer alike. */
 export class SpendReviewNotFoundError extends Error {
@@ -78,7 +108,9 @@ export class SpendDecisionRefusedError extends Error {
       | 'OVERRIDE_MISMATCH'
       | 'OVERRIDE_NOT_NEEDED'
       /** The request cannot be checked now (no price, no rate), so it has no snapshot to be decided on. */
-      | 'NOT_CHECKABLE',
+      | 'NOT_CHECKABLE'
+      /** The approver is the person who completed the review of Finance of this request: the two are two people (`SoD-8`, F32). */
+      | 'REVIEWER_IS_APPROVER',
     readonly years: readonly number[] = [],
   ) {
     super(`The spend step cannot be decided: ${reason}.`);

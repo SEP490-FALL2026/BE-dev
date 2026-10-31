@@ -152,3 +152,102 @@ export function noticeInputOf(record: NoticeInput): NoticeInput {
     autoRenew: record.autoRenew,
   };
 }
+
+/** What a subscription is made of once an update is applied: each field the update gives, and the four dates and the notice period cleared by null. */
+export function nextStateOf<B extends string>(
+  current: {
+    purchasedQuantity: number | null;
+    billingCycle: B | null;
+    startDate: string | null;
+    endDate: string | null;
+    renewalDate: string | null;
+    noticeDeadline: string | null;
+    noticePeriodDays: number | null;
+    autoRenew: boolean;
+    allowsMidTermReduction: boolean;
+  },
+  input: {
+    purchasedQuantity?: number;
+    billingCycle?: B;
+    startDate?: string;
+    endDate?: string | null;
+    renewalDate?: string | null;
+    noticeDeadline?: string | null;
+    noticePeriodDays?: number | null;
+    autoRenew?: boolean;
+    allowsMidTermReduction?: boolean;
+  },
+) {
+  return {
+    purchasedQuantity: input.purchasedQuantity === undefined ? current.purchasedQuantity : input.purchasedQuantity,
+    billingCycle: input.billingCycle ?? current.billingCycle,
+    startDate: input.startDate ?? current.startDate,
+    endDate: input.endDate === undefined ? current.endDate : input.endDate,
+    renewalDate: input.renewalDate === undefined ? current.renewalDate : input.renewalDate,
+    noticeDeadline: input.noticeDeadline === undefined ? current.noticeDeadline : input.noticeDeadline,
+    noticePeriodDays: input.noticePeriodDays === undefined ? current.noticePeriodDays : input.noticePeriodDays,
+    autoRenew: input.autoRenew ?? current.autoRenew,
+    allowsMidTermReduction: input.allowsMidTermReduction ?? current.allowsMidTermReduction,
+  };
+}
+
+/** Whether the unit price given is the one already recorded: none given, or the same amount in the same currency. */
+export function sameUnitPrice(
+  recorded: { amountMinor: bigint; currency: string } | null,
+  given: { amountMinor: bigint; currency: string } | null,
+): boolean {
+  return (
+    given === null ||
+    (recorded !== null && recorded.amountMinor === given.amountMinor && recorded.currency === given.currency)
+  );
+}
+
+/** Active when nothing keeps the subscription a draft (`missingData`), a draft otherwise. */
+export function subscriptionStatusOf(
+  plan: { pricingModel: PlanPricingModel | null },
+  kind: SubscriptionKind,
+  state: {
+    purchasedQuantity: number | null;
+    startDate: BusinessDate | null;
+    billingCycle: string | null;
+    unitPrice: unknown;
+    priceSnapshot: unknown;
+  },
+): 'ACTIVE' | 'DRAFT' {
+  const missing = missingData({
+    kind,
+    planPricingModel: plan.pricingModel,
+    quantity: state.purchasedQuantity,
+    startDate: state.startDate,
+    billingCycle: state.billingCycle,
+    hasPrice: state.unitPrice !== null,
+    hasSnapshot: state.priceSnapshot !== null,
+  });
+
+  return missing.length === 0 ? 'ACTIVE' : 'DRAFT';
+}
+
+/** What a declared subscription starts as: what the declaration gives, nothing recorded for the rest, and the two choices off. */
+export function declaredStateOf<B extends string>(input: {
+  purchasedQuantity?: number;
+  billingCycle?: B;
+  startDate?: string;
+  endDate?: string;
+  renewalDate?: string;
+  noticeDeadline?: string;
+  noticePeriodDays?: number;
+  autoRenew?: boolean;
+  allowsMidTermReduction?: boolean;
+}) {
+  return {
+    purchasedQuantity: input.purchasedQuantity ?? null,
+    billingCycle: input.billingCycle ?? null,
+    startDate: input.startDate ?? null,
+    endDate: input.endDate ?? null,
+    renewalDate: input.renewalDate ?? null,
+    noticeDeadline: input.noticeDeadline ?? null,
+    noticePeriodDays: input.noticePeriodDays ?? null,
+    autoRenew: input.autoRenew ?? false,
+    allowsMidTermReduction: input.allowsMidTermReduction ?? false,
+  };
+}

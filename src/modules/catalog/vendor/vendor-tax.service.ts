@@ -4,7 +4,7 @@ import { formatAmount } from '../../../core/money/money';
 import { CurrencyNotSupportedError } from '../../../core/money/money.errors';
 import { formatRatePercent } from '../../../core/money/tax-estimate';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { FinanceService } from '../../finance/finance.service';
+import { FinanceApi } from '../../finance/public/finance.api';
 import type {
   DefaultTaxProfileView,
   TaxEstimateBasis,
@@ -12,7 +12,7 @@ import type {
   TaxLineInput,
   TaxPayer,
   TaxProfileView,
-} from '../../finance/finance.types';
+} from '../../finance/public/finance.types';
 import { VendorQueryService } from './vendor-query.service';
 
 export interface TaxEstimateView {
@@ -36,7 +36,7 @@ export interface TaxEstimateView {
 export class VendorTaxService {
   constructor(
     private readonly vendors: VendorQueryService,
-    private readonly finance: FinanceService,
+    private readonly finance: FinanceApi,
   ) {}
 
   /** Throws VendorNotFoundError. */

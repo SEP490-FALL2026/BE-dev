@@ -3,9 +3,9 @@ import { Page, pageOf } from '../../../core/application/pagination';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import { isUniqueViolation } from '../../../infrastructure/database/unique-violation';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { AuditService } from '../../audit/audit.service';
-import { OrganizationService } from '../../organization/organization.service';
-import { catalogAuditEvent } from '../mappers/catalog-audit-event';
+import { AuditApi } from '../../audit/public/audit.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
+import { catalogAuditEvent } from '../catalog-audit-event.mapper';
 import {
   VendorGroupNameTakenError,
   VendorGroupNotFoundError,
@@ -15,7 +15,7 @@ import {
 } from './vendor-dictionary.errors';
 import { VendorDictionaryRepo } from './vendor-dictionary.repo';
 import type { VendorGroupRecord, VendorLineRecord } from './vendor-dictionary.types';
-import { cleanDomains, cleanName, cleanPatterns } from './vendor-dictionary.validation';
+import { cleanDomains, cleanName, cleanPatterns } from './vendor-dictionary.policy';
 
 const sameList = (a: readonly string[], b: readonly string[]): boolean =>
   a.length === b.length && a.every((value, index) => value === b[index]);
@@ -37,8 +37,8 @@ const lineSnapshot = (line: VendorLineRecord) => ({
 export class VendorDictionaryService {
   constructor(
     private readonly repo: VendorDictionaryRepo,
-    private readonly organization: OrganizationService,
-    private readonly audit: AuditService,
+    private readonly organization: OrganizationApi,
+    private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
   ) {}
 

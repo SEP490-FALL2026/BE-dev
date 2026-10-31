@@ -1,7 +1,7 @@
-import { createZodDto } from 'nestjs-zod';
+import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { z } from 'zod';
-import { isBusinessDate } from '../../../core/business-date';
 import { PROJECT_LABEL_MAX_LENGTH, REASON_MAX_LENGTH, TERM_MONTHS_MAX } from '../access-request/access-request.dto';
+import { businessDate } from '../../../infrastructure/http/dto/business-date.dto';
 
 /** The longest identifier a vendor keeps for an account: the bound of an address, as for any account of a seat. */
 export const IDENTIFIER_MAX_LENGTH = 254;
@@ -19,7 +19,7 @@ export const serviceAccountSubmitSchema = z.strictObject({
   termMonths: z.number().int().min(1).max(TERM_MONTHS_MAX),
   projectLabel: z.string().trim().min(1).max(PROJECT_LABEL_MAX_LENGTH).optional(),
   /** The day the money is expected to go out (paid software only); it fixes the budget year. Today when left out. */
-  expectedSpendOn: z.string().refine(isBusinessDate, { message: 'Must be a real date as YYYY-MM-DD.' }).optional(),
+  expectedSpendOn: businessDate.optional(),
 });
 
 /** The verdict of the IT Admin: a refusal gives its reason, an acceptance gives none. */
@@ -35,7 +35,8 @@ export const serviceAccountReviewSchema = z
     if (body.decision === 'ACCEPT' && body.reason !== undefined) {
       ctx.addIssue({ code: 'custom', path: ['reason'], message: 'Only a refusal gives a reason.' });
     }
-  });
+  })
+  .meta({ description: 'A refusal (REJECT) gives its reason; an acceptance (ACCEPT) gives none.' });
 
 export class ServiceAccountSubmitBodyDto extends createZodDto(serviceAccountSubmitSchema) {}
 export class ServiceAccountReviewBodyDto extends createZodDto(serviceAccountReviewSchema) {}

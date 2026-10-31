@@ -31,7 +31,7 @@ Inventory trước khi sửa:
 
 ### Task 1: CP0-09, CP0-10, OPENAPI-EXPORT.1
 
-- Files: `test/e2e/api-inventory.e2e-spec.ts`, `src/infrastructure/http/openapi-presentation.ts` + spec,
+- Files: `test/http/platform/api-inventory.http-spec.ts`, `src/infrastructure/http/openapi-presentation.ts` + spec,
   `scripts/dev/export-openapi.ts`, `scripts/dev/export-environment.ts`, `test/support/cli-process.ts`, process test.
 - Depends on: none
 - Acceptance: theo spec; `openapi.json` byte-identical sau phase.
@@ -51,7 +51,7 @@ Inventory trước khi sửa:
   khớp `7d33bbd20069` trước khi đi tiếp.
 - **OPENAPI-EXPORT.1**: `scripts/dev/export-environment.ts` (bốn giá trị E3 sinh trong bộ nhớ, thư mục làm việc tạm rỗng nên
   không đọc `.env`, khôi phục trong `finally`), export không đặt `NODE_ENV`, ghi đường dẫn tuyệt đối, Prettier resolve
-  theo `openapi.json` của repo. Process test (`test/e2e/openapi-export.e2e-spec.ts`, qua `runScript` của
+  theo `openapi.json` của repo. Process test (`test/http/platform/openapi-export.http-spec.ts`, qua `runScript` của
   `test/support/cli-process.ts`): không E3, không `NODE_ENV`, `.env` mồi trong cwd → exit 0, stdout/stderr rỗng, tài liệu
   byte-identical, không lộ giá trị. Đột biến bỏ injection / bỏ thư mục tạm → đỏ.
 - **Phát hiện ở bước dọn tài nguyên cuối** (một thư mục `slm-openapi-export-*` rỗng còn sót): khi graph API không khởi động
@@ -66,14 +66,14 @@ Inventory trước khi sửa:
 
 ### Task 2: gate test support
 
-- Files: `src/test-support-structure.spec.ts`, `test/README.md`, `docs/rules/module-structure.md`.
+- Files: `test/gates/test-support-structure.gate-spec.ts`, `test/README.md`, `docs/rules/module-structure.md`.
 - Depends on: Task 1
 - Acceptance: theo spec; hành vi support không đổi.
 - Verify: gate, đột biến tổng hợp, discovery, suite dùng harness.
 
 ### Checkpoint B
 
-Gate `src/test-support-structure.spec.ts` 19/19 (parser TypeScript; binding cục bộ không phải global; SuperTest `.expect`,
+Gate `test/gates/test-support-structure.gate-spec.ts` 19/19 (parser TypeScript; binding cục bộ không phải global; SuperTest `.expect`,
 `RegExp#test`, method `it`, chuỗi, chú thích được cho phép; mẫu sai và lách sai bị từ chối). Lần đầu một dương tính giả
 (`return test` của binding phá cấu trúc) → thêm theo dõi binding cục bộ, xanh. Đột biến trên tệp support thật
 (`describe`, import `@jest/globals`, bí danh `it`, 412 dòng) → đều đỏ, khôi phục cùng SHA-256. `pnpm test:discovery` sạch;
@@ -131,8 +131,8 @@ data-import + gate 10 suite/238.
 
 ### Task 5: một hợp đồng injectable công khai mỗi tệp
 
-- Files: `notifications/email-delivery.service.ts`, `notifications.service.ts`, `notifications.module.ts`,
-  `email-dispatch.loop.ts`; `identity-access/identity-access-inspection.service.ts`, `local-demo-account.service.ts`,
+- Files: `notifications/public/email-delivery.api.ts`, `notifications.service.ts`, `notifications.module.ts`,
+  `worker/email-dispatch.job.ts`; `identity-access/public/identity-access-inspection.api.ts`, `local-demo-account.service.ts`,
   `identity-access.service.ts`, hai facade module, consumer ở `installation`; gate.
 - Depends on: Task 4
 - Acceptance: theo spec; hành vi gửi thư và đồ thị module không đổi.
@@ -141,8 +141,8 @@ data-import + gate 10 suite/238.
 ### Checkpoint E
 
 - Gate (test trước) đỏ đúng hai tệp: `identity-access.service.ts` (3 injectable, Prompt 23) và `notifications.service.ts`
-  (2, Prompt 22). Tách nguyên văn: `notifications/email-delivery.service.ts`, `identity-access/identity-access-inspection.service.ts`,
-  `identity-access/local-demo-account.service.ts` (+ đổi tên spec tương ứng); consumer: vòng gửi thư, `inspect/`, `dev-seed/`.
+  (2, Prompt 22). Tách nguyên văn: `notifications/public/email-delivery.api.ts`, `identity-access/public/identity-access-inspection.api.ts`,
+  `identity-access/public/local-demo-account.api.ts` (+ đổi tên spec tương ứng); consumer: vòng gửi thư, `inspect/`, `dev-seed/`.
 - Đăng ký chính xác `PUBLIC_ROOT_CONTRACT_FILES` (boundaries + structure, ca kiểm hai danh sách bằng nhau); mỗi mục phải tồn
   tại, có đúng một injectable và consumer ngoài module; không tệp module nào re-export.
 - Đột biến: gộp lại hai injectable → đỏ; bỏ mục đăng ký → 3 đỏ; allowlist chung `*.service.ts` → đỏ; barrel re-export

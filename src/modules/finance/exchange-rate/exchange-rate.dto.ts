@@ -1,11 +1,10 @@
-import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
-import { isBusinessDate } from '../../../core/business-date';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
+import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
+import { businessDate } from '../../../infrastructure/http/dto/business-date.dto';
 
 const currencyCode = z.string().regex(/^[A-Z]{3}$/);
 /** A real calendar day as `YYYY-MM-DD`; a refinement, so the OpenAPI document carries no generated date pattern. */
-const businessDate = z.string().refine(isBusinessDate, { message: 'Must be a real date as YYYY-MM-DD.' });
 
 /**
  * The rate is a string on the wire, never a JSON number (ADR-0007). Whether it is a well-formed decimal, has at most

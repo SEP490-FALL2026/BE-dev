@@ -1,6 +1,6 @@
 import type { BusinessDate } from '../../../core/business-date';
-import type { Grounds, GroundsInput } from '../grounds/grounds.policy';
-import type { RoleFlag } from '../personnel.types';
+import type { Grounds, GroundsInput } from '../personnel-grounds.policy';
+import type { RoleFlag } from '../public/personnel.types';
 
 export type OffboardingState = 'HANDING_OVER' | 'LEFT' | 'CANCELLED';
 export type OffboardingChangeKind =
@@ -46,14 +46,16 @@ export interface OffboardingRecord {
   leftByAppUserId: string | null;
   cancelledAt: Date | null;
   cancelledByAppUserId: string | null;
+  cancelledByTicketId: string | null;
   cancelReason: string | null;
   accountLockByAppUserId: string | null;
   accountLockAt: Date | null;
   accountLockNote: string | null;
   closedAt: Date | null;
   closedByAppUserId: string | null;
-  selfExecuted: boolean;
-  recordedByAppUserId: string;
+  /** Who recorded it: an account, or the ticket of the controlled procedure: exactly one of the two is set. */
+  recordedByAppUserId: string | null;
+  recordedByTicketId: string | null;
   recordedAt: Date;
 }
 
@@ -78,12 +80,15 @@ export interface OffboardingChangeRecord {
   newLastWorkingDay: BusinessDate | null;
   reason: string | null;
   detail: Record<string, unknown> | null;
-  changedByAppUserId: string;
+  /** The account, or the ticket of the controlled procedure. */
+  changedByAppUserId: string | null;
+  changedByTicketId: string | null;
   changedAt: Date;
-  selfExecuted: boolean;
 }
 
 export interface OffboardingListFilter {
+  /** Set for an IT Admin: only the cases of these departments. Empty reads nothing. */
+  departmentIds?: readonly string[];
   employeeId?: string;
   state?: OffboardingState;
   pastLastDay?: boolean;

@@ -2,8 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { Page, pageOf } from '../../../core/application/pagination';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { AuditService } from '../../audit/audit.service';
-import { catalogAuditEvent } from '../mappers/catalog-audit-event';
+import { AuditApi } from '../../audit/public/audit.api';
+import { catalogAuditEvent } from '../catalog-audit-event.mapper';
 import {
   VendorProposalAlreadyResolvedError,
   VendorProposalNotFoundError,
@@ -23,7 +23,7 @@ export class VendorProposalService {
   constructor(
     private readonly proposals: VendorProposalRepo,
     private readonly dictionary: VendorDictionaryRepo,
-    private readonly audit: AuditService,
+    private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
   ) {}
 

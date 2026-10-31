@@ -1,3 +1,4 @@
+import { Client } from 'pg';
 import request from 'supertest';
 import type { AuthenticatedPrincipal } from '../../src/infrastructure/security/tokens/access-token-verifier.port';
 import { TransactionRunner } from '../../src/infrastructure/database/transaction-runner';
@@ -6,6 +7,8 @@ import type { CheckTrigger } from '../../src/modules/requests/spend/budget-check
 import { SpendRoutingService, type RoutingOutcome } from '../../src/modules/requests/spend/spend-routing.service';
 import type { ApiAccount } from './api-accounts';
 import { BudgetHarness, type VersionWire } from './budget-harness';
+import { approvedBudget } from './builders/budget.builder';
+import { waitForLockWaiters } from './lock-wait';
 import type { Department, Person } from './request-harness';
 
 /** A department with its head and a member, as `departmentWithHead` makes them. */
@@ -163,24 +166,26 @@ export class SpendHarness extends BudgetHarness {
     );
   }
 
-  /** The current budget of the department for the year, approved through the real decision, with what is held and spent. */
+  /**
+   * The current budget of the department for the year, approved through the real decision, with what is held and spent. The
+   * proposal, the version, its sending and the decision go through their services, not HTTP (T2.2): no suite that stands on
+   * this proves those routes.
+   */
   async budgetFor(unit: Unit, spec: BudgetSpec): Promise<VersionWire> {
     const year = spec.year ?? this.year;
     const window = { windowFrom: `${year}-12-01`, windowTo: `${year}-12-31`, quoteValidUntil: undefined };
-    const proposal = await this.budgetProposed(
-      unit.head,
-      unit.department.unitId,
-      spec.lines ?? [this.line(window)],
-      year,
-    );
-    const version = await this.built(proposal.id, {
-      base: this.money(spec.total),
-      reserve: this.money(0),
-      highValuePercent: spec.percent ?? 50,
-      ...(spec.amountThreshold ? { highValueAmount: this.money(spec.amountThreshold) } : {}),
+    const version = await approvedBudget<VersionWire>(this.ctx, {
+      headToken: unit.head.account.accessToken,
+      financeToken: this.finance.accessToken,
+      deciderToken: (await this.deciderOf(unit)).accessToken,
+      proposal: this.proposalBody(unit.department.unitId, spec.lines ?? [this.line(window)], year),
+      version: {
+        base: this.money(spec.total),
+        reserve: this.money(0),
+        highValuePercent: spec.percent ?? 50,
+        ...(spec.amountThreshold ? { highValueAmount: this.money(spec.amountThreshold) } : {}),
+      },
     });
-    await this.sendVersion(version.id).expect(200);
-    await this.decideVersion(version.id, { decision: 'APPROVE' }, await this.deciderOf(unit)).expect(200);
     if (spec.held) await this.commit(unit, version.id, year, spec.held, 'HELD');
     if (spec.spent) await this.commit(unit, version.id, year, spec.spent, 'EXPENSED');
 
@@ -319,6 +324,34 @@ export class SpendHarness extends BudgetHarness {
     request(this.server()).get('/api/v1/finance-reviews').query(query).set(this.as(account));
   reviewOf = (id: string, account: ApiAccount) =>
     request(this.server()).get(`/api/v1/access-requests/${id}/finance-review`).set(this.as(account));
+  /**
+   * Holds the row of the request in another connection and sends the calls one by one: each is waiting for the lock before the next is
+   * sent (`waitForLockWaiters`), the lock then goes to them in the order they queued, so the answer of each is the answer of its place.
+   * The lock is always released, and the calls are always settled, even when one of them fails the test.
+   */
+  async queuedOnRequest(requestId: string, sends: Array<() => request.Test>): Promise<request.Response[]> {
+    const holder = new Client({ connectionString: this.ctx.database.url });
+    const pending: Array<Promise<request.Response>> = [];
+    await holder.connect();
+    try {
+      await holder.query('BEGIN');
+      await holder.query('SELECT id FROM access_requests WHERE id = $1 FOR UPDATE', [requestId]);
+      for (const send of sends) {
+        pending.push(send().then((response) => response));
+        await waitForLockWaiters(this.ctx.sql, pending.length);
+      }
+      await holder.query('COMMIT');
+      const answers: request.Response[] = [];
+      for (const answer of pending) answers.push(await answer);
+
+      return answers;
+    } finally {
+      await holder.query('ROLLBACK').catch(() => undefined);
+      await holder.end();
+      await Promise.allSettled(pending);
+    }
+  }
+
   completeReview = (id: string, body: object, account: ApiAccount = this.finance) =>
     request(this.server()).post(`/api/v1/access-requests/${id}/finance-review`).set(this.as(account)).send(body);
   checkOf = (id: string, account: ApiAccount = this.finance) =>

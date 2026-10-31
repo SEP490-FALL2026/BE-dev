@@ -2,11 +2,11 @@ import { Injectable } from '@nestjs/common';
 import { pageOf, type Page } from '../../../core/application/pagination';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { CatalogService } from '../../catalog/catalog.service';
-import { OrganizationService } from '../../organization/organization.service';
-import { RegisteredRenewalHold } from '../assignment/registered-renewal-hold.service';
+import { CatalogApi } from '../../catalog/public/catalog.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
 import { HandoverService } from '../handover/handover.service';
-import type { PendingRenewal } from '../licensing-renewal.types';
+import { RenewalHoldHook } from '../public/licensing.extension-points';
+import type { PendingRenewal } from '../public/licensing-renewal.types';
 import { RevocationService } from '../provisioning/revocation.service';
 import type { ExpiredRightWire, StartedRevocationWire } from './expiry.dto';
 import { ExpiryError } from './expiry.errors';
@@ -32,11 +32,11 @@ interface QueueQuery {
 export class ExpiryQueueService {
   constructor(
     private readonly repo: ExpiryQueueRepo,
-    private readonly renewals: RegisteredRenewalHold,
+    private readonly renewals: RenewalHoldHook,
     private readonly revocations: RevocationService,
     private readonly handovers: HandoverService,
-    private readonly organization: OrganizationService,
-    private readonly catalog: CatalogService,
+    private readonly organization: OrganizationApi,
+    private readonly catalog: CatalogApi,
     private readonly runner: TransactionRunner,
   ) {}
 
@@ -48,7 +48,7 @@ export class ExpiryQueueService {
     const today = await this.organization.businessToday();
     const expired = await this.repo.expired(today);
     const [pending, units] = await Promise.all([
-      this.renewals.pendingRenewalsOf(expired.map((right) => right.assignmentId)),
+      this.renewals.get().pendingRenewalsOf(expired.map((right) => right.assignmentId)),
       this.organization.getOwningUnits([...new Set(expired.map((right) => right.employeeId))], today),
     ]);
 
@@ -84,7 +84,8 @@ export class ExpiryQueueService {
     const today = await this.organization.businessToday(now);
     const facts = await this.repo.factsOf(assignmentId);
     if (!facts) throw new ExpiryError('NOT_FOUND');
-    const renewalPending = facts.open && (await this.renewals.pendingRenewalsOf([assignmentId])).has(assignmentId);
+    const renewalPending =
+      facts.open && (await this.renewals.get().pendingRenewalsOf([assignmentId])).has(assignmentId);
     const refusal = startRefusalOf({
       kind: facts.kind,
       expectedEndDate: facts.expectedEndDate,

@@ -1,12 +1,17 @@
 import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
-import { ApiErrorResponses } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
+import {
+  ApiErrorResponses,
+  fallbackExample,
+  SERVICE_UNAVAILABLE_EXAMPLE,
+  VALIDATION_EXAMPLE,
+} from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
 import { RawResponse } from '../../../infrastructure/http/decorators/raw-response.decorator';
 import { Public } from '../../../infrastructure/security/decorators/public.decorator';
 import { InvitationRedemptionService } from '../accounts/invitation-redemption.service';
-import { AccountActivatedResponseDto, RedeemInvitationBodyDto } from '../dto/account-management.dto';
+import { AccountActivatedResponseDto, RedeemInvitationBodyDto } from '../accounts/account-management.dto';
 import {
   LoginBodyDto,
   PasswordResetBodyDto,
@@ -15,10 +20,15 @@ import {
   PasswordResetResponseDto,
   RefreshTokenBodyDto,
   SessionTokenResponseDto,
-} from '../dto/auth.dto';
-import { IssuedSession } from '../identity-access.types';
-import { toAccountApiException } from '../mappers/account.http-errors';
-import { toAuthApiException, toPasswordApiException, toPasswordResetApiException } from '../mappers/auth.http-errors';
+} from './auth.dto';
+import { IssuedSession } from '../public/identity-access.types';
+import { ACCOUNT_ERROR_EXAMPLES, toAccountApiException } from '../accounts/account.http-errors';
+import {
+  AUTH_ERROR_EXAMPLES,
+  toAuthApiException,
+  toPasswordApiException,
+  toPasswordResetApiException,
+} from './auth.http-errors';
 import { LoginService } from './login.service';
 import { PasswordResetRequestService } from './password-reset-request.service';
 import { PasswordResetService } from './password-reset.service';
@@ -32,9 +42,24 @@ interface SessionTokens {
   refreshExpiresAt: string;
 }
 
+const UNAVAILABLE_DESCRIPTION = 'The database is temporarily unavailable. Retry shortly.';
+/** The public auth routes report an outage as AUTH.UNAVAILABLE, never as a failed sign-in. */
 const UNAVAILABLE = {
   status: HttpStatus.SERVICE_UNAVAILABLE,
-  description: 'The database is temporarily unavailable. Retry shortly.',
+  description: UNAVAILABLE_DESCRIPTION,
+  examples: [AUTH_ERROR_EXAMPLES.UNAVAILABLE],
+} as const;
+/** The invitation route maps an outage through the account mapper: SERVICE_UNAVAILABLE. */
+const REDEEM_UNAVAILABLE = {
+  status: HttpStatus.SERVICE_UNAVAILABLE,
+  description: UNAVAILABLE_DESCRIPTION,
+  examples: [SERVICE_UNAVAILABLE_EXAMPLE],
+} as const;
+/** The stricter limit of the two reset routes is the throttler's, with its code. */
+const RESET_RATE_LIMIT = {
+  status: HttpStatus.TOO_MANY_REQUESTS,
+  description: 'Too many requests from this address: this route allows 10 a minute (HTTP_TOO_MANY_REQUESTS).',
+  examples: [fallbackExample(HttpStatus.TOO_MANY_REQUESTS)],
 } as const;
 
 @ApiTags('auth')
@@ -59,13 +84,19 @@ export class AuthController {
     {
       status: HttpStatus.UNAUTHORIZED,
       description: 'The email or password is not valid (one answer for every reason).',
+      examples: [AUTH_ERROR_EXAMPLES.INVALID_CREDENTIALS],
     },
-    { status: HttpStatus.UNPROCESSABLE_ENTITY, description: 'The request body is invalid.' },
+    {
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      description: 'The request body is invalid.',
+      examples: [VALIDATION_EXAMPLE],
+    },
     {
       status: HttpStatus.TOO_MANY_REQUESTS,
       description:
         'Too many failed sign-in attempts for this email; see retryAfterSeconds (AUTH.LOGIN_TEMPORARILY_BLOCKED). ' +
         'Too many requests to this route from this address also answer 429 (HTTP_TOO_MANY_REQUESTS).',
+      examples: [AUTH_ERROR_EXAMPLES.LOGIN_TEMPORARILY_BLOCKED, fallbackExample(HttpStatus.TOO_MANY_REQUESTS)],
     },
     UNAVAILABLE,
   )
@@ -86,10 +117,15 @@ export class AuthController {
     description: 'A new access token and a new refresh token; the presented refresh token is spent.',
   })
   @ApiErrorResponses(
-    { status: HttpStatus.UNPROCESSABLE_ENTITY, description: 'The body has no refresh token (VALIDATION_ERROR).' },
+    {
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      description: 'The body has no refresh token (VALIDATION_ERROR).',
+      examples: [VALIDATION_EXAMPLE],
+    },
     {
       status: HttpStatus.UNAUTHORIZED,
       description: 'The refresh token is unknown, malformed, expired, spent or its session ended.',
+      examples: [AUTH_ERROR_EXAMPLES.SESSION_INVALID],
     },
     UNAVAILABLE,
   )
@@ -113,7 +149,11 @@ export class AuthController {
   @ApiOperation({ operationId: 'authLogout', summary: 'Sign out the session of a refresh token' })
   @ApiResponse({ status: HttpStatus.NO_CONTENT, description: 'Signed out (or there was nothing to sign out).' })
   @ApiErrorResponses(
-    { status: HttpStatus.UNPROCESSABLE_ENTITY, description: 'The body has no refresh token (VALIDATION_ERROR).' },
+    {
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      description: 'The body has no refresh token (VALIDATION_ERROR).',
+      examples: [VALIDATION_EXAMPLE],
+    },
     UNAVAILABLE,
   )
   async logout(@Body() body: RefreshTokenBodyDto): Promise<void> {
@@ -139,11 +179,12 @@ export class AuthController {
     status: HttpStatus.ACCEPTED,
   })
   @ApiErrorResponses(
-    { status: HttpStatus.UNPROCESSABLE_ENTITY, description: 'The body is invalid (VALIDATION_ERROR).' },
     {
-      status: HttpStatus.TOO_MANY_REQUESTS,
-      description: 'Too many requests from this address: this route allows 10 a minute (HTTP_TOO_MANY_REQUESTS).',
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      description: 'The body is invalid (VALIDATION_ERROR).',
+      examples: [VALIDATION_EXAMPLE],
     },
+    RESET_RATE_LIMIT,
     UNAVAILABLE,
   )
   async requestPasswordReset(@Body() body: PasswordResetRequestBodyDto): Promise<{ requested: true }> {
@@ -173,15 +214,14 @@ export class AuthController {
       status: HttpStatus.BAD_REQUEST,
       description:
         'The link is not valid (unknown, used, replaced, expired, or the account cannot use it). One answer for all.',
+      examples: [AUTH_ERROR_EXAMPLES.PASSWORD_RESET_INVALID],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description: 'The body is invalid or the password does not meet the policy.',
+      examples: [VALIDATION_EXAMPLE, AUTH_ERROR_EXAMPLES.PASSWORD_POLICY_VIOLATION],
     },
-    {
-      status: HttpStatus.TOO_MANY_REQUESTS,
-      description: 'Too many requests from this address: this route allows 10 a minute (HTTP_TOO_MANY_REQUESTS).',
-    },
+    RESET_RATE_LIMIT,
     UNAVAILABLE,
   )
   async resetPassword(@Body() body: PasswordResetBodyDto): Promise<{ passwordReset: true }> {
@@ -210,12 +250,14 @@ export class AuthController {
     {
       status: HttpStatus.BAD_REQUEST,
       description: 'The link is not valid (unknown, used, replaced, expired, or the account cannot be activated).',
+      examples: [ACCOUNT_ERROR_EXAMPLES.INVITATION_INVALID],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description: 'The body is invalid or the password does not meet the policy.',
+      examples: [VALIDATION_EXAMPLE, AUTH_ERROR_EXAMPLES.PASSWORD_POLICY_VIOLATION],
     },
-    UNAVAILABLE,
+    REDEEM_UNAVAILABLE,
   )
   async redeemInvitation(@Body() body: RedeemInvitationBodyDto): Promise<{ activated: true }> {
     try {

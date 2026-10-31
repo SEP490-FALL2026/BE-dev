@@ -4,6 +4,7 @@ import {
   ApiErrorResponses,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
+  VALIDATION_EXAMPLE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
 import { AuthenticatedOnly } from '../../../infrastructure/security/decorators/access.decorators';
@@ -19,7 +20,10 @@ import {
   TransferReviewItemPageResponseDto,
   TransferReviewPageResponseDto,
 } from './transfer-review.dto';
-import { toTransferReviewApiException } from './transfer-review.http-errors';
+import {
+  TRANSFER_REVIEW_ERROR_EXAMPLES as EXAMPLES,
+  toTransferReviewApiException,
+} from './transfer-review.http-errors';
 import { TransferReviewDecisionService } from './transfer-review-decision.service';
 import { TransferReviewViewService } from './transfer-review-view.service';
 
@@ -27,11 +31,12 @@ const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPO
 const NOT_FOUND = {
   status: HttpStatus.NOT_FOUND,
   description: 'The review does not exist, or has nothing to do with the caller (TRANSFER_REVIEW.NOT_FOUND).',
+  examples: [EXAMPLES.NOT_FOUND],
 } as const;
 
 /**
- * The review a new head makes of the tools a person brought from another department that are outside the standard toolset of the
- * department they came to. Any signed-in person may ask: what a person sees and does is judged from the review, because the head
+ * The review the head of the department a person was transferred to makes of the tools the person holds: one line for every personal
+ * seat, paid or internal, whatever the department that owns its subscription (`QĐ-89b`). Any signed-in person may ask: what a person sees and does is judged from the review, because the head
  * of a department is a position held on a day and not a role of an account. The IT Admin reads every review and decides none.
  */
 @ApiTags('transfer-reviews')
@@ -53,6 +58,7 @@ export class TransferReviewsController {
   @ApiErrorResponses(...AUTH_ERRORS, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description: 'A filter or a page parameter is invalid (VALIDATION_ERROR).',
+    examples: [VALIDATION_EXAMPLE],
   })
   async list(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Query() query: ListTransferReviewsQueryDto) {
     try {
@@ -72,6 +78,7 @@ export class TransferReviewsController {
   @ApiErrorResponses(...AUTH_ERRORS, NOT_FOUND, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description: 'The id is not valid (VALIDATION_ERROR).',
+    examples: [VALIDATION_EXAMPLE],
   })
   async get(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: TransferReviewIdParamDto) {
     try {
@@ -86,11 +93,12 @@ export class TransferReviewsController {
   @ApiSuccessResponse(TransferReviewItemPageResponseDto, {
     message: 'TRANSFER_REVIEW.ITEMS_LISTED',
     description:
-      'A page of the tools outside the standard toolset, in the order they were listed: the application and plan, how it is provided, why the seat was given, and what the head decided about it, who and when. Usage is not shown.',
+      'A page of the tools of the review, one for every personal seat of the person, in the order they were listed: the application and plan, how it is provided, why the seat was given, and what the head decided about it, who and when. Usage is not shown.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, NOT_FOUND, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description: 'The id or a page parameter is not valid (VALIDATION_ERROR).',
+    examples: [VALIDATION_EXAMPLE],
   })
   async listItems(
     @CurrentPrincipal() actor: AuthenticatedPrincipal,
@@ -110,7 +118,7 @@ export class TransferReviewsController {
     status: HttpStatus.CREATED,
     message: 'TRANSFER_REVIEW.DECIDED',
     description:
-      'Records, once, what the head decides about one tool: still needed (the seat stays), no longer needed (the seat is taken away: a revocation is opened for the IT Admin, and the head confirms the handover of the data when the plan warns of data loss), or a new tool is needed (recorded as a need; no request is made and the seat stays). The review is completed when no tool waits. A review past its deadline is decided the same way.',
+      'Records, once, what the head decides about one tool: still needed (the seat stays until a new Request of the department for the same tool ends, then the old seat is taken back), no longer needed (the seat is taken away now: a revocation is opened for the IT Admin, and the head confirms the handover of the data when the plan warns of data loss), or a new tool is needed (recorded as a need; no request is made and the seat stays). The one decision that can be taken back is still needed: the same route, with no longer needed, opens the revocation as a first no longer needed would, and the Audit Trail keeps the earlier decision. The review is completed when no tool waits. A review past its deadline is decided the same way.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
@@ -118,21 +126,30 @@ export class TransferReviewsController {
       status: HttpStatus.FORBIDDEN,
       description:
         'The caller is not the head of the department the person came to today: the head before, an IT Admin, a stand-in approver or anyone else (TRANSFER_REVIEW.NOT_REVIEWER). Nothing is written.',
+      examples: [EXAMPLES.NOT_REVIEWER],
     },
     {
       status: HttpStatus.NOT_FOUND,
       description:
         'The review does not exist (TRANSFER_REVIEW.NOT_FOUND) or the tool is not part of it (TRANSFER_REVIEW.ITEM_NOT_FOUND).',
+      examples: [EXAMPLES.NOT_FOUND, EXAMPLES.ITEM_NOT_FOUND],
     },
     {
       status: HttpStatus.CONFLICT,
       description:
-        'A decision about the tool was written already (TRANSFER_REVIEW.DECISION_ALREADY_RECORDED), the review is not open (NOT_OPEN), the person has left (EMPLOYEE_LEFT), the kind of tool cannot be taken away through the system (REVOCATION_NOT_SUPPORTED) or the seat has ended (SEAT_NOT_OPEN): nothing changes.',
+        'A decision about the tool was written already and is final (TRANSFER_REVIEW.DECISION_ALREADY_RECORDED), except that still needed may become no longer needed while the old seat is not being taken back; the review is not open (NOT_OPEN), the person has left (EMPLOYEE_LEFT), the kind of tool cannot be taken away through the system (REVOCATION_NOT_SUPPORTED) or the seat has ended (SEAT_NOT_OPEN): nothing changes.',
+      examples: [
+        EXAMPLES.DECISION_ALREADY_RECORDED,
+        EXAMPLES.NOT_OPEN,
+        EXAMPLES.REVOCATION_NOT_SUPPORTED,
+        EXAMPLES.SEAT_NOT_OPEN,
+      ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
         'The request is invalid (VALIDATION_ERROR): an unknown decision, or a note that does not go with the decision or is longer than 500 characters.',
+      examples: [VALIDATION_EXAMPLE],
     },
   )
   async decide(

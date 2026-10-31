@@ -2,14 +2,16 @@ import { Body, Controller, Get, HttpStatus, Param, Put, Query } from '@nestjs/co
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
+  FORBIDDEN_EXAMPLE,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
+  VALIDATION_EXAMPLE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
 import { RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
 import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import type { TaxProfileView } from '../../finance/finance.types';
+import type { TaxProfileView } from '../../finance/public/finance.types';
 import {
   DeclareTaxProfileBodyDto,
   DeclaredTaxProfileResponseDto,
@@ -22,7 +24,7 @@ import {
   VendorIdParamDto,
   VendorPageResponseDto,
 } from './vendor.dto';
-import { toVendorApiException } from './vendor.http-errors';
+import { toVendorApiException, VENDOR_ERROR_EXAMPLES } from './vendor.http-errors';
 import { VendorQueryService } from './vendor-query.service';
 import { VendorTaxService } from './vendor-tax.service';
 
@@ -30,14 +32,17 @@ const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPO
 const READERS = {
   status: HttpStatus.FORBIDDEN,
   description: 'Only the IT Admin and Finance read vendors and their tax profiles.',
+  examples: [FORBIDDEN_EXAMPLE],
 } as const;
 const NOT_FOUND = {
   status: HttpStatus.NOT_FOUND,
   description: 'The vendor does not exist (VENDOR.NOT_FOUND).',
+  examples: [VENDOR_ERROR_EXAMPLES.NOT_FOUND],
 } as const;
 const INVALID_ID = {
   status: HttpStatus.UNPROCESSABLE_ENTITY,
   description: 'The id or the query is invalid (VALIDATION_ERROR).',
+  examples: [VALIDATION_EXAMPLE],
 } as const;
 
 const toProfileWire = (profile: TaxProfileView) => ({ ...profile, declaredAt: profile.declaredAt.toISOString() });
@@ -102,12 +107,23 @@ export class VendorsController {
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
-    { status: HttpStatus.FORBIDDEN, description: 'Only Finance declares a tax profile.' },
+    {
+      status: HttpStatus.FORBIDDEN,
+      description: 'Only Finance declares a tax profile.',
+      examples: [FORBIDDEN_EXAMPLE],
+    },
     NOT_FOUND,
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
         'The request is invalid (VALIDATION_ERROR) or a tax line is refused: VENDOR_TAX_PROFILE.TAX_TYPE_INVALID, TAX_TYPE_DUPLICATE, RATE_INVALID or TOO_MANY_LINES.',
+      examples: [
+        VALIDATION_EXAMPLE,
+        VENDOR_ERROR_EXAMPLES.TAX_TYPE_INVALID,
+        VENDOR_ERROR_EXAMPLES.TAX_TYPE_DUPLICATE,
+        VENDOR_ERROR_EXAMPLES.RATE_INVALID,
+        VENDOR_ERROR_EXAMPLES.TOO_MANY_LINES,
+      ],
     },
   )
   async declareTaxProfile(
@@ -154,6 +170,12 @@ export class VendorsController {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description:
       'The query is invalid (VALIDATION_ERROR), the amount is malformed, has too many decimals or is out of range (MONEY_*), or the currency is not supported (CURRENCY_NOT_SUPPORTED).',
+    examples: [
+      VALIDATION_EXAMPLE,
+      VENDOR_ERROR_EXAMPLES.MONEY_SCALE_EXCEEDED,
+      VENDOR_ERROR_EXAMPLES.MONEY_OUT_OF_RANGE,
+      VENDOR_ERROR_EXAMPLES.CURRENCY_NOT_SUPPORTED,
+    ],
   })
   async estimate(@Param() params: VendorIdParamDto, @Query() query: TaxEstimateQueryDto) {
     try {

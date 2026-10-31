@@ -1,18 +1,23 @@
 import { Body, Controller, Get, HttpStatus, Put } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
 import {
   ApiErrorResponses,
+  FORBIDDEN_EXAMPLE,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
+  VALIDATION_EXAMPLE,
 } from '../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../infrastructure/http/decorators/api-success-response.decorator';
 import { successEnvelopeSchema } from '../../infrastructure/http/dto/success-envelope.dto';
+import { createZodDto } from '../../infrastructure/http/dto/zod-dto';
 import { RequireRoles } from '../../infrastructure/security/decorators/access.decorators';
 import { CurrentPrincipal } from '../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../infrastructure/security/tokens/access-token-verifier.port';
-import { toOperatingParametersApiException } from './operating-parameters.http-errors';
+import {
+  OPERATING_PARAMETERS_ERROR_EXAMPLES,
+  toOperatingParametersApiException,
+} from './operating-parameters.http-errors';
 import { ReportingCurrencyService } from './reporting-currency.service';
 
 class SetReportingCurrencyBodyDto extends createZodDto(z.strictObject({ currency: z.string().regex(/^[A-Z]{3}$/) })) {}
@@ -25,7 +30,11 @@ class ReportingCurrencySetResponseDto extends createZodDto(
 
 const AUTH_ERRORS = [
   UNAUTHENTICATED_RESPONSE,
-  { status: HttpStatus.FORBIDDEN, description: 'Only the Super Admin reads or sets the reporting currency.' },
+  {
+    status: HttpStatus.FORBIDDEN,
+    description: 'Only the Super Admin reads or sets the reporting currency.',
+    examples: [FORBIDDEN_EXAMPLE],
+  },
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
 ] as const;
 
@@ -69,11 +78,13 @@ export class ReportingCurrencyController {
       status: HttpStatus.CONFLICT,
       description:
         'A rate was entered or a subscription has a converted price: the currency is locked (REPORTING_CURRENCY.LOCKED, details.reason).',
+      examples: [OPERATING_PARAMETERS_ERROR_EXAMPLES.REPORTING_CURRENCY_LOCKED],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
         'The request is invalid (VALIDATION_ERROR) or the currency is not supported (CURRENCY_NOT_SUPPORTED).',
+      examples: [VALIDATION_EXAMPLE, OPERATING_PARAMETERS_ERROR_EXAMPLES.CURRENCY_NOT_SUPPORTED],
     },
   )
   async set(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: SetReportingCurrencyBodyDto) {

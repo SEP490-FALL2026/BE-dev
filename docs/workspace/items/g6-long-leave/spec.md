@@ -125,3 +125,8 @@ Cập nhật 24/10/2026 bởi người phụ trách (AI theo giao việc của n
 **Cho hạng mục sau:** `g6-offboarding-record` gọi hai hàm của `LeaveDepartureService` (xem trên) và đặt `work_state`; `g6-hr-notices-and-verification` gọi `LeaveService.startInTx`; `g6-downstream-integration` và rule G7 gọi `PersonnelService.getLeaveIntervals`. FE: sáu thao tác mới và trường `workState` (danh sách thành viên phòng, tạo và sửa nhân viên).
 
 25/10/2026: `g6-offboarding-record` đã xong (`verified` local): hồ sơ nghỉ việc gọi `LeaveDepartureService.endForDeparture` (ngày ghi) và `resumeAfterCancelledDeparture` (khi hủy) trong transaction của mình, nên `AC-6` của `US-03-03` đã có test; `leave/leave-departure.service.ts` đã vào `INTRA_MODULE_CONTRACTS`. Chi tiết ở [spec](../g6-offboarding-record/spec.md#như-đã-xây-và-khác-biệt).
+
+## Mở lại theo baseline `769bb64` (Prompt 03, 26/10/2026)
+
+- Audit G0–G6 trên Docs `769bb64` ↔ BE `7c28e75` mở lại hạng mục này: F40, F45 — Super Admin ghi.
+- Remediation duy nhất: [g0-g6-final-business-baseline-remediation](../g0-g6-final-business-baseline-remediation/spec.md) ([impact matrix](../g0-g6-final-business-baseline-remediation/impact-matrix.md#3-findings)). AC liên quan không còn được coi là thỏa nguồn hiện hành cho tới khi remediation xong; trạng thái triển khai ở roadmap. Phần đã ghi phía trên là lịch sử, giữ nguyên.

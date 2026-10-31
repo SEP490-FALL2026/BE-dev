@@ -1,7 +1,7 @@
 /**
  * One table of names for the display-name rule (T-12) and the job-title comparison built on it. The same rows run
- * against `normalizeDisplayName` (src/core), `normalizeJobTitleName`/`isJobTitleNameTooLong` (organization) and the
- * job-title lookup key of the people import (data-import), so the three cannot drift apart. Invisible characters are
+ * against `normalizeDisplayName` (src/core) and the job-title comparison key of the people import (data-import), so the
+ * two cannot drift apart; the SQL of `20261027120000_job_title_text` spells the same rule out. Invisible characters are
  * written as escapes.
  */
 export interface DisplayNameCase {

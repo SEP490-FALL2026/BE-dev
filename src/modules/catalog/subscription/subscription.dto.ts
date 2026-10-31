@@ -1,7 +1,7 @@
-import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
-import { isBusinessDate } from '../../../core/business-date';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
+import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
+import { businessDate } from '../../../infrastructure/http/dto/business-date.dto';
 
 /**
  * Only the shape and a generous bound are checked here. Whether the kind and the plan fit, a perpetual purchase carries
@@ -9,7 +9,6 @@ import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-
  * finance facade and answers with its own code. Money is text, never a JSON number (ADR-0007). The plan and the kind are
  * not fields of a change, and nothing required can be cleared: only the four optional term fields take `null`.
  */
-const businessDate = z.string().refine(isBusinessDate, { message: 'Must be a real date as YYYY-MM-DD.' });
 const kind = z.enum(['TERM', 'PERPETUAL']);
 const status = z.enum(['DRAFT', 'ACTIVE']);
 const billingCycle = z.enum(['MONTHLY', 'QUARTERLY', 'ANNUAL', 'OTHER']);
@@ -19,6 +18,8 @@ const money = z.strictObject({ amount: z.string().max(40), currency: z.string().
 
 export const declareSubscriptionBodySchema = z.strictObject({
   planId: z.uuid(),
+  // The department that owns the purchase (QĐ-89a). Required, and never part of a change: it is not a field of PATCH.
+  ownerDepartmentId: z.uuid(),
   kind,
   purchasedQuantity: quantity.optional(),
   unitPrice: money.optional(),
@@ -69,6 +70,8 @@ const subscriptionSchema = z.strictObject({
   id: z.uuid(),
   planId: z.uuid(),
   planName: z.string(),
+  // The department that owns the purchase: always present (`QĐ-89a`).
+  ownerDepartmentId: z.uuid(),
   applicationId: z.uuid(),
   applicationName: z.string(),
   vendor: z.strictObject({ id: z.uuid(), name: z.string() }),

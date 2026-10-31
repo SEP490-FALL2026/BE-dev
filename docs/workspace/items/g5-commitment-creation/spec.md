@@ -24,11 +24,11 @@ Khi Người duyệt chi duyệt một Request, hệ thống tự giữ một kh
 
 ## Primary Story/AC
 
-| Story    | AC                          | Coverage | Phần còn lại thuộc                                                                                                                                          |
-| -------- | --------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| US-06-04 | AC-1→AC-3, AC-5, AC-7→AC-13 | full     | —                                                                                                                                                           |
-| US-06-07 | AC-1, AC-2, AC-5, AC-7      | partial  | AC-3, AC-4, AC-6: `g5-budget-version-decision` (đã làm)                                                                                                     |
-| US-06-09 | AC-2, AC-4, AC-9            | partial  | AC-1, AC-3, AC-5→AC-8, AC-11, AC-13→AC-18: `g5-budget-proposal-and-review`; AC-10: `g5-budget-version-decision`; AC-12: `g3-downstream-finance-integration` |
+| Story    | AC                          | Coverage | Phần còn lại thuộc                                                                                                                                                               |
+| -------- | --------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| US-06-04 | AC-1→AC-3, AC-5, AC-7→AC-13 | full     | —                                                                                                                                                                                |
+| US-06-07 | AC-1, AC-2, AC-5, AC-7      | partial  | AC-3, AC-4, AC-6: `g5-budget-version-decision` (đã làm)                                                                                                                          |
+| US-06-09 | AC-2, AC-4, AC-9            | partial  | AC-1, AC-3, AC-5→AC-8, AC-11, AC-13→AC-20, AC-22, AC-23: `g5-budget-proposal-and-review`; AC-10, AC-21: `g5-budget-version-decision`; AC-12: `g3-downstream-finance-integration` |
 
 ## Supporting references
 
@@ -103,3 +103,8 @@ Khi Người duyệt chi duyệt một Request, hệ thống tự giữ một kh
 23/10/2026: lập khung theo scope map G5 của [roadmap](../../../roadmap.md). Chưa thiết kế chi tiết, chưa code, chưa review, chưa nghiệm thu.
 
 23/10/2026: implement và `verified` local (người phụ trách: AI theo giao việc của người dùng). Khoản cam kết do quyết định duyệt chi giữ trong cùng transaction, mỗi năm có kỳ ràng buộc một khoản, chờ ngân sách nếu chưa có. Chưa commit, chưa peer review, chưa Owner review, chưa nghiệm thu.
+
+## Mở lại theo baseline `769bb64` (Prompt 03, 26/10/2026)
+
+- Audit G0–G6 trên Docs `769bb64` ↔ BE `7c28e75` mở lại hạng mục này: F31 — ghi khoản cam kết dưới khóa (Cost Center, năm).
+- Remediation duy nhất: [g0-g6-final-business-baseline-remediation](../g0-g6-final-business-baseline-remediation/spec.md) ([impact matrix](../g0-g6-final-business-baseline-remediation/impact-matrix.md#3-findings)). AC liên quan không còn được coi là thỏa nguồn hiện hành cho tới khi remediation xong; trạng thái triển khai ở roadmap. Phần đã ghi phía trên là lịch sử, giữ nguyên.

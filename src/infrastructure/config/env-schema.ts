@@ -3,6 +3,7 @@ import { parseCorsOrigins, validateProductionCorsOrigins } from './cors';
 import {
   DatabaseEnvironmentVariables,
   assertDatabaseLimits,
+  assertNoDatabaseAdministrationCredentials,
   databaseKeys,
   resolveDatabaseSettings,
 } from './database-environment';
@@ -11,9 +12,9 @@ import { SecretEnvironmentVariables, assertSecrets, secretKeys } from './secret-
 
 /*
  * The one public contract of the environment configuration: the settings type and the validators. The parts live
- * beside it by responsibility — database (also the installation command) and secrets (E3 = C) — and are composed here.
+ * beside it by responsibility — database (also the installation command) and secrets (a development run has no fallback for them) — and are composed here.
  * The queue and object storage validate their own keys when their module is mounted; the API, the worker and the
- * recovery command mount neither (E2 = A), so their keys are not part of this contract.
+ * recovery command mount neither (they stay on standby), so their keys are not part of this contract.
  */
 export { EnvironmentValidationError } from './environment-validation';
 export { resolveDatabaseUrl } from './database-url';
@@ -37,9 +38,9 @@ export interface EnvironmentVariables extends DatabaseEnvironmentVariables, Secr
   AUTH_JWT_ISSUER: string;
   AUTH_JWT_AUDIENCE: string;
   AUTH_INVITATION_TTL_SECONDS: number;
-  /** How long a password-reset link works (T-1). */
+  /** How long a password-reset link works. */
   AUTH_PASSWORD_RESET_TTL_SECONDS: number;
-  /** Reset links one account can be issued in any 60 minutes; further requests are answered the same but issue none (T-2). */
+  /** Reset links one account can be issued in any 60 minutes; further requests are answered the same but issue none. */
   AUTH_PASSWORD_RESET_MAX_PER_HOUR: number;
   APP_PUBLIC_URL: string;
   /** `id:base64` pairs separated by commas: keys that may still seal pending rows after a rotation. */
@@ -141,6 +142,8 @@ export function validateEnvironment(input: Record<string, unknown>): Environment
   assertSecrets(result);
 
   if (result.NODE_ENV === 'production') {
+    assertNoDatabaseAdministrationCredentials(input);
+
     if (!result.SMTP_TLS) {
       throw new EnvironmentValidationError(
         'Environment validation failed: SMTP_TLS must be true in production (the mail carries a bearer activation link)',

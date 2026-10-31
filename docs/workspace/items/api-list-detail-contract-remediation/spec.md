@@ -54,7 +54,7 @@ harness đặc tả projection và số query của repository danh sách.
   (mảng lồng không biên chưa có finding) thêm ở Prompt 09B.
 - Rule hiện có: [API contract](../../../rules/api-contract.md) (không có quy tắc collection),
   [database và nghiệp vụ](../../../rules/database-business.md) (đếm + trang cùng snapshot, thứ tự có khóa phụ).
-- Gate cùng họ: `test/e2e/api-inventory.e2e-spec.ts`, `src/architecture-structure.spec.ts` (ledger chỉ được co lại).
+- Gate cùng họ: `test/http/platform/api-inventory.http-spec.ts`, `test/gates/architecture-structure.gate-spec.ts` (ledger chỉ được co lại).
 
 ## Explicit out of scope
 
@@ -71,13 +71,13 @@ spec; các điểm _Cần Owner quyết_ chặn riêng hạng mục capability t
 
 - `docs/rules/api-contract.md` — mục [Collection và detail](../../../rules/api-contract.md#collection-và-detail-api-list-detail1)
   là nguồn chuẩn của quy tắc (bản trong spec này là thiết kế gốc); `docs/workspace/_template/spec.md` một đoạn nhắc.
-- Gate `src/api-collection-contract.spec.ts` (unit, chạy trong `pnpm check`) đọc `openapi.json` đã commit — an toàn vì
+- Gate `test/gates/api-collection-contract.gate-spec.ts` (unit, chạy trong `pnpm check`) đọc `openapi.json` đã commit — an toàn vì
   `GATE-01` của `delivery-gate-hardening` ghim artifact về LF và test export so đúng byte với bản sinh từ controller.
   **Lệch kế hoạch có chủ đích:** registry nằm **trong** tệp gate (như `LEGACY` của `architecture-structure.spec.ts`), không ở
   `src/api-collection-contract.registry.ts`: một `.ts` không phải spec trong `src/` sẽ được build vào `dist`.
 - Harness `test/support/query-count.ts` đọc lưu lượng qua `PgRelay.observe` (relay sẵn có, thêm theo dõi **mỗi lần thực thi**:
   Query hoặc Execute của portal đã Bind, không đọc giá trị bind); không đổi `PrismaService`, không thêm dependency, không cần
-  `pg_stat_statements`. Mẫu: `test/integration/query-count-harness.integration-spec.ts`.
+  `pg_stat_statements`. Mẫu: `test/integration/identity-access/query-count-harness.integration-spec.ts`.
 - Không đổi route, DTO, Prisma schema, migration hay query sản phẩm.
 
 ## Behavior and design
@@ -343,3 +343,8 @@ DTO hay query. Bảy quyết định `LD-13` vẫn mở; không hạng mục cap
 `LD-16` hai vế. Chỉ đổi gate và tài liệu; runtime, OpenAPI không đổi. Chưa có Owner review cuối hay remote CI.
 
 23/10/2026 (Prompt 10): các hạng mục chủ đã gỡ mục registry tương ứng: registry `COLLECTION_EXCEPTIONS` còn **14 mục trên 12 operation** (`detail-reuse` 3, `bounded` 5, `owner-decision` 5, `unbounded` 1) và `NESTED_ARRAYS` **63 mục** (`bounded` 60, `unbounded` 2, `owner-decision` 1); các mục `query` đã gỡ khi test harness chứng minh, và `departmentWarningList`, `nonWorkingDateList`, `projectList` không còn mục vì đã phân trang. Mục mới `projectGet#departments` (`bounded`, route mới ở `organization-identity-read-contracts`). Chưa có Owner review cuối; bảy điểm `LD-13` còn chờ Owner (xem review mục 11).
+
+## Mở lại theo baseline `769bb64` (Prompt 03, 26/10/2026)
+
+- Audit G0–G6 trên Docs `769bb64` ↔ BE `7c28e75` mở lại hạng mục này: F55 — `LD-13` điểm 1 → 7 còn mở (P03-D14).
+- Remediation duy nhất: [g0-g6-final-business-baseline-remediation](../g0-g6-final-business-baseline-remediation/spec.md) ([impact matrix](../g0-g6-final-business-baseline-remediation/impact-matrix.md#3-findings)). AC liên quan không còn được coi là thỏa nguồn hiện hành cho tới khi remediation xong; trạng thái triển khai ở roadmap. Phần đã ghi phía trên là lịch sử, giữ nguyên.

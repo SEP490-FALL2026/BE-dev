@@ -49,8 +49,23 @@ export function proposalPolicy(slaWorkingDays: number): RequestPolicy {
   };
 }
 
+/**
+ * Whether a person who holds these roles may send a request. The Super Admin files and decides no business record (`QĐ-87a`, `SoD-1`): whatever else they hold, they send none, on any route that sends one, and every service that sends judges it itself.
+ */
+export const mayRequest = (roles: readonly string[]): boolean => !roles.includes('SUPER_ADMIN');
+
 /** Whether the chain has a spend step: only then can one person hold both the need step and the spend step. */
 export const hasSpendStep = (policy: Pick<RequestPolicy, 'chain'>): boolean => policy.chain.includes('SPEND_APPROVAL');
+
+/**
+ * The Cost Center a request that costs money is charged to. The table gives every such request one: only a free internal request of
+ * a department that has none carries none (`QĐ-87g(2)`), and it has no spend step, no budget check and no commitment to charge.
+ */
+export function chargedCostCenterId(request: { id: string; costCenterId: string | null }): string {
+  if (request.costCenterId === null) throw new Error(`The request ${request.id} is charged to no Cost Center.`);
+
+  return request.costCenterId;
+}
 
 /** Who is asking and which roles they hold now. */
 export interface ViewingActor {

@@ -14,7 +14,7 @@
 
 Sau lát này, người đọc Swagger và công cụ sinh client (Orval) thấy đúng route nào cần bearer token, mỗi operation có
 một summary ngắn, credential hiển thị bằng placeholder an toàn, và document là OpenAPI 3.0 sạch; runtime và wire contract
-giữ nguyên. Kiểm được bằng `test/e2e/api-inventory.e2e-spec.ts` và diff `openapi.json`.
+giữ nguyên. Kiểm được bằng `test/http/platform/api-inventory.http-spec.ts` và diff `openapi.json`.
 
 ## Primary Story/AC
 

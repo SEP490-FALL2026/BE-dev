@@ -7,7 +7,7 @@
 
 ## Before coding
 
-Đọc AGENTS.md, CONTRIBUTING.md, [module structure](../../../rules/module-structure.md), [API contract](../../../rules/api-contract.md), [database rules](../../../rules/database-business.md), mã `licensing/assignment`, `licensing/provisioning` (đọc Assignment và tác vụ cấp), `organization.service.ts` (`getItAdminInCharge`), `identity-access.service.ts` (`findUsableItAdminEmployeeIds`) và `operating-parameters/parameter-definitions.ts` ở BE `7920ee5`. Đối chiếu: chưa có bảng phiếu; hàm ngày làm việc do `g6-transfer-record` hoặc `g5-step-sla-and-alerts` tạo; BE chưa có trạng thái tác vụ _chờ chấp nhận_. Hạng mục độc lập với các hạng mục nhân sự khác của G6. Migration `20261025000000_licensing_saas_issues` (tên tạm `20261024089500` phải xếp sau `20261024230000`) là task riêng đi trước mã dùng nó.
+Đọc AGENTS.md, CONTRIBUTING.md, [module structure](../../../rules/module-structure.md), [API contract](../../../rules/api-contract.md), [database rules](../../../rules/database-business.md), mã `licensing/assignment`, `licensing/provisioning` (đọc Assignment và tác vụ cấp), `organization.service.ts` (`getItAdminInCharge`), `identity-access.service.ts` (`findUsableItAdminEmployeeIds`) và `operating-parameters/parameter-definitions.policy.ts` ở BE `7920ee5`. Đối chiếu: chưa có bảng phiếu; hàm ngày làm việc do `g6-transfer-record` hoặc `g5-step-sla-and-alerts` tạo; BE chưa có trạng thái tác vụ _chờ chấp nhận_. Hạng mục độc lập với các hạng mục nhân sự khác của G6. Migration `20261025000000_licensing_saas_issues` (tên tạm `20261024089500` phải xếp sau `20261024230000`) là task riêng đi trước mã dùng nó.
 
 ## Tasks
 
@@ -20,7 +20,7 @@
 
 ### Task 2: dữ liệu và tham số (xong)
 
-- Files: `prisma/migrations/20261025000000_licensing_saas_issues/migration.sql`, `prisma/models/licensing.prisma`, `src/modules/operating-parameters/parameter-definitions.ts`, `parameter-definitions.spec.ts`, `PRISMA_MODEL_OWNER` ở `architecture-boundaries.spec.ts`, `operating-parameters-http.integration-spec.ts` (18 → 20 tham số)
+- Files: `prisma/migrations/20261025000000_licensing_saas_issues/migration.sql`, `prisma/models/licensing.prisma`, `src/modules/operating-parameters/parameter-definitions.policy.ts`, `parameter-definitions.spec.ts`, `PRISMA_MODEL_OWNER` ở `architecture-boundaries.spec.ts`, `operating-parameters-http.integration-spec.ts` (18 → 20 tham số)
 - Depends on: Task 1
 - Acceptance: bốn enum, `saas_issues` với `CHECK` theo trạng thái (kết quả, phiếu gốc, đóng), `saas_issue_entries` chỉ thêm; hai khóa tham số `SAAS_ISSUE_RESPONSE_WORKING_DAYS`, `SAAS_ISSUE_REOPEN_WORKING_DAYS`
 - Verify: nhóm test _what the database refuses_ (`23514`, `55000`) xanh; test định nghĩa tham số xanh; `pnpm prisma:validate`; `migrate diff --exit-code` = 0 trên CSDL kiểm thử riêng
@@ -41,7 +41,7 @@
 
 ### Task 5: xử lý, trùng, sweeper và API (xong)
 
-- Files: `saas-issue-handling.service.ts`, `saas-issue-sweep.service.ts`, `saas-issue.sweeper.ts`, `saas-issues.controller.ts`, `saas-issue.dto.ts`, `saas-issue.http-errors.ts`, `saas-issue.mapper.ts`, `api-coverage-manifest.ts`, `api-inventory.e2e-spec.ts` (286 → 295), `openapi.json`, `test/e2e/saas-issues.e2e-spec.ts`
+- Files: `saas-issue-handling.service.ts`, `saas-issue-sweep.service.ts`, `saas-issue.sweeper.ts`, `saas-issues.controller.ts`, `saas-issue.dto.ts`, `saas-issue.http-errors.ts`, `saas-issue.mapper.ts`, `api-coverage-manifest.ts`, `api-inventory.e2e-spec.ts` (286 → 295), `openapi.json`, `test/http/licensing/saas-issues.http-spec.ts`
 - Depends on: Task 4
 - Acceptance: chuyển trạng thái đúng đồ thị với kết quả và mã ticket ghi tay, không nhãn đã gửi ticket, tham chiếu luồng khác không tự kích hoạt, đánh dấu trùng, xử lý thay có audit, nhắc quá hạn một lần, đóng tự động; `403` và `404` đúng vai; mô tả OpenAPI chỉ web; AC-5, AC-8, AC-9 của `US-07-10` và AC-1→AC-9 của `US-07-11`
 - Verify: integration PostgreSQL và e2e của các AC đó xanh; `pnpm openapi:export` không lệch; test đếm câu lệnh xanh

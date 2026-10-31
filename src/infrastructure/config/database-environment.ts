@@ -41,7 +41,7 @@ export const databaseKeys = {
     .default(''),
   // Per-transaction limits for the organization/identity area. The ordering lock < statement <
   // transaction makes PostgreSQL stop a slow statement (55P03/57014) before Prisma closes the
-  // transaction itself (P2028); assertDatabaseLimits enforces it.
+  // transaction itself (28); assertDatabaseLimits enforces it.
   DB_LOCK_TIMEOUT_MS: Joi.number().integer().min(100).max(60_000).default(3_000),
   DB_STATEMENT_TIMEOUT_MS: Joi.number().integer().min(100).max(120_000).default(5_000),
   DB_TRANSACTION_TIMEOUT_MS: Joi.number().integer().min(100).max(180_000).default(10_000),
@@ -102,6 +102,31 @@ export function assertDatabaseLimits(result: DatabaseEnvironmentVariables): void
     throw new EnvironmentValidationError(
       'Environment validation failed: DB_IDLE_IN_TRANSACTION_TIMEOUT_MS must be higher than DB_TRANSACTION_TIMEOUT_MS, ' +
         'so the server only ends sessions the application has already given up on',
+    );
+  }
+}
+
+/**
+ * Credentials that administer the database (DB-04, Q9): the cluster superuser and the deploy role. Compose
+ * reads them from `.env` for interpolation only; the API, the worker and the recovery command get `.env.app` and the
+ * runtime `DATABASE_URL`, so in production any of these in their environment is a wiring mistake.
+ */
+const DATABASE_ADMINISTRATION_KEYS = [
+  'POSTGRES_PASSWORD',
+  'DATABASE_BOOTSTRAP_URL',
+  'DATABASE_DEPLOY_URL',
+  'DATABASE_DEPLOY_PASSWORD',
+] as const;
+
+/** Refuses, in production, an environment that carries a database administration credential; names keys, never values. */
+export function assertNoDatabaseAdministrationCredentials(input: Record<string, unknown>): void {
+  if (input.NODE_ENV !== 'production') return;
+  const present = DATABASE_ADMINISTRATION_KEYS.filter((key) => typeof input[key] === 'string' && input[key] !== '');
+  if (present.length > 0) {
+    throw new EnvironmentValidationError(
+      `Environment validation failed: the API, the worker and the recovery command must not receive database ` +
+        `administration credentials (${present.join(', ')}); give them the runtime role only ` +
+        '(docs/guides/containers.md#postgresql-roles-h7)',
     );
   }
 }

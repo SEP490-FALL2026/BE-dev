@@ -4,17 +4,18 @@ import { Page, pageOf } from '../../../core/application/pagination';
 import type { LicenseKeyStatus } from '../../../generated/prisma/client';
 import { DbTx, TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { AuditService } from '../../audit/audit.service';
-import { CatalogService } from '../../catalog/catalog.service';
-import { OrganizationService } from '../../organization/organization.service';
+import { AuditApi } from '../../audit/public/audit.api';
+import { CatalogApi } from '../../catalog/public/catalog.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
 import {
   LicenseKeyNotFoundError,
   LicenseKeyPlanNotK4Error,
   LicenseKeyRevealLimitError,
   SeatTargetNotFoundError,
-} from '../licensing.errors';
-import { licensingAuditEvent } from '../mappers/licensing-audit-event';
-import { LicenseKeyCipher } from './license-key-cipher';
+} from '../public/licensing.errors';
+import { licensingAuditEvent } from '../licensing-audit-event.mapper';
+import { LicenseKeyCipher } from './license-key-cipher.service';
+import { LicenseKeyApplicationRetiredError } from './license-key.errors';
 import {
   capacityOf,
   judgeBatch,
@@ -53,15 +54,16 @@ export class LicenseKeyService {
     private readonly repo: LicenseKeyRepo,
     private readonly quota: LicenseKeyRevealQuotaRepo,
     private readonly cipher: LicenseKeyCipher,
-    private readonly catalog: CatalogService,
-    private readonly organization: OrganizationService,
-    private readonly audit: AuditService,
+    private readonly catalog: CatalogApi,
+    private readonly organization: OrganizationApi,
+    private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
   ) {}
 
   /**
    * Keeps every valid key of the batch and reports each line that was not kept; a wrong line never spoils the others.
-   * Throws SeatTargetNotFoundError (no such purchase) and LicenseKeyPlanNotK4Error; nothing is kept then.
+   * Throws SeatTargetNotFoundError (no such purchase), LicenseKeyPlanNotK4Error and LicenseKeyApplicationRetiredError; nothing
+   * is kept then.
    */
   async import(
     actor: AuthenticatedPrincipal,
@@ -84,20 +86,35 @@ export class LicenseKeyService {
       .sort((a, b) => a.fingerprint.localeCompare(b.fingerprint));
 
     const stored = await this.runner.run(async (tx) => {
+      // The purchase is held for the transaction that keeps its keys: the subscription FOR UPDATE and its plan
+      // FOR SHARE, so a change of the plan's kind waits for the keys or the keys wait for it, and the kind is read again
+      // under the lock. The check before the transaction only answers early.
+      const held = await this.catalog.lockSeatTarget(tx, { subscriptionId: input.subscriptionId });
+      if (!held) throw new SeatTargetNotFoundError('SUBSCRIPTION');
+      if (held.provisioningType !== 'K4') throw new LicenseKeyPlanNotK4Error(held.provisioningType);
+      if (held.applicationStatus === 'RETIRED') throw new LicenseKeyApplicationRetiredError();
+
+      // One statement for the whole batch (a thousand round trips outlasted the transaction on a busy server).
+      const keptIds = await this.repo.insertManyIfNew(
+        tx,
+        sealed.map((row) => {
+          const { keyId, ciphertext } = this.cipher.encrypt(row.id, row.key);
+
+          return {
+            id: row.id,
+            organizationId: organization.id,
+            subscriptionId: input.subscriptionId,
+            fingerprint: row.fingerprint,
+            masked: maskKey(row.key),
+            ciphertext,
+            cipherKeyId: keyId,
+            importedByAppUserId: actor.appUserId,
+          };
+        }),
+      );
       let kept = 0;
       for (const row of sealed) {
-        const { keyId, ciphertext } = this.cipher.encrypt(row.id, row.key);
-        const isNew = await this.repo.insertIfNew(tx, {
-          id: row.id,
-          organizationId: organization.id,
-          subscriptionId: input.subscriptionId,
-          fingerprint: row.fingerprint,
-          masked: maskKey(row.key),
-          ciphertext,
-          cipherKeyId: keyId,
-          importedByAppUserId: actor.appUserId,
-        });
-        if (isNew) kept += 1;
+        if (keptIds.has(row.id)) kept += 1;
         else lines.push({ line: row.line, code: 'ALREADY_IN_STORE' });
       }
       await this.audit.record(
@@ -182,7 +199,8 @@ export class LicenseKeyService {
    * last slot cannot both pass.
    */
   private async takeSlot(tx: DbTx, actor: AuthenticatedPrincipal): Promise<void> {
-    const now = new Date();
+    // `Date.now()`, the one clock the windows are named by, so a test can set the instant of an opening.
+    const now = new Date(Date.now());
     for (const window of ['MINUTE', 'DAY'] as const) {
       if (!(await this.quota.take(tx, actor.appUserId, window, now))) {
         // For the operator, never for the caller: which account tried, not which key.
@@ -212,6 +230,7 @@ export class LicenseKeyService {
   private async requireK4Purchase(subscriptionId: string) {
     const target = await this.requireSubscription(subscriptionId);
     if (target.provisioningType !== 'K4') throw new LicenseKeyPlanNotK4Error(target.provisioningType);
+    if (target.applicationStatus === 'RETIRED') throw new LicenseKeyApplicationRetiredError();
 
     return target;
   }

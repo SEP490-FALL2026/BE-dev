@@ -1,6 +1,6 @@
-import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
+import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { MAX_CONTRACT_NAME_LENGTH, MAX_FILE_NAME_LENGTH } from './contract.policy';
 
 /**

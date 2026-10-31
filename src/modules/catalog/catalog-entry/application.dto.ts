@@ -1,6 +1,6 @@
-import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
+import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 
 /**
  * Only the shape and a generous bound are checked here. Whether a name is empty or too long, a domain is a host, a
@@ -59,7 +59,7 @@ export const listApplicationsQuerySchema = z.strictObject({
 });
 export const applicationIdParamSchema = z.strictObject({ id: z.uuid() });
 
-/** A row of the list (`LD-04`); the detail is this and the rest, so the shared fields cannot drift apart. */
+/** A row of the list; the detail is this and the rest, so the shared fields cannot drift apart. */
 const applicationSummarySchema = z.strictObject({
   id: z.uuid(),
   name: z.string(),

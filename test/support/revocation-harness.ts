@@ -2,12 +2,12 @@ import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { TransactionRunner } from '../../src/infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../src/infrastructure/security/tokens/access-token-verifier.port';
-import { LicensingService } from '../../src/modules/licensing/licensing.service';
+import { LicensingApi } from '../../src/modules/licensing/public/licensing.api';
 import type {
   OpenedRevocation,
   RevocationContext,
   RevocationDecision,
-} from '../../src/modules/licensing/licensing.types';
+} from '../../src/modules/licensing/public/licensing.types';
 import type { ApiAccount } from './api-accounts';
 import { ProvisioningHarness, type TaskWire } from './provisioning-harness';
 
@@ -65,7 +65,7 @@ export class RevocationHarness extends ProvisioningHarness {
 
   /** What a source module does in its own transaction: ask the licensing facade to open the revocation of a seat. */
   open = (assignmentId: string, source: string | undefined, options: OpenOptions = {}): Promise<OpenedRevocation> => {
-    const facade = this.ctx.app.get(LicensingService);
+    const facade = this.ctx.app.get(LicensingApi);
     const actor = options.actor ?? this.actorOf(this.it1);
 
     return this.ctx.app.get(TransactionRunner).run((tx) =>
@@ -151,12 +151,11 @@ export class RevocationHarness extends ProvisioningHarness {
     return date.toISOString().slice(0, 10);
   };
 
-  /** A fingerprint of every table a revocation must not touch: subscriptions, contracts, allocations, budgets and commitments. */
+  /** A fingerprint of every table a revocation must not touch: subscriptions, contracts, budgets and commitments. */
   async untouched(): Promise<Record<string, string>> {
     const tables = [
       'subscriptions',
       'contracts',
-      'subscription_cost_allocations',
       'budget_versions',
       'budget_commitments',
       'budget_commitment_releases',

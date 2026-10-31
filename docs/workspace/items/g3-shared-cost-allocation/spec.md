@@ -132,3 +132,9 @@ Audit cùng giao dịch: `COST_ALLOCATION.DECLARED` (phiên bản và dòng trư
 ## Changes and acceptance
 
 20/10/2026: thiết kế `ready`. Quyết định cần Owner xác nhận khi review: một phân bổ hiện hành cho mỗi thuê bao kèm lịch sử (chưa chia theo kỳ); tỷ lệ phần vạn tối đa 2 chữ số thập phân, mỗi dòng `> 0`, cho phép một dòng 100; gói `PER_HOST` được phân bổ và gói chưa khai mô hình giá bị từ chối; Cost Center ngừng dùng không nhận phân bổ mới; IT Admin và Finance đọc, chỉ Finance ghi; route đặt ở `catalog/subscription`. Chưa code, chưa review, chưa nghiệm thu.
+
+## Mở lại theo baseline `769bb64` (Prompt 03, 26/10/2026)
+
+- Audit G0–G6 trên Docs `769bb64` ↔ BE `7c28e75` mở lại hạng mục này: F05 — phân bổ theo tỷ lệ bị gỡ (`US-04-08` `RETIRED`).
+- Remediation duy nhất: [g0-g6-final-business-baseline-remediation](../g0-g6-final-business-baseline-remediation/spec.md) ([impact matrix](../g0-g6-final-business-baseline-remediation/impact-matrix.md#3-findings)). AC liên quan không còn được coi là thỏa nguồn hiện hành cho tới khi remediation xong; trạng thái triển khai ở roadmap. Phần đã ghi phía trên là lịch sử, giữ nguyên.
+- _27/10/2026 (Prompt 04, Task 0.1 của `g0-g6-final-business-baseline-remediation`, F60 — re-pin scope map [G3](../../../roadmap.md#work-item-decomposition-g3) Docs `e0cb5a0`, BE `7c28e75`):_ `US-04-08` `RETIRED` (F05): scope map khóa `US-04-08` AC-1→AC-5 ở `not affected`, hạng mục không còn là chủ của AC nào; bảng _Primary Story/AC_ ở trên giữ nguyên làm lịch sử của lát đã làm, mã/schema/API gỡ ở Task 1.4 ([impact matrix mục 9](../g0-g6-final-business-baseline-remediation/impact-matrix.md#9-phụ-lục-delta-user-stories-72e1480--769bb64)). Phần đã ghi phía trên là lịch sử, giữ nguyên.

@@ -1,17 +1,19 @@
 import { Controller, Get, HttpStatus, Param, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
 import {
   ApiErrorResponses,
+  FORBIDDEN_EXAMPLE,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
+  VALIDATION_EXAMPLE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
+import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
 import { ApplicationIdParamDto } from './application.dto';
-import { toApplicationApiException } from './application.http-errors';
+import { APPLICATION_ERROR_EXAMPLES as EXAMPLES, toApplicationApiException } from './application.http-errors';
 import { ApplicationOwnerService } from './application-owner.service';
 
 const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPONSE] as const;
@@ -88,8 +90,12 @@ export class ApplicationOwnersController {
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
-    { status: HttpStatus.FORBIDDEN, description: 'Only an IT Admin reads the alerts.' },
-    { status: HttpStatus.UNPROCESSABLE_ENTITY, description: 'The query is invalid (VALIDATION_ERROR).' },
+    { status: HttpStatus.FORBIDDEN, description: 'Only an IT Admin reads the alerts.', examples: [FORBIDDEN_EXAMPLE] },
+    {
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      description: 'The query is invalid (VALIDATION_ERROR).',
+      examples: [VALIDATION_EXAMPLE],
+    },
   )
   async warnings(@Query() query: OwnerWarningsQueryDto) {
     try {
@@ -112,11 +118,20 @@ export class ApplicationOwnersController {
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
-    { status: HttpStatus.FORBIDDEN, description: 'Only the IT Admin and Finance read the history.' },
-    { status: HttpStatus.NOT_FOUND, description: 'The application does not exist (APPLICATION.NOT_FOUND).' },
+    {
+      status: HttpStatus.FORBIDDEN,
+      description: 'Only the IT Admin and Finance read the history.',
+      examples: [FORBIDDEN_EXAMPLE],
+    },
+    {
+      status: HttpStatus.NOT_FOUND,
+      description: 'The application does not exist (APPLICATION.NOT_FOUND).',
+      examples: [EXAMPLES.NOT_FOUND],
+    },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description: 'The id is not a UUID or the query is invalid (VALIDATION_ERROR).',
+      examples: [VALIDATION_EXAMPLE],
     },
   )
   async history(@Param() params: ApplicationIdParamDto, @Query() query: OwnerWarningsQueryDto) {

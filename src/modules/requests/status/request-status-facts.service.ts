@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { RequestStatusRecipientsService } from './request-status-recipients.service';
-import { needsOf, ruleFor, subjectIdOf } from './request-status.policy';
+import { needsOf, ruleFor, subjectIdOf } from './rules/request-status-rules.policy';
 import { RequestStatusRepo } from './request-status.repo';
 import { NO_FACTS, type StatusEvent, type StatusFacts } from './request-status.types';
 

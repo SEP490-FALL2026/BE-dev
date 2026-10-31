@@ -325,4 +325,4 @@ Chi tiết ở [plan](plan.md). Năm hạng mục forward (thiết kế `draft`,
 22/10/2026 (Prompt 07): lập ma trận A–E, đối chiếu PR #14, scope map G2 mới, re-pin G3/G4, năm hạng mục remediation và
 khung G2. Chưa Owner review, chưa nghiệm thu. Gate trên cây merge của PR #14 chưa chạy lại (Prompt 08).
 
-23/10/2026 (Prompt 10): các hạng mục chủ đã hiện thực (xem [review mục 11](../../../reviews/g0-g4-post-merge-review-2026-10-22/README.md#11-xử-lý-tồn-đọng-prompt-10-23102026)): `BBI-D01`→`D10` trừ phần chờ G5 và `AC-17`; `BBI-E01` vẫn chặn (G5, Owner). Quyết định Owner được áp bằng mặc định của spec, chưa phải Owner chọn. Chưa commit lúc ghi, chưa Owner review.
+23/10/2026 (Prompt 10): các hạng mục chủ đã hiện thực (xem [review mục 11](../../../reviews/g0-g4-post-merge-review-2026-10-22/README.md#12-xử-lý-tồn-đọng-prompt-10-23102026)): `BBI-D01`→`D10` trừ phần chờ G5 và `AC-17`; `BBI-E01` vẫn chặn (G5, Owner). Quyết định Owner được áp bằng mặc định của spec, chưa phải Owner chọn. Chưa commit lúc ghi, chưa Owner review.

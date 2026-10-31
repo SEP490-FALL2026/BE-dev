@@ -11,6 +11,8 @@ enum BudgetProposalState {
   RETURNED
   // Finance has built a review version from it and sent that on.
   REVIEWED
+  // Closed by the year-end sweep because its fiscal year ended before it was decided on (QĐ-91c).
+  CLOSED_FISCAL_YEAR_ENDED
 }
 
 // How a line repeats (QĐ-82d): the purchase window and the service period are what Finance reads the year from.
@@ -39,6 +41,9 @@ enum BudgetVersionState {
   CHANGES_REQUESTED
   // A later version was approved in its place.
   SUPERSEDED
+  // Closed when its fiscal year ended (QĐ-91c): a current version stays as the reference budget of the year; one that never
+  // became current is marked `neverCurrent`.
+  EXPIRED
 }
 
 // What a head of department asks for one Cost Center and one fiscal year (BM-10, US-06-10). A proposal is never edited
@@ -51,6 +56,9 @@ model BudgetProposal {
   state                 BudgetProposalState
   // The proposal this one corrects, when it was sent again after being given back.
   previousProposalId    String?             @map("previous_proposal_id") @db.Uuid
+  // The proposal this one follows when the version made from that one was refused and the need changed (QĐ-92c(2)): a
+  // proposal is a resubmission OR a successor, and has at most one successor. Set by the system, never by a client.
+  successorOfProposalId String?             @unique @map("successor_of_proposal_id") @db.Uuid
   totalMinor            BigInt              @map("total_minor")
   currency              String              @db.Char(3)
   // Values, not foreign keys: the history outlives the account.
@@ -60,6 +68,9 @@ model BudgetProposal {
   returnedByEmployeeId  String?             @map("returned_by_employee_id") @db.Uuid
   returnedAt            DateTime?           @map("returned_at") @db.Timestamptz(3)
   withdrawnAt           DateTime?           @map("withdrawn_at") @db.Timestamptz(3)
+  // When a successor was submitted (set with it, in the same transaction), and when the year-end sweep closed the proposal.
+  succeededAt           DateTime?           @map("succeeded_at") @db.Timestamptz(3)
+  closedAt              DateTime?           @map("closed_at") @db.Timestamptz(3)
   updatedAt             DateTime            @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   organization   Organization         @relation(fields: [organizationId], references: [id])
@@ -67,6 +78,8 @@ model BudgetProposal {
   currencyRecord Currency             @relation("BudgetProposalCurrency", fields: [currency], references: [code], onDelete: Restrict)
   previous       BudgetProposal?      @relation("BudgetProposalChain", fields: [previousProposalId], references: [id], onDelete: Restrict)
   next           BudgetProposal[]     @relation("BudgetProposalChain")
+  successorOf    BudgetProposal?      @relation("BudgetProposalSuccession", fields: [successorOfProposalId], references: [id], onDelete: Restrict)
+  successor      BudgetProposal?      @relation("BudgetProposalSuccession")
   lines          BudgetProposalLine[]
   versions       BudgetVersion[]
 
@@ -100,46 +113,57 @@ model BudgetProposalLine {
 // One version of the budget of a Cost Center and a fiscal year (US-06-09). Finance builds it; only the spending approver
 // decides it (US-06-11). The number is the order of the versions of that Cost Center and year.
 model BudgetVersion {
-  id                   String             @id @default(uuid()) @db.Uuid
-  organizationId       String             @map("organization_id") @db.Uuid
-  costCenterId         String             @map("cost_center_id") @db.Uuid
-  year                 Int
-  number               Int
-  kind                 BudgetVersionKind
-  state                BudgetVersionState
-  proposalId           String?            @map("proposal_id") @db.Uuid
+  id                    String             @id @default(uuid()) @db.Uuid
+  organizationId        String             @map("organization_id") @db.Uuid
+  costCenterId          String             @map("cost_center_id") @db.Uuid
+  year                  Int
+  number                Int
+  kind                  BudgetVersionKind
+  state                 BudgetVersionState
+  proposalId            String?            @map("proposal_id") @db.Uuid
   // The version that was current when this revision was made.
-  basedOnVersionId     String?            @map("based_on_version_id") @db.Uuid
-  baseMinor            BigInt             @map("base_minor")
-  reserveMinor         BigInt             @map("reserve_minor")
-  totalMinor           BigInt             @map("total_minor")
-  currency             String             @db.Char(3)
+  basedOnVersionId      String?            @map("based_on_version_id") @db.Uuid
+  baseMinor             BigInt             @map("base_minor")
+  reserveMinor          BigInt             @map("reserve_minor")
+  totalMinor            BigInt             @map("total_minor")
+  currency              String             @db.Char(3)
   // A line is "high value" when it is over this share of what is left of the year (US-06-12).
-  highValuePercent     Int                @map("high_value_percent")
+  highValuePercent      Int                @map("high_value_percent")
   // The other way a line is high value: over this amount, whatever is left (QĐ-82c). Null when the version sets none.
-  highValueAmountMinor BigInt?            @map("high_value_amount_minor")
+  highValueAmountMinor  BigInt?            @map("high_value_amount_minor")
   // Forecast by quarter only: it never limits a payment (QĐ-82e). All four or none, adding up to the total.
-  q1Minor              BigInt?            @map("q1_minor")
-  q2Minor              BigInt?            @map("q2_minor")
-  q3Minor              BigInt?            @map("q3_minor")
-  q4Minor              BigInt?            @map("q4_minor")
+  q1Minor               BigInt?            @map("q1_minor")
+  q2Minor               BigInt?            @map("q2_minor")
+  q3Minor               BigInt?            @map("q3_minor")
+  q4Minor               BigInt?            @map("q4_minor")
   // Why a revision changes the budget; required to send it.
-  reason               String?
-  createdByEmployeeId  String             @map("created_by_employee_id") @db.Uuid
-  createdAt            DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
-  sentByEmployeeId     String?            @map("sent_by_employee_id") @db.Uuid
-  sentAt               DateTime?          @map("sent_at") @db.Timestamptz(3)
-  updatedAt            DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  reason                String?
+  createdByEmployeeId   String             @map("created_by_employee_id") @db.Uuid
+  createdAt             DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  sentByEmployeeId      String?            @map("sent_by_employee_id") @db.Uuid
+  sentAt                DateTime?          @map("sent_at") @db.Timestamptz(3)
+  // The draft of a proposal that was withdrawn or given back, set in the transaction of that move (F36, QĐ-91a). It stays a draft,
+  // is never deleted or sent, and does not count as the version in work of its Cost Center and year.
+  detachedAt            DateTime?          @map("detached_at") @db.Timestamptz(3)
+  // Closed with the fiscal year (QĐ-91c, F62): `neverCurrent` when the version was never the budget of the year.
+  neverCurrent          Boolean            @default(false) @map("never_current")
+  expiredAt             DateTime?          @map("expired_at") @db.Timestamptz(3)
+  // The refused version this one follows when the head's proposal stayed reviewed (QĐ-92c(1)). Set by the system.
+  rejectedPredecessorId String?            @unique @map("rejected_predecessor_id") @db.Uuid
+  updatedAt             DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  organization        Organization            @relation(fields: [organizationId], references: [id])
-  costCenter          CostCenter              @relation(fields: [costCenterId], references: [id], onDelete: Restrict)
-  currencyRecord      Currency                @relation("BudgetVersionCurrency", fields: [currency], references: [code], onDelete: Restrict)
-  proposal            BudgetProposal?         @relation(fields: [proposalId], references: [id], onDelete: Restrict)
-  basedOn             BudgetVersion?          @relation("BudgetVersionBasis", fields: [basedOnVersionId], references: [id], onDelete: Restrict)
-  revisions           BudgetVersion[]         @relation("BudgetVersionBasis")
+  organization        Organization                @relation(fields: [organizationId], references: [id])
+  costCenter          CostCenter                  @relation(fields: [costCenterId], references: [id], onDelete: Restrict)
+  currencyRecord      Currency                    @relation("BudgetVersionCurrency", fields: [currency], references: [code], onDelete: Restrict)
+  proposal            BudgetProposal?             @relation(fields: [proposalId], references: [id], onDelete: Restrict)
+  basedOn             BudgetVersion?              @relation("BudgetVersionBasis", fields: [basedOnVersionId], references: [id], onDelete: Restrict)
+  revisions           BudgetVersion[]             @relation("BudgetVersionBasis")
+  rejectedPredecessor BudgetVersion?              @relation("BudgetVersionFollowsRefused", fields: [rejectedPredecessorId], references: [id], onDelete: Restrict)
+  followedBy          BudgetVersion?              @relation("BudgetVersionFollowsRefused")
+  history             BudgetVersionHistoryEntry[]
   lines               BudgetVersionLine[]
   decisions           BudgetVersionDecision[]
-  attachedCommitments BudgetCommitment[]      @relation("BudgetCommitmentAttached")
+  attachedCommitments BudgetCommitment[]          @relation("BudgetCommitmentAttached")
 
   @@unique([costCenterId, year, number])
   @@index([costCenterId, year, state])
@@ -298,4 +322,39 @@ model BudgetCommitmentRelease {
 
   @@index([commitmentId, releasedAt])
   @@map("budget_commitment_releases")
+}
+
+enum BudgetVersionHistoryKind {
+  FIGURES_UPDATED
+  LINE_UPDATED
+  LINES_ADDED
+  LINES_IMPORTED
+  WINDOW_MOVED
+}
+
+// One edit of a version (F66, QĐ-91d), appended in the transaction of the edit and never changed (a trigger): what Finance
+// and the approver read to see how the version came to be. `audit_events` is the audit, not this read model. `seq` runs
+// from 1 for each version under the lock of the version row.
+model BudgetVersionHistoryEntry {
+  id                  String                   @id @default(uuid()) @db.Uuid
+  organizationId      String                   @map("organization_id") @db.Uuid
+  versionId           String                   @map("version_id") @db.Uuid
+  seq                 Int
+  kind                BudgetVersionHistoryKind
+  versionState        BudgetVersionState       @map("version_state")
+  position            Int?
+  fromPosition        Int?                     @map("from_position")
+  toPosition          Int?                     @map("to_position")
+  lineCount           Int?                     @map("line_count")
+  before              Json?
+  after               Json
+  // A value, not a foreign key: the history outlives the account.
+  changedByEmployeeId String                   @map("changed_by_employee_id") @db.Uuid
+  changedAt           DateTime                 @default(now()) @map("changed_at") @db.Timestamptz(3)
+
+  organization Organization  @relation(fields: [organizationId], references: [id])
+  version      BudgetVersion @relation(fields: [versionId], references: [id], onDelete: Restrict)
+
+  @@unique([versionId, seq])
+  @@map("budget_version_history")
 }

@@ -144,6 +144,7 @@ export class VersionViewService {
           state: version.state,
           proposalId: version.proposalId,
           basedOnVersionId: version.basedOnVersionId,
+          rejectedPredecessorId: version.rejectedPredecessorId,
           base: money(version.baseMinor),
           reserve: money(version.reserveMinor),
           total: money(version.totalMinor),
@@ -159,6 +160,9 @@ export class VersionViewService {
           createdBy: people.get(version.createdByEmployeeId) ?? null,
           createdAt: version.createdAt.toISOString(),
           sentAt: version.sentAt?.toISOString() ?? null,
+          detachedAt: version.detachedAt?.toISOString() ?? null,
+          neverCurrent: version.neverCurrent,
+          expiredAt: version.expiredAt?.toISOString() ?? null,
         };
       }),
     );

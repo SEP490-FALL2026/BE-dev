@@ -20,7 +20,7 @@
 
 ### Task 2: dữ liệu (xong)
 
-- Files: `prisma/migrations/20261024190000_licensing_service_account_moves/migration.sql`, `prisma/migrations/20261024190100_personnel_transfer_closure/migration.sql`, `prisma/models/licensing.prisma`, `prisma/models/personnel.prisma`, `prisma/models/organization.prisma` (quan hệ ngược), `src/architecture-boundaries.spec.ts` (`PRISMA_MODEL_OWNER`)
+- Files: `prisma/migrations/20261024190000_licensing_service_account_moves/migration.sql`, `prisma/migrations/20261024190100_personnel_transfer_closure/migration.sql`, `prisma/models/licensing.prisma`, `prisma/models/personnel.prisma`, `prisma/models/organization.prisma` (quan hệ ngược), `test/gates/architecture-boundaries.gate-spec.ts` (`PRISMA_MODEL_OWNER`)
 - Depends on: Task 1, `g6-transfer-record`
 - Acceptance: `service_account_moves` với unique một phần `PENDING` và `CHECK` trạng thái, `service_account_duty_notices` unique, cột đóng của điều chuyển chỉ khi `EFFECTIVE`
 - Verify: nhóm test _what the database refuses_ (`23505`, `23514`, `55000`, `23001`) xanh (`service-account-integrity`); `pnpm prisma:validate`; `migrate diff --exit-code` = 0 trên CSDL kiểm thử riêng

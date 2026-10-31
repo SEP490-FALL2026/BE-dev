@@ -1,7 +1,5 @@
-import type { DelegationRefusal } from './delegated-request.policy';
-import type { CancellationRefusal } from './cancellation.policy';
 import type { WithdrawalRefusal } from './withdrawal.policy';
-import type { HeldAccess } from './request-assessment.service';
+import type { CancellationRefusal, DelegationRefusal, HeldAccess } from './access-request.types';
 
 /** The request does not exist, or the caller has no part in it: the two answer alike so a request cannot be probed. */
 export class AccessRequestNotFoundError extends Error {
@@ -77,14 +75,6 @@ export class AccessRequestAlreadyHoldsAccessError extends Error {
   }
 }
 
-/** A tool outside the standard toolset of the sender is asked for without the reason that must go with it (`US-05-01` AC-6, `FR-3.18`). */
-export class AccessRequestOutsideStandardReasonRequiredError extends Error {
-  constructor() {
-    super('A tool outside the standard toolset needs the reason it is asked for.');
-    this.name = 'AccessRequestOutsideStandardReasonRequiredError';
-  }
-}
-
 /** The line a request is attached to cannot be kept (`US-05-04` AC-12, AC-13, `US-06-14` AC-5). */
 export class AccessRequestPlanLineRefusedError extends Error {
   constructor(
@@ -155,5 +145,32 @@ export class AccessRequestEmployeeRequiredError extends Error {
   constructor() {
     super('A request for a group is read for one person at a time: name the person.');
     this.name = 'AccessRequestEmployeeRequiredError';
+  }
+}
+
+/** The Super Admin does no business work and sends no request (`QĐ-87a`, `SoD-1`, F30); checked by every service that sends one. */
+export class AccessRequestSuperAdminCannotRequestError extends Error {
+  constructor() {
+    super('The Super Admin does not send requests for access.');
+    this.name = 'AccessRequestSuperAdminCannotRequestError';
+  }
+}
+
+/** The request is the caller's but is no longer a draft: a draft is sent or deleted once (spec L.1). */
+export class AccessRequestNotDraftError extends Error {
+  constructor() {
+    super('The request is not a draft any more.');
+    this.name = 'AccessRequestNotDraftError';
+  }
+}
+
+/**
+ * The caller does not hold the role the act needs: a service that closes a request for the IT Admin judges it itself, so the
+ * guard of a route is never the only invariant (F13). Answered as the guard answers: 403 `AUTHORIZATION.FORBIDDEN`.
+ */
+export class AccessRequestRoleRequiredError extends Error {
+  constructor(readonly role: 'IT_ADMIN') {
+    super(`Only the role ${role} may do this.`);
+    this.name = 'AccessRequestRoleRequiredError';
   }
 }

@@ -48,3 +48,5 @@ Gate xanh; ghi chú FE (vai và body đổi); cập nhật roadmap/scope map; Ow
 - [x] Diff cuối đã tự review; tài liệu vận hành/runbook bị ảnh hưởng đã cập nhật; phần chưa kiểm chứng ghi rõ.
 - [ ] Giao Owner review trên revision cụ thể; cập nhật roadmap/PR. Chỉ ghi `merged-dev`, `accepted`, `released` sau
       đúng sự kiện thật.
+
+**Prompt 29 (23/10/2026):** `P28-09` — guard production của AC-17 **giao G5** làm merge requirement (fail closed bằng kỹ thuật, không chỉ tài liệu); revision này vẫn không lên `main`/production trước đó. [g0-g4-checkpoint-fix-forward](../g0-g4-checkpoint-fix-forward/spec.md).

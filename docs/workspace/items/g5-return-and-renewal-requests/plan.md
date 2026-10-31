@@ -20,7 +20,7 @@
 
 ### Task 2: dữ liệu
 
-- Files: migration `20261024090000_requests_return_renewal_values`, `20261024090100_requests_return_and_renewal`, `20261024090200_licensing_assignment_renewal`, `prisma/models/requests.prisma`, `prisma/models/licensing.prisma`, `prisma/models/organization.prisma`, `prisma/models/catalog.prisma` (các quan hệ ngược), `src/architecture-boundaries.spec.ts` (chủ sở hữu hai bảng mới)
+- Files: migration `20261024090000_requests_return_renewal_values`, `20261024090100_requests_return_and_renewal`, `20261024090200_licensing_assignment_renewal`, `prisma/models/requests.prisma`, `prisma/models/licensing.prisma`, `prisma/models/organization.prisma`, `prisma/models/catalog.prisma` (các quan hệ ngược), `test/gates/architecture-boundaries.gate-spec.ts` (chủ sở hữu hai bảng mới)
 - Depends on: Task 1
 - Acceptance: phiếu hoàn trả đồng bộ trạng thái, bàn giao, nguồn và người xác nhận, tối đa một phiếu chờ cho một Assignment, không xóa, không đổi điều đã nói lúc gửi; chi tiết gia hạn bất biến và ràng buộc hoãn _đúng một dòng chi tiết cho Request `RENEWAL`_; Assignment nguồn `REQUEST` được có `predecessor_id`; `expected_end_date` đã có giá trị thì không đổi; giá trị enum thêm bằng migration riêng
 - Verify: `return-renewal-constraints` (10 ca, khẳng định cả tên ràng buộc) xanh; `license-assignment-constraints` và `provisioning-failure-constraints` xanh; `migrate deploy` rồi `migrate diff --exit-code` = 0
@@ -41,7 +41,7 @@
 
 ### Task 5: hoàn trả: service, hook, API
 
-- Files: `return-request/return-request.service.ts`, `return-request-query.service.ts`, `return-request.repo.ts`, `return-revocation.hook.ts`, `return-request.errors.ts`, `return-request.dto.ts`, `return-requests.controller.ts`, `return-request.http-errors.ts`, `access-request/withdrawal.service.ts`, `access-request.errors.ts`, `access-request.http-errors.ts` (`GRANT_COMPLETED` mang `assignmentId`), `requests.module.ts`, `test/support/api-coverage-manifest.ts`, `test/e2e/api-inventory.e2e-spec.ts`, `openapi.json`
+- Files: `return-request/return-request.service.ts`, `return-request-query.service.ts`, `return-request.repo.ts`, `return-revocation.hook.ts`, `return-request.errors.ts`, `return-request.dto.ts`, `return-requests.controller.ts`, `return-request.http-errors.ts`, `access-request/withdrawal.service.ts`, `access-request.errors.ts`, `access-request.http-errors.ts` (`GRANT_COMPLETED` mang `assignmentId`), `requests.module.ts`, `test/support/api-coverage-manifest.ts`, `test/http/platform/api-inventory.http-spec.ts`, `openapi.json`
 - Depends on: Task 4
 - Acceptance: gửi phiếu trong một transaction gồm tác vụ `REVOKE`, phiếu, audit; xác nhận bàn giao đúng người; hook chặn hoàn tất khi chưa xác nhận, ghi `COMPLETED` (có cờ) hay `FAILED`; mọi từ chối của spec; thân gửi đúng một `assignmentId`
 - Verify: `return-request`, `return-request-handover`, `return-request-conditions` xanh trên PostgreSQL riêng; e2e kiểm kê và OpenAPI xanh
@@ -52,7 +52,7 @@ Gate theo [CONTRIBUTING](../../../../CONTRIBUTING.md) chạy xanh; hồi quy c�
 
 ### Task 6: gia hạn: service, áp dụng, cổng giữ, API
 
-- Files: `renewal-request/renewal-request.service.ts`, `renewal-request-trail.ts`, `renewal-apply.service.ts`, `renewal-request.repo.ts`, `renewal-hold.reader.ts`, `renewal-request.errors.ts`, `renewal-request.dto.ts`, `renewal-requests.controller.ts`, `renewal-request.http-errors.ts`, `access-request/access-request.service.ts` (`submitWithin`, `SubmitOptions`), `access-request.types.ts`, `access-request.repo.ts`, `access-request-query.service.ts`, `access-request.wire.ts`, `access-request.dto.ts` (`RENEWAL`, khối `renewal`), `need-decision.service.ts`, `spend/spend-decision.service.ts`, `requests.module.ts`, `src/architecture-structure.spec.ts` (năm contract nội module), `test/support/api-coverage-manifest.ts`, `test/e2e/api-inventory.e2e-spec.ts`, `openapi.json`
+- Files: `renewal-request/renewal-request.service.ts`, `renewal-request-trail.ts`, `renewal-apply.service.ts`, `renewal-request.repo.ts`, `renewal-hold.reader.ts`, `renewal-request.errors.ts`, `renewal-request.dto.ts`, `renewal-requests.controller.ts`, `renewal-request.http-errors.ts`, `access-request/access-request.service.ts` (`submitWithin`, `SubmitOptions`), `access-request.types.ts`, `access-request.repo.ts`, `access-request-query.service.ts`, `access-request.wire.ts`, `access-request.dto.ts` (`RENEWAL`, khối `renewal`), `need-decision.service.ts`, `spend/spend-decision.service.ts`, `requests.module.ts`, `test/gates/architecture-structure.gate-spec.ts` (năm contract nội module), `test/support/api-coverage-manifest.ts`, `test/http/platform/api-inventory.http-spec.ts`, `openapi.json`
 - Depends on: Task 4, Task 5
 - Acceptance: gửi trước hạn (người giữ và trưởng phòng) và sau hạn (Request mới); duyệt xong thì ghi bản ghi mới trong cùng transaction và Request `COMPLETED`, không chờ IT; áp dụng không được thì `FAILED` và giải phóng cam kết; xác nhận quá 12 tháng theo tổng liên tiếp; Request gia hạn không bao giờ cấp được; luồng Request cấp thường không đổi; cổng `RenewalHold` đúng theo trạng thái Request
 - Verify: `renewal-request` (19 ca) xanh; hồi quy `access-request-*`, `spend-*`, `budget-*` xanh; e2e kiểm kê và OpenAPI xanh

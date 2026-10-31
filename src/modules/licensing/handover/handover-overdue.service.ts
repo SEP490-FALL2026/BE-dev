@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
-import { AuditService } from '../../audit/audit.service';
+import { AuditApi } from '../../audit/public/audit.api';
 import { HandoverCaseFacts } from './handover-case-facts.service';
 import { HandoverRepo } from './handover.repo';
 
@@ -18,7 +18,7 @@ export class HandoverOverdueService {
     private readonly runner: TransactionRunner,
     private readonly repo: HandoverRepo,
     private readonly facts: HandoverCaseFacts,
-    private readonly audit: AuditService,
+    private readonly audit: AuditApi,
   ) {}
 
   /** Returns how many duties were told in this pass. */

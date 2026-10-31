@@ -1,14 +1,18 @@
 # Software License Management — Backend
 
-Foundation để triển khai User Story bằng NestJS 11, TypeScript và PostgreSQL/Prisma. Source hạ tầng Redis/BullMQ và
-Kho đối tượng S3-compatible do API mount cho tệp của hợp đồng (ADR-0014); worker không mount nó và BullMQ chưa mount (E2 = A, H6.4). Module mới đặt file theo [module structure](docs/rules/module-structure.md) và
+Foundation để triển khai User Story bằng NestJS 11, TypeScript và PostgreSQL/Prisma. Kho đối tượng S3-compatible do API
+mount cho tệp của hợp đồng (ADR-0014); worker không mount nó. Redis/BullMQ (`src/infrastructure/queue`) là **hạ tầng dự phòng,
+chưa có consumer**, Owner giữ lại cho tương lai (`OD-R5`, 30/10/2026): chưa process nào mount nó, và chỉ khi một module mount nó
+thì cấu hình Redis mới được kiểm (E2 = A, H6.4). Module mới đặt file theo [module structure](docs/rules/module-structure.md) và
 architecture gate, không copy layout của một module cụ thể.
 
 **Đã có trong code:** lệnh khởi tạo `pnpm ops:bootstrap`, đăng nhập/làm mới/đăng xuất, `/me`, tạo tài khoản từ
 Employee, mời/kích hoạt, khóa/mở và gán/thu hồi vai, đổi/đặt lại mật khẩu, tra cứu Audit Trail, danh mục chức vụ/Cost
 Center, phòng và trưởng phòng (vai Manager suy ra), Người duyệt chi, tham số vận hành, import nhân sự CSV, checklist khởi
 tạo, chuyển giao Super Admin, lệnh khôi phục ngoài HTTP `pnpm ops:recover --help`, lệnh kiểm trạng thái chỉ đọc
-`pnpm ops:inspect` và lệnh dữ liệu demo chỉ local `pnpm dev:seed -- --confirm-local` (các lệnh ngoài HTTP cần
+`pnpm ops:inspect`, lệnh tách vai PostgreSQL production `pnpm ops:db-roles`, lệnh dữ liệu demo chỉ local
+`pnpm dev:seed -- --confirm-local` và lệnh nạp dataset demo dùng chung qua API `pnpm ops:demo-dataset`
+([runbook](docs/guides/demo-dataset.md)) (các lệnh ngoài HTTP cần
 `pnpm build`; rule: [operational commands](docs/rules/operational-commands.md)).
 Từ PR #14 (21/10/2026) có thêm route HTTP của G3/G4 ở ba ngữ cảnh `catalog`, `finance`, `licensing`
 ([ADR-0013](docs/decisions/0013-catalog-finance-licensing-contexts.md)): danh mục ứng dụng, gói, nhà cung cấp, hồ sơ thuế,
@@ -23,6 +27,13 @@ revision/PR và kết quả kiểm chứng nằm ở [roadmap](docs/roadmap.md),
 [audit nền tảng](docs/reviews/be-foundation-audit-2026-10-18/README.md) và
 [review G0/G1](docs/reviews/g0-g1-remediation-2026-10-15/README.md). Danh sách operation HTTP: `openapi.json`. Trạng
 thái ADR: [chỉ mục tài liệu](docs/README.md).
+
+## Cài mới và bootstrap trên VPS
+
+Sau khi CI/CD deploy image có `--password-stdin`, dùng
+[hướng dẫn bootstrap trên VPS](docs/guides/bootstrap-installation.md) để copy wrapper/template, điền `.env.bootstrap`,
+tạo tổ chức/phòng đầu tiên/Super Admin và kiểm tra. Hướng dẫn giải thích từng file env, cây thư mục VPS và mã thoát.
+Cài đặt hạ tầng, H7 và deploy: [runbook container](docs/guides/containers.md). Giữ database qua các lần deploy thì không bootstrap lại.
 
 ## Chạy local
 
@@ -88,7 +99,7 @@ thư luôn được gửi plaintext.
 
 ## Build và kiểm tra
 
-`pnpm check` chạy gate không cần dịch vụ ngoài; `pnpm test:e2e` kiểm tra HTTP
+`pnpm check` chạy gate không cần dịch vụ ngoài; `pnpm test:http` kiểm tra hợp đồng HTTP
 với boundary thay thế. Integration test cần PostgreSQL riêng: xem [test guide](test/README.md).
 `pnpm check` sinh Prisma client trước lint nên chạy được trực tiếp trên checkout sạch.
 
@@ -110,7 +121,7 @@ Xem [container guide](docs/guides/containers.md).
 
 - [CONTRIBUTING](CONTRIBUTING.md): workflow, lệnh và tiêu chí bàn giao.
 - [ARCHITECTURE](ARCHITECTURE.md): code đang có và ranh giới module.
-- [Hướng dẫn code](docs/guides/kien-truc-backend-va-cach-viet-code.md).
+- [Hướng dẫn dev mới](docs/guides/huong-dan-dev-moi.md).
 - [Hướng dẫn AI](docs/guides/ai-tools.md) và [AGENTS](AGENTS.md).
 - [Tài liệu](docs/README.md), [scripts](scripts/README.md), [tests](test/README.md).
 

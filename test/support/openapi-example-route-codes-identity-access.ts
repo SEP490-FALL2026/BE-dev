@@ -1,0 +1,108 @@
+import type { RouteErrorStatus } from './openapi-example-manifest';
+
+/** Part of ROUTE_ERROR_CODES (identity access), traced on BE `ea73c2f` (25/10/2026): see openapi-example-manifest.ts. */
+export const ROUTE_ERROR_CODES_IDENTITY_ACCESS: Readonly<
+  Record<string, Partial<Record<RouteErrorStatus, readonly string[]>>>
+> = {
+  appUserCreate: {
+    '404': ['ORGANIZATION.EMPLOYEE_NOT_FOUND'],
+    '409': [
+      'APP_USER.ALREADY_EXISTS_FOR_EMPLOYEE',
+      'APP_USER.EMPLOYEE_TERMINATED',
+      'APP_USER.FINANCE_ALREADY_ASSIGNED',
+      'APP_USER.LOGIN_EMAIL_TAKEN',
+    ],
+    '422': [
+      'APP_USER.LOGIN_EMAIL_INVALID',
+      'APP_USER.LOGIN_EMAIL_REQUIRED',
+      'APP_USER.ROLE_DERIVED',
+      'APP_USER.SUPER_ADMIN_TRANSFER_ONLY',
+    ],
+  },
+  appUserGet: {
+    '404': ['APP_USER.NOT_FOUND'],
+  },
+  appUserGrantRole: {
+    '404': ['APP_USER.NOT_FOUND'],
+    '409': [
+      'APP_USER.FINANCE_ALREADY_ASSIGNED',
+      'APP_USER.ROLE_ALREADY_GRANTED',
+      'APP_USER.ROLE_COMBINATION_FORBIDDEN',
+      'APP_USER.SELF_CHANGE_FORBIDDEN',
+    ],
+    '422': ['APP_USER.ROLE_DERIVED', 'APP_USER.SUPER_ADMIN_TRANSFER_ONLY'],
+  },
+  appUserLock: {
+    '404': ['APP_USER.NOT_FOUND'],
+    '409': ['APP_USER.SELF_CHANGE_FORBIDDEN', 'APP_USER.SUPER_ADMIN_HOLDER_NOT_LOCKABLE'],
+  },
+  appUserResendInvitation: {
+    '404': ['APP_USER.NOT_FOUND'],
+    '409': [
+      'APP_USER.ACCOUNT_LOCKED',
+      'APP_USER.ALREADY_ACTIVATED',
+      'APP_USER.EMPLOYEE_TERMINATED',
+      'APP_USER.SELF_CHANGE_FORBIDDEN',
+    ],
+  },
+  appUserRevokeRole: {
+    '404': ['APP_USER.NOT_FOUND', 'APP_USER.ROLE_NOT_GRANTED'],
+    '409': ['APP_USER.SELF_CHANGE_FORBIDDEN'],
+    '422': ['APP_USER.ROLE_DERIVED', 'APP_USER.SUPER_ADMIN_TRANSFER_ONLY'],
+  },
+  appUserUnlock: {
+    '404': ['APP_USER.NOT_FOUND'],
+    '409': ['APP_USER.SELF_CHANGE_FORBIDDEN'],
+  },
+  approvalRoleSet: {
+    '404': ['ORGANIZATION.EMPLOYEE_NOT_FOUND'],
+    '422': [
+      'APPROVAL_ROLE.EMPLOYEE_NOT_ACTIVE',
+      'APPROVAL_ROLE.NO_USABLE_ACCOUNT',
+      'APPROVAL_ROLE.SUBSTITUTE_MUST_DIFFER',
+      'APPROVAL_ROLE.SUPER_ADMIN_CANNOT_HOLD',
+    ],
+  },
+  authLogin: {
+    '401': ['AUTH.INVALID_CREDENTIALS'],
+    '429': ['AUTH.LOGIN_TEMPORARILY_BLOCKED'],
+    '503': ['AUTH.UNAVAILABLE'],
+  },
+  authLogout: {
+    '503': ['AUTH.UNAVAILABLE'],
+  },
+  authRedeemInvitation: {
+    '400': ['AUTH.INVITATION_INVALID'],
+    '422': ['AUTH.PASSWORD_POLICY_VIOLATION'],
+    '503': ['SERVICE_UNAVAILABLE'],
+  },
+  authRefresh: {
+    '401': ['AUTH.SESSION_INVALID'],
+    '503': ['AUTH.UNAVAILABLE'],
+  },
+  authRequestPasswordReset: {
+    '503': ['AUTH.UNAVAILABLE'],
+  },
+  authResetPassword: {
+    '400': ['AUTH.PASSWORD_RESET_INVALID'],
+    '422': ['AUTH.PASSWORD_POLICY_VIOLATION'],
+    '503': ['AUTH.UNAVAILABLE'],
+  },
+  meChangePassword: {
+    '422': ['AUTH.CURRENT_PASSWORD_INVALID', 'AUTH.PASSWORD_POLICY_VIOLATION'],
+    '429': ['AUTH.LOGIN_TEMPORARILY_BLOCKED'],
+  },
+  superAdminTransfer: {
+    '404': ['SUPER_ADMIN_TRANSFER.SUCCESSOR_NOT_FOUND'],
+    '422': [
+      'SUPER_ADMIN_TRANSFER.ACCOUNT_LOCKED',
+      'SUPER_ADMIN_TRANSFER.APPROVAL_ROLE_HELD',
+      'SUPER_ADMIN_TRANSFER.EMAIL_NOT_VERIFIED',
+      'SUPER_ADMIN_TRANSFER.EMPLOYEE_NOT_WORKING',
+      'SUPER_ADMIN_TRANSFER.HEADS_DEPARTMENT',
+      'SUPER_ADMIN_TRANSFER.NOT_ACTIVATED',
+      'SUPER_ADMIN_TRANSFER.SUCCESSOR_IS_HOLDER',
+      'SUPER_ADMIN_TRANSFER.WORK_ROLE_HELD',
+    ],
+  },
+};

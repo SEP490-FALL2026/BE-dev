@@ -2,10 +2,13 @@ import { Body, Controller, Get, Header, HttpStatus, Param, Post, Query } from '@
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
+  FORBIDDEN_EXAMPLE,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
+  VALIDATION_EXAMPLE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
+import { GLOBAL_RATE_LIMIT_DESCRIPTION } from '../../../infrastructure/http/openapi-rate-limit';
 import { RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
 import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
@@ -17,13 +20,15 @@ import {
   ListKeysQueryDto,
   RevealResponseDto,
 } from './license-key.dto';
-import { toLicenseKeyApiException } from './license-key.http-errors';
+import { REVEAL_LIMITS } from './license-key-reveal-quota.repo';
+import { LICENSE_KEY_ERROR_EXAMPLES, toLicenseKeyApiException } from './license-key.http-errors';
 import { LicenseKeyService } from './license-key.service';
 
 const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPONSE] as const;
 const IT_ONLY = {
   status: HttpStatus.FORBIDDEN,
   description: 'Only an IT Admin works the vault of license keys.',
+  examples: [FORBIDDEN_EXAMPLE],
 } as const;
 
 /**
@@ -53,10 +58,17 @@ export class LicenseKeysController {
     {
       status: HttpStatus.NOT_FOUND,
       description: 'The purchase does not exist (SUBSCRIPTION.NOT_FOUND).',
+      examples: [LICENSE_KEY_ERROR_EXAMPLES.SUBSCRIPTION_NOT_FOUND],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
-      description: 'The request is invalid (VALIDATION_ERROR) or the plan is not K4 (LICENSE_KEY.PLAN_NOT_K4).',
+      description:
+        'The request is invalid (VALIDATION_ERROR), the plan is not K4 (LICENSE_KEY.PLAN_NOT_K4) or its application is retired (LICENSE_KEY.APPLICATION_RETIRED).',
+      examples: [
+        VALIDATION_EXAMPLE,
+        LICENSE_KEY_ERROR_EXAMPLES.PLAN_NOT_K4,
+        LICENSE_KEY_ERROR_EXAMPLES.APPLICATION_RETIRED,
+      ],
     },
   )
   async import(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: ImportBodyDto) {
@@ -78,8 +90,16 @@ export class LicenseKeysController {
   @ApiErrorResponses(
     ...AUTH_ERRORS,
     IT_ONLY,
-    { status: HttpStatus.NOT_FOUND, description: 'The purchase does not exist (SUBSCRIPTION.NOT_FOUND).' },
-    { status: HttpStatus.UNPROCESSABLE_ENTITY, description: 'The query is invalid (VALIDATION_ERROR).' },
+    {
+      status: HttpStatus.NOT_FOUND,
+      description: 'The purchase does not exist (SUBSCRIPTION.NOT_FOUND).',
+      examples: [LICENSE_KEY_ERROR_EXAMPLES.SUBSCRIPTION_NOT_FOUND],
+    },
+    {
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      description: 'The query is invalid (VALIDATION_ERROR).',
+      examples: [VALIDATION_EXAMPLE],
+    },
   )
   async list(@Query() query: ListKeysQueryDto) {
     try {
@@ -107,12 +127,25 @@ export class LicenseKeysController {
   @ApiErrorResponses(
     ...AUTH_ERRORS,
     IT_ONLY,
-    { status: HttpStatus.NOT_FOUND, description: 'The key does not exist (LICENSE_KEY.NOT_FOUND).' },
-    { status: HttpStatus.UNPROCESSABLE_ENTITY, description: 'The id is invalid (VALIDATION_ERROR).' },
     {
+      status: HttpStatus.NOT_FOUND,
+      description: 'The key does not exist (LICENSE_KEY.NOT_FOUND).',
+      examples: [LICENSE_KEY_ERROR_EXAMPLES.NOT_FOUND],
+    },
+    {
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      description: 'The id is invalid (VALIDATION_ERROR).',
+      examples: [VALIDATION_EXAMPLE],
+    },
+    {
+      // Declaring a 429 here replaces the global one, so its wording is kept; the numbers are the quota's own.
       status: HttpStatus.TOO_MANY_REQUESTS,
       description:
-        'The account has opened as many keys as it may in this minute (10) or this day (200): HTTP_TOO_MANY_REQUESTS. Nothing was opened and nothing was counted.',
+        `The account has opened as many keys as it may in this minute (${REVEAL_LIMITS.MINUTE}) or this day ` +
+        `(${REVEAL_LIMITS.DAY}): HTTP_TOO_MANY_REQUESTS. Nothing was opened and nothing was counted. ` +
+        GLOBAL_RATE_LIMIT_DESCRIPTION,
+      // The quota's own answer; the throttler's answer has the same code and is therefore not shown again.
+      examples: [LICENSE_KEY_ERROR_EXAMPLES.REVEAL_LIMIT],
     },
   )
   async reveal(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: KeyIdParamDto) {

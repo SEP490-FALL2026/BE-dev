@@ -4,7 +4,17 @@ import {
   SubscriptionPerpetualNeedsLicensedApplicationError,
   SubscriptionPlanHasNoSubscriptionError,
 } from './subscription.errors';
-import { alertDates, assertSubscriptionShape, deriveNotice, missingData, noticeWarnings } from './subscription.policy';
+import {
+  alertDates,
+  assertSubscriptionShape,
+  declaredStateOf,
+  deriveNotice,
+  missingData,
+  nextStateOf,
+  noticeWarnings,
+  sameUnitPrice,
+  subscriptionStatusOf,
+} from './subscription.policy';
 
 const none = { noticeDeadline: null, noticePeriodDays: null, renewalDate: null, endDate: null, autoRenew: false };
 
@@ -243,5 +253,121 @@ describe('assertSubscriptionShape', () => {
     expect(() =>
       assertSubscriptionShape({ ...term, renewalDate: '2026-12-01', noticeDeadline: '2026-12-01' }),
     ).not.toThrow();
+  });
+});
+
+describe('what an update of a subscription makes of its state, and when it is a draft (US-04-03)', () => {
+  const current = {
+    purchasedQuantity: 10 as number | null,
+    billingCycle: 'ANNUAL' as string | null,
+    startDate: '2026-01-01' as string | null,
+    endDate: '2026-12-31' as string | null,
+    renewalDate: '2026-12-31' as string | null,
+    noticeDeadline: '2026-11-01' as string | null,
+    noticePeriodDays: 60 as number | null,
+    autoRenew: false,
+    allowsMidTermReduction: true,
+  };
+
+  it('keeps what the update does not give', () => {
+    expect(nextStateOf(current, {})).toEqual(current);
+  });
+
+  it('takes what the update gives, and clears the four dates and the notice period when it says null', () => {
+    expect(
+      nextStateOf(current, {
+        purchasedQuantity: 12,
+        billingCycle: 'MONTHLY',
+        startDate: '2026-02-01',
+        endDate: null,
+        renewalDate: null,
+        noticeDeadline: null,
+        noticePeriodDays: null,
+        autoRenew: true,
+        allowsMidTermReduction: false,
+      }),
+    ).toEqual({
+      purchasedQuantity: 12,
+      billingCycle: 'MONTHLY',
+      startDate: '2026-02-01',
+      endDate: null,
+      renewalDate: null,
+      noticeDeadline: null,
+      noticePeriodDays: null,
+      autoRenew: true,
+      allowsMidTermReduction: false,
+    });
+  });
+
+  it('is the same price when no price is given, or the amount and the currency are those recorded', () => {
+    expect(sameUnitPrice({ amountMinor: 100n, currency: 'USD' }, null)).toBe(true);
+    expect(sameUnitPrice(null, null)).toBe(true);
+    expect(sameUnitPrice({ amountMinor: 100n, currency: 'USD' }, { amountMinor: 100n, currency: 'USD' })).toBe(true);
+    expect(sameUnitPrice({ amountMinor: 100n, currency: 'USD' }, { amountMinor: 120n, currency: 'USD' })).toBe(false);
+    expect(sameUnitPrice({ amountMinor: 100n, currency: 'USD' }, { amountMinor: 100n, currency: 'VND' })).toBe(false);
+    expect(sameUnitPrice(null, { amountMinor: 100n, currency: 'USD' })).toBe(false);
+  });
+
+  const whole = {
+    purchasedQuantity: 5,
+    startDate: '2026-01-01',
+    billingCycle: 'ANNUAL',
+    unitPrice: {},
+    priceSnapshot: {},
+  };
+
+  it('is active when nothing keeps it a draft, and a draft when anything does', () => {
+    expect(subscriptionStatusOf({ pricingModel: 'PER_SEAT' }, 'TERM', whole)).toBe('ACTIVE');
+    expect(subscriptionStatusOf({ pricingModel: 'PER_SEAT' }, 'TERM', { ...whole, purchasedQuantity: null })).toBe(
+      'DRAFT',
+    );
+    expect(subscriptionStatusOf({ pricingModel: 'FLAT_RATE' }, 'TERM', { ...whole, purchasedQuantity: null })).toBe(
+      'ACTIVE',
+    );
+    expect(subscriptionStatusOf({ pricingModel: 'FLAT_RATE' }, 'TERM', { ...whole, priceSnapshot: null })).toBe(
+      'DRAFT',
+    );
+  });
+});
+
+describe('what a declared subscription starts as (US-04-03)', () => {
+  it('has nothing recorded and the two choices off when the declaration gives nothing', () => {
+    expect(declaredStateOf({})).toEqual({
+      purchasedQuantity: null,
+      billingCycle: null,
+      startDate: null,
+      endDate: null,
+      renewalDate: null,
+      noticeDeadline: null,
+      noticePeriodDays: null,
+      autoRenew: false,
+      allowsMidTermReduction: false,
+    });
+  });
+
+  it('keeps what the declaration gives', () => {
+    expect(
+      declaredStateOf({
+        purchasedQuantity: 5,
+        billingCycle: 'ANNUAL',
+        startDate: '2026-01-01',
+        endDate: '2026-12-31',
+        renewalDate: '2026-12-31',
+        noticeDeadline: '2026-11-01',
+        noticePeriodDays: 60,
+        autoRenew: true,
+        allowsMidTermReduction: true,
+      }),
+    ).toEqual({
+      purchasedQuantity: 5,
+      billingCycle: 'ANNUAL',
+      startDate: '2026-01-01',
+      endDate: '2026-12-31',
+      renewalDate: '2026-12-31',
+      noticeDeadline: '2026-11-01',
+      noticePeriodDays: 60,
+      autoRenew: true,
+      allowsMidTermReduction: true,
+    });
   });
 });

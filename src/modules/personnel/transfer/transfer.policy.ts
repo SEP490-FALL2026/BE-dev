@@ -1,7 +1,6 @@
 import { type BusinessDate } from '../../../core/business-date';
-import { placementReasons } from '../../organization/employee-placement.policy';
-import { groundsRefusal, type GroundsInput } from '../grounds/grounds.policy';
-import { type SelfActionMode } from '../personnel-self-action.policy';
+import { placementReasons } from '../../organization/public/employee-placement.policy';
+import { groundsRefusal, type GroundsInput } from '../personnel-grounds.policy';
 
 /**
  * What the policy of a transfer refuses, as a semantic code (`DEPARTMENT_TRANSFER.<code>` on the wire) and the facts a person
@@ -33,16 +32,15 @@ export interface NewTransferFacts {
   effectiveOn: BusinessDate;
   employee: { status: 'ACTIVE' | 'TERMINATED'; workState: 'WORKING' | 'ON_LONG_LEAVE' | 'HANDING_OVER' | 'LEFT' };
   /** The placement in force: where the person is, and since when. */
-  current: { departmentId: string; jobTitleId: string; validFrom: BusinessDate };
+  current: { departmentId: string; validFrom: BusinessDate };
   /** Where the person is to be; what the caller did not name stays as it is. */
-  target: { departmentId: string; jobTitleId: string };
-  destinationDepartment: { active: boolean; costCenterActive: boolean } | null;
-  destinationJobTitle: { active: boolean } | null;
+  target: { departmentId: string };
+  /** The department the person is to join: whether it exists and takes people. Its Cost Center is not asked (`QĐ-87d`(3)). */
+  destinationDepartment: { active: boolean } | null;
   grounds: GroundsInput | undefined;
   pending: { effectiveOn: BusinessDate } | null;
   /** Another waiting transfer names this person to follow the head of its department: they stay until it is settled. */
   namedAsSuccessor: boolean;
-  selfMode: SelfActionMode;
   successor: SuccessorFacts;
 }
 
@@ -51,15 +49,10 @@ export interface NewTransferFacts {
  * the same refusal the policy gives when it sees the department retired.
  */
 export function retiredDestinationRefusal(): TransferRefusal {
-  const [reason] = placementReasons({
-    department: { named: true, found: { active: false, costCenterActive: true } },
-    jobTitle: { named: true, found: { active: true } },
-  });
+  const [reason] = placementReasons({ department: { named: true, found: { active: false } } });
 
   return { code: reason.code, details: { subject: reason.subject } };
 }
-
-const SELF_REFUSAL: TransferRefusal = { code: 'SELF_EVENT_NEEDS_ANOTHER_IT_ADMIN' };
 
 /** The basis of a change of the day or a cancellation, which also needs a reason (`US-03-01` AC-19, AC-20). */
 function reasonAndGrounds(reason: string, grounds: GroundsInput | undefined): TransferRefusal | null {
@@ -98,24 +91,19 @@ function dateRefusal(today: BusinessDate, day: BusinessDate, periodStart: Busine
 
 /**
  * Whether a transfer may be recorded (`US-03-01` AC-14 -> AC-18, AC-21, AC-22): the person works for the organization and has no
- * other event waiting, something changes, the day is today or later, the destination can take people and the title can be
- * given, the basis is whole, nobody else has to act in their place, and the head of the department they leave is provided for.
+ * other event waiting, the department changes, the day is today or later, the destination can take people, the basis is whole,
+ * nobody else has to act in their place, and the head of the department they leave is provided for.
  */
 export function newTransferRefusal(facts: NewTransferFacts): TransferRefusal | null {
   const { employee, current, target } = facts;
   if (employee.status === 'TERMINATED' || employee.workState === 'LEFT') return { code: 'EMPLOYEE_LEFT' };
-  const departmentChanges = target.departmentId !== current.departmentId;
-  const titleChanges = target.jobTitleId !== current.jobTitleId;
-  if (!departmentChanges && !titleChanges) return { code: 'NO_CHANGE' };
+  if (target.departmentId === current.departmentId) return { code: 'NO_CHANGE' };
   const late = dateRefusal(facts.today, facts.effectiveOn, current.validFrom);
   if (late) return late;
 
   const reasons = placementReasons({
-    department: {
-      named: true,
-      found: departmentChanges ? facts.destinationDepartment : { active: true, costCenterActive: true },
-    },
-    jobTitle: { named: true, found: titleChanges ? facts.destinationJobTitle : { active: true } },
+    // A transfer is a change of place, not a charge: a department with no Cost Center takes people like any other (`QĐ-87d`(3)).
+    department: { named: true, found: facts.destinationDepartment },
   });
   const reason = reasons[0];
   // The code the shared policy gives is the code on the wire (`DEPARTMENT_TRANSFER.<code>`): this file writes none of them.
@@ -128,7 +116,6 @@ export function newTransferRefusal(facts: NewTransferFacts): TransferRefusal | n
     return { code: 'PENDING_EVENT_EXISTS', details: { kind: 'TRANSFER', effectiveOn: facts.pending.effectiveOn } };
   if (facts.namedAsSuccessor) return { code: 'PENDING_EVENT_EXISTS', details: { kind: 'HEAD_HANDOVER' } };
   if (employee.workState === 'HANDING_OVER') return { code: 'PENDING_EVENT_EXISTS', details: { kind: 'OFFBOARDING' } };
-  if (facts.selfMode === 'NEEDS_ANOTHER_IT_ADMIN') return SELF_REFUSAL;
 
   return successorRefusal(facts.successor);
 }
@@ -141,7 +128,6 @@ export interface PendingTransferFacts {
   periodStart: BusinessDate;
   reason: string;
   grounds: GroundsInput | undefined;
-  selfMode: SelfActionMode;
 }
 
 /** A transfer can be moved or cancelled only while it has not taken effect (`US-03-01` AC-19, AC-20). */
@@ -163,7 +149,6 @@ export function rescheduleRefusal(
   if (facts.newEffectiveOn === facts.effectiveOn) return { code: 'NO_CHANGE' };
   const late = dateRefusal(facts.today, facts.newEffectiveOn, facts.periodStart);
   if (late) return late;
-  if (facts.selfMode === 'NEEDS_ANOTHER_IT_ADMIN') return SELF_REFUSAL;
 
   return successorRefusal(facts.successor);
 }
@@ -172,8 +157,39 @@ export function rescheduleRefusal(
 export function cancelRefusal(facts: PendingTransferFacts): TransferRefusal | null {
   const settled = notPendingRefusal(facts);
   if (settled) return settled;
-  const detail = reasonAndGrounds(facts.reason, facts.grounds);
-  if (detail) return detail;
+  return reasonAndGrounds(facts.reason, facts.grounds);
+}
 
-  return facts.selfMode === 'NEEDS_ANOTHER_IT_ADMIN' ? SELF_REFUSAL : null;
+/** Whether a change of department may start at all, judged on what the person is before the locks: unknown, or gone. */
+export function subjectRefusal(seen: { status: string } | null): 'EMPLOYEE_NOT_FOUND' | 'EMPLOYEE_LEFT' | null {
+  if (!seen) return 'EMPLOYEE_NOT_FOUND';
+
+  return seen.status === 'TERMINATED' ? 'EMPLOYEE_LEFT' : null;
+}
+
+/** Whether, once the locks are taken, the placement in force is still the one seen before them (none, or another, is a change by someone else). */
+export function placementHeld<P extends { placementId: string }>(
+  current: P | null,
+  seenPlacementId: string,
+): current is P {
+  return current !== null && current.placementId === seenPlacementId;
+}
+
+/** The successor a head hands over to as the record and its audit name it: `NONE` when nobody takes over, null when the person did not head. */
+export function headSuccessorLabel(handover: { successorEmployeeId: string | null } | null): string | null {
+  return handover ? (handover.successorEmployeeId ?? 'NONE') : null;
+}
+
+/**
+ * Who followed the head before the move, so a move that names nobody keeps the choice (`US-03-01` AC-19, `US-03-04` AC-22): the person
+ * chosen, or nobody; nothing to keep when the person did not head the department.
+ */
+export function previousSuccessorChoice(
+  handover: { successorEmployeeId: string | null } | null,
+): { kind: 'EMPLOYEE'; employeeId: string } | { kind: 'NONE' } | undefined {
+  if (!handover) return undefined;
+
+  return handover.successorEmployeeId
+    ? { kind: 'EMPLOYEE', employeeId: handover.successorEmployeeId }
+    : { kind: 'NONE' };
 }

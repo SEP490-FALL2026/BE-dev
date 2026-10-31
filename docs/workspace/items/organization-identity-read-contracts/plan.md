@@ -39,7 +39,7 @@ với BE revision lúc bắt đầu.
 ### Task 4: cảnh báo phòng có biên toàn response
 
 - Files: `department-query.service.ts`, `departments.controller.ts`, `department.dto.ts`, integration cảnh báo phòng,
-  `src/api-collection-contract.spec.ts` (gỡ mục `departmentWarningList#unbounded`), `openapi.json` (sinh) nếu đổi wire.
+  `test/gates/api-collection-contract.gate-spec.ts` (gỡ mục `departmentWarningList#unbounded`), `openapi.json` (sinh) nếu đổi wire.
 - Depends on: hợp đồng đã được Owner duyệt (phân trang thật hoặc trần cứng của toàn response — chưa chọn).
 - Acceptance: `LD-15` (vế `departmentWarningList`).
 - Verify: test đỏ trước khi số phòng vượt biên; harness; gate collection xanh sau khi gỡ mục; `pnpm openapi:export` review diff.

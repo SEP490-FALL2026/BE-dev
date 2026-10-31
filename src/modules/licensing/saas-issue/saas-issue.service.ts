@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { AuditService } from '../../audit/audit.service';
-import { IdentityAccessService } from '../../identity-access/identity-access.service';
-import { OrganizationService } from '../../organization/organization.service';
-import { licensingAuditEvent } from '../mappers/licensing-audit-event';
+import { AuditApi } from '../../audit/public/audit.api';
+import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
+import { licensingAuditEvent } from '../licensing-audit-event.mapper';
 import { SaasIssueError } from './saas-issue.errors';
 import {
   assignmentProblem,
@@ -37,12 +37,12 @@ export interface SubmitIssueInput {
 export class SaasIssueService {
   constructor(
     private readonly runner: TransactionRunner,
-    private readonly organization: OrganizationService,
-    private readonly identity: IdentityAccessService,
+    private readonly organization: OrganizationApi,
+    private readonly identity: IdentityAccessApi,
     private readonly calendar: SaasIssueCalendar,
     private readonly issues: SaasIssueRepo,
     private readonly facts: SaasIssueFactsRepo,
-    private readonly audit: AuditService,
+    private readonly audit: AuditApi,
   ) {}
 
   async submit(actor: AuthenticatedPrincipal, input: SubmitIssueInput): Promise<SaasIssueRecord> {

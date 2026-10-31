@@ -2,14 +2,15 @@ import { Injectable } from '@nestjs/common';
 import { fiscalYearOf } from '../../../core/fiscal-year';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { BudgetsService } from '../../budgets/budgets.service';
-import { CatalogService } from '../../catalog/catalog.service';
-import { FinanceService } from '../../finance/finance.service';
-import { OperatingParametersService } from '../../operating-parameters/operating-parameters.service';
-import { OrganizationService } from '../../organization/organization.service';
+import { BudgetsApi } from '../../budgets/public/budgets.api';
+import { CatalogApi } from '../../catalog/public/catalog.api';
+import { FinanceApi } from '../../finance/public/finance.api';
+import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
+import { chargedCostCenterId } from '../access-request/access-request.policy';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
-import { AssessmentRepo } from '../access-request/assessment.repo';
-import { scaleSchedule } from '../group-request/line-allocation.policy';
+import { AssessmentReadRepo } from '../access-request/assessment-read.repo';
+import { scaleSchedule } from './line-allocation.policy';
 import { checkBudget, type CheckResult, type YearBudget, type YearSlice } from './budget-check.policy';
 import { BudgetCheckRepo, type CheckRecord, type CheckTrigger } from './budget-check.repo';
 
@@ -36,15 +37,19 @@ export type CheckOutcome =
 export class BudgetCheckService {
   constructor(
     private readonly checks: BudgetCheckRepo,
-    private readonly budgets: BudgetsService,
-    private readonly finance: FinanceService,
-    private readonly catalog: CatalogService,
-    private readonly organization: OrganizationService,
-    private readonly parameters: OperatingParametersService,
-    private readonly assessments: AssessmentRepo,
+    private readonly budgets: BudgetsApi,
+    private readonly finance: FinanceApi,
+    private readonly catalog: CatalogApi,
+    private readonly organization: OrganizationApi,
+    private readonly parameters: OperatingParametersApi,
+    private readonly assessments: AssessmentReadRepo,
   ) {}
 
-  /** Makes a check of the request and keeps it. */
+  /**
+   * Makes a check of the request and keeps it. The caller holds the lock of the request; this takes the lock of the Cost Center and
+   * each year the request binds in, in ascending order, before it reads a figure of the budget, and keeps it to the end of the
+   * transaction, which is also where the commitment of an approval is written.
+   */
   async run(
     tx: DbTx,
     request: AccessRequestRecord,
@@ -53,6 +58,7 @@ export class BudgetCheckService {
     now: Date,
     scope?: CheckScope,
   ): Promise<CheckOutcome> {
+    await this.checks.lockBudgetYears(tx, chargedCostCenterId(request), this.bindingYears(request, scope));
     const computed = await this.compute(tx, request, now, scope);
     if (computed.status === 'NOT_CHECKABLE') return computed;
 
@@ -74,6 +80,15 @@ export class BudgetCheckService {
     });
 
     return { status: 'CHECKED', check };
+  }
+
+  /** The years the payments that bind fall in, whichever of them are open: what the check reads and what a commitment holds. */
+  private bindingYears(request: AccessRequestRecord, scope?: CheckScope): number[] {
+    const { pricing } = request;
+    if (pricing.status !== 'PRICED' || pricing.schedule === null) return [];
+    const schedule = scope ? scaleSchedule(pricing.schedule, scope.priced, scope.scoped) : pricing.schedule;
+
+    return [...new Set((schedule ?? []).filter((period) => period.binding).map((period) => period.budgetYear))];
   }
 
   /**
@@ -123,10 +138,10 @@ export class BudgetCheckService {
     }
 
     const open = years.filter((year) => year >= currentYear);
-    const facts = await this.budgets.yearFacts(request.costCenterId, open, tx);
+    const facts = await this.budgets.yearFacts(chargedCostCenterId(request), open, tx);
     const pending = new Map<number, bigint>();
     for (const year of open)
-      pending.set(year, await this.checks.pendingFor(request.costCenterId, year, request.id, tx));
+      pending.set(year, await this.checks.pendingFor(chargedCostCenterId(request), year, request.id, tx));
     const slices: YearSlice[] = years.map((year) => {
       const found = facts.get(year);
       const budget: YearBudget | null = found

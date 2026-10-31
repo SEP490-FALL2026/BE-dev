@@ -1,7 +1,7 @@
-import { createZodDto } from 'nestjs-zod';
-import { isBusinessDate } from '../../../core/business-date';
+import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { z } from 'zod';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
+import { businessDate } from '../../../infrastructure/http/dto/business-date.dto';
 
 /** The longest note of a reason or a label a request keeps; the DTO bounds the request with them. */
 export const REASON_MAX_LENGTH = 1000;
@@ -11,7 +11,7 @@ export const TERM_MONTHS_MAX = 120;
 
 /**
  * `BM-01` as the person sending it fills it (`US-01-12` AC-1, `US-05-02` AC-6): the plan, the reason and the term are
- * required, the project is context only, and a reason for a tool outside the standard toolset is optional here. Nothing
+ * required, and the project is context only. Nothing
  * here chooses the branch, the Cost Center or who decides: the system fixes them from the plan and the department.
  */
 export const submitBodySchema = z.strictObject({
@@ -19,9 +19,8 @@ export const submitBodySchema = z.strictObject({
   businessReason: z.string().trim().min(1).max(REASON_MAX_LENGTH),
   termMonths: z.number().int().min(1).max(TERM_MONTHS_MAX),
   projectLabel: z.string().trim().min(1).max(PROJECT_LABEL_MAX_LENGTH).optional(),
-  outsideStandardReason: z.string().trim().min(1).max(REASON_MAX_LENGTH).optional(),
   /** The day the money is expected to go out (paid software only); it fixes the budget year. Today when left out. */
-  expectedSpendOn: z.string().refine(isBusinessDate, { message: 'Must be a real date as YYYY-MM-DD.' }).optional(),
+  expectedSpendOn: businessDate.optional(),
 });
 /**
  * What the head chooses for a request that costs money: a line of the plan of the budget, or that it is outside it
@@ -37,6 +36,10 @@ export const planLineChoiceFields = {
     .optional(),
   offPlan: z.literal(true).optional(),
 };
+
+/** What a client reads of the choice that `oneChoice` enforces. */
+export const PLAN_LINE_CHOICE_DESCRIPTION =
+  'Choose exactly one: a line of the plan of the budget (planLine), or that the spend is outside it (offPlan: true).';
 
 /** Exactly one of a line and "outside the plan". */
 export const oneChoice = (body: { planLine?: unknown; offPlan?: unknown }, ctx: z.RefinementCtx) => {
@@ -66,12 +69,10 @@ export const needDecisionBodySchema = z
     spend: z
       .strictObject({
         ...planLineChoiceFields,
-        expectedSpendOn: z
-          .string()
-          .refine(isBusinessDate, { message: 'Must be a real date as YYYY-MM-DD.' })
-          .optional(),
+        expectedSpendOn: businessDate.optional(),
       })
       .superRefine(oneChoice)
+      .meta({ description: PLAN_LINE_CHOICE_DESCRIPTION })
       .optional(),
   })
   .superRefine((body, ctx) => {
@@ -84,6 +85,12 @@ export const needDecisionBodySchema = z
     if (body.decision === 'REJECT' && body.spend !== undefined) {
       ctx.addIssue({ code: 'custom', path: ['spend'], message: 'Only an approval chooses a line of the plan.' });
     }
+  })
+  .meta({
+    description:
+      'A refusal (REJECT) gives its reason, and neither confirms a term nor chooses a line of the plan. An approval (APPROVE) may ' +
+      'confirm a term over twelve months with a reason of its own, and for a request that costs money chooses a line of the plan or ' +
+      'that it is outside it.',
   });
 const pageQuery = {
   page: z.coerce.number().int().positive().default(1),
@@ -124,6 +131,19 @@ const needDecisionSchema = z.strictObject({
 
 export const moneySchema = z.strictObject({ amount: z.string(), currency: z.string() });
 /** What the request costs: no amount for internal software, a priced amount, or a missing price with its reason. */
+
+/** What a request costs, estimated before tax and after, as the preview and the approver's card show it. */
+export const costEstimateSchema = z.strictObject({
+  label: z.enum(['ESTIMATE', 'ESTIMATE_NO_PROFILE']),
+  basis: z.enum(['PROFILE', 'DEFAULT_NO_PROFILE']),
+  taxGroup: z.string(),
+  preTax: moneySchema,
+  tax: moneySchema,
+  deductibleTax: moneySchema,
+  nonDeductibleTax: moneySchema,
+  estimatedCost: moneySchema,
+  totalPayable: moneySchema,
+});
 export const pricingSchema = z.strictObject({
   status: z.enum(['NOT_APPLICABLE', 'PRICED', 'MISSING']),
   missingReason: z.enum(['NO_PRICED_SUBSCRIPTION', 'CYCLE_UNKNOWN', 'AMOUNT_TOO_LARGE', 'AWAITING_QUOTE']).nullable(),
@@ -180,7 +200,8 @@ export const requestSchema = z.strictObject({
     })
     .nullable(),
   department: z.strictObject({ id: z.uuid(), code: z.string(), name: z.string() }),
-  costCenter: z.strictObject({ id: z.uuid(), code: z.string() }),
+  /** What the request is charged to; null for a free internal request of a department that has no Cost Center in use (`QĐ-87g(2)`). */
+  costCenter: z.strictObject({ id: z.uuid(), code: z.string() }).nullable(),
   requester: employeeRef,
   /** The person it is for; null for a request for a group (`type` GROUP_GRANT), whose people are read as lines. */
   beneficiary: employeeRef.nullable(),
@@ -189,9 +210,6 @@ export const requestSchema = z.strictObject({
   businessReason: z.string(),
   termMonths: z.number().int().positive(),
   projectLabel: z.string().nullable(),
-  outsideStandardReason: z.string().nullable(),
-  /** Whether the plan was outside the standard toolset of the sender on the day it was sent: a flag, never a stop. */
-  outsideStandard: z.boolean(),
   /** The head chose "outside the plan": a flag for Finance and the approver, never a stop. */
   offPlan: z.boolean(),
   /** The code the requests a head sent for people of the department in one go share; null for any other request. */
@@ -282,7 +300,7 @@ export const requestSchema = z.strictObject({
     .strictObject({
       cancelledBy: employeeRef,
       cancelledAt: z.iso.datetime(),
-      cause: z.enum(['BENEFICIARY_LEFT']),
+      cause: z.enum(['BENEFICIARY_LEFT', 'BENEFICIARY_TRANSFERRED']),
       note: z.string().nullable(),
     })
     .nullable(),
@@ -292,7 +310,7 @@ export const requestSchema = z.strictObject({
 export const withdrawBodySchema = z.strictObject({ reason: z.string().trim().min(1).max(1000).optional() });
 
 export class SubmitBodyDto extends createZodDto(submitBodySchema) {}
-/** A seat the person already holds in a tool that does the same work: a row of the list (`LD-08`). */
+/** A seat the person already holds in a tool that does the same work: a row of the list. */
 const similarSeatSchema = z.strictObject({
   assignmentId: z.uuid(),
   plan: z.strictObject({

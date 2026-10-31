@@ -1,5 +1,5 @@
 import type { YearResult } from './budget-check.policy';
-import { checkSpendDecider, judgeApproval } from './spend-decision.policy';
+import { checkSpendDecider, judgeApproval, spendDeciderRoleOf, spendDecisionRecordOf } from './spend-decision.policy';
 
 const year = (value: number, code: YearResult['code']): YearResult => ({
   year: value,
@@ -119,5 +119,76 @@ describe('what the check made now allows of an approval (US-06-01 AC-5, AC-16, A
     expect(judgeApproval(check([year(2026, 'BUDGET_OK')], { planLineOverdue: true }), true, null)).toEqual({
       kind: 'NEEDS_REVIEW',
     });
+  });
+});
+
+describe('what the decision of the spend step is recorded as (US-06-01 AC-2, AC-4, AC-5)', () => {
+  const step = { id: 'step-1', samePersonAsSpend: false, noIndependentReview: true };
+  const request = { id: 'req-1' };
+
+  it('records an approval in the role the person decided in, sends the request to be carried out, and says what was overridden', () => {
+    expect(
+      spendDecisionRecordOf(
+        { conflictSubstituteEmployeeId: null },
+        'approver',
+        { request, step },
+        {
+          decision: 'APPROVED',
+          checkId: 'check-1',
+          reason: null,
+          override: { reason: 'Cần gấp', years: [2026, 2027] },
+        },
+      ),
+    ).toEqual({
+      deciderRole: 'SPENDING_APPROVER',
+      requestState: 'AWAITING_EXECUTION',
+      action: 'ACCESS_REQUEST.SPEND_APPROVED',
+      detail: {
+        requestId: 'req-1',
+        checkId: 'check-1',
+        decision: 'APPROVED',
+        deciderRole: 'SPENDING_APPROVER',
+        override: true,
+        overrideYears: '2026,2027',
+        samePersonAsSpend: false,
+        noIndependentReview: true,
+        requestState: 'AWAITING_EXECUTION',
+      },
+    });
+  });
+
+  it('records a refusal as REJECTED, with no override, and the substitute in the role of the substitute for the conflict', () => {
+    const recorded = spendDecisionRecordOf(
+      { conflictSubstituteEmployeeId: 'substitute' },
+      'substitute',
+      { request, step },
+      { decision: 'REJECTED', checkId: null, reason: 'Không đủ ngân sách', override: null },
+    );
+
+    expect(recorded).toMatchObject({
+      deciderRole: 'CONFLICT_SUBSTITUTE',
+      requestState: 'REJECTED',
+      action: 'ACCESS_REQUEST.SPEND_REJECTED',
+      detail: { checkId: null, decision: 'REJECTED', override: false, overrideYears: '' },
+    });
+  });
+
+  it('is the approver when somebody else is the substitute', () => {
+    expect(
+      spendDecisionRecordOf(
+        { conflictSubstituteEmployeeId: 'substitute' },
+        'approver',
+        { request, step },
+        { decision: 'REJECTED', checkId: null, reason: null, override: null },
+      ).deciderRole,
+    ).toBe('SPENDING_APPROVER');
+  });
+});
+
+describe('the role the spending approver decides in (US-06-01)', () => {
+  it('is the substitute for the conflict when the person is the one named so, and the approver otherwise', () => {
+    expect(spendDeciderRoleOf({ conflictSubstituteEmployeeId: 'sub' }, 'sub')).toBe('CONFLICT_SUBSTITUTE');
+    expect(spendDeciderRoleOf({ conflictSubstituteEmployeeId: 'sub' }, 'approver')).toBe('SPENDING_APPROVER');
+    expect(spendDeciderRoleOf({ conflictSubstituteEmployeeId: null }, 'approver')).toBe('SPENDING_APPROVER');
   });
 });

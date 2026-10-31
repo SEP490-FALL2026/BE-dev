@@ -1,14 +1,13 @@
-import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
-import { isBusinessDate } from '../../../core/business-date';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
+import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
+import { businessDate } from '../../../infrastructure/http/dto/business-date.dto';
 
 /**
  * Only the shape and a generous bound are checked here. Whether the person is working, the day is after the account began
  * and not in the past, and the expected end date is required of time-limited staff is judged by the assignment policy and
  * answers with its own `LICENSE_ASSIGNMENT.*` code.
  */
-const businessDate = z.string().refine(isBusinessDate, { message: 'Must be a real date as YYYY-MM-DD.' });
 
 export const responsibleChangeBodySchema = z.strictObject({
   employeeId: z.uuid(),

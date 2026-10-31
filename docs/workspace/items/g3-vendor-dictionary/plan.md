@@ -16,28 +16,28 @@ Mỗi task theo TDD: viết test đỏ, xem nó đỏ đúng lý do, viết mã 
 
 ### Task 1: hàm nhận diện thuần `vendor-matcher`
 
-- Files: `src/modules/catalog/vendor-dictionary/vendor-matcher.ts`, `vendor-matcher.spec.ts`.
+- Files: `src/modules/catalog/vendor-dictionary/vendor-matcher.policy.ts`, `vendor-matcher.spec.ts`.
 - Depends on: none.
 - Acceptance: AC-1, AC-2, AC-3, AC-5 ở tầng hàm — host từ URL, tên miền phụ nhưng không nhãn dài hơn, mẫu nguyên văn, mẫu dài nhất thắng, bậc nhận diện theo tên, không tự chọn.
-- Verify: `pnpm exec jest src/modules/catalog/vendor-dictionary/vendor-matcher` → đỏ trước, xanh sau.
+- Verify: `pnpm exec jest src/modules/catalog/vendor-dictionary/vendor-matcher.policy` → đỏ trước, xanh sau.
 
 ### Task 2: dữ liệu từ điển
 
-- Files: `prisma/models/catalog.prisma`, migration `20261020110000_catalog_vendor_dictionary`, `src/architecture-boundaries.spec.ts` (`PRISMA_MODEL_OWNER`), `test/integration/vendor-dictionary-constraints.integration-spec.ts`.
+- Files: `prisma/models/catalog.prisma`, migration `20261020110000_catalog_vendor_dictionary`, `test/gates/architecture-boundaries.gate-spec.ts` (`PRISMA_MODEL_OWNER`), `test/integration/catalog/vendor-dictionary-constraints.integration-spec.ts`.
 - Depends on: `g3-catalog-foundation`.
 - Acceptance: unique tên nhóm (khóa chuẩn hóa), unique (nhóm, tên dòng), CHECK kích thước mảng, CHECK nhất quán đề xuất, một đề xuất chờ cho mỗi (tổ chức, tên), khóa ngoại.
 - Verify: `pnpm prisma:validate`, `pnpm prisma:generate`; test constraints đỏ trước migration, xanh sau.
 
 ### Task 3: capability `vendor-dictionary` — repo, service, lỗi, kiểm tra giá trị
 
-- Files: `src/modules/catalog/vendor-dictionary/vendor-dictionary.repo.ts`, `vendor-dictionary.service.ts`, `vendor-dictionary.errors.ts`, `vendor-dictionary.types.ts`, `src/modules/catalog/mappers/catalog-audit-event.ts`, `catalog.http-errors.ts` (+ spec).
+- Files: `src/modules/catalog/vendor-dictionary/vendor-dictionary.repo.ts`, `vendor-dictionary.service.ts`, `vendor-dictionary.errors.ts`, `vendor-dictionary.types.ts`, `src/modules/catalog/mappers/catalog-audit-event.mapper.ts`, `catalog.http-errors.ts` (+ spec).
 - Depends on: Task 1, Task 2.
 - Acceptance: ghi nhóm/dòng/đề xuất cùng giao dịch với audit; trùng tên → lỗi miền; nhận diện dùng hàm của Task 1 trên dữ liệu thật.
 - Verify: `pnpm exec jest src/modules/catalog`; integration `vendor-dictionary-http` ở Task 4.
 
 ### Task 4: HTTP, module, hợp đồng
 
-- Files: `vendor-dictionary.controller.ts`, `vendor-dictionary.dto.ts`, `src/modules/catalog/catalog.module.ts`, `src/app.module.ts`, `test/support/api-coverage-manifest.ts`, `test/e2e/vendor-dictionary.e2e-spec.ts`, `test/integration/vendor-dictionary-http.integration-spec.ts`, `test/e2e/api-inventory.e2e-spec.ts` (đếm operation).
+- Files: `vendor-dictionary.controller.ts`, `vendor-dictionary.dto.ts`, `src/modules/catalog/catalog.module.ts`, `src/app/app.module.ts`, `test/support/api-coverage-manifest.ts`, `test/http/catalog/vendor-dictionary.http-spec.ts`, `test/integration/catalog/vendor-dictionary-http.integration-spec.ts`, `test/http/platform/api-inventory.http-spec.ts` (đếm operation).
 - Depends on: Task 3.
 - Acceptance: chín operation đúng bảng HTTP; 401/403/422 theo vai; 409 trùng; không có `DELETE`; đồng thời hợp lệ.
 - Verify: `pnpm test:e2e` (suite `vendor-dictionary`, `api-inventory`), integration `vendor-dictionary-http` → xanh.

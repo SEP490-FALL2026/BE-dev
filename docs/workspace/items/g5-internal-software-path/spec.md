@@ -24,9 +24,9 @@ Request phần mềm nội bộ không phí đã có trong danh mục đi từ q
 
 ## Primary Story/AC
 
-| Story    | AC               | Coverage | Phần còn lại thuộc                                         |
-| -------- | ---------------- | -------- | ---------------------------------------------------------- |
-| US-05-20 | AC-1, AC-2, AC-7 | partial  | AC-3→AC-6, AC-8→AC-10: `g5-internal-software-registration` |
+| Story    | AC                      | Coverage | Phần còn lại thuộc                                         |
+| -------- | ----------------------- | -------- | ---------------------------------------------------------- |
+| US-05-20 | AC-1, AC-2, AC-7, AC-11 | partial  | AC-3→AC-6, AC-8→AC-10: `g5-internal-software-registration` |
 
 ## Supporting references
 
@@ -90,3 +90,7 @@ Request phần mềm nội bộ không phí đã có trong danh mục đi từ q
 23/10/2026: lập khung theo scope map G5 của [roadmap](../../../roadmap.md). Chưa thiết kế chi tiết, chưa code, chưa review, chưa nghiệm thu.
 
 23/10/2026: implement và `verified` local (người phụ trách: AI theo giao việc của người dùng). Hạng mục làm kèm phần cổng của [`g4-request-and-transfer-integration`](../g4-request-and-transfer-integration/spec.md) (`US-07-01` AC-1, AC-3, AC-15, AC-16) vì không thể cấp từ Request thật mà thiếu nó; phần còn lại của hạng mục đó (G6, `US-07-04`) vẫn chờ. `US-05-20` AC-3→AC-6, AC-8→AC-10 tách sang `g5-internal-software-registration`. Chưa commit, chưa peer review, chưa Owner review, chưa nghiệm thu.
+
+## Cập nhật scope map theo baseline `e0cb5a0` (Prompt 04, 27/10/2026)
+
+- _27/10/2026 (Prompt 04, Task 0.1 của `g0-g6-final-business-baseline-remediation`, F60 — re-pin scope map [G5](../../../roadmap.md#work-item-decomposition-g5) Docs `e0cb5a0`, BE `7c28e75`):_ nhận thêm `US-05-20` AC-11 (BEH-08, F27 — Request nội bộ không phí vẫn làm được khi cấu hình tài chính chưa hoàn tất; mục 9 không có cột chủ đề xuất, gán theo hạng mục đang chủ phần Request của Story — chờ xác nhận) ([impact matrix mục 9](../g0-g6-final-business-baseline-remediation/impact-matrix.md#9-phụ-lục-delta-user-stories-72e1480--769bb64)). Phần đã ghi phía trên là lịch sử, giữ nguyên.

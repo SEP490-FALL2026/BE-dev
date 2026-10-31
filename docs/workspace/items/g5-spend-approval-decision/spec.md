@@ -119,3 +119,8 @@ Người duyệt chi mở bước duyệt chi của một Request, thấy nhu c�
 23/10/2026: implement và `verified` local (người phụ trách: AI theo giao việc của người dùng). Scope map chuyển `US-06-01` AC-15, `US-06-08` AC-10 và `US-05-17` AC-9 sang `g5-group-requests`, `US-06-08` AC-2, AC-9 sang `g5-delegated-requests`. Duyệt chưa tạo khoản cam kết: `g5-commitment-creation` thêm vào đúng chỗ ghi quyết định. Chưa commit, chưa peer review, chưa Owner review, chưa nghiệm thu.
 
 24/10/2026 (sau `g5-group-requests`): `US-06-01` AC-15, `US-06-08` AC-10 và `US-05-17` AC-9 đã làm ở `g5-group-requests` (`POST /access-requests/{id}/line-spend-decisions`); `POST .../spend-approval` và quyết cả lô trả `409 ACCESS_REQUEST.GROUP_USES_LINES` hay bỏ qua với lý do `GROUP_NEEDS_LINES` cho Request nhóm; phần giữ cam kết và đóng bước về trưởng phòng dùng chung `SpendEffectsService`.
+
+## Mở lại theo baseline `769bb64` (Prompt 03, 26/10/2026)
+
+- Audit G0–G6 trên Docs `769bb64` ↔ BE `7c28e75` mở lại hạng mục này: F31, F32 — tuần tự hóa (Cost Center, năm); `SoD-8`.
+- Remediation duy nhất: [g0-g6-final-business-baseline-remediation](../g0-g6-final-business-baseline-remediation/spec.md) ([impact matrix](../g0-g6-final-business-baseline-remediation/impact-matrix.md#3-findings)). AC liên quan không còn được coi là thỏa nguồn hiện hành cho tới khi remediation xong; trạng thái triển khai ở roadmap. Phần đã ghi phía trên là lịch sử, giữ nguyên.

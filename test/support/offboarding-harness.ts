@@ -18,11 +18,12 @@ export interface CaseWire {
   department?: { id: string; code: string; name: string };
   priorWorkState?: 'WORKING' | 'ON_LONG_LEAVE';
   departureEffectiveOn?: string;
-  grounds?: { type: string; reference: string; issuer: string; issuedOn: string };
+  grounds?: { type: string; reference: string; issuer: string; issuedOn: string } | null;
   headSuccessor?: { kind: 'EMPLOYEE' | 'NONE'; employee: { id: string } | null } | null;
-  selfExecuted?: boolean;
-  left?: { leftOn: string; leftAt: string; leftByAppUserId: string } | null;
-  cancellation?: { cancelledAt: string; reason: string } | null;
+  recordedByAppUserId?: string | null;
+  recordedByProcedure?: boolean;
+  left?: { leftOn: string; leftAt: string; leftByAppUserId: string | null; leftByProcedure: boolean } | null;
+  cancellation?: { cancelledAt: string; cancelledByProcedure: boolean; reason: string } | null;
   accountLock?: { recordedAt: string; recordedByAppUserId: string; note: string } | null;
   closure?: { closedAt: string } | null;
   checklist?: {
@@ -86,21 +87,21 @@ export class OffboardingHarness extends HandoverHarness {
   /** The working day before `day`, with no day off in the calendar of a test installation. */
   dueBefore = (day: string): string => subtractWorkingDays(day, 1, new Set());
 
-  recordCase = (body: object, account: ApiAccount = this.it1) =>
+  recordCase = (body: object, account: ApiAccount = this.sa) =>
     request(this.server()).post('/api/v1/offboarding-cases').set(this.as(account)).send(body);
-  readCase = (id: string, account: ApiAccount = this.it1) =>
+  readCase = (id: string, account: ApiAccount = this.sa) =>
     request(this.server()).get(`/api/v1/offboarding-cases/${id}`).set(this.as(account));
-  listCases = (query = '', account: ApiAccount = this.it1) =>
+  listCases = (query = '', account: ApiAccount = this.sa) =>
     request(this.server()).get(`/api/v1/offboarding-cases${query}`).set(this.as(account));
-  rightsOf = (id: string, query = '', account: ApiAccount = this.it1) =>
+  rightsOf = (id: string, query = '', account: ApiAccount = this.sa) =>
     request(this.server()).get(`/api/v1/offboarding-cases/${id}/rights${query}`).set(this.as(account));
-  caseChanges = (id: string, query = '', account: ApiAccount = this.it1) =>
+  caseChanges = (id: string, query = '', account: ApiAccount = this.sa) =>
     request(this.server()).get(`/api/v1/offboarding-cases/${id}/changes${query}`).set(this.as(account));
-  changeLastDay = (id: string, body: object, account: ApiAccount = this.it1) =>
+  changeLastDay = (id: string, body: object, account: ApiAccount = this.sa) =>
     request(this.server()).post(`/api/v1/offboarding-cases/${id}/last-day-changes`).set(this.as(account)).send(body);
-  cancelCase = (id: string, body: object, account: ApiAccount = this.it1) =>
+  cancelCase = (id: string, body: object, account: ApiAccount = this.sa) =>
     request(this.server()).post(`/api/v1/offboarding-cases/${id}/cancellation`).set(this.as(account)).send(body);
-  markLeft = (id: string, body: object = {}, account: ApiAccount = this.it1) =>
+  markLeft = (id: string, body: object = {}, account: ApiAccount = this.sa) =>
     request(this.server()).post(`/api/v1/offboarding-cases/${id}/departure`).set(this.as(account)).send(body);
   lockAccount = (id: string, body: object, account: ApiAccount = this.it1) =>
     request(this.server()).post(`/api/v1/offboarding-cases/${id}/account-lock`).set(this.as(account)).send(body);
@@ -119,7 +120,7 @@ export class OffboardingHarness extends HandoverHarness {
     account: ApiAccount = this.it1,
   ) =>
     request(this.server()).post(`/api/v1/access-requests/${requestId}/cancellation`).set(this.as(account)).send(body);
-  startLongLeave = (body: object, account: ApiAccount = this.it1) =>
+  startLongLeave = (body: object, account: ApiAccount = this.sa) =>
     request(this.server()).post('/api/v1/long-leaves').set(this.as(account)).send(body);
 
   /** The body of a record for `person`: a planned handover ending on `day(10)` on the basis of a decision. */
@@ -131,7 +132,7 @@ export class OffboardingHarness extends HandoverHarness {
   });
 
   /** A departure recorded and expected to succeed (201). */
-  async recordedCase(person: Person, extra: object = {}, account: ApiAccount = this.it1): Promise<CaseWire> {
+  async recordedCase(person: Person, extra: object = {}, account: ApiAccount = this.sa): Promise<CaseWire> {
     const response = await this.recordCase(this.body(person, extra), account);
     if (response.status !== 201) throw new Error(`record: ${response.status} ${JSON.stringify(response.body)}`);
 

@@ -1,4 +1,4 @@
-import { REVOCATION_SOURCES, type RevocationSource } from '../licensing.types';
+import { REVOCATION_SOURCES, type RevocationSource } from '../public/licensing.types';
 import {
   allowedValues,
   confirmationCovers,
@@ -27,6 +27,8 @@ describe('the table of who confirms a handover (US-07-09)', () => {
     ['MANAGER_NOT_NEEDED', HEAD, 'DEPARTMENT_HEAD', false, true],
     ['GHOST_SEAT', HEAD, 'DEPARTMENT_HEAD', false, true],
     ['TRANSFER_REVIEW', null, 'DEPARTMENT_HEAD', false, true],
+    // After the installation the head of the holder's department decides, as the new head does after a transfer (US-07-09 row 5).
+    ['POST_SETUP_REVIEW', null, 'DEPARTMENT_HEAD', false, true],
     ['TIME_LIMITED_EXPIRY', null, 'IT_ADMIN', false, true],
     ['SUBSCRIPTION_REDUCTION', null, 'IT_ADMIN', false, true],
     ['SUBSCRIPTION_CANCELLATION', null, 'IT_ADMIN', false, true],

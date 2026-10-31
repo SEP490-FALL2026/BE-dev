@@ -4,7 +4,7 @@ import { BusinessDate, fromDateColumn, toDateColumn } from '../../../core/busine
 import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
-import type { Grounds } from '../grounds/grounds.policy';
+import type { Grounds } from '../personnel-grounds.policy';
 import type {
   HeadHandoverFacts,
   TransferChangeRecord,
@@ -20,11 +20,8 @@ const SUMMARY = {
   employeeId: true,
   fromDepartmentId: true,
   toDepartmentId: true,
-  fromJobTitleId: true,
-  toJobTitleId: true,
   effectiveOn: true,
   status: true,
-  selfExecuted: true,
 } as const;
 
 function toRecord(row: TransferRow): TransferRecord {
@@ -34,8 +31,6 @@ function toRecord(row: TransferRow): TransferRecord {
     employeeId: row.employeeId,
     fromDepartmentId: row.fromDepartmentId,
     toDepartmentId: row.toDepartmentId,
-    fromJobTitleId: row.fromJobTitleId,
-    toJobTitleId: row.toJobTitleId,
     effectiveOn: fromDateColumn(row.effectiveOn),
     status: row.status,
     closesPlacementId: row.closesPlacementId,
@@ -47,12 +42,13 @@ function toRecord(row: TransferRow): TransferRecord {
       issuer: row.groundsIssuer,
       issuedOn: fromDateColumn(row.groundsIssuedOn),
     },
-    selfExecuted: row.selfExecuted,
     recordedByAppUserId: row.recordedByAppUserId,
+    recordedByTicketId: row.recordedByTicketId,
     recordedAt: row.recordedAt,
     effectiveAt: row.effectiveAt,
     cancelledAt: row.cancelledAt,
     cancelledByAppUserId: row.cancelledByAppUserId,
+    cancelledByTicketId: row.cancelledByTicketId,
     cancelledReason: row.cancelledReason,
     closedAt: row.closedAt,
     closedByAppUserId: row.closedByAppUserId,
@@ -84,6 +80,7 @@ export class TransferRepo {
       | 'effectiveAt'
       | 'cancelledAt'
       | 'cancelledByAppUserId'
+      | 'cancelledByTicketId'
       | 'cancelledReason'
       | 'closedAt'
       | 'closedByAppUserId'
@@ -96,15 +93,14 @@ export class TransferRepo {
         employeeId: input.employeeId,
         fromDepartmentId: input.fromDepartmentId,
         toDepartmentId: input.toDepartmentId,
-        fromJobTitleId: input.fromJobTitleId,
-        toJobTitleId: input.toJobTitleId,
+        // The titles are not named: the database gives the row the catalogue entry the person has.
         effectiveOn: toDateColumn(input.effectiveOn),
         closesPlacementId: input.closesPlacementId,
         opensPlacementId: input.opensPlacementId,
         headHandover: input.headHandover ? (input.headHandover as unknown as Prisma.InputJsonValue) : Prisma.DbNull,
         ...groundsColumns(input.grounds),
-        selfExecuted: input.selfExecuted,
         recordedByAppUserId: input.recordedByAppUserId,
+        recordedByTicketId: input.recordedByTicketId,
         noticeId: input.noticeId ?? null,
       },
     });
@@ -132,6 +128,11 @@ export class TransferRepo {
     const row = await tx.departmentTransfer.findFirst({ where: { employeeId, status: 'PENDING' } });
 
     return row && toRecord(row);
+  }
+
+  /** How many reviews of the tools the transfer opened still wait for the head (a part of the record that is not closed). */
+  countOpenReviews(tx: DbTx, transferId: string): Promise<number> {
+    return tx.transferReview.count({ where: { transferId, status: 'OPEN' } });
   }
 
   /** Whether a transfer that waits names this person to follow the head of the department it leaves. */
@@ -209,13 +210,18 @@ export class TransferRepo {
     return toRecord(row);
   }
 
-  async cancel(tx: DbTx, id: string, by: { appUserId: string; reason: string }): Promise<TransferRecord> {
+  async cancel(
+    tx: DbTx,
+    id: string,
+    by: { appUserId: string | null; ticketId: string | null; reason: string },
+  ): Promise<TransferRecord> {
     const row = await tx.departmentTransfer.update({
       where: { id },
       data: {
         status: 'CANCELLED',
         cancelledAt: new Date(),
         cancelledByAppUserId: by.appUserId,
+        cancelledByTicketId: by.ticketId,
         cancelledReason: by.reason,
       },
     });
@@ -242,7 +248,8 @@ export class TransferRepo {
       newEffectiveOn: BusinessDate | null;
       reason: string;
       grounds: Grounds;
-      changedByAppUserId: string;
+      changedByAppUserId: string | null;
+      changedByTicketId: string | null;
     },
   ): Promise<void> {
     await tx.departmentTransferChange.create({
@@ -255,13 +262,25 @@ export class TransferRepo {
         reason: input.reason,
         ...groundsColumns(input.grounds),
         changedByAppUserId: input.changedByAppUserId,
+        changedByTicketId: input.changedByTicketId,
       },
     });
   }
 
-  /** One page of transfers, newest effective day first, and the total for the same filter, from one snapshot. */
+  /**
+   * One page of transfers, newest effective day first, and the total for the same filter, from one snapshot. With
+   * `departmentIds` only the transfers that leave or enter one of those units are listed (the scope of an IT Admin).
+   */
   async list(filter: TransferListFilter): Promise<{ items: TransferSummaryRecord[]; total: number }> {
     const where: Prisma.DepartmentTransferWhereInput = {
+      ...(filter.departmentIds
+        ? {
+            OR: [
+              { fromDepartmentId: { in: [...filter.departmentIds] } },
+              { toDepartmentId: { in: [...filter.departmentIds] } },
+            ],
+          }
+        : {}),
       ...(filter.employeeId ? { employeeId: filter.employeeId } : {}),
       ...(filter.status ? { status: filter.status } : {}),
       ...(filter.effectiveFrom || filter.effectiveTo
@@ -321,6 +340,7 @@ export class TransferRepo {
               issuedOn: fromDateColumn(row.groundsIssuedOn),
             },
             changedByAppUserId: row.changedByAppUserId,
+            changedByTicketId: row.changedByTicketId,
             changedAt: row.changedAt,
           })),
           total: await tx.departmentTransferChange.count({ where: { transferId } }),

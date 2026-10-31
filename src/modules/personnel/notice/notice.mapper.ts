@@ -1,8 +1,8 @@
 import type { BusinessDate } from '../../../core/business-date';
-import type { DepartmentBrief, EmployeeRecord } from '../../organization/organization.types';
+import type { DepartmentBrief, EmployeeRecord } from '../../organization/public/organization.types';
 import type { NoticeDetailWire, NoticeSummaryWire } from './notice.dto';
 import { isNoticeOverdue, isPriorityKind } from './notice.policy';
-import type { NoticeRecord, NoticeSummaryRecord, NoticeVerificationRecord } from './notice.types';
+import type { NoticeRecord, NoticeSummaryRecord, NoticeVerificationRecord } from '../personnel-notice.types';
 
 const UNKNOWN = '';
 
@@ -57,6 +57,7 @@ export function toDetail(
       method: facts.verification.method,
       reference: facts.verification.reference,
       verifiedByAppUserId: facts.verification.verifiedByAppUserId,
+      verifiedByProcedure: facts.verification.verifiedByTicketId !== null,
       verifiedAt: facts.verification.verifiedAt.toISOString(),
     },
   };
