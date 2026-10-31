@@ -5,6 +5,7 @@ import { FinanceModule } from '../finance/finance.module';
 import { OrganizationModule } from '../organization/organization.module';
 import { OperatingParametersController } from './operating-parameters.controller';
 import { OperatingParametersModule } from './operating-parameters.module';
+import { ParameterChangeService } from './parameter-change.service';
 import { ReportingCurrencyController } from './reporting-currency.controller';
 import { ReportingCurrencyService } from './reporting-currency.service';
 
@@ -15,6 +16,6 @@ import { ReportingCurrencyService } from './reporting-currency.service';
 @Module({
   imports: [OperatingParametersModule, DatabaseModule, AuditModule, OrganizationModule, FinanceModule],
   controllers: [OperatingParametersController, ReportingCurrencyController],
-  providers: [ReportingCurrencyService],
+  providers: [ParameterChangeService, ReportingCurrencyService],
 })
 export class OperatingParametersHttpModule {}

@@ -4,6 +4,8 @@
 - Phụ trách: AI theo giao việc Owner. Thiết kế ban đầu bởi: AI theo giao việc Owner.
 - Owner review: chưa review. Peer review: tùy chọn.
 - Triển khai: `blocked`. PR: chưa có.
+- 31/10/2026: khung `superseded` theo A-05 — không triển khai ở đây; việc chuyển sang các hạng mục `a05-*` (xem
+  [spec](spec.md), mục _Phân rã A-05_), mỗi hạng mục blocked on Owner G7 registry; design/contract only.
 
 ## Before coding
 

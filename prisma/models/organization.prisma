@@ -75,6 +75,8 @@ model Organization {
   costCenterDirectionActivation      CostCenterDirectionActivation?
   seatBaselineImports                SeatBaselineImport[]
   licenseAssignments                 LicenseAssignment[]
+  subscriptionRenewals               SubscriptionRenewal[]
+  subscriptionDeadlineEvents         SubscriptionDeadlineEvent[]
   provisioningTasks                  ProvisioningTask[]
   returnRequests                     ReturnRequest[]
   handoverDuties                     HandoverDuty[]

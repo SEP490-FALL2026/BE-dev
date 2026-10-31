@@ -7,6 +7,8 @@ enum AssignmentSource {
   BASELINE
   HANDOVER
   REQUEST
+  // The seat of a person carried from a subscription period to the period that renews it (QĐ-35c): names its predecessor.
+  RENEWAL_CARRY
 }
 
 enum AssignmentDateBasis {
@@ -49,24 +51,25 @@ model LicenseAssignment {
   createdByAppUserId          String              @map("created_by_app_user_id") @db.Uuid
   createdAt                   DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
 
-  organization        Organization               @relation(fields: [organizationId], references: [id])
-  plan                Plan                       @relation(fields: [planId], references: [id])
-  subscription        Subscription?              @relation(fields: [subscriptionId], references: [id], onDelete: Restrict)
-  employee            Employee                   @relation(fields: [employeeId], references: [id])
-  costCenter          CostCenter?                @relation(fields: [costCenterId], references: [id], onDelete: Restrict)
-  owningDepartment    Department?                @relation("AssignmentOwningDepartment", fields: [owningDepartmentId], references: [id], onDelete: Restrict)
-  predecessor         LicenseAssignment?         @relation("AssignmentChain", fields: [predecessorId], references: [id], onDelete: Restrict)
-  successors          LicenseAssignment[]        @relation("AssignmentChain")
-  baselineImport      SeatBaselineImport?        @relation(fields: [baselineImportId], references: [id], onDelete: Restrict)
+  organization        Organization                      @relation(fields: [organizationId], references: [id])
+  plan                Plan                              @relation(fields: [planId], references: [id])
+  subscription        Subscription?                     @relation(fields: [subscriptionId], references: [id], onDelete: Restrict)
+  employee            Employee                          @relation(fields: [employeeId], references: [id])
+  costCenter          CostCenter?                       @relation(fields: [costCenterId], references: [id], onDelete: Restrict)
+  owningDepartment    Department?                       @relation("AssignmentOwningDepartment", fields: [owningDepartmentId], references: [id], onDelete: Restrict)
+  predecessor         LicenseAssignment?                @relation("AssignmentChain", fields: [predecessorId], references: [id], onDelete: Restrict)
+  successors          LicenseAssignment[]               @relation("AssignmentChain")
+  baselineImport      SeatBaselineImport?               @relation(fields: [baselineImportId], references: [id], onDelete: Restrict)
   provisioningTasks   ProvisioningTask[]
   returnRequests      ReturnRequest[]
   handoverDuties      HandoverDuty[]
   dutyNotices         ServiceAccountDutyNotice[]
   expiryReminders     AssignmentExpiryReminder[]
+  renewalReleases     SubscriptionRenewalReleasedSeat[]
   saasIssues          SaasIssue[]
   transferReviewItems TransferReviewItem[]
-  renewalRequests     AccessRequestRenewal[]     @relation("RenewalOf")
-  renewalOfRequest    AccessRequestRenewal?      @relation("RenewalSuccessor")
+  renewalRequests     AccessRequestRenewal[]            @relation("RenewalOf")
+  renewalOfRequest    AccessRequestRenewal?             @relation("RenewalSuccessor")
 
   @@index([subscriptionId])
   @@index([planId])
@@ -490,4 +493,133 @@ model SaasIssueCounter {
   lastValue Int @map("last_value")
 
   @@map("saas_issue_counters")
+}
+
+// What the IT Admin proposes for a subscription period, what the person who decides spending chose, and what was really
+// done with the vendor (EP-11, MF-4). One per period (the subscription row of that term); it moves one way: proposed,
+// decided, outcome recorded. A decision never creates a budget commitment (QĐ-62s). The columns of a stage are written
+// together once and then frozen; nothing is deleted (CHECKs and a trigger in the migration).
+enum RenewalChoice {
+  RENEW
+  REDUCE
+  CANCEL
+}
+
+enum RenewalState {
+  PROPOSED
+  DECIDED
+  OUTCOME_RECORDED
+}
+
+enum RenewalExecutionPoint {
+  AS_PLANNED
+  MID_TERM
+  NEXT_RENEWAL
+}
+
+enum RenewalOutcome {
+  AS_DECIDED
+  VENDOR_REFUSED
+  DIFFERENT
+  UNCONFIRMED
+}
+
+enum RenewalNoticeBasis {
+  DECLARED
+  INFERRED_UNCONFIRMED
+  BY_END_DATE
+}
+
+enum RenewalDeadlineOutcome {
+  AUTO_RENEWAL_INCIDENT
+  EXPIRY_MARKED
+}
+
+model SubscriptionRenewal {
+  id                          String                 @id @default(uuid()) @db.Uuid
+  organizationId              String                 @map("organization_id") @db.Uuid
+  subscriptionId              String                 @unique @map("subscription_id") @db.Uuid
+  state                       RenewalState           @default(PROPOSED)
+  // The milestone the period was proposed against, as the catalog derived it then.
+  noticeBasis                 RenewalNoticeBasis     @map("notice_basis")
+  noticeBaseDate              DateTime               @map("notice_base_date") @db.Date
+  proposedChoice              RenewalChoice          @map("proposed_choice")
+  proposedQuantity            Int?                   @map("proposed_quantity")
+  proposalNote                String?                @map("proposal_note")
+  // What the Business Owner said, as the IT Admin who proposes recorded it: an input, never a step.
+  businessOwnerOpinion        String?                @map("business_owner_opinion")
+  proposedByEmployeeId        String                 @map("proposed_by_employee_id") @db.Uuid
+  // Accounts are values, not foreign keys: the history outlives the account (as the audit trail does).
+  proposedByAppUserId         String                 @map("proposed_by_app_user_id") @db.Uuid
+  proposedAt                  DateTime               @default(now()) @map("proposed_at") @db.Timestamptz(3)
+  decidedChoice               RenewalChoice?         @map("decided_choice")
+  decidedQuantity             Int?                   @map("decided_quantity")
+  decisionReason              String?                @map("decision_reason")
+  decidedByEmployeeId         String?                @map("decided_by_employee_id") @db.Uuid
+  decidedByAppUserId          String?                @map("decided_by_app_user_id") @db.Uuid
+  deciderRole                 String?                @map("decider_role")
+  decidedAt                   DateTime?              @map("decided_at") @db.Timestamptz(3)
+  decidedOn                   DateTime?              @map("decided_on") @db.Date
+  decidedAfterDeadline        Boolean?               @map("decided_after_deadline")
+  executionPoint              RenewalExecutionPoint? @map("execution_point")
+  activeSeatsAtDecision       Int?                   @map("active_seats_at_decision")
+  // What the decider saw, frozen when the decision was written (a later change of a budget leaves it as it was).
+  decisionSnapshot            Json?                  @map("decision_snapshot")
+  // Set once when the milestone passed with a decision and no outcome; kept as a trace after the outcome is recorded.
+  lateFlaggedAt               DateTime?              @map("late_flagged_at") @db.Timestamptz(3)
+  outcome                     RenewalOutcome?
+  outcomeNote                 String?                @map("outcome_note")
+  outcomeRecordedByEmployeeId String?                @map("outcome_recorded_by_employee_id") @db.Uuid
+  outcomeRecordedByAppUserId  String?                @map("outcome_recorded_by_app_user_id") @db.Uuid
+  outcomeRecordedAt           DateTime?              @map("outcome_recorded_at") @db.Timestamptz(3)
+  vendorFollowUpOpen          Boolean                @default(false) @map("vendor_follow_up_open")
+  nextSubscriptionId          String?                @unique @map("next_subscription_id") @db.Uuid
+  // Savings at renewal, only from an outcome the vendor confirmed and only when the new period costs less (QĐ-66w).
+  realisedSavingsMinor        BigInt?                @map("realised_savings_minor")
+  realisedSavingsCurrency     String?                @map("realised_savings_currency") @db.Char(3)
+  createdAt                   DateTime               @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt                   DateTime               @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization     Organization                      @relation(fields: [organizationId], references: [id])
+  subscription     Subscription                      @relation("RenewalOfPeriod", fields: [subscriptionId], references: [id], onDelete: Restrict)
+  nextSubscription Subscription?                     @relation("RenewalNextPeriod", fields: [nextSubscriptionId], references: [id], onDelete: Restrict)
+  releasedSeats    SubscriptionRenewalReleasedSeat[]
+
+  @@index([state, noticeBaseDate])
+  @@map("subscription_renewals")
+}
+
+// A seat the decider chose to take back when reducing below the seats in use (QĐ-66x), from the list ranked for them; the
+// revocation itself is a task of the provisioning queue. Written with the decision and never changed.
+model SubscriptionRenewalReleasedSeat {
+  renewalId    String @map("renewal_id") @db.Uuid
+  assignmentId String @map("assignment_id") @db.Uuid
+  rankGroup    String @map("rank_group")
+  position     Int
+
+  renewal    SubscriptionRenewal @relation(fields: [renewalId], references: [id], onDelete: Restrict)
+  assignment LicenseAssignment   @relation(fields: [assignmentId], references: [id], onDelete: Restrict)
+
+  @@id([renewalId, assignmentId])
+  @@index([assignmentId])
+  @@map("subscription_renewal_released_seats")
+}
+
+// What became of a period whose milestone passed with no decision (US-11-04): an incident when it renews itself (counted
+// by KPI-4), a mark that it will end otherwise. One per period, written by the system and never changed or deleted.
+model SubscriptionDeadlineEvent {
+  id              String                 @id @default(uuid()) @db.Uuid
+  organizationId  String                 @map("organization_id") @db.Uuid
+  subscriptionId  String                 @unique @map("subscription_id") @db.Uuid
+  kind            RenewalDeadlineOutcome
+  noticeBaseDate  DateTime               @map("notice_base_date") @db.Date
+  autoRenewAtTime Boolean                @map("auto_renew_at_time")
+  recordedOn      DateTime               @map("recorded_on") @db.Date
+  recordedAt      DateTime               @default(now()) @map("recorded_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Restrict)
+
+  @@index([kind, recordedOn])
+  @@map("subscription_deadline_events")
 }

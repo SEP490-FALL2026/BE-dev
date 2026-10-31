@@ -1,10 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
+import { Contributions } from '../../../core/extension/contributions';
 import { Hook } from '../../../core/extension/hook';
 import { Listeners } from '../../../core/extension/listeners';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import type { PendingRenewal } from './licensing-renewal.types';
+import type { RenewalFinancialReader, RenewalUsageReader } from './licensing-subscription-renewal.types';
 import type { SeatBaselineClosedHolder } from './licensing-seat-baseline.types';
 import type { PendingFileQuery, PendingPersonnelFile } from './licensing-service-account.types';
 import type {
@@ -148,5 +150,29 @@ export interface SeatBaselineClosedEvent {
 export class SeatBaselineClosedListeners extends Listeners<SeatBaselineClosedEvent, DbTx> {
   constructor() {
     super('licensing.seat-baseline-closed');
+  }
+}
+
+/**
+ * Who builds the snapshot of money a renewal is decided on (`US-11-02` AC-4, AC-5): the module that owns budgets and costs adds
+ * one reader. With none added the decision is still taken, and the snapshot frozen with it says that no figure was connected
+ * instead of showing a 0; with more than one the first is read.
+ */
+@Injectable()
+export class RenewalFinancialContributions extends Contributions<RenewalFinancialReader> {
+  constructor() {
+    super('licensing.renewal-financial-snapshot');
+  }
+}
+
+/**
+ * Who tells the renewal what the evidence of use says of each seat (the last activity, an open waste recommendation): the owner of
+ * usage evidence adds one reader once it exists. With none, the renewal ranks the seats without it and says the usage cannot be
+ * judged; it never guesses a usage of 0.
+ */
+@Injectable()
+export class RenewalUsageContributions extends Contributions<RenewalUsageReader> {
+  constructor() {
+    super('licensing.renewal-usage-evidence');
   }
 }

@@ -115,6 +115,110 @@ describe('the closed table of in-app notices', () => {
   });
 });
 
+describe('the alerts of the rights (a03-license-inbox-alerts, FR-5.14 lines 3, 12, 13, 38)', () => {
+  const ID = '00000000-0000-4000-8000-0000000000a3';
+
+  it('accepts each with the keys its writer sends and refuses an account identifier smuggled in', () => {
+    const accepted: InAppNotificationInput[] = [
+      notice({
+        code: 'LICENSE_EXPIRY_REMINDER',
+        params: { assignmentId: ID, holderEmployeeId: ID, planId: ID, expectedEndDate: '2026-09-30', audience: 'HEAD' },
+      }),
+      notice({
+        code: 'HANDOVER_CONFIRMATION_DUE',
+        params: { dutyId: ID, assignmentId: ID, employeeId: ID, role: 'DEPARTMENT_HEAD', dueOn: '2026-09-29' },
+      }),
+      notice({
+        code: 'HANDOVER_CONFIRMATION_OVERDUE',
+        params: { dutyId: ID, assignmentId: ID, employeeId: ID, role: 'IT_ADMIN', dueOn: '2026-09-29' },
+      }),
+      notice({
+        code: 'SERVICE_ACCOUNT_RESPONSIBLE_DUE',
+        params: { employeeId: ID, fileKind: 'TRANSFER', fileId: ID, dueOn: '2026-07-01', accountCount: 2 },
+      }),
+      notice({
+        code: 'SERVICE_ACCOUNT_RESPONSIBLE_OVERDUE',
+        params: {
+          assignmentId: ID,
+          employeeId: ID,
+          owningDepartmentId: null,
+          fileKind: 'OFFBOARDING',
+          fileId: ID,
+          dueOn: '2026-07-01',
+        },
+      }),
+      notice({
+        code: 'LEAVER_K1_ACCESS_RUNS_ON',
+        params: { taskId: ID, assignmentId: ID, employeeId: ID, planId: ID, accessUntil: '2026-11-30' },
+      }),
+    ];
+    for (const input of accepted)
+      expect({ code: input.code, refusal: refuseInAppNotification(input) }).toEqual({
+        code: input.code,
+        refusal: null,
+      });
+    expect(
+      refuseInAppNotification(
+        notice({ code: 'LEAVER_K1_ACCESS_RUNS_ON', params: { accountIdentifier: 'bot@acme.vn' } }),
+      ),
+    ).toEqual({ reason: 'PARAM_KEY_NOT_ALLOWED', key: 'accountIdentifier' });
+  });
+});
+
+describe('the notices of the renewal of a subscription (a06, EP-11)', () => {
+  const ID = '00000000-0000-4000-8000-0000000000a6';
+  const KEYS_BY_CODE = {
+    SUBSCRIPTION_RENEWAL_ALERT: [
+      'subscriptionId',
+      'renewalId',
+      'milestoneDays',
+      'baseDate',
+      'noticeBasis',
+      'audience',
+      'decisionRecorded',
+      'outcomeRecorded',
+      'usageData',
+    ],
+    SUBSCRIPTION_RENEWAL_DATA_QUALITY: ['subscriptionId', 'problem'],
+    SUBSCRIPTION_BUSINESS_OWNER_LEFT: ['subscriptionId', 'applicationId'],
+    SUBSCRIPTION_RENEWAL_PROPOSED: ['renewalId', 'subscriptionId', 'choice'],
+    SUBSCRIPTION_RENEWAL_DECIDED: ['renewalId', 'subscriptionId', 'choice', 'executionPoint'],
+    SUBSCRIPTION_RENEWAL_LATE: ['renewalId', 'subscriptionId', 'baseDate'],
+    SUBSCRIPTION_AUTO_RENEWAL_INCIDENT: ['subscriptionId', 'baseDate'],
+    SUBSCRIPTION_EXPIRY_MARKED: ['subscriptionId', 'baseDate', 'endDate'],
+  } as const;
+
+  it('pins the keys of each of the eight codes, so a new key is a decision and not an accident', () => {
+    for (const [code, keys] of Object.entries(KEYS_BY_CODE))
+      expect({ code, keys: [...(PARAM_KEYS_BY_CODE[code as keyof typeof PARAM_KEYS_BY_CODE] ?? [])].sort() }).toEqual({
+        code,
+        keys: [...keys].sort(),
+      });
+    expect(Object.keys(KEYS_BY_CODE)).toHaveLength(8);
+  });
+
+  it('accepts a notice with exactly its keys and refuses an amount or a person smuggled into one', () => {
+    for (const [code, keys] of Object.entries(KEYS_BY_CODE))
+      expect(
+        refuseInAppNotification(
+          notice({
+            code: code as InAppNotificationInput['code'],
+            subject: { type: 'SUBSCRIPTION', id: ID },
+            params: Object.fromEntries(keys.map((key) => [key, ID])),
+          }),
+        ),
+      ).toBeNull();
+    expect(
+      refuseInAppNotification(
+        notice({
+          code: 'SUBSCRIPTION_RENEWAL_DECIDED',
+          params: { renewalId: ID, subscriptionId: ID, choice: 'RENEW', executionPoint: 'NOW', unitPrice: '1000000' },
+        }),
+      ),
+    ).toEqual({ reason: 'PARAM_KEY_NOT_ALLOWED', key: 'unitPrice' });
+  });
+});
+
 describe('what the table says it may carry (INF-06, FR-3.11)', () => {
   it('has a list of keys for every code of the table and a code for every list', () => {
     expect(Object.keys(PARAM_KEYS_BY_CODE).sort()).toEqual([...IN_APP_NOTIFICATION_CODES].sort());

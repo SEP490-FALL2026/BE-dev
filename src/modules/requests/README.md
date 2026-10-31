@@ -49,7 +49,7 @@ controller) và `requests-work-facade.module.ts` (phần worker chạy, API dùn
 ## Tầng trong module
 
 Đồ thị capability → capability của `requests` **không có vòng** (R6; `pnpm arch:capabilities --module requests`, gate
-`capability-graph`): 36 capability, 111 cạnh. Cạnh đi từ tầng cao xuống tầng thấp hoặc ngang tầng, không vòng. Bảng tầng này duyệt kỹ
+`capability-graph`): 39 capability, 118 cạnh. Cạnh đi từ tầng cao xuống tầng thấp hoặc ngang tầng, không vòng. Bảng tầng này duyệt kỹ
 thuật P09, chưa có Owner review.
 
 | Tầng | Capability                                                                                                                                                                                                                                                                                                                                                                                      | Quy tắc                                               |
@@ -57,7 +57,7 @@ thuật P09, chưa có Owner review.
 | L0   | `access-request` (lõi: bản ghi, repo, policy, types, errors, định tuyến, giá, `assessment-read.repo`, `withdrawal.policy`), `outcome`                                                                                                                                                                                                                                                           | không import capability nào của `requests` (gate)     |
 | L1   | lõi nhánh, không controller: `spend`, `step-routing`, `request-draft`, `renewal-apply`, `plan-line`                                                                                                                                                                                                                                                                                             | chỉ import L0 và nhau, không vòng                     |
 | L2   | dịch vụ dùng chung, không controller: `request-intake`, `request-view`, `assessment`, `budget-information`, `group-request`, `grant`, `request-end`, `spend-approval-view`                                                                                                                                                                                                                      | import L0, L1 và L2 thấp hơn                          |
-| L3   | use case lá, có controller: `proposal-review`, `budget-questions`, `group-line-decisions`, `need-decision`, `withdraw`, `finance-review`, `spend-submission`, `spend-approval`, `request-submission`, `cancellation`, `reassignment`, `return-request`, `timing`, `delegated-request`, `renewal-request`, `service-account-request`, `group-request-submission`, `line-closure`, `draft`, `sla` | không ai import lên, trừ năm ngoại lệ dưới đây (gate) |
+| L3   | use case lá, có controller: `proposal-review`, `budget-questions`, `group-line-decisions`, `need-decision`, `need-decision-queue`, `my-requests`, `assessment-queue`, `withdraw`, `finance-review`, `spend-submission`, `spend-approval`, `request-submission`, `cancellation`, `reassignment`, `return-request`, `timing`, `delegated-request`, `renewal-request`, `service-account-request`, `group-request-submission`, `line-closure`, `draft`, `sla` | không ai import lên, trừ năm ngoại lệ dưới đây (gate) |
 
 `status` không controller và không import hay bị import capability nào của `requests`.
 
@@ -88,7 +88,7 @@ cùng cần; phần ghi nằm ở `assessment/assessment.repo.ts`.
 
 ## Capability → file chính
 
-36 capability ngang hàng (ADR-0019, `OD-A5`), tầng ở bảng trên. **`access-request/` là lõi chung** (`docs/rules/module-structure.md`).
+39 capability ngang hàng (ADR-0019, `OD-A5`), tầng ở bảng trên. **`access-request/` là lõi chung** (`docs/rules/module-structure.md`).
 
 - **Lõi và dùng chung (không controller)**
   - `access-request/` — `access-request.repo.ts` (writer duy nhất của `access_requests`, `access_request_beneficiaries`,

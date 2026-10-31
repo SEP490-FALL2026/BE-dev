@@ -7,6 +7,7 @@ import { SecurityModule } from '../infrastructure/security/security.module';
 import { AuditHttpModule } from '../modules/audit/audit-http.module';
 import { AuditModule } from '../modules/audit/audit.module';
 import { CatalogModule } from '../modules/catalog/catalog.module';
+import { DashboardsModule } from '../modules/dashboards/dashboards.module';
 import { FinanceHttpModule } from '../modules/finance/finance-http.module';
 import { DataImportModule } from '../modules/data-import/data-import.module';
 import { IdentityAccessModule } from '../modules/identity-access/identity-access.module';
@@ -45,6 +46,7 @@ import { HttpInfrastructureModule } from '../infrastructure/http/http-infrastruc
     BudgetsModule,
     OnboardingModule,
     IdentityAccessModule,
+    DashboardsModule,
     SecurityModule.register({ verifierModule: IdentityAccessModule }),
   ],
 })

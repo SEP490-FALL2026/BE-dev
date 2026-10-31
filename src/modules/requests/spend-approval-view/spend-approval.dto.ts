@@ -1,5 +1,6 @@
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { z } from 'zod';
+import { responseBusinessDate } from '../../../infrastructure/http/dto/business-date.dto';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
 import { costEstimateSchema } from '../access-request/access-request.dto';
 import { budgetInformationSchema } from '../budget-information/budget-information.dto';
@@ -103,8 +104,12 @@ const codeSchema = z.enum([
 const approvalSummarySchema = z.strictObject({
   requestId: z.uuid(),
   stepId: z.uuid(),
+  /** The kind of step the row is, the same key the list of the need steps carries, so a client can put the two lists in one. */
+  stepKind: z.literal('SPEND_APPROVAL'),
   openedAt: z.iso.datetime(),
   slaWorkingDays: z.number().int().positive(),
+  /** The business day the step is due as YYYY-MM-DD, counted on the calendar of the organization. */
+  dueOn: responseBusinessDate,
   plan: z.strictObject({ planId: z.uuid(), planName: z.string(), applicationName: z.string() }).nullable(),
   softwareName: z.string().nullable(),
   requester: employeeRef,

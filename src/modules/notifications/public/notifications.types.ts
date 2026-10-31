@@ -101,6 +101,23 @@ export const IN_APP_NOTIFICATION_CODES = [
   'BUDGET_PROPOSAL_CLOSED_YEAR_END',
   'BUDGET_PROPOSAL_TASK_ASSIGNED',
   'BUDGET_PROPOSAL_TASK_WAITING',
+  // The alerts of the rights (`a03-license-inbox-alerts`, `FR-5.14`): a right about to end, a handover not confirmed, a service
+  // account whose person leaves, a person who left and keeps a K1 access to the end of the paid period. Ids, codes and days only.
+  'LICENSE_EXPIRY_REMINDER',
+  'HANDOVER_CONFIRMATION_DUE',
+  'HANDOVER_CONFIRMATION_OVERDUE',
+  'SERVICE_ACCOUNT_RESPONSIBLE_DUE',
+  'SERVICE_ACCOUNT_RESPONSIBLE_OVERDUE',
+  'LEAVER_K1_ACCESS_RUNS_ON',
+  // The renewal of a subscription (EP-11): the milestones, the quality of the contract data, the case and its deadline.
+  'SUBSCRIPTION_RENEWAL_ALERT',
+  'SUBSCRIPTION_RENEWAL_DATA_QUALITY',
+  'SUBSCRIPTION_BUSINESS_OWNER_LEFT',
+  'SUBSCRIPTION_RENEWAL_PROPOSED',
+  'SUBSCRIPTION_RENEWAL_DECIDED',
+  'SUBSCRIPTION_RENEWAL_LATE',
+  'SUBSCRIPTION_AUTO_RENEWAL_INCIDENT',
+  'SUBSCRIPTION_EXPIRY_MARKED',
 ] as const;
 
 export type InAppNotificationCode = (typeof IN_APP_NOTIFICATION_CODES)[number];

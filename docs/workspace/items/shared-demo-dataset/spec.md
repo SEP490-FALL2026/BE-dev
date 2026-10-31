@@ -26,7 +26,7 @@ Owner theo runbook.
   `installation/demo-dataset` (tài khoản demo qua `DemoAccountsApi`), wrapper `scripts/ops/demo-dataset.sh` (cách A) và
   `scripts/ops/demo-dataset-local.mjs` (cách B).
 - Boundaries: không migration, bảng, route hay contract HTTP mới; dữ liệu nghiệp vụ chỉ ghi qua route HTTP hiện có;
-  ghi trong tiến trình chỉ là tài khoản demo, một transaction mỗi lượt, qua hợp đồng `LocalDemoAccountApi` có sẵn; mọi
+  ghi trong tiến trình chỉ là tài khoản demo, một transaction mỗi tài khoản (A-04, trước đó một transaction mỗi lượt), qua hợp đồng `LocalDemoAccountApi` có sẵn; mọi
   ghi có Audit Trail; quyền là quyền của vai đăng nhập.
 - Not larger: tài liệu API cho FE nằm ở repo Docs (`Figma UI-UX/API-Integration`), không phải hạng mục BE; nạp thật,
   bàn giao tài khoản và phiên bản dữ liệu sau là việc riêng.
@@ -191,3 +191,7 @@ nghiệm thu: không có gì là `accepted`.
 30/10/2026 (review Prompt 08 + yêu cầu Owner cùng ngày): khóa `apply`, lịch, so khớp bản ghi đã có, giới hạn danh sách,
 mô tả `plan`, runtime role cho lệnh; thêm cách B từ máy Windows qua SSH tunnel. Vẫn chưa commit, chưa SSH, chưa chạy
 trên VPS; trạng thái `local-ready-for-owner-review`.
+
+31/10/2026 (A-04, RA-08): tài khoản demo mô tả và ghi mỗi tài khoản một transaction (việc của transaction không tăng theo
+fixture; trước đó lần chạy lại qua đường chậm vượt `DB_TRANSACTION_TIMEOUT_MS`), nhả khóa `apply` không ném, báo cáo lỗi kèm
+mã nguyên nhân. Chẩn đoán và bằng chứng: [a04-seed-rerun-diagnosis](../a04-seed-rerun-diagnosis/spec.md).

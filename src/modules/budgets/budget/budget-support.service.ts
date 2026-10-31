@@ -125,6 +125,11 @@ export class BudgetSupportService {
     return Number(await this.parameters.getValue('FISCAL_YEAR_START_MONTH'));
   }
 
+  /** The month the fiscal year begins in, kept from changing until `tx` ends: read by what makes the first version of a budget. */
+  async holdFiscalYearStartMonth(tx: DbTx): Promise<number> {
+    return Number(await this.parameters.holdValue(tx, 'FISCAL_YEAR_START_MONTH'));
+  }
+
   today(now: Date, tx?: DbTx): Promise<BusinessDate> {
     return this.organization.businessToday(now, tx);
   }

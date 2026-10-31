@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import { AuditApi } from '../../audit/public/audit.api';
+import { HandoverAlertService } from './handover-alert.service';
 import { HandoverCaseFacts } from './handover-case-facts.service';
 import { HandoverRepo } from './handover.repo';
 
@@ -9,8 +10,9 @@ const BATCH = 200;
 
 /**
  * Tells, once for each duty, that the deadline of a handover passed without the confirmation (`US-03-09` AC-3, `US-07-09` AC-17): the
- * audit event is the point where the reminder to the person who confirms and the alert to the IT Admin are taken from. The mark and
- * the event are written together, so a duty is told once however many instances run the sweep.
+ * reminder to the person who confirms and the alert to the IT Admin in charge go to their inbox with the audit event (`US-12-15`
+ * line 12). The mark, the event and the notices are written together, so a duty is told once for a deadline however many instances
+ * run the sweep; a deadline that moves is told again when it passes, and a duty confirmed or cancelled is never told.
  */
 @Injectable()
 export class HandoverOverdueService {
@@ -19,6 +21,7 @@ export class HandoverOverdueService {
     private readonly repo: HandoverRepo,
     private readonly facts: HandoverCaseFacts,
     private readonly audit: AuditApi,
+    private readonly alerts: HandoverAlertService,
   ) {}
 
   /** Returns how many duties were told in this pass. */
@@ -45,6 +48,7 @@ export class HandoverOverdueService {
           },
           correlationId: duty.id,
         });
+        await this.alerts.tell(tx, 'OVERDUE', duty, now);
 
         return true;
       });

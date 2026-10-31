@@ -159,6 +159,20 @@ export const ROUTE_ERROR_CODES_CATALOG: Readonly<Record<string, Partial<Record<R
         'PLAN.WORKSPACE_TEXT_INVALID',
       ],
     },
+    requestableApplicationGet: {
+      '404': ['REQUESTABLE_SOFTWARE.APPLICATION_NOT_FOUND'],
+      '409': ['REQUESTABLE_SOFTWARE.NO_DEPARTMENT'],
+    },
+    requestableApplicationList: {
+      '409': ['REQUESTABLE_SOFTWARE.NO_DEPARTMENT'],
+    },
+    requestablePlanGet: {
+      '404': ['REQUESTABLE_SOFTWARE.PLAN_NOT_FOUND'],
+      '409': ['REQUESTABLE_SOFTWARE.NO_DEPARTMENT'],
+    },
+    requestablePlanList: {
+      '409': ['REQUESTABLE_SOFTWARE.NO_DEPARTMENT'],
+    },
     subscriptionComplete: {
       '404': ['SUBSCRIPTION.NOT_FOUND'],
       '409': ['REPORTING_CURRENCY_NOT_SUPPORTED'],

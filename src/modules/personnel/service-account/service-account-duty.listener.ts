@@ -15,7 +15,8 @@ const ACCOUNTS_NAMED = 50;
  * the accounts and the day. By its rules it never holds the record back (`QĐ-75e`, `QĐ-66i`): a person with no service account gets no
  * event, and a cancelled file stops the reminder by itself, because the list of duties reads only files that wait. (A failure of the
  * hook itself, a bug or a statement the database refuses, is not a rule: it rolls the record back like any failure inside the
- * transaction.) The event is the point the notification channel takes the reminder from (`g4-notification-delivery`).
+ * transaction.) The event goes with a notice in the inbox of the IT Admin in charge of the departments that own the accounts, once
+ * for the file and the day (`a03-license-inbox-alerts`).
  */
 @Injectable()
 export class ServiceAccountDutyHook implements OnModuleInit {
@@ -60,5 +61,11 @@ export class ServiceAccountDutyHook implements OnModuleInit {
         },
       ),
     );
+    // The reminder reaches the inbox of the IT Admin in charge of the departments that own the accounts (`US-12-15` line 13).
+    await this.licensingServiceAccounts.remindServiceAccountDuties(tx, {
+      organizationId: organization.id,
+      file: { employeeId: event.employeeId, fileKind: event.fileKind, fileId: event.fileId, dueOn: event.dueOn },
+      duties,
+    });
   }
 }

@@ -29,6 +29,18 @@ export class SubscriptionLookupService {
     );
   }
 
+  /**
+   * For each of these plans that the department can price, the billing cycle of the subscription `priceOfPlan` would use, in
+   * one read: what tells whether a price exists for a plan without reading or showing the price itself.
+   */
+  pricedCyclesOfPlans(
+    planIds: readonly string[],
+    ownerDepartmentId: string,
+    tx?: DbTx,
+  ): Promise<ReadonlyMap<string, 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER'>> {
+    return this.subscriptions.findPricedCyclesOfPlans(planIds, ownerDepartmentId, tx);
+  }
+
   /** The ids of every subscription and purchase a department owns, by id (what a rule about the department's work reads). */
   idsOwnedBy(departmentId: string, tx?: DbTx): Promise<string[]> {
     return this.subscriptions.idsOwnedBy(departmentId, tx);

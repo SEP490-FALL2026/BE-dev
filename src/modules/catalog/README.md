@@ -16,6 +16,9 @@ personnel, onboarding, data-import (chỉ type); gốc `src/app/app.module.ts` v
   - `getSubscriptionIdsOwnedBy`, `getApplicationsOwnedBy`, `getWorkspaceDutiesOf` — thứ một phòng ban/người đang giữ.
   - `registerInternalSoftware` — đăng ký phần mềm nội bộ trong transaction của bên gọi (US-05-20).
   - `getVendorName`, `getOnboardingFacts` — tên vendor; số ứng dụng/plan/subscription cho checklist onboarding.
+- `SubscriptionPeriodApi` ([public/subscription-period.api.ts](public/subscription-period.api.ts)) — kỳ subscription cho gia hạn
+  (licensing): `getPeriods`, `lockPeriod`, `listRenewalSubjects`, `recordNextPeriod` (kỳ mới nối chuỗi `renewed_from_id`, một
+  lần), `getRenewalAlertRecipient`; lỗi `public/subscription-period.errors.ts`, kiểu `public/subscription-period.types.ts`.
 - `SubscriptionOwnerAssignmentApi` (`public/subscription-owner-assignment.api.ts`) — `assign`: gán phòng ban sở hữu cho
   một subscription (`pnpm ops:assign-subscription-owner`).
 - `public/subscription-owner-assignment.errors.ts` — `AssignmentRefusedError`;
@@ -41,8 +44,8 @@ personnel, onboarding, data-import (chỉ type); gốc `src/app/app.module.ts` v
 ## Hướng phụ thuộc giữa capability (R6)
 
 Không vòng (`pnpm arch:capabilities --module catalog`, gate `capability-graph`). Từ thấp lên cao: `vendor-dictionary` →
-`vendor`, `functional-group` → `catalog-entry` → `plan` → `subscription` → `plan-terms`; `application-retirement` và
-`internal-software-registration` đứng trên `catalog-entry`, `plan` (và `subscription`). Một cạnh ngược mới là vòng: chuyển
+`vendor`, `functional-group` → `catalog-entry` → `plan` → `subscription` → `plan-terms`; `application-retirement`,
+`internal-software-registration` và `requestable-software` đứng trên `catalog-entry`, `plan` (và `subscription`). Một cạnh ngược mới là vòng: chuyển
 file thuần xuống tầng thấp, hoặc đưa dịch vụ điều phối lên capability mới theo tên use case.
 
 ## Capability → file chính
@@ -60,6 +63,11 @@ file thuần xuống tầng thấp, hoặc đưa dịch vụ điều phối lên
   plan và subscription nên đứng trên cả ba; controller, dto, policy, repo, `ApplicationRetirementService`.
 - `internal-software-registration/` — đăng ký phần mềm nội bộ: tạo ứng dụng và plan trong một transaction; đứng trên
   `catalog-entry/` và `plan/`; `InternalSoftwareRegistrationService` (facade `CatalogApi` gọi).
+- `requestable-software/` — danh mục cho người gửi Request chọn phần mềm/gói trước khi xem trước (`US-05-01` main flow,
+  `a01-employee-catalog-selector`): `GET /requestable-applications[/{id}]`, `GET /requestable-plans[/{id}]`, mọi người đăng
+  nhập; projection riêng, không dùng DTO quản trị. Ẩn ứng dụng retired/không có gói/loại ngoài baseline; mỗi dòng nêu
+  `canSubmit` (cổng Cost Center như preview) và trạng thái giá (`SubscriptionLookupService.pricedCyclesOfPlans`, không lộ số
+  tiền). `RequestableSoftwareService`, `requestable-software.policy.ts`, repo chỉ `select` trường được phép.
 - `functional-group/` — nhóm chức năng (BR-06.9); `functional-groups.controller.ts`; `FunctionalGroupService`.
 - `plan/` — plan của ứng dụng, workspace profile K2 (US-04-02); `plans.controller.ts`; `PlanService`,
   `PlanWorkspaceService`.
@@ -77,6 +85,8 @@ file thuần xuống tầng thấp, hoặc đưa dịch vụ điều phối lên
 ## Bất biến quan trọng
 
 - Không route nào xóa vendor, nhóm chức năng, plan, subscription hay hợp đồng (JSDoc các controller).
+- Chuỗi kỳ: `subscriptions.renewed_from_id` đặt một lần lúc tạo, cùng plan/phòng sở hữu, kỳ TERM, bắt đầu sau kỳ cũ (trigger
+  `subscriptions_renewal_chain`); một kỳ có tối đa một kỳ nối tiếp (unique).
 - Số lượng subscription không thấp hơn số ghế đang chiếm (`assertQuantityNotBelowOccupied`, `seat-guard.policy.ts`);
   retire ứng dụng chỉ khi Business Owner đã xác nhận và không còn assignment/subscription chặn
   (`application-retirement/application-retirement.service.ts`). Cả hai đọc ghế qua `SeatOccupancyHook`.

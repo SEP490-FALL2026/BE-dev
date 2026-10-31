@@ -35,7 +35,9 @@ audit, notifications. Được dùng bởi: requests; gốc `src/app/app.module.
   `spend/commitment-release.listener.ts`. Chưa bind thì nhả phần dư thất bại thay vì cho qua.
 - Đăng ký vào: `organization.change-listeners` (`budgets.head-change`) —
   `proposal/budget-head-change.listener.ts`; `organization.cost-center-use-readers` (`budgets.commitments`) —
-  `commitment/budget-cost-center-use.listener.ts`.
+  `commitment/budget-cost-center-use.listener.ts`; `operating-parameters.lock-readers` (`budgets.fiscal-year-start`) —
+  `version/fiscal-year-start-lock.listener.ts` (có phiên bản nào thì khóa tháng bắt đầu năm tài chính, US-01-04 AC-8;
+  `VersionCreationService` đọc tháng qua `OperatingParametersApi.holdValue` trong transaction tạo phiên bản).
 
 ## Capability → file chính
 

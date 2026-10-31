@@ -2,7 +2,8 @@ import type { BusinessDate } from '../../../core/business-date';
 import type { SeatTarget } from '../../catalog/public/catalog.types';
 
 export type AssignmentKind = 'PERSONAL' | 'SERVICE';
-export type AssignmentSource = 'BASELINE' | 'HANDOVER' | 'REQUEST';
+/** Where a seat came from; `RENEWAL_CARRY` is a seat carried to the period that renews its subscription (`QĐ-35c`). */
+export type AssignmentSource = 'BASELINE' | 'HANDOVER' | 'REQUEST' | 'RENEWAL_CARRY';
 export type AssignmentDateBasis = 'ACTUAL' | 'RECORDED';
 
 /** One seat held by one person on one subscription (or one internal plan) over `[effectiveFrom, validUntil)`. */

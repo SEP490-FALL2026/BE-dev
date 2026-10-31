@@ -173,8 +173,11 @@ describe('API inventory (e2e): openapi presentation and wire messages', () => {
     const WITHOUT_VALIDATION = [
       'approvalRoleList',
       'currencyList',
+      'employeeDashboardGet',
       'healthGetLiveness',
       'healthGetReadiness',
+      'itAdminDashboardGet',
+      'managerDashboardGet',
       'meDepartureNoticeGet',
       'meGet',
       'notificationMarkAllRead',
@@ -184,6 +187,7 @@ describe('API inventory (e2e): openapi presentation and wire messages', () => {
       'reportingCurrencyGet',
       'seatBaselineClose',
       'seatBaselineGet',
+      'superAdminDashboardGet',
       'superAdminWatchGet',
     ];
     const NEW_422 = [
@@ -247,7 +251,7 @@ describe('API inventory (e2e): openapi presentation and wire messages', () => {
         })
         .map((operation) => operation.key);
 
-      expect(operations).toHaveLength(287);
+      expect(operations).toHaveLength(306);
       expect(missing).toEqual([]);
     });
 

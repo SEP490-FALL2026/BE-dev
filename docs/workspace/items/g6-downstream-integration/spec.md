@@ -13,14 +13,14 @@ Hoàn tất các vế AC của nhóm điều chuyển, nghỉ việc, quyền c�
 
 ## Sizing decision
 
-- Container: G6 (nhóm giao việc, không phải ranh giới hạng mục).
+- Container: G6 và G8 (nhóm giao việc, không phải ranh giới hạng mục; G8 thêm ngày 31/10/2026 để giữ `US-12-15` AC-3, AC-4).
 - Mode: `split-story`.
 - Outcome and owner: giữ chỗ cho các vế AC của G6 chờ dữ liệu hay luồng ngoài nhóm; capability `personnel` và `licensing` (khi mở khóa).
 - Boundaries: hạng mục khung, không có code. Mở khóa khi rule `G1`→`G4` và `US-10-01` (G7), `US-12-13` và ghi nhận tiết kiệm (G8), hộp thông báo `US-05-15` có nguồn.
 - Not larger: không thêm AC mới; chỉ giữ chỗ cho vế AC đã ánh xạ ở scope map.
 - Not smaller: mỗi Story chỉ còn một vài vế chờ cùng một vài blocker ngoài nhóm; khung riêng cho từng Story chỉ lặp blocker.
 - Siblings: `g6-transfer-record`, `g6-long-leave`, `g6-offboarding-record`, `g6-revocation-by-grant-kind`, `g6-handover-confirmation`, `g6-transfer-tool-review`, `g6-time-limited-access`, `g3-downstream-finance-integration`, `g4-device-dependent-features`, `g4-notification-delivery`.
-- Scope map: [G6](../../../roadmap.md#work-item-decomposition-g6).
+- Scope map: [G6](../../../roadmap.md#work-item-decomposition-g6), [G8](../../../roadmap.md#work-item-decomposition-g8).
 
 ## Size exception
 
@@ -34,10 +34,10 @@ Hoàn tất các vế AC của nhóm điều chuyển, nghỉ việc, quyền c�
 
 | Story    | AC                         | Coverage | Phần còn lại thuộc                                                                                                                                                                                                                                                                   |
 | -------- | -------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| US-12-15 | AC-3, AC-4                 | partial  | vế ghost seat đang chờ, sai lệch usage và máy công ty chưa xác nhận của hai trang tổng quan: chờ rule, nguồn usage và sổ thiết bị (`US-09-01`) G7 của Owner; vế vận hành: `a10-manager-dashboard`, `a10-it-admin-dashboard`                                                          |
 | US-03-01 | AC-1                       | partial  | AC-1 (vế điều chuyển và Cost Center suy ra), AC-2, AC-4→AC-8, AC-11, AC-13→AC-16, AC-18→AC-24: `g6-transfer-record`; AC-9: `g6-service-account-handover`; AC-12: `g3-downstream-finance-integration`                                                                                 |
 | US-03-03 | AC-1→AC-3                  | partial  | AC-4, AC-5, AC-7, AC-8: `g6-long-leave`; AC-6: `g6-offboarding-record`                                                                                                                                                                                                               |
 | US-03-04 | AC-3, AC-6, AC-16, AC-21   | partial  | vế danh sách quyền, thu hồi và hồ sơ của các AC này: `g6-offboarding-record`; AC-11, AC-13, AC-27, AC-28: `g6-leaver-role-and-workspace-duties`; AC-17: `g6-service-account-handover`; AC-24, AC-25: `g6-leaver-request-closure`; vế K4 của AC-16 chờ `g4-device-dependent-features` |
-| US-03-05 | AC-1                       | partial  | AC-1 (vế nhắc, audit, danh sách), AC-2, AC-6→AC-11: `g6-time-limited-access`; AC-3: `g3-downstream-finance-integration`; AC-5: `g5-return-and-renewal-requests`                                                                                                                      |
 | US-03-07 | AC-3                       | partial  | AC-1, AC-2, AC-3 (vế quyết định), AC-4→AC-9, AC-11→AC-15: `g6-transfer-tool-review`; AC-10: `g3-downstream-finance-integration`                                                                                                                                                      |
 | US-07-05 | AC-10, AC-12, AC-13, AC-15 | partial  | AC-1→AC-5, AC-8, AC-11, AC-12 (vế tác vụ và Assignment), AC-15 (vế quyền còn), AC-17→AC-19: `g6-revocation-by-grant-kind`; AC-13 (vế giữ gỡ), AC-16: `g6-handover-confirmation`; AC-9: `g6-transfer-tool-review`; AC-6, AC-7: `g4-device-dependent-features`                         |
 
@@ -71,7 +71,6 @@ Chưa thiết kế — khung giữ chỗ cho scope map; thiết kế khi blocker
 | US-03-03 AC-1→AC-3           | nghỉ dài loại khỏi đánh giá, tạm dừng, không tính khoảng nghỉ (chờ blocker)  | theo AC (HTTP + PostgreSQL) | theo AC trong nguồn; ma trận cụ thể viết khi `ready` | chưa chạy                |
 | US-03-04 AC-3, AC-21         | khuyến nghị `G2` khi nghỉ việc, không có `G2` cho K5 (chờ blocker)           | theo AC (HTTP + PostgreSQL) | theo AC trong nguồn; ma trận cụ thể viết khi `ready` | chưa chạy                |
 | US-03-04 AC-6, AC-16         | tiết kiệm ghi đúng loại; vế K4 (chờ blocker)                                 | theo AC (HTTP + PostgreSQL) | theo AC trong nguồn; ma trận cụ thể viết khi `ready` | chưa chạy                |
-| US-03-05 AC-1                | nhắc trong hộp thông báo trong ứng dụng (chờ blocker)                        | theo AC (HTTP + PostgreSQL) | theo AC trong nguồn; ma trận cụ thể viết khi `ready` | chưa chạy                |
 | US-03-07 AC-3                | chi phí Figma của người chuyển tính vào Cost Center phòng nhận (chờ blocker) | theo AC (HTTP + PostgreSQL) | theo AC trong nguồn; ma trận cụ thể viết khi `ready` | chưa chạy                |
 | US-07-05 AC-10               | ghost seat chỉ thu hồi sau quyết định (chờ blocker)                          | theo AC (HTTP + PostgreSQL) | theo AC trong nguồn; ma trận cụ thể viết khi `ready` | chưa chạy                |
 | US-07-05 AC-12, AC-13, AC-15 | `G2` hiện tới khi thu hồi xong, trong lúc giữ gỡ và khi lỗi (chờ blocker)    | theo AC (HTTP + PostgreSQL) | theo AC trong nguồn; ma trận cụ thể viết khi `ready` | chưa chạy                |
@@ -95,3 +94,7 @@ Ma trận trên là khung từ tiêu đề AC; tình huống cụ thể được
 24/10/2026: `g6-long-leave` đã xong (`verified` local): `PersonnelService.getLeaveIntervals(employeeIds, from, to)` (`personnel.service.ts`, đã trong `PUBLIC_CONTRACT_EXPORTS`) trả khoảng nghỉ dài theo lô, một câu lệnh: người nghỉ từ `startedOn` đến _trước_ `endedOn` (rỗng khi còn nghỉ); sự kiện audit `LONG_LEAVE.RETURN_OVERDUE` là điểm gọi nhắc IT Admin; `employees.work_state = ON_LONG_LEAVE` là cờ loại khỏi đánh giá. Chi tiết ở [spec](../g6-long-leave/spec.md#như-đã-xây-và-khác-biệt).
 
 25/10/2026: `g6-time-limited-access` đã xong (`verified` local): điểm gọi cho vế hộp thông báo của `US-03-05` AC-1 là audit `LICENSE_ASSIGNMENT.EXPIRY_REMINDER` (một sự kiện cho mỗi người nhận: người giữ quyền, trưởng phòng, IT Admin phụ trách; `after` có `audience`, `recipientEmployeeId`, `holderEmployeeId`, `planId`, `departmentId`, `expectedEndDate`, `options`), và `GET /assignment-expiry-reminders` đọc lại nhắc của chính người gọi. `GET /assignment-expiry-queue` trả `daysOverdue` và cờ `debt` cho bảng điều khiển G8. Chi tiết ở [spec](../g6-time-limited-access/spec.md#như-đã-xây-và-khác-biệt).
+
+31/10/2026: vế hộp thông báo của `US-03-05` AC-1 chuyển sang [a03-license-inbox-alerts](../a03-license-inbox-alerts/spec.md)
+(A-03, F58): nhắc T−7 nay tới hộp thông báo của người giữ quyền, trưởng phòng và IT Admin phụ trách; dòng Primary và dòng ma trận
+tương ứng bỏ khỏi hạng mục này.

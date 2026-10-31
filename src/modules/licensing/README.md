@@ -1,14 +1,18 @@
 # licensing
 
 Mục đích: quyền dùng phần mềm của người — assignment ghế, đóng seat baseline, hàng đợi provisioning (grant và thu
-hồi), bàn giao trước khi thu hồi, quyền hết hạn, kho license key và báo lỗi SaaS. Story chính: US-02-05, US-03-05,
-US-03-06, US-03-08, US-03-09, US-04-12, US-05-14, US-07-01, US-07-02, US-07-04, US-07-05, US-07-09 → US-07-11.
+hồi), bàn giao trước khi thu hồi, quyền hết hạn, kho license key, báo lỗi SaaS, danh sách quyền của chính Employee và
+gia hạn subscription (đề xuất, quyết định, kết quả, mốc cảnh báo, sự cố tự gia hạn). Story chính: US-02-05, US-03-05,
+US-03-06, US-03-08, US-03-09, US-04-12, US-05-14, US-07-01, US-07-02, US-07-04, US-07-05, US-07-09 → US-07-11,
+US-11-01 → US-11-05 (một phần, xem `docs/workspace/items/a06-*`); phần đọc "Phần mềm của tôi" của US-12-15 AC-2 và
+US-16-01 AC-1; số đếm cho trang tổng quan theo vai (US-12-15 AC-2, AC-3, AC-4).
 Tầng: T4 (`scripts/arch/tiers.cjs`). Phụ thuộc: catalog, organization, identity-access, operating-parameters, audit,
-notifications. Được dùng bởi: requests, personnel, data-import, onboarding; gốc `src/app/app.module.ts`.
+notifications, finance (đơn vị tiền của tiết kiệm gia hạn). Được dùng bởi: requests, personnel, data-import, onboarding,
+dashboards; gốc `src/app/app.module.ts`.
 
 ## Public API (`public/`)
 
-- Facade, mỗi facade ≤ 8 phụ thuộc, tên method không đổi; consumer inject facade sở hữu method (module export cả sáu):
+- Facade, mỗi facade ≤ 8 phụ thuộc, tên method không đổi; consumer inject facade sở hữu method (module export cả bảy):
   - `LicensingApi` ([public/licensing.api.ts](public/licensing.api.ts)) — thu hồi, task grant, ghế của người:
     - `openRevocation` — cửa duy nhất mở thu hồi một ghế cá nhân, cho mọi nguồn (trả ghế, nghỉ việc, hết hạn…).
     - `lockGrantOfRequest`, `completedGrantOfRequest`, `cancelGrantOfRequest` — task grant của một request;
@@ -23,19 +27,25 @@ notifications. Được dùng bởi: requests, personnel, data-import, onboardin
   - `LicensingOpenGrantsApi` ([public/licensing-open-grants.api.ts](public/licensing-open-grants.api.ts)) —
     `listOpenGrantTasksOfBeneficiary`.
   - `LicensingServiceAccountApi` ([public/licensing-service-account.api.ts](public/licensing-service-account.api.ts)) —
-    `listServiceAccountDuties`.
+    `listServiceAccountDuties`, `remindServiceAccountDuties` (nhắc IT Admin phụ trách phòng sở hữu vào hộp thông báo, gọi từ
+    hook hồ sơ của personnel).
+  - `LicensingDashboardApi` ([public/licensing-dashboard.api.ts](public/licensing-dashboard.api.ts)) — số đếm cho trang tổng
+    quan theo vai (dashboards): `employeeFacts`, `departmentFacts`, `itAdminFacts`; type ở `licensing-dashboard.types.ts`.
   - `LicensingSeatBaselineApi` ([public/licensing-seat-baseline.api.ts](public/licensing-seat-baseline.api.ts)) — seat
     baseline (data-import, onboarding): `seatTargetRef`, `resolveBaselineTarget`, `lockBaselineTarget`, `baselineFacts`,
     `createBaselineAssignments`, `getBaselineProgress`, `openSeatHolders`.
 - `public/licensing.types.ts` — input/output của facade; `public/licensing-*.types.ts` — type theo nhóm việc.
 - `public/licensing.errors.ts` — lỗi nghiệp vụ (`SeatBaselineClosedError`, `RevocationRefusedError`, `Provisioning*`…).
-- `public/licensing.extension-points.ts` — năm point dưới đây, contract và union sự kiện `RevocationEvent`.
+- `public/licensing.extension-points.ts` — bảy point dưới đây, contract và union sự kiện `RevocationEvent`.
+- `public/licensing-subscription-renewal.types.ts` — contract của hai point gia hạn: `RenewalFinancialReader`
+  (snapshot tiền của người quyết) và `RenewalUsageReader` (bằng chứng sử dụng từng ghế).
 
 ## Bảng sở hữu
 
 - `license_assignments`, `seat_baseline_states`, `provisioning_tasks`, `provisioning_task_reasons`, `handover_duties`,
   `service_account_duty_notices`, `assignment_expiry_reminders`, `license_keys`, `license_key_reveal_windows`,
-  `saas_issues`, `saas_issue_entries`, `saas_issue_counters` (`prisma/models/licensing.prisma`).
+  `saas_issues`, `saas_issue_entries`, `saas_issue_counters`, `subscription_renewals`,
+  `subscription_renewal_released_seats`, `subscription_deadline_events` (`prisma/models/licensing.prisma`).
 
 ## Extension point
 
@@ -48,6 +58,10 @@ notifications. Được dùng bởi: requests, personnel, data-import, onboardin
   `service-account/personnel-file-deadlines.listener.ts`.
 - Mở `SeatBaselineClosedListeners` (`licensing.seat-baseline-closed`, Listeners) — personnel
   `transfer-review/post-setup-review.listener.ts`.
+- Mở `RenewalFinancialContributions` (`licensing.renewal-financial-snapshot`, Contributions) — chưa có bên thêm: module
+  sở hữu ngân sách/chi phí (requests/budgets) thêm reader; chưa có thì snapshot đóng băng ghi `NOT_CONNECTED`, không 0.
+- Mở `RenewalUsageContributions` (`licensing.renewal-usage-evidence`, Contributions) — chưa có bên thêm: chủ evidence
+  usage (G7) thêm reader; chưa có thì gia hạn nói `usage NOT_AVAILABLE` và xếp ghế không dùng dữ liệu sử dụng.
 - Đăng ký vào: `catalog.seat-occupancy` — `assignment/assignment-seat-occupancy.listener.ts`;
   `organization.department-service-account-reader` — `assignment/assignment-service-account.listener.ts`;
   `organization.department-use-readers` — `provisioning/department-use/department-open-work.listener.ts`.
@@ -55,7 +69,10 @@ notifications. Được dùng bởi: requests, personnel, data-import, onboardin
 ## Hướng phụ thuộc giữa capability (R6)
 
 Không vòng (`pnpm arch:capabilities --module licensing`, gate `capability-graph`). Từ thấp lên cao: `assignment`,
-`license-key`, `saas-issue` → `provisioning`, `seat-baseline` → `department-tools`, `handover` → `expiry`. Cạnh ngược là vòng:
+`license-key`, `saas-issue`, `device-binding` → `provisioning`, `seat-baseline` → `department-tools`, `handover` → `expiry` →
+`my-software`, `subscription-renewal` (đọc ghế, mở thu hồi qua `RevocationService`, không capability nào import nó) →
+`dashboard-facts`. Cạnh
+ngược là vòng:
 dịch vụ nào đọc cả ghế lẫn thu hồi thì đứng trên cả hai (như `department-tools/`), không import ngược xuống.
 
 ## Capability → file chính
@@ -76,9 +93,29 @@ dịch vụ nào đọc cả ghế lẫn thu hồi thì đứng trên cả hai (
   `HandoverService`, `HandoverConfirmationService`; `handover-duty.job.ts` nhắc quá hạn mỗi giờ.
 - `expiry/` — quyền đã hết hạn, nhắc trước 7 ngày (US-03-05); `expiry.controller.ts`; `expiry-reminder.job.ts`.
 - `license-key/` — kho key của mua đứt K4 (US-04-12); `license-keys.controller.ts`; `LicenseKeyService`.
+- `my-software/` — "Phần mềm của tôi" (US-12-15 AC-2, US-16-01 AC-1): `my-software.controller.ts`
+  (`GET /me/software-rights`, chỉ vai `EMPLOYEE`, chỉ quyền cá nhân của chính người gọi), `MySoftwareService`, `MySoftwareRepo`;
+  trạng thái theo ngày nghiệp vụ ở `my-software.policy.ts`. Không đọc khóa K4, giá, Cost Center hay định danh tài khoản.
+- `device-binding/` — contract sổ thiết bị G7 cho K4 (`DeviceRegistryPort`) và luật thuần gán/gỡ/giới hạn khóa theo thiết
+  bị; **chưa dùng ở đâu, chưa bind**: sổ thiết bị của Owner chưa có, chỉ có contract test với mock
+  (`device-binding.policy.spec.ts`, stand-in `test/support/device-registry-contract-double.ts`). Không import capability nào.
+- `dashboard-facts/` — số đếm mà trang tổng quan theo vai đọc (US-12-15 AC-2, AC-3, AC-4), mỗi số bằng tổng của danh sách
+  hiện có cùng phạm vi: quyền và quyền sắp hết của Employee (dùng luật của `my-software.policy.ts`), báo lỗi SaaS, ghế phòng ban
+  (qua `AssignmentDepartmentRepo`), task cấp/thu hồi và báo lỗi IT Admin phụ trách, key trong kho. `DashboardFactsService`,
+  `DashboardFactsRepo`; chỉ trả số, không dòng, giá, key hay định danh.
 - `saas-issue/` — báo lỗi quyền SaaS (BM-11, US-07-10, US-07-11); `saas-issues.controller.ts`; `SaasIssueService`,
   `SaasIssueHandlingService`; `saas-issue.job.ts`.
-- Gốc module (dùng chung nhiều capability): `licensing-audit-event.mapper.ts`, `licensing.http-errors.ts`.
+- `subscription-renewal/` — gia hạn subscription theo kỳ (EP-11): `subscription-renewals.controller.ts`
+  (`/subscription-renewals*`, `/subscription-deadline-events`); nhóm `proposal/` (IT Admin đề xuất), `decision/` (Người duyệt chi
+  quyết, mở thu hồi phần vượt/hủy), `outcome/` (IT Admin ghi kết quả, kỳ mới nối chuỗi qua `SubscriptionPeriodApi`, chuyển ghế
+  `RENEWAL_CARRY`, tiết kiệm `QĐ-66w`), `alerts/` (mốc T−15/T−7, chất lượng dữ liệu), `deadline/` (cờ thực hiện trễ, sự cố tự gia
+  hạn/đánh dấu hết hạn); `subscription-renewal.job.ts` chạy mỗi giờ qua `SubscriptionRenewalSweepService`; xếp ghế ở
+  `subscription-renewal-ranking.policy.ts`. Quyết định không tạo khoản cam kết ngân sách (`QĐ-62s`).
+- Gốc module (dùng chung nhiều capability): `licensing-audit-event.mapper.ts`, `licensing.http-errors.ts`;
+  `licensing-alerts.policy.ts` + `licensing-alerts.service.ts` (`LicensingAlerts`) — cảnh báo license `FR-5.14` vào hộp thông báo
+  (dòng 3 T−7 ở `expiry/`, dòng 12 bàn giao ở `handover/handover-alert.service.ts`, dòng 13 tài khoản dịch vụ ở
+  `assignment/service-account-duty/`, dòng 38 `K1` của người nghỉ ở `provisioning/revocation-completion/`; hạng mục
+  `a03-license-inbox-alerts`).
 
 ## Bất biến quan trọng
 
@@ -92,6 +129,9 @@ dịch vụ nào đọc cả ghế lẫn thu hồi thì đứng trên cả hai (
   baseline là vĩnh viễn (không route mở lại); sau đó assignment chỉ đến từ request.
 - `RevocationListeners` chạy theo thứ tự thêm (handover của licensing trước return của requests), dừng ở listener đầu
   tiên ném lỗi; thứ tự được ghim trong `provisioning-revocation-read-contracts.integration-spec.ts`.
+- Gia hạn: một case mỗi kỳ subscription; đề xuất, quyết định, kết quả mỗi phần ghi một lần rồi đóng băng (trigger
+  `subscription_renewals_guard`); kỳ mới nối chuỗi tối đa một (`subscriptions_renewed_from_id_key`); ghế chỉ chuyển khi số
+  ghế giữ ở ngày đầu kỳ mới ≤ số mua; khóa: case → subscription cũ `FOR UPDATE` → ghế. Không bao giờ tạo commitment.
 - License key mã hóa AES-256-GCM, id hàng và key id là dữ liệu xác thực (`license-key-cipher.service.ts`); chỉ IT
   Admin, không route xóa hay xuất key.
 

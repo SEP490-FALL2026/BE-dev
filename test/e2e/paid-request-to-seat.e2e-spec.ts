@@ -1,3 +1,4 @@
+import request from 'supertest';
 import type { TaskWire } from '../support/provisioning-harness';
 import type { AccessRequestWire } from '../support/request-harness';
 import type { Unit } from '../support/spend-harness';
@@ -7,7 +8,7 @@ const h = new StatusHarness();
 const M = 1_000_000;
 
 /**
- * E2E smoke of D-1: an employee asks for a paid plan of the catalog, the head approves the need and sends it on as spend, the
+ * E2E smoke of D-1: an employee finds a paid plan in the catalog of software they may request, previews it and asks for it, the head approves the need and sends it on as spend, the
  * spending approver approves the batch, the IT Admin grants the seat, and the worker's pass tells the employee. Real HTTP and
  * PostgreSQL; the worker's projection is run once by hand.
  */
@@ -34,6 +35,23 @@ describe('a paid request from the employee to the seat (e2e, D-1)', () => {
 
   afterAll(async () => {
     await h.stop();
+  });
+
+  it('the employee finds the plan in the catalog of software they may request, and previews it', async () => {
+    const as = h.as(unit.member.account);
+    const plans = h.dataOf<{ items: { id: string; price: { status: string }; canSubmit: boolean }[] }>(
+      await request(h.server()).get('/api/v1/requestable-plans?pageSize=100').set(as).expect(200),
+    ).items;
+    const picked = plans.find((plan) => plan.id === planId);
+    expect(picked).toMatchObject({ price: { status: 'PRICED' }, canSubmit: true });
+    const detail = h.dataOf<{ id: string; application: { id: string } }>(
+      await request(h.server()).get(`/api/v1/requestable-plans/${planId}`).set(as).expect(200),
+    );
+    await request(h.server()).get(`/api/v1/requestable-applications/${detail.application.id}`).set(as).expect(200);
+
+    const preview = await h.previewed(unit.member, detail.id, { termMonths: 1 });
+
+    expect(preview).toMatchObject({ branch: 'PAID_IN_CATALOG', canSubmit: true, pricing: { status: 'PRICED' } });
   });
 
   it('the employee sends the request, priced by the subscription of the department, and the head holds the need step', async () => {

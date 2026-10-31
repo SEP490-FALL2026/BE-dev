@@ -30,11 +30,10 @@ và việc đang mở (rà soát sau điều chuyển, khuyến nghị, xác nh�
 
 | Story    | AC          | Coverage | Phần còn lại thuộc                                                                                                                                      |
 | -------- | ----------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| US-01-04 | AC-8, AC-15 | partial  | AC-7, AC-14 và vế không có loại kỳ của AC-8: `g2-fiscal-year-operating-parameters`; AC-1→AC-6, AC-9→AC-13: `g2-operating-parameters` (giao trước GOV.1) |
+| US-01-04 | AC-15       | partial  | AC-7, AC-14: `g2-fiscal-year-operating-parameters`; AC-8: `b01-fiscal-year-start-lock` (vế khóa) và `g2-fiscal-year-operating-parameters` (vế không có loại kỳ); AC-1→AC-6, AC-9→AC-13: `g2-operating-parameters` (giao trước GOV.1) |
 | US-03-06 | AC-19       | partial  | AC-2 và vế tài khoản dịch vụ của AC-19: `g2-g4-unit-only-cost-attribution`; AC còn lại: `g2-department-profile` (giao trước GOV.1)                      |
 
-Vế giữ ở khung: `US-01-04` AC-8 — từ chối đổi tháng bắt đầu năm tài chính khi đã có phiên bản ngân sách (phải có
-**trước** khi G5 cho tạo phiên bản đầu tiên); AC-15 — thời hạn chờ trình được dùng để nhắc (`US-05-09` AC-11) và hai
+Vế giữ ở khung: `US-01-04` AC-15 (vế khóa của AC-8 đã chuyển sang `b01-fiscal-year-start-lock`) — thời hạn chờ trình được dùng để nhắc (`US-05-09` AC-11) và hai
 tham số phiếu báo lỗi (`US-07-10`, `US-07-11`; giá trị mặc định chốt ở thiết kế kỹ thuật); `US-03-06` AC-19 — nhóm _việc
 đang mở_ (rà soát, khuyến nghị, xác nhận) khi ngừng phòng.
 
@@ -63,7 +62,7 @@ Chưa thiết kế — khung giữ chỗ cho scope map; thiết kế khi blocker
 
 | AC / rủi ro      | Tình huống (gồm từ chối, edge case)                                 | Cấp test                    | Kết quả mong đợi                                     | Bằng chứng sau implement |
 | ---------------- | ------------------------------------------------------------------- | --------------------------- | ---------------------------------------------------- | ------------------------ |
-| `US-01-04` AC-8  | đổi tháng bắt đầu khi đã có phiên bản ngân sách (chờ blocker)       | theo AC (HTTP + PostgreSQL) | theo AC trong nguồn; ma trận cụ thể viết khi `ready` | chưa chạy                |
+| `US-01-04` AC-8  | (đã chuyển) đổi tháng bắt đầu khi đã có phiên bản ngân sách thuộc `b01-fiscal-year-start-lock` | — | — | — |
 | `US-01-04` AC-15 | thời hạn chờ trình và tham số phiếu báo lỗi được dùng (chờ blocker) | theo AC (HTTP + PostgreSQL) | theo AC trong nguồn; ma trận cụ thể viết khi `ready` | chưa chạy                |
 | `US-03-06` AC-19 | ngừng phòng còn việc đang mở (chờ blocker)                          | theo AC (HTTP + PostgreSQL) | theo AC trong nguồn; ma trận cụ thể viết khi `ready` | chưa chạy                |
 

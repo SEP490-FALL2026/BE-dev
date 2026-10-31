@@ -209,6 +209,11 @@ export class VersionRepo {
     return rows.map((row) => row.id);
   }
 
+  /** Whether any version of any Cost Center and year exists, in whatever state: what locks the month the fiscal year begins. */
+  async anyExists(tx: DbTx): Promise<boolean> {
+    return (await tx.budgetVersion.findFirst({ select: { id: true } })) !== null;
+  }
+
   /** The current version of the Cost Center and year, if any: at most one (INV-21). */
   async current(costCenterId: string, year: number, tx?: DbTx): Promise<VersionRecord | null> {
     const row = await (tx ?? this.prisma).budgetVersion.findFirst({ where: { costCenterId, year, state: 'APPROVED' } });

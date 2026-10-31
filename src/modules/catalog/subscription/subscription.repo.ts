@@ -28,6 +28,23 @@ const WITH_PLAN = {
 } as const;
 type Row = Prisma.SubscriptionGetPayload<{ include: typeof WITH_PLAN }>;
 
+/**
+ * The subscriptions a department can price a plan by: active, owned by that department, with a unit price, a currency and a
+ * billing cycle. A draft has no price to rely on, and the price of another department's subscription is never used.
+ */
+const pricedOf = (ownerDepartmentId: string): Prisma.SubscriptionWhereInput => ({
+  ownerDepartmentId,
+  status: 'ACTIVE',
+  unitPriceMinor: { not: null },
+  unitPriceCurrency: { not: null },
+  billingCycle: { not: null },
+});
+/** Of those, the one that prices a plan: the later start first (no start last), then the id. */
+const PRICED_FIRST: Prisma.SubscriptionOrderByWithRelationInput[] = [
+  { startDate: { sort: 'desc', nulls: 'last' } },
+  { id: 'asc' },
+];
+
 const date = (value: Date | null) => (value ? fromDateColumn(value) : null);
 const column = (value: string | null) => (value ? toDateColumn(value) : null);
 
@@ -81,6 +98,7 @@ function toRecord(row: Row): SubscriptionRecord {
     noticePeriodDays: row.noticePeriodDays,
     autoRenew: row.autoRenew,
     allowsMidTermReduction: row.allowsMidTermReduction,
+    renewedFromId: row.renewedFromId,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -117,13 +135,43 @@ export class SubscriptionRepo {
   constructor(private readonly prisma: PrismaService) {}
 
   async insert(tx: DbTx, input: NewSubscription): Promise<SubscriptionRecord> {
-    const { organizationId, planId, ownerDepartmentId, kind, ...state } = input;
+    const { organizationId, planId, ownerDepartmentId, kind, renewedFromId, ...state } = input;
     const row = await tx.subscription.create({
-      data: { organizationId, planId, ownerDepartmentId, kind, ...columnsOf(state) },
+      data: {
+        organizationId,
+        planId,
+        ownerDepartmentId,
+        kind,
+        renewedFromId: renewedFromId ?? null,
+        ...columnsOf(state),
+      },
       include: WITH_PLAN,
     });
 
     return toRecord(row);
+  }
+
+  /** The period that continues each of these, by the id of the one it continues; a period not renewed is absent. */
+  async successorsOf(ids: readonly string[], tx?: DbTx): Promise<Map<string, string>> {
+    if (ids.length === 0) return new Map();
+    const rows = await (tx ?? this.prisma).subscription.findMany({
+      where: { renewedFromId: { in: [...ids] } },
+      select: { id: true, renewedFromId: true },
+    });
+
+    return new Map(rows.flatMap((row) => (row.renewedFromId ? [[row.renewedFromId, row.id] as const] : [])));
+  }
+
+  /** The subscriptions with these ids, in one read; an id that does not exist is absent. */
+  async findMany(ids: readonly string[], tx?: DbTx): Promise<SubscriptionRecord[]> {
+    if (ids.length === 0) return [];
+    const rows = await (tx ?? this.prisma).subscription.findMany({
+      where: { id: { in: [...ids] } },
+      include: WITH_PLAN,
+      orderBy: { id: 'asc' },
+    });
+
+    return rows.map(toRecord);
   }
 
   async count(): Promise<number> {
@@ -173,20 +221,36 @@ export class SubscriptionRepo {
     billingCycle: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER';
   } | null> {
     const row = await (tx ?? this.prisma).subscription.findFirst({
-      where: {
-        planId,
-        ownerDepartmentId,
-        status: 'ACTIVE',
-        unitPriceMinor: { not: null },
-        unitPriceCurrency: { not: null },
-        billingCycle: { not: null },
-      },
-      orderBy: [{ startDate: { sort: 'desc', nulls: 'last' } }, { id: 'asc' }],
+      where: { planId, ...pricedOf(ownerDepartmentId) },
+      orderBy: PRICED_FIRST,
       select: { unitPriceMinor: true, unitPriceCurrency: true, billingCycle: true },
     });
     if (!row || row.unitPriceMinor === null || row.unitPriceCurrency === null || row.billingCycle === null) return null;
 
     return { unitPriceMinor: row.unitPriceMinor, currency: row.unitPriceCurrency, billingCycle: row.billingCycle };
+  }
+
+  /**
+   * The billing cycle of the subscription `findPricedOfPlan` would price each of these plans by for the department, in one
+   * read for any number of plans (the same filter and order, the first row of each plan wins); a plan with none is absent.
+   */
+  async findPricedCyclesOfPlans(
+    planIds: readonly string[],
+    ownerDepartmentId: string,
+    tx?: DbTx,
+  ): Promise<Map<string, 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER'>> {
+    const cycles = new Map<string, 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER'>();
+    if (planIds.length === 0) return cycles;
+    const rows = await (tx ?? this.prisma).subscription.findMany({
+      where: { planId: { in: [...planIds] }, ...pricedOf(ownerDepartmentId) },
+      orderBy: [{ planId: 'asc' }, ...PRICED_FIRST],
+      select: { planId: true, billingCycle: true },
+    });
+    for (const row of rows) {
+      if (row.billingCycle !== null && !cycles.has(row.planId)) cycles.set(row.planId, row.billingCycle);
+    }
+
+    return cycles;
   }
 
   async find(id: string, tx?: DbTx): Promise<SubscriptionRecord | null> {
