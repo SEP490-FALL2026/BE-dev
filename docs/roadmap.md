@@ -1,5 +1,12 @@
 # Roadmap backend
 
+**Đối chiếu 31/10/2026:** [audit roadmap/API GAP và phân việc hai dev](reviews/roadmap-and-api-gaps-2026-10-31/README.md)
+trên BE `eb41f9c`, Docs `d6d868c`. Một số trạng thái/blocker phía dưới là lịch sử (G5/G6 đã có source, refactor đã commit);
+không dùng riêng nhãn `blocked`/`not-started` cũ để giao implement lại. Audit ghi rõ API đọc còn thiếu, G2 fiscal lock,
+phần deferred và hai backlog đề xuất; chưa chuyển các hạng mục sang `accepted` hay thay scope map bằng đề xuất.
+**Phân công cập nhật cùng ngày:** Owner giữ G7/Tools, bên AI giữ AI G10; A/B chia phần còn lại G0–G6, API GAP,
+G8/G9 và BE phục vụ Mobile G10 theo hai list trong audit. Gia hạn subscription giao A, tài chính/đối soát giao B.
+
 Theo dõi lát US/AC theo [quy trình](workspace/README.md). Trạng thái hạng mục nằm tại đây; checklist chi tiết nằm trong plan. Mẫu `catalog` cũ đã được G3 thay bằng ba ngữ cảnh `catalog`, `finance`, `licensing` ([ADR-0013](decisions/0013-catalog-finance-licensing-contexts.md), Proposed); code đã merge không phải bằng chứng hoàn thành US. Chưa có US nào `accepted`. Baseline nghiệp vụ hiện hành: Docs `72e1480` ([sources](workspace/sources.md)); tác động lên code đã có ở [business-baseline-impact-2026-10-22](workspace/items/business-baseline-impact-2026-10-22/spec.md).
 
 **Bản draft 12/10/2026** — lập từ US v0.15 và quyết định QĐ-01 → QĐ-66; cập nhật cùng ngày theo `QĐ-67` (khởi tạo cài đặt, Employee Finance qua import, nhập tay nhân viên, `OQ-A-03`) — [snapshot nguồn](workspace/sources.md) `S-2026-10-12b`. Thứ tự và nhóm là đề xuất, không phải lịch hay phê duyệt. Người phụ trách có thể tự thiết kế rồi code, hoặc nhận thiết kế ban đầu từ Owner/người khác; không phải chờ peer review để bắt đầu. Owner review cuối trước khi đưa revision lên `main`/production.
