@@ -2,8 +2,8 @@ import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import { normalizeEmail } from '../../../core/email';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { OrganizationApi } from '../../organization/public/organization.api';
-import { AccountDirectoryService } from '../accounts/account-directory.service';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import { AccountRecordService } from '../accounts/account-record.service';
 import { ActionLinkService } from '../accounts/action-link.service';
 import { CredentialService } from '../credentials/credential.service';
 import { RoleGrantService } from '../accounts/role-grant.service';
@@ -21,11 +21,11 @@ import { employeeHasNotLeft, isActionLinkRedeemable } from '../accounts/account.
 @Injectable()
 export class IdentityAccessApi {
   constructor(
-    private readonly accounts: AccountDirectoryService,
+    private readonly accounts: AccountRecordService,
     private readonly grants: RoleGrantService,
     private readonly links: ActionLinkService,
     private readonly credentials: CredentialService,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly approvalRoles: ApprovalRoleHoldersService,
   ) {}
 
@@ -72,7 +72,7 @@ export class IdentityAccessApi {
     if (link === null || !isActionLinkRedeemable(link, new Date())) return false;
 
     // Redeeming refuses an employee who has left, so a link to one is dead and must not be mailed.
-    return employeeHasNotLeft(await this.organization.getEmployee(link.appUser.employeeId));
+    return employeeHasNotLeft(await this.organizationReads.getEmployee(link.appUser.employeeId));
   }
 
   /**

@@ -5,6 +5,7 @@ import type { LicensingSeatBaselineApi } from '../../src/modules/licensing/publi
 import type { NotificationsApi } from '../../src/modules/notifications/public/notifications.api';
 import type { InAppNotificationInput } from '../../src/modules/notifications/public/notifications.types';
 import type { OrganizationApi } from '../../src/modules/organization/public/organization.api';
+import type { OrganizationReadApi } from '../../src/modules/organization/public/organization-read.api';
 import type { EmployeeImportLookupData } from '../../src/modules/organization/public/organization.types';
 import { EmployeeImportConfirmationService } from '../../src/modules/data-import/employee-import/confirmation/employee-import-confirmation.service';
 import type {
@@ -174,7 +175,7 @@ export function harness(start: Directory = directory()) {
       const all = (storedRows.get(id) ?? []).filter((row) => !filter.outcome || row.outcome === filter.outcome);
       return Promise.resolve({ items: clone(all.slice(filter.skip, filter.skip + filter.take)), total: all.length });
     },
-    replacePreview(tx: DbTx, id: string, input: { rows: StoredRow[]; summary: unknown; expiresAt: Date }) {
+    replacePreview(tx: DbTx, id: string, input: Parameters<EmployeeImportRepo['replacePreview']>[2]) {
       calls.push(`repo.replacePreview(${where(tx)})`);
       const record = imports.get(id) as ImportRecord;
       record.previewVersion += 1;
@@ -183,7 +184,7 @@ export function harness(start: Directory = directory()) {
       storedRows.set(id, clone(input.rows));
       return Promise.resolve(record.previewVersion);
     },
-    markCompleted(tx: DbTx, id: string, input: { result: unknown; confirmKey: string; now: Date }) {
+    markCompleted(tx: DbTx, id: string, input: Parameters<EmployeeImportRepo['markCompleted']>[2]) {
       calls.push(`repo.markCompleted(${where(tx)})`);
       const record = imports.get(id) as ImportRecord;
       Object.assign(record, {
@@ -220,7 +221,7 @@ export function harness(start: Directory = directory()) {
       calls.push('org.getOrganization');
       return Promise.resolve(organization);
     },
-    lookupForEmployeeImport(names: Parameters<OrganizationApi['lookupForEmployeeImport']>[0], tx?: DbTx) {
+    lookupForEmployeeImport(names: Parameters<OrganizationReadApi['lookupForEmployeeImport']>[0], tx?: DbTx) {
       calls.push(`org.lookupForEmployeeImport(${where(tx)})`);
       lookups.push(clone(names));
       const data: EmployeeImportLookupData = {
@@ -314,10 +315,10 @@ export function harness(start: Directory = directory()) {
     },
   };
 
-  const rowValidation = new EmployeeImportRowValidationService(org as unknown as OrganizationApi);
+  const rowValidation = new EmployeeImportRowValidationService(org as unknown as OrganizationReadApi);
   const preview = new EmployeeImportPreviewService(
     repo as unknown as EmployeeImportRepo,
-    org as unknown as OrganizationApi,
+    org as unknown as OrganizationReadApi,
     audit as unknown as AuditApi,
     runner as unknown as TransactionRunner,
     { openSeatHolders: () => Promise.resolve([]) } as unknown as LicensingSeatBaselineApi,
@@ -326,6 +327,7 @@ export function harness(start: Directory = directory()) {
   const confirmation = new EmployeeImportConfirmationService(
     repo as unknown as EmployeeImportRepo,
     org as unknown as OrganizationApi,
+    org as unknown as OrganizationReadApi,
     audit as unknown as AuditApi,
     runner as unknown as TransactionRunner,
     notifications as unknown as NotificationsApi,

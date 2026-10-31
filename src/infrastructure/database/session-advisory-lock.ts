@@ -41,14 +41,18 @@ export async function trySessionAdvisoryLock(
 
   let released = false;
   return {
-    // Never throws (A-04): when the connection already broke, the server dropped the session and the lock with it, and
-    // end() closes the session in any other case, so a failed unlock cannot leave the lock held. A throw here would
-    // replace the caller's own result (a whole report) with this error.
+    // Rejects when the unlock fails, which means the holding connection broke: the server dropped the session and the lock
+    // with it, and the caller must hear that exclusivity was lost. The connection is closed either way, so a failed unlock
+    // cannot leave the lock held. Keeping the caller's own result (a whole report) out of the way of that error is the
+    // caller's job, not this function's (`runDemoDataset`, phase `lock-release`).
     release: async () => {
       if (released) return;
       released = true;
-      await client.query('SELECT pg_advisory_unlock(hashtextextended($1, 0))', [name]).catch(() => undefined);
-      await client.end().catch(() => undefined);
+      try {
+        await client.query('SELECT pg_advisory_unlock(hashtextextended($1, 0))', [name]);
+      } finally {
+        await client.end().catch(() => undefined);
+      }
     },
   };
 }

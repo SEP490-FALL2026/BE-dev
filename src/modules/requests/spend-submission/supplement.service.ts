@@ -11,7 +11,7 @@ import { SpendSupplementRefusedError } from '../spend/spend.errors';
 import type { SupplementBodyDto, SupplementWire } from '../spend/spend-submission.dto';
 import { SpendHeadService } from './spend-head.service';
 import { SupplementPricing } from './supplement-pricing.service';
-import { SupplementReadService } from './supplement-read.service';
+import { SupplementQueryService } from './supplement-query.service';
 import { SupplementRecorder } from './supplement-recorder.service';
 
 /**
@@ -32,7 +32,7 @@ export class SupplementService {
     private readonly groups: GroupSupplementService,
     private readonly pricing: SupplementPricing,
     private readonly recorder: SupplementRecorder,
-    private readonly reads: SupplementReadService,
+    private readonly queries: SupplementQueryService,
   ) {}
 
   /**
@@ -70,6 +70,6 @@ export class SupplementService {
       return this.recorder.record(tx, actor, request, { reason: body.reason, repriced, change, dropped, now });
     });
 
-    return (await this.reads.wires(requestId, [record]))[0];
+    return (await this.queries.wires(requestId, [record]))[0];
   }
 }

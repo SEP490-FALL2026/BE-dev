@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { BudgetSupportService } from '../budget/budget-support.service';
+import { BudgetFactsService } from '../budget/budget-facts.service';
 import {
   chunkSnapshots,
   figureChange,
@@ -24,7 +24,7 @@ import type { VersionRecord } from '../budget/version.repo';
 export class VersionHistoryService {
   constructor(
     private readonly entries: VersionHistoryRepo,
-    private readonly support: BudgetSupportService,
+    private readonly facts: BudgetFactsService,
   ) {}
 
   /** The figures of the version were edited: `before` was read before the edit and `after` is what it wrote. */
@@ -108,7 +108,7 @@ export class VersionHistoryService {
   }
 
   private async money(currency: string): Promise<(minor: bigint) => string> {
-    const format = await this.support.formatter(currency);
+    const format = await this.facts.formatter(currency);
 
     return (minor) => format(minor).amount;
   }

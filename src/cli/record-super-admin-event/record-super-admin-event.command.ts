@@ -25,7 +25,7 @@ export const recordSuperAdminEventCommand = defineCommand({
   execute: ({ command }) =>
     runInNestContext({
       // The graph validates the whole environment.
-      graph: () => import('./record-super-admin-event-cli.module').then((m) => m.SuperAdminEventCliModule),
+      graph: () => import('./record-super-admin-event-cli.module').then((m) => m.RecordSuperAdminEventCliModule),
       work: async (app) => {
         const result = await app.get(SuperAdminEventApi).run(command);
 

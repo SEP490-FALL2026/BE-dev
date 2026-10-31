@@ -4,6 +4,7 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { OrganizationHistoryApi } from '../../organization/public/organization-history.api';
 import { EmployeeNotFoundError } from '../../organization/public/organization.errors';
 import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { EmployeeRecord, PlacementInForce } from '../../organization/public/organization.types';
 import type { PersonnelActor } from '../public/personnel.types';
 import { TransferChangeService } from '../transfer/transfer-change.service';
@@ -39,6 +40,7 @@ export interface DepartureHeld {
 export class OffboardingPreconditions {
   constructor(
     private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly history: OrganizationHistoryApi,
     private readonly guard: TransferGuardService,
     private readonly transfers: TransferChangeService,
@@ -64,7 +66,7 @@ export class OffboardingPreconditions {
    * office, and the transfer that waits. Refused at once for a person who is unknown, gone, already handing over, or given no last day.
    */
   private async readBeforeLocks(tx: DbTx, input: RecordOffboardingInput, today: BusinessDate): Promise<DepartureSeen> {
-    const person = await this.organization.getEmployee(input.employeeId, tx);
+    const person = await this.organizationReads.getEmployee(input.employeeId, tx);
     const refused = subjectRefusal(person, input.lastWorkingDay);
     if (refused) throw new OffboardingRefusedError(refused);
     const before = await this.history.getPlacementInForce(tx, input.employeeId, today);
@@ -83,7 +85,7 @@ export class OffboardingPreconditions {
 
   private async headsOnLastDay(employeeId: string, departmentId: string, endsOn: BusinessDate): Promise<boolean> {
     return (
-      (await this.organization.getHeadedDepartment(employeeId, addDays(endsOn, -1)))?.departmentId === departmentId
+      (await this.organizationReads.getHeadedDepartment(employeeId, addDays(endsOn, -1)))?.departmentId === departmentId
     );
   }
 
@@ -112,7 +114,7 @@ export class OffboardingPreconditions {
     seen: DepartureSeen,
     today: BusinessDate,
   ): Promise<DepartureHeld> {
-    const employee = await this.organization.getEmployee(input.employeeId, tx);
+    const employee = await this.organizationReads.getEmployee(input.employeeId, tx);
     const current = await this.history.getPlacementInForce(tx, input.employeeId, today);
     if (!employee || !placementHeld(current, seen.before.placementId)) {
       throw new OffboardingRefusedError('CONCURRENT_CHANGE');
@@ -158,7 +160,7 @@ export class OffboardingPreconditions {
   /** Takes the successor row `FOR SHARE`; one that does not exist is judged by the policy, not here. */
   private async lockSuccessor(tx: DbTx, employeeId: string): Promise<void> {
     try {
-      await this.organization.lockEmployeeForShare(tx, employeeId);
+      await this.organizationReads.lockEmployeeForShare(tx, employeeId);
     } catch (error) {
       if (!(error instanceof EmployeeNotFoundError)) throw error;
     }

@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { LicensingApi } from '../../licensing/public/licensing.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { PricingRecord } from '../access-request/access-request.types';
 import { RequestFactsService, type Assessment, type RequestSettings } from '../access-request/request-facts.service';
@@ -60,7 +60,7 @@ export interface GroupJudgement {
 @Injectable()
 export class GroupSubmissionFactsService {
   constructor(
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly licensing: LicensingApi,
     private readonly assessment: RequestFactsService,
     private readonly requests: AccessRequestRepo,
@@ -87,15 +87,15 @@ export class GroupSubmissionFactsService {
     const lines = input.lines.filter((line, index) => requested.indexOf(line.employeeId) === index);
     const ids = lines.map((line) => line.employeeId);
 
-    const people = await this.organization.getEmployees(ids, tx);
-    const units = await this.organization.getOwningUnits(ids, today, tx);
+    const people = await this.organizationReads.getEmployees(ids, tx);
+    const units = await this.organizationReads.getOwningUnits(ids, today, tx);
     const open = await this.requests.openRequestHolders(tx, input.planId, ids);
     const known = new Map(people.map((person) => [person.id, person]));
     const facts: LineFacts[] = [];
     for (const line of lines) {
       const person = known.get(line.employeeId);
       const own = units.get(line.employeeId);
-      if (input.lockPeople && person) await this.organization.lockEmployeeForShare(tx, line.employeeId);
+      if (input.lockPeople && person) await this.organizationReads.lockEmployeeForShare(tx, line.employeeId);
       facts.push({
         employeeId: line.employeeId,
         departmentId: person ? (own?.departmentId ?? null) : null,

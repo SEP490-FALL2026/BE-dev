@@ -53,15 +53,16 @@ Lệnh nằm ở `src/cli/<lệnh>/` (bảng lệnh: `src/cli/commands.ts`) và 
 
 - Gốc module — `installation.module.ts` (graph của bootstrap), `installation.dto.ts` (đọc input cài đặt),
   `installation.repo.ts` (advisory lock để hai lần cài chạy nối tiếp).
-- `dev-seed/` — `dev-seed.module.ts`, `dev-seed-plan.policy.ts`, `local-seed.policy.ts` (ba guard local),
+- `dev-seed/` — `dev-seed-cli.module.ts` (graph của `dev:seed`), `dev-seed-plan.policy.ts`, `local-seed.policy.ts` (ba guard local),
   `dev-seed.repo.ts`, `local-password.service.ts`.
-- `demo-dataset/` — `demo-dataset.module.ts` (graph của `ops:demo-dataset`: organization, identity-access facade và
+- `demo-dataset/` — `demo-dataset-cli.module.ts` (graph của `ops:demo-dataset`: organization, identity-access facade và
   local seed facade, audit, `RuntimeDatabaseRoleModule` — production chỉ chạy bằng runtime role; không guard local vì mọi
   dữ liệu nghiệp vụ đi qua API).
-- `inspect/` — `inspection.module.ts` (mọi session read-only), `inspection-facts.policy.ts`, `migration-state.repo.ts`.
-- `migration-preflight/` — `migration-preflight.module.ts` (read-only, không module nghiệp vụ),
+- `inspect/` — `inspection-cli.module.ts` (graph của `ops:inspect`, mọi session read-only), `inspection-facts.policy.ts`, `migration-state.repo.ts`.
+- `migration-preflight/` — `migration-preflight-cli.module.ts` (graph của `ops:preflight`, read-only, không module nghiệp vụ),
   `migration-preflight-judgement.policy.ts`, `migration-preflight.repo.ts`.
-- Mỗi lệnh có Nest module riêng; API và worker không import module nào ở đây.
+- Mỗi lệnh có Nest module riêng, tên `<lệnh>-cli.module.ts`; API và worker không import module nào ở đây. `installation.module.ts` giữ tên: nó là
+  module `installation` (tầng T6) và bootstrap là lệnh duy nhất dùng nó.
 
 ## Bất biến quan trọng
 

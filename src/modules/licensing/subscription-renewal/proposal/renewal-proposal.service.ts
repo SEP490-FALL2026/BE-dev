@@ -3,7 +3,7 @@ import { TransactionRunner } from '../../../../infrastructure/database/transacti
 import type { AuthenticatedPrincipal } from '../../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../../audit/public/audit.api';
 import { SubscriptionPeriodApi } from '../../../catalog/public/subscription-period.api';
-import { OrganizationApi } from '../../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../../organization/public/organization-read.api';
 import { licensingAuditEvent } from '../../licensing-audit-event.mapper';
 import { RenewalNotifier } from '../subscription-renewal-notifier.service';
 import { RenewalPartiesService } from '../subscription-renewal-parties.service';
@@ -35,7 +35,7 @@ export class RenewalProposalService {
     private readonly repo: SubscriptionRenewalRepo,
     private readonly periods: SubscriptionPeriodApi,
     private readonly parties: RenewalPartiesService,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly notifier: RenewalNotifier,
     private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
@@ -53,7 +53,7 @@ export class RenewalProposalService {
     if (!milestone) throw new RenewalError('CONTRACT_DATA_INCOMPLETE');
 
     return this.runner.run(async (tx) => {
-      const organization = await this.organization.getOrganization(tx);
+      const organization = await this.organizationReads.getOrganization(tx);
       if (!organization) throw new Error('A renewal was proposed before installation');
       const created = await this.repo.insert(tx, {
         organizationId: organization.id,

@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { Client } from 'pg';
 import request from 'supertest';
 import { TransactionRunner } from '../../../src/infrastructure/database/transaction-runner';
-import { VendorDirectoryService } from '../../../src/modules/catalog/vendor/vendor-directory.service';
+import { VendorRecordService } from '../../../src/modules/catalog/vendor/vendor-record.service';
 import { bodyOf } from '../../support/api-body';
 import { SeatHarness } from '../../support/seat-baseline-harness';
 import { waitForLockWaiters } from '../../support/lock-wait';
@@ -129,7 +129,7 @@ describe('write integrity of catalog, finance and licensing (integration, DB-03,
       const [first, second] = [await group('Delta'), await group('Epsilon')];
       const vendor = await freeVendor('Zeta');
       const runner = h.ctx.app.get(TransactionRunner, { strict: false });
-      const vendors = h.ctx.app.get(VendorDirectoryService, { strict: false });
+      const vendors = h.ctx.app.get(VendorRecordService, { strict: false });
       let release!: () => void;
       const gate = new Promise<void>((resolve) => (release = resolve));
       let adopted!: () => void;

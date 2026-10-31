@@ -5,8 +5,8 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { AuditApi } from '../../audit/public/audit.api';
 import { EmployeeNotFoundError } from '../public/organization.errors';
 import { OrganizationContextService } from '../organization-context.service';
-import { DepartmentDirectoryService } from '../department/department-directory.service';
-import { EmployeeDirectoryService } from '../employee/employee-directory.service';
+import { DepartmentRecordService } from '../department/department-record.service';
+import { EmployeeRecordService } from '../employee/employee-record.service';
 import { OrganizationChangeService } from '../change-announcement/organization-change.service';
 import { EmployeeAccountsHook, type EmployeeAccounts } from '../public/organization.extension-points';
 import { DepartmentForbiddenError, HeadAssignmentError } from '../department/department.errors';
@@ -70,7 +70,7 @@ describe('DepartmentHeadService', () => {
           useValue: { businessToday: organization.businessToday, findOrganization: organization.getOrganization },
         },
         {
-          provide: DepartmentDirectoryService,
+          provide: DepartmentRecordService,
           useValue: {
             headHistory: organization.headHistory,
             endHeadPeriodsFrom: organization.endHeadPeriodsFrom,
@@ -79,7 +79,7 @@ describe('DepartmentHeadService', () => {
           },
         },
         {
-          provide: EmployeeDirectoryService,
+          provide: EmployeeRecordService,
           useValue: {
             lock: (tx: unknown, id: string) => organization.lockEmployeeForShare(tx, id) as Promise<void>,
             find: organization.getEmployee,

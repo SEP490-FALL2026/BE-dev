@@ -9,7 +9,7 @@ import {
   type GrantCancelInput,
 } from '../provisioning/grant-cancellation/provisioning-cancellation.service';
 import { ProvisioningTaskFrame } from '../provisioning/provisioning-task-frame.service';
-import { RevocationReadService } from '../provisioning/revocation-read.service';
+import { RevocationViewService } from '../provisioning/revocation-view.service';
 import { RevocationService } from '../provisioning/revocation.service';
 import type {
   AssignmentRecord,
@@ -35,7 +35,7 @@ export class LicensingApi {
     private readonly cancellations: ProvisioningCancellationService,
     private readonly frame: ProvisioningTaskFrame,
     private readonly revocations: RevocationService,
-    private readonly revocationReads: RevocationReadService,
+    private readonly revocationView: RevocationViewService,
   ) {}
 
   /**
@@ -56,12 +56,12 @@ export class LicensingApi {
    * transfer start from. A fixed number of statements however many seats there are.
    */
   listPersonalSeatsOf(employeeId: string, onDate: BusinessDate, tx?: DbTx): Promise<PersonalSeat[]> {
-    return this.revocationReads.personalSeatsOf(employeeId, onDate, tx);
+    return this.revocationView.personalSeatsOf(employeeId, onDate, tx);
   }
 
   /** How many personal seats each of these people holds on `onDate` or will, in one statement (the people with none are absent). */
   countPersonalSeatsOf(employeeIds: readonly string[], onDate: BusinessDate, tx?: DbTx): Promise<Map<string, number>> {
-    return this.revocationReads.countPersonalSeats(employeeIds, onDate, tx);
+    return this.revocationView.countPersonalSeats(employeeIds, onDate, tx);
   }
 
   /**
@@ -74,7 +74,7 @@ export class LicensingApi {
     assignmentIds: readonly string[],
     tx?: DbTx,
   ): Promise<Set<string>> {
-    return this.revocationReads.openedByReference(reference.sources, reference.referenceId, assignmentIds, tx);
+    return this.revocationView.openedByReference(reference.sources, reference.referenceId, assignmentIds, tx);
   }
 
   /**
@@ -82,7 +82,7 @@ export class LicensingApi {
    * that a person who left still has access until a day. A fixed number of statements however many people there are.
    */
   listTerminatingAccess(employeeIds: readonly string[], tx?: DbTx): Promise<TerminatingAccess[]> {
-    return this.revocationReads.terminatingAccess(employeeIds, tx);
+    return this.revocationView.terminatingAccess(employeeIds, tx);
   }
 
   /**

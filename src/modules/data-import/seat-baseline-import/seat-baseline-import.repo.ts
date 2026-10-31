@@ -2,6 +2,10 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
+import { seatBaselineImportCellsJson } from './seat-baseline-import-cells.json';
+import { seatBaselineImportErrorsJson } from './seat-baseline-import-errors.json';
+import { seatBaselineImportResultJson } from './seat-baseline-import-result.json';
+import { seatBaselineImportSummaryJson } from './seat-baseline-import-summary.json';
 import type {
   SeatCells,
   SeatImportResult,
@@ -9,6 +13,7 @@ import type {
   SeatImportSummary,
   SeatRowError,
   SeatRowOutcome,
+  StoredSeatRowError,
 } from './seat-baseline-import.types';
 
 export interface ImportRecord {
@@ -31,12 +36,20 @@ export interface ImportRecord {
   cancelledAt: Date | null;
 }
 
-/** One row of the preview as it is kept. */
-export interface StoredRow {
+/** One row of the preview as it is written: only the codes the preview gives now, never one that was retired. */
+export interface NewRow {
   lineNumber: number;
   cells: SeatCells;
   outcome: SeatRowOutcome;
   errors: SeatRowError[];
+}
+
+/** One row of the preview as it is kept, and as it reads back: an old row may carry a retired code. */
+export interface StoredRow {
+  lineNumber: number;
+  cells: SeatCells;
+  outcome: SeatRowOutcome;
+  errors: StoredSeatRowError[];
 }
 
 type Row = Prisma.SeatBaselineImportGetPayload<object>;
@@ -52,8 +65,8 @@ const toRecord = (row: Row): ImportRecord => ({
   status: row.status,
   previewVersion: row.previewVersion,
   ignoredColumns: row.ignoredColumns,
-  summary: row.summary as unknown as SeatImportSummary,
-  result: row.result as unknown as SeatImportResult | null,
+  summary: seatBaselineImportSummaryJson.decode(row.summary),
+  result: seatBaselineImportResultJson.decode(row.result),
   confirmKey: row.confirmKey,
   createdAt: row.createdAt,
   expiresAt: row.expiresAt,
@@ -61,7 +74,12 @@ const toRecord = (row: Row): ImportRecord => ({
   cancelledAt: row.cancelledAt,
 });
 
-const asJson = (value: unknown): Prisma.InputJsonValue => value as Prisma.InputJsonValue;
+const toStoredRow = (row: Prisma.SeatBaselineImportRowGetPayload<object>): StoredRow => ({
+  lineNumber: row.lineNumber,
+  cells: seatBaselineImportCellsJson.decode(row.cells),
+  outcome: row.outcome as SeatRowOutcome,
+  errors: seatBaselineImportErrorsJson.decode(row.errors),
+});
 
 /** The one writer of `seat_baseline_imports` and `seat_baseline_import_rows`. */
 @Injectable()
@@ -80,7 +98,7 @@ export class SeatBaselineImportRepo {
       ignoredColumns: string[];
       summary: SeatImportSummary;
       expiresAt: Date;
-      rows: readonly StoredRow[];
+      rows: readonly NewRow[];
     },
   ): Promise<string> {
     const created = await tx.seatBaselineImport.create({
@@ -92,7 +110,7 @@ export class SeatBaselineImportRepo {
         planId: input.planId,
         subscriptionId: input.subscriptionId,
         ignoredColumns: input.ignoredColumns,
-        summary: asJson(input.summary),
+        summary: seatBaselineImportSummaryJson.encode(input.summary),
         expiresAt: input.expiresAt,
       },
       select: { id: true },
@@ -101,9 +119,9 @@ export class SeatBaselineImportRepo {
       data: input.rows.map((row) => ({
         importId: created.id,
         lineNumber: row.lineNumber,
-        cells: asJson(row.cells),
+        cells: seatBaselineImportCellsJson.encode(row.cells),
         outcome: row.outcome,
-        errors: asJson(row.errors),
+        errors: seatBaselineImportErrorsJson.encode(row.errors),
       })),
     });
 
@@ -133,12 +151,7 @@ export class SeatBaselineImportRepo {
       orderBy: { lineNumber: 'asc' },
     });
 
-    return rows.map((row) => ({
-      lineNumber: row.lineNumber,
-      cells: row.cells as SeatCells,
-      outcome: row.outcome as SeatRowOutcome,
-      errors: row.errors as unknown as SeatRowError[],
-    }));
+    return rows.map(toStoredRow);
   }
 
   /** One page of rows and the total for the same filter, from one snapshot. */
@@ -158,12 +171,7 @@ export class SeatBaselineImportRepo {
         });
 
         return {
-          items: rows.map((row) => ({
-            lineNumber: row.lineNumber,
-            cells: row.cells as SeatCells,
-            outcome: row.outcome as SeatRowOutcome,
-            errors: row.errors as unknown as SeatRowError[],
-          })),
+          items: rows.map(toStoredRow),
           total: await tx.seatBaselineImportRow.count({ where }),
         };
       },
@@ -178,7 +186,12 @@ export class SeatBaselineImportRepo {
   ): Promise<void> {
     await tx.seatBaselineImport.update({
       where: { id },
-      data: { status: 'COMPLETED', result: asJson(input.result), confirmKey: input.confirmKey, confirmedAt: input.now },
+      data: {
+        status: 'COMPLETED',
+        result: seatBaselineImportResultJson.encode(input.result),
+        confirmKey: input.confirmKey,
+        confirmedAt: input.now,
+      },
     });
   }
 

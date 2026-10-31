@@ -3,7 +3,7 @@ import { pageOf, type Page } from '../../../core/application/pagination';
 import type { BusinessDate } from '../../../core/business-date';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { CatalogApi } from '../../catalog/public/catalog.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { effectiveFromLabel } from '../assignment/assignment.policy';
 import type { ProvisioningKind } from '../public/licensing.types';
 import { isExpiringSoon, rightStatusOf, type MySoftwareStatus, type MySoftwareView } from './my-software.policy';
@@ -37,7 +37,7 @@ export interface MySoftwareRight {
 export class MySoftwareService {
   constructor(
     private readonly repo: MySoftwareRepo,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly catalog: CatalogApi,
   ) {}
 
@@ -45,7 +45,7 @@ export class MySoftwareService {
     actor: AuthenticatedPrincipal,
     query: { view: MySoftwareView; page: number; pageSize: number },
   ): Promise<{ asOf: BusinessDate; view: MySoftwareView; page: Page<MySoftwareRight> }> {
-    const today = await this.organization.businessToday();
+    const today = await this.organizationReads.businessToday();
     const { items, total } = await this.repo.page(actor.employeeId, query.view, today, {
       skip: (query.page - 1) * query.pageSize,
       take: query.pageSize,

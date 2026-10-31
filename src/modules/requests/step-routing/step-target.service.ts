@@ -3,7 +3,7 @@ import type { BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import type { ApprovalRoleHolders } from '../../identity-access/public/identity-access.types';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { RoutingFactsService } from '../access-request/routing-facts.service';
 import { routeNeedStep } from '../access-request/routing.policy';
 import { routeFinanceReview, routeSpendStep } from './spend-routing.policy';
@@ -29,7 +29,7 @@ export interface TodayFacts {
 @Injectable()
 export class StepTargetService {
   constructor(
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly identity: IdentityAccessApi,
     private readonly routing: RoutingFactsService,
   ) {}
@@ -43,7 +43,7 @@ export class StepTargetService {
       holders.fallbackApproverEmployeeId,
     ].filter((id): id is string => id !== null);
     const working = new Set(
-      (named.length === 0 ? [] : await this.organization.getEmployees(named, tx))
+      (named.length === 0 ? [] : await this.organizationReads.getEmployees(named, tx))
         .filter((employee) => employee.status === 'ACTIVE')
         .map((employee) => employee.id),
     );
@@ -58,7 +58,7 @@ export class StepTargetService {
 
   async gatherToday(tx: DbTx, now: Date): Promise<TodayFacts> {
     return {
-      today: await this.organization.businessToday(now, tx),
+      today: await this.organizationReads.businessToday(now, tx),
       roles: await this.usableApprovalRoleHolders(tx),
       financeEmployeeId: await this.identity.findUsableFinanceEmployeeId(tx),
     };
@@ -114,7 +114,7 @@ export class StepTargetService {
           : { assigneeEmployeeId: null, reason: 'NO_FINANCE_REVIEWER' };
       }
       case 'IT_ASSESSMENT': {
-        const inCharge = await this.organization.getItAdminInCharge(request.requesterEmployeeId, facts.today, tx);
+        const inCharge = await this.organizationReads.getItAdminInCharge(request.requesterEmployeeId, facts.today, tx);
 
         return inCharge?.itAdminEmployeeId
           ? { assigneeEmployeeId: inCharge.itAdminEmployeeId, routingRow: null }
@@ -130,7 +130,7 @@ export class StepTargetService {
    */
   private async needDepartment(tx: DbTx, request: ReassignableRequest, today: BusinessDate): Promise<string> {
     if (request.type === 'SERVICE_ACCOUNT' || request.branch !== 'INTERNAL_FREE') return request.departmentId;
-    const placement = await this.organization.getEmployeePlacement(request.requesterEmployeeId, today, tx);
+    const placement = await this.organizationReads.getEmployeePlacement(request.requesterEmployeeId, today, tx);
 
     return placement?.departmentId ?? request.departmentId;
   }

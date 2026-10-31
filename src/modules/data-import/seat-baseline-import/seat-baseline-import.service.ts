@@ -8,7 +8,7 @@ import type { SeatTarget, SeatTargetRef } from '../../catalog/public/catalog.typ
 import { AssignmentConflictError, SeatBaselineClosedError } from '../../licensing/public/licensing.errors';
 import { LicensingSeatBaselineApi } from '../../licensing/public/licensing-seat-baseline.api';
 import type { BaselineFacts, NewBaselineAssignment } from '../../licensing/public/licensing.types';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import {
   seatImportCancelledEvent,
   seatImportConfirmedEvent,
@@ -60,7 +60,7 @@ const refOf = (record: ImportRecord): SeatTargetRef =>
 export class SeatBaselineImportService {
   constructor(
     private readonly repo: SeatBaselineImportRepo,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly licensingBaseline: LicensingSeatBaselineApi,
     private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
@@ -221,11 +221,11 @@ export class SeatBaselineImportService {
   /** The facts a judgement stands on, with the people and the Cost Centers the rows name read now (in `tx` when given). */
   private async factsFor(rows: readonly { cells: SeatCells }[], base: BaselineFacts, tx?: DbTx): Promise<SeatFacts> {
     const names = lookupNamesOf(rows);
-    const employees = await this.organization.getEmployeesByCodes(names.employeeCodes, tx);
-    const costCenters = await this.organization.getCostCentersByCodes(names.costCenterCodes, tx);
-    const companyDomains = await this.organization.getCompanyEmailDomains(tx);
+    const employees = await this.organizationReads.getEmployeesByCodes(names.employeeCodes, tx);
+    const costCenters = await this.organizationReads.getCostCentersByCodes(names.costCenterCodes, tx);
+    const companyDomains = await this.organizationReads.getCompanyEmailDomains(tx);
     // The department of each person on the day of the import and its Unit: a service account is owned and charged there.
-    const units = await this.organization.getOwningUnits(
+    const units = await this.organizationReads.getOwningUnits(
       employees.map((employee) => employee.id),
       base.recordedOn,
       tx,
@@ -266,13 +266,13 @@ export class SeatBaselineImportService {
     const before = await this.factsFor(stored, base, tx);
     const names = lookupNamesOf(stored);
     const employeeIds = names.employeeCodes.flatMap((code) => before.employees.get(code)?.id ?? []).sort();
-    for (const employeeId of employeeIds) await this.organization.lockEmployeeForShare(tx, employeeId);
+    for (const employeeId of employeeIds) await this.organizationReads.lockEmployeeForShare(tx, employeeId);
     // The Cost Centers the rows name and the Unit of each person's department, held so none is retired meanwhile.
     const costCenterIds = [
       ...names.costCenterCodes.flatMap((code) => before.costCenters.get(code)?.id ?? []),
       ...[...before.employees.values()].flatMap((employee) => employee.owningUnit?.costCenter?.id ?? []),
     ];
-    await this.organization.lockCostCentersShared(tx, [...new Set(costCenterIds)]);
+    await this.organizationReads.lockCostCentersShared(tx, [...new Set(costCenterIds)]);
 
     return this.factsFor(stored, base, tx);
   }
@@ -344,7 +344,7 @@ export class SeatBaselineImportService {
   }
 
   private async requireOrganization() {
-    const organization = await this.organization.getOrganization();
+    const organization = await this.organizationReads.getOrganization();
     if (!organization) throw new Error('A seat baseline was imported before installation');
 
     return organization;

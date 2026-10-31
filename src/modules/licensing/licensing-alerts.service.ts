@@ -3,7 +3,7 @@ import type { BusinessDate } from '../../core/business-date';
 import type { DbTx } from '../../infrastructure/database/transaction-runner';
 import { IdentityAccessApi } from '../identity-access/public/identity-access.api';
 import { NotificationsApi } from '../notifications/public/notifications.api';
-import { OrganizationApi } from '../organization/public/organization.api';
+import { OrganizationReadApi } from '../organization/public/organization-read.api';
 import { recipientsOf, usableOrNull, type LicensingAlert } from './licensing-alerts.policy';
 
 /**
@@ -16,7 +16,7 @@ import { recipientsOf, usableOrNull, type LicensingAlert } from './licensing-ale
 export class LicensingAlerts {
   constructor(
     private readonly notifications: NotificationsApi,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly identity: IdentityAccessApi,
   ) {}
 
@@ -30,7 +30,7 @@ export class LicensingAlerts {
   /** The IT Admin in charge of the department while they can act as one; null for no department or nobody usable. */
   async itAdminOfDepartment(departmentId: string | null, tx?: DbTx): Promise<string | null> {
     if (departmentId === null) return null;
-    const named = await this.organization.getItAdminInChargeOfDepartment(departmentId, tx);
+    const named = await this.organizationReads.getItAdminInChargeOfDepartment(departmentId, tx);
 
     return usableOrNull(named, await this.usableItAdmins([named]));
   }
@@ -41,7 +41,7 @@ export class LicensingAlerts {
    */
   async itAdminOfPerson(employeeId: string, onDates: readonly BusinessDate[], tx?: DbTx): Promise<string | null> {
     for (const onDate of onDates) {
-      const placement = await this.organization.getEmployeePlacement(employeeId, onDate, tx);
+      const placement = await this.organizationReads.getEmployeePlacement(employeeId, onDate, tx);
       if (placement) return this.itAdminOfDepartment(placement.departmentId, tx);
     }
 

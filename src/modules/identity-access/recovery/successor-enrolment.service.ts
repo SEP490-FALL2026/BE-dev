@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { AuditApi } from '../../audit/public/audit.api';
 import { EmployeeRecord } from '../../organization/public/organization.types';
-import { AccountDirectoryService } from '../accounts/account-directory.service';
+import { AccountRecordService } from '../accounts/account-record.service';
 import { ActionLinkRevocation } from '../accounts/action-link-revocation.service';
 import { SuccessorEligibility } from '../accounts/successor-eligibility.service';
 import { RecoveryLinks } from './recovery-links.service';
@@ -21,7 +21,7 @@ import { RecoveryContext, RecoveryResult } from '../public/recovery.types';
 @Injectable()
 export class SuccessorEnrolment {
   constructor(
-    private readonly accounts: AccountDirectoryService,
+    private readonly accounts: AccountRecordService,
     private readonly eligibility: SuccessorEligibility,
     private readonly links: RecoveryLinks,
     private readonly revocation: ActionLinkRevocation,

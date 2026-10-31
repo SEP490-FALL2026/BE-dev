@@ -1,7 +1,7 @@
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { LicensingDashboardApi } from '../../licensing/public/licensing-dashboard.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { PersonnelDashboardApi } from '../../personnel/public/personnel-dashboard.api';
 import { DashboardRefusedError } from '../section/dashboard-section.errors';
 import { ItAdminDashboardService } from './it-admin-dashboard.service';
@@ -28,7 +28,7 @@ function serviceWith(scope: string[]) {
     .mockResolvedValue({ openGrantTasks: 3, openRevocationTasks: 1, openSaasIssues: 2, keysInStore: 40 });
   const handingOverCases = jest.fn().mockResolvedValue(5);
   const service = new ItAdminDashboardService(
-    { businessToday: () => Promise.resolve('2026-10-23'), getItAdminScope } as unknown as OrganizationApi,
+    { businessToday: () => Promise.resolve('2026-10-23'), getItAdminScope } as unknown as OrganizationReadApi,
     { findUsableItAdminEmployeeIds } as unknown as IdentityAccessApi,
     { itAdminFacts } as unknown as LicensingDashboardApi,
     { handingOverCases } as unknown as PersonnelDashboardApi,

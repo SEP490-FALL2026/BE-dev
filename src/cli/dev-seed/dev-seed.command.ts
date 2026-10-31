@@ -15,7 +15,7 @@ export const devSeedCommand = defineCommand({
   execute: ({ confirmLocal }) =>
     runInNestContext({
       // The graph validates the database settings only.
-      graph: () => import('../../modules/installation/dev-seed/dev-seed.module').then((m) => m.DevSeedModule),
+      graph: () => import('../../modules/installation/dev-seed/dev-seed-cli.module').then((m) => m.DevSeedCliModule),
       work: async (app) => {
         const result = await app.get(DevSeedApi).seed({ confirmLocal });
         const output = formatSeedResult(result);

@@ -36,17 +36,17 @@ const COMMAND_FOLDERS = [
 const COMMAND_ONLY_FILES = [
   ...COMMAND_ENTRIES,
   'modules/identity-access/identity-access-inspection-facade.module.ts',
-  'modules/installation/inspect/inspection.module.ts',
+  'modules/installation/inspect/inspection-cli.module.ts',
   'modules/identity-access/identity-access-local-seed-facade.module.ts',
-  'modules/installation/dev-seed/dev-seed.module.ts',
-  'modules/installation/demo-dataset/demo-dataset.module.ts',
-  'modules/installation/migration-preflight/migration-preflight.module.ts',
+  'modules/installation/dev-seed/dev-seed-cli.module.ts',
+  'modules/installation/demo-dataset/demo-dataset-cli.module.ts',
+  'modules/installation/migration-preflight/migration-preflight-cli.module.ts',
   'cli/assign-subscription-owner/assign-subscription-owner-cli.module.ts',
-  'modules/catalog/subscription-owner-assignment/subscription-owner-assignment.module.ts',
+  'modules/catalog/subscription-owner-assignment/subscription-owner-assignment-cli.module.ts',
   'cli/cost-center-direction/cost-center-direction-cli.module.ts',
-  'modules/organization/cost-center-direction/cost-center-direction.module.ts',
+  'modules/organization/cost-center-direction/cost-center-direction-cli.module.ts',
   'cli/record-super-admin-event/record-super-admin-event-cli.module.ts',
-  'modules/personnel/super-admin-event/super-admin-event.module.ts',
+  'modules/personnel/super-admin-event/super-admin-event-cli.module.ts',
 ];
 /**
  * Where the old entries `dist/<alias>.js` are called inside images (OD-A7): every path named here must be an alias of the

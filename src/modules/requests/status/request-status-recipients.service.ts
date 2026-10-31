@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { FactNeed, RequestFacts, StatusFacts } from './request-status.types';
 
 export type RoleHolders = Pick<
@@ -18,7 +18,7 @@ export type RoleHolders = Pick<
 @Injectable()
 export class RequestStatusRecipientsService {
   constructor(
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly identity: IdentityAccessApi,
   ) {}
 
@@ -31,12 +31,13 @@ export class RequestStatusRecipientsService {
       superAdminEmployeeId: null,
     };
     if (request !== null && needs.includes('DEPARTMENT_HEAD')) {
-      const heads = await this.organization.getDepartmentHeads([request.departmentId], today);
+      const heads = await this.organizationReads.getDepartmentHeads([request.departmentId], today);
       holders.departmentHeadEmployeeId = heads.get(request.departmentId)?.employeeId ?? null;
     }
     if (request !== null && needs.includes('IT_ADMIN')) {
       holders.itAdminEmployeeId =
-        (await this.organization.getItAdminInCharge(request.requesterEmployeeId, today))?.itAdminEmployeeId ?? null;
+        (await this.organizationReads.getItAdminInCharge(request.requesterEmployeeId, today))?.itAdminEmployeeId ??
+        null;
     }
     if (needs.includes('FINANCE')) holders.financeEmployeeId = await this.identity.findUsableFinanceEmployeeId();
     if (needs.includes('SUPER_ADMIN'))
@@ -48,7 +49,7 @@ export class RequestStatusRecipientsService {
   /** Among these employees, those who still work: a person who has left is told nothing. */
   async stillWorking(employeeIds: readonly string[]): Promise<Set<string>> {
     if (employeeIds.length === 0) return new Set();
-    const people = await this.organization.getEmployees([...new Set(employeeIds)]);
+    const people = await this.organizationReads.getEmployees([...new Set(employeeIds)]);
 
     return new Set(people.filter((person) => person.status === 'ACTIVE').map((person) => person.id));
   }
@@ -59,6 +60,6 @@ export class RequestStatusRecipientsService {
   }
 
   businessToday(now: Date): Promise<BusinessDate> {
-    return this.organization.businessToday(now);
+    return this.organizationReads.businessToday(now);
   }
 }

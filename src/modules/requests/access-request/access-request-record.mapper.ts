@@ -2,8 +2,8 @@ import type { Prisma } from '../../../generated/prisma/client';
 import { fromDateColumn } from '../../../core/business-date';
 import { toPricing } from './access-request-pricing.mapper';
 import type { WaitingReason } from './routing.policy';
-import type { RequestPolicy } from './access-request.policy';
 import type { NeedStepState, AccessRequestRecord } from './access-request.types';
+import { requestPolicyJson } from './access-request.json';
 
 /** What a request is read as: the columns, the people it is for, its need steps with their decisions, and the lines of a group. */
 export const SELECT_REQUEST = {
@@ -168,8 +168,7 @@ export function toRecord(row: RequestRow): AccessRequestRecord {
     offPlan: row.offPlan,
     delegatedBatchId: row.delegatedBatchId,
     expectedEndDate: row.expectedEndDate ? fromDateColumn(row.expectedEndDate) : null,
-    // Written by `insert` from a `RequestPolicy`, and nowhere else.
-    policy: row.policy as unknown as RequestPolicy,
+    policy: requestPolicyJson.decode(row.policy),
     submittedAt: sent.submittedAt,
     withdrawal:
       row.withdrawalRequestedAt !== null && row.withdrawnByEmployeeId !== null

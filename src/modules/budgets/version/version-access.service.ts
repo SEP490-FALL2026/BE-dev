@@ -7,7 +7,7 @@ import {
   BudgetYearEndedError,
 } from '../budget/budget.errors';
 import { isEditable, yearHasEnded } from '../budget/budget.policy';
-import { BudgetSupportService } from '../budget/budget-support.service';
+import { BudgetFactsService } from '../budget/budget-facts.service';
 import { VersionRepo, type VersionRecord } from '../budget/version.repo';
 
 /**
@@ -20,14 +20,14 @@ import { VersionRepo, type VersionRecord } from '../budget/version.repo';
 export class VersionAccessService {
   constructor(
     private readonly versions: VersionRepo,
-    private readonly support: BudgetSupportService,
+    private readonly facts: BudgetFactsService,
   ) {}
 
   /** Only Finance changes a version; answers the month the fiscal year starts in, which every change is judged against. */
   async begin(actor: AuthenticatedPrincipal): Promise<number> {
-    this.support.requireFinance(actor);
+    this.facts.requireFinance(actor);
 
-    return this.support.fiscalYearStartMonth();
+    return this.facts.fiscalYearStartMonth();
   }
 
   /** The version as it is in the transaction. Throws BudgetVersionNotFoundError. */
@@ -50,7 +50,7 @@ export class VersionAccessService {
   async lockOfOpenYear(tx: DbTx, id: string, fiscalStart: number): Promise<VersionRecord> {
     const version = await this.versions.lockById(tx, id);
     if (!version) throw new BudgetVersionNotFoundError();
-    const today = await this.support.today(new Date(), tx);
+    const today = await this.facts.today(new Date(), tx);
     if (yearHasEnded(version.year, today, fiscalStart)) throw new BudgetYearEndedError(version.year);
 
     return version;

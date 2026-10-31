@@ -1,6 +1,6 @@
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { LicensingDashboardApi } from '../../licensing/public/licensing-dashboard.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { DashboardRefusedError } from '../section/dashboard-section.errors';
 import { EmployeeDashboardService } from './employee-dashboard.service';
 
@@ -17,7 +17,7 @@ const actor = (roles: readonly string[]): AuthenticatedPrincipal => ({
 function serviceWith() {
   const employeeFacts = jest.fn().mockResolvedValue({ currentRights: 4, expiringRights: 1, openSaasIssues: 0 });
   const service = new EmployeeDashboardService(
-    { businessToday: () => Promise.resolve('2026-10-23') } as unknown as OrganizationApi,
+    { businessToday: () => Promise.resolve('2026-10-23') } as unknown as OrganizationReadApi,
     { employeeFacts } as unknown as LicensingDashboardApi,
   );
 

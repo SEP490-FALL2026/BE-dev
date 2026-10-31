@@ -3,7 +3,7 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { SubscriptionPeriodApi } from '../../catalog/public/subscription-period.api';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { renewalDeciderOf } from './decision/renewal-decision.policy';
 import type { DeciderRole } from './subscription-renewal.types';
 
@@ -28,7 +28,7 @@ const READER_ROLES = ['IT_ADMIN', 'FINANCE', 'SPENDING_APPROVER'];
 @Injectable()
 export class RenewalPartiesService {
   constructor(
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly identity: IdentityAccessApi,
     private readonly periods: SubscriptionPeriodApi,
   ) {}
@@ -36,7 +36,7 @@ export class RenewalPartiesService {
   /** The IT Admin in charge of the owner department, else the first usable IT Admin; null when there is none. */
   async itAdminOf(departmentId: string, tx?: DbTx): Promise<string | null> {
     return (
-      (await this.organization.getItAdminInChargeOfDepartment(departmentId, tx)) ??
+      (await this.organizationReads.getItAdminInChargeOfDepartment(departmentId, tx)) ??
       (await this.identity.findFirstUsableItAdminEmployeeId(tx))
     );
   }

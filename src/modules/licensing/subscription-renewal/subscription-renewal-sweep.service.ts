@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { addDays } from '../../../core/business-date';
 import { SubscriptionPeriodApi } from '../../catalog/public/subscription-period.api';
 import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { RenewalUsageContributions } from '../public/licensing.extension-points';
 import { RenewalAlertsService } from './alerts/renewal-alerts.service';
 import { RenewalDeadlineService } from './deadline/renewal-deadline.service';
@@ -32,7 +32,7 @@ export class SubscriptionRenewalSweepService {
     private readonly periods: SubscriptionPeriodApi,
     private readonly repo: SubscriptionRenewalRepo,
     private readonly parties: RenewalPartiesService,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly parameters: OperatingParametersApi,
     private readonly usage: RenewalUsageContributions,
     private readonly alerts: RenewalAlertsService,
@@ -41,9 +41,9 @@ export class SubscriptionRenewalSweepService {
 
   async sweep(now: Date = new Date()): Promise<SweepResult> {
     const result: SweepResult = { told: 0, flaggedLate: 0, deadlineEvents: 0 };
-    const organization = await this.organization.getOrganization();
+    const organization = await this.organizationReads.getOrganization();
     if (!organization) return result;
-    const today = await this.organization.businessToday(now);
+    const today = await this.organizationReads.businessToday(now);
     const value = await this.parameters.getValue('RENEWAL_ALERT_DAYS_BEFORE_DEADLINE');
     const daysBefore = Array.isArray(value) ? value.filter((day): day is number => typeof day === 'number') : [];
     const subjects = await this.periods.listRenewalSubjects({

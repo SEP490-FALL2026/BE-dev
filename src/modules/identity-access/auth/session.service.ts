@@ -1,8 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { TransactionRunner, toTransientError } from '../../../infrastructure/database/transaction-runner';
 import { AuditApi } from '../../audit/public/audit.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
-import { AccountDirectoryService } from '../accounts/account-directory.service';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import { AccountRecordService } from '../accounts/account-record.service';
 import { IssuedSession } from '../public/identity-access.types';
 import { employeeHasNotLeft } from '../accounts/account.policy';
 import { SessionInvalidError } from './auth.errors';
@@ -18,9 +18,9 @@ export class SessionService {
   private readonly logger = new Logger(SessionService.name);
 
   constructor(
-    private readonly accounts: AccountDirectoryService,
+    private readonly accounts: AccountRecordService,
     private readonly sessions: SessionRepo,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly audit: AuditApi,
     private readonly sessionTokens: SessionTokenService,
     private readonly runner: TransactionRunner,
@@ -59,7 +59,7 @@ export class SessionService {
       if (!session || !token || !account || token.sessionId !== session.id) return { kind: 'invalid' };
 
       const now = new Date();
-      const employee = await this.organization.getEmployee(account.employeeId, tx);
+      const employee = await this.organizationReads.getEmployee(account.employeeId, tx);
       const accountUsable =
         account.status === 'ACTIVE' && account.activationState === 'ACTIVATED' && employeeHasNotLeft(employee);
       const sessionOpen = session.revokedAt === null && session.idleExpiresAt > now && session.absoluteExpiresAt > now;

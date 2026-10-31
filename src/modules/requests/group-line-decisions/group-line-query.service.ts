@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Page, pageOf } from '../../../core/application/pagination';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { AccessRequestNotFoundError } from '../access-request/access-request.errors';
 import { canViewRequest, viewFactsOf } from '../access-request/access-request.policy';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
@@ -26,7 +26,7 @@ export class GroupLineQueryService {
     private readonly lines: RequestLineRepo,
     private readonly decisions: LineDecisionRepo,
     private readonly amounts: LineAmountRepo,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly money: PricingViewService,
     private readonly steps: SpendStepRepo,
   ) {}
@@ -54,7 +54,7 @@ export class GroupLineQueryService {
     const stepOf = new Map(request.needSteps.map((step) => [step.id, step]));
     const people = new Map(
       (
-        await this.organization.getEmployees([
+        await this.organizationReads.getEmployees([
           ...new Set(
             [
               ...items.flatMap((line) => [line.employeeId, line.endedByEmployeeId]),

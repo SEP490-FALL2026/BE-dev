@@ -5,6 +5,7 @@ import { isUniqueViolation } from '../../../infrastructure/database/unique-viola
 import { AuditApi } from '../../audit/public/audit.api';
 import { OrganizationHistoryApi } from '../../organization/public/organization-history.api';
 import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { PersonnelNotifier, type PersonnelEventKind } from '../event-notice/personnel-notifier.service';
 import { groundsSnapshot, normalizedGrounds } from '../personnel-grounds.policy';
 import { personnelAuditEvent } from '../personnel-audit-event.mapper';
@@ -34,6 +35,7 @@ export class LeaveService {
   constructor(
     private readonly runner: TransactionRunner,
     private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly history: OrganizationHistoryApi,
     private readonly guard: TransferGuardService,
     private readonly leaves: LeaveRepo,
@@ -52,11 +54,12 @@ export class LeaveService {
   async startInTx(tx: DbTx, actor: PersonnelActor, input: StartLeaveInput): Promise<LeaveRecord> {
     this.guard.requireWriter(actor, input.employeeId);
     const organization = await this.requireOrganization();
-    const today = await this.organization.businessToday(new Date(), tx);
-    if (!(await this.organization.getEmployee(input.employeeId, tx))) throw new LeaveRefusedError('EMPLOYEE_NOT_FOUND');
+    const today = await this.organizationReads.businessToday(new Date(), tx);
+    if (!(await this.organizationReads.getEmployee(input.employeeId, tx)))
+      throw new LeaveRefusedError('EMPLOYEE_NOT_FOUND');
     await this.organization.lockEmployeeForUpdate(tx, input.employeeId);
     await this.guard.requireOperatorSubject(tx, actor, input.employeeId);
-    const employee = await this.organization.getEmployee(input.employeeId, tx);
+    const employee = await this.organizationReads.getEmployee(input.employeeId, tx);
     if (!employee) throw new LeaveRefusedError('EMPLOYEE_NOT_FOUND');
 
     refuse(
@@ -216,7 +219,7 @@ export class LeaveService {
 
   /** The installation's organization; a leave before installation is a programming error. */
   private async requireOrganization(): Promise<{ id: string }> {
-    const organization = await this.organization.getOrganization();
+    const organization = await this.organizationReads.getOrganization();
     if (!organization) throw new Error('A long leave was recorded before installation');
 
     return organization;
@@ -237,7 +240,7 @@ export class LeaveService {
   ): Promise<T> {
     const body = async (tx: DbTx): Promise<T> => {
       const organization = await this.requireOrganization();
-      const today: BusinessDate = await this.organization.businessToday(new Date(), tx);
+      const today: BusinessDate = await this.organizationReads.businessToday(new Date(), tx);
       const seen = await this.leaves.find(leaveId, tx);
       if (!seen) throw new LeaveRefusedError('NOT_FOUND');
       this.guard.requireWriter(actor, seen.employeeId);
@@ -245,7 +248,7 @@ export class LeaveService {
       await this.guard.requireOperatorSubject(tx, actor, seen.employeeId);
       const leave = await this.leaves.lock(tx, leaveId);
       if (!leave) throw new LeaveRefusedError('NOT_FOUND');
-      const employee = await this.organization.getEmployee(leave.employeeId, tx);
+      const employee = await this.organizationReads.getEmployee(leave.employeeId, tx);
 
       return work(tx, { organizationId: organization.id, leave, employeeCode: employee?.employeeCode ?? '', today });
     };
@@ -272,7 +275,7 @@ export class LeaveService {
     effectiveOn: BusinessDate,
     today: BusinessDate,
   ): Promise<void> {
-    const placement = await this.organization.getEmployeePlacement(leave.employeeId, today, tx);
+    const placement = await this.organizationReads.getEmployeePlacement(leave.employeeId, today, tx);
     if (!placement) return;
     await this.notifier.eventRecorded(tx, {
       organizationId: leave.organizationId,

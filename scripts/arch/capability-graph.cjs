@@ -160,6 +160,50 @@ function coreUsers(srcRoot) {
   return new Map([...users].map(([core, areas]) => [core, [...areas].sort()]));
 }
 
+/** Map<module, Set<capability>>: the capability folders that hold a `*.controller.ts` at any depth (specs and `generated` left out). */
+function controllerCapabilities(srcRoot) {
+  const found = new Map(moduleNames(srcRoot).map((name) => [name, new Set()]));
+  for (const file of sourceFiles(join(srcRoot, 'modules'))) {
+    if (!file.endsWith('.controller.ts')) continue;
+    const { module, capability } = placeOf(toSrc(srcRoot, file));
+    if (capability) found.get(module).add(capability);
+  }
+  return found;
+}
+
+/**
+ * The layer of every capability of one module, from the edges the gate judges (docs/rules/module-structure.md, R6):
+ * L3 has a controller (a use case with a route; the gate lets another capability import it only when its list names it, and one
+ * that imports nothing is still a use case, so a controller decides before the edges do); of the rest, L0 imports no other capability
+ * (the core every use case reads, or an isolated one), L1 imports only L0, L2 imports at least one L1 or L2. `names` are all the
+ * capabilities of the module (one with no edge still has a layer), `withController` the ones that hold a controller.
+ * Returns Map<capability, { layer, controller, imports, importedBy }>, sorted by layer then name; the lists are sorted.
+ */
+function layersOf(edges, names, withController) {
+  const imports = new Map(names.map((name) => [name, [...(edges.get(name)?.keys() ?? [])].sort()]));
+  const importedBy = new Map(names.map((name) => [name, []]));
+  for (const [from, targets] of imports) for (const target of targets) importedBy.get(target)?.push(from);
+  const isCore = new Set(names.filter((name) => imports.get(name).length === 0));
+  const layerOf = (name) => {
+    if (withController.has(name)) return 'L3';
+    if (isCore.has(name)) return 'L0';
+    return imports.get(name).every((target) => isCore.has(target)) ? 'L1' : 'L2';
+  };
+  return new Map(
+    names
+      .map((name) => [
+        name,
+        {
+          layer: layerOf(name),
+          controller: withController.has(name),
+          imports: imports.get(name),
+          importedBy: importedBy.get(name).sort(),
+        },
+      ])
+      .sort(([a, x], [b, y]) => x.layer.localeCompare(y.layer) || a.localeCompare(b)),
+  );
+}
+
 /** Strongly connected components of more than one capability (Tarjan), each sorted, the list sorted. */
 function cyclesOf(edges) {
   let index = 0;
@@ -200,8 +244,10 @@ function cyclesOf(edges) {
 module.exports = {
   capabilityGraph,
   capabilityNames,
+  controllerCapabilities,
   coreUsers,
   cyclesOf,
   importsOf,
+  layersOf,
   placeOf,
 };

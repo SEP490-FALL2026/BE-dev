@@ -44,6 +44,7 @@ for argument in "$@"; do
 done
 cat > "$FAKE_LOG/call-$n.stdin"
 printf '%s\\n' '[ĐÃ CÓ] org.departments — Phòng ban'
+if [ -n "\${FAKE_STDERR-}" ]; then printf '%s\\n' "$FAKE_STDERR" >&2; fi
 exit "\${FAKE_EXIT:-0}"
 `;
 
@@ -167,6 +168,33 @@ describe('scripts/ops/demo-dataset.sh', () => {
     const report = readFileSync(join(world.app, 'demo-dataset', reports[0]), 'utf8');
     assert.match(report, /org\.departments/);
     assertNoPassword(report, 'the kept report');
+  });
+
+  it('keeps the failure lines of the command (stderr) and the API it targeted in the report', () => {
+    const world = host();
+    const failure =
+      'The demo dataset run failed in phase startup after 8012 ms (run 9100 ms): Error retryable=true pg="Query read timeout"';
+    const result = run(world, { env: { FAKE_EXIT: '1', FAKE_STDERR: failure } });
+
+    assert.equal(result.status, 1, result.output);
+    const [name] = readdirSync(join(world.app, 'demo-dataset'));
+    const report = readFileSync(join(world.app, 'demo-dataset', name), 'utf8');
+    assert.match(report, /API http:\/\/slm-api:3000 \(default: DEMO_API_URL is not set\)/);
+    assert.match(report, new RegExp(`image ${IMAGE.replace(/[.]/g, '\\.')}`));
+    assert.ok(report.includes(failure), report);
+    assert.match(report, /exit 1 after \d+ s/);
+    assertNoPassword(report, 'the kept report');
+  });
+
+  it('says in the report when the API URL comes from the private file', () => {
+    const world = host({ settings: [...SETTINGS, ['DEMO_API_URL', 'http://slm-api:4000']] });
+    run(world);
+
+    const [name] = readdirSync(join(world.app, 'demo-dataset'));
+    assert.match(
+      readFileSync(join(world.app, 'demo-dataset', name), 'utf8'),
+      /API http:\/\/slm-api:4000 \(from DEMO_API_URL\)/,
+    );
   });
 
   it('passes the exit code of the command through, and an optional API URL', () => {

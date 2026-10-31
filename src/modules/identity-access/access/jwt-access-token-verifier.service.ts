@@ -6,10 +6,10 @@ import {
   InvalidAccessTokenError,
   TokenVerificationUnavailableError,
 } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { EmployeeRecord } from '../../organization/public/organization.types';
-import { ApprovalRoleDirectoryService } from '../approval-roles/approval-role-directory.service';
-import { SessionDirectoryService } from '../auth/session-directory.service';
+import { ApprovalRoleFactsService } from '../approval-roles/approval-role-facts.service';
+import { SessionRecordService } from '../auth/session-record.service';
 import { TokenService } from '../auth/token.service';
 import { PrincipalContext } from '../public/identity-access.types';
 import { employeeHasNotLeft } from '../accounts/account.policy';
@@ -24,9 +24,9 @@ import { resolveEffectiveRoles } from './effective-roles.policy';
 export class JwtAccessTokenVerifier implements AccessTokenVerifierPort {
   constructor(
     private readonly tokens: TokenService,
-    private readonly sessions: SessionDirectoryService,
-    private readonly organization: OrganizationApi,
-    private readonly approvalRoles: ApprovalRoleDirectoryService,
+    private readonly sessions: SessionRecordService,
+    private readonly organizationReads: OrganizationReadApi,
+    private readonly approvalRoles: ApprovalRoleFactsService,
   ) {}
 
   async verify(token: string): Promise<AuthenticatedPrincipal> {
@@ -36,7 +36,7 @@ export class JwtAccessTokenVerifier implements AccessTokenVerifierPort {
     let employee: EmployeeRecord | null;
     try {
       context = await this.sessions.findPrincipalContext(claims.sid);
-      employee = context ? await this.organization.getEmployee(context.employeeId) : null;
+      employee = context ? await this.organizationReads.getEmployee(context.employeeId) : null;
     } catch (error) {
       // Could not reach the database: the token may be fine, so this is a 503, never a 401.
       // Anything toTransientError does not recognise is a defect, and stays one (a 500 with a log).
@@ -64,7 +64,7 @@ export class JwtAccessTokenVerifier implements AccessTokenVerifierPort {
     let isSpendingApprover: boolean;
     try {
       [headed, isSpendingApprover] = await Promise.all([
-        this.organization.getHeadedDepartment(context.employeeId),
+        this.organizationReads.getHeadedDepartment(context.employeeId),
         this.approvalRoles.isSpendingApprover(context.employeeId),
       ]);
     } catch (error) {

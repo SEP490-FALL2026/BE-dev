@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionRunner, toTransientError } from '../../../infrastructure/database/transaction-runner';
-import { OrganizationApi } from '../../organization/public/organization.api';
-import { AccountDirectoryService } from '../accounts/account-directory.service';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import { AccountRecordService } from '../accounts/account-record.service';
 import { ActionLinkService } from '../accounts/action-link.service';
 import { CredentialService } from '../credentials/credential.service';
 import { PasswordPolicyError } from '../public/identity-access.errors';
@@ -16,10 +16,10 @@ import { canReceiveResetMail } from './password-reset.policy';
 @Injectable()
 export class PasswordResetService {
   constructor(
-    private readonly accounts: AccountDirectoryService,
+    private readonly accounts: AccountRecordService,
     private readonly links: ActionLinkService,
     private readonly credentials: CredentialService,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly redemption: PasswordResetRedemptionService,
     private readonly runner: TransactionRunner,
   ) {}
@@ -70,7 +70,7 @@ export class PasswordResetService {
       if (!stored || !account) return 'invalid';
 
       const now = new Date();
-      const employee = await this.organization.getEmployee(account.employeeId, tx);
+      const employee = await this.organizationReads.getEmployee(account.employeeId, tx);
       const usable =
         stored.appUserId === appUserId &&
         stored.purpose === 'RESET_PASSWORD' &&

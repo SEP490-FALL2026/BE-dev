@@ -70,7 +70,8 @@
   timer: it tells the modules that act on the organization (the listeners added to `OrganizationChangeListeners`)
   of the placements and head periods that took effect on a day that has come and were not told. One transaction for each change
   records it in `organization_change_announcements` (unique `(kind, subject_id)`, so two instances tell it once) and calls the
-  listeners; a listener that throws rolls that change back and it is tried again at the next pass, and a failed pass only logs.
+  listeners; a listener that throws rolls that change back and it is tried again at the next pass, and a failed pass only logs
+  (one line that names the kind of error, the code and whether it can be retried: the bullet after this one).
   A change written for today is told in the transaction that writes it. It runs in the API graph because that is where every
   listener (requests, personnel) is registered. Run one by hand with `OrganizationHistoryService.announceDueChanges(day)`.
   The API also runs `HandoverDutySweeper` once an hour (the first pass five minutes after start, unreferenced timer): for each
@@ -141,6 +142,16 @@
   priority, the workspaces by name and whether an emergency account is declared, never a password, a key or the name of that account) once, again
   when the roles change before the last working day and, with the highest priority, when a person who left still holds the Super Admin role or a
   workspace. Nothing here locks, revokes or reassigns anything; the notification channel reads the event (`g4-notification-delivery`).
+- A failed pass of a job (`*.job.ts`, the loops of the worker) or of a sweep that works record by record logs one line,
+  `<kind> failed: <description>`, where the description is `describeForOperator`
+  ([operator-error.ts](../../src/infrastructure/observability/operator-error.ts)): the class name of the error, its Prisma
+  code or SQLSTATE, `retryable=true|false` (true when the database or a network connection was only unavailable for a while:
+  deadlock, lock or statement timeout, a dropped or refused connection, SMTP included) and the name of the error underneath, one level. Never the message of the error, which can carry a
+  name, an address or a secret. A loop over records names the record that failed (`step <id>`), and one failure does not
+  stop the next record. An error that is not just something being unavailable for a while adds its stack frames as the trace argument
+  of `logger.error` (`traceForOperator`; the frames carry no message). The pass behaves as before: it goes on at the next
+  tick, and a listener that throws still rolls its transaction back. Never log `(error as Error).name`: gate `module-layout`
+  fails on it anywhere in `src/`.
 - Business modules call ObjectStoragePort rather than vendor SDKs.
 - A signed upload link signs the declared `Content-Type` and `Content-Length` and lives two minutes; what was looked at is
   copied once to a key no upload link reaches before it is kept (ADR-0014). A download link is an `attachment` with the

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Page, pageOf } from '../../../core/application/pagination';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { replacementRequired } from './application.policy';
 import { ApplicationRepo } from './application.repo';
 import type { ApplicationKind, ApplicationSummaryView, BusinessOwnerView, CatalogStatus } from './application.types';
@@ -14,7 +14,7 @@ import type { ApplicationKind, ApplicationSummaryView, BusinessOwnerView, Catalo
 export class ApplicationListService {
   constructor(
     private readonly applications: ApplicationRepo,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
   ) {}
 
   async list(query: {
@@ -33,7 +33,7 @@ export class ApplicationListService {
       skip: (query.page - 1) * query.pageSize,
       take: query.pageSize,
     });
-    const employees = await this.organization.getEmployees([
+    const employees = await this.organizationReads.getEmployees([
       ...new Set(items.map((item) => item.businessOwnerEmployeeId)),
     ]);
     const owners = new Map<string, BusinessOwnerView>(

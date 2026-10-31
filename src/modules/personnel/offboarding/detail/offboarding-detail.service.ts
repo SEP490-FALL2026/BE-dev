@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { CatalogApi } from '../../../catalog/public/catalog.api';
 import { LicensingApi } from '../../../licensing/public/licensing.api';
 import { LicensingHandoverApi } from '../../../licensing/public/licensing-handover.api';
-import { OrganizationApi } from '../../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../../organization/public/organization-read.api';
 import type { EmployeeRecord } from '../../../organization/public/organization.types';
 import type { ReadAccess } from '../../personnel-self-action.policy';
 import { RoleDutiesService } from '../../role-duties/role-duties.service';
@@ -24,7 +24,7 @@ const nonZero = (counts: Record<string, number>): Record<string, number> =>
 export class OffboardingDetailService {
   constructor(
     private readonly repo: OffboardingRepo,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly licensing: LicensingApi,
     private readonly licensingHandovers: LicensingHandoverApi,
     private readonly catalog: CatalogApi,
@@ -34,7 +34,7 @@ export class OffboardingDetailService {
 
   /** The case in full: for a case that is not cancelled, what the person still holds, the four steps and what keeps it open. */
   async detailOf(record: OffboardingRecord, access: ReadAccess = 'FULL'): Promise<OffboardingDetailWire> {
-    const today = await this.organization.businessToday();
+    const today = await this.organizationReads.businessToday();
     const live = record.state !== 'CANCELLED';
     const seats = live ? await this.licensing.listPersonalSeatsOf(record.employeeId, today) : [];
     const terminating = new Set(
@@ -87,7 +87,7 @@ export class OffboardingDetailService {
         record.employeeId,
         ...(record.headHandover?.successorEmployeeId ? [record.headHandover.successorEmployeeId] : []),
       ]),
-      this.organization.getDepartmentBrief(record.departmentId),
+      this.organizationReads.getDepartmentBrief(record.departmentId),
       live ? this.catalog.getApplicationsOwnedBy(record.employeeId, 1) : Promise.resolve({ total: 0 }),
       live ? this.sources.warningsOf(record.employeeId) : Promise.resolve({}),
     ]);
@@ -96,6 +96,6 @@ export class OffboardingDetailService {
   private async employeesOf(ids: readonly string[]): Promise<Map<string, EmployeeRecord>> {
     const unique = [...new Set(ids)];
 
-    return new Map((await this.organization.getEmployees(unique)).map((employee) => [employee.id, employee]));
+    return new Map((await this.organizationReads.getEmployees(unique)).map((employee) => [employee.id, employee]));
   }
 }

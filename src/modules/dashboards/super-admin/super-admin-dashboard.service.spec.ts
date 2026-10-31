@@ -1,6 +1,6 @@
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { OnboardingFacts } from '../../organization/public/organization.types';
 import { PersonnelDashboardApi } from '../../personnel/public/personnel-dashboard.api';
 import { DashboardRefusedError } from '../section/dashboard-section.errors';
@@ -36,7 +36,7 @@ function serviceWith() {
     {
       businessToday: () => Promise.resolve('2026-10-23'),
       getOnboardingFacts: () => Promise.resolve(FACTS),
-    } as unknown as OrganizationApi,
+    } as unknown as OrganizationReadApi,
     { findUsableItAdminEmployeeIds } as unknown as IdentityAccessApi,
     { noticesAwaitingHandling } as unknown as PersonnelDashboardApi,
   );

@@ -3,7 +3,7 @@ import { Page, pageOf } from '../../../core/application/pagination';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { BudgetNotAHistoryReaderError, BudgetVersionNotFoundError } from '../budget/budget.errors';
 import { deciderOf } from '../budget/budget.policy';
-import { BudgetSupportService } from '../budget/budget-support.service';
+import { BudgetFactsService } from '../budget/budget-facts.service';
 import { changesOf } from './version-history.policy';
 import { VersionHistoryRepo, type HistoryEntryRecord } from './version-history.repo';
 import { ProposalRepo } from '../budget/proposal.repo';
@@ -21,7 +21,7 @@ export class VersionHistoryViewService {
     private readonly versions: VersionRepo,
     private readonly entries: VersionHistoryRepo,
     private readonly proposals: ProposalRepo,
-    private readonly support: BudgetSupportService,
+    private readonly facts: BudgetFactsService,
   ) {}
 
   /** Throws BudgetNotAHistoryReaderError and BudgetVersionNotFoundError. */
@@ -35,7 +35,7 @@ export class VersionHistoryViewService {
     if (!version) throw new BudgetVersionNotFoundError();
 
     const { items, total } = await this.entries.page(id, (query.page - 1) * query.pageSize, query.pageSize);
-    const people = await this.support.people(items.map((entry) => entry.changedByEmployeeId));
+    const people = await this.facts.people(items.map((entry) => entry.changedByEmployeeId));
 
     return pageOf(
       items.map((entry) => toWire(entry, version, people.get(entry.changedByEmployeeId)?.fullName ?? '')),
@@ -52,7 +52,7 @@ export class VersionHistoryViewService {
   private async requireReader(actor: AuthenticatedPrincipal, version: VersionRecord | null): Promise<void> {
     if (actor.roles.includes('FINANCE')) return;
     const proposal = version?.proposalId ? await this.proposals.findById(version.proposalId) : null;
-    const decider = deciderOf(await this.support.holders(), proposal?.submittedByEmployeeId ?? null);
+    const decider = deciderOf(await this.facts.holders(), proposal?.submittedByEmployeeId ?? null);
     if (decider.employeeId === null || decider.employeeId !== actor.employeeId)
       throw new BudgetNotAHistoryReaderError();
   }

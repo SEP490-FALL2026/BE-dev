@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { cutHistory } from '../../../core/application/pagination';
 import { BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { ParameterNotFoundError } from '../operating-parameters.errors';
 import { OperatingParametersRepo } from '../operating-parameters.repo';
 import {
@@ -36,7 +36,7 @@ export interface ParameterView {
 export class OperatingParametersApi {
   constructor(
     private readonly repo: OperatingParametersRepo,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
   ) {}
 
   /** The value in force now: the stored one, or the default of the parameter. Throws ParameterNotFoundError for an unknown key. */
@@ -130,6 +130,6 @@ export class OperatingParametersApi {
 
   /** The business date the organization is on now, for the non-working-date rules. */
   today(): Promise<BusinessDate> {
-    return this.organization.businessToday();
+    return this.organizationReads.businessToday();
   }
 }

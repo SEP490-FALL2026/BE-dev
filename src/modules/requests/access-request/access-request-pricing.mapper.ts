@@ -1,6 +1,7 @@
 import type { Prisma } from '../../../generated/prisma/client';
 import { fromDateColumn, toDateColumn } from '../../../core/business-date';
 import type { PricingRecord } from './access-request.types';
+import { paymentScheduleJson } from './access-request.json';
 import type { MissingPriceReason } from './pricing.policy';
 
 /** The columns of a request that carry its price, as the database returns them. */
@@ -17,14 +18,6 @@ type PricingRow = Pick<
   | 'paymentSchedule'
 >;
 
-interface ScheduleJson {
-  dueOn: string;
-  amountMinor: string;
-  budgetYear: number;
-  /** Absent in a schedule written before quotes existed: every payment of it binds. */
-  binding?: boolean;
-}
-
 export function toPricing(row: PricingRow): PricingRecord {
   const currency = row.amountCurrency;
 
@@ -36,14 +29,7 @@ export function toPricing(row: PricingRow): PricingRecord {
     amount: row.amountMinor !== null && currency !== null ? { amountMinor: row.amountMinor, currency } : null,
     unitPrice: row.unitPriceMinor !== null && currency !== null ? { amountMinor: row.unitPriceMinor, currency } : null,
     billingCycle: row.billingCycle,
-    schedule: Array.isArray(row.paymentSchedule)
-      ? (row.paymentSchedule as unknown as ScheduleJson[]).map((period) => ({
-          dueOn: period.dueOn,
-          amountMinor: BigInt(period.amountMinor),
-          budgetYear: period.budgetYear,
-          binding: period.binding ?? true,
-        }))
-      : null,
+    schedule: paymentScheduleJson.decode(row.paymentSchedule),
   };
 }
 
@@ -58,13 +44,6 @@ export function pricingColumns(pricing: PricingRecord) {
     amountCurrency: pricing.amount?.currency ?? null,
     unitPriceMinor: pricing.unitPrice?.amountMinor ?? null,
     billingCycle: pricing.billingCycle,
-    paymentSchedule: pricing.schedule
-      ? (pricing.schedule.map((period) => ({
-          dueOn: period.dueOn,
-          amountMinor: period.amountMinor.toString(),
-          budgetYear: period.budgetYear,
-          binding: period.binding,
-        })) as unknown as Prisma.InputJsonArray)
-      : undefined,
+    paymentSchedule: pricing.schedule ? paymentScheduleJson.encode(pricing.schedule) : undefined,
   };
 }

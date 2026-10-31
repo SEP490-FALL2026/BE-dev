@@ -326,8 +326,8 @@ describe('ops:inspect (integration, real PostgreSQL)', () => {
 
       beforeAll(async () => {
         process.env.TEST_DATABASE_URL = database.url;
-        const { InspectionModule } = await import('../../../src/modules/installation/inspect/inspection.module');
-        app = await NestFactory.createApplicationContext(InspectionModule, { logger: false });
+        const { InspectionCliModule } = await import('../../../src/modules/installation/inspect/inspection-cli.module');
+        app = await NestFactory.createApplicationContext(InspectionCliModule, { logger: false });
       }, 90000);
 
       afterAll(async () => {

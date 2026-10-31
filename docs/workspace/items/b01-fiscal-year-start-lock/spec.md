@@ -74,7 +74,7 @@ mục `PUBLIC_CONTRACT_EXPORTS` của gate `module-graph`, `openapi.json` và ar
   ánh xạ 409 `PARAMETER.LOCKED` ở `operating-parameters.http-errors.ts`.
 - `budgets` (tầng T5) đăng ký `FiscalYearStartLockReader` (`version/fiscal-year-start-lock.listener.ts`,
   `budgets.fiscal-year-start`) bằng `onModuleInit`; `VersionRepo.anyExists(tx)` đọc `budget_versions`; `VersionCreationService`
-  đọc tháng qua `BudgetSupportService.holdFiscalYearStartMonth(tx)` → `OperatingParametersApi.holdValue`.
+  đọc tháng qua `BudgetFactsService.holdFiscalYearStartMonth(tx)` → `OperatingParametersApi.holdValue`.
 - Bảng đọc: `budget_versions` (chỉ budgets). Bảng ghi: `parameter_values`, `audit_events` (không đổi). Không bảng/cột mới.
 - API: `PUT /api/v1/operating-parameters/{key}` thêm phản hồi 409 `PARAMETER.LOCKED` (`details: { key, reason }`,
   `reason = BUDGET_VERSION_EXISTS`); không route mới, request/response thành công không đổi.

@@ -76,7 +76,7 @@ function toWire(view: ParameterView) {
     isDefault: view.isDefault,
     unit: view.unit,
     description: view.description,
-    constraints: view.constraints as unknown as Record<string, unknown>,
+    constraints: view.constraints,
     changedAt: view.changedAt ? view.changedAt.toISOString() : null,
   };
 }

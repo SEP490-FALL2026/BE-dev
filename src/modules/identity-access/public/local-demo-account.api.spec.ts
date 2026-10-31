@@ -1,5 +1,5 @@
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { AccountDirectoryService } from '../accounts/account-directory.service';
+import { AccountRecordService } from '../accounts/account-record.service';
 import { CredentialService } from '../credentials/credential.service';
 import { RoleGrantService } from '../accounts/role-grant.service';
 import { DemoAccountRoleError } from './identity-access.errors';
@@ -32,7 +32,7 @@ describe('LocalDemoAccountApi', () => {
     };
     const credentials = { createCredential: jest.fn().mockResolvedValue(undefined) };
     const service = new LocalDemoAccountApi(
-      accounts as unknown as AccountDirectoryService,
+      accounts as unknown as AccountRecordService,
       grants as unknown as RoleGrantService,
       credentials as unknown as CredentialService,
     );

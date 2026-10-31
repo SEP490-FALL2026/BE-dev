@@ -4,6 +4,7 @@ import { AuditApi } from '../../src/modules/audit/public/audit.api';
 import { IdentityAccessApi } from '../../src/modules/identity-access/public/identity-access.api';
 import { NotificationsApi } from '../../src/modules/notifications/public/notifications.api';
 import { OrganizationApi } from '../../src/modules/organization/public/organization.api';
+import { OrganizationReadApi } from '../../src/modules/organization/public/organization-read.api';
 import { LeaveService } from '../../src/modules/personnel/leave/leave.service';
 import { NoticeHandlingService } from '../../src/modules/personnel/notice/notice-handling.service';
 import { OffboardingChangeService } from '../../src/modules/personnel/offboarding/change/offboarding-change.service';
@@ -41,7 +42,7 @@ export function superAdminEventService(app: INestApplicationContext): SuperAdmin
 
   return new SuperAdminEventApi(
     app.get(TransactionRunner, { strict: false }),
-    app.get(OrganizationApi, { strict: false }),
+    app.get(OrganizationReadApi, { strict: false }),
     app.get(IdentityAccessApi, { strict: false }),
     tickets,
     new SuperAdminTransferEvents(
@@ -57,6 +58,7 @@ export function superAdminEventService(app: INestApplicationContext): SuperAdmin
     ),
     new ProfileCorrectionService(
       app.get(OrganizationApi, { strict: false }),
+      app.get(OrganizationReadApi, { strict: false }),
       app.get(AuditApi, { strict: false }),
       app.get(NotificationsApi, { strict: false }),
     ),

@@ -5,7 +5,7 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { SubscriptionPeriodApi } from '../../catalog/public/subscription-period.api';
 import type { RenewalPeriodFacts } from '../../catalog/public/subscription-period.types';
 import { FinanceApi } from '../../finance/public/finance.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type {
   DeadlineEventWire,
   RankedSeatWire,
@@ -33,7 +33,7 @@ export class RenewalViewService {
     private readonly periods: SubscriptionPeriodApi,
     private readonly parties: RenewalPartiesService,
     private readonly ranking: RenewalRankingService,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly finance: FinanceApi,
   ) {}
 
@@ -75,7 +75,7 @@ export class RenewalViewService {
   async detailOf(record: RenewalRecord): Promise<RenewalDetailWire> {
     const period = (await this.periodsOf([record.subscriptionId])).get(record.subscriptionId);
     if (!period) throw new RenewalError('NOT_FOUND');
-    const today = await this.organization.businessToday();
+    const today = await this.organizationReads.businessToday();
     const seats = await this.ranking.seatsOf(record.subscriptionId, today);
 
     return toRenewalDetail(record, {
@@ -99,10 +99,13 @@ export class RenewalViewService {
     await this.assertReader(actor);
     const record = await this.repo.find(id);
     if (!record) throw new RenewalError('NOT_FOUND');
-    const seats = await this.ranking.seatsOf(record.subscriptionId, await this.organization.businessToday());
+    const seats = await this.ranking.seatsOf(record.subscriptionId, await this.organizationReads.businessToday());
     const slice = seats.ranked.slice((query.page - 1) * query.pageSize, query.page * query.pageSize);
     const people = new Map(
-      (await this.organization.getEmployees(slice.map((seat) => seat.employeeId))).map((person) => [person.id, person]),
+      (await this.organizationReads.getEmployees(slice.map((seat) => seat.employeeId))).map((person) => [
+        person.id,
+        person,
+      ]),
     );
     const items = slice.flatMap((seat): RankedSeatWire[] => {
       const person = people.get(seat.employeeId);

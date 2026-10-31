@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
-import type { RequestPolicy } from '../access-request/access-request.policy';
+import { requestPolicyJson } from '../access-request/access-request.json';
 import { hasSpendStep } from '../access-request/access-request.policy';
 import type { NeedStepState } from '../access-request/access-request.types';
 import type { WaitingReason } from '../access-request/routing.policy';
@@ -49,7 +49,7 @@ function toRow(row: Row): MyRequestRow {
     termMonths: row.termMonths,
     submittedAt: row.submittedAt,
     updatedAt: row.updatedAt,
-    hasSpendStep: hasSpendStep(row.policy as unknown as RequestPolicy),
+    hasSpendStep: hasSpendStep(requestPolicyJson.decode(row.policy)),
     beneficiaryEmployeeId: isGroup ? null : (row.beneficiaries[0]?.employeeId ?? null),
     lineCount: row._count.beneficiaries,
     needStepId: step.id,

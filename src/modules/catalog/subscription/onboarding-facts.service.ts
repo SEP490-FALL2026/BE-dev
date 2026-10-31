@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { CatalogOnboardingFacts, PlanSummary } from '../public/catalog.types';
-import { ApplicationLookupService } from '../catalog-entry/application-lookup.service';
-import { PlanLookupService } from '../plan/plan-lookup.service';
+import { ApplicationFactsService } from '../catalog-entry/application-facts.service';
+import { PlanFactsService } from '../plan/plan-facts.service';
 import { SubscriptionRepo } from './subscription.repo';
 
 /**
@@ -11,8 +11,8 @@ import { SubscriptionRepo } from './subscription.repo';
 @Injectable()
 export class OnboardingFactsService {
   constructor(
-    private readonly applications: ApplicationLookupService,
-    private readonly plans: PlanLookupService,
+    private readonly applications: ApplicationFactsService,
+    private readonly plans: PlanFactsService,
     private readonly subscriptions: SubscriptionRepo,
   ) {}
 

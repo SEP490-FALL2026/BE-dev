@@ -4,7 +4,9 @@ import { fromDateColumn, toDateColumn, type BusinessDate } from '../../../core/b
 import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
+import { offboardingChangeDetailJson, type ChangeDetail } from '../personnel-change-detail.json';
 import type { Grounds } from '../personnel-grounds.policy';
+import { offboardingHeadHandoverJson } from '../personnel-head-handover.json';
 import type {
   HeadHandoverFacts,
   OffboardingChangeKind,
@@ -35,7 +37,7 @@ export function toRecord(row: CaseRow): OffboardingRecord {
       issuer: row.groundsIssuer,
       issuedOn: fromDateColumn(row.groundsIssuedOn),
     },
-    headHandover: (row.headHandover as HeadHandoverFacts | null) ?? null,
+    headHandover: offboardingHeadHandoverJson.decode(row.headHandover),
     placementClosedId: row.placementClosedId,
     leftOn: date(row.leftOn),
     leftAt: row.leftAt,
@@ -54,8 +56,6 @@ export function toRecord(row: CaseRow): OffboardingRecord {
     recordedAt: row.recordedAt,
   };
 }
-
-const json = (value: HeadHandoverFacts | null) => (value ? (value as unknown as Prisma.InputJsonValue) : Prisma.DbNull);
 
 export interface NewOffboarding {
   organizationId: string;
@@ -105,7 +105,7 @@ export class OffboardingRepo {
         groundsReference: input.grounds.reference,
         groundsIssuer: input.grounds.issuer,
         groundsIssuedOn: toDateColumn(input.grounds.issuedOn),
-        headHandover: json(input.headHandover),
+        headHandover: offboardingHeadHandoverJson.encode(input.headHandover),
         placementClosedId: input.placementClosedId,
         ...(left ? { leftOn: toDateColumn(left.on), leftAt: new Date(), leftByAppUserId: left.by } : {}),
         recordedByAppUserId: input.recordedByAppUserId,
@@ -168,7 +168,7 @@ export class OffboardingRepo {
         lastWorkingDay: toDateColumn(to.lastWorkingDay),
         departureEffectiveOn: toDateColumn(to.departureEffectiveOn),
         handoverDueOn: toDateColumn(to.handoverDueOn),
-        headHandover: json(to.headHandover),
+        headHandover: offboardingHeadHandoverJson.encode(to.headHandover),
         placementClosedId: to.placementClosedId,
       },
     });
@@ -232,7 +232,7 @@ export class OffboardingRepo {
       oldLastWorkingDay?: BusinessDate | null;
       newLastWorkingDay?: BusinessDate | null;
       reason?: string | null;
-      detail?: Record<string, unknown> | null;
+      detail?: ChangeDetail | null;
       changedByAppUserId: string | null;
       changedByTicketId: string | null;
     },
@@ -245,7 +245,7 @@ export class OffboardingRepo {
         oldLastWorkingDay: input.oldLastWorkingDay ? toDateColumn(input.oldLastWorkingDay) : null,
         newLastWorkingDay: input.newLastWorkingDay ? toDateColumn(input.newLastWorkingDay) : null,
         reason: input.reason ?? null,
-        detail: input.detail ? (input.detail as unknown as Prisma.InputJsonValue) : Prisma.DbNull,
+        detail: offboardingChangeDetailJson.encode(input.detail ?? null),
         changedByAppUserId: input.changedByAppUserId,
         changedByTicketId: input.changedByTicketId,
       },
@@ -282,7 +282,7 @@ export class OffboardingRepo {
             oldLastWorkingDay: date(row.oldLastWorkingDay),
             newLastWorkingDay: date(row.newLastWorkingDay),
             reason: row.reason,
-            detail: (row.detail as Record<string, unknown> | null) ?? null,
+            detail: offboardingChangeDetailJson.decode(row.detail),
             changedByAppUserId: row.changedByAppUserId,
             changedByTicketId: row.changedByTicketId,
             changedAt: row.changedAt,

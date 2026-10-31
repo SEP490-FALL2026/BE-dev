@@ -3,7 +3,7 @@ import type { BusinessDate } from '../../../core/business-date';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { accessRequestAuditEvent } from '../access-request/access-request-audit-event.mapper';
 import {
   AccessRequestAlreadyHoldsAccessError,
@@ -51,7 +51,7 @@ export class AccessRequestService {
   constructor(
     private readonly runner: TransactionRunner,
     private readonly repo: AccessRequestRepo,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly assessment: RequestFactsService,
     private readonly audit: AuditApi,
     private readonly drafts: RequestDraftRepo,
@@ -83,8 +83,8 @@ export class AccessRequestService {
     if (!mayRequest(actor.roles)) throw new AccessRequestSuperAdminCannotRequestError();
     if (options.draftId) await this.lockDraft(tx, actor, options.draftId);
     // The person sending is relied on until commit: they cannot be removed from the company between the check and the write.
-    await this.organization.lockEmployeeForShare(tx, actor.employeeId);
-    const employee = await this.organization.getEmployee(actor.employeeId, tx);
+    await this.organizationReads.lockEmployeeForShare(tx, actor.employeeId);
+    const employee = await this.organizationReads.getEmployee(actor.employeeId, tx);
     if (!employee) throw new AccessRequestNoDepartmentError();
 
     const now = new Date();

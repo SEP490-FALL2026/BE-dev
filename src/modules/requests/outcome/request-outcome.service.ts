@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { RequestOutcomeListeners, type RequestOutcomeEvent } from '../public/requests.extension-points';
 
 /** The request an outcome is about: only what the listeners are told of it. */
@@ -22,7 +22,7 @@ export interface OutcomeSubject {
 export class RequestOutcomeService {
   constructor(
     private readonly listeners: RequestOutcomeListeners,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
   ) {}
 
   /** The grant of the request completed for these people: the seat is real. */
@@ -51,7 +51,7 @@ export class RequestOutcomeService {
       planId: request.planId,
       beneficiaryEmployeeIds: [...new Set(employeeIds)].sort(),
       outcome,
-      endedOn: await this.organization.businessToday(now, tx),
+      endedOn: await this.organizationReads.businessToday(now, tx),
     });
   }
 }

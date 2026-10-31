@@ -1,7 +1,7 @@
 import { DbTx, TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import { AuditApi } from '../../audit/public/audit.api';
 import { IdentityAccessInspectionApi } from '../../identity-access/public/identity-access-inspection.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { CURRENT_INSTALLATION_RECORDS } from '../inspect/inspection-facts.policy';
 import { InstallationInspectionApi } from './installation-inspection.api';
 
@@ -85,7 +85,7 @@ describe('InstallationInspectionApi', () => {
     const service = new InstallationInspectionApi(
       runner as unknown as TransactionRunner,
       migrations,
-      organization as unknown as OrganizationApi,
+      organization as unknown as OrganizationReadApi,
       audit as unknown as AuditApi,
       identity as unknown as IdentityAccessInspectionApi,
     );

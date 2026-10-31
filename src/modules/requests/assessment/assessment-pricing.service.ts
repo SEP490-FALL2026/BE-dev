@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { AccessRequestRecord, PricingRecord } from '../access-request/access-request.types';
 import type { Quote } from '../access-request/assessment-record.types';
 import { QuoteService } from './quote.service';
@@ -24,7 +24,7 @@ const NOT_APPLICABLE: PricingRecord = {
 @Injectable()
 export class AssessmentPricingService {
   constructor(
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly quotes: QuoteService,
   ) {}
 
@@ -34,7 +34,7 @@ export class AssessmentPricingService {
     quote: Quote,
     when: { now: Date; fiscalYearStartMonth: number },
   ): Promise<PricingRecord> {
-    const today = await this.organization.businessToday(when.now, tx);
+    const today = await this.organizationReads.businessToday(when.now, tx);
 
     return this.quotes.price(
       quote,
@@ -57,7 +57,7 @@ export class AssessmentPricingService {
     spendQuote: Parameters<QuoteService['read']>[0] | undefined,
     when: { now: Date; fiscalYearStartMonth: number },
   ): Promise<{ quote: Quote | null; pricing: PricingRecord }> {
-    const today = await this.organization.businessToday(when.now, tx);
+    const today = await this.organizationReads.businessToday(when.now, tx);
     const quote = spendQuote ? await this.quotes.read(spendQuote) : null;
     if (!quote) return { quote, pricing: NOT_APPLICABLE };
     const pricing = this.quotes.price(

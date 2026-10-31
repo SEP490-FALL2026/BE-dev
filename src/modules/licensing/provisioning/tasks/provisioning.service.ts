@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Page, pageOf } from '../../../../core/application/pagination';
 import type { AuthenticatedPrincipal } from '../../../../infrastructure/security/tokens/access-token-verifier.port';
-import { OrganizationApi } from '../../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../../organization/public/organization-read.api';
 import { ProvisioningBeneficiaryDepartedError, ProvisioningTaskNotFoundError } from '../../public/licensing.errors';
 import { GrantRequestGateHook, RevocationListeners } from '../../public/licensing.extension-points';
 import type { ProvisioningChannel, ProvisioningTaskStatus } from '../../public/licensing.types';
@@ -25,7 +25,7 @@ export class ProvisioningService {
     private readonly repo: ProvisioningTaskRepo,
     private readonly frame: ProvisioningTaskFrame,
     private readonly views: ProvisioningTaskViewService,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly gate: GrantRequestGateHook,
     private readonly revocation: RevocationListeners,
   ) {}
@@ -75,7 +75,7 @@ export class ProvisioningService {
         if (locked.kind === 'REVOKE') {
           await this.revocation.emit(tx, { moment: 'BEFORE_WORK', task: toRevocationFacts(locked), now });
         } else {
-          const beneficiary = await this.organization.getEmployee(locked.assignment.employeeId, tx);
+          const beneficiary = await this.organizationReads.getEmployee(locked.assignment.employeeId, tx);
           if (beneficiary && beneficiary.status !== 'ACTIVE') {
             throw new ProvisioningBeneficiaryDepartedError(locked.requestId ?? '');
           }
@@ -140,7 +140,7 @@ export class ProvisioningService {
   /** The persons in charge by default who no longer work: the tasks of those join the general queue. */
   private async responsibleWhoLeft(): Promise<string[]> {
     const ids = await this.repo.responsibleEmployeeIds();
-    const known = await this.organization.getEmployees(ids);
+    const known = await this.organizationReads.getEmployees(ids);
 
     return known.filter((employee) => employee.status !== 'ACTIVE').map((employee) => employee.id);
   }

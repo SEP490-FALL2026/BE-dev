@@ -5,7 +5,7 @@ import {
   type AccessTokenVerifierPort,
   type AuthenticatedPrincipal,
 } from '../../../src/infrastructure/security/tokens/access-token-verifier.port';
-import { AccountDirectoryService } from '../../../src/modules/identity-access/accounts/account-directory.service';
+import { AccountRecordService } from '../../../src/modules/identity-access/accounts/account-record.service';
 import { CredentialService } from '../../../src/modules/identity-access/credentials/credential.service';
 import { RoleGrantService } from '../../../src/modules/identity-access/accounts/role-grant.service';
 import { LoginService } from '../../../src/modules/identity-access/auth/login.service';
@@ -60,7 +60,7 @@ export async function buildActivatedAccount(
   // Hashing is the slow part and happens before the transaction, as in every credential write of the application.
   const credential = await ctx.app.get(IdentityAccessApi).prepareCredential(password, spec.email);
   const organization = ctx.app.get(OrganizationApi);
-  const accounts = ctx.app.get(AccountDirectoryService, { strict: false });
+  const accounts = ctx.app.get(AccountRecordService, { strict: false });
   const credentials = ctx.app.get(CredentialService, { strict: false });
   const grants = ctx.app.get(RoleGrantService, { strict: false });
 

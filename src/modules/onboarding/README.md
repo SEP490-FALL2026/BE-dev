@@ -26,7 +26,7 @@ organization ([module-graph](../../../docs/generated/module-graph.md)). Được
 Module nhỏ, chưa chia capability; mọi file ở gốc module.
 
 - `onboarding.controller.ts` — `GET /onboarding-checklist` (`SUPER_ADMIN`, `IT_ADMIN`) → `onboarding.service.ts`.
-- `onboarding.service.ts` — đọc `OrganizationApi.getOnboardingFacts`, `DataImportApi.latestEmployeeImport`,
+- `onboarding.service.ts` — đọc `OrganizationReadApi.getOnboardingFacts`, `DataImportApi.latestEmployeeImport`,
   `CatalogApi.getOnboardingFacts`, `LicensingSeatBaselineApi.getBaselineProgress`, `IdentityAccessApi.findUsableItAdminEmployeeIds`.
 - `onboarding.policy.ts` — ai được đọc; `onboarding.errors.ts` — `OnboardingForbiddenError`.
 - Nest: `onboarding.module.ts` (controller + service, chỉ API mount).

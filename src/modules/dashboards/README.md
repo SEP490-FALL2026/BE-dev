@@ -14,7 +14,7 @@ dùng bởi: không module nào; chỉ `app/app.module.ts` mount `DashboardsModu
 
 ## Bảng sở hữu
 
-- Không có. Mọi số đọc qua `LicensingDashboardApi`, `PersonnelDashboardApi`, `OrganizationApi`, `IdentityAccessApi`; không
+- Không có. Mọi số đọc qua `LicensingDashboardApi`, `PersonnelDashboardApi`, `OrganizationReadApi`, `IdentityAccessApi`; không
   câu SQL nào trong module này.
 
 ## Extension point

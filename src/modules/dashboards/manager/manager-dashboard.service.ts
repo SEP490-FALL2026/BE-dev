@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { LicensingDashboardApi } from '../../licensing/public/licensing-dashboard.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { PersonnelDashboardApi } from '../../personnel/public/personnel-dashboard.api';
 import { DashboardRefusedError } from '../section/dashboard-section.errors';
 import {
@@ -39,7 +39,7 @@ export interface ManagerDashboard {
 @Injectable()
 export class ManagerDashboardService {
   constructor(
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly licensing: LicensingDashboardApi,
     private readonly personnel: PersonnelDashboardApi,
   ) {}
@@ -47,10 +47,10 @@ export class ManagerDashboardService {
   /** Throws DashboardRefusedError for a caller without the head role or who heads no department on the business day. */
   async overview(actor: AuthenticatedPrincipal): Promise<ManagerDashboard> {
     assertHoldsRole(actor.roles, 'MANAGER');
-    const today = await this.organization.businessToday();
-    const headed = await this.organization.getHeadedDepartment(actor.employeeId, today);
+    const today = await this.organizationReads.businessToday();
+    const headed = await this.organizationReads.getHeadedDepartment(actor.employeeId, today);
     if (!headed) throw new DashboardRefusedError();
-    const department = await this.organization.getDepartmentBrief(headed.departmentId);
+    const department = await this.organizationReads.getDepartmentBrief(headed.departmentId);
     const software = await this.licensing.departmentFacts(headed.departmentId, today);
     if (!department || !software) throw new DashboardRefusedError();
     const reviews = await this.personnel.openTransferReviews(department.id);

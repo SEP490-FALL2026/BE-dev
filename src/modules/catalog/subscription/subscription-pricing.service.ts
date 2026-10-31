@@ -3,7 +3,7 @@ import type { Money } from '../../../core/money/money';
 import { MoneyOutOfRangeError } from '../../../core/money/money.errors';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { FinanceApi } from '../../finance/public/finance.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { toSnapshot } from './subscription.mapper';
 import type { PriceSnapshotRecord, UnitPriceRecord } from './subscription.types';
 
@@ -16,7 +16,7 @@ import type { PriceSnapshotRecord, UnitPriceRecord } from './subscription.types'
 export class SubscriptionPricingService {
   constructor(
     private readonly finance: FinanceApi,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
   ) {}
 
   /** Reads the unit price in the minor units of its currency; a negative price is out of range. */
@@ -36,7 +36,7 @@ export class SubscriptionPricingService {
     money: Money | null,
   ): Promise<{ unitPrice: UnitPriceRecord | null; priceSnapshot: PriceSnapshotRecord | null }> {
     if (money === null) return { unitPrice: null, priceSnapshot: null };
-    const recordedOn = await this.organization.businessToday(undefined, tx);
+    const recordedOn = await this.organizationReads.businessToday(undefined, tx);
     const result = await this.finance.snapshotMoney(tx, money, recordedOn);
 
     return {

@@ -5,11 +5,11 @@ import type { AuthenticatedPrincipal } from '../../../../infrastructure/security
 import { SubscriptionPeriodApi } from '../../../catalog/public/subscription-period.api';
 import type { RenewalPeriodFacts } from '../../../catalog/public/subscription-period.types';
 import { FinanceSetupIncompleteError } from '../../../organization/public/organization.errors';
-import { OrganizationApi } from '../../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../../organization/public/organization-read.api';
 import { RevocationService } from '../../provisioning/revocation.service';
 import { RenewalFinancialContributions } from '../../public/licensing.extension-points';
 import { RenewalPartiesService } from '../subscription-renewal-parties.service';
-import { RenewalDecisionSupport } from './renewal-decision-support.service';
+import { RenewalDecisionTrail } from './renewal-decision-trail.service';
 import { RenewalRankingService } from '../subscription-renewal-ranking.service';
 import type { RankedSeat } from '../subscription-renewal-ranking.policy';
 import { RenewalError } from '../subscription-renewal.errors';
@@ -60,8 +60,8 @@ export class RenewalDecisionService {
     private readonly ranking: RenewalRankingService,
     private readonly revocations: RevocationService,
     private readonly financial: RenewalFinancialContributions,
-    private readonly organization: OrganizationApi,
-    private readonly support: RenewalDecisionSupport,
+    private readonly organizationReads: OrganizationReadApi,
+    private readonly trail: RenewalDecisionTrail,
   ) {}
 
   /** Throws RenewalError, FinanceSetupIncompleteError and the refusals of the revocation gate; nothing is written then. */
@@ -71,14 +71,14 @@ export class RenewalDecisionService {
     input: DecideRenewalInput,
     now = new Date(),
   ): Promise<RenewalRecord> {
-    const today = await this.organization.businessToday(now);
+    const today = await this.organizationReads.businessToday(now);
     const current = await this.repo.find(id);
     if (!current) throw new RenewalError('NOT_FOUND');
     const [period] = await this.periods.getPeriods([current.subscriptionId]);
     if (!period) throw new RenewalError('NOT_FOUND');
     const snapshot = await this.snapshotOf(period, now);
 
-    return this.support.run(async (tx) => {
+    return this.trail.run(async (tx) => {
       const record = await this.repo.lock(tx, id);
       if (!record) throw new RenewalError('NOT_FOUND');
       const decider = await this.parties.deciderOf(record.proposedByEmployeeId, tx);
@@ -122,7 +122,7 @@ export class RenewalDecisionService {
         this.toRevoke(input.choice, seats.held, released),
         now,
       );
-      await this.support.told(tx, actor, decided, period, released);
+      await this.trail.told(tx, actor, decided, period, released);
 
       return decided;
     });
@@ -145,7 +145,7 @@ export class RenewalDecisionService {
       }),
     );
     if (!needsChargeableOwner({ choice: input.choice, quantity: input.quantity ?? null, withinCurrentTerm })) return;
-    const owner = await this.organization.getDepartmentBrief(period.ownerDepartmentId, tx);
+    const owner = await this.organizationReads.getDepartmentBrief(period.ownerDepartmentId, tx);
     if (!owner?.costCenterActive) throw new FinanceSetupIncompleteError(period.ownerDepartmentId);
   }
 

@@ -2,8 +2,8 @@ import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { RequestableSoftwareRepo } from '../../../src/modules/catalog/requestable-software/requestable-software.repo';
-import { SubscriptionLookupService } from '../../../src/modules/catalog/subscription/subscription-lookup.service';
-import { OrganizationApi } from '../../../src/modules/organization/public/organization.api';
+import { SubscriptionFactsService } from '../../../src/modules/catalog/subscription/subscription-facts.service';
+import { OrganizationReadApi } from '../../../src/modules/organization/public/organization-read.api';
 import { bodyOf } from '../../support/api-body';
 import { UNAVAILABLE_TOKEN, bearer, createHttpContractApp, principal } from '../../support/http-contract-app';
 
@@ -101,8 +101,8 @@ describe('the software a person may request (HTTP contract, no database)', () =>
     app = await createHttpContractApp({
       overrides: [
         { token: RequestableSoftwareRepo, useValue: repo },
-        { token: OrganizationApi, useValue: organization },
-        { token: SubscriptionLookupService, useValue: subscriptions },
+        { token: OrganizationReadApi, useValue: organization },
+        { token: SubscriptionFactsService, useValue: subscriptions },
       ],
     });
   });

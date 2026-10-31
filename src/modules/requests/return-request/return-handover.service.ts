@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { accessRequestAuditEvent } from '../access-request/access-request-audit-event.mapper';
 import { ReturnRequestRefusedError } from './return-request.errors';
 import { handoverConfirmRefusal, handoverOnTime, mayReadReturn } from './return-request.policy';
@@ -14,7 +14,7 @@ export class ReturnHandoverService {
   constructor(
     private readonly runner: TransactionRunner,
     private readonly returns: ReturnRequestRepo,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly audit: AuditApi,
   ) {}
 
@@ -23,9 +23,9 @@ export class ReturnHandoverService {
     return this.runner.run(async (tx) => {
       const now = new Date();
       const found = await this.returns.lockById(tx, id);
-      const headed = await this.organization.getHeadedDepartment(
+      const headed = await this.organizationReads.getHeadedDepartment(
         actor.employeeId,
-        await this.organization.businessToday(now, tx),
+        await this.organizationReads.businessToday(now, tx),
       );
       if (
         !found ||
@@ -44,7 +44,7 @@ export class ReturnHandoverService {
       if (refusal) throw new ReturnRequestRefusedError(refusal);
 
       await this.returns.confirmHandover(tx, found.id, actor.employeeId, now);
-      const today = await this.organization.businessToday(now, tx);
+      const today = await this.organizationReads.businessToday(now, tx);
       await this.audit.record(
         tx,
         accessRequestAuditEvent(

@@ -4,7 +4,7 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { AuditApi } from '../../audit/public/audit.api';
 import { LicensingApi } from '../../licensing/public/licensing.api';
 import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { OrganizationChange } from '../../organization/public/organization.types';
 import { PersonnelNotifier } from '../event-notice/personnel-notifier.service';
 import { personnelSystemAuditEvent } from '../personnel-audit-event.mapper';
@@ -28,7 +28,7 @@ export class TransferReviewService {
     private readonly reviews: TransferReviewRepo,
     private readonly licensing: LicensingApi,
     private readonly parameters: OperatingParametersApi,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly audit: AuditApi,
     private readonly notifier: PersonnelNotifier,
   ) {}
@@ -40,7 +40,7 @@ export class TransferReviewService {
     if (change.fromDepartmentId === null || change.fromDepartmentId === change.toDepartmentId) return;
     if (await this.reviews.findByPlacement(tx, change.placementId)) return;
 
-    const employee = await this.organization.getEmployee(change.employeeId, tx);
+    const employee = await this.organizationReads.getEmployee(change.employeeId, tx);
     if (!employee || employee.status !== 'ACTIVE' || employee.workState === 'LEFT') return;
 
     await this.supersedeEarlier(tx, change);
@@ -92,11 +92,11 @@ export class TransferReviewService {
     tx: DbTx,
     review: { id: string; organizationId: string; employeeId: string; departmentId: string; dueOn: string },
   ): Promise<void> {
-    const today = await this.organization.businessToday(new Date(), tx);
+    const today = await this.organizationReads.businessToday(new Date(), tx);
     // The department is taken FOR SHARE before its head is read: the assignment of a first head holds it FOR UPDATE and hands
     // over the notices kept before it commits, so a notice is never kept for a department that has a head by then.
-    await this.organization.lockDepartmentShared(tx, review.departmentId);
-    const head = (await this.organization.getDepartmentHeads([review.departmentId], today, tx)).get(
+    await this.organizationReads.lockDepartmentShared(tx, review.departmentId);
+    const head = (await this.organizationReads.getDepartmentHeads([review.departmentId], today, tx)).get(
       review.departmentId,
     );
     await this.notifier.reviewDue(tx, {

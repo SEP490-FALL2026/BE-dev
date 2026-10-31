@@ -3,7 +3,7 @@ import { OrganizationContextService } from '../../src/modules/organization/organ
 
 /**
  * Says what day the organization is on, for a test. The one seam of that day is `OrganizationContextService.businessToday`: the
- * capabilities of the organization module read it there directly, and `OrganizationApi.businessToday` (the door the other modules use)
+ * capabilities of the organization module read it there directly, and `OrganizationReadApi.businessToday` (the door the other modules use)
  * delegates to it, so a stub here is seen by every reader of the day. A spy on the facade would not be: the capabilities of the
  * organization module never go through it, so they would keep reading the real day. Restore it with `jest.restoreAllMocks()` or the
  * returned spy's `mockRestore()`.

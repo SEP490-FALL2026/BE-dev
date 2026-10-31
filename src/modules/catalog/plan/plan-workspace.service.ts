@@ -4,7 +4,7 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { AuditApi } from '../../audit/public/audit.api';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { EmployeeNotFoundError } from '../../organization/public/organization.errors';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { catalogAuditEvent } from '../catalog-audit-event.mapper';
 import {
   PlanNotFoundError,
@@ -63,7 +63,7 @@ const sameSnapshot = (a: ReturnType<typeof snapshot>, b: ReturnType<typeof snaps
 export class PlanWorkspaceService {
   constructor(
     private readonly plans: PlanRepo,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly identity: IdentityAccessApi,
     private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
@@ -82,7 +82,7 @@ export class PlanWorkspaceService {
     const adminLimit = input.adminLimit ?? null;
     const procedure = cleanWorkspaceText(input.ownerTransferProcedure);
     const emergency = input.emergencyAccount ? this.cleanEmergency(input.emergencyAccount) : null;
-    const organization = await this.organization.getOrganization();
+    const organization = await this.organizationReads.getOrganization();
     if (!organization) throw new Error('The workspace profile was used before installation');
 
     const stored = await this.runner.run(async (tx) => {
@@ -146,7 +146,7 @@ export class PlanWorkspaceService {
       ...profile.members.map((member) => member.employeeId),
       ...(profile.emergencyAccount ? [profile.emergencyAccount.holderEmployeeId] : []),
     ]);
-    const employees = await this.organization.getEmployees([...ids]);
+    const employees = await this.organizationReads.getEmployees([...ids]);
     const people = new Map<string, PersonView>(
       employees.map((employee) => [
         employee.id,
@@ -191,12 +191,12 @@ export class PlanWorkspaceService {
    */
   private async requireItAdmin(tx: DbTx, employeeId: string): Promise<void> {
     try {
-      await this.organization.lockEmployeeForShare(tx, employeeId);
+      await this.organizationReads.lockEmployeeForShare(tx, employeeId);
     } catch (error) {
       if (error instanceof EmployeeNotFoundError) throw new PlanWorkspacePersonInvalidError(employeeId);
       throw error;
     }
-    const employee = await this.organization.getEmployee(employeeId, tx);
+    const employee = await this.organizationReads.getEmployee(employeeId, tx);
     if (!employee || employee.status !== 'ACTIVE') throw new PlanWorkspacePersonInvalidError(employeeId);
     const account = await this.identity.inspectEmployeeAccount(tx, employeeId);
     if (!account.usable || !account.roles.includes('IT_ADMIN')) throw new PlanWorkspacePersonInvalidError(employeeId);

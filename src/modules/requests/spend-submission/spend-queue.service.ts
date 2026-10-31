@@ -8,7 +8,7 @@ import { BudgetCheckRepo } from '../spend/budget-check.repo';
 import { FinanceReviewRepo } from '../spend/finance-review.repo';
 import { SlaQueueAgeService } from '../sla/sla-queue-age.service';
 import { SpendHeadService } from './spend-head.service';
-import { SpendReadSupport } from '../spend/spend-read.service';
+import { SpendWireViewService } from '../spend/spend-wire-view.service';
 import { SpendRequestRepo } from '../spend/spend-request.repo';
 import { queuedStatus } from '../spend/spend-status.service';
 import type { QueueItemWire } from '../spend/spend-submission.dto';
@@ -28,7 +28,7 @@ export class SpendQueueService {
     private readonly checks: BudgetCheckRepo,
     private readonly reviews: FinanceReviewRepo,
     private readonly catalog: CatalogApi,
-    private readonly support: SpendReadSupport,
+    private readonly wireView: SpendWireViewService,
     private readonly age: SlaQueueAgeService,
   ) {}
 
@@ -42,13 +42,13 @@ export class SpendQueueService {
       this.checks.latestOf(ids),
       this.reviews.latestOf(ids),
       planIds.length === 0 ? Promise.resolve([]) : this.catalog.getPlanSummaries(planIds),
-      this.support.people(
+      this.wireView.people(
         rows.flatMap((row) => [
           row.requesterEmployeeId,
           row.type === 'GROUP_GRANT' ? null : (row.beneficiaries[0]?.employeeId ?? null),
         ]),
       ),
-      this.support.units(rows.map((row) => row.amountCurrency)),
+      this.wireView.units(rows.map((row) => row.amountCurrency)),
       this.age.ageOf(rows.map((row) => ({ requestId: row.id, queuedAt: row.spendQueuedAt }))),
     ]);
     const items = rows.map((row): QueueItemWire => {

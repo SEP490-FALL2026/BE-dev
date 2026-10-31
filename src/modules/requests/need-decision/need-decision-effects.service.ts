@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { accessRequestAuditEvent } from '../access-request/access-request-audit-event.mapper';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
@@ -22,7 +22,7 @@ export class NeedDecisionEffects {
   constructor(
     private readonly repo: AccessRequestRepo,
     private readonly steps: AssessmentStepRepo,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly audit: AuditApi,
     private readonly entry: SpendEntryService,
     private readonly renewals: RenewalApplyService,
@@ -62,9 +62,9 @@ export class NeedDecisionEffects {
     request: AccessRequestRecord,
     decidedAt: Date,
   ): Promise<void> {
-    const inCharge = await this.organization.getItAdminInCharge(
+    const inCharge = await this.organizationReads.getItAdminInCharge(
       request.requesterEmployeeId,
-      await this.organization.businessToday(decidedAt, tx),
+      await this.organizationReads.businessToday(decidedAt, tx),
     );
     await this.steps.add(tx, {
       requestId: request.id,

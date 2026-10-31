@@ -69,10 +69,10 @@ nhận qua tham số hay biến môi trường).
 
 CLI dùng `InstallationConfigurationModule` chỉ validate môi trường và DB; API/worker giữ config đầy đủ.
 `IdentityAccessFacadeModule` (DatabaseModule + OrganizationModule) cung cấp facade `IdentityAccessService` cùng bốn
-contract của `accounts` (`AccountDirectoryService`, `RoleGrantService`, `ActionLinkService`, `CredentialService`) dùng
-chung instance cho `IdentityAccessModule` và `RecoveryModule`; repo AppUser/credential/RoleGrant/action token và
+contract của `accounts` (`AccountRecordService`, `RoleGrantService`, `ActionLinkService`, `CredentialService`) dùng
+chung instance cho `IdentityAccessModule` và `IdentityAccessRecoveryCliModule`; repo AppUser/credential/RoleGrant/action token và
 `PasswordHasher` là provider riêng sau các contract đó. CLI và worker chỉ import module này nên không dựng controller,
-JWT hay workflow đăng nhập; CLI cũng không kéo SMTP/outbox. `RecoveryModule` (lệnh khôi phục) chỉ export hai entry
+JWT hay workflow đăng nhập; CLI cũng không kéo SMTP/outbox. `IdentityAccessRecoveryCliModule` (lệnh khôi phục) chỉ export hai entry
 `HolderRecoveryService`, `RoleTransferRecoveryService`; provider mà cả API và lệnh khôi phục cần nhưng facade không cần
 (ví dụ `SessionRepo`, `RecoveryRepo`, hai port `ACCOUNT_SESSIONS`, `APPROVAL_ROLE_HOLDINGS`) khai ở cả hai module theo
 E6, ghim bằng danh sách chính xác. [Module graph test](../../test/gates/module-graph.gate-spec.ts) đọc metadata Nest
@@ -139,10 +139,10 @@ Hiện API, worker và PostgreSQL trên VPS cùng một máy nên ràng buộc n
 ([nghiệm thu §5](../reviews/be-architecture-test-acceptance-2026-10-29/README.md#5-tiêu-chí-ổn-định-khi-chạy-song-song) ghi phép
 kiểm gốc).
 
-Lệnh vận hành theo [operational commands](../rules/operational-commands.md). `InspectionModule` (H6.1) chỉ xác thực biến
+Lệnh vận hành theo [operational commands](../rules/operational-commands.md). `InspectionCliModule` (H6.1) chỉ xác thực biến
 DB, import `ReadOnlyDatabaseSessionModule` nên mọi phiên PostgreSQL mở `default_transaction_read_only=on`, và đọc qua
 `OrganizationService`, `AuditService.countByAction` và `IdentityAccessInspectionService`
-(`identity-access-inspection-facade.module.ts`, chỉ trong đồ thị này). `DevSeedModule` (H6.2) chỉ xác thực biến DB, kiểm
+(`identity-access-inspection-facade.module.ts`, chỉ trong đồ thị này). `DevSeedCliModule` (H6.2) chỉ xác thực biến DB, kiểm
 ba chốt local trước transaction và ghi qua `OrganizationService`, `LocalDemoAccountService`
 (`identity-access-local-seed-facade.module.ts`, chỉ trong đồ thị này) và `AuditService`. Không đồ thị lệnh nào tới được
 từ `AppModule`/`WorkerModule` (`module-graph.spec.ts`, `operational-commands.spec.ts`). Storage adapter hỗ trợ endpoint

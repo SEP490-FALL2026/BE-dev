@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { calendarWindowOf, dueOnOf, type DueStep } from './step-due-on.policy';
 
 /**
@@ -11,14 +11,14 @@ import { calendarWindowOf, dueOnOf, type DueStep } from './step-due-on.policy';
 @Injectable()
 export class StepDueOnService {
   constructor(
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly parameters: OperatingParametersApi,
   ) {}
 
   /** The due day of each step by its id; an empty page reads nothing. */
   async dueOn(steps: readonly (DueStep & { id: string })[]): Promise<Map<string, string>> {
     if (steps.length === 0) return new Map();
-    const organization = await this.organization.getOrganization();
+    const organization = await this.organizationReads.getOrganization();
     if (!organization) throw new Error('The organization is not set up, so a deadline cannot be counted.');
     const window = calendarWindowOf(steps, organization.timeZone);
     if (!window) return new Map();

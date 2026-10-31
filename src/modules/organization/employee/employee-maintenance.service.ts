@@ -12,7 +12,7 @@ import {
   EmployeeOpenSeatNeedsEndError,
 } from '../public/organization.errors';
 import { OrganizationContextService } from '../organization-context.service';
-import { EmployeeDirectoryService } from '../employee/employee-directory.service';
+import { EmployeeRecordService } from '../employee/employee-record.service';
 import type { EmployeeRecord } from '../public/organization.types';
 import { EmployeeWorkState, EmploymentType } from '../public/organization.types';
 import { EmployeeRowInvalidError, EmployeeUpdateEmptyError } from './employee.errors';
@@ -54,7 +54,7 @@ export interface MaintainedEmployeeView {
 export class EmployeeMaintenanceService {
   constructor(
     private readonly context: OrganizationContextService,
-    private readonly employees: EmployeeDirectoryService,
+    private readonly employees: EmployeeRecordService,
     private readonly audit: AuditApi,
     private readonly notifications: NotificationsApi,
     private readonly runner: TransactionRunner,

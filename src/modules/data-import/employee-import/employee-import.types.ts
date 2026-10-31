@@ -1,4 +1,4 @@
-import type { ImportRecord } from './employee-import.repo';
+export type ImportStatus = 'PREVIEW' | 'COMPLETED' | 'CANCELLED';
 
 /** What the preview says about a people file as a whole (`US-02-01`, `US-02-02`). */
 export interface ImportSummary {
@@ -34,7 +34,7 @@ export interface ImportResult {
 export interface ImportView {
   id: string;
   fileName: string;
-  status: ImportRecord['status'];
+  status: ImportStatus;
   previewVersion: number;
   ignoredColumns: string[];
   summary: ImportSummary;

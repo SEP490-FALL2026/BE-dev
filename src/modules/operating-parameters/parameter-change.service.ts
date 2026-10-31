@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { TransactionRunner, type DbTx } from '../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../audit/public/audit.api';
-import { OrganizationApi } from '../organization/public/organization.api';
+import { OrganizationReadApi } from '../organization/public/organization-read.api';
 import {
   ParameterLockedError,
   ParameterNotFoundError,
@@ -28,7 +28,7 @@ export class ParameterChangeService {
   constructor(
     private readonly repo: OperatingParametersRepo,
     private readonly parameters: OperatingParametersApi,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
     private readonly locks: ParameterLockContributions,
@@ -42,7 +42,7 @@ export class ParameterChangeService {
    */
   async set(actor: AuthenticatedPrincipal, key: string, value: unknown): Promise<ParameterView> {
     if (!definitionOf(key)) throw new ParameterNotFoundError(key);
-    const organization = await this.organization.getOrganization();
+    const organization = await this.organizationReads.getOrganization();
     if (!organization) throw new Error('The operating parameters were used before installation');
 
     await this.runner.run(async (tx) => {

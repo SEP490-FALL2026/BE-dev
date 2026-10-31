@@ -1,6 +1,7 @@
 import request from 'supertest';
 import { TransactionRunner } from '../../src/infrastructure/database/transaction-runner';
 import { OrganizationApi } from '../../src/modules/organization/public/organization.api';
+import { OrganizationReadApi } from '../../src/modules/organization/public/organization-read.api';
 import type { NewOrganizationChange } from '../../src/modules/organization/public/organization.types';
 import { StepReassignmentService } from '../../src/modules/requests/reassignment/step-reassignment.service';
 import {
@@ -110,7 +111,7 @@ export class ReassignmentHarness extends SpendHarness {
 
     return new StepRedeterminationSweepApi(
       app.get(StepReassignmentService, { strict: false }),
-      app.get(OrganizationApi, { strict: false }),
+      app.get(OrganizationReadApi, { strict: false }),
     );
   }
 

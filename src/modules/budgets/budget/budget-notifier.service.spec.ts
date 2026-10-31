@@ -5,9 +5,9 @@ import { FinanceApi } from '../../finance/public/finance.api';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { NotificationsApi } from '../../notifications/public/notifications.api';
 import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { BudgetNotifierService } from './budget-notifier.service';
-import { BudgetSupportService } from './budget-support.service';
+import { BudgetFactsService } from './budget-facts.service';
 import type { ProposalRecord } from './proposal.repo';
 
 const tx = { name: 'tx' } as unknown as DbTx;
@@ -40,7 +40,7 @@ describe('the notices of the budget loops that may be kept for a department with
       const moduleRef = await Test.createTestingModule({
         providers: [
           BudgetNotifierService,
-          { provide: BudgetSupportService, useValue: support },
+          { provide: BudgetFactsService, useValue: support },
           { provide: NotificationsApi, useValue: notifications },
         ],
       }).compile();
@@ -103,14 +103,14 @@ describe('the notices of the budget loops that may be kept for a department with
     });
   });
 
-  describe('BudgetSupportService.currentHeadOfLocked', () => {
+  describe('BudgetFactsService.currentHeadOfLocked', () => {
     const organization = { lockDepartmentShared: jest.fn(), getDepartmentHeads: jest.fn() };
 
-    async function support(): Promise<BudgetSupportService> {
+    async function support(): Promise<BudgetFactsService> {
       const moduleRef = await Test.createTestingModule({
         providers: [
-          BudgetSupportService,
-          { provide: OrganizationApi, useValue: organization },
+          BudgetFactsService,
+          { provide: OrganizationReadApi, useValue: organization },
           { provide: FinanceApi, useValue: {} },
           { provide: OperatingParametersApi, useValue: {} },
           { provide: IdentityAccessApi, useValue: {} },
@@ -118,7 +118,7 @@ describe('the notices of the budget loops that may be kept for a department with
         ],
       }).compile();
 
-      return moduleRef.get(BudgetSupportService);
+      return moduleRef.get(BudgetFactsService);
     }
 
     beforeEach(() => {

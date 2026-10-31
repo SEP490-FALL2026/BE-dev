@@ -5,6 +5,7 @@ import { AuditApi } from '../../audit/public/audit.api';
 import { FinanceApi } from '../../finance/public/finance.api';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { AlreadyInstalledError, InstallationInputError } from './installation.errors';
 import { InstallationInput, installationInputSchema } from '../installation.dto';
 import { InstallationRepo } from '../installation.repo';
@@ -30,6 +31,7 @@ export class InstallationApi {
   constructor(
     private readonly runner: TransactionRunner,
     private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly identity: IdentityAccessApi,
     private readonly audit: AuditApi,
     private readonly repo: InstallationRepo,
@@ -60,7 +62,7 @@ export class InstallationApi {
     return this.runner.run(async (tx) => {
       await this.repo.lockInstallation(tx);
       // Read after the lock: a concurrent installer that finished first is visible now.
-      if (await this.organization.getOrganization(tx)) throw new AlreadyInstalledError();
+      if (await this.organizationReads.getOrganization(tx)) throw new AlreadyInstalledError();
 
       const operator = {
         actorKind: 'OPERATOR' as const,

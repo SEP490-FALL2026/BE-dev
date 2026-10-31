@@ -27,8 +27,8 @@ operation trong hợp đồng Mobile. Hạng mục không thêm route, bảng ha
 
 ## Primary Story/AC
 
-| Story    | AC                    | Coverage | Phần còn lại thuộc                                                                                                                                                                                                  |
-| -------- | --------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Story    | AC              | Coverage | Phần còn lại thuộc                                                                                                                                                                                                                                                |
+| -------- | --------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | US-16-01 | AC-1→AC-6, AC-8 | partial  | AC-1 vế read model: `a02-my-software-read-model`; AC-2: route và dữ liệu `b03-my-requests` (Dev B), còn lại ở `a07-mobile-employee-flow` là bước list trong smoke/E2E Mobile và ánh xạ màn hình; AC-7: not affected (hành vi app native, BE không chặn theo kênh) |
 
 - **AC-1** (vế Mobile): chuỗi gọi `GET /me/software-rights` từ client mobile sau khi Request được cấp; chỉ quyền của người

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma } from '../../generated/prisma/client';
 import { DbTx } from '../../infrastructure/database/transaction-runner';
-import { AuditCursor, AuditEventInput, AuditEventSlice, AuditValue } from './public/audit.types';
+import { auditEventAfterJson, auditEventBeforeJson } from './audit-event-payload.json';
+import { AuditCursor, AuditEventInput, AuditEventSlice } from './public/audit.types';
 
 interface SliceRow {
   id: string;
@@ -11,7 +11,8 @@ interface SliceRow {
   resource_type: string;
   resource_id: string;
   actor_app_user_id: string | null;
-  after: { [key: string]: AuditValue } | null;
+  /** The JSON as PostgreSQL returns it; `auditEventAfterJson` says what it is. */
+  after: unknown;
 }
 
 @Injectable()
@@ -28,8 +29,8 @@ export class AuditRepo {
         action: event.action,
         resourceType: event.resourceType,
         resourceId: event.resourceId,
-        before: event.before ?? Prisma.DbNull,
-        after: event.after ?? Prisma.DbNull,
+        before: auditEventBeforeJson.encode(event.before ?? null),
+        after: auditEventAfterJson.encode(event.after ?? null),
         correlationId: event.correlationId,
         operatorReference: event.operatorReference ?? null,
       },
@@ -67,7 +68,7 @@ export class AuditRepo {
       resourceType: row.resource_type,
       resourceId: row.resource_id,
       actorAppUserId: row.actor_app_user_id,
-      after: row.after,
+      after: auditEventAfterJson.decode(row.after),
     }));
   }
 

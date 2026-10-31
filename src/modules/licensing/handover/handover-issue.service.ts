@@ -3,7 +3,7 @@ import type { BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { AssignmentEndService } from '../assignment/assignment-end.service';
 import { licensingAuditEvent } from '../licensing-audit-event.mapper';
 import type { OperatorAuditActor } from '../public/licensing-handover.types';
@@ -44,7 +44,7 @@ export class HandoverIssueService {
   constructor(
     private readonly repo: HandoverRepo,
     private readonly ending: AssignmentEndService,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly audit: AuditApi,
     private readonly alerts: HandoverAlertService,
   ) {}
@@ -54,7 +54,7 @@ export class HandoverIssueService {
     if (!required) return { outcome: 'NOT_REQUIRED' };
 
     await this.ending.lock(tx, input.assignmentId);
-    const organization = await this.organization.getOrganization(tx);
+    const organization = await this.organizationReads.getOrganization(tx);
     if (!organization) throw new Error('A handover was opened before installation');
 
     const open = await this.repo.lockOpenOf(tx, input.assignmentId);

@@ -35,12 +35,16 @@ Không có log gốc của lần chạy lại lỗi trên VPS trong repo BE/Docs
   không trùng tài khoản/Audit; 0 khóa; kết nối khóa đứt không che báo cáo.
 - Verify: integration đỏ trên mã cũ, xanh trên mã mới (evidence).
 
+> **01/11/2026 — sau tích hợp refactor lượt 2:** `release()` của `session-advisory-lock.ts` lại ném khi kết nối giữ khóa đã đứt (đóng kết nối trong mọi trường hợp); báo cáo của lượt do người gọi giữ (`runDemoDataset`, phase `lock-release`, kèm cảnh báo "The apply lock could not be released"), nên một lượt apply thứ hai không bị chặn từ lúc đó vẫn được nói ra cho operator.
+
 ### Task 3: mã nguyên nhân trong báo cáo lỗi
 
 - Files: `src/cli/demo-dataset/demo-dataset-failure.ts` (+ spec), `demo-dataset-runner.ts`, `demo-dataset.command.ts`.
 - Depends on: none.
 - Acceptance: bước `failed` và dòng lỗi cuối kèm `[P2028]`, `[Query read timeout]`, `[ECONNRESET]`…; không URL/giá trị.
 - Verify: `pnpm exec jest src/cli/demo-dataset`.
+
+> **01/11/2026 — sau tích hợp refactor lượt 2 (`be-readability-debuggability-followup`):** dòng lỗi do `src/cli/demo-dataset/demo-failure.ts` in dạng `code=… sqlState=… retryable=… pg="…"`; cùng thông tin, khác định dạng (`demo-dataset-failure.ts` và các nhãn `[P2028]`, `[Query read timeout]`, `[ECONNRESET]` nêu ở đây không còn).
 
 ### Task 4: hướng dẫn kiểm chứng và runbook
 

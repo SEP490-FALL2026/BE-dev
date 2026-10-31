@@ -2,8 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { Page, pageOf } from '../../../core/application/pagination';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { CatalogApi } from '../../catalog/public/catalog.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
-import { SpendReadSupport } from '../spend/spend-read.service';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import { SpendWireViewService } from '../spend/spend-wire-view.service';
 import { StepDueOnService } from '../spend-approval-view/step-due-on.service';
 import type { NeedQueueItemWire } from './need-decision-queue.dto';
 import { needQueueItemOf, type NeedQueueLookups } from './need-decision-queue.mapper';
@@ -21,8 +21,8 @@ export class NeedDecisionQueueService {
   constructor(
     private readonly steps: NeedDecisionQueueRepo,
     private readonly catalog: CatalogApi,
-    private readonly organization: OrganizationApi,
-    private readonly support: SpendReadSupport,
+    private readonly organizationReads: OrganizationReadApi,
+    private readonly wireView: SpendWireViewService,
     private readonly deadlines: StepDueOnService,
   ) {}
 
@@ -51,15 +51,15 @@ export class NeedDecisionQueueService {
     if (rows.length === 0) return { people: new Map(), plans: [], departments: [], units: new Map(), due: new Map() };
     const planIds = [...new Set(rows.flatMap(({ request }) => (request.planId === null ? [] : [request.planId])))];
     const [people, plans, departments, units, due] = await Promise.all([
-      this.support.people(
+      this.wireView.people(
         rows.flatMap(({ request }) => [
           request.requesterEmployeeId,
           request.type === 'GROUP_GRANT' ? null : (request.beneficiaries[0]?.employeeId ?? null),
         ]),
       ),
       planIds.length === 0 ? Promise.resolve([]) : this.catalog.getPlanSummaries(planIds),
-      this.organization.getDepartmentBriefs([...new Set(rows.map(({ request }) => request.departmentId))]),
-      this.support.units(rows.map(({ request }) => request.amountCurrency)),
+      this.organizationReads.getDepartmentBriefs([...new Set(rows.map(({ request }) => request.departmentId))]),
+      this.wireView.units(rows.map(({ request }) => request.amountCurrency)),
       this.deadlines.dueOn(
         rows.map((row) => ({ id: row.id, createdAt: row.createdAt, slaWorkingDays: row.slaWorkingDays })),
       ),

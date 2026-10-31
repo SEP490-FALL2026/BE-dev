@@ -2,11 +2,12 @@ import { Injectable, Logger } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { isWorkingDay, wallClockAt, workingDaysBetween } from '../../../core/working-days';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
+import { describeForOperator, traceForOperator } from '../../../infrastructure/observability/operator-error';
 import { AuditApi } from '../../audit/public/audit.api';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { NotificationsApi } from '../../notifications/public/notifications.api';
 import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { CongestionRepo } from './congestion.repo';
 import { isBacklog } from './step-sla.policy';
 
@@ -32,15 +33,15 @@ export class BacklogAlertService {
     private readonly notifications: NotificationsApi,
     private readonly audit: AuditApi,
     private readonly identity: IdentityAccessApi,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly parameters: OperatingParametersApi,
   ) {}
 
   async alert(now: Date = new Date()): Promise<BacklogAlertResult> {
     const result: BacklogAlertResult = { alerted: 0, failed: 0 };
-    const organization = await this.organization.getOrganization();
+    const organization = await this.organizationReads.getOrganization();
     if (!organization) return result;
-    const today = await this.organization.businessToday(now);
+    const today = await this.organizationReads.businessToday(now);
     if (!isWorkingDay(today, await this.parameters.getNonWorkingDates(today, today))) return result;
 
     const threshold = Number(await this.parameters.getValueAt('BACKLOG_ALERT_THRESHOLD', now));
@@ -105,7 +106,10 @@ export class BacklogAlertService {
         if (written) result.alerted += 1;
       } catch (error) {
         result.failed += 1;
-        this.logger.error(`The alert of a backlog failed: ${(error as Error).name}`);
+        this.logger.error(
+          `The alert of a backlog failed (holder ${holder.holderEmployeeId}): ${describeForOperator(error)}`,
+          traceForOperator(error),
+        );
       }
     }
 

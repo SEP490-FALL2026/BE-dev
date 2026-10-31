@@ -6,7 +6,7 @@ import { formatRate, parseRate } from '../../../core/money/rate';
 import { readSqlState, TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { CurrencyService } from '../currency/currency.service';
 import type { ExchangeRateRecord } from '../public/finance.types';
 import { financeAuditEvent } from '../finance-audit-event.mapper';
@@ -32,7 +32,7 @@ export class ExchangeRateService {
   constructor(
     private readonly currencies: CurrencyService,
     private readonly ledger: ExchangeRateLedgerService,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
   ) {}
@@ -72,7 +72,7 @@ export class ExchangeRateService {
   ): Promise<ExchangeRateView> {
     const rate = parseRate(input.rate);
     if (!(await this.currencies.find(input.currency))) throw new CurrencyNotSupportedError(input.currency);
-    const problem = rateDateProblem(input.rateDate, await this.organization.businessToday());
+    const problem = rateDateProblem(input.rateDate, await this.organizationReads.businessToday());
     if (problem === 'DATE_IN_FUTURE') throw new ExchangeRateDateInFutureError();
     if (problem === 'DATE_TOO_OLD') throw new ExchangeRateDateTooOldError();
 
@@ -81,7 +81,7 @@ export class ExchangeRateService {
         // The reporting currency that governs the rate, read with the organization row held FOR SHARE until the rate
         // commits (DB-01): a change in flight is waited for and then read, and a change after this one waits
         // for the rate and is refused by the lock. The check, the audit and the answer all speak this currency.
-        const organization = await this.organization.getOrganizationShared(tx);
+        const organization = await this.organizationReads.getOrganizationShared(tx);
         if (!organization) throw new Error('Exchange rates were used before installation');
         if (input.currency === organization.reportingCurrency) {
           throw new ExchangeRateSameAsReportingCurrencyError(input.currency);
@@ -115,7 +115,7 @@ export class ExchangeRateService {
   }
 
   private async requireOrganization() {
-    const organization = await this.organization.getOrganization();
+    const organization = await this.organizationReads.getOrganization();
     if (!organization) throw new Error('Exchange rates were used before installation');
 
     return organization;

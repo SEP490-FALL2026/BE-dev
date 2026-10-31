@@ -4,7 +4,7 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { AuditApi } from '../../audit/public/audit.api';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { NotificationsApi } from '../../notifications/public/notifications.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { ProvisioningAnotherItAdminNeededError } from '../public/licensing.errors';
 import { ProvisioningTaskFrame } from './provisioning-task-frame.service';
 import { ProvisioningTaskRepo } from './provisioning-task.repo';
@@ -79,7 +79,7 @@ describe('ProvisioningTaskFrame.work', () => {
       providers: [
         ProvisioningTaskFrame,
         { provide: ProvisioningTaskRepo, useValue: repo },
-        { provide: OrganizationApi, useValue: organization },
+        { provide: OrganizationReadApi, useValue: organization },
         { provide: IdentityAccessApi, useValue: identity },
         { provide: NotificationsApi, useValue: notifications },
         { provide: AuditApi, useValue: audit },

@@ -4,9 +4,9 @@ import type { BusinessDate } from '../../../core/business-date';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { catalogAuditEvent } from '../catalog-audit-event.mapper';
-import { PlanLookupService } from '../plan/plan-lookup.service';
+import { PlanFactsService } from '../plan/plan-facts.service';
 import { SubscriptionNoticeService } from '../subscription/subscription-notice.service';
 import { PlanTermsPlanNotFoundError, PlanTermsTextInvalidError } from './plan-terms.errors';
 import {
@@ -81,9 +81,9 @@ const contentOf = (terms: TermsRecord): TermsContent => ({
 export class PlanTermsService {
   constructor(
     private readonly terms: PlanTermsRepo,
-    private readonly plans: PlanLookupService,
+    private readonly plans: PlanFactsService,
     private readonly notices: SubscriptionNoticeService,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
   ) {}
@@ -139,9 +139,9 @@ export class PlanTermsService {
     planId: string,
     input: TermsInput,
   ): Promise<{ terms: TermsRecord; changed: boolean }> {
-    const organization = await this.organization.getOrganization();
+    const organization = await this.organizationReads.getOrganization();
     if (!organization) throw new Error('Plan terms were used before installation');
-    const today = await this.organization.businessToday();
+    const today = await this.organizationReads.businessToday();
     const content: TermsContent = {
       termsUrl: cleanTermsUrl(input.termsUrl),
       lastReviewedOn: input.lastReviewedOn ?? null,
@@ -187,7 +187,7 @@ export class PlanTermsService {
    * recorded it and when. It adds no step, no deadline and no approver, and nothing waits for it.
    */
   async recordOpinion(actor: AuthenticatedPrincipal, planId: string, input: { opinion: string }): Promise<OpinionView> {
-    const organization = await this.organization.getOrganization();
+    const organization = await this.organizationReads.getOrganization();
     if (!organization) throw new Error('Plan terms were used before installation');
     const text = cleanTermsText(input.opinion);
     if (text === null) throw new PlanTermsTextInvalidError();
@@ -223,7 +223,7 @@ export class PlanTermsService {
     page: number;
     pageSize: number;
   }): Promise<{ page: Page<ReviewWarning>; asOf: BusinessDate }> {
-    const asOf = await this.organization.businessToday();
+    const asOf = await this.organizationReads.businessToday();
     const all = await this.warningsFor(undefined, asOf);
     const items = all.slice((query.page - 1) * query.pageSize, query.page * query.pageSize);
 
@@ -231,7 +231,7 @@ export class PlanTermsService {
   }
 
   private async warningsFor(planId?: string, asOf?: BusinessDate): Promise<ReviewWarning[]> {
-    const today = asOf ?? (await this.organization.businessToday());
+    const today = asOf ?? (await this.organizationReads.businessToday());
     const notices = await this.notices.activeNotices(today, planId);
     const reviews = await this.terms.lastReviews([...new Set(notices.map((notice) => notice.planId))]);
     const warnings: ReviewWarning[] = [];
@@ -277,7 +277,7 @@ export class PlanTermsService {
       recordedAt: Date;
     }>,
   ): Promise<OpinionView[]> {
-    const employees = await this.organization.getEmployees([
+    const employees = await this.organizationReads.getEmployees([
       ...new Set(records.map((record) => record.businessOwnerEmployeeId)),
     ]);
     const byId = new Map(employees.map((employee) => [employee.id, employee]));

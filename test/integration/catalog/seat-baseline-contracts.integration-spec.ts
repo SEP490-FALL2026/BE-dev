@@ -1,6 +1,7 @@
 import request from 'supertest';
 import { CatalogApi } from '../../../src/modules/catalog/public/catalog.api';
 import { OrganizationApi } from '../../../src/modules/organization/public/organization.api';
+import { OrganizationReadApi } from '../../../src/modules/organization/public/organization-read.api';
 import { TransactionRunner } from '../../../src/infrastructure/database/transaction-runner';
 import { ApiAccount, adminToken, createActivatedAccount } from '../../support/api-accounts';
 import {
@@ -19,6 +20,7 @@ describe('what licensing reads of catalog and organization (integration, real Po
   let it1: ApiAccount;
   let catalog: CatalogApi;
   let organization: OrganizationApi;
+  let organizationReads: OrganizationReadApi;
   let runner: TransactionRunner;
   let businessOwner: string;
   let counter = 0;
@@ -35,6 +37,7 @@ describe('what licensing reads of catalog and organization (integration, real Po
     businessOwner = (await insertEmployeeFixture(ctx.app, seed, { code: 'E-OWN', email: 'owner@acme.vn' })).employeeId;
     catalog = ctx.app.get(CatalogApi, { strict: false });
     organization = ctx.app.get(OrganizationApi, { strict: false });
+    organizationReads = ctx.app.get(OrganizationReadApi, { strict: false });
     runner = ctx.app.get(TransactionRunner, { strict: false });
   }, 120000);
 
@@ -215,11 +218,11 @@ describe('what licensing reads of catalog and organization (integration, real Po
 
   describe('OrganizationApi, what the baseline reads of people, Cost Centers and domains', () => {
     it('finds employees by code with their employment type and status, and leaves out the unknown codes', async () => {
-      const found = await organization.getEmployeesByCodes(['E-IT1', 'E-OWN', 'E-NOBODY']);
+      const found = await organizationReads.getEmployeesByCodes(['E-IT1', 'E-OWN', 'E-NOBODY']);
 
       expect(found.map((employee) => employee.employeeCode).sort()).toEqual(['E-IT1', 'E-OWN']);
       expect(found[0]).toEqual(expect.objectContaining({ employmentType: 'STAFF', status: 'ACTIVE' }));
-      expect(await organization.getEmployeesByCodes([])).toEqual([]);
+      expect(await organizationReads.getEmployeesByCodes([])).toEqual([]);
     });
 
     it('finds Cost Centers by code with their kind and status', async () => {
@@ -250,14 +253,14 @@ describe('what licensing reads of catalog and organization (integration, real Po
         .send({ code, name: 'Corporate', kind: 'UNIT', departmentId: await bareDepartmentId() })
         .expect(201);
 
-      const found = await organization.getCostCentersByCodes([code, 'CC-MISSING']);
+      const found = await organizationReads.getCostCentersByCodes([code, 'CC-MISSING']);
 
       expect(found).toEqual([expect.objectContaining({ code, kind: 'UNIT', status: 'ACTIVE' })]);
-      expect(await organization.getCostCentersByCodes([])).toEqual([]);
+      expect(await organizationReads.getCostCentersByCodes([])).toEqual([]);
     });
 
     it('reads the company email domains from the work emails of its people, lower case, without repeats', async () => {
-      const domains = await organization.getCompanyEmailDomains();
+      const domains = await organizationReads.getCompanyEmailDomains();
 
       expect(domains).toContain('acme.vn');
       expect(new Set(domains).size).toBe(domains.length);

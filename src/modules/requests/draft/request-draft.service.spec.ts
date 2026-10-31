@@ -3,7 +3,7 @@ import { TransactionRunner } from '../../../infrastructure/database/transaction-
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
 import { CatalogApi } from '../../catalog/public/catalog.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { RequestDraftRepo, type DraftRow } from '../request-draft/request-draft.repo';
 import { RequestDraftService } from './request-draft.service';
 
@@ -47,7 +47,7 @@ describe('RequestDraftService.readOwn', () => {
         RequestDraftService,
         { provide: TransactionRunner, useValue: {} },
         { provide: RequestDraftRepo, useValue: drafts },
-        { provide: OrganizationApi, useValue: {} },
+        { provide: OrganizationReadApi, useValue: {} },
         { provide: CatalogApi, useValue: {} },
         { provide: AuditApi, useValue: {} },
       ],
@@ -125,7 +125,7 @@ describe('RequestDraftService.save', () => {
         RequestDraftService,
         { provide: TransactionRunner, useValue: { run: (fn: (client: unknown) => unknown) => fn(tx) } },
         { provide: RequestDraftRepo, useValue: drafts },
-        { provide: OrganizationApi, useValue: organization },
+        { provide: OrganizationReadApi, useValue: organization },
         { provide: CatalogApi, useValue: catalog },
         { provide: AuditApi, useValue: audit },
       ],

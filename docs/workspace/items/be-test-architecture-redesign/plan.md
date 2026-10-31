@@ -1,5 +1,11 @@
 # Plan: thiết kế lại các tầng test và pipeline CI của BE
 
+> **Bằng chứng/Owner disposition mới — 31/10/2026:** CI `41191829114` (`main`, `c14c06a…`) quality, HTTP,
+> integration, E2E xanh; integration 34 phút 11 giây. Owner chọn giữ 40 phút và ghi ngoại lệ có theo dõi, đã cập nhật
+> [ngân sách trong spec](spec.md#ngân-sách-thời-gian-ci-31102026-od-r8--b); không sửa workflow hay timeout test.
+> CD `41194738633` cùng SHA thành công. Đây thay trạng thái remote-pending của chính revision này; không chứng minh
+> nightly/A-B trial/O7 chưa thực hiện, không áp kết quả cho WIP local hiện tại.
+
 - [Spec](spec.md); revision đầu vào: Docs `578f442`, BE `c49a7dd`.
 - Phụ trách: chưa phân công. Thiết kế ban đầu bởi: AI theo yêu cầu Owner (28/10/2026).
 - Owner review: một phần — 29/10/2026 Owner chấp nhận devDependency trực tiếp `jest-environment-node` và miễn P7 (trung vị

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import { AuditApi } from '../../audit/public/audit.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { ControlledWaitAlertService } from './controlled-wait-alert.service';
 import {
   decideReassignment,
@@ -55,7 +55,7 @@ export class StepReassignmentService {
     private readonly repo: StepReassignmentRepo,
     private readonly targets: StepTargetService,
     private readonly alerts: ControlledWaitAlertService,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly audit: AuditApi,
   ) {}
 
@@ -70,7 +70,7 @@ export class StepReassignmentService {
   async requestIdsHeldByLeavers(): Promise<string[]> {
     const holders = await this.repo.holderIds();
     if (holders.length === 0) return [];
-    const left = (await this.organization.getEmployees(holders))
+    const left = (await this.organizationReads.getEmployees(holders))
       .filter((employee) => employee.status !== 'ACTIVE')
       .map((employee) => employee.id);
 
@@ -130,7 +130,7 @@ export class StepReassignmentService {
     if (holders.length === 0) return new Set();
 
     return new Set(
-      (await this.organization.getEmployees(holders, tx))
+      (await this.organizationReads.getEmployees(holders, tx))
         .filter((employee) => employee.status !== 'ACTIVE')
         .map((employee) => employee.id),
     );

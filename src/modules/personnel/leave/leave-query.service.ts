@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { PersonnelAccessRefusedError } from '../public/personnel.errors';
 import { readAccessOf, type ReadAccess } from '../personnel-self-action.policy';
 import { LeaveRefusedError } from './leave.errors';
@@ -37,7 +37,7 @@ const paged = <T>(items: T[], total: number, page: { page: number; pageSize: num
 export class LeaveQueryService {
   constructor(
     private readonly leaves: LeaveRepo,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly identity: IdentityAccessApi,
   ) {}
 
@@ -53,7 +53,7 @@ export class LeaveQueryService {
     },
   ): Promise<Paged<LeaveSummaryWire>> {
     const { employeeIds } = await this.scopeOf(actor);
-    const today = await this.organization.businessToday();
+    const today = await this.organizationReads.businessToday();
     const { items, total } = await this.leaves.list({ ...filter, ...(employeeIds ? { employeeIds } : {}), today });
     const employees = await this.employeesOf(items.map((item) => item.employeeId));
 
@@ -73,7 +73,7 @@ export class LeaveQueryService {
   }
 
   async detailOf(record: LeaveRecord, access: ReadAccess = 'FULL'): Promise<LeaveDetailWire> {
-    const today = await this.organization.businessToday();
+    const today = await this.organizationReads.businessToday();
 
     return toDetail(record, await this.employeesOf([record.employeeId]), today, access);
   }
@@ -103,16 +103,16 @@ export class LeaveQueryService {
     const access = readAccessOf(actor);
     if (access === 'NONE') throw new PersonnelAccessRefusedError('FORBIDDEN');
     if (access === 'FULL') return { access };
-    const departments = await this.organization.getItAdminScope(actor.employeeId, (ids) =>
+    const departments = await this.organizationReads.getItAdminScope(actor.employeeId, (ids) =>
       this.identity.findUsableItAdminEmployeeIds(ids),
     );
-    const members = await Promise.all(departments.map((id) => this.organization.getDepartmentMemberIds(id)));
+    const members = await Promise.all(departments.map((id) => this.organizationReads.getDepartmentMemberIds(id)));
 
     return { access, employeeIds: members.flatMap((ids) => ids ?? []) };
   }
 
   private async employeesOf(ids: string[]) {
-    const employees = await this.organization.getEmployees([...new Set(ids)]);
+    const employees = await this.organizationReads.getEmployees([...new Set(ids)]);
 
     return new Map(employees.map((employee) => [employee.id, employee]));
   }

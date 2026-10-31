@@ -83,7 +83,7 @@ chuẩn — không phục hồi `/standard-toolsets/mine`), `QĐ-87a`/`SoD-1`. A
   `subscription` (không vòng; `pnpm arch:capabilities --module catalog`). Không Nest module mới; controller trong
   `CatalogModule`. Không thêm facade `CatalogApi` (không module khác cần đọc; FE/Mobile đọc qua HTTP).
 - **Đọc liên module:** `OrganizationApi.businessToday`, `OrganizationApi.getOwningUnits` (T2, đúng chiều). Trong module:
-  `SubscriptionLookupService.pricedCyclesOfPlans` (mới) → `SubscriptionRepo.findPricedCyclesOfPlans` dùng **chung** bộ lọc và
+  `SubscriptionFactsService.pricedCyclesOfPlans` (mới) → `SubscriptionRepo.findPricedCyclesOfPlans` dùng **chung** bộ lọc và
   thứ tự với `findPricedOfPlan` mà preview dùng để định giá (`pricedOf`, `PRICED_FIRST`).
 - **Dữ liệu:** không đổi bảng. Đọc `applications` (id, name, kind, catalog_status, data_sensitivity ở detail),
   `vendors.name`, `functional_groups` (id, name), `plans` (id, name, provisioning_type; detail thêm sharing_policy,

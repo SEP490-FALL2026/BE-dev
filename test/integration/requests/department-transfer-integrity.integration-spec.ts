@@ -115,7 +115,7 @@ describe('the history of a person and the list of transfers (integration, real P
 
       await set('ON_LONG_LEAVE');
       expect(await state(person.employeeId)).toBe('ON_LONG_LEAVE');
-      expect((await h.organizationService().getEmployee(person.employeeId))?.workState).toBe('ON_LONG_LEAVE');
+      expect((await h.organizationReads().getEmployee(person.employeeId))?.workState).toBe('ON_LONG_LEAVE');
       await expect(set('LEFT')).rejects.toBeDefined();
       expect(await state(person.employeeId)).toBe('ON_LONG_LEAVE');
     });

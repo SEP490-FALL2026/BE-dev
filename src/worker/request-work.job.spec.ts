@@ -1,4 +1,5 @@
 import { Logger } from '@nestjs/common';
+import { TransientDatabaseError } from '../infrastructure/database/transaction-runner';
 import { RequestWorkLoop } from './request-work.job';
 
 describe('RequestWorkLoop', () => {
@@ -65,8 +66,34 @@ describe('RequestWorkLoop', () => {
     await jest.advanceTimersByTimeAsync(1000);
     expect(remind).toHaveBeenCalledTimes(2);
 
-    expect(logged).toHaveBeenCalledWith('Step reminders failed: SyntaxError');
+    expect(logged).toHaveBeenCalledTimes(1);
+    expect(logged).toHaveBeenCalledWith(
+      'Step reminders failed: SyntaxError retryable=false',
+      expect.stringMatching(/^\s+at /),
+    );
     expect(JSON.stringify(logged.mock.calls)).not.toContain('s3cr3t');
+    logged.mockRestore();
+    void loop.onModuleDestroy();
+  });
+
+  it('logs a database that was only unavailable as retryable, with its SQLSTATE and no trace, and runs the next piece', async () => {
+    const logged = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+    const remind = jest
+      .fn()
+      .mockRejectedValueOnce(new TransientDatabaseError('40P01', new Error('deadlock')))
+      .mockResolvedValue({});
+    const project = jest.fn().mockResolvedValue({});
+    const { loop } = build(jest.fn().mockResolvedValue({}), 1000, project, remind);
+
+    loop.onApplicationBootstrap();
+    await jest.advanceTimersByTimeAsync(0);
+
+    expect(project).toHaveBeenCalledTimes(1);
+    expect(logged).toHaveBeenCalledTimes(1);
+    expect(logged).toHaveBeenCalledWith(
+      'Step reminders failed: TransientDatabaseError sqlState=40P01 retryable=true cause=Error',
+      undefined,
+    );
     logged.mockRestore();
     void loop.onModuleDestroy();
   });
@@ -100,7 +127,10 @@ describe('RequestWorkLoop', () => {
     loop.onApplicationBootstrap();
     await jest.advanceTimersByTimeAsync(1000);
 
-    expect(logged).toHaveBeenCalledWith('Request work tick failed: TypeError');
+    expect(logged).toHaveBeenCalledWith(
+      'Request work tick failed: TypeError retryable=false',
+      expect.stringMatching(/^\s+at /),
+    );
     expect(JSON.stringify(logged.mock.calls)).not.toContain('s3cr3t');
     expect(sweep).toHaveBeenCalledTimes(2);
     logged.mockRestore();
@@ -120,8 +150,14 @@ describe('RequestWorkLoop', () => {
     expect(sweep).toHaveBeenCalledTimes(2);
     expect(project).toHaveBeenCalledTimes(2);
 
-    expect(logged).toHaveBeenCalledWith('Request work tick failed: TypeError');
-    expect(logged).toHaveBeenCalledWith('Request status projection failed: RangeError');
+    expect(logged).toHaveBeenCalledWith(
+      'Request work tick failed: TypeError retryable=false',
+      expect.stringMatching(/^\s+at /),
+    );
+    expect(logged).toHaveBeenCalledWith(
+      'Request status projection failed: RangeError retryable=false',
+      expect.stringMatching(/^\s+at /),
+    );
     expect(JSON.stringify(logged.mock.calls)).not.toContain('detail');
     logged.mockRestore();
     void loop.onModuleDestroy();

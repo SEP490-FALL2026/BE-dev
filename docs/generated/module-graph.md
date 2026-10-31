@@ -54,7 +54,7 @@ flowchart BT
   data_import -->|1| catalog
   data_import -->|9| licensing
   data_import -->|2| notifications
-  data_import -->|11| organization
+  data_import -->|12| organization
   finance -->|4| audit
   finance -->|4| organization
   identity_access -->|18| audit
@@ -63,7 +63,7 @@ flowchart BT
   installation -->|8| audit
   installation -->|2| finance
   installation -->|18| identity_access
-  installation -->|9| organization
+  installation -->|11| organization
   licensing -->|29| audit
   licensing -->|47| catalog
   licensing -->|2| finance
@@ -78,7 +78,7 @@ flowchart BT
   onboarding -->|2| organization
   operating_parameters -->|5| audit
   operating_parameters -->|2| finance
-  operating_parameters -->|6| organization
+  operating_parameters -->|7| organization
   organization -->|10| audit
   organization -->|4| notifications
   personnel -->|24| audit
@@ -87,7 +87,7 @@ flowchart BT
   personnel -->|29| licensing
   personnel -->|5| notifications
   personnel -->|4| operating_parameters
-  personnel -->|75| organization
+  personnel -->|81| organization
   personnel -->|5| requests
   requests -->|60| audit
   requests -->|16| budgets

@@ -3,7 +3,7 @@ import { TransactionRunner } from '../../../infrastructure/database/transaction-
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
 import { LicensingServiceAccountApi } from '../../licensing/public/licensing-service-account.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { personnelAuditEvent } from '../personnel-audit-event.mapper';
 import { PersonnelAccessRefusedError } from '../public/personnel.errors';
 import { technicalStepRefusal } from '../personnel-self-action.policy';
@@ -25,7 +25,7 @@ export class TransferClosureService {
     private readonly runner: TransactionRunner,
     private readonly transfers: TransferRepo,
     private readonly settlement: TransferSettlementService,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly licensingServiceAccounts: LicensingServiceAccountApi,
     private readonly audit: AuditApi,
     private readonly guard: TransferGuardService,
@@ -44,7 +44,7 @@ export class TransferClosureService {
 
   private closeInTx(actor: AuthenticatedPrincipal, id: string): Promise<TransferRecord> {
     return this.runner.run(async (tx) => {
-      const today = await this.organization.businessToday(new Date(), tx);
+      const today = await this.organizationReads.businessToday(new Date(), tx);
       const probe = await this.transfers.find(id, tx);
       if (!probe) throw new TransferRefusedError('NOT_FOUND');
       // A transfer whose day has come but that no write has settled yet is effective now.

@@ -20,7 +20,7 @@ Docker `slm-test-db` (127.0.0.1:55432) cho integration/E2E; không dùng Postgre
 
 - Files: `src/modules/catalog/requestable-software/requestable-software.policy.ts` (+ `.spec.ts`), `requestable-software.types.ts`;
   `src/modules/catalog/subscription/subscription.repo.ts` (`pricedOf`, `PRICED_FIRST`, `findPricedCyclesOfPlans`),
-  `subscription-lookup.service.ts` (`pricedCyclesOfPlans`).
+  `subscription-facts.service.ts` (`pricedCyclesOfPlans`).
 - Depends on: none.
 - Acceptance: ba loại baseline; cổng `FINANCE_SETUP_INCOMPLETE` chỉ cho phần mềm trả phí; trạng thái giá khớp `priceRequest`
   của preview (không subscription ⟹ `NO_PRICED_SUBSCRIPTION`, kỳ `OTHER` ⟹ `CYCLE_UNKNOWN`); batch dùng chung bộ lọc/thứ tự với

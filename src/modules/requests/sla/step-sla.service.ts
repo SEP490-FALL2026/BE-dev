@@ -3,8 +3,9 @@ import { randomUUID } from 'node:crypto';
 import { type BusinessDate } from '../../../core/business-date';
 import { isWorkingDay, wallClockAt } from '../../../core/working-days';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
+import { describeForOperator, traceForOperator } from '../../../infrastructure/observability/operator-error';
 import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { ReminderWriter } from './reminder-writer.service';
 import { SlaRecipientFactsService } from './sla-recipient-facts.service';
 import { SlaSubjectRepo, type CandidateCursor } from './sla-subject.repo';
@@ -47,15 +48,15 @@ export class StepSlaService {
     private readonly subjects: SlaSubjectRepo,
     private readonly facts: SlaRecipientFactsService,
     private readonly writer: ReminderWriter,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly parameters: OperatingParametersApi,
   ) {}
 
   async sweep(now: Date = new Date()): Promise<SlaSweepResult> {
     const result: SlaSweepResult = { workingDay: false, stepsReminded: 0, queueReminded: 0, failed: 0 };
-    const organization = await this.organization.getOrganization();
+    const organization = await this.organizationReads.getOrganization();
     if (!organization) return result;
-    const today = await this.organization.businessToday(now);
+    const today = await this.organizationReads.businessToday(now);
     if (!isWorkingDay(today, await this.parameters.getNonWorkingDates(today, today))) return result;
     result.workingDay = true;
 
@@ -88,7 +89,10 @@ export class StepSlaService {
           if (await this.remindStep(candidate.stepId, calendar, context)) reminded += 1;
         } catch (error) {
           failed += 1;
-          this.logger.error(`The reminder of a step failed: ${(error as Error).name}`);
+          this.logger.error(
+            `The reminder of a step failed (step ${candidate.stepId}): ${describeForOperator(error)}`,
+            traceForOperator(error),
+          );
         }
       }
       const last = page[page.length - 1];
@@ -153,7 +157,10 @@ export class StepSlaService {
           if (await this.remindQueued(candidate.requestId, calendar, context)) reminded += 1;
         } catch (error) {
           failed += 1;
-          this.logger.error(`The reminder of a request in the queue failed: ${(error as Error).name}`);
+          this.logger.error(
+            `The reminder of a request in the queue failed (request ${candidate.requestId}): ${describeForOperator(error)}`,
+            traceForOperator(error),
+          );
         }
       }
       const last = page[page.length - 1];

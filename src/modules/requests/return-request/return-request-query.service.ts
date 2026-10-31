@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { pageOf, type Page } from '../../../core/application/pagination';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { CatalogApi } from '../../catalog/public/catalog.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { ReturnDetailWire, ReturnSummaryWire } from './return-request.dto';
 import { ReturnRequestRefusedError } from './return-request.errors';
 import { mayReadReturn } from './return-request.policy';
@@ -17,14 +17,14 @@ import { ReturnRequestRepo, type ReturnRequestRecord, type ReturnRequestSummaryR
 export class ReturnRequestQueryService {
   constructor(
     private readonly returns: ReturnRequestRepo,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly catalog: CatalogApi,
   ) {}
 
   /** Throws ReturnRequestRefusedError (`NOT_FOUND`, also for a return the caller has no part in). */
   async get(actor: AuthenticatedPrincipal, id: string): Promise<ReturnDetailWire> {
     const record = await this.returns.findById(id);
-    const headed = await this.organization.getHeadedDepartment(actor.employeeId);
+    const headed = await this.organizationReads.getHeadedDepartment(actor.employeeId);
     if (
       !record ||
       !mayReadReturn({
@@ -46,7 +46,7 @@ export class ReturnRequestQueryService {
     actor: AuthenticatedPrincipal,
     query: { page: number; pageSize: number; state?: ReturnRequestRecord['state']; assignmentId?: string },
   ): Promise<Page<ReturnSummaryWire>> {
-    const headed = await this.organization.getHeadedDepartment(actor.employeeId);
+    const headed = await this.organizationReads.getHeadedDepartment(actor.employeeId);
     const { items, total } = await this.returns.page({
       scope: actor.roles.includes('IT_ADMIN')
         ? { all: true }
@@ -63,7 +63,7 @@ export class ReturnRequestQueryService {
   /** The record of a return the caller just sent or confirmed, as its detail. */
   async detail(record: ReturnRequestRecord): Promise<ReturnDetailWire> {
     const [summary] = await this.summaries([record]);
-    const people = await this.organization.getEmployees(
+    const people = await this.organizationReads.getEmployees(
       record.handoverConfirmedByEmployeeId ? [record.handoverConfirmedByEmployeeId] : [],
     );
     const confirmer = people[0];
@@ -84,10 +84,10 @@ export class ReturnRequestQueryService {
   private async summaries(rows: readonly ReturnRequestSummaryRecord[]): Promise<ReturnSummaryWire[]> {
     if (rows.length === 0) return [];
     const [people, departments, plans] = await Promise.all([
-      this.organization.getEmployees([
+      this.organizationReads.getEmployees([
         ...new Set(rows.flatMap((row) => [row.holderEmployeeId, row.requestedByEmployeeId])),
       ]),
-      this.organization.getDepartmentBriefs([...new Set(rows.map((row) => row.departmentId))]),
+      this.organizationReads.getDepartmentBriefs([...new Set(rows.map((row) => row.departmentId))]),
       this.catalog.getPlanSummaries([...new Set(rows.map((row) => row.planId))]),
     ]);
     const person = (id: string) => {

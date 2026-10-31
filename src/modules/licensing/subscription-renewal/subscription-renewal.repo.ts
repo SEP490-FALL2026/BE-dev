@@ -3,10 +3,10 @@ import { fromDateColumn, toDateColumn, type BusinessDate } from '../../../core/b
 import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
+import { renewalDecisionSnapshotJson } from './subscription-renewal-decision-snapshot.json';
 import type {
   DeadlineEventRecord,
   DeadlineOutcome,
-  DecisionSnapshot,
   DecisionWrite,
   NewRenewal,
   OutcomeWrite,
@@ -41,7 +41,7 @@ function decisionOf(row: Row): RenewalRecord['decision'] {
     decidedAfterDeadline: row.decidedAfterDeadline === true,
     executionPoint: row.executionPoint,
     activeSeatsAtDecision: row.activeSeatsAtDecision ?? 0,
-    snapshot: row.decisionSnapshot as unknown as DecisionSnapshot,
+    snapshot: renewalDecisionSnapshotJson.decode(row.decisionSnapshot),
   };
 }
 
@@ -160,7 +160,7 @@ export class SubscriptionRenewalRepo {
         decidedAfterDeadline: decision.decidedAfterDeadline,
         executionPoint: decision.executionPoint,
         activeSeatsAtDecision: decision.activeSeatsAtDecision,
-        decisionSnapshot: decision.snapshot as unknown as Prisma.InputJsonValue,
+        decisionSnapshot: renewalDecisionSnapshotJson.encode(decision.snapshot),
       },
     });
 

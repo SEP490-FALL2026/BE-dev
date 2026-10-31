@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import type { SeatTarget, SeatTargetRef } from '../../catalog/public/catalog.types';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { AssignmentService } from '../assignment/assignment.service';
 import type {
   AssignmentRecord,
@@ -22,7 +22,7 @@ export class LicensingSeatBaselineApi {
   constructor(
     private readonly assignments: AssignmentService,
     private readonly baseline: SeatBaselineService,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
   ) {}
 
   /** The target a baseline is for: exactly one subscription or one internal plan. Throws SeatTargetInvalidError. */
@@ -57,7 +57,7 @@ export class LicensingSeatBaselineApi {
 
   /** Whether the baseline is closed, the day rows without a grant date are recorded from, and what is already kept. */
   async baselineFacts(target: SeatTarget, tx?: DbTx): Promise<BaselineFacts> {
-    const recordedOn = await this.organization.businessToday(new Date(), tx);
+    const recordedOn = await this.organizationReads.businessToday(new Date(), tx);
     const state = await this.baseline.state(tx);
     const existing = await this.assignments.existingOf(target, tx);
 
@@ -74,7 +74,7 @@ export class LicensingSeatBaselineApi {
     actor: AuthenticatedPrincipal,
     input: { importId: string; target: SeatTarget; rows: readonly NewBaselineAssignment[] },
   ): Promise<AssignmentRecord[]> {
-    const organization = await this.organization.getOrganization(tx);
+    const organization = await this.organizationReads.getOrganization(tx);
     if (!organization) throw new Error('A baseline was written before installation');
     await this.baseline.lockOpen(tx);
 

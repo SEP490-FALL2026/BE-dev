@@ -4,8 +4,8 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { AuditApi } from '../../audit/public/audit.api';
 import type { EmptyState } from '../public/catalog.types';
 import { catalogAuditEvent } from '../catalog-audit-event.mapper';
-import { VendorDictionaryLookupService } from '../vendor-dictionary/vendor-dictionary-lookup.service';
-import { VendorDirectoryService, type EnsuredVendor } from '../vendor/vendor-directory.service';
+import { VendorDictionaryFactsService } from '../vendor-dictionary/vendor-dictionary-facts.service';
+import { VendorRecordService, type EnsuredVendor } from '../vendor/vendor-record.service';
 import {
   ApplicationDictionaryLineNotFoundError,
   ApplicationNotFoundError,
@@ -60,8 +60,8 @@ export interface UpdateApplicationInput {
 export class ApplicationService {
   constructor(
     private readonly applications: ApplicationRepo,
-    private readonly vendors: VendorDirectoryService,
-    private readonly dictionary: VendorDictionaryLookupService,
+    private readonly vendors: VendorRecordService,
+    private readonly dictionary: VendorDictionaryFactsService,
     private readonly vendorLinks: ApplicationVendorLinkService,
     private readonly views: ApplicationViewService,
     private readonly audit: AuditApi,

@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { DbTx, TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { AssignmentService } from '../assignment/assignment.service';
 import { SeatBaselineClosedError } from '../public/licensing.errors';
 import { SeatBaselineClosedListeners } from '../public/licensing.extension-points';
@@ -19,7 +19,7 @@ import { SeatBaselineRepo } from './seat-baseline.repo';
 export class SeatBaselineService {
   constructor(
     private readonly repo: SeatBaselineRepo,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly assignments: AssignmentService,
     private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
@@ -46,7 +46,7 @@ export class SeatBaselineService {
       if (state.closedAt) return { closedAt: state.closedAt, alreadyClosed: true };
 
       const closedAt = await this.repo.close(tx, organization.id, actor.appUserId);
-      const closedOn = await this.organization.businessToday(closedAt, tx);
+      const closedOn = await this.organizationReads.businessToday(closedAt, tx);
       const holders = await this.assignments.baselineHoldersOfOtherDepartments(tx, closedOn);
       await this.audit.record(
         tx,
@@ -75,7 +75,7 @@ export class SeatBaselineService {
   }
 
   private async requireOrganization(tx?: DbTx) {
-    const organization = await this.organization.getOrganization(tx);
+    const organization = await this.organizationReads.getOrganization(tx);
     if (!organization) throw new Error('The seat baseline was read before installation');
 
     return organization;

@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { CatalogApi } from '../../../catalog/public/catalog.api';
 import type { SeatTarget } from '../../../catalog/public/catalog.types';
 import { OperatingParametersApi } from '../../../operating-parameters/public/operating-parameters.api';
-import { OrganizationApi } from '../../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../../organization/public/organization-read.api';
 import type { BusinessDate } from '../../../../core/business-date';
 import type { AuthenticatedPrincipal } from '../../../../infrastructure/security/tokens/access-token-verifier.port';
 import {
@@ -40,7 +40,7 @@ export class ProvisioningGrantPlanner {
   constructor(
     private readonly gate: GrantRequestGateHook,
     private readonly catalog: CatalogApi,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly parameters: OperatingParametersApi,
   ) {}
 
@@ -59,10 +59,10 @@ export class ProvisioningGrantPlanner {
     assertGrantableType(plan.provisioningType);
     assertSubscriptionChoice(plan.provisioningType, input.subscriptionId);
 
-    const organization = await this.organization.getOrganization();
+    const organization = await this.organizationReads.getOrganization();
     if (!organization) throw new Error('A provisioning task was made before installation');
-    const today = await this.organization.businessToday();
-    const inCharge = await this.organization.getItAdminInCharge(
+    const today = await this.organizationReads.businessToday();
+    const inCharge = await this.organizationReads.getItAdminInCharge(
       input.responsibleEmployeeId ?? answer.employeeId,
       today,
     );

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { PersonnelAccessRefusedError } from '../public/personnel.errors';
 import { readAccessOf, type ReadAccess } from '../personnel-self-action.policy';
 import { TransferRefusedError } from './transfer.errors';
@@ -35,7 +35,7 @@ const paged = <T>(items: T[], total: number, page: { page: number; pageSize: num
 export class TransferQueryService {
   constructor(
     private readonly transfers: TransferRepo,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly identity: IdentityAccessApi,
   ) {}
 
@@ -100,7 +100,7 @@ export class TransferQueryService {
       ? { access }
       : {
           access,
-          departmentIds: await this.organization.getItAdminScope(actor.employeeId, (ids) =>
+          departmentIds: await this.organizationReads.getItAdminScope(actor.employeeId, (ids) =>
             this.identity.findUsableItAdminEmployeeIds(ids),
           ),
         };
@@ -121,8 +121,8 @@ export class TransferQueryService {
   private async namesOf(rows: { employeeIds: string[]; departmentIds: string[] }[]): Promise<TransferNames> {
     const unique = (pick: (row: (typeof rows)[number]) => string[]) => [...new Set(rows.flatMap(pick))];
     const [employees, departments] = await Promise.all([
-      this.organization.getEmployees(unique((row) => row.employeeIds)),
-      this.organization.getDepartmentBriefs(unique((row) => row.departmentIds)),
+      this.organizationReads.getEmployees(unique((row) => row.employeeIds)),
+      this.organizationReads.getDepartmentBriefs(unique((row) => row.departmentIds)),
     ]);
 
     return {

@@ -4,6 +4,7 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { OrganizationHistoryApi } from '../../organization/public/organization-history.api';
 import { EmployeeNotFoundError } from '../../organization/public/organization.errors';
 import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { DepartmentBrief, EmployeeRecord, PlacementInForce } from '../../organization/public/organization.types';
 import type { PersonnelActor } from '../public/personnel.types';
 import { TransferRefusedError } from './transfer.errors';
@@ -37,6 +38,7 @@ export interface TransferHeld {
 export class TransferPreconditions {
   constructor(
     private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly history: OrganizationHistoryApi,
     private readonly guard: TransferGuardService,
     private readonly transfers: TransferRepo,
@@ -58,7 +60,7 @@ export class TransferPreconditions {
   }
 
   private async readBeforeLocks(tx: DbTx, input: RecordTransferInput, today: BusinessDate): Promise<TransferSeen> {
-    const person = await this.organization.getEmployee(input.employeeId, tx);
+    const person = await this.organizationReads.getEmployee(input.employeeId, tx);
     const refused = subjectRefusal(person);
     if (refused) throw new TransferRefusedError(refused);
     const before = await this.history.getPlacementInForce(tx, input.employeeId, today);
@@ -76,7 +78,7 @@ export class TransferPreconditions {
     toDepartmentId: string,
   ): Promise<boolean> {
     if (toDepartmentId === fromDepartmentId) return false;
-    const headed = await this.organization.getHeadedDepartment(input.employeeId, addDays(input.effectiveOn, -1));
+    const headed = await this.organizationReads.getHeadedDepartment(input.employeeId, addDays(input.effectiveOn, -1));
 
     return headed?.departmentId === fromDepartmentId;
   }
@@ -108,7 +110,7 @@ export class TransferPreconditions {
     seen: TransferSeen,
     locked: { today: BusinessDate; departments: Map<string, DepartmentBrief> },
   ): Promise<TransferHeld> {
-    const employee = await this.organization.getEmployee(input.employeeId, tx);
+    const employee = await this.organizationReads.getEmployee(input.employeeId, tx);
     const current = await this.history.getPlacementInForce(tx, input.employeeId, locked.today);
     if (!employee || !placementHeld(current, seen.before.placementId)) {
       throw new TransferRefusedError('CONCURRENT_CHANGE');
@@ -164,7 +166,7 @@ export class TransferPreconditions {
   /** Takes the successor row `FOR SHARE`; one that does not exist is judged by the policy, not here. */
   private async lockSuccessor(tx: DbTx, employeeId: string): Promise<void> {
     try {
-      await this.organization.lockEmployeeForShare(tx, employeeId);
+      await this.organizationReads.lockEmployeeForShare(tx, employeeId);
     } catch (error) {
       if (!(error instanceof EmployeeNotFoundError)) throw error;
     }

@@ -138,7 +138,12 @@ it('refuses an employee with 403', async () => {
 Chọn module bị ảnh hưởng: `scripts/ci/affected-modules.mjs` (đổi `src/core`, `src/infrastructure`, `prisma/`,
 `test/support` hay dependency ⇒ chạy tất cả). Chạy local không thay kết quả GitHub Actions.
 
-**Thời gian và `timeout-minutes`.** Quy tắc: `timeout-minutes` của một job = p95 đo được + 50 %, làm tròn lên phút; không đặt
+**Ngoại lệ Owner 31/10/2026:** job integration giữ **40 phút**, theo dõi qua các run bình thường; không đổi timeout từng
+test. CI `41191829114` trên `main` `c14c06a…` đo job 34 phút 11 giây (parallel 30:27, timing 0:56, serial 1:15), xanh.
+Đây là ngoại lệ được chọn của quy tắc dự phòng bên dưới, không phải đã đạt p95 + 50%. Chỉ xem xét lại khi số đo/run
+timeout cho thấy cần; không mở benchmark P7/P8. Nightly vẫn theo cấu hình riêng, chưa có bằng chứng mới ở lượt này.
+
+**Thời gian và `timeout-minutes`.** Quy tắc mặc định (trừ ngoại lệ Owner ở trên): `timeout-minutes` của một job = p95 đo được + 50 %, làm tròn lên phút; không đặt
 theo mục tiêu. Mục tiêu cũ "integration đầy đủ ≤ 15 phút" **không đạt** và đã bỏ. Số đo trên `dev`, integration `ALL`, một
 runner 2 vCPU (run `40923299529`, `40945441332`):
 

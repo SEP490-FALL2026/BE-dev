@@ -3,7 +3,7 @@ import { Page, pageOf } from '../../../core/application/pagination';
 import { formatAmount } from '../../../core/money/money';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { FinanceApi } from '../../finance/public/finance.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import { codesOf } from '../spend/budget-check.policy';
 import { BudgetCheckRepo, type CheckRecord } from '../spend/budget-check.repo';
@@ -26,7 +26,7 @@ export class SpendViewService {
     private readonly checks: BudgetCheckRepo,
     private readonly steps: SpendStepRepo,
     private readonly reviews: FinanceReviewRepo,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly finance: FinanceApi,
   ) {}
 
@@ -50,7 +50,7 @@ export class SpendViewService {
       this.checks.latestOf(rows.map((row) => row.requestId)),
       this.people(rows.map((row) => row.request.requesterEmployeeId)),
       // A step is only ever opened for a request that was sent, so it has its Cost Center; a draft has none and has no step.
-      this.organization.costCentersByIds([
+      this.organizationReads.costCentersByIds([
         ...new Set(rows.flatMap((row) => (row.request.costCenterId === null ? [] : [row.request.costCenterId]))),
       ]),
     ]);
@@ -182,7 +182,7 @@ export class SpendViewService {
 
   private async people(ids: readonly string[]) {
     const wanted = [...new Set(ids)];
-    const found = wanted.length === 0 ? [] : await this.organization.getEmployees(wanted);
+    const found = wanted.length === 0 ? [] : await this.organizationReads.getEmployees(wanted);
 
     return new Map(
       found.map((employee) => [

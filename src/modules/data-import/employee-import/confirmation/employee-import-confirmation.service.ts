@@ -6,6 +6,7 @@ import { AuditApi } from '../../../audit/public/audit.api';
 import { NotificationsApi } from '../../../notifications/public/notifications.api';
 import { EmployeeCodeTakenError, EmployeeEmailTakenError } from '../../../organization/public/organization.errors';
 import { OrganizationApi } from '../../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../../organization/public/organization-read.api';
 import { importConfirmedEvent, importEmployeeCreatedEvent } from '../employee-import-audit.mapper';
 import type { EmployeeCells } from '../employee-import-row.types';
 import { outcomeCounts, toImportView } from '../employee-import-view.mapper';
@@ -45,6 +46,7 @@ export class EmployeeImportConfirmationService {
   constructor(
     private readonly repo: EmployeeImportRepo,
     private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
     private readonly notifications: NotificationsApi,
@@ -134,7 +136,7 @@ export class EmployeeImportConfirmationService {
     const cells = stored.map((row) => ({ lineNumber: row.lineNumber, cells: row.cells }));
     const before = await this.rowValidation.lookup(cells, own, tx);
     const wanted = idsUsedByValidRows(stored, before);
-    await this.organization.lockForEmployeeImport(tx, wanted.departmentIds);
+    await this.organizationReads.lockForEmployeeImport(tx, wanted.departmentIds);
     const fresh = judgeEmployeeRows(cells, await this.rowValidation.lookup(cells, own, tx));
     const changed = fresh.filter((row, index) => !sameJudgement(row, stored[index])).map((row) => row.lineNumber);
     if (changed.length > 0) throw new ImportPreviewStaleError(changed);
@@ -149,7 +151,7 @@ export class EmployeeImportConfirmationService {
     fresh: JudgedRow[],
     on: { actor: AuthenticatedPrincipal; importId: string; hrBasis: HrBasis },
   ): Promise<Map<string, number>> {
-    const today = await this.organization.businessToday();
+    const today = await this.organizationReads.businessToday();
     const createdByDepartment = new Map<string, number>();
     for (const row of fresh) {
       if (row.outcome !== 'VALID' || !row.parsed) continue;
@@ -175,7 +177,7 @@ export class EmployeeImportConfirmationService {
             hrBasis: on.hrBasis,
           }),
         );
-        const notices = await this.organization.getProfileNotices(tx, {
+        const notices = await this.organizationReads.getProfileNotices(tx, {
           kind: 'CREATED',
           organizationId,
           employeeId,
@@ -203,7 +205,7 @@ export class EmployeeImportConfirmationService {
   }
 
   private async requireOrganization() {
-    const organization = await this.organization.getOrganization();
+    const organization = await this.organizationReads.getOrganization();
     if (!organization) throw new Error('A people file was imported before installation');
 
     return organization;

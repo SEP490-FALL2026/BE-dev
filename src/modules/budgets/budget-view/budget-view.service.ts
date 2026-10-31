@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Page, pageOf } from '../../../core/application/pagination';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { BudgetNotYourCostCenterError } from '../budget/budget.errors';
-import { BudgetSupportService } from '../budget/budget-support.service';
+import { BudgetFactsService } from '../budget/budget-facts.service';
 import { CommitmentRepo, heldKey } from '../budget/commitment.repo';
 import { DecisionRepo } from '../budget/decision.repo';
 import { ProposalRepo } from '../budget/proposal.repo';
@@ -27,14 +27,14 @@ export class BudgetViewService {
     private readonly commitments: CommitmentRepo,
     private readonly decisions: DecisionRepo,
     private readonly views: VersionViewService,
-    private readonly support: BudgetSupportService,
+    private readonly facts: BudgetFactsService,
   ) {}
 
   /** Throws BudgetNotYourCostCenterError when the caller heads no department. */
   async mine(actor: AuthenticatedPrincipal, year: number): Promise<MineWire> {
     const costCenterId = await this.ownCostCenter(actor);
     const [costCenter, current, history, latest] = await Promise.all([
-      this.support.costCenter(costCenterId),
+      this.facts.costCenter(costCenterId),
       this.versions.reference(costCenterId, year),
       this.proposals.chainOf(costCenterId, year),
       this.versions.latestOf(costCenterId, year),
@@ -47,8 +47,8 @@ export class BudgetViewService {
       (current?.proposalId ? history.find((entry) => entry.id === current.proposalId) : undefined) ??
       history[0] ??
       null;
-    const money = proposal ? await this.support.formatter(proposal.currency) : null;
-    const total = current ? (await this.support.formatter(current.currency))(current.totalMinor) : null;
+    const money = proposal ? await this.facts.formatter(proposal.currency) : null;
+    const total = current ? (await this.facts.formatter(current.currency))(current.totalMinor) : null;
 
     return {
       costCenter,
@@ -95,12 +95,12 @@ export class BudgetViewService {
       take: query.pageSize,
     });
     const [centers, held] = await Promise.all([
-      this.support.costCenters(items.map((version) => version.costCenterId)),
+      this.facts.costCenters(items.map((version) => version.costCenterId)),
       this.commitments.totals(items.map((version) => ({ costCenterId: version.costCenterId, year: version.year }))),
     ]);
     const rows = await Promise.all(
       items.map(async (version) => {
-        const money = await this.support.formatter(version.currency);
+        const money = await this.facts.formatter(version.currency);
         const costCenter = centers.get(version.costCenterId);
         if (!costCenter) throw new Error(`The Cost Center ${version.costCenterId} of a version does not exist.`);
 
@@ -128,7 +128,7 @@ export class BudgetViewService {
   }
 
   private async ownCostCenter(actor: AuthenticatedPrincipal): Promise<string> {
-    const own = await this.support.headedCostCenter(actor.employeeId, await this.support.today(new Date()));
+    const own = await this.facts.headedCostCenter(actor.employeeId, await this.facts.today(new Date()));
     if (own === null) throw new BudgetNotYourCostCenterError();
 
     return own;

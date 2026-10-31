@@ -6,7 +6,7 @@ import { AuditApi } from '../../../audit/public/audit.api';
 import { SubscriptionPeriodApi } from '../../../catalog/public/subscription-period.api';
 import { SubscriptionPeriodRefusedError } from '../../../catalog/public/subscription-period.errors';
 import type { NextPeriodInput, RenewalPeriodFacts } from '../../../catalog/public/subscription-period.types';
-import { OrganizationApi } from '../../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../../organization/public/organization-read.api';
 import { licensingAuditEvent } from '../../licensing-audit-event.mapper';
 import { RenewalError } from '../subscription-renewal.errors';
 import { SubscriptionRenewalSeatRepo } from '../subscription-renewal-seat.repo';
@@ -64,7 +64,7 @@ export class RenewalOutcomeService {
     private readonly repo: SubscriptionRenewalRepo,
     private readonly seats: SubscriptionRenewalSeatRepo,
     private readonly periods: SubscriptionPeriodApi,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
   ) {}
@@ -78,7 +78,7 @@ export class RenewalOutcomeService {
   ): Promise<RenewalRecord> {
     return this.runner.run(async (tx) => {
       const { record, decision, period } = await this.awaitingOutcome(tx, id, input);
-      const today = await this.organization.businessToday(now, tx);
+      const today = await this.organizationReads.businessToday(now, tx);
       if (decision.choice === 'CANCEL' && input.outcome === 'AS_DECIDED')
         await this.assertAllTakenBack(tx, period, today);
       const next = input.nextPeriod ? await this.continueInto(tx, actor, period, input.nextPeriod) : null;

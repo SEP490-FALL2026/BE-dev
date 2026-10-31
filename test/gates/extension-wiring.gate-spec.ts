@@ -49,10 +49,10 @@ const NO_HTTP_GRAPHS = [
   'WorkerModule',
   'InstallationModule',
   'RecoveryCliModule',
-  'InspectionModule',
-  'SubscriptionOwnerAssignmentCliModule',
-  'DevSeedModule',
-  'DemoDatasetModule',
+  'InspectionCliModule',
+  'AssignSubscriptionOwnerCliModule',
+  'DevSeedCliModule',
+  'DemoDatasetCliModule',
 ] as const;
 
 const DEACTIVATION_ONLY =
@@ -103,10 +103,10 @@ const GRAPH_WIRING_EXCEPTIONS: readonly WiringException[] = [
     graphs: [
       'InstallationModule',
       'RecoveryCliModule',
-      'InspectionModule',
-      'SubscriptionOwnerAssignmentCliModule',
-      'DevSeedModule',
-      'DemoDatasetModule',
+      'InspectionCliModule',
+      'AssignSubscriptionOwnerCliModule',
+      'DevSeedCliModule',
+      'DemoDatasetCliModule',
     ],
     point: 'OrganizationChangeListeners',
     binders: [
@@ -122,7 +122,7 @@ const GRAPH_WIRING_EXCEPTIONS: readonly WiringException[] = [
       'in the API graph) and the command `record-super-admin-event`; none of these graphs runs any of them (no command of these graphs writes the organization).',
   },
   {
-    graphs: ['InspectionModule'],
+    graphs: ['InspectionCliModule'],
     point: 'ApprovalRoleChangeListeners',
     binders: ['RequestsApprovalRoleListener'],
     users: ['RoleGrantService'],
@@ -141,7 +141,7 @@ const GRAPH_WIRING_EXCEPTIONS: readonly WiringException[] = [
       'This reads the value of an argument, not only reachability: it stays true while those two callers grant nothing but SUPER_ADMIN.',
   },
   {
-    graphs: ['SuperAdminEventCliModule'],
+    graphs: ['RecordSuperAdminEventCliModule'],
     point: 'OrganizationChangeListeners',
     binders: ['HeldNoticeHandoverListener'],
     users: ['OrganizationChangeService'],
@@ -153,7 +153,7 @@ const GRAPH_WIRING_EXCEPTIONS: readonly WiringException[] = [
       'starts here and HEAD_PERIOD_START is not emitted: there is no held notice to hand over.',
   },
   {
-    graphs: ['DevSeedModule', 'DemoDatasetModule'],
+    graphs: ['DevSeedCliModule', 'DemoDatasetCliModule'],
     point: 'ApprovalRoleChangeListeners',
     binders: ['RequestsApprovalRoleListener'],
     users: ['RoleGrantService'],

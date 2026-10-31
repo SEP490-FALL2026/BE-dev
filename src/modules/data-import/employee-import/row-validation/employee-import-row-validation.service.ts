@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InvalidEmailError, normalizeEmail } from '../../../../core/email';
 import type { DbTx } from '../../../../infrastructure/database/transaction-runner';
-import { OrganizationApi } from '../../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../../organization/public/organization-read.api';
 import type { EmployeeCells } from '../employee-import-row.types';
 import type { StoredRow } from '../employee-import.repo';
 import {
@@ -23,10 +23,10 @@ export type OwnRecord = { employeeCode: string; normalizedEmail: string | null }
  */
 @Injectable()
 export class EmployeeImportRowValidationService {
-  constructor(private readonly organization: OrganizationApi) {}
+  constructor(private readonly organizationReads: OrganizationReadApi) {}
 
   async ownRecord(employeeId: string, tx?: DbTx): Promise<OwnRecord> {
-    const own = await this.organization.getEmployee(employeeId, tx);
+    const own = await this.organizationReads.getEmployee(employeeId, tx);
     if (!own) return null;
     let normalizedEmail: string | null = null;
     if (own.workEmail) {
@@ -45,7 +45,10 @@ export class EmployeeImportRowValidationService {
     own: OwnRecord = null,
     tx?: DbTx,
   ): Promise<EmployeeImportLookup> {
-    return { ...toEmployeeImportLookup(await this.organization.lookupForEmployeeImport(lookupNamesOf(rows), tx)), own };
+    return {
+      ...toEmployeeImportLookup(await this.organizationReads.lookupForEmployeeImport(lookupNamesOf(rows), tx)),
+      own,
+    };
   }
 
   /** Every row judged against the data as it is now, kept as the preview stores it. */
@@ -66,7 +69,7 @@ export class EmployeeImportRowValidationService {
 
       return department ? [department.id] : [];
     });
-    const without = await this.organization.departmentsWithoutHead(ids);
+    const without = await this.organizationReads.departmentsWithoutHead(ids);
 
     return without.map((department) => ({ code: department.code, name: department.name }));
   }

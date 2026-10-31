@@ -4,7 +4,7 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { BudgetDecisionRefusedError, BudgetVersionNotFoundError, BudgetYearEndedError } from '../budget/budget.errors';
 import { checkVersionDecision, deciderOf, yearHasEnded } from '../budget/budget.policy';
-import { BudgetSupportService } from '../budget/budget-support.service';
+import { BudgetFactsService } from '../budget/budget-facts.service';
 import { BudgetYearLockRepo } from '../budget/budget-year-lock.repo';
 import { ProposalRepo } from '../budget/proposal.repo';
 import { VersionRepo, type VersionRecord } from '../budget/version.repo';
@@ -29,7 +29,7 @@ export class VersionDecisionJudge {
   constructor(
     private readonly versions: VersionRepo,
     private readonly proposals: ProposalRepo,
-    private readonly support: BudgetSupportService,
+    private readonly facts: BudgetFactsService,
     private readonly yearLock: BudgetYearLockRepo,
     private readonly listeners: BudgetChangeListeners,
   ) {}
@@ -41,7 +41,7 @@ export class VersionDecisionJudge {
     const version = siblings.find((candidate) => candidate.id === id);
     if (!version) throw new BudgetVersionNotFoundError();
     // The approver who sent the proposal behind a version does not decide it: the substitute does (`US-06-08` AC-11).
-    const holders = await this.support.holders(tx);
+    const holders = await this.facts.holders(tx);
     const proposal = version.proposalId ? await this.proposals.findById(version.proposalId, tx) : null;
     const { employeeId: decider, approverIsParty } = deciderOf(holders, proposal?.submittedByEmployeeId ?? null);
     const refusal = checkVersionDecision({
@@ -54,7 +54,7 @@ export class VersionDecisionJudge {
     });
     // Who may not decide is told first; then a year that has ended, whether or not its closure has run; then the state.
     if (refusal && refusal !== 'NOT_SENT') throw new BudgetDecisionRefusedError(refusal);
-    const today = await this.support.today(new Date(), tx);
+    const today = await this.facts.today(new Date(), tx);
     if (yearHasEnded(version.year, today, fiscalStart)) throw new BudgetYearEndedError(version.year);
     if (refusal) throw new BudgetDecisionRefusedError(refusal);
     // The requests that wait on this budget are locked before the year, as every writer of the system does.

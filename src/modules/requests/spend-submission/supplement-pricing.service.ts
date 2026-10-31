@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { AccessRequestNotPriceableError } from '../access-request/access-request.errors';
 import type { AccessRequestRecord, PricingRecord } from '../access-request/access-request.types';
 import { RepricingService } from '../assessment/repricing.service';
@@ -16,7 +16,7 @@ import { SpendSupplementRefusedError } from '../spend/spend.errors';
 @Injectable()
 export class SupplementPricing {
   constructor(
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly repricing: RepricingService,
     private readonly groups: GroupSupplementService,
   ) {}
@@ -27,7 +27,7 @@ export class SupplementPricing {
     input: { expectedSpendOn: string | undefined; dropped: readonly string[]; fiscalYearStartMonth: number; now: Date },
   ): Promise<{ repriced: PricingRecord; change: NonNullable<ReturnType<typeof supplementChangeOf>> }> {
     const { pricing } = request;
-    const today = await this.organization.businessToday(input.now, tx);
+    const today = await this.organizationReads.businessToday(input.now, tx);
     const repriced = await this.repricing.reprice(
       tx,
       this.groups.withoutPeople(request, input.dropped),

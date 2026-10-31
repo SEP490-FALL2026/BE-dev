@@ -31,7 +31,7 @@ import {
 } from '../spend/spend-submission.dto';
 import { GROUP_REQUEST_ERROR_EXAMPLES, toGroupRequestApiException } from '../group-request/group-request.http-errors';
 import { SPEND_ERROR_EXAMPLES, toSpendApiException } from '../spend/spend.http-errors';
-import { SupplementReadService } from './supplement-read.service';
+import { SupplementQueryService } from './supplement-query.service';
 import { SupplementService } from './supplement.service';
 
 const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPONSE] as const;
@@ -71,7 +71,7 @@ export class SpendSubmissionController {
     private readonly batchViews: SpendBatchViewService,
     private readonly planLines: PlanLineRouteService,
     private readonly supplements: SupplementService,
-    private readonly supplementReads: SupplementReadService,
+    private readonly supplementQueries: SupplementQueryService,
   ) {}
 
   @Get('spend-queue')
@@ -290,7 +290,7 @@ export class SpendSubmissionController {
     @Query() query: PageQueryDto,
   ) {
     try {
-      return await this.supplementReads.list(actor, params.id, query);
+      return await this.supplementQueries.list(actor, params.id, query);
     } catch (error) {
       throw toSpendApiException(error);
     }

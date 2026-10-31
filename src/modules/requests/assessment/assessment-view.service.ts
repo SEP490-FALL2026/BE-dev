@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { CatalogApi } from '../../catalog/public/catalog.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
 import { AssessmentReadRepo } from '../access-request/assessment-read.repo';
 import type { AssessmentRecord, ProposalRecord, Quote } from '../access-request/assessment-record.types';
@@ -16,7 +16,7 @@ export class AssessmentViewService {
   constructor(
     private readonly assessments: AssessmentReadRepo,
     private readonly steps: AssessmentStepRepo,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly catalog: CatalogApi,
     private readonly pricing: PricingViewService,
   ) {}
@@ -35,7 +35,7 @@ export class AssessmentViewService {
     const planIds = [assessment.equivalentPlanId, assessment.alternativePlanId].filter(
       (id): id is string => id !== null,
     );
-    const people = await this.organization.getEmployees([...new Set(peopleIds)], tx);
+    const people = await this.organizationReads.getEmployees([...new Set(peopleIds)], tx);
     const plans = planIds.length > 0 ? await this.catalog.getPlanSummaries(planIds) : [];
     const priceView = await this.pricing.view(request.pricing);
     const costEstimate = await this.pricing.costEstimate(request.pricing, assessment.vendorId, tx);

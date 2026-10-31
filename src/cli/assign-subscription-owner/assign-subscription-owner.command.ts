@@ -19,7 +19,7 @@ export const assignSubscriptionOwnerCommand = defineCommand({
   execute: ({ command }) =>
     runInNestContext({
       // The graph validates the database settings only.
-      graph: () => import('./assign-subscription-owner-cli.module').then((m) => m.SubscriptionOwnerAssignmentCliModule),
+      graph: () => import('./assign-subscription-owner-cli.module').then((m) => m.AssignSubscriptionOwnerCliModule),
       work: async (app) => {
         const result = await app.get(SubscriptionOwnerAssignmentApi).assign(command);
 

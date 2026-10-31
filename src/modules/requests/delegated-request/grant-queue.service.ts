@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Page, pageOf } from '../../../core/application/pagination';
 import { CatalogApi } from '../../catalog/public/catalog.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { GrantQueueItemWire } from './delegated-request.dto';
 import { GrantQueueRepo } from './grant-queue.repo';
 
@@ -15,7 +15,7 @@ export class GrantQueueService {
   constructor(
     private readonly queue: GrantQueueRepo,
     private readonly catalog: CatalogApi,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
   ) {}
 
   async page(query: {
@@ -34,7 +34,7 @@ export class GrantQueueService {
         : this.catalog.getPlanSummaries([...new Set(rows.map((row) => row.planId))]),
       rows.length === 0
         ? Promise.resolve([])
-        : this.organization.getEmployees([
+        : this.organizationReads.getEmployees([
             ...new Set(rows.flatMap((row) => [row.requesterEmployeeId, row.beneficiaryEmployeeId])),
           ]),
     ]);

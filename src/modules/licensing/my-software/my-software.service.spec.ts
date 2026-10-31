@@ -1,6 +1,6 @@
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import type { CatalogApi } from '../../catalog/public/catalog.api';
-import type { OrganizationApi } from '../../organization/public/organization.api';
+import type { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { MyRightRow, MySoftwareRepo } from './my-software.repo';
 import { MySoftwareService } from './my-software.service';
 
@@ -48,7 +48,7 @@ function serviceWith(rows: MyRightRow[]) {
   ]);
   const service = new MySoftwareService(
     { page } as unknown as MySoftwareRepo,
-    { businessToday: jest.fn().mockResolvedValue(TODAY) } as unknown as OrganizationApi,
+    { businessToday: jest.fn().mockResolvedValue(TODAY) } as unknown as OrganizationReadApi,
     { getPlanRevocationInfo: plans } as unknown as CatalogApi,
   );
 

@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { LicensingDashboardApi } from '../../licensing/public/licensing-dashboard.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { assertHoldsRole, counted, notAvailable, type DashboardSection } from '../section/dashboard-section.policy';
 
 export interface EmployeeDashboard {
@@ -24,14 +24,14 @@ export interface EmployeeDashboard {
 @Injectable()
 export class EmployeeDashboardService {
   constructor(
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly licensing: LicensingDashboardApi,
   ) {}
 
   /** Throws DashboardRefusedError for a caller without the Employee role. */
   async overview(actor: AuthenticatedPrincipal): Promise<EmployeeDashboard> {
     assertHoldsRole(actor.roles, 'EMPLOYEE');
-    const today = await this.organization.businessToday();
+    const today = await this.organizationReads.businessToday();
     const facts = await this.licensing.employeeFacts(actor.employeeId, today);
 
     return {

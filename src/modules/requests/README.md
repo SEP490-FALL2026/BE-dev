@@ -49,19 +49,22 @@ controller) và `requests-work-facade.module.ts` (phần worker chạy, API dùn
 ## Tầng trong module
 
 Đồ thị capability → capability của `requests` **không có vòng** (R6; `pnpm arch:capabilities --module requests`, gate
-`capability-graph`): 39 capability, 118 cạnh. Cạnh đi từ tầng cao xuống tầng thấp hoặc ngang tầng, không vòng. Bảng tầng này duyệt kỹ
-thuật P09, chưa có Owner review.
+`capability-graph`): 39 capability, 118 cạnh. Cạnh đi từ tầng cao xuống tầng thấp hoặc ngang tầng, không vòng. **Cột tầng do lệnh tính** từ
+cùng đồ thị gate dùng, không viết tay, và `scripts/verify/capability-graph.test.mjs` đọc bảng này so với lệnh (lệch thì test đỏ): có
+controller thì L3; còn lại, không import capability nào thì L0, chỉ import L0 thì L1, import ít nhất một L1 hoặc L2 thì L2.
 
-| Tầng | Capability                                                                                                                                                                                                                                                                                                                                                                                      | Quy tắc                                               |
-| ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
-| L0   | `access-request` (lõi: bản ghi, repo, policy, types, errors, định tuyến, giá, `assessment-read.repo`, `withdrawal.policy`), `outcome`                                                                                                                                                                                                                                                           | không import capability nào của `requests` (gate)     |
-| L1   | lõi nhánh, không controller: `spend`, `step-routing`, `request-draft`, `renewal-apply`, `plan-line`                                                                                                                                                                                                                                                                                             | chỉ import L0 và nhau, không vòng                     |
-| L2   | dịch vụ dùng chung, không controller: `request-intake`, `request-view`, `assessment`, `budget-information`, `group-request`, `grant`, `request-end`, `spend-approval-view`                                                                                                                                                                                                                      | import L0, L1 và L2 thấp hơn                          |
+**Sửa bảng ngày 31/10/2026 (Phase 6.2 của `be-readability-debuggability-followup`).** Bảng cũ (duyệt kỹ thuật P09) xếp `spend` và
+`plan-line` vào L1 "lõi nhánh" và `status` riêng một dòng chú thích; đồ thị cho thấy `spend` import `step-routing` và `plan-line`
+import `spend`, nên theo luật tầng chúng là L2, và `status` (không controller, không cạnh) là L0. Sửa bảng, không sửa lệnh. Owner xác nhận bảng này 31/10/2026.
+
+| Tầng | Capability                                                                                                                                                                                                                                                                                                                                                                                                                                                | Quy tắc                                               |
+| ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| L0   | `access-request` (lõi: bản ghi, repo, policy, types, errors, định tuyến, giá, `assessment-read.repo`, `withdrawal.policy`), `outcome`; `status` (cô lập: không import, không ai import, không controller; lệnh in `L0 (cô lập)`)                                                                                                                                                                                                                          | không import capability nào của `requests` (gate)     |
+| L1   | lõi nhánh, không controller: `step-routing`, `request-draft`, `renewal-apply`                                                                                                                                                                                                                                                                                                                                                                             | chỉ import L0                                         |
+| L2   | dịch vụ dùng chung, không controller: `spend`, `plan-line`, `request-intake`, `request-view`, `assessment`, `budget-information`, `group-request`, `grant`, `request-end`, `spend-approval-view`                                                                                                                                                                                                                                                          | import ít nhất một L1 hoặc L2, không vòng             |
 | L3   | use case lá, có controller: `proposal-review`, `budget-questions`, `group-line-decisions`, `need-decision`, `need-decision-queue`, `my-requests`, `assessment-queue`, `withdraw`, `finance-review`, `spend-submission`, `spend-approval`, `request-submission`, `cancellation`, `reassignment`, `return-request`, `timing`, `delegated-request`, `renewal-request`, `service-account-request`, `group-request-submission`, `line-closure`, `draft`, `sla` | không ai import lên, trừ năm ngoại lệ dưới đây (gate) |
 
-`status` không controller và không import hay bị import capability nào của `requests`.
-
-**Số đo (30/10/2026).** Từ 24 capability, 82 cạnh, một vòng 19 capability → 36 capability, 111 cạnh, không vòng. Cạnh không tính cạnh
+**Số đo (30/10/2026).** Từ 24 capability, 82 cạnh, một vòng 19 capability → 36 capability, 111 cạnh, không vòng (sau khi tích hợp code dev A ngày 31/10/2026: 39 capability, 118 cạnh, thêm `need-decision-queue`, `my-requests`, `assessment-queue`, cả ba là L3 chỉ đọc, không ai import lên). Cạnh không tính cạnh
 vào `access-request` (29): 82; không tính thêm cạnh vào `outcome` (10): 72; không tính thêm cạnh vào `spend` (15): 57. **Mục tiêu "cạnh ≤ 50"
 của spec không đạt**, và không đạt được nếu giữ giới hạn 25 file mỗi thư mục: mọi use case đọc lõi (29 cạnh), mỗi capability tách ra để
 thư mục không quá 25 file thêm cạnh. Tiêu chí thay thế (Owner 31/10/2026: chấp nhận cho Task 4.3): không vòng; L0 không import capability; không thư mục nào quá 25
@@ -111,7 +114,7 @@ cùng cần; phần ghi nằm ở `assessment/assessment.repo.ts`.
     `budget-questions/` — `budget-information.controller.ts`.
   - `finance-review/` (US-06-13; `finance-reviews.controller.ts`; ghi ở `finance-review-writer.service.ts`, nhiều năm ở
     `spend-years-view.service.ts`), `spend-submission/` (hàng đợi chi, batch, bổ sung; US-06-12, US-06-14; bổ sung chia ba:
-    `supplement-pricing`, `supplement-recorder`, `supplement-read`), `spend-approval/` (spending approver quyết định; US-06-01;
+    `supplement-pricing`, `supplement-recorder`, `supplement-query`), `spend-approval/` (spending approver quyết định; US-06-01;
     `spend-approvals.controller.ts`, `spend-decision.service.ts` điều phối `spend-decision-recorder.service.ts`),
     `spend-approval-view/` (thẻ của approver: `spend-approval-queue.service.ts` hàng đợi, `spend-approval-view.service.ts` chi tiết,
     `spend-approval.mapper.ts` dựng wire, `spend-approval.dto.ts`, dùng cả cho request nhóm).
@@ -124,11 +127,15 @@ cùng cần; phần ghi nằm ở `assessment/assessment.repo.ts`.
     ngay sau hub trong `requests.module.ts` để thứ tự path của API không đổi.
   - `draft/` — bản nháp: lưu, liệt kê, gửi, xóa; `request-drafts.controller.ts`; `RequestDraftService`.
   - `assessment/` — thẩm định phần mềm ngoài catalog, đăng ký nội bộ, nối plan, tính lại giá (US-05-06, US-05-18, US-05-20);
-    `AssessmentReader` (đọc), `AssessmentService` (lưu), `AssessmentCompletionService`, `AssessmentRejectionService`, qua cổng chung
+    `AssessmentQueryService` (đọc), `AssessmentService` (lưu), `AssessmentCompletionService`, `AssessmentRejectionService`, qua cổng chung
     `AssessmentGate` (khóa đề xuất, người thẩm định, bước của IT Admin); `ProposalService`, `RepricingService`,
     `need-spend.service.ts`, `internal-registration.service.ts` (đăng ký nội bộ; `internalRegistrationBasis`, `registeredShapeOf`,
     `actsForAssignee` ở `assessment.policy.ts`); `proposal-review/` — `proposals.controller.ts`.
   - `delegated-request/` — gửi thay, hàng đợi grant (US-03-02; `delegated-request-submission.mapper.ts` dựng dòng và audit); `cancellation/` — IT Admin đóng request của người đã nghỉ (US-03-04).
+  - Ba danh sách đọc theo vai, chỉ đọc, không khóa, không ghi (L3): `my-requests/` — `GET /me/access-requests`, Request tôi đã gửi (`my-requests.service.ts`,
+    `my-requests.repo.ts`, `my-requests-facts.repo.ts`); `need-decision-queue/` — `GET /need-decisions`, bước chờ quyết nhu cầu của người đang được giao
+    (`need-decision-queue.service.ts`, `.repo.ts`, `.mapper.ts`); `assessment-queue/` — `GET /assessment-queue`, việc thẩm định của IT Admin trong phạm vi phụ trách
+    (`assessment-queue.service.ts`, `.repo.ts`, `.mapper.ts`). `my-requests` và `need-decision-queue` đọc cột `policy` qua `requestPolicyJson` (không ép kiểu).
 - **Request nhóm** (US-05-17)
   - `group-request/` — lõi nhóm: dòng từng người, phân bổ tiền, quyết định theo dòng, rút dòng, grant nhóm,
     `beneficiary-eligibility.policy.ts`; `group-line-decisions/` — `group-lines.controller.ts` và các service quyết định theo dòng (bước nhu cầu: `GroupNeedPreconditions`,
@@ -176,3 +183,6 @@ cùng cần; phần ghi nằm ở `assessment/assessment.repo.ts`.
 ## Test
 
 - Unit: `src/modules/requests/**/*.spec.ts`; HTTP: `test/http/requests/`; integration: `test/integration/requests/`.
+- Codec của cột JSON (`.json.ts`, [database rules](../../../docs/rules/database-business.md)): `access-request/access-request.json.ts` giữ cả
+  `policy` và `payment_schedule`, nên spec của chúng nằm trong `access-request/access-request.policy.spec.ts` và
+  `access-request/pricing.policy.spec.ts` (thư mục đã đủ 25 file); `request-draft/request-draft-policy.json.ts` (`policy` của bản nháp) có spec cạnh file.

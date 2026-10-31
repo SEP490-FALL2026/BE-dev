@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { addDays, type BusinessDate } from '../../../../core/business-date';
 import type { DbTx } from '../../../../infrastructure/database/transaction-runner';
 import { OrganizationHistoryApi } from '../../../organization/public/organization-history.api';
-import { OrganizationApi } from '../../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../../organization/public/organization-read.api';
 import { TransferGuardService } from '../../transfer/transfer-guard.service';
 import { previousSuccessorChoice } from '../../transfer/transfer.policy';
 import { OffboardingRefusedError } from '../offboarding.errors';
@@ -26,7 +26,7 @@ export interface JudgedMove {
 @Injectable()
 export class OffboardingChangeJudge {
   constructor(
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly history: OrganizationHistoryApi,
     private readonly guard: TransferGuardService,
     private readonly periods: OffboardingPeriodsService,
@@ -35,7 +35,7 @@ export class OffboardingChangeJudge {
   async judge(tx: DbTx, held: OffboardingRecord, today: BusinessDate, input: ChangeLastDayInput): Promise<JudgedMove> {
     const placementFrom =
       (held.placementClosedId ? await this.history.getPlacementStart(tx, held.placementClosedId) : null) ?? today;
-    const employee = await this.organization.getEmployee(held.employeeId, tx);
+    const employee = await this.organizationReads.getEmployee(held.employeeId, tx);
     if (!employee) throw new OffboardingRefusedError('EMPLOYEE_NOT_FOUND');
     const facts = changeFactsOf(held, {
       today,

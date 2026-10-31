@@ -57,8 +57,8 @@ file thuần xuống tầng thấp, hoặc đưa dịch vụ điều phối lên
 - `catalog-entry/` — ứng dụng (US-04-01), Business Owner (US-04-06), gợi ý K2 (`k2-recommendation.policy.ts`);
   `applications.controller.ts`, `application-owners.controller.ts`; `ApplicationService` (phần kiểm trước khi ghi ở
   `ApplicationWriteGuards`, phần đổi trạng thái là hàm thuần trong `application-state.policy.ts`). Gốc của module: `plan/` và
-  `subscription/` đọc ứng dụng qua `ApplicationLookupService`; ứng dụng muốn biết plan của mình để gợi ý K2 thì khai
-  `application-plans.types.ts` (`ApplicationPlans`) và `plan/plan-lookup.service.ts` trả lời, `catalog.module.ts` nối hai bên.
+  `subscription/` đọc ứng dụng qua `ApplicationFactsService`; ứng dụng muốn biết plan của mình để gợi ý K2 thì khai
+  `application-plans.types.ts` (`ApplicationPlans`) và `plan/plan-facts.service.ts` trả lời, `catalog.module.ts` nối hai bên.
 - `application-retirement/` — retire ứng dụng (xác nhận của Business Owner, chặn bởi assignment/subscription); đọc ứng dụng,
   plan và subscription nên đứng trên cả ba; controller, dto, policy, repo, `ApplicationRetirementService`.
 - `internal-software-registration/` — đăng ký phần mềm nội bộ: tạo ứng dụng và plan trong một transaction; đứng trên
@@ -66,7 +66,7 @@ file thuần xuống tầng thấp, hoặc đưa dịch vụ điều phối lên
 - `requestable-software/` — danh mục cho người gửi Request chọn phần mềm/gói trước khi xem trước (`US-05-01` main flow,
   `a01-employee-catalog-selector`): `GET /requestable-applications[/{id}]`, `GET /requestable-plans[/{id}]`, mọi người đăng
   nhập; projection riêng, không dùng DTO quản trị. Ẩn ứng dụng retired/không có gói/loại ngoài baseline; mỗi dòng nêu
-  `canSubmit` (cổng Cost Center như preview) và trạng thái giá (`SubscriptionLookupService.pricedCyclesOfPlans`, không lộ số
+  `canSubmit` (cổng Cost Center như preview) và trạng thái giá (`SubscriptionFactsService.pricedCyclesOfPlans`, không lộ số
   tiền). `RequestableSoftwareService`, `requestable-software.policy.ts`, repo chỉ `select` trường được phép.
 - `functional-group/` — nhóm chức năng (BR-06.9); `functional-groups.controller.ts`; `FunctionalGroupService`.
 - `plan/` — plan của ứng dụng, workspace profile K2 (US-04-02); `plans.controller.ts`; `PlanService`,
@@ -79,7 +79,7 @@ file thuần xuống tầng thấp, hoặc đưa dịch vụ điều phối lên
   `sameUnitPrice` là hàm thuần trong `subscription.policy.ts`.
 - `contract/` — hợp đồng và file riêng tư trong object storage (US-04-04); `contracts.controller.ts`,
   `documents.controller.ts`; `ContractService`, `DocumentService`; `document-expiry.job.ts` chạy mỗi giờ (DB-13).
-- `subscription-owner-assignment/` — repo và Nest module riêng của lệnh CLI; service nằm ở `public/`.
+- `subscription-owner-assignment/` — repo và Nest module riêng của lệnh CLI (`subscription-owner-assignment-cli.module.ts`); service nằm ở `public/`.
 - Gốc module: `catalog-audit-event.mapper.ts` (sự kiện Audit Trail, mọi capability dùng).
 
 ## Bất biến quan trọng

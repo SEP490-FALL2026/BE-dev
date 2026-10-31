@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import { AuditApi } from '../../audit/public/audit.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { personnelSystemAuditEvent } from '../personnel-audit-event.mapper';
 import { LeaveRepo } from './leave.repo';
 
@@ -19,13 +19,13 @@ export class LeaveOverdueService {
   constructor(
     private readonly runner: TransactionRunner,
     private readonly leaves: LeaveRepo,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly audit: AuditApi,
   ) {}
 
   /** Returns how many leaves were told in this pass. */
   async noticeOverdue(now: Date = new Date()): Promise<number> {
-    const today = await this.organization.businessToday(now);
+    const today = await this.organizationReads.businessToday(now);
     const late = await this.leaves.listOverdueUnnoticed(today, BATCH);
     let told = 0;
     for (const leave of late) {

@@ -4,7 +4,8 @@ import { INestApplicationContext } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
 import { AuditApi } from '../../../src/modules/audit/public/audit.api';
-import { DevSeedApi, LOCAL_PASSWORD_GENERATOR } from '../../../src/modules/installation/public/dev-seed.api';
+import { LOCAL_PASSWORD_GENERATOR } from '../../../src/modules/installation/dev-seed/dev-seed-credentials.service';
+import { DevSeedApi } from '../../../src/modules/installation/public/dev-seed.api';
 import { InstallationApi } from '../../../src/modules/installation/public/installation.api';
 import {
   DisposableDatabase,
@@ -61,8 +62,8 @@ describe('dev:seed (integration, real PostgreSQL)', () => {
     database = await provisionDisposableDatabase();
     await migrateDisposableDatabase(database);
     process.env.TEST_DATABASE_URL = database.url;
-    const { DevSeedModule } = await import('../../../src/modules/installation/dev-seed/dev-seed.module');
-    const moduleRef = await Test.createTestingModule({ imports: [DevSeedModule] })
+    const { DevSeedCliModule } = await import('../../../src/modules/installation/dev-seed/dev-seed-cli.module');
+    const moduleRef = await Test.createTestingModule({ imports: [DevSeedCliModule] })
       .overrideProvider(LOCAL_PASSWORD_GENERATOR)
       .useValue(() => `deterministic-password-${++counter}`)
       .compile();

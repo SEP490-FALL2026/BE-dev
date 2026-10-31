@@ -1,7 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import type { BusinessDate } from '../../../core/business-date';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { describeForOperator, traceForOperator } from '../../../infrastructure/observability/operator-error';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { StepReassignmentService, type SweepTrigger } from '../reassignment/step-reassignment.service';
 
 /** What one pass looked at and what it could not finish; a request that failed is tried again by the next pass. */
@@ -35,7 +36,7 @@ export class StepRedeterminationSweepApi {
 
   constructor(
     private readonly reassignment: StepReassignmentService,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
   ) {}
 
   async sweep(now: Date = new Date()): Promise<SweepResult> {
@@ -50,7 +51,7 @@ export class StepRedeterminationSweepApi {
     result.holderLeftRequests = heldByLeavers.length;
     result.failedRequests += await this.each(heldByLeavers, 'HOLDER_LEFT', correlationId, now);
 
-    const today = await this.organization.businessToday(now);
+    const today = await this.organizationReads.businessToday(now);
     if (this.dailyPassOn !== today) {
       const outcome = await this.dailyPass(correlationId, now);
       result.dailyPassRequests = outcome.requests;
@@ -89,7 +90,10 @@ export class StepRedeterminationSweepApi {
         await this.reassignment.reconcileInOwnTransaction(id, trigger, correlationId, now);
       } catch (error) {
         failed += 1;
-        this.logger.error(`Reassignment of a request failed (${trigger}): ${(error as Error).name}`);
+        this.logger.error(
+          `Reassignment of a request failed (${trigger}, request ${id}): ${describeForOperator(error)}`,
+          traceForOperator(error),
+        );
       }
     }
 

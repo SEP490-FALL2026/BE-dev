@@ -8,6 +8,7 @@ import { join, relative, sep } from 'node:path';
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- one implementation for the command and the gate
 const architecture = require('../../scripts/arch/capability-graph.cjs') as {
   capabilityGraph: (srcRoot: string) => Map<string, Map<string, Map<string, string[]>>>;
+  controllerCapabilities: (srcRoot: string) => Map<string, Set<string>>;
   cyclesOf: (edges: Map<string, Map<string, string[]>>) => string[][];
   importsOf: (file: string, srcRoot: string) => string[];
   placeOf: (srcPath: string) => { module: string; capability: string | null };
@@ -78,23 +79,9 @@ function controllerCapabilitiesImported(
   return Object.fromEntries(Object.entries(importers).sort(([a], [b]) => a.localeCompare(b)));
 }
 
-/** The capability folders of a module that hold a `*.controller.ts`, at any depth. */
+/** The capability folders of a module that hold a `*.controller.ts`, at any depth: the same list `pnpm arch:capabilities` prints as L3. */
 function capabilitiesWithController(srcRoot: string, module: string): Set<string> {
-  const found = new Set<string>();
-  const walk = (directory: string): void => {
-    for (const entry of readdirSync(directory, { withFileTypes: true })) {
-      const path = join(directory, entry.name);
-      if (entry.isDirectory()) {
-        if (entry.name !== 'generated') walk(path);
-      } else if (entry.name.endsWith('.controller.ts')) {
-        const { capability } = architecture.placeOf(relative(srcRoot, path).split(sep).join('/'));
-        if (capability) found.add(capability);
-      }
-    }
-  };
-  walk(join(srcRoot, 'modules', module));
-
-  return found;
+  return architecture.controllerCapabilities(srcRoot).get(module) ?? new Set<string>();
 }
 
 /**

@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from '@nestjs/common';
 import { LeaveOverdueService } from './leave-overdue.service';
+import { describeForOperator, traceForOperator } from '../../../infrastructure/observability/operator-error';
 
 /** The first sweep waits, so a short-lived process (a test, a command) never starts one. */
 const FIRST_SWEEP_AFTER_MS = 5 * 60 * 1000;
@@ -43,7 +44,7 @@ export class LeaveReturnSweeper implements OnApplicationBootstrap, OnModuleDestr
       const told = await this.overdue.noticeOverdue();
       if (told > 0) this.logger.log(`Told ${told} long leave(s) past their day of return`);
     } catch (error) {
-      this.logger.error(`Long leave return sweep failed: ${(error as Error).name}`);
+      this.logger.error(`Long leave return sweep failed: ${describeForOperator(error)}`, traceForOperator(error));
     } finally {
       this.schedule(SWEEP_EVERY_MS);
     }

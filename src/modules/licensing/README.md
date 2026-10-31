@@ -110,7 +110,9 @@ dịch vụ nào đọc cả ghế lẫn thu hồi thì đứng trên cả hai (
   quyết, mở thu hồi phần vượt/hủy), `outcome/` (IT Admin ghi kết quả, kỳ mới nối chuỗi qua `SubscriptionPeriodApi`, chuyển ghế
   `RENEWAL_CARRY`, tiết kiệm `QĐ-66w`), `alerts/` (mốc T−15/T−7, chất lượng dữ liệu), `deadline/` (cờ thực hiện trễ, sự cố tự gia
   hạn/đánh dấu hết hạn); `subscription-renewal.job.ts` chạy mỗi giờ qua `SubscriptionRenewalSweepService`; xếp ghế ở
-  `subscription-renewal-ranking.policy.ts`. Quyết định không tạo khoản cam kết ngân sách (`QĐ-62s`).
+  `subscription-renewal-ranking.policy.ts`. Quyết định không tạo khoản cam kết ngân sách (`QĐ-62s`). Cột JSON
+  `subscription_renewals.decision_snapshot` đi qua codec `subscription-renewal-decision-snapshot.json.ts` (spec cạnh file); audit và thông báo
+  của một quyết định ghi ở `decision/renewal-decision-trail.service.ts`.
 - Gốc module (dùng chung nhiều capability): `licensing-audit-event.mapper.ts`, `licensing.http-errors.ts`;
   `licensing-alerts.policy.ts` + `licensing-alerts.service.ts` (`LicensingAlerts`) — cảnh báo license `FR-5.14` vào hộp thông báo
   (dòng 3 T−7 ở `expiry/`, dòng 12 bàn giao ở `handover/handover-alert.service.ts`, dòng 13 tài khoản dịch vụ ở

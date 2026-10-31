@@ -1,6 +1,6 @@
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { LicensingDashboardApi } from '../../licensing/public/licensing-dashboard.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { PersonnelDashboardApi } from '../../personnel/public/personnel-dashboard.api';
 import { DashboardRefusedError } from '../section/dashboard-section.errors';
 import { ManagerDashboardService } from './manager-dashboard.service';
@@ -25,7 +25,7 @@ function serviceWith(headed: { departmentId: string } | null = { departmentId: '
       businessToday: () => Promise.resolve('2026-10-23'),
       getHeadedDepartment: jest.fn().mockResolvedValue(headed),
       getDepartmentBrief: jest.fn().mockResolvedValue(DEPARTMENT),
-    } as unknown as OrganizationApi,
+    } as unknown as OrganizationReadApi,
     { departmentFacts } as unknown as LicensingDashboardApi,
     { openTransferReviews } as unknown as PersonnelDashboardApi,
   );

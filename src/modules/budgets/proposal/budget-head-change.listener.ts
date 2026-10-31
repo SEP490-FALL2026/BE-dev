@@ -6,7 +6,7 @@ import {
 } from '../../organization/public/organization.extension-points';
 import type { OrganizationChange } from '../../organization/public/organization.types';
 import { BudgetNotifierService } from '../budget/budget-notifier.service';
-import { BudgetSupportService } from '../budget/budget-support.service';
+import { BudgetFactsService } from '../budget/budget-facts.service';
 import { ProposalRepo } from '../budget/proposal.repo';
 
 /**
@@ -21,7 +21,7 @@ export class BudgetHeadChangeListener implements OrganizationChangeListener, OnM
 
   constructor(
     private readonly proposals: ProposalRepo,
-    private readonly support: BudgetSupportService,
+    private readonly facts: BudgetFactsService,
     private readonly notifier: BudgetNotifierService,
     private readonly changes: OrganizationChangeListeners,
   ) {}
@@ -34,7 +34,7 @@ export class BudgetHeadChangeListener implements OrganizationChangeListener, OnM
     if (change.kind !== 'HEAD_PERIOD_START') return;
     const waiting = await this.proposals.returned(tx);
     if (waiting.length === 0) return;
-    const departments = await this.support.departmentsOf(
+    const departments = await this.facts.departmentsOf(
       [...new Set(waiting.map((proposal) => proposal.costCenterId))],
       tx,
     );

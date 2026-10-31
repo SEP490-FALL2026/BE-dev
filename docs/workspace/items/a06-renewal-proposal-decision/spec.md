@@ -67,7 +67,7 @@ code. Phụ thuộc `RevocationService` (`g6-revocation-by-grant-kind`), bảng 
 ## Ownership: module, data, API
 
 - **licensing `subscription-renewal/`:** `proposal/renewal-proposal.{service,policy}.ts`, `decision/renewal-decision.{service,policy}.ts`,
-  `decision/renewal-decision-support.service.ts`, `subscription-renewal-ranking.{policy,service}.ts`, `subscription-renewal-parties.service.ts`,
+  `decision/renewal-decision-trail.service.ts`, `subscription-renewal-ranking.{policy,service}.ts`, `subscription-renewal-parties.service.ts`,
   `subscription-renewal.repo.ts`, `subscription-renewal-seat.repo.ts`, `subscription-renewal-view.service.ts`, controller, DTO, lỗi.
 - **catalog:** `public/subscription-period.{api,types,errors}.ts`, `subscription/subscription-period.service.ts`; cột `renewed_from_id`.
 - **Bảng:** `subscription_renewals` (một dòng mỗi kỳ, unique `subscription_id`; trigger `subscription_renewals_guard` đóng băng từng

@@ -47,7 +47,7 @@ thì danh sách đổi ở lần đọc kế tiếp, còn quyết định vẫn 
 
 ## Dependencies and blockers
 
-Không có blocker. Dùng: `access-request/` (policy `deciderRoleOf`, `LONG_TERM_MONTHS`, `hasSpendStep`, DTO `employeeRef`, `moneySchema`), `spend/spend-read.service.ts` (tên người, đơn vị tiền), facade `CatalogApi.getPlanSummaries`, `OrganizationApi.getDepartmentBriefs`, `OrganizationApi.getOrganization`, `OperatingParametersApi.getNonWorkingDates`. B-01 đang sửa `operating-parameters` song song: B-02 chỉ gọi `getNonWorkingDates(from, to)` đã có, không đổi chữ ký.
+Không có blocker. Dùng: `access-request/` (policy `deciderRoleOf`, `LONG_TERM_MONTHS`, `hasSpendStep`, DTO `employeeRef`, `moneySchema`), `spend/spend-wire-view.service.ts` (tên người, đơn vị tiền), facade `CatalogApi.getPlanSummaries`, `OrganizationApi.getDepartmentBriefs`, `OrganizationApi.getOrganization`, `OperatingParametersApi.getNonWorkingDates`. B-01 đang sửa `operating-parameters` song song: B-02 chỉ gọi `getNonWorkingDates(from, to)` đã có, không đổi chữ ký.
 
 ## Ownership: module, data, API
 

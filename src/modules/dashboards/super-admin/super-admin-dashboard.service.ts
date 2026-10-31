@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { PersonnelDashboardApi } from '../../personnel/public/personnel-dashboard.api';
 import {
   assertHoldsRole,
@@ -36,7 +36,7 @@ export interface SuperAdminDashboard {
 @Injectable()
 export class SuperAdminDashboardService {
   constructor(
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly identity: IdentityAccessApi,
     private readonly personnel: PersonnelDashboardApi,
   ) {}
@@ -44,8 +44,8 @@ export class SuperAdminDashboardService {
   /** Throws DashboardRefusedError for a caller without the Super Admin role. */
   async overview(actor: AuthenticatedPrincipal): Promise<SuperAdminDashboard> {
     assertHoldsRole(actor.roles, 'SUPER_ADMIN');
-    const today = await this.organization.businessToday();
-    const facts = await this.organization.getOnboardingFacts();
+    const today = await this.organizationReads.businessToday();
+    const facts = await this.organizationReads.getOnboardingFacts();
     const usable = await this.identity.findUsableItAdminEmployeeIds(
       facts.departmentsByItAdmin.flatMap((department) =>
         department.itAdminEmployeeId ? [department.itAdminEmployeeId] : [],

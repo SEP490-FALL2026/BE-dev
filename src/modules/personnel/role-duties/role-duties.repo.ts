@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { fromDateColumn, type BusinessDate } from '../../../core/business-date';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
+import { offboardingHeadHandoverJson } from '../personnel-head-handover.json';
 import type { RoleFlag } from '../public/personnel.types';
 
 /** What the flows of the roles read of a case of a person who leaves. */
@@ -69,14 +70,12 @@ export class RoleDutiesRepo {
     closedAt: Date | null;
     roleFlags: RoleFlag[];
   }): RoleDutyCase {
-    const handover = row.headHandover as { successor?: 'EMPLOYEE' | 'NONE' } | null;
-
     return {
       id: row.id,
       employeeId: row.employeeId,
       state: row.state,
       lastWorkingDay: fromDateColumn(row.lastWorkingDay),
-      headSuccessor: handover?.successor ?? null,
+      headSuccessor: offboardingHeadHandoverJson.decode(row.headHandover)?.successor ?? null,
       departmentId: row.departmentId,
       closed: row.closedAt !== null,
       roleFlags: row.roleFlags,

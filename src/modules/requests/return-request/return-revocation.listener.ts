@@ -4,7 +4,7 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { AuditApi } from '../../audit/public/audit.api';
 import { RevocationListeners, type RevocationEvent } from '../../licensing/public/licensing.extension-points';
 import type { RevocationTaskFacts } from '../../licensing/public/licensing.types';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { accessRequestAuditEvent } from '../access-request/access-request-audit-event.mapper';
 import { handoverGate } from './handover.policy';
 import { ReturnHandoverPendingError } from './return-request.errors';
@@ -28,7 +28,7 @@ export class ReturnRevocationHook implements OnModuleInit {
 
   constructor(
     private readonly returns: ReturnRequestRepo,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly audit: AuditApi,
     private readonly revocation: RevocationListeners,
   ) {}
@@ -62,7 +62,7 @@ export class ReturnRevocationHook implements OnModuleInit {
       required: waiting.handoverRequired,
       confirmed: waiting.handoverConfirmedAt !== null,
       dueOn: waiting.handoverDueOn,
-      today: await this.organization.businessToday(now, tx),
+      today: await this.organizationReads.businessToday(now, tx),
     });
     if (gate === 'BLOCKED' && waiting.handoverDueOn !== null) {
       throw new ReturnHandoverPendingError(waiting.id, waiting.handoverDueOn);

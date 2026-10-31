@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { accessRequestAuditEvent } from '../access-request/access-request-audit-event.mapper';
 import { AccessRequestNotFoundError } from '../access-request/access-request.errors';
 import { hasSpendStep } from '../access-request/access-request.policy';
@@ -38,7 +38,7 @@ export class SpendBatchService {
     private readonly head: SpendHeadService,
     private readonly routing: SpendRoutingService,
     private readonly audit: AuditApi,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
   ) {}
 
   /**
@@ -61,9 +61,9 @@ export class SpendBatchService {
       }
       // A department with no Cost Center in use is stopped before anything is checked against a budget: not the answer of a year
       // with no budget, and nothing is written.
-      const today = await this.organization.businessToday(new Date(), tx);
-      const unit = (await this.organization.getOwningUnits([actor.employeeId], today, tx)).get(actor.employeeId);
-      if (unit) this.organization.requireUnitCostCenter(unit);
+      const today = await this.organizationReads.businessToday(new Date(), tx);
+      const unit = (await this.organizationReads.getOwningUnits([actor.employeeId], today, tx)).get(actor.employeeId);
+      if (unit) this.organizationReads.requireUnitCostCenter(unit);
 
       const organizationId = (locked.get(requestIds[0]) as AccessRequestRecord).organizationId;
       const now = new Date();
