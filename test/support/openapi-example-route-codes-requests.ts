@@ -185,6 +185,7 @@ export const ROUTE_ERROR_CODES_REQUESTS: Readonly<
   accessRequestTimingsGet: {
     '404': ['ACCESS_REQUEST.NOT_FOUND'],
   },
+  meAccessRequestList: { '403': ['ACCESS_REQUEST.SUPER_ADMIN_CANNOT_REQUEST'] },
   accessRequestWithdraw: {
     '403': ['ACCESS_REQUEST.NOT_REQUESTER'],
     '404': ['ACCESS_REQUEST.NOT_FOUND'],

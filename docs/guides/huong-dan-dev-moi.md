@@ -44,12 +44,12 @@ request/response, `.errors.ts` lỗi nghiệp vụ, `.http-errors.ts` ánh xạ 
 `.listener.ts` đăng ký extension point, `.job.ts` việc định kỳ. Tối đa 2 cấp thư mục dưới module, 25 file mỗi thư mục, không
 thư mục tên tầng kỹ thuật (`services/`, `dto/`, `utils/`).
 
-**Tầng trong `requests`.** `requests` có 36 capability; đồ thị giữa chúng không có vòng (R6) và xếp thành bốn lớp trong
+**Tầng trong `requests`.** `requests` có 39 capability; đồ thị giữa chúng không có vòng (R6) và xếp thành bốn lớp trong
 [module card](../../src/modules/requests/README.md#tầng-trong-module): L0 lõi (`access-request`, `outcome`), L1 lõi nhánh
 (`step-routing`, `request-draft`...), L2 dịch vụ dùng chung (`spend`, `request-view`, `assessment`...), L3 use case lá có controller
 (`need-decision`, `withdraw`, `finance-review`...). `pnpm arch:capabilities --module requests` in lớp của từng capability, tính từ
 đồ thị mà gate dùng. Lớp cao import lớp thấp; use case lá
-(L3) không ai import lên, trừ năm ngoại lệ ghi ở module card. Đừng nhầm lớp L0–L3 trong một module với tầng T1–T6 giữa các module.
+(L3) không ai import lên, trừ năm ngoại lệ ghi ở module card. Đừng nhầm lớp L0–L3 trong một module với tầng T1–T7 giữa các module.
 
 ## 2. Đi hết một route: `POST /api/v1/access-requests/{id}/need-decision`
 

@@ -1,3 +1,4 @@
+import { Prisma } from '../../generated/prisma/client';
 import { JsonColumnShapeError } from '../database/json-column.errors';
 import { TransientDatabaseError, readSqlState, toTransientError } from '../database/transaction-runner';
 
@@ -17,9 +18,16 @@ function nameOf(value: unknown): string {
   return IDENTIFIER.test(value.name) ? value.name : 'Error';
 }
 
-/** The Prisma code, the SQLSTATE of a pg error or the code of a socket error, when the value carries one. */
+/**
+ * The Prisma code, the SQLSTATE of a pg error or the code of a socket error, when the value carries one. A Prisma client that could
+ * not reach or sign in to the database keeps its code in `errorCode` (`P1000` bad credentials, `P1001` unreachable), not in `code`:
+ * the first thing to read when a command fails while it starts.
+ */
 function codeOf(value: unknown): string | undefined {
-  const code = (value as { code?: unknown } | null | undefined)?.code;
+  const code =
+    value instanceof Prisma.PrismaClientInitializationError
+      ? value.errorCode
+      : (value as { code?: unknown } | null | undefined)?.code;
 
   return typeof code === 'string' && CODE.test(code) ? code : undefined;
 }

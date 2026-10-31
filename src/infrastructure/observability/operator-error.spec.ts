@@ -39,6 +39,26 @@ describe('describeForOperator', () => {
     expect(summary).not.toContain('email');
   });
 
+  it('names the Prisma code of a client that could not connect or sign in, never its message', () => {
+    const refused = new Prisma.PrismaClientInitializationError(
+      'Authentication failed against database server, the provided database credentials for `slm_runtime:s3cr3t` are not valid',
+      'test',
+      'P1000',
+    );
+
+    expect(describeForOperator(refused)).toBe('PrismaClientInitializationError code=P1000 retryable=true');
+    expect(describeForOperator(refused)).not.toContain('s3cr3t');
+    expect(describeForOperator(new TransientDatabaseError(undefined, refused))).toBe(
+      'TransientDatabaseError code=P1000 retryable=true cause=PrismaClientInitializationError',
+    );
+    expect(
+      describeForOperator(new Prisma.PrismaClientInitializationError("Can't reach database server", 'test', 'P1001')),
+    ).toBe('PrismaClientInitializationError code=P1001 retryable=true');
+    expect(describeForOperator(new Prisma.PrismaClientInitializationError('no code given', 'test'))).toBe(
+      'PrismaClientInitializationError retryable=true',
+    );
+  });
+
   it('names a business error by its class only: the message may carry a name or an address', () => {
     const summary = describeForOperator(new AccessRequestNotFoundError());
 

@@ -1,3 +1,5 @@
+import { Prisma } from '../../generated/prisma/client';
+import { toTransientError } from '../../infrastructure/database/transaction-runner';
 import { DemoApiError, DemoApiUnreachableError } from './demo-api-client';
 import { exitCodeOf, runDemoSteps } from './demo-dataset-runner';
 import { formatDemoReport } from './demo-dataset-report';
@@ -58,6 +60,24 @@ describe('the demo dataset step runner', () => {
     ]);
 
     expect(reports[0]).toMatchObject({ status: 'failed', detail: 'Error retryable=false' });
+  });
+
+  it('puts the database cause in the detail of the step that failed, and the run still exits 1', async () => {
+    const outOfTime = toTransientError(
+      new Prisma.PrismaClientKnownRequestError('Transaction API error: secret-host:5432', {
+        code: 'P2028',
+        clientVersion: '7.9.1',
+      }),
+    );
+    const reports = await runDemoSteps(ctx('apply'), [
+      step('org.accounts', [], () => Promise.reject(outOfTime ?? new Error('not a transient error'))),
+    ]);
+
+    expect(reports[0]).toMatchObject({
+      status: 'failed',
+      detail: 'TransientDatabaseError code=P2028 retryable=true cause=PrismaClientKnownRequestError',
+    });
+    expect(exitCodeOf('apply', reports)).toBe(1);
   });
 
   it('says there is nothing to change when every step was there (apply)', () => {

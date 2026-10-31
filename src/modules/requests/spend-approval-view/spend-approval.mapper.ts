@@ -23,6 +23,8 @@ export interface QueueLookups {
   people: People;
   units: Map<string, number>;
   centers: readonly CostCenter[];
+  /** The day each step is due, by step id. */
+  due: Map<string, string>;
 }
 
 function planOf(
@@ -61,6 +63,13 @@ function partiesOf(row: OpenSpendRow, lookups: QueueLookups) {
   return { requester, beneficiary, center };
 }
 
+function dueOf(row: OpenSpendRow, lookups: QueueLookups): string {
+  const due = lookups.due.get(row.id);
+  if (due === undefined) throw new Error(`The step ${row.id} has no deadline counted.`);
+
+  return due;
+}
+
 /** A row of the queue (`US-06-01` AC-1): what the request is, what it costs, the first code of its check, and who holds which step. */
 export function approvalSummaryOf(row: OpenSpendRow, lookups: QueueLookups): ApprovalSummaryWire {
   const { request } = row;
@@ -70,8 +79,10 @@ export function approvalSummaryOf(row: OpenSpendRow, lookups: QueueLookups): App
   return {
     requestId: row.requestId,
     stepId: row.id,
+    stepKind: 'SPEND_APPROVAL',
     openedAt: row.createdAt.toISOString(),
     slaWorkingDays: row.slaWorkingDays,
+    dueOn: dueOf(row, lookups),
     plan: planOf(lookups.plans, request.planId),
     softwareName: request.proposal?.softwareName ?? null,
     requester,

@@ -51,6 +51,8 @@ export interface SubscriptionRecord {
   noticePeriodDays: number | null;
   autoRenew: boolean;
   allowsMidTermReduction: boolean;
+  /** The period this one continues (`QĐ-16`); null for a first period. */
+  renewedFromId: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -73,10 +75,15 @@ export interface NewSubscription {
   noticePeriodDays: number | null;
   autoRenew: boolean;
   allowsMidTermReduction: boolean;
+  /** Only the period a renewal records names the one it continues; set at insert and never changed. */
+  renewedFromId?: string | null;
 }
 
 /** What a write stores: the whole mutable state of the subscription, as computed. */
-export type SubscriptionState = Omit<NewSubscription, 'organizationId' | 'planId' | 'kind' | 'ownerDepartmentId'>;
+export type SubscriptionState = Omit<
+  NewSubscription,
+  'organizationId' | 'planId' | 'kind' | 'ownerDepartmentId' | 'renewedFromId'
+>;
 
 export interface SubscriptionListFilter {
   applicationId?: string;

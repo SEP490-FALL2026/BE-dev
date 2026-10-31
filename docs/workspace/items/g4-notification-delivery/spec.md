@@ -2,7 +2,7 @@
 
 - Phụ trách: AI theo giao việc Owner (lập bản đồ phân rã 20/10/2026).
 - Thiết kế ban đầu bởi: AI theo giao việc Owner (20/10/2026).
-- Thiết kế: `blocked`. Owner review: chưa review.
+- Thiết kế: `superseded` (31/10/2026: tiếp quản bởi [a03-license-inbox-alerts](../a03-license-inbox-alerts/spec.md)). Owner review: chưa review.
 - Nguồn: Docs `9416fe0` (BRD v3.46, US v0.15 — Story/AC ở bảng Primary Story/AC), BE `57b1e1c`.
 - Nhóm roadmap: G3 và G4 — chỉ là planning container, không phải phạm vi của hạng mục này (xem `## Sizing decision`).
 - _Tác động 22/10/2026 (baseline Docs `72e1480`):_ scope map G2 hoãn `US-02-02` AC-17 (báo hồ sơ nhân viên mới cho IT
@@ -83,3 +83,11 @@ Ma trận trên là khung từ tiêu đề AC; tình huống cụ thể (từ ch
 - Audit G0–G6 trên Docs `769bb64` ↔ BE `7c28e75` mở lại hạng mục này: F58 — cảnh báo license `FR-5.14` (phạm vi theo P03-D15).
 - Remediation duy nhất: [g0-g6-final-business-baseline-remediation](../g0-g6-final-business-baseline-remediation/spec.md) ([impact matrix](../g0-g6-final-business-baseline-remediation/impact-matrix.md#3-findings)). AC liên quan không còn được coi là thỏa nguồn hiện hành cho tới khi remediation xong; trạng thái triển khai ở roadmap. Phần đã ghi phía trên là lịch sử, giữ nguyên.
 - _27/10/2026 (Prompt 04, Task 0.1 của `g0-g6-final-business-baseline-remediation`, F60 — re-pin scope map [G3](../../../roadmap.md#work-item-decomposition-g3) Docs `e0cb5a0`, BE `7c28e75`):_ `US-04-10` `RETIRED` nên bỏ dòng `US-04-10` AC-1, AC-3 khỏi bảng _Primary Story/AC_ (lịch sử: từng `partial` — vế thông báo cho trưởng phòng khi đổi bộ chuẩn) ([impact matrix mục 9](../g0-g6-final-business-baseline-remediation/impact-matrix.md#9-phụ-lục-delta-user-stories-72e1480--769bb64)). Phần đã ghi phía trên là lịch sử, giữ nguyên.
+
+## Tiếp quản bởi A-03 (31/10/2026)
+
+- Hạng mục được tiếp quản bởi [a03-license-inbox-alerts](../a03-license-inbox-alerts/spec.md) (Dev A, A-03, F58, `RA-06`),
+  re-pin theo `FR-5.14`/`US-12-15` Docs `726219a`, BE `6eb12d1`. Phần bộ chuẩn (`US-04-10`, `RETIRED`) bỏ hẳn.
+- Vế thông báo của `US-07-02` AC-1, `US-07-04` AC-3, AC-6, AC-12, AC-13 chuyển sang A-03; AC-3 (lỗi xác thực connector) và
+  AC-12 (thu lại lời mời) `blocked` chờ contract G7 của Owner. Khung này vào danh sách `legacy` của `rules-check.config.json`;
+  mọi phần phía trên giữ làm lịch sử, không sửa.

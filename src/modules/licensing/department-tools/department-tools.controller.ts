@@ -45,7 +45,7 @@ class DepartmentToolsResponseDto extends createZodDto(
           fullName: z.string(),
           holderStatus: z.string(),
           kind: z.enum(['PERSONAL', 'SERVICE']),
-          source: z.enum(['BASELINE', 'HANDOVER', 'REQUEST']),
+          source: z.enum(['BASELINE', 'HANDOVER', 'REQUEST', 'RENEWAL_CARRY']),
           application: z.strictObject({ id: z.uuid(), name: z.string() }),
           plan: z.strictObject({ id: z.uuid(), name: z.string() }),
           effectiveFrom: z.string(),

@@ -36,6 +36,7 @@ Module chỉ import module **tầng thấp hơn**, hoặc module cùng tầng c�
 | T4   | `catalog`, `licensing`                    | `licensing → catalog`            |
 | T5   | `budgets`, `requests`, `data-import`      | `requests → budgets`             |
 | T6   | `personnel`, `onboarding`, `installation` | —                                |
+| T7   | `dashboards`                              | —                                |
 
 Cần gọi ngược chiều (module dưới cần biết điều module trên giữ): module dưới **mở một extension point**, module trên
 đăng ký (mục dưới). Không thêm cạnh ngược, không thêm cạnh cùng tầng khi chưa sửa bảng và ADR.

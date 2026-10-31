@@ -16,7 +16,7 @@ import {
 } from './demo-accounts.types';
 import { DemoAccountsChangedError } from './installation.errors';
 
-type Credentials = Map<string, { hash: string; hashPolicyVersion: number }>;
+type Credential = { hash: string; hashPolicyVersion: number };
 
 /**
  * The one part of `pnpm ops:demo-dataset` that is not driven through the HTTP API: the sign-in accounts of the demo people.
@@ -75,10 +75,11 @@ export class DemoAccountsApi {
 
   /**
    * Whether each wanted account is there as wanted, can be created, or conflicts with existing data. Writes nothing.
-   * Each account is judged in a short transaction of its own: a read needs no snapshot across accounts (`create`
-   * judges again inside its write transaction), and one transaction for all of them makes ~4 queries × the accounts
-   * sequential round trips, which over the SSH tunnel of the local path (~245 ms each to the VPS) outlived
-   * DB_TRANSACTION_TIMEOUT_MS (P2028).
+   * One short transaction per account (A-04): the work of a transaction never grows with the size of the fixture, so
+   * a database a tunnel away still answers within the transaction budget (`DB_TRANSACTION_TIMEOUT_MS`). The employees
+   * are read once for all the accounts, in a short transaction of their own: a read needs no snapshot across accounts
+   * (`create` reads them again inside the write transaction of each account), and a lookup for each account would add a
+   * round trip to every one of them.
    */
   async describe(organizationId: string, specs: readonly DemoAccountSpec[]): Promise<DemoAccountPlanItem[]> {
     const employees = await this.runner.run((tx) =>
@@ -101,8 +102,11 @@ export class DemoAccountsApi {
   }
 
   /**
-   * Creates the accounts the plan says are absent, all in one transaction, each with the same operator-chosen password
-   * hashed by the account policy (checked against each sign-in email). A conflict or a missing employee writes nothing.
+   * Creates the accounts the plan says are absent, each with the same operator-chosen password hashed by the account
+   * policy (checked against each sign-in email). A conflict or a missing employee anywhere writes nothing. Each account
+   * is written in a transaction of its own, after its password is hashed and after its plan is read again in that
+   * transaction; an account that changed meanwhile stops the run (`DemoAccountsChangedError`) with the accounts before
+   * it kept, so a rerun goes on from there like every other step of the command.
    */
   async create(
     organizationId: string,
@@ -112,42 +116,44 @@ export class DemoAccountsApi {
   ): Promise<DemoAccountPlanItem[]> {
     const first = await this.describe(organizationId, specs);
     if (first.some((item) => item.state === 'conflict' || item.state === 'no-employee')) return first;
-    const credentials = await this.hashFor(specs, first, password);
-    if (credentials.size === 0) return first;
-
-    return this.runner.run(async (tx) => {
-      const again = await this.plan(tx, organizationId, specs);
-      if (JSON.stringify(again) !== JSON.stringify(first)) throw new DemoAccountsChangedError();
-      await this.write(tx, organizationId, specs, again, credentials, attribution);
-
-      return this.plan(tx, organizationId, specs);
-    });
-  }
-
-  private async plan(
-    tx: DbTx,
-    organizationId: string,
-    specs: readonly DemoAccountSpec[],
-  ): Promise<DemoAccountPlanItem[]> {
-    const employees = await this.organizationReads.getEmployeesByCodes(
-      specs.map((spec) => spec.employeeCode),
-      tx,
-    );
+    const correlationId = randomUUID();
     const items: DemoAccountPlanItem[] = [];
-    for (const spec of specs) {
-      const employee = employees.find((candidate) => candidate.employeeCode === spec.employeeCode);
-      items.push(employee ? await this.planOne(tx, organizationId, spec, employee) : absentEmployee(spec));
+    for (const [index, spec] of specs.entries()) {
+      const planned = first[index];
+      if (planned.state !== 'absent') {
+        items.push(planned);
+        continue;
+      }
+      // Hashing is slow on purpose: it is done before the transaction opens (lock protocol rule 3).
+      const credential = await this.identity.prepareCredential(password, spec.loginEmail);
+      items.push(
+        await this.runner.run(async (tx) => {
+          const again = await this.planFresh(tx, organizationId, spec);
+          if (JSON.stringify(again) !== JSON.stringify(planned)) throw new DemoAccountsChangedError();
+          await this.write(tx, organizationId, spec, again, credential, { ...attribution, correlationId });
+
+          return this.planFresh(tx, organizationId, spec);
+        }),
+      );
     }
 
     return items;
+  }
+
+  /** The plan of one account with its employee read again in this transaction, so a change since `describe` shows. */
+  private async planFresh(tx: DbTx, organizationId: string, spec: DemoAccountSpec): Promise<DemoAccountPlanItem> {
+    const [employee] = await this.organizationReads.getEmployeesByCodes([spec.employeeCode], tx);
+
+    return this.planOne(tx, organizationId, spec, employee ?? null);
   }
 
   private async planOne(
     tx: DbTx,
     organizationId: string,
     spec: DemoAccountSpec,
-    employee: { id: string },
+    employee: { id: string } | null,
   ): Promise<DemoAccountPlanItem> {
+    if (!employee) return absentEmployee(spec);
     const state = await this.accounts.describeDemoAccount(tx, {
       organizationId,
       employeeId: employee.id,
@@ -165,61 +171,41 @@ export class DemoAccountsApi {
     };
   }
 
-  /** Hashing is slow on purpose: it is done before any transaction opens (lock protocol rule 3). */
-  private async hashFor(
-    specs: readonly DemoAccountSpec[],
-    plan: readonly DemoAccountPlanItem[],
-    password: string,
-  ): Promise<Credentials> {
-    const credentials: Credentials = new Map();
-    for (const spec of specs) {
-      if (plan.find((item) => item.employeeCode === spec.employeeCode)?.state !== 'absent') continue;
-      credentials.set(spec.employeeCode, await this.identity.prepareCredential(password, spec.loginEmail));
-    }
-
-    return credentials;
-  }
-
   private async write(
     tx: DbTx,
     organizationId: string,
-    specs: readonly DemoAccountSpec[],
-    plan: readonly DemoAccountPlanItem[],
-    credentials: Credentials,
-    attribution: DemoAccountsAttribution,
+    spec: DemoAccountSpec,
+    item: DemoAccountPlanItem,
+    credential: Credential,
+    attribution: DemoAccountsAttribution & { correlationId: string },
   ): Promise<void> {
-    const correlationId = randomUUID();
-    for (const spec of specs) {
-      const item = plan.find((candidate) => candidate.employeeCode === spec.employeeCode);
-      const credential = credentials.get(spec.employeeCode);
-      if (item?.state !== 'absent' || !item.employeeId || !credential) continue;
-      const { appUserId } = await this.accounts.createDemoAccount(tx, {
+    if (item.state !== 'absent' || !item.employeeId) return;
+    const { appUserId } = await this.accounts.createDemoAccount(tx, {
+      organizationId,
+      employeeId: item.employeeId,
+      loginEmail: spec.loginEmail,
+      role: spec.role,
+      passwordHash: credential.hash,
+      hashPolicyVersion: credential.hashPolicyVersion,
+    });
+    const record = (action: string, after: Record<string, string>) =>
+      this.audit.record(tx, {
         organizationId,
-        employeeId: item.employeeId,
-        loginEmail: spec.loginEmail,
-        role: spec.role,
-        passwordHash: credential.hash,
-        hashPolicyVersion: credential.hashPolicyVersion,
+        actorKind: 'OPERATOR',
+        operatorReference: attribution.operatorReference,
+        correlationId: attribution.correlationId,
+        action,
+        resourceType: 'AppUser',
+        resourceId: appUserId,
+        after,
       });
-      const record = (action: string, after: Record<string, string>) =>
-        this.audit.record(tx, {
-          organizationId,
-          actorKind: 'OPERATOR',
-          operatorReference: attribution.operatorReference,
-          correlationId,
-          action,
-          resourceType: 'AppUser',
-          resourceId: appUserId,
-          after,
-        });
-      await record('DEMO_DATASET.ACCOUNT_CREATED', {
-        employeeCode: spec.employeeCode,
-        activationState: 'ACTIVATED',
-        emailVerificationSource: 'BOOTSTRAP_ASSERTED',
-        environment: attribution.environment,
-      });
-      await record('ROLE.GRANTED', { role: spec.role });
-    }
+    await record('DEMO_DATASET.ACCOUNT_CREATED', {
+      employeeCode: spec.employeeCode,
+      activationState: 'ACTIVATED',
+      emailVerificationSource: 'BOOTSTRAP_ASSERTED',
+      environment: attribution.environment,
+    });
+    await record('ROLE.GRANTED', { role: spec.role });
   }
 }
 

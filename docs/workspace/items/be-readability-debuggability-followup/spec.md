@@ -209,6 +209,7 @@ StoredAuditEvent[]` — kết quả `$queryRaw`) → thay bằng generic `$query
   | `in_app_notifications.params`, `held_department_notifications.params`                       | `notifications/inbox/notification-params.json.ts`                                                                                                  |
   | `parameter_values.value`                                                                    | `operating-parameters/operating-parameters-value.json.ts`                                                                                          |
   | `saas_issues.linked_work`                                                                   | `licensing/saas-issue/saas-issue-linked-work.json.ts`                                                                                              |
+  | `subscription_renewals.decision_snapshot` (cột của dev A, tích hợp 31/10/2026)              | `licensing/subscription-renewal/subscription-renewal-decision-snapshot.json.ts`                                                                    |
 
   Hai cast không phải cột JSON: `audit-query.repo.ts` (thực ra là `findMany`, không phải `$queryRaw`) nay có hàm ánh xạ hàng tường
   minh; cast ở `operating-parameters.controller.ts` thừa (kiểu `Shape` đã gán được cho `Record<string, unknown>`) nên bỏ, không cần
@@ -328,12 +329,17 @@ service ghi dùng `-record` cho thống nhất. Mọi đường dẫn dưới `s
 Round B (hậu tố số nhiều `-lookups`), nên luật L4 nay cấm cả dạng số nhiều của năm hậu tố. Không tách file nào: nửa đọc của năm service
 ghi chỉ là lối vào của cùng các repo, và tách chúng là việc của một hạng mục có spec riêng.
 
-**Việc sau (Low, chưa làm; hai việc).**
+**Việc sau (Low, chưa làm; bốn việc).**
 
 1. `budget-facts` là hỗn hợp (dòng 1): tách phần định dạng tiền và tra người ra `budget-wire-view` như `spend-wire-view` để
    `-facts` chỉ còn dữ kiện và quyền.
 2. Dòng 18: đưa hai hàm của `department-facts.service.ts` (`lockAndReadEmployee`, `requireOrganization`) vào một lớp
    `@Injectable() DepartmentFactsService`, để file `*-facts.service.ts` có lớp như mọi `.service.ts` khác (phán quyết của reviewer Round B).
+3. (MG-05, review tích hợp dev A) `licensing/subscription-renewal/decision/renewal-decision-trail.service.ts` ghi snapshot vào audit bằng
+   `JSON.parse(JSON.stringify(decision.snapshot)) as { [key: string]: string }`: kiểu khai báo hẹp hơn dữ liệu (snapshot lồng nhau). Đổi sang
+   `{ [key: string]: AuditValue }` (kiểu của `public/audit.types.ts`) hoặc một hàm `toAuditSnapshot`.
+4. (MG-06) Cùng file: `run<T>()` chỉ chuyển tiếp sang `TransactionRunner`; tiêm `TransactionRunner` thẳng vào `RenewalDecisionService` rồi bỏ
+   `run`.
 
 Gate L4 chỉ cấm năm hậu tố cũ ở `*.service.ts`; `-record` không bị luật nào đòi, nên bảng từ vựng ghi nó thành một dòng chú thích bên dưới ba
 tên đọc.

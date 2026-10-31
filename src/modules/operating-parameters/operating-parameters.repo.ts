@@ -30,6 +30,14 @@ export class OperatingParametersRepo {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`operating-parameter:${key}`}, 0))`;
   }
 
+  /**
+   * The shared side of the lock of the key's change: what is created under the value takes it, so a change waits for the creation
+   * to commit and a creation waits for a change that is under way. Two holders never wait for each other.
+   */
+  async holdKey(tx: DbTx, key: string): Promise<void> {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock_shared(hashtextextended(${`operating-parameter:${key}`}, 0))`;
+  }
+
   async currentRows(client?: DbTx): Promise<ParameterRow[]> {
     const rows = await (client ?? this.prisma).parameterValue.findMany({
       where: { validTo: null },

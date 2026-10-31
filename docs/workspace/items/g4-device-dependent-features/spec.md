@@ -2,7 +2,7 @@
 
 - Phụ trách: AI theo giao việc Owner (lập bản đồ phân rã 20/10/2026).
 - Thiết kế ban đầu bởi: AI theo giao việc Owner (20/10/2026).
-- Thiết kế: `blocked`. Owner review: chưa review.
+- Thiết kế: `superseded` (31/10/2026, A-05: phân rã thành năm hạng mục `a05-*`, xem _Phân rã A-05_). Owner review: chưa review.
 - Nguồn: Docs `9416fe0` (BRD v3.46, US v0.15 — Story/AC ở bảng Primary Story/AC), BE `57b1e1c`.
 - Nhóm roadmap: G3 và G4 — chỉ là planning container, không phải phạm vi của hạng mục này (xem `## Sizing decision`).
 - [Kế hoạch](plan.md).
@@ -14,24 +14,19 @@ Hoàn tất các AC của G3/G4 cần sổ thiết bị công ty đã đăng ký
 ## Sizing decision
 
 - Container: G3 và G4 (nhóm giao việc, không phải ranh giới hạng mục).
-- Mode: `split-story`.
-- Outcome and owner: Hoàn tất các AC của G3/G4 cần sổ thiết bị công ty đã đăng ký: gán khóa K4 kèm thiết bị, thu hồi khóa, vi phạm số cài đặt trên một khóa, bản ký `BM-06` và dòng hiện trạng K4.
+- Mode: `technical-enabler`
+- Outcome and owner: Khung đã thay (31/10/2026), không còn sở hữu AC nào; mỗi AC/vế cũ có chủ mới ở mục _Phân rã A-05_. Outcome cũ: hoàn tất các AC của G3/G4 cần sổ thiết bị công ty đã đăng ký: gán khóa K4 kèm thiết bị, thu hồi khóa, vi phạm số cài đặt trên một khóa, bản ký `BM-06` và dòng hiện trạng K4.
 - Boundaries: Hạng mục khung: không có code. Mở khóa khi sổ thiết bị `US-09-01` và thu hồi theo kiểu cấp `US-07-05` có nguồn.
 - Not larger: Không thêm AC mới; chỉ giữ chỗ cho AC đã ánh xạ.
 - Not smaller: Các AC đều chờ cùng sổ thiết bị; tách theo Story tạo nhiều khung chỉ lặp cùng blocker.
-- Siblings: `g3-license-key-vault`, `g3-vendor-terms-checklist`, `g4-seat-baseline-import`, `g4-provisioning-queue-manual`, `g3-contract-documents`.
+- Siblings: `a05-k4-device-registry-contract`, `a05-k4-key-grant-by-device`, `a05-k4-baseline-key-by-device`, `a05-k4-device-install-limit`, `a05-k4-device-revocation`, `a05-bm06-signature-record`; trước đây `g3-license-key-vault`, `g3-vendor-terms-checklist`, `g4-seat-baseline-import`, `g4-provisioning-queue-manual`, `g3-contract-documents`.
 - Scope map: [G3](../../../roadmap.md#work-item-decomposition-g3), [G4](../../../roadmap.md#work-item-decomposition-g4).
 
 ## Primary Story/AC
 
-| Story    | AC        | Coverage | Phần còn lại thuộc                                                                                                                                                                         |
-| -------- | --------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| US-02-05 | AC-11     | partial  | AC-1→AC-16: `g4-seat-baseline-import`                                                                                                                                                      |
-| US-04-04 | AC-8      | partial  | AC-1→AC-3, AC-6, AC-9, AC-10: `g3-contract-documents`; AC-4→AC-7, AC-11: `g3-downstream-finance-integration`                                                                               |
-| US-04-11 | AC-10     | partial  | AC-1→AC-4, AC-6→AC-9: `g3-vendor-terms-checklist`                                                                                                                                          |
-| US-04-12 | AC-5→AC-8 | partial  | AC-1→AC-4, AC-9→AC-12: `g3-license-key-vault`                                                                                                                                              |
-| US-07-01 | AC-10     | partial  | AC-1, AC-2, AC-4→AC-9, AC-11→AC-13, AC-15, AC-17, AC-18: `g4-provisioning-queue-manual`; AC-1, AC-3, AC-15, AC-16: `g4-request-and-transfer-integration`; AC-14: `g4-seat-baseline-import` |
-| US-07-02 | AC-4      | partial  | AC-1→AC-7: `g4-provisioning-queue-manual`; AC-1: `g4-notification-delivery`                                                                                                                |
+| Story | AC             | Coverage | Phần còn lại thuộc                                                                                                                                                                                           |
+| ----- | -------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| —     | A05-SUPERSEDED | n/a      | thay bởi `a05-k4-key-grant-by-device`, `a05-k4-baseline-key-by-device`, `a05-k4-device-install-limit`, `a05-k4-device-revocation`, `a05-bm06-signature-record` (contract: `a05-k4-device-registry-contract`) |
 
 ## Size exception
 
@@ -88,3 +83,15 @@ Ma trận trên là khung từ tiêu đề AC; tình huống cụ thể (từ ch
 ## Changes and acceptance
 
 20/10/2026: lập khung theo bản đồ phân rã G3/G4 của [roadmap](../../../roadmap.md). Chưa thiết kế chi tiết, chưa code, chưa review, chưa nghiệm thu.
+
+## Phân rã A-05 (31/10/2026)
+
+- Khung này `superseded`: theo [A-05](../../../reviews/roadmap-and-api-gaps-2026-10-31/DEV-A.md) mọi Story/AC/vế từng giữ ở đây
+  chuyển sang đúng một hạng mục mới; contract sổ thiết bị ở [`a05-k4-device-registry-contract`](../a05-k4-device-registry-contract/spec.md).
+  Blocked on Owner G7 registry; design/contract only — không claim tích hợp K4.
+- Bảng Primary cũ (lịch sử, không còn claim): `US-02-05` AC-11 → `a05-k4-baseline-key-by-device` (vế K4); `US-04-04` AC-8 →
+  `a05-bm06-signature-record`; `US-04-11` AC-10 → `a05-k4-device-install-limit`; `US-04-12` AC-5, AC-6 →
+  `a05-k4-key-grant-by-device`, AC-7, AC-8 → `a05-k4-device-revocation`; `US-07-01` AC-10 → `a05-k4-key-grant-by-device`;
+  `US-07-02` AC-4 (vế K4) → `a05-k4-key-grant-by-device`. Thêm theo scope map G6: `US-07-05` AC-6, AC-7 và vế K4 của
+  `US-03-04` AC-16 → `a05-k4-device-revocation`.
+- Scope map G3/G4/G6 đã đổi theo phân rã A-05 trong [roadmap](../../../roadmap.md) (các dòng trỏ tới `a05-*`).

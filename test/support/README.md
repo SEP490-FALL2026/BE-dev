@@ -195,6 +195,14 @@ fixture SQL không chứng minh workflow tạo tài khoản. Dùng `bodyOf(respo
   renewals that wait, which returns the real reader when called back). The reminders and what the database refuses are in
   `assignment-expiry-reminders.integration-spec.ts`, the queue, the start of the revocation, the handover and the failure in
   `assignment-expiry-queue.integration-spec.ts`, and the routes without a database in `test/http/licensing/assignment-expiry.http-spec.ts`.
+- `support/renewal-harness.ts`: the expiry harness with what the renewal of a subscription needs: the seven calls (`renewals`, `read`,
+  `ranking`, `propose`, `decideRenewal`, `outcome`, `deadlineEvents`), `sweepOn(day)` (the hourly pass by hand as if it were that
+  day), `unit(members)` (a department with its Cost Center, a head, members and IT1 in charge), `term(options)` and
+  `termWithSeats(unit, deadlineInDays)` (term subscriptions with a milestone and seats), `perpetual()`, `proposedRenewal` (201 or fail),
+  `notices(code, subject)`, `caseRow`, `revocationReasons` and `left(person)`. The proposal and the decision are in
+  `subscription-renewal-decision.integration-spec.ts`, the outcome and the chain of periods in
+  `subscription-renewal-outcome.integration-spec.ts`, the pass in `subscription-renewal-sweep.integration-spec.ts`, and the routes
+  without a database in `test/http/licensing/subscription-renewals.http-spec.ts`.
 - `support/saas-issue-harness.ts`: the expiry harness with what the reports of errors in SaaS rights need: the nine calls (`issueOptions`,
   `submitIssue`, `listIssues`, `readIssue`, `issueEntries`, `addIssueMessage`, `reopenIssue`, `moveIssue`, `duplicateIssue`), `reported`
   (201 or fail), `reporterIn(code, inCharge, target)` (a department, a member with a seat), `openGrantTask` (a grant that is not finished,

@@ -66,6 +66,7 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   'CatalogModule: CatalogApi',
   // The extension point licensing binds its reader of occupied seats to (public/catalog.extension-points.ts).
   'CatalogModule: SeatOccupancyHook',
+  'CatalogModule: SubscriptionPeriodApi',
   // H8.3 (A4-10): the data-import facade; onboarding reads the latest people import through it.
   'DataImportModule: DataImportApi',
   // G3 (ADR-0013): the finance facade, money in and conversion snapshot out; the repos stay private.
@@ -81,10 +82,14 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   'LicensingModule: LicensingOpenGrantsApi',
   'LicensingModule: LicensingServiceAccountApi',
   'LicensingModule: LicensingSeatBaselineApi',
+  // G8 (US-12-15): the counts of licensing the role overviews read.
+  'LicensingModule: LicensingDashboardApi',
   // The extension points requests and personnel bind or add to (public/licensing.extension-points.ts).
   'LicensingModule: GrantRequestGateHook',
   'LicensingModule: RevocationListeners',
   'LicensingModule: RenewalHoldHook',
+  'LicensingModule: RenewalFinancialContributions',
+  'LicensingModule: RenewalUsageContributions',
   'LicensingModule: ResponsibleDeadlineHook',
   'LicensingModule: SeatBaselineClosedListeners',
   // H5.5 (identity-access Wave B): the account contracts the API and the recovery command reach the account persistence
@@ -129,10 +134,14 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   // G5 (FR-3.11): the inbox the routes of `NotificationsHttpModule` read, held once in the module that gives the notices.
   'NotificationsModule: InboxService',
   'OperatingParametersModule: OperatingParametersApi',
+  // B-01 (US-01-04): the extension point the budgets module binds its fiscal-year-start lock to.
+  'OperatingParametersModule: ParameterLockContributions',
   // G6 (ADR-0017): the extension point the flows that follow a personnel file (the owner of a service account) add their hooks to.
   'PersonnelModule: PersonnelFileHookContributions',
   // G6 (US-03-03): the days a person was on long leave, read by the rules of the recommendations of G7.
   'PersonnelModule: PersonnelApi',
+  // G8 (US-12-15): the counts of personnel the role overviews read.
+  'PersonnelModule: PersonnelDashboardApi',
   'OrganizationModule: OrganizationApi',
   'OrganizationModule: OrganizationReadApi',
   // The extension points the modules above bind or add to (public/organization.extension-points.ts).

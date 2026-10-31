@@ -41,11 +41,16 @@ import { PlanWorkspaceService } from './plan/plan-workspace.service';
 import { PlanRepo } from './plan/plan.repo';
 import { PlanService } from './plan/plan.service';
 import { PlansController } from './plan/plans.controller';
+import { RequestableSoftwareController } from './requestable-software/requestable-software.controller';
+import { RequestableSoftwareRepo } from './requestable-software/requestable-software.repo';
+import { RequestableSoftwareService } from './requestable-software/requestable-software.service';
 import { OnboardingFactsService } from './subscription/onboarding-facts.service';
 import { SeatTargetService } from './subscription/seat-target.service';
 import { SubscriptionDepartmentUseReader } from './subscription/subscription-department-use.listener';
 import { SubscriptionFactsService } from './subscription/subscription-facts.service';
 import { SubscriptionNoticeService } from './subscription/subscription-notice.service';
+import { SubscriptionPeriodService } from './subscription/subscription-period.service';
+import { SubscriptionPeriodApi } from './public/subscription-period.api';
 import { SubscriptionObligationService } from './subscription/subscription-obligation.service';
 import { SubscriptionRepo } from './subscription/subscription.repo';
 import { SubscriptionChangeGuard } from './subscription/subscription-change-guard.service';
@@ -98,6 +103,7 @@ import { VendorRepo } from './vendor/vendor.repo';
     ApplicationRetirementController,
     ContractsController,
     DocumentsController,
+    RequestableSoftwareController,
   ],
   providers: [
     VendorDictionaryService,
@@ -138,6 +144,7 @@ import { VendorRepo } from './vendor/vendor.repo';
     SubscriptionRepo,
     SubscriptionViewService,
     SubscriptionNoticeService,
+    SubscriptionPeriodService,
     SeatTargetService,
     OnboardingFactsService,
     SeatOccupancyHook,
@@ -150,12 +157,15 @@ import { VendorRepo } from './vendor/vendor.repo';
     ApplicationRetirementRepo,
     ApplicationRetirementService,
     CatalogApi,
+    SubscriptionPeriodApi,
     PlanTermsService,
     PlanTermsRepo,
     ApplicationOwnerService,
+    RequestableSoftwareRepo,
+    RequestableSoftwareService,
   ],
   // The facade licensing reads the seat targets through (ADR-0013), and the hook licensing binds its reader of occupied seats to
   // (`public/catalog.extension-points.ts`); the capability services and repos stay private.
-  exports: [CatalogApi, SeatOccupancyHook],
+  exports: [CatalogApi, SubscriptionPeriodApi, SeatOccupancyHook],
 })
 export class CatalogModule {}

@@ -29,6 +29,7 @@ import {
   OPERATING_PARAMETERS_ERROR_EXAMPLES,
   toOperatingParametersApiException,
 } from './operating-parameters.http-errors';
+import { ParameterChangeService } from './parameter-change.service';
 import { OperatingParametersApi, ParameterView } from './public/operating-parameters.api';
 
 const AUTH_ERRORS = [
@@ -90,6 +91,7 @@ function toWire(view: ParameterView) {
 export class OperatingParametersController {
   constructor(
     private readonly parameters: OperatingParametersApi,
+    private readonly parameterChange: ParameterChangeService,
     private readonly nonWorkingDates: NonWorkingDatesService,
   ) {}
 
@@ -125,6 +127,12 @@ export class OperatingParametersController {
       examples: [VALIDATION_EXAMPLE, OPERATING_PARAMETERS_ERROR_EXAMPLES.PARAMETER_VALUE_INVALID],
     },
     PARAMETER_NOT_FOUND,
+    {
+      status: HttpStatus.CONFLICT,
+      description:
+        'The value is locked because something was already made under it: the month the fiscal year begins cannot change once a budget version exists (PARAMETER.LOCKED).',
+      examples: [OPERATING_PARAMETERS_ERROR_EXAMPLES.PARAMETER_LOCKED],
+    },
   )
   async set(
     @CurrentPrincipal() actor: AuthenticatedPrincipal,
@@ -132,7 +140,7 @@ export class OperatingParametersController {
     @Body() body: SetParameterBodyDto,
   ) {
     try {
-      return toWire(await this.parameters.set(actor, params.key, body.value));
+      return toWire(await this.parameterChange.set(actor, params.key, body.value));
     } catch (error) {
       throw toOperatingParametersApiException(error);
     }

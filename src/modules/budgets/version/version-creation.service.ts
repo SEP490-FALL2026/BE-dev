@@ -42,9 +42,10 @@ export class VersionCreationService {
    */
   async createFromProposal(actor: AuthenticatedPrincipal, body: VersionBodyDto): Promise<VersionWire> {
     this.facts.requireFinance(actor);
-    const fiscalStart = await this.facts.fiscalYearStartMonth();
 
     return this.runner.run(async (tx) => {
+      // The month is read here and held until the commit: a change of it waits for this version, and finds it (`US-01-04` AC-8).
+      const fiscalStart = await this.facts.holdFiscalYearStartMonth(tx);
       // The proposal row is locked first, as the head's successor and the sending of a version lock it, so they queue.
       const proposal = await this.proposals.lockById(tx, body.proposalId);
       if (!proposal) throw new BudgetProposalNotFoundError();

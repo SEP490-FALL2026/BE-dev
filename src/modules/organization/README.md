@@ -13,12 +13,12 @@ operating-parameters, personnel, requests ([module-graph](../../../docs/generate
 - Hai facade, cả hai gọi trong `tx` của bên gọi. Chọn theo việc cần làm: chỉ đọc (kể cả khóa `FOR SHARE` để giữ giá trị đã đọc
   ổn định) thì `OrganizationReadApi`; ghi, khóa `FOR UPDATE` hoặc hỏi "đang được dùng" thì `OrganizationApi`. Một lớp dùng cả hai
   thì inject cả hai, tên trường `organization` và `organizationReads`.
-  - `OrganizationReadApi` ([public/organization-read.api.ts](public/organization-read.api.ts)), 36 phương thức đọc:
+  - `OrganizationReadApi` ([public/organization-read.api.ts](public/organization-read.api.ts)), 37 phương thức đọc:
     - Chung: `businessToday` — hôm nay theo múi giờ của tổ chức; `getOrganization`, `getOrganizationShared` (`FOR SHARE`),
       `getCompanyEmailDomains`, `readLocalSeedFixture` (cho `dev:seed`), `countUnmarkedChangesAsOf` (cho `ops:inspect`).
     - Phòng ban: `getDepartmentBrief(s)`, `lockDepartmentShared`, `lockDepartmentForEntry`, `getDepartmentMemberIds`,
       `getDepartmentHeads`, `getHeadedDepartment`, `isDepartmentHead`, `departmentsWithoutHead`; IT Admin phụ trách:
-      `getItAdminInCharge`, `getItAdminScope`, `getDepartmentIdsInChargeOf`.
+      `getItAdminInCharge`, `getItAdminInChargeOfDepartment`, `getItAdminScope`, `getDepartmentIdsInChargeOf`.
     - Nhân viên: `getEmployee`, `getEmployeeByCode`, `getEmployeesByCodes`, `getEmployees`, `getEmployeePlacement`,
       `getEmployeeProfile`, `searchActiveEmployees`, `lockEmployeeForShare`, `isWorkEmailTaken`, `lookupForEmployeeImport`,
       `lockForEmployeeImport` (`FOR SHARE` trên phòng ban), `getProfileNotices`, `getOnboardingFacts`.

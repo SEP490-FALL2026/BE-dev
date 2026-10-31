@@ -317,12 +317,20 @@ model Subscription {
   allowsMidTermReduction Boolean            @default(false) @map("allows_mid_term_reduction")
   // The department that owns the purchase (QĐ-89a): required, and never changed once set (a trigger).
   ownerDepartmentId      String             @map("owner_department_id") @db.Uuid
+  // The period this one continues (QĐ-16): set once, when the outcome of a renewal is recorded; a period has at most one
+  // successor (the unique index) and the link never changes (a trigger).
+  renewedFromId          String?            @unique @map("renewed_from_id") @db.Uuid
   createdAt              DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt              DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   organization        Organization                 @relation(fields: [organizationId], references: [id])
   plan                Plan                         @relation(fields: [planId], references: [id])
   ownerDepartment     Department                   @relation("SubscriptionOwnerDepartment", fields: [ownerDepartmentId], references: [id], onDelete: Restrict)
+  renewedFrom         Subscription?                @relation("SubscriptionRenewalChain", fields: [renewedFromId], references: [id], onDelete: Restrict)
+  renewedBy           Subscription?                @relation("SubscriptionRenewalChain")
+  renewalCase         SubscriptionRenewal?         @relation("RenewalOfPeriod")
+  renewalNextOf       SubscriptionRenewal?         @relation("RenewalNextPeriod")
+  deadlineEvent       SubscriptionDeadlineEvent?
   ownerAssignment     SubscriptionOwnerAssignment?
   priceCurrency       Currency?                    @relation("SubscriptionPriceCurrency", fields: [unitPriceCurrency], references: [code], onDelete: Restrict)
   exchangeRate        ExchangeRate?                @relation(fields: [priceExchangeRateId], references: [id], onDelete: Restrict)

@@ -41,6 +41,10 @@ export async function trySessionAdvisoryLock(
 
   let released = false;
   return {
+    // Rejects when the unlock fails, which means the holding connection broke: the server dropped the session and the lock
+    // with it, and the caller must hear that exclusivity was lost. The connection is closed either way, so a failed unlock
+    // cannot leave the lock held. Keeping the caller's own result (a whole report) out of the way of that error is the
+    // caller's job, not this function's (`runDemoDataset`, phase `lock-release`).
     release: async () => {
       if (released) return;
       released = true;

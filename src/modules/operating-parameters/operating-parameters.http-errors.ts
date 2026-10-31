@@ -9,6 +9,7 @@ import {
   NonWorkingDateNotFoundError,
   NonWorkingDateReasonInvalidError,
   NonWorkingDateTakenError,
+  ParameterLockedError,
   ParameterNotFoundError,
   ReportingCurrencyLockedError,
   ParameterValueInvalidError,
@@ -29,6 +30,9 @@ export function toOperatingParametersApiException(error: unknown): unknown {
       key: error.key,
       problem: error.problem,
     });
+  }
+  if (error instanceof ParameterLockedError) {
+    return refuse(HttpStatus.CONFLICT, 'PARAMETER.LOCKED', error.message, { key: error.key, reason: error.reason });
   }
   if (error instanceof NonWorkingDateInPastError) {
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'NON_WORKING_DATE.IN_PAST', error.message, { date: error.date });
@@ -59,6 +63,7 @@ const example = (error: Error) => errorExampleOf(toOperatingParametersApiExcepti
 export const OPERATING_PARAMETERS_ERROR_EXAMPLES = {
   PARAMETER_NOT_FOUND: example(new ParameterNotFoundError('<parameter-key>')),
   PARAMETER_VALUE_INVALID: example(new ParameterValueInvalidError('<parameter-key>', 'OUT_OF_RANGE')),
+  PARAMETER_LOCKED: example(new ParameterLockedError('<parameter-key>', 'BUDGET_VERSION_EXISTS')),
   NON_WORKING_DATE_IN_PAST: example(new NonWorkingDateInPastError('2026-01-01')),
   NON_WORKING_DATE_REASON_INVALID: example(new NonWorkingDateReasonInvalidError()),
   NON_WORKING_DATE_TAKEN: example(new NonWorkingDateTakenError('2026-01-01')),

@@ -6,6 +6,8 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { AuditApi } from '../../audit/public/audit.api';
 import { CatalogApi } from '../../catalog/public/catalog.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import { expiryReminderAlert, usableOrNull } from '../licensing-alerts.policy';
+import { LicensingAlerts } from '../licensing-alerts.service';
 import type { ExpiryReminderWire } from './expiry.dto';
 import { ExpiryError } from './expiry.errors';
 import { REMINDER_OPTIONS, reminderRange, remindersOwed, type ReminderAudience } from './expiry.policy';
@@ -18,8 +20,9 @@ const PASS_BATCH = 200;
  * The reminder that a right is about to end (`US-03-05` AC-1, AC-10). Once an hour every open personal right whose end date falls in
  * the next seven days is reminded, once for each right, end date and person: its holder, the head of their department today, and the
  * IT Admin in charge of it. A department with no head has no reminder for the head and nobody is told in its place. Each reminder
- * is a row and an audit event carrying the two choices (renew the right, or let it end): the point the inbox takes it from. Nothing
- * about the right is changed.
+ * is a row, an audit event carrying the two choices (renew the right, or let it end) and a notice in the inbox of the person, all in
+ * one transaction (`US-12-15` line 3); an IT Admin who can no longer act as one is not told. A right renewed, ended or cancelled
+ * before its reminder leaves the range and is told nothing more. Nothing about the right is changed.
  */
 @Injectable()
 export class ExpiryReminderService {
@@ -29,6 +32,7 @@ export class ExpiryReminderService {
     private readonly catalog: CatalogApi,
     private readonly runner: TransactionRunner,
     private readonly audit: AuditApi,
+    private readonly alerts: LicensingAlerts,
   ) {}
 
   /** Writes the reminders that are due and returns how many were new in this pass. */
@@ -39,6 +43,7 @@ export class ExpiryReminderService {
 
     const departmentOf = await this.departmentsOf(candidates, today);
     const itAdminOf = await this.itAdminsOf(candidates, departmentOf, today);
+    const usable = await this.alerts.usableItAdmins([...itAdminOf.values()]);
     const headOf = await this.organizationReads.getDepartmentHeads([...new Set(departmentOf.values())], today);
     let told = 0;
     for (const candidate of candidates) {
@@ -46,7 +51,7 @@ export class ExpiryReminderService {
       const owed = remindersOwed({
         holderEmployeeId: candidate.employeeId,
         headEmployeeId: departmentId ? (headOf.get(departmentId)?.employeeId ?? null) : null,
-        itAdminEmployeeId: departmentId ? (itAdminOf.get(departmentId) ?? null) : null,
+        itAdminEmployeeId: departmentId ? usableOrNull(itAdminOf.get(departmentId) ?? null, usable) : null,
       });
       told += await this.write(candidate, departmentId, owed);
     }
@@ -191,6 +196,18 @@ export class ExpiryReminderService {
           },
           correlationId: candidate.assignmentId,
         });
+        await this.alerts.tell(
+          tx,
+          candidate.organizationId,
+          [reminder.recipientEmployeeId],
+          expiryReminderAlert({
+            assignmentId: candidate.assignmentId,
+            holderEmployeeId: candidate.employeeId,
+            planId: candidate.planId,
+            expectedEndDate: candidate.expectedEndDate,
+            audience: reminder.audience,
+          }),
+        );
       }
 
       return written.length;

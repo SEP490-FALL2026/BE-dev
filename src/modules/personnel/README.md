@@ -4,13 +4,16 @@ Mục đích: sự kiện về chỗ đứng của một người trong tổ ch�
 (offboarding), thông báo trước của trưởng phòng, review công cụ sau khi chuyển phòng; ghi lịch sử qua `organization`
 (ADR-0017). Story chính: US-03-01, US-03-03, US-03-04, US-03-07, US-03-08, US-03-10, US-03-11, US-02-02.
 Tầng: T6 (`scripts/arch/tiers.cjs`). Phụ thuộc: organization, identity-access, catalog, licensing, requests,
-operating-parameters, audit, notifications. Được dùng bởi: không module nghiệp vụ nào; gốc `src/app/app.module.ts`
+operating-parameters, audit, notifications. Được dùng bởi: dashboards (`PersonnelDashboardApi`); gốc `src/app/app.module.ts`
 và lệnh `src/cli/record-super-admin-event/`.
 
 ## Public API (`public/`)
 
 - `PersonnelApi` ([public/personnel.api.ts](public/personnel.api.ts)) — `getLeaveIntervals`: các kỳ nghỉ dài hạn
   chạm một khoảng ngày, trong một câu lệnh, cho rule khuyến nghị của G7 (hiện chưa có bên gọi).
+- `PersonnelDashboardApi` ([public/personnel-dashboard.api.ts](public/personnel-dashboard.api.ts)) — số đếm cho trang tổng
+  quan theo vai (US-12-15 AC-3, AC-4, AC-7): `openTransferReviews`, `handingOverCases`, `noticesAwaitingHandling`; đọc qua
+  `dashboard-facts/dashboard-facts.repo.ts` (`PersonnelDashboardFactsRepo`), chỉ trả số.
 - `SuperAdminEventApi` ([public/super-admin-event.api.ts](public/super-admin-event.api.ts)) — `run`: ghi một sự kiện
   về chính Super Admin bằng ticket (`pnpm ops:record-super-admin-event`, spec L.2); lỗi `SuperAdminEventRefusedError`
   (`super-admin-event.errors.ts`), type ở `super-admin-event.types.ts`. Facade giữ 8 phụ thuộc: phần ghi theo họ sự kiện nằm ở ba
@@ -80,6 +83,8 @@ Không vòng (`pnpm arch:capabilities --module personnel`, gate `capability-grap
 - `role-duties/` — vai trò người sắp nghỉ đang giữ, vai trò Super Admin còn dùng được không;
   `me-departure-notice.controller.ts`, `super-admin-watch.controller.ts`; `RoleDutiesService`.
 - `service-account/` — chỉ gồm listener về người phụ trách service account (US-03-08).
+- `dashboard-facts/` — số đếm cho trang tổng quan theo vai: review sau điều chuyển đang mở của một phòng, ca nghỉ việc đang
+  bàn giao của các phòng, thông báo của trưởng phòng chờ xử lý; cùng điều kiện với danh sách tương ứng. Không import capability nào.
 - `event-notice/` — `personnel-file-hooks.service.ts` (chạy file hook), `personnel-notifier.service.ts` (inbox, F17).
 - `super-admin-event/` — Nest module riêng của lệnh (`super-admin-event-cli.module.ts`), policy, repo ticket, ba service theo họ sự kiện (điều chuyển, nghỉ dài hạn,
   thôi việc) và `profile-correction`; tiến trình API và worker không load nó.

@@ -9,6 +9,7 @@ import { SpendWireViewService } from '../spend/spend-wire-view.service';
 import { SpendStepRepo } from '../spend/spend-step.repo';
 import type { ApprovalSummaryWire } from './spend-approval.dto';
 import { approvalSummaryOf, type QueueLookups } from './spend-approval.mapper';
+import { StepDueOnService } from './step-due-on.service';
 
 type OpenSpendRows = Awaited<ReturnType<SpendStepRepo['pageOpenSpendOf']>>['rows'];
 
@@ -25,6 +26,7 @@ export class SpendApprovalQueueService {
     private readonly catalog: CatalogApi,
     private readonly organizationReads: OrganizationReadApi,
     private readonly wireView: SpendWireViewService,
+    private readonly deadlines: StepDueOnService,
   ) {}
 
   /** The spend steps waiting for the caller, the oldest first. */
@@ -50,7 +52,7 @@ export class SpendApprovalQueueService {
   private async lookupsFor(rows: OpenSpendRows): Promise<QueueLookups> {
     const requestIds = rows.map((row) => row.requestId);
     const planIds = [...new Set(rows.map((row) => row.request.planId).filter((id): id is string => id !== null))];
-    const [checks, batches, plans, people, units, centers] = await Promise.all([
+    const [checks, batches, plans, people, units, centers, due] = await Promise.all([
       this.checks.latestOf(requestIds),
       this.batches.latestBatchOf(requestIds),
       planIds.length === 0 ? Promise.resolve([]) : this.catalog.getPlanSummaries(planIds),
@@ -65,8 +67,11 @@ export class SpendApprovalQueueService {
       this.organizationReads.costCentersByIds([
         ...new Set(rows.flatMap((row) => (row.request.costCenterId === null ? [] : [row.request.costCenterId]))),
       ]),
+      this.deadlines.dueOn(
+        rows.map((row) => ({ id: row.id, createdAt: row.createdAt, slaWorkingDays: row.slaWorkingDays })),
+      ),
     ]);
 
-    return { checks, batches, plans, people, units, centers };
+    return { checks, batches, plans, people, units, centers, due };
   }
 }

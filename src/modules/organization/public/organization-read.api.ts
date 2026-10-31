@@ -97,6 +97,11 @@ export class OrganizationReadApi {
     );
   }
 
+  /** The IT Admin in charge of the department, named only while still working; null when there is none (`US-01-11`). */
+  getItAdminInChargeOfDepartment(departmentId: string, tx?: DbTx): Promise<string | null> {
+    return this.departments.itAdminInChargeOf(departmentId, tx);
+  }
+
   /** The departments this employee is named IT Admin in charge of, while they still work (an unlocked read, `US-01-11`). */
   getDepartmentIdsInChargeOf(employeeId: string, tx?: DbTx): Promise<string[]> {
     return this.departments.idsInChargeOf(employeeId, tx);
