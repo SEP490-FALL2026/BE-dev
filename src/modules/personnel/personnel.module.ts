@@ -68,6 +68,8 @@ import { WorkspaceBlockerSource } from './role-duties/workspace-blocker.listener
 import { PersonnelFileDeadlinesRepo } from './service-account/personnel-file-deadlines.repo';
 import { PersonnelFileDeadlines } from './service-account/personnel-file-deadlines.listener';
 import { PersonnelApi } from './public/personnel.api';
+import { PersonnelDashboardApi } from './public/personnel-dashboard.api';
+import { PersonnelDashboardFactsRepo } from './dashboard-facts/dashboard-facts.repo';
 import { ServiceAccountBlockerSource } from './service-account/service-account-blocker.listener';
 import { ServiceAccountDutyHook } from './service-account/service-account-duty.listener';
 import { TransferChangeWriter } from './transfer/transfer-change-writer.service';
@@ -220,12 +222,15 @@ import { TransferReviewsController } from './transfer-review/transfer-reviews.co
     LeaveNoticeRecorder,
     OffboardingNoticeRecorder,
     PersonnelApi,
+    PersonnelDashboardFactsRepo,
+    PersonnelDashboardApi,
   ],
   // The facade and the extension point of the file hooks, and the services of the writes the controlled procedure runs with an operator
   // actor.
   exports: [
     PersonnelFileHookContributions,
     PersonnelApi,
+    PersonnelDashboardApi,
     TransferService,
     TransferChangeService,
     LeaveService,

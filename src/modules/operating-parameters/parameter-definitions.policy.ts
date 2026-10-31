@@ -214,6 +214,14 @@ export function defaultValues(): ParameterValues {
   return Object.fromEntries(PARAMETER_DEFINITIONS.map((definition) => [definition.key, definition.default]));
 }
 
+/** The effective value of each parameter: the one set by the Super Admin, or the default. */
+export function effectiveValues(rows: readonly { key: string; value: ParameterValue }[]): ParameterValues {
+  const values = defaultValues();
+  for (const row of rows) if (definitionOf(row.key)) values[row.key] = row.value;
+
+  return values;
+}
+
 export type ParameterValidation =
   { ok: true } | { ok: false; reason: 'UNKNOWN_KEY' | 'WRONG_TYPE' | 'OUT_OF_RANGE' | 'INCONSISTENT' };
 

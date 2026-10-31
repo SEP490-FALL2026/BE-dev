@@ -37,10 +37,15 @@ export class AlreadyInstalledError extends Error {
   }
 }
 
-/** `ops:demo-dataset`: the demo accounts changed between the read and the write (someone wrote meanwhile). Nothing was written. */
+/**
+ * `ops:demo-dataset`: a demo account changed between the read and its write (someone wrote meanwhile). That account was
+ * not written; the accounts written before it are kept, and a rerun reads them as present.
+ */
 export class DemoAccountsChangedError extends Error {
   constructor() {
-    super('The demo accounts changed while they were being written; nothing was written. Run the command again.');
+    super(
+      'A demo account changed while the accounts were being written; it was not written (accounts written before it are kept). Run the command again.',
+    );
     this.name = 'DemoAccountsChangedError';
   }
 }

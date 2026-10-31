@@ -31,6 +31,7 @@ export interface HeldCommitResponse {
  *   what was held, so the test can see what PostgreSQL does with a statement it receives late.
  *
  * - `observe(listener)` reports every statement a client executes, for counting (test/support/query-count.ts).
+ * - `delay(ms)` delivers every chunk `ms` later in each direction, in order: a database a tunnel away (A-04).
  *
  * Only the SQL text of Parse and Query messages and the names in Bind and Execute are read; bind values are never
  * inspected.
@@ -39,6 +40,9 @@ export class PgRelay {
   private readonly server: Server;
   private readonly connections = new Set<RelayedConnection>();
   private paused = false;
+  private latencyMs = 0;
+  /** When the last delayed chunk to each socket is due, so a later chunk never overtakes it. */
+  private readonly lastDue = new WeakMap<Socket, number>();
   private trigger: RegExp | null = null;
   private readonly observers = new Set<(sql: string) => void>();
   private commitResponse: {
@@ -69,6 +73,11 @@ export class PgRelay {
 
   pause(): void {
     this.paused = true;
+  }
+
+  /** One-way latency for every chunk from now on (0 turns it off); a round trip costs twice `ms`. */
+  delay(ms: number): void {
+    this.latencyMs = ms;
   }
 
   resume(): void {
@@ -234,7 +243,16 @@ export class PgRelay {
   private forward(connection: RelayedConnection, to: Socket, chunk: Buffer): void {
     if (this.paused || connection.held || (connection.responseHeld && to === connection.client))
       connection.queue.push({ to, chunk });
+    else if (this.latencyMs > 0) this.later(to, chunk);
     else if (!to.destroyed) to.write(chunk);
+  }
+
+  private later(to: Socket, chunk: Buffer): void {
+    const due = Math.max(Date.now() + this.latencyMs, this.lastDue.get(to) ?? 0);
+    this.lastDue.set(to, due);
+    setTimeout(() => {
+      if (!to.destroyed) to.write(chunk);
+    }, due - Date.now()).unref();
   }
 
   private flush(connection: RelayedConnection): void {

@@ -23,7 +23,7 @@ export const listAssignmentsQuerySchema = z.strictObject({
   subscriptionId: z.uuid().optional(),
   planId: z.uuid().optional(),
   employeeId: z.uuid().optional(),
-  source: z.enum(['BASELINE', 'HANDOVER', 'REQUEST']).optional(),
+  source: z.enum(['BASELINE', 'HANDOVER', 'REQUEST', 'RENEWAL_CARRY']).optional(),
   kind: z.enum(['PERSONAL', 'SERVICE']).optional(),
   ...pageQuery,
 });
@@ -32,7 +32,7 @@ export const subscriptionIdParamSchema = z.strictObject({ id: z.uuid() });
 
 const assignmentSchema = z.strictObject({
   id: z.uuid(),
-  source: z.enum(['BASELINE', 'HANDOVER', 'REQUEST']),
+  source: z.enum(['BASELINE', 'HANDOVER', 'REQUEST', 'RENEWAL_CARRY']),
   kind: z.enum(['PERSONAL', 'SERVICE']),
   planId: z.uuid(),
   subscriptionId: z.uuid().nullable(),

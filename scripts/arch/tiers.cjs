@@ -7,6 +7,8 @@ const TIERS = [
   ['catalog', 'licensing'],
   ['budgets', 'requests', 'data-import'],
   ['personnel', 'onboarding', 'installation'],
+  // The role overviews read through the facades of the modules below, personnel among them.
+  ['dashboards'],
 ];
 
 // Allowed edges inside one tier (importer -> imported).

@@ -4,6 +4,7 @@ import { EnvironmentVariables } from '../../infrastructure/config/env-schema';
 import { DatabaseModule } from '../../infrastructure/database/database.module';
 import { AuditModule } from '../audit/audit.module';
 import { CatalogModule } from '../catalog/catalog.module';
+import { FinanceModule } from '../finance/finance.module';
 import { IdentityAccessFacadeModule } from '../identity-access/identity-access-facade.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { OperatingParametersModule } from '../operating-parameters/operating-parameters.module';
@@ -23,6 +24,8 @@ import { AssignmentServiceAccountReader } from './assignment/assignment-service-
 import { AssignmentListService } from './assignment/assignment-list.service';
 import { AssignmentService } from './assignment/assignment.service';
 import { AssignmentsController } from './assignment/assignments.controller';
+import { DashboardFactsRepo } from './dashboard-facts/dashboard-facts.repo';
+import { DashboardFactsService } from './dashboard-facts/dashboard-facts.service';
 import { DepartmentToolsController } from './department-tools/department-tools.controller';
 import { DepartmentToolsService } from './department-tools/department-tools.service';
 import { SubscriptionSeatsController } from './assignment/subscription-seats.controller';
@@ -32,6 +35,7 @@ import { ExpiryQueueService } from './expiry/expiry-queue.service';
 import { ExpiryReminderRepo } from './expiry/expiry-reminder.repo';
 import { ExpiryReminderService } from './expiry/expiry-reminder.service';
 import { ExpiryReminderSweeper } from './expiry/expiry-reminder.job';
+import { HandoverAlertService } from './handover/handover-alert.service';
 import { HandoverCaseFacts } from './handover/handover-case-facts.service';
 import { HandoverConfirmationService } from './handover/handover-confirmation.service';
 import { HandoverConfirmerResolver } from './handover/handover-confirmer.service';
@@ -44,19 +48,26 @@ import { HandoverRevocationHook } from './handover/handover-revocation.listener'
 import { HandoverViewService } from './handover/handover-view.service';
 import { HandoverRepo } from './handover/handover.repo';
 import { HandoverService } from './handover/handover.service';
+import { LicensingAlerts } from './licensing-alerts.service';
 import { LicenseKeyCipher, parsePreviousVaultKeys } from './license-key/license-key-cipher.service';
 import { LicenseKeyRepo } from './license-key/license-key.repo';
 import { LicenseKeyRevealQuotaRepo } from './license-key/license-key-reveal-quota.repo';
 import { LicenseKeyService } from './license-key/license-key.service';
 import { LicenseKeysController } from './license-key/license-keys.controller';
+import { MySoftwareController } from './my-software/my-software.controller';
+import { MySoftwareRepo } from './my-software/my-software.repo';
+import { MySoftwareService } from './my-software/my-software.service';
 import {
   GrantRequestGateHook,
+  RenewalFinancialContributions,
   RenewalHoldHook,
+  RenewalUsageContributions,
   ResponsibleDeadlineHook,
   RevocationListeners,
   SeatBaselineClosedListeners,
 } from './public/licensing.extension-points';
 import { LicensingApi } from './public/licensing.api';
+import { LicensingDashboardApi } from './public/licensing-dashboard.api';
 import { LicensingHandoverApi } from './public/licensing-handover.api';
 import { LicensingOpenGrantsApi } from './public/licensing-open-grants.api';
 import { LicensingRenewalApi } from './public/licensing-renewal.api';
@@ -78,6 +89,7 @@ import { RevocationTasksController } from './provisioning/revocation-completion/
 import { DepartmentOpenWorkReader } from './provisioning/department-use/department-open-work.listener';
 import { ProvisioningDepartmentUseRepo } from './provisioning/department-use/provisioning-department-use.repo';
 import { RevocationCompletionService } from './provisioning/revocation-completion/revocation-completion.service';
+import { RevocationLeaverAlert } from './provisioning/revocation-completion/revocation-leaver-alert.service';
 import { OpenGrantTaskRepo } from './provisioning/open-grants/open-grant-task.repo';
 import { OpenGrantTaskService } from './provisioning/open-grants/open-grant-task.service';
 import { RevocationReadRepo } from './provisioning/revocation-read.repo';
@@ -98,6 +110,21 @@ import { SaasIssuesController } from './saas-issue/saas-issues.controller';
 import { SeatBaselineController } from './seat-baseline/seat-baseline.controller';
 import { SeatBaselineRepo } from './seat-baseline/seat-baseline.repo';
 import { SeatBaselineService } from './seat-baseline/seat-baseline.service';
+import { RenewalAlertsService } from './subscription-renewal/alerts/renewal-alerts.service';
+import { RenewalDeadlineService } from './subscription-renewal/deadline/renewal-deadline.service';
+import { RenewalDecisionSupport } from './subscription-renewal/decision/renewal-decision-support.service';
+import { RenewalDecisionService } from './subscription-renewal/decision/renewal-decision.service';
+import { RenewalOutcomeService } from './subscription-renewal/outcome/renewal-outcome.service';
+import { RenewalProposalService } from './subscription-renewal/proposal/renewal-proposal.service';
+import { RenewalNotifier } from './subscription-renewal/subscription-renewal-notifier.service';
+import { RenewalPartiesService } from './subscription-renewal/subscription-renewal-parties.service';
+import { RenewalRankingService } from './subscription-renewal/subscription-renewal-ranking.service';
+import { SubscriptionRenewalSeatRepo } from './subscription-renewal/subscription-renewal-seat.repo';
+import { SubscriptionRenewalSweepService } from './subscription-renewal/subscription-renewal-sweep.service';
+import { RenewalViewService } from './subscription-renewal/subscription-renewal-view.service';
+import { SubscriptionRenewalSweeper } from './subscription-renewal/subscription-renewal.job';
+import { SubscriptionRenewalRepo } from './subscription-renewal/subscription-renewal.repo';
+import { SubscriptionRenewalsController } from './subscription-renewal/subscription-renewals.controller';
 
 /**
  * The licensing context (C3, ADR-0013): the assignments of seats, the closing of the seat baseline, the queue of
@@ -112,6 +139,7 @@ import { SeatBaselineService } from './seat-baseline/seat-baseline.service';
     AuditModule,
     OrganizationModule,
     CatalogModule,
+    FinanceModule,
     IdentityAccessFacadeModule,
     NotificationsModule,
     OperatingParametersModule,
@@ -128,8 +156,11 @@ import { SeatBaselineService } from './seat-baseline/seat-baseline.service';
     HandoverDutiesController,
     ExpiryController,
     SaasIssuesController,
+    MySoftwareController,
+    SubscriptionRenewalsController,
   ],
   providers: [
+    LicensingAlerts,
     AssignmentRepo,
     AssignmentDepartmentRepo,
     AssignmentSeatOccupancy,
@@ -168,6 +199,7 @@ import { SeatBaselineService } from './seat-baseline/seat-baseline.service';
     RevocationRecorder,
     RevocationService,
     RevocationCompletionService,
+    RevocationLeaverAlert,
     RevocationReadRepo,
     RevocationReadService,
     OpenGrantTaskRepo,
@@ -176,6 +208,7 @@ import { SeatBaselineService } from './seat-baseline/seat-baseline.service';
     HandoverListRepo,
     HandoverConfirmerResolver,
     HandoverCaseFacts,
+    HandoverAlertService,
     HandoverIssueService,
     HandoverService,
     HandoverRevocationHook,
@@ -196,6 +229,26 @@ import { SeatBaselineService } from './seat-baseline/seat-baseline.service';
     SaasIssueViewService,
     SaasIssueSweepService,
     SaasIssueSweeper,
+    MySoftwareRepo,
+    MySoftwareService,
+    SubscriptionRenewalRepo,
+    SubscriptionRenewalSeatRepo,
+    RenewalPartiesService,
+    RenewalRankingService,
+    RenewalNotifier,
+    RenewalProposalService,
+    RenewalDecisionSupport,
+    RenewalDecisionService,
+    RenewalOutcomeService,
+    RenewalAlertsService,
+    RenewalDeadlineService,
+    RenewalViewService,
+    SubscriptionRenewalSweepService,
+    SubscriptionRenewalSweeper,
+    RenewalFinancialContributions,
+    RenewalUsageContributions,
+    DashboardFactsRepo,
+    DashboardFactsService,
     LicenseKeyRepo,
     LicenseKeyRevealQuotaRepo,
     LicenseKeyService,
@@ -218,6 +271,7 @@ import { SeatBaselineService } from './seat-baseline/seat-baseline.service';
     // The extension points licensing opens (public/licensing.extension-points.ts): requests binds the gate.
     GrantRequestGateHook,
     LicensingApi,
+    LicensingDashboardApi,
     LicensingHandoverApi,
     LicensingOpenGrantsApi,
     LicensingRenewalApi,
@@ -227,6 +281,7 @@ import { SeatBaselineService } from './seat-baseline/seat-baseline.service';
   // Other modules read through the facade and bind the extension points; the capability services and the repos stay private.
   exports: [
     LicensingApi,
+    LicensingDashboardApi,
     LicensingHandoverApi,
     LicensingOpenGrantsApi,
     LicensingRenewalApi,
@@ -237,6 +292,8 @@ import { SeatBaselineService } from './seat-baseline/seat-baseline.service';
     RenewalHoldHook,
     ResponsibleDeadlineHook,
     SeatBaselineClosedListeners,
+    RenewalFinancialContributions,
+    RenewalUsageContributions,
   ],
 })
 export class LicensingModule {}

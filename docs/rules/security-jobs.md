@@ -74,8 +74,9 @@
   A change written for today is told in the transaction that writes it. It runs in the API graph because that is where every
   listener (requests, personnel) is registered. Run one by hand with `OrganizationHistoryService.announceDueChanges(day)`.
   The API also runs `HandoverDutySweeper` once an hour (the first pass five minutes after start, unreferenced timer): for each
-  handover duty whose deadline has passed unconfirmed it writes `overdue_noticed_at` and the audit event `HANDOVER_DUTY.OVERDUE` in one
-  transaction, so a duty is told once however many instances run; a failed pass only logs. Run one by hand with
+  handover duty whose deadline has passed unconfirmed it writes `overdue_noticed_at`, the audit event `HANDOVER_DUTY.OVERDUE` and an inbox
+  notice (`HANDOVER_CONFIRMATION_OVERDUE`) to the person who confirms today and the IT Admin in charge in one transaction, so a duty is told
+  once for a deadline however many instances run; a failed pass only logs. Run one by hand with
   `HandoverOverdueService.noticeOverdue(now)`.
   The API also runs `TransferReviewSweeper` once an hour (the first pass five minutes after start, unreferenced timer): for each open
   transfer review past its deadline whose department has a head today it writes `overdue_noticed_at` and the audit event
@@ -89,16 +90,18 @@
   `LeaveOverdueService.noticeOverdue(now)`.
   The API also runs `ServiceAccountDutySweeper` once an hour (the first pass five minutes after start, unreferenced timer): for each open
   service account whose responsible person has a transfer or a departure that is not closed and whose day has passed it writes a row of
-  `service_account_duty_notices` (unique for the account and the day) and the audit event `SERVICE_ACCOUNT_DUTY.OVERDUE` in one transaction,
-  so a day is told once however many instances run; a failed pass only logs. It only tells: the transfer or the departure still takes
+  `service_account_duty_notices` (unique for the account and the day), the audit event `SERVICE_ACCOUNT_DUTY.OVERDUE` and an inbox notice
+  (`SERVICE_ACCOUNT_RESPONSIBLE_OVERDUE`) to the IT Admin in charge of the owning department in one transaction, so a day is told once however
+  many instances run; a failed pass only logs. It only tells: the transfer or the departure still takes
   effect, the account keeps its person and nothing is revoked. It reads which people have a file that waits through the provider that the
   personnel module registers, so it finds nothing in a process that does not load it. Run one by hand with
   `ServiceAccountDutyService.noticeOverdue(now)`.
   The API also runs `ExpiryReminderSweeper` once an hour (the first pass five minutes after start, unreferenced timer): for each open
   personal right whose end date falls between today and seven days ahead it writes, in one transaction, at most three rows of
   `assignment_expiry_reminders` (unique for the right, the end date and the audience: the holder, the head of their department today, the
-  IT Admin in charge; none for a head nobody is) and the audit event `LICENSE_ASSIGNMENT.EXPIRY_REMINDER` for each new row, so a person is
-  told once however many instances run; a failed pass only logs. It only tells: the right stays in force, nothing is revoked or renewed
+  IT Admin in charge while they can act as one; none for a head nobody is) and, for each new row, the audit event
+  `LICENSE_ASSIGNMENT.EXPIRY_REMINDER` and an inbox notice (`LICENSE_EXPIRY_REMINDER`), so a person is told once however many instances run;
+  a failed pass only logs. It only tells: the right stays in force, nothing is revoked or renewed
   by the calendar, and the queue of the rights that have ended is read from the assignments, not stored. Run one by hand with
   `ExpiryReminderService.noticeDue(now)`.
   The API also runs `NoticeOverdueSweeper` once an hour (the first pass five minutes after start, unreferenced timer): for each notice of a
@@ -113,6 +116,17 @@
   passed it sets `response_overdue_noticed_at` and writes the audit event `SAAS_ISSUE.RESPONSE_OVERDUE` in one transaction, so a report is
   told once however many instances run; a failed pass only logs. The reminder only tells: the report keeps its IT Admin and its state and
   is never closed by the calendar while it is not resolved. Run one by hand with `SaasIssueSweepService.run(now)`.
+  The API also runs `SubscriptionRenewalSweeper` once an hour (the first pass five minutes after start, unreferenced timer): for each term
+  subscription period whose notice deadline falls from sixty days back to the largest `RENEWAL_ALERT_DAYS_BEFORE_DEADLINE` ahead it tells
+  the milestones due (inbox notices `SUBSCRIPTION_RENEWAL_ALERT`, with the audit event `SUBSCRIPTION_RENEWAL.ALERT_SENT`, and
+  `SUBSCRIPTION_RENEWAL_DATA_QUALITY` with `SUBSCRIPTION_RENEWAL.DATA_QUALITY_WARNED` when the contract has no date to count from), flags a
+  decision not carried out by its deadline late (`late_flagged_at`, the audit event `SUBSCRIPTION_RENEWAL.FLAGGED_LATE`, the notice
+  `SUBSCRIPTION_RENEWAL_LATE`) and records the event of a deadline passed with no decision (`subscription_deadline_events`, unique per
+  subscription and immutable, the audit event `SUBSCRIPTION.AUTO_RENEWAL_INCIDENT` or `SUBSCRIPTION.EXPIRY_MARKED` and its notice). It is
+  idempotent however many instances run: each notice carries an event key (`subscription-renewal-alert:{subscription}:{base date}:{days}`,
+  one per recipient), the late flag is a conditional update written once, and the deadline event has `ON CONFLICT DO NOTHING`; a failed
+  pass only logs. It only tells and flags late: it never renews, cancels, decides or records an outcome, never changes a subscription or
+  a seat, and a decision taken after the deadline is never voided. Run one by hand with `SubscriptionRenewalSweepService.sweep(now)`.
   The record of a departure has no job of its own: `EMPLOYEE_LEFT` is told once in the transaction that sets the employee `TERMINATED` (the
   unique `(kind, subject_id)` of the announcements makes a second telling a no-op), and a person who has left is refused by the sign-in and
   the access guard from their next action because they read the status of the employee, not a flag of the account. The reminder to the

@@ -13,7 +13,8 @@ operating-parameters, personnel, requests ([module-graph](../../../docs/generate
 - `OrganizationApi` ([public/organization.api.ts](public/organization.api.ts)), gọi trong `tx` của bên gọi:
   - `businessToday` — hôm nay theo múi giờ của tổ chức; `getOrganization`, `getOrganizationShared` (`FOR SHARE`).
   - Phòng ban: `getDepartmentBrief(s)`, `lockDepartmentShared`, `getDepartmentMemberIds`, `getDepartmentHeads`,
-    `isDepartmentHead`; IT Admin phụ trách: `getItAdminInCharge`, `getItAdminScope`.
+    `isDepartmentHead`; IT Admin phụ trách: `getItAdminInCharge`,
+    `getItAdminInChargeOfDepartment`, `getItAdminScope`.
   - Nhân viên: `createEmployeeWithPlacement` (cách duy nhất tạo nhân viên), `getEmployee(s)`, `getEmployeePlacement`,
     `searchActiveEmployees`, `lockEmployeeForShare`/`ForUpdate`, `lookupForEmployeeImport` (cho import).
   - Cost Center: `createUnitCostCenter`, `costCentersByIds`, `lockCostCentersShared`, `getOwningUnits`,

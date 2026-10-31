@@ -214,7 +214,14 @@ nghi tunnel còn mở: `Test-NetConnection 127.0.0.1 -Port 15432` phải `False`
 | `2`      | `apply`: mọi bước đã có, không ghi gì                                                            | Không cần làm gì.                                                                                                                     |
 | `4`      | Có bước **xung đột** hoặc **bị chặn**; bước khác đã chạy                                         | Đọc dòng `XUNG ĐỘT`: dữ liệu ngoài dataset đang giữ chỗ, hoặc bản ghi của dataset đã bị sửa — quyết định thủ công, lệnh không ghi đè. |
 | `3`      | Từ chối trước khi ghi (cấu hình, image, tương thích, lịch, khóa, sai tổ chức/API/mật khẩu)       | Sửa theo thông báo; chưa có bản ghi nào của dataset thay đổi.                                                                         |
-| `1`      | Lỗi giữa chừng (API không tới được, lỗi 5xx, tunnel đứt, vai PostgreSQL không phải runtime role) | Báo cáo nêu bước đã xong; sửa nguyên nhân rồi chạy lại `apply`, lệnh đi tiếp.                                                         |
+| `1`      | Lỗi giữa chừng (API không tới được, lỗi 5xx, tunnel đứt, vai PostgreSQL không phải runtime role) | Báo cáo nêu bước đã xong; sửa nguyên nhân rồi chạy lại `apply`, lệnh đi tiếp. Lỗi database kèm mã trong `[…]`: xem dưới bảng.         |
+
+Lỗi database ở mã thoát `1` kèm mã nguyên nhân trong ngoặc vuông (không URL, không giá trị): `[P2028]` — một transaction
+của lệnh quá `DB_TRANSACTION_TIMEOUT_MS` (đường tới PostgreSQL chậm hoặc host quá tải); `[Query read timeout]`, thường đi
+sau dòng `warning: A database connection was retired …` — một câu lệnh không được trả lời trong `DB_QUERY_TIMEOUT_MS`
+(tunnel/mạng khựng, host bỏ đói tiến trình, hay DDL lúc deploy); `[ECONNRESET]`/`[Connection terminated …]` — kết nối bị
+cắt; `[P2010 57014]` — `statement_timeout` phía server. Chạy lại `apply` khi đường đã ổn; đối chiếu chi tiết:
+[A-04 operator verification](../workspace/items/a04-seed-rerun-diagnosis/operator-verification.md).
 
 ## 6. Bàn giao cho FE
 
@@ -233,7 +240,10 @@ mẫu cho các màn đó **không** có nghĩa API của chúng chưa có.
 - Dataset không gỡ được bằng lệnh (không có cleanup): dữ liệu demo là bản ghi nghiệp vụ thật của cài đặt, giữ Audit
   Trail; muốn môi trường sạch thì cài đặt lại theo quyết định riêng của Owner.
 - Khóa nằm trên một kết nối PostgreSQL: nếu kết nối đó đứt (tunnel đứt ở cách B) khóa nhả trong khi lượt chạy có thể chưa
-  biết; lượt chạy sẽ lỗi ở lời gọi database kế tiếp. Không chạy hai operator cùng lúc.
+  biết; lượt chạy vẫn đi tiếp và báo cáo giữ nguyên (nhả khóa không ném lỗi, A-04). Không chạy hai operator cùng lúc.
+- Tài khoản demo được mô tả và ghi **mỗi tài khoản một transaction ngắn** (A-04): việc của một transaction không tăng theo
+  cỡ fixture, nên chịu được đường tới PostgreSQL chậm (đã kiểm ở khứ hồi 100 và 200 ms với ngân sách 10 s). Lượt dừng giữa
+  bước này giữ các tài khoản đã ghi (mỗi cái đủ credential, vai, Audit); chạy lại đọc chúng là đã có.
 - Cách B tin vào `releases/current-image` để biết bản đang chạy; nếu ai đó đổi container ngoài quy trình deploy, phép kiểm
   tương thích không thấy.
 - Các phần G7–G10 (usage, khuyến nghị ghost seat, gia hạn/chi phí/hóa đơn, đối soát, AI, mobile) không có trong dataset.

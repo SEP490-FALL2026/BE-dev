@@ -1,4 +1,5 @@
 import { DemoApiError } from './demo-api-client';
+import { databaseCauseOf } from './demo-dataset-failure';
 import { DemoInventoryIncompleteError, DemoSignInRefusedError } from './demo-step-kit';
 import type { DemoRunContext, DemoStep, StepReport, StepStatus } from './demo-run.types';
 
@@ -46,8 +47,9 @@ async function runOne(ctx: DemoRunContext, step: DemoStep): Promise<StepReport> 
       return { key: step.key, title: step.title, status: 'conflict', detail: `API từ chối: ${error.message}` };
     }
     const reason = error instanceof Error ? error.message : 'unknown error';
+    const cause = databaseCauseOf(error);
 
-    return { key: step.key, title: step.title, status: 'failed', detail: reason };
+    return { key: step.key, title: step.title, status: 'failed', detail: cause ? `${reason} [${cause}]` : reason };
   }
 }
 

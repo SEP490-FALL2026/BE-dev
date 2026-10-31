@@ -1,5 +1,6 @@
 import { DemoAccountsApi } from '../../modules/installation/public/demo-accounts.api';
-import { defineCommand, errorName, runInNestContext, writeCliFailure as fail } from '../run-command';
+import { defineCommand, runInNestContext, writeCliFailure as fail } from '../run-command';
+import { failureLine } from './demo-dataset-failure';
 import { formatDemoReport, formatDemoReportJson } from './demo-dataset-report';
 import { runDemoDataset } from './demo-dataset-run';
 import { DemoSecretsError, readDemoSecrets } from './demo-dataset-secrets';
@@ -13,7 +14,7 @@ export const demoDatasetCommand = defineCommand({
   usage: DEMO_DATASET_USAGE,
   parse: parseDemoDatasetArguments,
   argumentError: DemoDatasetArgumentError,
-  crashed: (error) => `The demo dataset run failed: ${errorName(error)}`,
+  crashed: failureLine,
   execute: async ({ command: args }) => {
     let secrets;
     try {
@@ -40,8 +41,8 @@ export const demoDatasetCommand = defineCommand({
 
         return outcome.report.exitCode;
       },
-      // Reported by its name only: no URL, no stack, no password.
-      failed: (error) => fail(`The demo dataset run failed: ${errorName(error)}`),
+      // Reported by its name and, for a database failure, its code (demo-dataset-failure.ts): no URL, no stack, no password.
+      failed: (error) => fail(failureLine(error)),
     });
   },
 });

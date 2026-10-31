@@ -41,14 +41,14 @@ export async function trySessionAdvisoryLock(
 
   let released = false;
   return {
+    // Never throws (A-04): when the connection already broke, the server dropped the session and the lock with it, and
+    // end() closes the session in any other case, so a failed unlock cannot leave the lock held. A throw here would
+    // replace the caller's own result (a whole report) with this error.
     release: async () => {
       if (released) return;
       released = true;
-      try {
-        await client.query('SELECT pg_advisory_unlock(hashtextextended($1, 0))', [name]);
-      } finally {
-        await client.end().catch(() => undefined);
-      }
+      await client.query('SELECT pg_advisory_unlock(hashtextextended($1, 0))', [name]).catch(() => undefined);
+      await client.end().catch(() => undefined);
     },
   };
 }

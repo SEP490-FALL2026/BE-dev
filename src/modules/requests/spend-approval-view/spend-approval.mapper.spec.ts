@@ -45,6 +45,7 @@ const lookups = (extra: Partial<QueueLookups> = {}): QueueLookups => ({
   ]),
   units: new Map([['VND', 0]]),
   centers: [{ id: 'cc-1', code: 'CC-01' }] as unknown as QueueLookups['centers'],
+  due: new Map([['step-1', '2026-10-05']]),
   ...extra,
 });
 
@@ -53,7 +54,9 @@ describe('a row of the queue of the spending approver (US-06-01 AC-1)', () => {
     expect(approvalSummaryOf(row(), lookups())).toMatchObject({
       requestId: 'req-1',
       stepId: 'step-1',
+      stepKind: 'SPEND_APPROVAL',
       openedAt: '2026-10-01T02:00:00.000Z',
+      dueOn: '2026-10-05',
       plan: { planId: 'plan-1', planName: 'Team', applicationName: 'Tool' },
       softwareName: null,
       lineCount: 1,
@@ -84,8 +87,11 @@ describe('a row of the queue of the spending approver (US-06-01 AC-1)', () => {
     ['the requester is not found', { people: new Map() }],
     ['the person it is for is not found', { people: new Map([['emp-1', person('emp-1')]]) }],
     ['the Cost Center is not found', { centers: [] }],
+    ['the deadline was not counted', { due: new Map() }],
   ])('refuses a step that points at a record that is missing: %s', (_label, missing) => {
-    expect(() => approvalSummaryOf(row(), lookups(missing as Partial<QueueLookups>))).toThrow('missing record');
+    expect(() => approvalSummaryOf(row(), lookups(missing as Partial<QueueLookups>))).toThrow(
+      /missing record|no deadline/,
+    );
   });
 });
 

@@ -19,6 +19,7 @@ export const MAX_EVENT_KEY_LENGTH = 200;
 
 const STEP = ['requestId', 'stepKind'] as const;
 const REMINDER_NUMBERS = ['reminderNumber', 'ageWorkingDays', 'overdueWorkingDays'] as const;
+const HANDOVER = ['dutyId', 'assignmentId', 'employeeId', 'role', 'dueOn'] as const;
 
 /**
  * The parameter keys each code may carry: the whole of what a notice says besides its code and its subject. A notice with a
@@ -82,6 +83,41 @@ export const PARAM_KEYS_BY_CODE: Readonly<Record<InAppNotificationCode, readonly
   BUDGET_PROPOSAL_CLOSED_YEAR_END: ['proposalId', 'costCenterId', 'year'],
   BUDGET_PROPOSAL_TASK_ASSIGNED: ['costCenterId', 'departmentId', 'year'],
   BUDGET_PROPOSAL_TASK_WAITING: ['proposalId', 'costCenterId', 'year'],
+  // The alerts of the rights (`a03-license-inbox-alerts`): the right, the person, the day and the role asked; never a key, an
+  // account identifier, a price or the text of a note.
+  LICENSE_EXPIRY_REMINDER: ['assignmentId', 'holderEmployeeId', 'planId', 'expectedEndDate', 'audience'],
+  HANDOVER_CONFIRMATION_DUE: HANDOVER,
+  HANDOVER_CONFIRMATION_OVERDUE: HANDOVER,
+  SERVICE_ACCOUNT_RESPONSIBLE_DUE: ['employeeId', 'fileKind', 'fileId', 'dueOn', 'accountCount'],
+  SERVICE_ACCOUNT_RESPONSIBLE_OVERDUE: [
+    'assignmentId',
+    'employeeId',
+    'owningDepartmentId',
+    'fileKind',
+    'fileId',
+    'dueOn',
+  ],
+  LEAVER_K1_ACCESS_RUNS_ON: ['taskId', 'assignmentId', 'employeeId', 'planId', 'accessUntil'],
+  // The renewal of a subscription: ids, the milestone and where it comes from, the choice and when it is carried out. The
+  // usage of the seats is only said to be available or not; no figure of money, no person but the recipient.
+  SUBSCRIPTION_RENEWAL_ALERT: [
+    'subscriptionId',
+    'renewalId',
+    'milestoneDays',
+    'baseDate',
+    'noticeBasis',
+    'audience',
+    'decisionRecorded',
+    'outcomeRecorded',
+    'usageData',
+  ],
+  SUBSCRIPTION_RENEWAL_DATA_QUALITY: ['subscriptionId', 'problem'],
+  SUBSCRIPTION_BUSINESS_OWNER_LEFT: ['subscriptionId', 'applicationId'],
+  SUBSCRIPTION_RENEWAL_PROPOSED: ['renewalId', 'subscriptionId', 'choice'],
+  SUBSCRIPTION_RENEWAL_DECIDED: ['renewalId', 'subscriptionId', 'choice', 'executionPoint'],
+  SUBSCRIPTION_RENEWAL_LATE: ['renewalId', 'subscriptionId', 'baseDate'],
+  SUBSCRIPTION_AUTO_RENEWAL_INCIDENT: ['subscriptionId', 'baseDate'],
+  SUBSCRIPTION_EXPIRY_MARKED: ['subscriptionId', 'baseDate', 'endDate'],
 };
 
 /** Whether the code is one of the closed table. */

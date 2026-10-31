@@ -48,6 +48,7 @@ mount nó sau này mới có validation chặt (`REDIS_HOST`, `REDIS_PASSWORD` �
 | T4   | `catalog`, `licensing`                    | Ứng dụng, gói, thuê bao; seat, cấp/thu hồi quyền         |
 | T5   | `budgets`, `requests`, `data-import`      | Ngân sách; Request và chi; import                        |
 | T6   | `personnel`, `onboarding`, `installation` | Vòng đời nhân sự; onboarding; cài đặt, vận hành          |
+| T7   | `dashboards`                              | Trang tổng quan theo vai (chỉ đọc qua facade)            |
 
 Module chỉ import tầng thấp hơn (cạnh cùng tầng được phép: `identity-access → organization`,
 `operating-parameters → finance`, `licensing → catalog`, `requests → budgets`). Khi module dưới cần phản ứng của module
